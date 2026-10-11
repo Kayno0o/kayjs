@@ -106,7 +106,7 @@ export function routeTable(routes: ServedRoute[], settings: LocaleSettings | und
 
   for (const locales of paths.values()) {
     for (const { candidates } of locales.values())
-      candidates.sort((a, b) => Number(isPlain(a)) - Number(isPlain(b)) || a.route.file.localeCompare(b.route.file))
+      candidates.sort((a, b) => Number(isPlain(a)) - Number(isPlain(b)) || (a.route.file < b.route.file ? -1 : Number(a.route.file > b.route.file)))
   }
 
   return { paths, shapes }

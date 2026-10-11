@@ -35,7 +35,8 @@ export async function bootProblems(root: string, options: CheckOptions, feeds: C
       run()
     }
     catch (error) {
-      diagnostics.push({ file, line: 1, column: 1, message: error instanceof Error ? error.message : String(error) })
+      for (const each of error instanceof AggregateError ? error.errors : [error])
+        diagnostics.push({ file, line: 1, column: 1, message: each instanceof Error ? each.message : String(each) })
     }
   }
 

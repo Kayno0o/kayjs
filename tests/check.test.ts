@@ -1021,10 +1021,12 @@ describe('kay check, what the server refuses at boot', () => {
     }
   })
 
-  it('reports a redirect from a path a page serves, a page under a locale prefix, and a public file a page serves', async () => {
+  it('reports a redirect from a path a page serves, a page under a locale prefix, and each public file a page serves', async () => {
     const root = await scratchProject({
       'src/routes/index.kay': 'p hi\n',
       'src/routes/about.kay': 'p about\n',
+      'src/routes/contact.kay': 'p contact\n',
+      'public/contact': 'text\n',
       'src/routes/en/team.kay': 'p team\n',
       'src/messages/fr.ts': 'export default {}\n',
       'src/messages/en.ts': 'export default {}\n',
@@ -1036,6 +1038,7 @@ describe('kay check, what the server refuses at boot', () => {
         ['kay.config.ts', 'kay: src/routes/en/team.kay serves /en/team, under the prefix of the locale en; kay serves every page there already'],
         ['kay.config.ts', 'kay: the redirect from /about takes a path a page serves; remove the redirect or the page'],
         ['public', 'kay: public/about and a page both serve /about'],
+        ['public', 'kay: public/contact and a page both serve /contact'],
       ])
     }
     finally {

@@ -1,6 +1,8 @@
 import type { KayConfig } from '../config'
-import type { GuardFile } from '../server/routes'
+import type { LocaleSettings } from '../runtime/i18n'
+import type { GuardFile, Route } from '../server/routes'
 import type { Command } from './command'
+import { existsSync } from 'node:fs'
 import { relative } from 'node:path'
 import process from 'node:process'
 import { Elysia } from 'elysia'
@@ -17,10 +19,12 @@ import { importModule } from '../server/bundle'
 import { buildingWithoutEnv, PUBLIC_ENV_PATH } from '../server/env'
 import { ERROR_REPORTS } from '../server/errors'
 import { FAVICON_PATHS, faviconSource } from '../server/favicon'
+import { localeCopies, localeSettings, routedSettings } from '../server/i18n'
 import { HEALTH_PATH } from '../server/lifecycle'
 import { registerLoader } from '../server/loader'
 import { SERVICE_WORKER } from '../server/offline'
 import { OPENAPI_PATH, REFERENCE_PATH } from '../server/openapi'
+import { reachesServerIsland } from '../server/prerender'
 import { PREVIEW_ROUTE } from '../server/preview'
 import { routeMounts, scanEndpoints, scanRoutes } from '../server/routes'
 import { ROBOTS, SITEMAP } from '../server/sitemap'
@@ -31,7 +35,7 @@ import { projectRoot } from './command'
 interface Listed {
   methods: string
   path: string
-  kind: 'page' | 'action' | 'endpoint' | 'api' | 'redirect' | 'feed' | 'kay'
+  kind: 'page' | 'action' | 'endpoint' | 'api' | 'plugin' | 'redirect' | 'feed' | 'kay'
   // The file serving it, or what it does when kay serves it.
   by: string
   notes?: string[] | undefined
@@ -39,11 +43,12 @@ interface Listed {
   guards?: string[] | undefined
 }
 
-const ROUTE_METHODS = /^(?:get|post|put|patch|delete|head|all)$/i
+const ROUTE_METHODS = /^(?:get|post|put|patch|delete|head|options|all|ws)$/i
+const PARAM = /:([^/?]+)/g
 const SVG_ICON = '/favicon.svg'
 const MASKABLE_ICON = /^\/icon-maskable-/
 
-// Every route the project serves, as its server would boot, without running a page or a guard: what a URL that does not match was meant to hit.
+// Every route the project serves, as its server would boot, without running a page or a guard: what a URL that does not match was meant to hit. API modules run as they are imported, as the server imports them.
 export const routes: Command = {
   usage: 'routes [dir]',
   options: {},
@@ -58,9 +63,10 @@ export const routes: Command = {
     buildingWithoutEnv()
 
     const config = await loadConfig(root)
-    const listed = [...await appRoutes(root, config), ...await apiRoutes(root, config), ...redirectRoutes(config), ...await feedRoutes(root, config), ...kayRoutes(root, config)]
+    const listed = [...await appRoutes(root, config), ...await apiRoutes(root, config), ...pluginRoutes(config), ...redirectRoutes(config), ...await feedRoutes(root, config), ...kayRoutes(root, config)]
+    const unlisted = unlistedServers(root, config)
 
-    console.log(formatListing(listed))
+    console.log(formatListing(listed) + (unlisted.length === 0 ? '' : `\n\nNot listed: the routes ${unlisted.join(' and ')} ${unlisted.length === 1 ? 'adds' : 'add'} when the server starts.`))
 
     return 0
   },
@@ -72,13 +78,15 @@ async function appRoutes(root: string, config: KayConfig): Promise<Listed[]> {
   const [pages, endpoints] = await Promise.all([scanRoutes(routesDir, mounts), scanEndpoints(routesDir, mounts)])
   const listed: Listed[] = []
   const actionFiles = new Set<string>()
+  const settings = config.i18n && routedSettings(localeSettings(config.i18n), pages)
 
   for (const route of pages) {
-    const server = await serverOf(route.file)
-    const prerender = server?.analysis.page?.settings.get('prerender')
-    const prerendered = prerender !== undefined && server!.source.slice(prerender.value.start, prerender.value.end) !== 'false'
+    const prerendered = await prerenderNote(route)
+    const guards = guardNotes(route.guards, route.open, config)
 
-    listed.push({ methods: 'GET', path: route.pattern, kind: 'page', by: shown(route.file), notes: [...prerendered ? ['prerendered'] : [], ...guardNotes(route.guards, route.open, config)], layouts: route.layouts.map(shown), guards: route.guards.map(guard => shown(guard.file)) })
+    // Each locale's copy, the layouts and guards under the first alone, as every copy shares them.
+    for (const [index, copy] of localeCopies(settings, route.pattern).entries())
+      listed.push({ methods: 'GET', path: withMatchers(copy.path, route), kind: 'page', by: shown(route.file), notes: [...localeNotes(copy, settings), ...prerendered, ...guards], ...index === 0 && { layouts: route.layouts.map(shown), guards: route.guards.map(guard => shown(guard.file)) } })
 
     // A layout's actions once, though every page under it renders it.
     for (const file of [...route.layouts, route.file].filter(file => !actionFiles.has(file))) {
@@ -106,10 +114,11 @@ async function apiRoutes(root: string, config: KayConfig): Promise<Listed[]> {
 
   for (const module of modules) {
     const guards = module.guards.map(guard => shown(guard.file))
-    const notes = guardNotes(module.guards, module.open, config)
+    // A library's module asks no guard of the app, but runs those of its own directory.
+    const notes = guardNotes(module.guards, module.open === true && module.guards.length === 0, config)
 
     try {
-      const instance = (await importModule<{ default?: unknown }>(module.file)).default
+      const instance = (await importApi(module.file)).default
 
       if (!(instance instanceof Elysia))
         throw new Error('it exports no Elysia instance by default')
@@ -123,6 +132,39 @@ async function apiRoutes(root: string, config: KayConfig): Promise<Listed[]> {
   }
 
   return listed
+}
+
+// An API module runs as it is imported: what it prints goes to stderr, off the listing, and its `process.exit()` fails it alone.
+async function importApi(file: string): Promise<{ default?: unknown }> {
+  const { log, info } = console
+  const exit = process.exit.bind(process)
+
+  console.log = console.info = console.error
+  process.exit = (code?: number) => {
+    throw new Error(`it calls process.exit(${code ?? ''})`)
+  }
+
+  try {
+    return await importModule<{ default?: unknown }>(file)
+  }
+  finally {
+    console.log = log
+    console.info = info
+    process.exit = exit
+  }
+}
+
+// The routes of the server plugins extensions give as an Elysia instance; one given as a function is built only as the server starts.
+function pluginRoutes(config: KayConfig): Listed[] {
+  return (config.extensions ?? []).flatMap(({ name, server }) => server instanceof Elysia ? server.routes.filter(route => ROUTE_METHODS.test(route.method)).map(route => ({ methods: route.method.toUpperCase(), path: route.path, kind: 'plugin' as const, by: `the extension ${name}` })) : [])
+}
+
+// What adds routes no file or setting tells of: the server entry, and the extensions' server plugins given as a function.
+function unlistedServers(root: string, config: KayConfig): string[] {
+  const entry = projectPaths(root, config).entry
+  const built = (config.extensions ?? []).filter(({ server }) => typeof server === 'function').map(({ name }) => `the extension ${name}'s server plugin`)
+
+  return [...existsSync(entry) ? [shown(entry)] : [], ...built]
 }
 
 function redirectRoutes(config: KayConfig): Listed[] {
@@ -160,6 +202,33 @@ function kayRoutes(root: string, config: KayConfig): Listed[] {
     ...favicon ? FAVICON_PATHS.filter(path => (path !== SVG_ICON || favicon.svg !== undefined) && (!MASKABLE_ICON.test(path) || favicon.maskable !== undefined)).map(path => kay(path, 'favicon, unless the app serves it')) : [],
     kay(SERVICE_WORKER, 'service worker'),
   ]
+}
+
+// Prerendered with `prerender: true`, or holding a server island; a list or a function names which of its paths are.
+async function prerenderNote(route: Route): Promise<string[]> {
+  const server = await serverOf(route.file)
+  const prerender = server?.analysis.page?.settings.get('prerender')
+  const value = prerender && server!.source.slice(prerender.value.start, prerender.value.end)
+
+  if (value === 'false')
+    return []
+
+  if (value === 'true' || (route.params.length === 0 && await reachesServerIsland(route.file)))
+    return ['prerendered']
+
+  return value === undefined ? [] : ['prerendered as its prerender setting lists']
+}
+
+// A param refusing what its matcher does not take, shown as its file names it: `/items/:id=integer`.
+function withMatchers(path: string, route: Route): string {
+  return path.replace(PARAM, (param, name: string) => route.matchers?.[name] === undefined ? param : `${param}=${route.matchers[name]}`)
+}
+
+function localeNotes(copy: { locale: string | undefined, host?: string }, settings: LocaleSettings | undefined): string[] {
+  if (copy.locale === undefined || settings === undefined)
+    return []
+
+  return [copy.host === undefined ? copy.locale : `${copy.locale} at ${copy.host}`]
 }
 
 function guardNotes(guards: GuardFile[] | { file: string }[], open: boolean | undefined, config: KayConfig): string[] {

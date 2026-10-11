@@ -44,9 +44,9 @@ function urlSegment(name: string): string {
 }
 
 // Each file takes its path, which a page serving it already refuses; the paths an HTML file is also served at give way to anything else, claimed before or after.
-// Every file is claimed before the first clash throws, so `kay check` also reports what clashes with a file listed after it.
+// Every file is claimed before the clashes throw, all of them together, so `kay check` reports each one.
 export function claimPublic(served: ServedPaths, files: PublicFile[]): ClaimedFile[] {
-  let clash: { error: unknown } | undefined
+  const clashes: Error[] = []
   const claimed = files.flatMap((file) => {
     const owner = relative(process.cwd(), file.path)
     const claim = { path: file.url, owner, kind: 'public' as const }
@@ -55,7 +55,7 @@ export function claimPublic(served: ServedPaths, files: PublicFile[]): ClaimedFi
       served.claim(claim, taken => taken.kind === 'page' ? `kay: ${owner} and a page both serve ${file.url}` : `kay: ${taken.owner} and ${owner} both serve ${file.url}`)
     }
     catch (error) {
-      clash ??= { error }
+      clashes.push(error as Error)
 
       return []
     }
@@ -63,8 +63,13 @@ export function claimPublic(served: ServedPaths, files: PublicFile[]): ClaimedFi
     return [{ ...file, claim }]
   })
 
+  const [clash, ...more] = clashes
+
+  if (clash && more.length === 0)
+    throw clash
+
   if (clash)
-    throw clash.error
+    throw new AggregateError(clashes, clashes.map(each => each.message).join('\n'))
 
   const fallbacks = htmlFallbacks(files, new Set()).map(file => ({ ...file, claim: { path: file.url, owner: relative(process.cwd(), file.path), kind: 'public' as const } }))
 

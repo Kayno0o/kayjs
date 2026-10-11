@@ -206,7 +206,7 @@ function revalidatePeriod(file: string, value: unknown): number | undefined {
 }
 
 // Whether the file's template, or that of a component it imports, however deep, marks a server island.
-async function reachesServerIsland(file: string, seen = new Set<string>()): Promise<boolean> {
+export async function reachesServerIsland(file: string, seen = new Set<string>()): Promise<boolean> {
   if (seen.has(file))
     return false
 

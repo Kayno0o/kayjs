@@ -117,7 +117,8 @@ export async function scanApi(apiDir: string, mounts: RouteMount[] = []): Promis
     }
   }
 
-  return modules.sort((a, b) => a.file.localeCompare(b.file))
+  // By code point, as every machine orders them alike.
+  return modules.sort((a, b) => a.file < b.file ? -1 : 1)
 }
 
 // The guards every module runs, the API directory's own first; with none of its own, those of a directory holding every module. A module setting `guards: false` runs none and leaves them as they are.
