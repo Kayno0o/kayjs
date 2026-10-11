@@ -51,8 +51,8 @@ export async function bootProblems(root: string, options: CheckOptions, feeds: C
     refused(config, () => shutdownSeconds(shutdownTimeout))
 
   // An SVG favicon is drawn by `kay build`, which it would fail.
-  for (const { file, message } of await svgFaviconProblems(faviconSource(root, options.favicon, options.manifest)))
-    diagnostics.push({ file, line: 1, column: 1, message })
+  for (const problem of await svgFaviconProblems(faviconSource(root, options.favicon, options.manifest)))
+    diagnostics.push({ line: 1, column: 1, ...problem })
 
   let settings: LocaleSettings | undefined
 

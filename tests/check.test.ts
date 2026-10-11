@@ -1546,7 +1546,7 @@ describe('kay check, unused code', () => {
   })
 
   it('reads the paths named from the current directory, through symlinks, and refuses one outside the project', async () => {
-    const root = await scratchProject({ 'src/a.kay': 'img(src="/a.png")\n', 'src/b.kay': 'img(src="/b.png")\n' })
+    const root = await scratchProject({ 'src/a.kay': 'img(src="/a.png")\n', 'src/b.kay': 'img(src="/b.png")\n', '..foo/c.kay': 'img(src="/c.png")\n' })
     const link = `${root}-link`
     const files = async (result: Promise<{ report: string }>) => (JSON.parse((await result).report) as { problems: { file: string }[] }).problems.map(problem => basename(problem.file))
     const inRoot = async (...args: string[]) => {
@@ -1561,6 +1561,7 @@ describe('kay check, unused code', () => {
 
       expect(await files(inRoot('src/a.kay'))).toEqual(['a.kay'])
       expect(await files(inRoot('src2/b.kay'))).toEqual(['b.kay'])
+      expect(await files(inRoot('..foo'))).toEqual(['c.kay'])
       expect(await files(runCheck(root, '--format', 'json', join(root, 'src2')))).toEqual(['a.kay', 'b.kay'])
       expect(await files(runCheck(root, '--format', 'json', join(link, 'src/a.kay')))).toEqual(['a.kay'])
       expect(await files(runCheck(link, '--format', 'json', join(root, 'src/b.kay')))).toEqual(['b.kay'])
@@ -1638,6 +1639,58 @@ describe('kay check, unused code', () => {
       await chmod(file, 0o644)
       await Bun.write(file, 'p a\n')
       expect(await watch.report()).toMatchObject({ errors: 0 })
+    }
+    finally {
+      await watch.stop()
+      await rm(root, { recursive: true, force: true })
+    }
+  }, 30_000)
+
+  it('keeps watching after a check that exits, as a kay.config.ts calling process.exit(), saying so', async () => {
+    const root = await scratchProject({ 'kay.config.ts': 'if (await Bun.file(import.meta.dir + \'/crash\').exists())\n  process.exit(9)\n\nexport default {}\n', 'src/a.kay': 'p a\n' })
+    const watch = watchChecks(root)
+
+    try {
+      expect(await watch.report()).toMatchObject({ errors: 0 })
+      await Bun.write(join(root, 'crash'), '')
+      await Bun.write(join(root, 'src/a.kay'), 'img(src="/a.png")\n')
+      expect(await watch.report()).toMatchObject({ errors: 1, problems: [{ code: null, message: 'the check stopped with exit code 9 before reporting' }] })
+      await rm(join(root, 'crash'))
+      await Bun.write(join(root, 'src/a.kay'), 'p a\n')
+      expect(await watch.report()).toMatchObject({ errors: 0 })
+    }
+    finally {
+      await watch.stop()
+      await rm(root, { recursive: true, force: true })
+    }
+  }, 30_000)
+
+  it('stops the check running, and what it started, when the watch is interrupted', async () => {
+    const root = await scratchProject({ 'kay.config.ts': 'const started = Bun.spawn([\'sleep\', \'30\'])\n\nawait Bun.write(import.meta.dir + \'/pid\', String(started.pid))\nawait Bun.sleep(30_000)\n\nexport default {}\n' })
+    const watch = watchChecks(root)
+    const pid = join(root, 'pid')
+    const alive = (id: number) => {
+      try {
+        return process.kill(id, 0)
+      }
+      catch {
+        return false
+      }
+    }
+
+    try {
+      while (!await Bun.file(pid).exists())
+        await Bun.sleep(20)
+
+      const started = Number(await Bun.file(pid).text())
+
+      expect(alive(started)).toBe(true)
+      await watch.stop()
+
+      for (let wait = 0; wait < 50 && alive(started); wait++)
+        await Bun.sleep(20)
+
+      expect(alive(started)).toBe(false)
     }
     finally {
       await watch.stop()

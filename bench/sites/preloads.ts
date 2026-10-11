@@ -1,7 +1,7 @@
 import type { Browser } from 'playwright-core'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { chromium } from 'playwright-core'
+import { launch } from '../browser'
 import { median } from '../format'
 import { PROFILES } from './browser'
 import { startNginx, startServer, waitReady } from './serve'
@@ -121,7 +121,7 @@ let browser: Browser | undefined
 
 try {
   await waitReady(variant, server)
-  browser = await chromium.launch({ headless: true })
+  browser = await launch()
 
   const samples = new Map<string, Sample[]>(rewrites.map(([name]) => [name, []]))
 

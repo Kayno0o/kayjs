@@ -10,6 +10,9 @@ export const SEARCH_CHUNK = 16
 export const MIN_WORD = 2
 
 const WORD = /[\p{L}\p{N}]+/gu
+
+// Soft hyphens, zero-width joiners and byte order marks, dropped from a word they sit in, in the index and the query alike; a zero-width space parts words, as in Thai.
+export const INVISIBLE = /[\u00AD\u200C\u2060\uFEFF\u200D]/g
 const MARK = /\p{M}/gu
 // Characters of text kept on either side of the first word found.
 const SNIPPET_BEFORE = 50
@@ -222,7 +225,7 @@ async function fetchJson(path: string): Promise<unknown> {
 }
 
 function fold(text: string): string {
-  return text.normalize('NFKD').replace(MARK, '').toLowerCase()
+  return text.normalize('NFKD').replace(MARK, '').replace(INVISIBLE, '').toLowerCase()
 }
 
 // About a line around the first word found, each word starting as a term does marked.

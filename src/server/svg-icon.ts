@@ -10,8 +10,8 @@ const PERCENT = /%\s*$/
 // Without system fonts, which resvg would otherwise load on every call, for seconds: text in an icon draws no glyph.
 const OPTIONS = { font: { loadSystemFonts: false } }
 
-// Draws the SVG at `file` as a square PNG of each size asked for, once it checked the SVG has a square size to draw at.
-export async function svgIcon(file: string, what: string): Promise<(size: number) => Uint8Array<ArrayBuffer>> {
+// Draws the SVG at `file` as a square PNG of each size asked for, once it checked the SVG has a square size to draw at; what it draws poorly goes to `warn`, kay's log by default.
+export async function svgIcon(file: string, what: string, warn = (message: string) => kayLog('warn', message)): Promise<(size: number) => Uint8Array<ArrayBuffer>> {
   const svg = await readSvg(file, what)
   let parsed: Resvg
 
@@ -33,7 +33,7 @@ export async function svgIcon(file: string, what: string): Promise<(size: number
     throw new Error(`kay: the ${what} ${file} is ${parsed.width}x${parsed.height}; it has to be square`)
 
   if (TEXT.test(markup))
-    kayLog('warn', `the ${what} ${file} has text, which kay draws without fonts, so as nothing; turn the text into paths`)
+    warn(`the ${what} ${file} has text, which kay draws without fonts, so as nothing; turn the text into paths`)
 
   return size => new Uint8Array(new Resvg(svg, { ...OPTIONS, fitTo: { mode: 'width', value: size } }).render().asPng())
 }

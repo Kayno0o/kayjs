@@ -245,10 +245,10 @@ describe('the search index', () => {
     expect((await search(dir, 'againword')).hits.map(hit => hit.href)).toEqual(['/plain#a%20b'])
   })
 
-  it('keeps a heading\'s own marks and the text of a link wrapping it, leaves out a mark linking to it, and joins a word split by a soft hyphen or a zero-width character', async () => {
+  it('keeps a heading\'s own marks and the text of a link wrapping it, leaves out a mark linking to it, and joins a word split by a soft hyphen or a zero-width joiner, in the text and the query, where a zero-width space parts two', async () => {
     const dir = await index([{
       path: '/marks',
-      html: '<main><h1>Marks</h1><h2 id="c">Using C#</h2><p>Sharpword</p><h2 id="r">Rules §</h2><p>Sectionword</p><h2 id="m">Install<a class="headerlink" href="#m">&para;</a></h2><p>Pilcrowword</p><h2 id="z"><a href="#z">&ZeroWidthSpace;</a>Setup</h2><p>Spaceword</p><h2 id="w"><a href="#w">Wrapped heading</a></h2><p>Wrapword</p><p>co&shy;operate and zero\u200Bwidth</p></main>',
+      html: '<main><h1>Marks</h1><h2 id="c">Using C#</h2><p>Sharpword</p><h2 id="r">Rules §</h2><p>Sectionword</p><h2 id="m">Install<a class="headerlink" href="#m">&para;</a></h2><p>Pilcrowword</p><h2 id="z"><a href="#z">&ZeroWidthSpace;</a>Setup</h2><p>Spaceword</p><h2 id="w"><a href="#w">Wrapped heading</a></h2><p>Wrapword</p><p>co&shy;operate and zero\u200Bwidth</p><p>Persian \u0645\u06CC\u200C\u062E\u0648\u0627\u0647\u0645</p></main>',
     }])
     const headings = async (word: string) => (await search(dir, word)).hits.map(hit => hit.heading)
 
@@ -258,6 +258,9 @@ describe('the search index', () => {
     expect(await headings('wrapword')).toEqual(['Wrapped heading'])
     expect(await headings('spaceword')).toEqual(['Setup'])
     expect((await search(dir, 'cooperate')).hits).toHaveLength(1)
-    expect((await search(dir, 'zerowidth')).hits).toHaveLength(1)
+    expect((await search(dir, 'co\u00ADoperate')).hits).toHaveLength(1)
+    expect((await search(dir, 'zero width')).hits).toHaveLength(1)
+    expect((await search(dir, 'zerowidth')).hits).toHaveLength(0)
+    expect((await search(dir, '\u0645\u06CC\u200C\u062E\u0648\u0627\u0647\u0645')).hits).toHaveLength(1)
   })
 })

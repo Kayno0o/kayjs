@@ -194,7 +194,7 @@ describe('favicon', () => {
     expect((await readdir(join(scratch, 'built-only-svg'))).sort()).toEqual(['apple-touch-icon.png', 'favicon.ico', 'favicon.svg', 'icon-192.png', 'icon-512.png'])
   })
 
-  it('reads an SVG\'s size off its root tag past a comment and a quoted >, and warns of text, which it draws as nothing', async () => {
+  it('reads an SVG\'s size off its root tag past a comment and a quoted >, and warns of text, which it draws as nothing, as kay check does without logging it', async () => {
     const commented = join(scratch, 'commented.svg')
     const lettered = join(scratch, 'lettered.svg')
 
@@ -209,6 +209,9 @@ describe('favicon', () => {
       await faviconFiles({ image: lettered, svg: lettered })
 
       expect(warned).toHaveBeenCalledWith(`kay: the favicon ${lettered} has text, which kay draws without fonts, so as nothing; turn the text into paths`)
+      warned.mockClear()
+      expect((await bootProblems(scratch, { favicon: 'lettered.svg' })).filter(problem => problem.file === lettered)).toEqual([{ file: lettered, line: 1, column: 1, severity: 'warning', message: `kay: the favicon ${lettered} has text, which kay draws without fonts, so as nothing; turn the text into paths` }])
+      expect(warned).not.toHaveBeenCalled()
     }
     finally {
       warned.mockRestore()

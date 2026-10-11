@@ -1,7 +1,7 @@
 import type { SearchLanguage, SearchManifest, SearchSection } from '../runtime/search'
 import { mkdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
-import { MIN_WORD, SEARCH_CHUNK, SEARCH_DIR, SEARCH_MANIFEST, searchShard, searchWords } from '../runtime/search'
+import { INVISIBLE, MIN_WORD, SEARCH_CHUNK, SEARCH_DIR, SEARCH_MANIFEST, searchShard, searchWords } from '../runtime/search'
 import { ASSET_PREFIX } from './assets'
 
 // A page `kay build` rendered, and how much its words count, its `search: { weight }`.
@@ -73,9 +73,7 @@ const ENTITIES: Record<string, string> = {
 }
 const MAX_CODE_POINT = 0x10FFFF
 // What a link to its own heading shows beside the heading's text, left out of it: a mark, or nothing visible.
-const ANCHOR_MARKS = /^[\s#¶§]*$/
-// Soft hyphens and zero-width characters, which would otherwise split the word they sit in.
-const INVISIBLE = /[\u00AD\u200B-\u200D\u2060\uFEFF]/g
+const ANCHOR_MARKS = /^[\s#¶§\u200B]*$/
 const SPACES = /\s+/g
 // Characters past which the file of a two-letter start is split by three.
 const SHARD_SIZE = 16_384
@@ -125,7 +123,7 @@ export async function writeSearchIndex(clientDir: string, pages: SearchPage[]): 
       into.set(shard, entries)
     }
 
-    for (const [word, postings] of [...words].sort(([a], [b]) => a.localeCompare(b)))
+    for (const [word, postings] of [...words].sort(([a], [b]) => a < b ? -1 : 1))
       put(byTwo, searchShard(word), word, postings)
 
     // A large file of two letters is split by three, its words of two letters left in it; a file of three letters stays whole, however large, as a query knows no longer one.

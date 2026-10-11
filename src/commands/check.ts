@@ -75,7 +75,7 @@ export const check: Command = {
       ]
 
       // The text report goes to stderr; the other formats are left whole for what reads them.
-      await watchChecks(root, [CLI, 'check', ...positionals, ...flags, '--format', format], format === 'text' && process.stderr.isTTY)
+      await watchChecks(root, [CLI, 'check', ...positionals, ...flags, '--format', format], format)
 
       return 0
     }
@@ -102,8 +102,9 @@ export const check: Command = {
 }
 
 // Checks now and again on every change to the project, its tests included, a change during a check bringing one more; until interrupted.
-// Each check is a `kay check` of its own, so an edit to kay.config.ts or a module it imports is read again, which a process's import cache would not, and a check that throws leaves the watch going.
-async function watchChecks(root: string, args: string[], clear: boolean): Promise<never> {
+// Each check is a `kay check` of its own, so an edit to kay.config.ts or a module it imports is read again, which a process's import cache would not, and a check that throws or exits leaves the watch going.
+async function watchChecks(root: string, args: string[], format: ProblemFormat): Promise<never> {
+  const clear = format === 'text' && process.stderr.isTTY
   let changed = false
   let running: Promise<void> | undefined
   let timer: Timer | undefined
@@ -115,20 +116,31 @@ async function watchChecks(root: string, args: string[], clear: boolean): Promis
       if (clear)
         process.stderr.write(CLEAR_SCREEN)
 
-      child = Bun.spawn([process.execPath, ...args], { stdio: ['ignore', 'inherit', 'inherit'] })
-      await child.exited
+      // A process group of its own, so an interrupt stops what it runs too, such as the type checker.
+      child = Bun.spawn([process.execPath, ...args], { stdio: ['ignore', 'inherit', 'inherit'], detached: true })
+
+      const code = await child.exited
+
+      // A config or a module it imports calling `process.exit()`, or a crash, leaves no report of its own.
+      if (code > 1 && child.signalCode === null)
+        printFailure('check', `the check stopped with exit code ${code} before reporting`, format)
     } while (changed)
 
     child = undefined
     running = undefined
   }
 
-  for (const [signal, code] of [['SIGINT', 130], ['SIGTERM', 143]] as const) {
-    process.once(signal, () => {
-      child?.kill()
-      process.exit(code)
-    })
+  const stop = async (signal: NodeJS.Signals, code: number) => {
+    if (child) {
+      process.kill(-child.pid, signal)
+      await child.exited
+    }
+
+    process.exit(code)
   }
+
+  for (const [signal, code] of [['SIGINT', 130], ['SIGTERM', 143]] as const)
+    process.once(signal, () => void stop(signal, code))
 
   running = checks()
   watchProject(root, () => {

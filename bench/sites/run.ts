@@ -6,7 +6,7 @@ import type { Variant } from './sites'
 import type { Weight } from './weigh'
 import { cpus } from 'node:os'
 import { join } from 'node:path'
-import { chromium } from 'playwright-core'
+import { launch } from '../browser'
 import { kilobytes, milliseconds, table } from '../format'
 import { PROFILES, vitals } from './browser'
 import { buildCommands, footprint, timeBuild } from './build'
@@ -65,7 +65,7 @@ const lab = await startAll()
 let browser: Browser
 
 try {
-  browser = await chromium.launch({ headless: true })
+  browser = await launch()
 }
 catch (error) {
   lab.stop()

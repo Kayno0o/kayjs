@@ -103,23 +103,25 @@ async function drawer(image: string, what: string): Promise<(size: number) => Pr
 }
 
 // The SVG's drawing, through a module an executable leaves out, as it serves the icons `kay build` drew.
-async function svgIconOf(file: string, what: string): Promise<(size: number) => Uint8Array<ArrayBuffer>> {
+async function svgIconOf(file: string, what: string, warn?: (message: string) => void): Promise<(size: number) => Uint8Array<ArrayBuffer>> {
   const { svgIcon } = await import('./svg-icon')
 
-  return svgIcon(file, what)
+  return svgIcon(file, what, warn)
 }
 
-// What `kay check` reports of a favicon or maskable icon given as an SVG: one with no size, not square or not drawable.
-export async function svgFaviconProblems(source: FaviconSource | undefined): Promise<{ file: string, message: string }[]> {
+// What `kay check` reports of a favicon or maskable icon given as an SVG: one with no size, not square or not drawable, and a warning for one with text.
+export async function svgFaviconProblems(source: FaviconSource | undefined): Promise<{ file: string, message: string, severity?: 'warning' }[]> {
   const icons: [string | undefined, string][] = [[source?.image, 'favicon'], [source?.maskable, 'maskable icon']]
   const problems = await Promise.all(icons.map(async ([file, what]) => {
     if (file === undefined || !SVG_FILE.test(file))
       return []
 
     try {
-      await svgIconOf(file, what)
+      const warnings: string[] = []
 
-      return []
+      await svgIconOf(file, what, message => warnings.push(message))
+
+      return warnings.map(message => ({ file, message: `kay: ${message}`, severity: 'warning' as const }))
     }
     catch (error) {
       return [{ file, message: error instanceof Error ? error.message : String(error) }]
