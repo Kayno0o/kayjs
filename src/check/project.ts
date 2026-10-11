@@ -139,7 +139,7 @@ async function checkMessages(root: string, config: I18nConfig | undefined, exten
 }
 
 // The collections' entries that fail to compile or to match their schema, the components their entries use and the feeds they serve.
-async function checkContent(root: string, config: string | undefined, site: boolean): Promise<{ problems: CheckDiagnostic[], uses: ComponentUse[], feeds: CollectionFeed[] }> {
+export async function checkContent(root: string, config: string | undefined, site: boolean): Promise<{ problems: CheckDiagnostic[], uses: ComponentUse[], feeds: CollectionFeed[] }> {
   if (config === undefined && !existsSync(projectPaths(root).content))
     return { problems: [], uses: [], feeds: [] }
 

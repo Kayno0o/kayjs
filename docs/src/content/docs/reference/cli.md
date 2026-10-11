@@ -17,6 +17,7 @@ bun run dev
 | `kay dev [dir]` | Run the server, restarting on change, with errors shown in the browser |
 | `kay build [dir]` | Check the project and bundle the browser code for production |
 | `kay check [dir]` | Type-check the project, `.kay` files included |
+| `kay routes [dir]` | List every route the project serves, and the file serving it |
 | `kay explain [lint\|group]` | List the lints, or a group's, or explain one |
 | `kay fmt [paths]` | Format `.kay` files |
 | `kay migrate astro [dir]` | Translate an Astro project into a kay one |
@@ -153,7 +154,7 @@ kay check src/routes/blog src/lib/feed.ts   # only the problems in those
 kay check --watch
 ```
 
-The first path is the project when it holds a `kay.config.ts`, a `package.json` or a `tsconfig.json`; the other paths, relative to the current directory, narrow the report to the problems in those files and directories. The project is still type-checked as a whole.
+The first path is the project when it is a directory holding a `kay.config.ts`, a `package.json` or a `tsconfig.json`, or outside the current directory; the other paths, relative to the current directory, narrow the report to the problems in those files and directories. The project is still type-checked as a whole.
 
 | Option | Effect |
 | --- | --- |
@@ -166,6 +167,24 @@ The first path is the project when it holds a `kay.config.ts`, a `package.json` 
 | `--entry <file>` | The server entry whose `app` types `ctx.locals`, `src/server.ts` by default |
 
 `kay check` and its lints have their [own page](/reference/checks).
+
+## kay routes
+
+```sh
+kay routes
+```
+
+```
+GET   /admin/report               page      src/routes/admin/report.kay, prerendered
+      layouts src/routes/_layout.kay > src/routes/admin/_layout.kay
+      guards  src/routes/admin/_guard.ts
+POST  /_kay/action/src/routes/index.kay/add  action  src/routes/index.kay add
+GET   /api/items                  api       src/api/items.ts
+GET   /old                        redirect  308 to /
+GET   /_kay/health                kay       health check
+```
+
+It lists every route the project serves in production, without starting the server or running a page or a guard: each page with its layouts and guards, outermost first, and `prerendered` when it sets `prerender`; each action of a page or a layout; each endpoint; each route of an API module, with its method; each redirect and collection feed; and the routes kay serves itself as the config turns them on, such as `/_kay/health`, the favicons and the sitemap. A route that sets `guards: false` is marked `open`, and one that `requireGuards` refuses with a 403 says so. API modules are the one thing it runs, as their routes are only known once their Elysia instance is built; one that fails to load, as without the server's environment, is listed by its mount with the error. Patterns are shown as the router reads them, before a locale's prefix.
 
 ## kay migrate
 
