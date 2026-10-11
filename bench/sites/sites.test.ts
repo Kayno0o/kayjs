@@ -1,4 +1,7 @@
 import type { Site, Variant } from './sites'
+import { copyFileSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 import { envOf, staleWarning, wantedSource } from './sites'
 
@@ -25,5 +28,20 @@ describe('envOf', () => {
     expect(envOf(variant({ env: { SITE_URL: 'https://bakery.example' } }, 'kay'))).toEqual({ SITE_URL: 'https://bakery.example' })
     expect(envOf(variant({ env: v => ({ DATABASE: `bakery_${v.kind}`, API_URL: `http://127.0.0.1:${v.ports.sidecar}` }) }, 'astro'))).toEqual({ DATABASE: 'bakery_astro', API_URL: 'http://127.0.0.1:47561' })
     expect(envOf(variant({}, 'kay'))).toEqual({})
+  })
+})
+
+describe('SITES', () => {
+  it('loads a config importing another checkout\'s copy of sites.ts, which reads none itself', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'kay-bench-config-'))
+    const config = join(dir, 'sites.config.ts')
+
+    mkdirSync(join(dir, 'other'))
+    copyFileSync(join(import.meta.dir, 'sites.ts'), join(dir, 'other/sites.ts'))
+    writeFileSync(config, `import { SITES } from './other/sites'\n\nexport default [{ name: \`bakery \${SITES.length}\`, repo: '.', astro: '', pages: [] }]\n`)
+
+    const child = Bun.spawnSync([process.execPath, '-e', `const { SITES } = await import(${JSON.stringify(join(import.meta.dir, 'sites.ts'))}); console.log(SITES.map(site => site.name).join())`], { env: { ...process.env, SITES_CONFIG: config }, timeout: 5000 })
+
+    expect({ code: child.exitCode, out: child.stdout.toString().trim() }).toEqual({ code: 0, out: 'bakery 0' })
   })
 })

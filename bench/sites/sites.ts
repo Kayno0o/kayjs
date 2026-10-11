@@ -67,12 +67,14 @@ export interface Manifest {
 
 const EXAMPLE = join(import.meta.dir, 'sites.config.example.ts')
 const CONFIG = resolve(parseArgs({ args: Bun.argv.slice(2), options: { config: { type: 'string' } }, strict: false }).values.config as string | undefined ?? process.env.SITES_CONFIG ?? join(import.meta.dir, 'sites.config.ts'))
+// Set while the config loads: a config importing another checkout's copy of this file makes that copy wait on the config again, a cycle Bun spins on rather than failing.
+const LOADING = Symbol.for('kay-bench-sites-config')
 
 // Outside any project: inside this repository, the sites' Tailwind and Vite would scan kay's own files, and kay's tests would scan the sites'.
 export const WORK = join(process.env.XDG_CACHE_HOME ?? join(homedir(), '.cache'), 'kay-bench-sites')
 
-// None without a config, which run.ts reports; the bench's tests read none.
-export const SITES: Site[] = existsSync(CONFIG) ? ((await import(CONFIG)) as { default: Site[] }).default.map(site => ({ ...site, repo: resolve(dirname(CONFIG), site.repo) })) : []
+// None without a config, which run.ts reports, and none in a copy the config itself imports; the bench's tests read none.
+export const SITES: Site[] = existsSync(CONFIG) && !(LOADING in globalThis) ? await sitesOf(CONFIG) : []
 export const NO_SITES = `no sites to measure: write ${CONFIG} after ${EXAMPLE}, or pass --config <file>`
 
 // `KIND=kay` measures the kay side only, keeping the Astro figures of an earlier run; the ports stay those of a full run.
@@ -101,6 +103,17 @@ export function envOf(variant: Variant): Record<string, string> {
   const env = variant.site.env
 
   return typeof env === 'function' ? env(variant) : env ?? {}
+}
+
+async function sitesOf(config: string): Promise<Site[]> {
+  Object.assign(globalThis, { [LOADING]: true })
+
+  try {
+    return ((await import(config)) as { default: Site[] }).default.map(site => ({ ...site, repo: resolve(dirname(config), site.repo) }))
+  }
+  finally {
+    Reflect.deleteProperty(globalThis, LOADING)
+  }
 }
 
 function oneOf<const Value extends string>(name: string, values: readonly Value[]): Value | undefined {
