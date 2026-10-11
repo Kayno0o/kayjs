@@ -3,10 +3,13 @@ import { mkdtemp, readdir, rename, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it, spyOn } from 'bun:test'
+import { Elysia } from 'elysia'
 import { outputDir } from '../src/build/assets'
 import { bootProblems } from '../src/check/boot'
 import { pages } from '../src/server'
-import { FAVICON_DIR, faviconFiles, manifestJson, writeFavicons } from '../src/server/favicon'
+import { FAVICON_DIR, faviconFiles, manifestJson, serveFavicons, writeFavicons } from '../src/server/favicon'
+import { ServedPaths } from '../src/server/served-paths'
+import { scratchDir } from './scratch'
 
 const ROUTES = 'tests/fixtures/seo/src/routes'
 const SOURCE = 'tests/fixtures/seo/src/favicon.png'
@@ -222,6 +225,32 @@ describe('favicon', () => {
 
       if (hadBuild)
         await rename(aside, built)
+    }
+  })
+
+  it('serves the icons a build wrote where it is given them, and draws the source\'s where it is not', async () => {
+    const dir = await scratchDir('favicon-')
+    const built = join(dir, FAVICON_DIR)
+    const old = join(dir, 'old.svg')
+    const current = join(dir, 'current.svg')
+    const served = async (builtDir?: string) => {
+      const own = new Elysia()
+
+      serveFavicons(own, new ServedPaths(), { source: { image: current, svg: current }, builtDir })
+
+      return (await own.handle(new Request('http://localhost/favicon.svg'))).text()
+    }
+
+    try {
+      await Bun.write(old, '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" fill="#c00"/></svg>')
+      await Bun.write(current, '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" fill="#0c0"/></svg>')
+      await writeFavicons({ image: old, svg: old }, built)
+
+      expect(await served(built)).toBe(await Bun.file(old).text())
+      expect(await served()).toBe(await Bun.file(current).text())
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
     }
   })
 
