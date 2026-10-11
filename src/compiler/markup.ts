@@ -16,11 +16,17 @@ const STATIC_ATTRIBUTE = /["<]|&(?!(?:#\d+|#x[\da-f]+|[a-z][a-z\d]*);)/gi
 const ATTRIBUTE_ENTITY: Record<string, string> = { '"': '&quot;', '<': '&lt;', '&': '&amp;' }
 // The attributes naming URLs of the site, which a path from its root in goes under its base.
 const BASED = new Set([...URL_ATTRIBUTES, 'srcset'])
-const ROOT_PATH = /(?:^|,)\s*\/(?!\/)/
+// A `srcset` URL from the root, `/a.png 2x` after the start or a comma.
+const SRCSET_ROOT_PATH = /(?:^|,)\s*\/(?!\/)/
 
 // Around a dynamic part of an island's markup, so the browser finds where it starts and ends.
 export const START_MARKER = `<!--${PART_START}-->`
 export const END_MARKER = `<!--${PART_END}-->`
+
+// A path from the site's root, `/about`, rather than `//cdn.example/a.js` on another host.
+export function fromRoot(url: string): boolean {
+  return url.startsWith('/') && !url.startsWith('//')
+}
 
 // The name a runtime helper is imported under.
 export function helperName(helper: string): string {
@@ -113,11 +119,8 @@ export abstract class TemplateWriter {
       described,
     }
 
-    if (element.classes.length > 0) {
-      const shorthand = this.shorthand(element)
-
-      plan.classes = classAttribute?.kind === 'expression' ? { text: shorthand, expression: classAttribute.expression } : { text: classAttribute?.kind === 'static' ? `${shorthand} ${decodeEntities(classAttribute.text)}` : shorthand }
-    }
+    if (element.classes.length > 0)
+      plan.classes = classAttribute?.kind === 'expression' ? { text: this.shorthand(element), expression: classAttribute.expression } : { text: this.staticClass(element, classAttribute) }
 
     for (const attribute of element.attributes) {
       if (attribute.kind === 'spread' || (plan.classes && attribute === classAttribute) || attribute === sizes)
@@ -157,7 +160,7 @@ export abstract class TemplateWriter {
           plan.staticContent = escapeText(text)
           plan.valueText = attributeName === 'value' ? text : undefined
         }
-        else if (BASED.has(attributeName) && ROOT_PATH.test(text)) {
+        else if (BASED.has(attributeName) && (attributeName === 'srcset' ? SRCSET_ROOT_PATH.test(text) : fromRoot(text))) {
           plan.attributes.push({ kind: 'rooted', name: attributeName, text })
         }
         else {
@@ -332,7 +335,7 @@ export abstract class TemplateWriter {
     const shorthand = element.classes.length > 0 ? this.shorthand(element) : undefined
 
     if (!spreads && classAttribute?.kind !== 'expression') {
-      b.add(JSON.stringify(classAttribute?.kind === 'static' ? `${shorthand} ${decodeEntities(classAttribute.text)}` : shorthand))
+      b.add(JSON.stringify(this.staticClass(element, classAttribute)))
 
       return
     }
@@ -397,6 +400,13 @@ export abstract class TemplateWriter {
 
   protected shorthand(element: ElementNode): string {
     return element.classes.map(span => this.source(span)).join(' ')
+  }
+
+  // The shorthand merged with a static `class` into one string.
+  protected staticClass(element: ElementNode, classAttribute: NamedAttribute | undefined): string {
+    const shorthand = this.shorthand(element)
+
+    return classAttribute?.kind === 'static' ? `${shorthand} ${decodeEntities(classAttribute.text)}` : shorthand
   }
 
   // The `sizes` of an `img` whose `src` goes through the image helper, which caps it for dense screens, so the loop leaves it out.

@@ -252,6 +252,24 @@ describe('elements', () => {
   })
 })
 
+describe('links from the root', () => {
+  const ISLAND = '---\nconst n = signal(0)\n---\n'
+
+  it('leaves a link to another host as written, and reads a path from the root through its entities', () => {
+    const html = compileKay('a(href="//cdn.example/x") X\na(href=" /y") Y\na(href="x,/y") Z\na(href="&#47;docs") D\n', 'page.kay', { output: 'html' }).tsx
+    const dom = compileKay(`${ISLAND}a(href="//cdn.example/x") X\na(href="&#47;docs") D\nimg(srcset="/a.png 1x, /b.png 2x" alt="")\n`, 'page.kay', { output: 'dom' }).tsx
+
+    expect(html).toContain('<a href=\\"//cdn.example/x\\">X</a>')
+    expect(html).toContain('<a href=\\" /y\\">Y</a>')
+    expect(html).toContain('<a href=\\"x,/y\\">Z</a>')
+    expect(html).toContain('KayAttribute("href", KayLocalHref("/docs"))')
+    expect(html).not.toContain('KayLocalHref("//')
+    expect(dom).toContain('<a href=\\"//cdn.example/x\\">X</a>')
+    expect(dom).toContain('"href", "/docs");')
+    expect(dom).toContain('"srcset", "/a.png 1x, /b.png 2x");')
+  })
+})
+
 describe('islands', () => {
   it('rejects hydrate inside an island, which hydrates as a whole', () => {
     expect(errors('---\nimport { signal } from "kay"\nimport Counter from "./counter.kay"\n---\nCounter(hydrate="visible")')).toEqual([expect.stringContaining('`hydrate` has no effect inside an island')])

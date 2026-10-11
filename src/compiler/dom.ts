@@ -410,7 +410,10 @@ export class DomTemplate extends TemplateWriter {
             })
 
             break
+          // Set once the options are in.
           case 'selected':
+            selected = attribute.expression
+
             break
           case 'value':
             own.push((variable) => {
@@ -437,9 +440,6 @@ export class DomTemplate extends TemplateWriter {
         contentBinding = variable => b.add(`KayEffect(() => KayProperty(${variable(node)}, ${JSON.stringify(property)}, (`).addSource(expression).add(')));')
       }
 
-      if (plan.selected && !plan.selected.bound)
-        selected = plan.selected.expression
-
       if (action) {
         if (action.method)
           html += ' method="post"'
@@ -447,7 +447,7 @@ export class DomTemplate extends TemplateWriter {
         if (action.enctype)
           html += ' enctype="multipart/form-data"'
 
-        if (described && !field)
+        if (described)
           own.push(variable => b.add(`KayEffect(() => KayProperty(${variable(node)}, "aria-describedby", KayFormInvalid((`).addSource(action.expression).add(`), ""${describedValue(described)}));`))
       }
 

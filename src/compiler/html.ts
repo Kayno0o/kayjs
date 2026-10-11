@@ -4,7 +4,7 @@ import type { CodeBuilder } from './mapping'
 import { actionOf, keyedByPosition, marksServerIsland, serverIslandOf } from './ast'
 import { decodeEntities } from './expression'
 import { childItems, constDeclaration, errorParagraphArguments, slotValue, soleDynamic } from './items'
-import { BEHAVIOUR, describedValue, END_MARKER, escapeStaticAttribute, escapeText, helperName, RAW_ELEMENTS, START_MARKER, TemplateWriter, VOID_ELEMENTS } from './markup'
+import { BEHAVIOUR, describedValue, END_MARKER, escapeStaticAttribute, escapeText, fromRoot, helperName, RAW_ELEMENTS, START_MARKER, TemplateWriter, VOID_ELEMENTS } from './markup'
 
 // The `kay/html` helpers static server output calls, each imported under a `Kay` name.
 const HTML_HELPERS = ['attempt', 'attribute', 'child', 'className', 'component', 'componentClass', 'currentPage', 'dynamic', 'element', 'errorParagraph', 'formConstraints', 'head', 'imageAttributes', 'localHref', 'loop', 'memo', 'merge', 'nonEmptyAttribute', 'omit', 'raw', 'refillOptions', 'selectOptions', 'serverIsland', 'show', 'style', 'untrack']
@@ -615,7 +615,7 @@ export class HtmlTemplate extends TemplateWriter {
 
     const local = this.localLink(element)
 
-    if (href?.kind === 'static' && decodeEntities(href.text).startsWith('/'))
+    if (href?.kind === 'static' && fromRoot(decodeEntities(href.text)))
       markup.dynamic(() => this.b.add(`${helperName('currentPage')}(${local ? `${helperName('localHref')}(` : ''}${JSON.stringify(decodeEntities(href.text))}${local ? ')' : ''})`))
     else if (href?.kind === 'expression')
       markup.dynamic(() => this.b.add(`${helperName('currentPage')}(${local ? `${helperName('localHref')}(` : ''}(`).addSource(href.expression).add(local ? ')))' : '))'))

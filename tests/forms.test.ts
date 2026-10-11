@@ -137,6 +137,8 @@ describe('the messages a refused form is described by', () => {
     const { tsx } = compileKay(FORM, 'page.kay', { output: 'dom' })
 
     expect(tsx).toContain('"aria-describedby", KayFormInvalid((add), "title") ? "help add-title-error" : "help"));')
+    // The effect writes the field's own description, which the template leaves out.
+    expect(tsx).not.toContain('aria-describedby=\\"help\\"')
     expect(tsx).toContain('"aria-describedby", KayFormInvalid((add), "tag") ? "add-tag-error" : undefined));')
     expect(tsx).toContain('"aria-describedby", KayFormInvalid((add), "") ? "own-form" : undefined));')
     expect(tsx).toContain('<p id=\\"add-tag-error\\">')

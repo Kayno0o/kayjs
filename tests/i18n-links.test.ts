@@ -16,7 +16,7 @@ const SCRIPT_URL = /<(?:script type="module" src|link rel="modulepreload" href)=
 const STATIC_IMPORT = /(?:from|import)\s*"([^"]+\.js)"/g
 
 // Apart from tests/i18n.test.ts, as one process serves one project and this one serves a copy whose island imports nothing of kay/i18n.
-describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('an island of an app with locales', () => {
+describe('an island of an app with locales', () => {
   let copy: string
   let site: TestSite
 
@@ -34,7 +34,7 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('an islan
     await rm(copy, { recursive: true, force: true })
   })
 
-  it('writes the links of an island that imports nothing of kay/i18n in the page\'s locale', async () => {
+  it.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('writes the links of an island that imports nothing of kay/i18n in the page\'s locale', async () => {
     const page = await site.open('/en')
 
     await page.click('button')
