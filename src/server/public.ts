@@ -31,11 +31,12 @@ export async function publicFiles(dir: string): Promise<PublicFile[]> {
 
   const entries = await readdir(dir, { recursive: true, withFileTypes: true })
 
+  // By URL, as the directory's own order changes from one file system to the next.
   return entries.filter(entry => entry.isFile()).map((entry) => {
     const path = join(entry.parentPath, entry.name)
 
     return { path, url: `/${relative(dir, path).split(sep).map(urlSegment).join('/')}` }
-  })
+  }).toSorted((a, b) => a.url < b.url ? -1 : a.url > b.url ? 1 : 0)
 }
 
 function urlSegment(name: string): string {
@@ -43,15 +44,28 @@ function urlSegment(name: string): string {
 }
 
 // Each file takes its path, which a page serving it already refuses; the paths an HTML file is also served at give way to anything else, claimed before or after.
+// Every file is claimed before the first clash throws, so `kay check` also reports what clashes with a file listed after it.
 export function claimPublic(served: ServedPaths, files: PublicFile[]): ClaimedFile[] {
-  const claimed = files.map((file) => {
+  let clash: { error: unknown } | undefined
+  const claimed = files.flatMap((file) => {
     const owner = relative(process.cwd(), file.path)
     const claim = { path: file.url, owner, kind: 'public' as const }
 
-    served.claim(claim, taken => taken.kind === 'page' ? `kay: ${owner} and a page both serve ${file.url}` : `kay: ${taken.owner} and ${owner} both serve ${file.url}`)
+    try {
+      served.claim(claim, taken => taken.kind === 'page' ? `kay: ${owner} and a page both serve ${file.url}` : `kay: ${taken.owner} and ${owner} both serve ${file.url}`)
+    }
+    catch (error) {
+      clash ??= { error }
 
-    return { ...file, claim }
+      return []
+    }
+
+    return [{ ...file, claim }]
   })
+
+  if (clash)
+    throw clash.error
+
   const fallbacks = htmlFallbacks(files, new Set()).map(file => ({ ...file, claim: { path: file.url, owner: relative(process.cwd(), file.path), kind: 'public' as const } }))
 
   return [...claimed, ...fallbacks.filter(file => served.offer(file.claim))]
