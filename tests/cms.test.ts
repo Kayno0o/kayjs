@@ -323,8 +323,10 @@ describe('the collections a CMS edits', () => {
     await readingFrom(base, ['content/pages'], async () => {
       await writeFile(join(base, 'content/pages/broken.json'), '{')
       await writeFile(join(base, 'content/pages/torn.md'), '---\ntitle: [\n---\n\nLost.\n')
+      await writeFile(join(base, 'content/pages/listed.yaml'), '- one\n')
 
       expect((await entries('pages')).find(entry => entry.slug === 'broken')).toEqual({ slug: 'broken', path: expect.stringMatching(/content\/pages\/broken\.json$/), data: undefined, draft: false, problem: expect.stringContaining('content/pages/broken.json:1 the JSON does not parse') })
+      expect((await entries('pages')).find(entry => entry.slug === 'listed')).toMatchObject({ data: undefined, problem: expect.stringMatching(/content\/pages\/listed\.yaml holds a list, not an entry's fields$/) })
       expect(await rejection(entries('articles'))).toMatchObject({ message: expect.stringMatching(/^kay: articles's folder .*content\/articles is missing/) })
       expect((await collections()).find(each => each.name === 'articles')).toMatchObject({ body: { kind: 'markdown' } })
       // The editor writes over a file that does not parse, in its name, a Markdown one keeping the body its frontmatter did not break.
@@ -351,6 +353,7 @@ describe('the collections a CMS edits', () => {
     const schema = t.Object({ title: t.String() })
     const odd = collection({ name: 'odd', load: (() => 'nope') as never }, { schema })
     const slugless = collection({ name: 'slugless', load: (() => [{ data: {} }]) as never }, { schema })
+    const listy = collection({ name: 'listy', load: () => [{ slug: 'a', data: ['x'], html: '' }] }, { schema })
     const broken = collection({ name: 'broken', load: () => {
       throw new Error('the CMS is down')
     } }, { schema })
@@ -359,9 +362,10 @@ describe('the collections a CMS edits', () => {
       throw new Error('no page')
     } })
 
-    await exporting([['odd', odd], ['slugless', slugless], ['broken', broken], ['titled', titled], ['failing', failing]], async () => {
+    await exporting([['odd', odd], ['slugless', slugless], ['listy', listy], ['broken', broken], ['titled', titled], ['failing', failing]], async () => {
       expect(await rejection(entries('odd'))).toMatchObject({ message: 'kay: odd\'s load gave string, not an array of entries' })
       expect(await rejection(entries('slugless'))).toMatchObject({ message: 'kay: slugless\'s load gave an entry with no slug: {"data":{}}' })
+      expect(await entries('listy')).toEqual([{ slug: 'a', data: undefined, draft: false, problem: 'kay: listy\'s entry a holds a list as its data, not an object of fields' }])
       expect((await collections()).find(each => each.name === 'broken')).toMatchObject({ body: { kind: 'markdown' }, problem: 'kay: broken\'s load threw: the CMS is down' })
       expect(await rejection(entries('broken'))).toMatchObject({ message: 'kay: broken\'s load threw: the CMS is down' })
       expect((await collections()).find(each => each.name === 'titled')).not.toHaveProperty('problem')

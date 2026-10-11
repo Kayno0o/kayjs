@@ -259,6 +259,20 @@ describe('kay check, edge cases', () => {
     }
   })
 
+  it('lets a page hand an island the entries and schemas a CMS reads, as they come', async () => {
+    const root = await scratchProject({
+      'src/routes/index.kay': '--- server\nimport { collections, entries } from \'kay/content\'\nimport Editor from \'../editor.kay\'\n\nconst [info] = await collections()\nconst listed = await entries(\'notes\')\n---\nEditor(schema={info!.schema} entries={listed})\n',
+      'src/editor.kay': '---\nimport type { JsonSchema, SourceEntry } from \'kay/content\'\nimport { signal } from \'kay\'\n\nconst { schema, entries } = props<{ schema: JsonSchema, entries: SourceEntry[] }>()\nconst open = signal(0)\n---\nbutton(onClick={() => open.set(open() + 1)}) {Object.keys(schema.properties ?? {}).join()} {entries.map(entry => String(entry.data?.title)).join()}\n',
+    })
+
+    try {
+      expect(await check(root)).toEqual([])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('types a template const, reporting at its line a type error and a name nothing reads', async () => {
     const root = await scratchProject({ 'src/list.kay': '---\nconst { products } = props<{ products: { name: string, cents: number }[] }>()\n---\nfor product of products\n  const price = product.cents.toUpperCase()\n  const { name, cents: _cents } = product\n  const unused = 1\n  li {price} {name}\n' })
 

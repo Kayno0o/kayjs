@@ -18,7 +18,7 @@ import { contentMode, loadEntries } from './load'
 import { compileMarkdown, MarkdownError } from './markdown'
 import { ContentError, decodeEntries } from './validate'
 
-export type { CollectionInfo, EntryFile, EntryPath, FieldKind, SourceEntry, WrittenEntry } from './edit'
+export type { CollectionInfo, DataValue, EntryFile, EntryPath, FieldKind, JsonSchema, SourceEntry, WrittenEntry } from './edit'
 export { collections, entries, entryFile, entrySource, fileField, imageField, markdownField, reference, removeEntry, repositoryRoot, saveEntry } from './edit'
 export type { FeedItem, FeedOptions } from './feed'
 export type { Heading, Highlighter, RenderedMarkdown } from './markdown'

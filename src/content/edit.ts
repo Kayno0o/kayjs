@@ -19,12 +19,32 @@ const saving = new Map<string, Promise<unknown>>()
 // The kinds of string field a CMS edits apart from plain text, as `x-kay: { kind }` in the schema says.
 export type FieldKind = 'image' | 'file' | 'markdown' | 'reference'
 
+// A value an entry's data holds, which an island takes as a prop.
+export type DataValue = string | number | boolean | bigint | null | undefined | Date | DataValue[] | { [key: string]: DataValue }
+
+// A collection's schema as JSON Schema, the keywords a CMS reads typed and the others kept, a field of a kind kay knows carrying `x-kay`.
+export interface JsonSchema {
+  'type'?: string | string[] | undefined
+  'title'?: string | undefined
+  'description'?: string | undefined
+  'properties'?: Record<string, JsonSchema> | undefined
+  'required'?: string[] | undefined
+  'items'?: JsonSchema | undefined
+  'anyOf'?: JsonSchema[] | undefined
+  'const'?: DataValue
+  'enum'?: DataValue[] | undefined
+  'default'?: DataValue
+  'format'?: string | undefined
+  'x-kay'?: { kind: FieldKind, collection?: string | undefined } | undefined
+  [keyword: string]: DataValue | JsonSchema | JsonSchema[] | Record<string, JsonSchema>
+}
+
 export interface CollectionInfo {
   // The name the content config exports it under, which the page's markers and `showDraft` use too.
   name: string
   kind: 'folder' | 'loaded'
   // The schema as JSON Schema, a field of a kind kay knows carrying `x-kay: { kind, collection? }`.
-  schema: Record<string, unknown>
+  schema: JsonSchema
   // Entries hold a Markdown body beside their data: a folder holding Markdown or no entry yet, a loader giving one or no entry yet.
   body?: { kind: 'markdown' } | undefined
   // The components a body may use, by the name it writes them with.
@@ -46,11 +66,12 @@ export interface SourceEntry {
   locale?: string | undefined
   // A folder entry's file, relative to the repository root; absent outside it.
   path?: string | undefined
-  data: unknown
+  // Its fields, absent when `problem` says why.
+  data: Record<string, DataValue> | undefined
   // Its Markdown body as written.
   body?: string | undefined
   draft: boolean
-  // Why a folder entry's file does not parse, its data then left out.
+  // Why a folder entry's file does not parse or its data holds no fields, a list say, its data then left out.
   problem?: string | undefined
   // The path of the page showing it, under the base: the collection's `url`, or the page whose `prerender` lists the collection.
   url?: string | undefined
@@ -443,12 +464,15 @@ async function folderEntries(name: string, dir: string): Promise<Omit<SourceEntr
 }
 
 // A folder entry's data and body as the collection reads them; a file that does not parse gives no data but its problem, and a Markdown one its body still, its frontmatter alone failing.
-async function readEntry(dir: string, file: string): Promise<{ data: unknown, body?: string, problem?: string }> {
+async function readEntry(dir: string, file: string): Promise<{ data: SourceEntry['data'], body?: string, problem?: string }> {
   const absolute = join(dir, file)
   const source = await Bun.file(absolute).text()
 
   try {
     const { data, body } = parseEntry(file, source)
+
+    if (!isFields(data))
+      return { data: undefined, ...body !== undefined && { body }, problem: `kay: ${relative(contentPlace().root, absolute).split(sep).join('/')} holds ${valueKind(data)}, not an entry's fields` }
 
     return { data, ...body !== undefined && { body } }
   }
@@ -481,8 +505,22 @@ async function loadedEntries(name: string, collection: Collection<unknown>): Pro
     if (typeof slug !== 'string')
       throw new Error(`kay: ${name}'s load gave an entry with no slug: ${JSON.stringify(item)}`)
 
-    return { slug, data, ...typeof body === 'string' && { body } }
+    const fields = isFields(data) ? { data } : { data: undefined, problem: `kay: ${name}'s entry ${slug} holds ${valueKind(data)} as its data, not an object of fields` }
+
+    return { slug, ...fields, ...typeof body === 'string' && { body } }
   })
+}
+
+// Whether an entry's data is an object of fields, as its schema reads it, and no list or plain value.
+function isFields(data: unknown): data is Record<string, DataValue> {
+  return typeof data === 'object' && data !== null && !Array.isArray(data)
+}
+
+function valueKind(value: unknown): string {
+  if (value === null || value === undefined)
+    return String(value)
+
+  return Array.isArray(value) ? 'a list' : `a ${typeof value}`
 }
 
 // Whether a collection's entries hold a Markdown body, or why they fail to read, one then assumed.
@@ -583,10 +621,10 @@ function entryText(file: string, data: unknown, body: string | undefined): strin
 }
 
 // Plain JSON Schema: TypeBox's own keys dropped, and a date a string in date-time format.
-function jsonSchema(schema: TSchema): Record<string, unknown> {
+function jsonSchema(schema: TSchema): JsonSchema {
   return JSON.parse(JSON.stringify(schema), (_key, value: unknown) => {
     const node = value as Record<string, unknown> | null
 
     return typeof node === 'object' && node !== null && node.type === 'Date' ? { ...node, type: 'string', format: 'date-time' } : value
-  }) as Record<string, unknown>
+  }) as JsonSchema
 }
