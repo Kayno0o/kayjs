@@ -80,7 +80,7 @@ export interface SourceEntry {
 // An entry as an editor wrote it, which `entrySource` and `saveEntry` take.
 export type WrittenEntry = Omit<DraftEntry, 'collection'>
 
-// The file a folder entry is written to: its path relative to the project root, absolute and relative to the repository root, and its text; `absolute` is the server's, never for the editor's browser.
+// The file a folder entry is read from or written to: its path relative to the project root, absolute and relative to the repository root; `absolute` is the server's, never for the editor's browser.
 export interface EntryPath {
   path: string
   absolute: string
@@ -88,6 +88,7 @@ export interface EntryPath {
 }
 
 export interface EntryFile extends EntryPath {
+  // The file as the editor wrote it.
   text: string
 }
 
@@ -239,9 +240,7 @@ export async function entrySource(name: string, slug: string, data: unknown, opt
     return { issues }
 
   const dir = folderOf(collection.dir)
-  const files = await folderFiles(name, dir)
-  const place = options.locale === undefined ? slug : `${options.locale}/${slug}`
-  const existing = files.find(file => slugOf(file) === place)
+  const { files, place, existing } = await entryPlace(name, dir, slug, options.locale)
 
   if (existing !== undefined && options.create === true)
     return { issues: [existingIssue(name, slug, options.locale)] }
@@ -270,13 +269,20 @@ export async function entryFile(name: string, slug: string, options: { locale?: 
     return { issues }
 
   const dir = folderOf(collection.dir)
-  const place = options.locale === undefined ? slug : `${options.locale}/${slug}`
-  const existing = (await folderFiles(name, dir)).find(file => slugOf(file) === place)
+  const { existing } = await entryPlace(name, dir, slug, options.locale)
 
   if (existing === undefined)
     return { issues: [{ ...at, path: '', key: 'slug', message: 'names no entry of the collection' }] }
 
   return { file: fileIn(name, dir, existing) }
+}
+
+// A folder's entry files, the entry's place among them, and the file holding it when the folder has one.
+async function entryPlace(name: string, dir: string, slug: string, locale: string | undefined): Promise<{ files: string[], place: string, existing: string | undefined }> {
+  const files = await folderFiles(name, dir)
+  const place = locale === undefined ? slug : `${locale}/${slug}`
+
+  return { files, place, existing: files.find(file => slugOf(file) === place) }
 }
 
 function fileIn(name: string, dir: string, file: string): EntryPath {

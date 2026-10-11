@@ -265,6 +265,8 @@ describe('the collections a CMS edits', () => {
 
     expect(await entryFile('articles', 'hello', { locale: 'fr' })).toEqual({ file: { path: hello, absolute: join(process.cwd(), hello), repoPath: hello } })
     expect(await entryFile('pages', 'contact')).toEqual({ file: { path: contact, absolute: join(process.cwd(), contact), repoPath: contact } })
+    // An option given as undefined is absent, and a JSON entry is found as any other.
+    expect(await entryFile('pages', 'about', { locale: undefined })).toMatchObject({ file: { path: 'tests/fixtures/cms/src/content/pages/about.json' } })
     expect(await entryFile('pages', 'missing')).toEqual({ issues: [{ collection: 'pages', slug: 'missing', path: '', key: 'slug', message: 'names no entry of the collection' }] })
     expect(await entryFile('articles', 'hello')).toMatchObject({ issues: [{ key: 'locale' }] })
     expect(await entryFile('pages', '../pages/about')).toMatchObject({ issues: [{ key: 'slug' }] })
@@ -443,25 +445,44 @@ describe('the collections a CMS edits', () => {
       expect(held.find(each => each.slug === 'fr/new')?.data.title).toBe('Un')
     })
 
-    const refusing = collection({ name: 'refusing', load: () => [], save: (entry) => {
+    const order: string[] = []
+    const gate = Promise.withResolvers<void>()
+    const started = Promise.withResolvers<void>()
+    let kept = [{ slug: 'kept', data: { title: 'Kept' }, html: '' }]
+    // Each save waits for the gate, a create then refusing the entry another process wrote.
+    const refusing = collection({ name: 'refusing', load: () => kept, save: async (entry) => {
+      order.push(`save ${entry.slug}`)
+      started.resolve()
+      await gate.promise
+
       if (entry.create === true)
         throw new Error('kept by another editor')
+    }, remove: (entry) => {
+      order.push(`remove ${entry.slug}`)
+      kept = kept.filter(each => each.slug !== entry.slug)
     } }, { schema: t.Object({ title: t.String() }) })
     const invalidated = spyOn(refusing, 'invalidate')
-    const gate = Promise.withResolvers<void>()
-    const waiting = collection({ name: 'waiting', load: () => [], save: async () => gate.promise }, { schema: t.Object({ title: t.String() }) })
+    const other = collection({ name: 'other', load: () => [], save: () => undefined }, { schema: t.Object({ title: t.String() }) })
 
-    await exporting([['refusing', refusing], ['waiting', waiting]], async () => {
-      expect(await rejection(saveEntry('refusing', { slug: 'taken', data: { title: 'T' } }, { create: true }))).toMatchObject({ message: 'kept by another editor' })
-      expect(invalidated).not.toHaveBeenCalled()
+    await exporting([['refusing', refusing], ['other', other]], async () => {
+      const thrown = saveEntry('refusing', { slug: 'taken', data: { title: 'T' } }, { create: true })
 
-      // The next save runs after one that threw, and a collection's saves wait for none of another's.
-      const pending = saveEntry('waiting', { slug: 'slow', data: { title: 'T' } })
+      await started.promise
+      const removed = removeEntry('refusing', 'kept')
+      const next = saveEntry('refusing', { slug: 'taken', data: { title: 'T' } })
 
-      expect(await saveEntry('refusing', { slug: 'taken', data: { title: 'T' } })).toEqual({})
-      expect(invalidated).toHaveBeenCalledTimes(1)
+      // While the gate holds the save, an invalid save and another collection's resolve, and the remove waits.
+      expect(await saveEntry('refusing', { slug: 'bad', data: { title: 3 } })).toMatchObject({ issues: [{ path: 'title' }] })
+      expect(await saveEntry('other', { slug: 'free', data: { title: 'T' } })).toEqual({})
+      expect(order).toEqual(['save taken'])
       gate.resolve()
-      expect(await pending).toEqual({})
+
+      // The remove after the save that threw runs, and the next save after it.
+      expect(await rejection(thrown)).toMatchObject({ message: 'kept by another editor' })
+      expect(await removed).toEqual({})
+      expect(await next).toEqual({})
+      expect(order).toEqual(['save taken', 'remove kept', 'save taken'])
+      expect(invalidated).toHaveBeenCalledTimes(2)
     })
   })
 
