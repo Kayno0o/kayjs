@@ -9,7 +9,6 @@ import { existsSync } from 'node:fs'
 import { mkdir, rm } from 'node:fs/promises'
 import { builtinModules } from 'node:module'
 import { join, relative, resolve } from 'node:path'
-import process from 'node:process'
 import { formatDiagnostic } from '../compiler'
 import { projectPaths } from '../project'
 import { apiStubs, apiTrees } from '../server/api'
@@ -196,8 +195,8 @@ async function buildIslands(root: string, base: string, islands: Map<string, str
     '',
   ].join('\n'))
 
-  // Bun resolves packages' `development` export condition unless NODE_ENV is defined as production, which would ship a package's dev build.
-  const define: Record<string, string> = { 'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV === 'development' ? 'development' : 'production'), ...options.exported === true && { KAY_STATIC_EXPORT: 'true' } }
+  // Bun resolves packages' `development` export condition unless NODE_ENV is defined as production, which would ship a package's dev build; a build for development, not NODE_ENV, asks for theirs.
+  const define: Record<string, string> = { 'process.env.NODE_ENV': JSON.stringify(options.hot === true ? 'development' : 'production'), ...options.exported === true && { KAY_STATIC_EXPORT: 'true' } }
   const external = publicEnv !== undefined ? [publicEnv] : []
   const plugins = async (anchor?: string, anchored?: ReadonlySet<string>) => [withoutStyles(), api, kay({ target: 'dom', root, cacheDir: projectPaths(root).cache, settings: options.settings, anchor, anchored, inspect: options.inspect, api: trees, external }), ...options.plugins ?? []]
 

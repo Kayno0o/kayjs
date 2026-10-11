@@ -4,7 +4,10 @@ import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { s } from 'kay'
 import { clientDir, outputDir, testWorker } from '../src/build/assets'
+import { setContentMode } from '../src/content/load'
 import { clientOptionsOf, modeOf, offlineOf, PRODUCTION, projectPaths, projectRootOf, renderOptionsOf, resolveProject } from '../src/project'
+import { setSite } from '../src/runtime/site'
+import { applyImageConfig } from '../src/server/image'
 import { setupPages } from '../src/server/setup'
 import { scratchDir } from './scratch'
 
@@ -54,16 +57,26 @@ describe('projectRootOf', () => {
 
 describe('setupPages', () => {
   it('gives serving and prerendering the routes, matchers, locales, site and render options of one project', async () => {
-    const root = process.cwd()
-    const client = { entryImports: [], islands: {}, styles: new Map(), pages: new Map(), dir: join(outputDir(root), 'dist') }
-    const project = resolveProject(root, { routes: 'tests/fixtures/site/src/routes', site: 'https://x.example', base: '/docs/', images: { resolve: () => undefined } })
-    const setup = await setupPages(project, async () => client, true)
+    // The build it reads, where the share cards' key goes, is a scratch one; the loader is the checkout's, one per process.
+    const scratch = await scratchDir('setup-pages')
+    const client = { entryImports: [], islands: {}, styles: new Map(), pages: new Map(), dir: join(scratch, 'dist') }
+    const project = resolveProject(process.cwd(), { routes: 'tests/fixtures/site/src/routes', site: 'https://x.example', base: '/docs/', images: { resolve: () => undefined } })
 
-    expect(setup.routes.map(route => route.pattern)).toContain('/admin/report')
-    expect(setup.matchers).toBeInstanceOf(Map)
-    expect(setup.locales.implicit).toBe(true)
-    expect(setup.site).toBe('https://x.example/docs')
-    expect(setup.renderOptions).toMatchObject({ dev: false, base: '/docs', resolvedImages: true, offline: false })
+    try {
+      const setup = await setupPages(project, async () => client, true)
+
+      expect(setup.routes.map(route => route.pattern)).toContain('/admin/report')
+      expect(setup.matchers).toBeInstanceOf(Map)
+      expect(setup.locales.implicit).toBe(true)
+      expect(setup.site).toBe('https://x.example/docs')
+      expect(setup.renderOptions).toMatchObject({ dev: false, base: '/docs', resolvedImages: true, offline: false })
+    }
+    finally {
+      setSite(undefined)
+      applyImageConfig(undefined)
+      setContentMode({ dev: false, prebuilt: false })
+      await rm(scratch, { recursive: true, force: true })
+    }
   })
 })
 

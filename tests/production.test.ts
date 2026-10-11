@@ -19,6 +19,7 @@ import { action } from '../src/runtime'
 import { sqliteCache } from '../src/runtime/cache.server'
 import { solveWork } from '../src/runtime/work'
 import { inlineScriptHashes, invalidatePage, pages, requestId, shutdown, sqliteJobs, sqliteStore } from '../src/server'
+import { servePages } from '../src/server/app'
 import { readClient, readManifest, writeManifest } from '../src/server/client'
 import { compressTextStrongest } from '../src/server/compress'
 import { probeHealth } from '../src/server/lifecycle'
@@ -110,11 +111,12 @@ describe('security headers', () => {
     }
   })
 
-  it('allows the live-reload script in development', async () => {
-    const app = await pages({ routes: ROUTES, prebuilt: false, dev: true })
-    const policy = directives((await app.handle(new Request('http://localhost/about'))).headers.get('content-security-policy'))
+  it('allows the live-reload script in development, as the server\'s mode says whatever its config holds', async () => {
+    const scriptSources = async (app: { handle: (request: Request) => Promise<Response> }) => directives((await app.handle(new Request('http://localhost/about'))).headers.get('content-security-policy')).get('script-src')
+    const dev = { dev: true, prebuilt: false, underKayDev: false }
 
-    expect(policy.get('script-src')).toEqual(['\'self\'', ...inlineScriptHashes({ dev: true })])
+    expect(await scriptSources(await pages({ routes: ROUTES, prebuilt: false, dev: true }))).toEqual(['\'self\'', ...inlineScriptHashes({ dev: true })])
+    expect(await scriptSources(await servePages(resolveProject(process.cwd(), { routes: ROUTES }, dev), async () => (await readClient(process.cwd()))!))).toEqual(['\'self\'', ...inlineScriptHashes({ dev: true })])
   })
 
   it('merges the app\'s directives and headers over kay\'s, false leaving one out', async () => {
@@ -819,9 +821,61 @@ describe('revalidation', () => {
 
       expect(await edition(running)).toBe('Edition 2')
       expect(await edition(stopped)).toBe('Edition 1')
+
+      // Started again, it takes its pages back.
+      stopped.listen(0)
+      news.edition = 3
+      invalidatePage('/news')
+      await shutdown(stopped)
+
+      expect(await edition(stopped)).toBe('Edition 3')
     }
     finally {
       news.edition = 1
+      await rm(join(outputDir(root), 'pages'), { recursive: true, force: true })
+      await writeManifest(root, manifest)
+    }
+  })
+
+  it('lets go of an app nothing reaches any more, one that only answered through handle() included', async () => {
+    const root = process.cwd()
+    const manifest = (await readManifest(root))!
+    // The paths invalidatePage meets, one per prerendered page of every app it reaches.
+    const reached = () => {
+      const paths: string[] = []
+
+      invalidatePage((path) => {
+        paths.push(path)
+
+        return false
+      })
+
+      return paths.filter(path => path === '/news').length
+    }
+
+    try {
+      await prerenderPages(resolveProject(root, { routes }), (await readClient(root))!)
+      const before = reached()
+      const dropped = await (async () => {
+        const app = await pages({ routes, prebuilt: true, security: false, log: false })
+
+        await app.handle(new Request('http://localhost/news'))
+
+        return new WeakRef(app)
+      })()
+
+      expect(reached()).toBe(before + 1)
+
+      // A timer of the request holds it a little while.
+      for (let attempt = 0; attempt < 40 && (dropped.deref() !== undefined || reached() > before); attempt++) {
+        Bun.gc(true)
+        await Bun.sleep(50)
+      }
+
+      expect(dropped.deref()).toBeUndefined()
+      expect(reached()).toBeLessThanOrEqual(before)
+    }
+    finally {
       await rm(join(outputDir(root), 'pages'), { recursive: true, force: true })
       await writeManifest(root, manifest)
     }

@@ -23,8 +23,9 @@ let server: ReturnType<typeof Bun.serve>
 // The host a page links an image of, which the export downloads.
 const remoteHost = Bun.serve({ port: 0, fetch: () => new Response(Bun.file(join(FIXTURE, 'src/hero.png'))) })
 
+// Under NODE_ENV=development too, as a shell left set for `kay dev` runs it, the build exports production pages.
 async function exportSite(outdir: string, root = FIXTURE): Promise<{ code: number, errors: string }> {
-  const child = Bun.spawn([process.execPath, CLI, 'build', root, '--no-check', '--static', '--outdir', outdir], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, KAY_TEST_REMOTE_ORIGIN: `http://127.0.0.1:${remoteHost.port}` } })
+  const child = Bun.spawn([process.execPath, CLI, 'build', root, '--no-check', '--static', '--outdir', outdir], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, NODE_ENV: 'development', KAY_TEST_REMOTE_ORIGIN: `http://127.0.0.1:${remoteHost.port}` } })
   const [errors, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
 
   return { code, errors }
@@ -196,6 +197,7 @@ describe('kay build --static', () => {
 
     expect(missing.status).toBe(404)
     expect(missing.text).toContain('<h1>Nothing here</h1>')
+    expect(missing.text).not.toContain('kay-boot')
     // Written by the export rather than prerendered, it goes through the page hooks all the same.
     expect(missing.text).toMatch(/<!--linked from \/404\.html: [^>]*\.css[^>]*--><\/body>/)
   })

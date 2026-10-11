@@ -113,7 +113,7 @@ kay build --compile ./server       # one executable
 kay build --static --outdir dist   # static files for a host with no server
 ```
 
-The build runs `kay check` first and keeps the last build when the check or the build fails.
+The build runs `kay check` first and keeps the last build when the check or the build fails. It builds for production whatever `NODE_ENV` the shell holds, and needs none of the server's secrets, such as `preview.secret`.
 
 | Option | Effect |
 | --- | --- |

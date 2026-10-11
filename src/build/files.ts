@@ -1,9 +1,10 @@
 import type { Dirent } from 'node:fs'
 import { mkdir, readdir, readFile, rename, rm } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
+import { KAY_DIR } from './assets'
 
 // Never source at any depth: dependencies, kay's own output and version control.
-const ALWAYS_IGNORED = new Set(['node_modules', '.kay', '.git'])
+const ALWAYS_IGNORED = new Set(['node_modules', KAY_DIR, '.git'])
 // The output a build leaves at the project root; anywhere deeper `dist` is an ordinary directory, `src/routes/dist` a page directory.
 const ROOT_IGNORED = new Set(['dist'])
 

@@ -30,7 +30,7 @@ import { offsetAt, positionAt } from '../compiler/mapping'
 import { cssImportsWithoutText, deprecatedSchemaNames } from '../compiler/script'
 import { CONFIG_FILE } from '../config'
 import { PROBLEMS_MARKER, USES_MARKER } from '../content/server'
-import { projectPaths, SHADOW_DIR } from '../project'
+import { projectPaths } from '../project'
 import { projectApi } from '../server/api'
 import { FAVICON_PATHS } from '../server/favicon'
 import { DEFAULT_LANG, extensionMessageFiles, localePattern, localePrefixes, localeSettings, messagesFile } from '../server/i18n'
@@ -142,14 +142,15 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
   const diagnostics: CheckDiagnostic[] = []
   const paths = projectPaths(root, options)
   const routesDir = paths.routes
+  const shadowDir = paths.types
 
-  const environmentPath = join(root, SHADOW_DIR, 'kay-env.d.ts')
-  const assetsPath = join(root, SHADOW_DIR, 'kay-assets.d.ts')
-  const iconsPath = join(root, SHADOW_DIR, 'kay-icons.d.ts')
-  const packagesPath = join(root, SHADOW_DIR, 'kay-packages.d.ts')
-  const settingsPath = join(root, SHADOW_DIR, SETTINGS_CHECK)
-  const exportsPath = join(root, SHADOW_DIR, EXPORTS_CHECK)
-  const settingsFile = join(root, SHADOW_DIR, SHADOW_SETTINGS)
+  const environmentPath = join(shadowDir, 'kay-env.d.ts')
+  const assetsPath = join(shadowDir, 'kay-assets.d.ts')
+  const iconsPath = join(shadowDir, 'kay-icons.d.ts')
+  const packagesPath = join(shadowDir, 'kay-packages.d.ts')
+  const settingsPath = join(shadowDir, SETTINGS_CHECK)
+  const exportsPath = join(shadowDir, EXPORTS_CHECK)
+  const settingsFile = join(shadowDir, SHADOW_SETTINGS)
   const own = await findKayFiles(root, { project: true, ownOnly: true, ownKayOnly: true })
   const sources = new Map(await Promise.all(own.map(async file => [file, await Bun.file(file).text()] as const)))
   const cacheDir = paths.cache
@@ -251,10 +252,10 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
   await writeIfChanged(settingsFile, serializeShadowSettings(root, { routesDir, islandOnly, lints: options.lints }))
 
   // Rewriting in place keeps every shadow file present for editors reading the tree meanwhile; only stale ones go.
-  const stale = (await readdir(join(root, SHADOW_DIR), { recursive: true, withFileTypes: true }))
+  const stale = (await readdir(shadowDir, { recursive: true, withFileTypes: true }))
     .filter(entry => entry.isFile())
     .map(entry => join(entry.parentPath, entry.name))
-    .filter(path => path !== environmentPath && path !== assetsPath && path !== iconsPath && path !== packagesPath && path !== settingsPath && path !== exportsPath && path !== settingsFile && path !== join(root, SHADOW_DIR, CONTENT_CHECK) && !files.has(path))
+    .filter(path => path !== environmentPath && path !== assetsPath && path !== iconsPath && path !== packagesPath && path !== settingsPath && path !== exportsPath && path !== settingsFile && path !== join(shadowDir, CONTENT_CHECK) && !files.has(path))
 
   await Promise.all(stale.map(async path => rm(path)))
 
@@ -317,7 +318,7 @@ function ownFile(root: string, file: string): boolean {
 
 // Each component a library exports, typed as the module its specifier names: rootDirs merges relative imports only, so a package's `.kay` files reach the app through these.
 function packageTypes(root: string, libraries: KayLibrary[]): string {
-  const shadowDir = join(root, SHADOW_DIR)
+  const shadowDir = projectPaths(root).types
 
   return libraries.flatMap(library => [...library.specifiers].map(([specifier, file]) => {
     const shadow = relative(shadowDir, shadowPath(root, file)).replace(TSX_EXTENSION, '')
@@ -331,7 +332,7 @@ function packageTypes(root: string, libraries: KayLibrary[]): string {
 
 // One line per library whose settings the app replaces, assigning the app's module to the type of the defaults it stands in for.
 function settingsCheck(root: string, settings: Record<string, string>, diagnostics: CheckDiagnostic[]): { code: string, lines: Map<number, { file: string, library: string }> } {
-  const shadowDir = join(root, SHADOW_DIR)
+  const shadowDir = projectPaths(root).types
   const imports: string[] = []
   const checks: string[] = []
   const lines = new Map<number, { file: string, library: string }>()
@@ -377,7 +378,7 @@ function exportsCheck(root: string, routesDir: string, routes: Route[], api: Api
   if (entries.length === 0)
     return { code: '', lines }
 
-  const shadowDir = join(root, SHADOW_DIR)
+  const shadowDir = projectPaths(root).types
   const kayTypes = [...guards.size > 0 ? ['Guard'] : [], ...endpoints.length > 0 ? ['EndpointBody'] : []]
   const header = [...kayTypes.length > 0 ? [`import type { ${kayTypes.join(', ')} } from 'kay'`] : [], ...api.length > 0 ? ['import type { AnyElysia } from \'elysia\''] : []]
   const imports = entries.map((entry, index) => `import ${entry.named === undefined ? `kayExport${index}` : `{ ${entry.named} as kayExport${index} }`} from ${JSON.stringify(relative(shadowDir, entry.file).replace(SCRIPT_EXTENSION, ''))}`)
@@ -551,9 +552,10 @@ export async function check(root: string, options: CheckOptions = {}): Promise<C
   const seo = configSeoLints(options, join(root, CONFIG_FILE), [...files.values()].map(file => file.source))
 
   diagnostics.push(...lintConfigProblems(root, options.lints), ...seo.filter(diagnostic => options.launch === true || !isLaunchLint(diagnostic.code)))
-  const settingsFile = join(resolve(root), SHADOW_DIR, SETTINGS_CHECK)
-  const exportsFile = join(resolve(root), SHADOW_DIR, EXPORTS_CHECK)
-  const contentFile = join(resolve(root), SHADOW_DIR, CONTENT_CHECK)
+  const shadowDir = projectPaths(root).types
+  const settingsFile = join(shadowDir, SETTINGS_CHECK)
+  const exportsFile = join(shadowDir, EXPORTS_CHECK)
+  const contentFile = join(shadowDir, CONTENT_CHECK)
   // The props Markdown entries give their components are typed with the rest, so the collections are read first.
   const content = await checkContent(root, options.content, options.site !== undefined)
   const props = contentPropsCheck(resolve(root), projectPaths(root, options).content, content.uses)
@@ -700,7 +702,7 @@ function contentPropsCheck(root: string, configFile: string, uses: ComponentUse[
     return { code: '', lines }
 
   const header = [
-    `import type * as kayContent from ${JSON.stringify(relative(join(root, SHADOW_DIR), configFile).replace(SCRIPT_EXTENSION, ''))}`,
+    `import type * as kayContent from ${JSON.stringify(relative(projectPaths(root).types, configFile).replace(SCRIPT_EXTENSION, ''))}`,
     '',
     'type KayPropsOf<Component> = Component extends (props: infer Props) => unknown ? Props : never',
     '',
@@ -766,8 +768,8 @@ function unusedCodesOf(shown: string | undefined): Set<number> {
 
 // Runs tsgo incrementally, or not at all when its last run was clean and nothing it read has changed since: tsgo's own incremental mode still parses every file, most of a warm run's time.
 async function typecheck(root: string, tsconfig: string, shown: string | undefined): Promise<{ output: string, errors: string, code: number }> {
-  const state = join(projectPaths(root).cache, 'check')
-  const shadowDir = join(resolve(root), SHADOW_DIR)
+  const { cache, types: shadowDir } = projectPaths(root)
+  const state = join(cache, 'check')
   const buildInfo = join(state, 'tsbuildinfo')
   const args = ['--noEmit', '--pretty', 'false', '--noUnusedLocals', '-p', tsconfig, '--incremental', '--tsBuildInfoFile', buildInfo]
   // The resolved config lists the root files, so one added or removed changes it as an edited option does.

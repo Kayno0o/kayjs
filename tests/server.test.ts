@@ -1024,6 +1024,30 @@ describe('prerendering', () => {
     }
   })
 
+  it('logs what a prerendered page throws rather than handing it to the app\'s onError, and builds without the server\'s preview secret', async () => {
+    const root = process.cwd()
+    const manifest = (await readManifest(root))!
+    const dir = await mkdtemp(join(root, '.kay/routes-'))
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+    const reported: unknown[] = []
+
+    try {
+      await Bun.write(join(dir, 'plain.kay'), '--- server\nexport const page = { prerender: true }\n---\np Plain\n')
+      expect(await prerenderPages(resolveProject(root, { routes: dir, preview: { secret: undefined as unknown as string } }), (await readClient(root))!)).toBe(1)
+
+      await Bun.write(join(dir, 'broken.kay'), '--- server\nexport const page = { prerender: true }\nconst fail = () => {\n  throw new Error(\'no database at build time\')\n}\n\nfail()\n---\np Broken\n')
+      await expect(prerenderPages(resolveProject(root, { routes: dir, onError: error => void reported.push(error) }), (await readClient(root))!)).rejects.toThrow('failed with 500')
+      expect(reported).toEqual([])
+      expect(logged).toHaveBeenCalledWith(expect.stringContaining('no database at build time'))
+    }
+    finally {
+      logged.mockRestore()
+      await rm(dir, { recursive: true, force: true })
+      await rm(join(outputDir(root), 'pages'), { recursive: true, force: true })
+      await writeManifest(root, manifest)
+    }
+  })
+
   it('refuses to prerender a page that reads what only a request carries', async () => {
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
 

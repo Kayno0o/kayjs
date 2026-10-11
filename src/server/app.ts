@@ -13,6 +13,7 @@ import { Elysia } from 'elysia'
 import { ASSET_PREFIX } from '../build/assets'
 import { mapBundleToKay } from '../build/sourcemap'
 import { extensionServers, pageHooks } from '../config'
+import { clearContentMode } from '../content/load'
 import { serveFeeds } from '../content/server'
 import { offlineOf } from '../project'
 import { localePath, splitLocale, untranslatedPath } from '../runtime/i18n'
@@ -186,7 +187,7 @@ function remembered(response: Response, request: Request, locale: string): Respo
 export async function servePages(project: Project<PagesOptions>, loadClient: () => Promise<ClientBuild>) {
   const { root, config: options, paths, mode } = project
   const routesDir = paths.routes
-  const { source, client, mounts, routes: scanned, matchers, collections, i18n, locales, base, site, scripts, styles, renderOptions, cards } = await setupPages(project, loadClient)
+  const { source, client, mounts, routes: scanned, matchers, collections, i18n, locales, base, site, imageCache, scripts, styles, renderOptions, cards } = await setupPages(project, loadClient)
   const routes = await Promise.all(scanned.map(loadGuards))
 
   if (i18n) {
@@ -363,7 +364,6 @@ export async function servePages(project: Project<PagesOptions>, loadClient: () 
     servePreview(app)
 
   const lookup = options.images?.resolve
-  const imageCache = source.imageCache(root)
   const imageRoute = {
     clientDir: client.dir,
     cacheDir: imageCache,
@@ -414,9 +414,15 @@ export async function servePages(project: Project<PagesOptions>, loadClient: () 
 
   const tracked = [...prerendered.values()].map(pages => trackPrerendered(pages, page => moved || page.readsSite === true))
 
+  app.onStart(() => {
+    for (const { track } of tracked)
+      track()
+  })
   app.onStop(() => {
-    for (const release of tracked)
+    for (const { release } of tracked)
       release()
+
+    clearContentMode(mode)
   })
 
   // `kay dev` prints its own.

@@ -15,8 +15,8 @@ export interface Revalidation {
   running?: Promise<void> | undefined
 }
 
-// The prerendered pages of every `pages()` still running, by path as the routes serve it.
-const served = new Set<Map<string, ServedPage>>()
+// The prerendered pages of every `pages()` still running, by path as the routes serve it, held weakly: an app nothing reaches any more, one that only ever answered through `handle()` say, lets go of its own.
+const served = new Set<WeakRef<Map<string, ServedPage>>>()
 // After a render that failed, the longest a page waits before the next request tries again.
 const RETRY_MS = 60_000
 // Counts invalidations, telling one made before a render started from one made while it ran, which a clock may not.
@@ -26,16 +26,20 @@ onPagesInvalidated((paths) => {
   markStale(path => paths.includes(path))
 })
 
-// A page `stale` picks waits for a fresh render on its first request, as one the build rendered for another site. The function returned lets go of the pages, as their app stops, so `invalidatePage` no longer reaches them.
-export function trackPrerendered(pages: Map<string, ServedPage>, stale: (page: ServedPage) => boolean = () => false): () => void {
-  served.add(pages)
+// A page `stale` picks waits for a fresh render on its first request, as one the build rendered for another site.
+// Tracked from now, for an app answering through `handle()`; `release` lets go of the pages as their app stops, so `invalidatePage` no longer reaches them, and `track` takes them back as it starts again.
+export function trackPrerendered(pages: Map<string, ServedPage>, stale: (page: ServedPage) => boolean = () => false): { track: () => void, release: () => void } {
+  const held = new WeakRef(pages)
+  const track = () => void served.add(held)
+
+  track()
 
   for (const page of pages.values()) {
     if (stale(page))
       revalidationOf(page).invalidatedAt = ++invalidations
   }
 
-  return () => served.delete(pages)
+  return { track, release: () => void served.delete(held) }
 }
 
 // Marks the prerendered page at `path`, or every one the function matches, as `/blog/` + anything, stale: the next request for it waits for a fresh render instead of getting it as it was.
@@ -52,7 +56,15 @@ export function invalidatePage(path: string | ((path: string) => boolean)): void
 function markStale(matches: (path: string) => boolean): string[] {
   const paths: string[] = []
 
-  for (const pages of served) {
+  for (const held of served) {
+    const pages = held.deref()
+
+    if (!pages) {
+      served.delete(held)
+
+      continue
+    }
+
     for (const [path, page] of pages) {
       if (matches(path)) {
         revalidationOf(page).invalidatedAt = ++invalidations

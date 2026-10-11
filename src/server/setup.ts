@@ -37,6 +37,8 @@ export interface PageSetup {
   locales: I18n
   base: string
   site: string | undefined
+  // Where resized images, remote ones and stored files are kept.
+  imageCache: string
   scripts: string[]
   styles: string[]
   renderOptions: RenderOptions
@@ -44,7 +46,7 @@ export interface PageSetup {
 }
 
 // What serving pages and prerendering them both start from: the routes and their param matchers, the collections, the locales, the head and the render options.
-// It installs what every render reads outside its request too: the `.kay` loader, the site, the image config, the share cards, the content's place and mode, the locales and the preview secret, with the tracer and the file store when serving, as a build traces nothing and an export links its files itself.
+// It installs what every render reads outside its request too: the `.kay` loader, the site, the image config, the share cards, the content's place and mode and the locales, with the preview secret, the tracer and the file store when serving, as a build traces nothing, previews nothing and an export links its files itself.
 export async function setupPages(project: Project, loadClient: () => Promise<ClientBuild>, prerendering = false): Promise<PageSetup> {
   const { root, config, paths, mode } = project
   const mounts = routeMounts(root, config.extensions)
@@ -67,13 +69,16 @@ export async function setupPages(project: Project, loadClient: () => Promise<Cli
   const maxDensity = applyImageConfig(config.images)
   const site = config.site === undefined ? undefined : siteOrigin(config.site) + base
 
+  const imageCache = source.imageCache(root)
+
   setSite(site, config.trailingSlash, prerendering)
-  setupPreview(config.preview, base)
   setContentMode(mode)
 
+  // A build may run without the server's secrets, the preview one included.
   if (!prerendering) {
+    setupPreview(config.preview, base)
     setTracer(config.tracer)
-    setupStorage(config.storage, join(source.imageCache(root), 'stored'))
+    setupStorage(config.storage, join(imageCache, 'stored'))
   }
 
   if (config.inlineStyles === true && !mode.dev)
@@ -85,5 +90,5 @@ export async function setupPages(project: Project, loadClient: () => Promise<Cli
     projectCollections(root, config.content),
   ])
 
-  return { source, client, mounts, routes, matchers, collections, i18n, locales, base, site, scripts, styles, renderOptions: renderOptionsOf(config, mode, { head, maxDensity }), cards }
+  return { source, client, mounts, routes, matchers, collections, i18n, locales, base, site, imageCache, scripts, styles, renderOptions: renderOptionsOf(config, mode, { head, maxDensity }), cards }
 }

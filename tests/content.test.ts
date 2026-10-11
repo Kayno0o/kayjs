@@ -9,12 +9,12 @@ import { outputDir } from '../src/build/assets'
 import { check } from '../src/check'
 import { collection, highlightCode, renderMarkdown } from '../src/content'
 import { feedXml } from '../src/content/feed'
-import { setContentMode, setContentPlace } from '../src/content/load'
+import { contentMode, manifestFile, setContentMode, setContentPlace } from '../src/content/load'
 import { compileMarkdown, MarkdownError } from '../src/content/markdown'
 import { writeContentManifests } from '../src/content/server'
 import { resolveProject } from '../src/project'
 import { sanitizeHtml } from '../src/runtime'
-import { pages } from '../src/server'
+import { pages, shutdown } from '../src/server'
 import { readClient, readManifest, writeManifest } from '../src/server/client'
 import { prerenderPages } from '../src/server/prerender'
 import { fixtureCopy } from './scratch'
@@ -82,6 +82,44 @@ describe('Markdown entries', () => {
       else
         process.env.NODE_ENV = previous
 
+      setContentMode({ dev: false, prebuilt: false })
+    }
+  })
+})
+
+describe('the content mode', () => {
+  it('asks the loaders for their preview in development, reads the build\'s entries when prebuilt, and goes back to NODE_ENV as its server stops', async () => {
+    const root = process.cwd()
+    const asked: boolean[] = []
+    const probe = (name: string) => collection({ name, load: ({ preview }) => {
+      asked.push(preview)
+
+      return []
+    } }, { schema: t.Object({}) })
+    const built = manifestFile(outputDir(root), 'content/authors')
+    const authors = async () => (await collection('content/authors', { schema: t.Object({ name: t.String() }) }).all()).map(author => author.data.name)
+
+    try {
+      setContentMode({ dev: true, prebuilt: false })
+      await probe('mode-dev').all()
+      setContentMode({ dev: false, prebuilt: false })
+      await probe('mode-production').all()
+      expect(asked).toEqual([true, false])
+
+      await Bun.write(built, JSON.stringify([{ slug: 'built', file: 'built.json', data: { name: 'Built' }, lines: {} }]))
+      expect(await authors()).not.toContain('Built')
+      setContentMode({ dev: false, prebuilt: true })
+      expect(await authors()).toEqual(['Built'])
+
+      const served = await pages({ routes, content, prebuilt: false, dev: true, security: false, log: false, site: SITE })
+
+      expect(contentMode().dev).toBe(true)
+      served.listen(0)
+      await shutdown(served)
+      expect(contentMode()).toMatchObject({ dev: process.env.NODE_ENV === 'development' })
+    }
+    finally {
+      await rm(built, { force: true })
       setContentMode({ dev: false, prebuilt: false })
     }
   })
