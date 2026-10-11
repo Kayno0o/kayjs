@@ -322,6 +322,36 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the dev pa
   }, 60_000)
 })
 
+describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('edit mode in a browser', () => {
+  it('shows a draft through the page swap, the island showing it kept alive, or where the schema refuses it', async () => {
+    const secret = 'a-preview-secret-long-enough-for-kay-0123456789'
+    const fixture = 'tests/fixtures/cms/src'
+    const cms = await testSite({ routes: `${fixture}/routes`, content: `${fixture}/content.config.ts`, api: `${fixture}/api`, preview: { secret }, browser: { path } })
+
+    try {
+      const editor = await cms.open(`/_kay/preview?path=/marks/launch&edit&secret=${secret}`)
+
+      await editor.waitFor('h1', { text: 'Launch day' })
+      await editor.click('button.count')
+      await editor.click('button.draft')
+      await editor.waitFor('h1', { text: 'Draft title' })
+
+      expect(await editor.text('article h2')).toBe('Drafted')
+      expect(await editor.text('button.count')).toBe('Clicked 1')
+      expect(await editor.path()).toBe('/marks/launch')
+
+      await editor.click('button.refused')
+      await editor.waitFor('p.issues', { text: '[{"collection":"news","slug":"launch","path":"title","message":"Expected property \'title\' to be string but found: 3"}]' })
+
+      expect(await editor.text('h1')).toBe('Draft title')
+      expect(editor.errors).toEqual([])
+    }
+    finally {
+      await cms.close()
+    }
+  }, 60_000)
+})
+
 describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('publicEnv', () => {
   it('reads the variables the config declares public from the server\'s environment, on the server and in the browser', async () => {
     process.env.KAY_TEST_MAP_KEY = 'pk-123'

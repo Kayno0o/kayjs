@@ -1,0 +1,12 @@
+---
+import { signal } from 'kay'
+import { showDraft } from 'kay/edit'
+
+const clicks = signal(0)
+const issues = signal('')
+const draft = async (data: unknown, body?: string) => issues.set(JSON.stringify((await showDraft([{ collection: 'news', slug: 'launch', data, body }])).issues ?? []))
+---
+button.count(onClick={() => clicks.set(n => n + 1)}) Clicked {clicks()}
+button.draft(onClick={async () => draft({ title: 'Draft title', published: true, tags: ['draft'] }, '## Drafted')}) Draft
+button.refused(onClick={async () => draft({ title: 3, published: true, tags: [] })}) Refused
+p.issues {issues()}

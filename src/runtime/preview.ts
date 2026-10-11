@@ -5,6 +5,16 @@ export interface PreviewState {
   loads: Map<unknown, Promise<unknown>>
   edit: boolean
   marks?: FieldMarks
+  // The entries an editor has not saved yet, standing in for theirs, by the name each collection is loaded under.
+  drafts?: Map<string, EntryDraft[]>
+}
+
+// An entry as an editor has it before saving: its data, and its Markdown body when it changed.
+export interface EntryDraft {
+  slug: string
+  locale?: string | undefined
+  data: unknown
+  body?: string | undefined
 }
 
 export type PreviewMode = 'preview' | 'edit'

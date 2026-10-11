@@ -12,5 +12,7 @@ export const PAGE_HEADER = 'x-kay-page'
 export const WORK_HEADER = 'x-kay-work'
 // Marks a page loaded fully from any link or form, past the swap: one setting `reload: true`.
 export const RELOAD_HEADER = 'x-kay-reload'
+// Where edit mode's `showDraft` posts the entries an editor has not saved, for the page rendered with them.
+export const DRAFT_ROUTE = '/_kay/draft'
 // Marks the data script holding the challenges of the actions a page's forms post to, by action URL.
 export const WORK_SCRIPT = 'data-kay-work'

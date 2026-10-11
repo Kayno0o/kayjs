@@ -21,7 +21,7 @@ import { cookieLocale, hostLocale, localeCookie, preferredLocale, prerenderKey, 
 import { answeringRequest } from './log'
 import { hookedResponse } from './page-hook'
 import { matchedParams, positionalParams } from './params'
-import { inPreview, previewRequested } from './preview'
+import { inPreview, previewRequested, requestDrafts } from './preview'
 import { requestId } from './protection'
 import { hasFlash, renderPage, renderUnmatched, servePrerendered } from './render'
 import { reportServerError } from './report'
@@ -104,7 +104,7 @@ export function pageResponder({ client, renderOptions, prerendered, settings, tr
 
     // Drafts shown, past any prerendered or cached copy.
     if (preview !== undefined)
-      return forVisitor(async () => inPreview(render, preview === 'edit'))
+      return forVisitor(async () => preview === 'edit' ? inPreview(render, true, requestDrafts(context.request)) : inPreview(render))
 
     const key = prerenderKey(settings, localeState()?.locale, canonicalPath(withoutSlash(url.pathname)))
     const page = prerendered.get(route.pattern)?.get(key)

@@ -39,7 +39,7 @@ import { claimApi, openApiDocument, openApiSettings, serveOpenApi } from './open
 import { withPageHeaders } from './page-headers'
 import { assetFiles } from './page-hook'
 import { loadPrerendered, pageResponder, servePageRoutes } from './page-routes'
-import { servePreview } from './preview'
+import { serveDrafts, servePreview } from './preview'
 import { requestId, trustProxy } from './protection'
 import { claimPublic, publicFiles, servePublic } from './public'
 import { claimRedirects, readRedirects, serveRedirects } from './redirects'
@@ -254,8 +254,10 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   if (options.security !== undefined && options.security !== false && options.security.reports === true)
     serveViolationReports(app, options.onError)
 
-  if (options.preview)
+  if (options.preview) {
     servePreview(app)
+    serveDrafts(app, collections)
+  }
 
   const imageRoute = imageRouteOf(project, setup, security, actionOptions)
 

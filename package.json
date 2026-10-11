@@ -50,6 +50,10 @@
       "types": "./types/runtime/seo.d.ts",
       "default": "./src/runtime/seo.ts"
     },
+    "./edit": {
+      "types": "./types/runtime/edit.d.ts",
+      "default": "./src/runtime/edit.ts"
+    },
     "./content": {
       "types": "./types/content/index.d.ts",
       "default": "./src/content/index.ts"

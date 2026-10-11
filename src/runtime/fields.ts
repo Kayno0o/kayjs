@@ -48,6 +48,10 @@ export function nameCollection(name: string, exportName: string): void {
   exportNames.set(name, exportName)
 }
 
+export function exportNameOf(name: string): string {
+  return exportNames.get(name) ?? name
+}
+
 // The request's marks, in edit mode only.
 export function editMarks(): FieldMarks | undefined {
   const state = previewState()
@@ -83,7 +87,7 @@ export function editableEntry<E extends Editable>(marks: FieldMarks, collection:
   if (known)
     return known
 
-  const exported = exportNames.get(collection) ?? collection
+  const exported = exportNameOf(collection)
   const name = `${encodeURIComponent(exported)}:${encodeURIComponent(entry.slug)}${entry.locale === undefined ? '' : `@${encodeURIComponent(entry.locale)}`}`
   const body = refIndex(marks, name)
   const Content = entry.Content as () => unknown

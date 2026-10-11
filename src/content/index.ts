@@ -119,6 +119,7 @@ export function collection<Schema extends TSchema, Components extends Record<str
   const name = typeof source === 'string' ? source : source.name
   const key = `kay:content:${name}`
   const decoded = new WeakMap<RawEntry[], Entries<Data>>()
+  const raws = new WeakMap<Entries<Data>, RawEntry[]>()
   const { draft, localized = false } = options
 
   const decode = (raw: RawEntry[]): Entries<Data> => {
@@ -141,7 +142,11 @@ export function collection<Schema extends TSchema, Components extends Record<str
         entry.translations = [...byLocale].filter(([, slugs]) => slugs.has(entry.slug)).map(([locale]) => locale).sort()
     }
 
-    return { list: entries, bySlug: new Map(entries.map(entry => [entry.slug, entry])), byLocale }
+    const result = { list: entries, bySlug: new Map(entries.map(entry => [entry.slug, entry])), byLocale }
+
+    raws.set(result, raw)
+
+    return result
   }
 
   // Validated before `cached` keeps them, so entries the schema refuses are fetched again on the next read.
@@ -189,7 +194,40 @@ export function collection<Schema extends TSchema, Components extends Record<str
     return entries
   }
 
-  const loaded = loader ? fromLoader : fromFolder
+  // The entries an editor has not saved stand in for theirs, for the request rendering them alone.
+  const withDrafts = async (entries: Entries<Data>): Promise<Entries<Data>> => {
+    const preview = previewState()
+    const drafts = preview?.drafts?.get(name)
+
+    if (!preview || !drafts)
+      return entries
+
+    const draftKey = `kay:draft:${name}`
+    let drafted = preview.loads.get(draftKey) as Promise<Entries<Data>> | undefined
+
+    if (!drafted) {
+      preview.loads.set(draftKey, drafted = (async () => {
+        const raw = [...raws.get(entries) ?? []]
+
+        for (const draft of drafts) {
+          const slug = localized ? `${draft.locale}/${draft.slug}` : draft.slug
+          const at = raw.findIndex(entry => entry.slug === slug)
+          const compiled = draft.body === undefined ? undefined : await compileMarkdown(draft.body, 1, options.highlight)
+          const entry: RawEntry = { ...raw[at] ?? { file: `${name}/${slug}` }, slug, data: draft.data, lines: {}, ...compiled }
+
+          if (at === -1)
+            raw.push(entry)
+          else
+            raw[at] = entry
+        }
+
+        return decode(raw)
+      })())
+    }
+
+    return drafted
+  }
+  const loaded = async () => withDrafts(await (loader ? fromLoader : fromFolder)())
   const hidden = (entry: Entry<Data>) => draft !== undefined && !contentMode().dev && !previewing() && draft(entry)
   // A draft translation is left out as a missing one is, the default locale's entry standing in.
   const shown = (entry: Entry<Data> | undefined) => entry !== undefined && !hidden(entry) ? entry : undefined

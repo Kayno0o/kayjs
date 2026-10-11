@@ -30,10 +30,7 @@ const checks = new WeakMap<TSchema, TypeCheck<TSchema>>()
 
 // Each entry's data read against the schema, defaults filled in and values decoded, such as a date from its text; the components each uses must be ones the collection names.
 export function decodeEntries(entries: RawEntry[], schema: TSchema, components: Record<string, unknown>, localized = false): { entry: RawEntry, data: unknown }[] {
-  let check = checks.get(schema)
-
-  if (!check)
-    checks.set(schema, check = TypeCompiler.Compile(schema))
+  const check = checkOf(schema)
 
   const problems: ContentProblem[] = []
   const decoded: { entry: RawEntry, data: unknown }[] = []
@@ -70,6 +67,34 @@ export function decodeEntries(entries: RawEntry[], schema: TSchema, components: 
     throw new ContentError(problems)
 
   return decoded
+}
+
+// Where a draft's data fails the schema, each field by its dotted path, `tags.0`, at most once.
+export function dataIssues(schema: TSchema, data: unknown): { path: string, message: string }[] {
+  const check = checkOf(schema)
+  const filled = withDefaults(data, schema)
+  const issues = new Map<string, string>()
+
+  if (check.Check(filled))
+    return []
+
+  for (const issue of check.Errors(filled)) {
+    const path = issue.path.split('/').slice(1).map(segment => segment.replaceAll('~1', '/').replaceAll('~0', '~')).join('.')
+
+    if (!issues.has(path))
+      issues.set(path, mapValueError(issue)?.summary ?? issue.message)
+  }
+
+  return [...issues].map(([path, message]) => ({ path, message }))
+}
+
+function checkOf(schema: TSchema): TypeCheck<TSchema> {
+  let check = checks.get(schema)
+
+  if (!check)
+    checks.set(schema, check = TypeCompiler.Compile(schema))
+
+  return check
 }
 
 function withDefaults(data: unknown, schema: TSchema): unknown {

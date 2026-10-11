@@ -208,6 +208,7 @@ describe('preview mode', () => {
     const { html } = await get('/marks/launch', edit)
 
     expect(html).toContain('<h1 data-kay-field="news:launch:title">Launch day</h1>')
+    expect(html).toContain('<h2 class="headline" data-kay-field="news:launch:title">Launch day</h2>')
     expect(html).toContain('<p>Posted as <!--kay-field news:launch:title-->Launch day<!--/kay-field--></p>')
     expect(html).toContain('<img src="/cover.png" alt="Launch day" data-kay-field-alt="news:launch:title">')
     expect(html).toContain('<ul data-kay-list="news:launch:tags"><li data-kay-field="news:launch:tags.0">launch</li></ul>')
@@ -232,6 +233,35 @@ describe('preview mode', () => {
       expect(entry.data.at).toBeInstanceOf(Date)
       expect(placeFieldMarks(html, marks)).toBe('<div data-kay-field="news:a:title">T</div><div><!--kay-field news:a:count-->3<!--/kay-field--> 3</div><a title="T">T</a><section data-kay-body="news:a"><p>x</p></section>')
     }, true)
+  })
+
+  it('renders a page with the entries an editor has not saved, for a visitor in edit mode alone, refusing a draft its schema refuses', async () => {
+    const edit = await previewCookie(`/_kay/preview?path=/news&edit&secret=${SECRET}`)
+    const preview = await previewCookie(`/_kay/preview?path=/news&secret=${SECRET}`)
+    const post = async (body: unknown, cookie = edit, headers: Record<string, string> = {}) => app.handle(new Request('http://localhost/_kay/draft', { method: 'POST', headers: { cookie, 'content-type': 'application/json', ...headers }, body: JSON.stringify(body) }))
+    const draft = { path: '/marks/launch', entries: [{ collection: 'news', slug: 'launch', data: { title: 'Draft title', published: true, tags: ['draft'] }, body: '## Drafted' }] }
+    const drafted = await post(draft)
+    const html = await drafted.text()
+
+    expect(drafted.status).toBe(200)
+    expect(drafted.headers.get('cache-control')).toBe('private, no-store')
+    expect(html).toContain('<h1 data-kay-field="news:launch:title">Draft title</h1>')
+    expect(html).toContain('<li data-kay-field="news:launch:tags.0">draft</li>')
+    expect(html).toContain('<article data-kay-body="news:launch"><h2 id="drafted">')
+    expect((await get('/marks/launch', edit)).html).toContain('>Launch day</h1>')
+    expect(await (await post({ path: '/marks/later', entries: [{ collection: 'news', slug: 'later', data: { title: 'Later on', published: false, tags: [] } }] })).text()).toContain('>Later on</h1>')
+
+    const refused = await post({ path: '/marks/launch', entries: [{ collection: 'news', slug: 'launch', data: { title: 3, published: true, tags: [1] } }, { collection: 'posts', slug: 'first', data: {} }] })
+
+    expect(refused.status).toBe(422)
+    expect(await refused.json()).toEqual({ issues: [
+      { collection: 'news', slug: 'launch', path: 'title', message: expect.any(String) },
+      { collection: 'news', slug: 'launch', path: 'tags.0', message: expect.any(String) },
+      { collection: 'posts', slug: 'first', path: '', message: 'names no collection the content config exports' },
+    ] })
+    expect((await post(draft, preview)).status).toBe(403)
+    expect((await post(draft, edit, { origin: 'https://evil.example' })).status).toBe(403)
+    expect((await post({ path: '//evil.example', entries: [] })).status).toBe(400)
   })
 
   it('shows drafts to that visitor alone, from a fresh load no cache keeps, until the cookie runs out or they leave', async () => {

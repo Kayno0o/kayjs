@@ -16,7 +16,7 @@ const NAMED = /`(\w+)(?:<[^`>]*>)?(?:\([^`]*\))?`/g
 // Names the prose places, as "`shutdown(app)` from `kay/server`" or "`onCleanup`, `untrack` and `flush` come from `kay` too".
 const MENTION = /((?:`\w+(?:<[^`>]*>)?(?:\([^`]*\))?`(?:, | and | or ))*`\w+(?:<[^`>]*>)?(?:\([^`]*\))?`),? (?:(?:imported |comes? )?from|in) `(kay(?:\/[\w/-]+)?)`/g
 // The entry points an app imports from, without what compiled files import (llms/project.md).
-const PUBLIC_ENTRIES = ['kay', 'kay/cache', 'kay/content', 'kay/i18n', 'kay/icons', 'kay/image', 'kay/markdown', 'kay/params', 'kay/seo', 'kay/server', 'kay/test']
+const PUBLIC_ENTRIES = ['kay', 'kay/cache', 'kay/content', 'kay/edit', 'kay/i18n', 'kay/icons', 'kay/image', 'kay/markdown', 'kay/params', 'kay/seo', 'kay/server', 'kay/test']
 const LEADING_TYPE = /^type\s+/
 const ALIAS = /\s+as\s+(?:\S.*)?$/
 

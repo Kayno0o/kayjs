@@ -4,7 +4,12 @@ import { news } from '../../content.config'
 const entry = await news.get(ctx.params.slug) ?? ctx.notFound()
 const { Content } = entry
 ---
+---
+import DraftEditor from '../../components/draft-editor.kay'
+import Headline from '../../components/headline.kay'
+---
 h1 {entry.data.title}
+Headline(title={entry.data.title})
 p Posted as {entry.data.title}
 img(src="/cover.png" alt={entry.data.title})
 ul
@@ -13,3 +18,4 @@ ul
 textarea Draft: {entry.data.title}
 article
   Content
+DraftEditor

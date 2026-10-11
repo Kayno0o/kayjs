@@ -170,6 +170,6 @@ The two differ only where Bun.markdown is odd: a named reference such as `&copy;
 
 ## Preview mode
 
-Setting `preview: { secret }` in `kay.config.ts` lets an editor see drafts on the live site through a signed link, see [the full reference](/llms/content#preview-mode). Edit mode, entered with `enterPreview(ctx, { edit: true })` or `previewUrl(path, { edit: true })`, is preview mode for a CMS editing content on the page, which `editing()` from `kay` tells: the page then marks the markup each field and body renders, `data-kay-field`, `data-kay-list` and `data-kay-body` attributes or comments around mixed text, for the CMS to find on the page.
+Setting `preview: { secret }` in `kay.config.ts` lets an editor see drafts on the live site through a signed link, see [the full reference](/llms/content#preview-mode). Edit mode, entered with `enterPreview(ctx, { edit: true })` or `previewUrl(path, { edit: true })`, is preview mode for a CMS editing content on the page, which `editing()` from `kay` tells: the page then marks the markup each field and body renders, `data-kay-field`, `data-kay-list` and `data-kay-body` attributes or comments around mixed text, for the CMS to find on the page. `showDraft(entries)` from `kay/edit` shows the page with the entries the editor has not saved, keeping the editor's island alive, or resolves where they fail the schema.
 
 <ReadMore href="/llms/content">Syntax highlighting, `renderMarkdown`, the caches, atom feeds and the loader options are in the full content reference.</ReadMore>

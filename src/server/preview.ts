@@ -1,14 +1,20 @@
 import type { CookieMap } from 'bun'
 import type { Elysia } from 'elysia'
 import type { PreviewConfig } from '../config'
+import type { Collection } from '../content'
 import type { Duration } from '../runtime/duration'
-import type { PreviewMode, PreviewState } from '../runtime/preview'
+import type { DraftEntry, DraftIssue } from '../runtime/edit'
+import type { EntryDraft, PreviewMode, PreviewState } from '../runtime/preview'
 import { AsyncLocalStorage } from 'node:async_hooks'
+import { dataIssues } from '../content/validate'
 import { durationSeconds } from '../runtime/duration'
+import { exportNameOf } from '../runtime/fields'
 import { setPreviewScope } from '../runtime/preview'
-import { overHttps } from './actions'
+import { DRAFT_ROUTE } from '../runtime/swap'
+import { isCrossSite, overHttps } from './actions'
 import { nodeCrypto } from './builtins'
 import { useStampSecret } from './stamp'
+import { visitAs } from './visit'
 
 // Where a preview link enters preview mode, or `?exit` leaves it.
 export const PREVIEW_ROUTE = '/_kay/preview'
@@ -20,6 +26,9 @@ const MIN_SECRET_LENGTH = 32
 // A path of the site, never `//host` nor `/\host`, which a browser reads as another site.
 const SITE_PATH = /^\/(?![/\\])\S*$/
 const TEXT = { 'content-type': 'text/plain; charset=utf-8' }
+// Names the drafts `/_kay/draft` renders a page with, by an id no request from outside can guess.
+const DRAFT_HEADER = 'x-kay-draft'
+const POSTED_HEADERS = ['content-type', 'content-length']
 
 interface PreviewSettings {
   secret: string
@@ -29,6 +38,7 @@ interface PreviewSettings {
 
 let settings: PreviewSettings | undefined
 const store = new AsyncLocalStorage<PreviewState>()
+const pendingDrafts = new Map<string, Map<string, EntryDraft[]>>()
 
 setPreviewScope(() => store.getStore())
 
@@ -47,9 +57,86 @@ export function setupPreview(config: PreviewConfig | undefined, base: string): v
   settings = { secret: config.secret, maxAge: durationSeconds(config.maxAge ?? DEFAULT_MAX_AGE, 'preview.maxAge'), base }
 }
 
-// Renders for a visitor in preview mode, in edit mode too when `edit` is set.
-export function inPreview<T>(run: () => T, edit = false): T {
-  return store.run({ loads: new Map(), edit }, run)
+// Renders for a visitor in preview mode, in edit mode too when `edit` is set, with the entries `drafts` holds standing in for theirs.
+export function inPreview<T>(run: () => T, edit = false, drafts?: Map<string, EntryDraft[]>): T {
+  return store.run({ loads: new Map(), edit, ...drafts && { drafts } }, run)
+}
+
+// The drafts `/_kay/draft` renders the page of `request` with.
+export function requestDrafts(request: Request): Map<string, EntryDraft[]> | undefined {
+  const id = request.headers.get(DRAFT_HEADER)
+
+  return id === null ? undefined : pendingDrafts.get(id)
+}
+
+// `/_kay/draft` answers a visitor in edit mode with the page at `path` rendered with the entries they have not saved, or a 422 with where those fail their schema.
+export function serveDrafts(app: Elysia, collections: Collection<unknown>[]): void {
+  app.post(DRAFT_ROUTE, async ({ request, server }) => {
+    if (previewRequested(request) !== 'edit' || isCrossSite(request))
+      return new Response('Drafts are shown in edit mode only', { status: 403, headers: TEXT })
+
+    const posted = await postedDrafts(request)
+
+    if (!posted)
+      return new Response('Not a draft: { path, entries: [{ collection, slug, locale?, data, body? }] }', { status: 400, headers: TEXT })
+
+    const drafts = new Map<string, EntryDraft[]>()
+    const issues: DraftIssue[] = []
+
+    for (const { collection, slug, locale, data, body } of posted.entries) {
+      const found = collections.find(each => exportNameOf(each.name) === collection)
+
+      if (!found) {
+        issues.push({ collection, slug, path: '', message: 'names no collection the content config exports' })
+
+        continue
+      }
+
+      issues.push(...dataIssues(found.options.schema, data).map(issue => ({ collection, slug, ...issue })))
+      drafts.set(found.name, [...drafts.get(found.name) ?? [], { slug, locale, data, body }])
+    }
+
+    if (issues.length > 0)
+      return Response.json({ issues }, { status: 422, headers: { 'cache-control': 'no-store' } })
+
+    const id = crypto.randomUUID()
+    const headers = new Headers(request.headers)
+
+    for (const name of POSTED_HEADERS)
+      headers.delete(name)
+
+    headers.set('accept', 'text/html')
+    headers.set(DRAFT_HEADER, id)
+    pendingDrafts.set(id, drafts)
+
+    try {
+      return await visitAs(request, new Request(new URL(posted.path, request.url), { headers }), server, async visit => app.handle(visit))
+    }
+    finally {
+      pendingDrafts.delete(id)
+    }
+  })
+}
+
+async function postedDrafts(request: Request): Promise<{ path: string, entries: DraftEntry[] } | undefined> {
+  let posted: unknown
+
+  try {
+    posted = await request.json()
+  }
+  catch {
+    return undefined
+  }
+
+  const { path, entries } = (posted ?? {}) as { path?: unknown, entries?: unknown }
+
+  return typeof path === 'string' && SITE_PATH.test(path) && Array.isArray(entries) && entries.every(isDraft) ? { path, entries: entries as DraftEntry[] } : undefined
+}
+
+function isDraft(value: unknown): boolean {
+  const { collection, slug, locale, body } = (value ?? {}) as Partial<Record<keyof DraftEntry, unknown>>
+
+  return typeof collection === 'string' && typeof slug === 'string' && (locale === undefined || typeof locale === 'string') && (body === undefined || typeof body === 'string')
 }
 
 // The mode the request's preview cookie, signed by this site and not expired yet, puts it in: `until.sig`, or `until.edit.sig` for edit mode.

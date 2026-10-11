@@ -1,0 +1,4 @@
+---
+const { title } = props<{ title: string }>()
+---
+h2.headline {title}
