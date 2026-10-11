@@ -19,7 +19,7 @@ bun run dev
 | `kay check [dir]` | Type-check the project, `.kay` files included |
 | `kay explain [lint\|group]` | List the lints, or a group's, or explain one |
 | `kay fmt [paths]` | Format `.kay` files |
-| `kay migrate astro [dir]` | Translate an Astro project into `.kay` files |
+| `kay migrate astro [dir]` | Translate an Astro project into a kay one |
 | `kay lsp --stdio` | The language server behind the editor extension |
 
 ## kay new
@@ -143,13 +143,27 @@ kay check --deny-warnings --fix
 
 `kay check` and its lints have their [own page](/reference/checks).
 
+## kay migrate
+
+```sh
+kay migrate astro . --out ../kay-site
+```
+
+Translates an Astro project's `.astro` files into `.kay` ones, its pages into `src/routes` and its content config into kay's, then lists what is left to do by hand at its line in the Astro file. It never writes over a file that exists.
+
+| Option | Effect |
+| --- | --- |
+| `[dir]` | The Astro project, the current directory by default |
+| `--out <dir>` | Writes there instead of next to the `.astro` files. A directory with no `package.json` gets a whole kay project: `package.json`, `kay.config.ts`, `tsconfig.json`, a server entry when the site renders on demand, and the project's other files under `src` and `public` |
+
+The [Astro guide](/guides/migrating-from-astro) shows what it translates and how to finish what it lists.
+
 ## Other commands
 
 ```sh
 kay explain positional-key   # one lint, with an example and the fix
 kay fmt src                  # format a folder
 kay fmt --check              # list unformatted files and fail
-kay migrate astro . --out ../kay-site
 ```
 
 <ReadMore href="/llms/project">Every `kay new` feature, what `kay dev` restarts on, the compiled executable's limits and what `kay migrate` translates are in the full project reference.</ReadMore>

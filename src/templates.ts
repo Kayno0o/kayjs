@@ -2,11 +2,21 @@
 
 export type Feature = 'server' | 'starter' | 'tailwind' | 'accents' | 'eslint' | 'tests' | 'ci' | 'docker' | 'auth' | 'ws'
 
+// What kay.config.ts sets beyond the features, for a project migrated from a site that already had them.
+export interface ConfigSettings {
+  lang?: string | undefined
+  site?: string | undefined
+  base?: string | undefined
+  // The `seo` defaults, left out where the pages already write their own titles and descriptions.
+  seo?: boolean | undefined
+}
+
 // The features a project is scaffolded with, as the files ask for them.
 interface Setup {
   has: (feature: Feature) => boolean
   // A Tailwind class list, left out of the markup of a project without Tailwind.
   tw: (classes: string) => string
+  settings: ConfigSettings
 }
 
 const REGISTRY = 'https://git.kaynooo.fr/api/packages/kaynooo/npm/'
@@ -14,6 +24,11 @@ const REGISTRY = 'https://git.kaynooo.fr/api/packages/kaynooo/npm/'
 // A file of these lines, each `false` left out.
 function lines(...entries: (string | false)[]): string {
   return `${entries.filter(entry => entry !== false).join('\n')}\n`
+}
+
+// A single-quoted string literal holding this text.
+function quote(text: string): string {
+  return `'${text.replaceAll('\\', '\\\\').replaceAll('\'', '\\\'')}'`
 }
 
 // A file of these blocks, each `false` left out, a blank line between the others.
@@ -238,8 +253,9 @@ it('${has('starter') ? 'greets from the server' : 'renders the home page'}', asy
 `
 }
 
-function config({ has }: Setup): string {
+function config({ has, settings }: Setup): string {
   const server = has('server')
+  const base = settings.base === undefined ? undefined : quote(settings.base)
 
   return lines(
     !server && 'import process from \'node:process\'',
@@ -248,10 +264,11 @@ function config({ has }: Setup): string {
     '',
     !server && '// Set when building, as the Pages workflow does: the path the site is published under; kay reads the host it is published on from SITE_URL.',
     'export default defineConfig({',
-    '  lang: \'en\',',
-    !server && '  base: process.env.SITE_BASE,',
+    `  lang: ${quote(settings.lang ?? 'en')},`,
+    settings.site !== undefined && `  site: ${quote(settings.site)},`,
+    server ? base !== undefined && `  base: ${base},` : `  base: process.env.SITE_BASE${base === undefined ? '' : ` ?? ${base}`},`,
     has('tailwind') && '  plugins: [tailwind],',
-    '  seo: { name: \'__NAME__\', titleTemplate: \'%s | __NAME__\', description: \'__NAME__, made with kay\' },',
+    settings.seo !== false && '  seo: { name: \'__NAME__\', titleTemplate: \'%s | __NAME__\', description: \'__NAME__, made with kay\' },',
     '})',
   )
 }
@@ -749,9 +766,9 @@ export function agentsFile(scripts: Record<string, string>): string {
 }
 
 // Every file but package.json, tsconfig.json and the agents' instructions, which `createProject` writes from the same features and scripts.
-export function templateFiles(features: ReadonlySet<Feature>): Record<string, string> {
+export function templateFiles(features: ReadonlySet<Feature>, settings: ConfigSettings = {}): Record<string, string> {
   const has = (feature: Feature) => features.has(feature)
-  const setup: Setup = { has, tw: classes => has('tailwind') ? classes : '' }
+  const setup: Setup = { has, tw: classes => has('tailwind') ? classes : '', settings }
   const server = has('server')
 
   return {

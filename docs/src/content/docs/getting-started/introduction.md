@@ -50,5 +50,6 @@ Counter
 - [Project structure](/getting-started/project-structure) shows where things live.
 - [Templates](/essentials/templates) and [Components](/essentials/components) teach the syntax.
 - [The tutorial](/guides/tutorial) builds a small app step by step.
+- [Migrating from Astro](/guides/migrating-from-astro) moves an Astro site over with one command.
 
 <ReadMore href="/llms">The full reference documents every topic, written for people and coding agents alike.</ReadMore>

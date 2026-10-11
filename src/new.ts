@@ -1,4 +1,4 @@
-import type { Feature } from './templates'
+import type { ConfigSettings, Feature } from './templates'
 import { randomBytes } from 'node:crypto'
 import { existsSync, statSync } from 'node:fs'
 import { chmod, readdir } from 'node:fs/promises'
@@ -113,11 +113,24 @@ export async function createProject(target: string, options: NewOptions = {}): P
 
   await refuseTarget(target)
 
+  const files = await projectFiles(dir, features, options.kay)
+
+  await Promise.all(Object.entries(files).map(async ([path, content]) => Bun.write(join(dir, path), content)))
+
+  // The session secret is for its owner's eyes only.
+  if (features.has('auth'))
+    await chmod(join(dir, '.env'), 0o600)
+
+  return Object.keys(files).sort()
+}
+
+// Every file of a project with these features in `dir`, named after it; run from a checkout of kay, packs it into `dir/vendor` for the project to depend on.
+export async function projectFiles(dir: string, features: ReadonlySet<Feature>, kayDependency?: string | undefined, settings: ConfigSettings = {}): Promise<Record<string, string>> {
   const has = (feature: Feature) => features.has(feature)
   const name = packageName(basename(dir))
   const kay = await Bun.file(join(KAY_ROOT, 'package.json')).json() as { name: string, version: string, dependencies: Record<string, string>, devDependencies: Record<string, string> }
   // A kay minor may break, so the project takes its patches only.
-  const dependency = options.kay ?? (existsSync(join(KAY_ROOT, '.git')) ? await packKay(join(dir, 'vendor')) : `npm:${kay.name}@~${kay.version}`)
+  const dependency = kayDependency ?? (existsSync(join(KAY_ROOT, '.git')) ? await packKay(join(dir, 'vendor')) : `npm:${kay.name}@~${kay.version}`)
   // An app's tests run each file in modules of its own, so each gets the database tests/database.ts copies for it.
   const scripts = {
     dev: 'kay dev',
@@ -135,7 +148,7 @@ export async function createProject(target: string, options: NewOptions = {}): P
     ...has('tailwind') ? ['bun-plugin-tailwind', 'tailwindcss'] : [],
   ].filter(entry => entry !== false)
   const files: Record<string, string> = {
-    ...templateFiles(features),
+    ...templateFiles(features, settings),
     'AGENTS.md': agentsFile(scripts),
     'package.json': `${JSON.stringify({
       name,
@@ -152,13 +165,7 @@ export async function createProject(target: string, options: NewOptions = {}): P
   if (has('auth'))
     files['.env'] = `SESSION_SECRET=${randomBytes(32).toString('hex')}\nDATABASE_URL=postgres://app:app@127.0.0.1:5433/app\nCOMPOSE_FILE=compose.dev.yaml\n`
 
-  await Promise.all(Object.entries(files).map(async ([path, content]) => Bun.write(join(dir, path), content.replaceAll('__NAME__', name))))
-
-  // The session secret is for its owner's eyes only.
-  if (has('auth'))
-    await chmod(join(dir, '.env'), 0o600)
-
-  return Object.keys(files).sort()
+  return Object.fromEntries(Object.entries(files).map(([path, content]) => [path, content.replaceAll('__NAME__', name)]))
 }
 
 // What a directory name becomes as a package name, which is also safe to write into a template: lower case letters, digits and `-._~`.

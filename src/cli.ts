@@ -553,7 +553,7 @@ async function scaffold(args: string[]): Promise<number> {
   }
 }
 
-// Translates an Astro project's `.astro` files and content config, in place or into `--out`, and lists what is left to do by hand.
+// Translates an Astro project's `.astro` files and content config, in place or into `--out`, a directory with no package.json getting the kay project around them, and lists what is left to do by hand.
 async function migrate(args: string[]): Promise<number> {
   const parsed = parseCommand(args, { out: { type: 'string' } }, 2)
 
@@ -575,7 +575,7 @@ async function migrate(args: string[]): Promise<number> {
   }
 
   const out = typeof parsed.values.out === 'string' ? resolve(parsed.values.out) : resolve(dir)
-  const { written, skipped, notes } = await migrateAstroProject(resolve(dir), out)
+  const { written, copied, skipped, notes } = await migrateAstroProject(resolve(dir), out)
   const shown = (file: string) => relative(process.cwd(), join(out, file)) || '.'
 
   for (const file of written)
@@ -584,10 +584,16 @@ async function migrate(args: string[]): Promise<number> {
   for (const file of skipped)
     console.log(`${colors.bold.yellow('kept')} ${shown(file)}, which exists`)
 
+  if (copied.length > 0)
+    done('copied', `${count(copied.length, 'other file')} of src and public`)
+
   if (notes.length > 0)
     console.log(`\nLeft to do by hand, the code it concerns marked \`kay migrate:\` where it was commented out:\n${notes.map(each => `${relative(process.cwd(), join(dir, each.file))}:${each.line}${each.target === undefined ? '' : ` (${shown(each.target)})`}: ${each.message}`).join('\n')}`)
 
   console.log(`\n${count(written.length, 'file')} written, ${count(notes.length, 'item')} left to do by hand`)
+
+  if (written.includes('package.json'))
+    console.log(`\n  ${colors.cyan(`cd ${shellQuote(relative(process.cwd(), out) || '.')} && bun install && bun run dev`)}`)
 
   return 0
 }

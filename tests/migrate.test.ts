@@ -1,6 +1,6 @@
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { formatKay } from '../src/compiler/format'
 import { migrateAstro } from '../src/migrate/astro'
@@ -108,7 +108,7 @@ const { items, open } = props<Record<string, unknown>>()
   })
 
   it('gives a layout\'s head to a head block and its body to the template', () => {
-    const { code, notes } = component(`---
+    const { code, notes, lang } = component(`---
 const { title, data } = Astro.props
 ---
 <!doctype html>
@@ -136,7 +136,8 @@ head
 // the page
 main(innerHTML={trustHtml(title)})
 `)
-    expect(notes.map(note => lead(note.message))).toEqual(['Astro.props without a `Props` type', '`lang` on html', 'the attributes of body (class="page") have no place in kay, which writes body itself'])
+    expect(notes.map(note => lead(note.message))).toEqual(['Astro.props without a `Props` type', 'the attributes of body (class="page") have no place in kay, which writes body itself'])
+    expect(lang).toEqual({ line: 5, value: 'en' })
   })
 
   it('fills a component\'s named slots from its children, and hydrates an island when Astro did', () => {
@@ -252,6 +253,7 @@ export const authors = collection('content/authors', {
 
     dirs.push(root)
     await Promise.all([
+      Bun.write(join(root, 'package.json'), '{ "dependencies": { "astro": "^5.0.0" } }'),
       Bun.write(join(root, 'tsconfig.json'), '{ "compilerOptions": { "paths": { "~/*": ["./src/*"] } } }'),
       Bun.write(join(root, 'src/pages/index.astro'), '---\nimport Layout from \'../layouts/BaseLayout.astro\'\nimport Card from \'~/components/ProductCard.astro\'\n---\n<Layout><Card /></Layout>\n'),
       Bun.write(join(root, 'src/pages/404.astro'), '<h1>Not found</h1>\n'),
@@ -268,6 +270,55 @@ export const authors = collection('content/authors', {
     expect(report.skipped).toEqual(['src/components/kept.kay'])
     expect(await Bun.file(join(root, 'src/routes/index.kay')).text()).toBe('--- server\nimport Layout from \'../layouts/base-layout.kay\'\nimport Card from \'~/components/product-card.kay\'\n---\nLayout\n  Card\n')
     expect(await Bun.file(join(root, 'src/components/kept.kay')).text()).toBe('p Mine\n')
-    expect(report.notes.map(note => note.file)).toEqual(['src/pages/api/ping.ts', 'tsconfig.json'])
+    expect(report.notes.map(note => note.file)).toEqual(['package.json', 'src/pages/api/ping.ts', 'tsconfig.json'])
+  })
+
+  it('writes the kay project around the pages into an empty directory, with the Astro project\'s settings, packages and other files', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'kay-migrate-'))
+    const out = join(await mkdtemp(join(tmpdir(), 'kay-migrate-')), 'site')
+
+    dirs.push(root, dirname(out))
+    await Promise.all([
+      Bun.write(join(root, 'package.json'), JSON.stringify({ dependencies: { 'astro': '^5.0.0', '@astrojs/node': '^9.0.0', 'tailwindcss': '^4.1.0', '@tailwindcss/vite': '^4.1.0', 'date-fns': '^4.1.0' }, devDependencies: { 'prettier-plugin-astro': '^0.14.0' } })),
+      Bun.write(join(root, 'astro.config.mjs'), 'import node from \'@astrojs/node\'\n\nexport default defineConfig({\n  site: \'https://example.com\',\n  base: \'/docs\',\n  output: \'server\',\n  adapter: node({ mode: \'standalone\' }),\n})\n'),
+      Bun.write(join(root, 'tsconfig.json'), '{ "extends": "astro/tsconfigs/strict", "compilerOptions": { "baseUrl": ".", "paths": { "@/*": ["src/*"] } } }'),
+      Bun.write(join(root, 'src/env.d.ts'), '/// <reference types="astro/client" />\n'),
+      Bun.write(join(root, 'src/layouts/Layout.astro'), '---\nimport \'../styles/global.css\'\n---\n<html lang="fr">\n  <head><title>Site</title></head>\n  <body><slot /></body>\n</html>\n'),
+      Bun.write(join(root, 'src/pages/index.astro'), '---\nimport Layout from \'../layouts/Layout.astro\'\n---\n<Layout><h1>Accueil</h1></Layout>\n'),
+      Bun.write(join(root, 'src/styles/global.css'), '@import \'tailwindcss\';\n'),
+      Bun.write(join(root, 'public/favicon.svg'), '<svg xmlns="http://www.w3.org/2000/svg"/>\n'),
+      Bun.write(join(root, 'public/.well-known/security.txt'), 'Contact: mailto:me@example.com\n'),
+    ])
+
+    const report = await migrateAstroProject(root, out, { kay: '^1.0.0' })
+    const packageJson = await Bun.file(join(out, 'package.json')).json() as { scripts: Record<string, string>, dependencies: Record<string, string>, devDependencies: Record<string, string> }
+
+    expect(report.written.toSorted()).toEqual(['.gitignore', '.npmrc', 'AGENTS.md', 'kay.config.ts', 'package.json', 'src/layouts/layout.kay', 'src/routes/index.kay', 'src/server.ts', 'tsconfig.json'])
+    expect(report.copied.toSorted()).toEqual(['public/.well-known/security.txt', 'public/favicon.svg', 'src/styles/global.css'])
+    expect(await Bun.file(join(out, 'src/routes/index.kay')).text()).toBe('--- server\nimport Layout from \'../layouts/layout.kay\'\n---\nLayout\n  h1 Accueil\n')
+    expect(await Bun.file(join(out, 'kay.config.ts')).text()).toBe('import tailwind from \'bun-plugin-tailwind\'\nimport { defineConfig } from \'kay/server\'\n\nexport default defineConfig({\n  lang: \'fr\',\n  site: \'https://example.com\',\n  base: \'/docs\',\n  plugins: [tailwind],\n})\n')
+    expect(await Bun.file(join(out, 'tsconfig.json')).json()).toEqual({ extends: 'kay/tsconfig.json', compilerOptions: { paths: { '@/*': ['./src/*'] } } })
+    expect(packageJson.scripts.dev).toBe('kay dev')
+    expect(packageJson.dependencies).toEqual({ 'date-fns': '^4.1.0', 'elysia': expect.any(String), 'kay': '^1.0.0' })
+    expect(Object.keys(packageJson.devDependencies)).toEqual(['@types/bun', 'bun-plugin-tailwind', 'tailwindcss'])
+    expect(report.notes).toEqual([])
+  })
+
+  it('carries a static site\'s base under the one the Pages workflow sets, and lists Tailwind 3', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'kay-migrate-'))
+    const out = join(root, 'kay')
+
+    dirs.push(root)
+    await Promise.all([
+      Bun.write(join(root, 'package.json'), JSON.stringify({ dependencies: { 'astro': '^4.0.0', '@astrojs/tailwind': '^5.0.0', 'tailwindcss': '^3.4.0' } })),
+      Bun.write(join(root, 'astro.config.ts'), 'export default defineConfig({ base: \'/blog\' })\n'),
+      Bun.write(join(root, 'src/pages/index.astro'), '<h1>Blog</h1>\n'),
+    ])
+
+    const report = await migrateAstroProject(root, out, { kay: '^1.0.0' })
+
+    expect(await Bun.file(join(out, 'kay.config.ts')).text()).toContain('  base: process.env.SITE_BASE ?? \'/blog\',\n')
+    expect(report.written).not.toContain('src/server.ts')
+    expect(report.notes.map(note => lead(note.message))).toEqual(['Tailwind 3'])
   })
 })

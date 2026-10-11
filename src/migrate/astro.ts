@@ -14,6 +14,8 @@ export interface Note {
 export interface MigratedFile {
   code: string
   notes: Note[]
+  // The `lang` a layout's `html` gives as text, which kay sets once in kay.config.ts.
+  lang?: { line: number, value: string } | undefined
 }
 
 export interface MigrateOptions {
@@ -92,7 +94,8 @@ export function migrateAstro(source: string, options: MigrateOptions): MigratedF
   const templateLine = lineAt(source, templateStart)
   const imports: Imports = { image: new Set(), router: new Set(), kay: new Set(), kayTypes: new Set() }
   const script = migrateFrontmatter(frontmatter, options, imports, (line, message) => notes.push({ line: line + 1, message }))
-  const template = migrateTemplate(source.slice(templateStart), options, imports, (line, message) => notes.push({ line: line + templateLine - 1, message }))
+  let lang: MigratedFile['lang']
+  const template = migrateTemplate(source.slice(templateStart), options, imports, (line, message) => notes.push({ line: line + templateLine - 1, message }), (line, value) => lang = { line: line + templateLine - 1, value })
   const kayImport = [...imports.kayTypes.size > 0 ? [`import type { ${[...imports.kayTypes].toSorted().join(', ')} } from 'kay'\n`] : [], ...imports.kay.size > 0 ? [`import { ${[...imports.kay].toSorted().join(', ')} } from 'kay'\n`] : []].join('')
   const fenced = `${kayImport}${script.trim()}`.trim()
   const fence = fenced === '' ? '' : `${options.role === 'page' ? '--- server' : '---'}\n${fenced}\n---\n`
@@ -102,7 +105,7 @@ export function migrateAstro(source: string, options: MigrateOptions): MigratedF
   if (formatted.diagnostics.length > 0)
     notes.push({ line: 1, message: `the translation does not parse as kay (${formatted.diagnostics[0]!.message}), so it is left as written; fix it by hand` })
 
-  return { code: formatted.diagnostics.length > 0 ? code : formatted.code, notes: notes.toSorted((a, b) => a.line - b.line) }
+  return { code: formatted.diagnostics.length > 0 ? code : formatted.code, notes: notes.toSorted((a, b) => a.line - b.line), lang }
 }
 
 function migrateFrontmatter(code: string, options: MigrateOptions, imports: Imports, note: (line: number, message: string) => void): string {
@@ -317,7 +320,7 @@ function walk(node: t.Node, visit: (node: t.Node, parent: t.Node | undefined) =>
   }
 }
 
-function migrateTemplate(markup: string, options: MigrateOptions, imports: Imports, note: (line: number, message: string) => void): string {
+function migrateTemplate(markup: string, options: MigrateOptions, imports: Imports, note: (line: number, message: string) => void, lang: (line: number, value: string) => void): string {
   const raws: RawBlock[] = []
   // Each change keeps the text's line count, so a node's line is its line in the file.
   const prepared = markup
@@ -337,7 +340,7 @@ function migrateTemplate(markup: string, options: MigrateOptions, imports: Impor
     return `// kay migrate: the markup below was not translated\n${markup.split('\n').map(line => `  ${line}`).join('\n')}\n`
   }
 
-  const translator = new Translator(wrapped, options, imports, raws, note)
+  const translator = new Translator(wrapped, options, imports, raws, note, lang)
 
   return translator.document(root.children)
 }
@@ -345,7 +348,7 @@ function migrateTemplate(markup: string, options: MigrateOptions, imports: Impor
 type Child = t.JSXText | t.JSXExpressionContainer | t.JSXSpreadChild | t.JSXElement | t.JSXFragment
 
 class Translator {
-  constructor(private readonly source: string, private readonly options: MigrateOptions, private readonly imports: Imports, private readonly raws: RawBlock[], private readonly note: (line: number, message: string) => void) {}
+  constructor(private readonly source: string, private readonly options: MigrateOptions, private readonly imports: Imports, private readonly raws: RawBlock[], private readonly note: (line: number, message: string) => void, private readonly lang: (line: number, value: string) => void) {}
 
   private text(node: t.Node): string {
     return this.source.slice(node.start!, node.end!)
@@ -379,7 +382,12 @@ class Translator {
     const lines: string[] = []
 
     for (const attribute of html.openingElement.attributes) {
-      if (attribute.type === 'JSXAttribute' && this.attributeName(attribute) === 'lang')
+      if (attribute.type !== 'JSXAttribute' || this.attributeName(attribute) !== 'lang')
+        continue
+
+      if (attribute.value?.type === 'StringLiteral')
+        this.lang(this.line(attribute), attribute.value.value)
+      else
         this.note(this.line(attribute), `\`lang\` on html: set \`lang: ${this.text(attribute.value!)}\` in kay.config.ts, which writes it on every page`)
     }
 
