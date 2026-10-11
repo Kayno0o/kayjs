@@ -299,6 +299,7 @@ describe('kay lsp imports', () => {
       // A kay library, its components given specifiers by its exports map.
       Bun.write(join(dir, 'node_modules/kay-lib/package.json'), JSON.stringify({ name: 'kay-lib', version: '1.0.0', type: 'module', peerDependencies: { kay: '*' }, exports: { './*.kay': './src/*.kay' } })),
       Bun.write(join(dir, 'node_modules/kay-lib/src/tag-pill.kay'), '---\nconst { label } = props<{ label: string }>()\n---\nspan.pill {label}\n'),
+      Bun.write(join(dir, 'node_modules/kay-lib/src/unused-pill.kay'), '---\nconst count: number = \'one\'\n---\nspan.pill {count}\n'),
       Bun.write(join(dir, 'src/actions.ts'), 'import { action } from \'kay\'\n\nexport const add = action(() => 1)\n'),
       Bun.write(join(dir, 'src/data.ts'), 'export function listTodos(): string[] {\n  return []\n}\n'),
       Bun.write(join(dir, 'src/badge.kay'), 'span.badge New\n'),
@@ -413,6 +414,14 @@ describe('kay lsp imports', () => {
     const diagnostics = await editor.change(page, source, 10)
 
     expect(diagnostics.map(diagnostic => [diagnostic.range.start.line, diagnostic.severity, diagnostic.code])).toEqual([[3, 2, 'identity-key']])
+    // Worded as kay check words it, its note and help on their own lines.
+    expect(diagnostics[0]!.message).toBe('These rows are matched by the objects themselves, which have no `id`\nnote: a list rebuilt with new objects, as a `.map` or a refresh makes, builds every row anew, and their state goes with them\nhelp: name what tells the rows apart, `for post of posts key={post.slug}`')
+  })
+
+  it('tells to call a function read by name where its value goes, as kay check does', async () => {
+    const diagnostics = await editor.change(page, '---\nconst open = () => true\n---\nif open\n  span on\n', 11)
+
+    expect(diagnostics.map(diagnostic => [diagnostic.range.start.line, diagnostic.code, diagnostic.message.split('\n').at(-1)])).toEqual([[3, 2774, 'help: a function is always true here, so its value is read by calling it, `open()`: a signal or memo reads by its name only where kay sees it made']])
   })
 
   it('reports nothing on the index of a positionally keyed for whose rows do not read it, and renames it with its key', async () => {
@@ -421,6 +430,11 @@ describe('kay lsp imports', () => {
 
     expect(diagnostics.map(diagnostic => [diagnostic.range.start.line, diagnostic.code])).toEqual([[3, 'positional-key']])
     expect(spots((await editor.rename(page, 3, 10, 'index'))[page]!)).toEqual([[3, 10, 11], [3, 26, 27]])
+  })
+
+  // Last, as opening another file publishes the page's diagnostics again, which a later change would take for its own.
+  it('leaves the type errors of a library component the app never imports to the library, as kay check does', async () => {
+    expect(await editor.open('node_modules/kay-lib/src/unused-pill.kay')).toEqual([])
   })
 })
 

@@ -1,7 +1,7 @@
 import type { KayLibrary, SettingsReplacement } from '../build/libraries'
 import type { Diagnostic, Fix } from '../compiler/ast'
 import type { Paint } from '../compiler/frame'
-import type { LintLevel, LintLevels, TypeLint } from '../compiler/lints'
+import type { LintLevels } from '../compiler/lints'
 import type { FaviconConfig, I18nConfig, KayConfig, KayExtension, SeoConfig } from '../config'
 import type { ComponentUse } from '../content/server'
 import type { ContentProblem } from '../content/validate'
@@ -10,6 +10,7 @@ import type { LocaleSettings } from '../runtime/i18n'
 import type { ApiModule } from '../server/api'
 import type { Redirects } from '../server/redirects'
 import type { Endpoint, Route, RouteMount } from '../server/routes'
+import type { TsgoDiagnostic, TypeScope } from './diagnose'
 import type { ShadowFile } from './shadow'
 import { existsSync, statSync } from 'node:fs'
 import { readdir, rm } from 'node:fs/promises'
@@ -25,7 +26,7 @@ import { importedSignals } from '../build/signals'
 import { cacheEntry } from '../build/transform'
 import { componentName, rendersAsIsland, SourceMap } from '../compiler'
 import { formatReport } from '../compiler/frame'
-import { isLaunchLint, isLint, isLintGroup, LEVELS, lintLevels, typeLint } from '../compiler/lints'
+import { isLaunchLint, isLint, isLintGroup, LEVELS, lintLevels } from '../compiler/lints'
 import { offsetAt, positionAt } from '../compiler/mapping'
 import { cssImportsWithoutText, deprecatedSchemaNames } from '../compiler/script'
 import { CONFIG_FILE } from '../config'
@@ -41,11 +42,11 @@ import { redirectProblems } from '../server/redirects'
 import { patternShapes, routeMounts, routeOf, scanEndpoints, scanRoutes, servedPaths } from '../server/routes'
 import { ROBOTS, SITEMAP } from '../server/sitemap'
 import { bootProblems } from './boot'
+import { diagnoseShadow, ownFile, reportsTypeErrors, shownOutsideKay, unusedCodesOf } from './diagnose'
 import { islandOnlyComponents } from './island-only'
 import { configSeoLints } from './seo'
 import { compileShadow, matcherSource, serializeShadowSettings, SHADOW_SETTINGS, shadowPath } from './shadow'
 
-const KAY_FILE = /\.kay$/
 const SETTINGS_CHECK = 'kay-settings.ts'
 const EXPORTS_CHECK = 'kay-exports.ts'
 const CONTENT_CHECK = 'kay-content.ts'
@@ -101,10 +102,6 @@ export interface CheckDiagnostic extends Pick<Diagnostic, 'label' | 'related' | 
   checkOnly?: boolean | undefined
 }
 
-// What `noUnusedLocals` reports: `kay check` turns it on for .kay files, and leaves other files to the project's tsconfig.
-export const UNUSED_CODES = new Set([6133, 6192, 6196, 6198, 6199, 6205])
-// What `noUnusedParameters` alone reports: a parameter, a destructured one or a type parameter, under the codes locals share.
-const UNUSED_PARAMETER_CODES = new Set([6133, 6198, 6205])
 // The project's own scripts, which `kay check` reads for what only it reports in them; a declaration file holds no code.
 const SCRIPT_MODULE = /\.(?:[cm]?ts|tsx)$/
 const DECLARATION_FILE = /\.d\.[cm]?ts$/
@@ -116,11 +113,6 @@ const TS_EXTENSION = /\.ts$/
 const PARAM_SEGMENT = /:([^/]+)/g
 // A prop name TypeScript reads unquoted, so its errors name it as written.
 const IDENTIFIER = /^[a-z_$][\w$]*$/i
-// A condition that is always true, a function standing in for its value.
-const ALWAYS_DEFINED = 'TS2774'
-const MISSING_PROPERTY = 'TS2339'
-const LEADING_NAME = /^[a-z_$][\w$]*/i
-const MEMBER_OF = /([a-z_$][\w$]*)\??\.$/i
 // What kay serves itself, whether or not the project turns it on.
 const KAY_PATHS = [SITEMAP, ROBOTS, ...FAVICON_PATHS, HEALTH_PATH, OPENAPI_PATH, REFERENCE_PATH]
 // What a browser percent-encodes in a path it is given: spaces, controls and anything outside ASCII.
@@ -307,13 +299,6 @@ export interface ShadowTypes {
   exports: Map<number, { file: string, wanted: string }>
   // The static components only islands render, which compile as rendered inline with them.
   islandOnly: Set<string>
-}
-
-// A file of the project itself: under its root and outside every `node_modules`.
-function ownFile(root: string, file: string): boolean {
-  const path = relative(resolve(root), file)
-
-  return !path.startsWith('..') && !path.split(sep).includes('node_modules')
 }
 
 // Each component a library exports, typed as the module its specifier names: rootDirs merges relative imports only, so a package's `.kay` files reach the app through these.
@@ -567,56 +552,29 @@ export async function check(root: string, options: CheckOptions = {}): Promise<C
   const [{ output, errors, code }, messages, boot] = await Promise.all([typecheck(root, tsconfig, shown), checkMessages(root, options.i18n, options.extensions), bootProblems(resolve(root), options)])
   const config = resolve(root, tsconfig)
   const reported = parseTscOutput(output, config, root)
-  // A file that did not compile has its errors already; what TypeScript makes of the code compiled around them would only add noise.
-  const broken = new Set(diagnostics.filter(diagnostic => !diagnostic.checkOnly).map(diagnostic => diagnostic.file))
-  // A library's own modules are its to check, as `skipLibCheck` leaves a declaration file's, a missing optional peer included: only its components compile as the app's. An app inside a linked library's repository keeps its own files.
-  const libraryModule = (file: string) => !KAY_FILE.test(file) && libraryOf(libraries, file) !== undefined && !ownFile(root, file)
+  const scope: TypeScope = { root, broken: new Set(diagnostics.filter(diagnostic => !diagnostic.checkOnly).map(diagnostic => diagnostic.file)), unreached, libraries }
   const levels = new Map<ShadowFile, ReturnType<typeof lintLevels>>()
-  // Unread code in a .kay file is the `unread-name` lint, at its level there.
-  const unreadLevel = (diagnostic: CheckDiagnostic): LintLevel | undefined => {
-    const shadow = files.get(diagnostic.file)
-
-    if (!shadow || diagnostic.code === undefined || !UNUSED_CODES.has(Number(diagnostic.code.slice(2))))
-      return undefined
-
+  const levelsOf = (shadow: ShadowFile) => {
     const levelAt = levels.get(shadow) ?? lintLevels(shadow.source, options.lints)
 
     levels.set(shadow, levelAt)
 
-    return levelAt('unread-name', shadow.map.toSource(offsetAt(shadow.tsx, diagnostic)) ?? 0)
-  }
-
-  // A lint the types find, as `identity-key`, at its level where the source has it.
-  const typeLintLevel = (diagnostic: CheckDiagnostic): { lint: TypeLint, level: LintLevel } | undefined => {
-    const lint = typeLint(diagnostic.message)
-    const shadow = files.get(diagnostic.file)
-
-    if (!lint || !shadow)
-      return undefined
-
-    const levelAt = levels.get(shadow) ?? lintLevels(shadow.source, options.lints)
-
-    levels.set(shadow, levelAt)
-
-    return { lint, level: levelAt(lint.code, shadow.map.toSource(offsetAt(shadow.tsx, diagnostic)) ?? 0) }
+    return levelAt
   }
 
   if (errors.trim() !== '')
     diagnostics.push({ file: config, line: 1, column: 1, message: errors.trim() })
 
   for (const diagnostic of reported) {
-    if (diagnostic.code !== undefined && UNUSED_CODES.has(Number(diagnostic.code.slice(2))) && (files.has(diagnostic.file) ? generatedOnly(diagnostic, files) : !projectUnused.has(Number(diagnostic.code.slice(2)))))
+    const shadow = files.get(diagnostic.file)
+    const diagnosed = shadow && diagnoseShadow(shadow, tsgoDiagnostic(diagnostic, shadow.tsx), levelsOf(shadow))
+
+    if (shadow ? !diagnosed : !shownOutsideKay(tsgoDiagnostic(diagnostic, '').code, projectUnused))
       continue
 
-    const unread = unreadLevel(diagnostic)
-    const typed = typeLintLevel(diagnostic)
-
-    if (unread === 'allow' || typed?.level === 'allow')
-      continue
-
-    const remapped = typed !== undefined
-      ? { ...remap(diagnostic, files), ...typed.lint, severity: typed.level === 'warn' ? 'warning' as const : 'error' as const }
-      : unread === undefined ? remap(diagnostic, files) : { ...remap(diagnostic, files), code: 'unread-name', severity: unread === 'warn' ? 'warning' as const : 'error' as const }
+    const remapped: CheckDiagnostic = shadow && diagnosed
+      ? { ...diagnostic, file: shadow.file, ...positionAt(shadow.source, diagnosed.span?.start ?? 0), code: diagnosed.code ?? diagnostic.code, severity: diagnosed.severity, message: diagnosed.message, note: diagnosed.note, help: diagnosed.help }
+      : diagnostic
     const setting = remapped.file === settingsFile ? settings.get(remapped.line) : undefined
     const exported = remapped.file === exportsFile ? exports.get(remapped.line) : undefined
     const used = remapped.file === contentFile ? props.lines.get(remapped.line) : undefined
@@ -627,7 +585,7 @@ export async function check(root: string, options: CheckOptions = {}): Promise<C
       diagnostics.push({ file: exported.file, line: 1, column: 1, code: remapped.code, message: `It must export ${exported.wanted}: ${remapped.message}` })
     else if (used)
       diagnostics.push({ file: resolve(root, used.file), line: used.line, column: 1, code: remapped.code, message: `<${used.component}> takes other props: ${remapped.message}` })
-    else if (!broken.has(remapped.file) && !unreached.has(remapped.file) && !libraryModule(remapped.file))
+    else if (reportsTypeErrors(remapped.file, scope))
       diagnostics.push(remapped)
   }
 
@@ -757,15 +715,6 @@ async function resolvedConfig(root: string, tsconfig: string): Promise<string | 
 }
 
 // The unused code the project's own tsconfig asks to be reported, in its .ts files too.
-function unusedCodesOf(shown: string | undefined): Set<number> {
-  if (shown === undefined)
-    return new Set()
-
-  const { compilerOptions } = JSON.parse(shown) as { compilerOptions?: { noUnusedLocals?: boolean, noUnusedParameters?: boolean } }
-
-  return compilerOptions?.noUnusedLocals === true ? UNUSED_CODES : compilerOptions?.noUnusedParameters === true ? UNUSED_PARAMETER_CODES : new Set()
-}
-
 // Runs tsgo incrementally, or not at all when its last run was clean and nothing it read has changed since: tsgo's own incremental mode still parses every file, most of a warm run's time.
 async function typecheck(root: string, tsconfig: string, shown: string | undefined): Promise<{ output: string, errors: string, code: number }> {
   const { cache, types: shadowDir } = projectPaths(root)
@@ -835,44 +784,11 @@ async function stillClean(run: CleanRun, shadowDir: string): Promise<boolean> {
   return hashes.length === Object.keys(run.generated).length && hashes.every(([file, hash]) => run.generated[file] === hash)
 }
 
-// A name kay generated, which the template reads in a way it does not spell out, rather than one the .kay file wrote.
-function generatedOnly(diagnostic: CheckDiagnostic, files: Map<string, ShadowFile>): boolean {
-  const shadow = files.get(diagnostic.file)!
+// What tsgo printed, at its offset in the file it read.
+function tsgoDiagnostic(diagnostic: CheckDiagnostic, text: string): TsgoDiagnostic {
+  const start = offsetAt(text, diagnostic)
 
-  return !shadow.map.isExact(offsetAt(shadow.tsx, diagnostic))
-}
-
-function remap(diagnostic: CheckDiagnostic, files: Map<string, ShadowFile>): CheckDiagnostic {
-  const shadow = files.get(diagnostic.file)
-
-  if (!shadow)
-    return diagnostic
-
-  const generated = offsetAt(shadow.tsx, diagnostic)
-  const source = shadow.map.toSource(generated) ?? 0
-  const remapped = { ...diagnostic, file: shadow.file, ...positionAt(shadow.source, source) }
-
-  return remapped.help === undefined && unreadSignal(diagnostic) ? { ...remapped, help: signalHelp(diagnostic, signalName(diagnostic, shadow.source, source)) } : remapped
-}
-
-// A condition always true for a function, or a signal where its value goes: what reading by its name a signal kay does not see made gives.
-function unreadSignal(diagnostic: CheckDiagnostic): boolean {
-  return diagnostic.code === ALWAYS_DEFINED || diagnostic.message.includes('\'Signal<')
-}
-
-// The signal the error is about where its position tells: the condition itself, or what a missing property was read on.
-function signalName(diagnostic: CheckDiagnostic, source: string, offset: number): string | undefined {
-  if (diagnostic.code === ALWAYS_DEFINED)
-    return LEADING_NAME.exec(source.slice(offset))?.[0]
-
-  return diagnostic.code === MISSING_PROPERTY ? MEMBER_OF.exec(source.slice(0, offset))?.[1] : undefined
-}
-
-// A condition on any function is always true, a signal's or another's, so its help says so before naming signals.
-function signalHelp(diagnostic: CheckDiagnostic, name: string | undefined): string {
-  const call = name === undefined ? 'calling it' : `calling it, \`${name}()\``
-
-  return diagnostic.code === ALWAYS_DEFINED ? `a function is always true here, so its value is read by ${call}: a signal or memo reads by its name only where kay sees it made` : `a signal or memo reads by its name only where kay sees it made, in the script, as a module's \`export const\` or as a prop typed \`Signal<T>\`; any other is read by ${call}`
+  return { code: diagnostic.code === undefined ? undefined : Number(diagnostic.code.slice(2)), message: diagnostic.message, start, end: start }
 }
 
 // With a code frame when the file's source is given.

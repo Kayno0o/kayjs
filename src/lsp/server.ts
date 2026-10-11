@@ -1,6 +1,7 @@
 import type { Subprocess } from 'bun'
+import type { KayLibrary } from '../build/libraries'
 import type { CheckOptions } from '../check'
-import type { ShadowFile } from '../check/shadow'
+import type { ShadowFile, SpanMode } from '../check/shadow'
 import type { Diagnostic as KayDiagnostic } from '../compiler'
 import type { Span } from '../compiler/ast'
 import type { KayConfig } from '../config'
@@ -10,10 +11,11 @@ import process from 'node:process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { findKayFiles } from '../build/files'
 import { importedSignals } from '../build/signals'
-import { configCheckOptions, TSGO, UNUSED_CODES, writeShadowTypes } from '../check'
-import { compileShadow, shadowPath, shadowSource } from '../check/shadow'
+import { configCheckOptions, TSGO, writeShadowTypes } from '../check'
+import { diagnoseShadow, reportsTypeErrors } from '../check/diagnose'
+import { compileShadow, generatedSpan, shadowPath, shadowSource, sourceSpan } from '../check/shadow'
 import { formatKay } from '../compiler/format'
-import { lintLevels, typeLint } from '../compiler/lints'
+import { lintLevels } from '../compiler/lints'
 import { offsetAt, positionAt } from '../compiler/mapping'
 import { parseKay } from '../compiler/parser'
 import { analyzeScript, analyzeServer } from '../compiler/script'
@@ -34,8 +36,10 @@ interface Project {
   routesDir: string
   shadowTree: string
   shadowFiles: Set<string>
-  // As of the last shadow write: the static components only islands render.
+  // As of the last shadow write: the static components only islands render, the library components the app never imports, whose errors are the library's, and the libraries.
   islandOnly: Set<string>
+  unreached: Set<string>
+  libraries: KayLibrary[]
   configured: boolean
 }
 
@@ -56,7 +60,6 @@ const TRAILING_SEMICOLON = /;$/
 // A one-line named import, as generated code writes them: its names, then its quoted module.
 const NAMED_IMPORT = /^import \{([^}]*)\} from (['"][^'"]+['"])/
 const RESERVED_CHARACTER = /[!'()*]/g
-const WORD_CHARACTER = /[\w$]/
 // Names generated code declares or imports, never written by the user.
 const GENERATED_NAME = /^(?:__props|__default_\d+|kayEvent|Kay(?:LoopFor|StaticFor|Show|Omit|ComponentClass|Dynamic|TemplateHelpers|Island|IslandBrand|HydrateWhen|Href|Html|Field|FormError|Prop|FunctionProp|Children|IdentityKey|PageContext|PrerenderedContext|PageSettings|QueryOf|PageData|JSX|FormAction|RegisterActions|ActionStub|UseHead|Await))$/
 const FULL_SYNC = 1
@@ -268,6 +271,8 @@ export class KayLanguageServer {
       )
       project.shadowFiles = files
       project.islandOnly = types.islandOnly
+      project.unreached = types.unreached
+      project.libraries = types.libraries
     }))
 
     return changes
@@ -287,7 +292,7 @@ export class KayLanguageServer {
     let project = this.projects.get(root)
 
     if (!project)
-      this.projects.set(root, project = { root, options: {}, routesDir: projectPaths(root).routes, shadowTree: `${projectPaths(root).types}/`, shadowFiles: new Set(), islandOnly: new Set(), configured: false })
+      this.projects.set(root, project = { root, options: {}, routesDir: projectPaths(root).routes, shadowTree: `${projectPaths(root).types}/`, shadowFiles: new Set(), islandOnly: new Set(), unreached: new Set(), libraries: [], configured: false })
 
     return project
   }
@@ -327,42 +332,42 @@ export class KayLanguageServer {
   }
 
   private async publishDiagnostics(document: Document) {
-    // A compile error leaves the shadow TSX half-written, so its type errors would only be noise; one found by type checking only leaves it whole.
+    const project = this.projectAt(projectRootOf(document.file, this.root))
     const rangeOf = (span: Span) => ({ start: toPosition(document.source, span.start), end: toPosition(document.source, Math.max(span.end, span.start + 1)) })
     const compileErrors = document.diagnostics.map(diagnostic => ({
       range: rangeOf(diagnostic),
       severity: diagnostic.severity === 'warning' ? WARNING : ERROR,
       source: 'kay',
       ...diagnostic.code !== undefined && { code: diagnostic.code },
-      message: [diagnostic.label !== undefined && diagnostic.label !== '' ? `${diagnostic.message} (${diagnostic.label})` : diagnostic.message, ...[['note', diagnostic.note], ['help', diagnostic.help]].flatMap(([kind, text]) => text === undefined ? [] : [`${kind}: ${text}`])].join('\n'),
+      message: editorMessage(diagnostic),
       ...diagnostic.related && { relatedInformation: diagnostic.related.map(span => ({ location: { uri: document.uri, range: rangeOf(span) }, message: span.label })) },
       ...diagnostic.code === 'unread-name' && { tags: [UNNECESSARY] },
     }))
-    const report = document.diagnostics.some(diagnostic => !diagnostic.checkOnly) ? undefined : await this.server.request<DocumentDiagnosticReport>('textDocument/diagnostic', { textDocument: { uri: document.shadowUri } })
+    // A compile error leaves the shadow TSX half-written, so its type errors would only be noise; one found by type checking only leaves it whole. The rest of what `kay check` leaves out stays out here too.
+    const broken = new Set(document.diagnostics.some(diagnostic => !diagnostic.checkOnly) ? [document.file] : [])
+    const reports = reportsTypeErrors(document.file, { root: project.root, broken, unreached: project.unreached, libraries: project.libraries })
+    const report = reports ? await this.server.request<DocumentDiagnosticReport>('textDocument/diagnostic', { textDocument: { uri: document.shadowUri } }) : undefined
 
     if (this.documents.get(document.uri) !== document)
       return
 
-    // Related information points into the shadow TSX, a file the user never sees. Unused code, a hint to TypeScript without `noUnusedLocals`, is the `unread-name` lint in a .kay file, as `kay check` reports it.
-    const levelAt = lintLevels(document.source, this.projectAt(projectRootOf(document.file, this.root)).options.lints)
+    // Related information points into the shadow TSX, a file the user never sees. Each one reads as `kay check` reports it: unused code is the `unread-name` lint, which TypeScript only hints at without `noUnusedLocals`.
+    const levelAt = lintLevels(document.source, project.options.lints)
     const typeErrors = (report?.items ?? []).flatMap(({ relatedInformation: _related, ...diagnostic }) => {
-      const range = toSourceRange(document, diagnostic.range, true)
-      const lint = typeLint(diagnostic.message)
+      const start = toOffset(document.tsx, diagnostic.range.start)
+      const diagnosed = diagnoseShadow(document, { code: typeof diagnostic.code === 'number' ? diagnostic.code : undefined, message: diagnostic.message, start, end: toOffset(document.tsx, diagnostic.range.end) }, levelAt)
 
-      // A lint the types find, `identity-key` say, at its level as `kay check` reports it.
-      if (lint) {
-        const level = levelAt(lint.code, range ? toOffset(document.source, range.start) : 0)
+      if (!diagnosed)
+        return []
 
-        return level === 'allow' ? [] : [{ ...diagnostic, code: lint.code, message: `${lint.message}: ${lint.help}`, severity: level === 'warn' ? WARNING : ERROR, range: range ?? zeroRange() }]
-      }
-
-      if (!UNUSED_CODES.has(Number(diagnostic.code)))
-        return [{ ...diagnostic, range: range ?? zeroRange() }]
-
-      // A name kay generated is no unused code of the user's.
-      const level = range && levelAt('unread-name', toOffset(document.source, range.start))
-
-      return range && level !== 'allow' ? [{ ...diagnostic, code: 'unread-name', severity: level === 'warn' ? WARNING : ERROR, tags: [UNNECESSARY], range }] : []
+      return [{
+        ...diagnostic,
+        ...diagnosed.code !== undefined && { code: diagnosed.code },
+        ...diagnosed.severity !== undefined && { severity: diagnosed.severity === 'warning' ? WARNING : ERROR },
+        ...diagnosed.unread && { tags: [UNNECESSARY] },
+        message: editorMessage(diagnosed),
+        range: diagnosed.span ? rangeOf(diagnosed.span) : zeroRange(),
+      }]
     })
 
     this.client.notify('textDocument/publishDiagnostics', { uri: document.uri, version: document.version, diagnostics: [...compileErrors, ...typeErrors] })
@@ -500,7 +505,7 @@ export class KayLanguageServer {
       const selection = toSourceRange(shadow, link.targetSelectionRange)
 
       if (selection)
-        return [{ originSelectionRange, targetUri, targetRange: toSourceRange(shadow, link.targetRange, true) ?? selection, targetSelectionRange: selection }]
+        return [{ originSelectionRange, targetUri, targetRange: toSourceRange(shadow, link.targetRange, 'loose') ?? selection, targetSelectionRange: selection }]
 
       const key = positionKey(link.targetUri, link.targetSelectionRange.start)
 
@@ -513,7 +518,7 @@ export class KayLanguageServer {
           return followed.map(found => ({ ...found, originSelectionRange }))
       }
 
-      return [{ originSelectionRange, targetUri, targetRange: toSourceRange(shadow, link.targetRange, true) ?? zeroRange(), targetSelectionRange: toSourceRange(shadow, link.targetSelectionRange, true) ?? zeroRange() }]
+      return [{ originSelectionRange, targetUri, targetRange: toSourceRange(shadow, link.targetRange, 'loose') ?? zeroRange(), targetSelectionRange: toSourceRange(shadow, link.targetSelectionRange, 'loose') ?? zeroRange() }]
     }))
 
     return links.flat()
@@ -826,10 +831,9 @@ function importEdit(source: string, offset: number, declaration: string): TextEd
 
 // A source range in the shadow TSX, when both ends were copied there.
 function toShadowRange(document: ShadowFile, range: Range): Range | undefined {
-  const start = document.map.toGenerated(toOffset(document.source, range.start))
-  const end = document.map.toGenerated(toOffset(document.source, range.end))
+  const span = generatedSpan(document, toOffset(document.source, range.start), toOffset(document.source, range.end))
 
-  return start === undefined || end === undefined ? undefined : { start: toPosition(document.tsx, start), end: toPosition(document.tsx, end) }
+  return span && { start: toPosition(document.tsx, span.start), end: toPosition(document.tsx, span.end) }
 }
 
 function fileEdits(edit: WorkspaceEdit): [string, TextEdit[]][] {
@@ -889,34 +893,16 @@ function mapInsertReplace(document: ShadowFile, edit: { insert: Range, replace: 
   return insert && replace ? { insert, replace } : undefined
 }
 
-// A generated range back in the .kay source: exact when copied from it; with `loose`, glue maps to the construct it stands for.
-function toSourceRange(document: ShadowFile, range: Range, loose = false): Range | undefined {
-  const start = toOffset(document.tsx, range.start)
-  const end = toOffset(document.tsx, range.end)
+// A generated range back in the .kay source.
+function toSourceRange(document: ShadowFile, range: Range, mode: SpanMode = 'exact'): Range | undefined {
+  const span = sourceSpan(document, toOffset(document.tsx, range.start), toOffset(document.tsx, range.end), mode)
 
-  if (!loose && (!document.map.isExact(start) || !document.map.isExact(end)))
-    return undefined
-
-  const sourceStart = document.map.toSource(start)
-
-  if (sourceStart === undefined)
-    return undefined
-
-  const sourceEnd = document.map.isExact(end) ? document.map.toSource(end) : undefined
-
-  return {
-    start: toPosition(document.source, sourceStart),
-    end: toPosition(document.source, sourceEnd !== undefined && sourceEnd >= sourceStart ? sourceEnd : wordEnd(document.source, sourceStart)),
-  }
+  return span && { start: toPosition(document.source, span.start), end: toPosition(document.source, span.end) }
 }
 
-function wordEnd(source: string, offset: number): number {
-  let end = offset
-
-  while (end < source.length && WORD_CHARACTER.test(source[end]!))
-    end++
-
-  return end === offset ? Math.min(offset + 1, source.length) : end
+// A diagnostic as an editor shows it, its label, note and help on their own lines.
+function editorMessage({ message, label, note, help }: Pick<KayDiagnostic, 'message' | 'label' | 'note' | 'help'>): string {
+  return [label !== undefined && label !== '' ? `${message} (${label})` : message, ...[['note', note], ['help', help]].flatMap(([kind, text]) => text === undefined ? [] : [`${kind}: ${text}`])].join('\n')
 }
 
 function applyEdit(source: string, range: Range, text: string): string {

@@ -1,11 +1,9 @@
 // `kay/eslint`: lints the script and server fences of .kay files through the TSX `kay check` type-checks them as, reporting at the .kay line.
-import type { Span } from '../compiler/ast'
-import type { SourceMap } from '../compiler/mapping'
+import type { ShadowFile } from '../check/shadow'
 import { existsSync } from 'node:fs'
 import { relative, resolve } from 'node:path'
-import { compileShadow, readShadowSettings, shadowPath } from '../check/shadow'
+import { compileShadow, fenceEdit, readShadowSettings, shadowPath, sourceSpan } from '../check/shadow'
 import { offsetAt, positionAt } from '../compiler/mapping'
-import { parseKay } from '../compiler/parser'
 import { projectRootOf } from '../project'
 
 export interface LintFix {
@@ -31,19 +29,12 @@ export interface ParserOptions {
   projectService?: unknown
 }
 
-interface Compiled {
-  source: string
-  tsx: string
-  map: SourceMap
-  fences: Span[]
-}
-
 const BLOCK = 'kay.tsx'
 // What ESLint names the block `preprocess` returns: the .kay file's path, then `<index>_kay.tsx`.
 const BLOCK_PATH = /^(.+\.kay)[/\\]\d+_kay\.tsx$/
 
 // Lint runs each file through preprocess then postprocess before the next, so this only ever holds the one being linted.
-const compiled = new Map<string, Compiled>()
+const compiled = new Map<string, ShadowFile>()
 
 export const processor = {
   meta: { name: 'kay' },
@@ -54,9 +45,8 @@ export const processor = {
     const root = projectRootOf(file)
     const settings = readShadowSettings(root)
     const { shadow } = compileShadow(root, settings.routesDir, file, text, settings.islandOnly.has(file), settings.lints)
-    const parsed = parseKay(text)
 
-    compiled.set(filename, { source: text, tsx: shadow.tsx, map: shadow.map, fences: [parsed.script, parsed.server].filter(span => span !== undefined) })
+    compiled.set(filename, shadow)
 
     return [{ text: shadow.tsx, filename: BLOCK }]
   },
@@ -93,20 +83,17 @@ export function shadowParser<Options extends ParserOptions, Result>(parser: { pa
   }
 }
 
-function mapMessage(entry: Compiled, message: LintMessage): LintMessage | undefined {
+function mapMessage(entry: ShadowFile, message: LintMessage): LintMessage | undefined {
   // A parser that throws, as the shadow parser does without a shadow file, reports no line, or line 0.
   const start = message.line >= 1 ? offsetAt(entry.tsx, { line: message.line, column: message.column }) : undefined
-  const source = start !== undefined && entry.map.isExact(start) ? entry.map.toSource(start) : undefined
-
-  // A copied run maps its end too, which is where generated code follows it, such as the `;` after a fence's last statement.
-  if (start === undefined || source === undefined || entry.tsx[start] !== entry.source[source] || !entry.fences.some(fence => source >= fence.start && source <= fence.end)) {
-    // A file that does not parse would otherwise pass: kay check names the reason at its line, this only keeps lint from passing.
-    return message.fatal ? { ...message, line: 1, column: 1, endLine: undefined, endColumn: undefined } : undefined
-  }
-
   const end = message.endLine === undefined || message.endColumn === undefined ? undefined : offsetAt(entry.tsx, { line: message.endLine, column: message.endColumn })
-  const sourceEnd = end !== undefined && entry.map.isExact(end) ? entry.map.toSource(end) : undefined
-  const endPosition = sourceEnd === undefined ? undefined : positionAt(entry.source, sourceEnd)
+  const span = start === undefined ? undefined : sourceSpan(entry, start, end ?? start, 'fences')
+
+  // A file that does not parse would otherwise pass: kay check names the reason at its line, this only keeps lint from passing.
+  if (!span)
+    return message.fatal ? { ...message, line: 1, column: 1, endLine: undefined, endColumn: undefined } : undefined
+
+  const endPosition = end === undefined ? undefined : positionAt(entry.source, span.end)
   const fix = message.fix && mapFix(entry, message.fix)
   const suggestions = message.suggestions?.flatMap((suggestion) => {
     const mappedFix = mapFix(entry, suggestion.fix)
@@ -114,12 +101,12 @@ function mapMessage(entry: Compiled, message: LintMessage): LintMessage | undefi
     return mappedFix ? [{ ...suggestion, fix: mappedFix }] : []
   })
 
-  return { ...message, ...positionAt(entry.source, source), endLine: endPosition?.line, endColumn: endPosition?.column, fix, suggestions }
+  return { ...message, ...positionAt(entry.source, span.start), endLine: endPosition?.line, endColumn: endPosition?.column, fix, suggestions }
 }
 
 // A fix stands only when the fence code it replaces was copied verbatim from the .kay file.
-function mapFix(entry: Compiled, fix: LintFix): LintFix | undefined {
-  const span = entry.map.toSourceSpan(fix.range[0], fix.range[1])
+function mapFix(entry: ShadowFile, fix: LintFix): LintFix | undefined {
+  const span = fenceEdit(entry, fix.range[0], fix.range[1])
 
-  return span && entry.fences.some(fence => span.start >= fence.start && span.end <= fence.end) ? { range: [span.start, span.end], text: fix.text } : undefined
+  return span && { range: [span.start, span.end], text: fix.text }
 }
