@@ -8,21 +8,26 @@ import { fences } from './libraries'
 const KAY_MODULE = /^kay(?:\/|$)/
 const SCRIPT_MODULE = /\.[cm]?[jt]sx?$/
 const scanned = new Map<string, { stamp: string, signals: Record<string, SignalKind> }>()
+// What each component imports, read again only once its text changes.
+const imports = new Map<string, { source: string, specifiers: string[] }>()
 
 // The signals and memos the modules a component imports export, which its template reads by name; part of every cache key of its compile, so editing such a module compiles the component again.
 // A package is left out, its code too large to scan on every compile, unless a relative import reaches into it, as a library's own components do.
 export function importedSignals(file: string, source: string): ImportedSignals {
   const found: ImportedSignals = {}
-  let specifiers: string[]
+  const known = imports.get(file)
+  let specifiers = known?.source === source ? known.specifiers : undefined
 
   try {
-    specifiers = transpilerFor('ts').scanImports(fences(source)).map(entry => entry.path)
+    specifiers ??= [...new Set(transpilerFor('ts').scanImports(fences(source)).map(entry => entry.path))]
   }
   catch {
     return found
   }
 
-  for (const specifier of new Set(specifiers)) {
+  imports.set(file, { source, specifiers })
+
+  for (const specifier of specifiers) {
     const path = KAY_MODULE.test(specifier) ? undefined : resolveFrom(specifier, file)
 
     if (path === undefined || !SCRIPT_MODULE.test(path) || (!specifier.startsWith('.') && path.includes('/node_modules/')))

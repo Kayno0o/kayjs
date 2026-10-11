@@ -1,7 +1,8 @@
 import type { ClientOptions, ClientSources } from '../build/client'
+import type { ImportGraph } from '../build/libraries'
 import type { ClientManifest } from '../server/client'
 import type { ClassWords } from './tailwind'
-import { realpathSync } from 'node:fs'
+import { existsSync, realpathSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { join, resolve, sep } from 'node:path'
 import process from 'node:process'
@@ -64,6 +65,7 @@ export function devBuilder(root: string, options: ClientOptions): (changed: stri
   const output = outputDir(root)
   const realRoot = realpathSync(root)
   let last: Built | undefined
+  const graph: ImportGraph = new Map()
   const classesOf = async (built: Built) => built.classes ??= tailwindClasses(built.styleInputs)
 
   const stylesChanged = async (previous: Built, sources: ClientSources, texts: Map<string, string | undefined>): Promise<boolean> => {
@@ -111,7 +113,11 @@ export function devBuilder(root: string, options: ClientOptions): (changed: stri
   }
 
   const build = async (changed: string[] | null): Promise<BuildOutcome> => {
-    const sources = await readClientSources(root, options)
+    // A file gone may leave another's import resolving elsewhere.
+    if (changed === null || changed.some(file => !existsSync(join(realRoot, file))))
+      graph.clear()
+
+    const sources = await readClientSources(root, options, graph)
     const previous = changed !== null && last !== undefined && await readText(join(output, MANIFEST)) === last.manifest ? last : undefined
 
     last = undefined

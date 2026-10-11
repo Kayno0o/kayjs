@@ -11,6 +11,7 @@ import { describe, expect, it } from 'bun:test'
 import { ASSET_FILE, clientDir, outputDir, writeAsset } from '../src/build/assets'
 import { buildClient } from '../src/build/client'
 import { writeIfChanged } from '../src/build/files'
+import { reachesAny } from '../src/build/libraries'
 import { formatSizeReport } from '../src/build/report'
 import { anchorModule } from '../src/build/runtime-chunk'
 import { runtimeConfig, withoutPlugins } from '../src/build/runtime-config'
@@ -951,6 +952,55 @@ describe('compile cache', () => {
     }
     finally {
       await rm(cacheDir, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('what a build keeps in memory', () => {
+  it('keeps a component\'s analysis while its inputs stay, the signals of the modules it imports included', async () => {
+    const dir = await scratchDir('kay-analysis-')
+    const cacheDir = join(dir, 'cache')
+    const file = join(dir, 'count.kay')
+    const source = '---\nimport { count } from \'./state\'\n---\np.count {count()}\n'
+
+    try {
+      await Bun.write(join(dir, 'state.ts'), 'import { signal } from \'kay\'\n\nexport const count = signal(0)\n')
+      const analysis = await analyzeKayCached(source, file, dir, cacheDir)
+
+      // Read from memory, not from the cache entry gone meanwhile, which a compile would write again.
+      await rm(cacheDir, { recursive: true })
+      expect(await analyzeKayCached(source, file, dir, cacheDir)).toBe(analysis)
+      expect(existsSync(cacheDir)).toBe(false)
+
+      await Bun.write(join(dir, 'state.ts'), 'export const count = () => 0\n')
+      expect(await analyzeKayCached(source, file, dir, cacheDir)).not.toBe(analysis)
+      expect(await readdir(cacheDir)).toEqual([expect.stringMatching(/-analysis\.json$/)])
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('keeps what a module imports while its text stays, looking again for a module it imports that was missing', async () => {
+    const dir = resolve(await scratchDir('kay-graph-'))
+    const from = join(dir, 'a.ts')
+    const target = join(dir, 'b.ts')
+    const graph = new Map()
+
+    try {
+      await Bun.write(from, 'import \'./b\'\nimport \'node:fs\'\n')
+      expect(await reachesAny(dir, [], from, new Set([target]), undefined, undefined, graph)).toBe(false)
+      expect(graph.get(from)).toMatchObject({ paths: [], missing: ['./b'] })
+
+      await Bun.write(target, '')
+      expect(await reachesAny(dir, [], from, new Set([target]), undefined, undefined, graph)).toBe(true)
+
+      await Bun.write(from, 'import \'node:fs\'\n')
+      expect(await reachesAny(dir, [], from, new Set([target]), undefined, undefined, graph)).toBe(false)
+      expect(graph.get(from)).toMatchObject({ paths: [], missing: [] })
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
     }
   })
 })

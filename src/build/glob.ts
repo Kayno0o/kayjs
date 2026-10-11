@@ -11,7 +11,7 @@ interface GlobCall {
   import?: string | undefined
 }
 
-const GLOB_CALL = 'import.meta.glob'
+export const GLOB_CALL = 'import.meta.glob'
 const GLOB_MAGIC = /[*?[\]{}()!]/
 const RELATIVE = /^\.\.?\//
 const NEGATED = /^!/

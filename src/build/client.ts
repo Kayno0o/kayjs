@@ -2,7 +2,7 @@ import type { BunPlugin } from 'bun'
 import type { LintLevels } from '../compiler/lints'
 import type { KayExtension } from '../config'
 import type { ClientBuild, ClientManifest } from '../server/client'
-import type { KayLibrary } from './libraries'
+import type { ImportGraph, KayLibrary } from './libraries'
 import type { ChunkInputs } from './report'
 import type { FileDiagnostic } from './transform'
 import { existsSync, realpathSync } from 'node:fs'
@@ -127,8 +127,8 @@ export async function bothBundles<Islands extends Promise<unknown> | undefined, 
   return [scripts.value, sheets.value]
 }
 
-// Compiles every component, throwing all of their errors at once.
-export async function readClientSources(root: string, options: ClientOptions = {}): Promise<ClientSources> {
+// Compiles every component, throwing all of their errors at once. `graph` keeps what each module imports, across builds when given.
+export async function readClientSources(root: string, options: ClientOptions = {}, graph: ImportGraph = new Map()): Promise<ClientSources> {
   const islands = new Map<string, string>()
   const classes = new Set<string>()
   const diagnostics: FileDiagnostic[] = []
@@ -140,7 +140,7 @@ export async function readClientSources(root: string, options: ClientOptions = {
   const mountedFiles = (await Promise.all(routeMounts(root, options.extensions).map(async mount => existsSync(mount.dir) ? findKayFiles(mount.dir) : []))).flat()
   const mounted = [...new Set([...mountedFiles, ...editor === undefined ? [] : [editor]])].filter(file => !ownFiles.has(file))
   const libraries = await findKayLibraries(root)
-  const fromLibraries = await reachableLibraryFiles(root, libraries, [...own, ...mounted])
+  const fromLibraries = await reachableLibraryFiles(root, libraries, [...own, ...mounted], graph)
   const files = [...own, ...mounted, ...fromLibraries.components]
   const sources = await Promise.all(files.map(async file => Bun.file(file).text()))
 
@@ -176,7 +176,7 @@ export async function readClientSources(root: string, options: ClientOptions = {
   const promoted = await Promise.all(files.map(async (file, index) => {
     const { island, promote } = analyses[index]!
 
-    return island === undefined && promote !== undefined && islandFiles.size > 0 && await reachesAny(root, libraries, realpathSync(file), islandFiles, edges, project) ? promote : undefined
+    return island === undefined && promote !== undefined && islandFiles.size > 0 && await reachesAny(root, libraries, realpathSync(file), islandFiles, edges, project, graph) ? promote : undefined
   }))
 
   for (const [index, promote] of promoted.entries()) {

@@ -33,7 +33,7 @@ export interface DevOptions {
 
 // Long enough to gather the few events one save makes, which come within a millisecond.
 const DEBOUNCE_MS = 10
-// How long after an editor last wrote a scratch file a source it left missing is waited for, as saving by renaming it away and writing it anew leaves it, on a machine busy enough to stretch the save.
+// How long a source an editor's save left missing is waited for, as saving by renaming it away and writing it anew leaves it, on a machine busy enough to stretch the save.
 const GONE_WAIT_MS = 200
 const SPARE = join(import.meta.dir, 'spare.ts')
 // When a server never says it is up, as one that never serves, the next process starts anyway after this: a guess, which also starts it beside a server that takes longer to boot.
@@ -54,6 +54,8 @@ const SERVER_ROOT_FILE = /^(?:\.env.*|bun\.lockb?)$|\.(?:[cm]?[jt]sx?|json[c5]?|
 // Tests, which no server imports.
 const TEST_DIRS = new Set(['tests', 'test', '__tests__', 'e2e'])
 const TEST_FILE = /(?:^|\/)__tests__\/|\.(?:test|spec)\.[cm]?[jt]sx?$/
+// The backups Vim, Emacs and JetBrains IDEs move a source to while they write it anew.
+const SAVE_BACKUPS = ['~', '___jb_old___', '___jb_tmp___']
 // The files editors write beside a source while saving it, its backup, swap or temporary copy, Vim's `4913` and Emacs' `.#` lock included.
 const EDITOR_SCRATCH = /(?:~|\.sw[opx]|\.tmp|___jb_(?:tmp|old)___|\.kate-swp)$|(?:^|\/)(?:4913|\.#[^/]*|#[^/]*#)$/
 // Past this, as after a checkout, the files changed are not passed on, and open pages reload.
@@ -340,14 +342,21 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     restarting = undefined
   }
   let scratchWritten = -Infinity
-  // A deleted source restarts at once, one an editor's save left missing a moment is waited for.
+  let waitingSince: number | undefined
+  // A deleted source restarts at once, while one a save left missing a moment, its backup beside it or the editor's scratch files just written, is waited for.
   const settle = () => {
-    if (performance.now() - scratchWritten < GONE_WAIT_MS && [...touched].some(file => !existsSync(join(root, file)))) {
+    const now = performance.now()
+    const saving = (file: string) => !existsSync(join(root, file)) && (now - scratchWritten < GONE_WAIT_MS || SAVE_BACKUPS.some(suffix => existsSync(join(root, file + suffix))))
+
+    waitingSince ??= now
+
+    if (now - waitingSince < GONE_WAIT_MS && [...touched].some(saving)) {
       timer = setTimeout(settle, DEBOUNCE_MS)
 
       return
     }
 
+    waitingSince = undefined
     changed = true
     restarting ??= drain()
   }

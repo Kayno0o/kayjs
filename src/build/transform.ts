@@ -46,6 +46,8 @@ export interface Analysis {
 // The packages a compile runs through, their versions part of every cache key.
 const COMPILER_PACKAGES = ['@babel/parser/package.json', '@babel/traverse/package.json', '@babel/types/package.json', '@typescript/native-preview/package.json']
 let fingerprint: string | undefined
+// Each file's last analysis in this process, which spares hashing and reading its cache entry again while the inputs stay the same.
+const analyzed = new Map<string, { inputs: string, analysis: Analysis }>()
 
 export interface FileDiagnostic extends Diagnostic {
   file: string
@@ -101,17 +103,30 @@ export async function transformKayCached(source: string, filename: string, given
 export async function analyzeKayCached(source: string, filename: string, root: string, cacheDir: string, check = false, lints?: LintLevels): Promise<Analysis> {
   // The id the file goes by is part of what it compiles to, and a link may change it.
   const signals = importedSignals(filename, source)
-  const entry = cacheEntry(cacheDir, filename, check ? 'analysis-check' : 'analysis', `${root}\0${throughLinks(root, filename)}\0${JSON.stringify(check ? lints ?? {} : {})}\0${JSON.stringify(signals)}\0${source}`)
+  const kind = check ? 'analysis-check' : 'analysis'
+  const inputs = `${root}\0${throughLinks(root, filename)}\0${JSON.stringify(check ? lints ?? {} : {})}\0${JSON.stringify(signals)}\0${source}`
+  const slot = `${kind}\0${filename}`
+  const last = analyzed.get(slot)
+
+  if (last?.inputs === inputs)
+    return last.analysis
+
+  const entry = cacheEntry(cacheDir, filename, kind, inputs)
   const cached = await readCacheEntry<Analysis>(entry)
 
-  if (cached !== undefined)
+  if (cached !== undefined) {
+    analyzed.set(slot, { inputs, analysis: cached })
+
     return cached
+  }
 
   const { island, promote, classes, diagnostics } = compileKay(source, throughLinks(root, filename), { root, check, lints, importedSignals: signals })
   const analysis = { island, promote, classes, diagnostics }
 
-  if (diagnostics.every(diagnostic => diagnostic.checkOnly))
+  if (diagnostics.every(diagnostic => diagnostic.checkOnly)) {
+    analyzed.set(slot, { inputs, analysis })
     await writeCacheEntry(entry, analysis)
+  }
 
   return analysis
 }
