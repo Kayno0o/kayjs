@@ -84,11 +84,14 @@ function ariaSort(column: Column<Row>): 'ascending' | 'descending' | undefined {
       for row of shown() key={rowKeyOf(row, rowKey)}
         tr.kui-table-row
           for column of columns() key={column.key}
-            td.kui-table-cell(data-label={column.header || undefined} data-align={column.align ?? 'start'} data-numeric={column.numeric ? '' : undefined})
-              if cell && drawnByBlock(column, given)
-                | {cell(row, column)}
-              else
-                | {cellText(row, column)}
+            td.kui-table-cell(data-align={column.align ?? 'start'} data-numeric={column.numeric ? '' : undefined})
+              if narrow === 'stack' && column.header
+                span.kui-table-cell-label {column.header}
+              .kui-table-cell-body
+                if cell && drawnByBlock(column, given)
+                  | {cell(row, column)}
+                else
+                  | {cellText(row, column)}
       else
         if rows.length > 0 && noMatch
           tr

@@ -12,7 +12,7 @@ afterEach(() => {
   mounted?.unmount()
 })
 
-const names = (root: HTMLElement) => [...root.querySelectorAll('tbody tr')].map(row => row.querySelector('td')?.textContent)
+const names = (root: HTMLElement) => [...root.querySelectorAll('tbody tr')].map(row => row.querySelector('.kui-table-cell-body')?.textContent)
 const header = (root: HTMLElement, index: number) => root.querySelectorAll('th')[index]!
 
 describe('Table', () => {
@@ -87,7 +87,7 @@ describe('Table with a filter', () => {
   test('draws the columns through @cell without cell: true, a numeric one sorting largest first and a cell: false one as text', async () => {
     mounted = await mount('src/components/filtered-table.kay', { rows: MOONS })
 
-    const cells = (row: number) => [...mounted!.root.querySelectorAll('tbody tr')[row]!.querySelectorAll('td')].map(cell => cell.innerHTML.replaceAll(/<!--[^>]*-->/g, ''))
+    const cells = (row: number) => [...mounted!.root.querySelectorAll('tbody tr')[row]!.querySelectorAll('.kui-table-cell-body')].map(cell => cell.innerHTML.replaceAll(/<!--[^>]*-->/g, ''))
 
     expect(cells(0)).toEqual(['<strong>Phobos</strong>', 'Mars', '11 km'])
     expect(header(mounted.root, 2).getAttribute('data-align')).toBe('end')

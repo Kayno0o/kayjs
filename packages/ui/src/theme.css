@@ -1463,7 +1463,16 @@
     @apply px-3 py-8 text-center text-xs text-kui-subtext0;
   }
 
-  /* A narrow table stacks each row as a card, a line per cell with its header beside it, and keeps only its sortable headers, as a row of buttons. */
+  /* Outside a narrow table, a cell holds its content alone: the label is the column header's job. */
+  .kui-table-cell-label {
+    @apply hidden;
+  }
+
+  .kui-table-cell-body {
+    @apply contents;
+  }
+
+  /* A narrow table stacks each row as a card, a line per cell with its header beside it, the labels as wide as the longest up to 40%, and keeps only its sortable headers, as sort buttons. */
   @container kui-table (width < 30rem) {
     .kui-table,
     .kui-table :where(thead, tbody, tr),
@@ -1472,7 +1481,7 @@
     }
 
     .kui-table :where(thead tr) {
-      @apply flex flex-wrap gap-x-4 gap-y-1 border-b border-kui-surface2 px-3 py-2;
+      @apply flex flex-wrap gap-2 border-b border-kui-surface2 px-3 py-2;
     }
 
     .kui-table :where(thead:not(:has(.kui-table-sort-btn))) {
@@ -1487,20 +1496,27 @@
       }
     }
 
+    .kui-table-sort-btn {
+      @apply border border-kui-surface2 px-2 py-0.5;
+    }
+
     .kui-table-row {
-      @apply py-2;
+      @apply grid grid-cols-[fit-content(40%)_1fr] gap-x-4 px-3 py-2;
     }
 
     .kui-table-cell {
-      @apply block py-1;
+      @apply col-span-full grid grid-cols-subgrid items-baseline px-0 py-1;
+    }
 
-      &:where([data-label]) {
-        @apply relative pl-[40%];
-      }
+    .kui-table-cell-label {
+      @apply block text-left text-kui-micro font-kui-label tracking-kui-label text-kui-subtext0 uppercase;
+    }
 
-      &:where([data-label])::before {
-        content: attr(data-label);
-        @apply absolute top-1 left-3 w-[calc(40%-1.5rem)] truncate text-left text-kui-micro leading-5 font-kui-label tracking-kui-label text-kui-subtext0 uppercase;
+    .kui-table-cell-body {
+      @apply block min-w-0;
+
+      &:where(:first-child) {
+        @apply col-span-full;
       }
     }
   }
