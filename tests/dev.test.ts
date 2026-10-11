@@ -1,10 +1,11 @@
 import type { Subprocess } from 'bun'
-import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { mkdir, mkdtemp, rename, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
+import { testWorker } from '../src/build/assets'
 import { buildClient } from '../src/build/client'
 import { KayCompileError } from '../src/build/transform'
 import { readShadowSettings } from '../src/check/shadow'
@@ -693,6 +694,89 @@ describe('kay dev', () => {
       await rm(root, { recursive: true, force: true })
     }
   })
+
+  it('builds the client beside the server: again for what an edit reaches only, its maps pointed at the .kay sources, its errors served, and a stylesheet edit sent to the open pages without a restart', async () => {
+    const scratch = join(import.meta.dir, '../node_modules/.cache')
+
+    await mkdir(scratch, { recursive: true })
+    const root = await mkdtemp(join(scratch, 'dev-client-'))
+    const lines: string[] = []
+    const children: Subprocess[] = []
+    const page = '--- server\nimport { name } from \'../name\'\n---\n---\nimport \'../app.css\'\nimport Counter from \'../counter.kay\'\n---\nh1 {name}\nCounter\n'
+    const counter = '---\nimport { signal } from \'kay\'\n\nconst count = signal(0)\n---\nbutton(onClick={() => count.set(n => n + 1)}) {count()}\n'
+    const output = join(root, '.kay', `dev${testWorker()}`)
+    // The browser build's scripts and stylesheets as each was last written.
+    const written = () => Object.fromEntries(readdirSync(join(output, 'dist')).filter(file => !file.endsWith('.map')).map(file => [file, statSync(join(output, 'dist', file)).mtimeMs]))
+
+    await Bun.write(join(root, 'src/app.css'), 'h1 { color: red }\n')
+    await Bun.write(join(root, 'src/name.ts'), 'export const name = \'Ada\'\n')
+    await Bun.write(join(root, 'src/counter.kay'), counter)
+    await Bun.write(join(root, 'src/routes/index.kay'), page)
+    // One port for every server, which a port of 0 would change at each restart.
+    const probe = Bun.listen({ hostname: 'localhost', port: 0, socket: { data: () => undefined } })
+    const port = probe.port
+
+    probe.stop(true)
+    const stop = await dev(root, { port, log: line => lines.push(line), onRestart: child => children.push(child) })
+
+    try {
+      await until(() => lines.length === 1, 20_000)
+
+      const url = lines[0]!.split(' ')[2]!
+      const stylesheet = async () => {
+        const href = (/href="(\/_kay\/[^"]+\.css)"/).exec(await (await fetch(url)).text())![1]!
+
+        return (await fetch(url + href)).text()
+      }
+
+      expect(await stylesheet()).toContain('red')
+
+      const [chunk] = (await Bun.file(join(output, 'manifest.json')).json() as { islands: Record<string, string[]> }).islands['src/counter.kay']!
+      const mapped = async () => ((await (await fetch(`${url}${chunk}.map`)).json()) as { sourcesContent: (string | null)[] }).sourcesContent.includes(counter)
+
+      for (const start = Date.now(); !await mapped(); await Bun.sleep(50)) {
+        if (Date.now() - start > 10_000)
+          throw new Error('the island\'s map never pointed at counter.kay')
+      }
+
+      const events = (await fetch(`${url}/_kay/dev/events`)).body!.getReader()
+
+      await events.read()
+      await Bun.write(join(root, 'src/app.css'), 'h1 { color: blue }\n')
+      await until(() => lines.some(line => line.includes('src/app.css: stylesheets swapped in')), 10_000)
+
+      expect(new TextDecoder().decode((await events.read()).value)).toStartWith('event: styles\n')
+      expect(await stylesheet()).toContain('#00f')
+      expect(children).toHaveLength(1)
+      await events.cancel()
+
+      const before = written()
+
+      await Bun.write(join(root, 'src/name.ts'), 'export const name = \'Grace\'\n')
+      await until(() => lines.length === 3, 10_000)
+
+      expect(await (await fetch(url)).text()).toContain('Grace</h1>')
+      expect(written()).toEqual(before)
+
+      await Bun.write(join(root, 'src/routes/index.kay'), `${page}else\n  p no\n`)
+      await until(() => lines.length === 4, 10_000)
+
+      const failed = await fetch(url)
+
+      expect(failed.status).toBe(500)
+      expect(await failed.text()).toContain('src/routes/index.kay:10:1')
+
+      await Bun.write(join(root, 'src/routes/index.kay'), page)
+      await until(() => lines.length === 5, 10_000)
+
+      expect(await (await fetch(url)).text()).toContain('Grace</h1>')
+      expect(children).toHaveLength(4)
+    }
+    finally {
+      await stop()
+      await rm(root, { recursive: true, force: true })
+    }
+  }, 60_000)
 
   it('serves the compile errors of a project that failed to boot, and the reload stream', async () => {
     const source = 'p ok\nelse\n  p no\n'

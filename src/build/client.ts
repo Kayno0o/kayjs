@@ -81,9 +81,38 @@ const WORKER_URL = /["']\.\/(?:assets\/)?([\w.~-]+\.js)["']/g
 // Every builtin, the ones Bun polyfills included: one whose polyfill lacks an export would fail the build that only looks for the way to the others.
 const BUILTINS = [...builtinModules, 'node:*', 'bun', 'bun:*']
 
+// What the components say before anything is bundled: the islands by id, the classes of the `.class` shorthand, what `kay check` would report of them, and the pages and layouts the stylesheets are gathered from.
+export interface ClientSources {
+  islands: Map<string, string>
+  classes: Set<string>
+  problems: string[]
+  pages: string[]
+  libraries: KayLibrary[]
+}
+
 // Bundles what the browser needs: one entry hydrating the islands, each island in its own chunk, and a stylesheet per page and layout.
 // Every component is compiled first, so all of the project's syntax errors come out together instead of one per bundler run.
 export async function buildClient(root: string, options: ClientOptions = {}): Promise<ClientBuild> {
+  const sources = await readClientSources(root, options)
+
+  await clearClientOutput(root)
+  await writeClasses(root, sources.classes)
+
+  const [scripts, styles] = await Promise.all([bundleIslands(root, sources.islands, options), bundleStyles(root, sources, options)])
+  const manifest: ClientManifest = { ...scripts.manifest, styles: styles.styles, ...options.hot && { problems: sources.problems } }
+
+  await writeManifest(root, manifest)
+
+  const built = fromManifest(root, manifest)
+
+  if (options.report !== undefined)
+    built.report = await sizeReport(root, clientDir(root), scripts.manifest, sources.islands, options.report === 'modules' ? scripts.inputs : undefined)
+
+  return built
+}
+
+// Compiles every component, throwing all of their errors at once.
+export async function readClientSources(root: string, options: ClientOptions = {}): Promise<ClientSources> {
   const islands = new Map<string, string>()
   const classes = new Set<string>()
   const diagnostics: FileDiagnostic[] = []
@@ -131,38 +160,35 @@ export async function buildClient(root: string, options: ClientOptions = {}): Pr
   if (diagnostics.length > 0)
     throw new KayCompileError(diagnostics)
 
-  const base = outputDir(root)
-  const dir = clientDir(root)
   const routesDir = projectPaths(root, options).routes
 
-  // A failed build must not leave the previous manifest pointing at files that are gone.
-  await Promise.all([rm(dir, { recursive: true, force: true }), rm(join(base, PRERENDERED_DIR), { recursive: true, force: true }), rm(join(base, MANIFEST), { force: true })])
-  await mkdir(dir, { recursive: true })
-  forgetBundleMaps()
-  // The stylesheet build hands these to Tailwind, which cannot read the `.class` shorthand: see styleImports.
-  await writeIfChanged(projectPaths(root).classes, [...classes].sort().join('\n'))
-
-  const [scripts, styles] = await Promise.all([
-    buildIslands(root, base, islands, options),
-    buildStyles(root, dir, [...existsSync(routesDir) ? await findKayFiles(routesDir) : [], ...mounted], libraries, options),
-  ])
-  const manifest: ClientManifest = { ...scripts.manifest, styles }
-
-  await writeManifest(root, manifest)
-
-  const built = options.hot ? { ...fromManifest(root, manifest), problems } : fromManifest(root, manifest)
-
-  if (options.report !== undefined)
-    built.report = await sizeReport(root, dir, scripts.manifest, islands, options.report === 'modules' ? scripts.inputs : undefined)
-
-  return built
+  return { islands, classes, problems, pages: [...existsSync(routesDir) ? await findKayFiles(routesDir) : [], ...mounted], libraries }
 }
 
-async function buildIslands(root: string, base: string, islands: Map<string, string>, options: ClientOptions): Promise<{ manifest: Omit<ClientManifest, 'styles'>, inputs: ChunkInputs }> {
+// A failed build must not leave the previous manifest pointing at files that are gone.
+export async function clearClientOutput(root: string): Promise<void> {
+  const base = outputDir(root)
+  const dir = clientDir(root)
+
+  await Promise.all([rm(dir, { recursive: true, force: true }), rm(join(base, PRERENDERED_DIR), { recursive: true, force: true }), rm(join(base, MANIFEST), { force: true })])
+  await mkdir(dir, { recursive: true })
+}
+
+// The stylesheet build hands these to Tailwind, which cannot read the `.class` shorthand: see styleImports.
+export async function writeClasses(root: string, classes: Set<string>): Promise<void> {
+  await writeIfChanged(projectPaths(root).classes, [...classes].sort().join('\n'))
+}
+
+// `inputs` holds the modules of each chunk, `maps` the source maps written.
+export async function bundleIslands(root: string, islands: Map<string, string>, options: ClientOptions): Promise<{ manifest: Omit<ClientManifest, 'styles'>, inputs: ChunkInputs, maps: string[] }> {
   const navigation = options.navigation ?? true
 
   if (islands.size === 0 && !navigation)
-    return { manifest: { entryImports: [], islands: {} }, inputs: {} }
+    return { manifest: { entryImports: [], islands: {} }, inputs: {}, maps: [] }
+
+  const base = outputDir(root)
+
+  forgetBundleMaps()
 
   const entryFile = join(base, 'entry.ts')
   const bootFile = join(base, 'boot.ts')
@@ -245,7 +271,7 @@ async function buildIslands(root: string, base: string, islands: Map<string, str
   const inputs = Object.fromEntries(Object.entries(build.metafile!.outputs).map(([output, meta]) => [output.replace(LEADING_DOT_SLASH, ''), meta.inputs]))
   const directives = await islandDirectives(root, build.outputs)
 
-  return { manifest: { ...manifest, navigation, ...directives && { directives } }, inputs }
+  return { manifest: { ...manifest, navigation, ...directives && { directives } }, inputs, maps: build.outputs.filter(output => output.kind === 'sourcemap').map(output => output.path) }
 }
 
 // What kay's policy refuses and the islands' chunks or the workers they start need: `'wasm-unsafe-eval'` to compile wasm, `blob:` workers for a package building its worker in memory, as qr-scanner does.
@@ -297,14 +323,14 @@ async function refuseBuiltinImports(root: string, logs: Bun.BuildOutput['logs'],
     throw new Error(`kay: a browser has no ${builtins.join(', ')}, and islands import modules reaching ${builtins.length === 1 ? 'it' : 'them'}: ${chains.join('; ')}. An island bundles every module it imports, the database or environment one opens as it loads included: move what the island needs to a module importing none of it, or pass it as a prop.`)
 }
 
-// Each page and layout is an entry whose code shrinks to its imports, so what comes out is the stylesheet of everything it renders.
-async function buildStyles(root: string, dir: string, pages: string[], libraries: KayLibrary[], options: ClientOptions): Promise<Record<string, string>> {
+// Each page and layout is an entry whose code shrinks to its imports, so what comes out is the stylesheet of everything it renders: each one's URL by the file relative to the root, and every module the build read.
+export async function bundleStyles(root: string, { pages, libraries }: Pick<ClientSources, 'pages' | 'libraries'>, options: ClientOptions): Promise<{ styles: Record<string, string>, inputs: string[] }> {
   if (pages.length === 0)
-    return {}
+    return { styles: {}, inputs: [] }
 
   const build = await Bun.build({
     entrypoints: pages,
-    outdir: dir,
+    outdir: clientDir(root),
     target: 'browser',
     minify: options.minify ?? false,
     metafile: true,
@@ -334,7 +360,7 @@ async function buildStyles(root: string, dir: string, pages: string[], libraries
     await Promise.all(build.outputs.filter(output => CSS_OUTPUT.test(output.path)).map(async output => Bun.write(output.path, rebaseCss(await Bun.file(output.path).text(), base))))
   }
 
-  return styles
+  return { styles, inputs: Object.keys(build.metafile!.inputs).map(input => resolve(input)) }
 }
 
 function islandManifest(root: string, outputs: Outputs, islands: Map<string, string>, entry: string, hot: boolean): Omit<ClientManifest, 'styles'> {

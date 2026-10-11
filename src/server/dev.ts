@@ -1,13 +1,17 @@
+import type { ClientOptions } from '../build/client'
 import type { KayCompileError } from '../build/transform'
+import type { BuildFailure } from '../dev/builder'
 import type { HotSwap } from '../runtime/client'
 import type { ClientBuild } from './client'
 import { readFileSync, statSync } from 'node:fs'
-import { basename, isAbsolute, relative, resolve } from 'node:path'
+import { basename, isAbsolute, join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { Elysia } from 'elysia'
-import { underKayDev } from '../build/assets'
+import { outputDir, underKayDev } from '../build/assets'
+import { kayLog } from '../runtime/log'
 import { isCrossSite } from './actions'
+import { BUILD_FAILURE, clientOptionsKey, fromManifest, readManifest } from './client'
 import { editorCommand } from './editor'
 import { compileErrorPage } from './overlay'
 
@@ -28,12 +32,14 @@ const SOURCE_FILE = /\.(?:kay|[cm]?[jt]sx?|json|css)$/
 
 // One per server process: `kay dev` restarts the process on every change, so a new id means new code.
 const BOOT_ID = crypto.randomUUID()
+// The event streams open on this server, which a stylesheet edit is pushed to.
+const streams = new Set<ReadableStreamDefaultController<string>>()
 
 // Reconnects once the restarted server is up: one running the code this page came from, restarted for a stylesheet, gets the page's stylesheets swapped in, one at a time; one running new code refreshes the page through the swap, which keeps the scroll and the islands whose props did not change, and loads the page fully when the swap cannot apply it, as after a new island. A page with no swap, as under `navigation: false`, keeps the server render it loaded with and applies what changed between it and the new one to the page, through `DEV_PATCH`; it reloads when that cannot be applied, and a server that failed to boot always reloads.
-// The old links go once the new ones loaded, so the page never shows unstyled, and a page that no longer answers as it did reloads instead.
+// The old links go once the new ones loaded, so the page never shows unstyled, and a page that no longer answers as it did reloads instead. A stylesheet edit swaps them the same way without a restart, on a `styles` event.
 // A server restarted for edited islands only also names their new chunks: a page on the code it replaced swaps them in through `$kayHot`, keeping its state, then its stylesheets.
 // The id is a meta beside the script, so the script reads the same on every server: a page swap keeps it rather than running a copy that connects again, and a policy allows it by one hash.
-export const LIVE_RELOAD = `<meta name="kay-boot" content="${BOOT_ID}"><script>(()=>{let b=document.querySelector('meta[name=kay-boot]')?.content,v,s,q=Promise.resolve();const load=async()=>{try{const r=await fetch(location.href,{cache:'no-store',headers:{accept:'text/html'}});return r.ok&&!r.redirected?new DOMParser().parseFromString(await r.text(),'text/html'):null}catch{return null}};new EventSource(${JSON.stringify(DEV_EVENTS)}).addEventListener('boot',e=>q=q.then(async()=>{let p=false;const d=e.data,s0=d.indexOf(' '),t=d.indexOf(' ',s0+1),i=d.slice(0,s0),c=t<0?d.slice(s0+1):d.slice(s0+1,t),h=t<0?null:JSON.parse(d.slice(t+1));if(i===b){v??=c;if(!window.$kayRefresh)s??=await load();return}if(c!==v){let ok=false;try{ok=!!h&&String(h.from)===v&&!!window.$kayHot&&await window.$kayHot(h)}catch{}if(!ok){if(c===i)return location.reload();if(window.$kayRefresh){try{await window.$kayRefresh()}catch{return location.reload()}}else p=true}v=c}b=i;try{const d=await load();if(!d)return location.reload();if(p){const m=await import(${JSON.stringify(DEV_PATCH)});if(!s||!m.patch(s,d))return location.reload();s=d}const o=[...document.querySelectorAll('link[rel=stylesheet]')],u=new Set(o.map(l=>l.getAttribute('href')));await Promise.all([...d.querySelectorAll('link[rel=stylesheet]')].map(l=>new Promise(r=>{const k=document.createElement('link'),h=l.getAttribute('href');k.rel='stylesheet';k.href=u.has(h)?h+(h.includes('?')?'&':'?')+'kay-dev='+i:h;k.onload=k.onerror=r;document.head.append(k)})));for(const l of o)l.remove()}catch{location.reload()}}))})()</script>`
+export const LIVE_RELOAD = `<meta name="kay-boot" content="${BOOT_ID}"><script>(()=>{let b=document.querySelector('meta[name=kay-boot]')?.content,v,s,q=Promise.resolve();const load=async()=>{try{const r=await fetch(location.href,{cache:'no-store',headers:{accept:'text/html'}});return r.ok&&!r.redirected?new DOMParser().parseFromString(await r.text(),'text/html'):null}catch{return null}},css=async(d,i)=>{const o=[...document.querySelectorAll('link[rel=stylesheet]')],u=new Set(o.map(l=>l.getAttribute('href')));await Promise.all([...d.querySelectorAll('link[rel=stylesheet]')].map(l=>new Promise(r=>{const k=document.createElement('link'),h=l.getAttribute('href');k.rel='stylesheet';k.href=u.has(h)?h+(h.includes('?')?'&':'?')+'kay-dev='+i:h;k.onload=k.onerror=r;document.head.append(k)})));for(const l of o)l.remove()},x=new EventSource(${JSON.stringify(DEV_EVENTS)});x.addEventListener('styles',e=>q=q.then(async()=>{try{const d=await load();if(!d)return location.reload();if(s)s=d;await css(d,e.data)}catch{location.reload()}}));x.addEventListener('boot',e=>q=q.then(async()=>{let p=false;const d=e.data,s0=d.indexOf(' '),t=d.indexOf(' ',s0+1),i=d.slice(0,s0),c=t<0?d.slice(s0+1):d.slice(s0+1,t),h=t<0?null:JSON.parse(d.slice(t+1));if(i===b){v??=c;if(!window.$kayRefresh)s??=await load();return}if(c!==v){let ok=false;try{ok=!!h&&String(h.from)===v&&!!window.$kayHot&&await window.$kayHot(h)}catch{}if(!ok){if(c===i)return location.reload();if(window.$kayRefresh){try{await window.$kayRefresh()}catch{return location.reload()}}else p=true}v=c}b=i;try{const d=await load();if(!d)return location.reload();if(p){const m=await import(${JSON.stringify(DEV_PATCH)});if(!s||!m.patch(s,d))return location.reload();s=d}await css(d,i)}catch{location.reload()}}))})()</script>`
 
 // Shows each problem kay logs in the browser, as `[kay] ...`, in a panel on the page as well as in the console; its own shadow root keeps the page's styles off it, and styles set through `style` pass a policy without inline styles.
 // The problems `kay check` would report of the project's components, without type checking, come in a data block the page carries, and show once it loads. A page swap takes the panel away with the body, so the next one lists the new page's problems only. It updates in a microtask, so a failure of its own never breaks the call that logged.
@@ -187,13 +193,103 @@ export async function openInEditor(root: string, request: Request): Promise<Resp
 // The stream stays open until the process exits; `retry` makes the browser poll quickly for the next one.
 // A server that failed to boot gives its own id as its code, so the pages on either side of it always reload.
 export function devEvents(failed = false, hot?: HotSwap): Response {
+  let own: ReadableStreamDefaultController<string> | undefined
   const stream = new ReadableStream<string>({
     start(controller) {
+      own = controller
+      streams.add(controller)
       controller.enqueue(`retry: 100\nevent: boot\ndata: ${BOOT_ID} ${failed ? BOOT_ID : process.env.KAY_DEV_CODE ?? BOOT_ID}${hot && !failed ? ` ${JSON.stringify(hot)}` : ''}\n\n`)
+    },
+    cancel() {
+      streams.delete(own!)
     },
   })
 
   return new Response(stream, { headers: { 'content-type': 'text/event-stream', 'cache-control': 'no-store' } })
+}
+
+// What the build `kay dev` keeps holds, as a production server reads `kay build`'s, its stylesheets following each stylesheet edit; undefined when the server is to bundle its own, as when `pages()` was given other options than kay.config.ts holds.
+export async function kayDevClient(root: string, options: ClientOptions): Promise<ClientBuild | undefined> {
+  if (process.send === undefined)
+    return undefined
+
+  const answer = await askKayDev()
+
+  if (answer === 'none')
+    return undefined
+
+  const key = clientOptionsKey(options)
+
+  if (answer === 'failed') {
+    const failure = await readFailure(root)
+
+    if (failure?.options === key)
+      throw failureError(failure)
+  }
+  else {
+    const manifest = await readManifest(root)
+
+    if (manifest?.options === key)
+      return followStyles(root, fromManifest(root, manifest))
+  }
+
+  kayLog('warn', '`pages()` was given options for the browser build that kay.config.ts does not hold, so each server bundles it as it boots; move them to kay.config.ts for `kay dev` to build it ahead')
+  process.send({ ownClient: true })
+
+  return undefined
+}
+
+// `kay dev` answers once its build is done: `built`, `failed`, or `none` when it has none for this server.
+async function askKayDev(): Promise<string> {
+  const { promise, resolve } = Promise.withResolvers<string>()
+  const answered = (message: unknown) => {
+    if (typeof message === 'object' && message !== null && 'client' in message && typeof message.client === 'string') {
+      process.off('message', answered)
+      resolve(message.client)
+    }
+  }
+
+  process.on('message', answered)
+  process.send!({ wantsClient: true })
+
+  return promise
+}
+
+async function readFailure(root: string): Promise<BuildFailure | undefined> {
+  const file = Bun.file(join(outputDir(root), BUILD_FAILURE))
+
+  return await file.exists() ? await file.json() as BuildFailure : undefined
+}
+
+// A compile error goes by its name, as `bootFailure` tells it: the class's module loads the compiler, which an executable leaves out.
+function failureError({ message, diagnostics }: BuildFailure): Error {
+  const error = Object.assign(new Error(message), diagnostics && { name: 'KayCompileError', diagnostics })
+
+  error.stack = diagnostics ? `KayCompileError: ${message}` : message
+
+  return error
+}
+
+// `kay dev` sends the stylesheets of a stylesheet edit to the server it does not restart for it; the open pages swap them in.
+function followStyles(root: string, client: ClientBuild): ClientBuild {
+  process.on('message', (message: unknown) => {
+    if (typeof message !== 'object' || message === null || !('styles' in message))
+      return
+
+    client.styles = new Map(Object.entries(message.styles as Record<string, string>).map(([file, url]) => [resolve(root, file), url]))
+
+    for (const stream of streams) {
+      try {
+        stream.enqueue(`event: styles\ndata: ${Date.now()}\n\n`)
+      }
+      catch {
+        streams.delete(stream)
+      }
+    }
+  })
+  process.send!({ followsStyles: true })
+
+  return client
 }
 
 // What a dev server serves when the project failed to boot: the errors on every page, until a fix restarts it.

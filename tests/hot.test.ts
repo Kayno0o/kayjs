@@ -16,7 +16,7 @@ const todos = (label: string) => `---\nimport { signal } from 'kay'\n\nconst ite
 const counter = (label: string) => `---\nimport { signal } from 'kay'\n\nconst count = signal(0)\nconst note = signal('')\n---\nbutton.count(onClick={() => count.set(n => n + 1)}) ${label} {count()}\ninput.note(bind:value={note})\n`
 
 const extra = '---\nimport { signal } from \'kay\'\n\nconst on = signal(false)\n---\nbutton.extra(onClick={() => on.set(!on())}) Extra {on() ? \'on\' : \'off\'}\n'
-const home = (text: string, withExtra = false) => `---\nimport Counter from '../components/counter.kay'\n${withExtra ? 'import Extra from \'../components/extra.kay\'\n' : ''}import Panel from '../components/panel.kay'\nimport Todos from '../components/todos.kay'\n---\nh1 Home\ndiv.solo\n  Counter\nPanel\nTodos\np.static ${text}\n${withExtra ? 'Extra\n' : ''}div(style="height: 3000px")\n`
+const home = (text: string, withExtra = false) => `---\nimport '../app.css'\nimport Counter from '../components/counter.kay'\n${withExtra ? 'import Extra from \'../components/extra.kay\'\n' : ''}import Panel from '../components/panel.kay'\nimport Todos from '../components/todos.kay'\n---\nh1 Home\ndiv.solo\n  Counter\nPanel\nTodos\np.static ${text}\n${withExtra ? 'Extra\n' : ''}div(style="height: 3000px")\n`
 
 let root: string
 let stop: () => Promise<void>
@@ -48,6 +48,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('kay dev in 
       // The panel embeds the counter, whose code Bun then moves to a chunk of its own.
       'src/components/panel.kay': '---\nimport { signal } from \'kay\'\nimport Counter from \'./counter.kay\'\n\nconst opened = signal(0)\n---\nsection.panel\n  button.open(onClick={() => opened.set(n => n + 1)}) Opened {opened()}\n  Counter\n',
       'src/components/todos.kay': todos('Drop'),
+      'src/app.css': 'p.static { color: rgb(255, 0, 0) }\n',
       'src/routes/index.kay': home('Static'),
     }
 
@@ -137,6 +138,21 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('kay dev in 
     expect(await page.textContent('.solo button.count')).toBe('Pressed 3')
   }, 60_000)
 
+  it('swaps an edited stylesheet into the open page, the server kept running and the page not reloaded', async () => {
+    const color = async () => page.evaluate(() => getComputedStyle(document.querySelector('p.static')!).color)
+
+    expect(await color()).toBe('rgb(255, 0, 0)')
+
+    // Written again by a server starting.
+    await rm(join(root, '.port'))
+    await Bun.write(join(root, 'src/app.css'), 'p.static { color: rgb(0, 0, 255) }\n')
+    await until(async () => await color() === 'rgb(0, 0, 255)')
+
+    expect(await sameDocument()).toBe(true)
+    expect(existsSync(join(root, '.port'))).toBe(false)
+    expect(await page.textContent('.solo button.count')).toBe('Pressed 3')
+  }, 60_000)
+
   // Chromium holds six connections to a host: a live reload connecting again on every swap would leave none for the page by the seventh edit, and a copy the policy refuses logs an error each time.
   it('keeps its one live reload connection through many server restarts, each edit shown without a reload', async () => {
     await page.evaluate(() => {
@@ -204,7 +220,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('kay dev in 
   it('opens the line an element came from on Alt+click, and lists the islands with the values of their signals', async () => {
     await page.click('h1', { modifiers: ['Alt'] })
     await until(() => existsSync(join(root, '.opened')))
-    expect(JSON.parse(await Bun.file(join(root, '.opened')).text())).toEqual(['-g', `${join(root, 'src/routes/index.kay')}:7:1`])
+    expect(JSON.parse(await Bun.file(join(root, '.opened')).text())).toEqual(['-g', `${join(root, 'src/routes/index.kay')}:8:1`])
 
     await page.click('button[aria-controls="kay-islands"]')
     await page.locator('#kay-islands', { hasText: 'src/components/extra.kay#1 true' }).waitFor()

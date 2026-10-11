@@ -127,9 +127,9 @@ interface Rendering {
 
 const CHARSET = '<meta charset="utf-8">'
 const VIEWPORT = '<meta name="viewport" content="width=device-width, initial-scale=1">'
-// Per set of islands and per chain of layouts: few exist, and they never change for a build.
-const islandScriptsOf = perClient()
-const stylesheetsOf = perClient()
+// Per set of islands and per chain of layouts: few exist, and they never change for a build. The stylesheets go by their map, which a server under `kay dev` swaps whole for a stylesheet edit.
+const islandScriptsOf = perOwner<ClientBuild>()
+const stylesheetsOf = perOwner<ClientBuild['styles']>()
 const TEXT = { 'content-type': 'text/plain; charset=utf-8' }
 // Header values are bytes, so a file name outside ASCII is escaped.
 const NOT_ASCII = /[^\x20-\x7E]/g
@@ -655,7 +655,7 @@ function stylesheets(client: ClientBuild, files: string[]): string {
   if (client.styles.size === 0)
     return ''
 
-  return stylesheetsOf(client, files.join('\n'), () => [...new Set(files.map(file => client.styles.get(file)))].filter(url => url !== undefined).map((url) => {
+  return stylesheetsOf(client.styles, files.join('\n'), () => [...new Set(files.map(file => client.styles.get(file)))].filter(url => url !== undefined).map((url) => {
     const css = client.inlineStyles?.get(url)
 
     return css === undefined ? `<link rel="stylesheet" href="${url}">` : `<style>${css}</style>`
@@ -677,15 +677,15 @@ function islandScripts(client: ClientBuild, islands: Set<string>, streamed: bool
   })
 }
 
-// One text per key and build, made the first time it is asked for.
-function perClient(): (client: ClientBuild, key: string, make: () => string) => string {
-  const caches = new WeakMap<ClientBuild, Map<string, string>>()
+// One text per key and owner, made the first time it is asked for.
+function perOwner<Owner extends object>(): (owner: Owner, key: string, make: () => string) => string {
+  const caches = new WeakMap<Owner, Map<string, string>>()
 
-  return (client, key, make) => {
-    let cached = caches.get(client)
+  return (owner, key, make) => {
+    let cached = caches.get(owner)
 
     if (!cached)
-      caches.set(client, cached = new Map<string, string>())
+      caches.set(owner, cached = new Map<string, string>())
 
     let text = cached.get(key)
 

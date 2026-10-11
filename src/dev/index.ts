@@ -1,13 +1,17 @@
 import type { Subprocess } from 'bun'
 import type { FSWatcher } from 'node:fs'
 import type { KayConfig } from '../config'
+import type { BuildOutcome } from './builder'
+import type { ClientBuilder } from './client'
 import { existsSync, readdirSync, readFileSync, statSync, watch } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { findProjectFiles, IGNORED_DIRS } from '../build/files'
 import { configCheckOptions, writeShadowTypes } from '../check'
+import { CONFIG_FILE } from '../config'
 import { projectPaths } from '../project'
+import { startClientBuilder } from './client'
 import { inspectorProxy } from './inspector'
 
 export interface DevOptions {
@@ -55,6 +59,7 @@ const WS_SCHEME = /^ws:\/\//
 const ANY_FILE = /^/
 
 // Runs the server entry in development and restarts it on every change; a fresh process is the only way to drop modules Bun has loaded.
+// The client is built beside it, by a process kept from one change to the next, which a stylesheet edit alone needs no restart for.
 // Resolves once watching, with a function stopping the watchers and the server.
 export async function dev(projectRoot: string, options: DevOptions = {}): Promise<() => Promise<void>> {
   const root = resolve(projectRoot)
@@ -82,6 +87,18 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   let address: string | undefined
   // The port the first server asked for and the one it moved to, busy, which every next server takes first.
   let moved: string | undefined
+  // Started once a server asks for the client, and again once a file it loaded changes; none once it exited, until then.
+  let builder: ClientBuilder | undefined
+  let builderStale = true
+  // A server asked for the client, so the next ones will: each restart starts building it at once.
+  let wantsClient = false
+  // `pages()` was given other options than kay.config.ts holds, so the servers bundle their own until the config changes.
+  let ownClient = false
+  // The build the running server reads, and the files changed since the last one began, null for all of them.
+  let building: Promise<BuildOutcome | undefined> | undefined
+  let unbuilt: Set<string> | null = null
+  // The server swapping in the stylesheets of a stylesheet edit, once it said it reads the build.
+  let follower: Subprocess | undefined
   const log = options.log ?? console.log
   // The inspector socket of each server process.
   const sockets = new Map<Subprocess, string>()
@@ -134,6 +151,76 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   }
 
   const env = await environmentWithoutDotenv()
+  const buildClient = async (): Promise<BuildOutcome | undefined> => {
+    if (ownClient)
+      return undefined
+
+    if (builderStale) {
+      await builder?.stop()
+      builder = startClientBuilder(root, env)
+      builderStale = false
+      unbuilt = null
+    }
+
+    const files = unbuilt === null || unbuilt.size > MAX_CHANGED_FILES ? null : [...unbuilt]
+
+    unbuilt = new Set()
+
+    const outcome = await builder?.build(files)
+
+    if (!outcome)
+      builder = undefined
+
+    return outcome
+  }
+  const answerClient = async (server: Subprocess) => {
+    const outcome = await (building ??= buildClient())
+
+    try {
+      server.send({ client: outcome === undefined ? 'none' : outcome.failed ? 'failed' : 'built' })
+    }
+    // Killed for a restart meanwhile.
+    catch {}
+  }
+  const received = (server: Subprocess, message: unknown) => {
+    if (typeof message !== 'object' || message === null)
+      return
+
+    if ('wantsClient' in message) {
+      wantsClient = true
+      void answerClient(server)
+    }
+
+    if ('ownClient' in message) {
+      ownClient = true
+      void builder?.stop()
+      builder = undefined
+    }
+
+    if ('followsStyles' in message)
+      follower = server
+
+    listened(server, message)
+  }
+  // A running server that reads the build takes the stylesheets of an edit to stylesheets alone; false when it needs a restart instead, as when the build failed.
+  const swapStylesheets = async (files: string[]) => {
+    if (files.length === 0 || !files.every(file => STYLESHEET.test(file)) || child === undefined || follower !== child || builder === undefined || builderStale)
+      return false
+
+    const server = child
+    const started = performance.now()
+    const outcome = await (building = buildClient())
+
+    if (!outcome || outcome.failed || server !== child)
+      return false
+
+    if (outcome.styles)
+      server.send({ styles: outcome.styles })
+
+    log(`${stamp()} ${describe(changedFilesNamed(root, files))}: stylesheets swapped in ${Math.round(performance.now() - started)} ms`)
+
+    return true
+  }
   // Chosen again for each process, so a `src/server.ts` written or deleted while running takes over at the next restart.
   const entryToRun = () => options.entry === undefined && !existsSync(entry) ? PAGES_ENTRY : entry
   const spawn = () => {
@@ -141,7 +228,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
 
     spareEntry = entryToRun()
 
-    const server = Bun.spawn([process.execPath, '--preload', SPARE, spareEntry], { cwd: root, env: { ...env, NODE_ENV: 'development', ...options.port === undefined ? {} : { PORT: String(options.port) }, ...socket === undefined ? {} : { BUN_INSPECT: `ws+unix://${socket}` } }, stdin: 'pipe', stdout: 'inherit', stderr: 'inherit', ipc: (message, server) => listened(server, message) })
+    const server = Bun.spawn([process.execPath, '--preload', SPARE, spareEntry], { cwd: root, env: { ...env, NODE_ENV: 'development', ...options.port === undefined ? {} : { PORT: String(options.port) }, ...socket === undefined ? {} : { BUN_INSPECT: `ws+unix://${socket}` } }, stdin: 'pipe', stdout: 'inherit', stderr: 'inherit', ipc: (message, server) => received(server, message) })
 
     if (socket !== undefined) {
       sockets.set(server, socket)
@@ -168,10 +255,18 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     void reportExit(child)
   }
   // The server never reads the generated types, only the editor and `kay check` do, so it starts before they are rewritten.
+  // The client builds while the last server stops and the next one boots, which waits for it only once it asks.
   const restart = async () => {
-    restartedAt = performance.now()
-    restartedFor = changedFilesNamed(root, [...touched])
+    const files = [...touched]
+
     touched = new Set()
+
+    if (await swapStylesheets(files))
+      return
+
+    restartedAt = performance.now()
+    restartedFor = changedFilesNamed(root, files)
+    building = wantsClient ? buildClient() : undefined
 
     const previous = child
 
@@ -192,6 +287,13 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   }
   const stopWatching = watchProject(root, (file) => {
     startupChanged ||= STARTUP_FILE.test(file)
+
+    if (STARTUP_FILE.test(file) || file === CONFIG_FILE || builder?.loaded(file) === true) {
+      builderStale = true
+      ownClient = false
+    }
+
+    unbuilt?.add(file)
 
     if (!STYLESHEET.test(file)) {
       codeVersion++
@@ -217,7 +319,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     await restarting
     child?.kill()
     spare?.kill()
-    await Promise.all([child?.exited, spare?.exited])
+    await Promise.all([child?.exited, spare?.exited, builder?.stop()])
     await inspector?.stop()
   }
 }

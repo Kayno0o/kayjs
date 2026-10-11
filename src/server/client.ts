@@ -1,3 +1,4 @@
+import type { ClientOptions } from '../build/client'
 import type { SizeReport } from '../build/report'
 import type { ServerIslandMode } from '../runtime/html'
 import { join, resolve } from 'node:path'
@@ -25,6 +26,10 @@ export interface ClientManifest {
   chunkInputs?: Record<string, string[]>
   // The sources the islands need beyond kay's policy, by directive: compiling wasm, starting a worker from a blob.
   directives?: Record<string, string[]>
+  // Development: what `kay check` would report of the project's components without type checking, for the problems panel.
+  problems?: string[]
+  // The build `kay dev` keeps: the options it was made with, as `clientOptionsKey` writes them, so a server given others builds its own.
+  options?: string
 }
 
 export interface PrerenderedPage {
@@ -49,8 +54,6 @@ export interface PrerenderedPage {
 
 export interface ClientBuild extends Omit<ClientManifest, 'styles' | 'pages'> {
   dir: string
-  // Development: what `kay check` would report of the project's components without type checking, for the problems panel.
-  problems?: string[]
   // By absolute path.
   styles: Map<string, string>
   pages: Map<string, PrerenderedPage>
@@ -67,10 +70,21 @@ const NOT_RELATIVE = /^(?:[a-z][\w+.-]*:|\/|#)/i
 const STYLE_END = /<\/style/gi
 
 export const MANIFEST = 'manifest.json'
+// Left beside the manifest when the build `kay dev` keeps failed; a server reads it first.
+export const BUILD_FAILURE = 'failure.json'
 // Where `kay build --compile` wrote the executable, for `kay start` to run; a later build without it leaves none.
 export const EXECUTABLE_RECORD = 'executable'
 
 export const PRERENDERED_DIR = 'pages'
+
+// What sets apart the builds of two sets of options; a plugin or a function counts by its name.
+export function clientOptionsKey(options: ClientOptions): string {
+  return JSON.stringify(options, (_key, value: unknown) => typeof value === 'function' ? `function ${value.name}` : isPlugin(value) ? `plugin ${value.name}` : value)
+}
+
+function isPlugin(value: unknown): value is { name: string } {
+  return typeof value === 'object' && value !== null && 'setup' in value && typeof value.setup === 'function' && 'name' in value && typeof value.name === 'string'
+}
 
 export async function writeManifest(root: string, manifest: ClientManifest): Promise<void> {
   await Bun.write(join(outputDir(root), MANIFEST), JSON.stringify(manifest))

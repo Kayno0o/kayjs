@@ -56,10 +56,20 @@ const DISK: ProjectSource = {
       kayLog('warn', 'no client build in .kay/client, bundling now; run `kay build` before starting in production')
     }
 
+    const options = clientOptionsOf(config, mode)
+
+    // `kay dev` builds it beside the server booting.
+    if (mode.underKayDev) {
+      const built = await (await import('./dev')).kayDevClient(root, options)
+
+      if (built)
+        return built
+    }
+
     // Imported only to bundle, as it brings the compiler, which a server reading a build never needs.
     const { buildClient } = await import('../build/client')
 
-    return buildClient(root, clientOptionsOf(config, mode))
+    return buildClient(root, options)
   },
   // Imported as it is asked for, as it needs Bun, which eslint's bundle of the shadow types runs without.
   prepare: async (root, settings) => (await import('./loader')).registerLoader(root, settings),

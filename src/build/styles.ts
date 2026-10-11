@@ -9,7 +9,7 @@ import { ASSET_FILE, writeAsset } from './assets'
 import { collectionComponents, importedNames, rendersContent } from './collection-components'
 import { scriptLoader, transpilerFor } from './files'
 import { globbedFiles } from './glob'
-import { libraryOf } from './libraries'
+import { importsOf, libraryOf } from './libraries'
 
 const KAY_FILE = /\.kay$/
 const SCRIPT_FILE = /\.[cm]?[jt]sx?$/
@@ -52,6 +52,11 @@ function importedSpecifiers(code: string, loader: Bun.JavaScriptLoader): string[
 // A module importing each of these files for what it brings along.
 function importing(paths: string[]): string {
   return paths.map(path => `import ${JSON.stringify(path)}\n`).join('')
+}
+
+// What the stylesheet build reads of a module it follows: its imports, and whether a component renders the entries of a collection. An edit leaving them alone leaves the stylesheets as they were.
+export async function styleSignature(path: string, source: string): Promise<string> {
+  return JSON.stringify([await importsOf(path, source), KAY_FILE.test(path) && rendersContent(parseKay(source).template)])
 }
 
 // For the stylesheet build: components and modules shrink to their imports, so Bun follows them down to every stylesheet a page uses, and the assets they import are written for the server to serve.

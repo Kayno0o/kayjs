@@ -64,6 +64,8 @@ kay: accents needs tailwind: add --with tailwind, or drop it with --without acce
 
 `kay dev` runs `src/server.ts` with `NODE_ENV=development`. Open pages refresh by themselves, an edited island is swapped in place, and a project that fails to compile shows its errors in the browser. What the entry imports before it calls `pages()`, such as a mailer rendering `.kay` mails, imports `.kay` files and icons as pages do.
 
+`kay dev` builds the browser code itself while the server boots, in a process it keeps from one change to the next, and the server reads that build as a production server reads `kay build`'s. An edit builds again only what it reaches: a change to a server module restarts the server alone, and an edit to stylesheets alone swaps them into the open pages without restarting anything. A `pages()` given options for the browser build that `kay.config.ts` does not hold bundles its own as it boots, and says so: keep those options in `kay.config.ts`.
+
 | Option | Effect |
 | --- | --- |
 | `--entry <file>` | The server entry, when it is not `src/server.ts` |
@@ -75,12 +77,12 @@ When another process holds the port, the server moves to the next free one, and 
 
 A project with no server entry, such as a static site, gets a server of kay's own on `PORT` (3000 by default).
 
-The terminal shows the address once, then one line per restart, naming what changed and how long the new server took to listen, with `, now on <address>` when the address changed, and says so when the server exits on its own:
+The terminal shows the address once, then one line per restart, naming what changed and how long the new server took to listen, or how long a stylesheet edit took to reach the server, with `, now on <address>` when the address changed, and says so when the server exits on its own:
 
 ```
 kay dev: http://localhost:3000 (ready in 412 ms)
 14:02:31 src/routes/index.kay: restarted in 58 ms
-14:02:47 src/app.css and 1 more: restarted in 61 ms
+14:02:47 src/app.css: stylesheets swapped in 24 ms
 14:03:05 the server exited with code 1, waiting for a change
 ```
 
