@@ -1,11 +1,11 @@
-import type { Attribute, AwaitNode, ConstNode, ElementNode, ErrorMessages, ForNode, IfNode, NamedAttribute, Node, SlotNode, Span, TextNode, TryNode } from './ast'
+import type { Attribute, AwaitNode, ConstNode, ElementNode, ErrorMessages, ForNode, IfNode, Node, Span, TryNode } from './ast'
 import type { DynamicItem } from './items'
 import type { CodeBuilder } from './mapping'
 import { URL_ATTRIBUTES } from '../runtime/base'
-import { actionOf, describedByOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, formFieldOf, marksServerIsland } from './ast'
+import { actionOf, describedByOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, formFieldOf, keyedByPosition, marksServerIsland } from './ast'
 import { decodeEntities, isFunctionExpression } from './expression'
-import { BEHAVIOUR, CONTENT_PROPERTIES, describedValue, END_MARKER, escapeStaticAttribute, escapeText, RAW_ELEMENTS, START_MARKER, VOID_ELEMENTS } from './html'
 import { childItems, constDeclaration, errorParagraphArguments, slotValue, soleDynamic } from './items'
+import { BEHAVIOUR, CONTENT_PROPERTIES, describedValue, END_MARKER, escapeStaticAttribute, escapeText, helperName, RAW_ELEMENTS, START_MARKER, TemplateWriter, VOID_ELEMENTS } from './markup'
 
 // The `kay/dom` helpers browser output calls, each imported under a `Kay` name.
 const DOM_HELPERS = ['append', 'attempt', 'attribute', 'awaited', 'branches', 'close', 'component', 'componentClass', 'dynamic', 'effect', 'errorParagraph', 'fragment', 'image', 'insert', 'listen', 'loop', 'markers', 'memo', 'merge', 'omit', 'property', 'ref', 'rowKey', 'setClass', 'setStyle', 'spread', 'template', 'text', 'transition', 'untrack']
@@ -16,11 +16,7 @@ const BASED = new Set([...URL_ATTRIBUTES, 'srcset'])
 const ROOT_PATH = /(?:^|,)\s*\/(?!\/)/
 
 export function domHelperImport(): string {
-  return `import { ${DOM_HELPERS.map(helper => `${helper} as ${domAlias(helper)}`).join(', ')} } from 'kay/dom'\n`
-}
-
-function domAlias(helper: string): string {
-  return `Kay${helper[0]!.toUpperCase()}${helper.slice(1)}`
+  return `import { ${DOM_HELPERS.map(helper => `${helper} as ${helperName(helper)}`).join(', ')} } from 'kay/dom'\n`
 }
 
 // A node of a template, so the code can reach the ones it binds: through `firstChild` and `nextSibling`, and past a dynamic part through its end marker.
@@ -36,7 +32,7 @@ interface TemplateNode {
 type Binding = (variable: (node: TemplateNode) => string) => void
 
 // A template as code building its DOM in the browser, or claiming the server's markup of it when an island hydrates.
-export class DomTemplate {
+export class DomTemplate extends TemplateWriter {
   private readonly templates: string[] = []
   private counter = 0
   // The action the form being emitted posts to, whose refusal marks its fields invalid.
@@ -46,7 +42,9 @@ export class DomTemplate {
 
   // `errors`: what a refused form's fields are described by.
   // `located`, in development: the source position each element carries for `kay dev`'s inspector.
-  constructor(private readonly b: CodeBuilder, private readonly src: string, private readonly errors?: ErrorMessages, private readonly located?: (element: ElementNode) => string | undefined) {}
+  constructor(b: CodeBuilder, src: string, private readonly errors?: ErrorMessages, private readonly located?: (element: ElementNode) => string | undefined) {
+    super(b, src)
+  }
 
   // A block: one element, or a fragment of its items, or `null` when empty.
   block(nodes: Node[]): void {
@@ -151,7 +149,7 @@ export class DomTemplate {
           const target = this.formTarget
 
           b.wrap(item.node, () => {
-            b.add(`KayInsert(${at}, () => ${domAlias('errorParagraph')}(KayFormError((`).addSource(target).add(`), ${JSON.stringify(item.node.name)}), ${errorParagraphArguments(item.node, this.src, this.errors?.lines.get(item.node))}));`)
+            b.add(`KayInsert(${at}, () => ${helperName('errorParagraph')}(KayFormError((`).addSource(target).add(`), ${JSON.stringify(item.node.name)}), ${errorParagraphArguments(item.node, this.src, this.errors?.lines.get(item.node))}));`)
           })
         }
 
@@ -160,7 +158,7 @@ export class DomTemplate {
   }
 
   private constDeclaration(node: ConstNode): void {
-    this.b.wrap(node, () => constDeclaration(this.b, node, this.src, domAlias('memo')))
+    this.b.wrap(node, () => constDeclaration(this.b, node, this.src, helperName('memo')))
   }
 
   private if(node: IfNode, at: string): void {
@@ -168,7 +166,7 @@ export class DomTemplate {
 
     // A `match` reads its subject once, which each branch compares with its values.
     if (node.subject)
-      b.add(`{ const KaySubject = ${domAlias('memo')}(() => (`).addSource(node.subject).add(')); ')
+      b.add(`{ const KaySubject = ${helperName('memo')}(() => (`).addSource(node.subject).add(')); ')
 
     b.add(`KayBranches(${at}, [`)
 
@@ -206,7 +204,7 @@ export class DomTemplate {
   private for(node: ForNode, at: string): void {
     const { b } = this
     // A key naming the index means rows are matched by position: `for row, i of rows key={i}`.
-    const positional = node.index !== undefined && node.key !== undefined && this.source(node.key).trim() === this.source(node.index)
+    const positional = keyedByPosition(node, this.src)
 
     b.add(`KayLoop(${at}, () => (`).addSource(node.each).add('), ')
 
@@ -215,7 +213,7 @@ export class DomTemplate {
     else if (node.key)
       b.add('(').addSource(node.item).add(') => (').addSource(node.key).add(')')
     else
-      b.add(domAlias('rowKey'))
+      b.add(helperName('rowKey'))
 
     b.add(', (').addSource(node.item)
 
@@ -653,13 +651,7 @@ export class DomTemplate {
 
     b.add(`KaySpread(${variable}, () => [`)
     this.sources(element, false)
-
-    if (actionOf(element, this.src)) {
-      const defaults = [['method', 'post'], ['enctype', 'multipart/form-data']].filter(([name]) => !this.named(element, name!))
-
-      if (defaults.length > 0)
-        b.add(`, { ${defaults.map(([name, value]) => `${JSON.stringify(name)}: ${JSON.stringify(value)}`).join(', ')} }`)
-    }
+    this.formDefaults(element)
 
     b.add(`]${content ? ', true' : ''});`)
   }
@@ -670,241 +662,21 @@ export class DomTemplate {
 
     b.add(dynamic ? 'KayDynamic(' : 'KayComponent(').addSource(element.tag).add(', ')
 
-    const spreads = element.attributes.some(attribute => attribute.kind === 'spread')
-
-    if (spreads)
-      b.add('KayMerge(')
-
-    const props = this.sources(element, true, true)
-
-    for (const slot of element.children.filter((child): child is SlotNode => child.kind === 'slot')) {
-      props.separate()
-
-      if (slot.params) {
-        b.add(`${JSON.stringify(this.source(slot.name))}: (`).addSource(slot.params).add(') => ')
-        this.childrenValue(slot.children)
-      }
-      else {
-        b.add(`get ${JSON.stringify(this.source(slot.name))}() { return `)
-        this.childrenValue(slot.children)
-        b.add(' }')
-      }
-    }
-
-    const children = element.children.filter(child => child.kind !== 'slot')
-
-    if (children.length > 0) {
-      props.separate()
-      b.add('get children() { return ')
-      this.childrenValue(children)
-      b.add(' }')
-    }
-
-    props.close()
-
-    if (spreads)
-      b.add(')')
-
+    this.componentProps(element, true)
     b.add(')')
   }
 
-  // The attributes as props objects, spreads between them in the order written; a component reads each expression through a getter, so it stays live.
-  private sources(element: ElementNode, getters: boolean, keepOpen = false): { separate: () => void, close: () => void } {
-    const { b } = this
-    const classAttribute = this.classAttribute(element)
-    const spreads = element.attributes.some(attribute => attribute.kind === 'spread')
-    const mergedClass = element.classes.length > 0 || (spreads && classAttribute !== undefined)
-    let open = false
-    let entries = 0
-    let objects = 0
-
-    const separate = () => {
-      if (!open) {
-        b.add(objects++ > 0 ? ', { ' : '{ ')
-        open = true
-        entries = 0
-      }
-
-      if (entries++ > 0)
-        b.add(', ')
-    }
-
-    const closeObject = () => {
-      if (open)
-        b.add(' }')
-
-      open = false
-    }
-
-    const close = () => {
-      if (!open && objects === 0)
-        b.add('{}')
-
-      closeObject()
-    }
-
-    const entry = (name: string, value: () => void, live: boolean) => {
-      separate()
-
-      if (getters && live) {
-        b.add(`get ${JSON.stringify(name)}() { return `)
-        value()
-        b.add(' }')
-      }
-      else {
-        b.add(`${JSON.stringify(name)}: `)
-        value()
-      }
-    }
-
-    if (element.id)
-      entry('id', () => b.add(JSON.stringify(this.source(element.id!))), false)
-
-    for (const attribute of element.attributes) {
-      if (attribute.kind === 'spread') {
-        closeObject()
-        b.add(objects++ > 0 ? ', (' : '(').addSource(attribute.expression).add(')')
-
-        continue
-      }
-
-      if (mergedClass && attribute === classAttribute)
-        continue
-
-      const name = this.source(attribute.name)
-
-      // Inside an island a server island is a component as any other.
-      if (marksServerIsland(element, name, this.src))
-        continue
-
-      if (attribute.kind === 'boolean')
-        entry(name, () => b.add('true'), false)
-      else if (attribute.kind === 'static')
-        entry(name, () => b.add(JSON.stringify(decodeEntities(attribute.text))), false)
-      else if (!element.component && attribute === actionOf(element, this.src))
-        entry(name, () => b.add('KayFormAction((').addSource(attribute.expression).add('))'), true)
-      else if (!element.component && name.startsWith('on') && !isFunctionExpression(this.source(attribute.expression)))
-        entry(name, () => b.add('(kayEvent) => (').addSource(attribute.expression).add(')?.(kayEvent)'), false)
-      else
-        entry(name, () => b.add('(').addSource(attribute.expression).add(')'), true)
-    }
-
-    if (mergedClass)
-      entry('class', () => this.mergedClass(element, classAttribute, spreads), true)
-
-    if (!keepOpen)
-      close()
-
-    return { separate, close }
+  protected rendered(nodes: Node[]): void {
+    this.block(nodes)
   }
 
-  // `class` as written: the shorthand alone or merged with a static attribute is a string; with an expression or spreads, an array of every source, which a component gets merged into one string, as its `class?: string` prop takes it.
-  private mergedClass(element: ElementNode, classAttribute: NamedAttribute | undefined, spreads: boolean): void {
-    const { b } = this
-    const shorthand = element.classes.length > 0 ? this.shorthand(element) : undefined
-
-    if (!spreads && classAttribute?.kind !== 'expression') {
-      b.add(JSON.stringify(classAttribute?.kind === 'static' ? `${shorthand} ${decodeEntities(classAttribute.text)}` : shorthand))
-
-      return
-    }
-
-    const items: (() => void)[] = []
-
-    if (shorthand !== undefined)
-      items.push(() => b.add(JSON.stringify(shorthand)))
-
-    for (const attribute of element.attributes) {
-      if (attribute.kind === 'spread')
-        items.push(() => b.add('((').addSource(attribute.expression).add(') as unknown as { class?: string }).class'))
-      else if (attribute === classAttribute && attribute.kind === 'static')
-        items.push(() => b.add(JSON.stringify(decodeEntities(attribute.text))))
-      else if (attribute === classAttribute && attribute.kind === 'expression')
-        items.push(() => b.add('(').addSource(attribute.expression).add(')'))
-    }
-
-    b.add(element.component ? `${domAlias('componentClass')}([` : '[')
-    for (const [index, item] of items.entries()) {
-      if (index > 0)
-        b.add(', ')
-
-      item()
-    }
-    b.add(element.component ? '])' : ']')
-  }
-
-  // What a component receives as `children` or a slot: a lone line of text as its string or values, as JSX passes it, anything else as a block.
-  private childrenValue(nodes: Node[]): void {
-    const { b } = this
-    const lone = nodes.length === 1 && nodes[0]!.kind === 'text' ? nodes[0] : undefined
-
-    if (!lone || lone.parts.some(part => part.kind === 'element')) {
-      this.block(nodes)
-
-      return
-    }
-
-    const parts = lone.parts as Exclude<TextNode['parts'][number], ElementNode>[]
-
-    if (parts.length > 1)
-      b.add('[')
-
-    for (const [index, part] of parts.entries()) {
-      if (index > 0)
-        b.add(', ')
-
-      if (part.kind === 'expression')
-        b.add('(').addSource(part.expression).add(')')
-      else
-        b.add(JSON.stringify(decodeEntities(part.text)))
-    }
-
-    if (parts.length > 1)
-      b.add(']')
-  }
-
-  private classAttribute(element: ElementNode): NamedAttribute | undefined {
-    return element.attributes.find((attribute): attribute is NamedAttribute => attribute.kind !== 'spread' && this.source(attribute.name) === 'class')
-  }
-
-  private shorthand(element: ElementNode): string {
-    return element.classes.map(span => this.source(span)).join(' ')
-  }
-
-  // The `sizes` of an `img` whose `src` goes through `KayImage`, which caps it for dense screens, so the loop leaves it out.
-  private imageSizes(element: ElementNode): NamedAttribute | undefined {
-    if (element.name !== 'img' || this.named(element, 'srcset') || !element.attributes.some(attribute => attribute.kind === 'expression' && this.source(attribute.name) === 'src'))
-      return undefined
-
-    return element.attributes.find((attribute): attribute is NamedAttribute => attribute.kind !== 'spread' && attribute.kind !== 'boolean' && this.source(attribute.name) === 'sizes')
-  }
-
-  private sizesArgument(sizes: NamedAttribute | undefined): void {
-    if (sizes?.kind === 'static')
-      this.b.add(`, ${JSON.stringify(decodeEntities(sizes.text))}`)
-    else if (sizes?.kind === 'expression')
-      this.b.add(', (').addSource(sizes.expression).add(')')
-  }
-
-  private named(element: ElementNode, name: string): boolean {
-    return element.attributes.some(attribute => attribute.kind !== 'spread' && this.source(attribute.name) === name)
+  // Inside an island a server island is a component as any other.
+  protected skips(element: ElementNode, name: string): boolean {
+    return marksServerIsland(element, name, this.src)
   }
 
   // A link's href kept as written, the link carrying `hreflang`, where any other goes to the page's locale's copy.
   private writtenLink(element: ElementNode, attribute: string): boolean {
     return element.name === 'a' && attribute === 'href' && this.named(element, 'hreflang')
-  }
-
-  private staticAttribute(element: ElementNode, name: string): string | undefined {
-    for (const attribute of element.attributes) {
-      if (attribute.kind === 'static' && this.source(attribute.name) === name)
-        return attribute.text
-    }
-
-    return undefined
-  }
-
-  private source(span: Span): string {
-    return this.src.slice(span.start, span.end)
   }
 }

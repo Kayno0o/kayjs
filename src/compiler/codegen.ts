@@ -4,7 +4,7 @@ import type { Rewrite } from './mapping'
 import type { PageSettingName } from './page-settings'
 import type { ImportBinding, ScriptAnalysis, ServerAnalysis } from './script'
 import { actionUrl } from '../runtime/action'
-import { actionOf, errorMessages, FIELD_ATTRIBUTE, FIELD_ELEMENTS, isChildrenSlot, isHead, isSlot, serverIslandOf, someNode, visitNodes } from './ast'
+import { actionOf, errorMessages, FIELD_ATTRIBUTE, FIELD_ELEMENTS, isChildrenSlot, isHead, isSlot, keyedByPosition, serverIslandOf, someNode, visitNodes } from './ast'
 import { domHelperImport, DomTemplate } from './dom'
 import { isFunctionExpression, mayHoldFunction } from './expression'
 import { htmlHelperImport, HtmlTemplate } from './html'
@@ -941,8 +941,7 @@ class Generator {
     }
 
     const tag = 'KayLoopFor'
-    // A key naming the index means rows are matched by position: `for row, i of rows key={i}`.
-    const positional = node.index !== undefined && node.key !== undefined && this.text(node.key).trim() === this.text(node.index)
+    const positional = keyedByPosition(node, this.src)
 
     // Only an island renders a list again, so only there do rows matched by their objects cost anything.
     const identityChecked = this.options.check === true && (this.options.island !== undefined || this.options.insideIsland === true) && !node.key
@@ -989,7 +988,7 @@ class Generator {
       b.add(') => ')
 
       // A positional key reads the index, so the type check sees it read, and hover and rename reach the key's name.
-      if (positional && node.key && this.options.check) {
+      if (positional && this.options.check) {
         b.add('(void (').addSource(node.key).add('), ')
         this.emitRoot(node.children)
         b.add(')')

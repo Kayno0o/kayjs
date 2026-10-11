@@ -1,8 +1,8 @@
 import type { Diagnostic, ForNode, KayFile, TextChunk } from './ast'
 import { accessibilityLints } from './a11y'
-import { walkNodes } from './ast'
-import { VOID_ELEMENTS } from './html'
+import { keyedByPosition, walkNodes } from './ast'
 import { positionAt } from './mapping'
+import { VOID_ELEMENTS } from './markup'
 
 // `allow` reports nothing, `warn` a warning that fails nothing unless `kay check --deny-warnings` runs, `deny` an error.
 export type LintLevel = 'allow' | 'warn' | 'deny'
@@ -466,11 +466,12 @@ function literalTags(source: string, chunk: TextChunk, found: Diagnostic[]) {
 function positionalKey(source: string, node: ForNode, found: Diagnostic[]) {
   const text = (span: { start: number, end: number }) => source.slice(span.start, span.end)
   const item = text(node.item)
-  const index = node.index && text(node.index)
   const first = node.children[0]
 
-  if (index === undefined || index === '' || !first || !node.key || text(node.key).trim() !== index || !IDENTIFIER.test(item))
+  if (!keyedByPosition(node, source) || !first || !IDENTIFIER.test(item))
     return
+
+  const index = text(node.index)
 
   const rows = source.slice(first.start, node.children.at(-1)!.end)
 
@@ -479,7 +480,7 @@ function positionalKey(source: string, node: ForNode, found: Diagnostic[]) {
 
   // Without the key the rows are matched by `id`; the index goes too once nothing else reads it, as the key was its only use.
   const indexRead = new RegExp(`(?<![\\w$.])${index.replaceAll('$', '\\$')}(?![\\w$])`).test(rows)
-  const edits = [...indexRead ? [] : [{ start: node.item.end, end: node.index!.end, text: '' }], { start: node.each.end, end: node.key.end + 1, text: '' }]
+  const edits = [...indexRead ? [] : [{ start: node.item.end, end: node.index.end, text: '' }], { start: node.each.end, end: node.key.end + 1, text: '' }]
 
   found.push({
     ...node.key,

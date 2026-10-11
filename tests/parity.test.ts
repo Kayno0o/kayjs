@@ -1,10 +1,11 @@
-import { mkdir, mkdtemp, rm } from 'node:fs/promises'
+import { mkdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { plugin } from 'bun'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { kay } from '../src/build/plugin'
 import { child } from '../src/runtime/html'
+import { scratchDir } from './scratch'
 
 await plugin(kay())
 
@@ -84,7 +85,7 @@ function written(node: globalThis.Node): string {
 }
 
 beforeAll(async () => {
-  dir = await mkdtemp(join(import.meta.dir, '.parity-'))
+  dir = await scratchDir('parity-')
 
   const names = Object.keys(FIXTURES)
   const entry = `import { render } from 'kay/dom'\n${names.map((_, index) => `import Main${index} from './${index}/main.kay'`).join('\n')}\n\nexport const mains = [${names.map((_, index) => `Main${index}`).join(', ')}]\nexport { render }\n`

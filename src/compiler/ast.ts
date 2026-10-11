@@ -205,6 +205,13 @@ export function marksServerIsland(element: ElementNode, name: string, source: st
   return name === SERVER_ISLAND_NOSCRIPT && serverIslandOf(element, source) !== undefined
 }
 
+// A key naming the loop's index, as `for row, i of rows key={i}` writes it: rows are matched by their position.
+export function keyedByPosition(node: ForNode, source: string): node is ForNode & { index: Span, key: Span } {
+  const index = node.index && source.slice(node.index.start, node.index.end)
+
+  return index !== undefined && index !== '' && node.key !== undefined && source.slice(node.key.start, node.key.end).trim() === index
+}
+
 // Every element of a template, nested ones included, in source order.
 export function* elementsIn(nodes: readonly Node[]): Generator<ElementNode> {
   for (const node of nodes) {

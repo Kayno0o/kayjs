@@ -1,34 +1,17 @@
-import type { Attribute, AwaitNode, ElementNode, ErrorMessages, ErrorNode, ForNode, IfBranch, IfNode, NamedAttribute, Node, SlotNode, Span, TextNode, TryNode } from './ast'
+import type { AwaitNode, ElementNode, ErrorMessages, ErrorNode, ForNode, IfBranch, IfNode, NamedAttribute, Node, Span, TryNode } from './ast'
 import type { DynamicItem, Item } from './items'
 import type { CodeBuilder } from './mapping'
-import { actionOf, describedByOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, formFieldOf, marksServerIsland, serverIslandOf } from './ast'
+import { actionOf, describedByOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, formFieldOf, keyedByPosition, marksServerIsland, serverIslandOf } from './ast'
 import { decodeEntities } from './expression'
 import { childItems, constDeclaration, errorParagraphArguments, slotValue, soleDynamic } from './items'
+import { BEHAVIOUR, CONTENT_PROPERTIES, describedValue, END_MARKER, escapeStaticAttribute, escapeText, helperName, RAW_ELEMENTS, START_MARKER, TemplateWriter, VOID_ELEMENTS } from './markup'
 
 // The `kay/html` helpers static server output calls, each imported under a `Kay` name.
 const HTML_HELPERS = ['attempt', 'attribute', 'child', 'className', 'component', 'componentClass', 'currentPage', 'dynamic', 'element', 'errorParagraph', 'formConstraints', 'head', 'imageAttributes', 'localHref', 'loop', 'memo', 'merge', 'nonEmptyAttribute', 'omit', 'raw', 'refillOptions', 'selectOptions', 'serverIsland', 'show', 'style', 'untrack']
 
-export const VOID_ELEMENTS = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'keygen', 'link', 'menuitem', 'meta', 'param', 'source', 'track', 'wbr'])
-export const RAW_ELEMENTS = new Set(['script', 'style'])
-// Properties that set an element's content rather than an attribute.
-export const CONTENT_PROPERTIES = new Set(['innerHTML', 'textContent', 'innerText', 'children'])
-// Handlers, refs, bindings and transitions, which only an island attaches; `open` is the one attribute starting with `on` that is none.
-export const BEHAVIOUR = /^(?:on(?!en$)|ref$|bind:|transition(?::|$))/
-const LESS_THAN = /</g
-const STATIC_ATTRIBUTE = /["<]|&(?!(?:#\d+|#x[\da-f]+|[a-z][a-z\d]*);)/gi
-const ATTRIBUTE_ENTITY: Record<string, string> = { '"': '&quot;', '<': '&lt;', '&': '&amp;' }
-
 export function htmlHelperImport(): string {
-  return `import { ${HTML_HELPERS.map(helper => `${helper} as ${htmlAlias(helper)}`).join(', ')} } from 'kay/html'\n`
+  return `import { ${HTML_HELPERS.map(helper => `${helper} as ${helperName(helper)}`).join(', ')} } from 'kay/html'\n`
 }
-
-function htmlAlias(helper: string): string {
-  return `Kay${helper[0]!.toUpperCase()}${helper.slice(1)}`
-}
-
-// Around a dynamic part of an island's markup, so the browser finds where it starts and ends.
-export const START_MARKER = '<!--[-->'
-export const END_MARKER = '<!--]-->'
 
 export interface HtmlOptions {
   // An island or a twin: dynamic parts carry markers for hydration.
@@ -39,21 +22,6 @@ export interface HtmlOptions {
   errors?: ErrorMessages | undefined
   // Development: the source position each element carries for `kay dev`'s inspector.
   located?: ((element: ElementNode) => string | undefined) | undefined
-}
-
-// Static text written as markup: `& b` and `&amp;` both stay as written, the way JSX text reaches the server markup.
-export function escapeText(text: string): string {
-  return text.replace(LESS_THAN, '&lt;')
-}
-
-// A quoted attribute as JSX reads it, an entity standing for its character, then escaped for markup.
-// What follows `KayFormInvalid(...` for a refused field or form: the value naming its error, else the template's own or none.
-export function describedValue(described: { refused: string, own?: string }): string {
-  return `) ? ${JSON.stringify(described.refused)} : ${described.own === undefined ? 'undefined' : JSON.stringify(described.own)}`
-}
-
-export function escapeStaticAttribute(text: string): string {
-  return text.replace(STATIC_ATTRIBUTE, char => ATTRIBUTE_ENTITY[char] ?? '&amp;')
 }
 
 // Static parts gather into one string literal; each dynamic part is an expression of the markup it renders.
@@ -96,11 +64,13 @@ class Markup {
 }
 
 // A template as code building its markup: what pages, layouts and static components render to outside islands, with no reactive runtime.
-export class HtmlTemplate {
+export class HtmlTemplate extends TemplateWriter {
   // The action the form being emitted posts to, whose refused post its fields show again.
   private formTarget: Span | undefined
 
-  constructor(private readonly b: CodeBuilder, private readonly src: string, private readonly options: HtmlOptions = {}) {}
+  constructor(b: CodeBuilder, src: string, private readonly options: HtmlOptions = {}) {
+    super(b, src)
+  }
 
   // The nodes' markup as one string expression; an element's content lets a lone dynamic part go without markers.
   markup(nodes: Node[], inElement = false): void {
@@ -133,7 +103,7 @@ export class HtmlTemplate {
           const rest = new Markup(this.b)
 
           this.b.add('(() => { ')
-          this.b.wrap(item.node, () => constDeclaration(this.b, item.node, this.src, this.options.accessorLoops === true ? htmlAlias('memo') : undefined))
+          this.b.wrap(item.node, () => constDeclaration(this.b, item.node, this.src, this.options.accessorLoops === true ? helperName('memo') : undefined))
           this.b.add('return (')
           this.items(items.slice(index + 1), rest, raw, markers)
           rest.end()
@@ -166,7 +136,7 @@ export class HtmlTemplate {
 
     switch (item.kind) {
       case 'expression':
-        b.add(`${htmlAlias(raw ? 'raw' : 'child')}((`).addSource(item.node.expression).add('))')
+        b.add(`${helperName(raw ? 'raw' : 'child')}((`).addSource(item.node.expression).add('))')
 
         break
       case 'component':
@@ -175,7 +145,7 @@ export class HtmlTemplate {
         break
       case 'slot':
         b.wrap(item.node, () => {
-          b.add(`${htmlAlias('child')}(`)
+          b.add(`${helperName('child')}(`)
           slotValue(b, item.node)
 
           if (item.node.children.length > 0) {
@@ -234,7 +204,7 @@ export class HtmlTemplate {
     }
 
     b.wrap(node, () => {
-      b.add(`${htmlAlias('errorParagraph')}(KayFormError((`).addSource(this.formTarget!).add(`), ${JSON.stringify(node.name)}), ${errorParagraphArguments(node, this.src, this.options.errors?.lines.get(node))})`)
+      b.add(`${helperName('errorParagraph')}(KayFormError((`).addSource(this.formTarget!).add(`), ${JSON.stringify(node.name)}), ${errorParagraphArguments(node, this.src, this.options.errors?.lines.get(node))})`)
     })
   }
 
@@ -253,7 +223,7 @@ export class HtmlTemplate {
 
       // The branch reads a named value through a function, as the island build of the same template does.
       if (branch.alias) {
-        b.add(`${htmlAlias('show')}((`).addSource(branch.test).add('), (').addSource(branch.alias).add(') => ')
+        b.add(`${helperName('show')}((`).addSource(branch.test).add('), (').addSource(branch.alias).add(') => ')
         this.markup(branch.children)
 
         if (hasRest) {
@@ -298,7 +268,7 @@ export class HtmlTemplate {
     const { b } = this
 
     b.wrap(node, () => {
-      b.add(`${htmlAlias('loop')}((`).addSource(node.each).add('), (').addSource(node.item)
+      b.add(`${helperName('loop')}((`).addSource(node.each).add('), (').addSource(node.item)
 
       if (node.index)
         b.add(', ').addSource(node.index)
@@ -315,7 +285,7 @@ export class HtmlTemplate {
       }
 
       if (this.options.accessorLoops)
-        b.add(node.index !== undefined && node.key !== undefined && this.source(node.key).trim() === this.source(node.index) ? ', "positional"' : ', "keyed"')
+        b.add(keyedByPosition(node, this.src) ? ', "positional"' : ', "keyed"')
 
       b.add(')')
     })
@@ -325,7 +295,7 @@ export class HtmlTemplate {
     const { b } = this
 
     b.wrap(node, () => {
-      b.add(`${htmlAlias('attempt')}(() => `)
+      b.add(`${helperName('attempt')}(() => `)
       this.markup(node.children)
 
       const branch = node.rejected
@@ -350,7 +320,7 @@ export class HtmlTemplate {
     const { b } = this
 
     b.wrap(node, () => {
-      b.add(`${htmlAlias('child')}(KayAwait({ `)
+      b.add(`${helperName('child')}(KayAwait({ `)
       b.wrap(node.value, () => b.add('value'))
       b.add(': (').addSource(node.value).add(')')
 
@@ -425,7 +395,7 @@ export class HtmlTemplate {
 
       if (classAttribute?.kind === 'expression') {
         markup.text(' class="')
-        markup.dynamic(() => b.add(`${htmlAlias('className')}([${JSON.stringify(shorthand)}, (`).addSource(classAttribute.expression).add(')])'))
+        markup.dynamic(() => b.add(`${helperName('className')}([${JSON.stringify(shorthand)}, (`).addSource(classAttribute.expression).add(')])'))
         markup.text('"')
       }
       else {
@@ -454,7 +424,7 @@ export class HtmlTemplate {
           selected = value
 
         markup.dynamic(() => {
-          b.add(`${htmlAlias('attribute')}(${JSON.stringify(property)}, `)
+          b.add(`${helperName('attribute')}(${JSON.stringify(property)}, `)
           value()
           b.add(')')
         })
@@ -506,7 +476,7 @@ export class HtmlTemplate {
         }
 
         if (attributeName === 'href' && this.localLink(element) && decodeEntities(attribute.text).startsWith('/')) {
-          markup.dynamic(() => b.add(`${htmlAlias('attribute')}("href", ${htmlAlias('localHref')}(${JSON.stringify(decodeEntities(attribute.text))}))`))
+          markup.dynamic(() => b.add(`${helperName('attribute')}("href", ${helperName('localHref')}(${JSON.stringify(decodeEntities(attribute.text))}))`))
 
           continue
         }
@@ -529,7 +499,7 @@ export class HtmlTemplate {
         selected = read(expression, false)
 
       if (attributeName === 'class' || attributeName === 'style') {
-        markup.dynamic(() => b.add(`${htmlAlias('nonEmptyAttribute')}(${JSON.stringify(attributeName)}, ${htmlAlias(attributeName === 'class' ? 'className' : 'style')}((`).addSource(expression).add(')))'))
+        markup.dynamic(() => b.add(`${helperName('nonEmptyAttribute')}(${JSON.stringify(attributeName)}, ${helperName(attributeName === 'class' ? 'className' : 'style')}((`).addSource(expression).add(')))'))
 
         continue
       }
@@ -539,7 +509,7 @@ export class HtmlTemplate {
         const sized = this.named(element, 'width') || this.named(element, 'height')
 
         markup.dynamic(() => {
-          b.add(`${htmlAlias('imageAttributes')}((`).addSource(expression).add(`), ${sized}`)
+          b.add(`${helperName('imageAttributes')}((`).addSource(expression).add(`), ${sized}`)
           this.sizesArgument(imageSizes)
           b.add(')')
         })
@@ -548,12 +518,12 @@ export class HtmlTemplate {
       }
 
       markup.dynamic(() => {
-        b.add(`${htmlAlias('attribute')}(${JSON.stringify(attributeName)}, `)
+        b.add(`${helperName('attribute')}(${JSON.stringify(attributeName)}, `)
 
         if (attribute === actionOf(element, this.src))
           b.add('KayFormAction((').addSource(expression).add('))')
         else if (attributeName === 'href' && this.localLink(element))
-          b.add(`${htmlAlias('localHref')}((`).addSource(expression).add('))')
+          b.add(`${helperName('localHref')}((`).addSource(expression).add('))')
         else
           b.add('(').addSource(expression).add(')')
 
@@ -571,7 +541,7 @@ export class HtmlTemplate {
         const written = [...(element.attributes as NamedAttribute[]).map(attribute => this.source(attribute.name)), ...name === 'input' ? [] : ['type']]
 
         markup.dynamic(() => {
-          b.add(htmlAlias('formConstraints'))
+          b.add(helperName('formConstraints'))
           fieldArguments()
           b.add(`, ${JSON.stringify(written)})`)
         })
@@ -579,7 +549,7 @@ export class HtmlTemplate {
 
       if (filled) {
         markup.dynamic(() => {
-          b.add(`${htmlAlias('attribute')}(${JSON.stringify(filled)}, ${filled === 'value' ? 'KayFormValue' : 'KayFormChecked'}`)
+          b.add(`${helperName('attribute')}(${JSON.stringify(filled)}, ${filled === 'value' ? 'KayFormValue' : 'KayFormChecked'}`)
           fieldArguments()
 
           // A radio button with no `value` posts `on`, as a checkbox does, but only the ticked one of its group.
@@ -601,14 +571,14 @@ export class HtmlTemplate {
 
       if (field.invalid) {
         markup.dynamic(() => {
-          b.add(`${htmlAlias('attribute')}("aria-invalid", KayFormInvalid`)
+          b.add(`${helperName('attribute')}("aria-invalid", KayFormInvalid`)
           fieldArguments()
           b.add('))')
         })
 
         if (described) {
           markup.dynamic(() => {
-            b.add(`${htmlAlias('attribute')}("aria-describedby", KayFormInvalid`)
+            b.add(`${helperName('attribute')}("aria-describedby", KayFormInvalid`)
             fieldArguments()
             b.add(`${describedValue(described)})`)
           })
@@ -636,7 +606,7 @@ export class HtmlTemplate {
         markup.text(' enctype="multipart/form-data"')
 
       if (described)
-        markup.dynamic(() => b.add(`${htmlAlias('attribute')}("aria-describedby", KayFormInvalid((`).addSource(action.expression).add(`), ""${describedValue(described)})`))
+        markup.dynamic(() => b.add(`${helperName('attribute')}("aria-describedby", KayFormInvalid((`).addSource(action.expression).add(`), ""${describedValue(described)})`))
     }
 
     const located = this.options.located?.(element)
@@ -658,7 +628,7 @@ export class HtmlTemplate {
       const own = selected
 
       markup.dynamic(() => {
-        b.add(`${htmlAlias('refillOptions')}(KayFormValue((`).addSource(target).add(`), ${JSON.stringify(field.name)}), `)
+        b.add(`${helperName('refillOptions')}(KayFormValue((`).addSource(target).add(`), ${JSON.stringify(field.name)}), `)
         this.markup(children, true)
 
         if (own) {
@@ -673,12 +643,12 @@ export class HtmlTemplate {
       markup.dynamic(() => {
         b.add('((value) => value === undefined ? ')
         this.markup(children, true)
-        b.add(` : ${htmlAlias('child')}(value))(KayFormValue((`).addSource(target).add(`), ${JSON.stringify(field.name)}))`)
+        b.add(` : ${helperName('child')}(value))(KayFormValue((`).addSource(target).add(`), ${JSON.stringify(field.name)}))`)
       })
     }
     else if (children.length > 0 && selected) {
       markup.dynamic(() => {
-        b.add(`${htmlAlias('selectOptions')}(`)
+        b.add(`${helperName('selectOptions')}(`)
         selected()
         b.add(', ')
         this.markup(children, true)
@@ -693,7 +663,7 @@ export class HtmlTemplate {
     }
     else if (content) {
       markup.dynamic(() => {
-        b.add(`${htmlAlias(rawContent ? 'raw' : 'child')}(`)
+        b.add(`${helperName(rawContent ? 'raw' : 'child')}(`)
         content()
         b.add(')')
       })
@@ -713,9 +683,9 @@ export class HtmlTemplate {
     const local = this.localLink(element)
 
     if (href?.kind === 'static' && decodeEntities(href.text).startsWith('/'))
-      markup.dynamic(() => this.b.add(`${htmlAlias('currentPage')}(${local ? `${htmlAlias('localHref')}(` : ''}${JSON.stringify(decodeEntities(href.text))}${local ? ')' : ''})`))
+      markup.dynamic(() => this.b.add(`${helperName('currentPage')}(${local ? `${helperName('localHref')}(` : ''}${JSON.stringify(decodeEntities(href.text))}${local ? ')' : ''})`))
     else if (href?.kind === 'expression')
-      markup.dynamic(() => this.b.add(`${htmlAlias('currentPage')}(${local ? `${htmlAlias('localHref')}(` : ''}(`).addSource(href.expression).add(local ? ')))' : '))'))
+      markup.dynamic(() => this.b.add(`${helperName('currentPage')}(${local ? `${helperName('localHref')}(` : ''}(`).addSource(href.expression).add(local ? ')))' : '))'))
   }
 
   // A link going to the page's locale's copy of what it names, as one carrying `hreflang` does not.
@@ -738,20 +708,9 @@ export class HtmlTemplate {
     const { b } = this
     const children = element.children.filter(child => child.kind !== 'slot')
 
-    b.add(`${htmlAlias('element')}(${JSON.stringify(element.name)}, [`)
-    this.sources(element, (attribute, emit) => {
-      if (attribute === actionOf(element, this.src))
-        b.add('KayFormAction((').addSource(attribute.expression).add('))')
-      else
-        emit()
-    })
-
-    if (actionOf(element, this.src)) {
-      const defaults = [['method', 'post'], ['enctype', 'multipart/form-data']].filter(([name]) => !this.named(element, name!))
-
-      if (defaults.length > 0)
-        b.add(`, { ${defaults.map(([name, value]) => `${JSON.stringify(name)}: ${JSON.stringify(value)}`).join(', ')} }`)
-    }
+    b.add(`${helperName('element')}(${JSON.stringify(element.name)}, [`)
+    this.sources(element, false)
+    this.formDefaults(element)
 
     b.add(']')
 
@@ -777,47 +736,14 @@ export class HtmlTemplate {
     // What renders in the browser too renders whole: an island hydrates as one.
     const island = dynamic || this.options.hydratable === true ? undefined : serverIslandOf(element, this.src)
 
-    b.add(`${htmlAlias('child')}(`)
+    b.add(`${helperName('child')}(`)
 
     if (dynamic)
-      b.add(`${htmlAlias('dynamic')}(`).addSource(element.tag).add(', ')
+      b.add(`${helperName('dynamic')}(`).addSource(element.tag).add(', ')
     else
-      b.add(`${htmlAlias(island ? 'serverIsland' : 'component')}(`).addSource(element.tag).add(', ')
+      b.add(`${helperName(island ? 'serverIsland' : 'component')}(`).addSource(element.tag).add(', ')
 
-    const spreads = element.attributes.some(attribute => attribute.kind === 'spread')
-
-    if (spreads)
-      b.add(`${htmlAlias('merge')}(`)
-
-    const closing = this.sources(element, (_, emit) => emit(), true)
-
-    for (const slot of element.children.filter((child): child is SlotNode => child.kind === 'slot')) {
-      closing.separate()
-
-      if (slot.params) {
-        b.add(`${JSON.stringify(this.source(slot.name))}: (`).addSource(slot.params).add(') => ')
-        this.childrenValue(slot.children)
-      }
-      else {
-        b.add(`get ${JSON.stringify(this.source(slot.name))}() { return `)
-        this.childrenValue(slot.children)
-        b.add(' }')
-      }
-    }
-
-    const children = element.children.filter(child => child.kind !== 'slot')
-
-    if (children.length > 0) {
-      closing.separate()
-      b.add('get children() { return ')
-      this.childrenValue(children)
-      b.add(' }')
-    }
-
-    closing.close()
-
-    if (spreads)
-      b.add(')')
+    this.componentProps(element, false)
 
     if (island)
       b.add(`, ${JSON.stringify(island.mode ?? 'inline')}`)
@@ -830,184 +756,16 @@ export class HtmlTemplate {
     b.add('))')
   }
 
-  // The attributes as props objects, spreads between them in the order written; the class a shorthand, an attribute and the spreads each bring merges last.
-  // Returns the last object, still open, for a component to add its children and slots to.
-  private sources(element: ElementNode, value: (attribute: Extract<Attribute, { kind: 'expression' }>, emit: () => void) => void, keepOpen = false): { separate: () => void, close: () => void } {
-    const { b } = this
-    const classAttribute = this.classAttribute(element)
-    const spreads = element.attributes.some(attribute => attribute.kind === 'spread')
-    const mergedClass = element.classes.length > 0 || (spreads && classAttribute !== undefined)
-    let open = false
-    let entries = 0
-    let objects = 0
-
-    const separate = () => {
-      if (!open) {
-        b.add(objects++ > 0 ? ', { ' : '{ ')
-        open = true
-        entries = 0
-      }
-
-      if (entries++ > 0)
-        b.add(', ')
-    }
-
-    const closeObject = () => {
-      if (open)
-        b.add(' }')
-
-      open = false
-    }
-
-    const close = () => {
-      if (!open && objects === 0)
-        b.add('{}')
-
-      closeObject()
-    }
-
-    if (element.id) {
-      separate()
-      b.add(`"id": ${JSON.stringify(this.source(element.id))}`)
-    }
-
-    for (const attribute of element.attributes) {
-      if (attribute.kind === 'spread') {
-        closeObject()
-        b.add(objects++ > 0 ? ', (' : '(').addSource(attribute.expression).add(')')
-
-        continue
-      }
-
-      if (mergedClass && attribute === classAttribute)
-        continue
-
-      const name = this.source(attribute.name)
-
-      if (element.component ? marksServerIsland(element, name, this.src) : BEHAVIOUR.test(name))
-        continue
-
-      separate()
-      b.add(`${JSON.stringify(name)}: `)
-
-      if (attribute.kind === 'boolean')
-        b.add('true')
-      else if (attribute.kind === 'static')
-        b.add(JSON.stringify(decodeEntities(attribute.text)))
-      else
-        value(attribute, () => b.add('(').addSource(attribute.expression).add(')'))
-    }
-
-    if (mergedClass) {
-      separate()
-      this.mergedClass(element, classAttribute, spreads)
-    }
-
-    if (!keepOpen)
-      close()
-
-    return { separate, close }
+  protected rendered(nodes: Node[]): void {
+    this.value(nodes)
   }
 
-  // `class` as written: the shorthand alone or merged with a static attribute is a string; with an expression or spreads, an array of every source, which a component gets merged into one string, as its `class?: string` prop takes it.
-  private mergedClass(element: ElementNode, classAttribute: NamedAttribute | undefined, spreads: boolean): void {
-    const { b } = this
-    const shorthand = element.classes.length > 0 ? this.shorthand(element) : undefined
-
-    b.add('"class": ')
-
-    if (!spreads && classAttribute?.kind !== 'expression') {
-      b.add(JSON.stringify(classAttribute?.kind === 'static' ? `${shorthand} ${decodeEntities(classAttribute.text)}` : shorthand))
-
-      return
-    }
-
-    const items: (() => void)[] = []
-
-    if (shorthand !== undefined)
-      items.push(() => b.add(JSON.stringify(shorthand)))
-
-    for (const attribute of element.attributes) {
-      if (attribute.kind === 'spread')
-        items.push(() => b.add('((').addSource(attribute.expression).add(') as unknown as { class?: string }).class'))
-      else if (attribute === classAttribute && attribute.kind === 'static')
-        items.push(() => b.add(JSON.stringify(decodeEntities(attribute.text))))
-      else if (attribute === classAttribute && attribute.kind === 'expression')
-        items.push(() => b.add('(').addSource(attribute.expression).add(')'))
-    }
-
-    b.add(element.component ? `${htmlAlias('componentClass')}([` : '[')
-    for (const [index, item] of items.entries()) {
-      if (index > 0)
-        b.add(', ')
-
-      item()
-    }
-    b.add(element.component ? '])' : ']')
-  }
-
-  // What a component receives as `children` or a slot: a lone line of text as its string or values, as JSX passes it, anything else as rendered markup.
-  private childrenValue(nodes: Node[]): void {
-    const { b } = this
-    const lone = nodes.length === 1 && nodes[0]!.kind === 'text' ? nodes[0] : undefined
-
-    if (!lone || lone.parts.some(part => part.kind === 'element')) {
-      this.value(nodes)
-
-      return
-    }
-
-    const parts = lone.parts as Exclude<TextNode['parts'][number], ElementNode>[]
-
-    if (parts.length > 1)
-      b.add('[')
-
-    for (const [index, part] of parts.entries()) {
-      if (index > 0)
-        b.add(', ')
-
-      if (part.kind === 'expression')
-        b.add('(').addSource(part.expression).add(')')
-      else
-        b.add(JSON.stringify(decodeEntities(part.text)))
-    }
-
-    if (parts.length > 1)
-      b.add(']')
-  }
-
-  private classAttribute(element: ElementNode): NamedAttribute | undefined {
-    return element.attributes.find((attribute): attribute is NamedAttribute => attribute.kind !== 'spread' && this.source(attribute.name) === 'class')
-  }
-
-  private shorthand(element: ElementNode): string {
-    return element.classes.map(span => this.source(span)).join(' ')
+  // Handlers, refs and bindings only an island attaches; a component's other props all reach it.
+  protected skips(element: ElementNode, name: string): boolean {
+    return element.component ? marksServerIsland(element, name, this.src) : BEHAVIOUR.test(name)
   }
 
   private isRadio(element: ElementNode): boolean {
     return element.attributes.some(attribute => attribute.kind === 'static' && this.source(attribute.name) === 'type' && attribute.text.toLowerCase() === 'radio')
-  }
-
-  // The `sizes` of an `img` whose `src` goes through `imageAttributes`, which caps it for dense screens, so the loop leaves it out.
-  private imageSizes(element: ElementNode): NamedAttribute | undefined {
-    if (element.name !== 'img' || this.named(element, 'srcset') || !element.attributes.some(attribute => attribute.kind === 'expression' && this.source(attribute.name) === 'src'))
-      return undefined
-
-    return element.attributes.find((attribute): attribute is NamedAttribute => attribute.kind !== 'spread' && attribute.kind !== 'boolean' && this.source(attribute.name) === 'sizes')
-  }
-
-  private sizesArgument(sizes: NamedAttribute | undefined): void {
-    if (sizes?.kind === 'static')
-      this.b.add(`, ${JSON.stringify(decodeEntities(sizes.text))}`)
-    else if (sizes?.kind === 'expression')
-      this.b.add(', (').addSource(sizes.expression).add(')')
-  }
-
-  private named(element: ElementNode, name: string): boolean {
-    return element.attributes.some(attribute => attribute.kind !== 'spread' && this.source(attribute.name) === name)
-  }
-
-  private source(span: Span): string {
-    return this.src.slice(span.start, span.end)
   }
 }
