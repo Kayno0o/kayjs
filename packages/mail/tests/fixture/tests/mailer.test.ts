@@ -1,7 +1,7 @@
 import type { Mail, Transport } from '@kaynooo/kayjs-mail'
 import process from 'node:process'
 import { darkPalette, defaults, mailer, MailNotConfigured, outbox } from '@kaynooo/kayjs-mail'
-import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
 import { mail } from '../src/mail'
 import ContactForm from '../src/mails/contact-form.kay'
 import Contact from '../src/mails/contact.kay'
@@ -9,6 +9,7 @@ import Hello from '../src/mails/hello.kay'
 import Kit from '../src/mails/kit.kay'
 import Plain from '../src/mails/plain.kay'
 import Welcome from '../src/mails/welcome.kay'
+import { logged } from './logged'
 
 const URL = 'https://fixture.test/confirm?token=a&b'
 
@@ -222,71 +223,48 @@ describe('the queue', () => {
 describe('the log', () => {
   it('names each mail sent, its recipients and the server\'s answer', async () => {
     const answering: Transport = { send: async () => ({ accepted: ['ada@example.com', 'bob@example.com'], rejected: [], response: '250 2.0.0 queued as 4F2' }) }
-    const info = spyOn(console, 'info').mockImplementation(() => undefined)
+    const lines = await logged(async () => mailer({ from: 'site@example.com', transport: answering, queue: { name: 'logged-mail' } }).send({ to: 'ada@example.com', bcc: 'bob@example.com', subject: 'Logged', text: 'T' }))
 
-    try {
-      await mailer({ from: 'site@example.com', transport: answering, queue: { name: 'logged-mail' } }).send({ to: 'ada@example.com', bcc: 'bob@example.com', subject: 'Logged', text: 'T' })
-
-      expect(info).toHaveBeenCalledWith('kayjs-mail: "Logged" sent to ada@example.com, bob@example.com: 250 2.0.0 queued as 4F2')
-    }
-    finally {
-      info.mockRestore()
-    }
+    expect(lines).toEqual([['info', 'kayjs-mail: "Logged" sent to ada@example.com, bob@example.com: 250 2.0.0 queued as 4F2']])
   })
 
   it('names a mail the server refuses outright and why, and throws all the same', async () => {
     const refusing: Transport = { send: async () => {
       throw new Error('550 mailbox unavailable')
     } }
-    const error = spyOn(console, 'error').mockImplementation(() => undefined)
+    const lines = await logged(async () => expect(mailer({ from: 'site@example.com', transport: refusing, queue: { name: 'refused-mail' } }).send({ to: { name: 'Ada', address: 'ada@example.com' }, subject: 'Refused', text: 'T' })).rejects.toThrow('550 mailbox unavailable'))
 
-    try {
-      await expect(mailer({ from: 'site@example.com', transport: refusing, queue: { name: 'refused-mail' } }).send({ to: { name: 'Ada', address: 'ada@example.com' }, subject: 'Refused', text: 'T' })).rejects.toThrow('550 mailbox unavailable')
-      expect(error).toHaveBeenCalledWith('kayjs-mail: "Refused" to ada@example.com was not sent: 550 mailbox unavailable')
-    }
-    finally {
-      error.mockRestore()
-    }
+    expect(lines).toEqual([['error', 'kayjs-mail: "Refused" to ada@example.com was not sent: 550 mailbox unavailable']])
   })
 
   it('names an enqueued mail given up after its last attempt, then hands it to the queue\'s onFailed', async () => {
     const refusing: Transport = { send: async () => {
       throw new Error('550 mailbox unavailable')
     } }
-    const error = spyOn(console, 'error').mockImplementation(() => undefined)
     const failed: string[] = []
-
-    try {
-      const queued = mailer({ from: 'site@example.com', transport: refusing, queue: { name: 'given-up-mail', attempts: 1, onFailed: (mail) => {
-        failed.push(mail.subject)
-      } } })
-
+    const queued = mailer({ from: 'site@example.com', transport: refusing, queue: { name: 'given-up-mail', attempts: 1, onFailed: (mail) => {
+      failed.push(mail.subject)
+    } } })
+    const lines = await logged(async () => {
       await queued.enqueue({ to: 'ada@example.com', subject: 'Given up', text: 'T' })
       await queued.drain()
+    })
 
-      expect(error).toHaveBeenCalledWith('kayjs-mail: "Given up" to ada@example.com is given up after its last attempt: 550 mailbox unavailable')
-      expect(failed).toEqual(['Given up'])
-    }
-    finally {
-      error.mockRestore()
-    }
+    expect(lines).toContainEqual(['error', 'kayjs-mail: "Given up" to ada@example.com is given up after its last attempt: 550 mailbox unavailable'])
+    expect(failed).toEqual(['Given up'])
   })
 })
 
 describe('a partly refused mail', () => {
   it('is logged naming the refused addresses, and sent all the same', async () => {
     const partial: Transport = { send: async () => ({ accepted: ['ada@example.com'], rejected: ['bob@example.com'] }) }
-    const warn = spyOn(console, 'warn').mockImplementation(() => undefined)
+    let delivery: Awaited<ReturnType<Transport['send']>> | undefined
+    const lines = await logged(async () => {
+      delivery = await mailer({ from: 'site@example.com', transport: partial, queue: { name: 'partial-mail' } }).send({ to: ['ada@example.com', 'bob@example.com'], subject: 'Partly', text: 'T' })
+    })
 
-    try {
-      const delivery = await mailer({ from: 'site@example.com', transport: partial, queue: { name: 'partial-mail' } }).send({ to: ['ada@example.com', 'bob@example.com'], subject: 'Partly', text: 'T' })
-
-      expect(delivery.rejected).toEqual(['bob@example.com'])
-      expect(warn).toHaveBeenCalledWith('kayjs-mail: "Partly" was refused for bob@example.com, and sent to the others')
-    }
-    finally {
-      warn.mockRestore()
-    }
+    expect(delivery?.rejected).toEqual(['bob@example.com'])
+    expect(lines).toContainEqual(['warn', 'kayjs-mail: "Partly" was refused for bob@example.com, and sent to the others'])
   })
 })
 

@@ -6,6 +6,7 @@ import { Elysia } from 'elysia'
 import { s } from 'kay'
 import { defineEnv, queue, renderToString } from 'kay/server'
 import { escapeHtml as escape } from './escape'
+import { log } from './log'
 import { addressOf, outbox } from './outbox'
 import { preview } from './preview'
 import { checkKey, smtp } from './smtp'
@@ -74,10 +75,6 @@ function recipientsOf(mail: Mail): string {
 // A subject in quotes, its line breaks escaped, so one a visitor wrote cannot add a line of its own to the log.
 function quoted(subject: string): string {
   return JSON.stringify(subject)
-}
-
-function reason(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
 }
 
 function domainOf(address: Address): string | undefined {
@@ -266,7 +263,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
       const delivery = await outbox.send(mail)
 
       if (process.env.NODE_ENV === 'development')
-        console.info(`kayjs-mail: ${quoted(mail.subject)} to ${recipientsOf(mail)} kept in the outbox, shown at /_kay/mail`)
+        log.info(`${quoted(mail.subject)} to ${recipientsOf(mail)} kept in the outbox, shown at /_kay/mail`)
 
       return delivery
     }
@@ -276,11 +273,11 @@ export function mailer(options: MailerOptions = {}): Mailer {
     const accepted = delivery.accepted.length > 0 || delivery.rejected.length > 0 ? delivery.accepted : [recipientsOf(mail)]
 
     if (accepted.length > 0)
-      console.info(`kayjs-mail: ${quoted(mail.subject)} sent to ${accepted.join(', ')}${delivery.response ? `: ${delivery.response}` : ''}`)
+      log.info(`${quoted(mail.subject)} sent to ${accepted.join(', ')}${delivery.response ? `: ${delivery.response}` : ''}`)
 
     // Logged rather than thrown: a retry would send the mail again to those who already have it.
     if (delivery.rejected.length > 0)
-      console.warn(`kayjs-mail: ${quoted(mail.subject)} was refused for ${delivery.rejected.join(', ')}, and sent to the others`)
+      log.warn(`${quoted(mail.subject)} was refused for ${delivery.rejected.join(', ')}, and sent to the others`)
 
     return delivery
   }
@@ -289,7 +286,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
   const jobs = queue<Mail>(name, deliver, {
     ...queueOptions,
     onFailed: async (mail, error) => {
-      console.error(`kayjs-mail: ${quoted(mail.subject)} to ${recipientsOf(mail)} is given up after its last attempt: ${reason(error)}`)
+      log.error(`${quoted(mail.subject)} to ${recipientsOf(mail)} is given up after its last attempt`, error)
       await onFailed?.(mail, error)
     },
   })
@@ -309,7 +306,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
         return await deliver(mail)
       }
       catch (error) {
-        console.error(`kayjs-mail: ${quoted(mail.subject)} to ${recipientsOf(mail)} was not sent: ${reason(error)}`)
+        log.error(`${quoted(mail.subject)} to ${recipientsOf(mail)} was not sent`, error)
 
         throw error
       }
