@@ -86,6 +86,24 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay/test i
     expect(costly.errors).toEqual([])
   })
 
+  it('sends a form again with the fresh challenge it is refused with, after an island\'s call or a failed post spent the page\'s', async () => {
+    const costly = await site.open('/costly')
+
+    await costly.click('button.payer')
+    await costly.waitFor('p.island-paid', { text: 'island' })
+    await costly.fill('input[name="title"]', 'after the island')
+    await costly.click('form button')
+    await costly.waitFor('p.paid', { text: 'Paid after the island' })
+    await costly.fill('input[name="title"]', 'refused')
+    await costly.click('form button')
+    await costly.waitFor('p.refused', { text: '409' })
+    await costly.fill('input[name="title"]', 'after a failure')
+    await costly.click('form button')
+    await costly.waitFor('p.paid', { text: 'Paid after a failure' })
+
+    expect(costly.errors).toEqual([])
+  })
+
   it('collects the errors of the page, uncaught ones included', async () => {
     await page.goto('/fallback')
     await page.click('button.break')

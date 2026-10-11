@@ -15,6 +15,8 @@ interface Answer {
   redirect: string | null
   // The page the form came from, rendered again with how the post failed.
   refused: boolean
+  // The fresh challenge a post refused by `proofOfWork` comes with.
+  work: string | null
 }
 
 const ISLAND = 'slot[data-component]'
@@ -609,7 +611,16 @@ async function loadChecks(): Promise<typeof import('./validate')> {
   return checks ??= import('./validate')
 }
 
-export async function preloadChecks(): Promise<void> {
+// A form posting to the action at `action` took focus; one with `proofOfWork` starts on its challenge as the visitor fills it in, so its post seldom waits for it.
+export async function preloadChecks(action?: string): Promise<void> {
+  try {
+    if (action !== undefined && document.querySelector(`script[${WORK_SCRIPT}]`))
+      (await import('./work.client')).startWork(action)
+  }
+  catch {
+    // The post solves it then.
+  }
+
   try {
     await loadChecks()
   }
@@ -647,9 +658,15 @@ async function send(form: HTMLFormElement, submitter: HTMLElement | null, url: U
 
   try {
     // The solution to the action's `proofOfWork` challenge, under way since the form took focus.
-    const work = document.querySelector(`script[${WORK_SCRIPT}]`) ? await (await import('./work.client')).spendWork(withoutBase(url.pathname)) : undefined
+    const body = multipart ? data : urlEncoded(data)
+    const action = withoutBase(url.pathname)
+    const work = document.querySelector(`script[${WORK_SCRIPT}]`) ? await (await import('./work.client')).spendWork(action) : undefined
 
-    response = await upload(url, multipart ? data : urlEncoded(data), form, work)
+    response = await upload(url, body, form, work)
+
+    // A challenge an island's call spent, or one gone stale, is refused with a fresh one: solved, the form goes again once.
+    if (response.work !== null)
+      response = await upload(url, body, form, await (await import('./work.client')).spendWork(action, response.work))
   }
   catch {
     // The swap could not send it: the browser does, as it would have.
@@ -744,7 +761,7 @@ async function upload(url: URL, body: FormData | URLSearchParams, form: HTMLForm
         bar.value = done
       }
     })
-    request.addEventListener('load', () => resolve({ type: request.getResponseHeader('content-type') ?? '', text: request.responseText, redirect: request.getResponseHeader(REDIRECT_HEADER), refused: request.getResponseHeader(FAILURE_HEADER) !== null }))
+    request.addEventListener('load', () => resolve({ type: request.getResponseHeader('content-type') ?? '', text: request.responseText, redirect: request.getResponseHeader(REDIRECT_HEADER), refused: request.getResponseHeader(FAILURE_HEADER) !== null, work: request.getResponseHeader(WORK_HEADER) }))
 
     for (const failure of ['error', 'abort', 'timeout'])
       request.addEventListener(failure, () => reject(new Error('kay: the form could not be sent')))

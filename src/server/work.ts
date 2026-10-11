@@ -1,10 +1,10 @@
 import type { Action, ProofOfWorkRefusal, RateStore } from '../runtime/action'
 import { isAction, workOf } from '../runtime/action'
-import { WORK_SCRIPT } from '../runtime/swap'
 import { nodeCrypto } from './builtins'
-import { signedText, signText, WORK_MARK } from './stamp'
+import { signedText, signText, WORK_MARK, WORK_OPEN } from './stamp'
 
 const DIGITS = /^\d{1,10}$/
+const MARK = new RegExp(`"${WORK_MARK}([^:"]*):(\\d+):(\\d+)"`, 'g')
 
 // Each action's `proofOfWork`, read once: `action()` refused one it cannot read.
 const works = new WeakMap<object, ReturnType<typeof workOf>>()
@@ -71,12 +71,10 @@ export function workScript(forms: Set<Action<never, unknown>>, prerendered: bool
       challenges[action.url] = prerendered ? `${WORK_MARK}${encodeURIComponent(action.url)}:${work.difficulty}:${work.maxAge}` : signWork(action.url, work.difficulty, work.maxAge)
   }
 
-  return Object.keys(challenges).length === 0 ? '' : `<script type="application/json" ${WORK_SCRIPT}>${JSON.stringify(challenges).replaceAll('<', '\\u003c')}</script>`
+  return Object.keys(challenges).length === 0 ? '' : `${WORK_OPEN}${JSON.stringify(challenges).replaceAll('<', '\\u003c')}</script>`
 }
 
-// A challenge for the mark a prerendered page holds, quoted as the script's JSON holds it.
-export function freshWork(mark: string): string {
-  const [url = '', difficulty = '', maxAge = ''] = mark.split(':')
-
-  return JSON.stringify(signWork(decodeURIComponent(url), Number(difficulty), Number(maxAge)))
+// The challenges script of a prerendered page, given its JSON, with a fresh challenge for each mark it holds.
+export function freshWork(challenges: string): string {
+  return `${WORK_OPEN}${challenges.replace(MARK, (_, url: string, difficulty: string, maxAge: string) => JSON.stringify(signWork(decodeURIComponent(url), Number(difficulty), Number(maxAge))))}</script>`
 }

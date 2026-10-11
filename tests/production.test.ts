@@ -1173,6 +1173,7 @@ describe('a prerendered page posted to', () => {
 
       expect((await post(solution)).status).toBe(303)
       expect((await post(solution)).status).toBe(422)
+      await expect(prerenderPages(resolveProject(root, { routes }), client, { exportAll: true })).rejects.toThrow('flyer.kay: a form in it posts to an action with `minTime` or `proofOfWork`')
     }
     finally {
       await rm(join(outputDir(root), 'pages'), { recursive: true, force: true })

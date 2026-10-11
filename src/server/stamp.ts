@@ -1,5 +1,6 @@
 import { setStamper, STAMP_FIELD } from '../runtime/action'
 import { prerendering } from '../runtime/html'
+import { WORK_SCRIPT } from '../runtime/swap'
 import { nodeCrypto } from './builtins'
 
 // What signs the stamps `minTime` reads and the links to private stored files: the preview secret, else a session's, else one of this process, which a restart changes, refusing what was signed before it.
@@ -15,9 +16,10 @@ const STAMP_MARK = 'kay-stamp:'
 
 // The same for a `proofOfWork` challenge, in the page's data script: the action, its difficulty and its `maxAge`.
 export const WORK_MARK = 'kay-work:'
+export const WORK_OPEN = `<script type="application/json" ${WORK_SCRIPT}>`
 
-// A stamp's hole holds its action in the first group, a challenge's its mark in the second.
-export const STAMP_HOLE = new RegExp(`name="${STAMP_FIELD}" value="${STAMP_MARK}([^"]*)"|"${WORK_MARK}([^"]*)"`, 'g')
+// A stamp's hole holds its action in the first group, the challenges script its JSON in the second, which holds no `<`: a page's own text cannot pass for either.
+export const STAMP_HOLE = new RegExp(`name="${STAMP_FIELD}" value="${STAMP_MARK}([^"]*)"|${WORK_OPEN}([^<]*)</script>`, 'g')
 
 // `use` keeps what one feature signs from passing for another's.
 export function signText(use: string, text: string): string {

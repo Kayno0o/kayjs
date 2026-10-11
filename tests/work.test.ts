@@ -6,7 +6,7 @@ import { stringify } from 'devalue'
 import { clientDir } from '../src/build/assets'
 import { resolveProject } from '../src/project'
 import { action, actionStub } from '../src/runtime/action'
-import { sha256, solveWork } from '../src/runtime/work'
+import { digest, sha256, solveWork } from '../src/runtime/work'
 import { servePages } from '../src/server/app'
 import { STAMP_HOLE } from '../src/server/stamp'
 import { freshWork, signWork, workScript } from '../src/server/work'
@@ -44,6 +44,10 @@ describe('proof-of-work', () => {
 
       expect(sha256(text)).toBe(new Bun.CryptoHasher('sha256').update(text).digest('hex'))
     }
+
+    expect(() => digest('k'.repeat(56))).toThrow('under 56 characters')
+    expect(() => digest('café')).toThrow('ASCII text only')
+    expect(solveWork('1.sälz.00000000000000000000000000000000000000000000000000000000000000000.1.s')).toBeUndefined()
   })
 
   it('gives a page the challenges of the actions its forms post to, which the browser solves', async () => {
@@ -99,6 +103,8 @@ describe('proof-of-work', () => {
       setSystemTime(start + 2000)
       expect((await post('gated', undefined, { navigate: false, fields: { kay_since: stamp } })).status).toBe(303)
       expect(await errorOf(await post('gated', 'forged', { navigate: false, fields: { kay_since: stamp } }))).toBe('422 This form has expired; send it again')
+      // Checked by `minTime` alone, an empty header as no header.
+      expect((await post('gated', '', { navigate: false, fields: { kay_since: stamp } })).status).toBe(303)
       expect(await errorOf(await post('solve', undefined, { navigate: false }))).toBe('422 Turn JavaScript on to send this form')
     }
     finally {
@@ -159,9 +165,11 @@ describe('proof-of-work', () => {
 
     expect(marks).toHaveLength(1)
 
-    const first = JSON.parse(freshWork(marks[0]![2]!)) as string
+    const fresh = () => (JSON.parse(WORK.exec(freshWork(marks[0]![2]!))![1]!) as Record<string, string>)['/_kay/action/a']!
+    const first = fresh()
 
-    expect(first).not.toBe(JSON.parse(freshWork(marks[0]![2]!)))
+    expect(first).not.toBe(fresh())
+    expect([...'<p>"kay-work:%"</p>'.matchAll(STAMP_HOLE)]).toEqual([])
     expect(solveWork(first)).toBeDefined()
     expect(Number.parseInt(first.slice(0, first.indexOf('.')), 36) - Date.now()).toBeLessThanOrEqual(60_000)
     expect(signWork('/_kay/action/a', 50, 1000).split('.')[3]).toBe((50).toString(36))

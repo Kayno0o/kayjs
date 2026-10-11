@@ -3,9 +3,10 @@ import { t } from 'elysia'
 import { action } from 'kay'
 
 // Each post costs the browser a challenge, solved in a worker.
-export const pay = action(t.Object({ title: t.String({ maxLength: 200 }) }), ({ title }) => title, { proofOfWork: 5000 })
+export const pay = action(t.Object({ title: t.String({ maxLength: 200 }) }), ({ title }, ctx) => title === 'refused' ? ctx.fail(409, 'Refused') : title, { proofOfWork: 5000 })
 
 const success = ctx.succeeded(pay)
+const failure = ctx.failed(pay)
 --- script
 import Payer from '../components/payer.kay'
 ---
@@ -17,4 +18,6 @@ form(action={pay})
   button Pay
 if success as done
   p.paid Paid {done.data}
+if failure as failed
+  p.refused {failed.status}
 Payer

@@ -1,0 +1,9 @@
+--- server
+import { subscribe } from './leaflet.kay'
+
+export const page = { prerender: true }
+---
+// Posting to another page's action, it exports none itself: the challenge alone keeps it from a static export.
+form(action={subscribe})
+  input(name="email" aria-label="Email")
+  button Subscribe

@@ -308,6 +308,7 @@ describe('kay new', () => {
 
       const client = await buildClient(dir)
 
+      // In the order the bundler wrote their chunks, not the source's.
       expect(Object.keys(client.islands).sort()).toEqual(['src/components/accent-picker.kay', 'src/components/counter.kay'])
       const stylesheet = client.styles.get(join(dir, 'src/routes/_layout.kay'))!
 

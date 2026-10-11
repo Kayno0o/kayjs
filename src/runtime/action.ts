@@ -121,6 +121,7 @@ export interface ProtectionMessages {
   honeypot?: string | undefined
   // Given `early` for a post sent sooner than `minTime`, `expired` for a stamp missing, forged or past `maxAge`.
   minTime?: (string | ((reason: MinTimeRefusal) => string)) | undefined
+  // Given `missing` for a post without a solution, `expired` for a challenge forged, another action's or past `maxAge`, `wrong` for a wrong number or a solution sent twice.
   proofOfWork?: (string | ((reason: ProofOfWorkRefusal) => string)) | undefined
   // Given the most bytes a post may send.
   bodyLimit?: (string | ((bytes: number) => string)) | undefined

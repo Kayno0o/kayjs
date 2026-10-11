@@ -206,8 +206,8 @@ export async function protectionRefusal(action: ServerAction<TSchema, unknown>, 
 
   const work = proofOfWork(action)
 
-  // A form posted without kay's script sends no solution, refused unless `minTime` let it through above.
-  if (work && !(plain && minTime && !request.headers.has(WORK_HEADER))) {
+  // A form posted without kay's script sends no solution, refused unless `minTime` let it through above, which then checks it alone.
+  if (work && !(plain && minTime && (request.headers.get(WORK_HEADER) ?? '') === '')) {
     const reason = await workRefusal(action.url, request.headers.get(WORK_HEADER), work.store ?? memoryOf(`${action.url}#work`))
 
     if (reason === 'wrong' && work.pretend)
