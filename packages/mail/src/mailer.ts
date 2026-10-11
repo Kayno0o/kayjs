@@ -52,7 +52,8 @@ export type Mailer = Elysia & {
 const DOCTYPE = /^\s*<!doctype/i
 const HTML_ROOT = /^\s*<html[\s>]/i
 const LINE_BREAK = /[\r\n]/
-const STYLE_ELEMENT = /<style\b[^>]*>[\s\S]*?<\/style>/gi
+// A style element, inside the conditional comment of one only Outlook reads included.
+const STYLE_ELEMENT = /(?:<!--\[if [^\]]+\]>)?<style\b[^>]*>[\s\S]*?<\/style>(?:<!\[endif\]-->)?/gi
 const DARK_RULES = /prefers-color-scheme:\s*dark/
 // `Name <address>` or a bare address, as `SMTP_FROM` holds one.
 const SENDER = '^(?:[^<>]*<[^\\s<>@]+@[^\\s<>@]+>|[^\\s<>@]+@[^\\s<>@]+)$'

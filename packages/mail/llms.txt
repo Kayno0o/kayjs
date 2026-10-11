@@ -77,7 +77,7 @@ Layout(preheader="Your account is ready")
 ```
 
 - `Layout` fills the window with the background colour and centres a card; `preheader` is the line clients show beside the subject, hidden in the mail itself; `@footer` sits under the card.
-- They hold in Outlook for Windows, which renders mails with Word: the card keeps its width through a table only Outlook reads, and the button stays padded and clickable as a whole. The document carries the head Outlook needs to keep its scale.
+- They hold in Outlook for Windows, which renders mails with Word: the card keeps its width through a table only Outlook reads, and the button stays padded and clickable as a whole. The document carries the head Outlook needs to keep its scale. Outlook tries a stack's first font alone and shows Times New Roman when Windows lacks it, as it lacks `system-ui` or a web font, so `Layout` gives it the settings' `font` and `mono` cut down to the fonts Windows has; a stack left with none gets Arial, Georgia or Courier New, by its generic family.
 - `Heading` (`level` 1, 2 or 3, 1 by default), `Paragraph` (`muted` for the small print), `Button(href)` and `Link(href)` take their text as children; `Link` sits inside a paragraph: `Paragraph Read #[Link(href={url}) the guide].`
 - `Code` shows a one-time or verification code, large, spaced and in `mono`, selected whole by one click where the client allows it: `Code {code}`.
 - `Divider` is a line across the card.

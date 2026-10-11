@@ -2,7 +2,7 @@
 import type { JSX } from 'kay'
 import { CARD_PADDING_X } from './card'
 import { darkStyle } from './dark'
-import { ghostTable } from './mso'
+import { ghostTable, msoFonts } from './mso'
 import settings from './settings'
 
 const { preheader, footer } = props<{ preheader?: string | undefined, footer?: JSX.Element }>()
@@ -11,6 +11,7 @@ const [open, close] = ghostTable(settings.width)
 const filler = '\u034F\u200C\u00A0'.repeat(100)
 ---
 {darkStyle(settings)}
+{msoFonts(settings.font, settings.mono)}
 table(class="km-bg" role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor={settings.background} style={`background:${settings.background}`})
   tr
     td(class="km-text" align="center" style={`padding:24px 12px;font-family:${settings.font};color:${settings.text}`})

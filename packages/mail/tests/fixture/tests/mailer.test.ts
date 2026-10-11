@@ -29,6 +29,8 @@ describe('rendering', () => {
     const { html } = await mail.render({ to: 'ada@example.com', subject: 'Welcome', view: Welcome, props: { name: 'Ada', url: URL } })
 
     expect(html).toContain('<o:PixelsPerInch>96</o:PixelsPerInch>')
+    expect(html).toContain('<!--[if mso]><style>body,table,td,th,p,a,span,h1,h2,h3{font-family:\'Segoe UI\', Arial, sans-serif!important}.km-mono{font-family:Consolas, \'Courier New\', monospace!important}</style><![endif]--></head>')
+    expect(html!.slice(html!.indexOf('<body'))).not.toContain('[if mso]><![endif]')
     expect(html).toContain('<!--[if true]><table role="presentation" width="560" align="center"')
     expect(html).toContain('style="max-width:560px;margin:0 auto"')
     expect(html).toContain('bgcolor="#ffffff"')
