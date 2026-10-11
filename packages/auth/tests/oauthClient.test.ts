@@ -132,7 +132,7 @@ describe('createOAuthClient.fetchUser', () => {
 
     const user = await client.fetchUser('tok')
 
-    expect(user).toEqual({ providerId: '42', username: 'bob', displayName: 'Bob', avatar: 'a', email: 'b@t.co' })
+    expect(user).toEqual({ providerId: '42', username: 'bob', displayName: 'Bob', avatar: 'https://cdn.discordapp.com/avatars/42/a.png', banner: null, email: 'b@t.co' })
     expect((calls[0]!.init!.headers as Record<string, string>).Authorization).toBe('Bearer tok')
   })
 
@@ -156,6 +156,13 @@ describe('createOAuthClient.fetchUser', () => {
 })
 
 describe('provider presets', () => {
+  test('discordProvider gives the avatar and the banner as CDN URLs, an animated one as a gif', () => {
+    const discord = discordProvider()
+
+    expect(discord.normalizeUser({ id: '42', username: 'bob', avatar: 'a_anim', banner: 'still' })).toMatchObject({ avatar: 'https://cdn.discordapp.com/avatars/42/a_anim.gif', banner: 'https://cdn.discordapp.com/banners/42/still.png' })
+    expect(discord.normalizeUser({ id: '42', username: 'bob', avatar: null })).toMatchObject({ avatar: null, banner: null })
+  })
+
   test('githubProvider normalizes ids to strings and sends a User-Agent', () => {
     const gh = githubProvider()
 

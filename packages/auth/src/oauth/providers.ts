@@ -13,12 +13,18 @@ interface DiscordRawUser {
   username: string
   global_name?: string | null
   avatar?: string | null
+  banner?: string | null
   email?: string | null
   // Whether Discord checked `email`.
   verified?: boolean
 }
 
-/** Discord OAuth2 provider preset. */
+// Discord answers bare image hashes; a hash starting `a_` is animated, served as a gif.
+function discordImage(kind: 'avatars' | 'banners', userId: string, hash: string | null | undefined): string | null {
+  return hash ? `https://cdn.discordapp.com/${kind}/${userId}/${hash}.${hash.startsWith('a_') ? 'gif' : 'png'}` : null
+}
+
+/** Discord OAuth2 provider preset, its avatar and banner as CDN URLs. */
 export function discordProvider(opts: { scopes?: string[], apiBase?: string } = {}): OAuthProvider<DiscordRawUser> {
   const apiBase = opts.apiBase ?? 'https://discord.com/api/v10'
 
@@ -34,7 +40,8 @@ export function discordProvider(opts: { scopes?: string[], apiBase?: string } = 
       providerId: raw.id,
       username: raw.username,
       displayName: raw.global_name ?? undefined,
-      avatar: raw.avatar ?? null,
+      avatar: discordImage('avatars', raw.id, raw.avatar),
+      banner: discordImage('banners', raw.id, raw.banner),
       email: raw.verified === true ? raw.email ?? null : null,
     }),
   }

@@ -15,6 +15,8 @@ export interface OAuthUser {
   username: string
   displayName?: string | undefined
   avatar?: string | null | undefined
+  /** The wide image atop the provider's profile, as a URL, for a provider that has one. */
+  banner?: string | null | undefined
   email?: string | null | undefined
 }
 
