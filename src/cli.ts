@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 import type { Command } from './commands/command'
 import process from 'node:process'
+import { bunProblem } from './bun'
 import { build } from './commands/build'
 import { check } from './commands/check'
 import { runCommand } from './commands/command'
@@ -19,6 +20,13 @@ const USAGE = Object.values(COMMANDS).map((command, index) => `${index === 0 ? '
 
 async function main(args: string[]): Promise<number> {
   const [name, ...rest] = args
+  const problem = bunProblem()
+
+  if (problem !== undefined) {
+    console.error(`kay: ${problem}`)
+
+    return 1
+  }
 
   if (name === '--help' || name === '-h') {
     console.log(USAGE)

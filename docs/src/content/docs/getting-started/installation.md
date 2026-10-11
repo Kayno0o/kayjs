@@ -4,7 +4,7 @@ order: 2
 description: Point Bun at the registry, scaffold a project with kay new and start the dev server.
 ---
 
-You need [Bun](https://bun.sh). kay is published as `@kaynooo/kayjs` on its own registry, so tell Bun where the `@kaynooo` scope lives once.
+You need [Bun](https://bun.sh), at least the version kay's `engines` names: the CLI and `pages()` refuse an older one and say how to update it, `bun update bun` when a dependency installed the npm `bun` package, which package scripts run ahead of the system Bun. kay is published as `@kaynooo/kayjs` on its own registry, so tell Bun where the `@kaynooo` scope lives once.
 
 ## Registry setup
 

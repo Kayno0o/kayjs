@@ -1,5 +1,6 @@
 import type { PagesOptions } from './app'
 import process from 'node:process'
+import { bunProblem } from '../bun'
 import { resolveProject } from '../project'
 import { kayLog } from '../runtime/log'
 import { servePages } from './app'
@@ -44,6 +45,11 @@ export { CspViolation } from './violations'
 // Serves every `.kay` page under the routes directory, plus the island bundle when a page needs one.
 // In development a project that fails to boot serves its errors instead, and every page reloads when the server restarts.
 export async function pages(options: PagesOptions = {}) {
+  const problem = bunProblem()
+
+  if (problem !== undefined)
+    throw new Error(`kay: ${problem}`)
+
   const source = projectSource()
   const mode = source.mode(options)
   const root = source.root(options.root ?? process.cwd())
