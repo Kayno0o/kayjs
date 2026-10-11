@@ -11,7 +11,7 @@ import { captchaOf, failure, oauthFailure, schemas } from '../forms'
 import Button from '@kaynooo/kayjs-ui/button.kay'
 import FormField from '@kaynooo/kayjs-ui/form-field.kay'
 
-// Reached before signing in, so the app's guards, one asking for a session say, do not run here.
+// Visitors reach this page before signing in, so none of the app's guards run here, whatever they check: one asking for a session would keep everyone out.
 export const page = { guards: false }
 
 export const password = action(schemas.signIn, async (input, ctx) => {

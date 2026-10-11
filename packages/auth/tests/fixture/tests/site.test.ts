@@ -81,6 +81,22 @@ describe('the prebuilt pages', () => {
     expect(await visitor.visit('/members')).toMatchObject({ url: '/auth/sign-in?redirect=%2Fmembers', status: 200 })
   })
 
+  test('kayjs-auth\'s own magic-link page, which the fixture replaces, opens under the same guard on a site replacing none, and spends the mailed link', async () => {
+    const run = Bun.spawn([process.execPath, join(import.meta.dir, 'shipped.ts')], { stdout: 'pipe', stderr: 'pipe' })
+    const [out, errors] = [await new Response(run.stdout).text(), await new Response(run.stderr).text()]
+
+    expect({ errors, exited: await run.exited }).toEqual({ errors: '', exited: 0 })
+
+    const { link, ...steps } = JSON.parse(out) as { link: string }
+
+    expect(link).toStartWith('/auth/magic-link?token=')
+    expect(steps).toEqual({
+      registered: { url: '/auth/account', status: 200 },
+      opened: { url: link, status: 200, buttons: ['Sign in'] },
+      spent: { url: '/auth/account', status: 200 },
+    })
+  }, 60_000)
+
   test('a refused registration says why, field by field', async () => {
     await signedUp('taken@example.com')
 
