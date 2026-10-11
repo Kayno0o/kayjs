@@ -39,7 +39,7 @@ Counter
 
 ## Key ideas
 
-- HTML first: a page with no interactive component ships no JavaScript.
+- HTML first: a page with no interactive component ships no JavaScript bundle, only one line of script keeping Back right.
 - Islands: a component with an event handler, a `bind:` or a signal hydrates by itself, and only it.
 - Typed actions: forms post to server actions checked against a schema, with or without JavaScript.
 - `kay check` type-checks everything, templates included, and reports errors at the `.kay` line and column.

@@ -1,0 +1,8 @@
+---
+import Counter from '../components/counter.kay'
+---
+h1 Home
+Counter
+a.still(href="/still") Still
+a.anchor(href="#below") Below
+p#below Below

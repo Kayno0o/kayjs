@@ -1,0 +1,2 @@
+// A page shipping no kay script, once loaded afresh, keeps the entries an earlier page swap pushed, which Back reaches as entries of this document: going to one of another page loads that page, as nothing swaps it in.
+export const historyScript = '<script>{const u=location.pathname+location.search;addEventListener("popstate",()=>{location.pathname+location.search!==u&&location.reload()})}</script>'

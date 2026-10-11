@@ -223,6 +223,48 @@ async function logged(shown: TestPage): Promise<string[]> {
   return shown.evaluate(() => [...document.querySelector('kay-problems')?.shadowRoot!.querySelectorAll('pre') ?? []].map(pre => pre.textContent).filter(problem => !problem.startsWith('a11y ')))
 }
 
+describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('history after a reload', () => {
+  it('goes back to the page a swap left, from a page without islands loaded afresh, as from one with them, an anchor on it staying put', async () => {
+    const history = await testSite({ routes: 'tests/fixtures/history/src/routes', browser: { path } })
+
+    try {
+      const view = await history.open('/')
+
+      await view.click('button.count')
+      await view.click('a.still')
+      await view.waitFor('h1', { text: 'Still' })
+      // Nothing of kay's runs on it once loaded afresh: only a few bytes.
+      await view.reload()
+
+      expect(await view.count('script[src]')).toBe(0)
+
+      await view.click('a.anchor')
+      await view.back()
+
+      expect(await view.path()).toBe('/still')
+      expect(await view.text('h1')).toBe('Still')
+
+      await view.back()
+      await view.waitFor('h1', { text: 'Home' })
+
+      expect(await view.path()).toBe('/')
+
+      await view.forward()
+      await view.waitFor('h1', { text: 'Still' })
+      await view.click('a.home')
+      await view.waitFor('h1', { text: 'Home' })
+      await view.reload()
+      await view.back()
+      await view.waitFor('h1', { text: 'Still' })
+
+      expect(view.errors).toEqual([])
+    }
+    finally {
+      await history.close()
+    }
+  }, 60_000)
+})
+
 describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay dev in a browser', () => {
   it('shows each problem kay recovers from on the page, a page swap leaving them behind', async () => {
     const dev = await testSite({ routes: 'tests/fixtures/navigation/src/routes', browser: { path }, dev: true, onError: () => undefined })

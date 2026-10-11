@@ -20,6 +20,7 @@ import { readClient, readInlineStyles, readManifest, writeManifest } from '../sr
 import { compressFiles, preferredEncoding } from '../src/server/compress'
 import { sourceHash } from '../src/server/csp'
 import { submittedValues } from '../src/server/flash'
+import { historyScript } from '../src/server/history'
 import { prerenderPages } from '../src/server/prerender'
 import { htmlFallbacks } from '../src/server/public'
 import { renderPage } from '../src/server/render'
@@ -110,7 +111,9 @@ describe('pages', () => {
     const about = await get('/about')
 
     expect(about.html).toContain('<h1>About</h1>')
-    expect(about.html).not.toMatch(SCRIPT)
+    // Only the line reloading a page Back reaches after a reload, as no kay script handles it there.
+    expect(about.html).toContain(historyScript)
+    expect(about.html.replace(historyScript, '')).not.toMatch(SCRIPT)
   })
 
   it('merges the head blocks of layouts and page, the page winning per title and meta name', async () => {
@@ -1071,7 +1074,7 @@ describe('content security policy', () => {
     const pagesHtml = await Promise.all(['/', '/about', '/feed', '/live'].map(async path => (await app.handle(new Request(`http://localhost${path}`))).text()))
     const inline = pagesHtml.flatMap(html => [...html.matchAll(EVERY_INLINE_SCRIPT)].map(match => match[1]!))
 
-    expect(new Set(inline).size).toBe(4)
+    expect(new Set(inline).size).toBe(5)
     for (const script of inline)
       expect(hashes).toContain(`'sha256-${new Bun.CryptoHasher('sha256').update(script).digest('base64')}'`)
   })
