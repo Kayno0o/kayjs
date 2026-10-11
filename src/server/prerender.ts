@@ -64,7 +64,7 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
     const prerender = pageSetting(module, 'prerender')
 
     if (options.exportAll)
-      refuseServerOnly(route, module)
+      refuseServerOnly(route, module, config.requireGuards)
 
     // A static export takes a page without params as it is, and so does a page holding a server island: what is not one is the same for everyone.
     const listed = (options.exportAll === true || marked) && prerender === undefined && route.params.length === 0 ? true : prerender
@@ -170,9 +170,12 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
 }
 
 // What only a server can do: a guard decides per request, and an action takes a post.
-function refuseServerOnly(route: Route, module: Record<string, unknown>): void {
+function refuseServerOnly(route: Route, module: Record<string, unknown>, required: boolean | undefined): void {
   if (route.guards.length > 0)
     throw new Error('kay: a guard covers it, and only a server can run one per request')
+
+  if (required === true && route.open !== true)
+    throw new Error('kay: requireGuards is on and no guard covers it; set `guards: false` in its `page` to export it')
 
   const action = Object.keys(module).find(name => isAction(module[name]))
 

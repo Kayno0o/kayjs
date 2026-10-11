@@ -79,7 +79,7 @@ describe('pageResponder', () => {
     await pages({ routes: dir, prebuilt: false })
 
     const client = (await readClient(root))!
-    const routes = await Promise.all((await scanRoutes(dir)).map(loadGuards))
+    const routes = await Promise.all((await scanRoutes(dir)).map(async route => loadGuards(route)))
     const { head } = await configHead(root, {}, client.dir)
     const respond = pageResponder({ client, renderOptions: { base: '/b', head }, prerendered: new Map([['/vip', built('/vip')], ['/gone', built('/gone')]]), settings: undefined, transforms: [], pageFile: async () => undefined })
 

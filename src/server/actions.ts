@@ -23,11 +23,12 @@ import { sizeText } from './body'
 import { importModule } from './bundle'
 import { cookieJar } from './cookies'
 import { handOver, submittedValues, writeSuccess } from './flash'
-import { runGuards } from './guards'
+import { requiredGuards, runGuards, unguarded } from './guards'
 import { requestLocale, stateFor } from './i18n'
 import { answeringRequest } from './log'
 import { countSucceeded, PRETEND, protectionRefusal, requestId } from './protection'
 import { reportServerError } from './report'
+import { setsNoGuards } from './routes'
 import { Denied, Redirect } from './signals'
 import { answered, SERVER_SPAN, traced } from './trace'
 import { visitAs } from './visit'
@@ -76,6 +77,7 @@ export interface ActionOptions {
   i18n: I18n
   // Where the site is mounted, which the page a refused form post came from is served under.
   base?: string | undefined
+  requireGuards?: boolean | undefined
 }
 
 // The params `path` gives the route, under any locale's pattern; undefined when the route does not serve it.
@@ -90,7 +92,7 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], m
   const served = new Map<string, { file: string, action: ServerAction<TSchema, unknown> }>()
   const limits = new Map<string, BodyLimit>()
 
-  for (const [file, { guards, ...page }] of actionFiles(routes)) {
+  for (const [file, { guards, ...page }] of actionFiles(routes, options.requireGuards)) {
     const module = await importModule<Record<string, unknown>>(file)
 
     for (const value of Object.values(module)) {
@@ -195,7 +197,7 @@ interface ActionPage {
 
 // Every page and layout once, with the guards of its own directory and above: a layout's actions are not behind the guards of the pages below it.
 // A page's actions read its params, a layout's those of every page it wraps.
-function actionFiles(routes: ServedRoute[]): Map<string, ActionPage & { guards: LoadedGuard[] }> {
+function actionFiles(routes: ServedRoute[], required: boolean | undefined): Map<string, ActionPage & { guards: LoadedGuard[] }> {
   const files = new Map<string, ActionPage & { guards: LoadedGuard[] }>()
 
   for (const route of routes) {
@@ -209,7 +211,11 @@ function actionFiles(routes: ServedRoute[]): Map<string, ActionPage & { guards: 
         continue
       }
 
-      files.set(file, { guards: route.guards.filter(guard => file.startsWith(dirname(guard.file) + sep)), routes: [route], params: route.params })
+      // A layout runs the guards of its own directory and above, unless it sets `guards: false`; a page those of its route.
+      const open = file === route.file ? route.open : setsNoGuards(file) || undefined
+      const guards = file === route.file ? route.guards : open ? [] : route.guards.filter(guard => guard.check !== unguarded && file.startsWith(dirname(guard.file) + sep))
+
+      files.set(file, { guards: requiredGuards(guards, { file, open }, route.special, required), routes: [route], params: route.params })
     }
   }
 

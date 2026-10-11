@@ -243,6 +243,27 @@ describe('kay build --static', () => {
     }
   })
 
+  it('refuses a page no guard covers on a site requiring guards, unless it sets guards: false', async () => {
+    const fixture = await fixtureCopy('static')
+    const elsewhere = await mkdtemp(join(tmpdir(), 'kay-static-'))
+    const config = join(fixture, 'kay.config.ts')
+
+    try {
+      await Bun.write(config, (await Bun.file(config).text()).replace('  site: ', '  requireGuards: true,\n  site: '))
+      await Bun.write(join(fixture, 'src/routes/about.kay'), `--- server\nexport const page = { guards: false }\n---\n${await Bun.file(join(fixture, 'src/routes/about.kay')).text()}`)
+
+      const { code, errors } = await exportSite(elsewhere, fixture)
+
+      expect(code).toBe(1)
+      expect(errors).toContain('src/routes/index.kay: requireGuards is on and no guard covers it; set `guards: false` in its `page` to export it')
+      expect(errors).not.toContain('src/routes/about.kay:')
+    }
+    finally {
+      await rm(fixture, { recursive: true, force: true })
+      await rm(elsewhere, { recursive: true, force: true })
+    }
+  })
+
   it('never clears a directory it did not write', async () => {
     const foreign = await mkdtemp(join(tmpdir(), 'kay-static-'))
 

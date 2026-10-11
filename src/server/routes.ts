@@ -20,6 +20,8 @@ export interface Route {
   special: SpecialPages
   // `_guard.ts` files covering the page and its actions, outermost first.
   guards: GuardFile[]
+  // No guard is asked of it on a site with `requireGuards`: it sets `guards: false`, or a library serves it.
+  open?: true | undefined
 }
 
 // A file under the routes directory answering GET with what its `GET` returns: `llms.txt.ts` serves `/llms.txt`.
@@ -30,6 +32,7 @@ export interface Endpoint {
   params: string[]
   suffix?: string | undefined
   guards: GuardFile[]
+  open?: true | undefined
 }
 
 // A request a guard refuses gets the nearest special pages outside the guard's directory, wrapped by the layouts outside it, so nothing it protects renders.
@@ -60,9 +63,9 @@ const DYNAMIC_SEGMENT = /^\[(\.\.\.)?([A-Z_$][\w$]*)(?:=([A-Z_$][\w$-]*))?\]$/i
 const OPTIONAL_SEGMENT = /^\[\[([A-Z_$][\w$]*)(?:=([A-Z_$][\w$-]*))?\]\]$/i
 // `(marketing)`: groups pages for their layouts and guards, adding nothing to the URL.
 const GROUP_SEGMENT = /^\(.+\)$/
-// A file whose `page` sets `layouts: false` is not wrapped by the layouts above it: a page by none, a layout by its parent directories' ones.
+// A file whose `page` sets `layouts: false` is not wrapped by the layouts above it: a page by none, a layout by its parent directories' ones; one setting `guards: false` runs none of the guards above it, nor do its actions.
 const PAGE_EXPORT = /^export\s+const\s+page\s*=\s*\{/m
-const NO_LAYOUTS_KEY = /(?:layouts|'layouts'|"layouts")\s*:\s*false\b/y
+const FALSE_KEY = /(?:([A-Z_$][\w$]*)|'([^'\n]*)'|"([^"\n]*)")\s*:\s*false\b/iy
 const QUOTES = new Set(['"', '\'', '`'])
 const SPACE = /\s/
 const KAY_EXTENSION = /\.kay$/
@@ -163,8 +166,9 @@ export async function scanRoutes(routesDir: string, mounts: RouteMount[] = []): 
 
       if (route && !served.has(routerKey(route.pattern))) {
         const at = virtualDir(trees, dirname(file))
+        const open = setsFalse(file, 'guards', read)
 
-        own.push({ ...route, layouts: layoutsOf(trees, at, file, read), special: specialPagesOf(trees, at, read), guards: guardsOf(trees, at, read) })
+        own.push({ ...route, layouts: layoutsOf(trees, at, file, read), special: specialPagesOf(trees, at, read), guards: open ? [] : guardsOf(trees, at, read), ...(open || tree !== trees[0]) && { open: true } })
       }
     }
 
@@ -190,8 +194,11 @@ export async function scanEndpoints(routesDir: string, mounts: RouteMount[] = []
     for (const file of existsSync(tree.dir) ? await findProjectFiles(tree.dir, ENDPOINT_FILE) : []) {
       const endpoint = endpointOf(tree.dir, file, tree.prefix)
 
-      if (endpoint && !served.has(endpointKey(endpoint)))
-        own.push({ ...endpoint, guards: guardsOf(trees, virtualDir(trees, dirname(file)), read) })
+      if (endpoint && !served.has(endpointKey(endpoint))) {
+        const open = setsFalse(file, 'guards', read)
+
+        own.push({ ...endpoint, guards: open ? [] : guardsOf(trees, virtualDir(trees, dirname(file)), read), ...(open || tree !== trees[0]) && { open: true } })
+      }
     }
 
     for (const endpoint of own)
@@ -262,35 +269,49 @@ export function paramsIn(shape: string, route: Pick<Route, 'catchAll'>): string[
   })
 }
 
-// Whether each file read so far exports `layouts = false`, so a scan reads a layout once however many pages it wraps.
-type LayoutsRead = Map<string, boolean>
+// The keys each file read so far sets to `false` in its `page`, so a scan reads a layout once however many pages it wraps.
+type LayoutsRead = Map<string, Set<string>>
 
 function layoutsOf(trees: RouteMount[], at: string, file: string, read: LayoutsRead): string[] {
-  if (exportsNoLayouts(file, read))
+  if (setsFalse(file, 'layouts', read))
     return []
 
   const layouts = directoriesUp(at).flatMap(dir => fileAt(trees, dir, LAYOUT) ?? []).reverse()
   // The innermost layout that leaves its parents out starts the chain.
-  const reset = layouts.findLastIndex(layout => exportsNoLayouts(layout, read))
+  const reset = layouts.findLastIndex(layout => setsFalse(layout, 'layouts', read))
 
   return reset === -1 ? layouts : layouts.slice(reset)
 }
 
-function exportsNoLayouts(file: string, read: LayoutsRead): boolean {
+function setsFalse(file: string, key: string, read: LayoutsRead): boolean {
   let found = read.get(file)
 
   if (found === undefined)
-    read.set(file, found = setsNoLayouts(readFileSync(file, 'utf8')))
+    read.set(file, found = falseKeys(readFileSync(file, 'utf8')))
 
-  return found
+  return found.has(key)
 }
 
-// `layouts: false` among the keys of `export const page = { ... }`, read without parsing the module: the server never loads a compiler.
-function setsNoLayouts(source: string): boolean {
-  const found = PAGE_EXPORT.exec(source)
+// Whether a page or a layout sets `guards: false`, running none of the guards above it.
+export function setsNoGuards(file: string): boolean {
+  return falseKeys(readFileSync(file, 'utf8')).has('guards')
+}
+
+// The keys set to `false` in the object literal `head` opens, `export const page = { ... }` unless named, read without parsing the module: the server never loads a compiler.
+export function falseKeys(source: string, head = PAGE_EXPORT): Set<string> {
+  const keys = new Set<string>()
+  const found = head.exec(source)
 
   if (!found)
-    return false
+    return keys
+
+  const keyAt = (at: number) => {
+    FALSE_KEY.lastIndex = at
+    const key = FALSE_KEY.exec(source)
+
+    if (key)
+      keys.add(key[1] ?? key[2] ?? key[3]!)
+  }
 
   let depth = 1
   // Where a key of the object itself may start: past its brace or a comma.
@@ -301,10 +322,7 @@ function setsNoLayouts(source: string): boolean {
 
     if (QUOTES.has(char)) {
       if (depth === 1 && atKey) {
-        NO_LAYOUTS_KEY.lastIndex = i
-
-        if (NO_LAYOUTS_KEY.test(source))
-          return true
+        keyAt(i)
       }
 
       for (i++; i < source.length && source[i] !== char; i++) {
@@ -331,17 +349,14 @@ function setsNoLayouts(source: string): boolean {
     }
     else if (!SPACE.test(char)) {
       if (depth === 1 && atKey) {
-        NO_LAYOUTS_KEY.lastIndex = i
-
-        if (NO_LAYOUTS_KEY.test(source))
-          return true
+        keyAt(i)
       }
 
       atKey = false
     }
   }
 
-  return false
+  return keys
 }
 
 function guardsOf(trees: RouteMount[], at: string, read: LayoutsRead): GuardFile[] {

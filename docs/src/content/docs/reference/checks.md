@@ -59,6 +59,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `css-import-without-text` | deny | code | A stylesheet imported for a value without `with { type: 'text' }` |
 | `literal-tag` | warn | code | An HTML tag written in template text, shown as written |
 | `uncaught-await` | warn | code | An `await` block with no `catch` |
+| `unguarded-route` | deny | security | With `requireGuards`, a route no guard covers that does not set `guards: false` |
 | `missing-site` | warn | seo | `seo` with no `site` |
 | `missing-description` | warn | seo | No `seo.description` |
 | `missing-share-image` | warn | seo | No share image on any page |

@@ -93,6 +93,23 @@ A guard reads the params of the page asked for in `ctx.params`, as `src/routes/o
 
 </Callout>
 
+### Public routes and sites that require guards
+
+A page under a guard that anyone may reach, such as the sign-in page under a root guard asking for a session, sets `guards: false` in its `page`, and runs none of the guards above it, nor do its actions. An endpoint sets it in its own `export const page`, and an API module in its `api()` options:
+
+```kay
+---
+export const page = { guards: false }
+---
+h1 Sign in
+```
+
+```ts
+export default api({ guards: false }).post('/webhook', handle)
+```
+
+With `requireGuards: true` in `kay.config.ts`, a site fails closed: every page, action, endpoint and API module of the app that no guard covers and that does not set `guards: false` answers 403, and `kay check` reports each one as `unguarded-route`. A page added outside a guarded directory is then refused rather than public. A library's routes keep the guards it gives them.
+
 ## Environment variables
 
 `defineEnv` reads `process.env` once against a schema at boot and stops the server with an error naming each missing variable. For variables an island may read, such as a map key, declare `publicEnv` in `kay.config.ts` and import it from `kay`:

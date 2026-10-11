@@ -19,10 +19,10 @@ import { encodeValue, unsendable } from '../runtime/wire'
 import { inLocale, isCrossSite, passGuards } from './actions'
 import { importModule } from './bundle'
 import { corsAdmits, corsResponse, corsRule, preflight, withCors } from './cors'
-import { loadGuard } from './guards'
+import { loadGuard, requiredGuards } from './guards'
 import { requestId } from './protection'
 import { reportServerError } from './report'
-import { apiMounts, directoriesUp, fileAt } from './routes'
+import { apiMounts, directoriesUp, falseKeys, fileAt } from './routes'
 import { answered, failed, SERVER_SPAN, startSpan } from './trace'
 
 // A module under the API directory or an extension's, as `pages()` mounts it.
@@ -32,6 +32,8 @@ export interface ApiModule {
   mount: string
   // The `_guard.ts` files of its directory and above, outermost first.
   guards: ApiGuard[]
+  // No guard is asked of it on a site with `requireGuards`: it sets `api({ guards: false })`, or a library serves it.
+  open?: true | undefined
 }
 
 export interface ApiGuard {
@@ -42,6 +44,7 @@ export interface ApiGuard {
 
 export const API_PREFIX = '/api'
 const GUARD = '_guard.ts'
+const API_OPTIONS = /\bapi\s*\(\s*\{/
 // Tests, declarations, and files or directories starting with `_`, guards and helpers, are no modules.
 const NOT_A_MODULE = /(?:^|\/)_|\.(?:test|spec|d)\.ts$/
 // What a body Elysia streams, awaits or asks for its response has: a generator, a thenable, an object with `toResponse()`.
@@ -106,7 +109,10 @@ export async function scanApi(apiDir: string, mounts: RouteMount[] = []): Promis
       if (index > 0 && taken.has(mount))
         continue
 
-      modules.push({ file: join(dir, path), mount, guards: guardsAt(trees, at) })
+      const file = join(dir, path)
+      const open = falseKeys(await Bun.file(file).text(), API_OPTIONS).has('guards')
+
+      modules.push({ file, mount, guards: open ? [] : guardsAt(trees, at), ...(open || index > 0) && { open: true } })
     }
   }
 
@@ -175,7 +181,7 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
 
     limits.set(module.mount, { bytes: (instance as { [BODY_LIMIT]?: number })[BODY_LIMIT], refuse: cors ? request => corsResponse(cors, request, tooLarge()) : tooLarge })
 
-    const guards = await Promise.all(module.guards.map(async ({ file }) => loadGuard({ file, special: {} })))
+    const guards = requiredGuards(await Promise.all(module.guards.map(async ({ file }) => loadGuard({ file, special: {} }))), module, {}, options.requireGuards)
     const methods = [...new Set(instance.routes.map(route => route.method.toUpperCase()).filter(method => method !== 'OPTIONS' && method !== 'WS'))]
 
     app.group(module.mount, (group) => {
@@ -349,6 +355,8 @@ export interface ApiOptions {
   bodyLimit?: number | undefined
   // Lets other sites' pages call the module's routes from the browser: `cors: { origins: ['https://app.example.com'], credentials: true }`.
   cors?: CorsOptions | undefined
+  // Runs none of the guards above the module, as a page's `guards: false` does; read from the `api({ guards: false })` call as written.
+  guards?: false | undefined
 }
 
 // An Elysia instance for a module under `src/api` whose handlers read what the app's `derive` and `resolve` add, typed through `Register` as `ctx.locals` is.

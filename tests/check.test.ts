@@ -1421,7 +1421,7 @@ describe('kay check, unused code', () => {
       expect(built).toContain('warning[missing-site]')
       expect(built).toContain('warning[missing-share-image]')
       expect((await runCheck(root, '--only', 'a11y')).output.match(/^\w+\[[\w-]+\]/gm)).toEqual(['error[missing-alt]'])
-      expect(await runCheck(root, '--only', 'nope')).toEqual({ code: 1, output: 'kay check: --only takes a group of lints, `code`, `a11y`, `forms`, `islands`, `seo`, not `nope`\n', report: '' })
+      expect(await runCheck(root, '--only', 'nope')).toEqual({ code: 1, output: 'kay check: --only takes a group of lints, `code`, `a11y`, `forms`, `islands`, `seo`, `security`, not `nope`\n', report: '' })
     }
     finally {
       await rm(root, { recursive: true, force: true })

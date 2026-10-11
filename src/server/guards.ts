@@ -1,5 +1,5 @@
 import type { Guard, GuardContext } from '../runtime'
-import type { GuardFile, Route } from './routes'
+import type { GuardFile, Route, SpecialPages } from './routes'
 import { importModule } from './bundle'
 
 export interface LoadedGuard extends GuardFile {
@@ -17,8 +17,15 @@ export interface Refusal {
   error: unknown
 }
 
-export async function loadGuards(route: Route): Promise<ServedRoute> {
-  return { ...route, guards: await Promise.all(route.guards.map(loadGuard)) }
+export async function loadGuards(route: Route, required = false): Promise<ServedRoute> {
+  return { ...route, guards: requiredGuards(await Promise.all(route.guards.map(loadGuard)), route, route.special, required) }
+}
+
+// What a site with `requireGuards` answers on a route of its own that no guard covers and that did not set `guards: false`.
+export const unguarded: Guard = ({ deny }) => deny(403, 'No guard covers this route')
+
+export function requiredGuards(guards: LoadedGuard[], route: { file: string, open?: true | undefined }, special: SpecialPages, required: boolean | undefined): LoadedGuard[] {
+  return required === true && guards.length === 0 && route.open !== true ? [{ file: route.file, special, check: unguarded }] : guards
 }
 
 export async function loadGuard(guard: GuardFile): Promise<LoadedGuard> {

@@ -7,7 +7,7 @@ import type { ServedPaths } from './served-paths'
 import { basename, relative } from 'node:path'
 import { passGuards } from './actions'
 import { importModule } from './bundle'
-import { loadGuard } from './guards'
+import { loadGuard, requiredGuards } from './guards'
 import { pageSetting } from './page-settings'
 import { listedParams, pathOf } from './prerendered'
 import { reportServerError } from './report'
@@ -32,7 +32,7 @@ export async function serveEndpoints(app: Elysia, endpoints: Endpoint[], options
   for (const endpoint of endpoints) {
     const key = routerKey(endpoint.pattern)
 
-    routes.set(key, [...routes.get(key) ?? [], await loadEndpoint(endpoint)])
+    routes.set(key, [...routes.get(key) ?? [], await loadEndpoint(endpoint, options.requireGuards)])
   }
 
   for (const served of routes.values()) {
@@ -58,13 +58,13 @@ export async function serveEndpoints(app: Elysia, endpoints: Endpoint[], options
   }
 }
 
-async function loadEndpoint(endpoint: Endpoint): Promise<ServedEndpoint> {
+async function loadEndpoint(endpoint: Endpoint, required: boolean | undefined): Promise<ServedEndpoint> {
   const get = (await importModule<{ GET?: unknown }>(endpoint.file)).GET
 
   if (typeof get !== 'function')
     throw new TypeError(`kay: ${endpoint.file} must export a GET handler: export function GET(ctx) { return 'text' }`)
 
-  return { ...endpoint, get: get as Handler, guards: await Promise.all(endpoint.guards.map(loadGuard)), type: Bun.file(`file${endpoint.suffix ?? basename(endpoint.pattern).slice(basename(endpoint.pattern).indexOf('.'))}`).type }
+  return { ...endpoint, get: get as Handler, guards: requiredGuards(await Promise.all(endpoint.guards.map(loadGuard)), endpoint, {}, required), type: Bun.file(`file${endpoint.suffix ?? basename(endpoint.pattern).slice(basename(endpoint.pattern).indexOf('.'))}`).type }
 }
 
 // Guards first, as for a page; what they set goes out with the endpoint's answer.

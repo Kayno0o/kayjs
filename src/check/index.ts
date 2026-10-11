@@ -58,6 +58,8 @@ export interface CheckOptions {
   seo?: SeoConfig | undefined
   favicon?: string | FaviconConfig | false | undefined
   publicEnv?: EnvSchema | undefined
+  // Reports each route of the app no guard covers, which the server refuses.
+  requireGuards?: boolean | undefined
   // Whether to report the lints of what a site lacks before it goes public, as `kay build` and `kay check --only seo` do.
   launch?: boolean | undefined
 }
@@ -75,9 +77,9 @@ export interface CheckDiagnostic extends Pick<Diagnostic, 'label' | 'related' | 
 }
 
 export function configCheckOptions(config: KayConfig): CheckOptions {
-  const { routes, publicDir, api, content, redirects, i18n, lang, settings, base, site, shutdownTimeout, lints, extensions, seo, favicon, publicEnv } = config
+  const { routes, publicDir, api, content, redirects, i18n, lang, settings, base, site, shutdownTimeout, lints, extensions, seo, favicon, publicEnv, requireGuards } = config
 
-  return { routes, publicDir, api, content, redirects, i18n, lang, settings, base, site, shutdownTimeout, lints, extensions, seo, favicon, publicEnv }
+  return { routes, publicDir, api, content, redirects, i18n, lang, settings, base, site, shutdownTimeout, lints, extensions, seo, favicon, publicEnv, requireGuards }
 }
 
 // Type-checks a project, .kay components included, and reports every error at the line and column the user wrote.

@@ -29,7 +29,7 @@ import { claimEndpoints, serveEndpoints } from './endpoints'
 import { servePublicEnv } from './env'
 import { serveErrorReports } from './errors'
 import { FAVICON_DIR, faviconSource, serveFavicons } from './favicon'
-import { loadGuard, loadGuards } from './guards'
+import { loadGuard, loadGuards, requiredGuards } from './guards'
 import { refuseLocaleClashes } from './i18n'
 import { avifQuality, serveImages } from './image'
 import { HEALTH_PATH, serveHealth, stopOnSignal } from './lifecycle'
@@ -64,8 +64,8 @@ export interface PagesOptions extends KayConfig {
 }
 
 // The routes with their guards loaded, which a localized site's links are told of, its localized feeds too.
-async function servedRoutes({ routes, i18n, collections }: PageSetup): Promise<ServedRoute[]> {
-  const served = await Promise.all(routes.map(loadGuards))
+async function servedRoutes({ routes, i18n, collections }: PageSetup, required: boolean | undefined): Promise<ServedRoute[]> {
+  const served = await Promise.all(routes.map(async route => loadGuards(route, required)))
 
   if (i18n) {
     refuseLocaleClashes(i18n.settings, served)
@@ -166,7 +166,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   const { root, config: options, paths, mode } = project
   const setup = await setupPages(project, loadClient)
   const { source, client, mounts, matchers, collections, i18n, locales, base, site, scripts, styles, renderOptions, cards } = setup
-  const routes = await servedRoutes(setup)
+  const routes = await servedRoutes(setup, options.requireGuards)
   const served = new ServedPaths()
   const table = routeTable(routes, i18n?.settings, served)
   const app = new Elysia({ name: 'kay/pages', seed: root })
@@ -221,7 +221,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   for (const path of await serveBuildFiles(app, client, { dev: mode.dev, security }))
     filePaths.add(path)
 
-  const actionOptions = { dev: mode.dev, onError: options.onError, i18n: locales, base }
+  const actionOptions = { dev: mode.dev, onError: options.onError, i18n: locales, base, requireGuards: options.requireGuards }
   const [actionLimits, apiModules, files] = await Promise.all([registerActionRoutes(app, routes, routeMatch(table, matchers), actionOptions), source.api(root, options), publicFiles(paths.public)])
   const publicServed = claimPublic(served, files)
   const api = await serveApi(app, apiModules, actionOptions)
@@ -240,7 +240,8 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   limitBodies(app, options.bodyLimit ?? DEFAULT_BODY_LIMIT, actionLimits, api.limits)
 
   if (servesOpenApi) {
-    const guards = await Promise.all(sharedGuards(apiModules).map(async file => loadGuard({ file, special: {} })))
+    // On a site requiring guards, the document is refused unless a guard covers every module.
+    const guards = requiredGuards(await Promise.all(sharedGuards(apiModules).map(async file => loadGuard({ file, special: {} }))), { file: paths.api }, {}, options.requireGuards)
 
     serveOpenApi(app, openApiDocument(api.mounted, { title: openapi.title ?? options.seo?.name ?? 'API', version: openapi.version ?? '1.0.0', base }), openapi, guards, actionOptions)
   }

@@ -14,6 +14,7 @@ export const LINT_GROUPS = {
   forms: 'Fields and the schemas of the actions they post to.',
   islands: 'Keys, signals and what an island renders again.',
   seo: 'What search engines and social networks read off a public site: warnings once `site` or `seo` is set, or the site is exported with `--static`, and nothing otherwise.',
+  security: 'What anyone may reach on a site asking for guards.',
 } as const
 
 export type LintGroup = keyof typeof LINT_GROUPS
@@ -230,6 +231,14 @@ export const LINTS = {
     summary: 'Template text holding what reads as an HTML tag: kay escapes text, so readers see the tag as written rather than the element.',
     wrong: 'p Press <kbd>Ctrl</kbd> K to search',
     right: 'p Press #[kbd Ctrl] K to search',
+  },
+  'unguarded-route': {
+    level: 'deny',
+    group: 'security',
+    site: true,
+    summary: 'With `requireGuards`, a page, a layout with actions, an endpoint or an API module of the app that no `_guard.ts` covers and that does not set `guards: false`: the server answers it 403.',
+    wrong: '// kay.config.ts sets requireGuards: true\n// src/routes/pricing.kay, with no _guard.ts above it',
+    right: '--- server\nexport const page = { guards: false }\n---\nh1 Pricing',
   },
   'missing-site': {
     level: 'warn',

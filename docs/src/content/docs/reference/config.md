@@ -87,6 +87,7 @@ Every option is optional. The ones below are the common ones, the rest are in th
 | `health` | The route a load balancer polls, `/_kay/health` by default |
 | `log` | One line per request, and kay's own messages: as text, `'json'`, a function receiving each `LogEntry`, or `false` for no request lines |
 | `bodyLimit` | The most bytes an action or API request may send, 1 MB by default |
+| `requireGuards` | Every page, action, endpoint and API module of the app answers 403 unless a guard covers it or it sets `guards: false`. See [Sessions and guards](/guides/sessions-and-guards) |
 | `openapi` | An OpenAPI document of the API modules at `/api/openapi.json`, and a reference page. See [API routes](/guides/api-routes#openapi) |
 | `shutdownTimeout` | How long a stopping server lets open requests finish, 10 seconds by default |
 | `onError` | Receives every error a load, render, guard, action or API route throws, for an error tracker |

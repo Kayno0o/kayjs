@@ -28,6 +28,7 @@ import { redirectProblems } from '../server/redirects'
 import { patternShapes, routeMounts, routeOf, scanEndpoints, scanRoutes, servedPaths } from '../server/routes'
 import { ASSET_TYPES, environmentTypes, KAY_PATHS, packageTypes } from './env-types'
 import { CONTENT_CHECK, EXPORTS_CHECK, exportsCheck, SETTINGS_CHECK, settingsCheck } from './generated'
+import { unguardedRoutes } from './guards'
 import { islandOnlyComponents } from './island-only'
 import { compileShadow, matcherSource, serializeShadowSettings, SHADOW_SETTINGS, shadowPath } from './shadow'
 
@@ -78,7 +79,7 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
   const libraries = await libraryShadows(root, options, own.files, tree)
 
   await tree.write('kay-env.d.ts', await environmentTypes(root, options, served))
-  problems.push(...redirectChecks(root, options, served))
+  problems.push(...redirectChecks(root, options, served), ...await unguardedRoutes(options, served))
   // A script rather than a module, which is what lets it declare a wildcard module.
   await tree.write('kay-assets.d.ts', ASSET_TYPES)
   await tree.write('kay-icons.d.ts', iconTypes(root))

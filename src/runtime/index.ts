@@ -310,7 +310,7 @@ export function defer<T>(value: T | PromiseLike<T>): Deferred<T> {
   return promise as Deferred<T>
 }
 
-// `export const page = { ... }` in a page's server fence; a layout takes `layouts` alone.
+// `export const page = { ... }` in a page's server fence; a layout takes `layouts` and `guards` alone.
 export interface PageSettings {
   // `kay build` renders the page once: `true` for a route without params, else the params of each page to render, as a list, a function returning one, a content collection or a `paginate()` list.
   prerender?: boolean | object
@@ -318,6 +318,8 @@ export interface PageSettings {
   revalidate?: Duration
   // `false` renders the page, or the layouts below this one, without the layouts above.
   layouts?: false
+  // `false` runs none of the `_guard.ts` files above the page, nor above its actions or a layout's: a sign-in page under a guard asking for a session.
+  guards?: false
   // The schema `ctx.query` is read against; a query it refuses answers 400.
   query?: TSchema
   // The pages of the route the sitemap lists, as `prerender` takes them; `false` leaves it out.
