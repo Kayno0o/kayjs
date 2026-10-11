@@ -1,17 +1,19 @@
-import type { Attribute, AwaitBranch, AwaitNode, ConstNode, ElementNode, ErrorNode, ForNode, IfNode, KayFile, NamedAttribute, Node, SlotNode, Span, TemplateFacts, TemplateHelper, TextNode, TryNode } from './ast'
+import type { ConstNode, ElementNode, KayFile, NamedAttribute, Node, Span, TemplateFacts, TemplateHelper } from './ast'
 import type { Rewrite } from './mapping'
 import type { PageSettingName } from './page-settings'
 import type { ImportBinding, ScriptAnalysis, ServerAnalysis } from './script'
 import { actionUrl } from '../runtime/action'
-import { actionOf, errorMessages, FIELD_ATTRIBUTE, FIELD_ELEMENTS, formTargets, isChildrenSlot, isHead, isSlot, keyedByPosition, serverIslandOf, someNode, visitNodes } from './ast'
+import { actionOf, errorMessages, formTargets, isChildrenSlot, isHead, isSlot, someNode, visitNodes } from './ast'
 import { domHelperImport, DomTemplate } from './dom'
-import { isFunctionExpression, mayHoldFunction } from './expression'
+import { mayHoldFunction } from './expression'
 import { htmlHelperImport, HtmlTemplate } from './html'
 import { sourceLocator } from './inspect'
-import { constDeclaration, slotValue } from './items'
+import { constDeclaration } from './items'
+import { JsxTemplate } from './jsx'
 import { CodeBuilder, DYNAMIC_TAG } from './mapping'
+import { helperName } from './markup'
 import { PAGE, PAGE_SETTINGS } from './page-settings'
-import { bindEvent, bindProblem, headTagProblem, sharedImports } from './validate'
+import { headTagProblem, sharedImports } from './validate'
 
 export interface GenerateOptions {
   name: string
@@ -60,18 +62,7 @@ export interface Generated {
   constSites: Set<number>
 }
 
-// JSX collapses a run of spaces in text, which `pre` and `textarea` would show, so a run goes out as a string.
-const JSX_TEXT_ESCAPES = /[{}<>]|[ \t]{2,}/g
-const NUMERIC_INPUTS = new Set(['number', 'range'])
-const FORM_FIELDS = new Set(['input', 'select', 'textarea', 'button'])
-const LINK_ELEMENTS = new Set(['a', 'area'])
-// Attributes rendered as markup rather than text.
-const MARKUP_ATTRIBUTES = new Set(['innerHTML', 'srcdoc'])
-// URLs checked as links are when written out: an expression there may be another kind of value, such as an action a form posts to.
-const WRITTEN_URLS = new Map([['img', 'src'], ['link', 'href'], ['form', 'action']])
-const WHITESPACE = /\s+/
 const CTX_REFERENCE = /\bctx\b/
-const EVENT_HANDLER = /^on[A-Z]/
 const IMPORT_COMMA_AFTER = /^\s*,\s*/
 const IMPORT_COMMA_BEFORE = /,\s*$/
 const DEFAULT_PREFIX = '__default_'
@@ -91,32 +82,101 @@ export function defaultName(index: number): string {
   return `${DEFAULT_PREFIX}${index}`
 }
 
-export function generate(file: KayFile, script: ScriptAnalysis, server: ServerAnalysis | undefined, options: GenerateOptions): Generated {
-  return new Generator(file, script, server, options).run()
+// What a pass builds: JSX, which the analysis pass reads, the same JSX with `kay check`'s assertions, or the code that runs, markup strings on the server or the browser's DOM.
+export type OutputMode = 'jsx' | 'check' | 'html' | 'dom'
+
+// Where a component stands toward islands: an island root; a static component rendering through its hydratable twin inside one, which may also render as an island itself where it must (`promotable twin`, or `promotable` without a twin); a static component only islands render; or a plain one.
+export type IslandKind = 'island' | 'twin' | 'promotable twin' | 'promotable' | 'inside island' | 'static'
+
+export function outputMode(options: GenerateOptions): OutputMode {
+  // Only the final pass builds what runs.
+  if (options.rewrites && options.output !== undefined)
+    return options.output
+
+  return options.check ? 'check' : 'jsx'
 }
 
-class Generator {
+export function islandKind(options: GenerateOptions): IslandKind {
+  if (options.island !== undefined)
+    return 'island'
+
+  if (options.twin !== undefined)
+    return options.promote === undefined ? 'twin' : 'promotable twin'
+
+  if (options.insideIsland)
+    return 'inside island'
+
+  return options.promote === undefined ? 'static' : 'promotable'
+}
+
+export function generate(file: KayFile, script: ScriptAnalysis, server: ServerAnalysis | undefined, options: GenerateOptions): Generated {
+  return new ModuleShell(file, script, server, options).run()
+}
+
+// The module around a template, alike for every output mode: its imports, the server fence's `load`, the component's signature, props and script, and its export; the template renders through the writer of the mode.
+class ModuleShell {
   private readonly b: CodeBuilder
   private readonly accessorSites = new Set<number>()
   private readonly constSites = new Set<number>()
   private readonly src: string
+  private readonly mode: OutputMode
+  private readonly kind: IslandKind
+  // The `--- server` fence, unless this output leaves it out, as a browser build does.
+  private readonly fence: ServerAnalysis | undefined
+  private readonly facts: TemplateFacts
   // The action of the form each node sits in, so its fields' names are checked against the action's input.
   private readonly forms: Map<Node, Span>
-  // Server values an `await` block renders by name, which `load` defers once they are declared.
-  private deferred = new Set<string>()
+  // Server values an `await` block renders by name: `load` defers each where it is declared, so the template changes how the server fence runs.
+  private readonly deferred: Set<string>
+  private readonly jsx: JsxTemplate
 
   constructor(private readonly file: KayFile, private readonly script: ScriptAnalysis, private readonly server: ServerAnalysis | undefined, private readonly options: GenerateOptions) {
     this.src = file.source
     this.b = new CodeBuilder(file.source, options.rewrites)
+    this.mode = outputMode(options)
+    this.kind = islandKind(options)
+    this.fence = options.includeServer === false ? undefined : server
+    this.facts = templateFacts(file)
     this.forms = formTargets(file.template, file.source)
+    this.deferred = deferredData(this.facts, this.fence)
+    this.jsx = new JsxTemplate(this.b, this.src, this.forms, {
+      check: this.mode === 'check',
+      staticLoops: this.staticLoops,
+      sendsIslandProps: this.kind === 'static' || this.kind === 'twin',
+      identityKeys: this.kind === 'island' || this.kind === 'inside island',
+    }, this.accessorSites, this.constSites)
   }
 
   run(): Generated {
-    const { b, script, server } = this
-    const includeServer = server !== undefined && this.options.includeServer !== false
+    const { head, hoisted, template } = this.splitHead(this.file.template)
+
+    this.imports(head !== undefined)
+
+    if (this.fence)
+      this.emitLoad(this.fence)
+
+    this.signature()
+    this.emitBody()
+
+    for (const node of hoisted)
+      this.emitHoistedConst(node)
+
+    // An island sets no head, and a static component rendering inside one leaves it to the server.
+    if (head && this.mode !== 'dom')
+      this.emitHead(head)
+
+    this.b.add('\nreturn ')
+    this.template(template)
+    this.exports()
+
+    return { builder: this.b, accessorSites: this.accessorSites, constSites: this.constSites }
+  }
+
+  private imports(head: boolean): void {
+    const { b, script, server, fence, facts, mode } = this
     // What the fences use from `kay` unimported, as they use `props<T>()`; a name the other fence of the same module imports needs no import.
-    const imported = new Set([...script.imports, ...includeServer ? server.imports : []].map(binding => binding.local))
-    const implicit = [...script.implicit, ...includeServer ? server.implicit : []].filter(name => !imported.has(name))
+    const imported = new Set([...script.imports, ...fence?.imports ?? []].map(binding => binding.local))
+    const implicit = [...script.implicit, ...fence?.implicit ?? []].filter(name => !imported.has(name))
 
     if (implicit.length > 0)
       b.add(`import { ${[...new Set(implicit)].join(', ')} } from 'kay'\n`)
@@ -127,94 +187,76 @@ class Generator {
     for (const span of script.hoisted)
       this.emitHoisted(span, script.specifiers, script.imports, [])
 
-    if (includeServer) {
-      const { duplicates } = sharedImports(script, server)
+    if (fence) {
+      const { duplicates } = sharedImports(script, fence)
 
-      for (const span of server.hoisted)
-        this.emitHoisted(span, server.specifiers, server.imports, duplicates)
+      for (const span of fence.hoisted)
+        this.emitHoisted(span, fence.specifiers, fence.imports, duplicates)
     }
-
-    const query = this.declaresQuery()
 
     if (server)
-      b.add(`import type { ${this.options.errorPage ? 'ErrorPageContext' : 'PageContext'} as KayPageContext, PageData as KayPageData${query !== undefined ? ', QueryOf as KayQueryOf' : ''}${this.settingType(PRERENDER) !== undefined ? ', PrerenderedContext as KayPrerenderedContext' : ''}${this.options.check && server.page ? ', PageSettings as KayPageSettings' : ''} } from 'kay'\n`)
+      b.add(`import type { ${this.options.errorPage ? 'ErrorPageContext' : 'PageContext'} as KayPageContext, PageData as KayPageData${this.declaresQuery() !== undefined ? ', QueryOf as KayQueryOf' : ''}${this.settingType(PRERENDER) !== undefined ? ', PrerenderedContext as KayPrerenderedContext' : ''}${mode === 'check' && server.page ? ', PageSettings as KayPageSettings' : ''} } from 'kay'\n`)
 
-    const facts = templateFacts(this.file)
     const kayHelpers: KayHelper[] = facts.actionForm ? ['formAction'] : []
     const actions = server?.exportNames.filter(name => !NOT_ACTIONS.has(name)) ?? []
-    const staticLoops = this.staticLoops
-    const html = this.final('html')
-    const dom = this.final('dom')
-    const runnable = html || dom
+    const runs = this.runs
     const used: Helper[] = [...script.props?.rest ? ['omit' as const] : [], ...facts.helpers]
-    const helpers = runnable ? [] : used.filter(helper => helper !== 'For')
-
-    if (includeServer) {
-      const data = new Set(server.data.map(binding => binding.name))
-
-      this.deferred = new Set([...facts.awaited].filter(name => data.has(name)))
-    }
 
     if (this.deferred.size > 0)
       kayHelpers.push('autoDefer')
 
     // What fills a form's fields back in once a post was refused.
-    if (runnable && kayHelpers.includes('formAction'))
+    if (runs && facts.actionForm)
       kayHelpers.push('formValue', 'formChecked', 'formInvalid', 'formError')
 
-    if (html && kayHelpers.includes('formAction'))
+    if (mode === 'html' && facts.actionForm)
       kayHelpers.push('formProtection')
 
-    if (includeServer ? server.exportNames.length > 0 : actions.length > 0)
-      kayHelpers.push(includeServer ? 'registerActions' : 'actionStub')
+    if (fence ? fence.exportNames.length > 0 : actions.length > 0)
+      kayHelpers.push(fence ? 'registerActions' : 'actionStub')
 
     if (kayHelpers.length > 0)
-      b.add(`import { ${kayHelpers.map(helper => `${helper} as ${kayAlias(helper)}`).join(', ')} } from 'kay/internal'\n`)
+      b.add(`import { ${kayHelpers.map(helper => `${helper} as ${helperName(helper)}`).join(', ')} } from 'kay/internal'\n`)
 
-    if (server && !includeServer) {
+    if (server && !fence) {
       for (const name of actions)
         b.add(`export const ${name} = KayActionStub(${JSON.stringify(actionUrl(this.options.moduleId, name))})\n`)
     }
 
-    const childrenSlot = facts.childrenSlot
-    const childrenType = ' & { children?: KayJSX.Element }'
-
-    if (childrenSlot)
+    if (facts.childrenSlot)
       b.add(`import type { JSX as KayJSX } from 'kay'\n`)
 
-    if (html)
+    if (mode === 'html')
       b.add(htmlHelperImport())
 
-    if (dom)
+    if (mode === 'dom')
       b.add(domHelperImport())
 
     // Code that only gets read, by the type checker and the analysis pass, declares the helpers of its control flow rather than import a runtime of them.
-    const declared: [name: string, helper: DeclaredHelper][] = helpers.map(helper => [helperAlias(helper), helper])
+    const declared: [name: string, helper: DeclaredHelper][] = runs ? [] : used.filter(helper => helper !== 'For').map(helper => [helperName(helper), helper])
 
-    if (used.includes('For') && !runnable)
-      declared.push(staticLoops ? ['KayStaticFor', 'staticFor'] : ['KayLoopFor', 'For'])
+    if (used.includes('For') && !runs)
+      declared.push(this.staticLoops ? ['KayStaticFor', 'staticFor'] : ['KayLoopFor', 'For'])
 
-    if (this.options.island !== undefined)
+    if (this.kind === 'island')
       b.add(`import { island as KayIsland } from 'kay/island'\n`)
 
-    if (this.options.twin !== undefined)
-      b.add(`import { ${this.options.promote === undefined ? 'insideIsland as KayInsideIsland' : 'promote as KayPromote'} } from 'kay/island'\nimport KayHydrated from ${JSON.stringify(this.options.twin)}\n`)
+    if (this.kind === 'twin' || this.kind === 'promotable twin')
+      b.add(`import { ${this.kind === 'twin' ? 'insideIsland as KayInsideIsland' : 'promote as KayPromote'} } from 'kay/island'\nimport KayHydrated from ${JSON.stringify(this.options.twin)}\n`)
 
-    if (this.options.island !== undefined && this.genericComponent)
+    if (this.kind === 'island' && this.genericComponent)
       b.add(`import type { IslandBrand as KayIslandBrand, IslandOptions as KayIslandOptions } from 'kay'\n`)
 
-    if (facts.await && !dom)
+    if (facts.await && mode !== 'dom')
       b.add(`import { Await as KayAwait } from 'kay/await'\n`)
 
-    if (facts.try && !runnable)
+    if (facts.try && !runs)
       declared.push(['KayTry', 'Try'])
 
-    if (!runnable && this.options.rewrites && [...this.options.rewrites.values()].some(rewrite => rewrite.dynamic))
+    if (!runs && this.options.rewrites && [...this.options.rewrites.values()].some(rewrite => rewrite.dynamic))
       declared.push([DYNAMIC_TAG, 'Dynamic'])
 
-    const { head, hoisted, template } = this.splitHead(this.file.template)
-
-    if (head && !this.options.check && !runnable)
+    if (head && mode === 'jsx')
       declared.push(['KayUseHead', 'head'])
 
     if (declared.length > 0) {
@@ -223,11 +265,15 @@ class Generator {
       for (const [name, helper] of declared)
         b.add(`declare const ${name}: KayTemplateHelpers[${JSON.stringify(helper)}]\n`)
     }
+  }
 
-    if (includeServer)
-      this.emitLoad(server, query)
+  // The component function's head: its type parameters and props, read off `__props`.
+  private signature(): void {
+    const { b, script, server } = this
+    const { childrenSlot } = this.facts
+    const childrenType = ' & { children?: KayJSX.Element }'
 
-    b.add(`\n${this.options.island !== undefined || this.options.twin !== undefined ? '' : 'export default '}function ${this.options.name}`)
+    b.add(`\n${this.wrapped ? '' : 'export default '}function ${this.options.name}`)
 
     if (this.file.typeParameters && !server)
       b.add('<').addSource(this.file.typeParameters).add('>')
@@ -251,47 +297,64 @@ class Generator {
     else if (childrenSlot) {
       b.add('__props: { children?: KayJSX.Element }')
     }
-    else if (facts.slot) {
+    else if (this.facts.slot) {
       b.add('__props: {}')
     }
 
     b.add(') {\n')
-    this.emitBody()
+  }
 
-    for (const node of hoisted)
-      this.emitHoistedConst(node, html || dom)
+  // What the component returns, through the writer of the mode, closing its function.
+  private template(nodes: Node[]): void {
+    const { b, src, mode } = this
+    const visible = nodes.filter(node => node.kind !== 'slot')
+    const errors = this.runs ? errorMessages(nodes, src) : undefined
+    const located = this.options.inspect === true ? sourceLocator(src, this.options.moduleId) : undefined
 
-    // An island sets no head, and a static component rendering inside one leaves it to the server.
-    if (head && !dom)
-      this.emitHead(head)
+    if (mode === 'html') {
+      new HtmlTemplate(b, src, this.forms, { hydratable: this.options.hydratable, accessorLoops: !this.staticLoops, errors, located }).value(visible)
+      b.add('\n}\n')
+    }
+    else if (mode === 'dom') {
+      const dom = new DomTemplate(b, src, this.forms, errors, located)
 
-    b.add('\nreturn ')
+      dom.block(visible)
+      b.add('\n}\n')
+      b.add(dom.declarations())
+    }
+    else {
+      this.jsx.emitRoot(nodes)
+      b.add('\n}\n')
+    }
+  }
 
-    const errors = html || dom ? errorMessages(template, this.src) : undefined
-    const located = this.options.inspect === true ? sourceLocator(this.src, this.options.moduleId) : undefined
-    const domTemplate = dom ? new DomTemplate(b, this.src, this.forms, errors, located) : undefined
+  // An island, or a static component with a hydratable twin, exports its function wrapped.
+  private exports(): void {
+    const { b, src } = this
+    const { name } = this.options
 
-    if (html)
-      new HtmlTemplate(b, this.src, this.forms, { hydratable: this.options.hydratable, accessorLoops: !staticLoops, errors, located }).value(this.withoutSlots(template))
-    else if (domTemplate)
-      domTemplate.block(this.withoutSlots(template))
-    else
-      this.emitRoot(template)
+    if (this.kind === 'promotable twin')
+      b.add(`\nexport default KayPromote(${JSON.stringify(this.options.promote)}, ${name} as never, KayHydrated as never${islandMessages(src)}) as typeof ${name}\n`)
+    else if (this.kind === 'twin')
+      b.add(`\nexport default ((props: never) => KayInsideIsland() ? KayHydrated(props) : ${name}(props)) as typeof ${name}\n`)
+    else if (this.kind === 'island')
+      b.add(`\nexport default KayIsland(${JSON.stringify(this.options.island)}, ${name}${this.genericComponent ? ' as never' : ''}${islandMessages(src, this.options.client)})${this.genericIslandType()}\n`)
+  }
 
-    b.add('\n}\n')
+  private get wrapped(): boolean {
+    return this.kind === 'island' || this.kind === 'twin' || this.kind === 'promotable twin'
+  }
 
-    if (domTemplate)
-      b.add(domTemplate.declarations())
+  private get runs(): boolean {
+    return this.mode === 'html' || this.mode === 'dom'
+  }
 
-    if (this.options.twin !== undefined && this.options.promote !== undefined)
-      b.add(`\nexport default KayPromote(${JSON.stringify(this.options.promote)}, ${this.options.name} as never, KayHydrated as never${islandMessages(this.src)}) as typeof ${this.options.name}\n`)
-    else if (this.options.twin !== undefined)
-      b.add(`\nexport default ((props: never) => KayInsideIsland() ? KayHydrated(props) : ${this.options.name}(props)) as typeof ${this.options.name}\n`)
+  // Pages, layouts and static components outside islands render once on the server and never hydrate, so their loops hand each row its item rather than an accessor to it.
+  private get staticLoops(): boolean {
+    if (this.mode === 'check' || this.kind === 'island')
+      return false
 
-    if (this.options.island !== undefined)
-      b.add(`\nexport default KayIsland(${JSON.stringify(this.options.island)}, ${this.options.name}${this.genericComponent ? ' as never' : ''}${islandMessages(this.src, this.options.client)})${this.genericIslandType()}\n`)
-
-    return { builder: b, accessorSites: this.accessorSites, constSites: this.constSites }
+    return this.options.output === 'html' || this.kind === 'twin' || this.kind === 'promotable twin' || this.fence !== undefined
   }
 
   // The type of the page's query schema, when it declares one; a layout or special page reads its page's.
@@ -302,16 +365,6 @@ class Generator {
   // What `load` types a setting from: its key of `page`.
   private settingType(name: PageSettingName): string | undefined {
     return this.server?.page?.settings.has(name) ? `typeof ${PAGE}.${name}` : undefined
-  }
-
-  // The final pass builds what runs; the analysis pass always generates JSX.
-  private final(output: 'html' | 'dom'): boolean {
-    return this.options.output === output && this.options.rewrites !== undefined
-  }
-
-  // Whether the props the template passes an island are sent to the browser as they are: a page, a layout, or a static component that would not render as an island in its place.
-  private get sendsIslandProps(): boolean {
-    return this.options.island === undefined && !this.options.insideIsland && this.options.promote === undefined
   }
 
   private get genericComponent(): boolean {
@@ -372,10 +425,11 @@ class Generator {
   }
 
   // Server exports stay at module level; the rest of the fence becomes `load(ctx)`, returning every name it declares.
-  private emitLoad(server: ServerAnalysis, query: string | undefined) {
+  private emitLoad(server: ServerAnalysis) {
     const { b } = this
+    const query = this.declaresQuery()
     // Typed where it is written, so the editor completes its keys and `kay check` reports one kay does not know.
-    const page = this.options.check ? server.page?.init : undefined
+    const page = this.mode === 'check' ? server.page?.init : undefined
 
     for (const span of server.exports) {
       if (page && page.start >= span.start && page.end <= span.end)
@@ -403,14 +457,14 @@ class Generator {
 
       this.deferDeclared(server, span)
     }
-    b.add(`\nreturn { ${server.data.map(data => this.deferred.has(data.name) ? `${data.name}: ${kayAlias('autoDefer')}(${data.name})` : data.name).join(', ')} }\n}\n`)
+    b.add(`\nreturn { ${server.data.map(data => this.deferred.has(data.name) ? `${data.name}: ${helperName('autoDefer')}(${data.name})` : data.name).join(', ')} }\n}\n`)
   }
 
   // Right where a deferred value is declared, so a promise rejecting while a later statement awaits crashes nothing; a statement an export reads runs at module level.
   private deferDeclared(server: ServerAnalysis, span: Span) {
     for (const data of server.data) {
       if (this.deferred.has(data.name) && data.local.start >= span.start && data.local.end <= span.end)
-        this.b.add(`\n${kayAlias('autoDefer')}(${data.name})\n`)
+        this.b.add(`\n${helperName('autoDefer')}(${data.name})\n`)
     }
   }
 
@@ -464,7 +518,7 @@ class Generator {
     }
 
     if (props.rest)
-      b.add('const ').addSource(props.rest).add(` = ${helperAlias('omit')}(__props, ${props.bindings.map(binding => JSON.stringify(binding.key)).join(', ')});\n`)
+      b.add('const ').addSource(props.rest).add(` = ${helperName('omit')}(__props, ${props.bindings.map(binding => JSON.stringify(binding.key)).join(', ')});\n`)
 
     // The analysis pass declares the destructured names so scope analysis can find every read of them; the final pass rewrites those reads instead.
     if (!this.options.rewrites && props.bindings.length > 0) {
@@ -474,7 +528,7 @@ class Generator {
       b.add('} = __props;\n')
     }
     // Type checking keeps each `{ title }` as a read of its prop, so the editor hovers, finds and renames it with the prop.
-    else if (this.options.check) {
+    else if (this.mode === 'check') {
       for (const binding of props.bindings) {
         if (this.text(binding.local) === binding.key)
           b.add('__props.').addSource(binding.local).add(';\n')
@@ -483,11 +537,11 @@ class Generator {
   }
 
   // A top-level `const` before the `head` block, declared ahead of it so the head reads it too.
-  private emitHoistedConst(node: ConstNode, final: boolean) {
+  private emitHoistedConst(node: ConstNode) {
     const { b } = this
     const memo = this.staticLoops ? undefined : 'KayMemo'
 
-    if (final) {
+    if (this.runs) {
       b.wrap(node, () => constDeclaration(b, node, this.src, memo))
       b.add('\n')
 
@@ -533,15 +587,15 @@ class Generator {
     const { b } = this
     const tags = head.children.filter((child): child is ElementNode => headTagProblem(child) === undefined)
 
-    if (this.options.check) {
+    if (this.mode === 'check') {
       b.add('void (<>')
-      this.emitChildren(tags)
+      this.jsx.emitChildren(tags)
       b.add('</>);\n')
 
       return
     }
 
-    b.add(this.final('html') ? 'KayHead([' : 'KayUseHead([')
+    b.add(this.mode === 'html' ? 'KayHead([' : 'KayUseHead([')
     for (const tag of tags) {
       this.emitHeadTag(tag)
       b.add(', ')
@@ -600,756 +654,6 @@ class Generator {
 
       b.add(' } }')
     })
-  }
-
-  private emitRoot(nodes: Node[]) {
-    const visible = this.withoutSlots(nodes)
-
-    if (visible.length === 1 && visible[0]!.kind === 'element' && !isSlot(visible[0]!)) {
-      this.emitElement(visible[0]!)
-
-      return
-    }
-
-    if (visible.length === 0) {
-      this.b.add('null')
-
-      return
-    }
-
-    this.b.add('<>')
-    this.emitChildren(visible)
-    this.b.add('</>')
-  }
-
-  // Branch and loop bodies as one expression: a lone element stays bare, several get a fragment.
-  private emitChildren(nodes: Node[]) {
-    let previous: Node | undefined
-
-    for (const [index, node] of nodes.entries()) {
-      switch (node.kind) {
-        case 'const':
-          this.emitConst(node, nodes.slice(index + 1))
-
-          return
-        case 'element':
-          this.emitElement(node)
-
-          break
-        case 'text':
-          // JSX folds a line break into a space, so the line break between two text lines is an expression.
-          if (previous?.kind === 'text')
-            this.b.add('{"\\n"}')
-
-          this.emitText(node)
-
-          break
-        case 'if':
-          this.b.wrap(node, () => {
-            this.b.add('{')
-
-            if (node.subject)
-              this.emitMatch(node, node.subject)
-            else
-              this.emitIf(node, 0)
-
-            this.b.add('}')
-          })
-
-          break
-        case 'for':
-          this.emitFor(node)
-
-          break
-        case 'await':
-          this.emitAwait(node)
-
-          break
-        case 'try':
-          this.emitTry(node)
-
-          break
-        case 'error':
-          this.emitError(node)
-
-          break
-        // Passed to the component above it, or reported as misplaced.
-        case 'slot':
-          break
-      }
-
-      previous = node
-    }
-  }
-
-  // The siblings after a `const` render inside a function declaring it, so its name reaches them and their children alone.
-  private emitConst(node: ConstNode, rest: Node[]) {
-    const { b } = this
-
-    b.add('{(() => { ')
-    b.wrap(node, () => {
-      b.add('const ')
-      this.constSites.add(b.code.length)
-
-      // Code that runs reads it as a memo, as it does a row, unless the markup renders once.
-      if (!this.staticLoops)
-        this.accessorSites.add(b.code.length)
-
-      b.addSource(node.pattern).add(' = (').addSource(node.value).add(');')
-    })
-    b.add(' return ')
-    this.emitRoot(rest)
-    b.add(' })()}')
-  }
-
-  // The field's name is typed as a `name` is: one of the action's input.
-  private emitError(node: ErrorNode) {
-    const { b } = this
-    const target = this.forms.get(node)
-
-    if (!target || !this.options.check)
-      return
-
-    b.wrap(node, () => {
-      b.add('{KayFormError((').addSource(target).add(')')
-
-      if (node.field) {
-        b.add(', ')
-        b.wrap(node.field, () => b.add(JSON.stringify(node.name)))
-      }
-
-      b.add(')}')
-    })
-  }
-
-  // A `switch`, so `kay check` narrows the subject in each branch and reports a value its type cannot hold.
-  private emitMatch(node: IfNode, subject: Span) {
-    const { b } = this
-
-    b.add('(() => { switch (').addSource(subject).add(') { ')
-
-    for (const branch of node.branches) {
-      b.wrap(branch, () => {
-        for (const value of branch.values ?? [])
-          b.add('case ').addSource(value).add(': ')
-
-        b.add(branch.values ? 'return (' : 'default: return (')
-        this.emitRoot(branch.children)
-        b.add('); ')
-      })
-    }
-
-    b.add(node.branches.some(branch => !branch.values) ? '} })()' : '} return null })()')
-  }
-
-  private emitIf(node: IfNode, index: number) {
-    const branch = node.branches[index]!
-    const { b } = this
-
-    b.wrap(branch, () => {
-      if (!branch.test) {
-        this.emitRoot(branch.children)
-
-        return
-      }
-
-      const hasRest = index + 1 < node.branches.length
-
-      if (branch.alias) {
-        b.add(`<${helperAlias('Show')} when={`).addSource(branch.test).add('}')
-
-        if (hasRest) {
-          b.add(' fallback={')
-          this.emitIf(node, index + 1)
-          b.add('}')
-        }
-
-        b.add('>{(')
-        this.accessorSites.add(b.code.length)
-        b.addSource(branch.alias).add(') => ')
-        this.emitRoot(branch.children)
-        b.add(`}</${helperAlias('Show')}>`)
-
-        return
-      }
-
-      b.add('(').addSource(branch.test).add(') ? ')
-      this.emitRoot(branch.children)
-      b.add(' : ')
-
-      if (hasRest)
-        this.emitIf(node, index + 1)
-      else
-        b.add('null')
-    })
-  }
-
-  // A component taking each block as a function, so the browser and the server each decide when to render which.
-  private emitAwait(node: AwaitNode) {
-    const { b } = this
-
-    b.wrap(node, () => {
-      // An error about the value, such as a promise `defer()` never took, lands on the value itself.
-      b.add('<KayAwait ')
-      b.wrap(node.value, () => b.add('value'))
-      b.add('={').addSource(node.value).add('}')
-
-      if (node.pending.length > 0) {
-        b.add(' pending={() => ')
-        this.emitRoot(node.pending)
-        b.add('}')
-      }
-
-      if (node.resolved)
-        this.emitAwaitBranch('ready', node.resolved)
-
-      if (node.rejected)
-        this.emitAwaitBranch('failed', node.rejected)
-
-      b.add(' />')
-    })
-  }
-
-  private emitTry(node: TryNode) {
-    const { b } = this
-
-    b.wrap(node, () => {
-      b.add('<KayTry block={() => ')
-      this.emitRoot(node.children)
-      b.add('}')
-
-      if (node.rejected)
-        this.emitAwaitBranch('failed', node.rejected)
-
-      b.add(' />')
-    })
-  }
-
-  private emitAwaitBranch(prop: 'ready' | 'failed', branch: AwaitBranch) {
-    const { b } = this
-
-    b.wrap(branch, () => {
-      b.add(` ${prop}={(`)
-
-      if (branch.alias)
-        b.addSource(branch.alias)
-
-      b.add(') => ')
-      this.emitRoot(branch.children)
-      b.add('}')
-    })
-  }
-
-  // Pages, layouts and static components outside islands render once on the server and never hydrate, so their loops hand each row its item rather than an accessor to it.
-  private get staticLoops(): boolean {
-    if (this.options.check || this.options.island !== undefined)
-      return false
-
-    return this.options.output === 'html' || this.options.twin !== undefined || (this.server !== undefined && this.options.includeServer !== false)
-  }
-
-  private emitFor(node: ForNode) {
-    const { b } = this
-
-    if (this.staticLoops) {
-      this.emitStaticFor(node)
-
-      return
-    }
-
-    const tag = 'KayLoopFor'
-    const positional = keyedByPosition(node, this.src)
-
-    // Only an island renders a list again, so only there do rows matched by their objects cost anything.
-    const identityChecked = this.options.check === true && (this.options.island !== undefined || this.options.insideIsland === true) && !node.key
-
-    b.wrap(node, () => {
-      b.add(`<${tag} each={`)
-
-      if (identityChecked)
-        b.add('KayIdentityKey((').addSource(node.each).add('))')
-      else
-        b.addSource(node.each)
-
-      b.add('} keyed={')
-
-      if (positional)
-        b.add('false')
-      else if (node.key)
-        b.add('(').addSource(node.item).add(') => (').addSource(node.key).add(')')
-      // Rows keyed by the item's `id` or the item itself, which any item has.
-      else
-        b.add('() => 0')
-
-      b.add('}')
-
-      if (node.fallback) {
-        b.add(' fallback={')
-        this.emitRoot(node.fallback)
-        b.add('}')
-      }
-
-      b.add('>{(')
-      this.accessorSites.add(b.code.length)
-      b.addSource(node.item)
-
-      if (node.index) {
-        b.add(', ')
-
-        if (!positional)
-          this.accessorSites.add(b.code.length)
-
-        b.addSource(node.index)
-      }
-
-      b.add(') => ')
-
-      // A positional key reads the index, so the type check sees it read, and hover and rename reach the key's name.
-      if (positional && this.options.check) {
-        b.add('(void (').addSource(node.key).add('), ')
-        this.emitRoot(node.children)
-        b.add(')')
-      }
-      else {
-        this.emitRoot(node.children)
-      }
-
-      b.add(`}</${tag}>`)
-    })
-  }
-
-  // Nothing here updates, so the loop's callback gets the item and the index themselves rather than `For`'s accessors.
-  private emitStaticFor(node: ForNode) {
-    const { b } = this
-
-    b.wrap(node, () => {
-      b.add('{KayStaticFor(').addSource(node.each).add(', (')
-      b.addSource(node.item)
-
-      if (node.index)
-        b.add(', ').addSource(node.index)
-
-      b.add(`) => `)
-      this.emitRoot(node.children)
-
-      if (node.fallback) {
-        b.add(', () => ')
-        this.emitRoot(node.fallback)
-      }
-
-      b.add(')}')
-    })
-  }
-
-  private emitElement(element: ElementNode) {
-    const { b } = this
-
-    if (isSlot(element)) {
-      b.wrap(element, () => {
-        b.add('{')
-        slotValue(b, element)
-
-        if (element.children.length > 0) {
-          b.add(' ?? ')
-          this.emitRoot(element.children)
-        }
-
-        b.add('}')
-      })
-
-      return
-    }
-
-    b.wrap(element, () => {
-      b.add('<')
-
-      const named = element.tag.end > element.tag.start
-      const dynamic = named ? b.addTag(element.tag) : false
-
-      if (!named)
-        b.add(element.name)
-
-      this.emitAttributes(element)
-      const slots = element.children.filter((child): child is SlotNode => child.kind === 'slot')
-      const children = element.children.filter(child => child.kind !== 'slot')
-
-      for (const slot of slots) {
-        if (!element.component)
-          continue
-
-        // `@row(todo)` passes a function the component calls per item, its parameters typed from the prop.
-        if (slot.params && this.options.check && this.sendsIslandProps) {
-          b.add(' ')
-          this.emitFunctionPropCheck(element, slot.name)
-        }
-
-        b.add(' ').addSource(slot.name).add('={')
-
-        if (slot.params)
-          b.add('(').addSource(slot.params).add(') => ')
-
-        this.emitRoot(slot.children)
-        b.add('}')
-      }
-
-      if (children.length === 0) {
-        b.add(' />')
-
-        return
-      }
-
-      b.add('>')
-      this.emitChildren(children)
-      b.add('</')
-
-      // The closing tag reads the name the way the opening one did: a prop, a loop item or a server value may be the component.
-      if (dynamic)
-        b.add(DYNAMIC_TAG)
-      else if (named)
-        b.addSource(element.tag)
-      else
-        b.add(element.name)
-
-      b.add('>')
-    })
-  }
-
-  private emitAttributes(element: ElementNode) {
-    const serverIsland = serverIslandOf(element, this.src)
-    const { b } = this
-
-    if (element.id)
-      b.add(' id="').addSource(element.id).add('"')
-
-    const classAttributes = element.attributes.filter((attribute): attribute is NamedAttribute => attribute.kind !== 'spread' && this.text(attribute.name) === 'class')
-
-    // A spread may carry a `class` of its own, which merges in too, so the class goes after every attribute and spread.
-    const spreads = element.attributes.some(attribute => attribute.kind === 'spread')
-    const merged = spreads && (element.classes.length > 0 || classAttributes.length > 0)
-
-    if (element.classes.length > 0 && !spreads)
-      this.emitShorthandClass(element, classAttributes[0])
-
-    for (const attribute of element.attributes) {
-      if ((element.classes.length > 0 || merged) && attribute === classAttributes[0])
-        continue
-
-      if (attribute === serverIsland?.attribute)
-        continue
-
-      // Not a prop: what it reads is checked on its own.
-      if (attribute === serverIsland?.noscript) {
-        if (attribute.kind === 'expression')
-          b.add(' {...(void (').addSource(attribute.expression).add('), {})}')
-
-        continue
-      }
-
-      b.add(' ')
-
-      if (!this.emitFormAttribute(element, attribute))
-        this.emitAttribute(element, attribute)
-    }
-
-    if (merged)
-      this.emitMergedClass(element, classAttributes[0])
-
-    if (actionOf(element, this.src)) {
-      const named = (name: string) => element.attributes.some(attribute => attribute.kind !== 'spread' && this.text(attribute.name) === name)
-
-      if (!named('method'))
-        b.add(' method="post"')
-
-      // Multipart whatever the schema, so file inputs post too; Elysia parses either encoding alike.
-      if (!named('enctype'))
-        b.add(' enctype="multipart/form-data"')
-    }
-  }
-
-  // `form(action={add})` posts to the action's URL, and each field `name` inside it must be a key of the action's input.
-  private emitFormAttribute(element: ElementNode, attribute: Attribute): boolean {
-    const { b } = this
-
-    if (attribute.kind === 'expression' && attribute === actionOf(element, this.src)) {
-      b.addSource(attribute.name).add(`={${kayAlias('formAction')}((`).addSource(attribute.expression).add('))}')
-
-      return true
-    }
-
-    if (attribute.kind === 'spread' || element.component)
-      return false
-
-    const name = this.text(attribute.name)
-    const target = this.forms.get(element)
-
-    if (name === FIELD_ATTRIBUTE ? !FIELD_ELEMENTS.has(element.name) : name !== 'name' || !FORM_FIELDS.has(element.name))
-      return false
-
-    // `field` writes `name`, and the constraints of the action's schema, which only a form posting to one has.
-    if (name === FIELD_ATTRIBUTE) {
-      const named = element.attributes.some(other => other.kind !== 'spread' && this.text(other.name) === 'name')
-
-      if (attribute.kind !== 'static' || named) {
-        b.add('{...{}}')
-
-        return true
-      }
-    }
-
-    if (!this.options.check || !target || attribute.kind !== 'static') {
-      if (name !== FIELD_ATTRIBUTE)
-        return false
-
-      b.wrap(attribute.name, () => b.add('name')).add(`=${JSON.stringify(attribute.kind === 'static' ? attribute.text : '')}`)
-
-      return true
-    }
-
-    b.wrap(attribute.name, () => b.add('name')).add('={KayField((').addSource(target).add('), ')
-    b.wrap(attribute.value, () => b.add(JSON.stringify(attribute.text)))
-    b.add(')}')
-
-    return true
-  }
-
-  private emitShorthandClass(element: ElementNode, attribute: NamedAttribute | undefined) {
-    const { b } = this
-    const shorthand = element.classes.map(span => this.text(span)).join(' ')
-    const source = { start: element.classes[0]!.start, end: element.classes.at(-1)!.end }
-
-    b.add(' ')
-
-    if (!attribute) {
-      b.wrap(source, () => b.add(`class=${quoteAttribute(shorthand)}`))
-
-      return
-    }
-
-    if (attribute.kind === 'static') {
-      b.wrap(source, () => b.add(`class=${quoteAttribute(`${shorthand} ${attribute.text}`)}`))
-
-      return
-    }
-
-    if (attribute.kind === 'expression') {
-      const [open, close] = element.component ? [`${helperAlias('componentClass')}([`, '])'] : ['[', ']']
-
-      b.addSource(attribute.name).add(`={${open}${JSON.stringify(shorthand)}, (`).addSource(attribute.expression).add(`)${close}}`)
-    }
-  }
-
-  // The shorthand, the `class` attribute and the `class` each spread brings, in the order they were written.
-  private emitMergedClass(element: ElementNode, classAttribute: NamedAttribute | undefined) {
-    const { b } = this
-    const shorthand = element.classes.length > 0 ? { start: element.classes[0]!.start, end: element.classes.at(-1)!.end } : undefined
-
-    b.add(' ')
-    b.wrap(classAttribute && (classAttribute.kind === 'expression' || !shorthand) ? classAttribute.name : shorthand!, () => b.add('class'))
-    b.add(element.component ? `={${helperAlias('componentClass')}([` : '={[')
-
-    if (shorthand)
-      b.add(JSON.stringify(element.classes.map(span => this.text(span)).join(' ')))
-
-    let separator = shorthand ? ', ' : ''
-
-    for (const attribute of element.attributes) {
-      if (attribute.kind === 'spread') {
-        b.add(`${separator}((`).addSource(attribute.expression).add(') as unknown as { class?: string }).class')
-        separator = ', '
-
-        continue
-      }
-
-      if (attribute !== classAttribute)
-        continue
-
-      if (attribute.kind === 'static')
-        b.add(`${separator}${JSON.stringify(attribute.text)}`)
-      else if (attribute.kind === 'expression')
-        b.add(`${separator}(`).addSource(attribute.expression).add(')')
-
-      separator = ', '
-    }
-
-    b.add(element.component ? '])}' : ']}')
-  }
-
-  private emitAttribute(element: ElementNode, attribute: Attribute) {
-    const { b } = this
-
-    if (this.options.check && this.emitCheckedAttribute(element, attribute))
-      return
-
-    switch (attribute.kind) {
-      case 'spread':
-        b.add('{...').addSource(attribute.expression).add('}')
-
-        return
-      case 'boolean':
-        b.addSource(attribute.name)
-
-        return
-      case 'static': {
-        b.addSource(attribute.name).add('=')
-        const quoted = quoteAttribute(attribute.text)
-
-        if (quoted === `"${attribute.text}"`)
-          b.add('"').addSource(attribute.value).add('"')
-        else
-          b.wrap(attribute.value, () => b.add(quoted))
-
-        return
-      }
-      case 'expression': {
-        const name = this.text(attribute.name)
-
-        if (name.startsWith('bind:')) {
-          this.emitBind(element, attribute, name.slice(5))
-
-          return
-        }
-
-        // Read at each event rather than once, as the browser build does, so a handler held by a prop, a signal or a loop item stays current.
-        if (!element.component && !this.options.check && EVENT_HANDLER.test(name) && !isFunctionExpression(this.text(attribute.expression))) {
-          b.addSource(attribute.name).add('={(kayEvent) => (').addSource(attribute.expression).add(')?.(kayEvent)}')
-
-          return
-        }
-
-        b.addSource(attribute.name).add('={').addSource(attribute.expression).add('}')
-      }
-    }
-  }
-
-  // The text of an attribute written as a quoted string.
-  private staticAttribute(element: ElementNode, name: string): string | undefined {
-    for (const attribute of element.attributes) {
-      if (attribute.kind === 'static' && this.text(attribute.name) === name)
-        return attribute.text
-    }
-
-    return undefined
-  }
-
-  // Check-only wrappers: a site link must match a page, markup must be made safe or written out, and a static parent passes an island serializable props only.
-  private emitCheckedAttribute(element: ElementNode, attribute: Attribute): boolean {
-    const { b } = this
-
-    if (attribute.kind === 'boolean')
-      return false
-
-    // Spread props reach an island serialized as the others do, so the object is checked as one prop would be.
-    if (attribute.kind === 'spread') {
-      if (!element.component || !this.sendsIslandProps)
-        return false
-
-      b.add('{...KayProp(').addSource(element.tag).add(')((').addSource(attribute.expression).add('))}')
-
-      return true
-    }
-
-    const name = this.text(attribute.name)
-
-    if (!element.component && ((LINK_ELEMENTS.has(element.name) && name === 'href') || (attribute.kind === 'static' && WRITTEN_URLS.get(element.name) === name && !this.servedOtherwise(element)))) {
-      b.addSource(attribute.name).add('={KayHref(')
-
-      if (attribute.kind === 'static')
-        b.wrap(attribute.value, () => b.add(JSON.stringify(attribute.text)))
-      else
-        b.add('(').addSource(attribute.expression).add(')')
-
-      b.add(')}')
-
-      return true
-    }
-
-    if (!element.component && attribute.kind === 'expression' && MARKUP_ATTRIBUTES.has(name)) {
-      b.addSource(attribute.name).add('={KayHtml((').addSource(attribute.expression).add('))}')
-
-      return true
-    }
-
-    if (!element.component || !this.sendsIslandProps || attribute.kind !== 'expression' || name.startsWith('bind:'))
-      return false
-
-    // A function never reaches an island, and left unwrapped it takes its parameter types from a generic component's other props.
-    if (isFunctionExpression(this.text(attribute.expression))) {
-      this.emitFunctionPropCheck(element, attribute.name)
-      b.add(' ').addSource(attribute.name).add('={').addSource(attribute.expression).add('}')
-
-      return true
-    }
-
-    b.addSource(attribute.name).add('={KayProp(').addSource(element.tag).add(')((').addSource(attribute.expression).add('))}')
-
-    return true
-  }
-
-  // A feed or a translation, served by what kay check does not list as pages, or a form posting to a route that may take its method only.
-  private servedOtherwise(element: ElementNode): boolean {
-    const value = (name: string) => element.attributes.find(attribute => attribute.kind !== 'spread' && this.text(attribute.name) === name)
-    const rel = value('rel')
-    const method = value('method')
-
-    if (element.name === 'form')
-      return method !== undefined && (method.kind !== 'static' || method.text.toLowerCase() !== 'get')
-
-    return element.name === 'link' && rel?.kind === 'static' && rel.text.split(WHITESPACE).includes('alternate')
-  }
-
-  // Reports a function passed to an island, `0` standing for the prop.
-  private emitFunctionPropCheck(element: ElementNode, name: Span) {
-    this.b.add('{...KayFunctionProp(').addSource(element.tag).add(')(').wrap(name, () => this.b.add('0')).add(')}')
-  }
-
-  // `bind:value={name}` reads the signal and writes it back from the matching input event.
-  private emitBind(element: ElementNode, attribute: Extract<Attribute, { kind: 'expression' }>, property: string) {
-    const { b } = this
-
-    if (bindProblem(element, property))
-      return
-
-    const inputType = this.staticAttribute(element, 'type') ?? 'text'
-    const event = bindEvent(element, property)
-    const read = property === 'checked' ? 'checked' : NUMERIC_INPUTS.has(inputType) ? 'valueAsNumber' : 'value'
-
-    b.wrap(attribute.name, () => b.add(property))
-    b.add('={(').addSource(attribute.expression).add(`)()} ${event}={(kayEvent) => `)
-
-    // An emptied number input has no number: the signal keeps its last one rather than take a NaN, or an undefined its type does not allow.
-    if (read === 'valueAsNumber')
-      b.add('{ const kayValue = kayEvent.currentTarget.valueAsNumber; if (!Number.isNaN(kayValue)) (').addSource(attribute.expression).add(').set(kayValue) }}')
-    else
-      b.add('(').addSource(attribute.expression).add(`).set(kayEvent.currentTarget.${read})}`)
-  }
-
-  private emitText(node: TextNode) {
-    const { b } = this
-
-    for (const part of node.parts) {
-      if (part.kind === 'element') {
-        this.emitElement(part)
-
-        continue
-      }
-
-      if (part.kind === 'expression') {
-        b.add('{').addSource(part.expression).add('}')
-
-        continue
-      }
-
-      const escaped = part.text.replace(JSX_TEXT_ESCAPES, text => `{${JSON.stringify(text)}}`)
-
-      if (escaped === this.text(part))
-        b.addSource(part)
-      else
-        b.wrap(part, () => b.add(escaped))
-    }
-  }
-
-  private withoutSlots(nodes: Node[]): Node[] {
-    return nodes.filter(node => node.kind !== 'slot')
   }
 
   private text(span: Span): string {
@@ -1416,18 +720,10 @@ export function templateFacts(file: KayFile): TemplateFacts {
 
 type KayHelper = 'formAction' | 'formValue' | 'formChecked' | 'formInvalid' | 'formError' | 'formProtection' | 'registerActions' | 'actionStub' | 'autoDefer'
 
-function kayAlias(helper: KayHelper): string {
-  return `Kay${helper[0]!.toUpperCase()}${helper.slice(1)}`
-}
-
 type Helper = TemplateHelper | 'omit'
 
 // The members of `TemplateHelpers` in src/runtime/checks.ts.
 type DeclaredHelper = Helper | 'staticFor' | 'Dynamic' | 'head' | 'Try'
-
-function helperAlias(helper: Helper): string {
-  return `Kay${helper[0]!.toUpperCase()}${helper.slice(1)}`
-}
 
 // A component call whose `class` merges several parts, which it gets as one string: a shorthand with a `class` expression, or a spread next to a shorthand or a `class`.
 function mergesComponentClass(element: ElementNode, source: string): boolean {
@@ -1440,17 +736,6 @@ function mergesComponentClass(element: ElementNode, source: string): boolean {
     return element.classes.length > 0 || attribute !== undefined
 
   return element.classes.length > 0 && attribute?.kind === 'expression'
-}
-
-// JSX attribute strings have no escapes, so pick a quote the value does not contain, or fall back to an expression.
-function quoteAttribute(value: string): string {
-  if (!value.includes('"'))
-    return `"${value}"`
-
-  if (!value.includes('\''))
-    return `'${value}'`
-
-  return `{${JSON.stringify(value)}}`
 }
 
 // `T extends Record<string, U>, const U = number` names `T` and `U`: the first identifier of each parameter, split at the commas outside any brackets.
@@ -1489,4 +774,11 @@ export function islandMessages(source: string, client = false): string {
     return `, ${JSON.stringify(keys)}, true`
 
   return keys.length > 0 ? `, ${JSON.stringify(keys)}` : ''
+}
+
+// The server values the template's `await` blocks render by name, which `load` defers.
+function deferredData(facts: TemplateFacts, server: ServerAnalysis | undefined): Set<string> {
+  const data = new Set(server?.data.map(binding => binding.name))
+
+  return new Set([...facts.awaited].filter(name => data.has(name)))
 }
