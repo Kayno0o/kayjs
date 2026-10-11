@@ -226,8 +226,20 @@ describe('stream() started from a handler', () => {
   afterAll(() => served.mockRestore())
 
   const until = async (ready: () => boolean) => {
-    for (let tries = 0; !ready() && tries < 100; tries++)
+    for (let waited = 0; !ready(); waited += 5) {
+      if (waited > 2_000)
+        throw new Error('timed out')
+
       await Bun.sleep(5)
+    }
+  }
+  const stopped = async () => Number(await (await site.fetch('/api/chat/forever/stopped')).text())
+  // The route's source stops a while after its run ends, longer under load: how many stopped once `count` did, or after 5 seconds.
+  const stopsReach = async (count: number) => {
+    for (let waited = 0; await stopped() < count && waited < 5_000; waited += 10)
+      await Bun.sleep(10)
+
+    return stopped()
   }
 
   it('waits idle for start(), each start opening a run with the options given then and forgetting the last', async () => {
@@ -250,34 +262,41 @@ describe('stream() started from a handler', () => {
 
   it('stops the route\'s source when closed, and starts again after', async () => {
     const forever = root(() => stream(chat, '/forever', { start: false }))
-    const stopped = async () => Number(await (await site.fetch('/api/chat/forever/stopped')).text())
     const before = await stopped()
 
     forever.start()
     await until(() => (forever.last() ?? 0) >= 2)
     forever.close()
     expect(forever.status()).toBe('closed')
-    await until(() => false)
-    expect(await stopped()).toBe(before + 1)
+    expect(await stopsReach(before + 1)).toBe(before + 1)
 
     forever.start()
     await until(() => (forever.last() ?? 0) >= 1)
     expect(forever.status()).toBe('open')
     forever.start()
-    await until(() => false)
-    expect(await stopped()).toBe(before + 2)
+    expect(await stopsReach(before + 2)).toBe(before + 2)
     forever.close()
+    // Its stop landing later would count for the next test.
+    expect(await stopsReach(before + 3)).toBe(before + 3)
   })
 
   it('stops the route\'s source once the island goes', async () => {
-    const stopped = async () => Number(await (await site.fetch('/api/chat/forever/stopped')).text())
     const before = await stopped()
-    const [forever, dispose] = root(dispose => [stream(chat, '/forever'), dispose] as const)
 
-    await until(() => (forever.last() ?? 0) >= 1)
-    dispose()
-    await until(() => false)
-    expect(await stopped()).toBe(before + 1)
+    // An island's browser, where the stream starts once mounted.
+    globalThis.document = { querySelector: () => null } as unknown as Document
+
+    try {
+      const [forever, dispose] = root(dispose => [stream(chat, '/forever'), dispose] as const)
+
+      await until(() => (forever.last() ?? 0) >= 1)
+      dispose()
+      expect(forever.status()).toBe('closed')
+      expect(await stopsReach(before + 1)).toBe(before + 1)
+    }
+    finally {
+      Reflect.deleteProperty(globalThis, 'document')
+    }
   })
 
   it('delivers nothing more of a run once a listener starts another, events left in its chunk included', async () => {
