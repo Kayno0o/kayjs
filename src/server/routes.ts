@@ -502,6 +502,16 @@ export function apiMounts(root: string, extensions: KayExtension[] = []): RouteM
   return extensions.flatMap(({ api }) => api ? [{ dir: throughLinks(root, resolve(root, api.dir)), prefix: mountPrefix(api.prefix) }] : [])
 }
 
+// The editor an extension in `extensions` gives, reached as its routes are; a site edits through one.
+export function extensionEditor(root: string, extensions: KayExtension[] = []): string | undefined {
+  const giving = extensions.filter(extension => extension.editor !== undefined)
+
+  if (giving.length > 1)
+    throw new Error(`kay: the extensions ${giving.map(extension => extension.name).join(' and ')} each give an editor, and a page shows one: list one of them in extensions`)
+
+  return giving[0] && throughLinks(root, resolve(root, giving[0].editor!))
+}
+
 // `/auth` for `auth`, `/auth/` and `/auth`; `''` for the root.
 function mountPrefix(prefix = '/'): string {
   const trimmed = prefix.replace(EDGE_SLASHES, '')

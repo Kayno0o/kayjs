@@ -7,6 +7,7 @@ import process from 'node:process'
 import { afterEach, describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { t } from 'elysia'
 import { outputDir } from '../src/build/assets'
+import { readClientSources } from '../src/build/client'
 import { collection, collections, entries, entrySource, removeEntry, saveEntry } from '../src/content'
 import { entryIssues, registerCollections, registerEditSite } from '../src/content/edit'
 import { contentPlace, parseEntry, setContentPlace } from '../src/content/load'
@@ -24,15 +25,18 @@ import { readClient, readManifest, writeManifest } from '../src/server/client'
 import { entryUrls } from '../src/server/entry-urls'
 import { prerenderPages } from '../src/server/prerender'
 import { inPreview, previewRequested, requestDrafts } from '../src/server/preview'
+import { extensionEditor } from '../src/server/routes'
 import { cms, resetCms } from './fixtures/cms/src/cms'
 import { articles, news, pages as pagesCollection } from './fixtures/cms/src/content.config'
 import { scratchDir } from './scratch'
 
 const FIXTURE = 'tests/fixtures/cms'
 const SECRET = 'a-preview-secret-long-enough-for-kay-0123456789'
-const options = { routes: `${FIXTURE}/src/routes`, content: `${FIXTURE}/src/content.config.ts`, api: `${FIXTURE}/src/api`, site: 'https://news.example', security: false as const, preview: { secret: SECRET } }
+const EDITOR = { name: 'editor', editor: `${FIXTURE}/src/components/draft-editor.kay` }
+const options = { routes: `${FIXTURE}/src/routes`, content: `${FIXTURE}/src/content.config.ts`, api: `${FIXTURE}/src/api`, site: 'https://news.example', security: false as const, preview: { secret: SECRET }, extensions: [EDITOR] }
 const app = await pages({ ...options, prebuilt: false })
 const COOKIE = /^kay_preview=([^;]+);/
+const HYDRATION_MARK = /<!--[[\]]-->/g
 
 async function get(path: string, cookie?: string): Promise<{ status: number, html: string, headers: Headers }> {
   const response = await app.handle(new Request(`http://localhost${path}`, { headers: cookie === undefined ? {} : { cookie } }))
@@ -336,7 +340,8 @@ describe('the collections a CMS edits', () => {
     await exporting([['odd', odd], ['slugless', slugless], ['broken', broken], ['titled', titled], ['failing', failing]], async () => {
       expect(await rejection(entries('odd'))).toMatchObject({ message: 'kay: odd\'s load gave string, not an array of entries' })
       expect(await rejection(entries('slugless'))).toMatchObject({ message: 'kay: slugless\'s load gave an entry with no slug: {"data":{}}' })
-      expect((await collections()).find(each => each.name === 'broken')).toMatchObject({ body: { kind: 'markdown' }, problem: 'the CMS is down' })
+      expect((await collections()).find(each => each.name === 'broken')).toMatchObject({ body: { kind: 'markdown' }, problem: 'kay: broken\'s load threw: the CMS is down' })
+      expect(await rejection(entries('broken'))).toMatchObject({ message: 'kay: broken\'s load threw: the CMS is down' })
       expect((await collections()).find(each => each.name === 'titled')).not.toHaveProperty('problem')
 
       const before = registerEditSite({ urls: async (_, entry) => `/route/${entry.slug}` })
@@ -505,6 +510,21 @@ describe('preview mode', () => {
     expect(plain).toBe((await get('/marks/launch')).html)
   })
 
+  it('renders the extension\'s editor last in edit mode alone, kept alive across pages, given each entry the page read', async () => {
+    const edit = await previewCookie(`/_kay/preview?path=/news&edit&secret=${SECRET}`)
+    const preview = await previewCookie(`/_kay/preview?path=/news&secret=${SECRET}`)
+    const editor = `${FIXTURE}/src/components/draft-editor.kay`
+    const slot = new RegExp(`<slot data-component="${editor}" data-props="[^"]+" data-persist="${editor}"><button class="count">[\\s\\S]*<ul class="edited">(.*)</ul></slot></body></html>$`)
+    const edited = async (path: string) => slot.exec((await get(path, edit)).html)?.[1]?.replaceAll(HYDRATION_MARK, '')
+
+    expect(await edited('/marks/launch')).toBe('<li>news:launch</li>')
+    expect(await edited('/news')).toBe('<li>news:launch</li><li>news:roadmap</li>')
+    expect(await edited('/articles/hello')).toBe('<li>articles:hello@fr</li>')
+    expect((await get('/marks/launch', preview)).html).not.toContain('draft-editor')
+    expect(() => extensionEditor('.', [EDITOR, { name: 'other', editor: 'other.kay' }])).toThrow('kay: the extensions editor and other each give an editor')
+    expect(await rejection(readClientSources(FIXTURE, { extensions: [{ name: 'static', editor: 'src/components/headline.kay' }] }))).toMatchObject({ message: expect.stringContaining('runs nothing in the browser') })
+  })
+
   it('marks a number once, a body around what it holds, and nothing written into a tag some other way or rendered by an island', () => {
     inPreview(() => {
       const marks = editMarks()!
@@ -614,6 +634,7 @@ describe('preview mode', () => {
       { collection: 'news', slug: 'roadmap', data: { title: 'T', published: true, tags: [] }, body: '<Callout>\nx' },
       { collection: 'news', slug: 'launch', locale: 'fr', data: { title: 'T', published: true, tags: [] } },
       { collection: 'articles', slug: 'hello', data: { title: 'T' } },
+      { collection: 'pages', slug: 'guide/index', data: { title: 'T', order: 1 } },
     ])
 
     expect(refused.status).toBe(422)
@@ -622,6 +643,7 @@ describe('preview mode', () => {
       { collection: 'news', slug: 'roadmap', path: '', body: true, message: '<Callout> is never closed: end it with </Callout>, or write <Callout /> on line 1' },
       { collection: 'news', slug: 'launch', locale: 'fr', path: '', key: 'locale', message: 'names a locale, which the collection is not localized by' },
       { collection: 'articles', slug: 'hello', path: '', key: 'locale', message: 'names no locale, which each entry of a localized collection has' },
+      { collection: 'pages', slug: 'guide/index', path: '', key: 'slug', message: 'has a slug whose file, guide/index, reads back as guide: write the entry as guide' },
     ] })
 
     const created = await post([{ collection: 'articles', slug: 'nouveau', locale: 'fr', data: { title: 'Nouveau' }, body: 'Tout neuf.' }], '/articles/nouveau')

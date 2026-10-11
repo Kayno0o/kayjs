@@ -15,7 +15,7 @@ import { apiStubs, apiTrees } from '../server/api'
 import { rebaseCss } from '../server/base'
 import { fromManifest, MANIFEST, PRERENDERED_DIR, writeManifest } from '../server/client'
 import { PUBLIC_ENV_PATH } from '../server/env'
-import { routeMounts } from '../server/routes'
+import { extensionEditor, routeMounts } from '../server/routes'
 import { ASSET_PREFIX, clientDir, outputDir } from './assets'
 import { findKayFiles, writeIfChanged } from './files'
 import { findKayLibraries, reachableLibraryFiles, reachesAny, sourceWords } from './libraries'
@@ -136,7 +136,9 @@ export async function readClientSources(root: string, options: ClientOptions = {
   const own = await findKayFiles(root, { project: true, ownKayOnly: true })
   // The pages of the libraries the app mounts, which it reaches through its config rather than an import.
   const ownFiles = new Set(own)
-  const mounted = (await Promise.all(routeMounts(root, options.extensions).map(async mount => existsSync(mount.dir) ? findKayFiles(mount.dir) : []))).flat().filter(file => !ownFiles.has(file))
+  const editor = extensionEditor(root, options.extensions)
+  const mountedFiles = (await Promise.all(routeMounts(root, options.extensions).map(async mount => existsSync(mount.dir) ? findKayFiles(mount.dir) : []))).flat()
+  const mounted = [...new Set([...mountedFiles, ...editor === undefined ? [] : [editor]])].filter(file => !ownFiles.has(file))
   const libraries = await findKayLibraries(root)
   const fromLibraries = await reachableLibraryFiles(root, libraries, [...own, ...mounted])
   const files = [...own, ...mounted, ...fromLibraries.components]
@@ -159,6 +161,8 @@ export async function readClientSources(root: string, options: ClientOptions = {
 
     if (compiled.island !== undefined)
       islands.set(compiled.island, file)
+    else if (file === editor)
+      throw new Error(`kay: the editor ${relative(root, file)} runs nothing in the browser, where an editor edits the page: give it a script reading signals, or a \`--- client\` fence`)
 
     for (const name of compiled.classes)
       classes.add(name)

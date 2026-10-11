@@ -326,7 +326,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('edit mode 
   it('shows a draft through the page swap, the island showing it kept alive, or where the schema refuses it', async () => {
     const secret = 'a-preview-secret-long-enough-for-kay-0123456789'
     const fixture = 'tests/fixtures/cms/src'
-    const cms = await testSite({ routes: `${fixture}/routes`, content: `${fixture}/content.config.ts`, api: `${fixture}/api`, preview: { secret }, browser: { path } })
+    const cms = await testSite({ routes: `${fixture}/routes`, content: `${fixture}/content.config.ts`, api: `${fixture}/api`, preview: { secret }, browser: { path }, extensions: [{ name: 'editor', editor: `${fixture}/components/draft-editor.kay` }] })
 
     try {
       const editor = await cms.open(`/_kay/preview?path=/marks/launch&edit&secret=${secret}`)
@@ -338,6 +338,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('edit mode 
 
       expect(await editor.text('article h2')).toBe('Drafted')
       expect(await editor.text('button.count')).toBe('Clicked 1')
+      expect(await editor.text('ul.edited')).toBe('news:launch')
       expect(await editor.path()).toBe('/marks/launch')
 
       await editor.click('button.refused')
@@ -353,6 +354,9 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('edit mode 
 
       expect(await editor.text('h1')).toBe('Next year')
       expect(await editor.path()).toBe('/marks/roadmap')
+      // The editor lived on through the navigation, given the entries of the page gone to.
+      expect(await editor.text('button.count')).toBe('Clicked 1')
+      expect(await editor.text('ul.edited')).toBe('news:roadmap')
       expect(editor.errors).toEqual([])
     }
     finally {

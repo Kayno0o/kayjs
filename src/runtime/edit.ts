@@ -1,3 +1,4 @@
+import type { EntryRef } from './fields'
 import { withBase, withoutBase } from './base'
 import { navigation } from './navigation'
 import { DRAFT_ROUTE, NAVIGATE_HEADER } from './swap'
@@ -21,6 +22,13 @@ export interface DraftIssue {
   body?: true
   key?: 'slug' | 'locale'
   message: string
+}
+
+export type { EntryRef }
+
+// What an extension's `editor` is given: each entry the page read, by the name the content config exports its collection under, those its head and attributes read included.
+export interface EditorProps {
+  entries: EntryRef[]
 }
 
 let latest: AbortController | undefined

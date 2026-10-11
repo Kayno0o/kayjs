@@ -1,6 +1,10 @@
 ---
+import type { EditorProps } from 'kay/edit'
 import { signal } from 'kay'
 import { showDraft } from 'kay/edit'
+
+// The editor the test extension gives, which every page renders in edit mode.
+const { entries } = props<EditorProps>()
 
 const clicks = signal(0)
 const issues = signal('')
@@ -11,3 +15,6 @@ button.draft(onClick={async () => draft({ title: 'Draft title', published: true,
 button.refused(onClick={async () => draft({ title: 3, published: true, tags: [] })}) Refused
 button.slow(onClick={async () => draft({ title: 'Slow draft', published: true, tags: [] })}) Slow
 p.issues {issues()}
+ul.edited
+  for entry of entries
+    li {entry.collection}:{entry.slug}{entry.locale === undefined ? '' : `@${entry.locale}`}

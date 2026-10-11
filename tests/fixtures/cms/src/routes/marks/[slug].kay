@@ -8,7 +8,6 @@ const { Content } = entry
 if (entry.data.title === 'Slow draft')
   await Bun.sleep(500)
 --- script
-import DraftEditor from '../../components/draft-editor.kay'
 import Headline from '../../components/headline.kay'
 import IslandTitle from '../../components/island-title.kay'
 ---
@@ -22,7 +21,6 @@ ul
 textarea Draft: {entry.data.title}
 article
   Content
-DraftEditor
 a.away(href="/marks/roadmap") Away
 IslandTitle(title={entry.data.title})
   em.slotted {entry.data.title}

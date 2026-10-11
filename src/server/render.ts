@@ -2,6 +2,7 @@ import type { KayConfig } from '../config'
 import type { ErrorPageContext, FailureOf, Locals, PageContext, PageError, SuccessOf } from '../runtime'
 import type { Outcome } from '../runtime/action'
 import type { PendingBlock } from '../runtime/await.server'
+import type { EditorProps } from '../runtime/edit'
 import type { HeadOptions, RenderedHead } from '../runtime/head'
 import type { ServerIslandMode } from '../runtime/html'
 import type { Locale } from '../runtime/i18n'
@@ -23,11 +24,12 @@ import { collectForms, OUTCOME_SCRIPT } from '../runtime/action'
 import { escapeAttribute } from '../runtime/escape'
 import { editMarks, placeFieldMarks, withFieldMarks } from '../runtime/fields'
 import { collectHead } from '../runtime/head'
-import { component, newServerIslands, withServerIslands } from '../runtime/html'
+import { child, component, newServerIslands, withServerIslands } from '../runtime/html'
 import { textDirection } from '../runtime/i18n'
 import { DEFAULT_MAX_DENSITY, RESOLVED_META } from '../runtime/image'
 import { localeState } from '../runtime/locale-state'
 import { kayLog } from '../runtime/log'
+import { editing } from '../runtime/preview'
 import { encodeValue, unsendable } from '../runtime/wire'
 import { rebaseHtml } from './base'
 import { importModule } from './bundle'
@@ -57,10 +59,18 @@ interface PageModule {
   load?: (ctx: PageContext<Record<string, unknown>>) => Promise<Record<string, unknown>>
 }
 
+// An island's module, whose `persist` keeps it alive across the page swap.
+interface EditorModule {
+  default: (props: EditorProps & { persist: true }) => unknown
+}
+
 type Loaded = PromiseSettledResult<Record<string, unknown>>
 // What a render writes; a prerendered page also goes out as its file.
 type Written = string | Uint8Array<ArrayBuffer> | ReadableStream<Uint8Array>
 type Body = Written | Bun.BunFile
+
+// The editor's module by its file, imported before a page in edit mode renders, which does not wait.
+const editors = new Map<string, EditorModule>()
 
 // HTML under the mount point already, as `kay build` rendered it or a server island's was rebased, which goes out as it is.
 class Rebased {
@@ -108,6 +118,8 @@ export interface RenderOptions {
   serverTiming?: boolean | undefined
   // Registers the service worker `offline` turns on.
   offline?: boolean | undefined
+  // The `.kay` island an extension gives as `editor`, which a page in edit mode renders last.
+  editor?: string | undefined
 }
 
 // What Elysia hands a route handler, derived and resolved values included; pages see it whole as `ctx.locals`.
@@ -179,7 +191,7 @@ async function loadRoute(route: ServedRoute, rendering: Rendering, client: Clien
   const loaded = new Map<string, Loaded>()
 
   try {
-    const modules = await importAll(files)
+    const modules = await importAll(files, options)
     // Read once the guards let the request through, so a refused query never renders what they protect; the layouts see the page's.
     const query = pageSetting(modules.at(-1)!, 'query')
 
@@ -536,7 +548,7 @@ async function renderSpecialPage(page: SpecialPage, rendering: Rendering, loaded
 
   for (const files of layoutsFailed ? [[page.file]] : [[...page.layouts, page.file], [page.file]]) {
     try {
-      const modules = await importAll(files)
+      const modules = await importAll(files, options)
 
       return renderDocument(files, modules, await runLoads(files, modules, rendering.ctx, loaded), client, rendering, options)
     }
@@ -556,7 +568,10 @@ function pageHead(page: PageModule, head: HeadOptions | undefined): HeadOptions 
   return { ...head, defaults: [...head?.defaults ?? [], { tag: 'meta', props: { name: 'robots', content: 'noindex' } }] }
 }
 
-async function importAll(files: string[]): Promise<PageModule[]> {
+async function importAll(files: string[], options: RenderOptions): Promise<PageModule[]> {
+  if (options.editor !== undefined && editing())
+    editors.set(options.editor, await importModule<EditorModule>(options.editor))
+
   return Promise.all(files.map(async file => importModule<PageModule>(file)))
 }
 
@@ -591,7 +606,10 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
   const scan = options.prerendering ? newServerIslands(true) : undefined
   // In edit mode the page's markup is marked with the fields of the entries it renders, once whole.
   const marks = editMarks()
-  const { result: { result: { html: body, islands, deferred }, head }, forms } = withFieldMarks(marks, () => collectForms(() => collectHead(() => scan ? withServerIslands(scan, () => renderStatic(view)) : renderStatic(view), pageHead(modules[page]!, options.head?.(rendering.ctx.url, rendering.status)))))
+  const editor = marks === undefined || options.editor === undefined ? undefined : editors.get(options.editor)
+  // The editor renders once the page did, given each entry the page read, kept alive by the page swap, which hands it the next page's.
+  const shown = editor === undefined ? view : () => ({ t: child(view()) + child(editor.default({ entries: [...marks!.entries.values()], persist: true })) })
+  const { result: { result: { html: body, islands, deferred }, head }, forms } = withFieldMarks(marks, () => collectForms(() => collectHead(() => scan ? withServerIslands(scan, () => renderStatic(shown)) : renderStatic(shown), pageHead(modules[page]!, options.head?.(rendering.ctx.url, rendering.status)))))
   const streamed = deferred.length > 0
   const hasIslands = client.entry !== undefined && islands.count > 0
   // A page posting forms to actions loads the entry too, which sends them without a reload; a page with neither still ships no JavaScript, and links from it load pages, losing no state.

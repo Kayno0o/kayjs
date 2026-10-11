@@ -391,7 +391,14 @@ async function readEntry(dir: string, file: string): Promise<{ data: unknown, bo
 }
 
 async function loadedEntries(name: string, collection: Collection<unknown>): Promise<Omit<SourceEntry, 'draft'>[]> {
-  const loaded: unknown = await collection.loader!.load({ preview: true })
+  let loaded: unknown
+
+  try {
+    loaded = await collection.loader!.load({ preview: true })
+  }
+  catch (error) {
+    throw new Error(`kay: ${name}'s load threw: ${error instanceof Error ? error.message : String(error)}`, { cause: error })
+  }
 
   if (!Array.isArray(loaded))
     throw new Error(`kay: ${name}'s load gave ${typeof loaded}, not an array of entries`)

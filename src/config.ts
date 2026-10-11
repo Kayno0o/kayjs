@@ -280,6 +280,8 @@ export interface KayExtension<Server extends AnyElysia = AnyElysia> {
   api?: { dir: string, prefix?: string | undefined } | undefined
   // A directory of message catalogs, `<locale>.ts` each, under the app's own: a key the app translates is the app's.
   messages?: string | undefined
+  // A `.kay` island every page renders at the end of its body in edit mode alone, kept alive across navigations, given `{ entries }`: each entry the page read, as `kay/edit`'s `EditorProps` types them. Absolute, or relative to the project root; one extension at most gives one.
+  editor?: string | undefined
   // Called with each page `kay build` prerenders, once the files it links are written and before it is compressed, and again when the server renders it afresh: returns the HTML to write.
   transformPage?: PageHook | undefined
 }
