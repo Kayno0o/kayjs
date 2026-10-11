@@ -224,3 +224,27 @@ test('a Markdown file whose frontmatter does not parse opens with its body kept'
     await rm(file, { force: true })
   }
 })
+
+// A 1x1 PNG, which kay's storage reads the size of.
+const PIXEL = Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAwS2OUAAAAABJRU5ErkJggg=='), char => char.charCodeAt(0))
+
+test('an upload is stored in its collection\'s folder, answered by the path that serves it', async () => {
+  const form = new FormData()
+
+  form.append('file', new File([PIXEL], 'pixel.png', { type: 'image/png' }))
+
+  const response = await site.fetch('/api/cms/files/products', { method: 'POST', body: form })
+  const { path } = await response.json() as { path: string }
+
+  expect(path).toMatch(/^\/_kay\/files\/products\/\w+\.1x1\.png$/)
+  expect(new Uint8Array(await (await site.fetch(path)).arrayBuffer())).toEqual(PIXEL)
+  expect((await site.fetch('/api/cms/files/nope', { method: 'POST', body: form })).status).toBe(404)
+})
+
+test('an image field previews what it holds, takes a drop or a pick, and still a typed path', async () => {
+  const page = await site.visit('/admin/collections/products/mug')
+
+  expect(page.find('[data-kcms-path]').map(field => field.attributes['data-kcms-path'])).toEqual(['name', 'photo'])
+  expect(page.find('[data-kcms-path="photo"] .kcms-file-drop')).toHaveLength(1)
+  expect(page.find('[data-kcms-path="photo"] input[aria-label="Path"]')).toHaveLength(1)
+})

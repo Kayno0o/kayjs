@@ -12,6 +12,8 @@ import Toggle from '@kaynooo/kayjs-ui/toggle.kay'
 import { emptyValue } from '../fields'
 import { joinPath } from '../paths'
 import FieldInput from './field-input.kay'
+import FileInput from './file-input.kay'
+import './fields.css'
 
 const { drafts, entry, field, path } = props<{ drafts: Drafts, entry: EntryRef, field: Field, path: string }>()
 
@@ -74,6 +76,9 @@ function setJson(next: string): void {
     when 'select'
       FormField(label={current.label} hint={current.hint} issue={issue()} required={current.required})
         Select(value={text()} options={current.options} emptyOption={!current.required} onChange={next => set(current.options.find(option => option.value === next)?.raw)})
+    when 'image', 'file'
+      FormField(label={current.label} hint={current.hint} issue={issue()} required={current.required} group)
+        FileInput(value={text()} image={current.kind === 'image'} collection={entry.collection} onChange={set})
     when 'json'
       FormField(label={current.label} hint={current.hint ?? 'JSON'} issue={issue()} required={current.required})
         textarea.kui-field-input.kcms-json(rows="4" value={value() === undefined ? '' : JSON.stringify(value(), null, 2)} onChange={event => setJson(event.currentTarget.value)})

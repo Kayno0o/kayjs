@@ -43,6 +43,8 @@ The screens live at `/admin` (`prefix` moves them) and stay closed without a `gu
 
 A commit shows on the site once it has rebuilt from it. The Forgejo token needs write access to the repository's contents; the commit is the token's user's. The server reads a folder collection's entries from its source files, so they ship with it: kay refuses to edit a folder missing from a build alone, or lying outside the repository.
 
+An image or file field (`imageField()`, `fileField()` from `kay/content`) takes a file dropped or picked, stored through kay's file storage, and keeps the path that serves it, so a page renders it as `img(src={entry.data.photo})`; a path typed in works too. kay keeps files in `data/files` by default: a deployed site sets `storage` in kay.config.ts to an S3 store or a disk that outlives a deploy.
+
 An app replaces a screen by writing a page at its path, `src/routes/admin/new/[collection].kay` say, and can render the screens' own `@kaynooo/kayjs-cms/entry-editor.kay` and `@kaynooo/kayjs-cms/entry-table.kay` in it.
 
 ## Develop

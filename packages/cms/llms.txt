@@ -9,6 +9,7 @@
 - Outside edit mode the page is unchanged and the editor is not rendered.
 - Draft rendering happens on the server: the editor sends the changed entries, kay renders the page with them and swaps it in, islands kept.
 - Every change goes through one API, `POST` and `DELETE /api/cms/entries/:collection/:slug` and `POST …/:slug/publish`, from the sidebar and from the screens alike. kay validates the data against the schema and names the file; kay writes nothing, the configured `files` saver does.
+- An `imageField()` or `fileField()` holds a path the site serves. A file dropped or picked on it goes to `POST /api/cms/files/:collection`, 20 MB at most, which stores it public through kay's `files.put` in a folder named for the collection, and the field keeps `files.url(key)`, `/_kay/files/<key>`; a typed path works as well, so a page renders either with `img(src={entry.data.photo})`. Replacing a file leaves the old one stored.
 - The app's root layout renders kayjs-ui's `Toaster` and `TooltipHost` and imports its theme; it wraps the screens too, so kayjs-cms renders neither, which would show each toast twice.
 - The screens are closed without a `guard`: kayjs-cms has no users of its own.
 - Edit mode is kay's preview mode, so the app sets `preview.secret`. The API admits a request when `editRequested(request)` from `kay/server` says so, or the guard does.

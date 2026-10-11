@@ -1,5 +1,5 @@
 import { s } from 'kay'
-import { collection } from 'kay/content'
+import { collection, imageField } from 'kay/content'
 import { outage, products as stock } from './products'
 
 export const posts = collection('content/posts', {
@@ -23,5 +23,5 @@ export const products = collection({
     stock.splice(0, stock.length, ...stock.filter(product => product.slug !== entry.slug))
   },
 }, {
-  schema: s.Object({ name: s.String({ minLength: 1 }) }),
+  schema: s.Object({ name: s.String({ minLength: 1 }), photo: s.Optional(imageField()) }),
 })

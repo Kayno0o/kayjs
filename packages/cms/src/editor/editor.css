@@ -88,22 +88,6 @@
   overflow-wrap: anywhere;
 }
 
-.kcms-list-item {
-  display: flex;
-  align-items: start;
-  gap: 0.25rem;
-}
-
-.kcms-list-item > .kcms-field {
-  flex: 1;
-  min-width: 0;
-}
-
-.kcms-json {
-  font-family: ui-monospace, monospace;
-  font-size: 0.8rem;
-}
-
 /* The page makes room for the open editor beside it, and shows what a click would edit. */
 @media (min-width: 64rem) {
   html.kcms-editing body {
