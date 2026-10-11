@@ -636,6 +636,29 @@ describe('transitions', () => {
     }
   })
 
+  it('play a for fallback in once its rows went, and out as rows come back', async () => {
+    const { root, dispose } = await mountKay({
+      'main.kay': `---\nimport { signal } from 'kay'\n\nconst items = signal(['a'])\n---\nbutton.clear(onClick={() => items.set([])}) Clear\nbutton.add(onClick={() => items.set(['b'])}) Add\nul\n  for item of items() key={item}\n    li.row {item}\n  else\n    li.empty(transition="fade" ${STYLE}) None\n`,
+    })
+
+    try {
+      root.querySelector<HTMLElement>('button.clear')!.click()
+      await updated()
+      const empty = root.querySelector('.empty')!
+
+      expect(empty.className).toBe('empty fade-enter-from fade-enter-active')
+      await done()
+      root.querySelector<HTMLElement>('button.add')!.click()
+      await updated()
+      expect([empty.className, empty.isConnected, root.querySelector('.row')?.textContent]).toEqual(['empty fade-leave-from fade-leave-active', true, 'b'])
+      await done()
+      expect(empty.isConnected).toBe(false)
+    }
+    finally {
+      await dispose()
+    }
+  })
+
   it('skip both phases when the user asks for reduced motion', async () => {
     const matchMedia = spyOn(window, 'matchMedia').mockImplementation(query => ({ matches: query === '(prefers-reduced-motion: reduce)' }) as MediaQueryList)
     const { root, dispose } = await mountKay({ 'main.kay': toggled(true, `p.panel(transition="fade" ${STYLE}) Hi`) })

@@ -537,8 +537,40 @@ export function insert(element: Node | null, start: Node | null, end: Node | nul
   })
 }
 
-// Swaps the unit a dynamic part holds for the one `render` builds, claimed instead when hydrating; `entering` when the block showed something before, so what it shows now plays its enter phase.
-function show(region: Region, previous: Unit[], render: () => unknown, entering = false): Unit[] {
+// What a block shows in its region, the root it built that under when it owns one, and whether it rendered before, so what it shows next plays its enter phase.
+interface Block {
+  region: Region
+  units: Unit[]
+  dispose: (() => void) | undefined
+  rendered: boolean
+}
+
+function blockIn(region: Region): Block {
+  return { region, units: [], dispose: undefined, rendered: false }
+}
+
+// Shows what `render` returns in place of what the block showed, claimed instead when hydrating; `owned` builds it under a root of its own, disposed when the block shows something else.
+function swap(block: Block, render: () => unknown, owned = false): void {
+  const entering = block.rendered
+
+  release(block)
+  block.units = owned
+    ? root((dispose) => {
+      block.dispose = dispose
+
+      return show(block.region, block.units, render, entering)
+    })
+    : show(block.region, block.units, render, entering)
+  block.rendered = true
+}
+
+function release(block: Block): void {
+  block.dispose?.()
+  block.dispose = undefined
+}
+
+// Swaps the units a region holds for the ones `render` builds, claimed instead when hydrating; `entering` plays the enter phase of what it shows.
+function show(region: Region, previous: Unit[], render: () => unknown, entering: boolean): Unit[] {
   if (claim)
     return claimUnits(region, render)
 
@@ -560,7 +592,7 @@ function show(region: Region, previous: Unit[], render: () => unknown, entering 
 
 // An `if` chain: the first branch whose test passes renders, built again only when another branch takes over; a branch naming its value reads it through a function.
 export function branches(element: Node | null, start: Node | null, end: Node | null, list: [test: (() => unknown) | null, render: (value: () => unknown) => unknown][]): void {
-  const region = new Region(element, start, end)
+  const block = blockIn(new Region(element, start, end))
   const chosen = memo<[number, unknown]>(() => {
     for (const [index, [test]] of list.entries()) {
       const value = test ? test() : true
@@ -573,14 +605,11 @@ export function branches(element: Node | null, start: Node | null, end: Node | n
   }, { equals: (previous, next) => previous[0] === next[0] && previous[1] === next[1] })
   const index = memo(() => chosen()[0])
   const value = () => chosen()[1]
-  let current: Unit[] = []
-  let started = false
 
   renderEffect(() => {
     const selected = index()
 
-    current = untrack(() => unrecorded(() => show(region, current, () => selected < 0 ? null : list[selected]![1](value), started)))
-    started = true
+    untrack(() => unrecorded(() => swap(block, () => selected < 0 ? null : list[selected]![1](value))))
   })
 }
 
@@ -601,152 +630,106 @@ export function rowKey(item: unknown): unknown {
 // A row reads its item through a function, and its index through one too when keyed, so a row kept across renders follows the new values.
 export function loop<T>(element: Node | null, start: Node | null, end: Node | null, each: () => readonly T[] | null | undefined | false, key: ((item: T) => unknown) | false, render: (item: () => T, index: (() => number) | number) => unknown, fallback?: () => unknown): void {
   const region = new Region(element, start, end)
+  // The fallback, and whether the loop rendered before, so the rows it makes then play their enter phase.
+  const empty = blockIn(region)
+  const built: Row[] = []
   let rows: Row[] = []
-  let fallbackUnits: Unit[] | undefined
-  let disposeFallback: (() => void) | undefined
 
   onCleanup(() => {
     for (const row of rows)
       row.dispose()
 
-    disposeFallback?.()
+    release(empty)
   })
 
-  const makeRow = (item: T, index: number, rowKey: unknown): Row => unrecorded(() => root((dispose) => {
-    const [readItem, setItem] = createSignal(item)
-    let setIndex: ((index: number) => void) | undefined
-    let readIndex: (() => number) | number = index
+  const makeRow = (item: T, index: number, rowKey: unknown): Row => {
+    const row = unrecorded(() => root((dispose): Row => {
+      const [readItem, setItem] = createSignal(item)
+      let setIndex: ((index: number) => void) | undefined
+      let readIndex: (() => number) | number = index
 
-    if (key !== false) {
-      const [read, write] = createSignal(index)
+      if (key !== false) {
+        const [read, write] = createSignal(index)
 
-      readIndex = read
-      setIndex = write
-    }
+        readIndex = read
+        setIndex = write
+      }
 
-    const value = render(readItem, readIndex)
-    const made = units(value)
+      const value = render(readItem, readIndex)
+      const made = units(value)
 
-    return { key: rowKey, unit: made.length === 0 ? null : made.length === 1 ? made[0]! : new Range(firstOf(made[0]!), lastOf(made.at(-1)!)), setItem: setItem as (item: unknown) => void, setIndex, dispose }
-  }))
+      return { key: rowKey, unit: made.length === 0 ? null : made.length === 1 ? made[0]! : new Range(firstOf(made[0]!), lastOf(made.at(-1)!)), setItem: setItem as (item: unknown) => void, setIndex, dispose }
+    }))
 
-  const showFallback = (on: boolean, entering: boolean) => {
-    if (on && !fallbackUnits && fallback) {
-      fallbackUnits = root((dispose) => {
-        disposeFallback = dispose
+    built.push(row)
 
-        return show(region, [], fallback, entering)
-      })
-    }
-    else if (!on && fallbackUnits) {
-      for (const unit of fallbackUnits)
-        removeUnit(unit)
-
-      disposeFallback?.()
-      fallbackUnits = undefined
-      disposeFallback = undefined
-    }
+    return row
   }
-
-  let started = false
 
   renderEffect(() => {
     const items = each()
     const list = items === false || items == null ? [] : items
 
     untrack(() => {
-      if (!started) {
-        started = true
+      const entering = empty.rendered
 
-        if (claim) {
-          rows = region.claim(() => list.map((item, index) => makeRow(item, index, key === false ? index : key(item))))
-          showFallback(list.length === 0, false)
+      rows = claim && !entering ? region.claim(() => list.map((item, index) => makeRow(item, index, key === false ? index : key(item)))) : reconcileRows(region, rows, list, key, makeRow)
 
-          return
-        }
-
-        rows = reconcileRows(region, rows, list, key, makeRow, false)
-        showFallback(list.length === 0, false)
-
-        return
+      if (entering) {
+        for (const row of built)
+          entered(row.unit)
       }
 
-      rows = reconcileRows(region, rows, list, key, makeRow, true)
-      showFallback(list.length === 0, true)
+      built.length = 0
+
+      // Owning a root of its own, the fallback shows while it has one.
+      if (list.length === 0 && !empty.dispose && fallback)
+        swap(empty, fallback, true)
+      else if (list.length > 0 && empty.dispose)
+        swap(empty, () => null)
+
+      empty.rendered = true
     })
   })
 }
 
-// `entering` once the loop rendered before: the rows it makes then play their enter phase.
-function reconcileRows<T>(region: Region, previous: Row[], list: readonly T[], key: ((item: T) => unknown) | false, makeOwnRow: (item: T, index: number, key: unknown) => Row, entering: boolean): Row[] {
-  const made: Row[] = []
-  const makeRow = (item: T, index: number, rowKey: unknown) => {
-    const row = makeOwnRow(item, index, rowKey)
-
-    made.push(row)
-
-    return row
-  }
-  const placed = <R>(rows: R) => {
-    if (entering) {
-      for (const row of made)
-        entered(row.unit)
-    }
-
-    return rows
-  }
-
+function reconcileRows<T>(region: Region, previous: Row[], list: readonly T[], key: ((item: T) => unknown) | false, makeRow: (item: T, index: number, key: unknown) => Row): Row[] {
   if (list.length === 0) {
-    if (previous.length > 0) {
-      for (const row of previous)
-        row.dispose()
-
-      // Clearing the element at once would cut the leave phase of a row playing one.
-      if (region.start || previous.some(row => animated(row.unit))) {
-        for (const row of previous) {
-          if (row.unit)
-            removeUnit(row.unit)
-        }
-      }
-      else {
-        region.clear()
-      }
-    }
+    removeRows(region, previous, true)
 
     return []
   }
 
-  // By position: the first rows take the new items, the rest come and go at the end.
-  if (key === false) {
-    const next: Row[] = []
+  return key === false ? positionalRows(region, previous, list, makeRow) : keyedRows(region, previous, list, key, makeRow)
+}
 
-    for (const [index, item] of list.entries()) {
-      const row = previous[index]
+// By position: the first rows take the new items, the rest come and go at the end.
+function positionalRows<T>(region: Region, previous: Row[], list: readonly T[], makeRow: (item: T, index: number, key: unknown) => Row): Row[] {
+  const next: Row[] = []
 
-      if (row) {
-        row.setItem(item)
-        next.push(row)
-      }
-      else {
-        const made = makeRow(item, index, index)
+  for (const [index, item] of list.entries()) {
+    const row = previous[index]
 
-        if (made.unit)
-          region.insert(made.unit)
-
-        next.push(made)
-      }
+    if (row) {
+      row.setItem(item)
+      next.push(row)
     }
+    else {
+      const made = makeRow(item, index, index)
 
-    for (const row of previous.slice(list.length)) {
-      row.dispose()
+      if (made.unit)
+        region.insert(made.unit)
 
-      if (row.unit)
-        removeUnit(row.unit)
+      next.push(made)
     }
-
-    return placed(next)
   }
 
+  removeRows(region, previous.slice(list.length), false)
+
+  return next
+}
+
+function keyedRows<T>(region: Region, previous: Row[], list: readonly T[], key: (item: T) => unknown, makeRow: (item: T, index: number, key: unknown) => Row): Row[] {
   const keys = list.map(key)
   const update = (row: Row, index: number) => {
     row.setItem(list[index])
@@ -783,7 +766,7 @@ function reconcileRows<T>(region: Region, previous: Row[], list: readonly T[], k
   }
 
   const middle: Row[] = []
-  let fresh = 0
+  let added = 0
 
   for (let index = start; index < newEnd; index++) {
     const row = byKey.get(keys[index])
@@ -795,24 +778,14 @@ function reconcileRows<T>(region: Region, previous: Row[], list: readonly T[], k
     }
     else {
       middle.push(makeRow(list[index]!, index, keys[index]))
-      fresh++
+      added++
     }
   }
 
-  // Every old row goes: the whole content is cleared at once, unless a row plays its leave phase.
-  if (byKey.size === previous.length && !region.start && !previous.some(row => animated(row.unit))) {
-    for (const row of previous)
-      row.dispose()
-
-    region.clear()
-    byKey.clear()
-  }
-
-  for (const row of byKey.values())
-    removeRow(row)
+  removeRows(region, [...byKey.values()], byKey.size === previous.length)
 
   // Only new rows between what stays: one insertion.
-  if (fresh === middle.length) {
+  if (added === middle.length) {
     const holder = document.createDocumentFragment()
 
     for (const row of middle) {
@@ -828,7 +801,22 @@ function reconcileRows<T>(region: Region, previous: Row[], list: readonly T[], k
     moveRows(region.parent, previous.slice(start, oldEnd).filter(row => kept.has(row)), middle, after)
   }
 
-  return placed([...previous.slice(0, start), ...middle, ...previous.slice(oldEnd)])
+  return [...previous.slice(0, start), ...middle, ...previous.slice(oldEnd)]
+}
+
+// Takes rows out; when they are all the region holds, its whole content is cleared at once, unless a row plays its leave phase, which that would cut.
+function removeRows(region: Region, rows: Row[], all: boolean): void {
+  if (all && rows.length > 0 && !region.start && !rows.some(row => animated(row.unit))) {
+    for (const row of rows)
+      row.dispose()
+
+    region.clear()
+
+    return
+  }
+
+  for (const row of rows)
+    removeRow(row)
 }
 
 function removeRow(row: Row): void {
@@ -939,46 +927,35 @@ function moveRows(parent: Node, kept: Row[], next: Row[], after: Node | null): v
 
 // An `await` block: the pending block while the value is a promise, then the `then` or `catch` block once it settles; a plain value renders `then` at once.
 export function awaited(element: Node | null, start: Node | null, end: Node | null, value: () => unknown, pending: (() => unknown) | undefined, ready: (value: unknown) => unknown, failed: ((error: unknown) => unknown) | undefined): void {
-  const region = new Region(element, start, end)
-  let current: Unit[] = []
+  const block = blockIn(new Region(element, start, end))
   let version = 0
-  let started = false
 
   renderEffect(() => {
     const settled = value()
     const own = ++version
-    const entering = started
 
-    started = true
     untrack(() => {
       if (!(settled instanceof Promise)) {
-        current = unrecorded(() => show(region, current, () => ready(settled), entering))
+        unrecorded(() => swap(block, () => ready(settled)))
 
         return
       }
 
-      // The pending block and the block replacing it each own what they create, so landing disposes the pending one.
-      let dispose: (() => void) | undefined
       // Where the block was declared, for one landing later to read what was provided there.
       const parent = getOwner()
 
       // Gone before the promise settles, the block never lands.
       onCleanup(() => {
         version++
-        dispose?.()
+        release(block)
       })
 
-      const block = (render: () => unknown, entering: boolean) => root((disposeBlock) => {
-        dispose?.()
-        dispose = disposeBlock
-        current = unrecorded(() => show(region, current, render, entering))
-      })
-
-      block(() => pending?.(), entering)
+      // The pending block and the block replacing it each own what they create, so landing disposes the pending one.
+      unrecorded(() => swap(block, () => pending?.(), true))
 
       const land = (render: () => unknown) => {
         if (own === version)
-          runWithOwner(parent, () => block(render, true))
+          runWithOwner(parent, () => unrecorded(() => swap(block, render, true)))
       }
 
       // A `then` block that throws while rendering is not the promise failing, so it stays out of the catch.
@@ -1013,13 +990,12 @@ export function attempt(element: Node | null, start: Node | null, end: Node | nu
   if (claim && failedOnServer(region))
     return
 
-  let current: Unit[] = []
+  const block = blockIn(region)
   let failed = false
-  let disposeBlock: (() => void) | undefined
-  let disposeFallback: (() => void) | undefined
+  let disposeContent: (() => void) | undefined
   const parent = getOwner()
 
-  onCleanup(() => disposeFallback?.())
+  onCleanup(() => release(block))
 
   const fail = (error: unknown) => {
     reportError(error, islandOf(region.parent))
@@ -1028,24 +1004,20 @@ export function attempt(element: Node | null, start: Node | null, end: Node | nu
       return
 
     failed = true
-    disposeBlock?.()
+    disposeContent?.()
     // What the block built, or claimed before it threw, goes; the fallback is built afresh.
     region.clear()
-    current = []
+    block.units = []
 
-    if (fallback) {
-      runWithOwner(parent, () => root((dispose) => {
-        disposeFallback = dispose
-        current = unrecorded(() => fresh(() => show(region, [], () => fallback(error))))
-      }))
-    }
+    if (fallback)
+      runWithOwner(parent, () => unrecorded(() => fresh(() => swap(block, () => fallback(error), true))))
   }
 
   catchError((dispose) => {
-    disposeBlock = dispose
+    disposeContent = dispose
 
     try {
-      current = show(region, current, render)
+      swap(block, render)
     }
     catch (error) {
       // Markup the island would not claim is the island's to recover from, rendering it afresh, not the block's to fall back from.
