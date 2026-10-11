@@ -16,7 +16,8 @@ export function throughLinks(root: string, file: string): string {
   if (!links)
     linkedPackages.set(root, links = [...packageLinks(join(root, 'node_modules')), ...rootLink(root)])
 
-  const found = links.find(([real]) => file.startsWith(real + sep))
+  // The deepest: a library repository linking itself into an example app holds that app's real root too.
+  const found = links.reduce<[string, string] | undefined>((best, link) => file.startsWith(link[0] + sep) && link[0].length > (best?.[0].length ?? -1) ? link : best, undefined)
 
   return found ? join(found[1], relative(found[0], file)) : file
 }

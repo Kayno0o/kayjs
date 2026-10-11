@@ -154,6 +154,20 @@ describe('throughLinks', () => {
     expect(throughLinks(app, join(tree, 'elsewhere/c.kay'))).toBe(join(tree, 'elsewhere/c.kay'))
     expect(throughLinks(app, join(app, 'src/d.kay'))).toBe(join(app, 'src/d.kay'))
   })
+
+  it('names a file under a linked root by the root, inside a package linking an ancestor of it too, as a library repository linking itself into its example does', async () => {
+    const repo = await scratchDir('dom-')
+    const example = join(repo, 'examples/app')
+    const link = join(repo, 'app-link')
+
+    projects.push(repo)
+    await write(repo, { 'src/lib.kay': 'p lib\n', 'examples/app/src/x.kay': 'p x\n', 'examples/app/node_modules/.keep': '' })
+    await symlink('../../..', join(example, 'node_modules/repo'))
+    await symlink(example, link)
+
+    expect(throughLinks(link, join(example, 'src/x.kay'))).toBe(join(link, 'src/x.kay'))
+    expect(throughLinks(link, join(repo, 'src/lib.kay'))).toBe(join(link, 'node_modules/repo/src/lib.kay'))
+  })
 })
 
 describe('kay libraries', () => {
