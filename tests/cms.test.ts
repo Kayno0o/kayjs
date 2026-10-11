@@ -257,6 +257,9 @@ describe('the collections a CMS edits', () => {
       { collection: 'articles', slug: '../escape', path: 'title', message: expect.any(String) },
     ] })
     expect(await rejection(entrySource('news', 'launch', {}))).toMatchObject({ message: expect.stringContaining('saveEntry()') })
+    // An entry's data is an object of fields, as `entries()` reads it back.
+    expect(await entrySource('pages', 'listed', [1])).toEqual({ issues: [{ collection: 'pages', slug: 'listed', path: '', message: 'holds a list as its data, not an object of fields' }] })
+    expect(await saveEntry('news', { slug: 'plain', data: 'text' })).toEqual({ issues: [{ collection: 'news', slug: 'plain', path: '', message: 'holds a string as its data, not an object of fields' }] })
   })
 
   it('gives the file a folder entry is read from, for the CMS to delete', async () => {
@@ -326,9 +329,11 @@ describe('the collections a CMS edits', () => {
       await writeFile(join(base, 'content/pages/broken.json'), '{')
       await writeFile(join(base, 'content/pages/torn.md'), '---\ntitle: [\n---\n\nLost.\n')
       await writeFile(join(base, 'content/pages/listed.yaml'), '- one\n')
+      await writeFile(join(base, 'content/pages/empty.yaml'), '')
 
       expect((await entries('pages')).find(entry => entry.slug === 'broken')).toEqual({ slug: 'broken', path: expect.stringMatching(/content\/pages\/broken\.json$/), data: undefined, draft: false, problem: expect.stringContaining('content/pages/broken.json:1 the JSON does not parse') })
       expect((await entries('pages')).find(entry => entry.slug === 'listed')).toMatchObject({ data: undefined, problem: expect.stringMatching(/content\/pages\/listed\.yaml holds a list, not an entry's fields$/) })
+      expect((await entries('pages')).find(entry => entry.slug === 'empty')).toMatchObject({ data: undefined, problem: expect.stringMatching(/content\/pages\/empty\.yaml holds null, not an entry's fields$/) })
       expect(await rejection(entries('articles'))).toMatchObject({ message: expect.stringMatching(/^kay: articles's folder .*content\/articles is missing/) })
       expect((await collections()).find(each => each.name === 'articles')).toMatchObject({ body: { kind: 'markdown' } })
       // The editor writes over a file that does not parse, in its name, a Markdown one keeping the body its frontmatter did not break.
@@ -355,7 +360,7 @@ describe('the collections a CMS edits', () => {
     const schema = t.Object({ title: t.String() })
     const odd = collection({ name: 'odd', load: (() => 'nope') as never }, { schema })
     const slugless = collection({ name: 'slugless', load: (() => [{ data: {} }]) as never }, { schema })
-    const listy = collection({ name: 'listy', load: () => [{ slug: 'a', data: ['x'], html: '' }] }, { schema })
+    const listy = collection({ name: 'listy', load: (() => [{ slug: 'a', data: ['x'], html: '' }, { slug: 'b', data: 'x', html: '' }, { slug: 'c', html: '' }]) as never }, { schema })
     const broken = collection({ name: 'broken', load: () => {
       throw new Error('the CMS is down')
     } }, { schema })
@@ -367,7 +372,7 @@ describe('the collections a CMS edits', () => {
     await exporting([['odd', odd], ['slugless', slugless], ['listy', listy], ['broken', broken], ['titled', titled], ['failing', failing]], async () => {
       expect(await rejection(entries('odd'))).toMatchObject({ message: 'kay: odd\'s load gave string, not an array of entries' })
       expect(await rejection(entries('slugless'))).toMatchObject({ message: 'kay: slugless\'s load gave an entry with no slug: {"data":{}}' })
-      expect(await entries('listy')).toEqual([{ slug: 'a', data: undefined, draft: false, problem: 'kay: listy\'s entry a holds a list as its data, not an object of fields' }])
+      expect((await entries('listy')).map(entry => entry.problem)).toEqual(['a list', 'a string', 'undefined'].map((kind, at) => `kay: listy's entry ${'abc'[at]} holds ${kind} as its data, not an object of fields`))
       expect((await collections()).find(each => each.name === 'broken')).toMatchObject({ body: { kind: 'markdown' }, problem: 'kay: broken\'s load threw: the CMS is down' })
       expect(await rejection(entries('broken'))).toMatchObject({ message: 'kay: broken\'s load threw: the CMS is down' })
       expect((await collections()).find(each => each.name === 'titled')).not.toHaveProperty('problem')

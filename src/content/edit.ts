@@ -29,7 +29,7 @@ export interface JsonSchema {
   'description'?: string | undefined
   'properties'?: Record<string, JsonSchema> | undefined
   'required'?: string[] | undefined
-  'items'?: JsonSchema | undefined
+  'items'?: JsonSchema | JsonSchema[] | undefined
   'anyOf'?: JsonSchema[] | undefined
   'const'?: DataValue
   'enum'?: DataValue[] | undefined
@@ -88,7 +88,6 @@ export interface EntryPath {
 }
 
 export interface EntryFile extends EntryPath {
-  // The file as the editor wrote it.
   text: string
 }
 
@@ -220,7 +219,11 @@ export async function entryIssues(name: string, collection: Collection<unknown>,
 
   const compiled = body === undefined ? undefined : await compiledBody(collection, body, message => issues.push({ ...at, path: '', body: true, message }))
 
-  issues.push(...dataIssues(collection.options.schema, data).map(issue => ({ ...at, ...issue })))
+  // A CMS edits entries whose data is an object of fields, as `entries()` reads them back.
+  if (isFields(data))
+    issues.push(...dataIssues(collection.options.schema, data).map(issue => ({ ...at, ...issue })))
+  else
+    issues.push({ ...at, path: '', message: `holds ${valueKind(data)} as its data, not an object of fields` })
 
   return { issues, compiled }
 }
@@ -527,7 +530,7 @@ async function loadedEntries(name: string, collection: Collection<unknown>): Pro
   })
 }
 
-// Whether an entry's data is an object of fields, as its schema reads it, and no list or plain value.
+// Whether an entry's data is an object of fields, and no list or plain value; its values are taken as they are, so a loader's class instance or function fails only where it is serialized, as an island's prop.
 function isFields(data: unknown): data is Record<string, DataValue> {
   return typeof data === 'object' && data !== null && !Array.isArray(data)
 }
