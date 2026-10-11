@@ -1,13 +1,13 @@
 import type { CheckOptions } from '../src/check'
 import { chmod, mkdir, mkdtemp, rm, utimes } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { basename, join, relative } from 'node:path'
+import { basename, join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { findKayFiles } from '../src/build/files'
 import { applySafeFixes, check } from '../src/check'
 import { islandOnlyComponents } from '../src/check/island-only'
-import { compileShadow } from '../src/check/shadow'
+import { compileShadow, SHADOW_DIR, shadowPath, shadowSource } from '../src/check/shadow'
 import { compileKay } from '../src/compiler'
 
 const fixtures = join(import.meta.dir, 'fixtures')
@@ -74,6 +74,16 @@ describe('kay check', () => {
 
     expect(shadow.tsx).toContain('import type { Row } from "../../../../shared/data"')
     expect(shadow.tsx).toContain('import type { Todo } from "./todo"')
+  })
+
+  it('maps a shadow file back to its source, inside the project and in a library above it', () => {
+    const root = join(fixtures, 'app')
+    const inside = join(root, 'src/routes/index.kay')
+    const outside = resolve(root, '../../node_modules/ui/card.kay')
+
+    expect(shadowPath(root, outside)).toBe(join(root, SHADOW_DIR, '__/__/node_modules/ui/card.kay.tsx'))
+    expect(shadowSource(root, shadowPath(root, inside))).toBe(inside)
+    expect(shadowSource(root, shadowPath(root, outside))).toBe(outside)
   })
 
   it('checks the directory given on the command line', async () => {

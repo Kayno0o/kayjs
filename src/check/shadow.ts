@@ -35,6 +35,11 @@ export function shadowPath(root: string, file: string): string {
   return join(root, SHADOW_DIR, `${relative(root, file).split(sep).map(part => part === PARENT ? OUTSIDE : part).join(sep)}.tsx`)
 }
 
+// The source file `shadow`, a path `shadowPath` gave, was compiled from.
+export function shadowSource(root: string, shadow: string): string {
+  return resolve(root, relative(join(root, SHADOW_DIR), shadow).slice(0, -'.tsx'.length).split(sep).map(part => part === OUTSIDE ? PARENT : part).join(sep))
+}
+
 export function serializeShadowSettings(root: string, settings: ShadowSettings): string {
   return `${JSON.stringify({ routes: relative(root, settings.routesDir), islandOnly: [...settings.islandOnly].map(file => relative(root, file)).sort() }, null, 2)}\n`
 }

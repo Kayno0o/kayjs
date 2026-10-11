@@ -12,7 +12,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { findKayFiles, TSCONFIG } from '../build/files'
 import { importedSignals } from '../build/signals'
 import { TSGO, UNUSED_CODES, writeShadowTypes } from '../check'
-import { compileShadow, SHADOW_DIR, shadowPath } from '../check/shadow'
+import { compileShadow, SHADOW_DIR, shadowPath, shadowSource } from '../check/shadow'
 import { formatKay } from '../compiler/format'
 import { lintLevels, typeLint } from '../compiler/lints'
 import { offsetAt, positionAt } from '../compiler/mapping'
@@ -690,7 +690,7 @@ export class KayLanguageServer {
     if (!project || !path.endsWith('.kay.tsx'))
       return undefined
 
-    const file = resolve(project.root, path.slice(project.shadowTree.length, -'.tsx'.length))
+    const file = shadowSource(project.root, path)
     const source = Bun.file(file)
 
     return await source.exists() ? compileShadow(project.root, project.routesDir, file, await source.text(), project.islandOnly.has(file)).shadow : undefined
