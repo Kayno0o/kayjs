@@ -1,6 +1,6 @@
 import type { Diagnostic, ElementNode, KayFile, NamedAttribute, Node } from './ast'
 import { ABSTRACT_ROLES, ARIA_ATTRIBUTES, closest, REQUIRED_STATES, ROLES, validAutocomplete } from './aria'
-import { awaitBlocks, tryBlocks } from './ast'
+import { childBlocks } from './ast'
 
 // Controls a person fills in, which a screen reader announces by their label.
 const LABELLED = new Set(['input', 'select', 'textarea'])
@@ -293,57 +293,26 @@ export function accessibilityLints(file: KayFile): Diagnostic[] {
   }
   const visit = (nodes: Node[], context: Context) => {
     for (const node of nodes) {
-      switch (node.kind) {
-        case 'element':
-          checkElement(node, context)
-          visit(node.children, inside(node, context))
+      const children = childBlocks(node)
 
-          break
-        case 'text':
-          for (const part of node.parts) {
-            if (part.kind === 'element') {
-              checkElement(part, context)
-              visit(part.children, inside(part, context))
-            }
-          }
+      if (node.kind === 'element') {
+        checkElement(node, context)
+        visit(node.children, inside(node, context))
+      }
+      else if (node.kind === 'text' || node.kind === 'slot') {
+        for (const block of children)
+          visit(block, node.kind === 'slot' ? { ...context, component: true } : context)
+      }
+      else {
+        const before = heading
 
-          break
-        case 'slot':
-          visit(node.children, { ...context, component: true })
-
-          break
-        case 'if': {
+        alternatives(context, children.length, (index, branch) => {
           // Each branch is another page: the heading before the block leads each, not the branch shown before it.
-          const before = heading
-
-          alternatives(context, node.branches.length, (index, branch) => {
+          if (node.kind === 'if')
             heading = before
-            visit(node.branches[index]!.children, branch)
-          })
 
-          break
-        }
-        case 'for':
-          alternatives(context, 2, (index, branch) => visit(index === 0 ? node.children : node.fallback ?? [], { ...branch, repeated: branch.repeated || index === 0 }))
-
-          break
-        case 'await': {
-          const parts = awaitBlocks(node)
-
-          alternatives(context, parts.length, (index, branch) => visit(parts[index]!, branch))
-
-          break
-        }
-        case 'try': {
-          const parts = tryBlocks(node)
-
-          alternatives(context, parts.length, (index, branch) => visit(parts[index]!, branch))
-
-          break
-        }
-        case 'const':
-        case 'error':
-          break
+          visit(children[index]!, { ...branch, repeated: branch.repeated || (node.kind === 'for' && index === 0) })
+        })
       }
     }
   }

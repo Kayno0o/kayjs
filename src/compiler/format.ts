@@ -1,5 +1,5 @@
-import type { Attribute, Diagnostic, ElementNode, KayFile, Node, Span } from './ast'
-import { awaitBlocks, tryBlocks } from './ast'
+import type { Attribute, Diagnostic, KayFile, Node, Span } from './ast'
+import { elementsIn, visitNodes } from './ast'
 import { parseKay } from './parser'
 
 export interface FormatResult {
@@ -146,96 +146,54 @@ function lineEnd(source: string, from: number): number {
 
 // Spans that may run over several lines: attribute lists and braced expressions.
 function multiLineSpans(nodes: Node[]): Span[] {
-  return nodes.flatMap((node): Span[] => {
-    if (node.kind === 'element')
-      return [...(node.parens ? [node.parens] : []), ...(node.outlet?.args ? [node.outlet.args] : []), ...multiLineSpans(node.children)]
+  const spans: Span[] = []
 
-    if (node.kind === 'text')
-      return node.parts.flatMap(part => part.kind === 'chunk' ? [] : part.kind === 'expression' ? [part] : multiLineSpans([part]))
-
-    if (node.kind === 'if')
-      return [...(node.subject ? [node.subject] : []), ...node.branches.flatMap(branch => [...(branch.test ? [branch.test] : []), ...multiLineSpans(branch.children)])]
-
-    if (node.kind === 'for')
-      return [node.each, ...node.key ? [{ start: node.key.start - 1, end: node.key.end + 1 }] : [], ...multiLineSpans(node.children), ...multiLineSpans(node.fallback ?? [])]
-
-    if (node.kind === 'await')
-      return [node.value, ...multiLineSpans(awaitBlocks(node).flat())]
-
-    if (node.kind === 'try')
-      return multiLineSpans(tryBlocks(node).flat())
-
-    if (node.kind === 'const')
-      return [node.pattern, node.value]
-
-    if (node.kind === 'error')
-      return []
-
-    return [...(node.params ? [node.params] : []), ...multiLineSpans(node.children)]
+  visitNodes(nodes, (node) => {
+    spans.push(...ownMultiLineSpans(node))
   })
+
+  return spans
+}
+
+function ownMultiLineSpans(node: Node): Span[] {
+  switch (node.kind) {
+    case 'element':
+      return [...node.parens ? [node.parens] : [], ...node.outlet?.args ? [node.outlet.args] : []]
+    case 'text':
+      return node.parts.filter(part => part.kind === 'expression')
+    case 'if':
+      return [...node.subject ? [node.subject] : [], ...node.branches.flatMap(branch => branch.test ? [branch.test] : [])]
+    case 'for':
+      return [node.each, ...node.key ? [{ start: node.key.start - 1, end: node.key.end + 1 }] : []]
+    case 'await':
+      return [node.value]
+    case 'const':
+      return [node.pattern, node.value]
+    case 'slot':
+      return node.params ? [node.params] : []
+    case 'try':
+    case 'error':
+      return []
+  }
 }
 
 // Where text ends in whitespace, which renders: such a line keeps its trailing spaces, only a blank line is trimmed.
 function trailingTextEnds(nodes: Node[]): Set<number> {
   const ends = new Set<number>()
 
-  for (const node of nodes) {
-    switch (node.kind) {
-      case 'element':
-        for (const end of trailingTextEnds(node.children))
-          ends.add(end)
+  visitNodes(nodes, (node) => {
+    const last = node.kind === 'text' ? node.parts.at(-1) : undefined
 
-        break
-      case 'text': {
-        const last = node.parts.at(-1)
-
-        if (last?.kind === 'chunk' && WHITESPACE_END.test(last.text))
-          ends.add(last.end)
-
-        for (const end of trailingTextEnds(node.parts.filter(part => part.kind === 'element')))
-          ends.add(end)
-
-        break
-      }
-      case 'if':
-        for (const branch of node.branches) {
-          for (const end of trailingTextEnds(branch.children))
-            ends.add(end)
-        }
-
-        break
-      case 'for':
-        for (const end of [...trailingTextEnds(node.children), ...trailingTextEnds(node.fallback ?? [])])
-          ends.add(end)
-
-        break
-      case 'await':
-        for (const end of trailingTextEnds(awaitBlocks(node).flat()))
-          ends.add(end)
-
-        break
-      case 'try':
-        for (const end of trailingTextEnds(tryBlocks(node).flat()))
-          ends.add(end)
-
-        break
-      case 'slot':
-        for (const end of trailingTextEnds(node.children))
-          ends.add(end)
-
-        break
-      case 'const':
-      case 'error':
-        break
-    }
-  }
+    if (last?.kind === 'chunk' && WHITESPACE_END.test(last.text))
+      ends.add(last.end)
+  })
 
   return ends
 }
 
 // Attribute lists keep the line layout the author chose, written canonically; one whose values themselves span lines is left alone.
 function attributeEdits(file: KayFile): AttributeEdit[] {
-  return elementsOf(file.template).flatMap((element): AttributeEdit[] => {
+  return [...elementsIn(file.template)].flatMap((element): AttributeEdit[] => {
     const parens = element.parens
     const attributes = element.attributes.map(attribute => attributeText(file.source, attribute))
 
@@ -264,33 +222,6 @@ function attributeText(source: string, attribute: Attribute): string {
     case 'spread':
       return `{...${slice(attribute.expression)}}`
   }
-}
-
-function elementsOf(nodes: Node[]): ElementNode[] {
-  return nodes.flatMap((node): ElementNode[] => {
-    if (node.kind === 'element')
-      return [node, ...elementsOf(node.children)]
-
-    if (node.kind === 'text')
-      return elementsOf(node.parts.filter(part => part.kind === 'element'))
-
-    if (node.kind === 'if')
-      return node.branches.flatMap(branch => elementsOf(branch.children))
-
-    if (node.kind === 'for')
-      return [...elementsOf(node.children), ...elementsOf(node.fallback ?? [])]
-
-    if (node.kind === 'await')
-      return elementsOf(awaitBlocks(node).flat())
-
-    if (node.kind === 'try')
-      return elementsOf(tryBlocks(node).flat())
-
-    if (node.kind === 'const' || node.kind === 'error')
-      return []
-
-    return elementsOf(node.children)
-  })
 }
 
 function applyEdits(content: string, offset: number, edits: AttributeEdit[]): string {

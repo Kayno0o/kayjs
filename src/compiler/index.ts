@@ -5,9 +5,9 @@ import type { FoundRewrites } from './rewrite'
 import type { ScriptAnalysis, ServerAnalysis } from './script'
 import { basename, relative } from 'node:path'
 import process from 'node:process'
-import { awaitBlocks, drawIcons, tryBlocks, visitNodes } from './ast'
+import { drawIcons, visitNodes } from './ast'
 import { browserReads } from './browser'
-import { generate, isInteractive, islandMessages, mayPromote } from './codegen'
+import { generate, isInteractive, islandMessages, mayPromote, templateFacts } from './codegen'
 import { applyLints, templateLints } from './lints'
 import { SourceMap } from './mapping'
 import { parseKay } from './parser'
@@ -88,7 +88,7 @@ export function compileKay(source: string, filename: string, options: CompileOpt
   const server = analyzeServer(source, file.server)
   const script = analyzeScript(source, file.script, server?.data.map(data => data.name))
 
-  drawIcons(file.template, new Set([...script.imports, ...server?.imports ?? []].filter(binding => !binding.typeOnly && binding.imported === 'default' && ICON_IMPORT.test(binding.source)).map(binding => binding.local)))
+  drawIcons(file, new Set([...script.imports, ...server?.imports ?? []].filter(binding => !binding.typeOnly && binding.imported === 'default' && ICON_IMPORT.test(binding.source)).map(binding => binding.local)))
 
   // A name a fence uses may clash with the component's own; the template's reads are found once the code is generated.
   const fences = [file.script, file.server].map(span => span ? source.slice(span.start, span.end) : '').join('\n')
@@ -143,14 +143,14 @@ export function compileKay(source: string, filename: string, options: CompileOpt
 
   // The server never renders a client-only island, so its module leaves the script out: a package touching `window` as it loads never loads there.
   if (client && options.output === 'html' && island !== undefined)
-    return { tsx: `import { island as KayIsland } from 'kay/island'\n\nexport default KayIsland(${JSON.stringify(island)}, undefined${islandMessages(source, true)})\n`, map: new SourceMap([], []), island, classes: shorthandClasses(file.template, source), diagnostics: reported }
+    return { tsx: `import { island as KayIsland } from 'kay/island'\n\nexport default KayIsland(${JSON.stringify(island)}, undefined${islandMessages(source, true)})\n`, map: new SourceMap([], []), island, classes: templateFacts(file).classes, diagnostics: reported }
 
   return {
     tsx: final.builder.code,
     map: final.builder.map(),
     island,
     promote,
-    classes: shorthandClasses(file.template, source),
+    classes: templateFacts(file).classes,
     diagnostics: reported,
   }
 }
@@ -199,38 +199,6 @@ function constantSignals(source: string, script: Span | undefined, found: FoundR
       checkOnly: true,
     }
   })
-}
-
-function shorthandClasses(nodes: Node[], source: string, found: string[] = []): string[] {
-  for (const node of nodes) {
-    if (node.kind === 'element') {
-      for (const span of node.classes)
-        found.push(source.slice(span.start, span.end))
-      shorthandClasses(node.children, source, found)
-    }
-    else if (node.kind === 'text') {
-      shorthandClasses(node.parts.filter(part => part.kind === 'element'), source, found)
-    }
-    else if (node.kind === 'if') {
-      for (const branch of node.branches)
-        shorthandClasses(branch.children, source, found)
-    }
-    else if (node.kind === 'await') {
-      shorthandClasses(awaitBlocks(node).flat(), source, found)
-    }
-    else if (node.kind === 'try') {
-      shorthandClasses(tryBlocks(node).flat(), source, found)
-    }
-    else if (node.kind === 'error') {
-      for (const span of node.classes)
-        found.push(source.slice(span.start, span.end))
-    }
-    else if (node.kind !== 'const') {
-      shorthandClasses([...node.children, ...(node.kind === 'for' ? node.fallback ?? [] : [])], source, found)
-    }
-  }
-
-  return found
 }
 
 export function islandId(filename: string, root = process.cwd()): string {

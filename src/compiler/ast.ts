@@ -1,3 +1,5 @@
+import type { TemplateFacts } from './codegen'
+
 // Offsets index into the whole .kay source, so every node maps back to the file the user wrote.
 export interface Span {
   start: number
@@ -208,41 +210,11 @@ export function marksServerIsland(element: ElementNode, name: string, source: st
 // Every element of a template, nested ones included, in source order.
 export function* elementsIn(nodes: readonly Node[]): Generator<ElementNode> {
   for (const node of nodes) {
-    switch (node.kind) {
-      case 'element':
-        yield node
-        yield* elementsIn(node.children)
+    if (node.kind === 'element')
+      yield node
 
-        break
-      case 'text':
-        yield* elementsIn(node.parts.filter(part => part.kind === 'element'))
-
-        break
-      case 'if':
-        for (const branch of node.branches)
-          yield* elementsIn(branch.children)
-
-        break
-      case 'for':
-        yield* elementsIn([...node.children, ...node.fallback ?? []])
-
-        break
-      case 'await':
-        yield* elementsIn([...node.pending, ...node.resolved?.children ?? [], ...node.rejected?.children ?? []])
-
-        break
-      case 'try':
-        yield* elementsIn([...node.children, ...node.rejected?.children ?? []])
-
-        break
-      case 'slot':
-        yield* elementsIn(node.children)
-
-        break
-      case 'const':
-      case 'error':
-        break
-    }
+    for (const block of childBlocks(node))
+      yield* elementsIn(block)
   }
 }
 
@@ -332,69 +304,43 @@ export function errorMessages(nodes: Node[], source: string): ErrorMessages {
   }
 
   // `form`: the action the form around these nodes posts to.
-  const visit = (children: Node[], loop: boolean, form: string | undefined) => {
-    for (const node of children) {
-      switch (node.kind) {
-        case 'element': {
-          const action = actionOf(node, source)
-          const posts = action ? text(action.expression).replace(WHITESPACE, '') : undefined
+  walkNodes(nodes, { loop: false, form: undefined as string | undefined }, (node, context) => {
+    const { loop, form } = context
 
-          if (posts !== undefined)
-            posted.add(posts)
+    if (node.kind === 'element') {
+      const action = actionOf(node, source)
+      const posts = action ? text(action.expression).replace(WHITESPACE, '') : undefined
 
-          for (const child of node.children) {
-            if (child.kind === 'text') {
-              for (const part of child.parts) {
-                if (part.kind === 'expression')
-                  shows(node, part.expression, loop)
-              }
-            }
+      if (posts !== undefined)
+        posted.add(posts)
+
+      for (const child of node.children) {
+        if (child.kind === 'text') {
+          for (const part of child.parts) {
+            if (part.kind === 'expression')
+              shows(node, part.expression, loop)
           }
-
-          visit(node.children, loop, posts ?? form)
-
-          break
         }
-        case 'if':
-          for (const branch of node.branches) {
-            if (branch.test)
-              shows(branch.children.find((child): child is ElementNode => child.kind === 'element'), branch.test, loop)
+      }
 
-            visit(branch.children, loop, form)
-          }
+      return { loop, form: posts ?? form }
+    }
 
-          break
-        case 'for':
-          visit([...node.children, ...node.fallback ?? []], true, form)
-
-          break
-        case 'await':
-          for (const block of awaitBlocks(node))
-            visit(block, loop, form)
-
-          break
-        case 'try':
-          for (const block of tryBlocks(node))
-            visit(block, loop, form)
-
-          break
-        case 'slot':
-          visit(node.children, loop, form)
-
-          break
-        case 'error':
-          if (form !== undefined && !loop)
-            lines.push({ node, action: form })
-
-          break
-        case 'text':
-        case 'const':
-          break
+    if (node.kind === 'if') {
+      for (const branch of node.branches) {
+        if (branch.test)
+          shows(branch.children.find((child): child is ElementNode => child.kind === 'element'), branch.test, loop)
       }
     }
-  }
+    else if (node.kind === 'for') {
+      return { loop: true, form }
+    }
+    else if (node.kind === 'error' && form !== undefined && !loop) {
+      lines.push({ node, action: form })
+    }
 
-  visit(nodes, false, undefined)
+    return context
+  })
 
   for (const { node, action } of lines) {
     const key = errorKey(action, node.name)
@@ -452,16 +398,6 @@ export function isChildrenSlot(node: Node): boolean {
   return isSlot(node) && (node as ElementNode).outlet === undefined
 }
 
-// The pending, resolved and failed blocks, in source order.
-export function awaitBlocks(node: AwaitNode): Node[][] {
-  return [node.pending, node.resolved?.children ?? [], node.rejected?.children ?? []]
-}
-
-// The block and its `catch` block, in source order.
-export function tryBlocks(node: TryNode): Node[][] {
-  return [node.children, node.rejected?.children ?? []]
-}
-
 export interface KayFile {
   source: string
   script?: Span | undefined
@@ -474,82 +410,61 @@ export interface KayFile {
   templateStart: number
   template: Node[]
   diagnostics: Diagnostic[]
+  // Found on first use, once icons are drawn.
+  facts?: TemplateFacts | undefined
 }
 
 // `Home.size-5`, with `Home` an icon `~icons/...` imports: the `svg` spreading it, as `svg({...Home} class="size-5")` would be written.
-export function drawIcons(nodes: Node[], icons: ReadonlySet<string>): void {
-  for (const node of nodes) {
-    switch (node.kind) {
-      case 'element':
-        if (node.component && icons.has(node.name)) {
-          node.attributes.unshift({ kind: 'spread', expression: node.tag })
-          node.name = 'svg'
-          node.component = false
-          node.tag = { start: node.tag.start, end: node.tag.start }
-        }
-
-        drawIcons(node.children, icons)
-
-        break
-      case 'text':
-        drawIcons(node.parts.filter(part => part.kind === 'element'), icons)
-
-        break
-      case 'slot':
-        drawIcons(node.children, icons)
-
-        break
-      case 'if':
-        drawIcons(node.branches.flatMap(branch => branch.children), icons)
-
-        break
-      case 'for':
-        drawIcons([...node.children, ...node.fallback ?? []], icons)
-
-        break
-      case 'await':
-        drawIcons(awaitBlocks(node).flat(), icons)
-
-        break
-      case 'try':
-        drawIcons(tryBlocks(node).flat(), icons)
-
-        break
-      case 'const':
-      case 'error':
-        break
+export function drawIcons(file: KayFile, icons: ReadonlySet<string>): void {
+  file.facts = undefined
+  visitNodes(file.template, (node) => {
+    if (node.kind === 'element' && node.component && icons.has(node.name)) {
+      node.attributes.unshift({ kind: 'spread', expression: node.tag })
+      node.name = 'svg'
+      node.component = false
+      node.tag = { start: node.tag.start, end: node.tag.start }
     }
+  })
+}
+
+// The node lists right under a node, in source order. Every template walker reaches nested nodes through this one switch, so a new kind of node fails to type-check here until it says what it holds.
+export function childBlocks(node: Node): Node[][] {
+  switch (node.kind) {
+    case 'element':
+    case 'slot':
+      return [node.children]
+    case 'text':
+      return [node.parts.filter(part => part.kind === 'element')]
+    case 'if':
+      return node.branches.map(branch => branch.children)
+    case 'for':
+      return [node.children, node.fallback ?? []]
+    case 'await':
+      return [node.pending, node.resolved?.children ?? [], node.rejected?.children ?? []]
+    case 'try':
+      return [node.children, node.rejected?.children ?? []]
+    case 'const':
+    case 'error':
+      return []
   }
 }
 
 // Calls `each` on every node of a template, nested ones included, in source order.
-export function visitNodes(nodes: Node[], each: (node: Node) => void): void {
-  for (const node of nodes) {
-    each(node)
+export function visitNodes(nodes: readonly Node[], each: (node: Node) => void): void {
+  walkNodes(nodes, undefined, each)
+}
 
-    if (node.kind === 'element') {
-      visitNodes(node.children, each)
-    }
-    else if (node.kind === 'text') {
-      visitNodes(node.parts.filter(part => part.kind === 'element'), each)
-    }
-    else if (node.kind === 'if') {
-      for (const branch of node.branches) {
-        visitNodes(branch.children, each)
-      }
-    }
-    else if (node.kind === 'await') {
-      for (const block of awaitBlocks(node)) {
-        visitNodes(block, each)
-      }
-    }
-    else if (node.kind === 'try') {
-      for (const block of tryBlocks(node)) {
-        visitNodes(block, each)
-      }
-    }
-    else if (node.kind !== 'const' && node.kind !== 'error') {
-      visitNodes([...node.children, ...(node.kind === 'for' ? node.fallback ?? [] : [])], each)
-    }
+// Like `visitNodes`, handing each node the context its parent answered for its children.
+export function walkNodes<C>(nodes: readonly Node[], context: C, each: (node: Node, context: C) => C): void {
+  for (const node of nodes) {
+    const inner = each(node, context)
+
+    for (const block of childBlocks(node))
+      walkNodes(block, inner, each)
   }
+}
+
+// Whether `found` holds for a node of the template, nested ones included.
+export function someNode(nodes: readonly Node[], found: (node: Node) => boolean): boolean {
+  return nodes.some(node => found(node) || childBlocks(node).some(block => someNode(block, found)))
 }

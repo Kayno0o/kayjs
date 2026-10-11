@@ -1,6 +1,6 @@
-import type { Diagnostic, ForNode, KayFile, Node, TextChunk } from './ast'
+import type { Diagnostic, ForNode, KayFile, TextChunk } from './ast'
 import { accessibilityLints } from './a11y'
-import { awaitBlocks, tryBlocks } from './ast'
+import { walkNodes } from './ast'
 import { VOID_ELEMENTS } from './html'
 import { positionAt } from './mapping'
 
@@ -400,44 +400,27 @@ function unknownLints(source: string): Diagnostic[] {
 // The template's own lints: what it can say from the markup alone.
 export function templateLints(file: KayFile): Diagnostic[] {
   const found: Diagnostic[] = []
-  // `literal` inside an element whose text shows code, where a tag is meant as written.
-  const visit = (nodes: Node[], literal = false) => {
-    for (const node of nodes) {
-      if (node.kind === 'text') {
-        for (const part of node.parts) {
-          if (part.kind === 'element')
-            visit([part], literal)
-          else if (part.kind === 'chunk' && !literal)
-            literalTags(file.source, part, found)
-        }
-      }
-      else if (node.kind === 'element') {
-        visit(node.children, literal || LITERAL_TEXT.has(node.name))
-      }
-      else if (node.kind === 'for') {
-        positionalKey(file.source, node, found)
-        visit([...node.children, ...node.fallback ?? []], literal)
-      }
-      else if (node.kind === 'if') {
-        for (const branch of node.branches)
-          visit(branch.children, literal)
-      }
-      else if (node.kind === 'await') {
-        if (!node.rejected)
-          found.push({ start: node.start, end: node.value.end, code: 'uncaught-await', message: 'Nothing renders in place of this block once its value rejects', note: 'the pending block goes, and the error only reaches the log', help: 'add a `catch` block after it, at the same indentation, saying what failed', checkOnly: true })
 
-        visit(awaitBlocks(node).flat(), literal)
-      }
-      else if (node.kind === 'try') {
-        visit(tryBlocks(node).flat(), literal)
-      }
-      else if (node.kind !== 'const' && node.kind !== 'error') {
-        visit(node.children, literal)
+  // `literal` inside an element whose text shows code, where a tag is meant as written.
+  walkNodes(file.template, false, (node, literal) => {
+    if (node.kind === 'text') {
+      for (const part of node.parts) {
+        if (part.kind === 'chunk' && !literal)
+          literalTags(file.source, part, found)
       }
     }
-  }
+    else if (node.kind === 'element') {
+      return literal || LITERAL_TEXT.has(node.name)
+    }
+    else if (node.kind === 'for') {
+      positionalKey(file.source, node, found)
+    }
+    else if (node.kind === 'await' && !node.rejected) {
+      found.push({ start: node.start, end: node.value.end, code: 'uncaught-await', message: 'Nothing renders in place of this block once its value rejects', note: 'the pending block goes, and the error only reaches the log', help: 'add a `catch` block after it, at the same indentation, saying what failed', checkOnly: true })
+    }
 
-  visit(file.template)
+    return literal
+  })
 
   return [...found, ...accessibilityLints(file)]
 }

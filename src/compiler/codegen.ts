@@ -4,7 +4,7 @@ import type { Rewrite } from './mapping'
 import type { PageSettingName } from './page-settings'
 import type { ImportBinding, ScriptAnalysis, ServerAnalysis } from './script'
 import { actionUrl } from '../runtime/action'
-import { actionOf, awaitBlocks, errorMessages, FIELD_ATTRIBUTE, FIELD_ELEMENTS, isChildrenSlot, isHead, isSlot, serverIslandOf, tryBlocks } from './ast'
+import { actionOf, errorMessages, FIELD_ATTRIBUTE, FIELD_ELEMENTS, isChildrenSlot, isHead, isSlot, serverIslandOf, someNode, visitNodes } from './ast'
 import { domHelperImport, DomTemplate } from './dom'
 import { isFunctionExpression, mayHoldFunction } from './expression'
 import { htmlHelperImport, HtmlTemplate } from './html'
@@ -156,19 +156,20 @@ class Generator {
     if (server)
       b.add(`import type { ${this.options.errorPage ? 'ErrorPageContext' : 'PageContext'} as KayPageContext, PageData as KayPageData${query !== undefined ? ', QueryOf as KayQueryOf' : ''}${this.settingType(PRERENDER) !== undefined ? ', PrerenderedContext as KayPrerenderedContext' : ''}${this.options.check && server.page ? ', PageSettings as KayPageSettings' : ''} } from 'kay'\n`)
 
-    const kayHelpers = formHelpers(this.file)
+    const facts = templateFacts(this.file)
+    const kayHelpers: KayHelper[] = facts.actionForm ? ['formAction'] : []
     const actions = server?.exportNames.filter(name => !NOT_ACTIONS.has(name)) ?? []
     const staticLoops = this.staticLoops
     const html = this.final('html')
     const dom = this.final('dom')
     const runnable = html || dom
-    const used = usedHelpers(this.file.template, script, this.src)
+    const used: Helper[] = [...script.props?.rest ? ['omit' as const] : [], ...facts.helpers]
     const helpers = runnable ? [] : used.filter(helper => helper !== 'For')
 
     if (includeServer) {
       const data = new Set(server.data.map(binding => binding.name))
 
-      this.deferred = new Set([...awaitedNames(this.file.template, this.src)].filter(name => data.has(name)))
+      this.deferred = new Set([...facts.awaited].filter(name => data.has(name)))
     }
 
     if (this.deferred.size > 0)
@@ -192,7 +193,7 @@ class Generator {
         b.add(`export const ${name} = KayActionStub(${JSON.stringify(actionUrl(this.options.moduleId, name))})\n`)
     }
 
-    const childrenSlot = usesSlot(this.file.template, isChildrenSlot)
+    const childrenSlot = facts.childrenSlot
     const childrenType = ' & { children?: KayJSX.Element }'
 
     if (childrenSlot)
@@ -219,10 +220,10 @@ class Generator {
     if (this.options.island !== undefined && this.genericComponent)
       b.add(`import type { IslandBrand as KayIslandBrand, IslandOptions as KayIslandOptions } from 'kay'\n`)
 
-    if (usesAwait(this.file.template) && !dom)
+    if (facts.await && !dom)
       b.add(`import { Await as KayAwait } from 'kay/await'\n`)
 
-    if (usesTry(this.file.template) && !runnable)
+    if (facts.try && !runnable)
       declared.push(['KayTry', 'Try'])
 
     if (!runnable && this.options.rewrites && [...this.options.rewrites.values()].some(rewrite => rewrite.dynamic))
@@ -274,7 +275,7 @@ class Generator {
     else if (childrenSlot) {
       b.add('__props: { children?: KayJSX.Element }')
     }
-    else if (usesSlot(this.file.template, isSlot)) {
+    else if (facts.slot) {
       b.add('__props: {}')
     }
 
@@ -1611,65 +1612,76 @@ const INTERACTIVE_ATTRIBUTE = /^(?:on[A-Z]|bind:|ref$)/
 
 // A component needs the browser when it handles events, binds inputs, takes refs or holds reactive state.
 export function isInteractive(file: KayFile, script: ScriptAnalysis): boolean {
-  if (script.reactive)
-    return true
-
-  const visit = (nodes: Node[]): boolean => nodes.some((node) => {
-    switch (node.kind) {
-      case 'element':
-        return node.attributes.some(attribute => attribute.kind !== 'spread' && INTERACTIVE_ATTRIBUTE.test(file.source.slice(attribute.name.start, attribute.name.end))) || visit(node.children)
-      case 'text':
-        return visit(node.parts.filter(part => part.kind === 'element'))
-      case 'if':
-        return node.branches.some(branch => visit(branch.children))
-      case 'for':
-        return visit(node.children) || visit(node.fallback ?? [])
-      case 'await':
-        return awaitBlocks(node).some(visit)
-      case 'try':
-        return tryBlocks(node).some(visit)
-      case 'slot':
-        return visit(node.children)
-      case 'const':
-      case 'error':
-        return false
-    }
-
-    return false
-  })
-
-  return visit(file.template)
+  return script.reactive || templateFacts(file).interactive
 }
 
 // Whether a static component passes a component what may be a function, a class or an instance of one, or a block taking parameters: should that component be an island, it renders as one itself.
 export function mayPromote(file: KayFile, script: ScriptAnalysis): boolean {
   const names = new Set([...script.functions, ...script.imports.filter(binding => !binding.typeOnly).map(binding => binding.local)])
 
-  const visit = (nodes: Node[]): boolean => nodes.some((node) => {
-    switch (node.kind) {
-      case 'element':
-        return (node.component && (node.attributes.some(attribute => (attribute.kind === 'expression' || attribute.kind === 'spread') && mayHoldFunction(file.source.slice(attribute.expression.start, attribute.expression.end), names)) || node.children.some(child => child.kind === 'slot' && child.params !== undefined))) || visit(node.children)
-      case 'text':
-        return visit(node.parts.filter(part => part.kind === 'element'))
-      case 'if':
-        return node.branches.some(branch => visit(branch.children))
-      case 'for':
-        return visit(node.children) || visit(node.fallback ?? [])
-      case 'await':
-        return awaitBlocks(node).some(visit)
-      case 'try':
-        return tryBlocks(node).some(visit)
-      case 'slot':
-        return visit(node.children)
-      case 'const':
-      case 'error':
-        return false
-    }
+  return someNode(file.template, node => node.kind === 'element' && node.component && (node.attributes.some(attribute => (attribute.kind === 'expression' || attribute.kind === 'spread') && mayHoldFunction(file.source.slice(attribute.expression.start, attribute.expression.end), names)) || node.children.some(child => child.kind === 'slot' && child.params !== undefined)))
+}
 
-    return false
+type TemplateHelper = 'For' | 'Show' | 'componentClass'
+
+// What the template holds that decides the code generated around it, found in one pass and kept on the file, which compiles several times.
+export interface TemplateFacts {
+  // An element handles events, binds an input or takes a ref.
+  interactive: boolean
+  // A form posts to an action.
+  actionForm: boolean
+  helpers: Set<TemplateHelper>
+  // The names `await` blocks render as they are, `await comments`.
+  awaited: Set<string>
+  slot: boolean
+  childrenSlot: boolean
+  await: boolean
+  try: boolean
+  // The shorthand classes of elements and `error` lines, `.card`, as written.
+  classes: string[]
+}
+
+export function templateFacts(file: KayFile): TemplateFacts {
+  if (file.facts)
+    return file.facts
+
+  const facts: TemplateFacts = { interactive: false, actionForm: false, helpers: new Set(), awaited: new Set(), slot: false, childrenSlot: false, await: false, try: false, classes: [] }
+  const text = (span: Span) => file.source.slice(span.start, span.end)
+
+  visitNodes(file.template, (node) => {
+    if (node.kind === 'element') {
+      facts.interactive ||= node.attributes.some(attribute => attribute.kind !== 'spread' && INTERACTIVE_ATTRIBUTE.test(text(attribute.name)))
+      facts.actionForm ||= actionOf(node, file.source) !== undefined
+      facts.slot ||= isSlot(node)
+      facts.childrenSlot ||= isChildrenSlot(node)
+      facts.classes.push(...node.classes.map(text))
+
+      if (mergesComponentClass(node, file.source))
+        facts.helpers.add('componentClass')
+    }
+    else if (node.kind === 'for') {
+      facts.helpers.add('For')
+    }
+    else if (node.kind === 'if' && node.branches.some(branch => branch.alias)) {
+      facts.helpers.add('Show')
+    }
+    else if (node.kind === 'await') {
+      const value = text(node.value).trim()
+
+      facts.await = true
+
+      if (IDENTIFIER.test(value))
+        facts.awaited.add(value)
+    }
+    else if (node.kind === 'try') {
+      facts.try = true
+    }
+    else if (node.kind === 'error') {
+      facts.classes.push(...node.classes.map(text))
+    }
   })
 
-  return visit(file.template)
+  return file.facts = facts
 }
 
 type KayHelper = 'formAction' | 'formValue' | 'formChecked' | 'formInvalid' | 'formError' | 'formProtection' | 'registerActions' | 'actionStub' | 'autoDefer'
@@ -1678,215 +1690,13 @@ function kayAlias(helper: KayHelper): string {
   return `Kay${helper[0]!.toUpperCase()}${helper.slice(1)}`
 }
 
-// The `kay/internal` helpers the template's forms need: `formAction` when a form posts to an action.
-function formHelpers(file: KayFile): KayHelper[] {
-  const hasActionForm = (nodes: Node[]): boolean => nodes.some((node) => {
-    switch (node.kind) {
-      case 'element':
-        return actionOf(node, file.source) !== undefined || hasActionForm(node.children)
-      case 'text':
-        return hasActionForm(node.parts.filter(part => part.kind === 'element'))
-      case 'if':
-        return node.branches.some(branch => hasActionForm(branch.children))
-      case 'for':
-        return hasActionForm(node.children) || hasActionForm(node.fallback ?? [])
-      case 'await':
-        return awaitBlocks(node).some(hasActionForm)
-      case 'try':
-        return tryBlocks(node).some(hasActionForm)
-      case 'slot':
-        return hasActionForm(node.children)
-      case 'const':
-      case 'error':
-        return false
-    }
-
-    return false
-  })
-
-  return hasActionForm(file.template) ? ['formAction'] : []
-}
-
-// The names `await` blocks render as they are, `await comments`.
-function awaitedNames(nodes: Node[], source: string, found = new Set<string>()): Set<string> {
-  for (const node of nodes) {
-    switch (node.kind) {
-      case 'element':
-      case 'slot':
-        awaitedNames(node.children, source, found)
-
-        break
-      case 'text':
-        awaitedNames(node.parts.filter(part => part.kind === 'element'), source, found)
-
-        break
-      case 'if':
-        for (const branch of node.branches)
-          awaitedNames(branch.children, source, found)
-
-        break
-      case 'for':
-        awaitedNames([...node.children, ...node.fallback ?? []], source, found)
-
-        break
-      case 'await': {
-        const value = source.slice(node.value.start, node.value.end).trim()
-
-        if (IDENTIFIER.test(value))
-          found.add(value)
-
-        for (const block of awaitBlocks(node))
-          awaitedNames(block, source, found)
-
-        break
-      }
-      case 'try':
-        for (const block of tryBlocks(node))
-          awaitedNames(block, source, found)
-
-        break
-      case 'const':
-      case 'error':
-        break
-    }
-  }
-
-  return found
-}
-
-type Helper = 'For' | 'Show' | 'omit' | 'componentClass'
+type Helper = TemplateHelper | 'omit'
 
 // The members of `TemplateHelpers` in src/runtime/checks.ts.
 type DeclaredHelper = Helper | 'staticFor' | 'Dynamic' | 'head' | 'Try'
 
 function helperAlias(helper: Helper): string {
   return `Kay${helper[0]!.toUpperCase()}${helper.slice(1)}`
-}
-
-function usesSlot(nodes: Node[], found: (node: Node) => boolean): boolean {
-  const uses = (inner: Node[]) => usesSlot(inner, found)
-
-  return nodes.some((node) => {
-    if (found(node))
-      return true
-
-    switch (node.kind) {
-      case 'element':
-      case 'slot':
-        return uses(node.children)
-      case 'text':
-        return uses(node.parts.filter(part => part.kind === 'element'))
-      case 'if':
-        return node.branches.some(branch => uses(branch.children))
-      case 'for':
-        return uses(node.children) || uses(node.fallback ?? [])
-      case 'await':
-        return awaitBlocks(node).some(uses)
-      case 'try':
-        return tryBlocks(node).some(uses)
-      case 'const':
-      case 'error':
-        return false
-    }
-
-    return false
-  })
-}
-
-function usesAwait(nodes: Node[]): boolean {
-  return nodes.some((node) => {
-    switch (node.kind) {
-      case 'await':
-        return true
-      case 'element':
-      case 'slot':
-        return usesAwait(node.children)
-      case 'text':
-        return usesAwait(node.parts.filter(part => part.kind === 'element'))
-      case 'if':
-        return node.branches.some(branch => usesAwait(branch.children))
-      case 'for':
-        return usesAwait(node.children) || usesAwait(node.fallback ?? [])
-      case 'try':
-        return tryBlocks(node).some(usesAwait)
-      case 'const':
-      case 'error':
-        return false
-    }
-
-    return false
-  })
-}
-
-function usesTry(nodes: Node[]): boolean {
-  return nodes.some((node) => {
-    switch (node.kind) {
-      case 'try':
-        return true
-      case 'element':
-      case 'slot':
-        return usesTry(node.children)
-      case 'text':
-        return usesTry(node.parts.filter(part => part.kind === 'element'))
-      case 'if':
-        return node.branches.some(branch => usesTry(branch.children))
-      case 'for':
-        return usesTry(node.children) || usesTry(node.fallback ?? [])
-      case 'await':
-        return awaitBlocks(node).some(usesTry)
-      case 'const':
-      case 'error':
-        return false
-    }
-
-    return false
-  })
-}
-
-function usedHelpers(nodes: Node[], script: ScriptAnalysis, source: string): Helper[] {
-  const used = new Set<Helper>()
-
-  if (script.props?.rest)
-    used.add('omit')
-
-  const visit = (list: Node[]) => {
-    for (const node of list) {
-      if (node.kind === 'for') {
-        used.add('For')
-        visit(node.children)
-        visit(node.fallback ?? [])
-      }
-      else if (node.kind === 'if') {
-        for (const branch of node.branches) {
-          if (branch.alias)
-            used.add('Show')
-
-          visit(branch.children)
-        }
-      }
-      else if (node.kind === 'element' || node.kind === 'slot') {
-        if (node.kind === 'element' && mergesComponentClass(node, source))
-          used.add('componentClass')
-
-        visit(node.children)
-      }
-      else if (node.kind === 'await') {
-        for (const block of awaitBlocks(node))
-          visit(block)
-      }
-      else if (node.kind === 'try') {
-        for (const block of tryBlocks(node))
-          visit(block)
-      }
-      else if (node.kind === 'text') {
-        visit(node.parts.filter(part => part.kind === 'element'))
-      }
-    }
-  }
-
-  visit(nodes)
-
-  return [...used]
 }
 
 // A component call whose `class` merges several parts, which it gets as one string: a shorthand with a `class` expression, or a spread next to a shorthand or a `class`.
