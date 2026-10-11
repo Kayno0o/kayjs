@@ -291,9 +291,10 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('history af
         window.history.pushState(null, '', '/elsewhere')
       })
       await view.back()
+      await view.forward()
       await Bun.sleep(300)
 
-      expect(await view.path()).toBe('/still')
+      expect(await view.path()).toBe('/elsewhere')
       expect(await view.evaluate(kept)).toBe(true)
       expect(view.errors).toEqual([])
     }

@@ -21,6 +21,7 @@ const PORTS_TRIED = 100
 
 // The first server the entry starts is the one `kay dev` reports.
 let port: number | undefined
+let serving = false
 // The port the last run asked for and the one it moved to, which this run takes first when it asks for the same.
 let moved: [asked: number, to: number] | undefined
 const serve = Bun.serve.bind(Bun)
@@ -47,6 +48,12 @@ Bun.serve = ((options: Parameters<typeof Bun.serve>[0]) => {
     port = server.port
     process.send?.({ listening: server.url.href, port, asked })
   }
+  // A server on a Unix socket has no address to report, but is up as well.
+  else if (port === undefined && !serving) {
+    process.send?.({ serving: true })
+  }
+
+  serving = true
 
   return server
 }) as typeof Bun.serve

@@ -17,11 +17,11 @@ import { editorCommand } from '../src/server/editor'
 // The parent's pid in /proc/<pid>/stat, after the command name and the state.
 const PARENT_PID = /\) \S+ (\d+)/
 
-// This process's children building the client of the project at `real`, its real path.
-function clientBuilders(real: string): string[] {
+// This process's children running `script` for the project at `real`, its real path: `builder.ts` building its client, `spare.ts` its servers.
+function childrenRunning(real: string, script: string): string[] {
   return readdirSync('/proc').filter((pid) => {
     try {
-      return PARENT_PID.exec(readFileSync(`/proc/${pid}/stat`, 'utf8'))?.[1] === String(process.pid) && readFileSync(`/proc/${pid}/cmdline`, 'utf8').includes('builder.ts') && readlinkSync(`/proc/${pid}/cwd`) === real
+      return PARENT_PID.exec(readFileSync(`/proc/${pid}/stat`, 'utf8'))?.[1] === String(process.pid) && readFileSync(`/proc/${pid}/cmdline`, 'utf8').includes(script) && readlinkSync(`/proc/${pid}/cwd`) === real
     }
     catch {
       return false
@@ -239,6 +239,22 @@ describe('kay dev', () => {
       await rm(root, { recursive: true, force: true })
     }
     expect(children.at(-1)!.killed).toBe(true)
+  })
+
+  it('readies the next server once one on a Unix socket is up, as one on a port', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
+
+    await Bun.write(join(root, 'src/server.ts'), `Bun.serve({ unix: ${JSON.stringify(join(root, 'kay.sock'))}, fetch: () => new Response('ok') })\n`)
+    const stop = await dev(root, { log: () => undefined })
+
+    try {
+      // Sooner than the fallback for a server that never says it is up.
+      await until(() => childrenRunning(realpathSync(root), 'spare.ts').length === 2, 1500)
+    }
+    finally {
+      await stop()
+      await rm(root, { recursive: true, force: true })
+    }
   })
 
   it('loads the .kay modules and globs the entry imports before it calls pages()', async () => {
@@ -852,7 +868,7 @@ describe('kay dev', () => {
     const real = realpathSync(root)
     const lines: string[] = []
     const counter = (step: number) => `---\nimport { signal } from 'kay'\n\nconst count = signal(${step})\n---\nbutton(onClick={() => count.set(n => n + 1)}) {count()}\n`
-    const builders = () => clientBuilders(real)
+    const builders = () => childrenRunning(real, 'builder.ts')
 
     await Bun.write(join(root, 'kay.config.ts'), 'export default {}\n')
     await Bun.write(join(root, 'src/counter.kay'), counter(0))
@@ -916,7 +932,7 @@ describe('kay dev', () => {
     }
 
     await Bun.sleep(1000)
-    expect(clientBuilders(realpathSync(root))).toEqual([])
+    expect(childrenRunning(realpathSync(root), 'builder.ts')).toEqual([])
     await rm(root, { recursive: true, force: true })
   }, 60_000)
 

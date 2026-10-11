@@ -34,10 +34,10 @@ const SOURCE_FILE = /\.(?:kay|[cm]?[jt]sx?|json|css)$/
 const BOOT_ID = crypto.randomUUID()
 // The event streams open on this server, which a stylesheet edit is pushed to.
 const streams = new Set<ReadableStreamDefaultController<string>>()
-// Once its server went away, a page connects again every 10 ms for about a restart's length, then less and less often, down to once a second, so a server that stays down is not polled hard.
+// Once its server went away, a page connects again every 10 ms for about a restart's length, then less and less often, down to four times a second, so a server that stays down is not polled hard.
 const FAST_RETRY_MS = 10
 const FAST_RETRIES = 50
-const SLOW_RETRY_MS = 1000
+const SLOW_RETRY_MS = 250
 
 // Reconnects once the restarted server is up: one running the code this page came from, restarted for a stylesheet, gets the page's stylesheets swapped in, one at a time; one running new code refreshes the page through the swap, which keeps the scroll and the islands whose props did not change, and loads the page fully when the swap cannot apply it, as after a new island. A page with no swap, as under `navigation: false`, keeps the server render it loaded with and applies what changed between it and the new one to the page, through `DEV_PATCH`; it reloads when that cannot be applied, and a server that failed to boot always reloads.
 // The old links go once the new ones loaded, so the page never shows unstyled, and a page that no longer answers as it did reloads instead. A stylesheet edit swaps them the same way without a restart, on a `styles` event.

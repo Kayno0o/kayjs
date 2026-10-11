@@ -96,7 +96,7 @@ Outside a component, a signal is read by calling it, `cart()`, and written with 
 
 ## Page navigation
 
-A page with an island or a form swaps the next page in without a reload. An island marked `persist` lives on from page to page, so `Player(persist)` in a layout keeps a song playing. What the next page renders again stays as it is, so a sidebar keeps its scroll. A page without kay's script still goes Back to a swapped page after a reload, through one line of script. Go to a page from code with `navigate`:
+A page with an island or a form swaps the next page in without a reload. An island marked `persist` lives on from page to page, so `Player(persist)` in a layout keeps a song playing. What the next page renders again stays as it is, so a sidebar keeps its scroll. A page without kay's script still goes Back to a swapped page after a reload, through one line of script, which leaves an entry your app pushed itself to your app. Go to a page from code with `navigate`:
 
 ```kay
 ---

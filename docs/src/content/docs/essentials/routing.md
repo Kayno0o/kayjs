@@ -182,7 +182,7 @@ Its pages serve under their prefix, `/auth/login`, inside your layouts and guard
 
 A CMS's extension can also name an `editor`, an island every page but the extensions' own renders last in edit mode with its stylesheets, kept alive across pages: see [Preview mode](/guides/content#preview-mode).
 
-While you write such a library, list its extension from an example or fixture app, by a relative import or through a link: `kay check` there, and the editor opened on the app, check the library's pages as the app's own, their route params typed by the app's matchers. Once installed from the registry, the errors inside its files are the library's to fix.
+While you write such a library, list its extension from an example or fixture app, by a relative import or through a link: `kay check` there, and the editor opened on the app, check the library's pages and its CMS editor as the app's own, their route params typed by the app's matchers. Once installed from the registry, the errors inside its files are the library's to fix.
 
 <ReadMore href="/llms/components#extensions">Writing an extension, its layouts, messages, API modules and config, page hooks and editor.</ReadMore>
 

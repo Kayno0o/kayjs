@@ -51,7 +51,11 @@ export function sentParts(code: string): { parts: Span[], functions: boolean } |
       }
     }
     // A shorthand property, a getter or a setter has no value apart from its key to wrap, so its object is checked whole.
-    else if (node.type === 'ObjectExpression' && !node.properties.some(property => property.type === 'ObjectProperty' ? property.shorthand : property.type === 'ObjectMethod' && property.kind !== 'method')) {
+    else if (node.type === 'ObjectExpression' && node.properties.some(property => property.type === 'ObjectProperty' ? property.shorthand : property.type === 'ObjectMethod' && property.kind !== 'method')) {
+      functions ||= node.properties.some(property => property.type === 'ObjectMethod' && property.kind === 'method')
+      parts.push({ start: node.start!, end: node.end! })
+    }
+    else if (node.type === 'ObjectExpression') {
       for (const property of node.properties) {
         if (property.type === 'ObjectMethod')
           functions = true

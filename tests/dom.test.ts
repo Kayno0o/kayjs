@@ -966,6 +966,62 @@ describe('the live reload script', () => {
       Object.assign(happyDOM.settings, { disableCSSFileLoading: false, handleDisabledFileLoadingAsSuccess: false })
     }
   })
+
+  it('connects again every 10 ms for a restart\'s length, then less often down to four times a second, one connection open at a time', async () => {
+    const script = (/<script>([\s\S]*)<\/script>/).exec(LIVE_RELOAD)![1]!
+    const sources: { closed: boolean, onerror?: () => void, boot?: (event: { data: string }) => void }[] = []
+    const delays: number[] = []
+    const due: (() => void)[] = []
+    const Source = class {
+      closed = false
+      onerror?: () => void
+      boot?: (event: { data: string }) => void
+      constructor() {
+        sources.push(this)
+      }
+
+      close() {
+        this.closed = true
+      }
+
+      addEventListener(name: string, listener: (event: { data: string }) => void) {
+        if (name === 'boot')
+          this.boot = listener
+      }
+    }
+    const fail = (times: number) => {
+      for (let time = 0; time < times; time++) {
+        sources.at(-1)!.onerror!()
+        due.shift()!()
+      }
+    }
+
+    // eslint-disable-next-line no-new-func -- runs the inline script a dev page carries
+    ;(new Function('EventSource', 'setTimeout', script) as (source: typeof Source, timeout: (run: () => void, delay: number) => void) => void)(Source, (run, delay) => {
+      delays.push(delay)
+      due.push(run)
+    })
+    fail(56)
+
+    expect(delays.slice(48)).toEqual([10, 10, 20, 40, 80, 160, 250, 250])
+    expect(sources.filter(source => !source.closed)).toHaveLength(1)
+
+    // A server answering starts the count over; running other code than the page, it reloads it.
+    const reload = spyOn(location, 'reload').mockImplementation(() => undefined)
+
+    try {
+      sources.at(-1)!.boot!({ data: 'next next' })
+      fail(1)
+
+      expect(delays.at(-1)).toBe(10)
+      expect(sources.filter(source => !source.closed)).toHaveLength(1)
+      await Bun.sleep(0)
+      expect(reload).toHaveBeenCalledTimes(1)
+    }
+    finally {
+      reload.mockRestore()
+    }
+  })
 })
 
 describe('actions called from the browser', () => {

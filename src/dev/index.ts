@@ -34,6 +34,8 @@ export interface DevOptions {
 // Long enough to gather the few events one save makes.
 const DEBOUNCE_MS = 30
 const SPARE = join(import.meta.dir, 'spare.ts')
+// When a server never says it is up, as one that never serves, the next process starts anyway after this.
+const SPARE_FALLBACK_MS = 2000
 
 // The server of a project with no entry of its own, as a static site is.
 export const PAGES_ENTRY = join(import.meta.dir, 'pages.ts')
@@ -234,6 +236,9 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     if ('followsStyles' in message)
       follower = server
 
+    if ('serving' in message && server === child)
+      readySpare()
+
     listened(server, message)
   }
   // A running server that reads the build takes the stylesheets of an edit to stylesheets alone; false when it needs a restart instead, as when the build failed.
@@ -272,7 +277,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     return server
   }
 
-  // The next process waits with kay loaded, started once the running server listens or exits so it never competes with that server's boot.
+  // The next process waits with kay loaded, started once the running server is up or exits, so it never competes with that server's boot.
   function readySpare() {
     if (spare === undefined && !stopping)
       spare = spawn()
@@ -294,6 +299,10 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     void child.stdin.flush()
     options.onRestart?.(child)
     void reportExit(child)
+
+    const started = child
+
+    setTimeout(() => started === child && readySpare(), SPARE_FALLBACK_MS).unref()
   }
   // The server never reads the generated types, only the editor and `kay check` do, so it starts before they are rewritten.
   // The client builds while the last server stops and the next one boots, which waits for it only once it asks.
