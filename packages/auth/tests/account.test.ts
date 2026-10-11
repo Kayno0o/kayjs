@@ -180,6 +180,22 @@ describe('deleting the account', () => {
     expect(await browser().post('/password', { identifier: 'ada@example.com', password: PASSWORD })).toEqual({ ok: false, error: 'invalid' })
   })
 
+  test('refuses the last admin before spending the proof, and lets them go once another admin exists', async () => {
+    const { ada, browser, store } = await registered({ admin: 'admin' })
+    const adaRecord = (await store.users.findByEmail('ada@example.com'))!
+
+    await store.users.update(adaRecord.id, { roles: ['admin'] })
+
+    expect(await ada.call('deleteAccount', { password: PASSWORD })).toEqual({ ok: false, error: 'last-admin' })
+    expect(await store.users.get(adaRecord.id)).toBeTruthy()
+
+    const { user } = await browser().call('register', { email: 'grace@example.com', password: PASSWORD })
+
+    await store.users.update(user.id, { roles: ['admin'] })
+
+    expect(await ada.call('deleteAccount', { password: PASSWORD })).toEqual({ ok: true })
+  })
+
   test('with a second factor and no password, takes a code', async () => {
     const app = testApp()
 

@@ -21,7 +21,7 @@ export interface ManagedUser extends User {
 // `forbidden` when the user asking does not meet the `admin` option, or acts as someone else.
 export type AdminFailure = 'forbidden' | 'not-found'
 
-export type RoleResult = { ok: true, user: ManagedUser } | { ok: false, error: AdminFailure | 'unknown-role' }
+export type RoleResult = { ok: true, user: ManagedUser } | { ok: false, error: AdminFailure | 'unknown-role' | 'self' }
 
 export type BanResult = { ok: true, user: ManagedUser } | { ok: false, error: AdminFailure | 'self' | 'admin' | 'until' }
 
@@ -47,6 +47,24 @@ export async function actingAdmin(state: RequestState): Promise<UserRecord | nul
 
 export async function isAdmin(state: RequestState, record: UserRecord): Promise<boolean> {
   return await state.core.admin?.(publicUser(record)) ?? false
+}
+
+// Whether `record` is the only user meeting the `admin` option, so losing them leaves the deployment with no admin.
+export async function lastAdmin(state: RequestState, record: UserRecord): Promise<boolean> {
+  if (!(await isAdmin(state, record)))
+    return false
+
+  for (let offset = 0; ; offset += USER_PAGE_MAX) {
+    const { users } = await state.core.store.users.list({ offset, limit: USER_PAGE_MAX })
+
+    for (const user of users) {
+      if (user.id !== record.id && await isAdmin(state, user))
+        return false
+    }
+
+    if (users.length < USER_PAGE_MAX)
+      return true
+  }
 }
 
 // Newest first, a page of `limit` (50 by default) from `offset`.
@@ -92,6 +110,10 @@ export async function changeRole(state: RequestState, userId: string, role: stri
     return { ok: true, user: managedUser(record) }
 
   const roles = granted ? [...record.roles, role] : record.roles.filter(held => held !== role)
+
+  if (record.id === actor.id && !(await isAdmin(state, { ...record, roles })))
+    return { ok: false, error: 'self' }
+
   const updated = await state.core.store.users.update(record.id, { roles }) ?? { ...record, roles }
 
   await report(state, updated, granted ? 'role-granted' : 'role-revoked', role, actor)

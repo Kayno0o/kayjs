@@ -4,6 +4,7 @@ import type { RequestState } from './state'
 import type { UserRecord } from './store'
 import type { Proof, ProofFailure } from './twoFactor'
 import { hashPassword } from '@kaynooo/utils'
+import { lastAdmin } from './admin'
 import { newPasswordProblem } from './breached'
 import { publicUser } from './core'
 import { revokeBearerTokens } from './email'
@@ -108,8 +109,13 @@ export async function unlink(state: RequestState, provider: string, proof: Proof
   return { ok: true }
 }
 
-// Deletes the signed-in user and everything kayjs-auth keeps for them, then signs this session out.
-export async function deleteAccount(state: RequestState, proof: Proof, signOut: () => Promise<void>): Promise<{ ok: true } | { ok: false, error: ProofFailure }> {
+// Deletes the signed-in user and everything kayjs-auth keeps for them, then signs this session out. The last admin is refused before the proof is spent.
+export async function deleteAccount(state: RequestState, proof: Proof, signOut: () => Promise<void>): Promise<{ ok: true } | { ok: false, error: ProofFailure | 'last-admin' }> {
+  const current = await state.current()
+
+  if (current && await lastAdmin(state, current))
+    return { ok: false, error: 'last-admin' }
+
   const proved = await reprove(state, proof)
 
   if (!proved.ok)

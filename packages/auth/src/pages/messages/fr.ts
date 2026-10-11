@@ -198,6 +198,8 @@ export default defineMessages({
       'disabled': 'La validation en deux étapes est désactivée.',
       'not-linked': 'Ce compte n’est pas lié.',
       'last-way-in': 'C’est votre seul moyen de connexion : ajoutez-en un autre d’abord.',
+      'self': 'Impossible sur votre propre compte.',
+      'last-admin': 'Vous êtes le seul administrateur : nommez-en un autre d’abord.',
       'not-found': 'Introuvable.',
       'label': 'Donnez un nom au jeton.',
       'scope': 'Choisissez ce que le jeton peut faire.',

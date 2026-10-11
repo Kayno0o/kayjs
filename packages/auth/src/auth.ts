@@ -445,8 +445,8 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     return unlink(this[STATE], provider, proof)
   }
 
-  // Deletes the signed-in user, calling `onDelete` for the app's own records, and signs this session out.
-  async deleteAccount(proof: Proof): Promise<{ ok: true } | { ok: false, error: ProofFailure }> {
+  // Deletes the signed-in user, calling `onDelete` for the app's own records, and signs this session out; the last admin is refused.
+  async deleteAccount(proof: Proof): Promise<{ ok: true } | { ok: false, error: ProofFailure | 'last-admin' }> {
     return deleteAccount(this[STATE], proof, () => this.signOut())
   }
 
@@ -558,6 +558,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     return changeRole(this[STATE], userId, role, true)
   }
 
+  // Takes a role back; one that would leave the admin asking no longer an admin is refused (`self`).
   async revokeRole(userId: string, role: Role): Promise<RoleResult> {
     return changeRole(this[STATE], userId, role, false)
   }

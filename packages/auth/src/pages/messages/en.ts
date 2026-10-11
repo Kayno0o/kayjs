@@ -198,6 +198,8 @@ export default defineMessages({
       'disabled': 'Two-step verification is off.',
       'not-linked': 'This account is not connected.',
       'last-way-in': 'This is your only way to sign in: add another first.',
+      'self': 'You cannot do this to your own account.',
+      'last-admin': 'You are the only admin: make someone else an admin first.',
       'not-found': 'Not found.',
       'label': 'Give the token a name.',
       'scope': 'Choose what the token is allowed to do.',

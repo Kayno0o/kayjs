@@ -119,6 +119,21 @@ describe('admin', () => {
     expect(await browser().post('/password', { identifier: 'ada@example.com', password: PASSWORD })).toMatchObject({ ok: true })
   })
 
+  test('an admin cannot take back their own admin role, which would leave the last one with no way back, though another of theirs goes', async () => {
+    const { admin, member, store } = await setup()
+
+    expect(await admin.browser.call('revokeRole', admin.id, 'admin')).toEqual({ ok: false, error: 'self' })
+    expect((await store.users.get(admin.id))?.roles).toEqual(['admin'])
+
+    await admin.browser.call('grantRole', admin.id, 'editor')
+
+    expect(await admin.browser.call('revokeRole', admin.id, 'editor')).toMatchObject({ ok: true, user: { roles: ['admin'] } })
+
+    const other = await member('second@example.com', ['admin'])
+
+    expect(await admin.browser.call('revokeRole', other.id, 'admin')).toMatchObject({ ok: true, user: { roles: [] } })
+  })
+
   test('an admin cannot ban themselves or another admin', async () => {
     const { admin, member } = await setup()
     const other = await member('second@example.com', ['admin'])
