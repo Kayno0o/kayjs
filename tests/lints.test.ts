@@ -127,7 +127,7 @@ describe('deprecated-schema-name', () => {
 })
 
 describe('page settings', () => {
-  it('refuses a setting exported under its own name, its fix moving every one into page at once, all at once, a value over several lines one level deeper', () => {
+  it('refuses a setting exported under its own name, its fix moving every one into page at once, a value over several lines one level deeper', () => {
     const one = '--- server\nexport const prerender = true\n---\np x'
     const several = '--- server\nimport { s } from \'kay\'\n\n// The search\nexport const query = s.Object({\n  page: s.Integer(),\n})\nexport const revalidate = \'1h\'\n---\np x'
     const moved = '--- server\nimport { s } from \'kay\'\n\nexport const page = {\n  query: s.Object({\n    page: s.Integer(),\n  }),\n  revalidate: \'1h\',\n}\n---\np x'
@@ -145,6 +145,13 @@ describe('page settings', () => {
     expect(fixed(declared)).toEqual(['--- server\nexport const page = {\n  prerender: async (): Promise<{ slug: string }[]> => {\n    return [{ slug: \'a\' }]\n  },\n}\n---\np x'])
     expect(fixed('--- server\nexport function sitemap(locale = \'en\') {\n  return [{ locale }]\n}\n---\np x')).toEqual(['--- server\nexport const page = {\n  sitemap: (locale = \'en\') => {\n    return [{ locale }]\n  },\n}\n---\np x'])
     expect(fixed('--- server\nexport function* prerender() {\n  yield { slug: \'a\' }\n}\n---\np x')).toEqual([])
+  })
+
+  it('leaves a function reading its own name, this or arguments, which an arrow would not give it, keeping blank lines blank', () => {
+    expect(fixed('--- server\nexport function sitemap(n = 1) {\n  return n > 3 ? [] : sitemap(n + 1)\n}\n---\np x')).toEqual([])
+    expect(fixed('--- server\nexport function sitemap() {\n  return [this]\n}\n---\np x')).toEqual([])
+    expect(fixed('--- server\nexport function sitemap() {\n  return () => arguments\n}\n---\np x')).toEqual([])
+    expect(fixed('--- server\nexport function sitemap() {\n  const sitemap = 1\n\n  return function () {\n    return [this, arguments, sitemap]\n  }\n}\n---\np x')).toEqual(['--- server\nexport const page = {\n  sitemap: () => {\n    const sitemap = 1\n\n    return function () {\n      return [this, arguments, sitemap]\n    }\n  },\n}\n---\np x'])
   })
 
   it('adds to the page export there is, on its line or one key a line', () => {

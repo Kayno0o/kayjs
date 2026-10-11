@@ -8,7 +8,7 @@ export const page = {
   prerender: async () => {
     return (await docs.all()).map((entry) => {
       const [section, page] = entry.slug.split('/')
-  
+
       return { section: section!, page: page! }
     })
   },

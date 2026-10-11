@@ -15,6 +15,8 @@ const STATIC_EXPORTS = new Set(['uid', 'sanitizeHtml', 'trustHtml', 'defer'])
 // What `kay/i18n` exports that makes a component an island; the rest of it reads the locale alike on both sides.
 const REACTIVE_I18N = new Set(['relativeTime'])
 const SIGNAL_TYPES: Record<string, SignalKind> = { Signal: 'signal', Memo: 'memo' }
+// A line break before a line with text: a blank line moving into `page` stays blank.
+const LINE_WITH_TEXT = /\n(?=[^\n])/g
 
 // What a component script, and a server fence, use from `kay` with no import, as they use `props<T>()`: the compiler imports them.
 export const SCRIPT_GLOBALS = ['signal', 'memo', 'effect', 'onMount']
@@ -175,10 +177,10 @@ export interface PageSettings {
   settings: Map<string, PageSetting>
 }
 
-// A setting exported under its own name, as before `page` held them.
 // The source from the start of `first` to the end of `last`.
 type TextOf = (first: t.Node, last?: t.Node) => string
 
+// A setting exported under its own name, as before `page` held them.
 interface SeparateSetting {
   name: PageSettingName
   local: Span
@@ -330,14 +332,47 @@ function pageSettings(ast: ParseResult<t.File>, statement: t.Statement, declarat
   }
 }
 
-// `export async function prerender() { ... }`, which moves into `page` as an arrow, unless it is a generator, which has none.
+// `export async function prerender() { ... }`, which moves into `page` as an arrow, unless it is a generator or reads what an arrow would not give it.
 function separateFunction(ast: ParseResult<t.File>, statement: t.Statement, declaration: t.FunctionDeclaration, span: Span, shift: (node: t.Node) => Span, text: TextOf): SeparateSetting {
   const id = declaration.id!
   const params = declaration.params.length > 0 ? text(declaration.params[0]!, declaration.params.at(-1)) : ''
   const value = `${declaration.async ? 'async ' : ''}(${params})${declaration.returnType ? text(declaration.returnType) : ''} => ${text(declaration.body)}`
-  const movable = !declaration.generator && !declaration.typeParameters && referenceCount(ast, statement, id.name) === 0
+  const movable = !declaration.generator && !declaration.typeParameters && !readsItself(ast, declaration) && referenceCount(ast, statement, id.name) === 0
 
   return { name: id.name as PageSettingName, local: shift(id), statement: span, value, movable }
+}
+
+// Whether a function reads its own name, `this` or `arguments`, none of which an arrow in `page` would give it.
+function readsItself(ast: ParseResult<t.File>, declaration: t.FunctionDeclaration): boolean {
+  const name = declaration.id!.name
+  const ownFunction = (path: NodePath) => path.findParent(parent => parent.isFunction() && !parent.isArrowFunctionExpression())?.node
+  let found = true
+
+  try {
+    loadTraverse()(ast, {
+      FunctionDeclaration(path: NodePath<t.FunctionDeclaration>) {
+        if (path.node !== declaration)
+          return
+
+        found = false
+        path.traverse({
+          ThisExpression(inner) {
+            found ||= ownFunction(inner) === declaration
+          },
+          Identifier(inner) {
+            if (!inner.isReferencedIdentifier())
+              return
+
+            found ||= inner.node.name === name ? inner.scope.getBinding(name)?.path.node === declaration : inner.node.name === 'arguments' && ownFunction(inner) === declaration
+          },
+        })
+        path.stop()
+      },
+    })
+  }
+  catch {}
+
+  return found
 }
 
 function keyName(key: t.Node): string | undefined {
@@ -419,7 +454,7 @@ function moveIntoPage(source: string, page: PageSettings | undefined, settings: 
 
 // A value moving into `page` one level deeper, unless a template literal's own lines would change with it.
 function indentValue(value: string): string {
-  return value.includes('`') ? value : value.replaceAll('\n', '\n  ')
+  return value.includes('`') ? value : value.replaceAll(LINE_WITH_TEXT, '\n  ')
 }
 
 // Past the line break ending a statement, so its line goes with it.
