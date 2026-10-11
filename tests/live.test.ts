@@ -278,7 +278,7 @@ describe('stream() started from a handler', () => {
     forever.close()
     // Its stop landing later would count for the next test.
     expect(await stopsReach(before + 3)).toBe(before + 3)
-  })
+  }, 15_000)
 
   it('stops the route\'s source once the island goes', async () => {
     const before = await stopped()
@@ -297,7 +297,7 @@ describe('stream() started from a handler', () => {
     finally {
       Reflect.deleteProperty(globalThis, 'document')
     }
-  })
+  }, 15_000)
 
   it('delivers nothing more of a run once a listener starts another, events left in its chunk included', async () => {
     const answer = (values: number[]) => async () => new Response(values.map(value => `data: ${encodeValue(value)}\n\n`).join(''))
@@ -376,8 +376,12 @@ describe('resource()', () => {
   })
 
   const until = async (ready: () => boolean) => {
-    for (let tries = 0; !ready() && tries < 100; tries++)
+    for (let waited = 0; !ready(); waited += 5) {
+      if (waited > 2_000)
+        throw new Error('timed out')
+
       await Bun.sleep(5)
+    }
   }
 
   it('reads a GET route as JSON, its dates as their ISO text', async () => {

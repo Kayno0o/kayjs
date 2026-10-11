@@ -70,6 +70,8 @@ interface Interceptor {
   created?: ((node: SignalNode<unknown>) => unknown) | undefined
   // An optimistic change applying: a signal about to be written, with how to write it back.
   writing?: ((node: SignalNode<unknown>, write: (value: unknown) => void) => void) | undefined
+  // An optimistic change applying: a change made inside it, undone later, put a signal back from `from` to `to`.
+  undone?: ((node: SignalNode<unknown>, from: unknown, to: unknown) => void) | undefined
 }
 
 let owner: Owner | undefined
@@ -134,12 +136,14 @@ export function ownSignal<T>(value: T, options?: SignalOptions<T>): [read: () =>
 export function undoable(change: () => void): () => void {
   const writes = new Map<SignalNode<unknown>, { before: unknown, write: (value: unknown) => void }>()
   const slot = interceptor ??= {}
-  const outer = slot.writing
+  const { writing: outer, undone: parent } = slot
   let written: Map<SignalNode<unknown>, unknown> | undefined
   const undo = () => batch(() => {
     for (const [node, { before, write }] of writes) {
-      if (written === undefined || node.value === written.get(node))
+      if (written === undefined || node.value === written.get(node)) {
+        parent?.(node, node.value, before)
         write(before)
+      }
     }
   })
 
@@ -149,6 +153,13 @@ export function undoable(change: () => void): () => void {
       writes.set(node, { before: node.value, write })
 
     outer?.(node, write)
+  }
+  // What a change made inside this one puts back is this one's to undo still, and the one around it's.
+  slot.undone = (node, from, to) => {
+    if (written?.has(node) && written.get(node) === from)
+      written.set(node, to)
+
+    parent?.(node, from, to)
   }
 
   try {
@@ -161,6 +172,7 @@ export function undoable(change: () => void): () => void {
   }
   finally {
     slot.writing = outer
+    slot.undone = parent
   }
 
   written = new Map([...writes.keys()].map(node => [node, node.value]))

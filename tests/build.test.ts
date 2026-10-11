@@ -18,6 +18,7 @@ import { describeThrown, mapBundleToKay, mapStack } from '../src/build/sourcemap
 import { analyzeKayCached, transformKayCached } from '../src/build/transform'
 import { loadConfig, withConfig } from '../src/config'
 import { projectPaths } from '../src/project'
+import { compileErrorPage } from '../src/server/overlay'
 import { scratchDir } from './scratch'
 
 const root = join(import.meta.dir, 'fixtures/islands')
@@ -975,11 +976,17 @@ describe('the files a build writes', () => {
     }
   })
 
-  it('says an error\'s message when its stack starts with the name alone', () => {
+  it('says an error\'s message when its stack starts with the name alone, in logs and on the page of a server failing to boot', () => {
     const error = new Error('database is locked')
 
     error.stack = 'Error\n    at claim (/app/src/jobs.ts:3:9)'
     expect(describeThrown(error)).toBe('Error: database is locked\n    at claim (/app/src/jobs.ts:3:9)')
+    expect(compileErrorPage([], error)).toContain('<pre>Error: database is locked\n    at claim (/app/src/jobs.ts:3:9)</pre>')
+
+    const stackless = new Error('no port free')
+
+    stackless.stack = ''
+    expect(compileErrorPage([], stackless)).toContain('<pre>no port free</pre>')
     const bare = new Error('kept')
 
     bare.message = ''

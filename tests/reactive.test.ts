@@ -408,6 +408,82 @@ describe('optimistic changes', () => {
     expect([count(), label(), done()]).toEqual([1, 'a', false])
   })
 
+  it('undo what a change made inside another wrote, three deep, whichever is undone first', () => {
+    const a = signal(0)
+    let middle: (() => void) | undefined
+    let inner: (() => void) | undefined
+    const outer = undoable(() => {
+      a.set(1)
+      middle = undoable(() => {
+        a.set(2)
+        inner = undoable(() => a.set(3))
+      })
+    })
+
+    inner!()
+    expect(a()).toBe(2)
+    middle!()
+    expect(a()).toBe(1)
+    outer()
+    expect(a()).toBe(0)
+
+    const again = undoable(() => {
+      a.set(1)
+      middle = undoable(() => a.set(2))
+    })
+
+    middle!()
+    again()
+    expect(a()).toBe(0)
+  })
+
+  it('undo what a change made inside another wrote when the outer one throws after it', () => {
+    const a = signal(0)
+    const b = signal(0)
+
+    expect(() => undoable(() => {
+      a.set(1)
+      undoable(() => b.set(1))
+
+      throw new Error('no such tier')
+    })).toThrow('no such tier')
+    expect([a(), b()]).toEqual([0, 0])
+  })
+
+  it('undo an optimistic call made inside another\'s optimistic function, both failing, the inner one first', async () => {
+    const outer = actionStub('/_kay/action/test/outer') as unknown as Action<object, null>
+    const inner = actionStub('/_kay/action/test/inner') as unknown as Action<object, null>
+    const a = signal(0)
+    // Each call's request fails when the test says, the inner one first.
+    const failing = new Map<string, () => void>()
+    const fetched = spyOn(globalThis, 'fetch').mockImplementation((async (input: RequestInfo | URL) => new Promise((_, reject) => {
+      failing.set(String(input), () => reject(new TypeError('offline')))
+    })) as unknown as typeof fetch)
+    let nested: Promise<null> | undefined
+
+    try {
+      const call = outer({}, {
+        optimistic: () => {
+          a.set(1)
+          nested = inner({}, { optimistic: () => a.set(2) })
+        },
+      })
+      const settled = Promise.allSettled([nested!, call])
+
+      expect(a()).toBe(2)
+      await Bun.sleep(0)
+      failing.get('/_kay/action/test/inner')!()
+      await Bun.sleep(0)
+      expect(a()).toBe(1)
+      failing.get('/_kay/action/test/outer')!()
+      expect((await settled).map(result => result.status)).toEqual(['rejected', 'rejected'])
+      expect(a()).toBe(0)
+    }
+    finally {
+      fetched.mockRestore()
+    }
+  })
+
   it('undo what they wrote, but not what was written since', () => {
     const count = signal(1)
     const label = signal('a')
