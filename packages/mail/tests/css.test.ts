@@ -25,6 +25,10 @@ describe('cssColours', () => {
     expect(() => cssColours(':root { --space: 12px }')('--space')).toThrow('--space in the stylesheet is 12px, which is no colour')
   })
 
+  it('names a string that is no stylesheet, as a path given before 0.8 is', () => {
+    expect(() => cssColours('./styles/site.css')).toThrow('the mail settings take their colours from "./styles/site.css", which is no stylesheet; give its text, imported with `with { type: \'text\' }`, or its file as a URL')
+  })
+
   it('reads the stylesheet a URL points at, naming its path', () => {
     expect(cssColours(SITE)('--color-brand')).toBe('#0047ff')
     expect(() => cssColours(SITE)('--color-wine')).toThrow(`--color-wine is not declared in ${SITE.pathname}`)

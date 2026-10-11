@@ -6,10 +6,10 @@ const DECLARATION = /(?<![\w-])(--[\w-]+)\s*:([^;{}]*)/g
 const VARIABLE = /var\(\s*(--[\w-]+)\s*(?:,([^()]*(?:\([^()]*\)[^()]*)*))?\)/g
 const OPAQUE = 255
 
-// The text of the stylesheet a URL points at, read as the server boots.
-function read(file: URL): string {
-  const path = fileURLToPath(file)
+const RULE = /[{}]/
 
+// The text of the stylesheet a URL points at, read as the server boots.
+function read(path: string): string {
   try {
     return readFileSync(path, 'utf8')
   }
@@ -20,7 +20,13 @@ function read(file: URL): string {
 
 // The colours of a stylesheet's custom properties, given its text, `import css from './global.css' with { type: 'text' }`, or a URL to read it from: `colour('--brand')` gives the property's first declaration, its `var()`s followed, as hex. A file that cannot be read, or a property missing or no opaque colour, throws naming the stylesheet, as `name` calls a text.
 export function cssColours(stylesheet: string | URL, name = 'the stylesheet'): (property: string) => string {
-  const [css, named] = stylesheet instanceof URL ? [read(stylesheet), fileURLToPath(stylesheet)] : [stylesheet, name]
+  const named = stylesheet instanceof URL ? fileURLToPath(stylesheet) : name
+  const css = stylesheet instanceof URL ? read(named) : stylesheet
+
+  // A string was a file's path before kayjs-mail 0.8, and a stylesheet declaring custom properties holds a rule.
+  if (typeof stylesheet === 'string' && !RULE.test(css))
+    throw new Error(`kayjs-mail: the mail settings take their colours from ${JSON.stringify(css)}, which is no stylesheet; give its text, imported with \`with { type: 'text' }\`, or its file as a URL`)
+
   const declared = new Map<string, string>()
 
   for (const [, property, value] of css.replace(COMMENT, '').matchAll(DECLARATION)) {
