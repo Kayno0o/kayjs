@@ -50,7 +50,7 @@ declare module 'kay' {
 }
 ```
 
-The server uses the plugin before the pages: `new Elysia().use(auth.plugin).use(await pages())`. It may also sit inside a plugin of the app's own, at any depth: `auth` reaches every route declared after it. The session plugin then goes on the app itself, or is left to `auth.plugin`: used first inside that plugin, it stays there, and every route outside it answers 500 with an error saying so. The plugin uses the session plugin itself, puts `auth` in every request's context (`ctx.locals.auth` in pages, actions and guards, `({ auth })` in Elysia routes), and serves the OAuth routes. Registering `app` lets `kay check` check links to those routes. `db.sync()` creates kayjs-auth's tables with the app's.
+The server uses the plugin before the pages: `new Elysia().use(auth.plugin).use(await pages())`. It may also sit inside a plugin of the app's own, at any depth: `auth` reaches every route declared after it. The session plugin then goes on the app itself, or is left to `auth.plugin`: used first inside that plugin, it stays there, and every route outside it answers 500 with an error saying so. The plugin uses the session plugin itself, puts `auth` in every request's context (`ctx.locals.auth` in pages, actions and guards, `({ auth })` in Elysia routes), and serves the OAuth routes. Registering `app` lets `kay check` check links to those routes. `db.sync()` creates kayjs-auth's tables with the app's. What it logs, a mailer, a hook or a check that failed, goes where the app's `log` setting sends kay's messages, headed `kayjs-auth:`, as text, as JSON or to the app's function, under the request being answered.
 
 `createAuth` options:
 
@@ -83,10 +83,11 @@ export const auth = createAuth({ /* ... */ pages: true })
 - The pages: `sign-in` (providers, password, magic link or code, passkey, remember me), `register`, `two-factor`, `reset-password`, `verify-email`, `magic-link`, `confirm-email`, and under `account`: the profile (address, username, verification), `security` (password, two-factor with its QR code and recovery codes, passkeys), `sessions`, `connections` (shown with providers), `tokens` and `data` (download, deletion). Each works without JavaScript but passkeys, and shows only what the config enables.
 - With `pages`, `signInPage`, `twoFactorPage`, `sessionsPage` and every `email.links` default to those pages, and `auth.guard()` without `redirect` sends an anonymous visitor to the sign-in page, `?redirect=` back. Without `pages`, `email.links` names a page for each kind, or `createAuth` throws.
 - An app file at a page's path replaces that page alone: `src/routes/auth/magic-link.kay` is the app's own magic-link page. Its texts live under `auth` in kay's messages: a key in the app's `src/messages/en.ts`, such as `auth: { signIn: { title: 'Welcome back' } }`, replaces that text and keeps the rest.
+- The pages reached before signing in, `sign-in`, `register`, `two-factor`, `reset-password`, `verify-email`, `magic-link` and `confirm-email`, set `guards: false`: an app's root `_guard.ts` asking for a session, `export default auth.guard()`, keeps the rest of the site to signed-in users and still lets visitors sign in, the `account` pages keeping it. An app page replacing one of them sets `guards: false` itself. kayjs-auth's own routes, OAuth and the rest, are its plugin's, which page guards never reach.
 - `captcha.widget`, `turnstileWidget(siteKey)` or `hcaptchaWidget(siteKey)`, is the widget the pages show where `captchaRequired` asks for one.
 - A provider's button reads its `label`, set on each preset (`GitHub`, `Google`) and overridden by `oauth.<name>.label`.
 - kayjs-ui is a dependency of kayjs-auth; the app keeps `@iconify-json/tabler` and Tailwind, kayjs-ui's peers.
-- The pages need kay 1.24 or later; the rest of kayjs-auth works on older ones.
+- kayjs-auth needs kay 1.37 or later.
 
 `auth.features()` tells any page, prebuilt or the app's own, what the config enables: `{ providers: [{ name, label }], email, codes, requireVerified, passkeys, captcha, scopes, prefix, signInPage, pages }`.
 

@@ -3,6 +3,7 @@ import type { Device } from './device'
 import type { RequestState } from './state'
 import type { SessionRecord, UserRecord } from './store'
 import { readDevice } from './device'
+import { log } from './log'
 
 // A visit is recorded at most this often, so a busy browser does not write on every request.
 const TOUCH_EVERY_MS = 5 * 60 * 1000
@@ -89,7 +90,7 @@ async function locate(core: Core, ip: string): Promise<string | null> {
     return await core.locate?.(ip) ?? null
   }
   catch (error) {
-    console.error('kayjs-auth: locate failed', error)
+    log.error('locate failed', error)
 
     return null
   }

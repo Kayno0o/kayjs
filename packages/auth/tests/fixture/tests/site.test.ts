@@ -72,6 +72,15 @@ describe('the prebuilt pages', () => {
     expect(text(await ada.visit('/'), '#who')).toBe('Anonymous')
   })
 
+  test('the pages reached before signing in open under the app\'s guard asking for a session, which keeps its own pages', async () => {
+    const visitor = await browser()
+
+    for (const path of ['/auth/sign-in', '/auth/register', '/auth/reset-password', '/auth/two-factor', '/auth/verify-email', '/auth/confirm-email', '/fr/auth/sign-in'])
+      expect(await visitor.visit(path)).toMatchObject({ url: path, status: 200 })
+
+    expect(await visitor.visit('/members')).toMatchObject({ url: '/auth/sign-in?redirect=%2Fmembers', status: 200 })
+  })
+
   test('a refused registration says why, field by field', async () => {
     await signedUp('taken@example.com')
 

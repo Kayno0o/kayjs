@@ -4,6 +4,7 @@ import type { RequestState } from './state'
 import type { UserRecord } from './store'
 import { clamp } from '@kaynooo/utils'
 import { publicUser } from './core'
+import { log } from './log'
 
 // The audit log is pruned of what outlived its age at most this often.
 const PRUNE_EVERY_MS = 60 * 60 * 1000
@@ -43,7 +44,7 @@ export async function report(state: RequestState, record: UserRecord, event: Aut
     await core.onEvent?.(event, publicUser(record), detail, { ip: state.address, userAgent: state.userAgent, actor: actor ? publicUser(actor) : null })
   }
   catch (error) {
-    console.error(`kayjs-auth: onEvent failed for ${event}`, error)
+    log.error(`onEvent failed for ${event}`, error)
   }
 
   if (!core.audit)
@@ -54,7 +55,7 @@ export async function report(state: RequestState, record: UserRecord, event: Aut
     await prune(core)
   }
   catch (error) {
-    console.error(`kayjs-auth: writing ${event} to the audit log failed`, error)
+    log.error(`writing ${event} to the audit log failed`, error)
   }
 }
 

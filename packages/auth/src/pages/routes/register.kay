@@ -11,6 +11,9 @@ import { captchaOf, failure, issue, schemas } from '../forms'
 import Button from '@kaynooo/kayjs-ui/button.kay'
 import FormField from '@kaynooo/kayjs-ui/form-field.kay'
 
+// Reached before signing in, so the app's guards, one asking for a session say, do not run here.
+export const page = { guards: false }
+
 export const register = action(schemas.register, async (input, ctx) => {
   const result = await ctx.locals.auth.register({ email: input.email, password: input.password, username: input.username, remember: input.remember === true, captcha: captchaOf(input), locale: ctx.locale })
 

@@ -10,6 +10,7 @@ import { admit } from './captcha'
 import { banned } from './core'
 import { digest, randomToken } from './keys'
 import { spend } from './limits'
+import { log } from './log'
 import { writing } from './mail'
 import { notify } from './notify'
 import { safeRedirect } from './oauth/redirect'
@@ -366,7 +367,7 @@ async function issueQuietly(state: RequestState, record: UserRecord, type: LinkT
     await issue(state, record, type, email, redirect, nonce)
   }
   catch (error) {
-    console.error(`kayjs-auth: mailing a ${type} link failed`, error)
+    log.error(`mailing a ${type} link failed`, error)
   }
 }
 

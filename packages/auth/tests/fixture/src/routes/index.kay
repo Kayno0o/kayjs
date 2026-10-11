@@ -1,4 +1,6 @@
 --- server
+export const page = { guards: false }
+
 const user = await ctx.locals.auth.user()
 ---
 if user as signedIn

@@ -39,6 +39,7 @@ import { createGate, scopeAllows } from './gate'
 import { deriveKeys } from './keys'
 import { DEFAULT_LIMITS } from './limits'
 import { acceptedLocales, validLocale } from './locale'
+import { log } from './log'
 import { localeTemplates } from './mail'
 import { noteSignIn } from './notify'
 import { createOAuthClient } from './oauth/client'
@@ -1057,7 +1058,7 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
         // A refresh that rotates no refresh token leaves the one held usable.
         await core.store.identities.update(name, subject.identity.providerId, tokens && tokens.refreshToken === undefined ? { ...sealed, refreshToken: subject.identity.refreshToken } : sealed)
       },
-      onError: error => console.error(`kayjs-auth: refreshing a ${name} token failed`, error),
+      onError: error => log.error(`refreshing a ${name} token failed`, error),
     }))
   }
 

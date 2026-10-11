@@ -1,6 +1,7 @@
 import type { Limits } from './limits'
 import type { RequestState } from './state'
 import { spend } from './limits'
+import { log } from './log'
 
 const TURNSTILE_URL = 'https://challenges.cloudflare.com/turnstile/v0/siteverify'
 const HCAPTCHA_URL = 'https://api.hcaptcha.com/siteverify'
@@ -83,7 +84,7 @@ export async function admit(state: RequestState, action: CaptchaAction, token: s
     return await core.captcha!.verify(token, action) ? undefined : 'captcha'
   }
   catch (error) {
-    console.error(`kayjs-auth: checking a CAPTCHA for ${action} failed`, error)
+    log.error(`checking a CAPTCHA for ${action} failed`, error)
 
     return 'captcha'
   }

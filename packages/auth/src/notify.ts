@@ -2,6 +2,7 @@ import type { SecurityEvent } from './mail'
 import type { RequestState } from './state'
 import type { UserRecord } from './store'
 import { report } from './events'
+import { log } from './log'
 import { writing } from './mail'
 
 // Tells the user and the app of a change to what protects the account; mail goes to a verified address only, so a typo never warns a stranger.
@@ -25,7 +26,7 @@ export async function notify(state: RequestState, record: UserRecord, event: Sec
     await mail.mailer.send({ to, kind: event, site: core.site, locale, ...url === undefined ? {} : { url }, ...detail === undefined ? {} : { detail }, ...templates[event]({ site: core.site, email: to, detail, url, locale }) })
   }
   catch (error) {
-    console.error(`kayjs-auth: mailing ${event} failed`, error)
+    log.error(`mailing ${event} failed`, error)
   }
 }
 

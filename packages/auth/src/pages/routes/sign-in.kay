@@ -11,6 +11,9 @@ import { captchaOf, failure, oauthFailure, schemas } from '../forms'
 import Button from '@kaynooo/kayjs-ui/button.kay'
 import FormField from '@kaynooo/kayjs-ui/form-field.kay'
 
+// Reached before signing in, so the app's guards, one asking for a session say, do not run here.
+export const page = { guards: false }
+
 export const password = action(schemas.signIn, async (input, ctx) => {
   const result = await ctx.locals.auth.signInWithPassword({ identifier: input.identifier, password: input.password, remember: input.remember === true, redirect: input.redirect, captcha: captchaOf(input) })
 

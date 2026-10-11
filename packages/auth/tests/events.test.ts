@@ -6,6 +6,8 @@ import { testApp } from './helpers/app'
 
 const PASSWORD = 'correct horse battery'
 const ACTIVITY = new Set<AuthEvent>(['signed-in', 'signed-out', 'sign-in-failed'])
+// Where kay sends what libraries log through `logFrom`, as the app's `log` setting says.
+const LOG_SINK = Symbol.for('kay.log')
 
 afterEach(() => {
   setSystemTime()
@@ -77,17 +79,28 @@ describe('events', () => {
     expect(said().slice(1)).toEqual([['signed-out', 'everywhere-else'], ['signed-out', 'everywhere']])
   })
 
-  test('an onEvent that throws is logged, and the sign-in goes on', async () => {
+  test('an onEvent that throws is logged through the app\'s log setting, and the sign-in goes on', async () => {
     const { browser } = testApp({
       onEvent: () => {
         throw new Error('down')
       },
     })
     const ada = browser()
+    const logged: unknown[][] = []
+    const global = globalThis as { [LOG_SINK]?: unknown }
+    const sink = global[LOG_SINK]
 
-    await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
+    global[LOG_SINK] = (...args: unknown[]) => logged.push(args)
+
+    try {
+      await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
+    }
+    finally {
+      global[LOG_SINK] = sink
+    }
 
     expect(await ada.json('/me')).toMatchObject({ email: 'ada@example.com' })
+    expect(logged).toContainEqual(['error', expect.stringMatching(/^onEvent failed for /), expect.objectContaining({ message: 'down' }), undefined, 'kayjs-auth'])
   })
 })
 

@@ -4,6 +4,7 @@ import type { IdentityRecord, UserRecord } from '../store'
 import type { OAuthTokens } from './types'
 import { newUserRecord, publicUser, sameText } from '../core'
 import { randomToken } from '../keys'
+import { log } from '../log'
 import { notify } from '../notify'
 import { normalizeEmail, normalizeUsername, usernameProblem } from '../rules'
 import { chooseRemember } from '../sessions'
@@ -176,7 +177,7 @@ async function heardProfile(core: Core, record: UserRecord, profile: Profile): P
     await core.onProviderProfile?.(publicUser(record), profile)
   }
   catch (error) {
-    console.error(`kayjs-auth: onProviderProfile failed for ${profile.provider}`, error)
+    log.error(`onProviderProfile failed for ${profile.provider}`, error)
   }
 }
 

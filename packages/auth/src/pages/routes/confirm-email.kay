@@ -6,6 +6,9 @@ import Panel from '../components/panel.kay'
 import { failure, schemas } from '../forms'
 import Button from '@kaynooo/kayjs-ui/button.kay'
 
+// Reached before signing in, so the app's guards, one asking for a session say, do not run here.
+export const page = { guards: false }
+
 // The link only shows this button, so a mail scanner opening it spends nothing.
 export const confirm = action(schemas.token, async ({ token }, ctx) => {
   const result = await ctx.locals.auth.confirmEmailChange(token)

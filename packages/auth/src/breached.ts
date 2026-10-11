@@ -1,6 +1,7 @@
 import type { Core } from './core'
 import type { PasswordProblem } from './rules'
 import { createHash } from 'node:crypto'
+import { log } from './log'
 import { passwordProblem } from './rules'
 
 const RANGE_URL = 'https://api.pwnedpasswords.com/range/'
@@ -39,7 +40,7 @@ export async function newPasswordProblem(core: Core, password: string): Promise<
     return await core.breached(password) ? 'breached' : undefined
   }
   catch (error) {
-    console.error('kayjs-auth: the breached-password check failed, so the password passes', error)
+    log.error('the breached-password check failed, so the password passes', error)
 
     return undefined
   }

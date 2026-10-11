@@ -5,6 +5,7 @@ import type { Requirement } from './types'
 import { publicUser } from './core'
 import { report } from './events'
 import { spend } from './limits'
+import { log } from './log'
 import { writing } from './mail'
 import { createRoleHierarchy } from './roles'
 import { emailProblem, normalizeEmail } from './rules'
@@ -386,7 +387,7 @@ export async function invite(state: RequestState, ref: string, email: string, ro
   }
   // Nobody would ever hear of an invitation left behind.
   catch (error) {
-    console.error('kayjs-auth: mailing an invitation failed', error)
+    log.error('mailing an invitation failed', error)
     await store.invitations.delete(invitation.id)
 
     return { ok: false, error: 'unavailable' }
