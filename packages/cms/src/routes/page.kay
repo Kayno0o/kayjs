@@ -1,6 +1,6 @@
 --- server
 import { localPath } from 'kay'
-import { enterPreview } from '../kay/server'
+import { enterPreview } from 'kay/server'
 
 // The screens' guard let the request in, so it may edit the page it names.
 enterPreview(ctx, { edit: true })

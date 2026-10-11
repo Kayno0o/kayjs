@@ -1,0 +1,15 @@
+--- server
+import { posts } from '../../content.config'
+
+export const page = { prerender: posts }
+
+const post = await posts.get(ctx.params.slug) ?? ctx.notFound()
+const { Content } = post
+---
+h1 {post.data.title}
+p Posted as {post.data.title}
+ul
+  for tag of post.data.tags
+    li {tag}
+article
+  Content

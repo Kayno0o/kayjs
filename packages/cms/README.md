@@ -34,10 +34,12 @@ export default defineConfig({
     // Left out, a file entry is written in the working tree, for `kay dev`.
     files: process.env.FORGEJO_TOKEN ? forgejo({ url: 'https://git.example.com', repo: 'me/site', token: process.env.FORGEJO_TOKEN }) : undefined,
   })],
+  // Edit mode is kay's preview mode: it needs the secret signing its cookie.
+  preview: { secret: process.env.PREVIEW_SECRET },
 })
 ```
 
-The screens live at `/admin` (`prefix` moves them) and stay closed without a `guard`. In edit mode, kay renders the editor at the end of every page, with the entries the page read. The CMS's API answers requests kay let into edit mode, and those the guard admits.
+The screens live at `/admin` (`prefix` moves them) and stay closed without a `guard`. In edit mode, kay renders the editor at the end of every page, with the entries the page read. The CMS's API answers requests kay let into edit mode, and those the guard admits. Their "Edit on page" links go through `/admin/page?path=`, which puts the editor the guard admitted in edit mode with kay's `enterPreview(ctx, { edit: true })`.
 
 A commit shows on the site once it has rebuilt from it. The Forgejo token needs write access to the repository's contents; the commit is the token's user's.
 

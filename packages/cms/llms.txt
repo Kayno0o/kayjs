@@ -10,6 +10,7 @@
 - Draft rendering happens on the server: the editor sends the changed entries, kay renders the page with them and swaps it in, islands kept.
 - Every change goes through one API, `POST` and `DELETE /api/cms/entries/:collection/:slug` and `POST …/:slug/publish`, from the sidebar and from the screens alike. kay validates the data against the schema and names the file; kay writes nothing, the configured `files` saver does.
 - The screens are closed without a `guard`: kayjs-cms has no users of its own.
+- Edit mode is kay's preview mode, so the app sets `preview.secret`. The API admits a request when `editRequested(request)` from `kay/server` says so, or the guard does.
 - `kay check` does not type-check an extension's routes yet (kaynooo/kayjs#296): the fixture renders the screens' components on a page of its own so they are checked.
 
 ## Setup

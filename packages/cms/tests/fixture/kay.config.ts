@@ -30,4 +30,7 @@ stubContent({
 })
 
 // The fixture lets everyone into the screens.
-export default defineConfig({ extensions: [cms({ guard: guard(() => undefined) })] })
+export default defineConfig({
+  extensions: [cms({ guard: guard(() => undefined) })],
+  preview: { secret: 'a-preview-secret-long-enough-for-kay-0123456789' },
+})

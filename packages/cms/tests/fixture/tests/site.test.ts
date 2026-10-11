@@ -1,13 +1,20 @@
 import { join } from 'node:path'
 import process from 'node:process'
-import { expect, test } from 'bun:test'
+import { beforeAll, expect, test } from 'bun:test'
 import { testSite } from 'kay/test'
+import { BODY, parseMarker } from '../../../src/markers'
 
 // Until kay renders the editor in edit mode (kaynooo/kayjs#262), the fixture's pages render it themselves.
 const ROOT = join(import.meta.dir, '..')
 // kay check prints this line on success since kay 1.18, nothing before.
 const CLEAN = /^(?:checked with no problems in \d+ ms\n)?$/
 const site = await testSite({ root: ROOT })
+// One client throughout, so the edit-mode cookie it is given goes with its next visits.
+let editor: Awaited<ReturnType<typeof testSite>>
+
+beforeAll(async () => {
+  editor = await testSite({ root: ROOT })
+})
 
 test('kay check passes on the fixture, the editor\'s components included', async () => {
   const check = Bun.spawn([process.execPath, join(ROOT, '..', '..', 'node_modules', '.bin', 'kay'), 'check'], { cwd: ROOT, stdout: 'pipe', stderr: 'pipe' })
@@ -70,4 +77,26 @@ test('an unknown collection or entry is a 404', async () => {
   expect((await site.fetch('/admin/collections/nope')).status).toBe(404)
   expect((await site.fetch('/admin/collections/posts/nope')).status).toBe(404)
   expect((await site.fetch('/admin/new/nope')).status).toBe(404)
+})
+
+test('opening a page through the screens puts it in edit mode, its fields marked as the editor reads them', async () => {
+  const plain = await site.visit('/blog/hello')
+
+  expect(plain.find('[data-kay-field]')).toEqual([])
+
+  const page = await editor.visit('/admin/page?path=/blog/hello')
+  const marked = page.find('[data-kay-field], [data-kay-list], [data-kay-body]').map(({ tag, attributes }) => {
+    const [name, value] = Object.entries(attributes).find(([key]) => key.startsWith('data-kay-'))!
+
+    return [tag, name, name === 'data-kay-list' ? value : parseMarker(value!, name === 'data-kay-body')]
+  })
+
+  expect(marked).toEqual([
+    ['h1', 'data-kay-field', { collection: 'posts', slug: 'hello', path: 'title' }],
+    ['ul', 'data-kay-list', 'posts:hello:tags'],
+    ['li', 'data-kay-field', { collection: 'posts', slug: 'hello', path: 'tags.0' }],
+    ['li', 'data-kay-field', { collection: 'posts', slug: 'hello', path: 'tags.1' }],
+    ['article', 'data-kay-body', { collection: 'posts', slug: 'hello', path: BODY }],
+  ])
+  expect(page.html).toContain('<!--kay-field posts:hello:title-->Hello world<!--/kay-field-->')
 })
