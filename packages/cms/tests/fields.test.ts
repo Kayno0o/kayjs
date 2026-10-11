@@ -1,6 +1,6 @@
 import type { Field } from '../src/fields'
 import { describe, expect, it } from 'bun:test'
-import { emptyValue, fieldsOf, humanize } from '../src/fields'
+import { emptyValue, fieldsOf, humanize, itemAt } from '../src/fields'
 
 describe('fieldsOf', () => {
   it('turns each property into a field, in order, with its label and whether it is required', () => {
@@ -103,5 +103,14 @@ describe('emptyValue', () => {
     })
 
     expect(emptyValue(item as Field)).toEqual({ label: '', on: false, count: undefined, size: 's', tags: [] })
+  })
+})
+
+describe('itemAt', () => {
+  it('numbers a list\'s items by their place, unless their schema titles them', () => {
+    const [tags, links] = fieldsOf({ properties: { tags: { type: 'array', items: { type: 'string' } }, links: { type: 'array', items: { type: 'string', title: 'Link' } } } }) as (Field & { kind: 'list' })[]
+
+    expect([itemAt(tags!, 0), itemAt(tags!, 1)].map(item => [item.key, item.label])).toEqual([[0, 'Item 1'], [1, 'Item 2']])
+    expect(itemAt(links!, 1).label).toBe('Link')
   })
 })

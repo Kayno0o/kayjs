@@ -18,12 +18,11 @@ export type Field
   = | FieldBase & { kind: 'text' | 'textarea' | 'markdown' | 'number' | 'integer' | 'boolean' | 'date' | 'datetime' | 'image' | 'file' | 'json' }
     | FieldBase & { kind: 'select', options: Choice[] }
     | FieldBase & { kind: 'reference', collection: string }
-    | FieldBase & { kind: 'list', item: Field }
+    | FieldBase & { kind: 'list', item: Field, numbered: boolean }
     | FieldBase & { kind: 'group', fields: Field[] }
 
 // A plain string longer than a line or two is edited in a textarea rather than a one-line box.
 const LONG_TEXT = 120
-// The words of a key: `publishedAt` holds `published` and `At`, `seoURL` holds `seo` and `URL`; `_` and `-` only separate them.
 // The words of a key: `publishedAt` gives `published At`, `seoURL` gives `seo URL`, an acronym keeping its capitals; `_` and `-` only separate.
 const WORD = /[A-Z]+(?![a-z])|[A-Z]?[a-z\d]+/g
 
@@ -80,12 +79,17 @@ export function fieldOf(key: string | number, schema: JsonSchema, required: bool
     case 'boolean':
       return { ...base, kind: 'boolean' }
     case 'array':
-      return inner.items === undefined ? { ...base, kind: 'json' } : { ...base, kind: 'list', item: fieldOf(0, inner.items, true) }
+      return inner.items === undefined ? { ...base, kind: 'json' } : { ...base, kind: 'list', item: fieldOf(0, inner.items, true), numbered: withoutNull(inner.items).schema.title === undefined }
     case 'object':
       return { ...base, kind: 'group', fields: fieldsOf(inner) }
     default:
       return { ...base, kind: 'json' }
   }
+}
+
+// A list's field for its item at `index`, numbered by its place unless its schema titles it.
+export function itemAt(list: Field & { kind: 'list' }, index: number): Field {
+  return { ...list.item, key: index, ...list.numbered && { label: `Item ${index + 1}` } }
 }
 
 function typeOf(schema: JsonSchema): string | undefined {

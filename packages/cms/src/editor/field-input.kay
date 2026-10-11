@@ -9,7 +9,7 @@ import MarkdownEditor from '@kaynooo/kayjs-ui/markdown-editor.kay'
 import Select from '@kaynooo/kayjs-ui/select.kay'
 import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
 import Toggle from '@kaynooo/kayjs-ui/toggle.kay'
-import { emptyValue } from '../fields'
+import { emptyValue, itemAt } from '../fields'
 import { joinPath } from '../paths'
 import FieldInput from './field-input.kay'
 import FileInput from './file-input.kay'
@@ -51,7 +51,7 @@ function setJson(next: string): void {
       FormField(label={current.label} hint={current.hint} issue={issue()} required={current.required} group)
         for item, i of items() key={i}
           .kcms-list-item
-            FieldInput(drafts={drafts} entry={entry} field={current.item} path={joinPath(path, i)})
+            FieldInput(drafts={drafts} entry={entry} field={itemAt(current, i)} path={joinPath(path, i)})
             IconButton(icon="delete" label="Remove" variant="ghost" size="sm" onClick={() => set(items().filter((_, at) => at !== i))})
         Button(label="Add" icon="plus" onClick={() => set([...items(), emptyValue(current.item)])})
     when 'group'
