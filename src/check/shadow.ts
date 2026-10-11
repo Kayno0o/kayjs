@@ -36,6 +36,8 @@ export interface ShadowFile {
 
 export interface ShadowSettings {
   routesDir: string
+  // The routes directories the app's extensions mount, whose pages' params are read from their own paths.
+  mounts: string[]
   islandOnly: Set<string>
   // The levels kay.config.ts gives the lints, which the compiler reports by.
   lints?: LintLevels | undefined
@@ -52,24 +54,33 @@ export function shadowSource(root: string, shadow: string): string {
 }
 
 export function serializeShadowSettings(root: string, settings: ShadowSettings): string {
-  return `${JSON.stringify({ routes: relative(root, settings.routesDir), islandOnly: [...settings.islandOnly].map(file => relative(root, file)).sort(), ...settings.lints && { lints: settings.lints } }, null, 2)}\n`
+  return `${JSON.stringify({ routes: relative(root, settings.routesDir), mounts: settings.mounts.map(dir => relative(root, dir)), islandOnly: [...settings.islandOnly].map(file => relative(root, file)).sort(), ...settings.lints && { lints: settings.lints } }, null, 2)}\n`
 }
 
 // The settings the shadow tree was written with, or the defaults when no `kay check`, `kay dev` or LSP has written it yet.
 export function readShadowSettings(root: string): ShadowSettings {
   try {
-    const saved = JSON.parse(readFileSync(join(projectPaths(root).types, SHADOW_SETTINGS), 'utf8')) as { routes: string, islandOnly: string[], lints?: LintLevels }
+    const saved = JSON.parse(readFileSync(join(projectPaths(root).types, SHADOW_SETTINGS), 'utf8')) as { routes: string, mounts?: string[], islandOnly: string[], lints?: LintLevels }
 
-    return { routesDir: resolve(root, saved.routes), islandOnly: new Set(saved.islandOnly.map(file => resolve(root, file))), lints: saved.lints }
+    return { routesDir: resolve(root, saved.routes), mounts: (saved.mounts ?? []).map(dir => resolve(root, dir)), islandOnly: new Set(saved.islandOnly.map(file => resolve(root, file))), lints: saved.lints }
   }
   catch {
-    return { routesDir: projectPaths(root).routes, islandOnly: new Set() }
+    return { routesDir: projectPaths(root).routes, mounts: [], islandOnly: new Set() }
   }
 }
 
-// Compiles one .kay file for type checking, its route params typed when it is a page under `pagesDir`, the routes directory or an extension's, by the matchers beside `routesDir`; `insideIsland` for a static component only islands render.
-export function compileShadow(root: string, routesDir: string, file: string, source: string, insideIsland = false, lints?: LintLevels, signals: ImportedSignals = importedSignals(file, source), pagesDir = routesDir): { shadow: ShadowFile, diagnostics: Diagnostic[] } {
-  const route = file.startsWith(pagesDir + sep) ? routeOf(pagesDir, file) : undefined
+export interface ShadowOptions {
+  routesDir: string
+  mounts: string[]
+  // For a static component only islands render.
+  insideIsland?: boolean
+  lints?: LintLevels | undefined
+  signals?: ImportedSignals
+}
+
+// Compiles one .kay file for type checking, its route params typed when it is a page of the routes directory or of an extension's, by the matchers beside `routesDir`.
+export function compileShadow(root: string, file: string, source: string, { routesDir, mounts, insideIsland = false, lints, signals = importedSignals(file, source) }: ShadowOptions): { shadow: ShadowFile, diagnostics: Diagnostic[] } {
+  const route = pageRoute(file, routesDir, mounts)
   const shadowDir = dirname(shadowPath(root, file))
   // rootDirs only merges paths inside the project, so an import reaching outside it is pointed there from the shadow file.
   const relocateImport = (specifier: string) => {
@@ -143,6 +154,13 @@ function wordEnd(source: string, offset: number): number {
     end++
 
   return end === offset ? Math.min(offset + 1, source.length) : end
+}
+
+// The route of `file` when it is a page, its path read from the routes directory holding it: the app's, or an extension's. Its matchers are the app's either way.
+export function pageRoute(file: string, routesDir: string, mounts: string[]): ReturnType<typeof routeOf> {
+  const pagesDir = mounts.find(dir => file.startsWith(dir + sep)) ?? routesDir
+
+  return file.startsWith(pagesDir + sep) ? routeOf(pagesDir, file) : undefined
 }
 
 // A matcher's param is what it returns, the project's own or kay's; an optional one may be missing.

@@ -24,6 +24,7 @@ import { parseKay } from '../compiler/parser'
 import { analyzeScript, analyzeServer } from '../compiler/script'
 import { CONFIG_FILE, loadConfig } from '../config'
 import { projectPaths, projectRootOf, SHADOW_DIR } from '../project'
+import { routeMounts } from '../server/routes'
 import { Connection } from './rpc'
 
 // Where a file tsgo names is for the editor: its .kay source for a shadow file, the file itself outside the shadow tree.
@@ -37,6 +38,8 @@ interface Project {
   root: string
   options: CheckOptions
   routesDir: string
+  // The routes directories its extensions mount.
+  mounts: string[]
   shadowTree: string
   shadowFiles: Set<string>
   // As of the last shadow write: the static components only islands render, the library components the app never imports, whose errors are the library's, and the libraries.
@@ -319,6 +322,7 @@ export class KayLanguageServer {
 
     project.options = { ...configCheckOptions(config), routes: (project.root === this.root ? this.routesSetting : undefined) ?? config.routes }
     project.routesDir = projectPaths(project.root, project.options).routes
+    project.mounts = routeMounts(project.root, project.options.extensions).map(mount => mount.dir)
     project.configured = true
   }
 
@@ -327,7 +331,7 @@ export class KayLanguageServer {
     let project = this.projects.get(root)
 
     if (!project)
-      this.projects.set(root, project = { root, options: {}, routesDir: projectPaths(root).routes, shadowTree: `${projectPaths(root).types}/`, shadowFiles: new Set(), islandOnly: new Set(), unreached: new Set(), libraries: [], configured: false })
+      this.projects.set(root, project = { root, options: {}, routesDir: projectPaths(root).routes, mounts: [], shadowTree: `${projectPaths(root).types}/`, shadowFiles: new Set(), islandOnly: new Set(), unreached: new Set(), libraries: [], configured: false })
 
     return project
   }
@@ -348,7 +352,7 @@ export class KayLanguageServer {
     const project = this.projectAt(projectRootOf(file, this.root))
     const insideIsland = project.islandOnly.has(file)
     const signals = importedSignals(file, source)
-    const { shadow, diagnostics } = compileShadow(project.root, project.routesDir, file, source, insideIsland, project.options.lints, signals)
+    const { shadow, diagnostics } = compileShadow(project.root, file, source, { routesDir: project.routesDir, mounts: project.mounts, insideIsland, lints: project.options.lints, signals })
     const document = { ...shadow, uri, shadowUri: pathToFileURL(shadowPath(project.root, file)).href, version, diagnostics, insideIsland, signals: JSON.stringify(signals) }
 
     this.documents.set(uri, document)
@@ -819,7 +823,7 @@ export class KayLanguageServer {
     const file = shadowSource(project.root, path)
     const source = Bun.file(file)
 
-    return await source.exists() ? compileShadow(project.root, project.routesDir, file, await source.text(), project.islandOnly.has(file), project.options.lints).shadow : undefined
+    return await source.exists() ? compileShadow(project.root, file, await source.text(), { routesDir: project.routesDir, mounts: project.mounts, insideIsland: project.islandOnly.has(file), lints: project.options.lints }).shadow : undefined
   }
 
   // `offset` is the position in the .kay source.

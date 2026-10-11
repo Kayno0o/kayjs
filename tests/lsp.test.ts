@@ -626,6 +626,35 @@ describe('kay lsp in a project nested in the workspace', () => {
   })
 })
 
+// A library's own fixture app lists its extension by a path beside it, opened from the app's folder.
+describe('kay lsp on an extension listed from beside the app', () => {
+  let editor: Editor
+  let dir: string
+
+  beforeAll(async () => {
+    dir = await scratchDir('lsp-extension-')
+    await Promise.all([
+      Bun.write(join(dir, 'app/tsconfig.json'), await Bun.file(join(fixtures, 'site/tsconfig.json')).text()),
+      Bun.write(join(dir, 'app/kay.config.ts'), 'export default { extensions: [{ name: \'lib\', routes: { dir: \'../lib/routes\', prefix: \'/lib\' } }] }\n'),
+      Bun.write(join(dir, 'app/src/routes/index.kay'), 'p Home\n'),
+      Bun.write(join(dir, 'app/src/params/code.ts'), 'export default (value: string): number | undefined => (/^\\d+$/).test(value) ? Number(value) : undefined\n'),
+      Bun.write(join(dir, 'lib/package.json'), JSON.stringify({ name: 'lib' })),
+      Bun.write(join(dir, 'lib/routes/codes/[id=code]/label.kay'), '--- server\nconst label: string = ctx.params.id\n---\np {label}\n'),
+    ])
+    editor = new Editor(join(dir, 'app'))
+    await editor.start()
+  })
+
+  afterAll(async () => {
+    await editor.stop()
+    await rm(dir, { recursive: true, force: true })
+  })
+
+  it('types a page\'s params from its path in the extension\'s routes, by the app\'s matchers, as kay check does', async () => {
+    expect((await editor.open('../lib/routes/codes/[id=code]/label.kay')).map(diagnostic => [diagnostic.range.start.line, diagnostic.message])).toEqual([[1, 'Type \'number\' is not assignable to type \'string\'.']])
+  })
+})
+
 // VS Code writes a project's path with more percent-escapes than Node does, and tsgo echoes URIs the VS Code way.
 describe('kay lsp in a path VS Code percent-encodes', () => {
   let editor: Editor

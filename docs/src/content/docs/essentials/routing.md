@@ -180,7 +180,7 @@ export default defineConfig({ extensions: [authPages()] })
 
 Its pages serve under their prefix, `/auth/login`, inside your layouts and guards. To change one, put your own file at the same path, `src/routes/auth/login.kay`: it replaces that page alone, and the library's others stay.
 
-While you write such a library, list its extension from an example or fixture app, by a relative import or through a link: `kay check` there checks the library's pages as the app's own. Once installed from the registry, the errors inside its files are the library's to fix.
+While you write such a library, list its extension from an example or fixture app, by a relative import or through a link: `kay check` there, and the editor opened on the app, check the library's pages as the app's own, their route params typed by the app's matchers. Once installed from the registry, the errors inside its files are the library's to fix.
 
 <ReadMore href="/llms/components#extensions">Writing an extension, its layouts, messages, API modules and config, and page hooks.</ReadMore>
 

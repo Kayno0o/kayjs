@@ -73,7 +73,7 @@ describe('kay check', () => {
   it('points imports reaching outside the project at their target from the shadow file', () => {
     const root = join(fixtures, 'app')
     const source = '---\nimport type { Row } from "../../shared/data"\nimport type { Todo } from "./todo"\n---\np\n'
-    const { shadow } = compileShadow(root, join(root, 'src/routes'), join(root, 'src/row.kay'), source)
+    const { shadow } = compileShadow(root, join(root, 'src/row.kay'), source, { routesDir: join(root, 'src/routes'), mounts: [] })
 
     expect(shadow.tsx).toContain('import type { Row } from "../../../../shared/data"')
     expect(shadow.tsx).toContain('import type { Todo } from "./todo"')

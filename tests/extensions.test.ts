@@ -6,6 +6,7 @@ import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { parse } from 'devalue'
 import { t } from 'elysia'
+import { readShadowSettings } from '../src/check/shadow'
 import { mergeConfig } from '../src/config'
 import { routeMounts, scanRoutes } from '../src/server/routes'
 import { scratchDir } from './scratch'
@@ -394,6 +395,7 @@ const LOCAL_CHECKED: Record<string, string> = {
   'lib/routes/broken.kay': '---\nconst wrong: number = \'beside\'\n---\np {wrong}\n',
   // The app's matchers type an extension's params as they do its own.
   'lib/routes/codes/[id=code].kay': '--- server\nconst id: number = ctx.params.id\n---\np {id}\n',
+  'lib/routes/codes/[id=code]/label.kay': '--- server\nconst label: string = ctx.params.id\n---\np {label}\n',
   // Two package roots, one inside the other, each listing pages.
   'abs/package.json': JSON.stringify({ name: 'abs' }),
   'abs/routes/broken.kay': '---\nconst wrong: number = \'absolute\'\n---\np {wrong}\n',
@@ -423,8 +425,12 @@ describe('an extension listed from beside the app', () => {
       expect([...output.matchAll(/\| const wrong: number = '(\w+)'/g)].map(match => match[1]).sort()).toEqual(['absolute', 'beside', 'linked', 'reached'])
       expect(output.split('error[missing-alt]').length).toBe(2)
       expect(output).not.toContain('codes/[id=code].kay')
+      expect(output.split('label.kay').length).toBe(2)
+      expect(output).toContain('Type \'number\' is not assignable to type \'string\'.\n --> ../lib/routes/codes/[id=code]/label.kay:2:')
       expect(output).toContain('--> ../lib/routes/[slug].kay:3:')
-      expect(output).toContain('6 errors')
+      expect(output).toContain('7 errors')
+      // What the ESLint processor types the pages by.
+      expect(readShadowSettings(join(dir, 'app')).mounts).toContain(join(dir, 'lib/routes'))
     }
     finally {
       await rm(dir, { recursive: true, force: true })

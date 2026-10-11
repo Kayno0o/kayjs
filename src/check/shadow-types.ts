@@ -2,13 +2,12 @@
 import type { CheckDiagnostic, CheckOptions } from '.'
 import type { KayLibrary } from '../build/libraries'
 import type { Diagnostic } from '../compiler/ast'
-import type { LintLevels } from '../compiler/lints'
 import type { I18nConfig } from '../config'
 import type { LocaleSettings } from '../runtime/i18n'
 import type { ApiModule } from '../server/api'
 import type { PublicFile } from '../server/public'
 import type { Endpoint, Route, RouteMount } from '../server/routes'
-import type { ShadowFile } from './shadow'
+import type { ShadowFile, ShadowOptions } from './shadow'
 import { existsSync, realpathSync } from 'node:fs'
 import { readdir, rm } from 'node:fs/promises'
 import { basename, dirname, join, relative, resolve, sep } from 'node:path'
@@ -26,13 +25,13 @@ import { projectApi } from '../server/api'
 import { localeSettings } from '../server/i18n'
 import { htmlFallbacks, publicFiles } from '../server/public'
 import { redirectProblems } from '../server/redirects'
-import { patternShapes, routeMounts, routeOf, scanEndpoints, scanRoutes, servedPaths } from '../server/routes'
+import { patternShapes, routeMounts, scanEndpoints, scanRoutes, servedPaths } from '../server/routes'
 import { ownFile } from './diagnose'
 import { ASSET_TYPES, environmentTypes, KAY_PATHS, packageTypes } from './env-types'
 import { CONTENT_CHECK, EXPORTS_CHECK, exportsCheck, SETTINGS_CHECK, settingsCheck } from './generated'
 import { unguardedRoutes } from './guards'
 import { islandOnlyComponents } from './island-only'
-import { compileShadow, matcherSource, serializeShadowSettings, SHADOW_SETTINGS, shadowPath } from './shadow'
+import { compileShadow, matcherSource, pageRoute, serializeShadowSettings, SHADOW_SETTINGS, shadowPath } from './shadow'
 
 // Imports each page of the extensions kay check reports as the app's own, so TypeScript checks them.
 const EXTENSION_PAGES = 'kay-extension-pages.ts'
@@ -101,7 +100,7 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
   if (libraries.pages.length > 0)
     await tree.write(EXTENSION_PAGES, libraries.pages.map(file => `import ${JSON.stringify(`./${relative(projectPaths(root).types, shadowPath(root, file)).slice(0, -'.tsx'.length)}`)}\n`).join(''))
 
-  await tree.write(SHADOW_SETTINGS, serializeShadowSettings(root, { routesDir, islandOnly: own.islandOnly, lints: options.lints }))
+  await tree.write(SHADOW_SETTINGS, serializeShadowSettings(root, { routesDir, mounts: mounts.map(mount => mount.dir), islandOnly: own.islandOnly, lints: options.lints }))
   // `contentChecks` writes the props check once it read the collections.
   await tree.removeStale([CONTENT_CHECK])
 
@@ -147,7 +146,7 @@ async function ownShadows(root: string, options: CheckOptions, tree: ShadowTree,
 
   for (const file of files) {
     const source = sources.get(file)!
-    const { shadow, diagnostics: compileDiagnostics } = await compileShadowCached(cacheDir, root, routesDir, file, source, islandOnly.has(file), options.lints, pagesDirOf(file, routesDir, mounts))
+    const { shadow, diagnostics: compileDiagnostics } = await compileShadowCached(cacheDir, root, file, source, { routesDir, mounts: mounts.map(mount => mount.dir), insideIsland: islandOnly.has(file), lints: options.lints })
 
     await tree.shadow(shadow, shadowPath(root, file))
     for (const diagnostic of compileDiagnostics)
@@ -177,7 +176,7 @@ async function libraryShadows(root: string, options: CheckOptions, own: string[]
 
   await Promise.all(files.map(async (file) => {
     const source = await Bun.file(file).text()
-    const { shadow, diagnostics: compileDiagnostics } = await compileShadowCached(cacheDir, root, routesDir, file, source, false, options.lints, pagesDirOf(file, routesDir, mounts))
+    const { shadow, diagnostics: compileDiagnostics } = await compileShadowCached(cacheDir, root, file, source, { routesDir, mounts: mounts.map(mount => mount.dir), lints: options.lints })
 
     await tree.shadow(shadow, shadowPath(root, file))
 
@@ -199,7 +198,7 @@ async function extensionPackages(root: string, libraries: KayLibrary[], mounts: 
   const dirs = new Set(mounts.filter(mount => libraryOf(libraries, join(mount.dir, 'page.kay')) === undefined).map(mount => packageRoot(mount.dir)))
 
   return Promise.all([...dirs].map(async (dir) => {
-    // The app itself, when the package holds it as a fixture, and the other projects inside it are left to their own checks, a kay library's files to the library.
+    // Left out: the app itself, when the package holds it as a fixture; the other projects inside it, to their own checks; a kay library's files, to the library.
     const files = (await findKayFiles(dir, { project: true, ownOnly: true, ownKayOnly: true })).filter(file => !file.startsWith(root + sep) && libraryOf(libraries, file) === undefined)
 
     return { name: basename(dir), dir, realDir: dir, files, specifiers: new Map<string, string>() }
@@ -214,11 +213,6 @@ function packageRoot(dir: string): string {
     if (at === dirname(at))
       return dir
   }
-}
-
-// The directory a page's path, and so its params, is read from: the app's routes, or those of the extension mounting it. Its matchers are the app's either way.
-function pagesDirOf(file: string, routesDir: string, mounts: RouteMount[]): string {
-  return mounts.find(mount => file.startsWith(mount.dir + sep))?.dir ?? routesDir
 }
 
 // The pages, public files, API modules and endpoints, with the locale settings, each with the reason the server would refuse it reported.
@@ -253,18 +247,18 @@ async function rendersAsIslandCached(cacheDir: string, file: string, source: str
   return island
 }
 
-// `compileShadow` through the build's cache of compiles. A page's params are typed by the matchers they name, so where each one is found, if anywhere, is part of the key, as are the signals of the modules it imports.
-async function compileShadowCached(cacheDir: string, root: string, routesDir: string, file: string, source: string, insideIsland: boolean, lints?: LintLevels, pagesDir = routesDir): Promise<ReturnType<typeof compileShadow>> {
-  const route = file.startsWith(pagesDir + sep) ? routeOf(pagesDir, file) : undefined
+// `compileShadow` through the build's cache of compiles. A page's params are read from its path in the routes directory holding it, an extension's or the app's, and typed by the matchers they name, so the mounts and where each matcher is found, if anywhere, are part of the key, as are the signals of the modules it imports.
+async function compileShadowCached(cacheDir: string, root: string, file: string, source: string, { routesDir, mounts, insideIsland = false, lints }: ShadowOptions): Promise<ReturnType<typeof compileShadow>> {
+  const route = pageRoute(file, routesDir, mounts)
   const matchers = Object.values(route?.matchers ?? {}).map(matcher => matcherSource(routesDir, matcher) ?? '')
   const signals = importedSignals(file, source)
-  const slot = cacheEntry(cacheDir, file, 'shadow', JSON.stringify([root, routesDir, pagesDir, insideIsland, lints ?? {}, matchers, signals, source]))
+  const slot = cacheEntry(cacheDir, file, 'shadow', JSON.stringify([root, routesDir, mounts, insideIsland, lints ?? {}, matchers, signals, source]))
   const cached = await readCacheEntry<{ tsx: string, map: ReturnType<SourceMap['toJSON']>, diagnostics: Diagnostic[] }>(slot)
 
   if (cached !== undefined)
     return { shadow: { source, file, tsx: cached.tsx, map: SourceMap.fromJSON(cached.map) }, diagnostics: cached.diagnostics }
 
-  const compiled = compileShadow(root, routesDir, file, source, insideIsland, lints, signals, pagesDir)
+  const compiled = compileShadow(root, file, source, { routesDir, mounts, insideIsland, lints, signals })
 
   await writeCacheEntry(slot, { tsx: compiled.shadow.tsx, map: compiled.shadow.map, diagnostics: compiled.diagnostics })
 
