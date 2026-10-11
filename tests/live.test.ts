@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { kay } from '../src/build/plugin'
 import { check } from '../src/check'
 import { flush, root, signal } from '../src/runtime'
-import { ApiError, call, dispatch, readEvents, resource, socket } from '../src/runtime/live'
+import { ApiError, call, dispatch, readEvents, resource, socket, stream } from '../src/runtime/live'
 import { apiStubs, scanApi } from '../src/server/api'
 import { rooms, sqliteRooms } from '../src/server/rooms'
 import { testSite } from '../src/test'
@@ -211,6 +211,105 @@ describe('API modules', () => {
     finally {
       await rm(outdir, { recursive: true, force: true })
     }
+  })
+})
+
+describe('stream() started from a handler', () => {
+  let served: ReturnType<typeof spyOn<typeof globalThis, 'fetch'>>
+
+  // A fetch the site answers, cancelling the answer's body once the signal aborts, as a browser does.
+  beforeAll(() => {
+    served = spyOn(globalThis, 'fetch').mockImplementation((async (input: RequestInfo | URL, init?: RequestInit) => site.fetch(String(input), init as never)) as typeof fetch)
+  })
+
+  afterAll(() => served.mockRestore())
+
+  const until = async (ready: () => boolean) => {
+    for (let tries = 0; !ready() && tries < 100; tries++)
+      await Bun.sleep(5)
+  }
+
+  it('waits idle for start(), each start opening a run with the options given then and forgetting the last', async () => {
+    const ticks = root(() => stream(chat, '/ticks', { start: false }))
+
+    expect(ticks.status()).toBe('idle')
+    expect(served).not.toHaveBeenCalled()
+
+    ticks.start({ query: { count: 2 } })
+    await until(() => ticks.status() === 'done')
+    expect(ticks.last()?.tick).toBe(2)
+    expect(String(served.mock.calls.at(-1)?.[0])).toBe('/api/chat/ticks?count=2')
+
+    ticks.start({ query: { count: 1 } })
+    expect(ticks.status()).toBe('connecting')
+    expect(ticks.last()).toBeUndefined()
+    await until(() => ticks.status() === 'done')
+    expect(ticks.last()?.at).toEqual(new Date(Date.UTC(2026, 0, 1)))
+  })
+
+  it('stops the route\'s source when closed, and starts again after', async () => {
+    const forever = root(() => stream(chat, '/forever', { start: false }))
+    const stopped = async () => Number(await (await site.fetch('/api/chat/forever/stopped')).text())
+    const before = await stopped()
+
+    forever.start()
+    await until(() => (forever.last() ?? 0) >= 2)
+    forever.close()
+    expect(forever.status()).toBe('closed')
+    await until(() => false)
+    expect(await stopped()).toBe(before + 1)
+
+    forever.start()
+    await until(() => (forever.last() ?? 0) >= 1)
+    expect(forever.status()).toBe('open')
+    forever.start()
+    await until(() => false)
+    expect(await stopped()).toBe(before + 2)
+    forever.close()
+  })
+
+  it('posts a body carrying a file, or a FormData, as a form', async () => {
+    const lines = root(() => stream(chat, '/lines', { method: 'post', start: false }))
+    const values: string[] = []
+
+    lines.on(line => void values.push(line))
+    lines.start({ body: { file: new File(['a\nb'], 'lines.txt'), prefix: '> ' } })
+    await until(() => lines.status() === 'done')
+    expect(values).toEqual(['> a', '> b'])
+    expect(served.mock.calls.at(-1)?.[1]?.body).toBeInstanceOf(FormData)
+
+    const form = new FormData()
+
+    form.append('file', new File(['c'], 'lines.txt'))
+    form.append('prefix', '')
+    lines.start({ body: form })
+    await until(() => lines.status() === 'done')
+    expect(values.at(-1)).toBe('c')
+  })
+
+  it('types the options of each start by the route', () => {
+    const typed = () => {
+      const ticks = stream(chat, '/ticks', { start: false })
+      const lines = stream(chat, '/lines', { method: 'post', start: false })
+
+      // @ts-expect-error: the route takes a count
+      ticks.start()
+      // @ts-expect-error: the count is a number
+      ticks.start({ query: { count: '2' } })
+      // @ts-expect-error: the route takes a file
+      lines.start({ body: { prefix: '' } })
+      // @ts-expect-error: /lines answers no GET
+      stream(chat, '/lines', { start: false })
+      // @ts-expect-error: /answer answers no GET
+      stream(chat, '/answer', { body: { prompt: '' } })
+      lines.start({ body: new FormData() })
+
+      const tick: number | undefined = ticks.last()?.tick
+
+      return tick
+    }
+
+    expect(typed).toBeFunction()
   })
 })
 

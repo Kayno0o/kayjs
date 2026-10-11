@@ -119,6 +119,22 @@ const answer = stream(chat, '/answer', {
 p {answer.last()}
 ```
 
+A stream opened with `start: false` waits, `idle`, for a handler to call `start()` with the params, query and body of that run, typed by the route. Each start closes the run going and forgets its last value. The body may hold a `File` or be a `FormData`, sent as a form. `close()` aborts the request, and the route's source stops as it would if the browser went away:
+
+```kay
+---
+import { stream } from 'kay'
+import chat from '../api/chat'
+
+const prompt = signal('')
+const answer = stream(chat, '/answer', { method: 'post', start: false })
+---
+input(value={prompt()} onInput={event => prompt.set(event.currentTarget.value)})
+button(onClick={() => answer.start({ body: { prompt: prompt() } })}) Ask
+button(onClick={answer.close} disabled={answer.status() !== 'open'}) Stop
+p {answer.last()}
+```
+
 ## Websockets
 
 A `.ws()` route is opened with `socket()`. `send` takes the route's `body`, `last()` reads the last message reactively and `status()` is `connecting`, `open` or `closed`. A dropped connection reconnects by itself.

@@ -1,6 +1,8 @@
 import { t } from 'elysia'
 import { api, eventStream } from 'kay/server'
 
+let stopped = 0
+
 // Each room echoes what it gets, signed by who sent it; `drop` closes the connection as a crashing server would.
 export default api()
   .ws('/:room', {
@@ -26,3 +28,18 @@ export default api()
 
     throw new Error('the source broke')
   })()))
+  .get('/forever', () => eventStream((async function* () {
+    try {
+      for (let tick = 1; ; tick++) {
+        yield tick
+        await Bun.sleep(10)
+      }
+    }
+    finally {
+      stopped++
+    }
+  })()))
+  .get('/forever/stopped', () => stopped)
+  .post('/lines', ({ body }) => eventStream((async function* () {
+    yield* (await body.file.text()).split('\n').map(line => `${body.prefix}${line}`)
+  })()), { body: t.Object({ file: t.File(), prefix: t.String() }) })
