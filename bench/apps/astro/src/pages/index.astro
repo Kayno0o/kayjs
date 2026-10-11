@@ -1,0 +1,22 @@
+---
+import Counter from '../components/Counter'
+import Site from '../layouts/Site.astro'
+import { formatPrice, PRODUCTS } from '../../../../shared/data'
+---
+<Site page="products">
+  <h1>Products</h1>
+  <p class="summary">{PRODUCTS.length} products</p>
+  <Counter client:load start={0} />
+  <ul class="products">
+    {PRODUCTS.map(product => (
+      <li class="product">
+        <h2>{product.name}</h2>
+        <p class="price">{formatPrice(product.price)}</p>
+        <p class={`stock ${product.stock === 0 ? 'out' : 'in'}`}>{product.stock} in stock</p>
+        <ul class="tags">
+          {product.tags.map(tag => <li>{tag}</li>)}
+        </ul>
+      </li>
+    ))}
+  </ul>
+</Site>

@@ -1,11 +1,11 @@
-// kay against Solid and Svelte, `bun run bench`, written to bench/results.md: it drives Chromium, the one BUN_CHROME_PATH names or the one `bunx playwright-core install chromium` downloads.
+// kay against Solid, Svelte, Astro, Next.js and Nuxt, `bun run bench`, written to bench/results.md: it drives Chromium, the one BUN_CHROME_PATH names or the one `bunx playwright-core install chromium` downloads.
 import type { Browser } from 'playwright-core'
 import type { LoadResult, OperationResult } from './browser'
 import { existsSync } from 'node:fs'
 import { cpus } from 'node:os'
 import { join } from 'node:path'
 import { parseArgs } from 'node:util'
-import { APPS } from './apps'
+import { APPS, IN_PROCESS_APPS } from './apps'
 import { assertHydrated, launch, measureLoad, measureOperations, serve } from './browser'
 import { kilobytes, medianOf, milliseconds, table } from './format'
 import { clientRows, PATHS, serverMarkup } from './markup'
@@ -17,7 +17,7 @@ interface SsrResult {
 }
 
 interface AppResult {
-  ssr: SsrResult
+  ssr: SsrResult | undefined
   products: LoadResult
   table: LoadResult
   operations: OperationResult[]
@@ -32,7 +32,7 @@ const RUNS = Number(runsOption)
 if (!Number.isInteger(RUNS) || RUNS < 1)
   throw new Error(`--runs takes a whole number of runs, not ${runsOption}`)
 
-// Solid and Svelte live in their own packages; install them on first run.
+// Every app but kay lives in its own package; install them on first run.
 async function installApps() {
   for (const app of APPS.filter(name => name !== 'kay')) {
     const dir = join(import.meta.dir, 'apps', app)
@@ -97,27 +97,30 @@ function loadRows(apps: AppResult[], page: 'products' | 'table'): string[][] {
 }
 
 function report(apps: AppResult[], environment: string[]): string {
+  const renders = apps.flatMap(app => app.ssr ? [app.ssr] : [])
+
   return [
-    '# Benchmark: kay, SolidJS and Svelte',
+    '# Benchmark: kay, SolidJS, Svelte, Astro, Next.js and Nuxt',
     '',
     ...environment.map(line => `- ${line}`),
     '',
-    `Every app renders the same markup from the same data behind the same Elysia server, checked before measuring, table rows included. Bold is the best of a row, the factor how far a value is from it. Reproduce with \`bun run bench${RUNS === DEFAULT_RUNS ? '' : ` --runs ${RUNS}`}\`.`,
+    `Every app renders the same markup from the same data, checked before measuring, table rows included: kay, Solid and Svelte behind the same Elysia server, Astro and Nuxt through their own request handlers called in-process, Next through its Node request handler on a local port. Bold is the best of a row, the factor how far a value is from it. Reproduce with \`bun run bench${RUNS === DEFAULT_RUNS ? '' : ` --runs ${RUNS}`}\`.`,
     '',
     'What differs by design:',
     '',
     '- Solid and Svelte hydrate the whole page, so their HTML carries the page data as JSON and their one bundle holds both pages\' components. kay hydrates its islands only and ships one chunk per island, fetched after its entry and shared chunk.',
-    '- Each table is written the way its framework\'s js-framework-benchmark entry is: Solid keeps a signal per label and selects rows with `createSelector`, Svelte keeps a `$state` label per row, kay replaces rows immutably under a keyed `for` and selects rows with `selection`.',
+    '- Nuxt hydrates the whole page too, the products coming from an API route into its payload. Astro hydrates its counter and table as SolidJS islands. Next renders server components and hydrates its client ones, the counter and table, streaming the component payload with the page.',
+    '- Each table is written the way its framework\'s js-framework-benchmark entry is: Solid keeps a signal per label and selects rows with `createSelector`, Svelte keeps a `$state` label per row, kay replaces rows immutably under a keyed `for` and selects rows with `selection`. Astro\'s island is the Solid table, Next keeps rows and selection in one reducer with memoised rows, Nuxt keeps a shallow ref of plain rows memoised with `v-memo`.',
     '',
     '## Server rendering',
     '',
-    'The products page (layout, 500 products, one counter) rendered in-process through the app\'s request handler, measured by mitata.',
+    'The products page (layout, 500 products, one counter) rendered in-process through the app\'s request handler, measured by mitata. Next is left out: it serves only through its own HTTP server, so its renders would carry a socket round trip the others never pay.',
     '',
-    table(['', ...APPS], [
-      ['renders/s', ...relative(apps.map(app => 1e9 / app.ssr.avg), value => value.toFixed(0), true)],
-      ['mean (ms)', ...relative(apps.map(app => app.ssr.avg / NANOSECONDS_PER_MS), milliseconds)],
-      ['p50 (ms)', ...relative(apps.map(app => app.ssr.p50 / NANOSECONDS_PER_MS), milliseconds)],
-      ['p99 (ms)', ...relative(apps.map(app => app.ssr.p99 / NANOSECONDS_PER_MS), milliseconds)],
+    table(['', ...IN_PROCESS_APPS], [
+      ['renders/s', ...relative(renders.map(ssr => 1e9 / ssr.avg), value => value.toFixed(0), true)],
+      ['mean (ms)', ...relative(renders.map(ssr => ssr.avg / NANOSECONDS_PER_MS), milliseconds)],
+      ['p50 (ms)', ...relative(renders.map(ssr => ssr.p50 / NANOSECONDS_PER_MS), milliseconds)],
+      ['p99 (ms)', ...relative(renders.map(ssr => ssr.p99 / NANOSECONDS_PER_MS), milliseconds)],
     ]),
     '',
     '## Products page in Chromium',
@@ -147,23 +150,23 @@ async function version(app: string, name: string): Promise<string> {
 
 async function measure(browser: Browser, run: number): Promise<AppResult[]> {
   const of = RUNS > 1 ? ` (run ${run} of ${RUNS})` : ''
-  const ssrResults: SsrResult[] = []
+  const ssrResults = new Map<string, SsrResult>()
 
-  for (const app of APPS) {
+  for (const app of IN_PROCESS_APPS) {
     console.error(`server rendering: ${app}${of}`)
-    ssrResults.push(await ssr(app))
+    ssrResults.set(app, await ssr(app))
   }
 
   const results: AppResult[] = []
 
-  for (const [index, app] of APPS.entries()) {
+  for (const app of APPS) {
     const server = await serve(app)
 
     try {
       console.error(`browser: ${app}${of}`)
       await assertHydrated(browser, server.url)
       results.push({
-        ssr: ssrResults[index]!,
+        ssr: ssrResults.get(app),
         products: await measureLoad(browser, server.url),
         table: await measureLoad(browser, `${server.url}/table`),
         operations: await measureOperations(browser, server.url),
@@ -195,7 +198,7 @@ try {
   const environment = [
     `${cpus()[0]?.model ?? 'unknown CPU'}, ${cpus().length} threads`,
     `Bun ${Bun.version}, Chromium ${browser.version()} headless`,
-    `${await version('kay', 'kay')}, ${await version('solid', 'solid-js')}, ${await version('svelte', 'svelte')}`,
+    `${await version('kay', 'kay')}, ${await version('solid', 'solid-js')}, ${await version('svelte', 'svelte')}, ${await version('astro', 'astro')}, ${await version('next', 'next')}, ${await version('nuxt', 'nuxt')}`,
     `run on ${new Date().toISOString().slice(0, 10)}${RUNS > 1 ? `, each value the median of ${RUNS} runs` : ''}`,
   ]
   const markdown = report(results, environment)

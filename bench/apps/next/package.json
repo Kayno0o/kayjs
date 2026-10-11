@@ -1,0 +1,14 @@
+{
+  "name": "bench-next",
+  "type": "module",
+  "private": true,
+  "dependencies": {
+    "next": "16.4.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0"
+  }
+}

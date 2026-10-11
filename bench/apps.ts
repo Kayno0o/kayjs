@@ -1,6 +1,9 @@
-export const APPS = ['kay', 'solid', 'svelte'] as const
+export const APPS = ['kay', 'solid', 'svelte', 'astro', 'next', 'nuxt'] as const
 
 export type AppName = typeof APPS[number]
+
+// Next serves only through its own HTTP server, so its renders would carry a socket round trip the others never pay: its server rendering is not timed.
+export const IN_PROCESS_APPS = APPS.filter(app => app !== 'next')
 
 export interface BenchApp {
   handle: (request: Request) => Promise<Response>

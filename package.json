@@ -156,7 +156,7 @@
     "bench:sites": "$npm_execpath bench/sites/run.ts",
     "bench:test": "$npm_execpath test ./bench",
     "docs:build": "$npm_execpath src/cli.ts build docs --static",
-    "bench:check": "$npm_execpath src/cli.ts check bench/apps/kay && tsgo --noEmit -p bench/apps/solid && tsgo --noEmit -p bench/apps/svelte"
+    "bench:check": "$npm_execpath src/cli.ts check bench/apps/kay && tsgo --noEmit -p bench/apps/solid && tsgo --noEmit -p bench/apps/svelte && tsgo --noEmit -p bench/apps/next && $npm_execpath --cwd=bench/apps/nuxt --bun run check && $npm_execpath --cwd=bench/apps/astro --bun run check"
   },
   "peerDependencies": {
     "@types/bun": "^1.4.2"

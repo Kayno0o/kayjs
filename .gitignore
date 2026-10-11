@@ -9,4 +9,9 @@ dist
 .claude/scheduled_tasks.lock
 
 bench/sites/sites.config.ts
+bench/apps/astro/.astro
+bench/apps/next/.next
+bench/apps/next/next-env.d.ts
+bench/apps/nuxt/.nuxt
+bench/apps/nuxt/.output
 bench/sites/results*.md

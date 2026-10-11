@@ -1,0 +1,17 @@
+{
+  "name": "bench-nuxt",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "check": "nuxt prepare && vue-tsc -b --noEmit"
+  },
+  "dependencies": {
+    "nuxt": "4.6.1",
+    "vue": "3.5.43",
+    "vue-router": "5.4.0"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "vue-tsc": "3.3.13"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "name": "bench-astro",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "check": "astro check"
+  },
+  "dependencies": {
+    "@astrojs/solid-js": "7.0.2",
+    "astro": "7.3.8",
+    "solid-js": "1.9.15"
+  },
+  "devDependencies": {
+    "@astrojs/check": "0.9.10",
+    "typescript": "5.9.3"
+  }
+}
