@@ -1,5 +1,6 @@
 import type { KayConfig, SeoConfig, TrailingSlash } from '../config'
 import type { HeadOptions, HeadTag, ImageSize } from '../runtime/head'
+import type { FontAssets } from './fonts'
 import type { LocaleCopy } from './i18n'
 import { join } from 'node:path'
 import { projectPaths } from '../project'
@@ -21,16 +22,17 @@ const CARD_FILE = /^\/_kay\/images\/card-[\da-z]+\.jpg$/
 // The head options of one response, from its URL and status.
 export type SeoHead = (url: URL, status: number) => HeadOptions
 
-// Everything kay.config.ts gives every page's head: the fonts, the favicon, its `head`, then `site` and `seo`, with the inline scripts and styles among them for the content security policy.
+// Everything kay.config.ts gives every page's head: the fonts, the favicon, its `head`, then `site` and `seo`, with the inline scripts and styles among them for the content security policy, and the fonts themselves, which share cards draw in.
 // An executable reads the fonts `kay build` recorded, its project being elsewhere; anything else writes them from their files.
-export async function configHead(root: string, config: KayConfig, clientDir: string, bundled = false): Promise<{ head: SeoHead | undefined, scripts: string[], styles: string[] }> {
+export async function configHead(root: string, config: KayConfig, clientDir: string, bundled = false): Promise<{ head: SeoHead | undefined, scripts: string[], styles: string[], fonts: FontAssets | undefined }> {
   const extra: HeadTag[] = []
   const scripts: string[] = []
   const styles: string[] = []
   const dir = join(clientDir, '..')
+  let fonts: FontAssets | undefined
 
   if (config.fonts !== undefined && config.fonts.length > 0) {
-    const fonts = bundled ? await builtFonts(dir) : await prepareFonts(root, config.fonts, dir)
+    fonts = bundled ? await builtFonts(dir) : await prepareFonts(root, config.fonts, dir)
 
     if (!fonts)
       throw new Error('kay: this executable holds no fonts; build it again with kay build --compile')
@@ -58,7 +60,7 @@ export async function configHead(root: string, config: KayConfig, clientDir: str
   const social = config.site !== undefined || config.seo !== undefined
   const sizeOf = social ? await cardImageSizes(projectPaths(root, config).public) : undefined
 
-  return { head: seoHead(config.site, config.seo, extra, config.trailingSlash, basePath(config.base), sizeOf), scripts, styles }
+  return { head: seoHead(config.site, config.seo, extra, config.trailingSlash, basePath(config.base), sizeOf), scripts, styles, fonts }
 }
 
 // The pixel size of a card image named by its path: an imported image's, a public file's, read once here, and a share card's 1200x630.

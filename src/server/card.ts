@@ -15,17 +15,16 @@ import { nodeCrypto } from './builtins'
 import { drawCard } from './card-draw'
 import { coverImage } from './crop'
 import { readFace } from './face'
-import { builtFonts } from './fonts'
 import { DEFAULT_QUALITY, drawing, findSource, MAX_UPLOAD_PIXELS, VARIANTS_DIR } from './image'
 import { revalidated } from './public'
 
 export interface CardSetup {
-  // `.kay/client`, where the build records its fonts and keeps the key cards are signed with.
+  // `.kay/client`, where the key cards are signed with is kept.
   dir: string
   // The built client, where the font files are.
   clientDir: string
-  // Whether kay.config.ts lists fonts: a `fonts.json` left from an earlier build is not read otherwise.
-  fonts: boolean
+  // The fonts kay.config.ts lists, as the head declares them.
+  fonts: FontAssets | undefined
   config?: CardConfig | undefined
   // `seo.name`, written under the title.
   name?: string | undefined
@@ -70,8 +69,7 @@ const requested = new Map<string, { title: string, image?: string | undefined }>
 
 // Settles the face, look and key cards are drawn and signed with, for every card this process links, served or prerendered; a face `images.card.font` names that `fonts` lacks stops the boot.
 export async function setupCards(setup: CardSetup): Promise<Cards> {
-  const fonts = setup.fonts ? await builtFonts(setup.dir) : undefined
-  const font = cardFont(setup.clientDir, fonts?.faces, setup.config?.font)
+  const font = cardFont(setup.clientDir, setup.fonts?.faces, setup.config?.font)
 
   if (font instanceof Error && setup.config?.font !== undefined)
     throw font

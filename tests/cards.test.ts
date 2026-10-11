@@ -11,6 +11,7 @@ import { setupCards, writeCards } from '../src/server/card'
 import { fitTitle, TEXT_WIDTH, textWidth } from '../src/server/card-draw'
 import { decodePng } from '../src/server/crop'
 import { readFace } from '../src/server/face'
+import { prepareFonts } from '../src/server/fonts'
 import { fillOutline } from '../src/server/raster'
 
 const FIXTURE = resolve('tests/fixtures/cards')
@@ -232,6 +233,16 @@ describe('share cards', () => {
     expect(() => shareCard({ title: 'Hello' })).toThrow('draws on the server')
   })
 
+  it('draws in the fonts the config lists, whatever fonts an earlier boot recorded', async () => {
+    const recorded = join(clientDir(process.cwd()), '..', 'fonts.json')
+
+    await Bun.write(recorded, JSON.stringify({ css: '', preload: [], faces: [] }))
+
+    const booted = await pages(config)
+
+    expect((await booted.handle(new Request('http://localhost/plain'))).status).toBe(200)
+  })
+
   it('writes at build time the cards prerendered pages asked for, which the route then serves as files', async () => {
     const client = clientDir(process.cwd())
     const hero = registerImage('/_kay/assets/card-hero.png', 1000, 600)
@@ -239,10 +250,8 @@ describe('share cards', () => {
     let name: string | undefined
 
     try {
-      // Booting writes the fonts again, which a test before may have left out.
-      await pages(config)
       await Bun.write(join(client, 'assets', 'card-hero.png'), Bun.file(join(FIXTURE, 'src/hero.png')))
-      await setupCards({ dir: join(client, '..'), clientDir: client, fonts: true, name: 'Cards', collect: true })
+      await setupCards({ dir: join(client, '..'), clientDir: client, fonts: await prepareFonts(process.cwd(), config.fonts, cache), name: 'Cards', collect: true })
 
       const url = shareCard({ title: 'Built   at\nbuild time', image: hero })
 
@@ -272,9 +281,7 @@ describe('share cards', () => {
     const client = clientDir(process.cwd())
 
     try {
-      await pages(config)
-      await Bun.write(join(dir, 'fonts.json'), Bun.file(join(client, '..', 'fonts.json')))
-      await setupCards({ dir, clientDir: client, fonts: true })
+      await setupCards({ dir, clientDir: client, fonts: await prepareFonts(process.cwd(), config.fonts, dir) })
 
       expect(await Bun.file(join(dir, 'card.key')).exists()).toBe(false)
 

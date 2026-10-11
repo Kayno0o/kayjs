@@ -84,11 +84,9 @@ export async function setupPages(project: Project, loadClient: () => Promise<Cli
   if (config.inlineStyles === true && !mode.dev)
     client.inlineStyles = await readInlineStyles(client, base)
 
-  const [{ head, scripts, styles }, cards, collections] = await Promise.all([
-    configHead(root, config, client.dir, source.embedded),
-    setupCards({ dir: join(client.dir, '..'), clientDir: client.dir, fonts: (config.fonts?.length ?? 0) > 0, config: config.images?.card, name: config.seo?.name, quality: config.images?.quality, bundled: source.embedded, collect: prerendering }),
-    projectCollections(root, config.content),
-  ])
+  const [{ head, scripts, styles, fonts }, collections] = await Promise.all([configHead(root, config, client.dir, source.embedded), projectCollections(root, config.content)])
+  // Drawn in the fonts the head just wrote, rather than those a `fonts.json` held before.
+  const cards = await setupCards({ dir: join(client.dir, '..'), clientDir: client.dir, fonts, config: config.images?.card, name: config.seo?.name, quality: config.images?.quality, bundled: source.embedded, collect: prerendering })
 
   return { source, client, mounts, routes, matchers, collections, i18n, locales, base, site, imageCache, scripts, styles, renderOptions: renderOptionsOf(config, mode, { head, maxDensity }), cards }
 }
