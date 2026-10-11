@@ -50,7 +50,6 @@ interface BenchWindow {
   __kayBenchShown: (kind: string, token: string) => Promise<number>
 }
 
-// Each side runs this many sessions, the sides alternating, the order reversed every other session.
 const KINDS: EditKind[] = ['template', 'style', 'server']
 const READY_TIMEOUT_MS = 60_000
 const SHOW_TIMEOUT_MS = 10_000
@@ -115,7 +114,7 @@ const WATCH = `(() => {
 
 const now = () => performance.timeOrigin + performance.now()
 
-// The counts the environment sets, read once the dev phase runs, so a bad one fails it alone.
+// The counts the environment sets, read once the dev phase runs, so a bad one fails it alone. Each side runs `sessions` sessions, the sides alternating, the order reversed every other session.
 let chosen: { sessions: number, starts: number, rounds: number } | undefined
 
 function counts() {
@@ -228,6 +227,7 @@ async function startup(variant: Variant): Promise<Timed> {
 // Waits for the server to answer `path`: with a 200 for a page, with anything for the path no page serves.
 async function untilServed(variant: Variant, server: Subprocess, path: string): Promise<void> {
   const started = performance.now()
+  const moved = new RegExp(`\\b${variant.ports.dev} (?:was|is) in use`)
 
   while (performance.now() - started < READY_TIMEOUT_MS && server.exitCode === null) {
     try {
@@ -240,7 +240,7 @@ async function untilServed(variant: Variant, server: Subprocess, path: string): 
     }
     catch {}
 
-    if (await portTaken(variant))
+    if (await logsSay(variant, moved))
       throw new Error(`${label(variant)}: the dev server found ${variant.ports.dev} taken and moved to another port; see dev.out.log in ${variant.devDir}`)
 
     await Bun.sleep(5)
@@ -249,10 +249,8 @@ async function untilServed(variant: Variant, server: Subprocess, path: string): 
   throw new Error(`${label(variant)}: the dev server did not serve ${path} on ${variant.ports.dev}, exit code ${server.exitCode}; see dev.err.log in ${variant.devDir}`)
 }
 
-// Whether the dev server said its port was taken, as `kay dev` and Vite do before moving to another.
-async function portTaken(variant: Variant): Promise<boolean> {
-  const said = new RegExp(`\\b${variant.ports.dev} (?:was|is) in use`)
-
+// Whether the dev server's output says `said`, as `kay dev` and Vite say their port was taken before moving to another.
+async function logsSay(variant: Variant, said: RegExp): Promise<boolean> {
   for (const name of LOGS) {
     const log = Bun.file(join(variant.devDir, name))
 
@@ -348,7 +346,9 @@ async function editSession(browser: Browser, variant: Variant, server: Subproces
     result.idle.push(cpuSince(variant, server, resting))
     result.rest.push(treeMemory(server.pid))
 
-    for (let round = 0; round <= counts().rounds; round++) {
+    const { rounds } = counts()
+
+    for (let round = 0; round <= rounds; round++) {
       for (const kind of KINDS) {
         const token = `kb${++sequence}q`
         const logged = Bun.file(log).size

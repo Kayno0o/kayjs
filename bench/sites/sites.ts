@@ -75,6 +75,8 @@ const CHECKOUT = join(import.meta.dir, '../..')
 const PUBLISHED = '@kaynooo/kayjs'
 // Beside a kay dev copy's install: where its kay came from.
 const KAY_SOURCE = 'kay-bench-source.txt'
+// The dev copies `staleInstalls` warned of.
+const stale = new Set<string>()
 
 export const VARIANTS: Variant[] = SITES.flatMap((site, index) => (['astro', 'kay'] as const).map((kind, offset) => {
   const slot = index * 2 + offset + 1
@@ -136,7 +138,23 @@ function kayPackage(): { specifier: string, source: string } | undefined {
     return { specifier: `file:${join(WORK, 'kay-checkout.tgz')}`, source }
   }
 
-  return KAY_PACKAGE.includes(':') ? { specifier: KAY_PACKAGE, source: KAY_PACKAGE } : { specifier: `npm:${PUBLISHED}@${KAY_PACKAGE}`, source: 'the registry' }
+  return { specifier: KAY_PACKAGE.includes(':') ? KAY_PACKAGE : `npm:${PUBLISHED}@${KAY_PACKAGE}`, source: wantedSource(KAY_PACKAGE, checkoutSource) }
+}
+
+// What a kay copy's source file says of an install from `kayPackage`, a checkout's read only when asked for.
+export function wantedSource(kayPackage: string, checkout: () => string): string {
+  if (kayPackage === 'checkout')
+    return checkout()
+
+  return kayPackage.includes(':') ? kayPackage : `the registry at ${kayPackage}`
+}
+
+// The warning a run reusing an install gets, or none when it is what was asked for and holds no uncommitted changes, which may not be those packed then.
+export function staleWarning(name: string, installed: string, wanted: string): string | undefined {
+  if (installed !== wanted)
+    return `SKIP_PREPARE: ${name} runs ${installed}, not ${wanted}; prepare again to measure that`
+
+  return installed.includes('uncommitted') ? `SKIP_PREPARE: ${name} runs uncommitted changes as packed by the last prepare, which may differ from the checkout's now` : undefined
 }
 
 function checkoutSource(): string {
@@ -152,15 +170,16 @@ export async function staleInstalls(): Promise<string[]> {
   if (KAY_PACKAGE === '' || PHASE === 'prod' || KIND === 'astro')
     return []
 
-  const wanted = KAY_PACKAGE === 'checkout' ? checkoutSource() : KAY_PACKAGE.includes(':') ? KAY_PACKAGE : 'the registry'
-  const warnings = await Promise.all(VARIANTS.filter(variant => variant.kind === 'kay').map(async (variant) => {
+  const wanted = wantedSource(KAY_PACKAGE, checkoutSource)
+  // Only the sites with a dev phase have a dev copy.
+  const warnings = await Promise.all(VARIANTS.filter(variant => variant.kind === 'kay' && variant.site.dev !== undefined).map(async (variant) => {
     const source = Bun.file(join(variant.devDir, KAY_SOURCE))
-    const installed = await source.exists() ? await source.text() : 'an unknown kay'
+    const warning = staleWarning(label(variant), await source.exists() ? await source.text() : 'an unknown kay', wanted)
 
-    if (installed !== wanted)
-      return [`SKIP_PREPARE: ${label(variant)} runs ${installed}, not ${wanted}; prepare again to measure that`]
+    if (warning !== undefined)
+      stale.add(variant.devDir)
 
-    return installed.includes('uncommitted') ? [`SKIP_PREPARE: ${label(variant)} runs uncommitted changes as packed by the last prepare, which may differ from the checkout's now`] : []
+    return warning ?? []
   }))
 
   return warnings.flat()
@@ -213,11 +232,11 @@ export async function versionIn(dir: string, name: string): Promise<string> {
   return manifest.version
 }
 
-// The kay a kay copy installed, and where from.
+// The kay a kay copy installed, and where from, flagged when `staleInstalls` warned of it.
 export async function kayIn(dir: string): Promise<string> {
   const source = Bun.file(join(dir, KAY_SOURCE))
 
-  return `kay ${await versionIn(dir, 'kay')}${await source.exists() ? `, ${await source.text()}` : ''}`
+  return `kay ${await versionIn(dir, 'kay')}${await source.exists() ? `, ${await source.text()}` : ''}${stale.has(dir) ? ' (reused by SKIP_PREPARE, not what KAY_PACKAGE names now)' : ''}`
 }
 
 export function label(variant: Variant): string {

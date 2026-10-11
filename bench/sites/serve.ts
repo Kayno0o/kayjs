@@ -12,8 +12,6 @@ const PSS = /^Pss:\s+(\d+)/m
 // A process's parent, after the name in parentheses, which may hold spaces and parentheses of its own.
 const STAT_PARENT = /^\) \S (\d+)/
 const DIGITS = /^\d+$/
-
-let ticks: number | undefined
 // How long a killed process may take to be gone.
 const GONE_TIMEOUT_MS = 5000
 const STAT_STATE = /^\) (\S)/
@@ -213,6 +211,8 @@ export function treeCpu(pid: number, dir?: string): number {
 
   return [...members].reduce((sum, member) => sum + (stats.has(member) ? cpuTicks(stats.get(member)!) : 0), 0) * 1000 / clockTicks()
 }
+
+let ticks: number | undefined
 
 // What /proc counts CPU time in, per second, 100 where `getconf` cannot say.
 export function clockTicks(): number {

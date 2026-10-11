@@ -48,11 +48,11 @@ if (VARIANTS.length === 0)
 let browser: Browser | undefined
 let stopping = false
 
-// An interrupted run stops what it started, so no server it leaves holds a port the next run would be timed against; a second signal meanwhile changes nothing, and what is slow to stop or fails to is left behind.
+// An interrupted run stops what it started, so no server it leaves holds a port the next run would be timed against; what is slow to stop or fails to is left behind, and a second signal exits at once.
 for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) {
   process.on(signal, () => {
     if (stopping)
-      return
+      process.exit(128 + constants.signals[signal])
 
     stopping = true
     void (async () => {
