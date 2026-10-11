@@ -2,18 +2,27 @@ import { decodeAvif } from './avif'
 
 // What an image's first bytes say it is, for the formats Bun.Image cannot be trusted with: AVIF, which it decodes only through the system's codec, and GIF, of which it reads the first frame.
 const GIF = [0x47, 0x49, 0x46, 0x38]
-const FTYP = [0x66, 0x74, 0x79, 0x70]
 const AVIF_BRANDS = new Set(['avif', 'avis'])
-const ISPE = [0x69, 0x73, 0x70, 0x65]
-// Where an AVIF's properties sit, its pixels after them.
-const AVIF_HEADER = 65_536
+// Enough of a file to hold its `ftyp` box and the brands it lists.
+const HEAD = 64
 
 export function isGif(bytes: Uint8Array): boolean {
   return GIF.every((byte, index) => bytes[index] === byte)
 }
 
+// An AVIF names itself in its `ftyp` box, as its major brand or among its compatible ones after a generic `mif1`.
 export function isAvif(bytes: Uint8Array): boolean {
-  return FTYP.every((byte, index) => bytes[index + 4] === byte) && AVIF_BRANDS.has(String.fromCharCode(...bytes.subarray(8, 12)))
+  if (fourCc(bytes, 4) !== 'ftyp')
+    return false
+
+  const end = Math.min(bytes.length, new DataView(bytes.buffer, bytes.byteOffset).getUint32(0))
+
+  for (let at = 8; at + 4 <= end; at += at === 8 ? 8 : 4) {
+    if (AVIF_BRANDS.has(fourCc(bytes, at)))
+      return true
+  }
+
+  return false
 }
 
 // Whether a GIF holds more than one frame, read from its blocks without decoding any.
@@ -41,15 +50,40 @@ export function animatedGif(bytes: Uint8Array): boolean {
   return false
 }
 
-// An AVIF's size, from its `ispe` property, read without decoding it.
-export function avifSize(bytes: Uint8Array): { width: number, height: number } | undefined {
-  const header = bytes.subarray(0, AVIF_HEADER)
+// An AVIF's size, from the `ispe` property of its primary item, read without decoding it, with the most pixels any of its items claims.
+export function avifSize(bytes: Uint8Array): { width: number, height: number, most: number } | undefined {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+  const meta = boxes(bytes, 0, bytes.length).find(box => box.type === 'meta')
+  const children = meta ? boxes(bytes, meta.start + 4, meta.end) : []
+  const pitm = children.find(box => box.type === 'pitm')
+  const iprp = children.find(box => box.type === 'iprp')
+  const inside = iprp ? boxes(bytes, iprp.start, iprp.end) : []
+  const ipco = inside.find(box => box.type === 'ipco')
+  const ipma = inside.find(box => box.type === 'ipma')
 
-  for (let at = 4; at + 16 <= header.length; at++) {
-    if (ISPE.every((byte, index) => header[at + index] === byte)) {
-      const view = new DataView(header.buffer, header.byteOffset + at + 8, 8)
+  if (!pitm || !ipco || !ipma)
+    return undefined
 
-      return { width: view.getUint32(0), height: view.getUint32(4) }
+  const primary = bytes[pitm.start] === 0 ? view.getUint16(pitm.start + 4) : view.getUint32(pitm.start + 4)
+  const properties = boxes(bytes, ipco.start, ipco.end)
+  const sizes = properties.map(box => box.type === 'ispe' && box.start + 12 <= box.end ? { width: view.getUint32(box.start + 4), height: view.getUint32(box.start + 8) } : undefined)
+  const most = Math.max(0, ...sizes.map(size => size ? size.width * size.height : 0))
+  const wide = bytes[ipma.start] !== 0
+  const large = (bytes[ipma.start + 3]! & 1) !== 0
+  let at = ipma.start + 8
+
+  for (let entry = view.getUint32(ipma.start + 4); entry > 0 && at < ipma.end; entry--) {
+    const item = wide ? view.getUint32(at) : view.getUint16(at)
+    const count = bytes[at + (wide ? 4 : 2)]!
+
+    at += wide ? 5 : 3
+
+    for (let association = 0; association < count; association++, at += large ? 2 : 1) {
+      const index = large ? view.getUint16(at) & 0x7FFF : bytes[at]! & 0x7F
+      const size = sizes[index - 1]
+
+      if (item === primary && size)
+        return { ...size, most }
     }
   }
 
@@ -61,11 +95,10 @@ export async function decodable(source: Blob | Uint8Array, maxPixels?: number): 
   if (!isAvif(await head(source)))
     return source
 
-  const bytes = source instanceof Uint8Array ? source : await source.bytes()
+  // Its buffer goes to the worker, so a caller's own is copied.
+  const bytes = source instanceof Uint8Array ? source.slice() : await source.bytes()
 
-  checkedAvif(bytes, maxPixels)
-
-  return decodeAvif(bytes)
+  return decodeAvif(bytes, checkedAvif(bytes, maxPixels))
 }
 
 // An image's size and format, from its header, an AVIF's included, and whether it is an animated GIF, which kay passes through rather than flatten to its first frame; refused past `maxPixels`.
@@ -81,7 +114,32 @@ export async function imageHeader(source: Blob | Uint8Array, maxPixels?: number)
 }
 
 async function head(source: Blob | Uint8Array): Promise<Uint8Array> {
-  return source instanceof Uint8Array ? source : source.slice(0, 12).bytes()
+  return source instanceof Uint8Array ? source : source.slice(0, HEAD).bytes()
+}
+
+function fourCc(bytes: Uint8Array, at: number): string {
+  return String.fromCharCode(...bytes.subarray(at, at + 4))
+}
+
+// The boxes between two offsets of an ISO media file, each by its type and where its content starts and ends.
+function boxes(bytes: Uint8Array, start: number, end: number): { type: string, start: number, end: number }[] {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+  const found: { type: string, start: number, end: number }[] = []
+  let at = start
+
+  while (at + 8 <= end) {
+    const size = view.getUint32(at)
+    const header = size === 1 ? 16 : 8
+    const length = size === 0 ? end - at : size === 1 && at + 16 <= end ? Number(view.getBigUint64(at + 8)) : size
+
+    if (length < header || at + length > end)
+      break
+
+    found.push({ type: fourCc(bytes, at + 4), start: at + header, end: at + length })
+    at += length
+  }
+
+  return found
 }
 
 function checkedAvif(bytes: Uint8Array, maxPixels: number | undefined): { width: number, height: number } {
@@ -90,11 +148,11 @@ function checkedAvif(bytes: Uint8Array, maxPixels: number | undefined): { width:
   if (!size)
     throw new Error('kay: an AVIF with no size in its header')
 
-  // Coded as Bun.Image codes the same refusal, so a caller tells it apart alike.
-  if (maxPixels !== undefined && size.width * size.height > maxPixels)
+  // Coded as Bun.Image codes the same refusal, so a caller tells it apart alike. Any item past the cap counts, as a grid's tile or a thumbnail could hide the size that decodes.
+  if (maxPixels !== undefined && Math.max(size.width * size.height, size.most) > maxPixels)
     throw Object.assign(new Error(`kay: an image over ${maxPixels} pixels`), { code: 'ERR_IMAGE_TOO_MANY_PIXELS' })
 
-  return size
+  return { width: size.width, height: size.height }
 }
 
 // The bytes of a color table a packed field announces.

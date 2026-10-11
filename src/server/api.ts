@@ -323,10 +323,14 @@ async function admit(guards: LoadedGuard[], context: { request: Request, params?
 
   const { headers } = context.set
 
-  for (const [name, value] of passed.headers)
-    headers[name] = value
-
   const cookies = new Headers()
+
+  for (const [name, value] of passed.headers) {
+    if (name === 'set-cookie')
+      cookies.append(name, value)
+    else
+      headers[name] = value
+  }
 
   passed.jar.writeTo(cookies)
 

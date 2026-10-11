@@ -11,6 +11,7 @@ import { basePath } from './base'
 import { faviconTags } from './favicon'
 import { builtFonts, fontTags, prepareFonts } from './fonts'
 import { localeCopies } from './i18n'
+import { imageHeader } from './image-format'
 import { publicFiles } from './public'
 import { slashedPath } from './routes'
 
@@ -67,7 +68,7 @@ async function cardImageSizes(publicDir: string): Promise<(path: string) => Imag
   await Promise.all((await publicFiles(publicDir)).filter(file => RESIZABLE.test(file.path)).map(async ({ path, url }) => {
     try {
       // Through Bun.file, which reaches the files an executable embeds, where Bun.Image given a path does not.
-      const { width, height } = await new Bun.Image(Bun.file(path)).metadata()
+      const { width, height } = await imageHeader(Bun.file(path))
 
       sizes.set(url, { width, height })
     }

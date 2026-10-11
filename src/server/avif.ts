@@ -34,11 +34,9 @@ export async function encodeAvif(image: Bun.Image, quality: number): Promise<Uin
   return run(id => ({ id, png, quality, speed: AVIF_SPEED }), png)
 }
 
-// An AVIF decoded to a PNG on the same threads, as Bun.Image reads no AVIF on Linux.
-export async function decodeAvif(avif: Uint8Array): Promise<Uint8Array> {
-  const bytes = avif.slice()
-
-  return run(id => ({ id, avif: bytes }), bytes)
+// An AVIF decoded to a PNG on the same threads, as Bun.Image reads no AVIF on Linux, refused unless it decodes to the size its header gave. Its buffer is handed to the worker.
+export async function decodeAvif(avif: Uint8Array, size: { width: number, height: number }): Promise<Uint8Array> {
+  return run(id => ({ id, avif, ...size }), avif)
 }
 
 async function run(task: (id: number) => AvifTask, bytes: Uint8Array): Promise<Uint8Array> {

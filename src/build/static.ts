@@ -46,6 +46,9 @@ export interface StaticExport {
 export function refuseStaticConfig(config: KayConfig): void {
   if (config.i18n?.domains)
     throw new Error('kay: a static export is one directory for one host, so it cannot serve locales by domain; drop i18n.domains or deploy a server')
+
+  if (config.images?.resolve)
+    throw new Error('kay: a static export has no image route to resize what images.resolve looks up on each request; drop images.resolve or deploy a server')
 }
 
 // Writes the whole site to `outdir`, as any static host serves it: every prerendered page, the browser build under `/_kay/`, the public files, the sitemap, feeds and favicons, `404.html`, and a page for each redirect.

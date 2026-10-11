@@ -88,8 +88,8 @@ function acceptsAvif(accept: string | null): boolean {
 }
 
 // Written under a temporary name and moved into place, so a reader never sees a variant half written, nor one a crash cut short.
-// `source` is a path, or an image already decoded to an uncompressed PNG.
-export async function writeVariant(source: string | Uint8Array, variant: number | ImageVariant, target: string, quality = DEFAULT_QUALITY, format: VariantFormat = 'webp'): Promise<void> {
+// `source` is a path, or an image already decoded, such as to an uncompressed PNG.
+export async function writeVariant(source: string | Blob | Uint8Array, variant: number | ImageVariant, target: string, quality = DEFAULT_QUALITY, format: VariantFormat = 'webp'): Promise<void> {
   const partial = `${target}.${crypto.randomUUID()}.tmp`
 
   // Read through Bun.file, which also reaches the files an executable embeds, where Bun.Image given a path does not.
@@ -177,7 +177,9 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
   const pending = new Map<string, Promise<void>>()
   const allowed = new Set((options.aspects ?? DEFAULT_ASPECTS).map(text => aspectKey(parseAspect(text)!)))
   // An imported image is named after its content, so its size and the variants already found never change: a request for one waits on no file system call.
-  const importedSizes = new Map<string, { width: number, height: number, animated: boolean }>()
+  const importedSizes = new Map<string, { width: number, height: number, format: string, animated: boolean }>()
+  // The AVIF sources variants are being written from, by version, decoded once for all of them.
+  const decodedAvif = new Map<string, { png?: Promise<Blob | Uint8Array>, writers: number }>()
   const importedVariants = new Map<string, Bun.BunFile>()
   // An imported variant by the URL that asked for it and whether its `Accept` takes AVIF, so a repeated request skips parsing the URL.
   const answered = new Map<string, { file: Bun.BunFile, headers: HeaderCopies }>()
@@ -195,12 +197,21 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
     if (known)
       return new Response(known.file, { headers: ownHeaders(set, known.headers) })
 
-    const fail = (body: string, status: number) => new Response(body, { status, headers: ownHeaders(set, text) })
+    let passed: GuardedRequest | undefined
+    // What the guards set goes out with every answer they let through.
+    const guarded = (response: Response) => {
+      for (const [name, value] of passed?.headers ?? [])
+        response.headers[name === 'set-cookie' ? 'append' : 'set'](name, value)
+
+      passed?.jar.writeTo(response.headers)
+
+      return response
+    }
+    const fail = (body: string, status: number) => guarded(new Response(body, { status, headers: ownHeaders(set, text) }))
 
     const url = new URL(request.url)
     const src = url.searchParams.get('src') ?? ''
     let source = await findSource(src, options, clientAddress(request, server))
-    let passed: GuardedRequest | undefined
 
     if (!source && options.resolve) {
       const found = await resolvedSource(src, context, options.resolve)
@@ -210,6 +221,8 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
           if (!found.headers.has(name))
             found.headers.set(name, value)
         }
+
+        found.headers.set('cache-control', 'private, no-store')
 
         return found
       }
@@ -249,17 +262,12 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
     if (typeof variant === 'string' && variant !== 'card')
       return fail(variant, 400)
 
-    // What the guards set goes out with the image; its URL may carry a signed link, or `images.resolve` admit only some, so no shared cache keeps it.
+    // Its URL may carry a signed link, or `images.resolve` admit only some, so no shared cache keeps it.
     const answer = (response: Response) => {
       if (source.private === true)
         response.headers.set('cache-control', 'private, no-cache')
 
-      for (const [name, value] of passed?.headers ?? [])
-        response.headers.set(name, value)
-
-      passed?.jar.writeTo(response.headers)
-
-      return response
+      return guarded(response)
     }
 
     // An animated GIF goes as it is at every width, a variant flattening it to its first frame; its card is still drawn from that frame.
@@ -292,12 +300,28 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
     // Requests for a variant being written wait for that one write.
     if (file === cached && (writing || !await Bun.file(cached).exists())) {
       if (!writing) {
+        // Counted before it waits its turn, so the variants a burst asks for share the decode.
+        const version = `${path}\n${stats?.size}\n${stats?.mtimeMs}`
+        const decoding = own.format === 'avif' ? decodedAvif.get(version) ?? { writers: 0 } : undefined
+
+        if (decoding) {
+          decoding.writers++
+          decodedAvif.set(version, decoding)
+        }
+
         writing = (async () => {
           try {
-            await drawing(async () => writeVariant(path, variant, cached, format === 'avif' ? options.avif : options.quality, format))
+            await drawing(async () => {
+              const decoded = decoding ? await (decoding.png ??= decodable(Bun.file(path), source.immutable ? undefined : MAX_UPLOAD_PIXELS)) : path
+
+              await writeVariant(decoded, variant, cached, format === 'avif' ? options.avif : options.quality, format)
+            })
           }
           finally {
             pending.delete(cached)
+
+            if (decoding && --decoding.writers === 0)
+              decodedAvif.delete(version)
           }
         })()
         pending.set(cached, writing)
@@ -438,8 +462,11 @@ export function sourceFile(src: string, options: ImageRouteOptions): { path: str
 }
 
 // `images.maxDensity`, `images.aspects`, `images.remote` and whether `images.resolve` is set, checked and set for every image this process renders, served or prerendered; returns the density.
-export function applyImageConfig(images: { maxDensity?: number | undefined, aspects?: string[] | undefined, remote?: string[] | undefined, resolve?: unknown } | undefined): number {
+export function applyImageConfig(images: { maxDensity?: number | undefined, aspects?: string[] | undefined, remote?: string[] | undefined, resolve?: unknown, guard?: unknown } | undefined): number {
   const maxDensity = images?.maxDensity ?? DEFAULT_MAX_DENSITY
+
+  if (images?.guard !== undefined && images.resolve === undefined)
+    throw new Error('kay: images.guard admits the images images.resolve looks up, and images.resolve is not set')
 
   if (!(maxDensity >= 1))
     throw new Error(`images.maxDensity is ${maxDensity}: it is at least 1, or Infinity to leave the browser's choice`)

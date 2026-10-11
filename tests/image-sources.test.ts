@@ -1,11 +1,12 @@
 import { mkdir, readdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
-import { afterAll, describe, expect, it } from 'bun:test'
+import { afterAll, describe, expect, it, spyOn } from 'bun:test'
+import { refuseStaticConfig } from '../src/build/static'
 import { image } from '../src/runtime/image'
 import { imageSize, pages, processImage } from '../src/server'
-import { encodeAvif } from '../src/server/avif'
-import { writeImageVariants } from '../src/server/image'
-import { imageHeader } from '../src/server/image-format'
+import * as avifCodec from '../src/server/avif'
+import { applyImageConfig, writeImageVariants } from '../src/server/image'
+import { imageHeader, isAvif } from '../src/server/image-format'
 import { scratchDir } from './scratch'
 
 const HERO = join(import.meta.dir, 'fixtures/images/src/hero.png')
@@ -46,11 +47,11 @@ function gif(width: number, height: number, frames: number[]): Uint8Array<ArrayB
 
 const still = gif(400, 10, [3])
 const animated = gif(400, 10, [3, 90])
-const avif = await encodeAvif(new Bun.Image(Bun.file(HERO)), 50)
+const avif = await avifCodec.encodeAvif(new Bun.Image(Bun.file(HERO)), 50)
 
 await mkdir(uploads)
 await mkdir(media)
-await Promise.all([Bun.write(join(uploads, 'still.gif'), still), Bun.write(join(uploads, 'animated.gif'), animated), Bun.write(join(uploads, 'hero.avif'), avif), Bun.write(join(media, '7'), Bun.file(HERO)), Bun.write(join(media, '8'), animated)])
+await Promise.all([Bun.write(join(uploads, 'still.gif'), still), Bun.write(join(uploads, 'animated.gif'), animated), Bun.write(join(uploads, 'hero.avif'), avif), Bun.write(join(uploads, 'burst.avif'), avif), Bun.write(join(media, '7'), Bun.file(HERO)), Bun.write(join(media, '8'), animated), Bun.write(join(media, '9'), avif)])
 
 const app = await pages({
   routes: 'tests/fixtures/images/src/routes',
@@ -62,12 +63,14 @@ const app = await pages({
         ctx.deny(401, 'Sign in')
 
       ctx.headers.set('x-guarded', 'yes')
+      ctx.headers.append('set-cookie', 'a=1')
+      ctx.headers.append('set-cookie', 'b=2')
     },
     resolve: (src, ctx) => {
       if (src === '/media/moved')
         ctx.redirect('/media/7')
 
-      return src.startsWith('/media/') && (src === '/media/7' || src === '/media/8') ? join(media, src.slice('/media/'.length)) : undefined
+      return src.startsWith('/media/') && ['7', '8', '9'].includes(src.slice('/media/'.length)) ? join(media, src.slice('/media/'.length)) : undefined
     },
   },
 })
@@ -90,6 +93,22 @@ describe('gif and avif sources', () => {
     await expect(imageSize(avif, { maxPixels: 1000 })).rejects.toThrow('over 1000 pixels')
   })
 
+  it('takes an AVIF naming itself among its compatible brands, and refuses one whose header lies about its size', async () => {
+    const generic = avif.slice()
+    const heic = avif.slice()
+    const lying = avif.slice()
+    const ispe = lying.findIndex((_, at) => new TextDecoder().decode(lying.subarray(at, at + 4)) === 'ispe')
+
+    generic.set(new TextEncoder().encode('mif1'), 8)
+    heic.set(new TextEncoder().encode('heic'), 8)
+    heic.set(new TextEncoder().encode('mif1heicmiafheic'), 16)
+    new DataView(lying.buffer).setUint32(ispe + 8, 999)
+
+    expect([isAvif(avif), isAvif(generic), isAvif(heic)]).toEqual([true, true, false])
+    expect(await imageSize(lying)).toMatchObject({ width: 999, height: 600 })
+    await expect(processImage(lying, { width: 100 })).rejects.toThrow('AVIF coding failed')
+  })
+
   it('tells an animated GIF from a still one', async () => {
     expect(await imageHeader(still)).toEqual({ width: 400, height: 10, format: 'gif', animated: false })
     expect((await imageHeader(Bun.file(join(uploads, 'animated.gif')))).animated).toBe(true)
@@ -103,6 +122,20 @@ describe('gif and avif sources', () => {
     expect(await new Bun.Image(await resizedGif.bytes()).metadata()).toEqual({ width: 320, height: 8, format: 'webp' })
     expect(await new Bun.Image(await resizedAvif.bytes()).metadata()).toEqual({ width: 320, height: 192, format: 'webp' })
     expect(image('/uploads/still.gif', { width: 400, height: 10 }).srcset).toContain('w=320 320w')
+  })
+
+  it('decodes an AVIF once for the variants a burst of requests asks for', async () => {
+    const decode = spyOn(avifCodec, 'decodeAvif')
+
+    try {
+      const answers = await Promise.all([320, 640, 960, 1000].map(async width => get('/uploads/burst.avif', `w=${width}`)))
+
+      expect(answers.map(answer => answer.status)).toEqual([200, 200, 200, 200])
+      expect(decode).toHaveBeenCalledTimes(1)
+    }
+    finally {
+      decode.mockRestore()
+    }
   })
 
   it('passes an animated GIF through untouched at every width, revalidated, and still draws its card', async () => {
@@ -160,7 +193,7 @@ describe('images.resolve and images.guard', () => {
     expect(denied.status).toBe(401)
     expect(await denied.text()).toBe('Sign in')
     expect(denied.headers.get('x-content-type-options')).toBe('nosniff')
-    expect((await get('/media/9', 'w=320', signedIn)).status).toBe(404)
+    expect((await get('/media/10', 'w=320', signedIn)).status).toBe(404)
   })
 
   it('answers the redirect resolve throws', async () => {
@@ -168,6 +201,31 @@ describe('images.resolve and images.guard', () => {
 
     expect(moved.status).toBe(303)
     expect(moved.headers.get('location')).toBe('/media/7')
+  })
+
+  it('runs the guard on every request, a variant cached for another or a revalidation alike, its cookies on each answer', async () => {
+    const admitted = await get('/media/9', 'w=320', signedIn)
+    const etag = admitted.headers.get('etag')!
+
+    expect(await new Bun.Image(await admitted.bytes()).metadata()).toEqual({ width: 320, height: 192, format: 'webp' })
+    expect(admitted.headers.getSetCookie()).toEqual(['a=1', 'b=2'])
+
+    const anonymous = await get('/media/9')
+
+    expect(anonymous.status).toBe(401)
+    expect(anonymous.headers.get('cache-control')).toBe('private, no-store')
+    expect((await get('/media/9', 'w=320', { 'if-none-match': etag })).status).toBe(401)
+
+    const revalidated = await get('/media/9', 'w=320', { ...signedIn, 'if-none-match': etag })
+
+    expect(revalidated.status).toBe(304)
+    expect(revalidated.headers.getSetCookie()).toEqual(['a=1', 'b=2'])
+    expect((await get('/media/9', 'w=999', signedIn)).headers.get('x-guarded')).toBe('yes')
+  })
+
+  it('refuses a guard with no resolve, and a static export, which has no route to resolve on', () => {
+    expect(() => applyImageConfig({ guard: () => undefined })).toThrow('images.resolve is not set')
+    expect(() => refuseStaticConfig({ images: { resolve: () => undefined } })).toThrow('no image route')
   })
 
   it('leaves imported and runtime directory images unguarded', async () => {
