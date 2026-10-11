@@ -135,9 +135,9 @@ async function watchChecks(root: string, args: string[], format: ProblemFormat):
     running = undefined
   }
 
-  const signalGroup = (signal: NodeJS.Signals) => {
+  const signalGroup = (check: Subprocess, signal: NodeJS.Signals) => {
     try {
-      process.kill(-child!.pid, signal)
+      process.kill(-check.pid, signal)
     }
     catch {
       // The check ended meanwhile, its group with it.
@@ -147,16 +147,20 @@ async function watchChecks(root: string, args: string[], format: ProblemFormat):
   const stop = async (signal: NodeJS.Signals, code: number) => {
     if (stopping) {
       if (child)
-        signalGroup('SIGKILL')
+        signalGroup(child, 'SIGKILL')
 
       return
     }
 
     stopping = true
 
-    if (child) {
-      signalGroup(signal)
-      await child.exited
+    const check = child
+
+    if (check) {
+      signalGroup(check, signal)
+      await check.exited
+      // What it started and left ignoring the signal goes with it.
+      signalGroup(check, 'SIGKILL')
     }
 
     process.exit(code)

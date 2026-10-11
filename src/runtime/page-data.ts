@@ -20,7 +20,7 @@ export function pageData<T>(selector: string, parse: (text: string) => unknown =
   return data
 }
 
-// A script that does not parse is reported once and skipped, so the others still read.
+// A script that does not parse is reported once and skipped, so the others still read; one still streaming may fail with each text it has, read again silently.
 function parseOnce(script: Element, parse: (text: string) => unknown): unknown {
   const text = script.textContent ?? ''
 
@@ -32,7 +32,9 @@ function parseOnce(script: Element, parse: (text: string) => unknown): unknown {
     return value
   }
   catch (error) {
-    console.error(error)
+    if (!failed.has(script))
+      console.error(error)
+
     failed.set(script, text)
 
     return MALFORMED

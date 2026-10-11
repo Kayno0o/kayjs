@@ -722,6 +722,32 @@ describe('kay build checks the project first', () => {
     }
   }, 60_000)
 
+  it('warns once of an SVG favicon\'s text, as the check when it runs, as the drawing when it does not', async () => {
+    const root = await scratchProject({
+      'tsconfig.json': tsconfig,
+      'src/favicon.svg': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><text x="4" y="24">K</text></svg>',
+      'src/routes/index.kay': 'p Home\n',
+    })
+    // The warnings the build answers with and the ones it logs, in a process of its own as the prerender registers the .kay loader.
+    const warnings = async (options: BuildOptions) => {
+      const script = `import { buildProject } from ${JSON.stringify(join(import.meta.dir, '../src/build/pipeline'))}\n\nconst { checked } = await buildProject(${JSON.stringify(root)}, { favicon: 'src/favicon.svg' }, ${JSON.stringify(options)})\n\nconsole.log(JSON.stringify(checked.map(diagnostic => diagnostic.message)))\n`
+      const child = Bun.spawn([process.execPath, '-e', script], { cwd: root, stdout: 'pipe', stderr: 'pipe' })
+      const [output, errors, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+
+      expect(code).toBe(0)
+
+      return [...JSON.parse(output.trim().split('\n').at(-1)!) as string[], ...errors.split('\n')].filter(line => line.includes('has text, which kay draws without fonts'))
+    }
+
+    try {
+      expect(await warnings({})).toHaveLength(1)
+      expect(await warnings({ check: false })).toHaveLength(1)
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  }, 60_000)
+
   it('checks with the tsconfig -p names, which --no-check does not take', async () => {
     const root = await scratchProject({ 'tsconfig.app.json': tsconfig, 'src/routes/index.kay': 'p Home\n' })
 
@@ -1064,7 +1090,6 @@ describe('a compiled server with an SVG favicon', () => {
   it('serves the icons kay build drew from it, carrying no resvg', async () => {
     const root = await scratchProject({
       'tsconfig.json': tsconfig,
-      'kay.config.ts': 'export default { favicon: \'src/favicon.svg\' }\n',
       'src/favicon.svg': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#c00"/></svg>',
       'src/routes/index.kay': 'h1 Home\n',
       'src/server.ts': `import process from 'node:process'

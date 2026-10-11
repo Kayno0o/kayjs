@@ -317,14 +317,17 @@ describe('page swap, checking a form in the browser', () => {
       expect(seen).toHaveLength(3)
       expect(logged).toHaveBeenCalledTimes(1)
 
-      // As a script read before the stream ended it.
+      // As a script read before the stream ended it, reported once however many texts it has.
+      document.querySelectorAll('script[data-test]')[1]!.textContent = '{broken still'
+      expect(pageData<object>('script[data-test]', parse)).toEqual([{ a: 1 }, { b: 2 }])
+      expect(logged).toHaveBeenCalledTimes(1)
       document.querySelectorAll('script[data-test]')[1]!.textContent = '{"c":3}'
       expect(pageData<object>('script[data-test]', parse)).toEqual([{ a: 1 }, { c: 3 }, { b: 2 }])
-      expect(seen).toHaveLength(4)
+      expect(seen).toHaveLength(5)
 
       document.body.innerHTML = '<script type="application/json" data-test>{"a":1}</script>'
       expect(pageData<object>('script[data-test]', parse)[0]).not.toBe(first[0]!)
-      expect(seen).toHaveLength(5)
+      expect(seen).toHaveLength(6)
     }
     finally {
       logged.mockRestore()

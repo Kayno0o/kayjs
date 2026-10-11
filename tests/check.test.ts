@@ -1670,15 +1670,12 @@ describe('kay check, unused code', () => {
   }, 30_000)
 
   it.each([
-    ['SIGTERM', [], 143],
-    ['SIGHUP', [], 129],
-    // A check and what it runs ignoring the first interrupt, killed at the second.
-    ['SIGINT', ['SIGINT'], 130],
-  ] as const)('stops the check running, and what it started, when the watch gets %s', async (signal, before, code) => {
-    const ignoring = before.length > 0
-    const config = ignoring
-      ? 'process.on(\'SIGINT\', () => {})\n\nconst started = Bun.spawn([\'sh\', \'-c\', \'trap "" INT; exec sleep 30\'])\n'
-      : 'const started = Bun.spawn([\'sleep\', \'30\'])\n'
+    ['SIGTERM', 'SIGTERM', [], 143, 'nothing'],
+    ['SIGHUP', 'SIGHUP', [], 129, 'nothing'],
+    ['SIGINT, what the check started ignoring it', 'SIGINT', [], 130, 'what it started'],
+    ['a second SIGINT, the check and what it started ignoring the first', 'SIGINT', ['SIGINT'], 130, 'both'],
+  ] as const)('stops the check running, and what it started, when the watch gets %s', async (_, signal, before, code, ignoring) => {
+    const config = `${ignoring === 'both' ? 'process.on(\'SIGINT\', () => {})\n\n' : ''}const started = Bun.spawn(${ignoring === 'nothing' ? '[\'sleep\', \'30\']' : '[\'sh\', \'-c\', \'trap "" INT; exec sleep 30\']'})\n`
     const root = await scratchProject({ 'kay.config.ts': `${config}\nawait Bun.write(import.meta.dir + '/pid', String(started.pid))\nawait Bun.sleep(30_000)\n\nexport default {}\n` })
     const watch = watchChecks(root)
     const pid = join(root, 'pid')
