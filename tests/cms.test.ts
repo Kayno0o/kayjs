@@ -418,14 +418,25 @@ describe('the collections a CMS edits', () => {
       expect(held.find(each => each.slug === 'fr/new')?.data.title).toBe('Un')
     })
 
-    const refusing = collection({ name: 'refusing', load: () => [], save: () => {
-      throw new Error('kept by another editor')
+    const refusing = collection({ name: 'refusing', load: () => [], save: (entry) => {
+      if (entry.create === true)
+        throw new Error('kept by another editor')
     } }, { schema: t.Object({ title: t.String() }) })
     const invalidated = spyOn(refusing, 'invalidate')
+    const gate = Promise.withResolvers<void>()
+    const waiting = collection({ name: 'waiting', load: () => [], save: async () => gate.promise }, { schema: t.Object({ title: t.String() }) })
 
-    await exporting([['refusing', refusing]], async () => {
+    await exporting([['refusing', refusing], ['waiting', waiting]], async () => {
       expect(await rejection(saveEntry('refusing', { slug: 'taken', data: { title: 'T' } }, { create: true }))).toMatchObject({ message: 'kept by another editor' })
       expect(invalidated).not.toHaveBeenCalled()
+
+      // The next save runs after one that threw, and a collection's saves wait for none of another's.
+      const pending = saveEntry('waiting', { slug: 'slow', data: { title: 'T' } })
+
+      expect(await saveEntry('refusing', { slug: 'taken', data: { title: 'T' } })).toEqual({})
+      expect(invalidated).toHaveBeenCalledTimes(1)
+      gate.resolve()
+      expect(await pending).toEqual({})
     })
   })
 

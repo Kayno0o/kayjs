@@ -13,7 +13,7 @@ import { dataIssues, decodeEntries, unknownComponents } from './validate'
 // What a CMS reads of the collections the content config exports, to edit their entries: kay's server API, kay writing nothing itself.
 // It gives drafts and files to whoever calls it: a CMS serves it from routes only an editor reaches.
 
-// The save each collection runs now, which the next waits for.
+// The save or remove each collection runs now, which the next waits for.
 const saving = new Map<string, Promise<unknown>>()
 
 // The kinds of string field a CMS edits apart from plain text, as `x-kay: { kind }` in the schema says.
@@ -238,20 +238,20 @@ export async function entrySource(name: string, slug: string, data: unknown, opt
 }
 
 // Hands an entry the editor wrote to a loaded collection's `save`, then reads the collection afresh; or resolves where it fails the collection, saving nothing.
-// `create` refuses an entry the loader already gives, and tells `save`, which refuses one another process created since. A collection's saves run in turn, so two creates here never both find the slug free.
+// `create` refuses an entry the loader already gives, and tells `save`, which refuses one another process created since. A collection's saves and removes run in turn, so two creates here never both find the slug free.
 export async function saveEntry(name: string, entry: WrittenEntry, options: { create?: boolean | undefined } = {}): Promise<{ issues?: DraftIssue[] }> {
   const collection = collectionNamed(name)
   const save = writer(name, collection, 'save')
+  const { issues } = await entryIssues(name, collection, entry)
+
+  if (issues.length > 0)
+    return { issues }
 
   return inTurn(name, async () => {
-    const { issues } = await entryIssues(name, collection, entry)
     const place = entry.locale === undefined ? entry.slug : `${entry.locale}/${entry.slug}`
 
-    if (issues.length === 0 && options.create === true && (await loadedEntries(name, collection)).some(each => each.slug === place))
-      issues.push(existingIssue(name, entry.slug, entry.locale))
-
-    if (issues.length > 0)
-      return { issues }
+    if (options.create === true && (await loadedEntries(name, collection)).some(each => each.slug === place))
+      return { issues: [existingIssue(name, entry.slug, entry.locale)] }
 
     await save(options.create === true ? { ...entry, create: true } : entry)
     collection.invalidate()
@@ -260,7 +260,7 @@ export async function saveEntry(name: string, entry: WrittenEntry, options: { cr
   })
 }
 
-// Runs after the collection's save before it, settled either way.
+// Runs once the collection's previous save or remove has settled, however it ended.
 async function inTurn<T>(name: string, run: () => Promise<T>): Promise<T> {
   const before = saving.get(name)
   const turn = (async () => {
@@ -288,18 +288,20 @@ export async function removeEntry(name: string, slug: string, locale?: string): 
   const at = { collection: name, slug, ...locale !== undefined && { locale } }
   const issues = placeIssues(collection, at)
 
-  const place = locale === undefined ? slug : `${locale}/${slug}`
-
-  if (issues.length === 0 && !(await loadedEntries(name, collection)).some(entry => entry.slug === place))
-    issues.push({ ...at, path: '', key: 'slug', message: 'names no entry of the collection' })
-
   if (issues.length > 0)
     return { issues }
 
-  await remove(at.locale === undefined ? { slug } : { slug, locale: at.locale })
-  collection.invalidate()
+  return inTurn(name, async () => {
+    const place = locale === undefined ? slug : `${locale}/${slug}`
 
-  return {}
+    if (!(await loadedEntries(name, collection)).some(entry => entry.slug === place))
+      return { issues: [{ ...at, path: '', key: 'slug', message: 'names no entry of the collection' }] }
+
+    await remove(at.locale === undefined ? { slug } : { slug, locale: at.locale })
+    collection.invalidate()
+
+    return {}
+  })
 }
 
 function existingIssue(collection: string, slug: string, locale: string | undefined): DraftIssue {
