@@ -40,7 +40,7 @@ h1 {post.title}
 | `[[page]].kay` | `/blog` and `/blog/2` |
 | `[id=integer].kay` | `/items/42` only, `ctx.params.id` a `number` |
 
-When two pages match a URL, the first segment telling them apart decides: a fixed name wins over a param, and a param over a catch-all. `/docs/intro` goes to `docs/[...path].kay` rather than `[section]/[page].kay`.
+When two pages match a URL, the first segment telling them apart decides: a fixed name wins over a param, and a param over a catch-all. `/docs/intro` goes to `docs/[...path].kay` rather than `[section]/[page].kay`. The same goes for any route ending in `*` against a page of params, whether a redirect's, an API module's or the app's own, over a listening server as through `app.handle()`. An app that passes `.use()` a promise, as `.use(import('./admin'))`, gets that once Elysia has loaded it, so a request in the moment after `listen()` may still reach the page of params.
 
 <Callout type="tip">
 

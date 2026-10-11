@@ -122,7 +122,7 @@ describe('over a listening server', () => {
 
     try {
       const admin = { headers: { 'x-admin': '1' } }
-      const requests: [string, RequestInit?][] = [[`/_kay/${asset}`], [`/_kay/files/${key}`], ['/docs/intro'], ['/docs/a/b'], ['/guide/start'], ['/x/y/z'], ['/blog/files/a/b'], ['/old/x/y'], ['/old/x/y', { method: 'HEAD' }], ['/api/files/x/y'], ['/api/files/x/y', admin]]
+      const requests: [string, RequestInit?][] = [[`/_kay/${asset}`], [`/_kay/files/${key}`], ['/docs/intro'], ['/docs/a/b'], ['/guide/start'], ['/x/y/z'], ['/blog/files/a'], ['/old/x/y'], ['/old/x/y', { method: 'HEAD' }], ['/api/files/x'], ['/api/files/x', admin]]
       const answers = async (get: (path: string, init?: RequestInit) => Promise<Response>) => Promise.all(requests.map(async ([path, init]) => {
         const response = await get(path, init)
         const text = await response.text()
@@ -139,12 +139,36 @@ describe('over a listening server', () => {
         ['GET /docs/a/b', 200, 'docs a/b'],
         ['GET /guide/start', 200, 'page guide start'],
         ['GET /x/y/z', 200, 'deep Deep'],
-        ['GET /blog/files/a/b', 200, 'files a/b'],
+        ['GET /blog/files/a', 200, 'files a'],
         ['GET /old/x/y', 308, '/new/x/y'],
         ['HEAD /old/x/y', 308, '/new/x/y'],
-        ['GET /api/files/x/y', 401, 'Admins only'],
-        ['GET /api/files/x/y', 200, 'api x/y'],
+        ['GET /api/files/x', 401, 'Admins only'],
+        ['GET /api/files/x', 200, 'api x'],
       ])
+    }
+    finally {
+      await app.stop()
+    }
+  }, 60_000)
+
+  it('keeps the methods an app names in its own serve.routes for a path a route ending in * wins', async () => {
+    const dir = await scratchDir('wildcards-serve-')
+    const routes = join(dir, 'routes')
+
+    await Bun.write(join(routes, '[section]/[page].kay'), 'p.page Page\n')
+
+    // kay registers a page of params as `/:p1/:p2`.
+    const own = { '/:p1/:p2': { POST: new Response('posted') } }
+    const app = new Elysia({ serve: { routes: own } as never }).use(await pages({ routes, redirects: { '/old/*': '/new/*' }, prebuilt: false, storage: memoryFiles() }))
+
+    app.listen({ port: 0, hostname: 'localhost' })
+
+    try {
+      const url = `http://localhost:${app.server!.port}/old/x`
+      const read = await fetch(url, { redirect: 'manual' })
+      const post = await fetch(url, { method: 'POST' })
+
+      expect([read.status, read.headers.get('location'), post.status, await post.text()]).toEqual([308, '/new/x', 200, 'posted'])
     }
     finally {
       await app.stop()

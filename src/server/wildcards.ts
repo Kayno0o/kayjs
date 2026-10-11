@@ -13,10 +13,15 @@ export function agreeOnWildcards(app: Elysia): void {
     if (Object.keys(routes).length === 0)
       return
 
-    // Elysia reads these again as the modules it waits on resolve, a microtask after it starts listening, and lays them over its own table.
+    // Elysia reads these again as the modules it waits on resolve, a microtask after it starts listening, or once a module the app passed `.use()` as a promise loaded, and lays them over its own table.
     const serve = (root.config.serve ?? {}) as { routes?: Record<string, unknown> }
+    const merged: Record<string, unknown> = { ...routes }
 
-    root.config.serve = { ...serve, routes: { ...routes, ...serve.routes } } as NonNullable<typeof root.config.serve>
+    // A path the app names too keeps the app's handler for each method it names, as Elysia merges its tables.
+    for (const [path, own] of Object.entries(serve.routes ?? {}))
+      merged[path] = path in routes && Object.getPrototypeOf(own) === Object.prototype ? { ...routes[path], ...own as object } : own
+
+    root.config.serve = { ...serve, routes: merged } as NonNullable<typeof root.config.serve>
   })
 }
 
