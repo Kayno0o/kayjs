@@ -28,6 +28,7 @@ import { loadConfig, pageHooks } from './config'
 import { writeContentManifests } from './content/server'
 import { ContentError } from './content/validate'
 import { dev } from './dev'
+import { InspectorAddressInUse } from './dev/inspector'
 import { formatFiles } from './format'
 import { startServer } from './lsp/server'
 import { migrateAstroProject } from './migrate/project'
@@ -649,7 +650,20 @@ async function runDev(args: string[]): Promise<number> {
   warnOtherKay('dev', root)
   const entry = typeof option === 'string' ? resolve(option) : inDir ? undefined : path
   const { routes, extensions, publicDir, api, settings, i18n, lang } = await loadConfig(root)
-  const stop = await dev(root, { entry, port: typeof port === 'string' ? Number(port) : undefined, inspect: typeof inspect === 'string' ? inspectorAddress(inspect) : undefined, open: open === true, routes, extensions, publicDir, api, settings, i18n, lang })
+  let stop: () => Promise<void>
+
+  try {
+    stop = await dev(root, { entry, port: typeof port === 'string' ? Number(port) : undefined, inspect: typeof inspect === 'string' ? inspectorAddress(inspect) : undefined, open: open === true, routes, extensions, publicDir, api, settings, i18n, lang })
+  }
+  catch (error) {
+    if (!(error instanceof InspectorAddressInUse))
+      throw error
+
+    console.error(error.message)
+
+    return 1
+  }
+
   const { promise, resolve: interrupted } = Promise.withResolvers<void>()
 
   process.once('SIGINT', interrupted)

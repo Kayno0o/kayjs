@@ -91,7 +91,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   // The inspector socket of each server process.
   const sockets = new Map<Subprocess, string>()
   const inspector = options.inspect === undefined ? undefined : inspectorProxy(options.inspect, () => child && sockets.get(child))
-  // Bun removes its socket as it exits, unless it was killed outright.
+  // Bun leaves its socket behind as it exits.
   const forgetSocket = async (server: Subprocess, socket: string) => {
     await server.exited
     sockets.delete(server)
@@ -222,7 +222,8 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     await restarting
     child?.kill()
     spare?.kill()
-    await Promise.all([child?.exited, spare?.exited, inspector?.stop()])
+    await Promise.all([child?.exited, spare?.exited])
+    await inspector?.stop()
   }
 }
 

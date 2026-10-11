@@ -8,6 +8,7 @@ import { describe, expect, it } from 'bun:test'
 import { buildClient } from '../src/build/client'
 import { KayCompileError } from '../src/build/transform'
 import { dev, watchProject } from '../src/dev'
+import { inspectorProxy } from '../src/dev/inspector'
 import { bootFailure, hotSwap } from '../src/server/dev'
 import { editorCommand } from '../src/server/editor'
 
@@ -469,16 +470,14 @@ describe('kay dev', () => {
 
   it('opens the debugger --inspect names on every server it runs, at the address it prints once, which a client closing as it connects never ends', async () => {
     const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
-    const free = Bun.serve({ port: 0, fetch: () => new Response() })
-    const port = free.port!
-
-    await free.stop()
     // Outside the project, whose changes restart the server, and written before it listens, so it is there once kay dev prints the address.
     const spawned = `${root}-spawned.txt`
 
     await Bun.write(join(root, 'src/server.ts'), `await Bun.write(${JSON.stringify(spawned)}, String(Bun.env.BUN_INSPECT))\nBun.serve({ port: 0, fetch: () => new Response() })\n`)
-    const child = Bun.spawn(['bun', join(import.meta.dir, '../src/cli.ts'), 'dev', root, `--inspect=${port}`], { stdout: 'pipe', stderr: 'pipe' })
+    const child = Bun.spawn(['bun', join(import.meta.dir, '../src/cli.ts'), 'dev', root, '--inspect=0'], { stdout: 'pipe', stderr: 'pipe' })
+    const sockets = async () => Array.fromAsync(new Bun.Glob(`kay-inspect-${child.pid}-*`).scan({ cwd: tmpdir(), onlyFiles: false }))
     const output: string[] = []
+    let port = 0
     const reading = (async () => {
       for await (const chunk of child.stdout.pipeThrough(new TextDecoderStream()))
         output.push(...chunk.split('\n').filter(Boolean))
@@ -521,6 +520,7 @@ describe('kay dev', () => {
 
     try {
       await until(() => output.length === 2, 10_000)
+      port = Number((/localhost:(\d+)/).exec(output[1]!)?.[1])
       expect(output[1]).toBe(`kay dev: debugger on ws://localhost:${port}/kay, https://debug.bun.sh/#localhost:${port}/kay`)
 
       for (let attempt = 0; attempt < 10; attempt++)
@@ -548,12 +548,37 @@ describe('kay dev', () => {
       // A server let go of exits within milliseconds and says so.
       await Bun.sleep(500)
       expect(output).toHaveLength(3)
+
+      const second = Bun.spawn(['bun', join(import.meta.dir, '../src/cli.ts'), 'dev', root, `--inspect=${port}`], { stdout: 'ignore', stderr: 'pipe' })
+
+      expect(await second.exited).toBe(1)
+      expect(await new Response(second.stderr).text()).toBe(`kay dev: the debugger address localhost:${port} is in use\n`)
+      expect(await sockets()).toHaveLength(1)
     }
     finally {
       child.kill('SIGTERM')
       await child.exited
       await reading
+      expect(await sockets()).toEqual([])
       await Promise.all([rm(root, { recursive: true, force: true }), rm(spawned, { force: true })])
+    }
+  })
+
+  it('lets no page of another site reach the debugger, as Bun\'s inspector does', async () => {
+    const proxy = inspectorProxy('ws://localhost:0/kay', () => undefined)
+    const status = async (headers: Record<string, string>) => (await fetch(proxy.url.replace('ws:', 'http:'), { headers })).status
+
+    try {
+      // Not a WebSocket upgrade, the answer once both checks pass.
+      expect(await status({})).toBe(426)
+      expect(await status({ host: '127.0.0.1', origin: 'https://debug.bun.sh' })).toBe(426)
+      expect(await status({ origin: 'http://localhost:3000' })).toBe(426)
+      expect(await status({ host: 'evil.example' })).toBe(400)
+      expect(await status({ origin: 'https://evil.example' })).toBe(403)
+      expect(await status({ origin: 'http://localhost.evil.example' })).toBe(403)
+    }
+    finally {
+      await proxy.stop()
     }
   })
 

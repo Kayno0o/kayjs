@@ -1,4 +1,5 @@
 import type { Server, ServerWebSocket } from 'bun'
+import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
@@ -17,6 +18,13 @@ const RELEASE = JSON.stringify({ id: RELEASE_ID, method: 'Runtime.evaluate', par
 const JSON_PATHS = new Set(['/json', '/json/list', '/json/version'])
 const IPV4 = /^\d{1,3}(?:\.\d{1,3}){3}$/
 const LOOPBACK_V4 = /^127(?:\.\d{1,3}){3}$/
+// The longest path a Unix socket takes on macOS, Linux taking 107.
+const SOCKET_PATH_MAX = 103
+// As Bun's inspector takes them: a heap snapshot comes back in one message.
+const MAX_PAYLOAD = 2 ** 31 - 1
+
+// A second `kay dev` asking for the address the first listens on.
+export class InspectorAddressInUse extends Error {}
 
 interface Link {
   upstream?: WebSocket | undefined
@@ -26,7 +34,7 @@ interface Link {
 }
 
 export interface InspectorProxy {
-  // The address it listens on, as the terminal prints it.
+  // The address it listens on, as the terminal prints it, with the port the system gave for port 0.
   url: string
   // A socket for a new server process, its `BUN_INSPECT`.
   socketFor: () => string
@@ -37,7 +45,41 @@ export interface InspectorProxy {
 export function inspectorProxy(address: string, current: () => string | undefined): InspectorProxy {
   const url = new URL(address)
   let count = 0
-  const server: Server<Link> = Bun.serve<Link>({
+  let server: Server<Link>
+
+  try {
+    server = serve(url, current)
+  }
+  catch (error) {
+    if ((error as { code?: unknown }).code === 'EADDRINUSE')
+      throw new InspectorAddressInUse(`kay dev: the debugger address ${url.host} is in use`, { cause: error })
+
+    throw error
+  }
+
+  // A directory only this user reaches, of this run alone, so no socket another process or an earlier run left behind is in the way.
+  const sockets = mkdtempSync(join(tmpdir(), `kay-inspect-${process.pid}-`))
+
+  if (join(sockets, `${Number.MAX_SAFE_INTEGER}.sock`).length > SOCKET_PATH_MAX) {
+    rmSync(sockets, { recursive: true, force: true })
+    void server.stop(true)
+
+    throw new Error(`kay dev: ${sockets} is too long a path for the debugger's sockets; set TMPDIR to a shorter directory`)
+  }
+
+  return {
+    url: `ws://${url.hostname}:${server.port}${url.pathname}`,
+    socketFor: () => join(sockets, `${++count}.sock`),
+    // Bun leaves a socket behind as its process exits.
+    stop: async () => {
+      await server.stop(true)
+      rmSync(sockets, { recursive: true, force: true })
+    },
+  }
+}
+
+function serve(url: URL, current: () => string | undefined): Server<Link> {
+  return Bun.serve<Link>({
     hostname: url.hostname,
     port: Number(url.port),
     async fetch(request, server) {
@@ -61,6 +103,7 @@ export function inspectorProxy(address: string, current: () => string | undefine
     },
     websocket: {
       idleTimeout: 0,
+      maxPayloadLength: MAX_PAYLOAD,
       open: client => connect(client, current, performance.now()),
       message: (client, message) => {
         const { upstream } = client.data
@@ -81,12 +124,6 @@ export function inspectorProxy(address: string, current: () => string | undefine
       },
     },
   })
-
-  return {
-    url: `ws://${url.host}${url.pathname}`,
-    socketFor: () => join(tmpdir(), `kay-inspect-${process.pid}-${++count}.sock`),
-    stop: async () => server.stop(true),
-  }
 }
 
 // Joins a client to the inspector of the server running; a server still starting has no socket yet, and is tried again.
