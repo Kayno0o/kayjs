@@ -15,7 +15,7 @@ kayjs-auth is published to the Forgejo registry at git.kaynooo.fr, beside kay. T
 bun add @kaynooo/kayjs-auth
 ```
 
-kay 1.37 or later and Elysia are peers, and `@kaynooo/pg-orm` too for the Postgres store.
+kay 1.37 or later, Elysia and kayjs-ui (any 0.x from 0.4.28, for the prebuilt pages) are peers, and `@kaynooo/pg-orm` too for the Postgres store.
 
 ## Set up
 

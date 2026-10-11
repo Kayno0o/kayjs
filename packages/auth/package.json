@@ -49,6 +49,7 @@
     "test": "bun test"
   },
   "peerDependencies": {
+    "@kaynooo/kayjs-ui": ">=0.4.28 <1",
     "@kaynooo/pg-orm": "^7.0.0",
     "elysia": "^1.4.30",
     "kay": "~1.37.0"
@@ -59,7 +60,6 @@
     }
   },
   "dependencies": {
-    "@kaynooo/kayjs-ui": "^0.4.28 || ^0.5.0 || ^0.6.0 || ^0.7.0",
     "@kaynooo/utils": "^2.27.0",
     "@simplewebauthn/server": "^14.0.3",
     "jose": "^6.2.12",
@@ -68,6 +68,7 @@
   "devDependencies": {
     "@kaynooo/eslint": "^6.0.1",
     "@kaynooo/kayjs-mail": "^0.3.0",
+    "@kaynooo/kayjs-ui": "^0.8.0",
     "@kaynooo/pg-orm": "^7.0.1",
     "@types/bun": "^1.4.2",
     "@typescript/native-preview": "^7.0.0-dev.20260707.2",
