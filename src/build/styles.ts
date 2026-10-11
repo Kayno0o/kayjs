@@ -19,6 +19,9 @@ const ABSOLUTE_URL = /^\//
 const TEXT_IMPORT = /\bfrom\s*(['"])([^'"\n]+)\1\s*(?:with|assert)\s*\{[^}]*\btype\s*:\s*(['"])text\3[^}]*\}|\bimport\(\s*(['"])([^'"\n]+)\4\s*,\s*\{\s*with\s*:\s*\{[^}]*\btype\s*:\s*(['"])text\6[^}]*\}\s*(?:,\s*)?\}\s*\)/g
 const ANY = /.*/
 const CSS_TEXT = 'kay-css-text'
+const CSS_EFFECT = 'kay-css-effect'
+// Ends the path of a stylesheet imported for its effect: the bundler tells modules apart by path alone, so without it a text import of the same file would be the same, empty, module.
+const EFFECT_SUFFIX = '?effect'
 
 // The specifiers `code` imports as text, each with how many times.
 function textImports(code: string): Map<string, number> {
@@ -151,7 +154,7 @@ export function styleImports(root: string, libraries: KayLibrary[] = []): BunPlu
 }
 
 // For the island and executable builds: stylesheets reach the page through the stylesheet build, so the code leaves them out, but for a text import, which gives a module the file's text.
-// A plugin sees no import's attributes, so they are read in the importer; a text import resolves apart, as its own module, so the same file imported for its effect elsewhere still brings nothing.
+// A plugin sees no import's attributes, so they are read in the importer; a text import and one for its effect resolve apart, each its own module, whichever the bundler meets first.
 export function withoutStyles(): BunPlugin {
   return {
     name: 'kay-without-styles',
@@ -160,12 +163,15 @@ export function withoutStyles(): BunPlugin {
         const file = withoutTwin(importer)
 
         // Bun resolves some imports a second time from the importer's directory.
-        if (statSync(file, { throwIfNoEntry: false })?.isFile() !== true || !textImports(readFileSync(file, 'utf8')).has(path))
+        if (statSync(file, { throwIfNoEntry: false })?.isFile() !== true)
           return undefined
 
-        return { path: Bun.resolveSync(path, dirname(file)), namespace: CSS_TEXT }
+        const resolved = Bun.resolveSync(path, dirname(file))
+
+        return textImports(readFileSync(file, 'utf8')).has(path) ? { path: resolved, namespace: CSS_TEXT } : { path: `${resolved}${EFFECT_SUFFIX}`, namespace: CSS_EFFECT }
       })
       build.onLoad({ filter: ANY, namespace: CSS_TEXT }, async ({ path }) => ({ contents: await Bun.file(path).text(), loader: 'text' }))
+      build.onLoad({ filter: ANY, namespace: CSS_EFFECT }, () => ({ contents: '', loader: 'js' }))
       build.onLoad({ filter: CSS_FILE }, () => ({ contents: '', loader: 'js' }))
     },
   }

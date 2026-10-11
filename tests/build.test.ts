@@ -1118,9 +1118,16 @@ describe('a stylesheet imported as text', () => {
       'src/app.css': '.app { color: blue }\n',
       'src/later.css': '.later { color: green }\n',
       'src/badge.css': '.badge-text { color: gold }\n',
-      'src/badge.kay': '---\nimport { signal } from \'kay\'\nimport badge from \'./badge.css\' with { type: \'text\' }\n\nconst on = signal(false)\n---\nbutton(onClick={() => on.set(o => !o)}) {on() ? badge : badge.length}\n',
-      'src/routes/index.kay': '---\nimport \'../app.css\'\nimport Badge from \'../badge.kay\'\n---\n--- server\nimport theme from \'../theme.css\' with { type: \'text\' }\n\nconst size: number = theme.length\n---\np.size {size}\nBadge\n',
-      'src/server.ts': 'import process from \'node:process\'\nimport { Elysia } from \'elysia\'\nimport { pages } from \'kay/server\'\nimport theme from \'./theme.css\' with { type: \'text\' }\n\nconst { default: later } = await import(\'./later.css\', { with: { type: \'text\' } })\nconst app = new Elysia().use(await pages({ security: false }))\nconst page = await (await app.handle(new Request(\'http://localhost/\'))).text()\n\nconsole.log(JSON.stringify({ theme, later, page: /<p class="size">(\\d+)<\\/p>/.exec(page)?.[1] }))\nprocess.exit(0)\n',
+      // Each imported as text and for its effect too, in either order: the server's, a page's, an island's.
+      'src/shared.css': '.shared { color: plum }\n',
+      'src/other.css': '.other { color: olive }\n',
+      'src/tag.css': '.tag-text { color: navy }\n',
+      'src/tag-plain.ts': 'import \'./tag.css\'\n',
+      'src/badge.kay': '---\nimport { signal } from \'kay\'\nimport badge from \'./badge.css\' with { type: \'text\' }\nimport \'./tag-plain\'\nimport tag from \'./tag.css\' with { type: \'text\' }\n\nconst on = signal(false)\n---\nbutton(onClick={() => on.set(o => !o)}) {on() ? badge + tag : badge.length}\n',
+      'src/routes/a.kay': '--- server\nimport other from \'../other.css\' with { type: \'text\' }\n---\np.other {other.length}\n',
+      'src/routes/z.kay': '---\nimport \'../other.css\'\n---\np Z\n',
+      'src/routes/index.kay': '---\nimport \'../app.css\'\nimport \'../shared.css\'\nimport Badge from \'../badge.kay\'\n---\n--- server\nimport theme from \'../theme.css\' with { type: \'text\' }\n\nconst size: number = theme.length\n---\np.size {size}\nBadge\n',
+      'src/server.ts': 'import process from \'node:process\'\nimport { Elysia } from \'elysia\'\nimport { pages } from \'kay/server\'\nimport shared from \'./shared.css\' with { type: \'text\' }\nimport theme from \'./theme.css\' with { type: \'text\' }\n\nconst { default: later } = await import(\'./later.css\', { with: { type: \'text\' } })\nconst app = new Elysia().use(await pages({ security: false }))\nconst page = await (await app.handle(new Request(\'http://localhost/\'))).text()\nconst other = await (await app.handle(new Request(\'http://localhost/a\'))).text()\n\nconsole.log(JSON.stringify({ theme, later, shared, page: /<p class="size">(\\d+)<\\/p>/.exec(page)?.[1], other: /<p class="other">(\\d+)<\\/p>/.exec(other)?.[1] }))\nprocess.exit(0)\n',
     })
     const theme = await Bun.file(join(root, 'src/theme.css')).text()
     const read = async (command: string[]) => {
@@ -1129,7 +1136,7 @@ describe('a stylesheet imported as text', () => {
 
       expect({ code, errors }).toEqual({ code: 0, errors: expect.any(String) })
 
-      return JSON.parse(output.trim().split('\n').at(-1)!) as { theme: string, later: string, page: string }
+      return JSON.parse(output.trim().split('\n').at(-1)!) as { theme: string, later: string, shared: string, page: string, other: string }
     }
 
     try {
@@ -1138,7 +1145,7 @@ describe('a stylesheet imported as text', () => {
 
       expect(report).not.toContain('error')
       expect(code).toBe(0)
-      const expected = { theme, later: '.later { color: green }\n', page: String(theme.length) }
+      const expected = { theme, later: '.later { color: green }\n', shared: '.shared { color: plum }\n', page: String(theme.length), other: String('.other { color: olive }\n'.length) }
 
       expect(await read([join(root, 'server')])).toEqual(expected)
       expect(await read([process.execPath, 'src/server.ts'])).toEqual(expected)
@@ -1153,6 +1160,7 @@ describe('a stylesheet imported as text', () => {
       expect(styles).not.toContain('themed')
       expect(styles).not.toContain('badge-text')
       expect(scripts).toContain('.badge-text { color: gold }')
+      expect(scripts).toContain('.tag-text { color: navy }')
       expect(scripts).not.toContain('.app { color')
     }
     finally {
