@@ -61,6 +61,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay/test i
   })
 
   it('fills a field as typing does, the form checked and posted as a user sends it', async () => {
+    await page.goto('/second')
     await page.fill('input[name="title"]', 'ab')
     await page.click('form button')
     // The first submit holds the post until the checks load, then reports what they find.
