@@ -50,7 +50,7 @@ const SHELL_SAFE = /^[\w@%+=:,./-]+$/
 // Colours a report as rustc does when stderr is a terminal that takes colours, and leaves it plain otherwise.
 const stderrColors = createColors({ stream: process.stderr })
 const toStderr: Paint = (styles, text) => styles.reduce((paint, style) => paint[style], stderrColors)(text)
-const USAGE = 'Usage: kay new <dir> [--kay <dependency>] [--template blank|server|site|app] [--with <features>] [--without <features>] [-y]\n       kay dev [dir] [--entry <file>]\n       kay build [dir] [--compile <executable>] [--entry <file>] [--static] [--outdir <dir>] [--no-check] [--analyze] [-p tsconfig.json]\n       kay check [dir] [-p tsconfig.json] [--entry <file>] [--deny-warnings] [--fix] [--only <group>]\n       kay explain [lint|group]\n       kay fmt [paths...] [--check]\n       kay migrate astro [dir] [--out <dir>]\n       kay lsp --stdio'
+const USAGE = 'Usage: kay new <dir> [--kay <dependency>] [--template blank|server|site|app] [--with <features>] [--without <features>] [-y]\n       kay dev [dir] [--entry <file>] [--port <port>]\n       kay build [dir] [--compile <executable>] [--entry <file>] [--static] [--outdir <dir>] [--no-check] [--analyze] [-p tsconfig.json]\n       kay check [dir] [-p tsconfig.json] [--entry <file>] [--deny-warnings] [--fix] [--only <group>]\n       kay explain [lint|group]\n       kay fmt [paths...] [--check]\n       kay migrate astro [dir] [--out <dir>]\n       kay lsp --stdio'
 
 interface Parsed {
   values: Record<string, string | boolean | undefined>
@@ -597,7 +597,7 @@ function shellQuote(path: string): string {
 
 // Restarts the server on every change until interrupted.
 async function runDev(args: string[]): Promise<number> {
-  const parsed = parseCommand(args, { entry: { type: 'string' } }, 1)
+  const parsed = parseCommand(args, { entry: { type: 'string' }, port: { type: 'string' } }, 1)
 
   if (typeof parsed === 'number')
     return parsed
@@ -619,12 +619,20 @@ async function runDev(args: string[]): Promise<number> {
     return 1
   }
 
+  const { port } = parsed.values
+
+  if (typeof port === 'string' && (!(/^\d{1,5}$/).test(port) || Number(port) > 65_535)) {
+    console.error(`kay: --port takes a port number, not ${port}\n${USAGE}`)
+
+    return 1
+  }
+
   const root = resolve(inDir ? path : '.')
 
   warnOtherKay('dev', root)
   const entry = typeof option === 'string' ? resolve(option) : inDir ? undefined : path
   const { routes, extensions, publicDir, api, settings, i18n, lang } = await loadConfig(root)
-  const stop = await dev(root, { entry, routes, extensions, publicDir, api, settings, i18n, lang })
+  const stop = await dev(root, { entry, port: typeof port === 'string' ? Number(port) : undefined, routes, extensions, publicDir, api, settings, i18n, lang })
   const { promise, resolve: interrupted } = Promise.withResolvers<void>()
 
   process.once('SIGINT', interrupted)

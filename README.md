@@ -38,7 +38,7 @@ In production the server serves what `kay build` wrote and bundles nothing at bo
 | Command | Does |
 | --- | --- |
 | `kay new <dir> [--template blank\|server\|site\|app] [--with <features>] [--without <features>] [-y] [--kay <dependency>]` | scaffold a project that checks, builds and runs: one bare page, a server run as one executable, a static site, or an app with sessions and members in Postgres through pg-orm; in a terminal with none of these options it asks for a preset, then for each feature; `--with` and `--without` change the preset's features, `-y` takes the server preset without asking, `--kay` sets its `kay` dependency |
-| `kay dev [dir] [--entry <file>]` | run the server, restarting on change, errors shown in the browser |
+| `kay dev [dir] [--entry <file>] [--port <port>]` | run the server, restarting on change, errors shown in the browser |
 | `kay build [dir] [--no-check]` | bundle the browser code for production while checking the project as `kay check` does, keeping the last build when either fails; `--no-check` skips the check |
 | `kay build [dir] --compile <file> [--entry <file>]` | the same, plus the server and everything it serves in one executable, `--entry` naming the server entry |
 | `kay build [dir] --static [--outdir dist]` | the same, then the whole site as static files for a host with no server |

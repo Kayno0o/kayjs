@@ -248,18 +248,19 @@ describe('kay dev', () => {
     }
   })
 
-  it('runs from the command line on the project a directory names, or with the entry --entry names', async () => {
+  it('runs from the command line on the project a directory names, or with the entry --entry names, on the port --port names', async () => {
     const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
     const seen = join(root, 'seen.txt')
     const cli = join(import.meta.dir, '../src/cli.ts')
-    const report = (name: string) => `await Bun.write(${JSON.stringify(seen)}, \`${name}|\${process.cwd()}\`)\nsetInterval(() => undefined, 1000)\n`
+    const report = (name: string) => `await Bun.write(${JSON.stringify(seen)}, \`${name}|\${process.cwd()}|\${process.env.PORT}\`)\nsetInterval(() => undefined, 1000)\n`
+    const port = process.env.PORT
 
     await Bun.write(join(root, 'src/server.ts'), report('server'))
     await Bun.write(join(root, 'src/other.ts'), report('other'))
 
     try {
       // An entry file in place of the directory, as `kay dev` took before, runs in the current directory.
-      for (const [args, expected, cwd] of [[[root], `server|${root}`, undefined], [[root, '--entry', join(root, 'src/other.ts')], `other|${root}`, undefined], [['src/other.ts'], `other|${root}`, root]] as const) {
+      for (const [args, expected, cwd] of [[[root], `server|${root}|${port}`, undefined], [[root, '--entry', join(root, 'src/other.ts')], `other|${root}|${port}`, undefined], [['src/other.ts'], `other|${root}|${port}`, root], [[root, '--port', '4123'], `server|${root}|4123`, undefined]] as const) {
         const child = Bun.spawn(['bun', cli, 'dev', ...args], { cwd: cwd ?? process.cwd(), stdout: 'ignore', stderr: 'pipe' })
 
         await until(() => existsSync(seen) && readFileSync(seen, 'utf8') === expected, 10_000)
@@ -272,6 +273,11 @@ describe('kay dev', () => {
 
       expect(await refused.exited).toBe(1)
       expect(await new Response(refused.stderr).text()).toContain('is not a directory, and --entry names the server entry already')
+
+      const notPort = Bun.spawn(['bun', cli, 'dev', root, '--port', '70000'], { stdout: 'ignore', stderr: 'pipe' })
+
+      expect(await notPort.exited).toBe(1)
+      expect(await new Response(notPort.stderr).text()).toContain('--port takes a port number, not 70000')
 
       const missing = Bun.spawn(['bun', cli, 'dev', join(root, 'typo')], { stdout: 'ignore', stderr: 'pipe' })
 

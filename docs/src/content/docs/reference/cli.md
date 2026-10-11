@@ -67,6 +67,7 @@ kay: accents needs tailwind: add --with tailwind, or drop it with --without acce
 | Option | Effect |
 | --- | --- |
 | `--entry <file>` | The server entry, when it is not `src/server.ts` |
+| `--port <port>` | Sets `PORT` for the server, over the shell's and the `.env`'s |
 
 A project with no server entry, such as a static site, gets a server of kay's own on `PORT` (3000 by default).
 

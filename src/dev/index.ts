@@ -10,6 +10,8 @@ import { writeShadowTypes } from '../check'
 export interface DevOptions {
   // The server entry, relative to the root, `src/server.ts` by default; with no file there, a server of kay's own serves the pages.
   entry?: string | undefined
+  // The `PORT` the server gets, over the shell's and the `.env`'s.
+  port?: number | undefined
   // Page, public file and API directories relative to the root, for the regenerated `.kay/types`.
   routes?: string | undefined
   extensions?: KayExtension[] | undefined
@@ -113,7 +115,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   const spawn = () => {
     spareEntry = entryToRun()
 
-    return Bun.spawn([process.execPath, '--preload', SPARE, spareEntry], { cwd: root, env: { ...env, NODE_ENV: 'development' }, stdin: 'pipe', stdout: 'inherit', stderr: 'inherit', ipc: (message, server) => listened(server, message) })
+    return Bun.spawn([process.execPath, '--preload', SPARE, spareEntry], { cwd: root, env: { ...env, NODE_ENV: 'development', ...options.port === undefined ? {} : { PORT: String(options.port) } }, stdin: 'pipe', stdout: 'inherit', stderr: 'inherit', ipc: (message, server) => listened(server, message) })
   }
   // Each restart takes the process waiting with kay loaded, and readies the next one.
   const start = () => {
