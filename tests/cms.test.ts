@@ -394,21 +394,57 @@ describe('the collections a CMS edits', () => {
 
   it('refuses to create an entry the collection holds, and tells the loader\'s save it creates', async () => {
     const saved: unknown[] = []
+    let loads = 0
     let held = [{ slug: 'en/hello', data: { title: 'Hello' }, html: '' }]
-    const tales = collection({ name: 'tales', load: () => held, save: (entry) => {
+    // Ignores `create`, overwriting as a plain save does.
+    const tales = collection({ name: 'tales', load: () => {
+      loads++
+
+      return held
+    }, save: async (entry) => {
+      await Bun.sleep(5)
       saved.push(entry)
-      held = [...held, { slug: `${entry.locale}/${entry.slug}`, data: entry.data as { title: string }, html: '' }]
+      held = [...held.filter(each => each.slug !== `${entry.locale}/${entry.slug}`), { slug: `${entry.locale}/${entry.slug}`, data: entry.data as { title: string }, html: '' }]
     } }, { schema: t.Object({ title: t.String() }), localized: true })
 
     await exporting([['tales', tales]], async () => {
       expect(await saveEntry('tales', { slug: 'hello', locale: 'en', data: { title: 'Hi' } }, { create: true })).toEqual({ issues: [{ collection: 'tales', slug: 'hello', locale: 'en', path: '', key: 'slug', message: 'names an entry the collection already holds' }] })
+      expect(loads).toBe(1)
       expect(await saveEntry('tales', { slug: 'hello', locale: 'fr', data: { title: 'Salut' } }, { create: true })).toEqual({})
       expect(await saveEntry('tales', { slug: 'hello', locale: 'fr', data: { title: 'Bonjour' } })).toEqual({})
       expect(saved).toEqual([{ slug: 'hello', locale: 'fr', data: { title: 'Salut' }, create: true }, { slug: 'hello', locale: 'fr', data: { title: 'Bonjour' } }])
+      // Two creates at once run in turn, the second finding the first's entry.
+      expect(await Promise.all(['Un', 'Deux'].map(async title => saveEntry('tales', { slug: 'new', locale: 'fr', data: { title } }, { create: true })))).toEqual([{}, { issues: [expect.objectContaining({ slug: 'new', key: 'slug' })] }])
+      expect(held.find(each => each.slug === 'fr/new')?.data.title).toBe('Un')
     })
 
-    expect(await entrySource('pages', 'about', { title: 'About', order: 2 }, { create: true })).toEqual({ issues: [{ collection: 'pages', slug: 'about', path: '', key: 'slug', message: 'names an entry the collection already holds' }] })
+    const refusing = collection({ name: 'refusing', load: () => [], save: () => {
+      throw new Error('kept by another editor')
+    } }, { schema: t.Object({ title: t.String() }) })
+    const invalidated = spyOn(refusing, 'invalidate')
+
+    await exporting([['refusing', refusing]], async () => {
+      expect(await rejection(saveEntry('refusing', { slug: 'taken', data: { title: 'T' } }, { create: true }))).toMatchObject({ message: 'kept by another editor' })
+      expect(invalidated).not.toHaveBeenCalled()
+    })
+  })
+
+  it('refuses to give the file of a new entry the folder holds, in any format, locale or index file', async () => {
+    const taken = (collection: string, slug: string, locale?: string) => ({ issues: [{ collection, slug, ...locale !== undefined && { locale }, path: '', key: 'slug' as const, message: 'names an entry the collection already holds' }] })
+
+    expect(await entrySource('pages', 'about', { title: 'About', order: 2 }, { create: true })).toEqual(taken('pages', 'about'))
+    expect(await entrySource('pages', 'contact', { title: 'Contact', order: 3 }, { create: true })).toEqual(taken('pages', 'contact'))
+    expect(await entrySource('articles', 'hello', { title: 'Salut' }, { locale: 'fr', create: true })).toEqual(taken('articles', 'hello', 'fr'))
     expect(await entrySource('pages', 'fresh', { title: 'Fresh', order: 9 }, { create: true })).toMatchObject({ file: { path: 'tests/fixtures/cms/src/content/pages/fresh.md' } })
+
+    const base = await scratchDir('cms-')
+
+    await readingFrom(base, ['content/pages'], async () => {
+      await mkdir(join(base, 'content/pages/guide'), { recursive: true })
+      await writeFile(join(base, 'content/pages/guide/index.md'), '---\ntitle: Guide\norder: 5\n---\n')
+
+      expect(await entrySource('pages', 'guide', { title: 'Guide', order: 5 }, { create: true })).toEqual(taken('pages', 'guide'))
+    })
   })
 
   it('names the method a loader lacks to save or remove its entries', async () => {

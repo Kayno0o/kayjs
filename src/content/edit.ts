@@ -13,6 +13,9 @@ import { dataIssues, decodeEntries, unknownComponents } from './validate'
 // What a CMS reads of the collections the content config exports, to edit their entries: kay's server API, kay writing nothing itself.
 // It gives drafts and files to whoever calls it: a CMS serves it from routes only an editor reaches.
 
+// The save each collection runs now, which the next waits for.
+const saving = new Map<string, Promise<unknown>>()
+
 // The kinds of string field a CMS edits apart from plain text, as `x-kay: { kind }` in the schema says.
 export type FieldKind = 'image' | 'file' | 'markdown' | 'reference'
 
@@ -235,23 +238,47 @@ export async function entrySource(name: string, slug: string, data: unknown, opt
 }
 
 // Hands an entry the editor wrote to a loaded collection's `save`, then reads the collection afresh; or resolves where it fails the collection, saving nothing.
-// `create` refuses an entry the loader already gives, and tells `save`, which can refuse one written since as it writes.
+// `create` refuses an entry the loader already gives, and tells `save`, which refuses one another process created since. A collection's saves run in turn, so two creates here never both find the slug free.
 export async function saveEntry(name: string, entry: WrittenEntry, options: { create?: boolean | undefined } = {}): Promise<{ issues?: DraftIssue[] }> {
   const collection = collectionNamed(name)
   const save = writer(name, collection, 'save')
-  const { issues } = await entryIssues(name, collection, entry)
-  const place = entry.locale === undefined ? entry.slug : `${entry.locale}/${entry.slug}`
 
-  if (issues.length === 0 && options.create === true && (await loadedEntries(name, collection)).some(each => each.slug === place))
-    issues.push(existingIssue(name, entry.slug, entry.locale))
+  return inTurn(name, async () => {
+    const { issues } = await entryIssues(name, collection, entry)
+    const place = entry.locale === undefined ? entry.slug : `${entry.locale}/${entry.slug}`
 
-  if (issues.length > 0)
-    return { issues }
+    if (issues.length === 0 && options.create === true && (await loadedEntries(name, collection)).some(each => each.slug === place))
+      issues.push(existingIssue(name, entry.slug, entry.locale))
 
-  await save(options.create === true ? { ...entry, create: true } : entry)
-  collection.invalidate()
+    if (issues.length > 0)
+      return { issues }
 
-  return {}
+    await save(options.create === true ? { ...entry, create: true } : entry)
+    collection.invalidate()
+
+    return {}
+  })
+}
+
+// Runs after the collection's save before it, settled either way.
+async function inTurn<T>(name: string, run: () => Promise<T>): Promise<T> {
+  const before = saving.get(name)
+  const turn = (async () => {
+    if (before !== undefined)
+      await Promise.allSettled([before])
+
+    return run()
+  })()
+
+  saving.set(name, turn)
+
+  try {
+    return await turn
+  }
+  finally {
+    if (saving.get(name) === turn)
+      saving.delete(name)
+  }
 }
 
 // Has a loaded collection's `remove` delete one of its entries, then reads the collection afresh; or resolves why it names none, deleting nothing.
