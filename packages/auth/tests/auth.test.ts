@@ -18,6 +18,17 @@ async function seeded() {
 }
 
 describe('createAuth', () => {
+  test('sessionCookie gives a test the cookie of a session signed in as a user, against the app\'s own auth', async () => {
+    const { auth, app, store } = testApp()
+
+    await store.users.create(userRecord({ id: 'u1', email: 'ada@example.com' }))
+    const cookie = await auth.sessionCookie('u1')
+    const response = await app.handle(new Request('http://localhost/me', { headers: { cookie } }))
+
+    expect(await response.json()).toMatchObject({ id: 'u1', email: 'ada@example.com' })
+    await expect(auth.sessionCookie('nobody')).rejects.toThrow('no user nobody')
+  })
+
   test('a visitor who never signed in reads as anonymous and gets no cookie', async () => {
     const { browser } = await seeded()
     const visitor = browser()

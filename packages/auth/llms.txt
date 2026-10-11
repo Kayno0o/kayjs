@@ -427,4 +427,6 @@ const site = await testSite({ use: [auth.plugin] })
 const page = await site.submit(signIn, { identifier: 'ada@example.com', password: 'correct horse battery' }, { from: '/login' })
 ```
 
+A test needing a signed-in request without going through a form takes `await auth.sessionCookie(userId)`, the `Cookie` header of a new session signed in as that user, as `signIn` makes it, against the app's own auth, to send by hand: `app.handle(new Request(url, { headers: { cookie } }))`.
+
 Each `testSite` keeps its own cookies, one browser each. `memoryStore()` keeps each test's users apart, and a mailer pushing into an array hands the test the links it would have mailed, `url` included; with kayjs-mail, its `outbox` holds what was sent.

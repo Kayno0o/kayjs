@@ -944,6 +944,30 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
       }
     },
 
+    // The `Cookie` header of a new session signed in as `userId`, as `signIn` makes it, for a test or a script to send by hand; throws for a missing or banned user.
+    async sessionCookie(userId: string): Promise<string> {
+      let failure: unknown
+      const signer = new Elysia().use(plugin).post('/', async ({ auth }) => {
+        try {
+          await auth.signIn({ id: userId })
+        }
+        catch (error) {
+          failure = error
+        }
+      })
+      const response = await signer.handle(new Request('http://localhost/', { method: 'POST' }))
+
+      if (failure !== undefined)
+        throw failure
+
+      // `name=value` off each Set-Cookie line, its attributes dropped.
+      return response.headers.getSetCookie().map((line) => {
+        const end = line.indexOf(';')
+
+        return end === -1 ? line : line.slice(0, end)
+      }).join('; ')
+    },
+
     // Who opened a websocket, read off the session cookie or bearer token its upgrade carried, which the plugin hands the socket as `ws.data.auth`: null for an anonymous one, or a socket opened on an app without the plugin.
     async socketUser(ws: { data?: unknown }): Promise<User | null> {
       const data = ws.data
