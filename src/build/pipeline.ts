@@ -151,7 +151,7 @@ export async function buildProject(root: string, config: KayConfig, options: Bui
     try {
       const executable = await compileServer(project, { outfile: resolve(root, options.compile.outfile), entry: options.compile.entry === undefined ? undefined : resolve(root, options.compile.entry) })
 
-      await Bun.write(join(output, EXECUTABLE_RECORD), executable)
+      await Bun.write(join(output, EXECUTABLE_RECORD), relative(root, executable))
 
       result.compiled = { executable, ms: performance.now() - stage }
     }
@@ -160,6 +160,10 @@ export async function buildProject(root: string, config: KayConfig, options: Bui
     }
 
     await options.onStage?.('compile', result)
+  }
+  else {
+    // `kay start` runs the entry of this build, not what an earlier one compiled.
+    await rm(join(output, EXECUTABLE_RECORD), { force: true })
   }
 
   return result

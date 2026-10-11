@@ -1,6 +1,7 @@
 import type { Command } from './command'
 import { existsSync, statSync } from 'node:fs'
 import { stat } from 'node:fs/promises'
+import { constants } from 'node:os'
 import { join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { outputDir } from '../build/assets'
@@ -10,8 +11,10 @@ import { projectPaths } from '../project'
 import { EXECUTABLE_RECORD, MANIFEST } from '../server/client'
 import { count, isPort, projectRoot } from './command'
 
-// The terminal interrupts the server along with `kay start`; these come to `kay start` alone.
-const FORWARDED = ['SIGTERM', 'SIGHUP'] as const
+// The server runs in a process group of its own, so each of these reaches it once, through `kay start`, whether a terminal sent it to the group or a supervisor to `kay start` alone: a second Ctrl-C stops it mid-drain, as it would run alone.
+const FORWARDED = ['SIGINT', 'SIGTERM', 'SIGHUP', 'SIGQUIT'] as const
+// The signals asking the server to stop: dying of one `kay start` passed on is a stop, not a failure.
+const STOPS = new Set<string>(['SIGINT', 'SIGTERM', 'SIGHUP'])
 
 // Serves the last build as the deployed server would: the executable `kay build --compile` made, else the server entry, in production.
 export const start: Command = {
@@ -38,27 +41,51 @@ export const start: Command = {
 
     await warnStale(root, built.mtimeMs)
 
-    const command = typeof option === 'string' ? [process.execPath, resolve(option)] : await serverCommand(root, output)
+    const command = typeof option === 'string' ? [process.execPath, resolve(option)] : await serverCommand(root, output, built.mtimeMs)
     const env = await environmentWithoutDotenv()
-    const server = Bun.spawn(command, { cwd: root, env: { ...env, NODE_ENV: 'production', ...typeof port === 'string' && { PORT: port } }, stdio: ['inherit', 'inherit', 'inherit'] })
+    const forwarded = new Set<string>()
+    let server: Bun.Subprocess
 
-    for (const signal of FORWARDED)
-      process.on(signal, () => server.kill(signal))
+    try {
+      server = Bun.spawn(command, { cwd: root, env: { ...env, NODE_ENV: 'production', ...typeof port === 'string' && { PORT: port } }, stdio: ['inherit', 'inherit', 'inherit'], detached: true })
+    }
+    catch (error) {
+      console.error(`kay start: cannot run ${relative(process.cwd(), command.at(-1)!)}: ${error instanceof Error ? error.message : String(error)}`)
 
-    // The server exits on the signal it shuts down for, which ends `kay start` as it asked.
+      return 1
+    }
+
+    for (const signal of FORWARDED) {
+      process.on(signal, () => {
+        forwarded.add(signal)
+        server.kill(signal)
+      })
+    }
+
     const code = await server.exited
+    const { signalCode } = server
 
-    return server.signalCode === null ? code : 0
+    if (signalCode === null)
+      return code
+
+    // As a shell reports a process a signal ended.
+    return STOPS.has(signalCode) && forwarded.has(signalCode) ? 0 : 128 + constants.signals[signalCode]
   },
 }
 
 // The executable the last build compiled, while it is still there, else the project's entry, or kay's own server of its pages when it has none.
-async function serverCommand(root: string, output: string): Promise<string[]> {
+async function serverCommand(root: string, output: string, builtAt: number): Promise<string[]> {
   const record = Bun.file(join(output, EXECUTABLE_RECORD))
-  const executable = await record.exists() ? await record.text() : undefined
+  // Relative to the root, so a copy of the project runs its own.
+  const executable = await record.exists() ? resolve(root, await record.text()) : undefined
+  const compiled = executable === undefined ? undefined : statSync(executable, { throwIfNoEntry: false })
 
-  if (executable !== undefined && existsSync(executable))
+  if (executable !== undefined && compiled) {
+    if (compiled.mtimeMs < builtAt)
+      console.warn(`kay start: the executable ${relative(process.cwd(), executable)} is older than the build, which a failed \`kay build\` leaves; run \`kay build --compile\` again`)
+
     return [executable]
+  }
 
   if (executable !== undefined)
     console.warn(`kay start: the executable the last build compiled, ${relative(process.cwd(), executable)}, is gone; starting the server entry instead`)

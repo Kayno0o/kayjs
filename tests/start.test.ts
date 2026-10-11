@@ -1,6 +1,6 @@
 import type { Subprocess } from 'bun'
 import { chmod, rm, utimes } from 'node:fs/promises'
-import { join } from 'node:path'
+import { join, relative } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { outputDir } from '../src/build/assets'
@@ -23,8 +23,13 @@ function start(dir: string, ...args: string[]): Subprocess<'ignore', 'pipe', 'pi
   return Bun.spawn([process.execPath, cli, 'start', dir, ...args], { stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' })
 }
 
-// Runs `whileUp` once the server listens, then stops it as a deployment would: the port it listened on, what `kay start` warned and how it exited.
-async function listening(child: Subprocess<'ignore', 'pipe', 'pipe'>, whileUp?: (port: string) => Promise<void>): Promise<{ port: string, warned: string, code: number }> {
+// In a process group of its own, as a shell runs a command, for the test to signal the group as Ctrl-C does.
+function startGroup(dir: string, ...args: string[]): Subprocess<'ignore', 'pipe', 'pipe'> {
+  return Bun.spawn([process.execPath, cli, 'start', dir, ...args], { stdin: 'ignore', stdout: 'pipe', stderr: 'pipe', detached: true })
+}
+
+// Runs `whileUp` once the server listens, then stops it with `signal`, as a deployment would: the port it listened on, what `kay start` warned and how it exited.
+async function listening(child: Subprocess<'ignore', 'pipe', 'pipe'>, whileUp?: (port: string) => Promise<void>, signal: NodeJS.Signals = 'SIGTERM', group = false): Promise<{ port: string, warned: string, code: number }> {
   const reader = child.stdout.getReader()
   let output = ''
 
@@ -45,7 +50,10 @@ async function listening(child: Subprocess<'ignore', 'pipe', 'pipe'>, whileUp?: 
     await whileUp?.(port)
   }
   finally {
-    child.kill('SIGTERM')
+    if (group)
+      process.kill(-child.pid, signal)
+    else
+      child.kill(signal)
   }
 
   const [warned, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
@@ -107,19 +115,61 @@ describe('kay start', () => {
     expect((await listening(start(dir))).warned).toContain('the build is older than .kay/scratch/')
   }, 60_000)
 
-  it('runs the executable the last build compiled, and the entry once it is gone', async () => {
+  it('runs the executable the last build compiled, relative to the root, warning when the build is newer, and the entry once it is gone or a build compiled none', async () => {
     const executable = join(dir, 'server')
+    const record = join(outputDir(dir), 'executable')
 
     await Bun.write(executable, '#!/bin/sh\necho "compiled $NODE_ENV"\n')
     await chmod(executable, 0o755)
-    await Bun.write(join(outputDir(dir), 'executable'), executable)
+    await Bun.write(record, 'server')
 
     const compiled = start(dir)
 
     expect(await new Response(compiled.stdout).text()).toBe('compiled production\n')
     expect(await compiled.exited).toBe(0)
 
+    const earlier = new Date(Date.now() - 60_000)
+
+    await utimes(executable, earlier, earlier)
+
+    const older = start(dir)
+
+    expect(await new Response(older.stderr).text()).toContain(`kay start: the executable ${relative(process.cwd(), executable)} is older than the build`)
+    expect(await older.exited).toBe(0)
+
+    await chmod(executable, 0o644)
+
+    const refused = start(dir)
+
+    expect(await new Response(refused.stderr).text()).toContain(`kay start: cannot run ${relative(process.cwd(), executable)}: EACCES`)
+    expect(await refused.exited).toBe(1)
+
     await rm(executable)
     expect((await listening(start(dir))).warned).toContain('is gone; starting the server entry instead')
+
+    await Bun.write(record, 'server')
+    expect(await Bun.spawn([process.execPath, cli, 'build', dir, '--no-check'], { stdout: 'ignore', stderr: 'ignore' }).exited).toBe(0)
+    expect(await Bun.file(record).exists()).toBe(false)
+  }, 60_000)
+
+  it('exits as the server does: with its code, 128 and the signal that killed it, or 0 once it stopped on the signal kay start alone was sent', async () => {
+    const entry = async (name: string, code: string) => {
+      await Bun.write(join(dir, name), code)
+
+      // Relative to the current directory.
+      return relative(process.cwd(), join(dir, name))
+    }
+
+    expect(await start(dir, '--entry', await entry('crash.ts', 'process.exit(3)\n')).exited).toBe(3)
+    expect(await start(dir, '--entry', await entry('killed.ts', 'process.kill(process.pid, \'SIGKILL\')\n')).exited).toBe(137)
+
+    for (const group of [false, true]) {
+      const port = String(freePort())
+      const interrupted = await listening((group ? startGroup : start)(dir, '--port', port), undefined, 'SIGINT', group)
+
+      expect(interrupted.code).toBe(0)
+      // The server drained and exited before `kay start` did.
+      expect(async () => Bun.serve({ port: Number(port), fetch: () => new Response() }).stop(true)).not.toThrow()
+    }
   }, 60_000)
 })

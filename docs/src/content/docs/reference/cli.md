@@ -136,12 +136,14 @@ kay start              # the last build, as the deployed server runs it
 kay start --port 8080
 ```
 
-It serves the last `kay build` with `NODE_ENV=production`: the executable `--compile` wrote when that build made one, the server entry otherwise, or kay's own server of the pages in a project without one. It refuses to start without a build, and warns when a source changed since, naming the latest. `.env` is read as the server reads it, `.env.production` included, not as the shell running `kay start` holds it.
+It serves the last `kay build` with `NODE_ENV=production`: the executable `--compile` wrote when that build made one (a later build without `--compile` drops it, and a build newer than the executable gets a warning), the server entry otherwise, or kay's own server of the pages in a project without one. It refuses to start without a build, and warns when a source changed since, naming the latest. The env files are read as the server reads them, as Bun does under `NODE_ENV=production`: `.env.production` and `.env` both, so a value only `.env` holds, such as a development database, reaches `kay start` unless `.env.production` sets it too. A variable the shell sets wins over both.
 
 | Option | Effect |
 | --- | --- |
-| `--entry <file>` | Runs that server entry instead |
-| `--port <port>` | The port to listen on, `PORT` or 3000 otherwise |
+| `--entry <file>` | Runs that server entry instead, relative to the current directory |
+| `--port <port>` | The port to listen on: `--port`, else the shell's `PORT`, else the one `.env.production` or `.env` sets, else 3000 |
+
+Ctrl-C, `SIGTERM` and `SIGHUP` reach the server once each, whether sent to the terminal's process group or to `kay start` alone, and `kay start` waits for it to drain and exit; a second Ctrl-C stops it at once. `kay start` exits with the server's code, with 0 when the server ended on a stop signal it passed on, and with 128 plus the signal's number when the server died of another, as an out-of-memory kill (137) or a crash (134, 139).
 
 ## kay check
 
