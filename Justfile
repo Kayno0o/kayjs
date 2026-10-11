@@ -13,11 +13,33 @@ release level:
 	set -euo pipefail
 	bun pm version {{level}}
 	tag=$(git tag --points-at HEAD)
+	before=$(tea actions runs ls -o json --limit 1 | jq -r '.[0].id // 0')
 	if ! git push --atomic origin HEAD "$tag"; then
 	  git tag -d "$tag"
 	  git reset --keep HEAD~1
 	  exit 1
 	fi
+	just watch-runs "$before"
+
+# wait for the Forgejo runs started after run <after>, failing on the first one that fails
+watch-runs after:
+	#!/usr/bin/env bash
+	set -euo pipefail
+	for _ in $(seq 1 120); do
+	  # Sleeping first gives a push's runs time to all appear, so one finishing early is not taken for the lot.
+	  sleep 20
+	  runs=$(tea actions runs ls -o json --limit 10 | jq -c --argjson after {{after}} '[.[] | select((.id | tonumber) > $after) | {id, status}]')
+	  if jq -e 'any(.status == "failure" or .status == "cancelled")' <<<"$runs" >/dev/null; then
+	    echo "a run failed: $runs" >&2
+	    exit 1
+	  fi
+	  if jq -e 'length > 0 and all(.status == "success" or .status == "skipped")' <<<"$runs" >/dev/null; then
+	    echo "every run passed: $runs"
+	    exit 0
+	  fi
+	done
+	echo "the runs did not finish in 40 minutes: $runs" >&2
+	exit 1
 
 worktree name: # a worktree at HEAD in .claude/worktrees/<name>, its dependencies installed, as Claude Code's own are made
 	bun .claude/hooks/worktree.ts create {{name}}
