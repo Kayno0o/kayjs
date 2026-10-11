@@ -338,6 +338,8 @@ A change to what protects an account is mailed to its verified address, never an
 
 With `audit: true`, or `{ maxAge }` in seconds (a year by default), the same events are kept in the store's audit log too, pruned of older ones at most hourly. `auditLog({ before, limit })` gives the signed-in user their own, newest first: `{ id, userId, event, detail, ip, userAgent, actorId, at }`. The log is kept past a user's deletion, so it still says what happened. Writing it never fails what it records: a failure is logged.
 
+`describeAuditEntry(entry, { locale, wording })` words an entry for a person, its detail included (`Role editor granted`, `Signed in with discord`), in English or French as the pages are, English for another locale. `wording` takes the app's own phrase for any event, a string or a function of the detail, over kayjs-auth's; `auditWording` holds kayjs-auth's by language.
+
 ## Admin
 
 `admin: 'admin'`, any requirement a guard takes, names who may manage users; without it, and to anyone else or to an admin acting as someone, every method below answers `{ ok: false, error: 'forbidden' }`.

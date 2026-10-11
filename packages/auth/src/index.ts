@@ -1,5 +1,7 @@
 export type { ChangeUsernameResult } from './account'
 export type { AdminFailure, BanResult, DeleteResult, ManagedUser, RoleResult } from './admin'
+export { auditWording, describeAuditEntry } from './auditWording'
+export type { AuditPhrase, AuditWording } from './auditWording'
 export * from './auth'
 export type { BearerToken, CreateTokenResult, TokenOptions } from './bearer'
 export { pwnedPassword } from './breached'
