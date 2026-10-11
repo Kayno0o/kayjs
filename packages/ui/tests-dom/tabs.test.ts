@@ -1,5 +1,6 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, expect, test } from 'bun:test'
+import { focusInvalid } from 'kay'
 import { mount, settle } from 'kay/test'
 import { click } from './dom'
 
@@ -111,4 +112,17 @@ test('shows the tab of a panel hidden until found once the browser finds somethi
 
   expect([shown(), visible(), changes]).toEqual([['Earth'], ['earth'], ['earth']])
   expect(earth.getAttribute('tabindex')).toBe('0')
+})
+
+test('shows the tab of a hidden panel when kay\'s focusInvalid reaches an invalid field in it', async () => {
+  const { root, shown, visible } = await tabs()
+  const input = root.querySelector<HTMLInputElement>('input[name="earth"]')!
+
+  input.setAttribute('aria-invalid', 'true')
+
+  expect(await focusInvalid(root)).toBe(true)
+  await settle()
+
+  expect([shown(), visible(), changes]).toEqual([['Earth'], ['earth'], ['earth']])
+  expect(document.activeElement).toBe(input)
 })
