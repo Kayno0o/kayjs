@@ -7,6 +7,8 @@ export interface EntryRow {
   title: string
   draft: boolean
   url?: string | undefined
+  // Why the entry's file does not parse, when it does not.
+  problem?: string | undefined
 }
 
 export const PAGE_SIZE = 50
@@ -15,10 +17,10 @@ export const PAGE_SIZE = 50
 export function rowsOf(collection: CollectionInfo, entries: SourceEntry[]): EntryRow[] {
   const titleKey = fieldsOf(collection.schema).find(field => field.kind === 'text')?.key
 
-  return entries.map(({ slug, locale, url, data, draft }) => {
-    const title = titleKey === undefined ? undefined : data[titleKey]
+  return entries.map(({ slug, locale, url, data, draft, problem }) => {
+    const title = titleKey === undefined ? undefined : data?.[titleKey]
 
-    return { slug, locale, url, draft, title: typeof title === 'string' && title.trim() !== '' ? title : slug }
+    return { slug, locale, url, draft, problem, title: typeof title === 'string' && title.trim() !== '' ? title : slug }
   })
 }
 
@@ -41,7 +43,9 @@ export function collectionPath(prefix: string, collection: string): string {
 }
 
 export function entryPath(prefix: string, { collection, slug, locale }: EntryRef): string {
-  const path = `${collectionPath(prefix, collection)}/${slug.split('/').map(encodeURIComponent).join('/')}`
+  const parts = slug.split('/')
+  // A loaded slug may start with `/` or hold `//`, which a path keeps only escaped.
+  const path = `${collectionPath(prefix, collection)}/${parts.includes('') ? encodeURIComponent(slug) : parts.map(encodeURIComponent).join('/')}`
 
   return locale === undefined ? path : `${path}?locale=${encodeURIComponent(locale)}`
 }

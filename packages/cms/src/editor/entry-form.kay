@@ -22,7 +22,7 @@ let box: HTMLElement | undefined
 effect(() => {
   const answer = source.value()
 
-  if (answer)
+  if (answer?.entry.data)
     drafts.open({ ...entry, data: answer.entry.data, body: answer.entry.body })
 })
 
@@ -62,6 +62,8 @@ section.kcms-entry(ref={element => box = element})
         Button(label={saving ? 'Saving…' : 'Save'} variant="accent" busy={saving} onClick={save})
   if source.status() === 'failed'
     p.kcms-entry-failure Could not load this entry: {source.error()?.message}
+  else if source.value()?.entry.problem as problem
+    p.kcms-entry-failure This entry's file does not parse: {problem}
   else if source.value() as answer
     EntryFields(drafts={drafts} entry={entry} collection={answer.collection})
   else

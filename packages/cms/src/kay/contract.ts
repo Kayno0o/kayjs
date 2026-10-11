@@ -61,10 +61,13 @@ export interface CollectionInfo {
 export interface SourceEntry {
   slug: string
   locale?: string | undefined
+  // Relative to the git root; left out for a loaded entry, or a folder outside the repository.
   path?: string | undefined
   // The page rendering the entry, when kay knows it.
   url?: string | undefined
-  data: Record<string, DataValue>
+  // Undefined for a file that does not parse, `problem` saying why.
+  data: Record<string, DataValue> | undefined
+  problem?: string | undefined
   body?: string | undefined
   draft: boolean
 }

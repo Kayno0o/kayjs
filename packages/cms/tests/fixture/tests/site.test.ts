@@ -1,3 +1,4 @@
+import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { beforeAll, expect, test } from 'bun:test'
@@ -143,4 +144,47 @@ test('a loaded entry is created and removed through its loader', async () => {
   expect((await send('GET', 'products/lamp')).answer).toHaveProperty('entry.data.name', 'Lamp')
   expect((await send('DELETE', 'products/lamp')).answer).toEqual({ saved: true })
   expect(products.map(product => product.slug)).toEqual(['mug'])
+})
+
+test('kay\'s own rules refuse a folder slug naming another file, and removing a loaded entry it does not hold', async () => {
+  saved.length = 0
+
+  expect((await send('POST', 'posts/..%2Fescape', { data: { title: 'Out' }, create: true })).answer).toHaveProperty('issues.0.key', 'slug')
+  expect((await send('DELETE', 'products/nope')).answer).toHaveProperty('issues.0.message', 'names no entry of the collection')
+  expect(saved).toEqual([])
+})
+
+test('a loaded slug starting with / opens at its escaped path', async () => {
+  expect((await send('POST', 'products/%2Fabout', { data: { name: 'About' }, create: true })).answer).toEqual({ saved: true })
+
+  try {
+    expect((await site.visit('/admin/collections/products')).find('.kcms-entries a').map(link => link.attributes.href)).toContain('/admin/collections/products/%2Fabout')
+    expect((await site.visit('/admin/collections/products/%2Fabout')).title()).toBe('/about - Products')
+  }
+  finally {
+    await send('DELETE', 'products/%2Fabout')
+  }
+})
+
+test('a file that does not parse lists as broken, and its screen only offers to delete it', async () => {
+  const file = join(ROOT, 'src/content/posts/broken.json')
+
+  await Bun.write(file, '{ "title": ')
+
+  try {
+    expect((await site.visit('/admin/collections/posts')).find('.kcms-entries .kui-badge').map(badge => badge.text)).toContain('Broken')
+
+    const page = await site.visit('/admin/collections/posts/broken')
+
+    expect(page.text('.kcms-entry-failure')).toContain('does not parse')
+    expect(page.find('[data-kcms-path]')).toEqual([])
+
+    saved.length = 0
+
+    expect((await send('DELETE', 'posts/broken')).answer).toHaveProperty('saved', true)
+    expect(saved.map(({ repoPath, text }) => [repoPath, text])).toEqual([['tests/fixture/src/content/posts/broken.json', undefined]])
+  }
+  finally {
+    await rm(file, { force: true })
+  }
 })

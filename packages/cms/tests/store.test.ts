@@ -24,11 +24,15 @@ const content: typeof Content = {
 
     return {}
   },
-  removeEntry: async (_collection, slug) => {
+  removeEntry: async (collection, slug) => {
+    if (!stored[collection]?.some(entry => entry.slug === slug))
+      return { issues: [{ collection, slug, path: '', key: 'slug', message: 'names no entry of the collection' }] }
+
     removed.push(slug)
 
     return {}
   },
+  repositoryRoot: () => '/site',
 }
 
 void mock.module('../src/kay/content', () => content)
@@ -40,7 +44,7 @@ beforeEach(() => {
   saved = []
   loaded = []
   removed = []
-  stored = { posts: [{ slug: 'hello', data: { title: 'Hello', draft: true }, body: 'Hi', draft: true }], products: [{ slug: 'mug', data: { name: 'Mug' }, draft: false }] }
+  stored = { posts: [{ slug: 'hello', path: 'content/posts/hello.md', data: { title: 'Hello', draft: true }, body: 'Hi', draft: true }], products: [{ slug: 'mug', data: { name: 'Mug' }, draft: false }] }
   configure({ files: { save: async (change) => {
     saved.push(change)
 
@@ -59,8 +63,7 @@ describe('saveEntry', () => {
     expect(saved).toEqual([])
   })
 
-  test('refuses a slug that is no path, and a new entry under a slug taken', async () => {
-    expect(await saveEntry({ collection: 'posts', slug: '../escape', data: {} }, { create: true })).toHaveProperty('issues.0.path', '')
+  test('refuses a new entry under a slug taken', async () => {
     expect(await saveEntry({ collection: 'posts', slug: 'hello', data: { title: 'Again' } }, { create: true })).toHaveProperty('issues.0.message', 'hello already exists')
     expect(await saveEntry({ collection: 'posts', slug: 'notes/new', data: { title: 'New' } }, { create: true })).toHaveProperty('saved', true)
     expect(saved.map(change => change.message)).toEqual(['content(posts): add notes/new'])
@@ -87,8 +90,23 @@ describe('deleteEntry', () => {
     expect(await deleteEntry({ collection: 'posts', slug: 'nope' })).toHaveProperty('issues.0.message', 'nope does not exist')
   })
 
-  test('removes a loaded entry through its loader', async () => {
+  test('commits away the file of an entry that no longer parses, by the path kay listed', async () => {
+    stored.posts = [{ slug: 'broken', path: 'content/posts/broken.md', data: undefined, problem: 'bad YAML', draft: false }]
+
+    expect(await deleteEntry({ collection: 'posts', slug: 'broken' })).toHaveProperty('saved', true)
+    expect(saved.map(change => [change.repoPath, change.absolute])).toEqual([['content/posts/broken.md', '/site/content/posts/broken.md']])
+  })
+
+  test('refuses a folder entry kay lists without a path, outside the repository', async () => {
+    stored.posts = [{ slug: 'hello', data: { title: 'Hello' }, draft: false }]
+
+    expect(await deleteEntry({ collection: 'posts', slug: 'hello' })).toHaveProperty('issues.0.message', 'posts\'s folder lies outside the repository, so its files cannot be committed')
+    expect(saved).toEqual([])
+  })
+
+  test('removes a loaded entry through its loader, or passes on why kay would not', async () => {
     expect(await deleteEntry({ collection: 'products', slug: 'mug' })).toEqual({ saved: true })
+    expect(await deleteEntry({ collection: 'products', slug: 'nope' })).toHaveProperty('issues.0.key', 'slug')
     expect(removed).toEqual(['mug'])
   })
 })
@@ -97,6 +115,13 @@ describe('publishEntry', () => {
   test('saves the entry as it was with its draft field off', async () => {
     expect(await publishEntry({ collection: 'posts', slug: 'hello' })).toHaveProperty('saved', true)
     expect(saved.map(change => [change.text, change.message])).toEqual([['{"title":"Hello","draft":false}\nHi', 'content(posts): publish hello']])
+  })
+
+  test('refuses an entry whose file does not parse', async () => {
+    stored.posts = [{ slug: 'broken', path: 'content/posts/broken.md', data: undefined, problem: 'bad YAML', draft: false }]
+
+    expect(await publishEntry({ collection: 'posts', slug: 'broken' })).toHaveProperty('issues.0.message', 'broken\'s file does not parse: bad YAML')
+    expect(saved).toEqual([])
   })
 
   test('refuses a collection without a draft field', async () => {

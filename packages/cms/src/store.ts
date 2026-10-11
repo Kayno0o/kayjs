@@ -1,12 +1,10 @@
 import type { Commit } from './files'
 import type { CollectionInfo, DraftEntry, EntryRef, Issue, SourceEntry } from './kay/contract'
-import { collections, entries, entrySource, removeEntry, saveEntry as saveLoaded } from './kay/content'
+import { join } from 'node:path'
+import { collections, entries, entrySource, removeEntry, repositoryRoot, saveEntry as saveLoaded } from './kay/content'
 import { settings } from './settings'
 
 export type SaveOutcome = { issues: Issue[] } | { saved: true, commit?: Commit | undefined }
-
-// Folder slugs become file paths, so they hold words, dashes and `/` between them, never `..` or a leading `/`.
-const SLUG = /^[\w-]+(?:\/[\w-]+)*$/
 
 export class UnknownCollection extends Error {}
 
@@ -34,9 +32,6 @@ function refused(ref: EntryRef, message: string, key?: Issue['key']): SaveOutcom
 // Saves an entry where its collection keeps it: a loaded one through its loader, a folder one as a file through the configured saver.
 export async function saveEntry(entry: DraftEntry, { create = false, verb }: { create?: boolean | undefined, verb?: string | undefined } = {}): Promise<SaveOutcome> {
   const collection = await collectionNamed(entry.collection)
-
-  if (!SLUG.test(entry.slug))
-    return refused(entry, 'A slug holds letters, digits, dashes and underscores, with `/` between folders', 'slug')
 
   if (create && await entryOf(entry))
     return refused(entry, `${entry.slug} already exists`, 'slug')
@@ -66,23 +61,21 @@ export async function deleteEntry(ref: EntryRef): Promise<SaveOutcome> {
   const collection = await collectionNamed(ref.collection)
 
   if (collection.kind === 'loaded') {
-    await removeEntry(collection.name, ref.slug, ref.locale)
+    const { issues } = await removeEntry(collection.name, ref.slug, ref.locale)
 
-    return { saved: true }
+    return issues?.length ? { issues } : { saved: true }
   }
 
   const existing = await entryOf(ref)
 
   if (!existing)
-    return refused(ref, `${ref.slug} does not exist`)
+    return refused(ref, `${ref.slug} does not exist`, 'slug')
 
-  // The file's path comes with its text, which kay only gives for data its schema takes.
-  const source = await entrySource(collection.name, ref.slug, existing.data, { locale: ref.locale, body: existing.body })
+  // The file goes by the path kay listed it under, so one that no longer parses can be deleted too.
+  if (existing.path === undefined)
+    return refused(ref, `${collection.name}'s folder lies outside the repository, so its files cannot be committed`)
 
-  if ('issues' in source)
-    return refused(ref, `${ref.slug} no longer fits its schema, so its file cannot be found to delete; fix it first`)
-
-  const commit = await settings().files.save({ repoPath: source.file.repoPath, absolute: source.file.absolute, text: undefined, message: `content(${collection.name}): delete ${ref.slug}` })
+  const commit = await settings().files.save({ repoPath: existing.path, absolute: join(repositoryRoot(), existing.path), text: undefined, message: `content(${collection.name}): delete ${ref.slug}` })
 
   return { saved: true, commit }
 }
@@ -97,7 +90,10 @@ export async function publishEntry(ref: EntryRef): Promise<SaveOutcome> {
   const existing = await entryOf(ref)
 
   if (!existing)
-    return refused(ref, `${ref.slug} does not exist`)
+    return refused(ref, `${ref.slug} does not exist`, 'slug')
+
+  if (!existing.data)
+    return refused(ref, `${ref.slug}'s file does not parse: ${existing.problem}`)
 
   return saveEntry({ ...ref, data: { ...existing.data, [collection.draftField]: false }, body: existing.body }, { verb: 'publish' })
 }

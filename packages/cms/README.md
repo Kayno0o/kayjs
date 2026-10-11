@@ -41,7 +41,7 @@ export default defineConfig({
 
 The screens live at `/admin` (`prefix` moves them) and stay closed without a `guard`. In edit mode, kay renders the editor at the end of every page, with the entries the page read. The CMS's API answers requests kay let into edit mode, and those the guard admits. Their "Edit on page" links go through `/admin/page?path=`, which puts the editor the guard admitted in edit mode with kay's `enterPreview(ctx, { edit: true })`.
 
-A commit shows on the site once it has rebuilt from it. The Forgejo token needs write access to the repository's contents; the commit is the token's user's.
+A commit shows on the site once it has rebuilt from it. The Forgejo token needs write access to the repository's contents; the commit is the token's user's. The server reads a folder collection's entries from its source files, so they ship with it: kay refuses to edit a folder missing from a build alone, or lying outside the repository.
 
 An app replaces a screen by writing a page at its path, `src/routes/admin/new/[collection].kay` say, and can render the screens' own `@kaynooo/kayjs-cms/entry-editor.kay` and `@kaynooo/kayjs-cms/entry-table.kay` in it.
 

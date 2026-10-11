@@ -37,6 +37,8 @@ Table.kcms-entries(columns={columns} rows={rows} rowKey={keyOf})
   @cell(row, column)
     if column.key === 'title'
       a(href={entryPath(prefix, ref(row))}) {row.title}
+      if row.problem as problem
+        Badge(tone="danger" label="Broken" data-tooltip={problem})
     else if column.key === 'draft'
       if row.draft
         Badge(tone="warning" label="Draft")

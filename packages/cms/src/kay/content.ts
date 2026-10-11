@@ -1,7 +1,7 @@
 import type { CollectionInfo, EntryFile, Issue, JsonSchema, SourceEntry } from './contract'
 import { collections as kayCollections, entries as kayEntries, entrySource as kayEntrySource } from 'kay/content'
 
-export { removeEntry, saveEntry } from 'kay/content'
+export { removeEntry, repositoryRoot, saveEntry } from 'kay/content'
 
 export async function collections(): Promise<CollectionInfo[]> {
   return (await kayCollections()).map(collection => ({ ...collection, schema: collection.schema as JsonSchema }))
