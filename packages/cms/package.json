@@ -54,7 +54,9 @@
     "@kaynooo/kayjs-ui": "^0.6.0",
     "@types/bun": "^1.4.2",
     "@typescript/native-preview": "^7.0.0-dev.20260707.2",
+    "bun-plugin-tailwind": "^0.1.2",
     "kay": "npm:@kaynooo/kayjs@~1.37.6",
+    "tailwindcss": "^4.3.3",
     "typescript": "^6.0.3"
   }
 }

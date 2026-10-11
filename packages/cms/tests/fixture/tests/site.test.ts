@@ -54,6 +54,19 @@ test('the screens and the editor render their own toaster, for an app rendering 
   expect((await editor.visit('/admin/page?path=/blog/hello')).find('.kui-toaster')).toHaveLength(1)
 })
 
+// Built by kay itself in the fixture: testSite's own build leaves out the app's layout stylesheet when run from another directory.
+test('the fixture ships kayjs-ui\'s theme built by Tailwind', async () => {
+  const build = Bun.spawn([process.execPath, join(ROOT, '..', '..', 'node_modules', '.bin', 'kay'), 'build'], { cwd: ROOT, stdout: 'ignore', stderr: 'ignore' })
+
+  expect(await build.exited).toBe(0)
+
+  const sheets = await Array.fromAsync(new Bun.Glob('*.css').scan(join(ROOT, '.kay', 'client', 'dist')))
+  const css = (await Promise.all(sheets.map(async sheet => Bun.file(join(ROOT, '.kay', 'client', 'dist', sheet)).text()))).join('\n')
+
+  expect(css).toContain('.kui-btn')
+  expect(css).not.toContain('@apply')
+}, 60_000)
+
 test('a collection lists its entries, with a draft to publish, and searches them', async () => {
   const page = await site.visit('/admin/collections/posts')
 
