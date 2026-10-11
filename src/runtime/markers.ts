@@ -7,5 +7,3 @@ export const PART_END = ']'
 export const FAILED = 'kay-failed'
 // The element an island renders in.
 export const ISLAND = 'slot[data-component]'
-// The meta naming the attributes the layouts and the page set on `<html>`, which the page swap replaces with the next page's.
-export const ROOT_ATTRIBUTES = 'kay-html'

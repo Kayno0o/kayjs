@@ -375,10 +375,12 @@ describe('head', () => {
     expect(errors('head\n  html.dark(data-theme="light" data-mode={mode})\np x')).toEqual([])
     expect(compileKay('head\n  html(data-theme={theme})\np x', 'test.kay', { check: true }).tsx).toContain('void (<><html data-theme={theme} /></>);')
     expect(errors('head\n  html x\np')).toEqual(['`html` holds nothing: it sets the attributes of `<html>`'])
-    expect(reports('head\n  html(lang="fr" dir="rtl")\np')).toEqual([
+    expect(reports('head\n  html(lang="fr" DIR="rtl")\np')).toEqual([
       expect.objectContaining({ message: 'kay sets `lang` on `<html>` from the page\'s locale', at: 'lang' }),
-      expect.objectContaining({ message: 'kay sets `dir` on `<html>` from the page\'s locale', at: 'dir' }),
+      expect.objectContaining({ message: 'kay sets `DIR` on `<html>` from the page\'s locale', at: 'DIR' }),
     ])
+    expect(errors('html(data-theme="light")\n  p x')).toEqual(['An `html` tag sets the attributes of `<html>` from the `head` block only'])
+    expect(errors('div\n  html(data-theme="light")')).toEqual(['An `html` tag sets the attributes of `<html>` from the `head` block only'])
   })
 
   it('reports what a head tag\'s attributes get wrong in a build, as kay check does', () => {

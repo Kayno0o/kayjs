@@ -3,6 +3,7 @@ import type { GenerateOptions } from './codegen'
 import type { LintName } from './lints'
 import type { PageSettingName } from './page-settings'
 import type { ImportBinding, ScriptAnalysis, ServerAnalysis } from './script'
+import { LOCALE_ATTRIBUTES } from '../runtime/root'
 import { childBlocks, FIELD_ATTRIBUTE, FIELD_ELEMENTS, isHead, isSlot, serverIslandOf, templateFacts } from './ast'
 
 type ValidateOptions = Pick<GenerateOptions, 'island' | 'insideIsland' | 'check' | 'special' | 'includeServer'>
@@ -14,8 +15,6 @@ const LOWERCASE_EVENT = /^on:?([a-z]+)$/
 const COMPOUND_EVENT = /^(dbl|key|mouse|pointer|touch|drag|focus|context|before|after)(click|down|up|press|move|enter|leave|over|out|start|end|cancel|in|menu|input)$/
 const HEAD_TAGS = new Set(['title', 'meta', 'link', 'style', 'script', 'base', 'html'])
 const HEAD_CONTENT = 'A `head` block holds `title`, `meta`, `link`, `style`, `script`, `base` and `html` elements only'
-// What kay sets on `<html>` from the page's locale.
-const OWN_ROOT_ATTRIBUTES = new Set(['lang', 'dir'])
 const QUERY: PageSettingName = 'query'
 // What only a static parent passes an island.
 const ISLAND_OPTIONS = new Set(['hydrate', 'persist'])
@@ -83,6 +82,8 @@ export function bindEvent(element: ElementNode, property: string): string {
 
 class Validator {
   private readonly diagnostics: Diagnostic[] = []
+  // The `html` tags of the `head` block, the only place one sets attributes.
+  private readonly rootTags = new Set<Node>()
   private readonly src: string
   private readonly forms: Map<Node, Span>
 
@@ -120,8 +121,10 @@ class Validator {
     })
 
     for (const tag of tags ?? []) {
-      if (tag.kind === 'element' && tag.name === 'html')
+      if (tag.kind === 'element' && tag.name === 'html') {
+        this.rootTags.add(tag)
         this.rootAttributes(tag)
+      }
     }
 
     this.nodes(tags ?? [])
@@ -133,7 +136,7 @@ class Validator {
   // `lang` and `dir` follow the page's locale, which an `html` tag cannot set apart from its messages and dates.
   private rootAttributes(tag: ElementNode): void {
     for (const attribute of tag.attributes) {
-      if (attribute.kind !== 'spread' && OWN_ROOT_ATTRIBUTES.has(this.text(attribute.name)))
+      if (attribute.kind !== 'spread' && LOCALE_ATTRIBUTES.includes(this.text(attribute.name).toLowerCase()))
         this.error(attribute.name, `kay sets \`${this.text(attribute.name)}\` on \`<html>\` from the page's locale`, { help: 'set `lang` in kay.config.ts, or the locales of `i18n`' })
     }
   }
@@ -216,6 +219,9 @@ class Validator {
 
     if (isHead(element))
       this.error(element, 'A `head` block sits at the top level of a template')
+
+    if (element.name === 'html' && !element.component && !this.rootTags.has(element))
+      this.error(element.tag, 'An `html` tag sets the attributes of `<html>` from the `head` block only', { note: 'kay writes `<html>` around every page', help: 'move it into the template\'s top-level `head` block' })
 
     if (isSlot(element)) {
       if (element.attributes.length > 0 || element.classes.length > 0 || element.id)

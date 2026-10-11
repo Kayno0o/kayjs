@@ -98,9 +98,9 @@ describe('seo head', () => {
     const dark = await (await app.handle(new Request('http://localhost/themed/dark'))).text()
 
     expect(themed).toStartWith('<!doctype html><html lang="en" class="dark" data-theme="light" data-section="home" data-banner><head>')
-    expect(themed).toContain('<meta name="kay-html" content="class data-theme data-section data-banner">')
-    expect(dark).toStartWith('<!doctype html><html lang="en" class="dark" data-theme="dark" data-section="dark"><head>')
-    expect(dark).toContain('<meta name="kay-html" content="class data-theme data-section">')
+    expect(themed).toContain('<meta name="kay-html" content="{&quot;class&quot;:&quot;dark&quot;,&quot;data-theme&quot;:&quot;light&quot;,&quot;data-section&quot;:&quot;home&quot;,&quot;data-banner&quot;:&quot;&quot;}">')
+    expect(dark).toStartWith('<!doctype html><html lang="en" class="dark" data-theme="dark" data-section="dark" data-case="lower"><head>')
+    expect(dark).toContain('<meta name="kay-html" content="{&quot;class&quot;:&quot;dark&quot;,&quot;data-theme&quot;:&quot;dark&quot;,&quot;data-section&quot;:&quot;dark&quot;,&quot;data-case&quot;:&quot;lower&quot;}">')
     expect((await headOf('/about')).head).not.toContain('kay-html')
   })
 

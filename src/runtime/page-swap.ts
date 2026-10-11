@@ -1,7 +1,8 @@
 import type { FetchedPage, Intent, Swap } from './navigation'
 import { focusInvalid } from './focus'
-import { ISLAND, ROOT_ATTRIBUTES } from './markers'
+import { ISLAND } from './markers'
 import { historyState, leave, navigation, pageKey, prefetched, restoreScroll, saveScroll, takeFormChecks } from './navigation'
+import { ROOT_ATTRIBUTES } from './root'
 import { NAVIGATE_HEADER, RELOAD_HEADER } from './swap'
 import { decodeValue } from './wire'
 
@@ -38,6 +39,7 @@ const PREFETCH_TTL_MS = 30_000
 const STYLESHEET_TIMEOUT_MS = 3000
 
 export const HTML = /^text\/html\b/
+const SPACES = /\s+/
 const SPECULATION = 'script[type="speculationrules"]'
 // The line a page without kay's script carries for Back after a reload, which a swapped-in page leaves to this one.
 const HISTORY = 'script[data-kay-history]'
@@ -297,26 +299,44 @@ function applyStreamed(page: Document): void {
   }
 }
 
-// Gives `<html>` the attributes the next page's layouts set in place of this one's, as the page is swapped: any other, as one a theme toggle sets, stays. Both lists are read before the heads merge, which moves the next one's.
+// Changes on `<html>` what the server sets differently for the next page, a class token by token, as the page is swapped: what a script set, as a theme toggle does, stays until the server's own value changes. Both are read before the heads merge, which moves the next page's.
 function swapRoot(next: Document): () => void {
-  const leaving = rootAttributes(document)
-  const wanted = rootAttributes(next)
+  const leaving = servedRoot(document)
+  const wanted = servedRoot(next)
 
   return () => {
     const root = document.documentElement
 
-    for (const name of leaving) {
-      if (!wanted.includes(name))
-        root.removeAttribute(name)
-    }
+    for (const name of new Set([...Object.keys(leaving), ...Object.keys(wanted)])) {
+      const before = leaving[name]
+      const after = wanted[name]
 
-    for (const name of wanted)
-      root.setAttribute(name, next.documentElement.getAttribute(name) ?? '')
+      if (name === 'class') {
+        const old = tokens(before)
+        const now = tokens(after)
+
+        root.classList.remove(...old.filter(token => !now.includes(token)))
+        root.classList.add(...now.filter(token => !old.includes(token)))
+      }
+      else if (after === undefined) {
+        root.removeAttribute(name)
+      }
+      else if (after !== before) {
+        root.setAttribute(name, after)
+      }
+    }
   }
 }
 
-function rootAttributes(page: Document): string[] {
-  return page.querySelector(`meta[name="${ROOT_ATTRIBUTES}"]`)?.getAttribute('content')?.split(' ') ?? []
+// What the page's layouts set on `<html>`, by name, which kay writes in a meta as the server renders it.
+function servedRoot(page: Document): Record<string, string> {
+  const content = page.querySelector(`meta[name="${ROOT_ATTRIBUTES}"]`)?.getAttribute('content')
+
+  return content == null ? {} : JSON.parse(content) as Record<string, string>
+}
+
+function tokens(value: string | undefined): string[] {
+  return value?.split(SPACES).filter(Boolean) ?? []
 }
 
 // Adds what only the next head holds now, and drops what only this one holds as the page is swapped: the page keeps its own styles until the next one's loaded.

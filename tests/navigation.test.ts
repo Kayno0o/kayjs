@@ -290,23 +290,33 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     await page.locator('section.box:has(p.boxed-bumps) button.box-count', { hasText: 'Box 1' }).waitFor()
   })
 
-  it('gives <html> the attributes the next page sets in place of this one\'s, and keeps one a script set', async () => {
+  it('changes on <html> only what the server sets differently for the next page, a class token by token, keeping what a script set', async () => {
     await page.goto(origin)
     await page.evaluate(() => {
       (window as { kayAlive?: boolean }).kayAlive = true
-      document.documentElement.dataset.toggle = 'on'
+      document.documentElement.dataset.theme = 'dark'
+      document.documentElement.classList.add('dark')
     })
-    const root = async () => page.evaluate(() => Object.fromEntries([...document.documentElement.attributes].map(attribute => [attribute.name, attribute.value])))
+    const root = async (): Promise<Record<string, string | string[]>> => page.evaluate(() => {
+      const { attributes, classList } = document.documentElement
 
-    expect(await root()).toEqual({ 'lang': 'en', 'data-page': '/', 'data-toggle': 'on' })
-    await page.click('a.second')
-    await page.locator('h1', { hasText: 'Second' }).waitFor()
-    expect(await sameDocument()).toBe(true)
-    expect(await root()).toEqual({ 'lang': 'en', 'data-page': '/second', 'class': 'second', 'data-second': '', 'data-toggle': 'on' })
-    await page.click('a.home')
-    await page.locator('h1', { hasText: 'Home' }).waitFor()
-    expect(await sameDocument()).toBe(true)
-    expect(await root()).toEqual({ 'lang': 'en', 'data-page': '/', 'data-toggle': 'on' })
+      return { ...Object.fromEntries([...attributes].filter(({ name }) => name !== 'class' && name !== 'aria-busy').map(({ name, value }) => [name, value])), class: [...classList].sort() }
+    })
+    const go = async (link: string, heading: string) => {
+      await page.click(`a.${link}`)
+      await page.locator('h1', { hasText: heading }).waitFor()
+      expect(await sameDocument()).toBe(true)
+    }
+
+    expect(await root()).toEqual({ 'lang': 'en', 'data-theme': 'dark', 'class': ['dark', 'served'] })
+    // The layout sets the same theme on the next page, so the toggle's stays, and the page's class replaces the layout's.
+    await go('second', 'Second')
+    expect(await root()).toEqual({ 'lang': 'en', 'data-theme': 'dark', 'data-second': '', 'class': ['dark', 'second'] })
+    // A page whose server sets nothing takes off what the last one's set, and no more.
+    await go('later', 'Later')
+    expect(await root()).toEqual({ lang: 'en', class: ['dark'] })
+    await go('home', 'Home')
+    expect(await root()).toEqual({ 'lang': 'en', 'data-theme': 'light', 'class': ['dark', 'served'] })
   })
 
   it('restores where the page was scrolled to when going back', async () => {

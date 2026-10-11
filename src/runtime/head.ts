@@ -1,5 +1,5 @@
 import { escape, escapeAttribute } from './escape'
-import { ROOT_ATTRIBUTES } from './markers'
+import { LOCALE_ATTRIBUTES, ROOT_ATTRIBUTES } from './root'
 
 // A tag a template's `head` block sets, its text as `children`.
 export interface HeadTag {
@@ -41,8 +41,6 @@ export interface RenderedHead {
 }
 
 const HEAD_TAGS = new Set(['title', 'meta', 'link', 'style', 'script', 'base', 'html'])
-// What kay sets on `<html>` from the page's locale.
-const OWN_ROOT_ATTRIBUTES = new Set(['lang', 'dir'])
 const ATTRIBUTE_NAME = /^[a-z_][\w:.-]*$/i
 const RESOURCE_RELS = new Set(['preload', 'modulepreload', 'prefetch', 'preconnect', 'dns-prefetch', 'stylesheet'])
 const VOID_TAGS = new Set(['meta', 'link', 'base'])
@@ -102,8 +100,8 @@ function renderHead(collected: HeadTag[][], options: HeadOptions): RenderedHead 
 
       if (tag.tag === 'html') {
         for (const [name, value] of Object.entries(tag.props)) {
-          if (!OWN_ROOT_ATTRIBUTES.has(name))
-            root[name] = value
+          if (!LOCALE_ATTRIBUTES.includes(name.toLowerCase()))
+            root[name.toLowerCase()] = value
         }
 
         continue
@@ -182,12 +180,11 @@ function renderHead(collected: HeadTag[][], options: HeadOptions): RenderedHead 
   }
 
   const rootAttributes = attributesOf(root)
-  const rootNames = Object.keys(rootAttributes).join(' ')
 
-  if (rootNames !== '')
-    metas += tagMarkup({ tag: 'meta', props: { name: ROOT_ATTRIBUTES, content: rootNames } })
+  if (rootAttributes.size > 0)
+    metas += tagMarkup({ tag: 'meta', props: { name: ROOT_ATTRIBUTES, content: JSON.stringify(Object.fromEntries([...rootAttributes].map(([name, value]) => [name, value === true ? '' : value]))) } })
 
-  return { prelude: prelude + viewportTag, styles, html: resourcesHtml + links + metas + others + scripts + title, root: Object.values(rootAttributes).join(''), charset: winners.has(CHARSET), viewport: winners.has(VIEWPORT) }
+  return { prelude: prelude + viewportTag, styles, html: resourcesHtml + links + metas + others + scripts + title, root: markupOf(rootAttributes), charset: winners.has(CHARSET), viewport: winners.has(VIEWPORT) }
 }
 
 // Open Graph and Twitter read their own tags only, so the title, description and canonical URL a page sets are repeated there unless it sets those too.
@@ -287,7 +284,7 @@ function replaceableIdentity({ tag, props }: HeadTag, unique: () => string): str
 }
 
 function tagMarkup(tag: HeadTag): string {
-  const attributes = Object.values(attributesOf(tag.props)).join('')
+  const attributes = markupOf(attributesOf(tag.props))
 
   if (VOID_TAGS.has(tag.tag))
     return `<${tag.tag}${attributes}>`
@@ -297,18 +294,27 @@ function tagMarkup(tag: HeadTag): string {
   return `<${tag.tag}${attributes}>${content}</${tag.tag}>`
 }
 
-// Each attribute a tag renders, by its name, as ` name="value"`: `true` renders the name alone, `false` and `null` nothing.
-function attributesOf(props: Record<string, unknown>): Record<string, string> {
-  const attributes: Record<string, string> = {}
+// The attributes a tag renders, by their name in lowercase as HTML reads it, the last of a name winning: `true` for one written bare, none for `false` and `null`.
+function attributesOf(props: Record<string, unknown>): Map<string, string | true> {
+  const attributes = new Map<string, string | true>()
 
   for (const [name, value] of Object.entries(props)) {
     if (name === 'children' || name === 'ref' || name.startsWith('on') || !ATTRIBUTE_NAME.test(name) || value == null || value === false)
       continue
 
-    attributes[name] = value === true ? ` ${name}` : ` ${name}="${escapeAttribute(String(value))}"`
+    attributes.set(name.toLowerCase(), value === true ? true : String(value))
   }
 
   return attributes
+}
+
+function markupOf(attributes: Map<string, string | true>): string {
+  let markup = ''
+
+  for (const [name, value] of attributes)
+    markup += value === true ? ` ${name}` : ` ${name}="${escapeAttribute(value)}"`
+
+  return markup
 }
 
 // A JSON script, such as JSON-LD, takes its data as an object or as text.

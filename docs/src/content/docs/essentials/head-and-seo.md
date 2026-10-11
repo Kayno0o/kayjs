@@ -20,18 +20,18 @@ h1 {post.title}
 
 ## Attributes on `<html>`
 
-An `html` tag in the `head` block sets attributes on `<html>`, such as a theme, from the server data too. A layout's win over the layouts around it, and the page's over all, one attribute at a time; `false` or `null` takes one off.
+An `html` tag in the `head` block sets attributes on `<html>`, such as a theme, from the server data too. A layout's win over the layouts around it, and the page's over all, one attribute at a time; `false` or `null` takes one off. It attaches no event handler.
 
 ```kay
 --- server
 const section = ctx.url.pathname.split('/')[1] || 'home'
 ---
 head
-  html.dark(data-theme="light" data-section={section})
+  html(data-theme="light" data-section={section})
 slot
 ```
 
-`lang` and `dir` stay kay's, set from `lang` in kay.config.ts or from the page's locale. When a link swaps the page in, `<html>` takes the next page's attributes, and keeps one a script set, as a theme toggle does, unless a layout sets it too.
+`lang` and `dir` stay kay's, set from `lang` in kay.config.ts or from the page's locale. When a link swaps the page in, `<html>` changes only where the server sets something else for the next page, a `class` token by token, so what a script set, as a theme toggle does, stays.
 
 ## Site defaults
 
