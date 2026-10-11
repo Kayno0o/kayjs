@@ -51,6 +51,10 @@ describe('server islands', () => {
       expect(placeholder).toEndWith('</slot><noscript><a href="?kay_island" rel="nofollow">Show the form</a></noscript><!--/kay-server:1-->')
 
       const app = await pages({ routes, prebuilt: true, security: false })
+      // Its loads run per request, so they are timed as a page rendered afresh is.
+      const timed = await pages({ routes, prebuilt: true, security: false, serverTiming: true })
+
+      expect((await timed.handle(new Request('http://localhost/'))).headers.get('server-timing')).toMatch(/render;dur=/)
       const visit = async (path: string, headers: Record<string, string> = {}) => app.handle(new Request(`http://localhost${path}`, { headers }))
       const before = built.slice(0, built.indexOf(INLINE))
       const after = built.slice(built.indexOf(INLINE) + INLINE.length)

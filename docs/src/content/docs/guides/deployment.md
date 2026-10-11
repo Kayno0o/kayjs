@@ -77,7 +77,7 @@ On SIGTERM or SIGINT the server stops taking connections, lets open requests fin
 
 With `NODE_ENV=production`, the server's first line says where it listens, the kay version and how many pages the build prerendered, and every request is logged as one line, `GET /blog/hello 200 12ms AZnLe0vUe9qD0uXq9vLwZw`, ending with the id its response carries as `X-Request-Id`. An error logged while answering it is headed by the same id, and `requestId(request)` from `kay/server` gives it to `onError`. Behind a proxy set in `proxy`, an `X-Request-Id` the proxy passed on is kept. `log: 'json'` writes these lines and kay's own messages, its errors and warnings, as one JSON object each, for a log collector.
 
-`tracer` takes an OpenTelemetry tracer from the `@opentelemetry/api` and SDK the app installs, kay itself depending on neither. Each page request becomes a span named after its route, with one span per load and one for the render inside it, and each action and API request becomes a span too. `serverTiming: true` sends the same load and render times as a `Server-Timing` header, as development always does.
+`tracer` takes an OpenTelemetry tracer from the `@opentelemetry/api` and SDK the app installs, kay itself depending on neither. Each page request becomes a span named after its route, with one span per load and one for the render inside it, and each action and API request becomes a span too. `serverTiming: true` sends the same load and render times as a `Server-Timing` header, as development always does, for every page rendered per request and the server islands of a prerendered one.
 
 ```ts
 import { trace } from '@opentelemetry/api'

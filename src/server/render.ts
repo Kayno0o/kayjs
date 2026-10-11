@@ -2,7 +2,7 @@ import type { KayConfig } from '../config'
 import type { ErrorPageContext, FailureOf, Locals, PageContext, PageError, SuccessOf } from '../runtime'
 import type { Outcome } from '../runtime/action'
 import type { PendingBlock } from '../runtime/await.server'
-import type { HeadOptions } from '../runtime/head'
+import type { HeadOptions, RenderedHead } from '../runtime/head'
 import type { ServerIslandMode } from '../runtime/html'
 import type { Locale } from '../runtime/i18n'
 import type { QueryRules } from '../runtime/query-param'
@@ -57,6 +57,22 @@ interface PageModule {
 }
 
 type Loaded = PromiseSettledResult<Record<string, unknown>>
+type Body = string | Uint8Array<ArrayBuffer> | ReadableStream<Uint8Array> | Bun.BunFile
+
+// HTML under the mount point already, as `kay build` rendered it or a server island's was rebased, which goes out as it is.
+class Rebased {
+  constructor(readonly body: Body) {}
+}
+
+// A route's modules, layouts outermost first, then the page, with what their loads returned.
+interface LoadedRoute {
+  files: string[]
+  modules: PageModule[]
+  data: Record<string, unknown>[]
+  // Each load as it settled, which a special page rendering in its place reuses.
+  loaded: Map<string, Loaded>
+  timings: number[] | undefined
+}
 
 // A prerendered page as the server holds it from boot: the brotli copy in memory, which nearly every browser takes, the others as files.
 export interface ServedPage extends Omit<PrerenderedPage, 'pattern' | 'file' | 'headers'> {
@@ -101,6 +117,7 @@ interface Rendering {
   headers: Headers
   status: number
   writeCookies: () => void
+  // The site's mount point, which rendered HTML goes under.
   base: string
   // The form post the browser came back from, if any.
   outcome: () => Outcome | null
@@ -109,8 +126,8 @@ interface Rendering {
 const CHARSET = '<meta charset="utf-8">'
 const VIEWPORT = '<meta name="viewport" content="width=device-width, initial-scale=1">'
 // Per set of islands and per chain of layouts: few exist, and they never change for a build.
-const scriptsCache = new WeakMap<ClientBuild, Map<string, string>>()
-const stylesCache = new WeakMap<ClientBuild, Map<string, string>>()
+const islandScriptsOf = perClient()
+const stylesheetsOf = perClient()
 const TEXT = { 'content-type': 'text/plain; charset=utf-8' }
 // Header values are bytes, so a file name outside ASCII is escaped.
 const NOT_ASCII = /[^\x20-\x7E]/g
@@ -123,18 +140,43 @@ export async function renderPage(route: ServedRoute, context: RequestContext, pa
 }
 
 async function renderRoute(route: ServedRoute, rendering: Rendering, client: ClientBuild, options: RenderOptions): Promise<Response> {
+  const page = await loadRoute(route, rendering, client, options)
+
+  if (page instanceof Response)
+    return page
+
+  try {
+    const started = performance.now()
+    const body = traced(`kay.render ${projectPath(route.file)}`, {}, () => renderDocument(page.files, page.modules, page.data, client, rendering, options))
+
+    timed(page, rendering, started)
+
+    return respond(rendering, body)
+  }
+  catch (error) {
+    return renderFailure(error, route.special, rendering, page.loaded, client, options)
+  }
+}
+
+// The response a guard refusing the request gives, if one does.
+async function refused(route: ServedRoute, rendering: Rendering, client: ClientBuild, options: RenderOptions): Promise<Response | undefined> {
   const refusal = route.guards.length > 0 ? await runGuards(route.guards, rendering.ctx) : undefined
 
+  return refusal && renderFailure(refusal.error, refusal.guard.special, rendering, new Map(), client, options)
+}
+
+// Past the route's guards, its modules and their loads; a refusal or a failed load answers as the page would.
+async function loadRoute(route: ServedRoute, rendering: Rendering, client: ClientBuild, options: RenderOptions): Promise<LoadedRoute | Response> {
+  const refusal = await refused(route, rendering, client, options)
+
   if (refusal)
-    return renderFailure(refusal.error, refusal.guard.special, rendering, new Map(), client, options)
+    return refusal
 
   const files = [...route.layouts, route.file]
   const loaded = new Map<string, Loaded>()
 
   try {
-    // Layouts outermost first, then the page: when several loads fail, the outermost one decides the response.
     const modules = await importAll(files)
-
     // Read once the guards let the request through, so a refused query never renders what they protect; the layouts see the page's.
     const query = pageSetting(modules.at(-1)!, 'query')
 
@@ -143,29 +185,37 @@ async function renderRoute(route: ServedRoute, rendering: Rendering, client: Cli
 
     // A prerendered page is stored with its headers and served to everyone, so it carries no one render's timings.
     const timings = options.serverTiming && !options.prerendering ? Array.from<number>({ length: files.length }) : undefined
-    const loads = await Promise.allSettled(modules.map(async (module, index) => runLoad(files[index]!, module, rendering.ctx, timings, index)))
 
-    for (const [index, load] of loads.entries())
-      loaded.set(files[index]!, load)
-
-    const data = loads.map((load) => {
-      if (load.status === 'rejected')
-        throw load.reason
-
-      return load.value
-    })
-
-    const started = performance.now()
-    const body = traced(`kay.render ${projectPath(route.file)}`, {}, () => renderDocument(files, modules, data, client, rendering, options))
-
-    if (timings)
-      rendering.headers.set('server-timing', serverTiming(files, modules, timings, performance.now() - started))
-
-    return respond(rendering, body)
+    return { files, modules, data: await runLoads(files, modules, rendering.ctx, loaded, timings), loaded, timings }
   }
   catch (error) {
     return renderFailure(error, route.special, rendering, loaded, client, options)
   }
+}
+
+// Every load at once, each settling into `loaded`, where one that went through already is reused; when several fail, the outermost one throws.
+async function runLoads(files: string[], modules: PageModule[], ctx: PageContext<Record<string, unknown>>, loaded: Map<string, Loaded>, timings?: number[]): Promise<Record<string, unknown>[]> {
+  const loads = await Promise.allSettled(modules.map(async (module, index) => {
+    const prior = loaded.get(files[index]!)
+
+    return prior?.status === 'fulfilled' ? prior.value : runLoad(files[index]!, module, ctx, timings, index)
+  }))
+
+  for (const [index, load] of loads.entries())
+    loaded.set(files[index]!, load)
+
+  return loads.map((load) => {
+    if (load.status === 'rejected')
+      throw load.reason
+
+    return load.value
+  })
+}
+
+// Times the loads and the render since `started` in a `Server-Timing` header, when they were timed.
+function timed({ files, modules, timings }: LoadedRoute, rendering: Rendering, started: number): void {
+  if (timings)
+    rendering.headers.set('server-timing', serverTiming(files, modules, timings, performance.now() - started))
 }
 
 function projectPath(file: string): string {
@@ -203,12 +253,11 @@ function serverTiming(files: string[], modules: PageModule[], timings: number[],
 // What `kay build` rendered, behind the page's guards, revalidated by its ETag.
 // `spliced` gives the page with what changes per request filled in, as its stamps, gzipped when the browser takes it.
 export async function servePrerendered(route: ServedRoute, page: ServedPage, params: Record<string, unknown>, context: RequestContext, client: ClientBuild, options: RenderOptions = {}, spliced?: () => Promise<{ body: string | Uint8Array<ArrayBuffer> | ReadableStream<Uint8Array>, gzip: boolean }>): Promise<Response> {
-  // Rendered under the mount point already, so its paths are not put under it twice.
-  const rendering = { ...createRendering(context, params, options), base: '' }
-  const refusal = route.guards.length > 0 ? await runGuards(route.guards, rendering.ctx) : undefined
+  const rendering = createRendering(context, params, options)
+  const refusal = await refused(route, rendering, client, options)
 
   if (refusal)
-    return renderFailure(refusal.error, refusal.guard.special, rendering, new Map(), client, options)
+    return refusal
 
   const { headers } = rendering
 
@@ -227,7 +276,7 @@ export async function servePrerendered(route: ServedRoute, page: ServedPage, par
 
     rendering.status = page.status
 
-    return respond(rendering, body)
+    return respond(rendering, new Rebased(body))
   }
 
   const encodings = Object.keys(page.encoded) as Encoding[]
@@ -249,17 +298,17 @@ export async function servePrerendered(route: ServedRoute, page: ServedPage, par
     headers.delete('content-type')
     rendering.status = 304
 
-    return respond(rendering, '')
+    return respond(rendering, new Rebased(''))
   }
 
   rendering.status = page.status
 
   if (!encoding)
-    return respond(rendering, page.html)
+    return respond(rendering, new Rebased(page.html))
 
   headers.set('content-encoding', encoding)
 
-  return respond(rendering, page.encoded[encoding]!)
+  return respond(rendering, new Rebased(page.encoded[encoding]!))
 }
 
 export interface RenderedServerIslands {
@@ -280,31 +329,16 @@ export async function renderServerIslands(route: ServedRoute, context: RequestCo
   const report = (error: unknown) => reportServerError(error, request, options.onError)
 
   return withOutcome(rendering.outcome, async () => {
-    const refusal = route.guards.length > 0 ? await runGuards(route.guards, rendering.ctx) : undefined
+    const page = await loadRoute(route, rendering, client, options)
 
-    if (refusal)
-      return renderFailure(refusal.error, refusal.guard.special, rendering, new Map(), client, options)
-
-    const files = [...route.layouts, route.file]
-    const loaded = new Map<string, Loaded>()
+    if (page instanceof Response)
+      return page
 
     try {
-      const modules = await importAll(files)
-      const loads = await Promise.allSettled(modules.map(async (module, index) => runLoad(files[index]!, module, rendering.ctx, undefined, index)))
-
-      for (const [index, load] of loads.entries())
-        loaded.set(files[index]!, load)
-
-      const data = loads.map((load) => {
-        if (load.status === 'rejected')
-          throw load.reason
-
-        return load.value
-      })
-
+      const started = performance.now()
       const islands = newServerIslands(path === undefined, path, skip)
       const inScope = <T>(run: () => T) => inServerScope(request, report, run, () => rendering.headers.append('vary', 'cookie'))
-      const { deferred } = inScope(() => withServerIslands(islands, () => renderStatic(viewOf(modules, data))))
+      const { deferred } = inScope(() => withServerIslands(islands, () => renderStatic(viewOf(page.modules, page.data))))
       // What a block inside an island renders is the island's own, every component of it included.
       const within = (view: () => unknown) => inScope(() => withServerIslands({ ...islands, inside: 1 }, () => renderStatic(view)))
       const settled = await Promise.all(islands.html.map(async html => settleBlocks(html, deferred, within, report)))
@@ -313,15 +347,16 @@ export async function renderServerIslands(route: ServedRoute, context: RequestCo
 
       // Blocks the islands left out still settle, so one failing reports nothing.
       void Promise.allSettled(deferred.map(async block => block.value))
+      timed(page, rendering, started)
 
       return { html, path: islands.path, headers: rendering.headers, reply: (body) => {
         rendering.headers.set('cache-control', 'private, no-store')
 
-        return respond({ ...rendering, base: '' }, body)
+        return respond(rendering, new Rebased(body))
       } }
     }
     catch (error) {
-      return renderFailure(error, route.special, rendering, loaded, client, options)
+      return renderFailure(error, route.special, rendering, page.loaded, client, options)
     }
   })
 }
@@ -442,14 +477,15 @@ export function hasFlash(request: Request): boolean {
   return cookie?.includes(FLASH_COOKIE) === true && new Bun.CookieMap(cookie).has(FLASH_COOKIE)
 }
 
-// A page under a mount point has its paths put under it as it goes out; a prerendered one had them when it was rendered, and its compressed copies are left as they are.
-function respond(rendering: Rendering, body: string | Uint8Array<ArrayBuffer> | ReadableStream<Uint8Array> | Bun.BunFile): Response {
+// A page under a mount point has its paths put under it as it goes out, unless they are already.
+function respond(rendering: Rendering, output: Body | Rebased): Response {
   rendering.writeCookies()
 
+  const body = output instanceof Rebased ? output.body : output
   const init = { status: rendering.status, headers: rendering.headers }
   const response = body instanceof ReadableStream || body instanceof Blob ? new Response(body, init) : wholeResponse(body, init)
 
-  return rendering.base !== '' && (typeof body === 'string' || body instanceof ReadableStream) ? rebaseHtml(response, rendering.base) : response
+  return !(output instanceof Rebased) && rendering.base !== '' && (typeof body === 'string' || body instanceof ReadableStream) ? rebaseHtml(response, rendering.base) : response
 }
 
 // A redirect goes out as is; anything else renders the nearest special page, falling back to plain text.
@@ -497,13 +533,8 @@ async function renderSpecialPage(page: SpecialPage, rendering: Rendering, loaded
   for (const files of layoutsFailed ? [[page.file]] : [[...page.layouts, page.file], [page.file]]) {
     try {
       const modules = await importAll(files)
-      const data = await Promise.all(modules.map(async (module, index) => {
-        const prior = loaded.get(files[index]!)
 
-        return prior?.status === 'fulfilled' ? prior.value : await module.load?.(rendering.ctx) ?? {}
-      }))
-
-      return renderDocument(files, modules, data, client, rendering, options)
+      return renderDocument(files, modules, await runLoads(files, modules, rendering.ctx, loaded), client, rendering, options)
     }
     catch (error) {
       reportServerError(error, rendering.ctx.request, options.onError)
@@ -562,15 +593,38 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
   // The entry fetches a deferred server island as it nears the viewport.
   const shipsEntry = hasIslands || posts || (client.entry !== undefined && scan?.modes.includes('defer') === true)
   const scripts = shipsEntry ? islandScripts(client, islands.eager, streamed, hasIslands) + (posts ? formsScript(forms) : '') + workScript(forms, options.prerendering === true) : ''
-  const locale = localeState()
-  const lang = locale?.locale ?? options.lang ?? DEFAULT_LANG
-  const start = `<!doctype html><html lang="${escapeAttribute(lang)}"${textDirection(lang) === 'rtl' ? ' dir="rtl"' : ''}><head>${head.charset ? '' : CHARSET}${head.prelude}${head.viewport ? '' : VIEWPORT}${head.styles}${stylesheets(client, files)}${head.html}${scripts}${hasIslands ? messagesScript(islands.messages, true) + outcomeScript(rendering.outcome()) + queryScript(rules) : ''}${options.base !== undefined && options.base !== '' ? `<meta name="kay-base" content="${escapeAttribute(options.base)}">` : ''}${hasIslands && options.maxDensity !== undefined && options.maxDensity !== DEFAULT_MAX_DENSITY ? `<meta name="kay-max-density" content="${options.maxDensity}">` : ''}${hasIslands && options.resolvedImages === true ? `<meta name="${RESOLVED_META}">` : ''}${speculationRules(options.prefetch, options.base)}${options.offline ? registerScript(options.base ?? '') : ''}${options.dev ? problemsBlock(client?.problems) + LIVE_RELOAD + DEV_PROBLEMS + A11Y_SCRIPT + inspectorScript() : ''}</head><body>${body}`
+  const lang = localeState()?.locale ?? options.lang ?? DEFAULT_LANG
+  const islandData = hasIslands ? messagesScript(islands.messages, true) + outcomeScript(rendering.outcome()) + queryScript(rules) : ''
+  const start = `${htmlOpen(lang)}<head>${headStart(head)}${stylesheets(client, files)}${head.html}${scripts}${islandData}${kayMetas(options, hasIslands)}${speculationRules(options.prefetch, options.base)}${options.offline ? registerScript(options.base ?? '') : ''}${options.dev ? devScripts(client) : ''}</head><body>${body}`
 
   if (!streamed)
     return `${start}</body></html>`
 
   // A deferred module would wait for the whole stream; an async one hydrates the islands already there as soon as it loads.
   return streamDocument(shipsEntry ? `${start}<script type="module" async src="${client.entry}"></script>` : start, deferred, client, shipsEntry, error => reportServerError(error, rendering.ctx.request, options.onError))
+}
+
+function htmlOpen(lang: string): string {
+  return `<!doctype html><html lang="${escapeAttribute(lang)}"${textDirection(lang) === 'rtl' ? ' dir="rtl"' : ''}>`
+}
+
+// The charset and viewport kay gives a page that sets neither, around what must come first in the head.
+function headStart(head: RenderedHead): string {
+  return `${head.charset ? '' : CHARSET}${head.prelude}${head.viewport ? '' : VIEWPORT}${head.styles}`
+}
+
+// What the islands read off the page: the mount point, and the image settings that are not the default.
+function kayMetas(options: RenderOptions, hasIslands: boolean): string {
+  const base = options.base !== undefined && options.base !== '' ? `<meta name="kay-base" content="${escapeAttribute(options.base)}">` : ''
+
+  if (!hasIslands)
+    return base
+
+  return `${base}${options.maxDensity !== undefined && options.maxDensity !== DEFAULT_MAX_DENSITY ? `<meta name="kay-max-density" content="${options.maxDensity}">` : ''}${options.resolvedImages === true ? `<meta name="${RESOLVED_META}">` : ''}`
+}
+
+function devScripts(client: ClientBuild): string {
+  return problemsBlock(client.problems) + LIVE_RELOAD + DEV_PROBLEMS + A11Y_SCRIPT + inspectorScript()
 }
 
 // The post the page answers, for its islands to render what the server did as they hydrate, then read through the action.
@@ -598,38 +652,17 @@ function stylesheets(client: ClientBuild, files: string[]): string {
   if (client.styles.size === 0)
     return ''
 
-  const key = files.join('\n')
-  let cached = stylesCache.get(client)
+  return stylesheetsOf(client, files.join('\n'), () => [...new Set(files.map(file => client.styles.get(file)))].filter(url => url !== undefined).map((url) => {
+    const css = client.inlineStyles?.get(url)
 
-  if (!cached)
-    stylesCache.set(client, cached = new Map<string, string>())
-
-  let html = cached.get(key)
-
-  if (html === undefined) {
-    html = [...new Set(files.map(file => client.styles.get(file)))].filter(url => url !== undefined).map((url) => {
-      const css = client.inlineStyles?.get(url)
-
-      return css === undefined ? `<link rel="stylesheet" href="${url}">` : `<style>${css}</style>`
-    }).join('')
-    cached.set(key, html)
-  }
-
-  return html
+    return css === undefined ? `<link rel="stylesheet" href="${url}">` : `<style>${css}</style>`
+  }).join(''))
 }
 
 // Preloads every chunk the page's eager islands need, so the browser fetches them alongside the entry instead of one round trip after another. A streamed page loads the entry after its first part instead.
 // A page without islands needs no hydration script, only the entry swapping pages.
 function islandScripts(client: ClientBuild, islands: Set<string>, streamed: boolean, hydration: boolean): string {
-  const key = `${streamed}\n${hydration}\n${[...islands].sort().join('\n')}`
-  let cached = scriptsCache.get(client)
-
-  if (!cached)
-    scriptsCache.set(client, cached = new Map<string, string>())
-
-  let html = cached.get(key)
-
-  if (html === undefined) {
+  return islandScriptsOf(client, `${streamed}\n${hydration}\n${[...islands].sort().join('\n')}`, () => {
     const chunks = new Set(client.entryImports)
 
     for (const id of islands) {
@@ -637,11 +670,27 @@ function islandScripts(client: ClientBuild, islands: Set<string>, streamed: bool
         chunks.add(chunk)
     }
 
-    html = `${[...chunks].map(chunk => `<link rel="modulepreload" href="${chunk}">`).join('')}${hydration ? hydrationScript : ''}${streamed ? '' : `<script type="module" src="${client.entry}"></script>`}`
-    cached.set(key, html)
-  }
+    return `${[...chunks].map(chunk => `<link rel="modulepreload" href="${chunk}">`).join('')}${hydration ? hydrationScript : ''}${streamed ? '' : `<script type="module" src="${client.entry}"></script>`}`
+  })
+}
 
-  return html
+// One text per key and build, made the first time it is asked for.
+function perClient(): (client: ClientBuild, key: string, make: () => string) => string {
+  const caches = new WeakMap<ClientBuild, Map<string, string>>()
+
+  return (client, key, make) => {
+    let cached = caches.get(client)
+
+    if (!cached)
+      caches.set(client, cached = new Map<string, string>())
+
+    let text = cached.get(key)
+
+    if (text === undefined)
+      cached.set(key, text = make())
+
+    return text
+  }
 }
 
 function describeError(error: unknown, dev = false): PageError {

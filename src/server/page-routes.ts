@@ -1,0 +1,255 @@
+import type { Elysia } from 'elysia'
+import type { TrailingSlash } from '../config'
+import type { LocaleSettings } from '../runtime/i18n'
+import type { ClientBuild } from './client'
+import type { ServedRoute } from './guards'
+import type { I18n } from './i18n'
+import type { PageHook, RenderedPage } from './page-hook'
+import type { Matcher, RouterShape } from './params'
+import type { RenderOptions, RequestContext, ServedPage } from './render'
+import type { Candidate, RouteTable } from './route-table'
+import type { SpecialPages } from './routes'
+import { join } from 'node:path'
+import { localePath, splitLocale, untranslatedPath } from '../runtime/i18n'
+import { localeState, runInLocale } from '../runtime/locale-state'
+import { overHttps } from './actions'
+import { PRERENDERED_DIR } from './client'
+import { encodedCopies, encodedPath, filesUnder } from './compress'
+import { handedOverFlash } from './flash'
+import { cookieLocale, hostLocale, localeCookie, preferredLocale, prerenderKey, stateFor } from './i18n'
+import { answeringRequest } from './log'
+import { hookedResponse } from './page-hook'
+import { matchedParams, positionalParams } from './params'
+import { inPreview, previewRequested } from './preview'
+import { requestId } from './protection'
+import { hasFlash, renderPage, renderUnmatched, servePrerendered } from './render'
+import { reportServerError } from './report'
+import { revalidateStale } from './revalidate'
+import { decodePath, withoutSlash } from './routes'
+import { serveServerIslands } from './server-islands'
+import { answered, SERVER_SPAN, traced } from './trace'
+
+// Every slash at either end of a path.
+const EDGE_SLASHES = /^\/+|\/+$/g
+
+// The params come resolved, each matcher's value in place of its text.
+export type PageResponder = (route: ServedRoute, params: Record<string, unknown>, context: RequestContext, url: URL) => Promise<Response>
+
+export interface ResponderOptions {
+  client: ClientBuild
+  renderOptions: RenderOptions
+  // The prerendered pages by route pattern, then by path.
+  prerendered: Map<string, Map<string, ServedPage>>
+  settings: LocaleSettings | undefined
+  // What the extensions' page hooks did to the prerendered pages, done again to each the server renders afresh.
+  transforms: PageHook[]
+  pageFile: RenderedPage['file']
+}
+
+// The prerendered pages by route pattern, then by path, with the compressed copies `kay build` wrote: only the brotli one is read into memory, at boot, the others served from their files.
+// A page with no copy is held as text, which compression then knows too small or not worth compressing again.
+export async function loadPrerendered(client: ClientBuild): Promise<Map<string, Map<string, ServedPage>>> {
+  const byRoute = new Map<string, Map<string, ServedPage>>()
+  const dir = join(client.dir, '..', PRERENDERED_DIR)
+  const copies = encodedCopies(await filesUnder(dir))
+
+  const loaded = await Promise.all([...client.pages.values()].map(async (page) => {
+    const file = join(dir, page.file)
+    const encodings = copies.get(file)
+    const encoded: ServedPage['encoded'] = {}
+
+    if (!encodings)
+      return { html: await Bun.file(file).text(), encoded }
+
+    for (const encoding of encodings)
+      encoded[encoding] = encoding === 'br' ? await Bun.file(encodedPath(file, encoding)).bytes() : Bun.file(encodedPath(file, encoding))
+
+    return { html: Bun.file(file), encoded }
+  }))
+
+  for (const [index, [path, page]] of [...client.pages].entries()) {
+    let paths = byRoute.get(page.pattern)
+
+    if (!paths)
+      byRoute.set(page.pattern, paths = new Map<string, ServedPage>())
+
+    paths.set(path, { status: page.status, etag: page.etag, headers: Object.entries(page.headers), renderedAt: page.renderedAt, revalidate: page.revalidate, islands: page.islands, stamps: page.stamps, readsSite: page.readsSite, ...loaded[index]! })
+  }
+
+  return byRoute
+}
+
+// A browser sends `/p/a@b` where `kay build` names the page `/p/a%40b`: each segment is decoded, then encoded the one way the build does.
+function canonicalPath(pathname: string): string {
+  return pathname.split('/').map(segment => encodeURIComponent(decodePath(segment) ?? segment)).join('/')
+}
+
+// Rendered for this visitor alone, kept by no cache.
+async function forVisitor(render: () => Promise<Response>): Promise<Response> {
+  const response = await render()
+
+  response.headers.set('cache-control', 'private, no-store')
+  response.headers.delete('etag')
+
+  return response
+}
+
+// How a page answers one request: rendered afresh, or the copy `kay build` rendered, revalidated, with its server islands filled in.
+export function pageResponder({ client, renderOptions, prerendered, settings, transforms, pageFile }: ResponderOptions): PageResponder {
+  return async (route, params, context, url) => {
+    const render = async () => renderPage(route, context, params, client, renderOptions)
+
+    // Drafts shown, past any prerendered or cached copy.
+    if (previewRequested(context.request))
+      return forVisitor(async () => inPreview(render))
+
+    const key = prerenderKey(settings, localeState()?.locale, canonicalPath(withoutSlash(url.pathname)))
+    const page = prerendered.get(route.pattern)?.get(key)
+
+    if (!page)
+      return render()
+
+    // How a form post went is for the visitor who sent it.
+    if (hasFlash(context.request) || handedOverFlash(context.request))
+      return forVisitor(render)
+
+    // Rendered as `kay build` renders it: without the request, for whoever its guards let through; it starts within the request, so in its locale.
+    await revalidateStale(page, async () => hookedResponse(await renderPage({ ...route, guards: [] }, { request: new Request(`http://localhost${url.pathname}`) }, params, client, { ...renderOptions, prerendering: true }), transforms, key, pageFile), error => reportServerError(error, context.request, renderOptions.onError))
+
+    const served = page.islands !== undefined || page.stamps === true ? await serveServerIslands(route, page, params, context, url, client, renderOptions) : undefined
+
+    return served ?? servePrerendered(route, page, params, context, client, renderOptions)
+  }
+}
+
+// The redirect giving a page one URL, so its relative links resolve one way: `/about/` to `/about`, or the other way with `always`; leading slashes collapse too, so `//host/` never becomes a redirect off the site.
+// A catch-all's own directory keeps one slash: `/docs//` goes to `/docs/`, since `/docs` is not one of its paths.
+function slashRedirect(url: URL, shape: RouterShape, trailingSlash: TrailingSlash): Response | undefined {
+  if (trailingSlash === 'ignore' || url.pathname === '/')
+    return undefined
+
+  const path = `/${url.pathname.replace(EDGE_SLASHES, '')}`
+  const directory = shape.path.endsWith('/*') && path.split('/').length === shape.path.split('/').length - 1
+  const wanted = trailingSlash === 'always' || directory ? `${path}/` : path
+
+  return wanted === url.pathname ? undefined : new Response(null, { status: 308, headers: { location: `${wanted}${url.search}` } })
+}
+
+// A temporary redirect, since another visitor goes elsewhere, which no shared cache may keep.
+function localeRedirect(settings: LocaleSettings, request: Request, url: URL): Response {
+  return new Response(null, { status: 307, headers: { 'location': `${localePath(settings, url.pathname, preferredLocale(settings, request))}${url.search}`, 'vary': 'cookie, accept-language', 'cache-control': 'private, no-cache' } })
+}
+
+// A visitor who followed a link of the site to another locale than the one they had is taken back to it from an unprefixed path; that response is theirs alone.
+// A first visit, a crawler or a cache filling chose nothing, so their responses stay cacheable.
+function remembered(response: Response, request: Request, locale: string): Response {
+  if (response.status !== 200 || request.headers.get('sec-fetch-site') !== 'same-origin' || cookieLocale(request) === locale)
+    return response
+
+  response.headers.append('set-cookie', localeCookie(locale, overHttps(request)))
+  response.headers.set('cache-control', 'private, no-cache')
+
+  return response
+}
+
+export interface PageRoutes {
+  table: RouteTable
+  matchers: Map<string, Matcher>
+  i18n: I18n | undefined
+  // The locales the config declares, or the site's one language.
+  locales: I18n
+  client: ClientBuild
+  renderOptions: RenderOptions
+  trailingSlash: TrailingSlash
+  // The routes directory's own `_404.kay` and `_error.kay`, for a path no page serves.
+  fallback: SpecialPages
+  respond: PageResponder
+}
+
+// A route per path the router serves, then one answering what none of them does, each in the locale its prefix or its host names.
+export function servePageRoutes(app: Elysia, { table, matchers, i18n, locales, client, renderOptions, trailingSlash, fallback, respond }: PageRoutes): void {
+  const settings = i18n?.settings
+  const inImplicitLocale = async (url: URL, request: Request, run: () => Promise<Response>) => runInLocale(stateFor(locales, locales.settings.defaultLocale, url.pathname, request), run)
+
+  const answer = async (candidates: Candidate[], context: RequestContext & { params: unknown }, url: URL): Promise<Response> => {
+    for (const { route, shape } of candidates) {
+      const text = positionalParams(shape, route, context.params as Record<string, string | null>)
+
+      if (text === 'malformed')
+        return new Response('Bad request', { status: 400, headers: { 'content-type': 'text/plain; charset=utf-8' } })
+
+      const params = matchedParams(route, text, matchers)
+
+      // A span per page request, its loads and render nested in it.
+      if (params) {
+        const { method } = context.request
+
+        return traced(`${method} ${route.pattern}`, { kind: SERVER_SPAN, attributes: { 'http.request.method': method, 'http.route': route.pattern, 'url.path': url.pathname, 'kay.request.id': requestId(context.request) } }, async (span) => {
+          const response = await respond(route, params, context, url)
+
+          if (span)
+            answered(span, response.status)
+
+          return response
+        })
+      }
+    }
+
+    return renderUnmatched(candidates.at(-1)!.route.special, context, client, renderOptions)
+  }
+
+  for (const [path, served] of table.paths) {
+    app.get(path, async (context) => {
+      const url = new URL(context.request.url)
+      // On a host, the path is served in the host's locale, or not at all when only another locale's translation names it.
+      const locale = settings?.hosts ? hostLocale(settings, context.request) : served.keys().next().value
+      const own = served.get(locale)
+      const redirect = slashRedirect(url, (own ?? served.values().next().value!).candidates[0]!.shape, trailingSlash)
+
+      if (redirect)
+        return redirect
+
+      if (!i18n || !settings)
+        return inImplicitLocale(url, context.request, async () => answeringRequest(context.request, async () => answer(own!.candidates, context, url)))
+
+      // With every locale prefixed, a path without one goes to the visitor's.
+      if (locale === undefined)
+        return localeRedirect(settings, context.request, url)
+
+      const rest = url.pathname.slice(own?.prefix.length ?? 0) || '/'
+
+      if (own?.untranslated === true)
+        return new Response(null, { status: 308, headers: { location: `${localePath(settings, rest, locale, url.host)}${url.search}` } })
+
+      const state = stateFor(i18n, locale, untranslatedPath(settings, rest, locale), context.request)
+
+      if (!own)
+        return runInLocale(state, async () => renderUnmatched(served.values().next().value!.candidates.at(-1)!.route.special, context, client, renderOptions))
+
+      const response = await runInLocale(state, async () => answeringRequest(context.request, async () => answer(own.candidates, context, url)))
+
+      return settings.prefixDefault ? remembered(response, context.request, locale) : response
+    })
+  }
+
+  // Every route above wins over this one, so it only answers what no page serves.
+  if (!(fallback.notFound ?? fallback.error))
+    return
+
+  app.get('/*', async (context) => {
+    const url = new URL(context.request.url)
+
+    if (!i18n || !settings)
+      return inImplicitLocale(url, context.request, async () => renderUnmatched(fallback, context, client, renderOptions))
+
+    const { locale, path } = splitLocale(settings, url.pathname)
+    const answering = locale ?? (settings.hosts ? hostLocale(settings, context.request) : preferredLocale(settings, context.request))
+    const response = await runInLocale(stateFor(i18n, answering, untranslatedPath(settings, path, answering), context.request), async () => renderUnmatched(fallback, context, client, renderOptions))
+
+    // A path with no locale of its own is answered in the visitor's, which a shared cache must tell apart.
+    if (locale === undefined && !settings.hosts)
+      response.headers.append('vary', 'cookie, accept-language')
+
+    return response
+  })
+}
