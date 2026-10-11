@@ -216,7 +216,7 @@ async function fetchJson(path: string): Promise<unknown> {
   const response = await fetch(withBase(path))
 
   if (!response.ok)
-    throw new Error(`kay: the search index answered ${response.status} for ${path}; \`search: true\` in kay.config.ts has \`kay build\` write it`)
+    throw new Error(`kay: the search index answered ${response.status} for ${path}; \`kay build\` writes it when kay.config.ts sets \`search: true\`, and \`kay dev\` has none`)
 
   return response.json()
 }

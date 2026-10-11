@@ -25,6 +25,7 @@ import { avifQuality, writeImageVariants, writeRemoteVariants } from '../server/
 import { hookPrerendered } from '../server/page-hook'
 import { prerenderPages } from '../server/prerender'
 import { remoteImages, remotePatterns } from '../server/remote'
+import { slashedPath } from '../server/routes'
 import { linkStoredFiles } from '../server/storage'
 import { buildClient } from './client'
 import { compileServer } from './compile'
@@ -242,7 +243,7 @@ async function outputStage(project: Project, exported: boolean, client: ClientBu
   const prerendered = await prerenderPages(project, client, { exportAll: exported, rendered })
 
   if (config.search === true)
-    await writeSearchIndex(client.dir, rendered.flatMap(page => page.search === false ? [] : [{ path: page.path, html: page.html, weight: page.search }]))
+    await writeSearchIndex(client.dir, rendered.flatMap(page => page.search === false ? [] : [{ path: slashedPath(page.path, config.trailingSlash), html: page.html, weight: page.search }]))
 
   // The heads are the check's to read, so a build without checking skips them with it.
   const linted = checking ? pageSeoLints(config, rendered, exported) : []

@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { clientDir } from '../src/build/assets'
+import { writeSearchIndex } from '../src/build/search'
 import { flush, root as reactiveRoot, signal } from '../src/runtime'
 import { SEARCH_MANIFEST, searchResults, searchShard, searchSite, searchWords } from '../src/runtime/search'
 import { scratchDir } from './scratch'
@@ -169,6 +170,27 @@ describe('search', () => {
     }
   })
 
+  it('leaves out a page requireGuards answers 403 to, and links each page as trailingSlash serves it', async () => {
+    const site = await scratchDir('search-guards-')
+
+    try {
+      await Promise.all([
+        Bun.write(join(site, 'kay.config.ts'), 'export default { favicon: false, search: true, requireGuards: true, trailingSlash: \'always\' }\n'),
+        Bun.write(join(site, 'src/routes/pricing.kay'), `--- server\n${PRERENDER}\n---\nh1 Pricing\np Pricingword\n`),
+        Bun.write(join(site, 'src/routes/about.kay'), '--- server\nexport const page = { prerender: true, guards: false }\n---\nh1 About\np Aboutword\n'),
+      ])
+      await build(site)
+
+      const dir = clientDir(site)
+
+      expect((await search(dir, 'pricingword')).hits).toEqual([])
+      expect((await search(dir, 'aboutword')).hits.map(hit => hit.href)).toEqual(['/about/'])
+    }
+    finally {
+      await rm(site, { recursive: true, force: true })
+    }
+  }, 60_000)
+
   it('is written by kay build --static, under the files it exports', async () => {
     const site = await scratchDir('search-static-')
 
@@ -185,4 +207,41 @@ describe('search', () => {
       await rm(site, { recursive: true, force: true })
     }
   }, 60_000)
+})
+
+describe('the search index', () => {
+  const index = async (pages: { path: string, html: string }[]) => {
+    const dir = await scratchDir('search-index-')
+
+    await writeSearchIndex(dir, pages.map(page => ({ ...page, weight: 1 })))
+
+    return dir
+  }
+
+  it('splits a large file of two letters by three, and keeps one of three letters whole however large', async () => {
+    const words = 'product project process program provide professional property protect'
+    const huge = 'pr'.padEnd(40_000, 'x')
+    const dir = await index([...Array.from({ length: 700 }, (_, n) => ({ path: `/p${n}`, html: `<main><h1>Page ${n}</h1><p>${words}</p></main>` })), { path: '/blob', html: `<main><h1>Blob</h1><pre>${huge}</pre></main>` }])
+    const manifest = await Bun.file(join(dir, 'search.json')).json() as SearchManifest
+    const shards = (await readdir(join(dir, 'search', manifest.dir, '0'))).filter(file => file.startsWith('w-'))
+
+    expect(shards).toContain(`w-${searchShard('pro', 3)}.json`)
+    expect((await search(dir, 'protect')).hits).toHaveLength(20)
+    expect((await search(dir, huge)).hits.map(hit => hit.href)).toEqual(['/blob'])
+  }, 60_000)
+
+  it('reads a page with no main, void and self-closing elements kept out, entities decoded, headings and their anchors as they read', async () => {
+    const dir = await index([{
+      path: '/plain',
+      html: '<html lang="en"><head><title>Plain</title></head><body><nav>Navword</nav><h1>First</h1><h1>Second</h1><p>Caf&eacute; &amp; cr&egrave;me, &#99999999; &mdash; done<img data-search="false" src="x.png"><br data-search="false"><svg data-search="false"/>Afterword</p><h2 id="a b">Usage <a href="#a b">#</a></h2><p>Usageword</p><h2 id="a b">Again</h2><p>Againword</p></body></html>',
+    }])
+    const [cafe] = (await search(dir, 'cafe creme')).hits
+
+    expect(cafe).toMatchObject({ page: 'First Second', href: '/plain' })
+    expect(cafe!.snippet.map(part => part.text).join('')).toContain('Café & crème, &#99999999; \u2014 done')
+    expect((await search(dir, 'afterword')).hits).toHaveLength(1)
+    expect((await search(dir, 'navword')).hits).toEqual([])
+    expect((await search(dir, 'usageword')).hits.map(hit => [hit.heading, hit.href])).toEqual([['Usage', '/plain#a%20b']])
+    expect((await search(dir, 'againword')).hits.map(hit => hit.href)).toEqual(['/plain#a%20b'])
+  })
 })

@@ -46,11 +46,11 @@ ul
 
 Each hit links a section of a page: the text above its first `h2`, `h3` or `h4`, or a heading and the text under it, through the heading's `id`. `snippet` is a line of that text around the first word found, its parts marking each word searched for.
 
-A query needs all its words, each found as a word or the start of one, with case and accents ignored. A word in the page's title counts most, then one in a heading, then the text. The browser loads only the part of the index holding the words typed, then the texts of the best hits.
+A query needs all its words, each found as a word or the start of one, with case and accents ignored. A word is a run of letters and digits, so in Chinese or Japanese, written without spaces, a query finds a run only by its start. A word in the page's title counts most, then one in a heading, then the text. The browser loads only the part of the index holding the words typed, then the texts of the best hits.
 
 ## What goes in
 
-Each page is read from its `main`, or its `body` without one. Navigation, footers, scripts and anything marked `data-search="false"` stay out. So do pages behind a guard, pages with `noindex`, and pages setting `search: false` in their `page`. `search: { weight: 0.5 }` makes a page's words count half as much, so its hits come after the others':
+Each page is read from its `main`, or its `body` without one. Navigation, footers, scripts and anything marked `data-search="false"` stay out. So do pages behind a guard or refused by `requireGuards`, pages with `noindex`, and pages setting `search: false` in their `page`. `search: { weight: 0.5 }` makes a page's words count half as much, so its hits come after the others':
 
 ```kay
 --- server

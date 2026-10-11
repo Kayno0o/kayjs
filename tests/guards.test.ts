@@ -160,6 +160,23 @@ describe('the OpenAPI document on a site requiring guards', () => {
 
     expect(await status(await pages({ routes: join(dir, 'routes'), api: join(dir, 'open-api'), prebuilt: false, requireGuards: true, openapi: true }))).toBe(200)
   })
+
+  it('stays refused with a library\'s modules under guards of their own beside an open module, and with no module at all', async () => {
+    const guarded = (name: string) => `import { guard } from 'kay'\n\nexport default guard(({ request, deny }) => {\n  if (!request.headers.has('x-${name}'))\n    deny(403)\n})\n`
+    const lib = join(dir, 'two/api')
+
+    await Promise.all([
+      Bun.write(join(lib, 'a/_guard.ts'), guarded('a')),
+      Bun.write(join(lib, 'a/m.ts'), 'import { api } from \'kay/server\'\n\nexport default api().get(\'/\', () => \'a\')\n'),
+      Bun.write(join(lib, 'b/_guard.ts'), guarded('b')),
+      Bun.write(join(lib, 'b/m.ts'), 'import { api } from \'kay/server\'\n\nexport default api().get(\'/\', () => \'b\')\n'),
+    ])
+    const extensions = [{ name: 'two', api: { dir: lib, prefix: 'two' } }]
+    const status = async (api: string, more = extensions) => (await (await pages({ routes: join(dir, 'routes'), api: join(dir, api), prebuilt: false, requireGuards: true, openapi: true, extensions: more })).handle(new Request('http://localhost/api/openapi.json'))).status
+
+    expect(await status('open-api')).toBe(403)
+    expect(await status('none', [])).toBe(403)
+  })
 })
 
 describe('falseKeys', () => {

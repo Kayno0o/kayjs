@@ -131,7 +131,7 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
           const noindex = pageSetting(module, 'noindex') === true
           const search = pageSetting(module, 'search') as PageSettings['search']
 
-          options.rendered?.push({ path: copy.path, file: route.file, locale: copy.locale, html, noindex, sitemap: pageSetting(module, 'sitemap') !== undefined, search: noindex || search === false || route.guards.length > 0 ? false : search?.weight ?? 1 })
+          options.rendered?.push({ path: copy.path, file: route.file, locale: copy.locale, html, noindex, sitemap: pageSetting(module, 'sitemap') !== undefined, search: noindex || search === false || guardedPage(route, config.requireGuards) ? false : search?.weight ?? 1 })
         }
 
         pages[copy.key] = { pattern: route.pattern, file: name, status: response.status, headers: storedHeaders(response.headers), etag: pageEtag(html), renderedAt: Date.now(), revalidate, ...islands.length > 0 ? { islands } : {}, ...stamps ? { stamps } : {}, ...readsSite ? { readsSite } : {} }
@@ -172,6 +172,11 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
   client.pages = new Map(Object.entries(pages))
 
   return Object.keys(pages).length
+}
+
+// Whether a guard answers for the page, `requireGuards` refusing one no guard covers: its words stay out of the public search index.
+function guardedPage(route: Route, required: boolean | undefined): boolean {
+  return route.guards.length > 0 || (required === true && route.open !== true)
 }
 
 // What only a server can do: a guard decides per request, and an action takes a post.
