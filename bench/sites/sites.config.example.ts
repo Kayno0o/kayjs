@@ -40,14 +40,16 @@ export default [
     env: variant => ({ DATABASE_URL: `postgres://florist:bench@127.0.0.1:47600/florist_${variant.kind}`, API_URL: `http://127.0.0.1:${variant.ports.sidecar}` }),
     // The Astro pages fetch from an API production ran beside them: started and measured with the server, nginx sending it `/api/`.
     sidecar: { astro: { command: variant => [process.execPath, 'api/index.ts', '--port', String(variant.ports.sidecar)], paths: ['/api/'] } },
-    // Started before the builds, given the variants measured, and stopped as the run ends: here a database per side, seeded afresh.
-    services: async () => {
-      Bun.spawnSync(['docker', 'run', '-d', '--rm', '--name', 'bench-florist', '-e', 'POSTGRES_USER=florist', '-e', 'POSTGRES_PASSWORD=bench', '-p', '127.0.0.1:47600:5432', 'postgres:18-alpine'])
-      // Then wait for it to answer, and create and seed `florist_astro` and `florist_kay`.
-
-      return async () => {
-        Bun.spawnSync(['docker', 'rm', '-f', 'bench-florist'])
-      }
+    // Started before the builds, given the variants measured, and stopped as the run ends, however far the start got: here a database per side, seeded afresh.
+    services: {
+      start: async () => {
+        if (Bun.spawnSync(['docker', 'run', '-d', '--rm', '--name', 'kay-bench-florist', '-e', 'POSTGRES_USER=florist', '-e', 'POSTGRES_PASSWORD=bench', '-p', '127.0.0.1:47600:5432', 'postgres:18-alpine']).exitCode !== 0)
+          throw new Error('florist: docker run failed')
+        // Then wait for it to answer, and create and seed `florist_astro` and `florist_kay`.
+      },
+      stop: async () => {
+        Bun.spawnSync(['docker', 'rm', '-fv', 'kay-bench-florist'])
+      },
     },
   },
 ] satisfies Site[]

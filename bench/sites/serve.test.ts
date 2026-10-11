@@ -1,9 +1,10 @@
 import type { Subprocess } from 'bun'
-import { mkdtempSync, realpathSync } from 'node:fs'
+import type { Variant } from './sites'
+import { existsSync, mkdtempSync, realpathSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
-import { cpuTicks, ensureFree, isRunning, killAll, parentOf, processesIn, processTree, stopEverything, tracked, treeCpu, treeMemory } from './serve'
+import { cpuTicks, ensureFree, isRunning, killAll, memory, parentOf, processesIn, processTree, serverMemory, stopEverything, stopServer, tracked, treeCpu, treeMemory } from './serve'
 
 // Burns 200 ms of CPU, however busy the machine.
 const BURN = 'while (process.cpuUsage().user < 200_000);'
@@ -18,6 +19,10 @@ async function burnt(process: Subprocess<'ignore', 'pipe'>): Promise<void> {
     if (output.includes('burnt'))
       return
   }
+}
+
+function variantIn(dir: string): Variant {
+  return { site: { name: 'bakery', repo: '', astro: '', pages: [] }, kind: 'astro', dir, devDir: `${dir}-dev`, ports: { backend: 0, http: 0, https: 0, dev: 0, sidecar: 0 } }
 }
 
 // Polls until `done` holds, a second at most.
@@ -167,5 +172,52 @@ describe('stopEverything', () => {
 
     expect(pids.filter(isRunning)).toEqual([])
     expect(started.signalCode).toBe('SIGKILL')
+  })
+})
+
+describe('stopServer', () => {
+  it('stops a server, then the sidecar it started, gone for good', async () => {
+    const dir = realpathSync(mkdtempSync(join(tmpdir(), 'kay-bench-sidecar-')))
+    const server = Bun.spawn(['sh', '-c', 'sleep 30 & exec sleep 30'], { cwd: dir })
+
+    await until(() => processTree(server.pid).length === 2)
+    const tree = processTree(server.pid)
+
+    expect(tree.length).toBe(2)
+    await stopServer(variantIn(dir), server)
+
+    expect(tree.filter(pid => existsSync(`/proc/${pid}`))).toEqual([])
+  })
+
+  it('finds the sidecar in its directory when the server exited first and left it out of its tree', async () => {
+    const dir = realpathSync(mkdtempSync(join(tmpdir(), 'kay-bench-orphan-')))
+    const server = Bun.spawn(['sh', '-c', 'sleep 30 >/dev/null & echo $!'], { cwd: dir, stdout: 'pipe' })
+    const sidecar = Number((await new Response(server.stdout).text()).trim())
+
+    await server.exited
+    expect(isRunning(sidecar)).toBe(true)
+    await stopServer(variantIn(dir), server)
+
+    expect(existsSync(`/proc/${sidecar}`)).toBe(false)
+  })
+})
+
+describe('serverMemory', () => {
+  it('counts a server and its sidecar, their shared pages once and their resident peaks summed', async () => {
+    const server = Bun.spawn(['sh', '-c', 'sleep 30 & exec sleep 30'])
+
+    try {
+      await until(() => processTree(server.pid).length === 2)
+      const tree = processTree(server.pid)
+      const counted = serverMemory(server.pid)
+
+      expect(tree.length).toBe(2)
+      expect(counted.pss).toBeGreaterThan(0)
+      expect(counted.pss).toBeLessThan(tree.reduce((sum, pid) => sum + memory(pid).rss, 0))
+      expect(counted.peak).toBe(tree.reduce((sum, pid) => sum + memory(pid).peak, 0))
+    }
+    finally {
+      await killAll(processTree(server.pid))
+    }
   })
 })

@@ -147,5 +147,5 @@ try {
 finally {
   await browser?.close()
   nginx.kill()
-  await stopServer(server)
+  await stopServer(variant, server)
 }

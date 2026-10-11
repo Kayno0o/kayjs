@@ -111,8 +111,8 @@ export async function startServer(variant: Variant): Promise<Subprocess> {
   if (sidecar !== undefined)
     await ensureFree(variant.ports.sidecar, `${variant.dir}'s sidecar`)
 
-  // A shell starts the sidecar in the background, then becomes the server, so the sidecar is the server's child and counts in its tree.
-  return tracked(Bun.spawn(sidecar === undefined ? server : ['sh', '-c', `${sidecar.command(variant).map(arg => Bun.$.escape(arg)).join(' ')} & exec "$@"`, 'sh', ...server], {
+  // A shell starts the sidecar in the background, on its own port, then becomes the server, so the sidecar is the server's child and counts in its tree.
+  return tracked(Bun.spawn(sidecar === undefined ? server : ['sh', '-c', `PORT=${variant.ports.sidecar} ${sidecar.command(variant).map(arg => Bun.$.escape(arg)).join(' ')} & exec "$@"`, 'sh', ...server], {
     cwd: variant.dir,
     stdout: 'ignore',
     stderr: Bun.file(serverLog(variant)),
@@ -120,14 +120,17 @@ export async function startServer(variant: Variant): Promise<Subprocess> {
   }))
 }
 
-// Stops a server as a signal stops it in production, then what it started that outlived it, as its sidecar.
-export async function stopServer(server: Subprocess): Promise<void> {
+// Stops a server as a signal stops it in production, then what it started that outlived it, as its sidecar, found in its directory when the server exited first and the sidecar left its tree.
+export async function stopServer(variant: Variant, server: Subprocess): Promise<void> {
   const tree = processTree(server.pid)
 
   server.kill()
   await server.exited
-  await killAll(tree.slice(1))
-  await untilReaped(tree.slice(1))
+
+  const outlived = [...new Set([...tree.slice(1), ...processesIn(variant.dir)])]
+
+  await killAll(outlived)
+  await untilReaped(outlived)
 }
 
 // A killed process's sockets close with its last thread, which may outlive the state `isRunning` reads, so a port stays taken until the process is reaped.
@@ -166,7 +169,7 @@ export async function waitReady(variant: Variant, server: Subprocess): Promise<n
     await Bun.sleep(2)
   }
 
-  await stopServer(server)
+  await stopServer(variant, server)
   const stderr = (await Bun.file(serverLog(variant)).text()).slice(-2000)
 
   throw new Error(`${variant.dir} did not answer on ${variant.ports.backend}, exit code ${server.exitCode}:\n${stderr}`)
@@ -180,9 +183,9 @@ export function memory(pid: number): { rss: number, peak: number } {
   return { rss: read(VM_RSS), peak: read(VM_HWM) }
 }
 
-// Resident and peak memory of a server and its sidecar, summed: each process's peak, which need not have come at once.
-export function serverMemory(pid: number): { rss: number, peak: number } {
-  return processTree(pid).map(memory).reduce((sum, process) => ({ rss: sum.rss + process.rss, peak: sum.peak + process.peak }), { rss: 0, peak: 0 })
+// Proportional memory of a server and its sidecar, which counts the pages they share once, and their resident peaks summed, which need not have come at once.
+export function serverMemory(pid: number): { pss: number, peak: number } {
+  return { pss: treeMemory(pid).pss, peak: processTree(pid).reduce((sum, member) => sum + memory(member).peak, 0) }
 }
 
 function statLine(pid: number): string {
@@ -374,7 +377,7 @@ export async function startAll(): Promise<{ servers: Map<Variant, Subprocess>, n
   const servers = new Map<Variant, Subprocess>()
   const stop = async () => {
     nginx.kill()
-    await Promise.all([...servers.values()].map(stopServer))
+    await Promise.all([...servers].map(async ([variant, server]) => stopServer(variant, server)))
     await nginx.exited
   }
 

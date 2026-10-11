@@ -18,8 +18,8 @@ export interface Site {
   env?: Record<string, string> | ((variant: Variant) => Record<string, string>)
   // A second process a side's server needs, as an API the pages fetch from: started with it in its directory, counted with it, and given the paths nginx sends its way.
   sidecar?: Partial<Record<Variant['kind'], Sidecar>>
-  // Runs before the site is built and served, given the variants measured, and returns what stops it after the run: a database the servers read, seeded afresh each run.
-  services?: (variants: Variant[]) => Promise<() => Promise<void>>
+  // What the site's servers need besides themselves, as a database seeded afresh: started before the builds, given the variants measured, and stopped as the run ends, however far `start` got.
+  services?: { start: (variants: Variant[]) => Promise<void>, stop: () => Promise<void> }
   // What its dev servers read from the environment, none unless set: production's `env` may point a dev server elsewhere, as at the live site for its reloads.
   devEnv?: Record<string, string>
   // Runs on each side's dev copy once installed, given its directory, as for pointing the dev server's reloads back at it.
@@ -243,21 +243,44 @@ export async function prepare() {
   }
 }
 
-// Starts what each site measured needs besides its servers, stopped when the run disposes of it or by `stopServices`.
+// Starts what each site measured needs besides its servers, stopped when the run disposes of it or by `stopServices`; a start that fails stops every one started.
 export async function startServices(): Promise<AsyncDisposable> {
-  for (const site of SITES) {
-    const variants = VARIANTS.filter(variant => variant.site === site)
+  try {
+    for (const site of SITES) {
+      const variants = VARIANTS.filter(variant => variant.site === site)
 
-    if (site.services !== undefined && variants.length > 0)
-      services.push(await site.services(variants))
+      if (site.services === undefined || variants.length === 0)
+        continue
+
+      // Before the start, so a start failing or interrupted halfway is stopped too.
+      services.push(site.services.stop)
+      await site.services.start(variants)
+    }
+  }
+  catch (error) {
+    await stopServices()
+
+    throw error
   }
 
   return { [Symbol.asyncDispose]: stopServices }
 }
 
+// Every stop runs, one failing or not; the first failure is thrown once they all ran.
 export async function stopServices(): Promise<void> {
-  for (const stop of services.splice(0).reverse())
-    await stop()
+  const failures: unknown[] = []
+
+  for (const stop of services.splice(0).reverse()) {
+    try {
+      await stop()
+    }
+    catch (error) {
+      failures.push(error)
+    }
+  }
+
+  if (failures.length > 0)
+    throw failures[0]
 }
 
 export function commitOf(variant: Variant): string {

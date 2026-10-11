@@ -23,7 +23,7 @@ interface Result {
   weights: Weight[]
   cold: ColdStart
   loads: Load[]
-  memory: { rss: number, peak: number }
+  memory: { pss: number, peak: number }
   vitals: Record<string, Vitals[]>
 }
 
@@ -57,9 +57,15 @@ for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) {
     stopping = true
     void (async () => {
       try {
-        await Promise.race([stopEverything(VARIANTS.map(variant => variant.devDir)), Bun.sleep(STOP_MS)])
-        await Promise.race([stopServices(), Bun.sleep(STOP_MS)])
-        await Promise.race([browser?.close(), Bun.sleep(STOP_MS)])
+        // Each step runs, one failing or not: a sidecar runs in its variant's directory, which a server that exited first no longer holds in its tree.
+        for (const step of [async () => stopEverything(VARIANTS.flatMap(variant => [variant.dir, variant.devDir])), stopServices, async () => browser?.close()]) {
+          try {
+            await Promise.race([step(), Bun.sleep(STOP_MS)])
+          }
+          catch (error) {
+            console.error(error)
+          }
+        }
       }
       finally {
         process.exit(128 + constants.signals[signal])
@@ -89,7 +95,7 @@ for (const variant of producing ? VARIANTS : []) {
 
   for (const command of buildCommands(variant))
     builds.push(await timeBuild(variant, command))
-  results.set(variant, { builds, footprint: footprint(variant), weights: [], cold: { ms: 0, rss: 0 }, loads: [], memory: { rss: 0, peak: 0 }, vitals: {} })
+  results.set(variant, { builds, footprint: footprint(variant), weights: [], cold: { ms: 0, pss: 0 }, loads: [], memory: { pss: 0, peak: 0 }, vitals: {} })
 }
 
 for (const variant of producing ? VARIANTS : []) {
@@ -182,12 +188,12 @@ try {
       '',
       '## Server',
       '',
-      `Cold start is from spawning the server to its first 200 on the home page, median of 7. Under load, 32 clients request one URL through nginx for 5 s over keepalive HTTP/1.1, accepting brotli; CPU is per request, of the site's server and of nginx, which compresses what the server sent uncompressed. The client is Bun's fetch, which tops out near 40,000 requests a second.${VARIANTS.some(variant => variant.site.sidecar?.[variant.kind] !== undefined) ? ' A server with a sidecar, as an API its pages fetch from, counts with it: cold start waits for both to answer, memory and CPU are their sums.' : ''}`,
+      `Cold start is from spawning the server to its first 200 on the home page, median of 7. Under load, 32 clients request one URL through nginx for 5 s over keepalive HTTP/1.1, accepting brotli; CPU is per request, of the site's server and of nginx, which compresses what the server sent uncompressed. The client is Bun's fetch, which tops out near 40,000 requests a second. Memory is proportional (PSS), counting once the pages processes share; its peak is resident (RSS).${VARIANTS.some(variant => variant.site.sidecar?.[variant.kind] !== undefined) ? ' A server with a sidecar, as an API its pages fetch from, counts with it: cold start waits for both to answer, memory and CPU are their sums.' : ''}`,
       '',
       table(header, [
         row('cold start', result => `${milliseconds(result.cold.ms)} ms`),
-        row('memory once started', result => megabytes(result.cold.rss)),
-        row('memory after load (peak)', result => `${megabytes(result.memory.rss)} (${megabytes(result.memory.peak)})`),
+        row('memory once started', result => megabytes(result.cold.pss)),
+        row('memory after load (peak)', result => `${megabytes(result.memory.pss)} (${megabytes(result.memory.peak)})`),
       ]),
       '',
       table(['', 'URL', 'req/s', 'p50 (ms)', 'p99 (ms)', 'server CPU (µs/req)', 'nginx CPU (µs/req)'], VARIANTS.flatMap(variant => results.get(variant)!.loads.map(entry => [label(variant), `\`${entry.url}\``, entry.rps.toFixed(0), milliseconds(entry.p50), milliseconds(entry.p99), entry.serverCpu.toFixed(0), entry.nginxCpu.toFixed(0)]))),

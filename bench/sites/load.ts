@@ -6,7 +6,7 @@ import { clockTicks, cpuTicks, processTree, serverMemory, startServer, stopServe
 
 export interface ColdStart {
   ms: number
-  rss: number
+  pss: number
 }
 
 export interface Load {
@@ -32,11 +32,11 @@ export async function coldStart(variant: Variant): Promise<ColdStart> {
   for (let run = 0; run < COLD_STARTS; run++) {
     const server = await startServer(variant)
 
-    runs.push({ ms: await waitReady(variant, server), rss: serverMemory(server.pid).rss })
-    await stopServer(server)
+    runs.push({ ms: await waitReady(variant, server), pss: serverMemory(server.pid).pss })
+    await stopServer(variant, server)
   }
 
-  return { ms: median(runs.map(run => run.ms)), rss: median(runs.map(run => run.rss)) }
+  return { ms: median(runs.map(run => run.ms)), pss: median(runs.map(run => run.pss)) }
 }
 
 function cpuSeconds(pid: number): number {
