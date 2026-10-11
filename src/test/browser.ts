@@ -104,6 +104,8 @@ const SINGLETON = /^org\.chromium\.Chromium\./
 const FETCHER = /^org\.chromium\.Chromium\.chromium_chrome_url_fetcher_\./
 // A Chrome or Chromium executable, as /proc names it.
 const CHROME = /chrom/i
+// Chrome's crash handler, which outlives it on the temp directory it started with, Alpine's among them, but makes nothing there.
+const CRASH_HANDLER = /crashpad/
 // Where the owned directory notes the profile Bun made.
 const BUN_RECORD = 'bun-profile'
 // Chrome's lock names its host and process.
@@ -534,7 +536,7 @@ function chromeRunsIn(temp: string): boolean {
   return (attempt(() => readdirSync('/proc')) ?? []).some((name) => {
     const argv = attempt(() => readFileSync(`/proc/${name}/cmdline`, 'utf8'))?.split('\0')
 
-    if (argv?.[0] === undefined || !CHROME.test(basename(argv[0])) || argv.some(arg => arg.startsWith('--type=')) || !running(Number(name)))
+    if (argv?.[0] === undefined || !CHROME.test(basename(argv[0])) || CRASH_HANDLER.test(basename(argv[0])) || argv.some(arg => arg.startsWith('--type=')) || !running(Number(name)))
       return false
 
     const environ = attempt(() => readFileSync(`/proc/${name}/environ`, 'utf8'))?.split('\0')

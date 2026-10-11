@@ -497,7 +497,7 @@ describe.skipIf(!existsSync('/proc'))('a killed Chrome\'s leftovers', () => {
     }
   })
 
-  it('removes the empty directories Chrome leaves in the temp directory once no Chrome runs on it', async () => {
+  it('removes the empty directories Chrome leaves in the temp directory once no Chrome runs on it, its crash handler left running', async () => {
     const temp = await mkdtemp(join(tmpdir(), 'kt-'))
     const bin = await scratchDir('fake-chrome-')
     const fetcher = join(temp, 'org.chromium.Chromium.chromium_chrome_url_fetcher_.aB3dE9')
@@ -506,8 +506,11 @@ describe.skipIf(!existsSync('/proc'))('a killed Chrome\'s leftovers', () => {
     await mkdir(fetcher)
     // Busybox's sleep, Alpine's, would run the applet its name says.
     await symlink(process.execPath, join(bin, 'chromium'))
+    await symlink(process.execPath, join(bin, 'chrome_crashpad_handler'))
 
-    const chrome = Bun.spawn([join(bin, 'chromium'), '-e', 'setTimeout(() => {}, 30_000)'], { env: { ...process.env, TMPDIR: temp } })
+    const fake = (name: string) => Bun.spawn([join(bin, name), '-e', 'setTimeout(() => {}, 30_000)'], { env: { ...process.env, TMPDIR: temp } })
+    const chrome = fake('chromium')
+    const crashHandler = fake('chrome_crashpad_handler')
 
     process.env.TMPDIR = temp
 
@@ -527,6 +530,7 @@ describe.skipIf(!existsSync('/proc'))('a killed Chrome\'s leftovers', () => {
         process.env.TMPDIR = saved
 
       chrome.kill('SIGKILL')
+      crashHandler.kill('SIGKILL')
       await Promise.all([rm(temp, { recursive: true, force: true }), rm(bin, { recursive: true, force: true })])
     }
   })
