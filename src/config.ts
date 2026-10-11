@@ -188,6 +188,23 @@ export interface ManifestConfig {
   themeColor?: string | undefined
   backgroundColor?: string | undefined
   display?: 'fullscreen' | 'standalone' | 'minimal-ui' | 'browser' | undefined
+  orientation?: 'any' | 'natural' | 'landscape' | 'landscape-primary' | 'landscape-secondary' | 'portrait' | 'portrait-primary' | 'portrait-secondary' | undefined
+  // The page the installed app opens, a path of the site; defaults to `/`.
+  startUrl?: string | undefined
+  // The paths the installed app keeps in its window, a path of the site; browsers default to the start page's directory.
+  scope?: string | undefined
+  // A square image relative to the root, its subject inside the middle 80% a launcher may crop to a circle: kay serves it as the manifest's maskable icons.
+  maskable?: string | undefined
+  // The pages a launcher offers from the app's icon.
+  shortcuts?: ManifestShortcut[] | undefined
+}
+
+export interface ManifestShortcut {
+  name: string
+  // A path of the site.
+  url: string
+  shortName?: string | undefined
+  description?: string | undefined
 }
 
 export interface OfflineConfig {

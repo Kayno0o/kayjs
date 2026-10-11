@@ -14,18 +14,21 @@ const SVG = '/favicon.svg'
 const MANIFEST = '/manifest.webmanifest'
 // Browsers ask for the first two at these paths on their own; the manifest points at the others.
 const PNG_FILES: Record<string, number> = { '/apple-touch-icon.png': 180, '/icon-192.png': 192, '/icon-512.png': 512 }
+const MASKABLE_FILES: Record<string, number> = { '/icon-maskable-192.png': 192, '/icon-maskable-512.png': 512 }
+const MANIFEST_SIZES = [192, 512]
 const ICO_SIZES = [16, 32, 48]
 // The widest icon kay writes, which the source must reach so none is upscaled.
 const LARGEST = 512
 const ICO = '/favicon.ico'
 
-// Every path the favicon serves, an SVG one adding its SVG.
-export const FAVICON_PATHS = [ICO, ...Object.keys(PNG_FILES), MANIFEST, SVG]
+// Every path the favicon serves, an SVG one adding its SVG and a maskable manifest icon its own icons.
+export const FAVICON_PATHS = [ICO, ...Object.keys(PNG_FILES), MANIFEST, SVG, ...Object.keys(MASKABLE_FILES)]
 
-// The image the icons are made from and the SVG served beside it, both absolute.
+// The image the icons are made from, the SVG served beside it and the manifest's maskable image, all absolute.
 export interface FaviconSource {
   image: string
   svg?: string | undefined
+  maskable?: string | undefined
 }
 
 // Whether a `favicon` setting serves an SVG: kay's mark does, and a project's own when it names one.
@@ -33,23 +36,25 @@ function servesSvg(favicon: string | FaviconConfig | undefined): boolean {
   return typeof favicon !== 'string'
 }
 
-// The paths a project's `favicon` setting serves.
-export function faviconPaths(favicon: string | FaviconConfig | false | undefined): string[] {
+// The paths a project's `favicon` and `manifest` settings serve.
+export function faviconPaths(favicon: string | FaviconConfig | false | undefined, manifest?: ManifestConfig): string[] {
   if (favicon === false)
     return []
 
-  return servesSvg(favicon) ? FAVICON_PATHS : FAVICON_PATHS.filter(path => path !== SVG)
+  return FAVICON_PATHS.filter(path => (path !== SVG || servesSvg(favicon)) && (!(path in MASKABLE_FILES) || manifest?.maskable !== undefined))
 }
 
 // The favicon's source: the project's own, kay's mark when it names none, or none once turned off.
-export function faviconSource(root: string, favicon: string | FaviconConfig | false | undefined): FaviconSource | undefined {
+export function faviconSource(root: string, favicon: string | FaviconConfig | false | undefined, manifest?: ManifestConfig): FaviconSource | undefined {
   if (favicon === false)
     return undefined
 
-  if (favicon === undefined)
-    return { image: DEFAULT_FAVICON, svg: DEFAULT_SVG }
+  const maskable = manifest?.maskable === undefined ? {} : { maskable: resolve(root, manifest.maskable) }
 
-  return typeof favicon === 'string' ? { image: resolve(root, favicon) } : { image: resolve(root, favicon.image), svg: resolve(root, favicon.svg) }
+  if (favicon === undefined)
+    return { image: DEFAULT_FAVICON, svg: DEFAULT_SVG, ...maskable }
+
+  return typeof favicon === 'string' ? { image: resolve(root, favicon), ...maskable } : { image: resolve(root, favicon.image), svg: resolve(root, favicon.svg), ...maskable }
 }
 
 export interface FaviconOptions {
@@ -63,29 +68,39 @@ export interface FaviconOptions {
   base?: string | undefined
 }
 
-// The favicon in the sizes browsers ask for: an ICO of PNGs, the Apple touch icon and the manifest's icons.
-export async function faviconFiles({ image: source, svg }: FaviconSource): Promise<Map<string, Uint8Array<ArrayBuffer>>> {
-  const { width, height } = await new Bun.Image(source).metadata()
+// The favicon in the sizes browsers ask for: an ICO of PNGs, the Apple touch icon and the manifest's icons, maskable ones included.
+export async function faviconFiles({ image: source, svg, maskable }: FaviconSource): Promise<Map<string, Uint8Array<ArrayBuffer>>> {
+  await checkSquare(source, 'favicon')
 
-  if (width !== height)
-    throw new Error(`kay: the favicon ${source} is ${width}x${height}; it has to be square`)
-
-  // Enlarged to the sizes it lacks, so the manifest keeps the 192 and 512 icons a browser asks for before it offers to install the site.
-  if (width < LARGEST)
-    kayLog('warn', `the favicon ${source} is ${width}x${height}, enlarged to the icons up to ${LARGEST}x${LARGEST}, which look blurred; a source of ${LARGEST}x${LARGEST} or more keeps them sharp`)
+  if (maskable !== undefined)
+    await checkSquare(maskable, 'maskable icon')
 
   const files = new Map<string, Uint8Array<ArrayBuffer>>()
-  const png = async (size: number) => new Uint8Array(await new Bun.Image(source).resize(size, size).png().bytes())
+  const png = async (image: string, size: number) => new Uint8Array(await new Bun.Image(image).resize(size, size).png().bytes())
 
   for (const [path, size] of Object.entries(PNG_FILES))
-    files.set(path, await png(size))
+    files.set(path, await png(source, size))
 
-  files.set(ICO, ico(await Promise.all(ICO_SIZES.map(png)), ICO_SIZES))
+  files.set(ICO, ico(await Promise.all(ICO_SIZES.map(async size => png(source, size))), ICO_SIZES))
 
   if (svg !== undefined)
     files.set(SVG, await Bun.file(svg).bytes())
 
+  for (const [path, size] of maskable === undefined ? [] : Object.entries(MASKABLE_FILES))
+    files.set(path, await png(maskable!, size))
+
   return files
+}
+
+async function checkSquare(source: string, what: string): Promise<void> {
+  const { width, height } = await new Bun.Image(source).metadata()
+
+  if (width !== height)
+    throw new Error(`kay: the ${what} ${source} is ${width}x${height}; it has to be square`)
+
+  // Enlarged to the sizes it lacks, so the manifest keeps the 192 and 512 icons a browser asks for before it offers to install the site.
+  if (width < LARGEST)
+    kayLog('warn', `the ${what} ${source} is ${width}x${height}, enlarged to the icons up to ${LARGEST}x${LARGEST}, which look blurred; a source of ${LARGEST}x${LARGEST} or more keeps them sharp`)
 }
 
 export async function writeFavicons(source: FaviconSource, dir: string): Promise<void> {
@@ -131,24 +146,36 @@ export function faviconTags(favicon: string | FaviconConfig | undefined): HeadTa
   ]
 }
 
-// Its icons and start page under the site's mount point.
+// Its icons, pages and scope under the site's mount point.
 export function manifestJson(name: string | undefined, description: string | undefined, manifest: ManifestConfig = {}, base = ''): string {
+  const icon = (kind: string, purpose?: string) => (size: number) => ({ src: `${base}/${kind}-${size}.png`, sizes: `${size}x${size}`, type: 'image/png', purpose })
+
   return JSON.stringify({
     name,
     short_name: manifest.shortName ?? name,
     description,
-    icons: [192, 512].map(size => ({ src: `${base}/icon-${size}.png`, sizes: `${size}x${size}`, type: 'image/png' })),
-    start_url: `${base}/`,
+    icons: [...MANIFEST_SIZES.map(icon('icon')), ...manifest.maskable === undefined ? [] : MANIFEST_SIZES.map(icon('icon-maskable', 'maskable'))],
+    start_url: base + sitePath(manifest.startUrl ?? '/', 'startUrl'),
+    scope: manifest.scope === undefined ? undefined : base + sitePath(manifest.scope, 'scope'),
     display: manifest.display,
+    orientation: manifest.orientation,
     theme_color: manifest.themeColor,
     background_color: manifest.backgroundColor,
+    shortcuts: manifest.shortcuts?.map(shortcut => ({ name: shortcut.name, short_name: shortcut.shortName, description: shortcut.description, url: base + sitePath(shortcut.url, `a shortcut's url`) })),
   })
+}
+
+function sitePath(path: string, what: string): string {
+  if (!path.startsWith('/') || path.startsWith('//'))
+    throw new Error(`kay: the manifest's ${what} is a path of the site, starting with a single /, not ${path}`)
+
+  return path
 }
 
 // Serves the favicon files and the manifest at their paths, except one a public file or a page already serves; made from the source on first request unless `kay build` wrote them.
 export function serveFavicons(app: Elysia, taken: Set<string>, options: FaviconOptions): void {
   let files: Promise<Map<string, Uint8Array<ArrayBuffer>>> | undefined
-  const paths = [...Object.keys(PNG_FILES), ICO, ...options.source.svg === undefined ? [] : [SVG]]
+  const paths = [...Object.keys(PNG_FILES), ICO, ...options.source.svg === undefined ? [] : [SVG], ...options.source.maskable === undefined ? [] : Object.keys(MASKABLE_FILES)]
   const read = async () => {
     const built = new Map<string, Uint8Array<ArrayBuffer>>()
 

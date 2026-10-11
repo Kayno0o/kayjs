@@ -37,7 +37,7 @@ Every option is optional. The ones below are the common ones, the rest are in th
 | `seo` | What every page's head starts from: `name`, `titleTemplate`, `description`, `image`, `twitter`, `jsonLd`. See [Head and SEO](/essentials/head-and-seo) |
 | `head` | Tags every page's head carries, written as a `head` block compiles them; the CSP lets their inline scripts through. See [Head and SEO](/essentials/head-and-seo) |
 | `favicon` | A square image of 512 px or more, served as the favicon and the manifest icons. `false` serves none |
-| `manifest` | The web manifest: `shortName`, `themeColor`, `display` |
+| `manifest` | The web manifest: `shortName`, `themeColor`, `backgroundColor`, `display`, `orientation`, `startUrl`, `scope`, `shortcuts`, and a `maskable` image served as its maskable icons |
 | `offline` | A service worker keeping the build's files and some pages for offline visitors |
 | `lang` | The `lang` of the `html` element |
 

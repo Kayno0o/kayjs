@@ -422,7 +422,7 @@ async function finishOutput(root: string, config: KayConfig, exported: boolean, 
   await writeRemoteVariants(client.dir, remote, config.images?.quality)
   await writeCards(client.dir, join(root, '.kay', 'cache', 'cards'), remote)
 
-  const favicon = faviconSource(root, config.favicon)
+  const favicon = faviconSource(root, config.favicon, config.manifest)
 
   if (favicon !== undefined)
     await writeFavicons(favicon, join(client.dir, '..', FAVICON_DIR))

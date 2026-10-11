@@ -86,12 +86,18 @@ export const page = {
 
 ## Favicon
 
-`favicon` names a square image of 512 pixels or more. kay serves the sizes browsers ask for, a web manifest, and links them from every page.
+`favicon` names a square image of 512 pixels or more. kay serves the sizes browsers ask for, a web manifest, and links them from every page. The manifest also takes the installed app's `startUrl`, `scope`, `orientation` and `shortcuts`, and a `maskable` image, its subject inside the middle 80%, which kay serves as the icons a launcher crops to its own shape.
 
 ```ts
 export default defineConfig({
   favicon: 'src/favicon.png',
-  manifest: { shortName: 'Ex', themeColor: '#1e1e2e', display: 'standalone' },
+  manifest: {
+    shortName: 'Ex',
+    themeColor: '#1e1e2e',
+    display: 'standalone',
+    maskable: 'src/favicon-maskable.png',
+    shortcuts: [{ name: 'New note', url: '/notes/new' }],
+  },
 })
 ```
 

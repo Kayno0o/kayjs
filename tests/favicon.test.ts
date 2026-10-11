@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it, spyOn } from 'bun:test'
 import { pages } from '../src/server'
-import { faviconFiles, writeFavicons } from '../src/server/favicon'
+import { faviconFiles, manifestJson, writeFavicons } from '../src/server/favicon'
 
 const ROUTES = 'tests/fixtures/seo/src/routes'
 const SOURCE = 'tests/fixtures/seo/src/favicon.png'
@@ -77,6 +77,26 @@ describe('favicon', () => {
       display: 'standalone',
       theme_color: '#1e1e2e',
     })
+  })
+
+  it('carries the start page, scope, orientation, shortcuts and maskable icons the config sets, made from their own image', async () => {
+    const installed = await pages({ routes: ROUTES, prebuilt: false, favicon: SOURCE, seo: { name: 'Kay site' }, manifest: { maskable: SOURCE, startUrl: '/notes', scope: '/', orientation: 'any', shortcuts: [{ name: 'New note', shortName: 'New', description: 'Write a note', url: '/notes/new' }] } })
+    const manifest = await (await installed.handle(new Request('http://localhost/manifest.webmanifest'))).json() as { icons: unknown[] }
+    const maskable = await installed.handle(new Request('http://localhost/icon-maskable-512.png'))
+
+    expect(manifest).toMatchObject({ start_url: '/notes', scope: '/', orientation: 'any', shortcuts: [{ name: 'New note', short_name: 'New', description: 'Write a note', url: '/notes/new' }] })
+    expect(manifest.icons.slice(2)).toEqual([{ src: '/icon-maskable-192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' }, { src: '/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }])
+    expect(maskable.headers.get('content-type')).toBe('image/png')
+    expect(await widthOf(await maskable.bytes())).toBe(512)
+    expect((await get('/icon-maskable-512.png')).status).toBe(404)
+  })
+
+  it('puts the manifest\'s pages under the site\'s mount point, and refuses one that is no path of the site', () => {
+    const manifest = JSON.parse(manifestJson('Kay site', undefined, { startUrl: '/notes', scope: '/', shortcuts: [{ name: 'New', url: '/notes/new' }] }, '/docs')) as Record<string, unknown>
+
+    expect(manifest).toMatchObject({ start_url: '/docs/notes', scope: '/docs/', shortcuts: [{ name: 'New', url: '/docs/notes/new' }] })
+    expect(() => manifestJson('Kay site', undefined, { startUrl: 'notes' })).toThrow('kay: the manifest\'s startUrl is a path of the site')
+    expect(() => manifestJson('Kay site', undefined, { shortcuts: [{ name: 'Out', url: '//example.com' }] })).toThrow('a shortcut\'s url')
   })
 
   it('leaves a path to the public file serving it', async () => {

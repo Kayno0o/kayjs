@@ -86,7 +86,7 @@ export async function exportStatic(root: string, config: KayConfig, client: Clie
   // The extensions' server plugins are left out, since nothing a static site serves runs them and one may open a database.
   const extensions = config.extensions?.map(({ server: _, ...extension }) => extension)
   const app = new Elysia().use(await servePages({ ...config, extensions, root, prebuilt: true, log: false, health: false, security: false, compress: false }))
-  const fetched = [SERVICE_WORKER, ...config.site === undefined ? [] : [SITEMAP, ROBOTS], ...faviconPaths(config.favicon), ...config.publicEnv === undefined ? [] : [PUBLIC_ENV_PATH], ...(await projectCollections(root, config.content)).flatMap(collection => feedPaths(collection, config.i18n && localeSettings(config.i18n)).map(({ path }) => path)), ...(await exportedEndpoints(root, await scanEndpoints(resolve(root, config.routes ?? 'src/routes'), routeMounts(root, config.extensions)))).paths]
+  const fetched = [SERVICE_WORKER, ...config.site === undefined ? [] : [SITEMAP, ROBOTS], ...faviconPaths(config.favicon, config.manifest), ...config.publicEnv === undefined ? [] : [PUBLIC_ENV_PATH], ...(await projectCollections(root, config.content)).flatMap(collection => feedPaths(collection, config.i18n && localeSettings(config.i18n)).map(({ path }) => path)), ...(await exportedEndpoints(root, await scanEndpoints(resolve(root, config.routes ?? 'src/routes'), routeMounts(root, config.extensions)))).paths]
 
   for (const path of fetched) {
     const response = await app.handle(new Request(`http://localhost${path}`))

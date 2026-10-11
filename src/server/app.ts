@@ -422,7 +422,7 @@ export async function servePages(root: string, options: PagesOptions, loadClient
   if (site !== undefined)
     serveSitemap(app, routes, site, taken, { dev: options.dev, onError: options.onError, trailingSlash: options.trailingSlash, locales: i18n?.settings })
 
-  const favicon = faviconSource(root, options.favicon)
+  const favicon = faviconSource(root, options.favicon, options.manifest)
 
   if (favicon !== undefined)
     serveFavicons(app, new Set([...taken, ...servedPaths(routes)]), { source: favicon, builtDir: join(client.dir, '..', FAVICON_DIR), name: options.seo?.name, description: options.seo?.description, manifest: options.manifest, base })
