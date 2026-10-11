@@ -27,8 +27,9 @@ const CONTENT_CONFIGS = ['src/content.config.ts', 'src/content/config.ts']
 const ENDPOINT = /\.(?:ts|js|mjs)$/
 const ASTRO_CONFIGS = ['astro.config.mjs', 'astro.config.ts', 'astro.config.mts', 'astro.config.js']
 const SERVER_OUTPUT = /\boutput\s*:\s*['"]server['"]|\badapter\s*:/
-const CONFIG_SITE = /\bsite\s*:\s*['"]([^'"]+)['"]/
-const CONFIG_BASE = /\bbase\s*:\s*['"]([^'"]+)['"]/
+// The Astro config's `site` and `base`, their value captured when it is a plain string.
+const CONFIG_KEYS = [['site', /\bsite\s*:\s*(?:['"]([^'"\n]+)['"](?=\s*[,}\n]))?/], ['base', /\bbase\s*:\s*(?:['"]([^'"\n]+)['"](?=\s*[,}\n]))?/]] as const
+const MARKDOWN_PAGE = /\.mdx?$/
 // Astro, its integrations and its plugins for other tools, which a kay project has no use for.
 const ASTRO_PACKAGE = /^(?:astro|astro-.+|.+-astro|@astrojs\/.+|@tailwindcss\/vite)$/
 const TAILWIND_3 = /^\D*3\./
@@ -62,23 +63,15 @@ function targetOf(file: string): { path: string, role: Role } {
   return { path: join(dirname(file), `${kebab(basename(file, '.astro'))}.kay`), role: 'component' }
 }
 
-// The tsconfig `paths` aliases ending in `/*`, such as `~/*`, as prefix and folder.
-async function aliasesOf(root: string): Promise<[string, string][]> {
-  const file = Bun.file(join(root, 'tsconfig.json'))
+// The tsconfig `paths`, each target made relative to the project root as kay's tsconfig takes them, and the aliases ending in `/*`, such as `~/*`, as prefix and folder.
+async function pathsOf(root: string): Promise<{ paths: Record<string, string[]>, aliases: [string, string][] }> {
+  // A tsconfig may hold comments and trailing commas, which Bun's JSONC reader takes.
+  const config = await readJson<{ compilerOptions?: { baseUrl?: string, paths?: Record<string, string[]> } }>(join(root, 'tsconfig.json'))
+  const base = config?.compilerOptions?.baseUrl ?? '.'
+  const paths = Object.fromEntries(Object.entries(config?.compilerOptions?.paths ?? {}).map(([alias, targets]) => [alias, targets.map(target => `./${relative(root, resolve(root, base, target))}`)]))
+  const aliases = Object.entries(paths).filter(([alias, targets]) => alias.endsWith('/*') && targets[0]?.endsWith('/*')).map(([alias, targets]): [string, string] => [alias.slice(0, -1), relative(root, resolve(root, targets[0]!.slice(0, -1)))])
 
-  if (!await file.exists())
-    return []
-
-  try {
-    // A tsconfig may hold comments and trailing commas, which Bun's JSONC reader takes.
-    const config = Bun.JSONC.parse(await file.text()) as { compilerOptions?: { baseUrl?: string, paths?: Record<string, string[]> } }
-    const base = config.compilerOptions?.baseUrl ?? '.'
-
-    return Object.entries(config.compilerOptions?.paths ?? {}).filter(([alias, targets]) => alias.endsWith('/*') && targets[0]?.endsWith('/*')).map(([alias, targets]) => [alias.slice(0, -1), relative(root, resolve(root, base, targets[0]!.slice(0, -1)))])
-  }
-  catch {
-    return []
-  }
+  return { paths, aliases }
 }
 
 async function readJson<T>(path: string): Promise<T | undefined> {
@@ -117,7 +110,7 @@ export async function migrateAstroProject(root: string, out = root, options: Mig
   const report: MigrateReport = { written: [], copied: [], skipped: [], notes: [] }
   const files = (await Array.fromAsync(new Glob('src/**/*.astro').scan({ cwd: root }))).toSorted()
   const targets = new Map(files.map(file => [file, targetOf(file)]))
-  const aliases = await aliasesOf(root)
+  const { paths, aliases } = await pathsOf(root)
   const note = (file: string, target: string | undefined, { line, message }: Note) => report.notes.push({ file, line, target, message })
   // A directory with no package.json gets a kay project around the pages; one with its own, such as the Astro project, keeps it.
   const scaffold = !existsSync(join(out, 'package.json'))
@@ -188,31 +181,56 @@ export async function migrateAstroProject(root: string, out = root, options: Mig
     break
   }
 
-  // Endpoints have no place in the routes folder: kay serves them from its API routes.
-  for await (const endpoint of new Glob('src/pages/**/*').scan({ cwd: root })) {
-    if (ENDPOINT.test(endpoint))
-      note(endpoint, undefined, { line: 1, message: 'an Astro endpoint: write it as an API route in src/api/ (see API routes)' })
+  // Endpoints have no place in the routes folder: kay serves them from its API routes. Markdown pages are a collection's entries in kay.
+  for await (const file of new Glob('src/pages/**/*').scan({ cwd: root })) {
+    if (ENDPOINT.test(file))
+      note(file, undefined, { line: 1, message: 'an Astro endpoint: write it as an API route in src/api/ (see API routes)' })
+    else if (MARKDOWN_PAGE.test(file))
+      note(file, undefined, { line: 1, message: 'a Markdown page: make it an entry of a content collection and render it from a page (see Content collections)' })
   }
 
-  // Into another directory, the stylesheets, modules, images, content and public files the pages read come along.
+  // Into another directory, the stylesheets, modules, images, content and public files the pages read come along, those beside the pages moving with them into `src/routes`, where kay routes only `.kay` and endpoint files.
   if (resolve(out) !== resolve(root)) {
     for await (const file of new Glob('{src,public}/**/*').scan({ cwd: root, dot: true })) {
-      if (!file.endsWith('.astro') && !file.startsWith('src/pages/') && !NOT_COPIED.has(file))
+      if (file.endsWith('.astro') || NOT_COPIED.has(file))
+        continue
+
+      if (!file.startsWith('src/pages/'))
         await write(file, Bun.file(join(root, file)), report.copied)
+      else if (!ENDPOINT.test(file) && !MARKDOWN_PAGE.test(file))
+        await write(join('src/routes', file.slice('src/pages/'.length)), Bun.file(join(root, file)), report.copied)
     }
   }
 
   if (TAILWIND_3.test(dependencies.tailwindcss ?? '') || '@astrojs/tailwind' in dependencies)
     note('package.json', undefined, { line: 1, message: 'Tailwind 3: kay builds stylesheets with Tailwind 4 through bun-plugin-tailwind; upgrade them with `bunx @tailwindcss/upgrade`' })
 
+  const settings: ConfigSettings = { lang: lang?.lang.value, seo: false }
+
+  // `site` and `base` carry over when the Astro config writes them as strings; any other value is listed for kay.config.ts.
+  for (const [key, pattern] of CONFIG_KEYS) {
+    const match = pattern.exec(config)
+
+    if (match === null || configFile === undefined)
+      continue
+
+    const line = config.slice(0, match.index).split('\n').length
+
+    if (match[1] === undefined)
+      note(configFile, undefined, { line, message: `\`${key}\` is not a string kay migrate reads: set it in kay.config.ts` })
+    else if (scaffold)
+      settings[key] = match[1]
+    else
+      note(configFile, undefined, { line, message: `\`${key}\`: set \`${key}: '${match[1]}'\` in kay.config.ts` })
+  }
+
   if (scaffold) {
-    const settings: ConfigSettings = { lang: lang?.lang.value, site: CONFIG_SITE.exec(config)?.[1], base: CONFIG_BASE.exec(config)?.[1], seo: false }
     const project = await projectFiles(out, new Set(featuresOf(root, config, dependencies)), options.kay, settings)
 
     project['package.json'] = withPackages(project['package.json']!, astro)
 
-    if (aliases.length > 0)
-      project['tsconfig.json'] = `${JSON.stringify({ extends: 'kay/tsconfig.json', compilerOptions: { paths: Object.fromEntries(aliases.map(([prefix, folder]) => [`${prefix}*`, [`./${folder}/*`]])) } }, null, 2)}\n`
+    if (Object.keys(paths).length > 0)
+      project['tsconfig.json'] = `${JSON.stringify({ extends: 'kay/tsconfig.json', compilerOptions: { paths } }, null, 2)}\n`
 
     for (const [path, content] of Object.entries(project)) {
       if (!REPLACED.has(path))
@@ -223,11 +241,14 @@ export async function migrateAstroProject(root: string, out = root, options: Mig
     if (lang)
       note(lang.file, lang.target, { line: lang.lang.line, message: `\`lang\` on html: set \`lang: '${lang.lang.value}'\` in kay.config.ts, which writes it on every page` })
 
-    if (aliases.length > 0)
-      note('tsconfig.json', undefined, { line: 1, message: `the code imports through ${aliases.map(([prefix]) => `${prefix}*`).join(', ')}: keep \`paths\` in the kay project's tsconfig.json` })
+    if (Object.keys(paths).length > 0)
+      note('tsconfig.json', undefined, { line: 1, message: `the code imports through ${Object.keys(paths).join(', ')}: keep \`paths\` in the kay project's tsconfig.json` })
 
-    if (resolve(out) === resolve(root))
-      note('package.json', undefined, { line: 1, message: 'the Astro project\'s, left as it is: give it the scripts and dependencies `kay new` writes, or migrate into an empty directory with --out, which writes them' })
+    if (resolve(out) === resolve(root)) {
+      const astroPackages = Object.keys(dependencies).filter(name => ASTRO_PACKAGE.test(name)).toSorted()
+
+      note('package.json', undefined, { line: 1, message: `the Astro project's, left as it is: add the \`kay\` dependency \`kay new\` writes, run \`kay dev\`, \`kay build\` and \`kay check\` from its scripts${astroPackages.length > 0 ? ` and remove ${astroPackages.join(', ')}` : ''}; or migrate into an empty directory with --out, which writes it` })
+    }
   }
 
   report.notes.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line)

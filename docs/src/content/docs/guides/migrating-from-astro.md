@@ -18,7 +18,7 @@ The new project has:
 - `src/routes` with each page of `src/pages`, `404.astro` becoming `_404.kay` and `500.astro` `_error.kay`.
 - Components and layouts in their own folders, named in kebab-case (`BaseLayout.astro` becomes `base-layout.kay`), with every import of them rewritten, through `tsconfig.json` aliases such as `~/*` too.
 - `src/content.config.ts` rewritten for kay, its zod schemas written in `t`.
-- The project's other files under `src` and `public` (stylesheets, modules, images, Markdown content, the favicon) copied as they are.
+- The project's other files under `src` and `public` (stylesheets, modules, images, Markdown content, the favicon) copied as they are, those beside the pages moving with them into `src/routes`.
 - A `package.json` with kay's scripts, and the Astro project's own packages minus Astro's.
 - A `kay.config.ts` with the `site`, `base` and `<html lang>` the Astro site set.
 - A `tsconfig.json` keeping the Astro project's `paths`.
@@ -94,7 +94,9 @@ The command ends with a list of what it could not translate, each item at its li
 - **`astro:assets` and `Image`**: an imported image is its URL, `img(src={photo})`, which kay sizes and serves in modern formats (see [Styling and assets](/essentials/styling-and-assets)).
 - **Tailwind 3**: kay builds with Tailwind 4, so upgrade the stylesheets with `bunx @tailwindcss/upgrade`.
 - **Attributes on `<body>`**: kay writes `body` itself, so move them to an element inside it.
+- **A Markdown page** (`src/pages/*.md`): make it an entry of a [content collection](/guides/content) and render it from a page.
+- **A `site` or `base` that is not a plain string**, such as one read from the environment: set it in `kay.config.ts`.
 
-Then run `bun run check`: it type-checks every `.kay` file and reports what is still wrong at its line.
+Then run `bun run check`: it type-checks every `.kay` file and reports what is still wrong at its line. The migrated `kay.config.ts` leaves out kay's `seo` defaults, since the pages write their own head, so a page with no description is reported too: give it a `meta(name="description")` in its `head` block, or set `seo.description` for every page.
 
 <ReadMore href="/llms/project">The command's full behaviour, with every option of the other `kay` commands, is in the project reference.</ReadMore>

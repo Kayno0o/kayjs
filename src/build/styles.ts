@@ -13,6 +13,11 @@ const SCRIPT_FILE = /\.[cm]?[jt]sx?$/
 const CSS_FILE = /\.css$/
 const ABSOLUTE_URL = /^\//
 
+// A module importing each of these files for what it brings along.
+function importing(paths: string[]): string {
+  return paths.map(path => `import ${JSON.stringify(path)}\n`).join('')
+}
+
 // For the stylesheet build: components and modules shrink to their imports, so Bun follows them down to every stylesheet a page uses, and the assets they import are written for the server to serve.
 // A page's server code is left out but for its assets, the components and stylesheets it imports, and the components of the collections whose entries it renders, and nothing outside the project but stylesheets is followed: no server-only module ever reaches the bundler.
 export function styleImports(root: string, libraries: KayLibrary[] = []): BunPlugin {
@@ -36,7 +41,7 @@ export function styleImports(root: string, libraries: KayLibrary[] = []): BunPlu
 
     await Promise.all(paths.filter(path => ASSET_FILE.test(path)).map(async path => writeAsset(path, root)))
 
-    return paths.filter(followed).map(path => `import ${JSON.stringify(path)}\n`).join('')
+    return importing(paths.filter(followed))
   }
   // Server code never reaches the bundler, but the assets it imports, through the project's modules too, are written all the same.
   const walked = new Set<string>()
@@ -57,7 +62,7 @@ export function styleImports(root: string, libraries: KayLibrary[] = []): BunPlu
   }
 
   // A component the server code imports renders on the page as one the script imports does, so its stylesheets, and the ones the server code imports itself, are the page's too.
-  const serverStyles = (code: string, importer: string) => scan(code, importer, 'ts').filter(path => (KAY_FILE.test(path) || CSS_FILE.test(path)) && followed(path)).map(path => `import ${JSON.stringify(path)}\n`).join('')
+  const serverStyles = (code: string, importer: string) => importing(scan(code, importer, 'ts').filter(path => (KAY_FILE.test(path) || CSS_FILE.test(path)) && followed(path)))
 
   // A collection's components render inside the Markdown of its entries, so a page rendering one's `Content` renders those of every collection its server code imports.
   const collections = new Map<string, Promise<Map<string, string[]>>>()
@@ -76,7 +81,7 @@ export function styleImports(root: string, libraries: KayLibrary[] = []): BunPlu
       return [...await exported].flatMap(([name, components]) => names.has(name) || names.has('*') ? components.flatMap(component => resolve(component, module) ?? []) : [])
     }))
 
-    return [...new Set(files.flat())].filter(followed).map(path => `import ${JSON.stringify(path)}\n`).join('')
+    return importing([...new Set(files.flat())].filter(followed))
   }
 
   return {

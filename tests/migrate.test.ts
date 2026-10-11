@@ -304,6 +304,35 @@ export const authors = collection('content/authors', {
     expect(report.notes).toEqual([])
   })
 
+  it('keeps the tools the Astro project had, moves the files beside its pages into routes, and lists what it cannot carry', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'kay-migrate-'))
+    const out = join(root, 'kay')
+
+    dirs.push(root)
+    await Promise.all([
+      Bun.write(join(root, 'package.json'), JSON.stringify({ devDependencies: { astro: '^5.0.0', eslint: '^9.0.0' } })),
+      Bun.write(join(root, 'astro.config.mjs'), 'export default defineConfig({\n  site: process.env.SITE,\n})\n'),
+      Bun.write(join(root, 'tsconfig.json'), '{ "compilerOptions": { "paths": { "@/*": ["./*"], "@config": ["src/config.ts"] } } }'),
+      Bun.write(join(root, 'Dockerfile'), 'FROM node\n'),
+      Bun.write(join(root, '.forgejo/workflows/deploy.yml'), 'on: push\n'),
+      Bun.write(join(root, 'src/pages/index.astro'), '---\nimport hero from \'./hero.png\'\n---\n<img src={hero} alt="" />\n'),
+      Bun.write(join(root, 'src/pages/hero.png'), 'png'),
+      Bun.write(join(root, 'src/pages/about.md'), '# About\n'),
+      Bun.write(join(root, 'src/pages/feed.xml.ts'), 'export const GET = () => new Response(\'\')\n'),
+      Bun.write(join(root, 'src/styles/global.css'), '.theirs {}\n'),
+      Bun.write(join(out, 'src/styles/global.css'), '.mine {}\n'),
+    ])
+
+    const report = await migrateAstroProject(root, out, { kay: '^1.0.0' })
+
+    expect(report.written).toEqual(expect.arrayContaining(['eslint.config.ts', '.forgejo/workflows/pages.yml', 'Dockerfile', 'nginx.conf']))
+    expect(report.copied).toEqual(['src/routes/hero.png'])
+    expect(report.skipped).toEqual(['src/styles/global.css'])
+    expect(await Bun.file(join(out, 'src/styles/global.css')).text()).toBe('.mine {}\n')
+    expect(await Bun.file(join(out, 'tsconfig.json')).json()).toEqual({ extends: 'kay/tsconfig.json', compilerOptions: { paths: { '@/*': ['./*'], '@config': ['./src/config.ts'] } } })
+    expect(report.notes.map(note => `${note.file}:${note.line} ${lead(note.message)}`)).toEqual(['astro.config.mjs:2 `site` is not a string kay migrate reads', 'src/pages/about.md:1 a Markdown page', 'src/pages/feed.xml.ts:1 an Astro endpoint'])
+  })
+
   it('carries a static site\'s base under the one the Pages workflow sets, and lists Tailwind 3', async () => {
     const root = await mkdtemp(join(tmpdir(), 'kay-migrate-'))
     const out = join(root, 'kay')
