@@ -2,6 +2,7 @@ import type { Core } from './core'
 import type { RequestState } from './state'
 import type { BearerTokenRecord, UserRecord } from './store'
 import type { Proof, ProofFailure } from './twoFactor'
+import { banned } from './core'
 import { digest, randomToken } from './keys'
 import { notify } from './notify'
 import { reprove } from './twoFactor'
@@ -10,6 +11,7 @@ import { reprove } from './twoFactor'
 const TOUCH_EVERY_MS = 5 * 60 * 1000
 const LABEL_MAX_LENGTH = 64
 const BEARER = /^Bearer\s+(\S+)$/i
+const TOKEN = /^\S{16,4096}$/
 
 // A bearer token as the app lists it; the token itself is shown once, when minted.
 export interface BearerToken {
@@ -30,20 +32,47 @@ export interface TokenOptions<Scope extends string = string> {
   expiresIn?: number | undefined
 }
 
-export type CreateTokenResult = { ok: true, token: string, id: string } | { ok: false, error: ProofFailure | 'label' | 'scope' | 'expiry' }
+type TokenProblem = 'label' | 'scope' | 'expiry'
+
+export type CreateTokenResult = { ok: true, token: string, id: string } | { ok: false, error: ProofFailure | TokenProblem }
+
+export type IssueTokenResult = { ok: true, token: string, id: string } | { ok: false, error: TokenProblem | 'token' | 'not-found' | 'banned' }
+
+function tokenProblem(core: Core, name: string, options: TokenOptions): TokenProblem | undefined {
+  if (name.length === 0 || name.length > LABEL_MAX_LENGTH)
+    return 'label'
+
+  if (options.scopes && (options.scopes.length === 0 || options.scopes.some(scope => !core.scopes.has(scope))))
+    return 'scope'
+
+  if (options.expiresIn !== undefined && !(Number.isFinite(options.expiresIn) && options.expiresIn > 0))
+    return 'expiry'
+}
+
+async function storeToken(core: Core, userId: string, name: string, options: TokenOptions, token: string): Promise<string> {
+  const id = crypto.randomUUID()
+
+  await core.store.bearerTokens.create({
+    id,
+    userId,
+    label: name,
+    digest: digest(token),
+    scopes: options.scopes ? [...new Set(options.scopes)] : null,
+    createdAt: new Date(),
+    lastUsedAt: null,
+    expiresAt: options.expiresIn === undefined ? null : new Date(Date.now() + options.expiresIn * 1000),
+  })
+
+  return id
+}
 
 // A token for a device or an API client of the signed-in user, minted from a session only, never from another token.
 export async function createToken(state: RequestState, proof: Proof, label: string, options: TokenOptions = {}): Promise<CreateTokenResult> {
   const name = label.trim()
+  const problem = tokenProblem(state.core, name, options)
 
-  if (name.length === 0 || name.length > LABEL_MAX_LENGTH)
-    return { ok: false, error: 'label' }
-
-  if (options.scopes && (options.scopes.length === 0 || options.scopes.some(scope => !state.core.scopes.has(scope))))
-    return { ok: false, error: 'scope' }
-
-  if (options.expiresIn !== undefined && !(Number.isFinite(options.expiresIn) && options.expiresIn > 0))
-    return { ok: false, error: 'expiry' }
+  if (problem)
+    return { ok: false, error: problem }
 
   const proved = await reprove(state, proof)
 
@@ -54,21 +83,35 @@ export async function createToken(state: RequestState, proof: Proof, label: stri
     return { ok: false, error: 'signed-out' }
 
   const token = randomToken()
-  const id = crypto.randomUUID()
+  const id = await storeToken(state.core, proved.record.id, name, options, token)
 
-  await state.core.store.bearerTokens.create({
-    id,
-    userId: proved.record.id,
-    label: name,
-    digest: digest(token),
-    scopes: options.scopes ? [...new Set(options.scopes)] : null,
-    createdAt: new Date(),
-    lastUsedAt: null,
-    expiresAt: options.expiresIn === undefined ? null : new Date(Date.now() + options.expiresIn * 1000),
-  })
   await notify(state, proved.record, 'token-created', name)
 
   return { ok: true, token, id }
+}
+
+// A token for `userId` with no proof, for the app to gate; `token` adopts one it handed out before, 16 to 4096 characters without whitespace, as a bearer header carries.
+export async function issueToken(core: Core, userId: string, label: string, options: TokenOptions & { token?: string | undefined } = {}): Promise<IssueTokenResult> {
+  const name = label.trim()
+  const problem = tokenProblem(core, name, options)
+
+  if (problem)
+    return { ok: false, error: problem }
+
+  if (options.token !== undefined && !TOKEN.test(options.token))
+    return { ok: false, error: 'token' }
+
+  const record = await core.store.users.get(userId)
+
+  if (!record)
+    return { ok: false, error: 'not-found' }
+
+  if (banned(record))
+    return { ok: false, error: 'banned' }
+
+  const token = options.token ?? randomToken()
+
+  return { ok: true, token, id: await storeToken(core, record.id, name, options, token) }
 }
 
 export async function listTokens(state: RequestState): Promise<BearerToken[]> {

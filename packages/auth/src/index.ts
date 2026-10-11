@@ -3,7 +3,7 @@ export type { AdminFailure, BanResult, DeleteResult, ManagedUser, RoleResult } f
 export { auditWording, describeAuditEntry } from './auditWording'
 export type { AuditPhrase, AuditWording } from './auditWording'
 export * from './auth'
-export type { BearerToken, CreateTokenResult, TokenOptions } from './bearer'
+export type { BearerToken, CreateTokenResult, IssueTokenResult, TokenOptions } from './bearer'
 export { pwnedPassword } from './breached'
 export { hcaptcha, hcaptchaWidget, turnstile, turnstileWidget } from './captcha'
 export type { CaptchaAction, CaptchaOptions, CaptchaWidget } from './captcha'

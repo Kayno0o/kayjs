@@ -305,6 +305,17 @@ describe('coming back from the provider', () => {
     expect(await store.identities.find('discord', '1')).toBeUndefined()
   })
 
+  test('with `failurePage`, a refused account and a failed exchange land on the same page with no reason, so the allow list does not leak', async () => {
+    providers({ 1: { id: '1', username: 'ada' } }, { tokenStatus: 500 })
+    const { browser } = setup({ allow: profile => profile.providerId === '2', failurePage: '/denied' })
+
+    expect((await signInWith(browser(), 'discord', '1')).response.headers.get('location')).toBe('/denied')
+
+    providers({ 1: { id: '1', username: 'ada' } })
+
+    expect((await signInWith(browser(), 'discord', '1')).response.headers.get('location')).toBe('/denied')
+  })
+
   test('keeps the return path on the site', async () => {
     providers({ 1: { id: '1', username: 'ada' } })
     const { browser } = setup()

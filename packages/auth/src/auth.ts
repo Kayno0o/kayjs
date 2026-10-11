@@ -4,7 +4,7 @@ import type { Guard } from 'kay'
 import type { KayConfig, Session } from 'kay/server'
 import type { ChangeUsernameResult } from './account'
 import type { AdminFailure, BanResult, DeleteResult, ManagedUser, RoleResult } from './admin'
-import type { BearerToken, CreateTokenResult, TokenOptions } from './bearer'
+import type { BearerToken, CreateTokenResult, IssueTokenResult, TokenOptions } from './bearer'
 import type { CaptchaAction, CaptchaOptions } from './captcha'
 import type { AuthSessionData, Core, OAuthApp, Profile, SignedIn, User } from './core'
 import type { ChangeEmailResult, CodeResult, EmailOptions, LinkResult, MailRequestResult, ResetPasswordResult, VerifyEmailResult } from './email'
@@ -28,7 +28,7 @@ import { Elysia } from 'elysia'
 import { clientAddress, rateKey } from 'kay/server'
 import { changePassword, changeUsername, deleteAccount, unlink } from './account'
 import { actingAdmin, adminAuditLog, banUser, changeRole, deleteUser, getUser, isAdmin, listUsers, unbanUser } from './admin'
-import { bearerUser, createToken, listTokens, revokeToken, tokenUser } from './bearer'
+import { bearerUser, createToken, issueToken, listTokens, revokeToken, tokenUser } from './bearer'
 import { pwnedPassword } from './breached'
 import { admit, captchaRequired } from './captcha'
 import { banned, newUserRecord, publicUser } from './core'
@@ -87,6 +87,8 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   site?: string | undefined
   // Where a sign-in that failed goes, with `?error=` saying why; the prebuilt sign-in page with `pages`, else `/`.
   signInPage?: string | undefined
+  // Where every failed OAuth sign-in goes instead, with no reason in the URL, so that whether an account may sign in does not leak, as with an `allow` list.
+  failurePage?: string | undefined
   // Where a sign-in goes to ask for the second factor, `/two-factor` by default: a page whose form posts the code to an action calling `verifyTwoFactor`.
   twoFactorPage?: string | undefined
   // The prebuilt pages, `authPages()` as kay.config.ts lists it or `true` for its defaults: the sign-in, two-factor and sessions pages and the mailed links default to them.
@@ -833,7 +835,7 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
   const core = createCore(options)
   const { hasRole, isGranted } = createRoleHierarchy<User, Role>(options.roles ?? {} as RoleHierarchy<Role>, user => user.roles as Role[])
 
-  const failed = (error: OAuthFailure) => withQuery(core.signInPage, `error=${error}`)
+  const failed = (error: OAuthFailure) => options.failurePage ?? withQuery(core.signInPage, `error=${error}`)
 
   const plugin = new Elysia({ name: 'kayjs-auth' })
     // Typed as a plain instance: `AnyElysia` would merge `any` routes into the app's, and every link would check.
@@ -974,6 +976,11 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
       const state = typeof data === 'object' && data !== null && 'auth' in data ? data.auth : undefined
 
       return state instanceof Auth ? state.user() : null
+    },
+
+    // A bearer token for `userId` taking no proof and sending no mail, for a flow the app gates itself, such as pairing a device, or a script. `token` adopts one the app handed out before, so its devices keep working through a migration.
+    async issueToken(userId: string, label: string, tokenOptions: TokenOptions<Scope> & { token?: string | undefined } = {}): Promise<IssueTokenResult> {
+      return issueToken(core, userId, label, tokenOptions)
     },
 
     // The user a bearer token belongs to, for a websocket handshake sending one in its first message.

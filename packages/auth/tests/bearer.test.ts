@@ -183,3 +183,42 @@ describe('scoped and expiring tokens', () => {
     expect(await ada.call('tokens')).toEqual([expect.objectContaining({ id: minted.id, expiresAt: expect.any(String), expired: true })])
   })
 })
+
+describe('issuing a token from the server', () => {
+  test('mints one for a user with no proof and no mail or event, which a device then signs in with', async () => {
+    const events: string[] = []
+    const app = testApp({ onEvent: event => void events.push(event) })
+    const { user } = await app.browser().call('register', { email: 'ada@example.com', password: PASSWORD })
+
+    events.length = 0
+    const issued = await app.auth.issueToken(user.id, 'Kitchen display', { expiresIn: 365 * 24 * 60 * 60 })
+
+    expect(issued.ok).toBe(true)
+    expect(await app.browser().json('/me', { headers: { authorization: `Bearer ${issued.ok && issued.token}` } })).toMatchObject({ email: 'ada@example.com' })
+    expect(events).toEqual([])
+  })
+
+  test('adopts a token the app handed out before, so its devices keep working through a migration', async () => {
+    const app = testApp()
+    const { user } = await app.browser().call('register', { email: 'ada@example.com', password: PASSWORD })
+    const legacy = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.legacy-signature'
+
+    expect(await app.auth.issueToken(user.id, 'Old device', { token: legacy })).toMatchObject({ ok: true, token: legacy })
+    expect(await app.browser().json('/me', { headers: { authorization: `Bearer ${legacy}` } })).toMatchObject({ email: 'ada@example.com' })
+  })
+
+  test('refuses a missing or banned user, a token a header cannot carry, and what createToken refuses', async () => {
+    const app = testApp()
+    const { user } = await app.browser().call('register', { email: 'ada@example.com', password: PASSWORD })
+
+    expect(await app.auth.issueToken('nobody', 'Phone')).toEqual({ ok: false, error: 'not-found' })
+    expect(await app.auth.issueToken(user.id, 'Phone', { token: 'short' })).toEqual({ ok: false, error: 'token' })
+    expect(await app.auth.issueToken(user.id, 'Phone', { token: 'has a space in it, sixteen+' })).toEqual({ ok: false, error: 'token' })
+    expect(await app.auth.issueToken(user.id, ' ')).toEqual({ ok: false, error: 'label' })
+    expect(await app.auth.issueToken(user.id, 'Phone', { expiresIn: 0 })).toEqual({ ok: false, error: 'expiry' })
+
+    await app.store.users.update(user.id, { bannedAt: new Date() })
+
+    expect(await app.auth.issueToken(user.id, 'Phone')).toEqual({ ok: false, error: 'banned' })
+  })
+})
