@@ -8,6 +8,7 @@ import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { Elysia } from 'elysia'
 import { ActionError } from '../src/runtime'
 import { readActionResponse } from '../src/runtime/action'
+import { leaveGuards } from '../src/runtime/navigation'
 import { session } from '../src/server/session'
 import { testSite } from '../src/test'
 import { NativeRequest, withNatives } from '../src/test/natives'
@@ -316,10 +317,28 @@ describe('kay/test', () => {
     expect(site.cookies.has('kay_flash')).toBe(false)
   })
 
-  it('sends the browser where a called action redirects', async () => {
+  it('sends the browser where a called action redirects, once the leave guards let it go', async () => {
     GlobalRegistrator.register({ url: 'http://localhost/admin' })
 
+    const asked: string[] = []
+    let leaving = false
+    const guard = {
+      dirty: () => true,
+      confirm: (to: URL) => {
+        asked.push(to.pathname)
+
+        return leaving
+      },
+    }
+
+    leaveGuards.add(guard)
+
     try {
+      void readActionResponse(new Response(null, { status: 303, headers: { 'x-kay-redirect': '/about' } }), '/_kay/action/test/go')
+      await Bun.sleep(10)
+      expect([asked, window.location.href]).toEqual([['/about'], 'http://localhost/admin'])
+
+      leaving = true
       void readActionResponse(new Response(null, { status: 303, headers: { 'x-kay-redirect': '/about' } }), '/_kay/action/test/go')
       // The swap is imported first, which takes a tick.
       await Bun.sleep(10)
@@ -328,6 +347,7 @@ describe('kay/test', () => {
       expect(window.location.href).toBe('http://localhost/about')
     }
     finally {
+      leaveGuards.delete(guard)
       await GlobalRegistrator.unregister()
     }
   })

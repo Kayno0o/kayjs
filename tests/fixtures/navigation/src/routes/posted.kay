@@ -1,0 +1,27 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+export const away = action(t.Object({}), (_, ctx) => ctx.redirect('/plain'))
+export const crash = action(t.Object({}), (_, ctx) => ctx.fail(400, 'Refused'))
+export const upload = action(t.Object({ file: t.File() }), async ({ file }) => file.size, { bodyLimit: 8 * 1024 * 1024 })
+
+// A refusal this page cannot render, which the server's error page answers.
+if (ctx.failed(crash))
+  throw new Error('This page cannot show the refusal')
+
+const sent = ctx.succeeded(upload)
+---
+head
+  title Posted
+h1 Posted
+form.away(action={away})
+  button Away
+form.crash(action={crash})
+  button Crash
+form.upload(action={upload})
+  input(type="file" name="file")
+  progress
+  button Upload
+if sent as done
+  p.sent Sent {done.data}

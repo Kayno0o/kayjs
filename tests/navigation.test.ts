@@ -672,6 +672,102 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     expect(await transitions('reduce', '@view-transition { navigation: auto; }')).toBe(0)
   })
 
+  it('swaps in the page a post redirects to, another one taking a history entry', async () => {
+    const fresh = await browser.newPage()
+    const alive = async () => fresh.evaluate(() => (window as { kayAlive?: boolean }).kayAlive === true)
+
+    await fresh.goto(`${origin}/posted`)
+    await fresh.evaluate(() => {
+      (window as { kayAlive?: boolean }).kayAlive = true
+    })
+    await fresh.click('form.away button')
+    await fresh.locator('h1', { hasText: 'Plain' }).waitFor()
+
+    expect([new URL(fresh.url()).pathname, await alive()]).toEqual(['/plain', true])
+
+    await fresh.goBack()
+    await fresh.locator('h1', { hasText: 'Posted' }).waitFor()
+    expect(await alive()).toBe(true)
+    await fresh.close()
+  })
+
+  it('shows in place the error page a post is answered with, the address and the history kept', async () => {
+    const fresh = await browser.newPage()
+
+    await fresh.goto(`${origin}/posted`)
+    await fresh.evaluate(() => {
+      (window as { kayAlive?: boolean }).kayAlive = true
+    })
+    const entries = await fresh.evaluate(() => history.length)
+    const answered = fresh.waitForResponse(response => response.request().method() === 'POST')
+
+    await fresh.click('form.crash button')
+    expect((await answered).status()).toBe(500)
+    await fresh.waitForFunction(() => document.querySelector('form.crash') === null)
+
+    expect(await fresh.evaluate(() => [location.pathname, history.length, (window as { kayAlive?: boolean }).kayAlive])).toEqual(['/posted', entries, true])
+    await fresh.close()
+  })
+
+  it('shows how much of a form\'s upload went, on the form and its progress bars, then nothing once sent', async () => {
+    const fresh = await browser.newPage()
+
+    await fresh.goto(`${origin}/posted`)
+    await fresh.setInputFiles('form.upload input', { name: 'big.bin', mimeType: 'application/octet-stream', buffer: Buffer.alloc(4 * 1024 * 1024) })
+    await fresh.evaluate(() => {
+      const form = document.querySelector<HTMLFormElement>('form.upload')!
+      const seen: [string, number][] = []
+
+      ;(window as { seen?: typeof seen }).seen = seen
+      new MutationObserver(() => seen.push([form.style.getPropertyValue('--kay-progress'), form.querySelector('progress')!.value])).observe(form, { attributes: true, attributeFilter: ['style'] })
+    })
+    await fresh.click('form.upload button')
+    await fresh.locator('p.sent', { hasText: `Sent ${4 * 1024 * 1024}` }).waitFor()
+
+    const seen = await fresh.evaluate(() => (window as { seen?: [string, number][] }).seen!)
+    const sent = seen.filter(([progress]) => progress !== '')
+
+    expect(sent.length).toBeGreaterThan(0)
+    expect(sent.at(-1)).toEqual(['1', 1])
+    expect(sent.every(([progress, value]) => Number(progress) === value && value > 0 && value <= 1)).toBe(true)
+    expect(seen.at(-1)![0]).toBe('')
+    await fresh.close()
+  })
+
+  it('leaves a form to the browser when form posting cannot load', async () => {
+    const fresh = await browser.newPage()
+
+    await fresh.route(/\/forms-[^/]*\.js$/, async route => route.abort())
+    await fresh.goto(`${origin}/posted`)
+    await fresh.evaluate(() => {
+      (window as { kayAlive?: boolean }).kayAlive = true
+    })
+    await fresh.click('form.away button')
+    await fresh.locator('h1', { hasText: 'Plain' }).waitFor()
+
+    expect(await fresh.evaluate(() => (window as { kayAlive?: boolean }).kayAlive)).toBeUndefined()
+    await fresh.close()
+  })
+
+  it('shows the page of the last navigation started, one started earlier and answered later dropped', async () => {
+    const fresh = await browser.newPage()
+
+    await fresh.goto(`${origin}/plain`)
+    const entries = await fresh.evaluate(() => history.length)
+
+    await fresh.route(`${origin}/second`, async (route) => {
+      await Bun.sleep(600)
+      await route.continue()
+    })
+    await fresh.click('a.second')
+    await fresh.click('a.home')
+    await fresh.locator('h1', { hasText: 'Home' }).waitFor()
+    await Bun.sleep(900)
+
+    expect(await fresh.evaluate(() => [location.pathname, document.querySelector('h1')!.textContent, history.length])).toEqual(['/', 'Home', entries + 1])
+    await fresh.close()
+  })
+
   it('announces the swapped page without making it any taller, so one filling the screen gets no scrollbar', async () => {
     await page.goto(origin)
     await page.click('a.second')

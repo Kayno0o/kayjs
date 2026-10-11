@@ -136,8 +136,9 @@ function policyOf(swap: Swap): Policy {
 export async function go(url: URL, swap: Swap): Promise<void> {
   const token = ++navigation.current
   const isCurrent = () => token === navigation.current
+  const { history: change } = policyOf(swap)
 
-  if (policyOf(swap).history !== 'none')
+  if (change !== 'none')
     saveScroll()
 
   document.documentElement.setAttribute('aria-busy', 'true')
@@ -165,7 +166,7 @@ export async function go(url: URL, swap: Swap): Promise<void> {
       console.error(error)
 
       if (isCurrent())
-        leave(new URL(page.url), pageKey(new URL(location.href)) === pageKey(new URL(page.url)) || replaces(swap))
+        leave(new URL(page.url), pageKey(new URL(location.href)) === pageKey(new URL(page.url)) || change === 'none')
     }
   }
   finally {
@@ -177,12 +178,15 @@ export async function go(url: URL, swap: Swap): Promise<void> {
 // Puts a fetched page in place of this one; anything that is no page of this build, a file or an error answered as text, is loaded or shown as the browser would.
 export async function show(page: FetchedPage, hash: string, swap: Swap, isCurrent: () => boolean = () => true): Promise<void> {
   const target = new URL(page.url)
+  const policy = policyOf(swap)
+  // A page loaded fully in place of a swap that takes no history entry replaces the current one, as going back made one already.
+  const replaces = policy.history === 'none'
 
   target.hash = hash
 
   // A page asking for full loads, or isolated otherwise, is still refreshed in place, its query changed included: the document stays the one it loaded.
   if (!HTML.test(page.type) || (page.full && target.pathname !== location.pathname)) {
-    leave(target, replaces(swap))
+    leave(target, replaces)
 
     return
   }
@@ -193,7 +197,7 @@ export async function show(page: FetchedPage, hash: string, swap: Swap, isCurren
   const entry = entryOf(next)
 
   if ((entry !== undefined && entry !== entryOf(document)) || next.documentElement.lang !== document.documentElement.lang) {
-    leave(target, replaces(swap))
+    leave(target, replaces)
 
     return
   }
@@ -214,38 +218,30 @@ export async function show(page: FetchedPage, hash: string, swap: Swap, isCurren
 
     document.title = next.title
     head.commit()
-    swapBody(next, swap)
-
-    writeHistory(swap, target)
+    swapBody(next, policy)
+    writeHistory(policy, target)
 
     if (pageKey(target) !== navigation.shown)
       navigation.page++
 
     navigation.shown = pageKey(target)
 
-    if (policyOf(swap).scroll !== 'keep')
+    if (policy.scroll !== 'keep')
       restoreScroll(swap.saved, hash)
 
-    moveFocus(swap)
+    moveFocus(swap, policy)
     takeFormChecks(document)
     navigation.hooks!.hydrate(document.body)
   }
 
-  if (policyOf(swap).transition && viewTransitions())
+  if (policy.transition && viewTransitions())
     await (document as Document & { startViewTransition: (update: () => void) => { finished: Promise<void> } }).startViewTransition(commit).finished
   else
     commit()
 }
 
-// A page loaded fully in place of a swap that takes no history entry replaces the current one, as going back made one already.
-function replaces(swap: Swap): boolean {
-  return policyOf(swap).history === 'none'
-}
-
 // The entry a swap adds or replaces, holding where the page it leaves was scrolled to.
-export function writeHistory(swap: Swap, target: URL): void {
-  const { history: change } = policyOf(swap)
-
+function writeHistory({ history: change }: Policy, target: URL): void {
   if (change === 'push') {
     navigation.at++
     history.pushState(historyState(), '', target)
@@ -363,10 +359,9 @@ async function loaded(link: HTMLLinkElement): Promise<void> {
 }
 
 // The next page's body morphed into this one: what it renders again stays the same element, so a layout's sidebar keeps its scroll, and the islands that live on are moved over before anything is taken away, so a playing video or an open socket never notices.
-function swapBody(next: Document, swap: Swap): void {
+function swapBody(next: Document, policy: Policy): void {
   const body = document.adoptNode(next.body)
   const old = document.body
-  const policy = policyOf(swap)
 
   const kept = new Set<Element>()
 
@@ -546,9 +541,7 @@ function later(from: ChildNode | null, node: Node): ChildNode | undefined {
 }
 
 // The element focused before, found again on a refreshed page; on a new page its autofocus field or its heading, so a screen reader starts there, the title announced.
-function moveFocus(swap: Swap): void {
-  const policy = policyOf(swap)
-
+function moveFocus(swap: Swap, policy: Policy): void {
   if (policy.focus === 'refused' && swap.refused && showRefusal(document.forms[swap.refused.form], swap.refused.control))
     return
 
