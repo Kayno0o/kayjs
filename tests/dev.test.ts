@@ -17,6 +17,18 @@ import { editorCommand } from '../src/server/editor'
 // The parent's pid in /proc/<pid>/stat, after the command name and the state.
 const PARENT_PID = /\) \S+ (\d+)/
 
+// This process's children building the client of the project at `real`, its real path.
+function clientBuilders(real: string): string[] {
+  return readdirSync('/proc').filter((pid) => {
+    try {
+      return PARENT_PID.exec(readFileSync(`/proc/${pid}/stat`, 'utf8'))?.[1] === String(process.pid) && readFileSync(`/proc/${pid}/cmdline`, 'utf8').includes('builder.ts') && readlinkSync(`/proc/${pid}/cwd`) === real
+    }
+    catch {
+      return false
+    }
+  })
+}
+
 async function until(condition: () => boolean, timeout = 5000) {
   for (const start = Date.now(); !condition(); await Bun.sleep(20)) {
     if (Date.now() - start > timeout)
@@ -789,15 +801,7 @@ describe('kay dev', () => {
     const real = realpathSync(root)
     const lines: string[] = []
     const counter = (step: number) => `---\nimport { signal } from 'kay'\n\nconst count = signal(${step})\n---\nbutton(onClick={() => count.set(n => n + 1)}) {count()}\n`
-    // This process's children building the client of this project.
-    const builders = () => readdirSync('/proc').filter((pid) => {
-      try {
-        return PARENT_PID.exec(readFileSync(`/proc/${pid}/stat`, 'utf8'))?.[1] === String(process.pid) && readFileSync(`/proc/${pid}/cmdline`, 'utf8').includes('builder.ts') && readlinkSync(`/proc/${pid}/cwd`) === real
-      }
-      catch {
-        return false
-      }
-    })
+    const builders = () => clientBuilders(real)
 
     await Bun.write(join(root, 'kay.config.ts'), 'export default {}\n')
     await Bun.write(join(root, 'src/counter.kay'), counter(0))
@@ -840,13 +844,38 @@ describe('kay dev', () => {
     }
   }, 60_000)
 
+  it('starts no process building the client once stopping, for a server asking for it as it stops', async () => {
+    const scratch = join(import.meta.dir, '../node_modules/.cache')
+
+    await mkdir(scratch, { recursive: true })
+    const root = await mkdtemp(join(scratch, 'dev-stopping-'))
+    const ran = join(root, 'ran')
+
+    await Bun.write(join(root, 'kay.config.ts'), 'export default {}\n')
+    await Bun.write(join(root, 'src/routes/index.kay'), 'h1 Home\n')
+    // Asks as kay's server does once it boots, but only as it is told to stop.
+    await Bun.write(join(root, 'src/server.ts'), `import process from 'node:process'\n\nprocess.on('SIGTERM', () => {\n  process.send!({ wantsClient: true })\n  setTimeout(() => process.exit(0), 100)\n})\nsetInterval(() => undefined, 1000)\nawait Bun.write(${JSON.stringify(ran)}, '')\n`)
+    const stop = await dev(root, { log: () => undefined })
+
+    try {
+      await until(() => existsSync(ran), 20_000)
+    }
+    finally {
+      await stop()
+    }
+
+    await Bun.sleep(1000)
+    expect(clientBuilders(realpathSync(root))).toEqual([])
+    await rm(root, { recursive: true, force: true })
+  }, 60_000)
+
   it('says once that the process building the client exited, until a build succeeds again', async () => {
     const scratch = join(import.meta.dir, '../node_modules/.cache')
 
     await mkdir(scratch, { recursive: true })
     const root = await mkdtemp(join(scratch, 'dev-builder-exit-'))
     const lines: string[] = []
-    const exits = () => lines.filter(line => line.includes('the process building the client exited')).length
+    const exits = () => lines.filter(line => line.endsWith('the process building the client exited; each change starts it again, the servers building their own until one build succeeds')).length
     const counter = (step: number) => `---\nimport { signal } from 'kay'\n\nconst count = signal(${step})\n---\nbutton(onClick={() => count.set(n => n + 1)}) {count()}\n`
     // No line for a while: the restarts and the builds a change started are over.
     const settled = async () => {

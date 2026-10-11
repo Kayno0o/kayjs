@@ -245,13 +245,48 @@ describe('kay start', () => {
     expect(performance.now() - interrupted).toBeLessThan(5000)
   }, 60_000)
 
-  it('stops the server once kay start is killed with its group, which no signal it passes on reaches', async () => {
+  it('stops the server once kay start is killed with its group, which no signal it passes on reaches, while it serves or still boots', async () => {
     const port = String(freePort())
     const child = startGroup(dir, '--port', port)
 
     await listening(child, undefined, 'SIGKILL', true)
 
     expect(await released(port)).toBe(true)
+
+    const late = relative(process.cwd(), join(dir, 'late.ts'))
+
+    await Bun.write(late, `import process from 'node:process'\n\nconsole.log(\`pid \${process.pid}\`)\nawait Bun.sleep(1500)\n${SERVER}`)
+
+    const booting = startGroup(dir, '--entry', late)
+    const reader = booting.stdout.getReader()
+    let output = ''
+
+    // Killed as soon as the server says it runs, a second and a half before it listens.
+    while (!(/pid \d+\n/).test(output)) {
+      const { value, done } = await reader.read()
+
+      if (done)
+        throw new Error('kay start exited before the server ran')
+
+      output += new TextDecoder().decode(value)
+    }
+
+    const pid = Number((/pid (\d+)/).exec(output)![1])
+    const alive = () => {
+      try {
+        return process.kill(pid, 0)
+      }
+      catch {
+        return false
+      }
+    }
+
+    process.kill(-booting.pid, 'SIGKILL')
+
+    for (const until = Date.now() + 8000; alive() && Date.now() < until;)
+      await Bun.sleep(100)
+
+    expect(alive()).toBe(false)
   }, 30_000)
 
   it('runs the executable `kay build --compile` made, from wherever the project moved', async () => {

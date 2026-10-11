@@ -1514,6 +1514,8 @@ describe('kay check, unused code', () => {
       await Bun.write(config, 'export default {}\n')
 
       expect((await runCheckIn({ GITHUB_WORKSPACE: root }, root, '--format', 'github')).report).toStartWith('::error file=src/a.kay,line=1,col=1,')
+      // A project outside the workspace keeps its paths from the current directory.
+      expect((await runCheckIn({ GITHUB_WORKSPACE: join(root, 'src/elsewhere') }, root, '--format', 'github')).report).toStartWith(`::error file=${relative(process.cwd(), join(root, 'src/a.kay'))},line=1,col=1,`)
     }
     finally {
       await rm(root, { recursive: true, force: true })

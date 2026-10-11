@@ -3,7 +3,7 @@ import type { ParseArgsOptionsConfig } from 'node:util'
 import type { CheckDiagnostic } from '../check'
 import type { Paint } from '../compiler/frame'
 import { realpathSync, statSync } from 'node:fs'
-import { join, relative, resolve } from 'node:path'
+import { isAbsolute, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { parseArgs } from 'node:util'
 import { colors, createColors } from '@kaynooo/utils/tools/colors'
@@ -189,9 +189,12 @@ export function printFailure(command: string, failure: unknown, format: ProblemF
     console.log(workflowCommand(problem))
 }
 
-// GitHub and Forgejo resolve an annotation's file from the repository's root, where the job checked it out, whatever directory the step ran in.
+// GitHub and Forgejo resolve an annotation's file from the repository's root, where the job checked it out, whatever directory the step ran in; a file outside it keeps its path from the current directory.
 function shownPath(file: string, format: ProblemFormat): string {
-  return relative(format === 'github' ? process.env.GITHUB_WORKSPACE ?? process.cwd() : process.cwd(), file)
+  const workspace = format === 'github' ? process.env.GITHUB_WORKSPACE : undefined
+  const fromWorkspace = workspace === undefined ? undefined : relative(workspace, file)
+
+  return fromWorkspace === undefined || fromWorkspace === '..' || fromWorkspace.startsWith(`..${sep}`) || isAbsolute(fromWorkspace) ? relative(process.cwd(), file) : fromWorkspace
 }
 
 function printedProblem(diagnostic: CheckDiagnostic, source: string | undefined, format: ProblemFormat): PrintedProblem {

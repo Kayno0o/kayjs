@@ -85,9 +85,17 @@ export function stopOnSignal(app: Elysia, lifecycle: Lifecycle, wait: Duration =
     const onTerm = () => void stop('SIGTERM received')
     const onInt = () => void stop('SIGINT received')
     const onHup = () => void stop('SIGHUP received')
-    // Only the server `kay start` runs itself watches it, not a process the app starts in turn.
-    const parent = process.env[START_PARENT] === String(process.ppid) ? process.ppid : undefined
+    // Only the server `kay start` runs itself watches it, not a process the app starts in turn, whose parent is the server.
+    const named = Number(process.env[START_PARENT] ?? Number.NaN)
+    const parent = named === process.ppid ? named : undefined
     const watch = parent === undefined ? undefined : setInterval(() => process.ppid !== parent && void stop('kay start exited'), PARENT_POLL_MS)
+
+    // Killed while the server booted, which left it to another parent already.
+    if (parent === undefined && Number.isInteger(named) && named > 0 && !alive(named)) {
+      void stop('kay start exited')
+
+      return
+    }
 
     watch?.unref()
     process.once('SIGTERM', onTerm)
@@ -104,6 +112,18 @@ export function stopOnSignal(app: Elysia, lifecycle: Lifecycle, wait: Duration =
       release = undefined
     }
   })
+}
+
+function alive(pid: number): boolean {
+  try {
+    process.kill(pid, 0)
+
+    return true
+  }
+  catch (error) {
+    // Alive, under another user.
+    return (error as { code?: unknown }).code === 'EPERM'
+  }
 }
 
 async function withTimeout(check: unknown): Promise<unknown> {
