@@ -12,6 +12,10 @@ export interface DevOptions {
   entry?: string | undefined
   // The `PORT` the server gets, over the shell's and the `.env`'s.
   port?: number | undefined
+  // The debugger every server opens, as `BUN_INSPECT` takes it, such as `ws://localhost:6499/kay`.
+  inspect?: string | undefined
+  // Opens the address in the browser once the first server listens.
+  open?: boolean | undefined
   // Page, public file and API directories relative to the root, for the regenerated `.kay/types`.
   routes?: string | undefined
   extensions?: KayExtension[] | undefined
@@ -51,6 +55,7 @@ const MAX_CHANGED_FILES = 200
 // The address of a server listening on the root path, as kay's do, reads better without its slash.
 const ROOT_PATH = /(?<=\/\/[^/]+)\/$/
 const STOP_SIGNALS = new Set(['SIGINT', 'SIGTERM', 'SIGHUP'])
+const WS_SCHEME = /^ws:\/\//
 
 // Runs the server entry in development and restarts it on every change; a fresh process is the only way to drop modules Bun has loaded.
 // Resolves once watching, with a function stopping the watchers and the server.
@@ -78,6 +83,8 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   let restartedFor: string[] = []
   let restartedAt = performance.now()
   let address: string | undefined
+  // The port the first server asked for and the one it moved to, busy, which every next server takes first.
+  let moved: string | undefined
   const log = options.log ?? console.log
   const color = options.log === undefined && process.stdout.isTTY && process.env.NO_COLOR === undefined
   const stamp = () => {
@@ -92,11 +99,22 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
 
     const url = message.listening.replace(ROOT_PATH, '')
     const took = `${Math.round(performance.now() - restartedAt)} ms`
+    const { asked, port } = message as Partial<Record<'asked' | 'port', number>>
 
-    if (address === undefined)
-      log(`kay dev: ${url} (ready in ${took})`)
-    else
+    moved = asked !== undefined && port !== undefined && asked !== port ? `${asked}:${port}` : undefined
+
+    if (address === undefined) {
+      log(`kay dev: ${url} (ready in ${took}${moved === undefined ? '' : `, ${asked} was in use`})`)
+
+      if (options.inspect !== undefined)
+        log(`kay dev: debugger on ${options.inspect}, https://debug.bun.sh/#${options.inspect.replace(WS_SCHEME, '')}`)
+
+      if (options.open === true)
+        openBrowser(url, log)
+    }
+    else {
       log(`${stamp()} ${describe(restartedFor)}: restarted in ${took}${url === address ? '' : `, now on ${url}`}`)
+    }
 
     address = url
   }
@@ -115,7 +133,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   const spawn = () => {
     spareEntry = entryToRun()
 
-    return Bun.spawn([process.execPath, '--preload', SPARE, spareEntry], { cwd: root, env: { ...env, NODE_ENV: 'development', ...options.port === undefined ? {} : { PORT: String(options.port) } }, stdin: 'pipe', stdout: 'inherit', stderr: 'inherit', ipc: (message, server) => listened(server, message) })
+    return Bun.spawn([process.execPath, '--preload', SPARE, spareEntry], { cwd: root, env: { ...env, NODE_ENV: 'development', ...options.port === undefined ? {} : { PORT: String(options.port) }, ...options.inspect === undefined ? {} : { BUN_INSPECT: options.inspect } }, stdin: 'pipe', stdout: 'inherit', stderr: 'inherit', ipc: (message, server) => listened(server, message) })
   }
   // Each restart takes the process waiting with kay loaded, and readies the next one.
   const start = () => {
@@ -126,11 +144,12 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     }
 
     child = spare
-    void child.stdin.write(`start ${codeVersion} ${startedAt} ${JSON.stringify(changedFiles.size > MAX_CHANGED_FILES ? null : [...changedFiles])}\n`)
+    void child.stdin.write(`start ${codeVersion} ${moved ?? '-'} ${startedAt} ${JSON.stringify(changedFiles.size > MAX_CHANGED_FILES ? null : [...changedFiles])}\n`)
     startedAt = codeVersion
     changedFiles = new Set()
     void child.stdin.flush()
-    spare = spawn()
+    // Two processes cannot hold the debugger's port, so under it each server starts once the last one exited.
+    spare = options.inspect === undefined ? spawn() : undefined
     options.onRestart?.(child)
     void reportExit(child)
   }
@@ -196,6 +215,18 @@ function changedFilesNamed(root: string, files: string[]): string[] {
   const kept = files.filter(file => statSync(join(root, file), { throwIfNoEntry: false })?.isFile() === true)
 
   return kept.length > 0 ? kept : files.filter(file => !files.some(other => other.startsWith(`${file}/`)))
+}
+
+// The system's browser, or the command `BROWSER` names; a machine without one says so.
+function openBrowser(url: string, log: (line: string) => void): void {
+  const command = process.env.BROWSER !== undefined && process.env.BROWSER !== '' ? [process.env.BROWSER] : process.platform === 'darwin' ? ['open'] : process.platform === 'win32' ? ['cmd', '/c', 'start', '""'] : ['xdg-open']
+
+  try {
+    Bun.spawn([...command, url], { stdio: ['ignore', 'ignore', 'ignore'] }).unref()
+  }
+  catch {
+    log(`kay dev: no browser to open ${url} with: ${command[0]} is not installed`)
+  }
 }
 
 // The files a restart came from, as its report names them.

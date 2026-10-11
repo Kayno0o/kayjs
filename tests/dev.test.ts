@@ -409,6 +409,110 @@ describe('kay dev', () => {
     expect(lines).toHaveLength(3)
   })
 
+  it('moves off a busy port, saying which was in use, and stays on the port it moved to after a restart', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
+    const lines: string[] = []
+    const holder = Bun.serve({ port: 0, fetch: () => new Response('holder') })
+    const busy = holder.port!
+
+    await Bun.write(join(root, 'src/server.ts'), `Bun.serve({ port: ${busy}, fetch: () => new Response('ok') })\n`)
+    const stop = await dev(root, { log: line => lines.push(line) })
+
+    try {
+      await until(() => lines.length === 1)
+      const [, moved] = new RegExp(`^kay dev: http://localhost:(\\d+) \\(ready in \\d+ ms, ${busy} was in use\\)$`).exec(lines[0]!) ?? []
+
+      expect(Number(moved)).toBeGreaterThan(busy)
+      expect(await (await fetch(`http://localhost:${moved}`)).text()).toBe('ok')
+
+      // The port it asked for is free again, but open pages stay on the one it moved to.
+      await holder.stop()
+      await Bun.write(join(root, 'src/routes/about.kay'), 'p About\n')
+      await until(() => lines.length === 2)
+      expect(lines[1]).toMatch(/^\d\d:\d\d:\d\d src\/routes\/about\.kay: restarted in \d+ ms$/)
+      expect(await (await fetch(`http://localhost:${moved}`)).text()).toBe('ok')
+    }
+    finally {
+      await holder.stop()
+      await stop()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('opens the address in the BROWSER command once, not on a restart', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
+    const lines: string[] = []
+    const opened = join(root, 'opened.txt')
+    const browser = join(root, 'browser.sh')
+    const previous = process.env.BROWSER
+
+    await Bun.write(browser, `#!/bin/sh\necho "$1" >> ${JSON.stringify(opened)}\n`)
+    chmodSync(browser, 0o755)
+    await Bun.write(join(root, 'src/server.ts'), 'Bun.serve({ port: 0, fetch: () => new Response() })\n')
+    process.env.BROWSER = browser
+    const stop = await dev(root, { open: true, log: line => lines.push(line) })
+
+    try {
+      await until(() => existsSync(opened))
+      const [, address] = (/^kay dev: (\S+) /).exec(lines[0]!) ?? []
+
+      await Bun.write(join(root, 'src/routes/about.kay'), 'p About\n')
+      await until(() => lines.length === 2)
+      expect(readFileSync(opened, 'utf8')).toBe(`${address}\n`)
+    }
+    finally {
+      process.env.BROWSER = previous
+      await stop()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('opens the debugger --inspect names on every server it runs, at the address it prints once', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
+    const free = Bun.serve({ port: 0, fetch: () => new Response() })
+    const port = free.port!
+
+    await free.stop()
+    await Bun.write(join(root, 'src/server.ts'), 'Bun.serve({ port: 0, fetch: () => new Response() })\nawait Bun.write(\'spawned.txt\', String(Bun.env.BUN_INSPECT))\n')
+    const child = Bun.spawn(['bun', join(import.meta.dir, '../src/cli.ts'), 'dev', root, `--inspect=${port}`], { stdout: 'pipe', stderr: 'pipe' })
+    const output: string[] = []
+    const reading = (async () => {
+      for await (const chunk of child.stdout.pipeThrough(new TextDecoderStream()))
+        output.push(...chunk.split('\n').filter(Boolean))
+    })()
+    const connects = async () => {
+      const socket = new WebSocket(`ws://localhost:${port}/kay`)
+      const { promise, resolve } = Promise.withResolvers<boolean>()
+
+      socket.addEventListener('open', () => resolve(true))
+      socket.addEventListener('error', () => resolve(false))
+      const open = await promise
+
+      socket.close()
+
+      return open
+    }
+
+    try {
+      await until(() => output.length === 2, 10_000)
+      expect(output[1]).toBe(`kay dev: debugger on ws://localhost:${port}/kay, https://debug.bun.sh/#localhost:${port}/kay`)
+      expect(await connects()).toBe(true)
+      // The app's own processes do not try to open it again.
+      expect(await Bun.file(join(root, 'spawned.txt')).text()).toBe('undefined')
+
+      await Bun.write(join(root, 'src/routes/about.kay'), 'p About\n')
+      await until(() => output.length === 3, 10_000)
+      expect(output[2]).toMatch(/restarted in/)
+      expect(await connects()).toBe(true)
+    }
+    finally {
+      child.kill('SIGTERM')
+      await child.exited
+      await reading
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('drops the line an entry prints once it listens, which kay dev prints itself', async () => {
     const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
     const messages: unknown[] = []
