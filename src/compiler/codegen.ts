@@ -1,5 +1,4 @@
-import type { Attribute, AwaitBranch, AwaitNode, ConstNode, Details, Diagnostic, ElementNode, ErrorNode, ForNode, IfNode, KayFile, Labelled, NamedAttribute, Node, ServerIslandMark, SlotNode, Span, TemplateFacts, TemplateHelper, TextNode, TryNode } from './ast'
-import type { LintName } from './lints'
+import type { Attribute, AwaitBranch, AwaitNode, ConstNode, ElementNode, ErrorNode, ForNode, IfNode, KayFile, NamedAttribute, Node, SlotNode, Span, TemplateFacts, TemplateHelper, TextNode, TryNode } from './ast'
 import type { Rewrite } from './mapping'
 import type { PageSettingName } from './page-settings'
 import type { ImportBinding, ScriptAnalysis, ServerAnalysis } from './script'
@@ -12,6 +11,7 @@ import { sourceLocator } from './inspect'
 import { constDeclaration, slotValue } from './items'
 import { CodeBuilder, DYNAMIC_TAG } from './mapping'
 import { PAGE, PAGE_SETTINGS } from './page-settings'
+import { bindEvent, bindProblem, headTagProblem, sharedImports } from './validate'
 
 export interface GenerateOptions {
   name: string
@@ -58,14 +58,10 @@ export interface Generated {
   accessorSites: Set<number>
   // Generated offsets of the names a template `const` declares, its pattern's start.
   constSites: Set<number>
-  diagnostics: Diagnostic[]
 }
 
 // JSX collapses a run of spaces in text, which `pre` and `textarea` would show, so a run goes out as a string.
 const JSX_TEXT_ESCAPES = /[{}<>]|[ \t]{2,}/g
-const BINDABLE = new Set(['input', 'textarea', 'select'])
-const TRANSITION_PART = 'transition:'
-const TRANSITION_PARTS = new Set(['enter', 'enter-from', 'enter-to', 'leave', 'leave-from', 'leave-to'])
 const NUMERIC_INPUTS = new Set(['number', 'range'])
 const FORM_FIELDS = new Set(['input', 'select', 'textarea', 'button'])
 const LINK_ELEMENTS = new Set(['a', 'area'])
@@ -76,12 +72,9 @@ const WRITTEN_URLS = new Map([['img', 'src'], ['link', 'href'], ['form', 'action
 const WHITESPACE = /\s+/
 const CTX_REFERENCE = /\bctx\b/
 const EVENT_HANDLER = /^on[A-Z]/
-const LOWERCASE_EVENT = /^on:?([a-z]+)$/
-const COMPOUND_EVENT = /^(dbl|key|mouse|pointer|touch|drag|focus|context|before|after)(click|down|up|press|move|enter|leave|over|out|start|end|cancel|in|menu|input)$/
 const IMPORT_COMMA_AFTER = /^\s*,\s*/
 const IMPORT_COMMA_BEFORE = /,\s*$/
 const DEFAULT_PREFIX = '__default_'
-const HEAD_TAGS = new Set(['title', 'meta', 'link', 'style', 'script', 'base'])
 // `kay build` renders the page once when it is `true`.
 const PRERENDER: PageSettingName = 'prerender'
 const IDENTIFIER = /^[A-Z_$][\w$]*$/i
@@ -91,18 +84,8 @@ const QUERY: PageSettingName = 'query'
 const MESSAGE_KEY = /(?:\bt\(\s*|\bT\([^)]*?\bkey=)(['"`])([\w.-]+)\1/g
 // The server exports that are no actions: the page's settings, and each under its own name as they were exported before.
 const NOT_ACTIONS = new Set<string>([PAGE, ...PAGE_SETTINGS])
-// What only a static parent passes an island.
-const ISLAND_OPTIONS = new Set(['hydrate', 'persist'])
 // A type parameter's name, past the `const`, `in` and `out` modifiers it may carry.
 const TYPE_PARAMETER_NAME = /^\s*(?:(?:const|in|out)\s+)*([A-Z_$][\w$]*)/i
-// Elements a keyboard reaches and a screen reader announces as controls; a click handler on any other one needs a `role`.
-const INTERACTIVE_TAGS = new Set(['a', 'audio', 'button', 'details', 'embed', 'iframe', 'input', 'label', 'object', 'option', 'select', 'summary', 'textarea', 'video'])
-// An attribute an element needs to be understood without seeing it, and what to write.
-const REQUIRED_TEXT = new Map<string, [attribute: string, message: string, help: string]>([
-  ['img', ['alt', 'An `img` needs `alt`', 'say what it shows, or write `alt=""` when it is only decoration']],
-  ['iframe', ['title', 'An `iframe` needs a `title`', 'name what it holds, which screen readers announce']],
-])
-const HEAD_CONTENT = 'A `head` block holds `title`, `meta`, `link`, `style`, `script` and `base` elements only'
 
 export function defaultName(index: number): string {
   return `${DEFAULT_PREFIX}${index}`
@@ -116,7 +99,6 @@ class Generator {
   private readonly b: CodeBuilder
   private readonly accessorSites = new Set<number>()
   private readonly constSites = new Set<number>()
-  private readonly diagnostics: Diagnostic[] = []
   private readonly src: string
   // The action of the form each node sits in, so its fields' names are checked against the action's input.
   private readonly forms: Map<Node, Span>
@@ -146,7 +128,7 @@ class Generator {
       this.emitHoisted(span, script.specifiers, script.imports, [])
 
     if (includeServer) {
-      const duplicates = this.duplicateImports(script, server)
+      const { duplicates } = sharedImports(script, server)
 
       for (const span of server.hoisted)
         this.emitHoisted(span, server.specifiers, server.imports, duplicates)
@@ -247,20 +229,13 @@ class Generator {
 
     b.add(`\n${this.options.island !== undefined || this.options.twin !== undefined ? '' : 'export default '}function ${this.options.name}`)
 
-    if (this.file.typeParameters) {
-      if (server)
-        this.error(this.file.typeParameters, 'A page has no type parameters', { note: 'a page gets its data from `--- server` and takes no props' })
-      else
-        b.add('<').addSource(this.file.typeParameters).add('>')
-    }
+    if (this.file.typeParameters && !server)
+      b.add('<').addSource(this.file.typeParameters).add('>')
 
     b.add('(')
 
     if (server) {
       b.add(`__props: KayPageData<typeof load>${childrenSlot ? childrenType : ''}`)
-
-      if (script.props)
-        this.error(script.props.statement, 'A page declares no props', { note: 'a page gets its data from `--- server`', help: 'read the server names directly' })
     }
     else if (script.props) {
       b.add(childrenSlot ? '__props: (' : '__props: ')
@@ -316,20 +291,12 @@ class Generator {
     if (this.options.island !== undefined)
       b.add(`\nexport default KayIsland(${JSON.stringify(this.options.island)}, ${this.options.name}${this.genericComponent ? ' as never' : ''}${islandMessages(this.src, this.options.client)})${this.genericIslandType()}\n`)
 
-    return { builder: b, accessorSites: this.accessorSites, constSites: this.constSites, diagnostics: this.diagnostics }
+    return { builder: b, accessorSites: this.accessorSites, constSites: this.constSites }
   }
 
-  // The type of the page's query schema, when it declares one; a layout's or special page's declaration is reported.
+  // The type of the page's query schema, when it declares one; a layout or special page reads its page's.
   private declaresQuery(): string | undefined {
-    const span = this.server?.page?.settings.get(QUERY)?.key
-
-    if (span && this.options.special) {
-      this.error(span, 'Only a page declares its query', { help: 'read the page\'s query through `ctx.query`' })
-
-      return undefined
-    }
-
-    return this.settingType(QUERY)
+    return this.options.special ? undefined : this.settingType(QUERY)
   }
 
   // What `load` types a setting from: its key of `page`.
@@ -360,29 +327,6 @@ class Generator {
     const { name } = this.options
 
     return ` as unknown as KayIslandBrand & (<${parameters}>(props: Parameters<typeof ${name}<${typeParameterNames(parameters).join(', ')}>>[0] & KayIslandOptions) => ReturnType<typeof ${name}>)`
-  }
-
-  // Both fences land in one module, so a name they both import is declared once; the server fence's copy is the one left out, and a name imported two different ways is reported.
-  private duplicateImports(script: ScriptAnalysis, server: ServerAnalysis): ImportBinding[] {
-    const seen = new Map(script.imports.map(binding => [binding.local, binding]))
-    const duplicates: ImportBinding[] = []
-
-    for (const binding of server.imports) {
-      const first = seen.get(binding.local)
-
-      if (!first) {
-        seen.set(binding.local, binding)
-
-        continue
-      }
-
-      if (first.imported === binding.imported && first.source === binding.source && (binding.typeOnly || !first.typeOnly))
-        duplicates.push(binding)
-      else
-        this.error(binding.span, `\`${binding.local}\` is imported twice, once in each fence, and not the same way`, { related: [{ ...first.span, label: 'first imported here' }], help: 'import it once' })
-    }
-
-    return duplicates
   }
 
   private emitHoisted(span: Span, specifiers: Span[], imports: ImportBinding[], duplicates: ImportBinding[]) {
@@ -578,13 +522,6 @@ class Generator {
         continue
       }
 
-      if (head)
-        this.error(node.tag, 'A template has one `head` block', { related: [{ ...head.tag, label: 'the first one' }] })
-      else if (this.options.island !== undefined)
-        this.error(node.tag, 'An island cannot set the document head', { note: 'an island also renders in the browser', help: 'move the `head` block to its page' })
-      else if (node.attributes.length > 0 || node.classes.length > 0 || node.id)
-        this.error(node, 'A `head` block takes no attributes')
-
       head ??= node
     }
 
@@ -594,7 +531,7 @@ class Generator {
   // Registered before the template renders, so a page's title and meta tags win over its layouts': they render first and register first.
   private emitHead(head: ElementNode) {
     const { b } = this
-    const tags = head.children.filter((child): child is ElementNode => this.isHeadTag(child))
+    const tags = head.children.filter((child): child is ElementNode => headTagProblem(child) === undefined)
 
     if (this.options.check) {
       b.add('void (<>')
@@ -610,21 +547,6 @@ class Generator {
       b.add(', ')
     }
     b.add(']);\n')
-  }
-
-  private isHeadTag(node: Node): boolean {
-    if (node.kind !== 'element' || node.component || !HEAD_TAGS.has(node.name)) {
-      this.error(node, HEAD_CONTENT)
-
-      return false
-    }
-
-    const nested = node.children.find(child => child.kind !== 'text' || child.parts.some(part => part.kind === 'element'))
-
-    if (nested)
-      this.error(nested, `\`${node.name}\` holds text only`)
-
-    return nested === undefined
   }
 
   // The tag `head()` takes: `{ tag: 'meta', props: { name: 'description', content: (description) } }`.
@@ -747,13 +669,12 @@ class Generator {
           this.emitTry(node)
 
           break
-        case 'slot':
-          this.reportSlot(node)
-
-          break
         case 'error':
           this.emitError(node)
 
+          break
+        // Passed to the component above it, or reported as misplaced.
+        case 'slot':
           break
       }
 
@@ -786,13 +707,7 @@ class Generator {
     const { b } = this
     const target = this.forms.get(node)
 
-    if (!target) {
-      this.error(node, '`error` shows the message of a form posting to an action, so it sits inside one', { help: 'move it into the `form(action={...})` whose post it reports on' })
-
-      return
-    }
-
-    if (!this.options.check)
+    if (!target || !this.options.check)
       return
 
     b.wrap(node, () => {
@@ -1029,16 +944,7 @@ class Generator {
   private emitElement(element: ElementNode) {
     const { b } = this
 
-    if (this.options.check && !element.component)
-      this.checkAccessibility(element)
-
-    if (isHead(element))
-      this.error(element, 'A `head` block sits at the top level of a template')
-
     if (isSlot(element)) {
-      if (element.attributes.length > 0 || element.classes.length > 0 || element.id)
-        this.error(element, '`slot` takes no attributes', { note: '`slot` marks where a layout or wrapper renders its children, and `slot name` its `name` block prop' })
-
       b.wrap(element, () => {
         b.add('{')
         slotValue(b, element)
@@ -1067,26 +973,9 @@ class Generator {
       const slots = element.children.filter((child): child is SlotNode => child.kind === 'slot')
       const children = element.children.filter(child => child.kind !== 'slot')
 
-      // Each prop is passed once: by an attribute, by an `@name` block, or for `children` by the lines under the tag.
-      const passed = new Map<string, Labelled>(element.attributes.flatMap(attribute => attribute.kind === 'spread' ? [] : [[this.text(attribute.name), { ...attribute.name, label: 'passed by this attribute' }]]))
-
-      if (children.length > 0)
-        passed.set('children', { start: children[0]!.start, end: children[0]!.end, label: 'passed by the lines under the tag' })
-
       for (const slot of slots) {
-        if (!element.component) {
-          this.reportSlot(slot)
-
+        if (!element.component)
           continue
-        }
-
-        const name = this.text(slot.name)
-        const earlier = passed.get(name)
-
-        if (earlier !== undefined)
-          this.error(slot.name, `\`${name}\` is passed twice`, { label: 'passed again here', related: [earlier] })
-
-        passed.set(name, { ...slot.name, label: `passed by this \`@${name}\`` })
 
         // `@row(todo)` passes a function the component calls per item, its parameters typed from the prop.
         if (slot.params && this.options.check && this.sendsIslandProps) {
@@ -1125,32 +1014,14 @@ class Generator {
     })
   }
 
-  private checkServerIsland({ attribute, mode, noscript }: ServerIslandMark): void {
-    if (this.options.island !== undefined || this.options.insideIsland)
-      this.error(attribute.name, '`server` has no effect inside an island', { note: 'an island renders in the browser too, as a whole' })
-    else if (mode === undefined)
-      this.error(attribute.name, '`server` takes no value, or "defer"', { help: '`server` renders it per request inside the prerendered page, `server="defer"` once the browser fetches it on approach' })
-    else if (noscript && mode !== 'defer')
-      this.error(noscript.name, '`noscript` only goes with `server="defer"`', { note: 'an inline server island arrives with the page, so it needs no JavaScript' })
-    else if (noscript?.kind === 'boolean')
-      this.error(noscript.name, '`noscript` takes the text of its link', { help: 'such as `noscript="Show the contact form"`' })
-  }
-
   private emitAttributes(element: ElementNode) {
     const serverIsland = serverIslandOf(element, this.src)
     const { b } = this
 
-    if (element.id) {
-      if (element.attributes.some(attribute => attribute.kind !== 'spread' && this.text(attribute.name) === 'id'))
-        this.error(element.id, 'The id is set twice', { label: 'set by `#id`', related: element.attributes.flatMap(attribute => attribute.kind !== 'spread' && this.text(attribute.name) === 'id' ? [{ ...attribute.name, label: 'and by this attribute' }] : []) })
-
+    if (element.id)
       b.add(' id="').addSource(element.id).add('"')
-    }
 
     const classAttributes = element.attributes.filter((attribute): attribute is NamedAttribute => attribute.kind !== 'spread' && this.text(attribute.name) === 'class')
-
-    if (classAttributes.length > 1)
-      this.error(classAttributes[1]!.name, 'An element takes one `class` attribute', { related: [{ ...classAttributes[0]!.name, label: 'the first one' }], help: 'put several classes in one: `class="a b"`' })
 
     // A spread may carry a `class` of its own, which merges in too, so the class goes after every attribute and spread.
     const spreads = element.attributes.some(attribute => attribute.kind === 'spread')
@@ -1163,14 +1034,8 @@ class Generator {
       if ((element.classes.length > 0 || merged) && attribute === classAttributes[0])
         continue
 
-      if (element.component && (this.options.island !== undefined || this.options.insideIsland) && attribute.kind !== 'spread' && ISLAND_OPTIONS.has(this.text(attribute.name)))
-        this.error(attribute.name, `\`${this.text(attribute.name)}\` has no effect inside an island`, { note: 'an island hydrates and lives on as a whole' })
-
-      if (attribute === serverIsland?.attribute) {
-        this.checkServerIsland(serverIsland)
-
+      if (attribute === serverIsland?.attribute)
         continue
-      }
 
       // Not a prop: what it reads is checked on its own.
       if (attribute === serverIsland?.noscript) {
@@ -1222,14 +1087,7 @@ class Generator {
 
     // `field` writes `name`, and the constraints of the action's schema, which only a form posting to one has.
     if (name === FIELD_ATTRIBUTE) {
-      const named = element.attributes.find((other): other is NamedAttribute => other.kind !== 'spread' && this.text(other.name) === 'name')
-
-      if (!target)
-        this.error(attribute.name, '`field` names a field of a form posting to an action, so it sits inside one', { help: 'write `name` for a form posting elsewhere' })
-      else if (attribute.kind !== 'static')
-        this.error(attribute.name, '`field` takes the field\'s name as written text', { note: 'its constraints are read off the action\'s schema by that name', help: 'write `field="title"`, or `name={...}` for a name computed at render' })
-      else if (named)
-        this.error(attribute.name, 'A field has `field` or `name`, not both', { related: [{ ...named.name, label: 'named here' }], help: 'drop `name`: `field` writes it' })
+      const named = element.attributes.some(other => other.kind !== 'spread' && this.text(other.name) === 'name')
 
       if (attribute.kind !== 'static' || named) {
         b.add('{...{}}')
@@ -1277,11 +1135,7 @@ class Generator {
       const [open, close] = element.component ? [`${helperAlias('componentClass')}([`, '])'] : ['[', ']']
 
       b.addSource(attribute.name).add(`={${open}${JSON.stringify(shorthand)}, (`).addSource(attribute.expression).add(`)${close}}`)
-
-      return
     }
-
-    this.error(attribute.name, '`class` needs a value')
   }
 
   // The shorthand, the `class` attribute and the `class` each spread brings, in the order they were written.
@@ -1313,8 +1167,6 @@ class Generator {
         b.add(`${separator}${JSON.stringify(attribute.text)}`)
       else if (attribute.kind === 'expression')
         b.add(`${separator}(`).addSource(attribute.expression).add(')')
-      else
-        this.error(attribute.name, '`class` needs a value')
 
       separator = ', '
     }
@@ -1325,14 +1177,8 @@ class Generator {
   private emitAttribute(element: ElementNode, attribute: Attribute) {
     const { b } = this
 
-    if (attribute.kind !== 'spread')
-      this.checkTransition(element, attribute)
-
     if (this.options.check && this.emitCheckedAttribute(element, attribute))
       return
-
-    if (!element.component && attribute.kind === 'expression')
-      this.reportLowercaseEvent(attribute)
 
     switch (attribute.kind) {
       case 'spread':
@@ -1340,16 +1186,10 @@ class Generator {
 
         return
       case 'boolean':
-        if (this.text(attribute.name).startsWith('bind:'))
-          this.error(attribute.name, '`bind:` needs a signal', { help: '`bind:value={name}`' })
-
         b.addSource(attribute.name)
 
         return
       case 'static': {
-        if (this.text(attribute.name).startsWith('bind:'))
-          this.error(attribute.name, '`bind:` needs a signal', { help: '`bind:value={name}`' })
-
         b.addSource(attribute.name).add('=')
         const quoted = quoteAttribute(attribute.text)
 
@@ -1381,26 +1221,6 @@ class Generator {
     }
   }
 
-  // Type checking only, so a page still runs while it is fixed. A spread may carry what is missing, so an element with one is left alone.
-  private checkAccessibility(element: ElementNode) {
-    if (element.attributes.some(attribute => attribute.kind === 'spread'))
-      return
-
-    const names = new Set(element.attributes.map(attribute => this.text((attribute as Exclude<Attribute, { kind: 'spread' }>).name)))
-    // `.card` has no tag of its own to point at.
-    const at = element.tag.end > element.tag.start ? element.tag : element
-    const required = REQUIRED_TEXT.get(element.name)
-
-    if (required && !names.has(required[0]))
-      this.lint(at, required[0] === 'alt' ? 'missing-alt' : 'missing-title', required[1], { help: required[2] })
-
-    if (element.name === 'input' && this.staticAttribute(element, 'type') === 'image' && !names.has('alt'))
-      this.lint(at, 'missing-alt', 'An image button needs `alt`', { help: 'name what it does' })
-
-    if (names.has('onClick') && !names.has('role') && !INTERACTIVE_TAGS.has(element.name))
-      this.lint(at, 'unreachable-click', `This \`${element.name}\` reacts to \`onClick\` but is out of reach of the keyboard and screen readers`, { help: 'use a `button`, or give it a `role` along with a `tabindex` and a key handler' })
-  }
-
   // The text of an attribute written as a quoted string.
   private staticAttribute(element: ElementNode, name: string): string | undefined {
     for (const attribute of element.attributes) {
@@ -1409,18 +1229,6 @@ class Generator {
     }
 
     return undefined
-  }
-
-  // `onclick` and `on:click` attach nothing, and the component would not become an island either.
-  private reportLowercaseEvent(attribute: Extract<Attribute, { kind: 'expression' }>) {
-    const name = LOWERCASE_EVENT.exec(this.text(attribute.name))?.[1]
-
-    if (name === undefined)
-      return
-
-    const camel = `on${capitalize(name.replace(COMPOUND_EVENT, (_, first: string, second: string) => capitalize(first) + capitalize(second)))}`
-
-    this.error(attribute.name, `\`${this.text(attribute.name)}\` does not attach a handler`, { note: 'events are written in camelCase', help: `\`${camel}\``, fixes: [{ title: `Write \`${camel}\``, edits: [{ ...attribute.name, text: camel }], safe: true }] })
   }
 
   // Check-only wrappers: a site link must match a page, markup must be made safe or written out, and a static parent passes an island serializable props only.
@@ -1494,42 +1302,15 @@ class Generator {
     this.b.add('{...KayFunctionProp(').addSource(element.tag).add(')(').wrap(name, () => this.b.add('0')).add(')}')
   }
 
-  private checkTransition(element: ElementNode, attribute: NamedAttribute) {
-    const name = this.text(attribute.name)
-
-    if (name !== 'transition' && !name.startsWith(TRANSITION_PART))
-      return
-
-    if (element.component)
-      this.error(attribute.name, `\`${name}\` animates an element, not a component`, { help: 'set it on the element the component renders, which a prop can carry' })
-    else if (name !== 'transition' && !TRANSITION_PARTS.has(name.slice(TRANSITION_PART.length)))
-      this.error(attribute.name, `\`${name}\` is no phase of a transition`, { help: 'use `transition:enter`, `transition:enter-from` or `transition:enter-to`, or the same for `leave`' })
-  }
-
   // `bind:value={name}` reads the signal and writes it back from the matching input event.
   private emitBind(element: ElementNode, attribute: Extract<Attribute, { kind: 'expression' }>, property: string) {
     const { b } = this
 
-    if (element.component || !BINDABLE.has(element.name)) {
-      this.error(attribute.name, '`bind:` works on <input>, <textarea> and <select> only', { help: 'pass a component a value and a setter' })
-
+    if (bindProblem(element, property))
       return
-    }
-
-    if (property !== 'value' && property !== 'checked') {
-      this.error(attribute.name, `\`bind:${property}\` is not supported`, { help: 'use `bind:value` or `bind:checked`' })
-
-      return
-    }
 
     const inputType = this.staticAttribute(element, 'type') ?? 'text'
-    const event = property === 'checked' || element.name === 'select' ? 'onChange' : 'onInput'
-
-    const handler = element.attributes.find(candidate => candidate.kind !== 'spread' && this.text(candidate.name) === event) as NamedAttribute | undefined
-
-    if (handler)
-      this.error(attribute.name, `\`bind:${property}\` already handles \`${event}\``, { related: [{ ...handler.name, label: 'handled here too' }], help: 'drop one of them' })
-
+    const event = bindEvent(element, property)
     const read = property === 'checked' ? 'checked' : NUMERIC_INPUTS.has(inputType) ? 'valueAsNumber' : 'value'
 
     b.wrap(attribute.name, () => b.add(property))
@@ -1568,38 +1349,11 @@ class Generator {
   }
 
   private withoutSlots(nodes: Node[]): Node[] {
-    const visible: Node[] = []
-
-    for (const node of nodes) {
-      if (node.kind === 'slot')
-        this.reportSlot(node)
-      else
-        visible.push(node)
-    }
-
-    return visible
-  }
-
-  private reportSlot(slot: SlotNode) {
-    if (this.options.rewrites)
-      return
-
-    this.error(slot, `\`@${this.text(slot.name)}\` must sit directly under a component, to pass it as that component's \`${this.text(slot.name)}\` prop`)
+    return nodes.filter(node => node.kind !== 'slot')
   }
 
   private text(span: Span): string {
     return this.src.slice(span.start, span.end)
-  }
-
-  // Both passes generate the same code, so only the first one reports.
-  private error(span: Span, message: string, details?: Details) {
-    if (!this.options.rewrites)
-      this.diagnostics.push({ start: span.start, end: span.end, message, ...details })
-  }
-
-  private lint(span: Span, code: LintName, message: string, details?: Details) {
-    if (!this.options.rewrites)
-      this.diagnostics.push({ start: span.start, end: span.end, code, message, ...details, checkOnly: true })
   }
 }
 
@@ -1686,10 +1440,6 @@ function mergesComponentClass(element: ElementNode, source: string): boolean {
     return element.classes.length > 0 || attribute !== undefined
 
   return element.classes.length > 0 && attribute?.kind === 'expression'
-}
-
-function capitalize(word: string): string {
-  return `${word[0]!.toUpperCase()}${word.slice(1)}`
 }
 
 // JSX attribute strings have no escapes, so pick a quote the value does not contain, or fall back to an expression.

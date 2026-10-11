@@ -14,6 +14,7 @@ import { parseKay } from './parser'
 import { findRewrites } from './rewrite'
 import { analyzeScript, analyzeServer, cssImportsWithoutText, deprecatedSchemaNames, unboundedFields } from './script'
 import { ISLAND_TWIN } from './twin'
+import { validate } from './validate'
 
 export type { Diagnostic } from './ast'
 export { formatDiagnostic } from './frame'
@@ -120,7 +121,7 @@ export function compileKay(source: string, filename: string, options: CompileOpt
   }
 
   const final = generate(file, script, server, { ...generateOptions, name, rewrites: found.rewrites, translates: found.translates })
-  const diagnostics = [...file.diagnostics, ...script.diagnostics, ...(server?.diagnostics ?? []), ...analysis.diagnostics, ...found.diagnostics]
+  const diagnostics = [...file.diagnostics, ...script.diagnostics, ...(server?.diagnostics ?? []), ...validate(file, script, server, generateOptions), ...found.diagnostics]
 
   // Code that does not parse usually already has a better diagnostic from the fence or the template; this one is what is left when nothing else explains it.
   if (found.syntaxError && diagnostics.length === 0)
