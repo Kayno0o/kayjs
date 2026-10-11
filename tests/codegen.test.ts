@@ -236,7 +236,7 @@ describe('elements', () => {
 
     const source = '---\nimport List from \'./list.kay\'\n---\nList(items={[1]})\n  @row(n)\n    li {n}'
 
-    expect(compileKay(source, '_layout.kay', { check: true }).tsx).toContain('<List items={KayProp(List)(([1]))} {...KayFunctionProp(List)(0)} row={(n) => <li>{n}</li>} />')
+    expect(compileKay(source, '_layout.kay', { check: true }).tsx).toContain('<List items={[1]} {...KayFunctionProp(List)(0)} row={(n) => <li>{n}</li>} />')
     // A component renders as an island in its place should List be one, so what it passes is not sent as it is.
     expect(compileKay(source, 'test.kay', { check: true }).tsx).toContain('<List items={[1]} row={(n) => <li>{n}</li>} />')
   })
@@ -605,7 +605,7 @@ describe('generic components', () => {
   it('leaves a function given to a component unwrapped in check output, so a generic one types its parameters', () => {
     const code = compileKay('---\nimport List from \'./list.kay\'\n---\nList(items={[1]} show={n => String(n)})', '_layout.kay', { check: true }).tsx
 
-    expect(code).toContain('<List items={KayProp(List)(([1]))} {...KayFunctionProp(List)(0)} show={n => String(n)} />')
+    expect(code).toContain('<List items={[1]} {...KayFunctionProp(List)(0)} show={n => String(n)} />')
   })
 })
 

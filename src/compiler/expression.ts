@@ -26,6 +26,59 @@ function isFunctionExpression(code: string): boolean {
   }
 }
 
+// Values no island prop check needs to see.
+const LITERALS = new Set(['StringLiteral', 'NumericLiteral', 'BooleanLiteral', 'NullLiteral', 'BigIntLiteral', 'TemplateLiteral'])
+
+// The parts of a prop's value a static parent checks as sent to an island, each on its own, relative to `code`; nothing when it does not parse.
+// A literal array or object, a literal value and the branches of a condition stay out, wrapping them would stop a generic component's other props from typing them, so their parts are checked instead; an operand of `&&`, `||` or `??` is not, as wrapping it would lose what it narrows. `functions` when the value holds one, which is checked apart.
+export function sentParts(code: string): { parts: Span[], functions: boolean } | undefined {
+  let expression: t.Expression
+
+  try {
+    expression = parseExpression(code, { plugins: ['typescript'] })
+  }
+  catch {
+    return undefined
+  }
+
+  const parts: Span[] = []
+  let functions = false
+  const visit = (node: t.Node): void => {
+    if (node.type === 'ArrayExpression') {
+      for (const element of node.elements) {
+        if (element !== null)
+          visit(element)
+      }
+    }
+    // A shorthand property has no value apart from its key to wrap, so its object is checked whole.
+    else if (node.type === 'ObjectExpression' && !node.properties.some(property => property.type === 'ObjectProperty' && property.shorthand)) {
+      for (const property of node.properties) {
+        if (property.type === 'ObjectMethod')
+          functions = true
+        else
+          visit(property.type === 'SpreadElement' ? property.argument : property.value)
+      }
+    }
+    else if (node.type === 'SpreadElement') {
+      visit(node.argument)
+    }
+    else if (node.type === 'ConditionalExpression') {
+      visit(node.consequent)
+      visit(node.alternate)
+    }
+    else if (node.type === 'ArrowFunctionExpression' || node.type === 'FunctionExpression') {
+      functions = true
+    }
+    else if (!LITERALS.has(node.type)) {
+      parts.push({ start: node.start!, end: node.end! })
+    }
+  }
+
+  visit(expression)
+
+  return { parts, functions }
+}
+
 // Whether an expression may hold a function, a class or an instance of one, which no static parent can send an island: it writes one, or reads one of `names`.
 export function mayHoldFunction(code: string, names: ReadonlySet<string>): boolean {
   let expression: t.Expression

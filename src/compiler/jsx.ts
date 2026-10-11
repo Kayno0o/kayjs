@@ -2,7 +2,7 @@ import type { Attribute, AwaitBranch, AwaitNode, ConstNode, ElementNode, ErrorNo
 import type { CodeBuilder } from './mapping'
 import type { Sites } from './rewrite'
 import { actionOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, isSlot, keyedByPosition, serverIslandOf } from './ast'
-import { isFunctionAt } from './expression'
+import { isFunctionAt, sentParts } from './expression'
 import { slotValue } from './items'
 import { DYNAMIC_TAG } from './mapping'
 import { helperName } from './markup'
@@ -716,7 +716,23 @@ export class JsxTemplate {
       return true
     }
 
-    b.addSource(attribute.name).add('={KayProp(').addSource(element.tag).add(')((').addSource(attribute.expression).add('))}')
+    const { start, end } = attribute.expression
+    const sent = sentParts(this.src.slice(start, end)) ?? { parts: [{ start: 0, end: end - start }], functions: false }
+    let at = start
+
+    if (sent.functions) {
+      this.emitFunctionPropCheck(element, attribute.name)
+      b.add(' ')
+    }
+
+    b.addSource(attribute.name).add('={')
+
+    for (const part of sent.parts) {
+      b.addSource({ start: at, end: start + part.start }).add('KayProp(').addSource(element.tag).add(')((').addSource({ start: start + part.start, end: start + part.end }).add('))')
+      at = start + part.end
+    }
+
+    b.addSource({ start: at, end }).add('}')
 
     return true
   }
