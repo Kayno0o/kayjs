@@ -1004,8 +1004,8 @@ describe('the size report', () => {
     }
   })
 
-  it('reports no JavaScript for a site with no island', () => {
-    expect(formatSizeReport({ islands: [] })).toBe('no JavaScript: no page has an island')
+  it('reports no JavaScript bundle for a site with no island', () => {
+    expect(formatSizeReport({ islands: [] })).toBe('no JavaScript bundle: no page has an island')
   })
 })
 

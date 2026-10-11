@@ -263,6 +263,44 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('history af
       await history.close()
     }
   }, 60_000)
+
+  it('leaves Back and Forward to kay\'s script across a swap to a page without islands, and an entry the app pushed to the app', async () => {
+    const history = await testSite({ routes: 'tests/fixtures/history/src/routes', browser: { path } })
+    const kept = () => (window as unknown as { kept?: boolean }).kept === true
+
+    try {
+      const view = await history.open('/')
+
+      await view.evaluate(() => {
+        (window as unknown as { kept: boolean }).kept = true
+      })
+      await view.click('a.still')
+      await view.waitFor('h1', { text: 'Still' })
+      await view.back()
+      await view.waitFor('h1', { text: 'Home' })
+      await view.forward()
+      await view.waitFor('h1', { text: 'Still' })
+      // A reload would come once the traversal is over.
+      await Bun.sleep(300)
+
+      expect(await view.evaluate(kept)).toBe(true)
+
+      await view.reload()
+      await view.evaluate(() => {
+        (window as unknown as { kept: boolean }).kept = true
+        window.history.pushState(null, '', '/elsewhere')
+      })
+      await view.back()
+      await Bun.sleep(300)
+
+      expect(await view.path()).toBe('/still')
+      expect(await view.evaluate(kept)).toBe(true)
+      expect(view.errors).toEqual([])
+    }
+    finally {
+      await history.close()
+    }
+  }, 60_000)
 })
 
 describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay dev in a browser', () => {

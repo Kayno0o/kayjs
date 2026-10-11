@@ -50,8 +50,8 @@ export function sentParts(code: string): { parts: Span[], functions: boolean } |
           visit(element)
       }
     }
-    // A shorthand property has no value apart from its key to wrap, so its object is checked whole.
-    else if (node.type === 'ObjectExpression' && !node.properties.some(property => property.type === 'ObjectProperty' && property.shorthand)) {
+    // A shorthand property, a getter or a setter has no value apart from its key to wrap, so its object is checked whole.
+    else if (node.type === 'ObjectExpression' && !node.properties.some(property => property.type === 'ObjectProperty' ? property.shorthand : property.type === 'ObjectMethod' && property.kind !== 'method')) {
       for (const property of node.properties) {
         if (property.type === 'ObjectMethod')
           functions = true

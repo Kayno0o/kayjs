@@ -91,7 +91,7 @@ See [Content collections](content.md).
 
 ## Islands
 
-A component whose template handles an event, `onClick`, or binds a field, `bind:value`, or whose script uses a value from `kay`, such as `signal`, runs in the browser as an island; the rest of the page ships no JavaScript. A page hands it server data as props, plain values only, so it maps the entries to what the island shows, `src/routes/posts/index.kay` here:
+A component whose template handles an event, `onClick`, or binds a field, `bind:value`, or whose script uses a value from `kay`, such as `signal`, runs in the browser as an island; the rest of the page ships no JavaScript bundle. A page hands it server data as props, plain values only, so it maps the entries to what the island shows, `src/routes/posts/index.kay` here:
 
 ```kay
 --- server

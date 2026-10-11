@@ -103,7 +103,7 @@ function heaviest(root: string, chunks: Record<string, { bytesInOutput?: number 
 // The report as `kay build` prints it, one line per island, the heaviest first.
 export function formatSizeReport(report: SizeReport): string {
   if (report.entry === undefined && report.islands.length === 0)
-    return 'no JavaScript: no page has an island'
+    return 'no JavaScript bundle: no page has an island'
 
   const rows: [string, string, ModuleSize[] | undefined][] = [
     ...report.entry === undefined ? [] : [['entry, loaded by every page with an island', kilobytes(report.entry.size), report.entry.modules] satisfies [string, string, ModuleSize[] | undefined]],

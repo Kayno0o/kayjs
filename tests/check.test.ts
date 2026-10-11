@@ -760,6 +760,23 @@ describe('kay check, edge cases', () => {
     }
   })
 
+  it('reports two extensions giving an editor at the config', async () => {
+    const root = await scratchProject({
+      'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ extensions: [{ name: \'one\', editor: \'./one.kay\' }, { name: \'two\', editor: \'./two.kay\' }] })\n',
+      'src/routes/index.kay': 'p home\n',
+    })
+
+    try {
+      const { code, output } = await runCheck(root)
+
+      expect(code).toBe(1)
+      expect(output).toContain(`error: kay: the extensions one and two each give an editor, and a page shows one: list one of them in extensions\n --> ${relative(process.cwd(), join(root, 'kay.config.ts'))}:1:1`)
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('refuses what only a request carries in a prerendered page, and leaves it to a page rendered per request', async () => {
     const root = await scratchProject({
       'src/routes/index.kay': '--- server\nexport const page = { prerender: true }\n\nconst theme = ctx.cookies.get(\'theme\')\n---\np {theme}\n',

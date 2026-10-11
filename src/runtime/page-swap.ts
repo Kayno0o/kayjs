@@ -39,6 +39,8 @@ const STYLESHEET_TIMEOUT_MS = 3000
 
 export const HTML = /^text\/html\b/
 const SPECULATION = 'script[type="speculationrules"]'
+// The line a page without kay's script carries for Back after a reload, which a swapped-in page leaves to this one.
+const HISTORY = 'script[data-kay-history]'
 const SWAP_PATTERN = /\$kayAwait/
 // Scripts the browser runs; any other type, such as `application/json` or `application/ld+json`, holds data of the page it came with.
 const RUNNABLE_TYPES = new Set(['', 'module', 'text/javascript', 'application/javascript', 'importmap'])
@@ -309,7 +311,7 @@ function mergeHead(next: Document): { loaded: Promise<unknown>, commit: () => vo
 
     wanted.add(key)
 
-    if (keep.has(key) || element.tagName === 'TITLE' || element.matches(SPECULATION))
+    if (keep.has(key) || element.tagName === 'TITLE' || element.matches(SPECULATION) || element.matches(HISTORY))
       continue
 
     const added = element.tagName === 'SCRIPT' ? runnable(element as HTMLScriptElement) : document.adoptNode(element)

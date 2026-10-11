@@ -607,6 +607,23 @@ describe('generic components', () => {
 
     expect(code).toContain('<List items={[1]} {...KayFunctionProp(List)(0)} show={n => String(n)} />')
   })
+
+  it('checks the parts of a literal prop a page sends, not the literal, so a generic component types it', () => {
+    const check = (value: string) => (/<List items=\{(.*)\} \/>/).exec(compileKay(`---\nimport List from './list.kay'\n---\nList(items={${value}})`, '_layout.kay', { check: true }).tsx)?.[1]
+
+    expect(check('[\'a\', [x, `b`], ...rest, { n: 1, m: y, ...more }]')).toBe('[\'a\', [KayProp(List)((x)), `b`], ...KayProp(List)((rest)), { n: 1, m: KayProp(List)((y)), ...KayProp(List)((more)) }]')
+    expect(check('[ok ? [\'a\'] : z]')).toBe('[ok ? [\'a\'] : KayProp(List)((z))]')
+    // An operand of `&&` keeps what it narrows, so the operation is checked whole.
+    expect(check('[a && a.b]')).toBe('[KayProp(List)((a && a.b))]')
+    // A shorthand property, a getter or a setter has no value of its own to wrap.
+    expect(check('[{ x }, { get y() { return 1 } }, { set z(v: number) {} }]')).toBe('[KayProp(List)(({ x })), KayProp(List)(({ get y() { return 1 } })), KayProp(List)(({ set z(v: number) {} }))]')
+  })
+
+  it('checks a method in a literal prop a page sends as a function given to the component', () => {
+    const code = compileKay('---\nimport List from \'./list.kay\'\n---\nList(items={[{ run() { return 1 } }]})', '_layout.kay', { check: true }).tsx
+
+    expect(code).toContain('<List {...KayFunctionProp(List)(0)} items={[{ run() { return 1 } }]} />')
+  })
 })
 
 describe('types in the component script', () => {

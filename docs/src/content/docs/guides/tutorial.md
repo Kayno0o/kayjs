@@ -149,7 +149,7 @@ A post the schema refuses comes back to the page with the fields as they were ty
 
 ## Filter in the browser with an island
 
-Everything so far ships no JavaScript. A component using signals, handlers or `bind:` is an island: it renders on the server, then hydrates in the browser. Create `src/components/book-filter.kay`:
+Everything so far ships no JavaScript bundle. A component using signals, handlers or `bind:` is an island: it renders on the server, then hydrates in the browser. Create `src/components/book-filter.kay`:
 
 ```kay
 ---

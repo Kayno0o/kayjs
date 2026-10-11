@@ -2,7 +2,7 @@
 import type { CheckDiagnostic, CheckOptions } from '.'
 import type { KayLibrary } from '../build/libraries'
 import type { Diagnostic } from '../compiler/ast'
-import type { I18nConfig } from '../config'
+import type { I18nConfig, KayExtension } from '../config'
 import type { LocaleSettings } from '../runtime/i18n'
 import type { ApiModule } from '../server/api'
 import type { PublicFile } from '../server/public'
@@ -164,7 +164,8 @@ async function libraryShadows(root: string, options: CheckOptions, own: string[]
   // The app's own directories are checked already; a linked library has its real path outside any `node_modules`, an installed one inside.
   const linked = (path: string) => !ownFile(root, path) && existsSync(path) && !realpathSync(path).split(sep).includes('node_modules')
   const local = mounts.filter(mount => linked(mount.dir))
-  const editor = extensionEditor(root, options.extensions)
+  const diagnostics: CheckDiagnostic[] = []
+  const editor = editorOf(root, options.extensions, diagnostics)
   const localEditor = editor !== undefined && linked(editor) ? editor : undefined
   const followed = [...libraries, ...await extensionPackages(root, libraries, [...local.map(mount => mount.dir), ...localEditor === undefined ? [] : [dirname(localEditor)]])]
   const files = [...new Set(followed.flatMap(library => library.files))]
@@ -174,7 +175,6 @@ async function libraryShadows(root: string, options: CheckOptions, own: string[]
 
     return library ? throughNodeModules(library, file) : file
   })])
-  const diagnostics: CheckDiagnostic[] = []
   const unreached = new Set<string>()
 
   await Promise.all(files.map(async (file) => {
@@ -287,6 +287,18 @@ async function apiModulesOf(root: string, options: CheckOptions, diagnostics: Ch
     diagnostics.push({ file: projectPaths(root, options).api, line: 1, column: 1, message: error instanceof Error ? error.message : String(error) })
 
     return []
+  }
+}
+
+// The editor the extensions give, or undefined with the reason it cannot be told reported at the config, as when two give one.
+function editorOf(root: string, extensions: KayExtension[] | undefined, diagnostics: CheckDiagnostic[]): string | undefined {
+  try {
+    return extensionEditor(root, extensions)
+  }
+  catch (error) {
+    diagnostics.push({ file: join(root, CONFIG_FILE), line: 1, column: 1, message: error instanceof Error ? error.message : String(error) })
+
+    return undefined
   }
 }
 

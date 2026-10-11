@@ -1,7 +1,7 @@
 ---
 title: Islands
 order: 6
-description: Interactive components render on the server and hydrate in the browser, everything else ships no JavaScript.
+description: Interactive components render on the server and hydrate in the browser, everything else ships no JavaScript bundle.
 ---
 
 A component is an island when it is interactive: an element has an `on*` handler, a `bind:` or a `ref`, or its script uses `signal`, `memo`, `effect` or another value from `kay`. kay renders it on the server, then hydrates it in the browser. Static components ship nothing.

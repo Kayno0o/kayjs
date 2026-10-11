@@ -41,7 +41,7 @@ const BODY = /<body>([\s\S]*)<\/body>/
 // Any script but the speculation rules, which hold no code.
 const SCRIPT = /<script(?! type="speculationrules")/
 const INLINE_SCRIPTS = /<script>([\s\S]*?)<\/script>/g
-const EVERY_INLINE_SCRIPT = /<script(?: type="speculationrules")?>([\s\S]*?)<\/script>/g
+const EVERY_INLINE_SCRIPT = /<script(?: type="speculationrules"| data-kay-history)?>([\s\S]*?)<\/script>/g
 const SPECULATION = /<script type="speculationrules">(.*?)<\/script>/
 const FORM_ACTION = /<form\b[^>]*\saction="([^"]*)"/
 // happy-dom swaps in its own Request, which Elysia cannot read headers from.
