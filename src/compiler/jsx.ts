@@ -1,5 +1,6 @@
 import type { Attribute, AwaitBranch, AwaitNode, ConstNode, ElementNode, ErrorNode, ForNode, IfNode, NamedAttribute, Node, SlotNode, Span, TemplateFacts, TextNode, TryNode } from './ast'
 import type { CodeBuilder } from './mapping'
+import type { Sites } from './rewrite'
 import { actionOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, isSlot, keyedByPosition, serverIslandOf } from './ast'
 import { isFunctionAt } from './expression'
 import { slotValue } from './items'
@@ -32,7 +33,7 @@ const EVENT_HANDLER = /^on[A-Z]/
 
 // A template as JSX: what the analysis pass reads for scope, and `kay check` type-checks.
 export class JsxTemplate {
-  constructor(private readonly b: CodeBuilder, private readonly src: string, private readonly facts: TemplateFacts, private readonly options: JsxOptions, private readonly accessorSites: Set<number>, private readonly constSites: Set<number>) {}
+  constructor(private readonly b: CodeBuilder, private readonly src: string, private readonly facts: TemplateFacts, private readonly options: JsxOptions, private readonly sites: Sites) {}
 
   emitRoot(nodes: Node[]): void {
     const visible = this.withoutSlots(nodes)
@@ -121,11 +122,8 @@ export class JsxTemplate {
     b.add('{(() => { ')
     b.wrap(node, () => {
       b.add('const ')
-      this.constSites.add(b.code.length)
-
       // Code that runs reads it as a memo, as it does a row, unless the markup renders once.
-      if (!this.options.staticLoops)
-        this.accessorSites.add(b.code.length)
+      this.sites.consts.set(b.code.length, !this.options.staticLoops)
 
       b.addSource(node.pattern).add(' = (').addSource(node.value).add(');')
     })
@@ -197,7 +195,7 @@ export class JsxTemplate {
         }
 
         b.add('>{(')
-        this.accessorSites.add(b.code.length)
+        this.sites.rows.add(b.code.length)
         b.addSource(branch.alias).add(') => ')
         this.emitRoot(branch.children)
         b.add(`}</${helperName('Show')}>`)
@@ -314,14 +312,14 @@ export class JsxTemplate {
       }
 
       b.add('>{(')
-      this.accessorSites.add(b.code.length)
+      this.sites.rows.add(b.code.length)
       b.addSource(node.item)
 
       if (node.index) {
         b.add(', ')
 
         if (!positional)
-          this.accessorSites.add(b.code.length)
+          this.sites.rows.add(b.code.length)
 
         b.addSource(node.index)
       }

@@ -3,6 +3,7 @@ import type { AwaitNode, ConstNode, ElementNode, ErrorNode, ForNode, IfNode, Nod
 import type { CodeBuilder } from './mapping'
 import { parseExpression } from '@babel/parser'
 import { isHead, isSlot } from './ast'
+import { PROPS } from './names'
 
 // The children of an element or a block as the markup holds them: runs of static text, plain elements, and dynamic parts.
 // Server markup and browser code both walk this list, so hydration finds a dynamic part where the browser expects it.
@@ -153,12 +154,12 @@ function patternNames(pattern: string): string[] {
 // What a `slot` renders: the component's children, or the block prop it names, called with its arguments when it has some.
 export function slotValue(b: CodeBuilder, slot: ElementNode): void {
   if (!slot.outlet) {
-    b.add('__props.children')
+    b.add(`${PROPS}.children`)
 
     return
   }
 
-  b.add('__props.').addSource(slot.outlet.name)
+  b.add(`${PROPS}.`).addSource(slot.outlet.name)
 
   if (slot.outlet.args)
     b.add('?.(').addSource(slot.outlet.args).add(')')

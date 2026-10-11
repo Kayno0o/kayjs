@@ -1,6 +1,7 @@
 import type { ConstNode, ElementNode, KayFile, Node, Span, TemplateFacts, TemplateHelper } from './ast'
 import type { Rewrite } from './mapping'
 import type { PageSettingName } from './page-settings'
+import type { Sites } from './rewrite'
 import type { ImportBinding, ScriptAnalysis, ServerAnalysis } from './script'
 import { actionUrl } from '../runtime/action'
 import { errorMessages, isHead, someNode, templateFacts } from './ast'
@@ -12,6 +13,7 @@ import { constDeclaration } from './items'
 import { JsxTemplate } from './jsx'
 import { CodeBuilder, DYNAMIC_TAG } from './mapping'
 import { helperName } from './markup'
+import { defaultName, LOAD, PROPS } from './names'
 import { PAGE, PAGE_SETTINGS } from './page-settings'
 import { headTagProblem, sharedImports } from './validate'
 
@@ -56,16 +58,12 @@ export interface GenerateOptions {
 
 export interface Generated {
   builder: CodeBuilder
-  // Generated offsets of parameters whose references must be called: loop items, loop indexes, narrowed `if` aliases.
-  accessorSites: Set<number>
-  // Generated offsets of the names a template `const` declares, its pattern's start.
-  constSites: Set<number>
+  sites: Sites
 }
 
 const CTX_REFERENCE = /\bctx\b/
 const IMPORT_COMMA_AFTER = /^\s*,\s*/
 const IMPORT_COMMA_BEFORE = /,\s*$/
-const DEFAULT_PREFIX = '__default_'
 // `kay build` renders the page once when it is `true`.
 const PRERENDER: PageSettingName = 'prerender'
 // The page's query schema, which types and validates `ctx.query`.
@@ -76,10 +74,6 @@ const MESSAGE_KEY = /(?:\bt\(\s*|\bT\([^)]*?\bkey=)(['"`])([\w.-]+)\1/g
 const NOT_ACTIONS = new Set<string>([PAGE, ...PAGE_SETTINGS])
 // A type parameter's name, past the `const`, `in` and `out` modifiers it may carry.
 const TYPE_PARAMETER_NAME = /^\s*(?:(?:const|in|out)\s+)*([A-Z_$][\w$]*)/i
-
-export function defaultName(index: number): string {
-  return `${DEFAULT_PREFIX}${index}`
-}
 
 // What a pass builds: JSX, which the analysis pass reads, the same JSX with `kay check`'s assertions, or the code that runs, markup strings on the server or the browser's DOM.
 type OutputMode = 'jsx' | 'check' | 'html' | 'dom'
@@ -115,8 +109,7 @@ export function generate(file: KayFile, script: ScriptAnalysis, server: ServerAn
 // The module around a template, alike for every output mode: its imports, the server fence's `load`, the component's signature, props and script, and its export; the template renders through the writer of the mode.
 class ModuleShell {
   private readonly b: CodeBuilder
-  private readonly accessorSites = new Set<number>()
-  private readonly constSites = new Set<number>()
+  private readonly sites: Sites = { rows: new Set(), consts: new Map(), props: new Map() }
   private readonly src: string
   private readonly mode: OutputMode
   private readonly kind: IslandKind
@@ -144,7 +137,7 @@ class ModuleShell {
       staticLoops: this.staticLoops,
       sendsIslandProps: this.kind === 'static' || this.kind === 'twin',
       identityKeys: this.kind === 'island' || this.kind === 'inside island',
-    }, this.accessorSites, this.constSites)
+    }, this.sites)
   }
 
   run(): Generated {
@@ -169,7 +162,7 @@ class ModuleShell {
     this.template(template)
     this.exports()
 
-    return { builder: this.b, accessorSites: this.accessorSites, constSites: this.constSites }
+    return { builder: this.b, sites: this.sites }
   }
 
   private imports(head: boolean): void {
@@ -281,10 +274,10 @@ class ModuleShell {
     b.add('(')
 
     if (server) {
-      b.add(`__props: KayPageData<typeof load>${childrenSlot ? childrenType : ''}`)
+      b.add(`${PROPS}: KayPageData<typeof ${LOAD}>${childrenSlot ? childrenType : ''}`)
     }
     else if (script.props) {
-      b.add(childrenSlot ? '__props: (' : '__props: ')
+      b.add(childrenSlot ? `${PROPS}: (` : `${PROPS}: `)
 
       if (script.props.type)
         b.addSource(script.props.type)
@@ -295,10 +288,10 @@ class ModuleShell {
         b.add(`)${childrenType}`)
     }
     else if (childrenSlot) {
-      b.add('__props: { children?: KayJSX.Element }')
+      b.add(`${PROPS}: { children?: KayJSX.Element }`)
     }
     else if (this.facts.slot) {
-      b.add('__props: {}')
+      b.add(`${PROPS}: {}`)
     }
 
     b.add(') {\n')
@@ -451,13 +444,17 @@ class ModuleShell {
     const context = `KayPageContext<${params}${query !== undefined ? `, KayQueryOf<${query}>` : ''}>`
     const prerender = this.settingType(PRERENDER)
 
-    b.add(`\nexport async function load(${ctx}: ${prerender !== undefined ? `KayPrerenderedContext<${prerender}, ${context}>` : context}) {\n`)
+    b.add(`\nexport async function ${LOAD}(${ctx}: ${prerender !== undefined ? `KayPrerenderedContext<${prerender}, ${context}>` : context}) {\n`)
     for (const span of server.body) {
       b.addSource(span)
 
       this.deferDeclared(server, span)
     }
-    b.add(`\nreturn { ${server.data.map(data => this.deferred.has(data.name) ? `${data.name}: ${helperName('autoDefer')}(${data.name})` : data.name).join(', ')} }\n}\n`)
+    const handOver = `return { ${server.data.map(data => this.deferred.has(data.name) ? `${data.name}: ${helperName('autoDefer')}(${data.name})` : data.name).join(', ')} }`
+
+    b.add('\n')
+    this.sites.handOver = { start: b.code.length, end: b.code.length + handOver.length }
+    b.add(`${handOver}\n}\n`)
   }
 
   // Right where a deferred value is declared, so a promise rejecting while a later statement awaits crashes nothing; a statement an export reads runs at module level.
@@ -474,9 +471,12 @@ class ModuleShell {
 
     if (!this.options.rewrites && data.length > 0) {
       this.b.add('\nconst { ')
-      for (const binding of data)
-        this.b.add(`${JSON.stringify(binding.name)}: `).addSource(binding.local).add(', ')
-      this.b.add('} = __props;\n')
+      for (const [index, binding] of data.entries()) {
+        this.b.add(`${JSON.stringify(binding.name)}: `)
+        this.sites.props.set(this.b.code.length, { binding: { local: binding.local, key: binding.name }, index: (this.script.props?.bindings.length ?? 0) + index })
+        this.b.addSource(binding.local).add(', ')
+      }
+      this.b.add(`} = ${PROPS};\n`)
     }
 
     const props = this.script.props
@@ -502,7 +502,7 @@ class ModuleShell {
     b.add('\n')
 
     if (props.name)
-      b.add('const ').addSource(props.name).add(' = __props;\n')
+      b.add('const ').addSource(props.name).add(` = ${PROPS};\n`)
 
     // A default runs the first time an `undefined` prop is read, then keeps its value like a destructuring default; it is typed as the prop, so a function or an object literal in it gets its type from the props type.
     for (const [index, binding] of props.bindings.entries()) {
@@ -510,7 +510,7 @@ class ModuleShell {
         continue
 
       const name = defaultName(index)
-      const type = `Exclude<(typeof __props)[${JSON.stringify(binding.key)}], undefined>`
+      const type = `Exclude<(typeof ${PROPS})[${JSON.stringify(binding.key)}], undefined>`
 
       b.add(`let ${name}_made: { value: ${type} } | undefined;\n`)
       b.wrap(binding.local, () => b.add(`const ${name} = (): ${type} => (${name}_made ??= { value: (`))
@@ -518,20 +518,23 @@ class ModuleShell {
     }
 
     if (props.rest)
-      b.add('const ').addSource(props.rest).add(` = ${helperName('omit')}(__props, ${props.bindings.map(binding => JSON.stringify(binding.key)).join(', ')});\n`)
+      b.add('const ').addSource(props.rest).add(` = ${helperName('omit')}(${PROPS}, ${props.bindings.map(binding => JSON.stringify(binding.key)).join(', ')});\n`)
 
     // The analysis pass declares the destructured names so scope analysis can find every read of them; the final pass rewrites those reads instead.
     if (!this.options.rewrites && props.bindings.length > 0) {
       b.add('const { ')
-      for (const binding of props.bindings)
-        b.add(`${JSON.stringify(binding.key)}: `).addSource(binding.local).add(', ')
-      b.add('} = __props;\n')
+      for (const [index, binding] of props.bindings.entries()) {
+        b.add(`${JSON.stringify(binding.key)}: `)
+        this.sites.props.set(b.code.length, { binding, index })
+        b.addSource(binding.local).add(', ')
+      }
+      b.add(`} = ${PROPS};\n`)
     }
     // Type checking keeps each `{ title }` as a read of its prop, so the editor hovers, finds and renames it with the prop.
     else if (this.mode === 'check') {
       for (const binding of props.bindings) {
         if (this.text(binding.local) === binding.key)
-          b.add('__props.').addSource(binding.local).add(';\n')
+          b.add(`${PROPS}.`).addSource(binding.local).add(';\n')
       }
     }
   }
@@ -550,11 +553,7 @@ class ModuleShell {
 
     b.wrap(node, () => {
       b.add('const ')
-      this.constSites.add(b.code.length)
-
-      if (memo !== undefined)
-        this.accessorSites.add(b.code.length)
-
+      this.sites.consts.set(b.code.length, memo !== undefined)
       b.addSource(node.pattern).add(' = (').addSource(node.value).add(');\n')
     })
   }

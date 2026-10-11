@@ -6,6 +6,7 @@ import { keyedByPosition, marksServerIsland } from './ast'
 import { decodeEntities, isFunctionAt } from './expression'
 import { childItems, constDeclaration, errorParagraphArguments, slotValue, soleDynamic } from './items'
 import { describedValue, END_MARKER, escapeStaticAttribute, escapeText, helperName, RAW_ELEMENTS, START_MARKER, TemplateWriter, VOID_ELEMENTS } from './markup'
+import { SUBJECT } from './names'
 
 // The `kay/dom` helpers browser output calls, each imported under a `Kay` name.
 const DOM_HELPERS = ['append', 'attempt', 'attribute', 'awaited', 'branches', 'close', 'component', 'componentClass', 'dynamic', 'effect', 'errorParagraph', 'fragment', 'image', 'insert', 'listen', 'loop', 'markers', 'memo', 'merge', 'omit', 'property', 'ref', 'rowKey', 'setClass', 'setStyle', 'spread', 'template', 'text', 'transition', 'untrack']
@@ -161,7 +162,7 @@ export class DomTemplate extends TemplateWriter {
 
     // A `match` reads its subject once, which each branch compares with its values.
     if (node.subject)
-      b.add(`{ const KaySubject = ${helperName('memo')}(() => (`).addSource(node.subject).add(')); ')
+      b.add(`{ const ${SUBJECT} = ${helperName('memo')}(() => (`).addSource(node.subject).add(')); ')
 
     b.add(`KayBranches(${at}, [`)
 
@@ -173,7 +174,7 @@ export class DomTemplate extends TemplateWriter {
           b.add('() => ')
 
           for (const [index, value] of branch.values.entries())
-            b.add(index === 0 ? 'KaySubject() === (' : ' || KaySubject() === (').addSource(value).add(')')
+            b.add(index === 0 ? `${SUBJECT}() === (` : ` || ${SUBJECT}() === (`).addSource(value).add(')')
         }
         else if (branch.test) {
           b.add('() => (').addSource(branch.test).add(')')

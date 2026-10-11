@@ -17,6 +17,7 @@ import { compileShadow, generatedSpan, shadowPath, shadowSource, sourceSpan } fr
 import { formatKay } from '../compiler/format'
 import { lintLevels } from '../compiler/lints'
 import { offsetAt, positionAt } from '../compiler/mapping'
+import { GENERATED_NAME } from '../compiler/names'
 import { parseKay } from '../compiler/parser'
 import { analyzeScript, analyzeServer } from '../compiler/script'
 import { loadConfig } from '../config'
@@ -60,8 +61,6 @@ const TRAILING_SEMICOLON = /;$/
 // A one-line named import, as generated code writes them: its names, then its quoted module.
 const NAMED_IMPORT = /^import \{([^}]*)\} from (['"][^'"]+['"])/
 const RESERVED_CHARACTER = /[!'()*]/g
-// Names generated code declares or imports, never written by the user.
-const GENERATED_NAME = /^(?:__props|__default_\d+|kayEvent|Kay(?:LoopFor|StaticFor|Show|Omit|ComponentClass|Dynamic|TemplateHelpers|Island|IslandBrand|HydrateWhen|Href|Html|Field|FormError|Prop|FunctionProp|Children|IdentityKey|PageContext|PrerenderedContext|PageSettings|QueryOf|PageData|JSX|FormAction|RegisterActions|ActionStub|UseHead|Await))$/
 const FULL_SYNC = 1
 const ERROR = 1 as const
 const WARNING = 2 as const

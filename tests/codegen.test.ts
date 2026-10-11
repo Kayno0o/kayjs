@@ -496,6 +496,8 @@ describe('component names', () => {
     expect(compileKay('---\nconst { ts } = props<{ ts: number }>()\n---\np {new Date(ts).getFullYear()}', 'date.kay').tsx).toContain('export default function DatePage(')
     expect(compileKay('p {Date.now()}', 'date.kay').tsx).toContain('export default function DatePage(')
     expect(compileKay('p {Date.now()}', 'other.kay').tsx).toContain('export default function Other(')
+    expect(compileKay('p Date of birth', 'date.kay').tsx).toContain('export default function Date(')
+    expect(compileKay('p {Date.now() + DatePage}', 'date.kay').tsx).toContain('export default function DatePagePage(')
   })
 
   it('keeps the name for a template that renders the component itself', () => {

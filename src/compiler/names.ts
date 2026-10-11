@@ -1,0 +1,22 @@
+// The names the compiler writes into a component's module, which the passes and the editor all read.
+
+// The props object every component function takes.
+export const PROPS = '__props'
+// The value an updater gets, as `count += 1` writes `count.set((KayCurrent) => KayCurrent + 1)`.
+export const CURRENT = 'KayCurrent'
+// A `case` block's subject, read once for every `when`.
+export const SUBJECT = 'KaySubject'
+// The server fence's function, which hands its data to the template.
+export const LOAD = 'load'
+// The component function's name in the analysis pass, which no read in the source can resolve to: the real one is chosen once the reads are known.
+export const SELF = 'KaySelf'
+
+const DEFAULT_PREFIX = '__default_'
+
+// A prop default's getter, by the prop's index in the destructuring.
+export function defaultName(index: number): string {
+  return `${DEFAULT_PREFIX}${index}`
+}
+
+// What the editor leaves out of completions: the names above and what the generated code imports or declares.
+export const GENERATED_NAME = new RegExp(`^(?:${[PROPS, CURRENT, SUBJECT, SELF, 'kayEvent'].join('|')}|${DEFAULT_PREFIX}\\d+|Kay(?:LoopFor|StaticFor|Show|Omit|ComponentClass|Dynamic|TemplateHelpers|Island|IslandBrand|HydrateWhen|Href|Html|Field|FormError|Prop|FunctionProp|Children|IdentityKey|PageContext|PrerenderedContext|PageSettings|QueryOf|PageData|JSX|FormAction|RegisterActions|ActionStub|UseHead|Await))$`)

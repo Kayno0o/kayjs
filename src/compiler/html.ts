@@ -5,6 +5,7 @@ import { actionOf, keyedByPosition, marksServerIsland, serverIslandOf } from './
 import { decodeEntities } from './expression'
 import { childItems, constDeclaration, errorParagraphArguments, slotValue, soleDynamic } from './items'
 import { BEHAVIOUR, describedValue, END_MARKER, escapeStaticAttribute, escapeText, fromRoot, helperName, RAW_ELEMENTS, START_MARKER, TemplateWriter, VOID_ELEMENTS } from './markup'
+import { SUBJECT } from './names'
 
 // The `kay/html` helpers static server output calls, each imported under a `Kay` name.
 const HTML_HELPERS = ['attempt', 'attribute', 'child', 'className', 'component', 'componentClass', 'currentPage', 'dynamic', 'element', 'errorParagraph', 'formConstraints', 'head', 'imageAttributes', 'localHref', 'loop', 'memo', 'merge', 'nonEmptyAttribute', 'omit', 'raw', 'refillOptions', 'selectOptions', 'serverIsland', 'show', 'style', 'untrack']
@@ -161,7 +162,7 @@ export class HtmlTemplate extends TemplateWriter {
 
           // A `match` reads its subject once, which each branch compares with its values.
           if (subject) {
-            b.add('((KaySubject) => ')
+            b.add(`((${SUBJECT}) => `)
             this.if(item.node, 0)
             b.add(')(').addSource(subject).add(')')
           }
@@ -259,7 +260,7 @@ export class HtmlTemplate extends TemplateWriter {
     }
 
     for (const [index, value] of branch.values.entries())
-      b.add(index === 0 ? 'KaySubject === (' : ' || KaySubject === (').addSource(value).add(')')
+      b.add(index === 0 ? `${SUBJECT} === (` : ` || ${SUBJECT} === (`).addSource(value).add(')')
   }
 
   private for(node: ForNode): void {

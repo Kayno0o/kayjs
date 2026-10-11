@@ -1,7 +1,7 @@
 import type { Diagnostic, Node, Span } from './ast'
 import type { LintLevels } from './lints'
 import type { ImportedSignals, SignalKind } from './module-signals'
-import type { FoundRewrites } from './rewrite'
+import type { NameFindings } from './rewrite'
 import type { ParsedFence, ScriptAnalysis, ServerAnalysis } from './script'
 import { basename, relative } from 'node:path'
 import process from 'node:process'
@@ -11,6 +11,7 @@ import { generate, isInteractive, islandMessages, mayPromote } from './codegen'
 import { cssImportsWithoutText, deprecatedSchemaNames, separatePageSettings, unboundedFields } from './fence-checks'
 import { applyLints, templateLints } from './lints'
 import { SourceMap } from './mapping'
+import { SELF } from './names'
 import { parseKay } from './parser'
 import { findRewrites } from './rewrite'
 import { analyzeScript, analyzeServer } from './script'
@@ -92,9 +93,6 @@ export function compileKay(source: string, filename: string, options: CompileOpt
 
   drawIcons(file, new Set([...script.imports, ...server?.imports ?? []].filter(binding => !binding.typeOnly && binding.imported === 'default' && ICON_IMPORT.test(binding.source)).map(binding => binding.local)))
 
-  // A name a fence uses may clash with the component's own; the template's reads are found once the code is generated.
-  const fences = [file.script, file.server].map(span => span ? source.slice(span.start, span.end) : '').join('\n')
-  let name = freeName(componentName(filename), fences)
   // Pages, layouts and special pages render on the server: a package they import never switches them.
   const routeFile = file.server !== undefined || ROUTE_FILES.has(basename(filename))
   const client = file.client !== undefined || (options.clientOnly === true && !routeFile)
@@ -103,8 +101,8 @@ export function compileKay(source: string, filename: string, options: CompileOpt
   const twin = hydratableServer && !options.twinBuild && island === undefined && !routeFile ? `./${basename(filename)}${ISLAND_TWIN}` : undefined
   const promote = island === undefined && !routeFile && mayPromote(file, script) ? islandId(filename, options.root) : undefined
   const generateOptions = { island, client, twin, promote, output: options.output, hydratable: hydratableServer && (island !== undefined || options.twinBuild === true), moduleId: islandId(filename, options.root), includeServer: options.includeServer, params: options.params, paramTypes: options.paramTypes, check: options.check, insideIsland: options.insideIsland, inspect: options.inspect, relocateImport: options.relocateImport, errorPage: basename(filename) === ERROR_PAGE, special: basename(filename).startsWith('_') }
-  const bindings = [...(script.props?.bindings ?? []), ...(server?.data ?? []).map(data => ({ local: data.local, key: data.name }))]
-  let analysis = generate(file, script, server, { ...generateOptions, name })
+  // The analysis pass names the component so no read resolves to it, then the name is chosen free of what the code reads.
+  const analysis = generate(file, script, server, { ...generateOptions, name: SELF })
   const imported = new Map<string, SignalKind>([...script.imports, ...server?.imports ?? []].flatMap((binding) => {
     const kind = binding.typeOnly ? undefined : options.importedSignals?.[binding.source]?.[binding.imported]
 
@@ -112,16 +110,10 @@ export function compileKay(source: string, filename: string, options: CompileOpt
   }))
   // Only code that runs calls the accessors of rows and aliases; the type checker reads them as values, which it narrows.
   const values = options.output === undefined
-  let found = findRewrites(analysis.builder.code, analysis.builder.map(), analysis.accessorSites, analysis.constSites, bindings, name, values, file.templateStart, imported)
-
-  // A `date.kay` declaring `function Date` would break the `new Date()` its template reads.
-  while (found.shadowsName) {
-    name = `${name}Page`
-    analysis = generate(file, script, server, { ...generateOptions, name })
-    found = findRewrites(analysis.builder.code, analysis.builder.map(), analysis.accessorSites, analysis.constSites, bindings, name, values, file.templateStart, imported)
-  }
-
-  const final = generate(file, script, server, { ...generateOptions, name, rewrites: found.rewrites, translates: found.translates })
+  const found = findRewrites({ code: analysis.builder.code, map: analysis.builder.map(), sites: analysis.sites, values, templateStart: file.templateStart, imported })
+  const fences = [file.script, file.server].map(span => span ? source.slice(span.start, span.end) : '').join('\n')
+  const name = freeName(componentName(filename), fences, found.findings.globalReads)
+  const final = generate(file, script, server, { ...generateOptions, name, rewrites: found.plan.rewrites, translates: found.plan.translates })
   const diagnostics = [...file.diagnostics, ...script.diagnostics, ...(server?.diagnostics ?? []), ...server ? separatePageSettings(source, server) : [], ...validate(file, script, server, generateOptions), ...found.diagnostics]
 
   // Code that does not parse usually already has a better diagnostic from the fence or the template; this one is what is left when nothing else explains it.
@@ -136,7 +128,7 @@ export function compileKay(source: string, filename: string, options: CompileOpt
   const broken = diagnostics.some(diagnostic => !diagnostic.checkOnly)
 
   if (options.check)
-    diagnostics.push(...unboundedFields(server), ...[script.fence, server?.fence].flatMap(fence => fence ? [...fenceSchemaNames(source, fence), ...cssImportsWithoutText(fence)] : []), ...broken ? [] : [...unreadNames(source, file.template, script, server, found), ...constantSignals(source, file.script, found)], ...templateLints(file))
+    diagnostics.push(...unboundedFields(server), ...[script.fence, server?.fence].flatMap(fence => fence ? [...fenceSchemaNames(source, fence), ...cssImportsWithoutText(fence)] : []), ...broken ? [] : [...unreadNames(source, file.template, script, server, found.findings), ...constantSignals(source, file.script, found.findings)], ...templateLints(file))
 
   if (file.client && routeFile)
     diagnostics.push({ ...file.client, message: 'A page, layout or special page cannot be `--- client`', note: 'it renders on the server', help: 'move what needs the browser to a component it renders, and make that one `--- client`' })
@@ -163,7 +155,7 @@ function fenceSchemaNames(source: string, fence: ParsedFence): Diagnostic[] {
   return deprecatedSchemaNames(fence, !MEMBER_OF_T.test(`${source.slice(0, fence.offset)} ${source.slice(fence.offset + fence.code.length)}`))
 }
 
-function unreadNames(source: string, template: Node[], script: ScriptAnalysis, server: ServerAnalysis | undefined, found: FoundRewrites): Diagnostic[] {
+function unreadNames(source: string, template: Node[], script: ScriptAnalysis, server: ServerAnalysis | undefined, found: NameFindings): Diagnostic[] {
   const unread: Diagnostic[] = []
   const unused = (span: Span) => found.unread.has(span.start) && !source.startsWith('_', span.start)
   // A `slot name` reads its prop off the props object, not through the destructured name.
@@ -188,7 +180,7 @@ function unreadNames(source: string, template: Node[], script: ScriptAnalysis, s
 }
 
 // The signals the component script declares and nothing writes.
-function constantSignals(source: string, script: Span | undefined, found: FoundRewrites): Diagnostic[] {
+function constantSignals(source: string, script: Span | undefined, found: NameFindings): Diagnostic[] {
   return found.constantSignals.filter(({ name }) => script !== undefined && name.start >= script.start && name.end <= script.end).map(({ name, value }) => {
     const text = source.slice(name.start, name.end)
 
@@ -215,7 +207,7 @@ export function componentName(filename: string): string {
   return name === '' || LEADING_DIGIT.test(name) ? `Page${name}` : name
 }
 
-// A page `table.kay` importing `components/table.kay` would otherwise declare a `Table` that shadows the import and renders itself.
-function freeName(name: string, code: string): string {
-  return new RegExp(`(?<![\\w$])${name}(?![\\w$])`).test(code) ? freeName(`${name}Page`, code) : name
+// A page `table.kay` importing `components/table.kay` would otherwise declare a `Table` that shadows the import and renders itself, and a `date.kay` declaring `function Date` would break the `new Date()` its template reads.
+function freeName(name: string, fences: string, reads: ReadonlySet<string>): string {
+  return reads.has(name) || new RegExp(`(?<![\\w$])${name}(?![\\w$])`).test(fences) ? freeName(`${name}Page`, fences, reads) : name
 }
