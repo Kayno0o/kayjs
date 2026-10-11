@@ -143,16 +143,18 @@ export function undoable(change: () => void): () => void {
     }
   })
 
+  // A change made inside another is part of it too, so undoing the outer one undoes both.
   slot.writing = (node, write) => {
     if (!writes.has(node))
       writes.set(node, { before: node.value, write })
+
+    outer?.(node, write)
   }
 
   try {
     batch(change)
   }
   catch (error) {
-    slot.writing = outer
     undo()
 
     throw error

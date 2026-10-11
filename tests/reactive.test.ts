@@ -5,6 +5,7 @@ import { batch, effect, every, flush, linked, listen, memo, onCleanup, onMount, 
 import { ActionError, actionStub } from '../src/runtime/action'
 import { navigation } from '../src/runtime/navigation'
 import { createSignal, ownSignal, recordSignals, renderEffect, renderOnServer, undoable, unrecorded } from '../src/runtime/reactive'
+import { inServerScope } from '../src/server/scope'
 
 describe('signals', () => {
   it('read the last value written, a function written being an updater', () => {
@@ -33,6 +34,23 @@ describe('signals', () => {
     flush()
     expect(runs).toEqual({ plain: 1, always: 2 })
     dispose()
+  })
+})
+
+describe('server scopes', () => {
+  it('keep what each request writes to a shared signal to that request, two of them overlapping across awaits', async () => {
+    const shared = createSignal('module')
+    const report = () => undefined
+    const request = async (value: string, before: number, after: number) => inServerScope(new Request('http://localhost/'), report, async () => {
+      await Bun.sleep(before)
+      shared[1](value)
+      await Bun.sleep(after)
+
+      return shared[0]()
+    })
+
+    expect(await Promise.all([request('first', 0, 30), request('second', 10, 5)])).toEqual(['first', 'second'])
+    expect(shared[0]()).toBe('module')
   })
 })
 
@@ -279,6 +297,58 @@ describe('recordSignals', () => {
 
     expect(reshaped.result).toEqual([5, 0, ''])
   })
+
+  it('records again what the outer one records once an inner one throws', () => {
+    const outer = recordSignals(() => {
+      createSignal(1)
+
+      try {
+        recordSignals(() => {
+          createSignal(2)
+
+          throw new Error('the script broke')
+        })
+      }
+      catch {}
+
+      createSignal(3)
+    })
+
+    expect(outer.values()).toEqual([1, 3])
+  })
+
+  it('leaves out what unrecorded blocks make, nested or not, while one recording inside them records its own', () => {
+    let inner: { values: () => unknown[] } | undefined
+    const outer = recordSignals(() => {
+      createSignal(1)
+      unrecorded(() => {
+        unrecorded(() => createSignal('nested'))
+        createSignal('row')
+        inner = recordSignals(() => createSignal('own'))
+        createSignal('after')
+      })
+      createSignal(2)
+    })
+
+    expect(outer.values()).toEqual([1, 2])
+    expect(inner!.values()).toEqual(['own'])
+    expect(createSignal('outside')[0]()).toBe('outside')
+  })
+
+  it('records the signals an optimistic change makes, and keeps recording once it is undone', () => {
+    const recorded = recordSignals(() => {
+      const [, write] = createSignal(1)
+      const undo = undoable(() => {
+        write(2)
+        createSignal('made in the change')
+      })
+
+      undo()
+      createSignal(3)
+    })
+
+    expect(recorded.values()).toEqual([1, 'made in the change', 3])
+  })
 })
 
 describe('linked', () => {
@@ -313,6 +383,31 @@ describe('linked', () => {
 })
 
 describe('optimistic changes', () => {
+  it('undo a change made inside another with the outer one, and keep the outer one\'s undo once an inner change throws', () => {
+    const count = signal(1)
+    const label = signal('a')
+    const done = signal(false)
+    const undo = undoable(() => {
+      count.set(2)
+
+      try {
+        undoable(() => {
+          label.set('b')
+
+          throw new Error('no such tier')
+        })
+      }
+      catch {}
+
+      expect(label()).toBe('a')
+      label.set('c')
+      undoable(() => done.set(true))
+    })
+
+    undo()
+    expect([count(), label(), done()]).toEqual([1, 'a', false])
+  })
+
   it('undo what they wrote, but not what was written since', () => {
     const count = signal(1)
     const label = signal('a')
@@ -443,7 +538,15 @@ describe('optimistic changes', () => {
 })
 
 describe('every', () => {
-  it('runs every interval until its root goes, starting and stopping as its condition turns', () => {
+  it('runs every interval until its root goes, starting and stopping as its condition turns', async () => {
+    // Once a server scope ran in the process, fake timers no longer settle a tick's await before the next tick: each step lets it.
+    const advance = async (ms: number) => {
+      for (let step = 0; step < ms; step += 50) {
+        jest.advanceTimersByTime(50)
+        await Promise.resolve()
+      }
+    }
+
     jest.useFakeTimers()
 
     try {
@@ -456,23 +559,23 @@ describe('every', () => {
       })
 
       flush()
-      jest.advanceTimersByTime(250)
+      await advance(250)
       expect(runs).toBe(0)
 
       active.set(true)
       flush()
-      jest.advanceTimersByTime(250)
+      await advance(250)
       expect(runs).toBe(2)
 
       active.set(false)
       flush()
-      jest.advanceTimersByTime(250)
+      await advance(250)
       expect(runs).toBe(2)
 
       active.set(true)
       flush()
       dispose()
-      jest.advanceTimersByTime(250)
+      await advance(250)
       expect(runs).toBe(2)
     }
     finally {
