@@ -9,7 +9,7 @@ import { ContentError } from '../src/content/validate'
 import { resolveProject } from '../src/project'
 import { cached } from '../src/runtime/cache'
 import { editing, previewing } from '../src/runtime/preview'
-import { enterPreview, pages, previewUrl } from '../src/server'
+import { editRequested, enterPreview, pages, previewUrl } from '../src/server'
 import { readClient, readManifest, writeManifest } from '../src/server/client'
 import { prerenderPages } from '../src/server/prerender'
 import { inPreview, previewRequested } from '../src/server/preview'
@@ -168,7 +168,13 @@ describe('preview mode', () => {
   })
 
   it('puts a visitor in edit mode through the secret, a signed link or a guard, signed apart from preview mode so neither turns into it', async () => {
-    const mode = (cookie: string) => previewRequested(new Request('http://localhost/', { headers: { cookie } }))
+    const mode = (cookie: string) => {
+      const request = new Request('http://localhost/', { headers: { cookie } })
+
+      expect(editRequested(request)).toBe(previewRequested(request) === 'edit')
+
+      return previewRequested(request)
+    }
     const bySecret = await previewCookie(`/_kay/preview?path=/news&edit&secret=${SECRET}`)
     const link = previewUrl('/news', { edit: true })
     const cookies = new Bun.CookieMap()

@@ -54,6 +54,7 @@ Types include `Component`, `Signal`, `Guard`, `Duration`, `PageContext`, `Endpoi
 | `rooms`, `memoryRooms`, `sqliteRooms` | Websocket rooms |
 | `invalidatePage` | Rebuilds a prerendered page |
 | `enterPreview`, `exitPreview`, `previewUrl` | Preview mode for drafts, edit mode with `{ edit: true }` |
+| `editRequested` | Whether a request is in edit mode |
 | `renderToString` | Renders a component to a string, for mails and feeds |
 | `processImage`, `imageSize` | Resize or measure an image |
 | `files`, `diskFiles`, `s3Files`, `memoryFiles` | Stored uploads and their stores. See [File storage](/guides/file-storage) |

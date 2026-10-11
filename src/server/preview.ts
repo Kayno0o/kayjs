@@ -67,6 +67,11 @@ export function previewRequested(request: Request): PreviewMode | undefined {
   return sameText(sig, sign(settings, cookieText(until, edit))) ? edit ? 'edit' : 'preview' : undefined
 }
 
+// Whether the request is in edit mode, for a CMS's API module or guard to let in the editor alone outside a page's render, where `editing()` tells.
+export function editRequested(request: Request): boolean {
+  return previewRequested(request) === 'edit'
+}
+
 // Puts the visitor in preview mode for `preview.maxAge`, from a guard, a page or an action whose `ctx` carries cookies, such as one letting a signed-in editor in; `edit` puts them in edit mode as well.
 export function enterPreview(ctx: { cookies: CookieMap, request: Request }, options: { edit?: boolean } = {}): void {
   const current = settingsFor('enterPreview()')
