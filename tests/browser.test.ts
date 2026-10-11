@@ -1,6 +1,6 @@
 import type { TestPage, TestSite } from '../src/test'
-import { existsSync } from 'node:fs'
-import { chmod, mkdir, mkdtemp, readdir, rm } from 'node:fs/promises'
+import { existsSync, readFileSync } from 'node:fs'
+import { chmod, mkdir, mkdtemp, readdir, rm, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
@@ -8,6 +8,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { t } from 'elysia'
 import { chromium } from 'playwright-core'
 import { browserPath, testSite } from '../src/test'
+import { chromeTree, killAll, removeFetcherDirs } from '../src/test/browser'
 import { scratchDir } from './scratch'
 
 // Without BUN_CHROME_PATH or a Chrome on the PATH, the Chromium playwright-core installed for the other browser tests.
@@ -454,6 +455,72 @@ it('opens a page and never closes it', async () => {
       await rm(temp, { recursive: true, force: true })
     }
   }, 60_000)
+})
+
+// What some Chrome leaves when killed, Alpine's among them, played by processes of this test's own.
+describe.skipIf(!existsSync('/proc'))('a killed Chrome\'s leftovers', () => {
+  const alive = (pid: number) => {
+    try {
+      return !readFileSync(`/proc/${pid}/stat`, 'utf8').includes(') Z ')
+    }
+    catch {
+      return false
+    }
+  }
+
+  it('kills the processes of a Chrome naming the profile it was given, what it started included, and no other process', async () => {
+    const profile = join(await scratchDir('tree-'), 'profile')
+    const chrome = Bun.spawn(['sh', '-c', 'sleep 30 & wait', 'sh', `--user-data-dir=${profile}`])
+    const other = Bun.spawn(['sleep', '30'])
+
+    try {
+      let tree: number[] = []
+
+      for (let attempt = 0; attempt < 50 && tree.length < 2; attempt++) {
+        await Bun.sleep(20)
+        tree = chromeTree(chrome.pid, profile)
+      }
+
+      expect(tree).toHaveLength(2)
+      expect(chromeTree(other.pid, profile)).toEqual([])
+      killAll(tree)
+      expect(tree.map(alive)).toEqual([false, false])
+      expect(alive(other.pid)).toBe(true)
+    }
+    finally {
+      chrome.kill('SIGKILL')
+      other.kill('SIGKILL')
+    }
+  })
+
+  it('removes the empty directories Chrome leaves in the temp directory once no Chrome runs on it', async () => {
+    const temp = await mkdtemp(join(tmpdir(), 'kt-'))
+    const bin = await scratchDir('fake-chrome-')
+    const fetcher = join(temp, 'org.chromium.Chromium.chromium_chrome_url_fetcher_.aB3dE9')
+    const saved = process.env.TMPDIR
+
+    await mkdir(fetcher)
+    // Busybox's sleep, Alpine's, would run the applet its name says.
+    await symlink(process.execPath, join(bin, 'chromium'))
+
+    const chrome = Bun.spawn([join(bin, 'chromium'), '-e', 'setTimeout(() => {}, 30_000)'], { env: { ...process.env, TMPDIR: temp } })
+
+    process.env.TMPDIR = temp
+
+    try {
+      removeFetcherDirs()
+      expect(existsSync(fetcher)).toBe(true)
+      chrome.kill('SIGKILL')
+      await chrome.exited
+      removeFetcherDirs()
+      expect(existsSync(fetcher)).toBe(false)
+    }
+    finally {
+      process.env.TMPDIR = saved
+      chrome.kill('SIGKILL')
+      await rm(temp, { recursive: true, force: true })
+    }
+  })
 })
 
 async function printed(child: { stdout: ReadableStream<Uint8Array>, stderr: ReadableStream<Uint8Array>, exited: Promise<number> }): Promise<[string, number]> {
