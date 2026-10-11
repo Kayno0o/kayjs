@@ -437,6 +437,22 @@ describe('optimistic changes', () => {
     expect(a()).toBe(0)
   })
 
+  it('leave a signal the outer change wrote alone once something wrote it since, though an inner undo matched it by chance', () => {
+    const a = signal(0)
+    let inner: (() => void) | undefined
+    const outer = undoable(() => {
+      a.set(1)
+      inner = undoable(() => a.set(2))
+      a.set(3)
+    })
+
+    a.set(2)
+    inner!()
+    expect(a()).toBe(1)
+    outer()
+    expect(a()).toBe(1)
+  })
+
   it('undo what a change made inside another wrote when the outer one throws after it', () => {
     const a = signal(0)
     const b = signal(0)

@@ -154,7 +154,7 @@ export function undoable(change: () => void): () => void {
 
     outer?.(node, write)
   }
-  // What a change made inside this one puts back is this one's to undo still, and the one around it's.
+  // What a change made inside this one puts back is this one's to undo still, and the enclosing change's too.
   slot.undone = (node, from, to) => {
     if (written?.has(node) && written.get(node) === from)
       written.set(node, to)

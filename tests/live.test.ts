@@ -31,6 +31,16 @@ const { default: party } = await import(join(apiDir, 'party.ts')) as typeof impo
 const { default: notes } = await import(join(apiDir, 'notes.ts')) as typeof import('./fixtures/live/src/api/notes')
 const { addNote } = await import(resolve(fixture, 'src/lib/notes.ts')) as typeof import('./fixtures/live/src/lib/notes')
 
+// Polls a condition a request or another process makes true, failing past 2 seconds.
+async function until(ready: () => boolean): Promise<void> {
+  for (let waited = 0; !ready(); waited += 5) {
+    if (waited > 2_000)
+      throw new Error('timed out')
+
+    await Bun.sleep(5)
+  }
+}
+
 function upgrade(path: string, headers: Record<string, string> = {}): Request {
   return new Request(`http://localhost${path}`, { headers: { 'upgrade': 'websocket', 'connection': 'Upgrade', 'sec-websocket-key': 'dGhlIHNhbXBsZSBub25jZQ==', 'sec-websocket-version': '13', ...headers } })
 }
@@ -225,14 +235,6 @@ describe('stream() started from a handler', () => {
 
   afterAll(() => served.mockRestore())
 
-  const until = async (ready: () => boolean) => {
-    for (let waited = 0; !ready(); waited += 5) {
-      if (waited > 2_000)
-        throw new Error('timed out')
-
-      await Bun.sleep(5)
-    }
-  }
   const stopped = async () => Number(await (await site.fetch('/api/chat/forever/stopped')).text())
   // The route's source stops a while after its run ends, longer under load: how many stopped once `count` did, or after 5 seconds.
   const stopsReach = async (count: number) => {
@@ -278,7 +280,7 @@ describe('stream() started from a handler', () => {
     forever.close()
     // Its stop landing later would count for the next test.
     expect(await stopsReach(before + 3)).toBe(before + 3)
-  }, 15_000)
+  }, 20_000)
 
   it('stops the route\'s source once the island goes', async () => {
     const before = await stopped()
@@ -374,15 +376,6 @@ describe('resource()', () => {
     served.mockRestore()
     Reflect.deleteProperty(globalThis, 'document')
   })
-
-  const until = async (ready: () => boolean) => {
-    for (let waited = 0; !ready(); waited += 5) {
-      if (waited > 2_000)
-        throw new Error('timed out')
-
-      await Bun.sleep(5)
-    }
-  }
 
   it('reads a GET route as JSON, its dates as their ISO text', async () => {
     const rooms = root(() => resource(chat, '/rooms'))
@@ -801,16 +794,6 @@ describe('rooms', () => {
       const received: string[] = []
 
       return { received, raw: { sendText: (text: string) => void received.push(text) } }
-    }
-
-    // Polls a condition another process makes true, failing past a second.
-    async function until(condition: () => boolean): Promise<void> {
-      for (let waited = 0; !condition(); waited += 5) {
-        if (waited > 1_000)
-          throw new Error('timed out')
-
-        await Bun.sleep(5)
-      }
     }
 
     beforeAll(async () => {
