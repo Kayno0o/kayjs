@@ -1097,6 +1097,7 @@ describe('a compiled server with an SVG favicon', () => {
   it('serves the icons kay build drew from it, carrying no resvg', async () => {
     const root = await scratchProject({
       'tsconfig.json': tsconfig,
+      'kay.config.ts': 'export default { favicon: \'src/favicon.svg\' }\n',
       'src/favicon.svg': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#c00"/></svg>',
       'src/routes/index.kay': 'h1 Home\n',
       'src/server.ts': `import process from 'node:process'
