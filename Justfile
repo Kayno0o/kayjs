@@ -25,7 +25,7 @@ release level:
 watch-runs after:
 	#!/usr/bin/env bash
 	set -euo pipefail
-	for _ in $(seq 1 240); do
+	for _ in $(seq 1 90); do
 	  # Sleeping first gives a push's runs time to all appear, so one finishing early is not taken for the lot.
 	  sleep 10
 	  runs=$(tea actions runs ls -o json --limit 10 | jq -c --argjson after {{after}} '[.[] | select((.id | tonumber) > $after) | {id, status}]')
@@ -38,7 +38,7 @@ watch-runs after:
 	    exit 0
 	  fi
 	done
-	echo "the runs did not finish in 40 minutes: $runs" >&2
+	echo "the runs did not finish in 15 minutes: $runs" >&2
 	exit 1
 
 worktree name: # a worktree at HEAD in .claude/worktrees/<name>, its dependencies installed, as Claude Code's own are made
