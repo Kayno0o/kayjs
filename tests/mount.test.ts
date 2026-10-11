@@ -45,6 +45,22 @@ describe('mount', () => {
     unmount()
   })
 
+  it('reveals an invalid field hidden until found as find-in-page does, innermost first, a closed details opened, then focuses it', async () => {
+    const focused: boolean[] = []
+    const matched: string[] = []
+    const { root, unmount } = await mount('tests/fixtures/mount/until-found.kay', { onFocused: (took: boolean) => focused.push(took) })
+
+    root.addEventListener('beforematch', event => matched.push((event.target as Element).className))
+    root.querySelector<HTMLButtonElement>('.save')!.click()
+
+    expect(matched).toEqual(['inner', 'outer'])
+    expect(root.querySelectorAll('[hidden]')).toHaveLength(0)
+    expect(root.querySelector('details')!.open).toBe(true)
+    expect(focused).toEqual([true])
+    expect(document.activeElement).toBe(root.querySelector('.code'))
+    unmount()
+  })
+
   it('runs every mount on modules of its own, as a page load does, a persisted signal reading storage as it is then, which a test writes and reads as it keeps it', async () => {
     try {
       writePersisted('favorites', ['first'])

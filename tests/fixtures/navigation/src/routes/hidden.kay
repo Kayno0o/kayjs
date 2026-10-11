@@ -1,0 +1,15 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+export const save = action(t.Object({ code: t.String({ minLength: 3, error: 'Too short' }) }), async ({ code }) => code)
+---
+head
+  title Hidden
+h1 Hidden
+form(action={save})
+  section.panel(hidden="until-found")
+    input(name="code" aria-label="Code")
+    if save.error('code') as message
+      p.code-error {message}
+  button.unchecked(formnovalidate) Save

@@ -645,6 +645,23 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     expect(await page.evaluate(() => document.getElementById('add-title-error')?.textContent)).toBe('Too short')
   })
 
+  it('reveals the field a post was refused for when it is hidden until found, as find-in-page does', async () => {
+    await page.goto(`${origin}/hidden`)
+    await page.evaluate(() => {
+      const matched: string[] = []
+
+      ;(window as { matched?: string[] }).matched = matched
+      document.addEventListener('beforematch', event => matched.push((event.target as Element).className))
+      document.querySelector<HTMLInputElement>('input[name="code"]')!.value = 'ab'
+    })
+    await page.click('button.unchecked')
+    await page.waitForFunction(() => document.activeElement?.getAttribute('name') === 'code')
+
+    expect(await page.evaluate(() => (window as { matched?: string[] }).matched)).toEqual(['panel'])
+    expect(await page.evaluate(() => document.querySelector('section.panel')!.hasAttribute('hidden'))).toBe(false)
+    expect(await page.textContent('p.code-error')).toBe('Too short')
+  })
+
   it('announces a form\'s own refusal, the button that posted it focused again', async () => {
     await page.goto(`${origin}/second`)
     await page.fill('input[name="title"]', 'busy')

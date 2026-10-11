@@ -1,0 +1,11 @@
+---
+import { focusInvalid } from 'kay'
+
+const { onFocused } = props<{ onFocused: (focused: boolean) => void }>()
+---
+button.save(onClick={() => onFocused(focusInvalid())}) Save
+section.outer(hidden="until-found")
+  details
+    summary More
+    div.inner(hidden="until-found")
+      input.code(aria-label="Code" aria-invalid="true")
