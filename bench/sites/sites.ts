@@ -18,6 +18,8 @@ export interface Site {
   env?: Record<string, string>
   // What its dev servers read from the environment, none unless set: production's `env` may point a dev server elsewhere, as at the live site for its reloads.
   devEnv?: Record<string, string>
+  // Runs on each side's dev copy once installed, given its directory, as for pointing the dev server's reloads back at it.
+  prepareDev?: (dir: string, kind: Variant['kind']) => void | Promise<void>
   // Rewrites the Astro side's package.json before its install, as for dependencies whose pinned versions the registry lost.
   patch?: (manifest: Manifest) => void
   // Runs before the site's Astro side is exported, given the work directory, as for building a dependency it needs from source.
@@ -126,6 +128,9 @@ export async function prepare() {
       }
 
       run([process.execPath, 'install'], dir)
+
+      if (dir === variant.devDir)
+        await variant.site.prepareDev?.(dir, variant.kind)
     }
   }
 }
