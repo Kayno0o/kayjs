@@ -6,7 +6,7 @@ import { decodeEntities } from './expression'
 import { childItems, constDeclaration, errorParagraphArguments, slotValue, soleDynamic } from './items'
 
 // The `kay/html` helpers static server output calls, each imported under a `Kay` name.
-const HTML_HELPERS = ['attempt', 'attribute', 'child', 'className', 'component', 'componentClass', 'currentPage', 'dynamic', 'element', 'errorParagraph', 'formConstraints', 'head', 'imageAttributes', 'localHref', 'loop', 'memo', 'merge', 'omit', 'raw', 'refillOptions', 'selectOptions', 'serverIsland', 'show', 'style', 'untrack']
+const HTML_HELPERS = ['attempt', 'attribute', 'child', 'className', 'component', 'componentClass', 'currentPage', 'dynamic', 'element', 'errorParagraph', 'formConstraints', 'head', 'imageAttributes', 'localHref', 'loop', 'memo', 'merge', 'nonEmptyAttribute', 'omit', 'raw', 'refillOptions', 'selectOptions', 'serverIsland', 'show', 'style', 'untrack']
 
 export const VOID_ELEMENTS = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'keygen', 'link', 'menuitem', 'meta', 'param', 'source', 'track', 'wbr'])
 export const RAW_ELEMENTS = new Set(['script', 'style'])
@@ -529,9 +529,7 @@ export class HtmlTemplate {
         selected = read(expression, false)
 
       if (attributeName === 'class' || attributeName === 'style') {
-        markup.text(` ${attributeName}="`)
-        markup.dynamic(() => b.add(`${htmlAlias(attributeName === 'class' ? 'className' : 'style')}((`).addSource(expression).add('))'))
-        markup.text('"')
+        markup.dynamic(() => b.add(`${htmlAlias('nonEmptyAttribute')}(${JSON.stringify(attributeName)}, ${htmlAlias(attributeName === 'class' ? 'className' : 'style')}((`).addSource(expression).add(')))'))
 
         continue
       }

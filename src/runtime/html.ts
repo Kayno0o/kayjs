@@ -195,6 +195,11 @@ export function style(value: unknown): string {
   return result
 }
 
+// ` class="..."` from what `className` or `style` made of a value, or nothing for an empty one, which the browser leaves out too.
+export function nonEmptyAttribute(name: string, text: string): string {
+  return text === '' ? '' : ` ${name}="${text}"`
+}
+
 // An element whose attributes are only known at render time: spreads, or a component tag that names an element.
 // An attribute set by several sources takes the last one's value and place; `content`, the markup of the lines under the tag, wins over a `children` or `innerHTML` property.
 export function element(tag: string, sources: readonly object[], content?: () => string): Html {
