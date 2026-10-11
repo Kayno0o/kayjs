@@ -9,7 +9,7 @@ import process from 'node:process'
 import tailwind from 'bun-plugin-tailwind'
 import { describe, expect, it } from 'bun:test'
 import { ASSET_FILE, clientDir, outputDir, writeAsset } from '../src/build/assets'
-import { buildClient, readClientSources } from '../src/build/client'
+import { buildClient } from '../src/build/client'
 import { writeIfChanged } from '../src/build/files'
 import { formatSizeReport } from '../src/build/report'
 import { anchorModule } from '../src/build/runtime-chunk'
@@ -95,7 +95,7 @@ describe('kay build', () => {
 
       expect(Object.keys((await buildClient(root)).islands).sort()).toEqual(islands)
       // Bun resolves imports to real paths, which a project's own modules are found under too.
-      expect([...(await readClientSources(linked)).islands.keys()].filter(id => id.startsWith('src/')).sort()).toEqual(islands.slice(1))
+      expect(Object.keys((await buildClient(linked)).islands).sort()).toEqual(islands)
     }
     finally {
       await Promise.all([rm(root, { recursive: true, force: true }), rm(linked, { force: true })])
@@ -518,6 +518,34 @@ describe('kay.config.ts', () => {
     expect(withoutPlugins('const base = { plugins: [] }\nexport default { ...base, plugins: [] }\n')).toBeUndefined()
     expect(withoutPlugins('export default { plugins: [ }\n')).toBeUndefined()
   })
+
+  it('builds a project through a link to it as from its real path, its islands and a library\'s named and bundled alike', async () => {
+    const counter = '---\nimport { signal } from \'kay\'\n\nconst n = signal(0)\n---\nbutton(type="button" onClick={() => n.set(n() + 1)}) {n()}\n'
+    const root = await scratchProject({
+      'package.json': JSON.stringify({ name: 'app', private: true, dependencies: { 'ui-lib': '1.0.0' } }),
+      'node_modules/ui-lib/package.json': JSON.stringify({ name: 'ui-lib', version: '1.0.0', type: 'module', peerDependencies: { kay: '*' }, exports: { './*.kay': './src/*.kay' } }),
+      'node_modules/ui-lib/src/card.kay': counter,
+      'src/counter.kay': counter,
+      'src/routes/index.kay': '--- server\nexport const page = { prerender: true }\n---\n---\nimport Card from \'ui-lib/card.kay\'\nimport Counter from \'../counter.kay\'\n---\nCounter\nCard\n',
+    })
+    const link = `${root}-link`
+
+    await symlink(root, link)
+
+    try {
+      const [report, code] = await printed(Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', link, '--no-check', '--static'], { stdout: 'pipe', stderr: 'pipe' }))
+      const html = await Bun.file(join(root, 'dist/index.html')).text()
+      const manifest = await Bun.file(join(outputDir(root), 'manifest.json')).json() as { islands: Record<string, string[]> }
+
+      expect(code, report).toBe(0)
+      expect([...html.matchAll(/data-component="([^"]+)"/g)].map(match => match[1])).toEqual(['src/counter.kay', 'node_modules/ui-lib/src/card.kay'])
+      expect(Object.keys(manifest.islands).sort()).toEqual(['node_modules/ui-lib/src/card.kay', 'src/counter.kay'])
+    }
+    finally {
+      await rm(link, { force: true })
+      await rm(root, { recursive: true, force: true })
+    }
+  }, 30_000)
 
   it('strips the config Bun loads through a symlinked project', async () => {
     const root = await scratchProject({
