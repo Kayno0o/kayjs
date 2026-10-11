@@ -154,16 +154,17 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('kay dev in 
   }, 60_000)
 
   // Chromium holds six connections to a host: a live reload connecting again on every swap would leave none for the page by the seventh edit, and a copy the policy refuses logs an error each time.
-  it('keeps its one live reload connection through many server restarts, each edit shown without a reload', async () => {
+  it('keeps one live reload connection open through many server restarts, each edit shown without a reload', async () => {
+    // The page opens a connection again each time its server goes away, closing the one that failed.
     await page.evaluate(() => {
       const Source = window.EventSource
-      const opened = window as { kaySources?: number }
+      const opened = window as { kaySources?: EventSource[] }
 
-      opened.kaySources = 0
+      opened.kaySources = []
       window.EventSource = class extends Source {
         constructor(...args: ConstructorParameters<typeof EventSource>) {
           super(...args)
-          opened.kaySources! += 1
+          opened.kaySources!.push(this)
         }
       }
     })
@@ -181,7 +182,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('kay dev in 
     }
 
     expect(await sameDocument()).toBe(true)
-    expect(await page.evaluate(() => (window as { kaySources?: number }).kaySources)).toBe(0)
+    expect(await page.evaluate(() => (window as { kaySources?: EventSource[] }).kaySources!.filter(source => source.readyState !== EventSource.CLOSED).length)).toBe(1)
     expect(await page.evaluate(() => [...document.scripts].filter(script => script.textContent.includes('/_kay/dev/events')).length)).toBe(1)
     expect(await page.locator('meta[name=kay-boot]').count()).toBe(1)
     expect(refused).toEqual([])

@@ -144,14 +144,17 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     }
 
     address = url
+    readySpare()
   }
 
   // A server killed for a restart or by `kay dev` stopping exits as expected, as does one the terminal interrupted along with `kay dev`; one exiting on its own leaves nothing serving until the next change.
   const reportExit = async (server: Subprocess) => {
     const code = await server.exited
 
-    if (server === child && !stopping && !STOP_SIGNALS.has(server.signalCode ?? ''))
+    if (server === child && !stopping && !STOP_SIGNALS.has(server.signalCode ?? '')) {
       log(`${stamp()} the server exited with code ${code}, waiting for a change`)
+      readySpare()
+    }
   }
 
   const env = await environmentWithoutDotenv()
@@ -268,7 +271,14 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
 
     return server
   }
-  // Each restart takes the process waiting with kay loaded, and readies the next one.
+
+  // The next process waits with kay loaded, started once the running server listens or exits so it never competes with that server's boot.
+  function readySpare() {
+    if (spare === undefined && !stopping)
+      spare = spawn()
+  }
+
+  // Each restart takes the process waiting with kay loaded, or a fresh one when none is ready yet.
   const start = () => {
     if (startupChanged || spare === undefined || spare.exitCode !== null || spareEntry !== entryToRun()) {
       spare?.kill()
@@ -277,11 +287,11 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     }
 
     child = spare
+    spare = undefined
     void child.stdin.write(`start ${codeVersion} ${moved ?? '-'} ${startedAt} ${JSON.stringify(changedFiles.size > MAX_CHANGED_FILES ? null : [...changedFiles])}\n`)
     startedAt = codeVersion
     changedFiles = new Set()
     void child.stdin.flush()
-    spare = spawn()
     options.onRestart?.(child)
     void reportExit(child)
   }

@@ -3,6 +3,8 @@ import process from 'node:process'
 import { loadTraverse } from '../compiler/rewrite'
 import { registerEarlyLoader } from '../server/loader'
 import '../server'
+// The `.kay` loader's plugin loads now too: only registering it waits for the start line, as registering reads the app's config.
+import '../build/plugin'
 
 // Preloaded into the server process `kay dev` starts ahead of the next restart: kay and its compiler load while nothing waits on them.
 // Bun runs the entry once this resolves, as the main module, when `kay dev` writes a line.

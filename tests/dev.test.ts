@@ -982,7 +982,7 @@ describe('kay dev', () => {
 
     expect(events.headers.get('content-type')).toBe('text/event-stream')
     // Its code is its own id, so pages on either side of it always reload.
-    expect(await firstEvent(events)).toMatch(/^retry: 100\nevent: boot\ndata: ([\w-]+) \1\n\n$/)
+    expect(await firstEvent(events)).toMatch(/^event: boot\ndata: ([\w-]+) \1\n\n$/)
   })
 })
 
