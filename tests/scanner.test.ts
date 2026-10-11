@@ -32,6 +32,11 @@ describe('balanced', () => {
     expect(balanced('{ if (a) {} /}/.test(b) } rest')).toEqual(['{ if (a) {} /}/.test(b) }', []])
   })
 
+  it('steps over a block comment that never closes to the end', () => {
+    expect(balanced('{a /* } rest')).toEqual(['{a /* } rest', ['{ Unclosed `{`']])
+    expect(scanner('/* open').scan.blockComment(0)).toBe(7)
+  })
+
   it('reports a bracket that closes another, and one never closed', () => {
     expect(balanced('{a)')).toEqual(['{a)', [') Unbalanced `)`']])
     expect(balanced('{a')).toEqual(['{a', ['{ Unclosed `{`']])
@@ -54,6 +59,8 @@ describe('regex', () => {
     expect(end('(a) / 2 / 3')).toBe(-1)
     expect(end('a / 2 / 3')).toBe(-1)
     expect(end('a++ / 2 / 1')).toBe(-1)
+    expect(end('a-- / 2 / 1')).toBe(-1)
+    expect(end('a[0] / 2 / 1')).toBe(-1)
     expect(end('x = /a\n/')).toBe(-1)
   })
 })
@@ -71,6 +78,9 @@ describe('strings and template literals', () => {
     const { scan, errors } = scanner(src)
 
     expect([src.slice(0, scan.template(0)), errors]).toEqual(['`a${`b${c}`}d`', []])
-    expect(scanner('`a').scan.template(0)).toBe(2)
+    const open = scanner('`a')
+
+    expect(open.scan.template(0)).toBe(2)
+    expect(open.errors).toEqual(['` Unclosed template literal'])
   })
 })

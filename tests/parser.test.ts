@@ -299,6 +299,25 @@ describe('control flow', () => {
     ])
   })
 
+  it('aliases the whole condition before a last as and a lowercase name, whatever operators it holds', () => {
+    const file = parse('if (a || b) as u\n  p\nif (x) as u\n  p\nif user() as u\nelse if (x) as v\n  p\nif a && b as u\n  p\nif a == b || c as u\n  p\nif a ? b : c as d\n  p\nif y as Row\n  p\nif x as u // the user\n  p\nif x as été\n  p\nif f("a as b") as found\n  p\nif x as u as v\n  p')
+
+    expect(file.diagnostics).toEqual([])
+    expect(outline(file)).toMatchObject([
+      { if: [{ test: '(a || b)', alias: 'u' }] },
+      { if: [{ test: '(x)', alias: 'u' }] },
+      { if: [{ test: 'user()', alias: 'u' }, { test: '(x)', alias: 'v' }] },
+      { if: [{ test: 'a && b', alias: 'u' }] },
+      { if: [{ test: 'a == b || c', alias: 'u' }] },
+      { if: [{ test: 'a ? b : c', alias: 'd' }] },
+      { if: [{ test: 'y as Row', alias: undefined }] },
+      { if: [{ test: 'x', alias: 'u' }] },
+      { if: [{ test: 'x', alias: 'été' }] },
+      { if: [{ test: 'f("a as b")', alias: 'found' }] },
+      { if: [{ test: 'x as u', alias: 'v' }] },
+    ])
+  })
+
   it('reads for with index, key and an else fallback', () => {
     const file = parse('for todo, i of todos().filter(t => t.open) key={todo.id}\n  li {todo.title}\nelse\n  li.empty none')
     const node = file.template[0] as ForNode
