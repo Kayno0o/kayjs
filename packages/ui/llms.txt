@@ -268,7 +268,7 @@ PageSection(title="Moons")
 - `Meter(value={usage} label="Disk" fillClass="bg-kui-warning")`: a `role="meter"` bar holding `value` between 0 and 100. `fillClass` styles the fill alone, such as a colour picked by threshold.
 - `BarList(rows={[{ key: 'fr', label: 'France', value: 120, display: '120 visits' }]})`: a bar per row, each measured against the largest value, reading `display` or else the value. `onSelect(row)` makes each row a button, from an island; `empty` is what it reads with no rows. Its rows are typed `BarListRow`, or any type extending it.
 - `SiteFavicon(src={site.favicon} name={site.name})`: a site's icon, or the `globe` slot in a colour drawn from `name` when `src` is missing or fails to load.
-- `CopyButton(text={url} label="Copy link")`: copies `text`, with `html` alongside for apps that paste rich text, and reads `copiedLabel` for two seconds. A copy the browser refuses toasts `failure`.
+- `CopyButton(text={url} label="Copy link")`: copies `text`, with `html` alongside for apps that paste rich text, and reads `copiedLabel` for two seconds. It takes Button's `variant`. A copy the browser refuses toasts `failure`.
 - `Rating(value={4.6} max={5} label="Rated 4.6 out of 5")`: stars filled to `value`'s share of `max`, part of a star included, kept between none and all. Screen readers read `label`, `4.6 out of 5` by default.
 - BarList, SiteFavicon and CopyButton are islands taking data alone, so a static page passes them their props as it would to any element.
 

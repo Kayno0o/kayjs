@@ -220,8 +220,9 @@ describe('data', () => {
     expect(await page('rating-none')).toBe(`<article id="rating-none"><span role="img" aria-label="3 out of 0" class="kui-rating">${stars(0)}<span class="kui-rating-fill" style="width: 0%">${stars(0)}</span></span></article>`)
   })
 
-  test('CopyButton is a plain button saying what it copies', async () => {
+  test('CopyButton is a plain button saying what it copies, taking Button\'s variants', async () => {
     expect(await page('copy')).toBe('<article id="copy"><button type="button" class="kui-btn kui-copy-btn">Copy link</button></article>')
+    expect(await page('copy-accent')).toBe('<article id="copy-accent"><button type="button" class="kui-btn kui-copy-btn kui-btn-accent">Copy link</button></article>')
   })
 })
 

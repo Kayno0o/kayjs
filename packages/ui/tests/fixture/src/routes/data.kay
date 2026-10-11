@@ -21,6 +21,8 @@ main
     SiteFavicon(name="kaynooo.fr")
   article#copy
     CopyButton(text="https://kaynooo.fr" label="Copy link")
+  article#copy-accent
+    CopyButton(text="https://kaynooo.fr" label="Copy link" variant="accent")
   article#rating
     Rating(value={4.6})
   article#rating-out
