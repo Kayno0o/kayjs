@@ -121,10 +121,10 @@ export function servedLocales(config: I18nConfig | undefined): string[] {
   }
 }
 
-// A library's own modules are its to check, as `skipLibCheck` leaves a declaration file's, a missing optional peer included: only its components compile as the app's. An app inside a linked library's repository keeps its own files, and a linked extension's package only holds the modules its own package.json is nearest to.
+// A library's own modules are its to check, as `skipLibCheck` leaves a declaration file's, a missing optional peer included: only its components compile as the app's. An app inside a linked library's repository keeps its own files, and a linked extension's package holds the modules it is the nearest package of and its dependencies', which leaves out the other packages beside it in a repository.
 export function reportsTypeErrors(file: string, scope: TypeScope): boolean {
   const library = KAY_FILE.test(file) || ownFile(scope.root, file) ? undefined : libraryOf(scope.libraries, file)
-  const libraryModule = library !== undefined && (library.extension !== true || [library.dir, library.realDir].includes(packageRoot(dirname(file))))
+  const libraryModule = library !== undefined && (library.extension !== true || [library.dir, library.realDir].some(dir => file.startsWith(dir + sep) && (packageRoot(dirname(file)) === dir || file.slice(dir.length).split(sep).includes('node_modules'))))
 
   return !scope.broken.has(file) && !scope.unreached.has(file) && !libraryModule
 }

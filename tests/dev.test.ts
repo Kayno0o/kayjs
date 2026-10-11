@@ -93,6 +93,31 @@ describe('the dev watcher', () => {
     } }
   }
 
+  it('hands the files editors write beside a source to onScratch, at the root as below it', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'kay-watch-'))
+    const changes: string[] = []
+    const scratch = ['.env.swp', '.env~', '.env___jb_old___', 'src/.server.ts.swp', 'src/server.ts~', 'src/4913', 'src/server.ts___jb_tmp___', 'src/.#server.ts']
+    let scratchWritten = 0
+
+    await Bun.write(join(root, '.env'), '')
+    await Bun.write(join(root, 'src/server.ts'), '')
+    const stop = watchProject(root, file => changes.push(file), { onScratch: () => scratchWritten++ })
+
+    try {
+      for (const file of scratch)
+        await Bun.write(join(root, file), '')
+
+      await until(() => scratchWritten >= scratch.length)
+      await Bun.write(join(root, 'src/server.ts'), 'edited')
+      await until(() => changes.includes('src/server.ts'))
+      expect(changes.filter(file => file !== 'src/server.ts')).toEqual([])
+    }
+    finally {
+      stop()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('keeps watching a root file replaced atomically, and one created after it started', async () => {
     const { root, sees, cleanup } = await watched({ 'tsconfig.json': '{}', 'src/server.ts': '' })
 

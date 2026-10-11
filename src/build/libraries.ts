@@ -103,15 +103,24 @@ export interface SettingsReplacement {
   replacement: string
 }
 
-// The library holding `file`, by its path under `node_modules` or its real one: the deepest, for a library installed inside another's `node_modules`.
-// The nearest directory from `dir` up with a package.json, `dir` itself when none has one.
+// The nearest directory from `dir` up with a package.json naming a package, `dir` itself when none has one: one only setting `type` for a folder leaves it in the package above.
 export function packageRoot(dir: string): string {
   for (let at = dir; ; at = dirname(at)) {
-    if (existsSync(join(at, 'package.json')))
+    if (namesPackage(join(at, 'package.json')))
       return at
 
     if (at === dirname(at))
       return dir
+  }
+}
+
+// The library holding `file`, by its path under `node_modules` or its real one: the deepest, for a library installed inside another's `node_modules`.
+function namesPackage(manifest: string): boolean {
+  try {
+    return typeof (JSON.parse(readFileSync(manifest, 'utf8')) as { name?: unknown }).name === 'string'
+  }
+  catch {
+    return false
   }
 }
 

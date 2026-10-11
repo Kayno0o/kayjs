@@ -737,7 +737,7 @@ describe('kay check, edge cases', () => {
   })
 
   it('types a literal array or object prop by a generic component\'s other props in a page as in a component, still checking what it sends an island', async () => {
-    const use = '---\nimport Table from \'../components/table.kay\'\nimport Pick from \'../components/pick.kay\'\n\nconst planets = [{ id: 1, name: \'Mars\', moons: 2 }]\nconst columns = [{ key: \'name\', header: \'Name\', sortValue: true as const }]\n---\nTable(columns={columns} rows={planets} rowKey="id" filter={[\'name\']})\nTable(columns={[{ key: \'moons\', sortValue: row => row.moons }]} rows={planets} rowKey="id" filter={planets.length > 0 ? [\'moons\'] : []})\nPick(items={[{ id: 1, at: new Date() }]} rows={[{ id: 2, at: new Intl.NumberFormat() }]})\nPick(items={[{ id: 1, at: new Date(), run: () => 1 }]} rows={[]})\nPick(items={[{ id: 1, at: new Date(), get n() { return 1 }, cb: () => 1 }]} rows={[]})\n'
+    const use = '---\nimport Table from \'../components/table.kay\'\nimport Pick from \'../components/pick.kay\'\n\nconst planets = [{ id: 1, name: \'Mars\', moons: 2 }]\nconst columns = [{ key: \'name\', header: \'Name\', sortValue: true as const }]\n---\nTable(columns={columns} rows={planets} rowKey="id" filter={[\'name\']})\nTable(columns={[{ key: \'moons\', sortValue: row => row.moons }]} rows={planets} rowKey="id" filter={planets.length > 0 ? [\'moons\'] : []})\nPick(items={[{ id: 1, at: new Date() }]} rows={[{ id: 2, at: new Intl.NumberFormat() }]})\nPick(items={[{ id: 1, at: new Date(), run: () => 1 }]} rows={[]})\nPick(items={[{ id: 1, at: new Date(), get n() { return 1 }, cb: () => 1 }]} rows={[]})\nPick(items={[{ id: 1, at: new Date(), get n() { return 1 }, run() { return 1 } }]} rows={[]})\n'
     const root = await scratchProject({
       'src/table.ts': 'export interface Column<Row> { key: string, sortValue?: ((row: Row) => string | number) | true }\nexport type RowFilter<Row> = readonly (keyof Row & string)[] | ((row: Row) => string[])\nexport type RowKey<Row> = (keyof Row & string) | ((row: Row) => string | number)\n',
       'src/components/table.kay': '--- <Row>\nimport type { Column, RowFilter, RowKey } from \'../table\'\n\nconst { columns, rows, rowKey, filter } = props<{ columns: Column<Row>[], rows: Row[], rowKey: RowKey<Row>, filter?: RowFilter<Row> | undefined }>()\n---\np {columns.length} {rows.length} {String(rowKey)} {String(filter)}\n',
@@ -754,6 +754,7 @@ describe('kay check, edge cases', () => {
         ['src/routes/index.kay', 10, 62, true],
         ['src/routes/index.kay', 11, 6, true],
         ['src/routes/index.kay', 12, 14, true],
+        ['src/routes/index.kay', 13, 14, true],
       ])
     }
     finally {

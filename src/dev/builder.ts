@@ -43,7 +43,7 @@ interface Built {
   // What the stylesheet build reads of each module it followed, and the words of each file Tailwind may read classes from.
   signatures: Map<string, string>
   words: Map<string, Set<string>>
-  // Which new words make Tailwind classes, when a stylesheet imports it: loaded once the first new word comes, then compiled again after each stylesheet build.
+  // Which new words make Tailwind classes, when a stylesheet imports it: compiled by the first new word after each stylesheet build, so edits adding none pay nothing.
   classes?: Promise<ClassWords | undefined> | undefined
   // Reading them once the stylesheets are built, which the next build waits for.
   read: Promise<void>
@@ -64,13 +64,7 @@ export function devBuilder(root: string, options: ClientOptions): (changed: stri
   const output = outputDir(root)
   const realRoot = realpathSync(root)
   let last: Built | undefined
-  let tailwindLoaded = false
-  const classesOf = async (built: Built) => {
-    tailwindLoaded = true
-    built.classes ??= tailwindClasses(built.styleInputs)
-
-    return built.classes
-  }
+  const classesOf = async (built: Built) => built.classes ??= tailwindClasses(built.styleInputs)
 
   const stylesChanged = async (previous: Built, sources: ClientSources, texts: Map<string, string | undefined>): Promise<boolean> => {
     if (!sameItems(previous.sources.pages, sources.pages) || (plugins && !sameItems(previous.sources.classes, sources.classes)))
@@ -165,7 +159,7 @@ export function devBuilder(root: string, options: ClientOptions): (changed: stri
       signatures,
       words,
       read: styles ? readInputs(styleInputs, signatures, words) : Promise.resolve(),
-      classes: !styles ? previous!.classes : tailwindLoaded ? tailwindClasses(styleInputs) : undefined,
+      classes: styles ? undefined : previous!.classes,
       manifest: text,
     }
 

@@ -8,6 +8,7 @@ import { parse } from 'devalue'
 import { t } from 'elysia'
 import { servedByTheApp, servedLocales } from '../src/check/diagnose'
 import { readShadowSettings } from '../src/check/shadow'
+import { writeShadowTypes } from '../src/check/shadow-types'
 import { mergeConfig } from '../src/config'
 import { UNSERVED_MESSAGE } from '../src/runtime/checks'
 import { apiStubs } from '../src/server/api'
@@ -387,14 +388,17 @@ describe('a library\'s routes', () => {
 const LOCAL_CHECKED: Record<string, string> = {
   'app/package.json': JSON.stringify({ name: 'app', dependencies: { 'linked-lib': 'link:../linked' } }),
   'app/tsconfig.json': TSCONFIG,
-  'app/kay.config.ts': 'import { defineConfig } from \'kay/server\'\nimport { linkedPages } from \'linked-lib\'\n\nexport default defineConfig({ extensions: [{ name: \'lib\', routes: { dir: \'../lib/routes\', prefix: \'/auth\' } }, linkedPages(), { name: \'abs\', routes: { dir: `${import.meta.dir}/../abs/routes`, prefix: \'/abs\' } }, { name: \'sub\', routes: { dir: \'../abs/sub/routes\', prefix: \'/sub\' } }, { name: \'edit\', editor: \'../edit/editor.kay\' }, { name: \'ws\', routes: { dir: \'node_modules/ws-lib/routes\', prefix: \'/ws\' } }, { name: \'mono\', routes: { dir: \'../mono/ext/routes\', prefix: \'/mono\' } }] })\n',
+  'app/kay.config.ts': 'import { defineConfig } from \'kay/server\'\nimport { linkedPages } from \'linked-lib\'\n\nexport default defineConfig({ extensions: [{ name: \'lib\', routes: { dir: \'../lib/routes\', prefix: \'/auth\' } }, linkedPages(), { name: \'abs\', routes: { dir: `${import.meta.dir}/../abs/routes`, prefix: \'/abs\' } }, { name: \'sub\', routes: { dir: \'../abs/sub/routes\', prefix: \'/sub\' } }, { name: \'edit\', editor: \'../edit/editor.kay\' }, { name: \'ws\', routes: { dir: \'node_modules/ws-lib/routes\', prefix: \'/ws\' } }, { name: \'ws-more\', routes: { dir: \'../ws/more\', prefix: \'/more\' } }, { name: \'mono\', routes: { dir: \'../mono/ext/routes\', prefix: \'/mono\' } }] })\n',
   'app/src/routes/index.kay': '---\nimport { shared } from \'../../../mono/shared/util\'\n---\np.home home {shared}\n',
   'app/src/params/code.ts': 'export default (value: string): number | undefined => (/^\\d+$/).test(value) ? Number(value) : undefined\n',
   'lib/package.json': JSON.stringify({ name: 'lib' }),
   'lib/card.kay': '---\nconst { title } = props<{ title: string }>()\n---\np.card {title}\n',
-  'lib/routes/login.kay': '---\nimport Card from \'../card.kay\'\nimport { title } from \'../titles\'\n---\nCard(title={title})\n',
+  'lib/routes/login.kay': '---\nimport Card from \'../card.kay\'\nimport { title } from \'../titles\'\nimport { format } from \'../helpers/format\'\n---\nCard(title={format(title)})\n',
   // A module of the package, its own to check as a library's are: the strictness it is written for may not be the app's.
   'lib/titles.ts': 'const wrong: number = \'module\'\n\nexport const title = `Sign in ${wrong}`\n',
+  // A folder setting its module type alone, still the package's.
+  'lib/helpers/package.json': JSON.stringify({ type: 'module' }),
+  'lib/helpers/format.ts': 'const wrong: number = \'nestedmodule\'\n\nexport const format = (title: string) => `${title} ${wrong}`\n',
   // Typed by its own path: `id` is no param of it.
   'lib/routes/[slug].kay': '--- server\nconst slug: string = ctx.params.slug\nconst id = ctx.params.id\n---\np {slug} {id}\n',
   'lib/routes/broken.kay': '---\nconst wrong: number = \'beside\'\n---\np {wrong}\n',
@@ -422,7 +426,11 @@ const LOCAL_CHECKED: Record<string, string> = {
   'edit/labels.ts': 'const wrong: number = \'editmodule\'\n\nexport const label = `${wrong}`\n',
   // Listed through the link a workspace gives, its routes under `node_modules` by path but not for real.
   'ws/package.json': JSON.stringify({ name: 'ws-lib' }),
-  'ws/routes/broken.kay': '---\nimport { label } from \'../labels\'\n\nconst wrong: number = \'workspace\'\n---\np {wrong} {label}\n',
+  'ws/routes/broken.kay': '---\nimport { label } from \'../labels\'\nimport { dep } from \'../node_modules/dep/index\'\n\nconst wrong: number = \'workspace\'\n---\np {wrong} {label} {dep}\n',
+  // More of its routes listed by the real path, the package checked once, and a dependency it installs itself, reached by its path.
+  'ws/more/page.kay': '---\nconst wrong: number = \'wsmore\'\n---\np {wrong}\n',
+  'ws/node_modules/dep/package.json': JSON.stringify({ name: 'dep', type: 'module', exports: { '.': './index.ts' } }),
+  'ws/node_modules/dep/index.ts': 'const wrong: number = \'dependency\'\n\nexport const dep = `${wrong}`\n',
   'ws/labels.ts': 'const wrong: number = \'wsmodule\'\n\nexport const label = `${wrong}`\n',
   // Routes in no package of their own, inside a repository whose other packages stay the app's to check when it imports them.
   'mono/package.json': JSON.stringify({ name: 'mono', private: true }),
@@ -446,7 +454,7 @@ describe('an extension listed from beside the app', () => {
 
       expect(code).toBe(1)
       // A frame shows the lines before its own, so the editor's `nope()` shows its `wrong` again.
-      expect([...new Set(output.matchAll(/\| const wrong: number = '(\w+)'/g).map(match => match[1]))].sort()).toEqual(['absolute', 'beside', 'edited', 'editor', 'linked', 'reached', 'sibling', 'workspace'])
+      expect([...new Set(output.matchAll(/\| const wrong: number = '(\w+)'/g).map(match => match[1]))].sort()).toEqual(['absolute', 'beside', 'edited', 'editor', 'linked', 'reached', 'sibling', 'workspace', 'wsmore'])
       expect(output.split('error[missing-alt]').length).toBe(2)
       expect(output).not.toContain('codes/[id=code].kay')
       expect(output.split('label.kay').length).toBe(2)
@@ -456,9 +464,11 @@ describe('an extension listed from beside the app', () => {
       // A name the compiled script does not get, as `onCleanup` now does.
       expect(output).toContain('Cannot find name \'nope\'.')
       expect(output).not.toContain('Cannot find name \'onCleanup\'')
-      expect(output).toContain('13 errors')
+      expect(output).toContain('14 errors')
       // What the ESLint processor types the pages by.
       expect(readShadowSettings(join(dir, 'app')).mounts).toContain(join(dir, 'lib/routes'))
+      // The workspace package once, by the link the app imports it through, its routes listed by either path.
+      expect((await writeShadowTypes(join(dir, 'app'), { extensions: [{ name: 'ws', routes: { dir: join(dir, 'app/node_modules/ws-lib/routes'), prefix: '/ws' } }, { name: 'ws-more', routes: { dir: join(dir, 'ws/more'), prefix: '/more' } }] })).libraries.filter(library => library.extension).map(library => library.dir.slice(dir.length + 1)).sort()).toEqual(['app/node_modules/ws-lib'])
     }
     finally {
       await rm(dir, { recursive: true, force: true })

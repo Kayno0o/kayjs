@@ -33,8 +33,8 @@ export interface DevOptions {
 
 // Long enough to gather the few events one save makes, which come within a millisecond.
 const DEBOUNCE_MS = 10
-// How long a file a change left missing is waited for, as an editor saving by renaming it away and writing it anew leaves it, on a machine busy enough to stretch the save.
-const GONE_WAIT_MS = 60
+// How long after an editor last wrote a scratch file a source it left missing is waited for, as saving by renaming it away and writing it anew leaves it, on a machine busy enough to stretch the save.
+const GONE_WAIT_MS = 200
 const SPARE = join(import.meta.dir, 'spare.ts')
 // When a server never says it is up, as one that never serves, the next process starts anyway after this: a guess, which also starts it beside a server that takes longer to boot.
 const SPARE_FALLBACK_MS = 2000
@@ -55,7 +55,7 @@ const SERVER_ROOT_FILE = /^(?:\.env.*|bun\.lockb?)$|\.(?:[cm]?[jt]sx?|json[c5]?|
 const TEST_DIRS = new Set(['tests', 'test', '__tests__', 'e2e'])
 const TEST_FILE = /(?:^|\/)__tests__\/|\.(?:test|spec)\.[cm]?[jt]sx?$/
 // The files editors write beside a source while saving it, its backup, swap or temporary copy, Vim's `4913` and Emacs' `.#` lock included.
-const EDITOR_SCRATCH = /(?:~|\.sw[a-px]|\.tmp|___jb_(?:tmp|old)___|\.kate-swp)$|(?:^|\/)(?:4913|\.#[^/]*|#[^/]*#)$/
+const EDITOR_SCRATCH = /(?:~|\.sw[opx]|\.tmp|___jb_(?:tmp|old)___|\.kate-swp)$|(?:^|\/)(?:4913|\.#[^/]*|#[^/]*#)$/
 // Past this, as after a checkout, the files changed are not passed on, and open pages reload.
 const MAX_CHANGED_FILES = 200
 // The address of a server listening on the root path, as kay's do, reads better without its slash.
@@ -339,16 +339,15 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
 
     restarting = undefined
   }
-  let waited = 0
+  let scratchWritten = -Infinity
+  // A deleted source restarts at once, one an editor's save left missing a moment is waited for.
   const settle = () => {
-    if (waited < GONE_WAIT_MS && [...touched].some(file => !existsSync(join(root, file)))) {
-      waited += DEBOUNCE_MS
+    if (performance.now() - scratchWritten < GONE_WAIT_MS && [...touched].some(file => !existsSync(join(root, file)))) {
       timer = setTimeout(settle, DEBOUNCE_MS)
 
       return
     }
 
-    waited = 0
     changed = true
     restarting ??= drain()
   }
@@ -371,6 +370,10 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
 
     clearTimeout(timer)
     timer = setTimeout(settle, DEBOUNCE_MS)
+  }, {
+    onScratch: () => {
+      scratchWritten = performance.now()
+    },
   })
 
   start()
@@ -497,8 +500,8 @@ function isDirectory(path: string): boolean {
 }
 
 // The root is watched for the entries it gains and loses, each top-level directory recursively, and a directory created again gets a new watcher, the old one staying on the inode that is gone.
-// `onChange` gets the changed path relative to the root; the returned function stops watching. `tests` watches the tests too, as `kay check` reads them.
-export function watchProject(root: string, onChange: (file: string) => void, { tests = false }: { tests?: boolean } = {}): () => void {
+// `onChange` gets the changed path relative to the root, and `onScratch` hears of the files editors write beside a source instead; the returned function stops watching. `tests` watches the tests too, as `kay check` reads them.
+export function watchProject(root: string, onChange: (file: string) => void, { tests = false, onScratch }: { tests?: boolean, onScratch?: () => void } = {}): () => void {
   const ignored = gitIgnoredNames(root)
   const watched = (name: string) => (watchedName(name) || (tests && TEST_DIRS.has(name))) && !ignored.has(name)
   const directories = new Map<string, FSWatcher>()
@@ -512,7 +515,9 @@ export function watchProject(root: string, onChange: (file: string) => void, { t
     // The directory may go between the check and the watch, or the system run out of watchers: `kay dev` keeps going without it.
     try {
       const watcher = watch(join(root, name), { recursive: true }, (_event, file) => {
-        if (file === null || ((tests || !TEST_FILE.test(file)) && !EDITOR_SCRATCH.test(file)))
+        if (file !== null && EDITOR_SCRATCH.test(file))
+          onScratch?.()
+        else if (file === null || tests || !TEST_FILE.test(file))
           onChange(`${name}/${file ?? ''}`)
       })
 
@@ -524,6 +529,12 @@ export function watchProject(root: string, onChange: (file: string) => void, { t
     }
   }
   const rootWatcher = watch(root, (_event, name) => {
+    if (name !== null && EDITOR_SCRATCH.test(name)) {
+      onScratch?.()
+
+      return
+    }
+
     if (name === null || !watched(name))
       return
 
