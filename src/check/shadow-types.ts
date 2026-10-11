@@ -44,6 +44,7 @@ export interface ShadowTypes {
   problems: CheckDiagnostic[]
   // Library components the app never imports, whose errors are not its own.
   unreached: Set<string>
+  // The kay libraries, and the packages of the linked extensions, whose own modules are theirs to check.
   libraries: KayLibrary[]
   // The app's settings module each line of the settings check stands for, with the library it sets.
   settings: Map<number, { file: string, library: string }>
@@ -107,7 +108,7 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
   // `contentChecks` writes the props check once it read the collections.
   await tree.removeStale([CONTENT_CHECK])
 
-  return { files: tree.shadows, diagnostics: [...own.diagnostics, ...libraries.diagnostics], problems, unreached: libraries.unreached, libraries: libraries.libraries, settings: replaced.lines, exports: exported.lines, islandOnly: own.islandOnly, mounts, locales: served.settings ? localePrefixes(served.settings) : [] }
+  return { files: tree.shadows, diagnostics: [...own.diagnostics, ...libraries.diagnostics], problems, unreached: libraries.unreached, libraries: libraries.followed, settings: replaced.lines, exports: exported.lines, islandOnly: own.islandOnly, mounts, locales: served.settings ? localePrefixes(served.settings) : [] }
 }
 
 function shadowTree(dir: string): ShadowTree {
@@ -160,8 +161,8 @@ async function ownShadows(root: string, options: CheckOptions, tree: ShadowTree,
 }
 
 // A library's components compile against the app's types, and the ones it reaches are reported as its own: `kay build` compiles those.
-// So are the pages and the editor of an extension not installed from the registry, as a library's own example or fixture app lists it, and what they reach of its package.
-async function libraryShadows(root: string, options: CheckOptions, own: string[], tree: ShadowTree, mounts: RouteMount[]): Promise<{ libraries: KayLibrary[], pages: string[], diagnostics: CheckDiagnostic[], unreached: Set<string> }> {
+// So are the pages and the editor of an extension not installed from the registry, as a library's own example or fixture app lists it, and what they reach of its package: its own modules stay its own to check, as a library's do.
+async function libraryShadows(root: string, options: CheckOptions, own: string[], tree: ShadowTree, mounts: RouteMount[]): Promise<{ libraries: KayLibrary[], followed: KayLibrary[], pages: string[], diagnostics: CheckDiagnostic[], unreached: Set<string> }> {
   const { routes: routesDir, cache: cacheDir } = projectPaths(root, options)
   const libraries = await findKayLibraries(root)
   // The app's own directories are checked already; a linked library has its real path outside any `node_modules`, an installed one inside.
@@ -196,7 +197,7 @@ async function libraryShadows(root: string, options: CheckOptions, own: string[]
       diagnostics.push(fromCompile(file, source, diagnostic))
   }))
 
-  return { libraries, pages, diagnostics, unreached }
+  return { libraries, followed, pages, diagnostics, unreached }
 }
 
 // The package holding each of `extensionDirs`, an extension's routes or its editor's directory, that no kay library holds, the nearest directory above them with a package.json, as a library: its components are shadowed and reached as one's are.

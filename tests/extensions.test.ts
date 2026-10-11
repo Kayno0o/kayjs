@@ -392,7 +392,9 @@ const LOCAL_CHECKED: Record<string, string> = {
   'app/src/params/code.ts': 'export default (value: string): number | undefined => (/^\\d+$/).test(value) ? Number(value) : undefined\n',
   'lib/package.json': JSON.stringify({ name: 'lib' }),
   'lib/card.kay': '---\nconst { title } = props<{ title: string }>()\n---\np.card {title}\n',
-  'lib/routes/login.kay': '---\nimport Card from \'../card.kay\'\n---\nCard(title="Sign in")\n',
+  'lib/routes/login.kay': '---\nimport Card from \'../card.kay\'\nimport { title } from \'../titles\'\n---\nCard(title={title})\n',
+  // A module of the package, its own to check as a library's are: the strictness it is written for may not be the app's.
+  'lib/titles.ts': 'const wrong: number = \'module\'\n\nexport const title = `Sign in ${wrong}`\n',
   // Typed by its own path: `id` is no param of it.
   'lib/routes/[slug].kay': '--- server\nconst slug: string = ctx.params.slug\nconst id = ctx.params.id\n---\np {slug} {id}\n',
   'lib/routes/broken.kay': '---\nconst wrong: number = \'beside\'\n---\np {wrong}\n',
@@ -419,7 +421,7 @@ const LOCAL_CHECKED: Record<string, string> = {
 }
 
 describe('an extension listed from beside the app', () => {
-  it('has kay check report the errors of its pages and editor and what they reach as the app\'s own, linked or not', async () => {
+  it('has kay check report the errors of its pages and editor and the components they reach as the app\'s own, linked or not', async () => {
     const dir = await scratchDir('extension-local-')
 
     try {
