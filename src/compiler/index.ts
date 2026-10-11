@@ -110,7 +110,7 @@ export function compileKay(source: string, filename: string, options: CompileOpt
   }))
   // Only code that runs calls the accessors of rows and aliases; the type checker reads them as values, which it narrows.
   const values = options.output === undefined
-  const found = findRewrites({ code: analysis.builder.code, map: analysis.builder.map(), sites: analysis.sites, values, templateStart: file.templateStart, imported })
+  const found = findRewrites({ code: analysis.builder.code, map: analysis.builder.map(), sites: analysis.sites, values, templateStart: file.templateStart, imported, component: componentName(filename) })
   const fences = [file.script, file.server].map(span => span ? source.slice(span.start, span.end) : '').join('\n')
   const name = freeName(componentName(filename), fences, found.findings.globalReads)
   const final = generate(file, script, server, { ...generateOptions, name, rewrites: found.plan.rewrites, translates: found.plan.translates })

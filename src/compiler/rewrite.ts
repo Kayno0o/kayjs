@@ -53,6 +53,8 @@ export interface RewriteInput {
   templateStart: number
   // The signals and memos the component imports from its own modules, by local name.
   imported?: ReadonlyMap<string, SignalKind> | undefined
+  // The name the file gives the component, which a template `const` would hide from the tags after it.
+  component?: string | undefined
 }
 
 // What the final pass applies.
@@ -107,6 +109,25 @@ export function findRewrites(input: RewriteInput): FoundRewrites {
   return new RewriteFinder(input).run(ast)
 }
 
+// What holds a type besides a type itself: an annotation, type arguments and parameters, and what an interface or a class declares it extends or implements.
+const TYPE_HOLDERS = new Set(['TSTypeAnnotation', 'TSTypeParameterInstantiation', 'TSTypeParameterDeclaration', 'TSInterfaceDeclaration', 'TSTypeAliasDeclaration', 'TSExpressionWithTypeArguments', 'TSInterfaceHeritage', 'TSClassImplements'])
+
+// Whether an identifier names a type rather than reading a value; `typeof name` reads the value.
+function namesType(path: NodePath): boolean {
+  for (let parent = path.parentPath; parent; parent = parent.parentPath) {
+    if (parent.isTSTypeQuery())
+      return false
+
+    if (parent.isTSType() || TYPE_HOLDERS.has(parent.node.type))
+      return true
+
+    if (parent.isStatement() || parent.isFunction())
+      return false
+  }
+
+  return false
+}
+
 // One walk over the analysis pass, each concern of it in a method of its own: signals, props, rows, template `const`s, `listen` targets and `load`'s reads.
 class RewriteFinder {
   private readonly rewrites: Rewrites = new Map()
@@ -119,14 +140,11 @@ class RewriteFinder {
   private readonly known = new Set<Binding>()
   // Writes to a constant or an import, reported once every name kay knows is found.
   private readonly assigned: { binding: Binding, identifier: t.Identifier }[] = []
-  private readonly map: SourceMap
   private translates = false
   // The names nothing in the module declares, of which `globalReads` keeps those read as values.
   private globals: Record<string, unknown> = {}
 
-  constructor(private readonly input: RewriteInput) {
-    this.map = input.map
-  }
+  constructor(private readonly input: RewriteInput) {}
 
   run(ast: t.File): FoundRewrites {
     traverse(ast, {
@@ -166,11 +184,11 @@ class RewriteFinder {
     }
   }
 
-  // A tag is a JSX identifier, so a component rendering itself by its name is no read of it.
+  // A tag is a JSX identifier, so a component rendering itself by its name is no read of it, and neither is a type of that name.
   private globalRead(path: NodePath<t.Identifier>) {
     const { name } = path.node
 
-    if (Object.hasOwn(this.globals, name) && path.isReferencedIdentifier() && !path.scope.getBinding(name))
+    if (Object.hasOwn(this.globals, name) && path.isReferencedIdentifier() && !path.scope.getBinding(name) && !namesType(path))
       this.globalReads.add(name)
   }
 
@@ -178,7 +196,7 @@ class RewriteFinder {
   // `rewrite` gives what a read becomes, or nothing to leave it as written; `readOnly` reports a write, left out when the caller writes it.
   private visitBinding(scope: Scope, name: string, rewrite: (reference: NodePath) => Read | undefined, readOnly: ReadOnly | undefined, typeOf?: string) {
     const binding = scope.getBinding(name)
-    const { map, rewrites } = this
+    const { input: { map }, rewrites } = this
 
     if (!binding)
       return
@@ -228,7 +246,7 @@ class RewriteFinder {
   // In the template a signal or memo is its value, `{count}` reading `count()`; a call, `.set` and `bind:` still take the signal itself.
   private readonly templateRead = (reference: NodePath): boolean => {
     const { node, parent } = reference
-    const source = this.map.isExact(node.start!) ? this.map.toSource(node.start!) : undefined
+    const source = this.input.map.isExact(node.start!) ? this.input.map.toSource(node.start!) : undefined
 
     if (source === undefined || source < this.input.templateStart || tagPosition(reference) !== undefined || typeQueryOf(reference) !== undefined)
       return false
@@ -249,7 +267,7 @@ class RewriteFinder {
   // An assignment to a signal writes it: `count = 1` through `count.set(1)`, `count += 1` and `count++` through an updater, so an effect writing it does not track it too.
   // `access` spells the signal itself, as a prop's is read off the props object.
   private signalWrite(violation: NodePath, name: string, kind: SignalKind, access: Rewrite) {
-    const { map, rewrites } = this
+    const { input: { map }, rewrites } = this
     const { node } = violation
     const identifier = assignedIdentifier(node, name)
     const at = identifier && map.isExact(identifier.start!) ? map.toSource(identifier.start!) : undefined
@@ -299,7 +317,7 @@ class RewriteFinder {
     this.known.add(binding)
 
     for (const reference of binding.referencePaths) {
-      const source = this.templateRead(reference) ? this.map.toSource(reference.node.start!) : undefined
+      const source = this.templateRead(reference) ? this.input.map.toSource(reference.node.start!) : undefined
 
       if (source !== undefined)
         this.rewrites.set(source, { ...withShorthand(reference, name, { after: '()' }), end: source + name.length })
@@ -311,15 +329,15 @@ class RewriteFinder {
   // A template `const`: each name it declares is new to the template, never reassigned, and, as `accessor`, read through the memo it is.
   private templateConst(path: NodePath<t.VariableDeclarator>, accessor: boolean) {
     for (const [name, identifier] of Object.entries(path.getBindingIdentifiers())) {
-      const source = this.map.toSource(identifier.start!)
+      const source = this.input.map.toSource(identifier.start!)
       const binding = path.scope.getBinding(name)
       const hidden = path.scope.parent?.getBinding(name)
 
       if (source === undefined || !binding)
         continue
 
-      if (hidden) {
-        const declared = this.map.isExact(hidden.identifier.start!) ? this.map.toSource(hidden.identifier.start!) : undefined
+      if (hidden || name === this.input.component) {
+        const declared = hidden && this.input.map.isExact(hidden.identifier.start!) ? this.input.map.toSource(hidden.identifier.start!) : undefined
 
         this.diagnostics.push({ start: source, end: source + name.length, message: `\`${name}\` is already declared`, note: 'a template `const` would hide it from the lines after it', help: 'give the `const` a name of its own', related: declared === undefined ? undefined : [{ start: declared, end: declared + name.length, label: 'declared here' }] })
       }
@@ -370,13 +388,13 @@ class RewriteFinder {
     // `relativeTime` from `kay/i18n` makes a memo too.
     const made = importedFromKay(path.scope, init.callee) ?? (importedFromKay(path.scope, init.callee, 'kay/i18n') === 'relativeTime' ? 'memo' : undefined)
     const binding = path.scope.getBinding(id.name)
-    const start = this.map.isExact(id.start!) ? this.map.toSource(id.start!) : undefined
+    const start = this.input.map.isExact(id.start!) ? this.input.map.toSource(id.start!) : undefined
 
     if (binding && made !== undefined && ACCESSORS.has(made))
       this.signalBinding(binding, id.name, made === 'memo' ? 'memo' : 'signal')
 
     if (start !== undefined && made === 'signal' && onlyRead(binding, this.templateRead))
-      this.constantSignals.set(start, { name: { start, end: start + id.name.length }, value: sourceSpan(this.map, init.arguments[0]) })
+      this.constantSignals.set(start, { name: { start, end: start + id.name.length }, value: sourceSpan(this.input.map, init.arguments[0]) })
   }
 
   // A prop or a server value is read off the props object wherever its name is read.
@@ -406,7 +424,7 @@ class RewriteFinder {
 
   // `listen(window, ...)` takes its target as a function, so a server render never reads `window`.
   private listenTarget(path: NodePath<t.CallExpression>) {
-    const { map } = this
+    const { map } = this.input
     const target = path.node.arguments[0]
 
     if (!target || target.type === 'ArrowFunctionExpression' || target.type === 'FunctionExpression' || target.type === 'SpreadElement' || importedFromKay(path.scope, path.node.callee) !== 'listen' || !map.isExact(target.start!) || !map.isExact(target.end! - 1))
@@ -426,7 +444,7 @@ class RewriteFinder {
     const target = path.node.type === 'AssignmentExpression' ? path.node.left : path.node.argument
     const binding = target.type === 'Identifier' ? path.scope.getBinding(target.name) : undefined
 
-    if (target.type === 'Identifier' && (binding?.kind === 'const' || binding?.kind === 'module') && this.map.isExact(target.start!))
+    if (target.type === 'Identifier' && (binding?.kind === 'const' || binding?.kind === 'module') && this.input.map.isExact(target.start!))
       this.assigned.push({ binding, identifier: target })
   }
 
@@ -447,7 +465,7 @@ class RewriteFinder {
   // Writes to a name kay sees no signal in.
   private unassignable() {
     for (const { binding, identifier } of this.assigned) {
-      const start = this.map.toSource(identifier.start!)
+      const start = this.input.map.toSource(identifier.start!)
 
       if (!this.known.has(binding) && start !== undefined)
         this.diagnostics.push({ start, end: start + identifier.name.length, message: `\`${identifier.name}\` is not a signal kay can tell, so it cannot be assigned`, note: 'kay writes a name through `.set` when it sees the signal made: by `signal`, `persisted`, `linked` or `queryParam` in this script, as a module\'s `export const`, or as a prop typed `Signal<T>`', help: `write \`${identifier.name}.set(...)\` if it holds a signal` })

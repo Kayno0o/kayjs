@@ -2,6 +2,7 @@ import * as parser from '@babel/parser'
 import { describe, expect, it, spyOn } from 'bun:test'
 import { compileKay, componentName } from '../src/compiler'
 import { moduleSignals } from '../src/compiler/module-signals'
+import { CURRENT, defaultName, GENERATED_NAME, PROPS } from '../src/compiler/names'
 
 function tsx(source: string): string {
   const result = compileKay(source, 'test.kay')
@@ -522,11 +523,40 @@ describe('component names', () => {
     expect(compileKay('p {Date.now()}', 'other.kay').tsx).toContain('export default function Other(')
     expect(compileKay('p Date of birth', 'date.kay').tsx).toContain('export default function Date(')
     expect(compileKay('p {Date.now() + DatePage}', 'date.kay').tsx).toContain('export default function DatePagePage(')
+    expect(compileKay('---\nconst DatePage = 1\n---\np {Date.now() + DatePage}', 'date.kay').tsx).toContain('export default function DatePagePage(')
+  })
+
+  it('keeps the name a type of the template spells, renaming it only for `typeof`, which reads the value', () => {
+    const recursive = '---\nconst { n } = props<{ n: number }>()\n---\nif n > 0\n  Node(n={n - 1})\n'
+    const named = (template: string) => compileKay(`${recursive}${template}`, 'node.kay', { output: 'html' }).tsx.match(/\bfunction ([A-Z]\w*)\(/)?.[1]
+
+    expect(named('button(onClick={(e: MouseEvent) => (e.target as { parentNode: Node }).parentNode}) x')).toBe('Node')
+    expect(named('p {String(((x: Node, y: Array<Node>): x is Node => true) as unknown as new () => Node)}')).toBe('Node')
+    expect(named('p {String(n as unknown as typeof Node)}')).toBe('NodePage')
+    expect(compileKay('---\nconst { ts } = props<{ ts: number }>()\n---\nif ts > 0\n  Date(ts={0})\np {String(ts as unknown as Date)}', 'date.kay').tsx).toContain('export default function Date(')
+  })
+
+  it('reports a template `const` named like the component, which its tags after it would render', () => {
+    expect(compileKay('const Card = 1\np {Card}', 'card.kay', { check: true }).diagnostics.map(d => d.message)).toEqual(['`Card` is already declared'])
+  })
+
+  it('leaves the names the generated code declares out of the editor\'s completions', () => {
+    expect([PROPS, CURRENT, defaultName(0), defaultName(12)].filter(name => !GENERATED_NAME.test(name))).toEqual([])
+    expect(['props', 'Current', 'KayCurrentValue', '__default_x'].filter(name => GENERATED_NAME.test(name))).toEqual([])
   })
 
   it('keeps the name for a template that renders the component itself', () => {
     expect(compileKay('---\nconst { n } = props<{ n: number }>()\n---\nif n > 0\n  Tree(n={n - 1})', 'tree.kay').tsx).toContain('export default function Tree(')
     expect(compileKay('---\nimport { signal } from \'kay\'\n---\np {Counter}', 'counter.kay').tsx).toContain('\nfunction CounterPage(')
+  })
+})
+
+describe('server values the fence reads', () => {
+  it('reports a server value only when neither the template nor the rest of the fence reads it', () => {
+    const unread = (server: string, template: string) => compileKay(`--- server\n${server}\n---\n${template}`, 'list.kay', { check: true }).diagnostics.filter(d => d.code === 'unread-name').map(d => d.message)
+
+    expect(unread('const a = 1\nconst b = 2\nconst sum = a + b\nconst lonely = 3', 'p {sum}')).toEqual(['`lonely` is never read'])
+    expect(unread('const first = 1\nconst second = 2', 'p {second}')).toEqual(['`first` is never read'])
   })
 })
 

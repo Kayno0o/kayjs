@@ -18,5 +18,5 @@ export function defaultName(index: number): string {
   return `${DEFAULT_PREFIX}${index}`
 }
 
-// What the editor leaves out of completions: the names above and what the generated code imports or declares.
-export const GENERATED_NAME = new RegExp(`^(?:${[PROPS, CURRENT, SUBJECT, SELF, 'kayEvent'].join('|')}|${DEFAULT_PREFIX}\\d+|Kay(?:LoopFor|StaticFor|Show|Omit|ComponentClass|Dynamic|TemplateHelpers|Island|IslandBrand|HydrateWhen|Href|Html|Field|FormError|Prop|FunctionProp|Children|IdentityKey|PageContext|PrerenderedContext|PageSettings|QueryOf|PageData|JSX|FormAction|RegisterActions|ActionStub|UseHead|Await))$`)
+// What the editor leaves out of completions: the names above a completion can reach, and what the generated code imports or declares.
+export const GENERATED_NAME = new RegExp(`^(?:${[PROPS, CURRENT, 'kayEvent'].join('|')}|${DEFAULT_PREFIX}\\d+|Kay(?:LoopFor|StaticFor|Show|Omit|ComponentClass|Dynamic|TemplateHelpers|Island|IslandBrand|HydrateWhen|Href|Html|Field|FormError|Prop|FunctionProp|Children|IdentityKey|PageContext|PrerenderedContext|PageSettings|QueryOf|PageData|JSX|FormAction|RegisterActions|ActionStub|UseHead|Await))$`)
