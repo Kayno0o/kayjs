@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { compileKay } from '../src/compiler'
+import { moduleChecks } from '../src/compiler/fence-checks'
 import { explainLint, LINT_GROUPS, lintList, LINTS } from '../src/compiler/lints'
 
 function lints(source: string, options: CompileOptions = {}) {
@@ -135,6 +136,16 @@ describe('deprecated-schema-name', () => {
     expect(fixed(renamed)).toEqual([renamed.replaceAll('t }', 's }').replaceAll('typeof t', 'typeof s').replaceAll('t.', 's.')])
     expect(fixed(taken)).toEqual([taken.replace('{ t }', '{ s as t }')])
     expect(fixed(aliased)).toEqual([aliased.replace('t as schema', 's as schema')])
+  })
+
+  it('leaves a fence or module declaring a name twice to the type check, which reports it', () => {
+    const twice = 'import { t } from \'kay\'\nconst a = 1\nconst a = 2\n'
+
+    const duplicate = { code: undefined, severity: undefined, at: 'a' }
+
+    expect(lints(`---\n${twice}---\ndiv {a}`)).toEqual([duplicate])
+    expect(lints(`--- server\n${twice}---\ndiv x`)).toEqual([duplicate])
+    expect(moduleChecks(twice)).toEqual([])
   })
 })
 

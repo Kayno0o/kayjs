@@ -130,31 +130,37 @@ export function deprecatedSchemaNames(fence: ParsedFence, renamable = true): Dia
   const diagnostics: Diagnostic[] = []
   const span = fence.shift
 
-  loadTraverse()(fence.ast, {
-    ImportSpecifier(path: NodePath<t.ImportSpecifier>) {
-      const { imported, local } = path.node
-      const declaration = path.parent as t.ImportDeclaration
+  // Babel gives no scopes to a fence declaring a name twice, which the type check reports already.
+  try {
+    loadTraverse()(fence.ast, {
+      ImportSpecifier(path: NodePath<t.ImportSpecifier>) {
+        const { imported, local } = path.node
+        const declaration = path.parent as t.ImportDeclaration
 
-      if (declaration.source.value !== 'kay' || imported.type !== 'Identifier' || imported.name !== 't')
-        return
+        if (declaration.source.value !== 'kay' || imported.type !== 'Identifier' || imported.name !== 't')
+          return
 
-      const references = local.name === 't' ? path.scope.getBinding('t')?.referencePaths ?? [] : []
-      const rename = renamable && local.name === 't' && !path.scope.hasBinding('s') && references.every(reference => !reference.scope.hasBinding('s'))
-      const edits = local.name !== 't'
-        ? [{ ...span(imported), text: 's' }]
-        : rename ? [path.node, ...references.map(reference => reference.node)].map(node => ({ ...span(node), text: 's' })) : [{ ...span(path.node), text: 's as t' }]
+        const references = local.name === 't' ? path.scope.getBinding('t')?.referencePaths ?? [] : []
+        const rename = renamable && local.name === 't' && !path.scope.hasBinding('s') && references.every(reference => !reference.scope.hasBinding('s'))
+        const edits = local.name !== 't'
+          ? [{ ...span(imported), text: 's' }]
+          : rename ? [path.node, ...references.map(reference => reference.node)].map(node => ({ ...span(node), text: 's' })) : [{ ...span(path.node), text: 's as t' }]
 
-      diagnostics.push({
-        ...span(imported),
-        code: 'deprecated-schema-name',
-        message: '`t` from \'kay\' is `s` now',
-        note: '`t` is left to translations, which every template reads without an import',
-        help: 'import `s` and build schemas with `s.Object(...)`',
-        fixes: [{ title: rename ? 'Rename it `s`' : 'Import `s`', edits, safe: true }],
-        checkOnly: true,
-      })
-    },
-  })
+        diagnostics.push({
+          ...span(imported),
+          code: 'deprecated-schema-name',
+          message: '`t` from \'kay\' is `s` now',
+          note: '`t` is left to translations, which every template reads without an import',
+          help: 'import `s` and build schemas with `s.Object(...)`',
+          fixes: [{ title: rename ? 'Rename it `s`' : 'Import `s`', edits, safe: true }],
+          checkOnly: true,
+        })
+      },
+    })
+  }
+  catch {
+    return []
+  }
 
   return diagnostics
 }

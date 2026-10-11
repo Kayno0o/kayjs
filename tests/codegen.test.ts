@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'bun:test'
+import * as parser from '@babel/parser'
+import { describe, expect, it, spyOn } from 'bun:test'
 import { compileKay, componentName } from '../src/compiler'
 import { moduleSignals } from '../src/compiler/module-signals'
 
@@ -313,6 +314,29 @@ describe('fences', () => {
     expect(reports('---\nconst el = <p>x</p>\n---\np x')).toEqual([{ message: 'A fence holds TypeScript, never JSX', at: '<p>x</p>', help: 'put markup in the template, or in a component of its own' }])
     expect(errors('--- server\nconst el = <><b /></>\n---\np x')).toEqual(['A fence holds TypeScript, never JSX'])
     expect(errors('---\nconst x = 1 +\n---\np x')).toEqual(['Unexpected token'])
+  })
+
+  it('parse each fence and each handler once a compile, however many passes and checks read it', () => {
+    const script = 'const a = signal(true)\nconst f = () => 1\nconst g = () => 2\n'
+    const server = 'import { t } from \'kay\'\n\nexport const page = { query: t.Object({}) }\n'
+    const source = `--- server\n${server}---\n---\nimport { signal } from 'kay'\n${script}---\nbutton(onclick={a() ? f : g}) x\n`
+    const parse = spyOn(parser, 'parse')
+    const parseExpression = spyOn(parser, 'parseExpression')
+
+    try {
+      for (const options of [{ check: true }, { output: 'html' as const }, { output: 'dom' as const }]) {
+        parse.mockClear()
+        parseExpression.mockClear()
+        compileKay(source, 'test.kay', options)
+
+        expect(parse.mock.calls.filter(([code]) => code === server || code === `import { signal } from 'kay'\n${script}`)).toHaveLength(2)
+        expect(parseExpression.mock.calls.filter(([code]) => code === 'a() ? f : g').length).toBeLessThanOrEqual(1)
+      }
+    }
+    finally {
+      parse.mockRestore()
+      parseExpression.mockRestore()
+    }
   })
 })
 
