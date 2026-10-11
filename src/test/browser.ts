@@ -1,4 +1,6 @@
-import { existsSync } from 'node:fs'
+import { existsSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, rmdirSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { basename, dirname, join } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { ISLAND } from '../runtime/markers'
@@ -88,6 +90,24 @@ const TIMED_OUT = Symbol('timed out')
 // Loaded, no page swap in flight, and every island hydrating on load done: `_$k` is set on an island once hydrated.
 const SETTLED = `document.readyState === 'complete' && !document.documentElement.hasAttribute('aria-busy') && [...document.querySelectorAll('${ISLAND}:not([data-hydrate=visible]):not([data-hydrate=idle])')].every(island => island._$k)`
 
+// What kay makes for the Chrome of a process, named after it so a later run removes what a killed one left.
+const OWNED = /^kay-chrome-(\d+)-/
+// The profile Bun makes for Chrome even when given another, left empty then.
+const BUN_PROFILE = /^--user-data-dir=(.+\.bun-chrome)$/
+// Chrome's lock, beside the profile, which a killed Chrome leaves.
+const SINGLETON = /^org\.chromium\.Chromium\./
+// Where the owned directory notes the profile Bun made.
+const BUN_RECORD = 'bun-profile'
+// Chrome's lock names its host and process.
+const LOCK_PID = /-(\d+)$/
+const EXIT_WAIT_MS = 5000
+
+// The browser of this process's pages. Bun runs one Chrome for every view and leaves the profile it gives it in the temp directory, so kay gives it one of its own and removes it once the last page closes, or at exit.
+let browser: { dir: string, pages: number, ready: Promise<void> } | undefined
+// The process of the Chrome the last page's close killed: Bun spawns another only once it reaped that one, and fails a view made sooner.
+let killed: number | undefined
+let exitHooked = false
+
 // The browser pages are opened in, or undefined when there is none: for `describe.skipIf(!browserPath())`.
 export function browserPath(path?: string): string | undefined {
   const given = path ?? process.env.BUN_CHROME_PATH
@@ -121,16 +141,30 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
   // How many of `errors` a call already looked through for kay's own.
   let seen = 0
   // Chrome refuses to run its sandbox as root, as in a CI container, whose small /dev/shm crashes its renderer.
-  const argv = process.getuid?.() === 0 ? ['--no-sandbox', '--disable-dev-shm-usage'] : []
-  const view = new Bun.WebView({
-    ...options.width === undefined ? {} : { width: options.width },
-    ...options.height === undefined ? {} : { height: options.height },
-    backend: { type: 'chrome', path: executable, argv, url: false },
-    console: (type, ...args) => {
-      if (type === 'error')
-        errors.push(args.map(consoleText).join(' '))
-    },
-  })
+  const rootArgv = process.getuid?.() === 0 ? ['--no-sandbox', '--disable-dev-shm-usage'] : []
+  const { dir, first } = await claimBrowser()
+  // `--enable-automation` lets Chrome tell its command line, which names the profile Bun made.
+  const argv = [...rootArgv, `--user-data-dir=${join(dir, 'profile')}`, '--enable-automation']
+  let view: Bun.WebView
+
+  try {
+    view = new Bun.WebView({
+      ...options.width === undefined ? {} : { width: options.width },
+      ...options.height === undefined ? {} : { height: options.height },
+      backend: { type: 'chrome', path: executable, argv, url: false },
+      console: (type, ...args) => {
+        if (type === 'error')
+          errors.push(args.map(consoleText).join(' '))
+      },
+    })
+  }
+  catch (error) {
+    releaseBrowser()
+
+    throw error
+  }
+
+  let closed = false
   let origin = new URL(url).origin
   // A view runs one `evaluate()` at a time, so the page's calls queue rather than fail when a test runs two at once.
   let queue = Promise.resolve()
@@ -284,12 +318,23 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
       await view.reload()
       await poll(SETTLED, 'the page to reload and hydrate its islands')
     }),
-    close: () => view.close(),
+    close: () => {
+      view.close()
+
+      if (!closed)
+        releaseBrowser()
+
+      closed = true
+    },
     [Symbol.asyncDispose]: async () => page.close(),
   }
 
   // A blank page first: the DevTools session the next calls use starts with a navigation.
   await view.navigate('about:blank')
+
+  if (first)
+    await noteBunProfile(view, dir)
+
   await view.cdp('Runtime.enable')
   view.addEventListener('Runtime.exceptionThrown', (event) => {
     const { exceptionDetails } = (event as MessageEvent<{ exceptionDetails: { text: string, exception?: { description?: string } } }>).data
@@ -310,6 +355,114 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
   }
 
   return page
+}
+
+// A share of the browser for a page, the directory kay owns for it, and whether this page starts the browser.
+async function claimBrowser(): Promise<{ dir: string, first: boolean }> {
+  if (browser) {
+    browser.pages++
+    await browser.ready
+
+    return { dir: browser.dir, first: false }
+  }
+
+  sweepProfiles()
+  browser = { dir: mkdtempSync(join(tmpdir(), `kay-chrome-${process.pid}-`)), pages: 1, ready: killed === undefined ? Promise.resolve() : exited(killed) }
+  killed = undefined
+
+  if (!exitHooked)
+    process.on('exit', closeBrowser)
+
+  exitHooked = true
+  await browser.ready
+
+  return { dir: browser.dir, first: true }
+}
+
+// The last page gone, the browser goes with its profile, and the next page starts another.
+function releaseBrowser() {
+  if (browser && --browser.pages === 0)
+    closeBrowser()
+}
+
+function closeBrowser() {
+  if (!browser)
+    return
+
+  const { dir } = browser
+  const pid = LOCK_PID.exec(attempt(() => readlinkSync(join(dir, 'profile', 'SingletonLock'))) ?? '')?.[1]
+
+  // Closing the views leaves Chrome running, and would leave it writing to the profile.
+  Bun.WebView.closeAll()
+  killed = pid === undefined ? undefined : Number(pid)
+  removeProfile(dir)
+  browser = undefined
+}
+
+// The directory kay owns, Chrome's lock beside the profile, which a killed Chrome leaves, and the empty profile Bun made.
+function removeProfile(dir: string) {
+  const socket = attempt(() => readlinkSync(join(dir, 'profile', 'SingletonSocket')))
+
+  if (socket !== undefined && SINGLETON.test(basename(dirname(socket))))
+    rmSync(dirname(socket), { recursive: true, force: true })
+
+  const bun = attempt(() => readFileSync(join(dir, BUN_RECORD), 'utf8'))
+
+  // Only while empty: a Chrome the app's own view started runs on Bun's.
+  if (bun !== undefined)
+    attempt(() => rmdirSync(bun))
+
+  rmSync(dir, { recursive: true, force: true, maxRetries: 3 })
+}
+
+// What the browsers of killed runs left, their process gone.
+function sweepProfiles() {
+  for (const name of readdirSync(tmpdir())) {
+    const pid = OWNED.exec(name)?.[1]
+
+    if (pid !== undefined && !alive(Number(pid)))
+      removeProfile(join(tmpdir(), name))
+  }
+}
+
+async function exited(pid: number) {
+  const until = Date.now() + EXIT_WAIT_MS
+
+  while (alive(pid) && Date.now() < until)
+    await Bun.sleep(POLL_MS)
+}
+
+function alive(pid: number): boolean {
+  try {
+    process.kill(pid, 0)
+
+    return true
+  }
+  catch (error) {
+    // Another user's.
+    return (error as NodeJS.ErrnoException).code === 'EPERM'
+  }
+}
+
+// Chrome's command line names the profile Bun made for it, which kay's replaced; one the app's own view started without `--enable-automation` tells nothing.
+async function noteBunProfile(view: Bun.WebView, dir: string) {
+  try {
+    const { arguments: argv } = await view.cdp<{ arguments: string[] }>('Browser.getBrowserCommandLine')
+    const bun = argv.map(arg => BUN_PROFILE.exec(arg)?.[1]).find(found => found !== undefined)
+
+    if (bun !== undefined)
+      writeFileSync(join(dir, BUN_RECORD), bun)
+  }
+  catch {}
+}
+
+function attempt<T>(run: () => T): T | undefined {
+  try {
+    return run()
+  }
+  catch {
+    return undefined
+  }
 }
 
 interface Axe {

@@ -1,10 +1,14 @@
 import type { TestPage, TestSite } from '../src/test'
 import { existsSync } from 'node:fs'
+import { mkdir, mkdtemp, readdir, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { t } from 'elysia'
 import { chromium } from 'playwright-core'
 import { browserPath, testSite } from '../src/test'
+import { scratchDir } from './scratch'
 
 // Without BUN_CHROME_PATH or a Chrome on the PATH, the Chromium playwright-core installed for the other browser tests.
 const path = browserPath() ?? (existsSync(chromium.executablePath()) ? chromium.executablePath() : undefined)
@@ -336,6 +340,53 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('publicEnv'
       await env.close()
       delete process.env.KAY_TEST_MAP_KEY
       delete process.env.KAY_TEST_SERVER_ONLY
+    }
+  }, 60_000)
+})
+
+describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the browser\'s profile', () => {
+  const kinds = (names: string[]) => names.map(name => name.startsWith('kay-chrome-') ? 'kay' : name.endsWith('.bun-chrome') ? 'bun' : name.startsWith('org.chromium.') ? 'chrome' : name).sort()
+
+  it('leaves nothing in the temp directory once the last page closes or the process exits, and removes what a killed run left', async () => {
+    // A temp directory of its own, short as Chrome's socket path must be.
+    const temp = await mkdtemp(join(tmpdir(), 'kay-temp-'))
+    const script = join(await scratchDir('profile-'), 'run.ts')
+
+    await mkdir(join(temp, 'kay-chrome-999999999-killed', 'profile'), { recursive: true })
+    await Bun.write(script, `import { readdirSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import process from 'node:process'
+import { browse } from ${JSON.stringify(resolve('src/test/browser.ts'))}
+
+const server = Bun.serve({ port: 0, fetch: () => new Response('<p>Hi</p>', { headers: { 'content-type': 'text/html' } }) })
+const open = async () => browse(\`http://localhost:\${server.port}/\`, { path: process.argv[2] })
+const pages = [await open(), await open()]
+
+console.log(JSON.stringify(readdirSync(tmpdir())))
+
+for (const page of pages)
+  page.close()
+
+console.log(JSON.stringify(readdirSync(tmpdir())))
+await open()
+await server.stop()
+process.exit(0)
+`)
+
+    try {
+      const child = Bun.spawn([process.execPath, script, path!], { env: { ...process.env, TMPDIR: temp }, stdout: 'pipe', stderr: 'pipe' })
+      const [out, errors, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+      const [opened, closed] = out.trim().split('\n').map(line => kinds(JSON.parse(line) as string[]))
+
+      expect({ code, errors }).toEqual({ code: 0, errors: '' })
+      // One owned directory, the killed run's gone; Bun's profile stays empty, Chrome running on kay's.
+      expect(opened).toEqual(['bun', 'chrome', 'kay'])
+      expect(closed).toEqual([])
+      // The page opened last, left open, goes at exit.
+      expect(kinds(await readdir(temp))).toEqual([])
+    }
+    finally {
+      await rm(temp, { recursive: true, force: true })
     }
   }, 60_000)
 })
