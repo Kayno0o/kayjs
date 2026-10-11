@@ -150,6 +150,22 @@ export const news = collection({
 
 `news.invalidate()` refreshes it, typically from a webhook in an API route.
 
+## Markdown in an island
+
+`markdownHtml` from `kay/markdown` renders Markdown a user writes, such as an editor's preview or a chat reply streaming in, as sanitized HTML: tables, images and task lists kept, scripts and handlers dropped.
+
+```kay
+---
+import { markdownHtml } from 'kay/markdown'
+
+const text = signal('')
+---
+textarea(aria-label="Note" value={text()} onInput={e => text.set(e.currentTarget.value)})
+div(innerHTML={markdownHtml(text())})
+```
+
+The server renders it with Bun.markdown, the island with marked, writing the same HTML; only the islands importing it load marked, about 15 KB gzipped. It is sync, so it can run again on every chunk of a stream.
+
 ## Preview mode
 
 Setting `preview: { secret }` in `kay.config.ts` lets an editor see drafts on the live site through a signed link, see [the full reference](/llms/content#preview-mode).

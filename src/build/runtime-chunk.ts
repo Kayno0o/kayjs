@@ -17,6 +17,8 @@ const DEFAULT_IMPORT = /^[\w$]+\s*(?:,|$)/
 const NAMED = /\{([^}]*)\}/
 const ALIAS = /\s+as\s+/
 const KAY_SPECIFIER = /^kay(?:\/|$)/
+// Entries of the runtime that bundle a package, which stay in the chunks of the islands importing them rather than weigh on every page.
+const OWN_CHUNK = new Set(['kay/markdown'])
 const RELATIVE = /^\.\.?\//
 const EXTENSIONS = ['.ts', '.tsx', '/index.ts']
 const ALL = '*'
@@ -135,7 +137,7 @@ export async function runtimeChunk(entry: string, options: { plugins: BunPlugin[
     return undefined
 
   for (const output of outer.outputs)
-    importedNames(await output.text(), used, specifier => KAY_SPECIFIER.test(specifier))
+    importedNames(await output.text(), used, specifier => KAY_SPECIFIER.test(specifier) && !OWN_CHUNK.has(specifier))
 
   const roots = (await Promise.all([...used.keys()].map(specifierFile))).filter(file => file !== undefined)
   const { eager, lazy } = await reach(roots)

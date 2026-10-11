@@ -68,6 +68,11 @@
       "browser": "./src/runtime/cache.ts",
       "default": "./src/runtime/cache.server.ts"
     },
+    "./markdown": {
+      "types": "./types/runtime/markdown.server.d.ts",
+      "browser": "./src/runtime/markdown.client.ts",
+      "default": "./src/runtime/markdown.server.ts"
+    },
     "./image": {
       "types": "./types/runtime/image.public.d.ts",
       "default": "./src/runtime/image.public.ts"
@@ -161,7 +166,8 @@
     "@typescript/native-preview": "^7.0.0-dev.20260707.2",
     "axe-core": "^4.14.0",
     "devalue": "^6.0.2",
-    "elysia": "^1.4.30"
+    "elysia": "^1.4.30",
+    "marked": "^18.1.0"
   },
   "devDependencies": {
     "@fontsource/inter": "^5.3.0",
