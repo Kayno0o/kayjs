@@ -72,6 +72,15 @@
   --spacing-kui-field-y: 0.25rem;
   --color-kui-field-focus: var(--color-kui-accent);
   --kui-field-focus-shadow: none;
+
+  /* A Notice's frame and weight, the compact one taking the weight too. */
+  --kui-border-notice: var(--kui-border-card);
+  --font-weight-kui-notice: 400;
+
+  /* An Avatar's ring, and the weight of the initial it falls back to. */
+  --kui-border-avatar: var(--kui-border-card);
+  --color-kui-avatar-ring: var(--color-kui-surface2);
+  --font-weight-kui-avatar: 600;
 }
 
 /* Dark unless the visitor's system asks for light; `data-theme="light"` or `"dark"`, on the root or on any element, wins over both for what it holds. */
@@ -1621,7 +1630,8 @@
   }
 
   .kui-notice {
-    @apply border border-kui-overlay0 bg-kui-surface1 px-4 py-3 text-sm text-kui-text;
+    @apply border-solid border-kui-overlay0 bg-kui-surface1 px-4 py-3 text-sm font-kui-notice text-kui-text;
+    border-width: var(--kui-border-notice);
 
     &:where([data-tone='success']) {
       @apply border-kui-success text-kui-success;
@@ -1641,7 +1651,8 @@
   }
 
   .kui-avatar {
-    @apply inline-grid size-8 shrink-0 place-items-center overflow-hidden rounded-full border border-kui-surface2 bg-kui-surface1;
+    @apply inline-grid size-8 shrink-0 place-items-center overflow-hidden rounded-full border-solid border-kui-avatar-ring bg-kui-surface1;
+    border-width: var(--kui-border-avatar);
 
     &:where([data-size='xs']) {
       @apply size-5;
@@ -1662,7 +1673,7 @@
 
   /* Its colours are set inline, seeded by the name. */
   .kui-avatar-initial {
-    @apply grid size-full place-items-center text-xs font-semibold uppercase;
+    @apply grid size-full place-items-center text-xs font-kui-avatar uppercase;
   }
 
   :where(.kui-avatar[data-size='lg']) .kui-avatar-initial {
