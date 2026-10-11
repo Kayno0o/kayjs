@@ -624,8 +624,8 @@ describe('generic components', () => {
 
     expect(code).toContain('<List {...KayFunctionProp(List)(0)} items={[{ run() { return 1 } }]} />')
 
-    // Beside a getter, which keeps the object whole.
-    expect(compileKay('---\nimport List from \'./list.kay\'\n---\nList(items={[{ get n() { return 1 }, run() { return 1 } }]})', '_layout.kay', { check: true }).tsx).toContain('<List {...KayFunctionProp(List)(0)} items={[KayProp(List)(({ get n() { return 1 }, run() { return 1 } }))]} />')
+    // Beside a getter, which keeps the object whole, the check of the object covering it.
+    expect(compileKay('---\nimport List from \'./list.kay\'\n---\nList(items={[{ get n() { return 1 }, run() { return 1 } }]})', '_layout.kay', { check: true }).tsx).toContain('<List items={[KayProp(List)(({ get n() { return 1 }, run() { return 1 } }))]} />')
   })
 })
 

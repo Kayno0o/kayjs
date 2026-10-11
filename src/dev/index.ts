@@ -31,10 +31,12 @@ export interface DevOptions {
   log?: ((line: string) => void) | undefined
 }
 
-// Long enough to gather the few events one save makes.
-const DEBOUNCE_MS = 30
+// Long enough to gather the few events one save makes, which come within a millisecond.
+const DEBOUNCE_MS = 10
+// How long a file a change left missing is waited for, as an editor saving by renaming it away and writing it anew leaves it, on a machine busy enough to stretch the save.
+const GONE_WAIT_MS = 60
 const SPARE = join(import.meta.dir, 'spare.ts')
-// When a server never says it is up, as one that never serves, the next process starts anyway after this.
+// When a server never says it is up, as one that never serves, the next process starts anyway after this: a guess, which also starts it beside a server that takes longer to boot.
 const SPARE_FALLBACK_MS = 2000
 
 // The server of a project with no entry of its own, as a static site is.
@@ -52,6 +54,8 @@ const SERVER_ROOT_FILE = /^(?:\.env.*|bun\.lockb?)$|\.(?:[cm]?[jt]sx?|json[c5]?|
 // Tests, which no server imports.
 const TEST_DIRS = new Set(['tests', 'test', '__tests__', 'e2e'])
 const TEST_FILE = /(?:^|\/)__tests__\/|\.(?:test|spec)\.[cm]?[jt]sx?$/
+// The files editors write beside a source while saving it, its backup, swap or temporary copy, Vim's `4913` and Emacs' `.#` lock included.
+const EDITOR_SCRATCH = /(?:~|\.sw[a-px]|\.tmp|___jb_(?:tmp|old)___|\.kate-swp)$|(?:^|\/)(?:4913|\.#[^/]*|#[^/]*#)$/
 // Past this, as after a checkout, the files changed are not passed on, and open pages reload.
 const MAX_CHANGED_FILES = 200
 // The address of a server listening on the root path, as kay's do, reads better without its slash.
@@ -335,6 +339,19 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
 
     restarting = undefined
   }
+  let waited = 0
+  const settle = () => {
+    if (waited < GONE_WAIT_MS && [...touched].some(file => !existsSync(join(root, file)))) {
+      waited += DEBOUNCE_MS
+      timer = setTimeout(settle, DEBOUNCE_MS)
+
+      return
+    }
+
+    waited = 0
+    changed = true
+    restarting ??= drain()
+  }
   const stopWatching = watchProject(root, (file) => {
     startupChanged ||= STARTUP_FILE.test(file)
 
@@ -353,10 +370,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     touched.add(file)
 
     clearTimeout(timer)
-    timer = setTimeout(() => {
-      changed = true
-      restarting ??= drain()
-    }, DEBOUNCE_MS)
+    timer = setTimeout(settle, DEBOUNCE_MS)
   })
 
   start()
@@ -498,7 +512,7 @@ export function watchProject(root: string, onChange: (file: string) => void, { t
     // The directory may go between the check and the watch, or the system run out of watchers: `kay dev` keeps going without it.
     try {
       const watcher = watch(join(root, name), { recursive: true }, (_event, file) => {
-        if (file === null || tests || !TEST_FILE.test(file))
+        if (file === null || ((tests || !TEST_FILE.test(file)) && !EDITOR_SCRATCH.test(file)))
           onChange(`${name}/${file ?? ''}`)
       })
 

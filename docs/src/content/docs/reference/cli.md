@@ -65,7 +65,7 @@ kay: accents needs tailwind: add --with tailwind, or drop it with --without acce
 
 `kay dev` runs `src/server.ts` with `NODE_ENV=development`. Open pages refresh by themselves, an edited island is swapped in place, and a project that fails to compile shows its errors in the browser. What the entry imports before it calls `pages()`, such as a mailer rendering `.kay` mails, imports `.kay` files and icons as pages do.
 
-`kay dev` builds the browser code itself while the server boots, in a process it keeps from one change to the next, and the server reads that build as a production server reads `kay build`'s. An edit builds again only what it reaches: a change to a server module restarts the server alone, and an edit to stylesheets alone swaps them into the open pages without restarting anything. A `pages()` given options for the browser build that `kay.config.ts` does not hold bundles its own as it boots, and says so: keep those options in `kay.config.ts`.
+`kay dev` builds the browser code itself while the server boots, in a process it keeps from one change to the next, and the server reads that build as a production server reads `kay build`'s. An edit builds again only what it reaches: a change to a server module restarts the server alone, a new word in a template builds the Tailwind stylesheets again only when Tailwind makes a class of it, and an edit to stylesheets alone swaps them into the open pages without restarting anything. A `pages()` given options for the browser build that `kay.config.ts` does not hold bundles its own as it boots, and says so: keep those options in `kay.config.ts`.
 
 | Option | Effect |
 | --- | --- |

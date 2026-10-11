@@ -4,7 +4,7 @@ import type { KayConfig } from '../src/config'
 import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp, readdir, rename, rm, stat, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { basename, dirname, join } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import process from 'node:process'
 import tailwind from 'bun-plugin-tailwind'
 import { describe, expect, it } from 'bun:test'
@@ -17,9 +17,10 @@ import { runtimeConfig, withoutPlugins } from '../src/build/runtime-config'
 import { describeThrown, mapBundleToKay, mapStack } from '../src/build/sourcemap'
 import { analyzeKayCached, transformKayCached } from '../src/build/transform'
 import { loadConfig, withConfig } from '../src/config'
+import { devBuilder } from '../src/dev/builder'
 import { projectPaths } from '../src/project'
 import { compileErrorPage } from '../src/server/overlay'
-import { scratchDir } from './scratch'
+import { fixtureCopy, scratchDir } from './scratch'
 
 const root = join(import.meta.dir, 'fixtures/islands')
 
@@ -194,6 +195,35 @@ describe('kay build', () => {
     }
     finally {
       await rm(join(project, '.kay'), { recursive: true, force: true })
+    }
+  })
+
+  it('builds the stylesheets again in kay dev only for a word Tailwind makes a class of', async () => {
+    const project = resolve(await fixtureCopy('tailwind'))
+    const page = join(project, 'src/routes/index.kay')
+    const source = await Bun.file(page).text()
+    const build = devBuilder(project, { plugins: [tailwind] })
+    const rebuilds = async (added: string) => {
+      // A build reads its stylesheets' sources once done, which the next one waits for: an empty one, so the edit comes after.
+      await build([])
+      await Bun.write(page, `${source}  p ${added}\n`)
+
+      return (await build(['src/routes/index.kay'])).styles !== undefined
+    }
+
+    try {
+      expect((await build(null)).styles).toBeDefined()
+      expect(await rebuilds('Bonjour tout le monde')).toBe(false)
+      expect(await rebuilds('Bonjour underline-offset-4')).toBe(true)
+      expect(await rebuilds('Bonjour underline-offset-4 encore')).toBe(false)
+      // A value Tailwind reads across what splits words, a dotted shorthand and an arbitrary one.
+      expect(await rebuilds('Bonjour underline-offset-4 encore span(class="bg-(--brand)")')).toBe(true)
+      expect(await rebuilds('Bonjour underline-offset-4 encore span.py-1')).toBe(true)
+      expect(await rebuilds('Bonjour underline-offset-4 encore span.py-1 span.py-1.5')).toBe(true)
+      expect(await rebuilds('Bonjour underline-offset-4 encore span.py-1 span.py-1.5 span(class="w-[13px]")')).toBe(true)
+    }
+    finally {
+      await rm(project, { recursive: true, force: true })
     }
   })
 

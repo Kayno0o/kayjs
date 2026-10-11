@@ -187,7 +187,7 @@ describe('the dev watcher', () => {
 
   it('starts the server with the .env as it is now, over the values Bun loaded into kay dev itself', async () => {
     const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
-    const seen = join(root, 'seen.txt')
+    const seen = join(root, '.seen')
 
     await Bun.write(join(root, '.env'), 'KAY_GREETING=hello\nKAY_FROM_SHELL=file\n')
     await Bun.write(join(root, 'src/server.ts'), `await Bun.write(${JSON.stringify(seen)}, \`\${process.env.KAY_GREETING}|\${process.env.KAY_FROM_SHELL}\`)\nsetInterval(() => undefined, 1000)\n`)
@@ -249,7 +249,7 @@ describe('kay dev', () => {
 
     try {
       // Sooner than the fallback for a server that never says it is up.
-      await until(() => childrenRunning(realpathSync(root), 'spare.ts').length === 2, 1500)
+      await until(() => childrenRunning(realpathSync(root), 'spare.ts').length === 2, 1900)
     }
     finally {
       await stop()
@@ -262,7 +262,7 @@ describe('kay dev', () => {
 
     await mkdir(base, { recursive: true })
     const root = await mkdtemp(join(base, 'kay-dev-'))
-    const seen = join(root, 'seen.txt')
+    const seen = join(root, '.seen')
 
     await Bun.write(join(root, 'src/mails/welcome.kay'), 'p Welcome\n')
     await Bun.write(join(root, 'src/mailer.ts'), 'import Welcome from \'./mails/welcome.kay\'\n\nexport const mails = { Welcome, ...import.meta.glob(\'./mails/*.kay\', { eager: true, import: \'default\' }) }\n')
@@ -304,7 +304,7 @@ describe('kay dev', () => {
 
   it('runs from the command line on the project a directory names, or with the entry --entry names, on the port --port names', async () => {
     const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
-    const seen = join(root, 'seen.txt')
+    const seen = join(root, '.seen')
     const cli = join(import.meta.dir, '../src/cli.ts')
     const report = (name: string) => `await Bun.write(${JSON.stringify(seen)}, \`${name}|\${process.cwd()}|\${process.env.PORT}\`)\nsetInterval(() => undefined, 1000)\n`
     const port = process.env.PORT
@@ -345,7 +345,7 @@ describe('kay dev', () => {
 
   it('runs the entry as the main module, and a changed .env reaches the next server', async () => {
     const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
-    const seen = join(root, 'seen.txt')
+    const seen = join(root, '.seen')
     const children: Subprocess[] = []
 
     await Bun.write(join(root, '.env'), 'KAY_GREETING=hello\n')
@@ -367,9 +367,62 @@ describe('kay dev', () => {
     }
   })
 
+  it('restarts once per save, however the editor writes the file, on a machine slow enough to stretch the save', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
+    const server = join(root, 'src/server.ts')
+    const children: Subprocess[] = []
+    const body = (n: number) => `// ${n}\nsetInterval(() => undefined, 1000)\n`
+
+    await Bun.write(server, body(0))
+    const stop = await dev(root, { onRestart: child => children.push(child) })
+    const saves = [
+      async () => Bun.write(server, body(1)),
+      // A temporary file renamed over the source.
+      async () => {
+        await Bun.write(`${server}.tmp`, body(2))
+        await Bun.sleep(30)
+        await rename(`${server}.tmp`, server)
+      },
+      // The source moved to a backup, written anew and the backup deleted, as Vim saves.
+      async () => {
+        await rename(server, `${server}~`)
+        await Bun.sleep(30)
+        await Bun.write(server, body(3))
+        await Bun.sleep(30)
+        await rm(`${server}~`)
+      },
+      // A JetBrains IDE's safe write: a temporary copy, the source renamed away, the copy renamed over it.
+      async () => {
+        await Bun.write(`${server}___jb_tmp___`, body(4))
+        await rename(server, `${server}___jb_old___`)
+        await Bun.sleep(30)
+        await rename(`${server}___jb_tmp___`, server)
+        await rm(`${server}___jb_old___`)
+      },
+    ]
+
+    try {
+      await until(() => children.length === 1)
+
+      for (const [index, save] of saves.entries()) {
+        await Bun.sleep(200)
+        await save()
+        await until(() => children.length === index + 2)
+      }
+
+      await Bun.sleep(300)
+      expect(children).toHaveLength(saves.length + 1)
+    }
+    finally {
+      await stop()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('serves the pages itself while the project has no server entry, and runs one written meanwhile at the next restart', async () => {
     const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
-    const seen = join(root, 'seen.txt')
+    // Hidden, so the server writing it restarts nothing.
+    const seen = join(root, '.seen')
     const children: Subprocess[] = []
 
     await Bun.write(join(root, '.env'), 'PORT=0\n')

@@ -1,5 +1,6 @@
 import type { ClientOptions, ClientSources } from '../build/client'
 import type { ClientManifest } from '../server/client'
+import type { ClassWords } from './tailwind'
 import { realpathSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { join, resolve, sep } from 'node:path'
@@ -13,6 +14,7 @@ import { KayCompileError } from '../build/transform'
 import { withConfig } from '../config'
 import { clientOptionsOf } from '../project'
 import { BUILD_FAILURE, clientOptionsKey, MANIFEST } from '../server/client'
+import { tailwindClasses } from './tailwind'
 
 // `kay dev` asks for a build with the files changed since the last one, relative to the root, or null for a build of everything.
 export interface BuildRequest {
@@ -41,6 +43,8 @@ interface Built {
   // What the stylesheet build reads of each module it followed, and the words of each file Tailwind may read classes from.
   signatures: Map<string, string>
   words: Map<string, Set<string>>
+  // Which new words make Tailwind classes, when a stylesheet imports it: loaded once the first new word comes, then compiled again after each stylesheet build.
+  classes?: Promise<ClassWords | undefined> | undefined
   // Reading them once the stylesheets are built, which the next build waits for.
   read: Promise<void>
   // The manifest as written: another one in its place, as a server building its own client writes, means building everything again.
@@ -60,6 +64,13 @@ export function devBuilder(root: string, options: ClientOptions): (changed: stri
   const output = outputDir(root)
   const realRoot = realpathSync(root)
   let last: Built | undefined
+  let tailwindLoaded = false
+  const classesOf = async (built: Built) => {
+    tailwindLoaded = true
+    built.classes ??= tailwindClasses(built.styleInputs)
+
+    return built.classes
+  }
 
   const stylesChanged = async (previous: Built, sources: ClientSources, texts: Map<string, string | undefined>): Promise<boolean> => {
     if (!sameItems(previous.sources.pages, sources.pages) || (plugins && !sameItems(previous.sources.classes, sources.classes)))
@@ -74,8 +85,12 @@ export function devBuilder(root: string, options: ClientOptions): (changed: stri
 
       const known = previous.words.get(file)
 
-      if (plugins && text !== undefined && SCANNED_FILE.test(file) && (!known || sourceWords(text).some(word => !known.has(word))))
-        return true
+      if (plugins && text !== undefined && SCANNED_FILE.test(file)) {
+        const fresh = known ? sourceWords(text).filter(word => !known.has(word)) : sourceWords(text)
+
+        if (fresh.length > 0 && (await classesOf(previous))?.(fresh, text) !== false)
+          return true
+      }
     }
 
     return false
@@ -150,6 +165,7 @@ export function devBuilder(root: string, options: ClientOptions): (changed: stri
       signatures,
       words,
       read: styles ? readInputs(styleInputs, signatures, words) : Promise.resolve(),
+      classes: !styles ? previous!.classes : tailwindLoaded ? tailwindClasses(styleInputs) : undefined,
       manifest: text,
     }
 
