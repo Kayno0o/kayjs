@@ -66,6 +66,19 @@ function list(addresses: Address | Address[] | undefined): Address[] {
   return addresses === undefined ? [] : Array.isArray(addresses) ? addresses : [addresses]
 }
 
+function recipientsOf(mail: Mail): string {
+  return [...mail.to, ...mail.cc, ...mail.bcc].map(addressOf).join(', ')
+}
+
+// A subject in quotes, its line breaks escaped, so one a visitor wrote cannot add a line of its own to the log.
+function quoted(subject: string): string {
+  return JSON.stringify(subject)
+}
+
+function reason(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
+}
+
 function domainOf(address: Address): string | undefined {
   const plain = addressOf(address)
   const at = plain.lastIndexOf('@')
@@ -248,20 +261,45 @@ export function mailer(options: MailerOptions = {}): Mailer {
   }
 
   const deliver = async (mail: Mail): Promise<Delivery> => {
-    const delivery = await transport.send(mail)
+    if (transport === outbox) {
+      const delivery = await outbox.send(mail)
+
+      if (process.env.NODE_ENV === 'development')
+        console.info(`kayjs-mail: ${quoted(mail.subject)} to ${recipientsOf(mail)} kept in the outbox, shown at /_kay/mail`)
+
+      return delivery
+    }
+
+    let delivery: Delivery
+
+    try {
+      delivery = await transport.send(mail)
+    }
+    catch (error) {
+      console.error(`kayjs-mail: ${quoted(mail.subject)} to ${recipientsOf(mail)} was not sent: ${reason(error)}`)
+
+      throw error
+    }
+
+    const accepted = delivery.accepted.length > 0 ? delivery.accepted.join(', ') : recipientsOf(mail)
+
+    console.info(`kayjs-mail: ${quoted(mail.subject)} sent to ${accepted}${delivery.response ? `: ${delivery.response}` : ''}`)
 
     // Logged rather than thrown: a retry would send the mail again to those who already have it.
     if (delivery.rejected.length > 0)
-      console.warn(`kayjs-mail: "${mail.subject}" was refused for ${delivery.rejected.join(', ')}, and sent to the others`)
-
-    if (transport === outbox && process.env.NODE_ENV === 'development')
-      console.info(`kayjs-mail: "${mail.subject}" to ${mail.to.map(addressOf).join(', ')} kept in the outbox, shown at /_kay/mail`)
+      console.warn(`kayjs-mail: ${quoted(mail.subject)} was refused for ${delivery.rejected.join(', ')}, and sent to the others`)
 
     return delivery
   }
 
-  const { name = 'mail', ...queueOptions } = options.queue ?? {}
-  const jobs = queue<Mail>(name, deliver, queueOptions)
+  const { name = 'mail', onFailed, ...queueOptions } = options.queue ?? {}
+  const jobs = queue<Mail>(name, deliver, {
+    ...queueOptions,
+    onFailed: async (mail, error) => {
+      console.error(`kayjs-mail: ${quoted(mail.subject)} to ${recipientsOf(mail)} is given up after its last attempt: ${reason(error)}`)
+      await onFailed?.(mail, error)
+    },
+  })
   const plugin = new Elysia().use(jobs)
 
   if (transport === outbox && process.env.NODE_ENV === 'development')

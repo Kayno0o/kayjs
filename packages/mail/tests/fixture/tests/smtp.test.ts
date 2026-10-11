@@ -1,7 +1,7 @@
 import { generateKeyPairSync } from 'node:crypto'
 import process from 'node:process'
 import { mailer, smtp } from '@kaynooo/kayjs-mail'
-import { afterAll, describe, expect, it } from 'bun:test'
+import { afterAll, describe, expect, it, spyOn } from 'bun:test'
 import { bodyText, startSmtp } from '../../helpers/smtp'
 import Welcome from '../src/mails/welcome.kay'
 
@@ -37,6 +37,20 @@ describe('smtp', () => {
 
     expect(received.to).toEqual(['<ada@example.com>'])
     expect(received.data.slice(0, received.data.indexOf('\n\n'))).not.toMatch(/^Bcc:/im)
+  })
+
+  it('logs each mail sent with the server\'s answer, its subject\'s line breaks escaped', async () => {
+    const mail = mailer({ from: 'hello@fixture.test', transport: smtp({ host: '127.0.0.1', port: server.port }) })
+    const info = spyOn(console, 'info').mockImplementation(() => undefined)
+
+    try {
+      await mail.send({ to: 'ada@example.com', cc: 'bob@example.com', subject: 'Hi\nforged line', text: 'Hello' })
+
+      expect(info).toHaveBeenCalledWith('kayjs-mail: "Hi\\nforged line" sent to ada@example.com, bob@example.com: 250 queued')
+    }
+    finally {
+      info.mockRestore()
+    }
   })
 
   it('never sends a password over a connection that did not upgrade to TLS', async () => {
