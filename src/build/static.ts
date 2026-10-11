@@ -19,9 +19,14 @@ import { compressPaths } from '../server/compress'
 import { localeSettings } from '../server/i18n'
 import { applyPageHooks, assetFiles } from '../server/page-hook'
 import { publicFiles } from '../server/public'
+import { withoutSlash } from '../server/routes'
 import { siteOrigin } from '../server/seo'
 
 // Left in the directory a static export writes, so a later export knows it may clear it, and never clears one it did not write.
+interface App {
+  handle: (request: Request) => Promise<Response>
+}
+
 const MARKER = '.kay-static'
 const COPIES = ['.br', '.gz']
 const SOURCE_MAP = /\.map$/
@@ -111,7 +116,7 @@ export async function exportStatic(project: Project, client: ClientBuild, outdir
 
   written.push(...await writeRedirects(out, config.redirects ?? {}, base, origin))
 
-  written.push(...await writeLocaleRedirects(app, out, config, built.map(([path]) => path), origin))
+  written.push(...await writeLocaleRedirects(app, out, config, built.map(([path]) => path), base, origin))
 
   await compressPaths(written)
   await Bun.write(join(out, MARKER), '')
@@ -120,7 +125,7 @@ export async function exportStatic(project: Project, client: ClientBuild, outdir
 }
 
 // The paths the server sends to a page in its locale, each written as a page sending there: with every locale prefixed, the page's path without its prefix, and the path a locale translates, untranslated.
-async function writeLocaleRedirects(app: { handle: (request: Request) => Promise<Response> }, out: string, config: KayConfig, paths: string[], origin: string): Promise<string[]> {
+async function writeLocaleRedirects(app: App, out: string, config: KayConfig, paths: string[], base: string, origin: string): Promise<string[]> {
   const settings = config.i18n && localeSettings(config.i18n)
 
   if (!settings || settings.hosts)
@@ -138,21 +143,37 @@ async function writeLocaleRedirects(app: { handle: (request: Request) => Promise
     const page = untranslatedPath(settings, own, locale)
 
     for (const source of [localePath({ ...settings, paths: undefined }, page, locale), page]) {
-      if (source !== path)
+      if (withoutSlash(source) !== withoutSlash(path))
         sources.add(source)
     }
   }
 
-  // Asked as a first visit asks, which goes to the default locale.
   for (const source of sources) {
-    const response = await app.handle(new Request(`http://localhost${source}`))
-    const location = response.headers.get('location')
+    const location = await localeRedirect(app, source, base)
 
-    if (response.status >= 300 && response.status < 400 && location !== null)
+    if (location !== undefined)
       written.push(...await writeRefresh(out, source, location, origin))
   }
 
   return written
+}
+
+// Where the server sends a first visit to the path, which goes to the default locale. Under `trailingSlash`, its slash redirects come before and after that one: the page is written to send where they settle.
+async function localeRedirect(app: App, source: string, base: string): Promise<string | undefined> {
+  const redirected = async (path: string) => {
+    const response = await app.handle(new Request(`http://localhost${path}`))
+    const location = response.headers.get('location')
+
+    return response.status >= 300 && response.status < 400 && location !== null ? location : undefined
+  }
+  const sitePath = (location: string | undefined) => location?.startsWith(`${base}/`) === true ? location.slice(base.length) : undefined
+  const slashOnly = (from: string | undefined, to: string | undefined) => from !== undefined && to !== undefined && to !== from && withoutSlash(to) === withoutSlash(from)
+  const first = await redirected(source)
+  const location = slashOnly(source, sitePath(first)) ? await redirected(sitePath(first)!) : first
+  const target = sitePath(location)
+  const settled = target === undefined ? undefined : await redirected(target)
+
+  return slashOnly(target, sitePath(settled)) ? settled : location
 }
 
 // A directory kay may write to: never the project or what holds it, and one with files in it only when an export wrote them.

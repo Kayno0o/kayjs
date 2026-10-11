@@ -39,14 +39,6 @@ function servesSvg(favicon: string | FaviconConfig | undefined): boolean {
   return typeof favicon !== 'string'
 }
 
-// The paths a project's `favicon` and `manifest` settings serve.
-export function faviconPaths(favicon: string | FaviconConfig | false | undefined, manifest?: ManifestConfig): string[] {
-  if (favicon === false)
-    return []
-
-  return FAVICON_PATHS.filter(path => (path !== SVG || servesSvg(favicon)) && (!(path in MASKABLE_FILES) || manifest?.maskable !== undefined))
-}
-
 // The favicon's source: the project's own, kay's mark when it names none, or none once turned off.
 export function faviconSource(root: string, favicon: string | FaviconConfig | false | undefined, manifest?: ManifestConfig): FaviconSource | undefined {
   if (favicon === false)

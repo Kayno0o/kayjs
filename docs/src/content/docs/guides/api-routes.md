@@ -24,7 +24,7 @@ export default api()
   )
 ```
 
-`api()` is an Elysia instance whose handlers read the app's `locals`, so `({ user })` is typed. A `_guard.ts` in `src/api/` protects its routes like it protects pages. A single file a static export should write, such as `llms.txt`, is an [endpoint file](/essentials/routing#endpoint-files) in `src/routes/` instead.
+`api()` is an Elysia instance whose handlers read the app's `locals`, so `({ user })` is typed. A `_guard.ts` in `src/api/` protects its routes like it protects pages. A route at the path of a page, a public file, an endpoint or a redirect stops the server at boot. A single file a static export should write, such as `llms.txt`, is an [endpoint file](/essentials/routing#endpoint-files) in `src/routes/` instead.
 
 A handler that throws is logged with its stack and handed to `onError`, like a page's error, and answers 500 with `Internal Server Error` in production, its message in development. A module's own `onError` answering the error comes first, and a body its schema refuses or a `status()` thrown keeps the answer Elysia gives, unlogged.
 

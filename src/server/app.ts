@@ -40,7 +40,7 @@ import { assetFiles } from './page-hook'
 import { loadPrerendered, pageResponder, servePageRoutes } from './page-routes'
 import { servePreview } from './preview'
 import { requestId, trustProxy } from './protection'
-import { servePublic } from './public'
+import { claimPublic, publicFiles, servePublic } from './public'
 import { claimRedirects, readRedirects, serveRedirects } from './redirects'
 import { remoteImages, remotePatterns } from './remote'
 import { trackPrerendered } from './revalidate'
@@ -222,7 +222,8 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
     filePaths.add(path)
 
   const actionOptions = { dev: mode.dev, onError: options.onError, i18n: locales, base }
-  const [actionLimits, apiModules] = await Promise.all([registerActionRoutes(app, routes, routeMatch(table, matchers), actionOptions), source.api(root, options), servePublic(app, served, paths.public)])
+  const [actionLimits, apiModules, files] = await Promise.all([registerActionRoutes(app, routes, routeMatch(table, matchers), actionOptions), source.api(root, options), publicFiles(paths.public)])
+  const publicServed = claimPublic(served, files)
   const api = await serveApi(app, apiModules, actionOptions)
   const endpoints = await source.endpoints(paths.routes, mounts)
 
@@ -277,11 +278,12 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   if (log !== false && !mode.dev)
     announceStart(app, log, [...prerendered.values()].reduce((count, pages) => count + pages.size, 0))
 
+  await servePublic(app, served, publicServed)
   serveRedirects(app, redirects)
 
   const respond = pageResponder({ client, renderOptions, prerendered, settings: i18n?.settings, transforms: pageHooks(options.extensions), pageFile: assetFiles({ clientDir: client.dir, publicDir: paths.public, base, aspects: options.images?.aspects }) })
 
-  servePageRoutes(app, { table, matchers, i18n, locales, client, renderOptions, trailingSlash: options.trailingSlash ?? 'never', fallback: source.fallback(paths.routes, mounts), respond })
+  servePageRoutes(app, { table, served, matchers, i18n, locales, client, renderOptions, trailingSlash: options.trailingSlash ?? 'never', fallback: source.fallback(paths.routes, mounts), respond })
 
   return { app, served }
 }

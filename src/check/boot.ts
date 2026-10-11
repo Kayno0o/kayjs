@@ -1,15 +1,18 @@
 import type { CheckDiagnostic, CheckOptions } from '.'
+import type { CollectionFeed } from '../content/server'
 import type { LocaleSettings } from '../runtime/i18n'
 import { join } from 'node:path'
 import { islandId } from '../compiler'
 import { parseKay } from '../compiler/parser'
 import { analyzeServer } from '../compiler/script'
 import { CONFIG_FILE } from '../config'
+import { claimFeed } from '../content/server'
 import { projectPaths } from '../project'
 import { actionUrl } from '../runtime/action'
 import { actionClash } from '../server/actions'
 import { basePath } from '../server/base'
 import { claimEndpoints } from '../server/endpoints'
+import { PUBLIC_ENV_PATH } from '../server/env'
 import { localeSettings, refuseLocaleClashes } from '../server/i18n'
 import { shutdownSeconds } from '../server/lifecycle'
 import { claimPublic, publicFiles } from '../server/public'
@@ -19,9 +22,9 @@ import { routeMounts, scanEndpoints, scanRoutes } from '../server/routes'
 import { siteOrigin } from '../server/seo'
 import { ServedPaths } from '../server/served-paths'
 
-// What the server refuses when it boots, found by the functions it calls then, so `kay check` and the boot cannot disagree.
+// What the server refuses when it boots, found by the functions it calls then, so `kay check` and the boot cannot disagree; the collections' feeds come from the process that read them.
 // Only `kay check` and `kay build` look for them: the editor reads routes mid-edit, two pages serving one path among them.
-export async function bootProblems(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
+export async function bootProblems(root: string, options: CheckOptions, feeds: CollectionFeed[] = []): Promise<CheckDiagnostic[]> {
   const diagnostics: CheckDiagnostic[] = []
   const config = join(root, CONFIG_FILE)
   const { routes: routesDir, public: publicDir } = projectPaths(root, options)
@@ -61,6 +64,10 @@ export async function bootProblems(root: string, options: CheckOptions): Promise
   const served = new ServedPaths()
 
   refused(routesDir, () => refuseClashes(routesDir, routes, served, settings))
+
+  if (options.publicEnv)
+    served.claim({ path: PUBLIC_ENV_PATH, owner: '`publicEnv`', kind: 'kay' })
+
   refused(publicDir, () => claimPublic(served, files))
 
   try {
@@ -71,6 +78,10 @@ export async function bootProblems(root: string, options: CheckOptions): Promise
   }
 
   refused(config, () => claimRedirects(served, readRedirects(options.redirects ?? {})))
+
+  // API modules' routes are left to the boot, which `kay build` runs: listing them takes running the modules, which may need what only the server has.
+  for (const feed of feeds)
+    refused(projectPaths(root, options).content, () => claimFeed(served, feed, settings))
 
   diagnostics.push(...await actionClashes(root, [...new Set(routes.flatMap(route => [...route.layouts, route.file]))]))
 

@@ -9,6 +9,7 @@ import type { Matcher, RouterShape } from './params'
 import type { RenderOptions, RequestContext, ServedPage } from './render'
 import type { Candidate, RouteTable } from './route-table'
 import type { SpecialPages } from './routes'
+import type { ServedPaths } from './served-paths'
 import { join } from 'node:path'
 import { localePath, splitLocale, untranslatedPath } from '../runtime/i18n'
 import { localeState, runInLocale } from '../runtime/locale-state'
@@ -154,6 +155,8 @@ function remembered(response: Response, request: Request, locale: string): Respo
 
 export interface PageRoutes {
   table: RouteTable
+  // What else took a path the table only offered, which it then leaves alone.
+  served: ServedPaths
   matchers: Map<string, Matcher>
   i18n: I18n | undefined
   // The locales the config declares, or the site's one language.
@@ -167,7 +170,7 @@ export interface PageRoutes {
 }
 
 // A route per path the router serves, then one answering what none of them does, each in the locale its prefix or its host names.
-export function servePageRoutes(app: Elysia, { table, matchers, i18n, locales, client, renderOptions, trailingSlash, fallback, respond }: PageRoutes): void {
+export function servePageRoutes(app: Elysia, { table, served: claims, matchers, i18n, locales, client, renderOptions, trailingSlash, fallback, respond }: PageRoutes): void {
   const settings = i18n?.settings
   const inImplicitLocale = async (url: URL, request: Request, run: () => Promise<Response>) => runInLocale(stateFor(locales, locales.settings.defaultLocale, url.pathname, request), run)
 
@@ -198,7 +201,12 @@ export function servePageRoutes(app: Elysia, { table, matchers, i18n, locales, c
     return renderUnmatched(candidates.at(-1)!.route.special, context, client, renderOptions)
   }
 
-  for (const [path, served] of table.paths) {
+  for (const [path, offered] of table.paths) {
+    const served = new Map([...offered].filter(([, entry]) => entry.untranslated === undefined || claims.holds(entry.untranslated)))
+
+    if (served.size === 0)
+      continue
+
     app.get(path, async (context) => {
       const url = new URL(context.request.url)
       // On a host, the path is served in the host's locale, or not at all when only another locale's translation names it.
@@ -218,7 +226,7 @@ export function servePageRoutes(app: Elysia, { table, matchers, i18n, locales, c
 
       const rest = url.pathname.slice(own?.prefix.length ?? 0) || '/'
 
-      if (own?.untranslated === true)
+      if (own?.untranslated !== undefined)
         return new Response(null, { status: 308, headers: { location: `${localePath(settings, rest, locale, url.host)}${url.search}` } })
 
       const state = stateFor(i18n, locale, untranslatedPath(settings, rest, locale), context.request)

@@ -1,5 +1,5 @@
 import type { Elysia } from 'elysia'
-import type { ServedPaths } from './served-paths'
+import type { Claim, ServedPaths } from './served-paths'
 import { existsSync } from 'node:fs'
 import { readdir, stat } from 'node:fs/promises'
 import { join, relative, sep } from 'node:path'
@@ -20,6 +20,10 @@ export interface PublicFile {
   url: string
 }
 
+export interface ClaimedFile extends PublicFile {
+  claim: Claim
+}
+
 // Every file under the directory with the URL path it is served at, written the way a browser sends it: `/logo@2x.png`, `/c%3Ad.txt`.
 export async function publicFiles(dir: string): Promise<PublicFile[]> {
   if (!existsSync(dir))
@@ -38,15 +42,19 @@ function urlSegment(name: string): string {
   return encodeURIComponent(name).replace(SENT_AS_IS, decodeURIComponent).replace(ROUTER_SYNTAX, char => `%${char.charCodeAt(0).toString(16).toUpperCase()}`)
 }
 
-// Each file takes its path, which a page serving it already refuses; the paths an HTML file is also served at give way to anything else.
-export function claimPublic(served: ServedPaths, files: PublicFile[]): PublicFile[] {
-  for (const { path, url } of files) {
-    const owner = relative(process.cwd(), path)
+// Each file takes its path, which a page serving it already refuses; the paths an HTML file is also served at give way to anything else, claimed before or after.
+export function claimPublic(served: ServedPaths, files: PublicFile[]): ClaimedFile[] {
+  const claimed = files.map((file) => {
+    const owner = relative(process.cwd(), file.path)
+    const claim = { path: file.url, owner, kind: 'public' as const }
 
-    served.claim({ path: url, owner, kind: 'public' }, taken => taken.kind === 'page' ? `kay: ${owner} and a page both serve ${url}` : `kay: ${taken.owner} and ${owner} both serve ${url}`)
-  }
+    served.claim(claim, taken => taken.kind === 'page' ? `kay: ${owner} and a page both serve ${file.url}` : `kay: ${taken.owner} and ${owner} both serve ${file.url}`)
 
-  return [...files, ...htmlFallbacks(files, new Set()).filter(({ path, url }) => served.offer({ path: url, owner: relative(process.cwd(), path), kind: 'public' }))]
+    return { ...file, claim }
+  })
+  const fallbacks = htmlFallbacks(files, new Set()).map(file => ({ ...file, claim: { path: file.url, owner: relative(process.cwd(), file.path), kind: 'public' as const } }))
+
+  return [...claimed, ...fallbacks.filter(file => served.offer(file.claim))]
 }
 
 // The paths a static host's `try_files $uri $uri.html $uri/index.html` serves an HTML file at besides its own: `/x` for `x.html`, else for `x/index.html`, so a site exported under the directory keeps its links without `.html`.
@@ -83,8 +91,9 @@ export function revalidated(request: Request, etag: string, body: () => BodyInit
   return new Response(body(), { headers: { ...headers, etag, 'cache-control': REVALIDATE } })
 }
 
-export async function servePublic(app: Elysia, served: ServedPaths, dir: string): Promise<void> {
-  for (const { path, url } of claimPublic(served, await publicFiles(dir))) {
+// Registered once every path is claimed, so a path an HTML file was only offered and something claimed since is not served twice.
+export async function servePublic(app: Elysia, served: ServedPaths, files: ClaimedFile[]): Promise<void> {
+  for (const { path, url } of files.filter(file => served.holds(file.claim))) {
     const { size, mtimeMs } = await stat(path)
     const etag = `W/"${size.toString(36)}-${Math.floor(mtimeMs).toString(36)}"`
 

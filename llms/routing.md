@@ -111,7 +111,7 @@ export function GET({ params }: EndpointContext<{ slug: string }>) {
 - `GET(ctx)` takes an `EndpointContext`: `request`, `url`, `params` and `locals`, as a page's `ctx` has them. It returns a string, a `Blob` or a `Response`, or a promise of one: a string is sent as the type its extension names, `text/plain` for `.txt`, in UTF-8, a Blob with its own type or else that one, and a Response as it is, its status and headers included. A handler that throws answers 500 and goes to `onError`.
 - The `_guard.ts` files above an endpoint run before it, as they do for a page: a redirect or a denial answers, and the cookies and headers they set go out with its answer.
 - A param is a plain `[name]` segment, the extension of the last one written after its brackets, `[slug].json`; a rest, an optional or a matcher param stops the server. Endpoints whose paths only differ by that extension share the path, `feeds/[slug].json.ts` beside `feeds/[name].xml.ts`, but a page cannot share one with an endpoint, `posts/[slug].kay` beside `posts/[slug].json.ts`, as the router reads both as `/posts/:slug`: move one, `posts/[slug]/feed.json.ts`.
-- An endpoint serving a page's path, another endpoint's or a public file's stops the server, which `kay check` reports. Locale prefixes and layouts leave endpoints alone, and the sitemap lists none.
+- An endpoint serving a page's path in any locale, another endpoint's, a public file's, a redirect's, an API route's or a feed's stops the server, which `kay check` reports. Locale prefixes and layouts leave endpoints alone, and the sitemap lists none.
 - A `.ts` file without an extension before `.ts`, `format.ts`, stays a helper, as do `.test.ts` and `.d.ts` files.
 - `kay check` checks links to endpoints, `a(href="/feeds/news.json")`, and that each exports a `GET` returning one of those; `kay build --compile` embeds them, and `kay build --static` writes each to its path: one without params as it is, one with params for each set of values `export const page = { prerender: [...] }` lists, as a page does.
 
@@ -223,7 +223,7 @@ export default defineConfig({
 })
 ```
 
-- An old path names params as `:name` segments and may end in `*`; its target uses them, the `*` carrying the rest of the path, and the request's query goes along unless the target has its own. A target naming a param the old path lacks, or an old path a page serves, stops the server.
+- An old path names params as `:name` segments and may end in `*`; its target uses them, the `*` carrying the rest of the path, and the request's query goes along unless the target has its own. A target naming a param the old path lacks, or an old path a page in any locale, a public file, an endpoint, an API route or a feed serves, stops the server; an HTML file's path without `.html` and a translated page's untranslated path give way to it.
 - `kay check` reports a target on the site that no page or public file serves; a `:param` stands for any segment there, and another site's URL is not checked.
 
 ## Rewrites

@@ -3,11 +3,12 @@ import type { Diagnostic, Fix } from '../compiler/ast'
 import type { Paint } from '../compiler/frame'
 import type { LintLevels } from '../compiler/lints'
 import type { FaviconConfig, I18nConfig, KayConfig, KayExtension, SeoConfig } from '../config'
-import type { ComponentUse } from '../content/server'
+import type { CollectionFeed, ComponentUse } from '../content/server'
 import type { ContentProblem } from '../content/validate'
 import type { Duration } from '../runtime/duration'
 import type { LocaleSettings } from '../runtime/i18n'
 import type { ApiModule } from '../server/api'
+import type { EnvSchema } from '../server/env'
 import type { Redirects } from '../server/redirects'
 import type { Endpoint, Route, RouteMount } from '../server/routes'
 import type { TsgoDiagnostic, TypeScope } from './diagnose'
@@ -30,7 +31,7 @@ import { isLaunchLint, isLint, isLintGroup, LEVELS, lintLevels } from '../compil
 import { offsetAt, positionAt } from '../compiler/mapping'
 import { cssImportsWithoutText, deprecatedSchemaNames } from '../compiler/script'
 import { CONFIG_FILE } from '../config'
-import { PROBLEMS_MARKER, USES_MARKER } from '../content/server'
+import { FEEDS_MARKER, PROBLEMS_MARKER, USES_MARKER } from '../content/server'
 import { projectPaths } from '../project'
 import { projectApi } from '../server/api'
 import { FAVICON_PATHS } from '../server/favicon'
@@ -86,6 +87,7 @@ export interface CheckOptions {
   // What a public site's head starts from, which the `seo` lints read.
   seo?: SeoConfig | undefined
   favicon?: string | FaviconConfig | false | undefined
+  publicEnv?: EnvSchema | undefined
   // Whether to report the lints of what a site lacks before it goes public, as `kay build` and `kay check --only seo` do.
   launch?: boolean | undefined
 }
@@ -524,9 +526,9 @@ function spellings(path: string): string[] {
 }
 
 export function configCheckOptions(config: KayConfig): CheckOptions {
-  const { routes, publicDir, api, content, redirects, i18n, lang, settings, base, site, shutdownTimeout, lints, extensions, seo, favicon } = config
+  const { routes, publicDir, api, content, redirects, i18n, lang, settings, base, site, shutdownTimeout, lints, extensions, seo, favicon, publicEnv } = config
 
-  return { routes, publicDir, api, content, redirects, i18n, lang, settings, base, site, shutdownTimeout, lints, extensions, seo, favicon }
+  return { routes, publicDir, api, content, redirects, i18n, lang, settings, base, site, shutdownTimeout, lints, extensions, seo, favicon, publicEnv }
 }
 
 // Type-checks a project, .kay components included, and reports every error at the line and column the user wrote.
@@ -549,7 +551,7 @@ export async function check(root: string, options: CheckOptions = {}): Promise<C
 
   const shown = await resolvedConfig(root, tsconfig)
   const projectUnused = unusedCodesOf(shown)
-  const [{ output, errors, code }, messages, boot] = await Promise.all([typecheck(root, tsconfig, shown), checkMessages(root, options.i18n, options.extensions), bootProblems(resolve(root), options)])
+  const [{ output, errors, code }, messages, boot] = await Promise.all([typecheck(root, tsconfig, shown), checkMessages(root, options.i18n, options.extensions), bootProblems(resolve(root), options, content.feeds)])
   const config = resolve(root, tsconfig)
   const reported = parseTscOutput(output, config, root)
   const scope: TypeScope = { root, broken: new Set(diagnostics.filter(diagnostic => !diagnostic.checkOnly).map(diagnostic => diagnostic.file)), unreached, libraries }
@@ -637,19 +639,21 @@ function problemsIn(root: string, output: string): CheckDiagnostic[] {
 }
 
 // The collections' entries that fail to compile or to match their schema, read in a process of its own.
-async function checkContent(root: string, config: string | undefined, site: boolean): Promise<{ problems: CheckDiagnostic[], uses: ComponentUse[] }> {
+async function checkContent(root: string, config: string | undefined, site: boolean): Promise<{ problems: CheckDiagnostic[], uses: ComponentUse[], feeds: CollectionFeed[] }> {
   if (config === undefined && !existsSync(projectPaths(root).content))
-    return { problems: [], uses: [] }
+    return { problems: [], uses: [], feeds: [] }
 
   const child = Bun.spawn([process.execPath, CONTENT_PROBLEMS, resolve(root), config ?? '', site ? 'site' : ''], { cwd: root, stdout: 'pipe', stderr: 'pipe' })
   const [output, errors, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
 
   if (code !== 0)
-    return { problems: [{ file: projectPaths(root, { content: config }).content, line: 1, column: 1, message: errors.trim() || `reading the collections exited with code ${code}` }], uses: [] }
+    return { problems: [{ file: projectPaths(root, { content: config }).content, line: 1, column: 1, message: errors.trim() || `reading the collections exited with code ${code}` }], uses: [], feeds: [] }
 
-  const uses = output.split('\n').find(text => text.startsWith(USES_MARKER))?.slice(USES_MARKER.length)
+  const marked = (marker: string) => output.split('\n').find(text => text.startsWith(marker))?.slice(marker.length)
+  const uses = marked(USES_MARKER)
+  const feeds = marked(FEEDS_MARKER)
 
-  return { problems: problemsIn(root, output), uses: uses === undefined ? [] : JSON.parse(uses) as ComponentUse[] }
+  return { problems: problemsIn(root, output), uses: uses === undefined ? [] : JSON.parse(uses) as ComponentUse[], feeds: feeds === undefined ? [] : JSON.parse(feeds) as CollectionFeed[] }
 }
 
 // One line per component a Markdown entry uses, its props assigned to the type the component takes, so one missing, misspelt or of the wrong type is a type error at the entry's line.

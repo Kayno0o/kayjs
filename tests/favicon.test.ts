@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it, spyOn } from 'bun:test'
 import { pages } from '../src/server'
-import { faviconFiles, faviconPaths, manifestJson, writeFavicons } from '../src/server/favicon'
+import { faviconFiles, manifestJson, writeFavicons } from '../src/server/favicon'
 
 const ROUTES = 'tests/fixtures/seo/src/routes'
 const SOURCE = 'tests/fixtures/seo/src/favicon.png'
@@ -103,12 +103,6 @@ describe('favicon', () => {
 
     expect((await readdir(join(scratch, 'built-maskable'))).sort()).toEqual(['apple-touch-icon.png', 'favicon.ico', 'icon-192.png', 'icon-512.png', 'icon-maskable-192.png', 'icon-maskable-512.png'])
     expect(await Bun.file(join(scratch, 'built-maskable/icon-maskable-512.png')).bytes()).toEqual(maskableBytes)
-  })
-
-  it('lists the maskable icons among the paths a static export fetches only when the manifest names one', () => {
-    expect(faviconPaths(SOURCE, { maskable: SOURCE })).toContain('/icon-maskable-512.png')
-    expect(faviconPaths(SOURCE)).not.toContain('/icon-maskable-192.png')
-    expect(faviconPaths(false, { maskable: SOURCE })).toEqual([])
   })
 
   it('refuses a maskable image that is not square', async () => {

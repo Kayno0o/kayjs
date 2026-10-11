@@ -3,6 +3,7 @@ import type { RouteMatch } from './actions'
 import type { ServedRoute } from './guards'
 import type { Matcher, RouterShape } from './params'
 import type { Route } from './routes'
+import type { Claim } from './served-paths'
 import { localePattern, localePrefixes } from './i18n'
 import { isPlain, routerShapes, shapeParams } from './params'
 import { refuseRouteNames } from './routes'
@@ -17,7 +18,8 @@ export interface Candidate {
 export interface LocaleServed {
   prefix: string
   candidates: Candidate[]
-  untranslated?: true
+  // What a path a locale translates offers at its untranslated one, which it sends to the translation while it holds the path.
+  untranslated?: Claim
 }
 
 export interface RouteTable {
@@ -53,12 +55,12 @@ function namedPath({ path, positions }: RouterShape): string {
 export function routeTable(routes: ServedRoute[], settings: LocaleSettings | undefined, served = new ServedPaths()): RouteTable {
   const paths = new Map<string, Map<string | undefined, LocaleServed>>()
   const shapes = new Map<ServedRoute, RouterShape[]>(routes.map(route => [route, []]))
-  const serve = (path: string, locale: string | undefined, served: LocaleServed) => {
+  const serve = (path: string, locale: string | undefined, entry: LocaleServed) => {
     const locales = paths.get(path) ?? new Map<string | undefined, LocaleServed>()
 
     paths.set(path, locales)
 
-    return locales.get(locale) ?? (locales.set(locale, served), served)
+    return locales.get(locale) ?? (locales.set(locale, entry), entry)
   }
   const variants = localeVariants(settings)
   const translated = (route: ServedRoute, locale: string | undefined) => settings && locale !== undefined ? localePattern(settings, route.pattern, locale) : route.pattern
@@ -89,10 +91,11 @@ export function routeTable(routes: ServedRoute[], settings: LocaleSettings | und
         continue
 
       for (const shape of routerShapes(route, prefix)) {
-        const sent = serve(shape.path, locale, { prefix, candidates: [], untranslated: true })
+        const offer = { path: shape.path, owner: route.file, kind: 'page' as const, scope: scope(locale) }
+        const sent = serve(shape.path, locale, { prefix, candidates: [], untranslated: offer })
 
-        if (sent.untranslated === true) {
-          served.offer({ path: shape.path, owner: route.file, kind: 'page', scope: scope(locale) })
+        if (sent.untranslated === offer) {
+          served.offer(offer)
           sent.candidates.push({ route, shape })
         }
 

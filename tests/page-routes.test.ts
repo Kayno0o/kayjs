@@ -23,7 +23,7 @@ describe('routeTable', () => {
 
     expect([...table.paths.keys()].sort()).toEqual(['/about', '/fr/about', '/fr/organisations/:p3', '/fr/orgs/:p3', '/orgs/:p2'])
     expect(table.paths.get('/fr/organisations/:p3')!.get('fr')).toMatchObject({ prefix: '/fr', candidates: [{ route: org }] })
-    expect(table.paths.get('/fr/orgs/:p3')!.get('fr')).toMatchObject({ prefix: '/fr', untranslated: true, candidates: [{ route: org }] })
+    expect(table.paths.get('/fr/orgs/:p3')!.get('fr')).toMatchObject({ prefix: '/fr', untranslated: { path: '/fr/orgs/:p3', kind: 'page' }, candidates: [{ route: org }] })
     expect(table.paths.get('/about')!.get('en')!.candidates).toEqual([{ route: about, shape: expect.objectContaining({ path: '/about' }) }])
 
     const match = routeMatch(table, new Map())

@@ -24,6 +24,15 @@ const TRAILING_SLASH = /\/$/
 export const PROBLEMS_MARKER = 'kay-content-problems:'
 // Starts the line `kay check` reads the components Markdown entries use from.
 export const USES_MARKER = 'kay-content-uses:'
+// Starts the line `kay check` reads the collections' feeds from, which it claims their paths for as the server does.
+export const FEEDS_MARKER = 'kay-content-feeds:'
+
+// A collection's feed, by the collection's name.
+export interface CollectionFeed {
+  collection: string
+  path: string
+  localized: boolean
+}
 
 // A component a Markdown entry writes, with the props it gives, for `kay check` to type them.
 export interface ComponentUse {
@@ -85,11 +94,15 @@ export async function writeContentManifests(root: string, clientBase: string, co
 
 // Every entry that fails to compile or to match its schema, across the project's collections, and the components their Markdown uses, for `kay check`. A loader's entries are read only when the server runs.
 // `site` says whether the config sets the site's URL, which a collection's feed needs.
-export async function contentProblems(root: string, config?: string, site = true): Promise<{ problems: ContentProblem[], uses: ComponentUse[] }> {
+export async function contentProblems(root: string, config?: string, site = true): Promise<{ problems: ContentProblem[], uses: ComponentUse[], feeds: CollectionFeed[] }> {
   const problems: ContentProblem[] = []
   const uses: ComponentUse[] = []
+  const feeds: CollectionFeed[] = []
 
   for (const [name, collection] of await namedCollections(root, config)) {
+    if (collection.options.feed)
+      feeds.push(collectionFeed(collection))
+
     if (collection.options.feed && !site)
       problems.push({ file: relative(root, projectPaths(root, { content: config }).content), line: 1, message: feedNeedsSite(collection).message })
 
@@ -112,7 +125,7 @@ export async function contentProblems(root: string, config?: string, site = true
     }
   }
 
-  return { problems, uses }
+  return { problems, uses, feeds }
 }
 
 // A component the collection lacks is a content problem of its own, so only those it has are typed.
@@ -126,18 +139,21 @@ function feedNeedsSite(collection: Collection<unknown>): Error {
   return new Error(`kay: the collection ${collection.name} has a feed, whose links need the site's URL: set \`site\` in kay.config.ts`)
 }
 
-// Where a collection's feed is served: at its path, or a localized collection's under each locale's prefix, the locale then known; with domains, each host serves its own at the path.
-export function feedPaths(collection: Collection<unknown>, settings: LocaleSettings | undefined): { path: string, locale: string | undefined }[] {
-  const { feed, localized } = collection.options
+function collectionFeed(collection: Collection<unknown>): CollectionFeed {
+  return { collection: collection.name, path: collection.options.feed!.path, localized: collection.options.localized === true }
+}
 
-  if (!feed)
-    return []
-
-  if (localized !== true || !settings || settings.hosts)
-    return [{ path: feed.path, locale: undefined }]
-
+// Claims where a collection's feed is served: at its path, or a localized collection's under each locale's prefix, the locale then known; with domains, each host serves its own at the path.
+export function claimFeed(served: ServedPaths, feed: CollectionFeed, settings: LocaleSettings | undefined): { path: string, locale: string | undefined }[] {
   // A feed is no page, so no translated path names it.
-  return settings.locales.map(locale => ({ path: localePath({ ...settings, paths: undefined }, feed.path, locale), locale }))
+  const paths = !feed.localized || !settings || settings.hosts
+    ? [{ path: feed.path, locale: undefined }]
+    : settings.locales.map(locale => ({ path: localePath({ ...settings, paths: undefined }, feed.path, locale), locale }))
+
+  for (const { path } of paths)
+    served.claim({ path, owner: `the feed of the collection ${feed.collection}`, kind: 'kay', exported: true })
+
+  return paths
 }
 
 // Serves each collection's feed at its path; one stays cached for an hour in production.
@@ -154,8 +170,7 @@ export function serveFeeds(app: Elysia, served: ServedPaths, collections: Collec
 
     const headers = { 'content-type': `${feed.format === 'atom' ? 'application/atom+xml' : 'application/rss+xml'}; charset=utf-8`, 'cache-control': dev ? 'no-cache' : 'public, max-age=3600' }
 
-    for (const { path, locale } of feedPaths(collection, i18n?.settings)) {
-      served.claim({ path, owner: `the feed of the collection ${collection.name}`, kind: 'kay', exported: true })
+    for (const { path, locale } of claimFeed(served, collectionFeed(collection), i18n?.settings)) {
       app.get(path, async ({ request }) => {
         if (!i18n || collection.options.localized !== true)
           return new Response(feedXml(await collection.all(), feed, origin), { headers })

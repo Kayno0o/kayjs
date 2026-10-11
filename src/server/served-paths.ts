@@ -44,13 +44,14 @@ function overlap(claim: Claim, taken: Claim): boolean {
   return (method === other || method === 'ALL' || other === 'ALL') && (claim.scope === undefined || taken.scope === undefined || claim.scope === taken.scope)
 }
 
-// Every path the server serves, claimed as each feature registers its routes, so two that would serve one path stop the boot, and kay's own files give way to the app's.
+// Every path the server serves, claimed as each feature registers its routes, so two that would serve one path stop the boot; what is only offered, kay's own files, an HTML file's path without `.html` and a translated page's untranslated path, gives way to any claim.
 export class ServedPaths {
   readonly #claims = new Map<string, Claim[]>()
+  readonly #offers = new WeakSet<Claim>()
 
-  // The claim holding the path already, which this one cannot share it with.
-  #holder(claim: Claim): Claim | undefined {
-    return this.#claims.get(routerKey(claim.path))?.find(taken => overlap(claim, taken) && !mayShare(claim, taken))
+  // The claims holding the path already, which this one cannot share it with.
+  #holders(claim: Claim): Claim[] {
+    return this.#claims.get(routerKey(claim.path))?.filter(taken => overlap(claim, taken) && !mayShare(claim, taken)) ?? []
   }
 
   #add(claim: Claim): void {
@@ -59,24 +60,34 @@ export class ServedPaths {
     this.#claims.set(key, [...this.#claims.get(key) ?? [], claim])
   }
 
-  // Takes the path, or stops the boot with what `clash` says of the claim holding it.
+  // Takes the path from what only offered it, or stops the boot with what `clash` says of the claim holding it.
   claim(claim: Claim, clash?: Clash): void {
-    const taken = this.#holder(claim)
+    const holders = this.#holders(claim)
+    const taken = holders.find(holder => !this.#offers.has(holder))
 
     if (taken)
       throw new Error(clash?.(taken) ?? `kay: ${taken.owner} and ${claim.owner} both serve ${claim.path}`)
 
+    if (holders.length > 0)
+      this.#claims.set(routerKey(claim.path), this.#claims.get(routerKey(claim.path))!.filter(held => !holders.includes(held)))
+
     this.#add(claim)
   }
 
-  // Takes the path unless something serves it already, as kay's own files do, and says whether it did.
+  // Takes the path unless something serves it already, and says whether it did; a later claim takes it back.
   offer(claim: Claim): boolean {
-    if (this.#holder(claim))
+    if (this.#holders(claim).length > 0)
       return false
 
+    this.#offers.add(claim)
     this.#add(claim)
 
     return true
+  }
+
+  // Whether the claim still holds its path, for a feature to serve it only then.
+  holds(claim: Claim): boolean {
+    return this.#claims.get(routerKey(claim.path))?.includes(claim) === true
   }
 
   // The GET paths a static export writes, in the order they were claimed.

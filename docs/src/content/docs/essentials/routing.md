@@ -94,7 +94,7 @@ export function GET({ params }: EndpointContext<{ slug: string }>) {
 
 `GET` gets the `request`, `url`, `params` and `locals`, and returns a string, a `Blob` or a `Response`. A string goes out as the type its extension names, `text/plain` for `llms.txt`. The guards above it run first, as they do for a page, and `kay build --static` writes it to a file, for each set of params its `prerender` lists.
 
-A page and an endpoint cannot share a param path, `posts/[slug].kay` beside `posts/[slug].json.ts`: put the endpoint one level down, `posts/[slug]/feed.json.ts`. A `.ts` file with no extension before `.ts` stays a helper.
+A page and an endpoint cannot share a param path, `posts/[slug].kay` beside `posts/[slug].json.ts`: put the endpoint one level down, `posts/[slug]/feed.json.ts`. An endpoint at a path a page in any locale, a public file, a redirect, an API route or a feed serves stops the server at boot. A `.ts` file with no extension before `.ts` stays a helper.
 
 ## Not found and errors
 
@@ -162,6 +162,8 @@ export default defineConfig({
   },
 })
 ```
+
+An old path that a page in any locale, a public file, an endpoint, an API route or a feed serves stops the server at boot. An HTML file's path without `.html` gives way to a redirect, as does a translated page's untranslated path.
 
 ## Pages from a library
 
