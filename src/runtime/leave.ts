@@ -1,5 +1,5 @@
-import type { LeaveGuard } from './navigate'
-import { leaveGuards, navigation } from './navigate'
+import type { LeaveGuard } from './navigation'
+import { leaveGuards, navigation } from './navigation'
 import { effect, onCleanup } from './reactive'
 
 export interface LeaveGuardOptions {

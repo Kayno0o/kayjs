@@ -192,6 +192,7 @@ export async function bundleIslands(root: string, islands: Map<string, string>, 
 
   const entryFile = join(base, 'entry.ts')
   const bootFile = join(base, 'boot.ts')
+  const runtimeFile = join(base, 'runtime.ts')
   const trees = apiTrees(root, options)
   const api = apiStubs(trees)
   const registry = [...islands].map(([id, file]) => `  ${JSON.stringify(id)}: () => import(${JSON.stringify(file)}),`).join('\n')
@@ -234,11 +235,16 @@ export async function bundleIslands(root: string, islands: Map<string, string>, 
   const chunk = await runtimeChunk(entryFile, { plugins: await plugins(), define, external })
 
   // In development the entry keeps its own code, the islands it imports by their hashed names included: the runtime's chunk then stays as it was through an edit of an island, which swaps in alone.
-  if (chunk)
+  // A second entry point importing the runtime alone has Bun give it that chunk of its own, which it would otherwise merge into the entry's.
+  if (chunk) {
     await Bun.write(entryFile, `import ${JSON.stringify(ANCHOR)}\n${options.hot ? `import ${JSON.stringify(bootFile)}\n` : ''}`)
 
+    if (options.hot)
+      await Bun.write(runtimeFile, `import ${JSON.stringify(ANCHOR)}\n`)
+  }
+
   const config = {
-    entrypoints: [entryFile],
+    entrypoints: [entryFile, ...chunk && options.hot ? [runtimeFile] : []],
     target: 'browser',
     splitting: true,
     // The pages preload the chunks of their islands themselves, and every island shares the one the page loads first, so Bun's own preloading would only weigh on it.

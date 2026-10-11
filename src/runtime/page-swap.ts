@@ -1,23 +1,34 @@
-import type { Swap } from './navigate'
-import type { FetchedPage } from './swap'
-import { withoutBase } from './base'
+import type { FetchedPage, Intent, Swap } from './navigation'
 import { focusInvalid } from './focus'
 import { ISLAND } from './markers'
-import { busyForms, checkedForms, leave, navigation, pageKey, restoreScroll, saveScroll, submitNatively, swappable, takeFormChecks, writeHistory } from './navigate'
-import { FAILURE_HEADER, NAVIGATE_HEADER, PAGE_HEADER, prefetched, REDIRECT_HEADER, RELOAD_HEADER, swapState, WORK_HEADER, WORK_SCRIPT } from './swap'
+import { historyState, leave, navigation, pageKey, prefetched, restoreScroll, saveScroll, takeFormChecks } from './navigation'
+import { NAVIGATE_HEADER, RELOAD_HEADER } from './swap'
 import { decodeValue } from './wire'
 
-// The page swap itself, which `./navigate` loads once a visitor is about to follow a link or post a form.
+// The page swap itself, which `./navigate` loads once a visitor is about to follow a link, and `./forms` once a form is posted.
 
-// What the server answered a form the swap posted.
-interface Answer {
-  type: string
-  text: string
-  redirect: string | null
-  // The page the form came from, rendered again with how the post failed.
-  refused: boolean
-  // The fresh challenge a post refused by `proofOfWork` comes with.
-  work: string | null
+// How a swap goes, read off its intent: the one place a swap decides it.
+interface Policy {
+  // `push` adds a history entry, `replace` takes the current one's place, `none` leaves history alone, as going back does.
+  history: 'push' | 'replace' | 'none'
+  // Where the window scrolls to once swapped: the top or the URL's hash, the position the entry saved, or where it is.
+  scroll: 'top' | 'saved' | 'keep'
+  // What gets focus: the new page's autofocus field or heading, its title announced, the element focused before, or the refused form's field.
+  focus: 'page' | 'kept' | 'refused'
+  // The islands kept: those marked `persist`, or besides them every one whose component and props did not change.
+  islands: 'persist' | 'unchanged'
+  // Whether the page changes through a view transition, once its stylesheets opt in.
+  transition: boolean
+}
+
+const POLICIES: Record<Intent, Policy> = {
+  visit: { history: 'push', scroll: 'top', focus: 'page', islands: 'persist', transition: true },
+  query: { history: 'push', scroll: 'keep', focus: 'kept', islands: 'persist', transition: true },
+  traverse: { history: 'none', scroll: 'saved', focus: 'page', islands: 'persist', transition: true },
+  refresh: { history: 'none', scroll: 'keep', focus: 'kept', islands: 'unchanged', transition: false },
+  redirect: { history: 'replace', scroll: 'keep', focus: 'kept', islands: 'persist', transition: true },
+  refusal: { history: 'none', scroll: 'keep', focus: 'refused', islands: 'persist', transition: true },
+  error: { history: 'none', scroll: 'top', focus: 'page', islands: 'persist', transition: true },
 }
 
 const PERSISTENT = 'slot[data-persist]'
@@ -25,10 +36,10 @@ const PERSISTENT = 'slot[data-persist]'
 const OPAQUE = `${ISLAND},slot[data-kay-server],script,template`
 const PREFETCH_TTL_MS = 30_000
 const STYLESHEET_TIMEOUT_MS = 3000
-const HTML = /^text\/html\b/
+
+export const HTML = /^text\/html\b/
 const SPECULATION = 'script[type="speculationrules"]'
 const SWAP_PATTERN = /\$kayAwait/
-const HTTP_PROTOCOLS = new Set(['http:', 'https:'])
 // Scripts the browser runs; any other type, such as `application/json` or `application/ld+json`, holds data of the page it came with.
 const RUNNABLE_TYPES = new Set(['', 'module', 'text/javascript', 'application/javascript', 'importmap'])
 const REDUCED_MOTION = '(prefers-reduced-motion: reduce)'
@@ -36,9 +47,6 @@ const ID_LIST = /\s+/
 const ISOLATING_EMBEDDERS = new Set(['require-corp', 'credentialless'])
 // What follows a policy's value, such as `; report-to="endpoint"`.
 const POLICY_PARAMS = /;.*/
-
-let current = 0
-let checks: Promise<typeof import('./validate')> | undefined
 
 interface KeptIsland extends HTMLElement {
   // Set by the entry once the island hydrated: gives it new props.
@@ -112,10 +120,24 @@ async function pageFor(url: URL): Promise<FetchedPage> {
   return fetchPage(url)
 }
 
-export async function go(url: URL, swap: Swap): Promise<void> {
-  const token = ++current
+// The intent's policy, with history replaced as the swap asks, and the top for a traversal to an entry that saved no position.
+function policyOf(swap: Swap): Policy {
+  const policy = { ...POLICIES[swap.intent] }
 
-  if (swap.history !== 'none')
+  if (swap.replace)
+    policy.history = 'replace'
+
+  if (policy.scroll === 'saved' && !swap.saved)
+    policy.scroll = 'top'
+
+  return policy
+}
+
+export async function go(url: URL, swap: Swap): Promise<void> {
+  const token = ++navigation.current
+  const isCurrent = () => token === navigation.current
+
+  if (policyOf(swap).history !== 'none')
     saveScroll()
 
   document.documentElement.setAttribute('aria-busy', 'true')
@@ -127,41 +149,40 @@ export async function go(url: URL, swap: Swap): Promise<void> {
       page = await pageFor(url)
     }
     catch {
-      navigation.released = true
-      location.assign(url)
+      leave(url)
 
       return
     }
 
-    if (token !== current)
+    if (!isCurrent())
       return
 
     try {
-      await show(page, url.hash, swap, () => token === current)
+      await show(page, url.hash, swap, isCurrent)
     }
     catch (error) {
       // A page the swap could not put in place is loaded instead, as following the link would have.
       console.error(error)
 
-      if (token === current)
-        leave(new URL(page.url), pageKey(new URL(location.href)) === pageKey(new URL(page.url)) ? { ...swap, history: 'none' } : swap)
+      if (isCurrent())
+        leave(new URL(page.url), pageKey(new URL(location.href)) === pageKey(new URL(page.url)) || replaces(swap))
     }
   }
   finally {
-    if (token === current)
+    if (isCurrent())
       document.documentElement.removeAttribute('aria-busy')
   }
 }
 
 // Puts a fetched page in place of this one; anything that is no page of this build, a file or an error answered as text, is loaded or shown as the browser would.
-async function show(page: FetchedPage, hash: string, swap: Swap, isCurrent: () => boolean = () => true): Promise<void> {
+export async function show(page: FetchedPage, hash: string, swap: Swap, isCurrent: () => boolean = () => true): Promise<void> {
   const target = new URL(page.url)
 
   target.hash = hash
 
   // A page asking for full loads, or isolated otherwise, is still refreshed in place, its query changed included: the document stays the one it loaded.
   if (!HTML.test(page.type) || (page.full && target.pathname !== location.pathname)) {
-    leave(target, swap)
+    leave(target, replaces(swap))
 
     return
   }
@@ -172,7 +193,7 @@ async function show(page: FetchedPage, hash: string, swap: Swap, isCurrent: () =
   const entry = entryOf(next)
 
   if ((entry !== undefined && entry !== entryOf(document)) || next.documentElement.lang !== document.documentElement.lang) {
-    leave(target, swap)
+    leave(target, replaces(swap))
 
     return
   }
@@ -198,19 +219,40 @@ async function show(page: FetchedPage, hash: string, swap: Swap, isCurrent: () =
     writeHistory(swap, target)
 
     if (pageKey(target) !== navigation.shown)
-      swapState.page++
+      navigation.page++
 
     navigation.shown = pageKey(target)
-    restoreScroll(swap, hash)
+
+    if (policyOf(swap).scroll !== 'keep')
+      restoreScroll(swap.saved, hash)
+
     moveFocus(swap)
     takeFormChecks(document)
     navigation.hooks!.hydrate(document.body)
   }
 
-  if (viewTransitions() && !swap.refresh)
+  if (policyOf(swap).transition && viewTransitions())
     await (document as Document & { startViewTransition: (update: () => void) => { finished: Promise<void> } }).startViewTransition(commit).finished
   else
     commit()
+}
+
+// A page loaded fully in place of a swap that takes no history entry replaces the current one, as going back made one already.
+function replaces(swap: Swap): boolean {
+  return policyOf(swap).history === 'none'
+}
+
+// The entry a swap adds or replaces, holding where the page it leaves was scrolled to.
+export function writeHistory(swap: Swap, target: URL): void {
+  const { history: change } = policyOf(swap)
+
+  if (change === 'push') {
+    navigation.at++
+    history.pushState(historyState(), '', target)
+  }
+  else if (change === 'replace') {
+    history.replaceState(historyState(), '', target)
+  }
 }
 
 function entryOf(page: Document): string | undefined {
@@ -324,6 +366,7 @@ async function loaded(link: HTMLLinkElement): Promise<void> {
 function swapBody(next: Document, swap: Swap): void {
   const body = document.adoptNode(next.body)
   const old = document.body
+  const policy = policyOf(swap)
 
   const kept = new Set<Element>()
 
@@ -348,7 +391,7 @@ function swapBody(next: Document, swap: Swap): void {
     }
   }
 
-  if (swap.refresh) {
+  if (policy.islands === 'unchanged') {
     const unchanged = [...old.querySelectorAll<KeptIsland>(ISLAND)]
 
     for (const placeholder of body.querySelectorAll<HTMLElement>(ISLAND)) {
@@ -391,7 +434,7 @@ function swapBody(next: Document, swap: Swap): void {
   }
 
   // A new page starts at the top in the element holding its heading too, such as a main column scrolling on its own.
-  if (swap.scroll === 'top') {
+  if (policy.scroll === 'top') {
     for (let parent = (document.querySelector('[autofocus]') ?? document.querySelector('h1'))?.parentElement; parent && parent !== document.body; parent = parent.parentElement)
       parent.scrollTo(0, 0)
   }
@@ -504,11 +547,13 @@ function later(from: ChildNode | null, node: Node): ChildNode | undefined {
 
 // The element focused before, found again on a refreshed page; on a new page its autofocus field or its heading, so a screen reader starts there, the title announced.
 function moveFocus(swap: Swap): void {
-  if (swap.refused && showRefusal(document.forms[swap.refused.form], swap.refused.control))
+  const policy = policyOf(swap)
+
+  if (policy.focus === 'refused' && swap.refused && showRefusal(document.forms[swap.refused.form], swap.refused.control))
     return
 
-  if (swap.focus !== undefined) {
-    const before = swap.focus
+  if (policy.focus !== 'page') {
+    const before = swap.focused ?? null
 
     if (before?.isConnected)
       return
@@ -521,7 +566,8 @@ function moveFocus(swap: Swap): void {
     return
   }
 
-  if (Array.isArray(swap.scroll))
+  // Going back to a position the entry saved leaves the reader where they were.
+  if (policy.scroll === 'saved')
     return
 
   const target = document.querySelector<HTMLElement>('[autofocus]') ?? document.querySelector<HTMLElement>('h1')
@@ -604,181 +650,4 @@ function optsIn(rules: CSSRuleList): boolean {
   }
 
   return false
-}
-
-// Checks the form, already marked busy, then posts it.
-export async function submit(form: HTMLFormElement, submitter: HTMLElement | null, url: URL): Promise<void> {
-  const ours = checkedForms.has(form)
-
-  // Past the schema, the constraints the template writes itself, which the browser no longer checks once kay took the form.
-  if ((form.noValidate && !ours) || submitter?.hasAttribute('formnovalidate') || (await passes(form, withoutBase(url.pathname)) && (!ours || form.reportValidity()))) {
-    await send(form, submitter, url)
-
-    return
-  }
-
-  busyForms.delete(form)
-}
-
-async function loadChecks(): Promise<typeof import('./validate')> {
-  return checks ??= import('./validate')
-}
-
-// A form posting to the action at `action` took focus; one with `proofOfWork` starts on its challenge as the visitor fills it in, so its post seldom waits for it.
-export async function preloadChecks(action?: string): Promise<void> {
-  try {
-    if (action !== undefined && document.querySelector(`script[${WORK_SCRIPT}]`))
-      (await import('./work.client')).startWork(action)
-  }
-  catch {
-    // The post solves it then.
-  }
-
-  try {
-    await loadChecks()
-  }
-  catch {
-    // The browser keeps a module that failed to load as failed, so every submit then leaves the form to the server.
-  }
-}
-
-// A check that breaks, on a pattern the browser cannot read for one, or checks that cannot load, leave the form to the server rather than unsendable.
-async function passes(form: HTMLFormElement, action: string): Promise<boolean> {
-  try {
-    const { checkForm } = await loadChecks()
-
-    return checkForm(form, action)
-  }
-  catch (error) {
-    console.error(error)
-
-    return true
-  }
-}
-
-// Posts the form as the browser would, multipart unless it says otherwise, then shows the page the action sends the browser back to.
-async function send(form: HTMLFormElement, submitter: HTMLElement | null, url: URL): Promise<void> {
-  const data = new FormData(form, submitter)
-  const multipart = (submitter?.getAttribute('formenctype') ?? form.enctype) === 'multipart/form-data'
-  const focused = document.activeElement
-  const refused = { form: [...document.forms].indexOf(form), control: [...form.elements].indexOf(focused as Element) }
-
-  busyForms.add(form)
-  form.setAttribute('aria-busy', 'true')
-  prefetched.clear()
-
-  let response: Answer
-
-  try {
-    // The solution to the action's `proofOfWork` challenge, under way since the form took focus.
-    const body = multipart ? data : urlEncoded(data)
-    const action = withoutBase(url.pathname)
-    const work = document.querySelector(`script[${WORK_SCRIPT}]`) ? await (await import('./work.client')).spendWork(action) : undefined
-
-    response = await upload(url, body, form, work)
-
-    // A challenge an island's call spent, or one gone stale, is refused with a fresh one: solved, the form goes again once.
-    if (response.work !== null)
-      response = await upload(url, body, form, await (await import('./work.client')).spendWork(action, response.work))
-  }
-  catch {
-    // The swap could not send it: the browser does, as it would have.
-    submitNatively(form, submitter)
-
-    return
-  }
-  finally {
-    busyForms.delete(form)
-    form.removeAttribute('aria-busy')
-    form.style.removeProperty('--kay-progress')
-  }
-
-  // Sent once: from here on a failure loads the page rather than posting again.
-  if (response.redirect !== null) {
-    const next = new URL(response.redirect, location.href)
-
-    if (!HTTP_PROTOCOLS.has(next.protocol))
-      return
-
-    if (!swappable(next)) {
-      navigation.released = true
-      location.assign(next)
-
-      return
-    }
-
-    const same = next.pathname === location.pathname && next.search === location.search
-
-    await go(next, same ? { history: 'replace', scroll: 'keep', focus: focused } : { history: 'push', scroll: 'top' })
-
-    return
-  }
-
-  // A refused post's page replaces this one where it stands, as its redirect back here did; an error page is shown as it came; a denial answered as text, as the browser shows text.
-  if (HTML.test(response.type)) {
-    try {
-      await show({ url: location.href, type: response.type, html: response.text }, '', response.refused ? { history: 'none', scroll: 'keep', focus: focused, refused } : { history: 'none', scroll: 'top' })
-    }
-    catch (error) {
-      console.error(error)
-      showText(response.text)
-    }
-
-    return
-  }
-
-  showText(response.text)
-}
-
-function showText(text: string): void {
-  navigation.hooks!.dispose(document.body)
-
-  const pre = document.createElement('pre')
-
-  pre.textContent = text
-  document.body.replaceChildren(pre)
-}
-
-// What the browser posts for a form that is not multipart: a file goes as its name.
-function urlEncoded(data: FormData): URLSearchParams {
-  const body = new URLSearchParams()
-
-  for (const [name, value] of data)
-    body.append(name, typeof value === 'string' ? value : value.name)
-
-  return body
-}
-
-// XMLHttpRequest rather than fetch, for the upload's progress: `--kay-progress` on the form, and the value of each `progress` inside it, go from 0 to 1.
-async function upload(url: URL, body: FormData | URLSearchParams, form: HTMLFormElement, work: string | undefined): Promise<Answer> {
-  return new Promise((resolve, reject) => {
-    const request = new XMLHttpRequest()
-
-    request.open('POST', url)
-    request.setRequestHeader(NAVIGATE_HEADER, '1')
-    request.setRequestHeader(PAGE_HEADER, location.pathname + location.search)
-
-    if (work !== undefined)
-      request.setRequestHeader(WORK_HEADER, work)
-
-    request.upload.addEventListener('progress', (event) => {
-      if (!event.lengthComputable)
-        return
-
-      const done = event.loaded / event.total
-
-      form.style.setProperty('--kay-progress', String(done))
-
-      for (const bar of form.querySelectorAll('progress')) {
-        bar.max = 1
-        bar.value = done
-      }
-    })
-    request.addEventListener('load', () => resolve({ type: request.getResponseHeader('content-type') ?? '', text: request.responseText, redirect: request.getResponseHeader(REDIRECT_HEADER), refused: request.getResponseHeader(FAILURE_HEADER) !== null, work: request.getResponseHeader(WORK_HEADER) }))
-
-    for (const failure of ['error', 'abort', 'timeout'])
-      request.addEventListener(failure, () => reject(new Error('kay: the form could not be sent')))
-
-    request.send(body)
-  })
 }

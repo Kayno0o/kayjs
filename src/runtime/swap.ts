@@ -1,4 +1,4 @@
-// What the page swap shares with action calls and the server, apart from it so that neither bundles the swap.
+// The headers and markers the page swap and action calls share with the server, apart from them so that the server bundles neither.
 
 // Where a called action, or a form the swap posts, sends the browser, in place of `location`, which fetch and XMLHttpRequest would follow.
 export const REDIRECT_HEADER = 'x-kay-redirect'
@@ -14,17 +14,3 @@ export const WORK_HEADER = 'x-kay-work'
 export const RELOAD_HEADER = 'x-kay-reload'
 // Marks the data script holding the challenges of the actions a page's forms post to, by action URL.
 export const WORK_SCRIPT = 'data-kay-work'
-
-export interface FetchedPage {
-  url: string
-  type: string
-  html: string
-  // A page the browser loads itself from another one: one asking for it, or one whose cross-origin isolation differs from this document's, which cannot change in place.
-  full?: true
-}
-
-// Whether the swap took over the app's links, which an action call then shows its effects through, and how many other pages it showed since, which a call's outcome belongs to one of.
-export const swapState = { started: false, page: 0 }
-
-// Pages fetched ahead of a click, by URL; an action may change what they show, so each post forgets them.
-export const prefetched = new Map<string, { at: number, page: Promise<FetchedPage> }>()

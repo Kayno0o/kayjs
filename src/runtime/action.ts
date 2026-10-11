@@ -6,9 +6,10 @@ import type { Locale } from './i18n'
 import { withBase } from './base'
 import { durationSeconds } from './duration'
 import { escapeAttribute } from './escape'
+import { leave, mayLeave, navigation, prefetched } from './navigation'
 import { createSignal, undoable, untrack } from './reactive'
 import { sendValue } from './send'
-import { FAILURE_HEADER, PAGE_HEADER, prefetched, REDIRECT_HEADER, swapState, WORK_HEADER, WORK_SCRIPT } from './swap'
+import { FAILURE_HEADER, PAGE_HEADER, REDIRECT_HEADER, WORK_HEADER, WORK_SCRIPT } from './swap'
 import { uploaded } from './upload'
 import { decodeValue, unflattenValue } from './wire'
 
@@ -464,11 +465,11 @@ function callable(url: () => string): { call: (input: never, options?: CallOptio
   const [last, setLast] = createSignal<{ page: number, outcome: Outcome | null } | undefined>(undefined, undefined, false)
   const [progress, setProgress] = createSignal<number | undefined>(undefined, undefined, false)
   const shift = (by: number) => setInFlight(untrack(inFlight) + by)
-  const called = (outcome: Outcome | null) => setLast({ page: swapState.page, outcome })
+  const called = (outcome: Outcome | null) => setLast({ page: navigation.page, outcome })
   const outcome = () => {
     const posted = requestOutcome?.()
     const own = last()
-    const found = posted !== undefined ? posted : own?.page === swapState.page ? own.outcome : pageOutcome()
+    const found = posted !== undefined ? posted : own?.page === navigation.page ? own.outcome : pageOutcome()
 
     return found?.action === url() ? found : undefined
   }
@@ -487,14 +488,10 @@ function callable(url: () => string): { call: (input: never, options?: CallOptio
       let undo: (() => void) | undefined
       let posted = false
       let sent = false
-      // Started before the caller goes on, so a navigation it starts next supersedes the refresh rather than the other way round; the swap is loaded already.
-      const refreshPage = async () => {
-        if (!swapState.started || options?.refresh === false)
-          return
-
-        const { refresh } = await import('./navigate')
-
-        void refresh()
+      // Started before the caller goes on, so a navigation it starts next supersedes the refresh rather than the other way round; a site with `navigation: false` shows a call's effects itself.
+      const refreshPage = () => {
+        if (options?.refresh !== false)
+          void navigation.refresh?.()
       }
 
       try {
@@ -507,7 +504,7 @@ function callable(url: () => string): { call: (input: never, options?: CallOptio
         posted = true
 
         called({ action: url(), succeeded: true, data })
-        await refreshPage()
+        refreshPage()
 
         return data
       }
@@ -518,7 +515,7 @@ function callable(url: () => string): { call: (input: never, options?: CallOptio
 
         // The server may have run a call aborted once it was sent, which the page then shows as it stands.
         if (sent && options?.signal?.aborted === true)
-          await refreshPage()
+          refreshPage()
 
         if (error instanceof ActionError && !(error instanceof ActionRedirect))
           called({ action: url(), status: error.status, values: {}, errors: error.errors, data: error.data })
@@ -652,9 +649,16 @@ export async function readActionResponse<Output>(response: Response, action: str
   return (body === '' ? undefined : decodeValue(body)) as Output
 }
 
-// Imported when needed: an island calling actions on a site with `navigation: false` ships none of the swap.
+// Through the swap once it took over the app's links; a site with `navigation: false` loads the page, asking the leave guards first as `navigate()` would.
 async function goTo(target: string): Promise<void> {
-  const { navigate } = await import('./navigate')
+  if (navigation.navigate) {
+    await navigation.navigate(target)
 
-  await navigate(target)
+    return
+  }
+
+  const url = new URL(withBase(target), location.href)
+
+  if (await mayLeave(url))
+    leave(url)
 }
