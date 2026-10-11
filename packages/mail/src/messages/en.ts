@@ -107,6 +107,11 @@ export default defineMessages({
         lead: 'An access token named {detail} was created for your {site} account.',
         ending: 'If this was not you, reset your password and check your account at once.',
       },
+      'signed-out-everywhere': {
+        subject: 'Signed out everywhere on {site}',
+        lead: 'Your {site} account was signed out everywhere: every session and access token it had has ended.',
+        ending: 'If this was not you, reset your password and check your account at once.',
+      },
       'account-deleted': {
         subject: 'Account deleted on {site}',
         lead: 'Your {site} account was deleted.',

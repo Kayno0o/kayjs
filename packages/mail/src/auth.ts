@@ -5,11 +5,11 @@ import { decode } from './text'
 
 // kayjs-auth's kinds of mail: a link to follow or a code to type, then news of a change to the account.
 export type AuthLinkKind = 'verify-email' | 'reset-password' | 'magic-link' | 'change-email' | 'invitation'
-export type AuthNoticeKind = 'new-sign-in' | 'password-changed' | 'email-changed' | 'two-factor-enabled' | 'two-factor-disabled' | 'recovery-code-used' | 'recovery-codes-regenerated' | 'provider-linked' | 'provider-unlinked' | 'passkey-added' | 'passkey-removed' | 'token-created' | 'account-deleted'
+export type AuthNoticeKind = 'new-sign-in' | 'password-changed' | 'email-changed' | 'two-factor-enabled' | 'two-factor-disabled' | 'recovery-code-used' | 'recovery-codes-regenerated' | 'provider-linked' | 'provider-unlinked' | 'passkey-added' | 'passkey-removed' | 'token-created' | 'signed-out-everywhere' | 'account-deleted'
 export type AuthKind = AuthLinkKind | AuthNoticeKind
 
 export const AUTH_LINK_KINDS: readonly AuthLinkKind[] = ['verify-email', 'reset-password', 'magic-link', 'change-email', 'invitation']
-export const AUTH_NOTICE_KINDS: readonly AuthNoticeKind[] = ['new-sign-in', 'password-changed', 'email-changed', 'two-factor-enabled', 'two-factor-disabled', 'recovery-code-used', 'recovery-codes-regenerated', 'provider-linked', 'provider-unlinked', 'passkey-added', 'passkey-removed', 'token-created', 'account-deleted']
+export const AUTH_NOTICE_KINDS: readonly AuthNoticeKind[] = ['new-sign-in', 'password-changed', 'email-changed', 'two-factor-enabled', 'two-factor-disabled', 'recovery-code-used', 'recovery-codes-regenerated', 'provider-linked', 'provider-unlinked', 'passkey-added', 'passkey-removed', 'token-created', 'signed-out-everywhere', 'account-deleted']
 
 export const LINK_KINDS = new Set<string>(AUTH_LINK_KINDS)
 const NOTICE_KINDS = new Set<string>(AUTH_NOTICE_KINDS)

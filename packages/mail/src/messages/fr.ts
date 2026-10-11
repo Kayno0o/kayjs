@@ -106,6 +106,11 @@ export default defineMessages({
         lead: 'Un jeton d\'accès nommé {detail} a été créé pour votre compte {site}.',
         ending: 'Si ce n\'était pas vous, réinitialisez votre mot de passe et vérifiez votre compte sans attendre.',
       },
+      'signed-out-everywhere': {
+        subject: 'Déconnexion partout sur {site}',
+        lead: 'Votre compte {site} a été déconnecté partout : toutes ses sessions et tous ses jetons d\'accès ont pris fin.',
+        ending: 'Si ce n\'était pas vous, réinitialisez votre mot de passe et vérifiez votre compte sans attendre.',
+      },
       'account-deleted': {
         subject: 'Compte supprimé sur {site}',
         lead: 'Votre compte {site} a été supprimé.',
