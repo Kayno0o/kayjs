@@ -12,8 +12,8 @@ import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { parse, stringify } from 'devalue'
 import { Elysia } from 'elysia'
-import { classesFile, outputDir } from '../src/build/assets'
-import { resolveProject } from '../src/project'
+import { outputDir } from '../src/build/assets'
+import { projectPaths, resolveProject } from '../src/project'
 import { ActionError } from '../src/runtime'
 import { inlineScriptHashes, pages } from '../src/server'
 import { readClient, readInlineStyles, readManifest, writeManifest } from '../src/server/client'
@@ -157,7 +157,7 @@ describe('pages', () => {
     expect(page).toContain('.card {')
     expect(page).toContain('.counter {')
     expect((await get('/about')).html).toContain(`<meta name="viewport" content="width=device-width"><link rel="stylesheet" href="${links[0]}"><link rel="icon"`)
-    expect((await Bun.file(classesFile(process.cwd())).text()).split('\n')).toEqual(expect.arrayContaining(['card', 'counter']))
+    expect((await Bun.file(projectPaths(process.cwd()).classes).text()).split('\n')).toEqual(expect.arrayContaining(['card', 'counter']))
   })
 
   it('writes the stylesheets into the head with inlineStyles, each let through a strict style-src by its hash under the mount point', async () => {

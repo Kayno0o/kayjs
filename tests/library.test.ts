@@ -2,8 +2,8 @@ import { readdir, rm, symlink } from 'node:fs/promises'
 import { join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
-import { classesFile } from '../src/build/assets'
 import { throughLinks } from '../src/build/links'
+import { projectPaths } from '../src/project'
 import { scratchDir } from './scratch'
 
 const CLI = resolve('src/cli.ts')
@@ -167,7 +167,7 @@ describe('kay libraries', () => {
 
     const html = await Bun.file(join(out, 'index.html')).text()
     const scripts = await Promise.all((await readdir(join(out, '_kay'))).filter(name => name.endsWith('.js')).map(async name => Bun.file(join(out, '_kay', name)).text()))
-    const classes = (await Bun.file(classesFile(project)).text()).split('\n')
+    const classes = (await Bun.file(projectPaths(project).classes).text()).split('\n')
 
     expect(html).toContain('<span class="badge lib-badge-class text-gray-500">hi app:hi</span>')
     expect(html).toContain('data-component="node_modules/kay-lib/src/counter.kay"')

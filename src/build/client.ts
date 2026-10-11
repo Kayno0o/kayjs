@@ -17,7 +17,7 @@ import { rebaseCss } from '../server/base'
 import { fromManifest, MANIFEST, PRERENDERED_DIR, writeManifest } from '../server/client'
 import { PUBLIC_ENV_PATH } from '../server/env'
 import { routeMounts } from '../server/routes'
-import { ASSET_PREFIX, classesFile, clientDir, outputDir } from './assets'
+import { ASSET_PREFIX, clientDir, outputDir } from './assets'
 import { findKayFiles, writeIfChanged } from './files'
 import { findKayLibraries, reachableLibraryFiles, sourceWords } from './libraries'
 import { throughLinks } from './links'
@@ -139,7 +139,7 @@ export async function buildClient(root: string, options: ClientOptions = {}): Pr
   await mkdir(dir, { recursive: true })
   forgetBundleMaps()
   // The stylesheet build hands these to Tailwind, which cannot read the `.class` shorthand: see styleImports.
-  await writeIfChanged(classesFile(root), [...classes].sort().join('\n'))
+  await writeIfChanged(projectPaths(root).classes, [...classes].sort().join('\n'))
 
   const [scripts, styles] = await Promise.all([
     buildIslands(root, base, islands, options),

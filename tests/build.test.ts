@@ -7,7 +7,7 @@ import { dirname, join } from 'node:path'
 import process from 'node:process'
 import tailwind from 'bun-plugin-tailwind'
 import { describe, expect, it } from 'bun:test'
-import { ASSET_FILE, classesFile, clientDir, outputDir, writeAsset } from '../src/build/assets'
+import { ASSET_FILE, clientDir, outputDir, writeAsset } from '../src/build/assets'
 import { buildClient } from '../src/build/client'
 import { writeIfChanged } from '../src/build/files'
 import { formatSizeReport } from '../src/build/report'
@@ -16,6 +16,7 @@ import { runtimeConfig, withoutPlugins } from '../src/build/runtime-config'
 import { describeThrown, mapBundleToKay, mapStack } from '../src/build/sourcemap'
 import { analyzeKayCached, transformKayCached } from '../src/build/transform'
 import { loadConfig, withConfig } from '../src/config'
+import { projectPaths } from '../src/project'
 import { scratchDir } from './scratch'
 
 const root = join(import.meta.dir, 'fixtures/islands')
@@ -847,9 +848,9 @@ describe('the files a build writes', () => {
 
     try {
       process.env.BUN_TEST_WORKER_ID = '3'
-      expect([outputDir('/app'), classesFile('/app')]).toEqual(['/app/.kay/client-3', '/app/.kay/classes-3.txt'])
+      expect([outputDir('/app'), projectPaths('/app').classes]).toEqual(['/app/.kay/client-3', '/app/.kay/classes-3.txt'])
       delete process.env.BUN_TEST_WORKER_ID
-      expect([outputDir('/app'), classesFile('/app')]).toEqual(['/app/.kay/client', '/app/.kay/classes.txt'])
+      expect([outputDir('/app'), projectPaths('/app').classes]).toEqual(['/app/.kay/client', '/app/.kay/classes.txt'])
     }
     finally {
       if (worker === undefined)

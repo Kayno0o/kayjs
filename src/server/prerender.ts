@@ -13,7 +13,6 @@ import { IMAGE_ROUTE } from '../runtime/image'
 import { runInLocale } from '../runtime/locale-state'
 import { standInReads } from '../runtime/site'
 import { projectApi } from './api'
-import { setupCards } from './card'
 import { PRERENDERED_DIR, readManifest, writeManifest } from './client'
 import { exportedEndpoints } from './endpoints'
 import { localeCopies, stateFor } from './i18n'
@@ -56,8 +55,6 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
   const dir = join(output, PRERENDERED_DIR)
   const { mounts, routes, matchers, i18n, locales, site, renderOptions } = await setupPages(project, async () => client, true)
 
-  await setupCards({ dir: join(client.dir, '..'), clientDir: client.dir, fonts: (config.fonts?.length ?? 0) > 0, config: config.images?.card, name: config.seo?.name, quality: config.images?.quality, collect: true })
-
   const pages: Record<string, PrerenderedPage> = {}
   const paths = new Map<string, string>()
 
@@ -87,7 +84,8 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
         const request = new Request(`${copy.host === undefined ? 'http://localhost' : `https://${copy.host}`}${copy.path}`)
         // Guards run when the page is served, for whoever asks; the build renders what they let through.
         const reads = standInReads()
-        const render = async () => renderPage({ ...route, guards: [] }, { request }, matched, client, { ...renderOptions, prerendering: true })
+        // onError is the app's for requests it answers; the build logs what a prerendered page throws.
+        const render = async () => renderPage({ ...route, guards: [] }, { request }, matched, client, { ...renderOptions, onError: undefined, prerendering: true })
         const response = await runInLocale(stateFor(locales, copy.locale ?? locales.settings.defaultLocale, path, request), render)
 
         if (response.status >= 500)

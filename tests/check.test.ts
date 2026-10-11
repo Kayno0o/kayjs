@@ -7,8 +7,9 @@ import { describe, expect, it } from 'bun:test'
 import { findKayFiles } from '../src/build/files'
 import { applySafeFixes, check } from '../src/check'
 import { islandOnlyComponents } from '../src/check/island-only'
-import { compileShadow, SHADOW_DIR, shadowPath, shadowSource } from '../src/check/shadow'
+import { compileShadow, shadowPath, shadowSource } from '../src/check/shadow'
 import { compileKay } from '../src/compiler'
+import { SHADOW_DIR } from '../src/project'
 
 const fixtures = join(import.meta.dir, 'fixtures')
 

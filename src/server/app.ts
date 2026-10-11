@@ -13,7 +13,7 @@ import { Elysia } from 'elysia'
 import { ASSET_PREFIX } from '../build/assets'
 import { mapBundleToKay } from '../build/sourcemap'
 import { extensionServers, pageHooks } from '../config'
-import { projectCollections, serveFeeds } from '../content/server'
+import { serveFeeds } from '../content/server'
 import { offlineOf } from '../project'
 import { localePath, splitLocale, untranslatedPath } from '../runtime/i18n'
 import { IMAGE_ROUTE } from '../runtime/image'
@@ -23,7 +23,7 @@ import { overHttps, registerActionRoutes } from './actions'
 import { serveApi, sharedGuards } from './api'
 import { rebaseCss, rebaseRedirects } from './base'
 import { DEFAULT_BODY_LIMIT, limitBodies } from './body'
-import { serveCards, setupCards } from './card'
+import { serveCards } from './card'
 import { PRERENDERED_DIR } from './client'
 import { compressResponse, encodedCopies, encodedPath, filesUnder, fixedTexts, preferredEncoding } from './compress'
 import { DEV_A11Y, DEV_AXE, DEV_EVENTS, DEV_INSPECTOR, DEV_OPEN, DEV_PATCH, devA11y, devAxe, devEvents, devInspector, devPatch, hotSwap, openInEditor } from './dev'
@@ -33,7 +33,7 @@ import { serveErrorReports } from './errors'
 import { FAVICON_DIR, faviconSource, serveFavicons } from './favicon'
 import { handedOverFlash } from './flash'
 import { loadGuard, loadGuards } from './guards'
-import { cookieLocale, hostLocale, localeCookie, localePattern, localePrefixes, preferredLocale, prerenderKey, refuseLocaleClashes, serveLocales, stateFor } from './i18n'
+import { cookieLocale, hostLocale, localeCookie, localePattern, localePrefixes, preferredLocale, prerenderKey, refuseLocaleClashes, stateFor } from './i18n'
 import { avifQuality, serveImages } from './image'
 import { HEALTH_PATH, serveHealth, stopOnSignal } from './lifecycle'
 import { announceStart, answeringRequest, logRequests, pathOf, useLogger } from './log'
@@ -41,7 +41,7 @@ import { serveServiceWorker } from './offline'
 import { openApiDocument, openApiSettings, refuseOpenApiClashes, serveOpenApi } from './openapi'
 import { assetFiles, hookedResponse } from './page-hook'
 import { isPlain, matchedParams, positionalParams, routerShapes, shapeParams } from './params'
-import { inPreview, previewRequested, servePreview, setupPreview } from './preview'
+import { inPreview, previewRequested, servePreview } from './preview'
 import { requestId, trustProxy } from './protection'
 import { servePublic } from './public'
 import { readRedirects, refuseRedirectClashes, serveRedirects } from './redirects'
@@ -55,8 +55,8 @@ import { headerCopies, ownHeaders, securityHeaders, setSecurityHeaders } from '.
 import { serveServerIslands } from './server-islands'
 import { setupPages } from './setup'
 import { serveSitemap } from './sitemap'
-import { serveFiles, setupStorage } from './storage'
-import { answered, SERVER_SPAN, setTracer, traced } from './trace'
+import { serveFiles } from './storage'
+import { answered, SERVER_SPAN, traced } from './trace'
 import { serveViolationReports } from './violations'
 
 // Every slash at either end of a path.
@@ -186,9 +186,8 @@ function remembered(response: Response, request: Request, locale: string): Respo
 export async function servePages(project: Project<PagesOptions>, loadClient: () => Promise<ClientBuild>) {
   const { root, config: options, paths, mode } = project
   const routesDir = paths.routes
-  const { source, client, mounts, routes: scanned, matchers, i18n, locales, base, site, scripts, styles, renderOptions } = await setupPages(project, loadClient)
+  const { source, client, mounts, routes: scanned, matchers, collections, i18n, locales, base, site, scripts, styles, renderOptions, cards } = await setupPages(project, loadClient)
   const routes = await Promise.all(scanned.map(loadGuards))
-  const collections = await projectCollections(root, options.content)
 
   if (i18n) {
     refuseLocaleClashes(i18n.settings, routes)
@@ -198,14 +197,11 @@ export async function servePages(project: Project<PagesOptions>, loadClient: () 
     i18n.settings = { ...i18n.settings, pages: routes.map(route => route.pattern), ...feeds.length > 0 && { feeds } }
   }
 
-  serveLocales(root, locales)
   const inImplicitLocale = async (url: URL, request: Request, run: () => Promise<Response>) => runInLocale(stateFor(locales, locales.settings.defaultLocale, url.pathname, request), run)
-
-  setTracer(options.tracer)
 
   const app = new Elysia({ name: 'kay/pages', seed: root })
   // Hashed as they go out, under the mount point.
-  const security = securityHeaders({ ...options, islands: client.directives, scripts, styles: [...styles, ...client.inlineStyles?.values() ?? []].map(style => rebaseCss(style, base)) })
+  const security = securityHeaders({ ...options, dev: mode.dev, islands: client.directives, scripts, styles: [...styles, ...client.inlineStyles?.values() ?? []].map(style => rebaseCss(style, base)) })
   // The paths of the build's files and the image route, whose responses carry the security headers themselves.
   const filePaths = new Set<string>([IMAGE_ROUTE])
 
@@ -363,8 +359,6 @@ export async function servePages(project: Project<PagesOptions>, loadClient: () 
   if (options.security !== undefined && options.security !== false && options.security.reports === true)
     serveViolationReports(app, options.onError)
 
-  setupPreview(options.preview, base)
-
   if (options.preview)
     servePreview(app)
 
@@ -387,10 +381,8 @@ export async function servePages(project: Project<PagesOptions>, loadClient: () 
     }, guard: options.images?.guard, actions: actionOptions },
   }
 
-  setupStorage(options.storage, join(imageCache, 'stored'))
   serveFiles(app)
   serveImages(app, imageRoute)
-  const cards = await setupCards({ dir: join(client.dir, '..'), clientDir: client.dir, fonts: (options.fonts?.length ?? 0) > 0, config: options.images?.card, name: options.seo?.name, quality: options.images?.quality, bundled: source.embedded })
 
   serveCards(app, cards, imageRoute)
 

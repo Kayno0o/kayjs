@@ -2,6 +2,7 @@ import { mkdir, mkdtemp, rm, stat } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { kay } from '../build/plugin'
 import { loadConfig } from '../config'
+import { projectPaths } from '../project'
 import { sendValue } from '../runtime/send'
 import { decodeValue } from '../runtime/wire'
 import { testRoot } from './root'
@@ -125,7 +126,7 @@ async function evaluate(root: string, code: string): Promise<MountModule> {
 }
 
 async function testDir(root: string): Promise<string> {
-  const dir = join(root, '.kay', 'test')
+  const dir = projectPaths(root).tests
 
   await mkdir(dir, { recursive: true })
 

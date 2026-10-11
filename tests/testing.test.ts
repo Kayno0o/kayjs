@@ -333,6 +333,20 @@ describe('kay/test', () => {
   })
 })
 
+describe('testSite in development', () => {
+  it('serves its pages as kay dev does with dev: true, and as production otherwise', async () => {
+    const dev = await testSite({ routes, dev: true })
+
+    try {
+      expect((await dev.fetch('/_kay/dev/patch.js')).status).toBe(200)
+      expect((await site.fetch('/_kay/dev/patch.js')).status).toBe(404)
+    }
+    finally {
+      await dev.close()
+    }
+  })
+})
+
 describe('reading a page', () => {
   afterAll(resetTodos)
 

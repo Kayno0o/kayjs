@@ -12,7 +12,7 @@ import { Elysia } from 'elysia'
 import { outputDir } from '../build/assets'
 import { buildClient } from '../build/client'
 import { withConfig } from '../config'
-import { clientOptionsOf, resolveProject } from '../project'
+import { clientOptionsOf, PRODUCTION, resolveProject } from '../project'
 import { encodeCall, minTimeOf, readActionResponse, STAMP_FIELD } from '../runtime/action'
 import { durationSeconds } from '../runtime/duration'
 import { openSocket, readEvents, routeUrl, streamRequest } from '../runtime/live'
@@ -154,7 +154,7 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
   const config = { ...loaded, site: loaded.site ?? ORIGIN, storage: options.storage ?? memoryFiles() }
   const project = resolveProject(root, config, { dev: config.dev === true, prebuilt: false, underKayDev: false })
   const client: ClientBuild = options.browser !== undefined && options.browser !== false
-    ? await buildClient(root, clientOptionsOf(config, { dev: false, underKayDev: false }))
+    ? await buildClient(root, clientOptionsOf(config, PRODUCTION))
     : { entryImports: [], islands: {}, styles: new Map(), pages: new Map(), dir: join(outputDir(root), 'dist') }
   const browser = typeof options.browser === 'object' ? options.browser : {}
   const pages = await servePages(project, async () => client)

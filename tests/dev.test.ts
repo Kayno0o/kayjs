@@ -185,12 +185,14 @@ describe('kay dev', () => {
 
     await Bun.write(join(root, 'src/server.ts'), 'setInterval(() => undefined, 1000)\n')
     await Bun.write(join(root, 'src/routes/index.kay'), 'p Home\n')
-    const stop = await dev(root, { config: { lints: { 'unread-name': 'allow' } }, onRestart: child => children.push(child) })
+    await Bun.write(join(root, 'site-content.ts'), 'export {}\n')
+    const stop = await dev(root, { config: { lints: { 'unread-name': 'allow' }, content: 'site-content.ts' }, onRestart: child => children.push(child) })
 
     try {
       expect(children).toHaveLength(1)
       expect(await Bun.file(join(root, '.kay/types/src/routes/index.kay.tsx')).exists()).toBe(true)
       expect(readShadowSettings(root).lints).toEqual({ 'unread-name': 'allow' })
+      expect(await Bun.file(join(root, '.kay/types/kay-env.d.ts')).text()).toContain('FeedPathsOf<typeof import("../../site-content")>')
 
       await Bun.write(join(root, 'src/routes/about.kay'), 'p About\n')
       await until(() => children.length === 2)

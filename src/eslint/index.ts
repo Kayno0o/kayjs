@@ -2,11 +2,11 @@
 import type { Span } from '../compiler/ast'
 import type { SourceMap } from '../compiler/mapping'
 import { existsSync } from 'node:fs'
-import { dirname, join, relative, resolve } from 'node:path'
-import { TSCONFIG } from '../build/files'
+import { relative, resolve } from 'node:path'
 import { compileShadow, readShadowSettings, shadowPath } from '../check/shadow'
 import { offsetAt, positionAt } from '../compiler/mapping'
 import { parseKay } from '../compiler/parser'
+import { projectRootOf } from '../project'
 
 export interface LintFix {
   range: [number, number]
@@ -51,7 +51,7 @@ export const processor = {
 
   preprocess(text: string, filename: string): { text: string, filename: string }[] {
     const file = resolve(filename)
-    const root = projectRoot(file)
+    const root = projectRootOf(file)
     const settings = readShadowSettings(root)
     const { shadow } = compileShadow(root, settings.routesDir, file, text, settings.islandOnly.has(file), settings.lints)
     const parsed = parseKay(text)
@@ -82,7 +82,7 @@ export function shadowParser<Options extends ParserOptions, Result>(parser: { pa
         return parser.parseForESLint(code, options)
 
       const file = match[1]!
-      const root = projectRoot(file)
+      const root = projectRootOf(file)
       const shadow = shadowPath(root, file)
 
       if ((Boolean(options.project) || Boolean(options.projectService)) && !existsSync(shadow))
@@ -122,14 +122,4 @@ function mapFix(entry: Compiled, fix: LintFix): LintFix | undefined {
   const span = entry.map.toSourceSpan(fix.range[0], fix.range[1])
 
   return span && entry.fences.some(fence => span.start >= fence.start && span.end <= fence.end) ? { range: [span.start, span.end], text: fix.text } : undefined
-}
-
-// The project a file belongs to, as the LSP finds it: the nearest directory holding a tsconfig.json, which is where `kay check` runs.
-function projectRoot(file: string): string {
-  for (let dir = dirname(file); dir !== dirname(dir); dir = dirname(dir)) {
-    if (existsSync(join(dir, TSCONFIG)))
-      return dir
-  }
-
-  return dirname(file)
 }

@@ -5,21 +5,20 @@ import type { Diagnostic as KayDiagnostic } from '../compiler'
 import type { Span } from '../compiler/ast'
 import type { KayConfig } from '../config'
 import type { CodeAction, CodeActionParams, CompletionItem, CompletionList, DidChangeTextDocumentParams, DocumentDiagnosticReport, DocumentHighlight, FileEvent, Hover, InitializeParams, Location, LocationLink, Position, Range, TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams, TextEdit, WorkspaceEdit } from './protocol'
-import { existsSync } from 'node:fs'
-import { dirname, join, resolve } from 'node:path'
+import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { findKayFiles, TSCONFIG } from '../build/files'
+import { findKayFiles } from '../build/files'
 import { importedSignals } from '../build/signals'
 import { configCheckOptions, TSGO, UNUSED_CODES, writeShadowTypes } from '../check'
-import { compileShadow, SHADOW_DIR, shadowPath, shadowSource } from '../check/shadow'
+import { compileShadow, shadowPath, shadowSource } from '../check/shadow'
 import { formatKay } from '../compiler/format'
 import { lintLevels, typeLint } from '../compiler/lints'
 import { offsetAt, positionAt } from '../compiler/mapping'
 import { parseKay } from '../compiler/parser'
 import { analyzeScript, analyzeServer } from '../compiler/script'
 import { loadConfig } from '../config'
-import { projectPaths } from '../project'
+import { projectPaths, projectRootOf, SHADOW_DIR } from '../project'
 import { Connection } from './rpc'
 
 // Where a file tsgo names is for the editor: its .kay source for a shadow file, the file itself outside the shadow tree.
@@ -235,7 +234,7 @@ export class KayLanguageServer {
     for (const previous of this.documents.values()) {
       const file = fileURLToPath(previous.uri)
 
-      if ((this.projects.get(projectRoot(this.root, file))?.islandOnly.has(file) ?? false) !== previous.insideIsland)
+      if ((this.projects.get(projectRootOf(file, this.root))?.islandOnly.has(file) ?? false) !== previous.insideIsland)
         this.refresh(previous)
     }
     this.scheduleDiagnostics()
@@ -243,7 +242,7 @@ export class KayLanguageServer {
 
   // Writes the shadow tree of every project holding a .kay file, and returns the shadow files that came, changed and went.
   private async writeShadows(): Promise<FileEvent[]> {
-    const roots = new Set((await findKayFiles(this.root, { project: true })).map(file => projectRoot(this.root, file)))
+    const roots = new Set((await findKayFiles(this.root, { project: true })).map(file => projectRootOf(file, this.root)))
     const changes: FileEvent[] = []
 
     for (const [root, project] of this.projects) {
@@ -288,7 +287,7 @@ export class KayLanguageServer {
     let project = this.projects.get(root)
 
     if (!project)
-      this.projects.set(root, project = { root, options: {}, routesDir: projectPaths(root).routes, shadowTree: `${resolve(root, SHADOW_DIR)}/`, shadowFiles: new Set(), islandOnly: new Set(), configured: false })
+      this.projects.set(root, project = { root, options: {}, routesDir: projectPaths(root).routes, shadowTree: `${projectPaths(root).types}/`, shadowFiles: new Set(), islandOnly: new Set(), configured: false })
 
     return project
   }
@@ -306,7 +305,7 @@ export class KayLanguageServer {
 
   private compile(uri: string, source: string, version: number): Document {
     const file = fileURLToPath(uri)
-    const project = this.projectAt(projectRoot(this.root, file))
+    const project = this.projectAt(projectRootOf(file, this.root))
     const insideIsland = project.islandOnly.has(file)
     const signals = importedSignals(file, source)
     const { shadow, diagnostics } = compileShadow(project.root, project.routesDir, file, source, insideIsland, project.options.lints, signals)
@@ -345,7 +344,7 @@ export class KayLanguageServer {
       return
 
     // Related information points into the shadow TSX, a file the user never sees. Unused code, a hint to TypeScript without `noUnusedLocals`, is the `unread-name` lint in a .kay file, as `kay check` reports it.
-    const levelAt = lintLevels(document.source, this.projectAt(projectRoot(this.root, document.file)).options.lints)
+    const levelAt = lintLevels(document.source, this.projectAt(projectRootOf(document.file, this.root)).options.lints)
     const typeErrors = (report?.items ?? []).flatMap(({ relatedInformation: _related, ...diagnostic }) => {
       const range = toSourceRange(document, diagnostic.range, true)
       const lint = typeLint(diagnostic.message)
@@ -729,16 +728,6 @@ async function projectConfig(root: string): Promise<KayConfig> {
 
     return {}
   }
-}
-
-// The nearest folder above `file` holding a tsconfig.json, within the workspace; the workspace folder itself otherwise.
-function projectRoot(workspace: string, file: string): string {
-  for (let dir = dirname(file); dir.startsWith(`${workspace}/`); dir = dirname(dir)) {
-    if (existsSync(join(dir, TSCONFIG)))
-      return dir
-  }
-
-  return workspace
 }
 
 // Runs until the editor closes the stream.

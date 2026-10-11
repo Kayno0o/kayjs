@@ -2,13 +2,18 @@ import type { ClientOptions } from './build/client'
 import type { KayConfig } from './config'
 import type { RenderOptions } from './server/render'
 import type { SeoHead } from './server/seo'
-import { join, resolve } from 'node:path'
+import { existsSync } from 'node:fs'
+import { dirname, join, resolve, sep } from 'node:path'
 import process from 'node:process'
-import { clientDir, outputDir, underKayDev } from './build/assets'
+import { clientDir, KAY_DIR, outputDir, testWorker, underKayDev } from './build/assets'
+import { TSCONFIG } from './build/files'
 import { basePath } from './server/base'
 
 // The content collections' config, when `content` names no other file.
 export const CONTENT_CONFIG = 'src/content.config.ts'
+
+// The shadow tree `kay check`, `kay dev`, the LSP and eslint type the `.kay` files through, under the root.
+export const SHADOW_DIR = join(KAY_DIR, 'types')
 
 // Where a project keeps each of its parts, as absolute paths: kay's defaults are written here alone.
 export interface ProjectPaths {
@@ -19,11 +24,14 @@ export interface ProjectPaths {
   // The server entry `kay dev`, `kay check` and `kay build --compile` start from.
   entry: string
   content: string
-  // Under `.kay`: what compiling the project keeps between runs, the executable's generated entry, and the browser build with the directory it serves.
+  // Under `.kay`: what compiling the project keeps between runs, the executable's generated entry, the browser build with the directory it serves, the shadow tree, the class names kay collects for Tailwind (at the path an app's own `@source` line may name, but for each test worker's) and the components tests mount.
   cache: string
   compile: string
   output: string
   client: string
+  types: string
+  classes: string
+  tests: string
 }
 
 export function projectPaths(root: string, config: Pick<KayConfig, 'routes' | 'publicDir' | 'api' | 'content'> & { entry?: string | undefined } = {}): ProjectPaths {
@@ -36,11 +44,29 @@ export function projectPaths(root: string, config: Pick<KayConfig, 'routes' | 'p
     api: resolve(absolute, config.api ?? 'src/api'),
     entry: resolve(absolute, config.entry ?? 'src/server.ts'),
     content: resolve(absolute, config.content ?? CONTENT_CONFIG),
-    cache: join(absolute, '.kay', 'cache'),
-    compile: join(absolute, '.kay', 'compile'),
+    cache: join(absolute, KAY_DIR, 'cache'),
+    compile: join(absolute, KAY_DIR, 'compile'),
     output: outputDir(absolute),
     client: clientDir(absolute),
+    types: join(absolute, SHADOW_DIR),
+    classes: join(absolute, KAY_DIR, `classes${testWorker()}.txt`),
+    tests: join(absolute, KAY_DIR, 'test'),
   }
+}
+
+// The project a file belongs to: the nearest directory holding a tsconfig.json, which is where `kay check` runs, looked for up to `within` (an editor's workspace), else the file's own directory.
+export function projectRootOf(file: string, within?: string): string {
+  const inside = (dir: string) => within === undefined || dir === within || dir.startsWith(within + sep)
+
+  for (let dir = dirname(file); inside(dir); dir = dirname(dir)) {
+    if (existsSync(join(dir, TSCONFIG)))
+      return dir
+
+    if (dir === dirname(dir))
+      break
+  }
+
+  return within ?? dirname(file)
 }
 
 // A directory of the cache under `.kay`, by name.

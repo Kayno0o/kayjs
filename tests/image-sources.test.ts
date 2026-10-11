@@ -1,6 +1,8 @@
 import { mkdir, readdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
+import process from 'node:process'
 import { afterAll, describe, expect, it, spyOn } from 'bun:test'
+import { outputDir } from '../src/build/assets'
 import { refuseStaticConfig } from '../src/build/static'
 import { image } from '../src/runtime/image'
 import { imageSize, pages, processImage } from '../src/server'
@@ -170,6 +172,22 @@ describe('gif and avif sources', () => {
 })
 
 describe('images.resolve and images.guard', () => {
+  it('tells the islands of a prerendered page that the image route resolves any path', async () => {
+    const root = await scratchDir('resolved-')
+
+    try {
+      await Bun.write(join(root, 'kay.config.ts'), 'export default { images: { resolve: () => undefined } }\n')
+      await Bun.write(join(root, 'src/components/counter.kay'), '---\nimport { signal } from \'kay\'\n\nconst count = signal(0)\n---\nbutton(onClick={() => count.set(value => value + 1)}) {count()}\n')
+      await Bun.write(join(root, 'src/routes/index.kay'), '--- server\nexport const page = { prerender: true }\n---\n---\nimport Counter from \'../components/counter.kay\'\n---\nCounter\n')
+      // A process of its own, as one process serves one project.
+      expect(await Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', root, '--no-check'], { stdout: 'ignore', stderr: 'inherit' }).exited).toBe(0)
+      expect(await Bun.file(join(outputDir(root), 'pages/index.html')).text()).toContain('<meta name="kay-resolved-images">')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('resizes any path of the site image() is given a size for, which the app resolves', () => {
     const props = image('/media/7', { width: 1000, height: 600 })
 

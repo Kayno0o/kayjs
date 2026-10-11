@@ -11,7 +11,6 @@ import * as builtInMatchers from '../runtime/params'
 import { matcherFile } from '../server/params'
 import { routeOf } from '../server/routes'
 
-export const SHADOW_DIR = join('.kay', 'types')
 // What the shadow tree was last compiled with, for tools that compile one file at a time without reading kay.config.ts, such as the ESLint processor.
 export const SHADOW_SETTINGS = 'kay-shadow.json'
 const TS_EXTENSION = /\.ts$/
@@ -35,12 +34,12 @@ export interface ShadowSettings {
 
 // A file outside the project, such as a library a workspace installs in a `node_modules` above it, goes under one `__` folder per level climbed, so it stays inside the tree and its sibling components still resolve beside it. A project folder named `__` would share that path.
 export function shadowPath(root: string, file: string): string {
-  return join(root, SHADOW_DIR, `${relative(root, file).split(sep).map(part => part === PARENT ? OUTSIDE : part).join(sep)}.tsx`)
+  return join(projectPaths(root).types, `${relative(root, file).split(sep).map(part => part === PARENT ? OUTSIDE : part).join(sep)}.tsx`)
 }
 
 // The source file `shadow`, a path `shadowPath` gave, was compiled from.
 export function shadowSource(root: string, shadow: string): string {
-  return resolve(root, relative(join(root, SHADOW_DIR), shadow).slice(0, -'.tsx'.length).split(sep).map(part => part === OUTSIDE ? PARENT : part).join(sep))
+  return resolve(root, relative(projectPaths(root).types, shadow).slice(0, -'.tsx'.length).split(sep).map(part => part === OUTSIDE ? PARENT : part).join(sep))
 }
 
 export function serializeShadowSettings(root: string, settings: ShadowSettings): string {
@@ -50,7 +49,7 @@ export function serializeShadowSettings(root: string, settings: ShadowSettings):
 // The settings the shadow tree was written with, or the defaults when no `kay check`, `kay dev` or LSP has written it yet.
 export function readShadowSettings(root: string): ShadowSettings {
   try {
-    const saved = JSON.parse(readFileSync(join(root, SHADOW_DIR, SHADOW_SETTINGS), 'utf8')) as { routes: string, islandOnly: string[], lints?: LintLevels }
+    const saved = JSON.parse(readFileSync(join(projectPaths(root).types, SHADOW_SETTINGS), 'utf8')) as { routes: string, islandOnly: string[], lints?: LintLevels }
 
     return { routesDir: resolve(root, saved.routes), islandOnly: new Set(saved.islandOnly.map(file => resolve(root, file))), lints: saved.lints }
   }

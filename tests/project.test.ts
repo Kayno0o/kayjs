@@ -1,9 +1,12 @@
+import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { s } from 'kay'
-import { clientDir, outputDir } from '../src/build/assets'
-import { clientOptionsOf, modeOf, offlineOf, PRODUCTION, projectPaths, renderOptionsOf } from '../src/project'
+import { clientDir, outputDir, testWorker } from '../src/build/assets'
+import { clientOptionsOf, modeOf, offlineOf, PRODUCTION, projectPaths, projectRootOf, renderOptionsOf, resolveProject } from '../src/project'
+import { setupPages } from '../src/server/setup'
+import { scratchDir } from './scratch'
 
 describe('projectPaths', () => {
   it('gives kay\'s defaults, or what the config names, as absolute paths', () => {
@@ -20,8 +23,47 @@ describe('projectPaths', () => {
       compile: '/app/.kay/compile',
       output: outputDir(root),
       client: clientDir(root),
+      types: '/app/.kay/types',
+      classes: `/app/.kay/classes${testWorker()}.txt`,
+      tests: '/app/.kay/test',
     })
     expect(projectPaths(join(root, 'site', '..'), { routes: 'pages', publicDir: 'static', api: 'api', content: 'content.ts', entry: 'server.ts' })).toMatchObject({ root, routes: '/app/pages', public: '/app/static', api: '/app/api', content: '/app/content.ts', entry: '/app/server.ts' })
+  })
+})
+
+describe('projectRootOf', () => {
+  it('finds the nearest directory holding a tsconfig.json, up to the workspace when one is given', async () => {
+    const root = await scratchDir('project-root')
+    const app = join(root, 'apps', 'site')
+
+    try {
+      await Bun.write(join(app, 'tsconfig.json'), '{}')
+      await Bun.write(join(app, 'src', 'routes', 'index.kay'), '')
+      await Bun.write(join(root, 'loose', 'card.kay'), '')
+
+      expect(projectRootOf(join(app, 'src', 'routes', 'index.kay'))).toBe(app)
+      expect(projectRootOf(join(app, 'src', 'routes', 'index.kay'), root)).toBe(app)
+      expect(projectRootOf(join(app, 'src', 'routes', 'index.kay'), join(app, 'src'))).toBe(join(app, 'src'))
+      expect(projectRootOf(join(root, 'loose', 'card.kay'), root)).toBe(root)
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('setupPages', () => {
+  it('gives serving and prerendering the routes, matchers, locales, site and render options of one project', async () => {
+    const root = process.cwd()
+    const client = { entryImports: [], islands: {}, styles: new Map(), pages: new Map(), dir: join(outputDir(root), 'dist') }
+    const project = resolveProject(root, { routes: 'tests/fixtures/site/src/routes', site: 'https://x.example', base: '/docs/', images: { resolve: () => undefined } })
+    const setup = await setupPages(project, async () => client, true)
+
+    expect(setup.routes.map(route => route.pattern)).toContain('/admin/report')
+    expect(setup.matchers).toBeInstanceOf(Map)
+    expect(setup.locales.implicit).toBe(true)
+    expect(setup.site).toBe('https://x.example/docs')
+    expect(setup.renderOptions).toMatchObject({ dev: false, base: '/docs', resolvedImages: true, offline: false })
   })
 })
 

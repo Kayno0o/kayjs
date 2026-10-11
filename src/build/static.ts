@@ -9,10 +9,11 @@ import process from 'node:process'
 import { Elysia } from 'elysia'
 import { pageHooks } from '../config'
 import { feedPaths, projectCollections } from '../content/server'
+import { resolveProject } from '../project'
 import { joinBase } from '../runtime/base'
 import { escape, escapeAttribute } from '../runtime/escape'
 import { localePath, splitLocale, untranslatedPath } from '../runtime/i18n'
-import { pages as servePages } from '../server'
+import { servePages } from '../server/app'
 import { basePath } from '../server/base'
 import { PRERENDERED_DIR } from '../server/client'
 import { compressPaths } from '../server/compress'
@@ -87,7 +88,7 @@ export async function exportStatic(project: Project, client: ClientBuild, outdir
   // What kay serves itself comes from the app, as a server would answer it.
   // The extensions' server plugins are left out, since nothing a static site serves runs them and one may open a database.
   const extensions = config.extensions?.map(({ server: _, ...extension }) => extension)
-  const app = new Elysia().use(await servePages({ ...config, extensions, root, prebuilt: true, log: false, health: false, security: false, compress: false }))
+  const app = new Elysia().use(await servePages(resolveProject(root, { ...config, extensions, log: false, health: false, security: false, compress: false }, project.mode), async () => client))
   const fetched = [SERVICE_WORKER, ...config.site === undefined ? [] : [SITEMAP, ROBOTS], ...faviconPaths(config.favicon, config.manifest), ...config.publicEnv === undefined ? [] : [PUBLIC_ENV_PATH], ...(await projectCollections(root, config.content)).flatMap(collection => feedPaths(collection, config.i18n && localeSettings(config.i18n)).map(({ path }) => path)), ...(await exportedEndpoints(root, await scanEndpoints(routesDir, routeMounts(root, config.extensions)))).paths]
 
   for (const path of fetched) {
