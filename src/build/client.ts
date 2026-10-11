@@ -462,9 +462,9 @@ function islandPath(root: string, input: string): string {
   return relative(root, resolve(input)).replaceAll('\\', '/')
 }
 
-// Bun names entry points relative to the working directory or to the build's root, so both are tried.
+// Bun names entry points relative to the working directory, not the root: from a library holding a test app, its layout and the app's share a path.
 function entryFile(root: string, entryPoint: string, files: Set<string>): string | undefined {
-  return [resolve(root, entryPoint), resolve(entryPoint), throughLinks(root, resolve(entryPoint))].find(file => files.has(file))
+  return [resolve(entryPoint), throughLinks(root, resolve(entryPoint))].find(file => files.has(file))
 }
 
 function assetUrl(output: string): string {

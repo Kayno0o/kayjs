@@ -4,7 +4,7 @@ import type { KayConfig } from '../src/config'
 import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp, readdir, rename, rm, stat, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import process from 'node:process'
 import tailwind from 'bun-plugin-tailwind'
 import { describe, expect, it } from 'bun:test'
@@ -221,6 +221,32 @@ describe('kay build', () => {
     }
     finally {
       await rm(join(root, '.kay'), { recursive: true, force: true })
+    }
+  })
+
+  it('keys each page\'s stylesheet by its own file, from a working directory other than the root', async () => {
+    // A library holding its own routes and an app testing it inside: from the library, its layout and the app's share a relative path.
+    const base = await scratchProject({
+      'src/routes/_layout.kay': '---\nimport \'./admin.css\'\n---\nsection\n  slot\n',
+      'src/routes/admin.css': '.admin { color: teal }\n',
+      'fixture/src/app.css': '.app { color: red }\n',
+      'fixture/src/routes/_layout.kay': '---\nimport \'../app.css\'\n---\nmain\n  slot\n',
+      'fixture/src/routes/index.kay': 'p home\n',
+    })
+    const app = join(base, 'fixture')
+    const cwd = process.cwd()
+
+    try {
+      process.chdir(base)
+      const { styles } = await buildClient(app, { extensions: [{ name: 'lib', routes: { dir: join(base, 'src/routes'), prefix: '/admin' } }] })
+      const sheet = async (file: string) => Bun.file(join(clientDir(app), basename(styles.get(file)!))).text()
+
+      expect(await sheet(join(app, 'src/routes/_layout.kay'))).toContain('.app')
+      expect(await sheet(join(base, 'src/routes/_layout.kay'))).toContain('.admin')
+    }
+    finally {
+      process.chdir(cwd)
+      await rm(base, { recursive: true, force: true })
     }
   })
 
