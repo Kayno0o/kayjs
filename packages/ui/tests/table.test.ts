@@ -1,6 +1,6 @@
 import type { Column } from '../src/table'
 import { describe, expect, test } from 'bun:test'
-import { cellText, nextSort, rowKeyOf, sortedRows } from '../src/table'
+import { cellText, drawnByBlock, nextSort, resolvedColumn, rowKeyOf, rowMatches, sortedRows } from '../src/table'
 
 interface Planet { id: number, name: string, moons: number | null }
 
@@ -49,4 +49,24 @@ test('cellText shows nothing for a missing value, and rowKeyOf reads a field or 
   expect(cellText(planets[0]!, moons)).toBe('2')
   expect(rowKeyOf(planets[0]!, 'id')).toBe(1)
   expect(rowKeyOf(planets[0]!, planet => planet.name)).toBe('Mars')
+})
+
+test('a numeric column aligns to the end and sorts by its own value, largest first, unless it says otherwise', () => {
+  expect(resolvedColumn<Planet>({ key: 'moons', header: 'Moons', numeric: true })).toEqual({ key: 'moons', header: 'Moons', numeric: true, align: 'end', sortValue: true, defaultDirection: 'desc' })
+  expect(resolvedColumn<Planet>({ key: 'moons', header: 'Moons', numeric: true, defaultDirection: 'asc' }).defaultDirection).toBe('asc')
+  expect(resolvedColumn(name)).toBe(name)
+})
+
+test('the @cell block draws every column but a cell: false one, or only the cell: true ones once a column sets it', () => {
+  const plain: Column<Planet>[] = [name, { ...moons, cell: false }]
+  const marked: Column<Planet>[] = [{ ...name, cell: true }, moons]
+
+  expect(plain.map(column => drawnByBlock(column, plain))).toEqual([true, false])
+  expect(marked.map(column => drawnByBlock(column, marked))).toEqual([true, false])
+})
+
+test('a filter keeps a row whose fields or function values hold the text, its case and spaces ignored', () => {
+  expect(planets.filter(planet => rowMatches(planet, ['name'], ' AR ')).map(planet => planet.name)).toEqual(['Mars', 'Earth'])
+  expect(planets.filter(planet => rowMatches(planet, row => [row.name, row.moons], '2')).map(planet => planet.name)).toEqual(['Mars'])
+  expect(planets.filter(planet => rowMatches(planet, ['moons'], ''))).toHaveLength(3)
 })

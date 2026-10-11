@@ -150,26 +150,33 @@ Dialog(open={editing()} title="Rename" onClose={() => editing.set(false)})
 import type { Column } from '@kaynooo/kayjs-ui'
 
 const columns: Column<Post>[] = [
-  { key: 'title', header: 'Title', sortValue: true, cell: true },
-  { key: 'views', header: 'Views', sortValue: post => post.views, defaultDirection: 'desc', align: 'end' },
-  { key: 'author', header: 'Author' },
+  { key: 'title', header: 'Title', sortValue: true },
+  { key: 'views', header: 'Views', numeric: true },
+  { key: 'author', header: 'Author', cell: false },
 ]
 ```
 
 ```kay
-Table(columns={columns} rows={posts} rowKey="id")
+Table(columns={columns} rows={posts} rowKey="id" filter={['title', 'author']} filterParam="q")
   @cell(post, column)
-    a(href={`/posts/${post.id}`}) {post.title}
+    if column.key === 'title'
+      a(href={`/posts/${post.id}`}) {post.title}
+    else
+      | {post.views.toLocaleString()}
   @empty
     EmptyState(title="No posts yet")
+  @noMatch
+    EmptyState(title="No post matches")
 ```
 
-- A column shows the row's value at `key` as text. With `cell: true`, it shows what the `@cell(row, column)` block draws instead.
+- With a `@cell(row, column)` block, every column shows what it draws, but one with `cell: false`, which shows the row's value at `key` as text, as every column does without the block. A table where any column sets `cell: true` draws only those through the block, as before.
+- `numeric: true` marks a count or an amount: aligned to the end, its digits in columns, sorted by its own value and largest first, each overridable by `align`, `sortValue` and `defaultDirection`.
 - A column with `sortValue` sorts when its header is clicked. `true` sorts by the row's value at `key`; a function sorts by what it returns.
 - The first click sorts in `defaultDirection`, `desc` unless set, and the next click flips it. `sort` gives the sort to start from.
 - `serverSort` leaves the rows in the order they came. The headers show the sort, and `onSort(sort)` lets the page fetch the rows sorted that way, from a load or an action.
 - With `sortValue: true`, dates sort by time, booleans as 0 and 1, and a missing value sorts last in either direction.
 - `rowKey` is a field of the row or a function of it, and tells rows apart across a sort.
+- `filter` shows a search box above the rows, `filterLabel` (`Filter`) naming it, and keeps the rows where a value it reads holds the typed text, case and surrounding spaces ignored: the fields it names, or what a function of the row returns, `filter={post => [post.title, post.author.name]}`. `filterParam="q"` keeps the text in the page's URL as `?q=`, which the server reads too, so a reload or a shared link renders filtered. `@noMatch` shows when the filter hides every row, `@empty` when there are none.
 
 ### Segmented, TabNav, SiteNav, Tabs, Toggle
 

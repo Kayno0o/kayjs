@@ -13,8 +13,31 @@ export interface Column<Row> {
   sortValue?: ((row: Row) => string | number) | true
   // The direction the first click on its header sorts by.
   defaultDirection?: SortDirection
-  // Drawn by the table's `@cell(row, column)` block rather than as the row's value at `key`.
-  cell?: true
+  // A count or an amount: aligned to the end, its digits in columns, sorted by its own value, largest first, unless the column sets these itself.
+  numeric?: true
+  // Drawn by the table's `@cell(row, column)` block rather than as the row's value at `key`. Left out, a column is drawn by the block when there is one and no other column sets `cell: true`; `false` keeps it as text.
+  cell?: boolean
+}
+
+// The column with what `numeric` stands for filled in where it says nothing itself.
+export function resolvedColumn<Row>(column: Column<Row>): Column<Row> {
+  return column.numeric ? { align: 'end', sortValue: true, defaultDirection: 'desc', ...column } : column
+}
+
+// Whether the `@cell` block draws the column: one marked `cell: true` puts the table in the older way, where only those are.
+export function drawnByBlock<Row>(column: Column<Row>, columns: Column<Row>[]): boolean {
+  return column.cell ?? !columns.some(other => other.cell === true)
+}
+
+// What a filter box reads off a row: the row's fields named, or what a function of it returns.
+export type RowFilter<Row> = readonly (keyof Row & string)[] | ((row: Row) => (string | number | null | undefined)[])
+
+// Whether any value the filter reads holds the typed text, its case and surrounding spaces ignored; empty text keeps every row.
+export function rowMatches<Row>(row: Row, filter: RowFilter<Row>, text: string): boolean {
+  const needle = text.trim().toLowerCase()
+  const values = typeof filter === 'function' ? filter(row) : filter.map(key => row[key])
+
+  return needle === '' || values.some(value => (typeof value === 'string' || typeof value === 'number') && String(value).toLowerCase().includes(needle))
 }
 
 // How a table tells its rows apart: a field of the row, or a function of it.

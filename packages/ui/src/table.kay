@@ -1,11 +1,11 @@
 --- <Row>
 import type { JSX } from 'kay'
-import type { Column, RowKey, SortState } from './table'
-import { effect, signal } from 'kay'
+import type { Column, RowFilter, RowKey, SortState } from './table'
+import { effect, persisted, signal } from 'kay'
 import Icon from './icon.kay'
-import { cellText, nextSort, rowKeyOf, sortedRows } from './table'
+import { cellText, drawnByBlock, nextSort, resolvedColumn, rowKeyOf, rowMatches, sortedRows } from './table'
 
-const { columns, rows, rowKey, sort, serverSort = false, onSort, cell, empty, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
+const { columns: given, rows, rowKey, sort, serverSort = false, onSort, cell, empty, filter, filterLabel = 'Filter', filterPlaceholder, filterParam, noMatch, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
   columns: Column<Row>[]
   rows: Row[]
   rowKey: RowKey<Row>
@@ -15,19 +15,37 @@ const { columns, rows, rowKey, sort, serverSort = false, onSort, cell, empty, cl
   serverSort?: boolean | undefined
   // Called with each sort a header click asks for, to fetch the rows sorted that way when `serverSort` is set.
   onSort?: ((sort: SortState) => void) | undefined
-  // Draws the cells of the columns marked `cell: true`.
+  // Draws the cells of the columns it covers, see `Column.cell`.
   cell?: ((row: Row, column: Column<Row>) => JSX.Element) | undefined
   // Shown in place of the rows when there are none.
   empty?: JSX.Element
+  // A search box above the rows, keeping those where a value it reads holds the typed text: the row's fields named, or what a function of the row returns.
+  filter?: RowFilter<Row> | undefined
+  // Names the search box.
+  filterLabel?: string | undefined
+  filterPlaceholder?: string | undefined
+  // The query parameter keeping the typed text in the page's URL, so a reload or a shared link filters the same; without it the text stays on the page.
+  filterParam?: string | undefined
+  // Shown in place of the rows when the filter hides every one; `empty` otherwise.
+  noMatch?: JSX.Element
   class?: string | undefined
 }>()
 
+const columns = () => given.map(resolvedColumn)
 const current = signal(sort)
+const typed = filterParam === undefined ? signal('') : persisted(filterParam, '', { storage: 'query' })
 
 effect(() => current.set(sort))
 
-const shown = () => serverSort ? rows : sortedRows(rows, columns, current())
+const shown = () => serverSort ? kept() : sortedRows(kept(), columns(), current())
 const sorting = (column: Column<Row>) => column.sortValue !== undefined && current()?.key === column.key
+
+// The rows the filter keeps, all of them without one.
+function kept(): Row[] {
+  const by = filter
+
+  return by === undefined ? rows : rows.filter(row => rowMatches(row, by, typed()))
+}
 
 function toggle(column: Column<Row>) {
   const next = nextSort(current(), column)
@@ -44,10 +62,14 @@ function ariaSort(column: Column<Row>): 'ascending' | 'descending' | undefined {
 }
 ---
 .kui-table-wrap({...rest} class={className})
+  if filter
+    label.kui-table-filter
+      span.kui-label-text {filterLabel}
+      input.kui-field-input.kui-table-filter-input(type="search" value={typed()} placeholder={filterPlaceholder} autocomplete="off" onInput={event => typed.set(event.currentTarget.value)})
   table.kui-table
     thead
       tr
-        for column of columns key={column.key}
+        for column of columns() key={column.key}
           th.kui-table-head-cell(scope="col" data-align={column.align ?? 'start'} aria-sort={ariaSort(column)})
             if column.sortValue
               button.kui-table-sort-btn(type="button" data-direction={sorting(column) ? current()?.direction : undefined} onClick={() => toggle(column)})
@@ -59,14 +81,18 @@ function ariaSort(column: Column<Row>): 'ascending' | 'descending' | undefined {
     tbody
       for row of shown() key={rowKeyOf(row, rowKey)}
         tr.kui-table-row
-          for column of columns key={column.key}
-            td.kui-table-cell(data-align={column.align ?? 'start'})
-              if column.cell && cell
+          for column of columns() key={column.key}
+            td.kui-table-cell(data-align={column.align ?? 'start'} data-numeric={column.numeric ? '' : undefined})
+              if cell && drawnByBlock(column, given)
                 | {cell(row, column)}
               else
                 | {cellText(row, column)}
       else
-        if empty
+        if rows.length > 0 && noMatch
           tr
-            td.kui-table-empty-cell(colspan={columns.length})
+            td.kui-table-empty-cell(colspan={given.length})
+              | {noMatch}
+        else if empty
+          tr
+            td.kui-table-empty-cell(colspan={given.length})
               | {empty}

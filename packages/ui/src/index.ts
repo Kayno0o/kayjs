@@ -11,5 +11,5 @@ export type { AxisScale, AxisTick, BarListRow, ChartSeries, ScatterAxis, Scatter
 export type * from './popover'
 export type { RangeValue } from './range'
 export { rangeFrom } from './range'
-export type { Column, RowKey, SortDirection, SortState } from './table'
+export type { Column, RowFilter, RowKey, SortDirection, SortState } from './table'
 export * from './toast'

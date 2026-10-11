@@ -77,6 +77,13 @@ test('Table renders sorted on the server from a static page, its sortable header
   expect(table).toContain('<th class="kui-table-head-cell" scope="col" data-align="end">Moons</th>')
 })
 
+test('Table filters on the server by the text its query param holds, shown in its search box', async () => {
+  const table = (await element('/table?q=EAR', 'filtered')).replaceAll(/<!--[^>]*-->/g, '')
+
+  expect(table).toContain('<label class="kui-table-filter"><span class="kui-label-text">Filter</span><input class="kui-field-input kui-table-filter-input" type="search" value="EAR" autocomplete="off"></label>')
+  expect([...table.matchAll(/<td class="kui-table-cell" data-align="start">([^<]*)<\/td>/g)].map(([, text]) => text)).toEqual(['Earth'])
+})
+
 describe('controls', () => {
   const page = async (id: string) => (await element('/controls', id)).replaceAll(/<!--[^>]*-->/g, '')
 

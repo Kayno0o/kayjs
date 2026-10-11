@@ -1372,6 +1372,15 @@
     @apply w-full overflow-x-auto border border-kui-surface2 bg-kui-surface0;
   }
 
+  /* Sticky, so it stays in view while a wide table scrolls under it. */
+  .kui-table-filter {
+    @apply sticky left-0 flex items-center gap-2 border-b border-kui-surface2 px-3 py-2;
+  }
+
+  .kui-table-filter-input {
+    @apply w-56 max-w-full;
+  }
+
   .kui-table {
     @apply w-full border-collapse text-sm;
   }
@@ -1414,6 +1423,10 @@
 
   .kui-table-cell {
     @apply px-3 py-1.5 text-kui-text;
+
+    &:where([data-numeric]) {
+      @apply tabular-nums;
+    }
 
     &:where([data-align='center']) {
       @apply text-center;
