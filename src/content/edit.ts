@@ -7,7 +7,7 @@ import { dirname, join, relative, resolve, sep } from 'node:path'
 import { t } from 'elysia'
 import { isDraft } from './drafts'
 import { contentPlace, entryFiles, parseEntry, slugOf } from './load'
-import { compileMarkdown, MarkdownError } from './markdown'
+import { compileMarkdown, MarkdownError, splitFrontmatter } from './markdown'
 import { dataIssues, decodeEntries, unknownComponents } from './validate'
 
 // What a CMS reads of the collections the content config exports, to edit their entries: kay's server API, kay writing nothing itself.
@@ -33,6 +33,8 @@ export interface CollectionInfo {
   dir?: string | undefined
   // The boolean field `draft: 'field'` names, true for a draft: publishing writes false to it.
   draftField?: string | undefined
+  // Why its entries fail to read, a loader throwing say; `body` is then assumed.
+  problem?: string | undefined
 }
 
 // An entry as its source holds it, drafts included: a folder's file as written, a loader's entry as it gives it in preview.
@@ -137,17 +139,19 @@ export async function collections(): Promise<CollectionInfo[]> {
     const { draft, localized = false, schema } = collection.options
     const dir = collection.dir === undefined ? undefined : folderOf(collection.dir)
     const inRepo = dir === undefined ? undefined : repoPath(repoRoot, dir)
+    const { body, problem } = await bodyHeld(name, collection, dir)
 
     return {
       name,
       kind: dir === undefined ? 'loaded' : 'folder',
       schema: jsonSchema(schema),
-      ...await holdsBody(name, collection, dir) && { body: { kind: 'markdown' } },
+      ...body && { body: { kind: 'markdown' } },
       components: Object.keys(collection.components),
       localized,
       ...localized && site?.locales && { locales: [...site.locales] },
       ...inRepo !== undefined && { dir: inRepo },
       ...typeof draft === 'string' && { draftField: draft },
+      ...problem !== undefined && { problem },
     }
   }))
 }
@@ -177,14 +181,14 @@ export async function entries(name: string, options: { locale?: string } = {}): 
   }))
 }
 
-// Where an entry an editor wrote fails its collection: a slug naming another place, or another file than its own in a folder, a locale the site does not serve, a locale missing from a localized collection's entry or given to another's, the schema, or a component its body uses that the collection does not name.
+// Where an entry an editor wrote fails its collection: a slug naming another place, or another file than its own in a folder, a new `a/index` included, a locale the site does not serve, a locale missing from a localized collection's entry or given to another's, the schema, or a component its body uses that the collection does not name.
 // A body's issue is flagged `body`, a slug's or a locale's `key`, apart from a data field of that name; the body comes back compiled when it compiles.
 export async function entryIssues(name: string, collection: Collection<unknown>, entry: WrittenEntry): Promise<{ issues: DraftIssue[], compiled?: CompiledMarkdown | undefined }> {
   const { slug, locale, data, body } = entry
   const at = { collection: name, slug, ...locale !== undefined && { locale } }
   const issues: DraftIssue[] = []
 
-  issues.push(...placeIssues(collection, at))
+  issues.push(...placeIssues(collection, at), ...await indexIssues(collection, at))
 
   const compiled = body === undefined ? undefined : await compiledBody(collection, body, message => issues.push({ ...at, path: '', body: true, message }))
 
@@ -211,14 +215,9 @@ export async function entrySource(name: string, slug: string, data: unknown, opt
   const files = await folderFiles(name, dir)
   const place = options.locale === undefined ? slug : `${options.locale}/${slug}`
   const existing = files.find(file => slugOf(file) === place)
-  const at = { collection: name, slug, ...options.locale !== undefined && { locale: options.locale }, path: '' }
-
-  // A new `a/index` file reads back as `a`, a locale's `en/index` as no entry of a locale at all; an existing one keeps its file.
-  if (existing === undefined && place.includes('/') && place.endsWith('/index'))
-    return { issues: [{ ...at, key: 'slug', message: `has a slug whose file, ${place}, reads back as another entry: the last part of a slug is not index` }] }
 
   if (existing !== undefined && options.body !== undefined && !MARKDOWN.test(existing))
-    return { issues: [{ ...at, body: true, message: `goes to ${existing}, a data file holding no body` }] }
+    return { issues: [{ collection: name, slug, ...options.locale !== undefined && { locale: options.locale }, path: '', body: true, message: `goes to ${existing}, a data file holding no body` }] }
 
   const relativeFile = existing ?? `${place}.${options.body !== undefined || files.some(file => MARKDOWN.test(file)) ? 'md' : 'json'}`
   const absolute = join(dir, relativeFile)
@@ -227,7 +226,7 @@ export async function entrySource(name: string, slug: string, data: unknown, opt
   if (inRepo === undefined)
     throw new Error(`kay: ${name}'s folder lies outside the repository holding the project, so a CMS cannot commit its files`)
 
-  const body = options.body ?? (existing !== undefined && MARKDOWN.test(existing) ? await keptBody(dir, existing) : undefined)
+  const body = options.body ?? (existing !== undefined && MARKDOWN.test(existing) ? (await readEntry(dir, existing)).body : undefined)
 
   return { file: { path: relative(contentPlace().root, absolute).split(sep).join('/'), absolute, repoPath: inRepo, text: entryText(relativeFile, data, body) } }
 }
@@ -284,6 +283,23 @@ function placeIssues(collection: Collection<unknown>, at: { collection: string, 
     issues.push({ ...at, path: '', key: 'locale', message: site?.locales ? `names a locale the site does not serve: it serves ${site.locales.join(', ')}` : 'has a locale naming no folder of the collection' })
 
   return issues
+}
+
+// A new `a/index` file in a folder reads back as `a`, a locale's `en/index` as no entry of a locale at all; an existing one keeps its file.
+async function indexIssues(collection: Collection<unknown>, at: { collection: string, slug: string, locale?: string }): Promise<DraftIssue[]> {
+  const place = at.locale === undefined ? at.slug : `${at.locale}/${at.slug}`
+
+  if (collection.dir === undefined || !place.endsWith('/index'))
+    return []
+
+  const dir = folderOf(collection.dir)
+
+  if (existsSync(dir) && (await entryFiles(dir)).some(file => slugOf(file) === place))
+    return []
+
+  const readsAs = place.slice(0, -'/index'.length)
+
+  return [{ ...at, path: '', key: 'slug', message: at.locale === undefined || at.slug !== 'index' ? `has a slug whose file, ${place}, reads back as ${readsAs}: write the entry as ${at.slug.slice(0, -'/index'.length)}` : `has a slug whose file, ${place}, reads back as no entry of a locale: give the entry another slug` }]
 }
 
 // A file or folder name the collection's folder lists: not empty nor hidden, with no slash or control character.
@@ -350,31 +366,17 @@ async function folderEntries(name: string, dir: string): Promise<Omit<SourceEntr
     const path = repoPath(repoRoot, join(dir, file))
     const at = { slug: slugOf(file), ...path !== undefined && { path } }
 
-    try {
-      return { ...at, ...await readEntry(dir, file) }
-    }
-    catch (error) {
-      return { ...at, data: undefined, problem: error instanceof Error ? error.message : String(error) }
-    }
+    return { ...at, ...await readEntry(dir, file) }
   }))
 }
 
-// The body of the Markdown file an entry is written over, none when it does not parse: the editor writes it whole again.
-async function keptBody(dir: string, file: string): Promise<string | undefined> {
-  try {
-    return (await readEntry(dir, file)).body
-  }
-  catch {
-    return undefined
-  }
-}
-
-// A folder entry's data and body as the collection reads them, a file that does not parse named in the error.
-async function readEntry(dir: string, file: string): Promise<{ data: unknown, body?: string }> {
+// A folder entry's data and body as the collection reads them; a file that does not parse gives no data but its problem, and a Markdown one its body still, its frontmatter alone failing.
+async function readEntry(dir: string, file: string): Promise<{ data: unknown, body?: string, problem?: string }> {
   const absolute = join(dir, file)
+  const source = await Bun.file(absolute).text()
 
   try {
-    const { data, body } = parseEntry(file, await Bun.file(absolute).text())
+    const { data, body } = parseEntry(file, source)
 
     return { data, ...body !== undefined && { body } }
   }
@@ -382,7 +384,9 @@ async function readEntry(dir: string, file: string): Promise<{ data: unknown, bo
     if (!(error instanceof MarkdownError))
       throw error
 
-    throw new Error(`kay: ${relative(contentPlace().root, absolute).split(sep).join('/')}:${error.line} ${error.message}`)
+    const body = MARKDOWN.test(file) ? splitFrontmatter(source).body : undefined
+
+    return { data: undefined, ...body !== undefined && { body }, problem: `kay: ${relative(contentPlace().root, absolute).split(sep).join('/')}:${error.line} ${error.message}` }
   }
 }
 
@@ -400,6 +404,16 @@ async function loadedEntries(name: string, collection: Collection<unknown>): Pro
 
     return { slug, data, ...typeof body === 'string' && { body } }
   })
+}
+
+// Whether a collection's entries hold a Markdown body, or why they fail to read, one then assumed.
+async function bodyHeld(name: string, collection: Collection<unknown>, dir: string | undefined): Promise<{ body: boolean, problem?: string }> {
+  try {
+    return { body: await holdsBody(name, collection, dir) }
+  }
+  catch (error) {
+    return { body: true, problem: error instanceof Error ? error.message : String(error) }
+  }
 }
 
 // Whether a collection's entries hold a Markdown body: a folder's in Markdown files, a loader's as `body` rather than `html`; one with no entry yet, or a folder missing, as beside a build alone, may.

@@ -8,7 +8,7 @@ import { afterEach, describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { t } from 'elysia'
 import { outputDir } from '../src/build/assets'
 import { collection, collections, entries, entrySource, removeEntry, saveEntry } from '../src/content'
-import { registerCollections, registerEditSite } from '../src/content/edit'
+import { entryIssues, registerCollections, registerEditSite } from '../src/content/edit'
 import { contentPlace, parseEntry, setContentPlace } from '../src/content/load'
 import { MarkdownError } from '../src/content/markdown'
 import { ContentError } from '../src/content/validate'
@@ -25,7 +25,7 @@ import { entryUrls } from '../src/server/entry-urls'
 import { prerenderPages } from '../src/server/prerender'
 import { inPreview, previewRequested, requestDrafts } from '../src/server/preview'
 import { cms, resetCms } from './fixtures/cms/src/cms'
-import { articles, news } from './fixtures/cms/src/content.config'
+import { articles, news, pages as pagesCollection } from './fixtures/cms/src/content.config'
 import { scratchDir } from './scratch'
 
 const FIXTURE = 'tests/fixtures/cms'
@@ -261,7 +261,10 @@ describe('the collections a CMS edits', () => {
 
     expect(await entrySource('pages', 'index', { title: 'T', order: 1 })).toMatchObject({ file: { path: 'tests/fixtures/cms/src/content/pages/index.md' } })
     // `en/index.md` would read back as an entry `en` outside any locale.
-    expect(await entrySource('articles', 'index', { title: 'T' }, { locale: 'en' })).toEqual({ issues: [{ collection: 'articles', slug: 'index', locale: 'en', path: '', key: 'slug', message: 'has a slug whose file, en/index, reads back as another entry: the last part of a slug is not index' }] })
+    expect(await entrySource('articles', 'index', { title: 'T' }, { locale: 'en' })).toEqual({ issues: [{ collection: 'articles', slug: 'index', locale: 'en', path: '', key: 'slug', message: 'has a slug whose file, en/index, reads back as no entry of a locale: give the entry another slug' }] })
+    expect(await entrySource('pages', 'guide/index', { title: 'T', order: 1 })).toMatchObject({ issues: [{ key: 'slug', message: 'has a slug whose file, guide/index, reads back as guide: write the entry as guide' }] })
+    // A draft takes the same rule, so the page shows no entry the CMS cannot save.
+    expect(await entryIssues('pages', pagesCollection, { slug: 'guide/index', data: { title: 'T', order: 1 } })).toMatchObject({ issues: [{ key: 'slug' }] })
 
     const base = await scratchDir('cms-')
 
@@ -298,9 +301,10 @@ describe('the collections a CMS edits', () => {
       expect((await entries('pages')).find(entry => entry.slug === 'broken')).toEqual({ slug: 'broken', path: expect.stringMatching(/content\/pages\/broken\.json$/), data: undefined, draft: false, problem: expect.stringContaining('content/pages/broken.json:1 the JSON does not parse') })
       expect(await rejection(entries('articles'))).toMatchObject({ message: expect.stringMatching(/^kay: articles's folder .*content\/articles is missing/) })
       expect((await collections()).find(each => each.name === 'articles')).toMatchObject({ body: { kind: 'markdown' } })
-      // The editor writes over a file that does not parse, in its name, a Markdown one's body given whole again.
+      // The editor writes over a file that does not parse, in its name, a Markdown one keeping the body its frontmatter did not break.
       expect(await entrySource('pages', 'broken', { title: 'Mended', order: 4 })).toMatchObject({ file: { absolute: join(base, 'content/pages/broken.json'), text: '{\n  "title": "Mended",\n  "order": 4\n}\n' } })
-      expect(await entrySource('pages', 'torn', { title: 'Torn', order: 5 })).toMatchObject({ file: { absolute: join(base, 'content/pages/torn.md'), text: '---\ntitle: Torn\norder: 5\n---\n' } })
+      expect((await entries('pages')).find(entry => entry.slug === 'torn')).toMatchObject({ data: undefined, body: '\nLost.\n', problem: expect.stringContaining('torn.md') })
+      expect(await entrySource('pages', 'torn', { title: 'Torn', order: 5 })).toMatchObject({ file: { absolute: join(base, 'content/pages/torn.md'), text: '---\ntitle: Torn\norder: 5\n---\n\nLost.\n' } })
       expect(await entrySource('pages', 'torn', { title: 'Torn', order: 5 }, { body: 'Found.' })).toMatchObject({ file: { text: '---\ntitle: Torn\norder: 5\n---\n\nFound.\n' } })
     })
   })
@@ -317,7 +321,7 @@ describe('the collections a CMS edits', () => {
     })
   })
 
-  it('reads a loader as it is, refusing what gives no entries, and hands `url` the data its schema decoded alone', async () => {
+  it('reads a loader as it is, refusing what gives no entries, telling a collection failing to read, and hands `url` the data its schema decoded alone', async () => {
     const schema = t.Object({ title: t.String() })
     const odd = collection({ name: 'odd', load: (() => 'nope') as never }, { schema })
     const slugless = collection({ name: 'slugless', load: (() => [{ data: {} }]) as never }, { schema })
@@ -332,8 +336,19 @@ describe('the collections a CMS edits', () => {
     await exporting([['odd', odd], ['slugless', slugless], ['broken', broken], ['titled', titled], ['failing', failing]], async () => {
       expect(await rejection(entries('odd'))).toMatchObject({ message: 'kay: odd\'s load gave string, not an array of entries' })
       expect(await rejection(entries('slugless'))).toMatchObject({ message: 'kay: slugless\'s load gave an entry with no slug: {"data":{}}' })
-      expect(await rejection(collections())).toMatchObject({ message: 'the CMS is down' })
-      expect((await entries('titled')).map(entry => entry.url)).toEqual(['/t/good', undefined])
+      expect((await collections()).find(each => each.name === 'broken')).toMatchObject({ body: { kind: 'markdown' }, problem: 'the CMS is down' })
+      expect((await collections()).find(each => each.name === 'titled')).not.toHaveProperty('problem')
+
+      const before = registerEditSite({ urls: async (_, entry) => `/route/${entry.slug}` })
+
+      try {
+        // An entry the schema refuses takes the route's page.
+        expect((await entries('titled')).map(entry => entry.url)).toEqual(['/t/good', '/route/bad'])
+      }
+      finally {
+        registerEditSite(before)
+      }
+
       expect(await rejection(entries('failing'))).toMatchObject({ message: 'no page' })
     })
   })
@@ -358,6 +373,19 @@ describe('the collections a CMS edits', () => {
     expect(cms.entries.map(entry => entry.slug)).toEqual(['launch', 'roadmap'])
   })
 
+  it('removes a localized loader\'s entry in its locale', async () => {
+    let held = [{ slug: 'en/hello', data: { title: 'Hello' }, html: '' }, { slug: 'fr/hello', data: { title: 'Salut' }, html: '' }]
+    const tales = collection({ name: 'tales', load: () => held, remove: ({ slug, locale }) => {
+      held = held.filter(entry => entry.slug !== `${locale}/${slug}`)
+    } }, { schema: t.Object({ title: t.String() }), localized: true })
+
+    await exporting([['tales', tales]], async () => {
+      expect(await removeEntry('tales', 'hello', 'fr')).toEqual({})
+      expect(held.map(entry => entry.slug)).toEqual(['en/hello'])
+      expect(await removeEntry('tales', 'hello', 'fr')).toMatchObject({ issues: [{ key: 'slug', message: 'names no entry of the collection' }] })
+    })
+  })
+
   it('names the method a loader lacks to save or remove its entries', async () => {
     expect(await rejection(saveEntry('notes', { slug: 'hello', locale: 'en', data: { title: 'Hi' } }))).toMatchObject({ message: 'kay: notes\'s loader declares no save, which saveEntry() hands the entry to' })
     expect(await rejection(removeEntry('notes', 'hello', 'en'))).toMatchObject({ message: 'kay: notes\'s loader declares no remove, which removeEntry() hands the entry to' })
@@ -369,13 +397,24 @@ describe('the collections a CMS edits', () => {
     registerEditSite(before)
 
     const served = (await pages({ ...options, prebuilt: false })).listen(0)
-    const registered = registerEditSite(undefined)
+    let running = true
 
-    registerEditSite(registered)
-    expect(registered).toBeDefined()
-    expect(registered).not.toBe(before)
-    await served.stop()
-    expect(registerEditSite(before)).toBeUndefined()
+    try {
+      const registered = registerEditSite(undefined)
+
+      registerEditSite(registered)
+      expect(registered).toBeDefined()
+      expect(registered).not.toBe(before)
+      await served.stop()
+      running = false
+      expect(registerEditSite(undefined)).toBeUndefined()
+    }
+    finally {
+      if (running)
+        await served.stop()
+
+      registerEditSite(before)
+    }
   })
 })
 
