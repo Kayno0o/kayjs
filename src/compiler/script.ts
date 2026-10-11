@@ -888,6 +888,41 @@ export function deprecatedSchemaNames(code: string, offset: number, renamable = 
   return diagnostics
 }
 
+const CSS_BINDING = /\bimport\b[^;'"]+from\s*['"][^'"\n]+\.css['"]/
+
+// A stylesheet imported for a value with no `with { type: 'text' }`, in `code` starting at `offset` of its file: kay types it as the text it gives with the attribute, which Bun gives only with it.
+export function cssImportsWithoutText(code: string, offset: number): Diagnostic[] {
+  if (!CSS_BINDING.test(code))
+    return []
+
+  let ast: ParseResult<t.File>
+
+  try {
+    ast = parse(code, { sourceType: 'module', plugins: ['typescript'], errorRecovery: true })
+  }
+  catch {
+    return []
+  }
+
+  return ast.program.body.flatMap((node) => {
+    if (node.type !== 'ImportDeclaration' || !node.source.value.endsWith('.css') || node.specifiers.length === 0 || node.importKind === 'type')
+      return []
+
+    if ((node.attributes ?? []).some(({ key, value }) => (key.type === 'Identifier' ? key.name : key.value) === 'type' && value.value === 'text'))
+      return []
+
+    return [{
+      start: offset + node.start!,
+      end: offset + node.end!,
+      code: 'css-import-without-text',
+      message: `${node.source.value} is imported for a value without \`with { type: 'text' }\``,
+      note: 'Bun gives such an import its text only with the attribute',
+      help: 'add `with { type: \'text\' }` for the file\'s text, or import it with no name for the page\'s stylesheets',
+      checkOnly: true,
+    }]
+  })
+}
+
 // Every `s.String(...)` call in a schema, with the name of the field it types, the nearest property holding it.
 function schemaStrings(node: t.Node | null | undefined, field: string | undefined, found: (call: t.CallExpression, field: string | undefined) => void): void {
   if (!node || typeof node.type !== 'string')

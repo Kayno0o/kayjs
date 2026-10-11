@@ -57,6 +57,7 @@ What the markup alone cannot tell, such as text too faint on its background, con
 | `redundant-alt` | warn | a11y | Alt text that is a filename or says it is an image. |
 | `constant-signal` | warn | islands | A signal the component script declares and only ever reads: it never changes, so a plain `const` renders the same without the reactivity. |
 | `deprecated-schema-name` | warn | code | `t` imported from `kay` for the schema builder, now `s`; `--fix` renames it, in `.kay` fences and the project's own modules alike. |
+| `css-import-without-text` | deny | code | A stylesheet imported for a value without `with { type: 'text' }`, whose value Bun and the compiled executable would give apart; in `.kay` fences and the project's own modules alike. |
 | `literal-tag` | warn | code | Template text holding an HTML tag, `p Press <kbd>Ctrl</kbd>`: text is escaped, so readers see the tag as written. Text inside `code`, `pre`, `kbd` and `samp`, an entity such as `&lt;kbd&gt;` and a name that is no element, as in `Array<string>`, are left alone. The quick fix writes a pair around plain text, or a void element, as `#[kbd Ctrl]`. |
 | `uncaught-await` | warn | code | An `await` block with no `catch` block: once its value rejects, the pending block goes with nothing in its place and the error only reaches the log. A `try` around it does not catch it, a streamed block settling after the page has rendered. |
 | `missing-site` | warn | seo | `seo` set with no `site`, in kay.config.ts or `SITE_URL`: no canonical links, `og:url`, sitemap or robots.txt. |

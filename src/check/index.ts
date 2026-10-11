@@ -27,7 +27,7 @@ import { componentName, rendersAsIsland, SourceMap } from '../compiler'
 import { formatReport } from '../compiler/frame'
 import { isLaunchLint, isLint, isLintGroup, LEVELS, lintLevels, typeLint } from '../compiler/lints'
 import { offsetAt, positionAt } from '../compiler/mapping'
-import { deprecatedSchemaNames } from '../compiler/script'
+import { cssImportsWithoutText, deprecatedSchemaNames } from '../compiler/script'
 import { CONFIG_FILE } from '../config'
 import { CONTENT_CONFIG, PROBLEMS_MARKER, USES_MARKER } from '../content/server'
 import { projectApi } from '../server/api'
@@ -629,7 +629,7 @@ export async function check(root: string, options: CheckOptions = {}): Promise<C
       diagnostics.push(remapped)
   }
 
-  diagnostics.push(...content.problems, ...messages, ...boot, ...await moduleSchemaNames(root, options.lints))
+  diagnostics.push(...content.problems, ...messages, ...boot, ...await moduleLints(root, options.lints))
 
   // A failing run that reported nothing must not pass for a clean one.
   if (code !== 0 && reported.length === 0 && errors.trim() === '')
@@ -638,15 +638,15 @@ export async function check(root: string, options: CheckOptions = {}): Promise<C
   return diagnostics
 }
 
-// The schema builder the project's own scripts import as `t`: the `deprecated-schema-name` lint, which the compiler finds in fences only.
-async function moduleSchemaNames(root: string, levels: LintLevels | undefined): Promise<CheckDiagnostic[]> {
+// The lints the compiler finds in fences, in the project's own scripts: the schema builder imported as `t`, and a stylesheet imported for a value with no text attribute.
+async function moduleLints(root: string, levels: LintLevels | undefined): Promise<CheckDiagnostic[]> {
   const files = (await findProjectFiles(root, SCRIPT_MODULE, { project: true, ownKayOnly: true })).filter(file => !DECLARATION_FILE.test(file))
   const found = await Promise.all(files.map(async (file) => {
     const source = await Bun.file(file).text()
     const levelAt = lintLevels(source, levels)
 
-    return deprecatedSchemaNames(source, 0).flatMap((diagnostic) => {
-      const level = levelAt('deprecated-schema-name', diagnostic.start)
+    return [...deprecatedSchemaNames(source, 0), ...cssImportsWithoutText(source, 0)].flatMap((diagnostic) => {
+      const level = isLint(diagnostic.code) ? levelAt(diagnostic.code, diagnostic.start) : 'deny'
 
       return level === 'allow' ? [] : [fromCompile(file, source, { ...diagnostic, severity: level === 'warn' ? 'warning' : 'error' })]
     })

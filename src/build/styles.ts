@@ -1,6 +1,8 @@
 import type { BunPlugin } from 'bun'
 import type { KayLibrary } from './libraries'
+import { readFileSync, statSync } from 'node:fs'
 import { dirname, sep } from 'node:path'
+import { withoutTwin } from '../compiler'
 import { parseKay } from '../compiler/parser'
 import { ASSET_FILE, classesFile, writeAsset } from './assets'
 import { collectionComponents, importedNames, rendersContent } from './collection-components'
@@ -13,10 +15,12 @@ const SCRIPT_FILE = /\.[cm]?[jt]sx?$/
 const CSS_FILE = /\.css$/
 const ABSOLUTE_URL = /^\//
 // `import css from './x.css' with { type: 'text' }` and its dynamic form: the file's text, read by the module, which no stylesheet build follows.
-const TEXT_IMPORT = /\bfrom\s*(['"])([^'"\n]+)\1\s*(?:with|assert)\s*\{\s*type\s*:\s*(['"])text\3\s*(?:,\s*)?\}|\bimport\(\s*(['"])([^'"\n]+)\4\s*,\s*\{\s*with\s*:\s*\{\s*type\s*:\s*(['"])text\6\s*(?:,\s*)?\}\s*(?:,\s*)?\}\s*\)/g
+const TEXT_IMPORT = /\bfrom\s*(['"])([^'"\n]+)\1\s*(?:with|assert)\s*\{[^}]*\btype\s*:\s*(['"])text\3[^}]*\}|\bimport\(\s*(['"])([^'"\n]+)\4\s*,\s*\{\s*with\s*:\s*\{[^}]*\btype\s*:\s*(['"])text\6[^}]*\}\s*(?:,\s*)?\}\s*\)/g
+const ANY = /.*/
+const CSS_TEXT = 'kay-css-text'
 
-// What `code` imports, but for its text imports: each one drops one import of its specifier, so the same file imported for its effect too still counts.
-function importedSpecifiers(code: string, loader: Bun.JavaScriptLoader): string[] {
+// The specifiers `code` imports as text, each with how many times.
+function textImports(code: string): Map<string, number> {
   const texts = new Map<string, number>()
 
   for (const match of code.matchAll(TEXT_IMPORT)) {
@@ -24,6 +28,13 @@ function importedSpecifiers(code: string, loader: Bun.JavaScriptLoader): string[
 
     texts.set(specifier, (texts.get(specifier) ?? 0) + 1)
   }
+
+  return texts
+}
+
+// What `code` imports, but for its text imports: each one drops one import of its specifier, so the same file imported for its effect too still counts.
+function importedSpecifiers(code: string, loader: Bun.JavaScriptLoader): string[] {
+  const texts = textImports(code)
 
   return transpilerFor(loader).scanImports(code).flatMap(({ path }) => {
     const left = texts.get(path) ?? 0
@@ -130,12 +141,23 @@ export function styleImports(root: string, libraries: KayLibrary[] = []): BunPlu
   }
 }
 
-// For the island and executable builds: stylesheets reach the page through the stylesheet build, so the code leaves them out. A stylesheet loads as its text, which an import for its effect leaves unused for the bundler to drop, and a text import, which Bun does not tell a plugin apart, reads.
+// For the island and executable builds: stylesheets reach the page through the stylesheet build, so the code leaves them out, but for a text import, which gives a module the file's text.
+// A plugin sees no import's attributes, so they are read in the importer; a text import resolves apart, as its own module, so the same file imported for its effect elsewhere still brings nothing.
 export function withoutStyles(): BunPlugin {
   return {
     name: 'kay-without-styles',
     setup(build) {
-      build.onLoad({ filter: CSS_FILE }, async ({ path }) => ({ contents: await Bun.file(path).text(), loader: 'text' }))
+      build.onResolve({ filter: CSS_FILE }, ({ path, importer }) => {
+        const file = withoutTwin(importer)
+
+        // Bun resolves some imports a second time from the importer's directory.
+        if (statSync(file, { throwIfNoEntry: false })?.isFile() !== true || !textImports(readFileSync(file, 'utf8')).has(path))
+          return undefined
+
+        return { path: Bun.resolveSync(path, dirname(file)), namespace: CSS_TEXT }
+      })
+      build.onLoad({ filter: ANY, namespace: CSS_TEXT }, async ({ path }) => ({ contents: await Bun.file(path).text(), loader: 'text' }))
+      build.onLoad({ filter: CSS_FILE }, () => ({ contents: '', loader: 'js' }))
     },
   }
 }

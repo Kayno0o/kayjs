@@ -215,6 +215,23 @@ describe('kay check, edge cases', () => {
     }
   })
 
+  it('refuses a stylesheet a module imports for a value without the text attribute', async () => {
+    const root = await scratchProject({
+      'src/routes/index.kay': 'p Home\n',
+      'src/theme.css': ':root { --brand: red }\n',
+      'src/mail.ts': 'import theme from \'./theme.css\'\nimport text from \'./theme.css\' with { type: \'text\' }\n\nexport const sizes = [theme.length, text.length]\n',
+    })
+
+    try {
+      const diagnostics = await check(root)
+
+      expect(diagnostics.map(d => [d.file.slice(root.length + 1), d.line, d.code, d.severity])).toEqual([['src/mail.ts', 1, 'css-import-without-text', 'error']])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('leaves a kay project nested inside, holding its own kay.config.ts, to its own check', async () => {
     const root = await scratchProject({
       'src/routes/index.kay': 'p Home\n',

@@ -20,7 +20,7 @@ article.card
 
 `@import`, nesting and relative `url()` assets work in the stylesheet.
 
-Imported `with { type: 'text' }`, a stylesheet is its text instead, a string in server code and in the executable `kay build --compile` writes, for a mail or a generated page to inline; it joins no page stylesheet.
+Imported `with { type: 'text' }`, a stylesheet is its text instead, a string in server code and in the executable `kay build --compile` writes, for a mail or a generated page to inline; it joins no page stylesheet. The text is the file as written, a Tailwind entry's `@import` lines included, not the CSS built from it, and an island importing it carries it in its script. A stylesheet imported under a name without the attribute is refused by `kay check` (`css-import-without-text`).
 
 ```ts
 import theme from './theme.css' with { type: 'text' }

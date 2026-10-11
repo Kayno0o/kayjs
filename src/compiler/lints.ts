@@ -188,6 +188,13 @@ export const LINTS = {
     wrong: '--- server\nimport { t } from \'kay\'\n\nexport const page = { query: t.Object({ page: t.Integer({ minimum: 1 }) }) }\n---\np Page',
     right: '--- server\nimport { s } from \'kay\'\n\nexport const page = { query: s.Object({ page: s.Integer({ minimum: 1 }) }) }\n---\np Page',
   },
+  'css-import-without-text': {
+    level: 'deny',
+    group: 'code',
+    summary: 'A stylesheet imported for a value with no `with { type: \'text\' }`: Bun gives its text only with the attribute, so the value differs between `kay dev` and the executable `kay build --compile` writes. Imported with no name, a stylesheet joins the page\'s stylesheets instead; found in `.kay` fences and `.ts` modules alike.',
+    wrong: '--- server\nimport theme from \'./theme.css\'\n---\np {theme.length}',
+    right: '--- server\nimport theme from \'./theme.css\' with { type: \'text\' }\n---\np {theme.length}',
+  },
   'positional-key': {
     level: 'warn',
     group: 'islands',

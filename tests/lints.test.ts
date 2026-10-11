@@ -113,6 +113,18 @@ describe('kay explain', () => {
   })
 })
 
+describe('css-import-without-text', () => {
+  it('refuses a stylesheet a fence imports for a value without the text attribute, leaving one imported for its effect or as text', () => {
+    const named = '--- server\nimport theme from \'./theme.css\'\nimport * as tokens from \'./tokens.css\'\nimport text from \'./text.css\' with { type: \'text\', other: \'x\' }\nimport \'./page.css\'\n\nconsole.log(theme, tokens, text)\n---\np x'
+
+    expect(lints(named)).toEqual([
+      { code: 'css-import-without-text', severity: 'error', at: 'import theme from \'./theme.css\'' },
+      { code: 'css-import-without-text', severity: 'error', at: 'import * as tokens from \'./tokens.css\'' },
+    ])
+    expect(lints(`---\n// kay-allow css-import-without-text\nimport theme from './theme.css'\n\nconst size = theme.length\n---\np {size}`)).toEqual([])
+  })
+})
+
 describe('deprecated-schema-name', () => {
   it('renames the schema builder imported as t in its fence, or imports s as t where the rename cannot reach', () => {
     const renamed = '--- server\nimport { action, t } from \'kay\'\n\ntype Query = typeof t\nexport const add = action(t.Object({ title: t.String({ maxLength: 9 }) }), async () => undefined)\n---\np x'

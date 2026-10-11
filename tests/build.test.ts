@@ -856,14 +856,17 @@ describe('the files a build writes', () => {
 })
 
 describe('a stylesheet imported as text', () => {
-  it('reads the file under Bun and in the executable, types as a string in kay check, and stays out of the page\'s stylesheets', async () => {
+  it('reads the file under Bun, in the executable and in an island, types as a string in kay check, and stays out of the page\'s stylesheets', async () => {
     const root = await scratchProject({
       'tsconfig.json': tsconfig,
       'kay.config.ts': 'export default { favicon: false }\n',
       'src/theme.css': ':root { --brand: #123456 }\n.themed { color: red }\n',
       'src/app.css': '.app { color: blue }\n',
-      'src/routes/index.kay': '---\nimport \'../app.css\'\n---\n--- server\nimport theme from \'../theme.css\' with { type: \'text\' }\n\nconst size: number = theme.length\n---\np.size {size}\n',
-      'src/server.ts': 'import process from \'node:process\'\nimport { Elysia } from \'elysia\'\nimport { pages } from \'kay/server\'\nimport theme from \'./theme.css\' with { type: \'text\' }\n\nconst app = new Elysia().use(await pages({ security: false }))\nconst page = await (await app.handle(new Request(\'http://localhost/\'))).text()\n\nconsole.log(JSON.stringify({ theme, page: /<p class="size">(\\d+)<\\/p>/.exec(page)?.[1] }))\nprocess.exit(0)\n',
+      'src/later.css': '.later { color: green }\n',
+      'src/badge.css': '.badge-text { color: gold }\n',
+      'src/badge.kay': '---\nimport { signal } from \'kay\'\nimport badge from \'./badge.css\' with { type: \'text\' }\n\nconst on = signal(false)\n---\nbutton(onClick={() => on.set(o => !o)}) {on() ? badge : badge.length}\n',
+      'src/routes/index.kay': '---\nimport \'../app.css\'\nimport Badge from \'../badge.kay\'\n---\n--- server\nimport theme from \'../theme.css\' with { type: \'text\' }\n\nconst size: number = theme.length\n---\np.size {size}\nBadge\n',
+      'src/server.ts': 'import process from \'node:process\'\nimport { Elysia } from \'elysia\'\nimport { pages } from \'kay/server\'\nimport theme from \'./theme.css\' with { type: \'text\' }\n\nconst { default: later } = await import(\'./later.css\', { with: { type: \'text\' } })\nconst app = new Elysia().use(await pages({ security: false }))\nconst page = await (await app.handle(new Request(\'http://localhost/\'))).text()\n\nconsole.log(JSON.stringify({ theme, later, page: /<p class="size">(\\d+)<\\/p>/.exec(page)?.[1] }))\nprocess.exit(0)\n',
     })
     const theme = await Bun.file(join(root, 'src/theme.css')).text()
     const read = async (command: string[]) => {
@@ -872,7 +875,7 @@ describe('a stylesheet imported as text', () => {
 
       expect({ code, errors }).toEqual({ code: 0, errors: expect.any(String) })
 
-      return JSON.parse(output.trim().split('\n').at(-1)!) as { theme: string, page: string }
+      return JSON.parse(output.trim().split('\n').at(-1)!) as { theme: string, later: string, page: string }
     }
 
     try {
@@ -881,13 +884,22 @@ describe('a stylesheet imported as text', () => {
 
       expect(report).not.toContain('error')
       expect(code).toBe(0)
-      expect(await read([join(root, 'server')])).toEqual({ theme, page: String(theme.length) })
-      expect(await read([process.execPath, 'src/server.ts'])).toEqual({ theme, page: String(theme.length) })
+      const expected = { theme, later: '.later { color: green }\n', page: String(theme.length) }
 
-      const styles = await Promise.all((await readdir(clientDir(root), { recursive: true })).filter(name => name.endsWith('.css')).map(async name => Bun.file(join(clientDir(root), name)).text()))
+      expect(await read([join(root, 'server')])).toEqual(expected)
+      expect(await read([process.execPath, 'src/server.ts'])).toEqual(expected)
+      // A stylesheet imported for its effect leaves no text behind in the code.
+      expect((await Bun.file(join(root, 'server')).text()).includes('.app { color')).toBe(false)
 
-      expect(styles.join('')).toContain('.app')
-      expect(styles.join('')).not.toContain('themed')
+      const files = await readdir(clientDir(root), { recursive: true })
+      const joined = async (extension: string) => (await Promise.all(files.filter(name => name.endsWith(extension)).map(async name => Bun.file(join(clientDir(root), name)).text()))).join('')
+      const [styles, scripts] = await Promise.all([joined('.css'), joined('.js')])
+
+      expect(styles).toContain('.app')
+      expect(styles).not.toContain('themed')
+      expect(styles).not.toContain('badge-text')
+      expect(scripts).toContain('.badge-text { color: gold }')
+      expect(scripts).not.toContain('.app { color')
     }
     finally {
       await rm(root, { recursive: true, force: true })
