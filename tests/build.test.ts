@@ -1220,7 +1220,7 @@ describe('a compiled server with an editor', () => {
     const secret = 'a-preview-secret-long-enough-for-kay-0123456789'
     const root = await scratchProject({
       'tsconfig.json': tsconfig,
-      'kay.config.ts': `export default { favicon: false, preview: { secret: '${secret}' }, extensions: [{ name: 'lib', editor: 'lib/editor.kay' }] }\n`,
+      'kay.config.ts': `export default { favicon: false, preview: { secret: '${secret}' }, extensions: [{ name: 'lib', editor: \`\${import.meta.dir}/lib/editor.kay\` }] }\n`,
       'lib/editor.css': '.edited { outline: 1px dashed teal }\n',
       'lib/editor.kay': '---\nimport { signal } from \'kay\'\nimport \'./editor.css\'\n\nconst clicks = signal(0)\n---\nbutton.edited(onClick={() => clicks.set(n => n + 1)}) Edit {clicks()}\n',
       'src/routes/index.kay': 'h1 Home\n',
