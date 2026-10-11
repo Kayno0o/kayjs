@@ -74,7 +74,7 @@ const LOADING = Symbol.for('kay-bench-sites-config')
 export const WORK = join(process.env.XDG_CACHE_HOME ?? join(homedir(), '.cache'), 'kay-bench-sites')
 
 // None without a config, which run.ts reports, and none in a copy the config itself imports; the bench's tests read none.
-export const SITES: Site[] = existsSync(CONFIG) && !(LOADING in globalThis) ? await sitesOf(CONFIG) : []
+export const SITES: Site[] = existsSync(CONFIG) && !Reflect.has(globalThis, LOADING) ? await sitesOf(CONFIG) : []
 export const NO_SITES = `no sites to measure: write ${CONFIG} after ${EXAMPLE}, or pass --config <file>`
 
 // `KIND=kay` measures the kay side only, keeping the Astro figures of an earlier run; the ports stay those of a full run.

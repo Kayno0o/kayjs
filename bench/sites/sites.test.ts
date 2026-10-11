@@ -1,5 +1,5 @@
 import type { Site, Variant } from './sites'
-import { copyFileSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
@@ -32,16 +32,30 @@ describe('envOf', () => {
 })
 
 describe('SITES', () => {
-  it('loads a config importing another checkout\'s copy of sites.ts, which reads none itself', () => {
+  // Loads `sites.ts` in a child under a config of `source`, printing its sites and whether the loading flag outlived the load.
+  function load(source: string): { code: number | null, out: string } {
     const dir = mkdtempSync(join(tmpdir(), 'kay-bench-config-'))
     const config = join(dir, 'sites.config.ts')
 
-    mkdirSync(join(dir, 'other'))
-    copyFileSync(join(import.meta.dir, 'sites.ts'), join(dir, 'other/sites.ts'))
-    writeFileSync(config, `import { SITES } from './other/sites'\n\nexport default [{ name: \`bakery \${SITES.length}\`, repo: '.', astro: '', pages: [] }]\n`)
+    try {
+      mkdirSync(join(dir, 'other'))
+      copyFileSync(join(import.meta.dir, 'sites.ts'), join(dir, 'other/sites.ts'))
+      writeFileSync(config, source)
 
-    const child = Bun.spawnSync([process.execPath, '-e', `const { SITES } = await import(${JSON.stringify(join(import.meta.dir, 'sites.ts'))}); console.log(SITES.map(site => site.name).join())`], { env: { ...process.env, SITES_CONFIG: config }, timeout: 5000 })
+      const child = Bun.spawnSync([process.execPath, '-e', `const names = await import(${JSON.stringify(join(import.meta.dir, 'sites.ts'))}).then(module => module.SITES.map(site => site.name).join(), error => error.message); console.log(names, Reflect.has(globalThis, Symbol.for('kay-bench-sites-config')))`], { env: { ...process.env, SITES_CONFIG: config }, timeout: 3000 })
 
-    expect({ code: child.exitCode, out: child.stdout.toString().trim() }).toEqual({ code: 0, out: 'bakery 0' })
+      return { code: child.exitCode, out: child.stdout.toString().trim() }
+    }
+    finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  }
+
+  it('loads a config importing another checkout\'s copy of sites.ts, which reads none itself', () => {
+    expect(load(`import { SITES } from './other/sites'\n\nexport default [{ name: \`bakery \${SITES.length}\`, repo: '.', astro: '', pages: [] }]\n`)).toEqual({ code: 0, out: 'bakery 0 false' })
+  })
+
+  it('clears the loading flag when the config throws', () => {
+    expect(load(`throw new Error('broken config')\n`)).toEqual({ code: 0, out: 'broken config false' })
   })
 })
