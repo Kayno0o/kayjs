@@ -100,9 +100,11 @@ export function pageResponder({ client, renderOptions, prerendered, settings, tr
   return async (route, params, context, url) => {
     const render = async () => renderPage(route, context, params, client, renderOptions)
 
+    const preview = previewRequested(context.request)
+
     // Drafts shown, past any prerendered or cached copy.
-    if (previewRequested(context.request))
-      return forVisitor(async () => inPreview(render))
+    if (preview !== undefined)
+      return forVisitor(async () => inPreview(render, preview === 'edit'))
 
     const key = prerenderKey(settings, localeState()?.locale, canonicalPath(withoutSlash(url.pathname)))
     const page = prerendered.get(route.pattern)?.get(key)

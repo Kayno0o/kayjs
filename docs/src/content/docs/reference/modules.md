@@ -33,6 +33,7 @@ import { collection } from 'kay/content'
 | `sanitizeHtml`, `trustHtml` | Clean untrusted HTML, or mark HTML as safe to render |
 | `uid` | A unique id that matches between server and browser |
 | `previewing` | Whether the visitor is in preview mode |
+| `editing` | Whether the visitor is in edit mode, a CMS editing content on the page |
 | `logFrom` | A library's log, `logFrom('my-library').error(message, error)`, written where the app's `log` setting sends kay's messages, or to the console as `[my-library] message` outside a server |
 
 Types include `Component`, `Signal`, `Guard`, `Duration`, `PageContext`, `EndpointContext`, `EndpointBody` and `Locals`.
@@ -52,7 +53,7 @@ Types include `Component`, `Signal`, `Guard`, `Duration`, `PageContext`, `Endpoi
 | `queue`, `memoryJobs`, `sqliteJobs` | Durable jobs with retries |
 | `rooms`, `memoryRooms`, `sqliteRooms` | Websocket rooms |
 | `invalidatePage` | Rebuilds a prerendered page |
-| `enterPreview`, `exitPreview`, `previewUrl` | Preview mode for drafts |
+| `enterPreview`, `exitPreview`, `previewUrl` | Preview mode for drafts, edit mode with `{ edit: true }` |
 | `renderToString` | Renders a component to a string, for mails and feeds |
 | `processImage`, `imageSize` | Resize or measure an image |
 | `files`, `diskFiles`, `s3Files`, `memoryFiles` | Stored uploads and their stores. See [File storage](/guides/file-storage) |

@@ -8,10 +8,11 @@ import { collection } from '../src/content'
 import { ContentError } from '../src/content/validate'
 import { resolveProject } from '../src/project'
 import { cached } from '../src/runtime/cache'
+import { editing, previewing } from '../src/runtime/preview'
 import { enterPreview, pages, previewUrl } from '../src/server'
 import { readClient, readManifest, writeManifest } from '../src/server/client'
 import { prerenderPages } from '../src/server/prerender'
-import { inPreview } from '../src/server/preview'
+import { inPreview, previewRequested } from '../src/server/preview'
 import { cms, resetCms } from './fixtures/cms/src/cms'
 import { news } from './fixtures/cms/src/content.config'
 
@@ -164,6 +165,33 @@ describe('preview mode', () => {
 
     setSystemTime(new Date(Date.now() + 2 * 60 * 60_000))
     expect(await refuse(link)).toBe(403)
+  })
+
+  it('puts a visitor in edit mode through the secret, a signed link or a guard, signed apart from preview mode so neither turns into it', async () => {
+    const mode = (cookie: string) => previewRequested(new Request('http://localhost/', { headers: { cookie } }))
+    const bySecret = await previewCookie(`/_kay/preview?path=/news&edit&secret=${SECRET}`)
+    const link = previewUrl('/news', { edit: true })
+    const cookies = new Bun.CookieMap()
+
+    enterPreview({ cookies, request: new Request('http://localhost/') }, { edit: true })
+
+    expect(bySecret).toMatch(/^kay_preview=\d+\.edit\.[\w-]+$/)
+    expect(mode(bySecret)).toBe('edit')
+    expect(link).toContain('&edit=&sig=')
+    expect(mode(await previewCookie(link))).toBe('edit')
+    expect(mode(`kay_preview=${cookies.get('kay_preview')}`)).toBe('edit')
+    expect(mode(await previewCookie(`/_kay/preview?path=/news&secret=${SECRET}`))).toBe('preview')
+
+    const preview = await previewCookie(previewUrl('/news'))
+    const [until, sig] = preview.slice('kay_preview='.length).split('.')
+
+    expect(mode(`kay_preview=${until}.edit.${sig}`)).toBeUndefined()
+    expect(mode(bySecret.replace('.edit.', '.'))).toBeUndefined()
+    expect((await app.handle(new Request(`http://localhost${previewUrl('/news')}&edit`))).status).toBe(403)
+    expect((await get('/news', bySecret)).headers.get('cache-control')).toBe('private, no-store')
+    expect([previewing(), editing()]).toEqual([false, false])
+    expect(inPreview(() => [previewing(), editing()], true)).toEqual([true, true])
+    expect(inPreview(() => [previewing(), editing()])).toEqual([true, false])
   })
 
   it('shows drafts to that visitor alone, from a fresh load no cache keeps, until the cookie runs out or they leave', async () => {
