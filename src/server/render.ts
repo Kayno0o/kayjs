@@ -21,6 +21,7 @@ import process from 'node:process'
 import { browserOnlyHint, mappedStack } from '../build/sourcemap'
 import { collectForms, OUTCOME_SCRIPT } from '../runtime/action'
 import { escapeAttribute } from '../runtime/escape'
+import { editMarks, placeFieldMarks, withFieldMarks } from '../runtime/fields'
 import { collectHead } from '../runtime/head'
 import { component, newServerIslands, withServerIslands } from '../runtime/html'
 import { textDirection } from '../runtime/i18n'
@@ -588,7 +589,9 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
   const view = viewOf(modules, data)
   // A prerendered page holds each server island between marks the server splits it at.
   const scan = options.prerendering ? newServerIslands(true) : undefined
-  const { result: { result: { html: body, islands, deferred }, head }, forms } = collectForms(() => collectHead(() => scan ? withServerIslands(scan, () => renderStatic(view)) : renderStatic(view), pageHead(modules[page]!, options.head?.(rendering.ctx.url, rendering.status))))
+  // In edit mode the page's markup is marked with the fields of the entries it renders, once whole.
+  const marks = editMarks()
+  const { result: { result: { html: body, islands, deferred }, head }, forms } = withFieldMarks(marks, () => collectForms(() => collectHead(() => scan ? withServerIslands(scan, () => renderStatic(view)) : renderStatic(view), pageHead(modules[page]!, options.head?.(rendering.ctx.url, rendering.status)))))
   const streamed = deferred.length > 0
   const hasIslands = client.entry !== undefined && islands.count > 0
   // A page posting forms to actions loads the entry too, which sends them without a reload; a page with neither still ships no JavaScript, and links from it load pages, losing no state.
@@ -598,7 +601,8 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
   const scripts = shipsEntry ? islandScripts(client, islands.eager, streamed, hasIslands) + (posts ? formsScript(forms) : '') + workScript(forms, options.prerendering === true) : ''
   const lang = localeState()?.locale ?? options.lang ?? DEFAULT_LANG
   const islandData = hasIslands ? messagesScript(islands.messages, true) + outcomeScript(rendering.outcome()) + queryScript(rules) : ''
-  const start = `${htmlOpen(lang)}<head>${headStart(head)}${stylesheets(client, files)}${head.html}${scripts}${islandData}${kayMetas(options, hasIslands)}${speculationRules(options.prefetch, options.base)}${options.offline ? registerScript(options.base ?? '') : ''}${options.dev ? devScripts(client) : ''}</head><body>${body}`
+  const written = `${htmlOpen(lang)}<head>${headStart(head)}${stylesheets(client, files)}${head.html}${scripts}${islandData}${kayMetas(options, hasIslands)}${speculationRules(options.prefetch, options.base)}${options.offline ? registerScript(options.base ?? '') : ''}${options.dev ? devScripts(client) : ''}</head><body>${body}`
+  const start = marks === undefined ? written : placeFieldMarks(written, marks)
 
   if (!streamed)
     return `${start}</body></html>`

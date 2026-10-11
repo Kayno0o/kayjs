@@ -7,6 +7,7 @@ import type { Segment } from './markdown'
 import type { ContentProblem } from './validate'
 import { dirname, relative } from 'node:path'
 import { projectPaths } from '../project'
+import { nameCollection } from '../runtime/fields'
 import { localePath } from '../runtime/i18n'
 import { runInLocale } from '../runtime/locale-state'
 import { importModule } from '../server/bundle'
@@ -71,7 +72,12 @@ async function namedCollections(root: string, config?: string): Promise<[string,
 
   const module = await importModule<Record<string, unknown>>(file)
 
-  return Object.entries(module).filter((entry): entry is [string, Collection<unknown>] => isCollection(entry[1]))
+  const collections = Object.entries(module).filter((entry): entry is [string, Collection<unknown>] => isCollection(entry[1]))
+
+  for (const [exported, collection] of collections)
+    nameCollection(collection.name, exported)
+
+  return collections
 }
 
 // Compiles every collection from its files and writes what the server reads in production, failing on the first collection with a bad entry. A loader's collection is read when the server runs.

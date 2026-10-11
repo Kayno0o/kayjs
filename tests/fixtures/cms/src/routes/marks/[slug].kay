@@ -1,0 +1,15 @@
+--- server
+import { news } from '../../content.config'
+
+const entry = await news.get(ctx.params.slug) ?? ctx.notFound()
+const { Content } = entry
+---
+h1 {entry.data.title}
+p Posted as {entry.data.title}
+img(src="/cover.png" alt={entry.data.title})
+ul
+  for tag of entry.data.tags
+    li {tag}
+textarea Draft: {entry.data.title}
+article
+  Content

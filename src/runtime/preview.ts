@@ -1,7 +1,10 @@
+import type { FieldMarks } from './fields'
+
 // What a request in preview mode carries while it renders: each loaded collection's entries, loaded once per request, and whether it is in edit mode.
 export interface PreviewState {
   loads: Map<unknown, Promise<unknown>>
   edit: boolean
+  marks?: FieldMarks
 }
 
 export type PreviewMode = 'preview' | 'edit'

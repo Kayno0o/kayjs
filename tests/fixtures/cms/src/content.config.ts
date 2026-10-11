@@ -7,10 +7,10 @@ export const news = collection({
   load: ({ preview }) => {
     cms.loads.push(preview)
 
-    return cms.entries.map(entry => ({ slug: entry.slug, data: { title: entry.title, published: entry.published }, body: entry.body }))
+    return cms.entries.map(entry => ({ slug: entry.slug, data: { title: entry.title, published: entry.published, tags: entry.slug.split('-') }, body: entry.body }))
   },
 }, {
-  schema: t.Object({ title: t.String(), published: t.Boolean() }),
+  schema: t.Object({ title: t.String(), published: t.Boolean(), tags: t.Array(t.String()) }),
   draft: entry => !entry.data.published,
   feed: { path: '/news/rss.xml', title: 'News', item: entry => ({ title: entry.data.title, path: `/news/${entry.slug}`, date: new Date(0) }) },
 })

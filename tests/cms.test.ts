@@ -8,6 +8,8 @@ import { collection } from '../src/content'
 import { ContentError } from '../src/content/validate'
 import { resolveProject } from '../src/project'
 import { cached } from '../src/runtime/cache'
+import { editableEntry, editMarks, placeFieldMarks, withFieldMarks } from '../src/runtime/fields'
+import { child } from '../src/runtime/html'
 import { editing, previewing } from '../src/runtime/preview'
 import { editRequested, enterPreview, pages, previewUrl } from '../src/server'
 import { readClient, readManifest, writeManifest } from '../src/server/client'
@@ -198,6 +200,38 @@ describe('preview mode', () => {
     expect([previewing(), editing()]).toEqual([false, false])
     expect(inPreview(() => [previewing(), editing()], true)).toEqual([true, true])
     expect(inPreview(() => [previewing(), editing()])).toEqual([true, false])
+  })
+
+  it('marks in edit mode the markup each field and body renders, the same page byte for byte outside it', async () => {
+    const edit = await previewCookie(`/_kay/preview?path=/news&edit&secret=${SECRET}`)
+    const preview = await previewCookie(`/_kay/preview?path=/news&secret=${SECRET}`)
+    const { html } = await get('/marks/launch', edit)
+
+    expect(html).toContain('<h1 data-kay-field="news:launch:title">Launch day</h1>')
+    expect(html).toContain('<p>Posted as <!--kay-field news:launch:title-->Launch day<!--/kay-field--></p>')
+    expect(html).toContain('<img src="/cover.png" alt="Launch day" data-kay-field-alt="news:launch:title">')
+    expect(html).toContain('<ul data-kay-list="news:launch:tags"><li data-kay-field="news:launch:tags.0">launch</li></ul>')
+    expect(html).toContain('<textarea>Draft: Launch day</textarea>')
+    expect(html).toContain('<article data-kay-body="news:launch"><h2 id="what-ships">')
+    expect(html).not.toMatch(/[\uE000-\uE004]/)
+    expect((await get('/news', edit)).html).toContain('<li data-kay-field="news:roadmap:title">Next year</li>')
+
+    const plain = (await get('/marks/launch', preview)).html
+
+    expect(plain).not.toContain('kay-field')
+    expect(plain).not.toContain('kay-body')
+    expect(plain).toBe((await get('/marks/launch')).html)
+  })
+
+  it('marks a number once, a body around what it holds, and nothing written into a tag some other way or rendered by an island', () => {
+    inPreview(() => {
+      const marks = editMarks()!
+      const entry = editableEntry(marks, 'news', { slug: 'a', data: { title: 'T', count: 3, at: new Date(0) }, Content: () => ({ t: '<p>x</p>' }) })
+      const html = withFieldMarks(marks, () => `<div>${child(entry.data.title)}</div><div>${child(entry.data.count)} ${child(3)}</div><a title="${child(entry.data.title)}">${withFieldMarks(undefined, () => child(entry.data.title))}</a><section>${child(entry.Content())}</section>`)
+
+      expect(entry.data.at).toBeInstanceOf(Date)
+      expect(placeFieldMarks(html, marks)).toBe('<div data-kay-field="news:a:title">T</div><div><!--kay-field news:a:count-->3<!--/kay-field--> 3</div><a title="T">T</a><section data-kay-body="news:a"><p>x</p></section>')
+    }, true)
   })
 
   it('shows drafts to that visitor alone, from a fresh load no cache keeps, until the cookie runs out or they leave', async () => {

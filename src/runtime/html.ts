@@ -4,6 +4,7 @@
 import type { FieldSchema } from './form'
 import { isAction } from './action'
 import { escape, escapeAttribute } from './escape'
+import { fieldMarks, markedAttribute, markedList, markedText, withFieldMarks } from './fields'
 import { nativeConstraints } from './form'
 import { localizedLink } from './i18n'
 import { imageSource } from './image'
@@ -50,10 +51,10 @@ const HREFLANG = /\shreflang=/i
 // A child value's markup: text escaped, any other object as the markup it holds.
 export function child(value: unknown): string {
   if (typeof value === 'string')
-    return escape(value)
+    return fieldMarks.marking === undefined ? escape(value) : markedText(value, escape(value))
 
   if (typeof value === 'number')
-    return String(value)
+    return fieldMarks.marking === undefined ? String(value) : markedText(value, String(value))
 
   let markup = ''
 
@@ -89,7 +90,9 @@ export function attribute(name: string, value: unknown): string {
   if (given === false)
     return ''
 
-  return given === true ? ` ${name}` : ` ${name}="${escapeAttribute(safeUrl(name, given))}"`
+  const markup = given === true ? ` ${name}` : ` ${name}="${escapeAttribute(safeUrl(name, given))}"`
+
+  return fieldMarks.marking === undefined ? markup : markup + markedAttribute(name, value)
 }
 
 // A link of the site in the locale of the page rendering it; see `localizedLink`.
@@ -340,9 +343,16 @@ export function show<T>(value: T, render: (value: () => NonNullable<T>) => strin
 // A `for`: each row's markup, or the fallback's when there is nothing to list.
 // In an island a row reads its item, and a keyed row its index, through functions, as the browser build of the same template does.
 export function loop<T>(each: readonly T[] | null | undefined | false, render: (item: T | (() => T), index: number | (() => number)) => string, fallback?: () => string, accessors?: 'keyed' | 'positional'): string {
-  if (each == null || each === false || each.length === 0)
-    return fallback?.() ?? ''
+  if (each == null || each === false || each.length === 0) {
+    const markup = fallback?.() ?? ''
 
+    return fieldMarks.marking === undefined || each == null || each === false ? markup : markedList(each, markup)
+  }
+
+  return fieldMarks.marking === undefined ? rows(each, render, accessors) : markedList(each, rows(each, render, accessors))
+}
+
+function rows<T>(each: readonly T[], render: (item: T | (() => T), index: number | (() => number)) => string, accessors?: 'keyed' | 'positional'): string {
   let markup = ''
 
   for (let index = 0; index < each.length; index++) {
@@ -378,6 +388,12 @@ export function selectOptions(value: unknown, markup: string, only = false): str
 
 // An `img` source, with the variants, `sizes` and size of an imported image.
 export function imageAttributes(src: unknown, sized: boolean, sizes?: unknown): string {
+  if (fieldMarks.marking !== undefined) {
+    const mark = markedAttribute('src', src)
+
+    return withFieldMarks(undefined, () => imageAttributes(src, sized, sizes)) + mark
+  }
+
   let markup = ''
 
   for (const [name, value] of Object.entries(imageSource(src, sized, sizes)))

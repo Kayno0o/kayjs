@@ -9,6 +9,7 @@ import type { Heading, Highlighter, Segment } from './markdown'
 import type { ContentProblem } from './validate'
 import { cached, invalidate } from '../runtime/cache'
 import { durationSeconds } from '../runtime/duration'
+import { editableEntries } from '../runtime/fields'
 import { child, localLinks } from '../runtime/html'
 import { localeState } from '../runtime/locale-state'
 import { previewing, previewState } from '../runtime/preview'
@@ -204,22 +205,21 @@ export function collection<Schema extends TSchema, Components extends Record<str
       const wanted = localized ? locale ?? localeState()?.locale : undefined
 
       if (wanted === undefined)
-        return list.filter(entry => !hidden(entry))
+        return editableEntries(name, list.filter(entry => !hidden(entry)))
 
       const own = byLocale.get(wanted)
       const fallback = localeState()?.settings.defaultLocale
 
-      return list.filter(entry => !hidden(entry) && (entry.locale === wanted || (entry.locale === fallback && shown(own?.get(entry.slug)) === undefined)))
+      return editableEntries(name, list.filter(entry => !hidden(entry) && (entry.locale === wanted || (entry.locale === fallback && shown(own?.get(entry.slug)) === undefined))))
     },
     get: async (slug, locale) => {
       const { bySlug, byLocale } = await loaded()
       const wanted = localized ? locale ?? localeState()?.locale : undefined
       const fallback = localeState()?.settings.defaultLocale
 
-      if (wanted === undefined)
-        return shown(bySlug.get(slug))
+      const found = wanted === undefined ? shown(bySlug.get(slug)) : shown(byLocale.get(wanted)?.get(slug)) ?? (fallback === undefined ? undefined : shown(byLocale.get(fallback)?.get(slug)))
 
-      return shown(byLocale.get(wanted)?.get(slug)) ?? (fallback === undefined ? undefined : shown(byLocale.get(fallback)?.get(slug)))
+      return found && editableEntries(name, [found])[0]
     },
     invalidate: () => {
       loading = undefined
