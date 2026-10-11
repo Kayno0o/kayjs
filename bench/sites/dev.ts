@@ -5,7 +5,7 @@ import { rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { median, milliseconds, table } from '../format'
 import { ensureFree, killAll, processesIn, processTree, tracked, treeCpu, treeMemory } from './serve'
-import { kayIn, label, VARIANTS, versionIn } from './sites'
+import { BUNX, kayIn, label, VARIANTS, versionIn } from './sites'
 
 type EditKind = 'template' | 'style' | 'server'
 type Memory = ReturnType<typeof treeMemory>
@@ -188,7 +188,7 @@ function spawnDev(variant: Variant): Subprocess {
 
   freshLogs(variant.devDir)
 
-  return tracked(Bun.spawn(variant.kind === 'astro' ? [process.execPath, 'x', '--bun', 'astro', 'dev', '--port', port, '--host', '127.0.0.1'] : [process.execPath, 'x', 'kay', 'dev', '--port', port], {
+  return tracked(Bun.spawn(variant.kind === 'astro' ? [...BUNX, 'astro', 'dev', '--port', port, '--host', '127.0.0.1'] : [...BUNX, 'kay', 'dev', '--port', port], {
     cwd: variant.devDir,
     stdout: Bun.file(join(variant.devDir, 'dev.out.log')),
     stderr: Bun.file(join(variant.devDir, 'dev.err.log')),

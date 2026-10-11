@@ -231,14 +231,14 @@ describe('kay check, edge cases', () => {
       'p {doubled !== undefined && doubled + 1}',
       'button(onClick={() => sent.set(1)}) {sent * 2}',
       'p {sent.toFixed(1)} {sent?.toFixed(1)}',
-      'button(onClick={() => { if (sent !== undefined) { sent = undefined; console.log(sent * 2) } }}) Reset',
+      'button(onClick={() => { if (sent !== undefined) console.log(sent * 2) }}) Log',
       'p {sent !== undefined && [1, 2].map(i => sent * i)}',
       '',
     ].join('\n')
     const root = await scratchProject({ 'src/components/meter.kay': meter })
 
     try {
-      expect((await check(root)).map(d => [d.line, d.column, d.code, d.message])).toEqual([[13, 38, 'TS2532', 'Object is possibly \'undefined\'.'], [14, 4, 'TS2532', 'Object is possibly \'undefined\'.'], [15, 81, 'TS2532', 'Object is possibly \'undefined\'.'], [16, 42, 'TS2532', 'Object is possibly \'undefined\'.']])
+      expect((await check(root)).map(d => [d.line, d.column, d.code, d.message])).toEqual([[13, 38, 'TS2532', 'Object is possibly \'undefined\'.'], [14, 4, 'TS2532', 'Object is possibly \'undefined\'.'], [15, 61, 'TS2532', 'Object is possibly \'undefined\'.'], [16, 42, 'TS2532', 'Object is possibly \'undefined\'.']])
     }
     finally {
       await rm(root, { recursive: true, force: true })

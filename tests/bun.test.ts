@@ -8,14 +8,24 @@ import { scratchDir } from './scratch'
 
 describe('the Bun kay runs on', () => {
   it('meets the engines of kay\'s package.json, a canary counting as its release', () => {
-    expect(engines.bun).toBe('>=1.4.3')
-    expect(bunProblem('1.4.3', '/usr/bin/bun')).toBeUndefined()
-    expect(bunProblem('1.4.4-canary.1+6c1eb067e', '/usr/bin/bun')).toBeUndefined()
-    expect(bunProblem('1.4.2', '/usr/bin/bun')).toBe('kay needs Bun >=1.4.3, and runs on Bun 1.4.2 at /usr/bin/bun: run `bun upgrade`')
+    const floor = engines.bun.replace('>=', '')
+
+    expect(bunProblem({ version: floor })).toBeUndefined()
+    expect(bunProblem({ version: '1.4.4-canary.1+6c1eb067e', range: '>=1.4.3' })).toBeUndefined()
+    expect(bunProblem({ version: '1.4.2', path: '/usr/bin/bun', range: '>=1.4.3' })).toBe('Bun 1.4.2 at /usr/bin/bun is under the >=1.4.3 kay needs: run `bun upgrade`')
   })
 
-  it('names the npm bun package a dependency installed as the one to update', () => {
-    expect(bunProblem('1.4.2', '/app/node_modules/bun/bin/bun.exe')).toBe('kay needs Bun >=1.4.3, and runs on Bun 1.4.2 at /app/node_modules/bun/bin/bun.exe: a dependency installed the npm `bun` package, which package scripts run ahead of the system Bun; run `bun update bun`')
+  it('names the npm bun package of the project, or of a workspace above it, as the one to update, not a global one', () => {
+    const npmBun = 'a dependency installed the npm `bun` package, which package scripts run ahead of the system Bun; run `bun update bun`'
+    const fix = (path: string, cwd: string) => {
+      const problem = bunProblem({ version: '1.4.2', path, cwd, range: '>=1.4.3' })!
+
+      return problem.slice(problem.indexOf(' kay needs: ') + ' kay needs: '.length)
+    }
+
+    expect(fix('/app/node_modules/bun/bin/bun.exe', '/app')).toBe(npmBun)
+    expect(fix('/repo/node_modules/bun/bin/bun.exe', '/repo/sites/blog')).toBe(npmBun)
+    expect(fix('/usr/lib/node_modules/bun/bin/bun.exe', '/app')).toBe('run `bun upgrade`')
   })
 
   it('is refused by the CLI and by pages() under the floor', async () => {
@@ -27,7 +37,7 @@ describe('the Bun kay runs on', () => {
       await cp(join(import.meta.dir, '../src'), join(dir, 'src'), { recursive: true })
       await Bun.write(join(dir, 'package.json'), JSON.stringify({ ...manifest, engines: { bun: '>=99.0.0' } }))
       // The fix it names depends on which Bun runs the tests, the system one or the npm package.
-      const refused = `kay: kay needs Bun >=99.0.0, and runs on Bun ${Bun.version} at ${process.execPath}: `
+      const refused = `kay: Bun ${Bun.version} at ${process.execPath} is under the >=99.0.0 kay needs: `
       const run = async (...args: string[]) => {
         const child = Bun.spawn([process.execPath, ...args], { cwd: dir, stdout: 'pipe', stderr: 'pipe' })
         const [stderr, code] = await Promise.all([new Response(child.stderr).text(), child.exited])

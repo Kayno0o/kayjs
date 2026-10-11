@@ -96,6 +96,9 @@ function oneOf<const Value extends string>(name: string, values: readonly Value[
   return value as Value
 }
 
+// A package's bin run by the Bun running the bench: without `--bun`, a `bun` shebang finds the npm `bun` a plugin's peer dependency installs, first on the bin's PATH.
+export const BUNX = [process.execPath, 'x', '--bun']
+
 export function run(cmd: string[], cwd: string, env: Record<string, string> = {}): string {
   const result = Bun.spawnSync(cmd, { cwd, env: { ...process.env, ...env }, stdout: 'pipe', stderr: 'pipe' })
   const output = result.stdout.toString() + result.stderr.toString()
