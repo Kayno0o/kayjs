@@ -539,7 +539,7 @@ describe('optimistic changes', () => {
 
 describe('every', () => {
   it('runs every interval until its root goes, starting and stopping as its condition turns', async () => {
-    // Once a server scope ran in the process, fake timers no longer settle a tick's await before the next tick: each step lets it.
+    // Once a test before waited on a real timer, fake timers no longer settle a tick's await before the next tick: each step lets it.
     const advance = async (ms: number) => {
       for (let step = 0; step < ms; step += 50) {
         jest.advanceTimersByTime(50)
