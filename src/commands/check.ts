@@ -2,8 +2,8 @@ import type { CheckDiagnostic } from '../check'
 import type { LintGroup } from '../compiler/lints'
 import type { KayConfig } from '../config'
 import type { Command, ProblemFormat } from './command'
-import { existsSync } from 'node:fs'
-import { join, relative, resolve, sep } from 'node:path'
+import { existsSync, statSync } from 'node:fs'
+import { isAbsolute, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { applySafeFixes, check as checkTypes, configCheckOptions } from '../check'
 import { isLint, isLintGroup, LINT_GROUPS, LINTS } from '../compiler/lints'
@@ -43,7 +43,7 @@ export const check: Command = {
 
     // The first path is the project when it is one; the others, or all of them otherwise, are what to report on, relative to the current directory.
     const [first, ...rest] = positionals
-    const dir = first !== undefined && PROJECT_FILES.some(file => existsSync(join(first, file))) ? first : undefined
+    const dir = first !== undefined && isProjectDir(first) ? first : undefined
     const paths = dir === undefined ? positionals : rest
     const missing = paths.find(path => !existsSync(path))
 
@@ -110,6 +110,13 @@ async function watchChecks(root: string, run: () => Promise<unknown>, clear: boo
   }, { tests: true })
 
   return new Promise<never>(() => undefined)
+}
+
+// A directory holding a project's files, or outside the current directory, where no path to report on lies.
+function isProjectDir(path: string): boolean {
+  const outside = relative(process.cwd(), resolve(path))
+
+  return statSync(path, { throwIfNoEntry: false })?.isDirectory() === true && (PROJECT_FILES.some(file => existsSync(join(path, file))) || outside.startsWith('..') || isAbsolute(outside))
 }
 
 function inScope(diagnostic: CheckDiagnostic, scope: string[]): boolean {
