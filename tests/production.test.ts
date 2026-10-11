@@ -115,6 +115,12 @@ describe('security headers', () => {
     expect(frames({}, {}, { 'frame-ancestors': ['https://cms.example.com'] })).toBeUndefined()
     expect(frames({ 'frame-ancestors': ['\'none\''] }, { 'x-frame-options': 'SAMEORIGIN' })).toBe('SAMEORIGIN')
     expect(frames(false)).toBe('SAMEORIGIN')
+    expect(frames({ 'frame-ancestors': [] })).toBe('DENY')
+    expect(frames({ 'frame-ancestors': ['\'None\''] })).toBe('DENY')
+    expect(frames({ 'frame-ancestors': ['\'self\''] })).toBe('SAMEORIGIN')
+    expect(frames({ 'frame-ancestors': ['\'self\'', '\'SELF\''] })).toBe('SAMEORIGIN')
+    expect(securityHeaders({ security: { reportOnly: { 'frame-ancestors': ['\'none\''] } } })!['x-frame-options']).toBe('SAMEORIGIN')
+    expect(securityHeaders({ security: false }, [{ headers: { 'cross-origin-embedder-policy': 'require-corp' } }])).toEqual({ 'cross-origin-embedder-policy': 'require-corp' })
   })
 
   it('starts a directive a page adds from the policy before the page, whatever order the page lists its directives in', () => {

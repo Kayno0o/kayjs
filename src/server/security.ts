@@ -216,12 +216,18 @@ function serialized(directives: Map<string, string[]>): string {
   return [...directives].map(([name, sources]) => sources.length > 0 ? `${name} ${sources.join(' ')}` : name).join('; ')
 }
 
-// What X-Frame-Options says of the policy's `frame-ancestors`: DENY for `'none'`, SAMEORIGIN for `'self'` alone, and nothing for any other source, which it cannot name, or without the directive.
+// What X-Frame-Options says of the policy's `frame-ancestors`: DENY for `'none'` or no source at all, SAMEORIGIN for `'self'` alone, and nothing for any other source, which it cannot name, or without the directive.
 function frameOptions(sources: string[] | undefined): string | undefined {
-  if (sources?.length !== 1)
+  if (sources === undefined)
     return undefined
 
-  return sources[0] === NONE ? 'DENY' : sources[0] === SELF ? 'SAMEORIGIN' : undefined
+  const kinds = new Set(sources.map(source => source.toLowerCase()))
+  const [only] = kinds
+
+  if (only === undefined || (kinds.size === 1 && only === NONE))
+    return 'DENY'
+
+  return kinds.size === 1 && only === SELF ? 'SAMEORIGIN' : undefined
 }
 
 // What the browser enforces for a fetch directive the policy lacks: that of the directive it falls back to, or nothing for any other.
