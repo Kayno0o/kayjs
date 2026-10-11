@@ -116,12 +116,12 @@ export function reference(collection: string, options?: StringOptions): ReturnTy
   return t.String({ ...options, 'x-kay': { kind: 'reference', collection } })
 }
 
-// A string field holding an image's path, which a CMS edits by uploading or picking one.
+// A string field holding the path the site serves an image at, an upload's `files.url(key)` say, which a CMS edits by uploading or picking one.
 export function imageField(options?: StringOptions): ReturnType<typeof t.String> {
   return t.String({ ...options, 'x-kay': { kind: 'image' } })
 }
 
-// A string field holding a file's path, which a CMS edits by uploading or picking one.
+// A string field holding the path the site serves a file at, an upload's `files.url(key)` say, which a CMS edits by uploading or picking one.
 export function fileField(options?: StringOptions): ReturnType<typeof t.String> {
   return t.String({ ...options, 'x-kay': { kind: 'file' } })
 }
@@ -157,7 +157,7 @@ export async function collections(): Promise<CollectionInfo[]> {
 }
 
 // The entries of the collection exported as `name`, drafts included, as their source holds them now, a loader's loaded afresh as preview mode loads them; one locale's alone when given.
-export async function entries(name: string, options: { locale?: string } = {}): Promise<SourceEntry[]> {
+export async function entries(name: string, options: { locale?: string | undefined } = {}): Promise<SourceEntry[]> {
   const collection = collectionNamed(name)
   const { localized = false } = collection.options
 
@@ -199,7 +199,7 @@ export async function entryIssues(name: string, collection: Collection<unknown>,
 
 // The file holding a folder collection's entry as the editor wrote it, for a CMS to commit, or where it fails the collection; kay writes nothing.
 // An entry the folder holds keeps its file and format, its body too when none is given; a new one is Markdown when it has a body or the folder holds Markdown, JSON otherwise.
-export async function entrySource(name: string, slug: string, data: unknown, options: { locale?: string, body?: string } = {}): Promise<{ file: EntryFile } | { issues: DraftIssue[] }> {
+export async function entrySource(name: string, slug: string, data: unknown, options: { locale?: string | undefined, body?: string | undefined } = {}): Promise<{ file: EntryFile } | { issues: DraftIssue[] }> {
   const collection = collectionNamed(name)
 
   if (collection.dir === undefined)

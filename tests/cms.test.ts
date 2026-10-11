@@ -283,8 +283,9 @@ describe('the collections a CMS edits', () => {
   it('writes each entry back as it read it, in its own format', async () => {
     const dir = `${FIXTURE}/src/content/pages`
 
-    for (const entry of await entries('pages')) {
-      const written = await entrySource('pages', entry.slug, entry.data, entry.body === undefined ? {} : { body: entry.body })
+    // An option given as undefined is absent, as an entry read back hands it.
+    for (const entry of await entries('pages', { locale: undefined })) {
+      const written = await entrySource('pages', entry.slug, entry.data, { locale: entry.locale, body: entry.body })
 
       expect(written).toMatchObject({ file: { path: entry.path } })
       expect('file' in written && written.file.text).toBe(await Bun.file(entry.path!).text())
