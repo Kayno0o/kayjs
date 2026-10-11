@@ -2,8 +2,8 @@
 import type { ParseArgsOptionsConfig } from 'node:util'
 import type { CheckDiagnostic } from '../check'
 import type { Paint } from '../compiler/frame'
-import { realpathSync, statSync } from 'node:fs'
-import { isAbsolute, join, relative, resolve, sep } from 'node:path'
+import { existsSync, realpathSync, statSync } from 'node:fs'
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { parseArgs } from 'node:util'
 import { colors, createColors } from '@kaynooo/utils/tools/colors'
@@ -85,6 +85,10 @@ export function projectRoot(command: string, path = '.'): string | undefined {
 export function warnOtherKay(command: string, root: string): void {
   let imported: string
 
+  // Without a `node_modules` above it, Bun would install npm's own `kay`, another package, to resolve it: seconds of network for every command.
+  if (!kayInstalledAbove(root))
+    return
+
   try {
     imported = realpathSync(Bun.resolveSync('kay', root))
   }
@@ -100,6 +104,16 @@ export function warnOtherKay(command: string, root: string): void {
   const own = resolve(imported, '../../..')
 
   console.warn(`kay ${command}: this is the kay at ${resolve(running, '../../..')}, but the project imports the one at ${own}; run the project's own, \`bun ${relative(realpathSync(root), join(own, 'src/cli.ts'))}\`, or reinstall if its node_modules/.bin/kay links elsewhere`)
+}
+
+function kayInstalledAbove(root: string): boolean {
+  for (let dir = root; ; dir = dirname(dir)) {
+    if (existsSync(join(dir, 'node_modules', 'kay')))
+      return true
+
+    if (dir === dirname(dir))
+      return false
+  }
 }
 
 // What a command did, on stdout so a terminal does not take it for an error: the verb in green, how long it took dimmed.

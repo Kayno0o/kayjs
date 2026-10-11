@@ -3,12 +3,13 @@ import { chmod, mkdir, mkdtemp, rm, symlink, utimes } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, join, relative, resolve } from 'node:path'
 import process from 'node:process'
-import { describe, expect, it } from 'bun:test'
+import { describe, expect, it, spyOn } from 'bun:test'
 import { findKayFiles } from '../src/build/files'
 import { applySafeFixes, check } from '../src/check'
 import { islandOnlyComponents } from '../src/check/island-only'
 import { probe } from '../src/check/project'
 import { compileShadow, shadowPath, shadowSource } from '../src/check/shadow'
+import { warnOtherKay } from '../src/commands/command'
 import { compileKay } from '../src/compiler'
 import { SHADOW_DIR } from '../src/project'
 
@@ -110,6 +111,20 @@ describe('kay check', () => {
       expect(errors).toContain(`kay check: this is the kay at ${join(import.meta.dir, '..')}, but the project imports the one at ${join(root, 'node_modules/kay')}; run the project's own, \`bun node_modules/kay/src/cli.ts\``)
     }
     finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('resolves no kay for that warning from a project with none installed, which Bun would fetch from npm', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'kay-none-'))
+    const resolveSync = spyOn(Bun, 'resolveSync')
+
+    try {
+      warnOtherKay('check', root)
+      expect(resolveSync).not.toHaveBeenCalled()
+    }
+    finally {
+      resolveSync.mockRestore()
       await rm(root, { recursive: true, force: true })
     }
   })
