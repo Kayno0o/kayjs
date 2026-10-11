@@ -9,7 +9,7 @@ import { existsSync } from 'node:fs'
 import { readdir, rename, rm, stat } from 'node:fs/promises'
 import { basename, extname, join, normalize, resolve, sep } from 'node:path'
 import { ASSET_PREFIX } from '../build/assets'
-import { aspectKey, CARD, croppedSize, DEFAULT_ASPECTS, DEFAULT_MAX_DENSITY, FILES_ROUTE, IMAGE_ROUTE, IMAGE_WIDTHS, parseAspect, requestedRemoteVariants, requestedVariants, RESIZABLE, setAspects, setMaxDensity, setRemoteImages, setResolvedImages, SMALL_STEP, variantHeight, variantSuffix } from '../runtime/image'
+import { aspectKey, CARD, croppedSize, cutOrBelow, DEFAULT_ASPECTS, DEFAULT_MAX_DENSITY, FILES_ROUTE, IMAGE_ROUTE, IMAGE_WIDTHS, parseAspect, requestedRemoteVariants, requestedVariants, RESIZABLE, setAspects, setMaxDensity, setRemoteImages, setResolvedImages, SMALL_STEP, variantHeight, variantSuffix } from '../runtime/image'
 import { inLocale, passGuards } from './actions'
 import { AVIF_SPEED, DEFAULT_AVIF_QUALITY, encodeAvif } from './avif'
 import { coverImage } from './crop'
@@ -137,7 +137,7 @@ export async function writeImageVariants(clientDir: string, quality = DEFAULT_QU
       return
 
     // A width below the ladder a page asked for may be the image's own, written already.
-    const variants = [...IMAGE_WIDTHS.filter(step => step < width), width, ...requestedVariants(name).filter(variant => variant === 'card' || variant.aspect !== undefined || variant.width < width)]
+    const variants = [...IMAGE_WIDTHS.filter(step => step < width), width, ...requestedVariants(name).filter(variant => cutOrBelow(variant, width))]
     // The share card stays a JPEG, which social sites read best.
     const encodings = variants.flatMap(variant => [{ variant, format: 'webp' as const, level: String(quality) }, ...avif === undefined || variant === 'card' ? [] : [{ variant, format: 'avif' as const, level: `${avif}s${AVIF_SPEED}` }]])
     const missing: { variant: number | ImageVariant, format: VariantFormat, target: string, cached: string | undefined }[] = []

@@ -19,6 +19,8 @@ const HERO = join(import.meta.dir, 'fixtures/images/src/hero.png')
 const uploads = await mkdtemp(join(tmpdir(), 'kay-uploads-'))
 
 await Bun.write(join(uploads, 'photo.png'), Bun.file(HERO))
+// Narrower than the ladder's first width.
+await Bun.write(join(uploads, 'small.webp'), (await processImage(Bun.file(HERO), { width: 200, height: 120, fit: 'cover' })).bytes)
 
 const app = await pages({ routes: 'tests/fixtures/images/src/routes', prebuilt: false, images: { dirs: { '/uploads/': uploads } } })
 const html = await (await app.handle(new Request('http://localhost/'))).text()
@@ -184,10 +186,18 @@ describe('image route', () => {
 
   it('takes the image\'s own width and a multiple of 16 below the ladder, and refuses any other width or one above its own', async () => {
     expect((await new Bun.Image(await (await get(heroAt(1000))).bytes()).metadata()).width).toBe(1000)
-    expect((await new Bun.Image(await (await get(heroAt(96))).bytes()).metadata()).width).toBe(96)
+    const smallAt = (width: number) => `/_kay/image?src=${encodeURIComponent('/uploads/small.webp')}&w=${width}`
 
-    for (const width of [700, 1280, 100, 0, -320, -16, 'x', ''])
+    for (const width of [96, 16, 304])
+      expect((await new Bun.Image(await (await get(heroAt(width))).bytes()).metadata()).width).toBe(width)
+
+    expect((await new Bun.Image(await (await get(smallAt(200))).bytes()).metadata()).width).toBe(200)
+
+    for (const width of [700, 1280, 100, 336, 0, -320, -16, 'x', ''])
       expect((await get(heroAt(width))).status).toBe(400)
+
+    for (const width of [208, 320])
+      expect((await get(smallAt(width))).status).toBe(400)
   })
 
   it('reads nothing outside the built assets and the runtime image directories', async () => {
@@ -551,6 +561,25 @@ describe('crops and share cards', () => {
       expect(await readdir(join(client, 'images'))).toEqual(expect.arrayContaining(['crop-abc-320.webp', 'crop-abc-320-16x9.webp', 'crop-abc-1000-16x9.webp', 'crop-abc-96.webp', 'crop-abc-192.webp', 'crop-abc-card.jpg']))
       expect(await new Bun.Image(Bun.file(join(client, 'images', 'crop-abc-640-16x9.webp'))).metadata()).toEqual({ width: 640, height: 360, format: 'webp' })
       expect(await new Bun.Image(Bun.file(join(client, 'images', 'crop-abc-card.jpg'))).metadata()).toEqual({ width: 1200, height: 630, format: 'jpeg' })
+    }
+    finally {
+      await rm(client, { recursive: true, force: true })
+    }
+  })
+
+  it('writes an image narrower than the ladder at its own width and the widths below it pages asked for, its own once', async () => {
+    const client = await mkdtemp(join(tmpdir(), 'kay-client-'))
+
+    try {
+      await Bun.write(join(client, 'assets', 'small-abc.webp'), Bun.file(join(uploads, 'small.webp')))
+
+      const small = registerImage('/_kay/assets/small-abc.webp', 200, 120)
+
+      image(small, { sizes: '95px' })
+      image(small, { sizes: '150px' })
+      await writeImageVariants(client)
+
+      expect((await readdir(join(client, 'images'))).sort()).toEqual(['small-abc-160.webp', 'small-abc-192.webp', 'small-abc-200.webp', 'small-abc-96.webp'])
     }
     finally {
       await rm(client, { recursive: true, force: true })

@@ -152,6 +152,11 @@ export function variantHeight(width: number, [aspectWidth, aspectHeight]: Aspect
 }
 
 // What a variant's file name ends with, after the image's own name.
+// A card, a crop, or a width below `width`: the ladder's own widths aside, what a page asks for.
+export function cutOrBelow(variant: ImageVariant, width: number): boolean {
+  return variant === 'card' || variant.aspect !== undefined || variant.width < width
+}
+
 export function variantSuffix(variant: ImageVariant): string {
   if (variant === 'card')
     return '-card.jpg'
@@ -412,7 +417,7 @@ export function imageUrl(src: string, width: number, aspect?: Aspect): string {
 
 function variantUrl(src: string, variant: ImageVariant): string {
   // A crop, a card or a width below the ladder, which only pages ask for.
-  const asked = variant === 'card' || variant.aspect !== undefined || variant.width < IMAGE_WIDTHS[0]
+  const asked = cutOrBelow(variant, IMAGE_WIDTHS[0])
 
   if (variantFiles && REMOTE.test(src)) {
     requestedRemote.set(src, (requestedRemote.get(src) ?? new Map<string, ImageVariant>()).set(variantSuffix(variant), variant))
