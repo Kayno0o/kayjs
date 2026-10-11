@@ -140,8 +140,8 @@ describe('image route', () => {
     expect(await (await get(heroAt(640))).bytes()).toEqual(bytes)
   })
 
-  it('answers an imported image\'s variant again without reading its source or looking the variant up', async () => {
-    await get(heroAt(320))
+  it('answers an imported image\'s variant again without reading its source or looking the variant up, with a request id of its own', async () => {
+    const first = await get(heroAt(320))
 
     const file = spyOn(Bun, 'file')
 
@@ -151,6 +151,9 @@ describe('image route', () => {
       expect(file).not.toHaveBeenCalled()
       expect(again.status).toBe(200)
       expect((await new Bun.Image(await again.bytes()).metadata()).width).toBe(320)
+      expect(again.headers.get('x-request-id')).toMatch(/^[\w-]{22}$/)
+      expect(again.headers.get('x-request-id')).not.toBe(first.headers.get('x-request-id'))
+      expect(again.headers.get('x-content-type-options')).toBe('nosniff')
     }
     finally {
       file.mockRestore()

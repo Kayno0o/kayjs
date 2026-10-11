@@ -53,6 +53,9 @@ const FALLBACKS: Record<string, string[]> = {
 }
 const FETCH_DIRECTIVE = /-src(?:-elem|-attr)?$/
 
+// Set on every context, as `app.ts` does.
+const REQUEST_ID = 'x-request-id'
+
 const HEADERS: Record<string, string> = {
   'x-content-type-options': 'nosniff',
   'referrer-policy': 'strict-origin-when-cross-origin',
@@ -135,13 +138,35 @@ export function setSecurityHeaders(set: Context['set'], security: [name: string,
 }
 
 // The copy a file route answers with: the secured one when the context holds no header, since the response's own would win over the app's; else the plain one, the security headers going on the context as on every other route.
+// The request id every context holds goes on the response itself when it is alone there, so Elysia has no header to copy the response for.
 export function ownHeaders(set: Context['set'], copies: HeaderCopies): Record<string, string> {
+  const id = requestIdAlone(set.headers)
+
+  if (id !== undefined) {
+    delete set.headers[REQUEST_ID]
+
+    return { ...copies.secured, [REQUEST_ID]: id }
+  }
+
   if (!isNotEmpty(set.headers))
     return copies.secured
 
   setSecurityHeaders(set, copies.security)
 
   return copies.plain
+}
+
+function requestIdAlone(headers: Context['set']['headers']): string | undefined {
+  let id: string | undefined
+
+  for (const name in headers) {
+    if (name !== REQUEST_ID)
+      return undefined
+
+    id = headers[name]
+  }
+
+  return id
 }
 
 // kay's directives, plus the sources its islands need, with each layer of the app's merged over them in turn, a directive given `false` left out; `script-src` and `script-src-elem` always keep the hashes of kay's inline scripts, and `style-src` and `style-src-elem` those of its inline styles.

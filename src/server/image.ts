@@ -221,7 +221,8 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
     let source = await findSource(src, options, clientAddress(request, server))
 
     if (!source && options.resolve) {
-      const found = await resolvedSource(src, context, options.resolve)
+      // The guards get a copy of the context: Elysia reads a handler passing its whole context to a function as using all of it, so it would parse the cookies of every request and copy every response for the jar that sets.
+      const found = await resolvedSource(src, { ...context }, options.resolve)
 
       if (found instanceof Response) {
         for (const [name, value] of Object.entries(options.security ?? {})) {

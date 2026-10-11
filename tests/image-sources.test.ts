@@ -2,6 +2,7 @@ import { mkdir, readdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, it, spyOn } from 'bun:test'
+import { Elysia } from 'elysia'
 import { outputDir } from '../src/build/assets'
 import { refuseStaticConfig } from '../src/build/static'
 import { image } from '../src/runtime/image'
@@ -203,6 +204,29 @@ describe('images.resolve and images.guard', () => {
     expect(response.headers.get('x-guarded')).toBe('yes')
     expect(await new Bun.Image(await response.bytes()).metadata()).toEqual({ width: 640, height: 384, format: 'webp' })
     expect((await get('/media/8', 'w=320', signedIn)).headers.get('content-type')).toBe('image/gif')
+  })
+
+  it('hands the guards the locals of the app and the cookies of the request, and its answer what they set and the request id', async () => {
+    const withLocals = new Elysia().derive({ as: 'global' }, () => ({ user: 'ada' })).use(await pages({
+      routes: 'tests/fixtures/images/src/routes',
+      prebuilt: false,
+      images: {
+        guard: (ctx) => {
+          if ((ctx.locals as { user?: string }).user !== 'ada' || ctx.cookies.get('theme') !== 'dark')
+            ctx.deny(401)
+
+          ctx.cookies.set('seen', '1')
+          ctx.headers.set('x-guarded', 'yes')
+        },
+        resolve: src => src === '/media/7' ? join(media, '7') : undefined,
+      },
+    }))
+    const response = await withLocals.handle(new Request(`http://localhost/_kay/image?src=${encodeURIComponent('/media/7')}&w=320`, { headers: { cookie: 'theme=dark' } }))
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get('x-guarded')).toBe('yes')
+    expect(response.headers.getSetCookie()).toEqual([expect.stringMatching(/^seen=1/)])
+    expect(response.headers.get('x-request-id')).toMatch(/^[\w-]{22}$/)
   })
 
   it('refuses a request the guard stops, and 404s a source resolve does not know', async () => {
