@@ -2,7 +2,7 @@ import type { Subprocess } from 'bun'
 import type { Variant } from './sites'
 import { existsSync, mkdirSync, readdirSync, readFileSync, readlinkSync, rmSync } from 'node:fs'
 import { join, sep } from 'node:path'
-import { run, VARIANTS, WORK } from './sites'
+import { envOf, run, VARIANTS, WORK } from './sites'
 
 const NGINX = join(WORK, 'nginx')
 const READY_TIMEOUT_MS = 20_000
@@ -105,20 +105,56 @@ export async function startServer(variant: Variant): Promise<Subprocess> {
   // Written over from its start, the log would keep the end of a longer one before it.
   rmSync(serverLog(variant), { force: true })
 
-  return tracked(Bun.spawn(variant.kind === 'astro' ? [process.execPath, 'dist/server/entry.mjs'] : ['./server'], {
+  const server = variant.kind === 'astro' ? [process.execPath, 'dist/server/entry.mjs'] : ['./server']
+  const sidecar = variant.site.sidecar?.[variant.kind]
+
+  if (sidecar !== undefined)
+    await ensureFree(variant.ports.sidecar, `${variant.dir}'s sidecar`)
+
+  // A shell starts the sidecar in the background, then becomes the server, so the sidecar is the server's child and counts in its tree.
+  return tracked(Bun.spawn(sidecar === undefined ? server : ['sh', '-c', `${sidecar.command(variant).map(arg => Bun.$.escape(arg)).join(' ')} & exec "$@"`, 'sh', ...server], {
     cwd: variant.dir,
     stdout: 'ignore',
     stderr: Bun.file(serverLog(variant)),
-    env: { PATH: process.env.PATH!, HOME: process.env.HOME!, NODE_ENV: 'production', HOST: '127.0.0.1', PORT: String(variant.ports.backend), CACHE_PATH: ':memory:', ...variant.site.env },
+    env: { PATH: process.env.PATH!, HOME: process.env.HOME!, NODE_ENV: 'production', HOST: '127.0.0.1', PORT: String(variant.ports.backend), CACHE_PATH: ':memory:', ...envOf(variant) },
   }))
 }
 
-// Milliseconds until the server answers its home page with a 200; what it printed on stderr if it exits or never does.
+// Stops a server as a signal stops it in production, then what it started that outlived it, as its sidecar.
+export async function stopServer(server: Subprocess): Promise<void> {
+  const tree = processTree(server.pid)
+
+  server.kill()
+  await server.exited
+  await killAll(tree.slice(1))
+  await untilReaped(tree.slice(1))
+}
+
+// A killed process's sockets close with its last thread, which may outlive the state `isRunning` reads, so a port stays taken until the process is reaped.
+async function untilReaped(pids: number[]): Promise<void> {
+  const started = performance.now()
+
+  while (pids.some(pid => existsSync(`/proc/${pid}`))) {
+    if (performance.now() - started > GONE_TIMEOUT_MS)
+      throw new Error(`processes ${pids.filter(pid => existsSync(`/proc/${pid}`)).join(', ')} not reaped ${GONE_TIMEOUT_MS / 1000} s after being killed`)
+
+    await Bun.sleep(5)
+  }
+}
+
+// Milliseconds until the server answers its home page with a 200, and its sidecar answers at all, as a page may render while the sidecar it fetches from still starts; what it printed on stderr if it exits or never does.
 export async function waitReady(variant: Variant, server: Subprocess): Promise<number> {
   const started = performance.now()
+  const sidecar = variant.site.sidecar?.[variant.kind]
+  let sidecarUp = sidecar === undefined
 
   while (performance.now() - started < READY_TIMEOUT_MS && server.exitCode === null) {
     try {
+      if (!sidecarUp) {
+        await (await fetch(`http://127.0.0.1:${variant.ports.sidecar}${sidecar!.paths[0]}`)).arrayBuffer()
+        sidecarUp = true
+      }
+
       const response = await fetch(`http://127.0.0.1:${variant.ports.backend}/`)
 
       await response.arrayBuffer()
@@ -130,8 +166,7 @@ export async function waitReady(variant: Variant, server: Subprocess): Promise<n
     await Bun.sleep(2)
   }
 
-  server.kill()
-  await server.exited
+  await stopServer(server)
   const stderr = (await Bun.file(serverLog(variant)).text()).slice(-2000)
 
   throw new Error(`${variant.dir} did not answer on ${variant.ports.backend}, exit code ${server.exitCode}:\n${stderr}`)
@@ -143,6 +178,11 @@ export function memory(pid: number): { rss: number, peak: number } {
   const read = (field: RegExp) => Number(field.exec(status)![1]) * 1024
 
   return { rss: read(VM_RSS), peak: read(VM_HWM) }
+}
+
+// Resident and peak memory of a server and its sidecar, summed: each process's peak, which need not have come at once.
+export function serverMemory(pid: number): { rss: number, peak: number } {
+  return processTree(pid).map(memory).reduce((sum, process) => ({ rss: sum.rss + process.rss, peak: sum.peak + process.peak }), { rss: 0, peak: 0 })
 }
 
 function statLine(pid: number): string {
@@ -260,6 +300,18 @@ function upstream(variant: Variant): string {
   return `${variant.site.name.replace(NOT_WORD, '_')}_${variant.kind}`
 }
 
+function proxy(path: string, upstream: string): string {
+  return `
+    location ${path} {
+      proxy_pass http://${upstream};
+      proxy_http_version 1.1;
+      proxy_set_header Connection "";
+      proxy_set_header Host $host;
+      proxy_set_header X-Forwarded-For $remote_addr;
+      proxy_set_header X-Forwarded-Proto $scheme;
+    }`
+}
+
 // nginx as a production server sets it up in front of the sites: HTTP/2 over TLS, brotli and gzip at level 6, a keepalive upstream.
 export async function startNginx(): Promise<Subprocess> {
   mkdirSync(join(NGINX, 'tmp'), { recursive: true })
@@ -267,23 +319,22 @@ export async function startNginx(): Promise<Subprocess> {
   if (!existsSync(join(NGINX, 'cert.pem')))
     run(['openssl', 'req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '365', '-subj', '/CN=localhost', '-keyout', join(NGINX, 'key.pem'), '-out', join(NGINX, 'cert.pem')], NGINX)
 
-  const servers = VARIANTS.map(variant => `
-  upstream ${upstream(variant)} { server 127.0.0.1:${variant.ports.backend}; keepalive 32; }
+  const servers = VARIANTS.map((variant) => {
+    const sidecar = variant.site.sidecar?.[variant.kind]
+
+    return `
+  upstream ${upstream(variant)} { server 127.0.0.1:${variant.ports.backend}; keepalive 32; }${sidecar === undefined
+    ? ''
+    : `
+  upstream ${upstream(variant)}_sidecar { server 127.0.0.1:${variant.ports.sidecar}; keepalive 32; }`}
   server {
     listen 127.0.0.1:${variant.ports.https} ssl;
     listen 127.0.0.1:${variant.ports.http};
     http2 on;
     ssl_certificate ${NGINX}/cert.pem;
-    ssl_certificate_key ${NGINX}/key.pem;
-    location / {
-      proxy_pass http://${upstream(variant)};
-      proxy_http_version 1.1;
-      proxy_set_header Connection "";
-      proxy_set_header Host $host;
-      proxy_set_header X-Forwarded-For $remote_addr;
-      proxy_set_header X-Forwarded-Proto $scheme;
-    }
-  }`).join('\n')
+    ssl_certificate_key ${NGINX}/key.pem;${proxy('/', upstream(variant))}${(sidecar?.paths ?? []).map(path => proxy(path, `${upstream(variant)}_sidecar`)).join('')}
+  }`
+  }).join('\n')
 
   await Bun.write(join(NGINX, 'nginx.conf'), `load_module ${MODULES}/ngx_http_brotli_filter_module.so;
 worker_processes auto;
@@ -322,9 +373,9 @@ export async function startAll(): Promise<{ servers: Map<Variant, Subprocess>, n
   const nginx = await startNginx()
   const servers = new Map<Variant, Subprocess>()
   const stop = async () => {
-    for (const server of [...servers.values(), nginx])
-      server.kill()
-    await Promise.all([...servers.values(), nginx].map(async server => server.exited))
+    nginx.kill()
+    await Promise.all([...servers.values()].map(stopServer))
+    await nginx.exited
   }
 
   try {

@@ -31,4 +31,23 @@ export default [
       delete manifest.devDependencies?.['@bakery/eslint-config']
     },
   },
+  {
+    name: 'florist',
+    repo: '../../../florist',
+    astro: 'd4e5f6a',
+    pages: ['/', '/bouquets'],
+    // A function of the variant when the sides differ, as each reads its own database, or a value depends on its ports.
+    env: variant => ({ DATABASE_URL: `postgres://florist:bench@127.0.0.1:47600/florist_${variant.kind}`, API_URL: `http://127.0.0.1:${variant.ports.sidecar}` }),
+    // The Astro pages fetch from an API production ran beside them: started and measured with the server, nginx sending it `/api/`.
+    sidecar: { astro: { command: variant => [process.execPath, 'api/index.ts', '--port', String(variant.ports.sidecar)], paths: ['/api/'] } },
+    // Started before the builds, given the variants measured, and stopped as the run ends: here a database per side, seeded afresh.
+    services: async () => {
+      Bun.spawnSync(['docker', 'run', '-d', '--rm', '--name', 'bench-florist', '-e', 'POSTGRES_USER=florist', '-e', 'POSTGRES_PASSWORD=bench', '-p', '127.0.0.1:47600:5432', 'postgres:18-alpine'])
+      // Then wait for it to answer, and create and seed `florist_astro` and `florist_kay`.
+
+      return async () => {
+        Bun.spawnSync(['docker', 'rm', '-f', 'bench-florist'])
+      }
+    },
+  },
 ] satisfies Site[]

@@ -14,8 +14,12 @@ export interface Site {
   pages: string[]
   // The pages put under load, besides the largest stylesheet the home page links; the first two pages unless set.
   loaded?: string[]
-  // What the site reads from the environment when it builds and serves.
-  env?: Record<string, string>
+  // What the site reads from the environment when it builds and serves, the same on both sides unless it depends on the variant, as a database or a sidecar's port does.
+  env?: Record<string, string> | ((variant: Variant) => Record<string, string>)
+  // A second process a side's server needs, as an API the pages fetch from: started with it in its directory, counted with it, and given the paths nginx sends its way.
+  sidecar?: Partial<Record<Variant['kind'], Sidecar>>
+  // Runs before the site is built and served, given the variants measured, and returns what stops it after the run: a database the servers read, seeded afresh each run.
+  services?: (variants: Variant[]) => Promise<() => Promise<void>>
   // What its dev servers read from the environment, none unless set: production's `env` may point a dev server elsewhere, as at the live site for its reloads.
   devEnv?: Record<string, string>
   // Runs on each side's dev copy once installed, given its directory, as for pointing the dev server's reloads back at it.
@@ -40,19 +44,25 @@ export interface TextEdit {
   text: string
 }
 
+export interface Sidecar {
+  command: (variant: Variant) => string[]
+  paths: string[]
+}
+
 export interface Variant {
   site: Site
   kind: 'astro' | 'kay'
   dir: string
   // The copy the dev phase runs and edits, apart from the production build.
   devDir: string
-  // Where the variant listens, then nginx in front of it over plain HTTP and over HTTP/2 with TLS, then its dev server.
-  ports: { backend: number, http: number, https: number, dev: number }
+  // Where the variant listens, then nginx in front of it over plain HTTP and over HTTP/2 with TLS, then its dev server, then its sidecar.
+  ports: { backend: number, http: number, https: number, dev: number, sidecar: number }
 }
 
 export interface Manifest {
   dependencies: Record<string, string>
   devDependencies?: Record<string, string>
+  overrides?: Record<string, string>
 }
 
 const EXAMPLE = join(import.meta.dir, 'sites.config.example.ts')
@@ -73,6 +83,8 @@ export const PHASE = oneOf('PHASE', ['prod', 'dev'] as const)
 const KAY_PACKAGE = process.env.KAY_PACKAGE ?? ''
 const CHECKOUT = join(import.meta.dir, '../..')
 const PUBLISHED = '@kaynooo/kayjs'
+// What stops the services the sites' servers need, in the order they started.
+const services: (() => Promise<void>)[] = []
 // Beside a kay dev copy's install: where its kay came from.
 const KAY_SOURCE = 'kay-bench-source.txt'
 // The dev copies `staleInstalls` warned of, with why.
@@ -81,8 +93,15 @@ const stale = new Map<string, string>()
 export const VARIANTS: Variant[] = SITES.flatMap((site, index) => (['astro', 'kay'] as const).map((kind, offset) => {
   const slot = index * 2 + offset + 1
 
-  return { site, kind, dir: join(WORK, `${site.name}-${kind}`), devDir: join(WORK, `${site.name}-${kind}-dev`), ports: { backend: 47200 + slot, http: 47080 + slot, https: 47440 + slot, dev: 47320 + slot } }
+  return { site, kind, dir: join(WORK, `${site.name}-${kind}`), devDir: join(WORK, `${site.name}-${kind}-dev`), ports: { backend: 47200 + slot, http: 47080 + slot, https: 47440 + slot, dev: 47320 + slot, sidecar: 47560 + slot } }
 })).filter(variant => (KIND === undefined || variant.kind === KIND) && (PHASE !== 'dev' || variant.site.dev !== undefined))
+
+// What the variant's builds and servers read from the environment.
+export function envOf(variant: Variant): Record<string, string> {
+  const env = variant.site.env
+
+  return typeof env === 'function' ? env(variant) : env ?? {}
+}
 
 function oneOf<const Value extends string>(name: string, values: readonly Value[]): Value | undefined {
   const value = process.env[name]
@@ -222,6 +241,23 @@ export async function prepare() {
         await variant.site.prepareDev?.(dir, variant.kind)
     }
   }
+}
+
+// Starts what each site measured needs besides its servers, stopped when the run disposes of it or by `stopServices`.
+export async function startServices(): Promise<AsyncDisposable> {
+  for (const site of SITES) {
+    const variants = VARIANTS.filter(variant => variant.site === site)
+
+    if (site.services !== undefined && variants.length > 0)
+      services.push(await site.services(variants))
+  }
+
+  return { [Symbol.asyncDispose]: stopServices }
+}
+
+export async function stopServices(): Promise<void> {
+  for (const stop of services.splice(0).reverse())
+    await stop()
 }
 
 export function commitOf(variant: Variant): string {

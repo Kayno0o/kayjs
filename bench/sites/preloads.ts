@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { launch } from '../browser'
 import { median } from '../format'
 import { PROFILES } from './browser'
-import { startNginx, startServer, waitReady } from './serve'
+import { startNginx, startServer, stopServer, waitReady } from './serve'
 import { VARIANTS } from './sites'
 
 // The experiment behind #88: a site's kay build as `bench:sites` last built it, its head's preloads rewritten in flight, timed under Lighthouse's throttling.
@@ -146,6 +146,6 @@ try {
 }
 finally {
   await browser?.close()
-  server.kill()
   nginx.kill()
+  await stopServer(server)
 }

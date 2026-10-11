@@ -2,7 +2,7 @@ import type { Subprocess } from 'bun'
 import type { Variant } from './sites'
 import { readFileSync } from 'node:fs'
 import { median } from '../format'
-import { clockTicks, cpuTicks, memory, startServer, waitReady } from './serve'
+import { clockTicks, cpuTicks, processTree, serverMemory, startServer, stopServer, waitReady } from './serve'
 
 export interface ColdStart {
   ms: number
@@ -32,9 +32,8 @@ export async function coldStart(variant: Variant): Promise<ColdStart> {
   for (let run = 0; run < COLD_STARTS; run++) {
     const server = await startServer(variant)
 
-    runs.push({ ms: await waitReady(variant, server), rss: memory(server.pid).rss })
-    server.kill()
-    await server.exited
+    runs.push({ ms: await waitReady(variant, server), rss: serverMemory(server.pid).rss })
+    await stopServer(server)
   }
 
   return { ms: median(runs.map(run => run.ms)), rss: median(runs.map(run => run.rss)) }
@@ -42,6 +41,11 @@ export async function coldStart(variant: Variant): Promise<ColdStart> {
 
 function cpuSeconds(pid: number): number {
   return cpuTicks(readFileSync(`/proc/${pid}/stat`, 'utf8'), { own: true }) / clockTicks()
+}
+
+// Of the server and its sidecar.
+function serverCpuSeconds(pid: number): number {
+  return processTree(pid).reduce((sum, member) => sum + cpuSeconds(member), 0)
 }
 
 function nginxCpuSeconds(nginx: Subprocess): number {
@@ -73,7 +77,7 @@ export async function load(variant: Variant, path: string, server: Subprocess, n
 
   await clients(performance.now() + WARMUP_MS, false)
 
-  const serverBefore = cpuSeconds(server.pid)
+  const serverBefore = serverCpuSeconds(server.pid)
   const nginxBefore = nginxCpuSeconds(nginx)
   const started = performance.now()
 
@@ -88,7 +92,7 @@ export async function load(variant: Variant, path: string, server: Subprocess, n
     rps: latencies.length / seconds,
     p50: sorted[sorted.length >> 1]!,
     p99: sorted[Math.floor(sorted.length * 0.99)]!,
-    serverCpu: perRequest(cpuSeconds(server.pid) - serverBefore),
+    serverCpu: perRequest(serverCpuSeconds(server.pid) - serverBefore),
     nginxCpu: perRequest(nginxCpuSeconds(nginx) - nginxBefore),
   }
 }

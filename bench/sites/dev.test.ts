@@ -9,7 +9,7 @@ import { devSection, freshLogs, restartsIn } from './dev'
 const MEMORY = { pss: 200 * 1024 * 1024, rss: 300 * 1024 * 1024, processes: 3 }
 
 function variant(kind: Variant['kind']): Variant {
-  return { site: { name: 'bakery', repo: '', astro: '', pages: [] }, kind, dir: '', devDir: '', ports: { backend: 0, http: 0, https: 0, dev: 0 } }
+  return { site: { name: 'bakery', repo: '', astro: '', pages: [] }, kind, dir: '', devDir: '', ports: { backend: 0, http: 0, https: 0, dev: 0, sidecar: 0 } }
 }
 
 function result(software: string, edits: DevResult['edits']): DevResult {

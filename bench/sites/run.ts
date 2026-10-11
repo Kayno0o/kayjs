@@ -13,8 +13,8 @@ import { PROFILES, vitals } from './browser'
 import { buildCommands, footprint, timeBuild } from './build'
 import { development, devSection } from './dev'
 import { coldStart, load } from './load'
-import { memory, startAll, stopEverything } from './serve'
-import { commitOf, KIND, label, NO_SITES, PHASE, prepare, SITES, staleInstalls, VARIANTS, versionIn } from './sites'
+import { serverMemory, startAll, stopEverything } from './serve'
+import { commitOf, KIND, label, NO_SITES, PHASE, prepare, SITES, staleInstalls, startServices, stopServices, VARIANTS, versionIn } from './sites'
 import { VIEWPORTS, weigh } from './weigh'
 
 interface Result {
@@ -58,6 +58,7 @@ for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) {
     void (async () => {
       try {
         await Promise.race([stopEverything(VARIANTS.map(variant => variant.devDir)), Bun.sleep(STOP_MS)])
+        await Promise.race([stopServices(), Bun.sleep(STOP_MS)])
         await Promise.race([browser?.close(), Bun.sleep(STOP_MS)])
       }
       finally {
@@ -76,6 +77,8 @@ else {
     console.error(warning)
 }
 
+// eslint-disable-next-line unused-imports/no-unused-vars -- held for its disposal, which stops the services as the run ends, failed or not
+await using _services = await startServices()
 const results = new Map<Variant, Result>()
 const producing = PHASE !== 'dev'
 
@@ -115,7 +118,7 @@ try {
       result.weights.push(await weigh(variant, path))
     for (const path of [...variant.site.loaded ?? variant.site.pages.slice(0, 2), await stylesheet(variant)])
       result.loads.push(await load(variant, path, server, lab!.nginx))
-    result.memory = memory(server.pid)
+    result.memory = serverMemory(server.pid)
   }
 
   for (const profile of producing ? PROFILES : []) {
@@ -179,7 +182,7 @@ try {
       '',
       '## Server',
       '',
-      'Cold start is from spawning the server to its first 200 on the home page, median of 7. Under load, 32 clients request one URL through nginx for 5 s over keepalive HTTP/1.1, accepting brotli; CPU is per request, of the site\'s server and of nginx, which compresses what the server sent uncompressed. The client is Bun\'s fetch, which tops out near 40,000 requests a second.',
+      `Cold start is from spawning the server to its first 200 on the home page, median of 7. Under load, 32 clients request one URL through nginx for 5 s over keepalive HTTP/1.1, accepting brotli; CPU is per request, of the site's server and of nginx, which compresses what the server sent uncompressed. The client is Bun's fetch, which tops out near 40,000 requests a second.${VARIANTS.some(variant => variant.site.sidecar?.[variant.kind] !== undefined) ? ' A server with a sidecar, as an API its pages fetch from, counts with it: cold start waits for both to answer, memory and CPU are their sums.' : ''}`,
       '',
       table(header, [
         row('cold start', result => `${milliseconds(result.cold.ms)} ms`),
