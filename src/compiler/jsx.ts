@@ -1,4 +1,4 @@
-import type { Attribute, AwaitBranch, AwaitNode, ConstNode, ElementNode, ErrorNode, ForNode, IfNode, NamedAttribute, Node, SlotNode, Span, TemplateFacts, TextNode, TryNode } from './ast'
+import type { Attribute, AwaitBranch, AwaitNode, ConstNode, ElementNode, ErrorNode, ForNode, IfNode, MatchNode, NamedAttribute, Node, SlotNode, Span, TemplateFacts, TextNode, TryNode } from './ast'
 import type { CodeBuilder } from './mapping'
 import type { Sites } from './rewrite'
 import { actionOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, isSlot, keyedByPosition, serverIslandOf } from './ast'
@@ -38,8 +38,8 @@ export class JsxTemplate {
   emitRoot(nodes: Node[]): void {
     const visible = this.withoutSlots(nodes)
 
-    if (visible.length === 1 && visible[0]!.kind === 'element' && !isSlot(visible[0]!)) {
-      this.emitElement(visible[0]!)
+    if (visible.length === 1 && visible[0]!.kind === 'element' && !isSlot(visible[0])) {
+      this.emitElement(visible[0])
 
       return
     }
@@ -80,12 +80,15 @@ export class JsxTemplate {
         case 'if':
           this.b.wrap(node, () => {
             this.b.add('{')
+            this.emitIf(node, 0)
+            this.b.add('}')
+          })
 
-            if (node.subject)
-              this.emitMatch(node, node.subject)
-            else
-              this.emitIf(node, 0)
-
+          break
+        case 'match':
+          this.b.wrap(node, () => {
+            this.b.add('{')
+            this.emitMatch(node)
             this.b.add('}')
           })
 
@@ -153,23 +156,32 @@ export class JsxTemplate {
   }
 
   // A `switch`, so `kay check` narrows the subject in each branch and reports a value its type cannot hold.
-  private emitMatch(node: IfNode, subject: Span) {
+  private emitMatch(node: MatchNode) {
     const { b } = this
+    const { fallback } = node
 
-    b.add('(() => { switch (').addSource(subject).add(') { ')
+    b.add('(() => { switch (').addSource(node.subject).add(') { ')
 
-    for (const branch of node.branches) {
+    for (const branch of node.cases) {
       b.wrap(branch, () => {
-        for (const value of branch.values ?? [])
+        for (const value of branch.values)
           b.add('case ').addSource(value).add(': ')
 
-        b.add(branch.values ? 'return (' : 'default: return (')
+        b.add('return (')
         this.emitRoot(branch.children)
         b.add('); ')
       })
     }
 
-    b.add(node.branches.some(branch => !branch.values) ? '} })()' : '} return null })()')
+    if (fallback) {
+      b.wrap(fallback, () => {
+        b.add('default: return (')
+        this.emitRoot(fallback.children)
+        b.add('); ')
+      })
+    }
+
+    b.add(fallback ? '} })()' : '} return null })()')
   }
 
   private emitIf(node: IfNode, index: number) {
@@ -177,20 +189,14 @@ export class JsxTemplate {
     const { b } = this
 
     b.wrap(branch, () => {
-      if (!branch.test) {
-        this.emitRoot(branch.children)
-
-        return
-      }
-
-      const hasRest = index + 1 < node.branches.length
+      const hasRest = index + 1 < node.branches.length || node.fallback !== undefined
 
       if (branch.alias) {
         b.add(`<${helperName('Show')} when={`).addSource(branch.test).add('}')
 
         if (hasRest) {
           b.add(' fallback={')
-          this.emitIf(node, index + 1)
+          this.emitIfRest(node, index + 1)
           b.add('}')
         }
 
@@ -206,12 +212,20 @@ export class JsxTemplate {
       b.add('(').addSource(branch.test).add(') ? ')
       this.emitRoot(branch.children)
       b.add(' : ')
-
-      if (hasRest)
-        this.emitIf(node, index + 1)
-      else
-        b.add('null')
+      this.emitIfRest(node, index + 1)
     })
+  }
+
+  // What renders when the branches before `index` all fail: the next one, else the `else` block.
+  private emitIfRest(node: IfNode, index: number) {
+    const { fallback } = node
+
+    if (index < node.branches.length)
+      this.emitIf(node, index)
+    else if (fallback)
+      this.b.wrap(fallback, () => this.emitRoot(fallback.children))
+    else
+      this.b.add('null')
   }
 
   // A component taking each block as a function, so the browser and the server each decide when to render which.

@@ -77,18 +77,35 @@ export interface TextNode extends Span {
 }
 
 export interface IfBranch extends Span {
-  // A `when` line's whole value list, which `values` splits; none on an `else`.
-  test?: Span | undefined
+  test: Span
   alias?: Span | undefined
-  values?: Span[] | undefined
   children: Node[]
 }
 
-// A `match` is an `if` whose branches compare its subject to each of their values.
+// The block an `if` or a `match` renders when no branch takes it.
+export interface ElseBlock extends Span {
+  children: Node[]
+}
+
 export interface IfNode extends Span {
   kind: 'if'
-  subject?: Span | undefined
   branches: IfBranch[]
+  fallback?: ElseBlock | undefined
+}
+
+// A `when` line: its whole value list, which `values` splits at its top-level commas.
+export interface MatchCase extends Span {
+  test: Span
+  values: Span[]
+  children: Node[]
+}
+
+// The first case one of whose values the subject equals renders.
+export interface MatchNode extends Span {
+  kind: 'match'
+  subject: Span
+  cases: MatchCase[]
+  fallback?: ElseBlock | undefined
 }
 
 export interface ForNode extends Span {
@@ -150,7 +167,7 @@ export interface ErrorNode extends Span {
   name: string
 }
 
-export type Node = ElementNode | TextNode | IfNode | ForNode | AwaitNode | TryNode | SlotNode | ConstNode | ErrorNode
+export type Node = ElementNode | TextNode | IfNode | MatchNode | ForNode | AwaitNode | TryNode | SlotNode | ConstNode | ErrorNode
 
 // An attribute written with a name, which a spread is not.
 export type NamedAttribute = Exclude<Attribute, { kind: 'spread' }>
@@ -331,11 +348,9 @@ export function errorMessages(nodes: Node[], source: string): ErrorMessages {
       return { loop, form: posts ?? form }
     }
 
-    if (node.kind === 'if') {
-      for (const branch of node.branches) {
-        if (branch.test)
-          shows(branch.children.find((child): child is ElementNode => child.kind === 'element'), branch.test, loop)
-      }
+    if (node.kind === 'if' || node.kind === 'match') {
+      for (const branch of node.kind === 'if' ? node.branches : node.cases)
+        shows(branch.children.find((child): child is ElementNode => child.kind === 'element'), branch.test, loop)
     }
     else if (node.kind === 'for') {
       return { loop: true, form }
@@ -464,7 +479,8 @@ export function childBlocks(node: Node): Node[][] {
     case 'text':
       return [node.parts.filter(part => part.kind === 'element')]
     case 'if':
-      return node.branches.map(branch => branch.children)
+    case 'match':
+      return [...(node.kind === 'if' ? node.branches : node.cases).map(branch => branch.children), ...node.fallback ? [node.fallback.children] : []]
     case 'for':
       return [node.children, node.fallback ?? []]
     case 'await':

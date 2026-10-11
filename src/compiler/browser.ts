@@ -353,13 +353,10 @@ function templateExpressions(file: KayFile): { span: Span, deferred: boolean }[]
       }
     }
     else if (node.kind === 'if') {
-      if (node.subject)
-        found.push({ span: node.subject, deferred: false })
-
-      for (const branch of node.branches) {
-        if (branch.test)
-          found.push({ span: branch.test, deferred: false })
-      }
+      found.push(...node.branches.map(branch => ({ span: branch.test, deferred: false })))
+    }
+    else if (node.kind === 'match') {
+      found.push({ span: node.subject, deferred: false }, ...node.cases.map(branch => ({ span: branch.test, deferred: false })))
     }
     else if (node.kind === 'for') {
       found.push({ span: node.each, deferred: false }, ...node.key ? [{ span: node.key, deferred: false }] : [])

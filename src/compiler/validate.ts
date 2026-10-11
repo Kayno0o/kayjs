@@ -3,7 +3,7 @@ import type { GenerateOptions } from './codegen'
 import type { LintName } from './lints'
 import type { PageSettingName } from './page-settings'
 import type { ImportBinding, ScriptAnalysis, ServerAnalysis } from './script'
-import { FIELD_ATTRIBUTE, FIELD_ELEMENTS, isHead, isSlot, serverIslandOf, templateFacts } from './ast'
+import { childBlocks, FIELD_ATTRIBUTE, FIELD_ELEMENTS, isHead, isSlot, serverIslandOf, templateFacts } from './ast'
 
 type ValidateOptions = Pick<GenerateOptions, 'island' | 'insideIsland' | 'check' | 'special' | 'includeServer'>
 
@@ -156,8 +156,9 @@ class Validator {
 
           break
         case 'if':
-          for (const branch of node.branches)
-            this.nodes(branch.children)
+        case 'match':
+          for (const block of childBlocks(node))
+            this.nodes(block)
 
           break
         case 'for':

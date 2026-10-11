@@ -1,4 +1,4 @@
-import type { AwaitNode, ElementNode, ErrorMessages, ErrorNode, ForNode, IfBranch, IfNode, NamedAttribute, Node, Span, TemplateFacts, TryNode } from './ast'
+import type { AwaitNode, ElementNode, ElseBlock, ErrorMessages, ErrorNode, ForNode, IfNode, MatchNode, NamedAttribute, Node, Span, TemplateFacts, TryNode } from './ast'
 import type { DynamicItem, Item } from './items'
 import type { CodeBuilder } from './mapping'
 import { actionOf, keyedByPosition, marksServerIsland, serverIslandOf } from './ast'
@@ -157,18 +157,15 @@ export class HtmlTemplate extends TemplateWriter {
 
         break
       case 'if':
-        b.wrap(item.node, () => {
-          const { subject } = item.node
+        b.wrap(item.node, () => this.if(item.node, 0))
 
-          // A `match` reads its subject once, which each branch compares with its values.
-          if (subject) {
-            b.add(`((${SUBJECT}) => `)
-            this.if(item.node, 0)
-            b.add(')(').addSource(subject).add(')')
-          }
-          else {
-            this.if(item.node, 0)
-          }
+        break
+      case 'match':
+        // A `match` reads its subject once, which each case compares with its values.
+        b.wrap(item.node, () => {
+          b.add(`((${SUBJECT}) => `)
+          this.match(item.node, 0)
+          b.add(')(').addSource(item.node.subject).add(')')
         })
 
         break
@@ -212,13 +209,7 @@ export class HtmlTemplate extends TemplateWriter {
     const branch = node.branches[index]!
 
     b.wrap(branch, () => {
-      if (!branch.test) {
-        this.markup(branch.children)
-
-        return
-      }
-
-      const hasRest = index + 1 < node.branches.length
+      const hasRest = index + 1 < node.branches.length || node.fallback !== undefined
 
       // The branch reads a named value through a function, as the island build of the same template does.
       if (branch.alias) {
@@ -227,7 +218,7 @@ export class HtmlTemplate extends TemplateWriter {
 
         if (hasRest) {
           b.add(', () => ')
-          this.if(node, index + 1)
+          this.ifRest(node, index + 1)
         }
 
         b.add(')')
@@ -235,32 +226,51 @@ export class HtmlTemplate extends TemplateWriter {
         return
       }
 
-      b.add('((')
-      this.test(branch)
-      b.add(') ? ')
+      b.add('((').addSource(branch.test).add(') ? ')
       this.markup(branch.children)
       b.add(' : ')
-
-      if (hasRest)
-        this.if(node, index + 1)
-      else
-        b.add('""')
-
+      this.ifRest(node, index + 1)
       b.add(')')
     })
   }
 
-  private test(branch: IfBranch): void {
-    const { b } = this
+  // What renders when the branches before `index` all fail: the next one, else the `else` block.
+  private ifRest(node: IfNode, index: number): void {
+    if (index < node.branches.length)
+      this.if(node, index)
+    else
+      this.else(node.fallback)
+  }
 
-    if (!branch.values) {
-      b.addSource(branch.test!)
+  private match(node: MatchNode, index: number): void {
+    const { b } = this
+    const branch = node.cases[index]
+
+    if (!branch) {
+      this.else(node.fallback)
 
       return
     }
 
-    for (const [index, value] of branch.values.entries())
-      b.add(index === 0 ? `${SUBJECT} === (` : ` || ${SUBJECT} === (`).addSource(value).add(')')
+    b.wrap(branch, () => {
+      b.add('((')
+
+      for (const [index, value] of branch.values.entries())
+        b.add(index === 0 ? `${SUBJECT} === (` : ` || ${SUBJECT} === (`).addSource(value).add(')')
+
+      b.add(') ? ')
+      this.markup(branch.children)
+      b.add(' : ')
+      this.match(node, index + 1)
+      b.add(')')
+    })
+  }
+
+  private else(block: ElseBlock | undefined): void {
+    if (block)
+      this.b.wrap(block, () => this.markup(block.children))
+    else
+      this.b.add('""')
   }
 
   private for(node: ForNode): void {

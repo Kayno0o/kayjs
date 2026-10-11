@@ -32,7 +32,9 @@ function outline(file: KayFile, nodes: Node[] = file.template): unknown[] {
       case 'text':
         return node.parts.map(part => part.kind === 'chunk' ? part.text : part.kind === 'expression' ? `{${text(file, part.expression)}}` : outline(file, [part])[0])
       case 'if':
-        return { if: node.branches.map(branch => ({ test: text(file, branch.test), alias: text(file, branch.alias), children: outline(file, branch.children) })) }
+        return { if: node.branches.map(branch => ({ test: text(file, branch.test), alias: text(file, branch.alias), children: outline(file, branch.children) })), else: node.fallback && outline(file, node.fallback.children) }
+      case 'match':
+        return { match: text(file, node.subject), cases: node.cases.map(branch => ({ values: branch.values.map(value => text(file, value)), children: outline(file, branch.children) })), else: node.fallback && outline(file, node.fallback.children) }
       case 'for':
         return { for: text(file, node.item), index: text(file, node.index), of: text(file, node.each), key: text(file, node.key), children: outline(file, node.children), fallback: node.fallback && outline(file, node.fallback) }
       case 'await':
@@ -277,16 +279,23 @@ describe('control flow', () => {
     const file = parse('if a()\n  p a\nelse if b()\n  p b\nelse\n  p c')
     const node = file.template[0] as IfNode
 
-    expect(node.branches.map(branch => text(file, branch.test))).toEqual(['a()', 'b()', undefined])
+    expect(node.branches.map(branch => text(file, branch.test))).toEqual(['a()', 'b()'])
+    expect(node.fallback?.children).toHaveLength(1)
     expect(file.diagnostics).toEqual([])
   })
 
-  it('reads a narrowing alias but leaves type keywords alone', () => {
-    const file = parse('if user() as u\n  p {u.name}\nif x as const\n  p y')
+  it('reads a narrowing alias as TypeScript reads a cast to a type of that name, and any other cast as a cast', () => {
+    const file = parse('if user() as u\n  p {u.name}\nif list.find(f) as  item\n  p y\nif x as const\n  p y\nif x as string\n  p y\nif (x as u)\n  p y\nif x as Box<T>\n  p y\nif a.b as c.d\n  p y\nif class\n  p y')
 
     expect(outline(file)).toMatchObject([
       { if: [{ test: 'user()', alias: 'u' }] },
+      { if: [{ test: 'list.find(f)', alias: 'item' }] },
       { if: [{ test: 'x as const', alias: undefined }] },
+      { if: [{ test: 'x as string', alias: undefined }] },
+      { if: [{ test: '(x as u)', alias: undefined }] },
+      { if: [{ test: 'x as Box<T>', alias: undefined }] },
+      { if: [{ test: 'a.b as c.d', alias: undefined }] },
+      { if: [{ test: 'class', alias: undefined }] },
     ])
   })
 
@@ -311,12 +320,9 @@ describe('control flow', () => {
 
   it('reads a match, its when lines split at their top-level commas and a last else', () => {
     const file = parse('match post.status\n  // the cases\n  when \'draft\'\n    p Draft\n  when \'a, b\', pick(1, 2), [3]\n    p Live\n  else\n    p Unknown')
-    const node = file.template[0] as IfNode
 
     expect(file.diagnostics).toEqual([])
-    expect(text(file, node.subject)).toBe('post.status')
-    expect(node.branches.map(branch => branch.values?.map(value => text(file, value)))).toEqual([['\'draft\''], ['\'a, b\'', 'pick(1, 2)', '[3]'], undefined])
-    expect(node.branches.map(branch => branch.children.length)).toEqual([1, 1, 1])
+    expect(outline(file)).toEqual([{ match: 'post.status', cases: [{ values: ['\'draft\''], children: [{ tag: 'p', children: [['Draft']] }] }, { values: ['\'a, b\'', 'pick(1, 2)', '[3]'], children: [{ tag: 'p', children: [['Live']] }] }], else: [{ tag: 'p', children: [['Unknown']] }] }])
   })
 
   it('rejects a match without a subject or a when, other lines in it, an else before a when, and a when outside one', () => {
@@ -339,9 +345,8 @@ describe('control flow', () => {
     const file = parse('if a\n  p x\nelse\n  if b\n    p y\n  p z\n')
     const node = file.template[0] as IfNode
 
-    expect(node.branches).toHaveLength(2)
-    expect(text(file, node.branches[1]?.test)).toBeUndefined()
-    expect(node.branches[1]?.children.map(child => child.kind)).toEqual(['if', 'element'])
+    expect(node.branches).toHaveLength(1)
+    expect(node.fallback?.children.map(child => child.kind)).toEqual(['if', 'element'])
 
     const loop = parse('for x of xs key={x}\n  p x\nelse\n  if b\n    p y\n').template[0] as ForNode
 

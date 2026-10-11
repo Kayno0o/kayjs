@@ -1,4 +1,4 @@
-import type { AwaitNode, ConstNode, ElementNode, ErrorMessages, ForNode, IfNode, Node, Span, TemplateFacts, TryNode } from './ast'
+import type { AwaitNode, ConstNode, ElementNode, ElseBlock, ErrorMessages, ForNode, IfNode, MatchNode, Node, Span, TemplateFacts, TryNode } from './ast'
 import type { DynamicItem } from './items'
 import type { CodeBuilder } from './mapping'
 import type { PlannedAttribute } from './markup'
@@ -128,6 +128,10 @@ export class DomTemplate extends TemplateWriter {
         b.wrap(item.node, () => this.if(item.node, at))
 
         break
+      case 'match':
+        b.wrap(item.node, () => this.match(item.node, at))
+
+        break
       case 'for':
         b.wrap(item.node, () => this.for(item.node, at))
 
@@ -160,30 +164,11 @@ export class DomTemplate extends TemplateWriter {
   private if(node: IfNode, at: string): void {
     const { b } = this
 
-    // A `match` reads its subject once, which each branch compares with its values.
-    if (node.subject)
-      b.add(`{ const ${SUBJECT} = ${helperName('memo')}(() => (`).addSource(node.subject).add(')); ')
-
     b.add(`KayBranches(${at}, [`)
 
     for (const branch of node.branches) {
       b.wrap(branch, () => {
-        b.add('[')
-
-        if (branch.values) {
-          b.add('() => ')
-
-          for (const [index, value] of branch.values.entries())
-            b.add(index === 0 ? `${SUBJECT}() === (` : ` || ${SUBJECT}() === (`).addSource(value).add(')')
-        }
-        else if (branch.test) {
-          b.add('() => (').addSource(branch.test).add(')')
-        }
-        else {
-          b.add('null')
-        }
-
-        b.add(', (')
+        b.add('[() => (').addSource(branch.test).add('), (')
 
         if (branch.alias)
           b.addSource(branch.alias)
@@ -194,7 +179,42 @@ export class DomTemplate extends TemplateWriter {
       })
     }
 
-    b.add(node.subject ? ']); }' : ']);')
+    this.else(node.fallback)
+    b.add(']);')
+  }
+
+  // A `match` reads its subject once, which each case compares with its values.
+  private match(node: MatchNode, at: string): void {
+    const { b } = this
+
+    b.add(`{ const ${SUBJECT} = ${helperName('memo')}(() => (`).addSource(node.subject).add(`)); KayBranches(${at}, [`)
+
+    for (const branch of node.cases) {
+      b.wrap(branch, () => {
+        b.add('[() => ')
+
+        for (const [index, value] of branch.values.entries())
+          b.add(index === 0 ? `${SUBJECT}() === (` : ` || ${SUBJECT}() === (`).addSource(value).add(')')
+
+        b.add(', () => ')
+        this.block(branch.children)
+        b.add('], ')
+      })
+    }
+
+    this.else(node.fallback)
+    b.add(']); }')
+  }
+
+  private else(block: ElseBlock | undefined): void {
+    if (!block)
+      return
+
+    this.b.wrap(block, () => {
+      this.b.add('[null, () => ')
+      this.block(block.children)
+      this.b.add('], ')
+    })
   }
 
   private for(node: ForNode, at: string): void {

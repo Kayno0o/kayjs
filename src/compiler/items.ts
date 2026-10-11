@@ -1,5 +1,5 @@
 import type * as t from '@babel/types'
-import type { AwaitNode, ConstNode, ElementNode, ErrorNode, ForNode, IfNode, Node, TextExpression, TryNode } from './ast'
+import type { AwaitNode, ConstNode, ElementNode, ErrorNode, ForNode, IfNode, MatchNode, Node, TextExpression, TryNode } from './ast'
 import type { CodeBuilder } from './mapping'
 import { parseExpression } from '@babel/parser'
 import { isHead, isSlot } from './ast'
@@ -14,6 +14,7 @@ export type Item
     | { kind: 'component', node: ElementNode }
     | { kind: 'slot', node: ElementNode }
     | { kind: 'if', node: IfNode }
+    | { kind: 'match', node: MatchNode }
     | { kind: 'for', node: ForNode }
     | { kind: 'await', node: AwaitNode }
     | { kind: 'try', node: TryNode }
@@ -73,6 +74,7 @@ export function childItems(nodes: Node[]): Item[] {
 
         break
       case 'if':
+      case 'match':
       case 'for':
       case 'await':
       case 'try':

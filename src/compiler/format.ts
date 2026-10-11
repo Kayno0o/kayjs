@@ -162,7 +162,9 @@ function ownMultiLineSpans(node: Node): Span[] {
     case 'text':
       return node.parts.filter(part => part.kind === 'expression')
     case 'if':
-      return [...node.subject ? [node.subject] : [], ...node.branches.flatMap(branch => branch.test ? [branch.test] : [])]
+      return node.branches.map(branch => branch.test)
+    case 'match':
+      return [node.subject, ...node.cases.map(branch => branch.test)]
     case 'for':
       return [node.each, ...node.key ? [{ start: node.key.start - 1, end: node.key.end + 1 }] : []]
     case 'await':

@@ -89,7 +89,7 @@ match post.status
 
 The expression is read once, and `kay check` narrows it in each block as a TypeScript `switch` does: on a union of objects, `match shape.kind` types `shape` per `when`, and a `when` value the type cannot hold is an error.
 
-`if value as name` binds the truthy value for the children. A `for` matches its rows by `item.id`, else by the item itself. When your items have neither, name a key: `for post of posts key={post.slug}`.
+`if value as name` binds the truthy value for the children; `as string`, `as const` or `as Box<T>` stays a cast. A `for` matches its rows by `item.id`, else by the item itself. When your items have neither, name a key: `for post of posts key={post.slug}`.
 
 A `const` line names a value for the lines after it and their children, so a row computes it once however often it reads it:
 

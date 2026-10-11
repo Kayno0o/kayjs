@@ -1,4 +1,7 @@
-import type { Attribute, AwaitBranch, AwaitNode, ConstNode, Details, Diagnostic, ElementNode, ErrorNode, ForNode, IfNode, KayFile, Node, SlotNode, Span, TextNode, TryNode } from './ast'
+import type * as t from '@babel/types'
+import type { Attribute, AwaitBranch, AwaitNode, ConstNode, Details, Diagnostic, ElementNode, ErrorNode, ForNode, IfBranch, IfNode, KayFile, MatchNode, Node, SlotNode, Span, TextNode, TryNode } from './ast'
+import { parseExpression } from '@babel/parser'
+import { Scanner } from './scanner'
 
 // `--- server`, `--- client`, `--- script`, or `--- <T extends Row>` making the component generic, its type parameters in the third or fourth group: `--- client <T>` takes both.
 const FENCE = /---(?:([ \t]*)([a-z]+)(?:[ \t]+<(.*)>)?|[ \t]*<(.*)>)?[ \t]*\r?\n/diy
@@ -16,6 +19,14 @@ const SLOT_NAME = /@[A-Z_$][\w$]*/iy
 const NAMED_SLOT = /slot[ \t]+([A-Z_$][\w$]*)/diy
 const FOR_HEAD = /for[ \t]+([A-Z_$][\w$]*)(?:[ \t]*,[ \t]*([A-Z_$][\w$]*))?[ \t]+of[ \t]+/diy
 const KEYWORD = /(if|else[ \t]+if|else|for|await|then|catch|try|match|when)(?=[ \t]|\r?\n|$)/y
+const COMMENT_HEAD = /\/\//y
+// `| text`, or a line made of an expression, which is text as `| {expr}` is.
+const TEXT_HEAD = /\| ?|(?=\{)/y
+const SLOT_HEAD = /(?=@)/y
+// `- code`, which pug runs.
+const PUG_CODE = /-(?= |\r?\n|$)/y
+// What a condition naming its value holds, which may as well be a cast.
+const MAY_ALIAS = /\sas\s/
 const MATCH_LINE = /(when|else)(?=[ \t]|\r?\n|$)/y
 const CONST_HEAD = /const(?=[ \t]|\r?\n|$)/y
 // `let x = 1`: a declaration kay has no counterpart for, told from a `var` element by the `=`.
@@ -42,18 +53,15 @@ const PUG_HINTS: Record<string, string> = {
 // `then list` closing the `await` line, or a bare `then`.
 const INLINE_THEN = /\s+then(?:\s+([a-z_$][\w$]*))?\s*$/d
 const BRANCH_NAME = /[a-z_$][\w$]*/iy
-const ALIAS = /\s+as\s+([a-z_$][\w$]*)\s*$/d
 const KEY_ATTRIBUTE = /[ \t]+key=\{/y
 const CAPITALIZED = /^[A-Z]/
 const WHITESPACE = /\s/
 const ATTRIBUTE_SEPARATOR = /[\s,]/
-// What a `/` after one of these characters starts: a regex literal, since an operand is expected there.
-const REGEX_PRECEDERS = new Set('(,=:[!&|?{};+-*%<>~^')
-const REGEX_KEYWORDS = new Set(['return', 'typeof', 'void', 'delete', 'in', 'of', 'instanceof', 'new', 'throw', 'case', 'yield', 'await', 'else', 'do'])
-const WORD_BEFORE = /[\w$]+$/
-const REGEX_FLAGS = /[a-z]*/iy
-const CLOSERS = { '{': '}', '(': ')', '[': ']' } as const
-const TYPE_KEYWORDS = new Set(['any', 'unknown', 'never', 'string', 'number', 'boolean', 'bigint', 'symbol', 'object', 'const'])
+
+// A keyword starting a line, such as `if`, past which a space or the end of the line comes.
+function keyword(words: string): RegExp {
+  return new RegExp(`(?:${words})(?=[ \\t]|\\r?\\n|$)`, 'y')
+}
 
 export function parseKay(source: string): KayFile {
   const diagnostics: Diagnostic[] = []
@@ -130,7 +138,11 @@ class TemplateParser {
   // The element that indented children attach to: the innermost one of a `li: a` block expansion.
   private target: ElementNode | undefined
 
-  constructor(private readonly src: string, private pos: number, private readonly diagnostics: Diagnostic[]) {}
+  private readonly scan: Scanner
+
+  constructor(private readonly src: string, private pos: number, private readonly diagnostics: Diagnostic[]) {
+    this.scan = new Scanner(src, (start, end, message) => this.error(start, end, message))
+  }
 
   // Where the first `---` or labeled fence line outside strings, template literals and comments starts.
   closingLine(): number | undefined {
@@ -147,15 +159,15 @@ class TemplateParser {
       const char = this.src[i]!
 
       if (char === '"' || char === '\'')
-        i = this.skipString(i, char)
+        i = this.scan.string(i, char)
       else if (char === '`')
-        i = this.skipTemplate(i)
+        i = this.scan.template(i)
       else if (char === '/' && this.src[i + 1] === '/')
-        i = this.lineEnd(i)
+        i = this.scan.lineEnd(i)
       else if (char === '/' && this.src[i + 1] === '*')
-        i = this.skipBlockComment(i)
+        i = this.scan.blockComment(i)
       else if (char === '/')
-        i = Math.max(this.skipRegex(start, i), i + 1)
+        i = Math.max(this.scan.regex(start, i), i + 1)
       else
         i++
     }
@@ -169,7 +181,7 @@ class TemplateParser {
     this.skipBlankLines()
 
     if (this.pos < this.src.length)
-      this.error(this.pos, this.lineEnd(this.pos), 'Unexpected indentation')
+      this.error(this.pos, this.scan.lineEnd(this.pos), 'Unexpected indentation')
 
     return nodes
   }
@@ -207,159 +219,56 @@ class TemplateParser {
     return nodes
   }
 
-  private parseLine(indent: number, siblings: Node[]) {
-    const start = this.pos
-
-    if (this.src.startsWith('//', start)) {
-      this.pos = this.lineEnd(start)
-      this.skipChildren(indent)
-
-      return
-    }
-
-    if (this.src[start] === '|') {
-      this.pos++
-
-      if (this.src[this.pos] === ' ')
-        this.pos++
-
-      siblings.push(this.parseText(start, '\n'))
-      this.rejectChildren(indent, 'Text lines cannot have children')
-
-      return
-    }
-
+  // Each kind of line by how it starts, tried in order, the cursor at the start of the line; a line none of them starts is an element.
+  private readonly lineKinds: [head: RegExp, parse: (indent: number, siblings: Node[], head: RegExpExecArray) => void][] = [
+    [COMMENT_HEAD, indent => this.skipLine(indent)],
     // A line made of an expression is text, as `| {expr}` is.
-    if (this.src[start] === '{') {
+    [TEXT_HEAD, (indent, siblings, head) => {
+      const start = this.pos
+
+      this.pos += head[0].length
       siblings.push(this.parseText(start, '\n'))
       this.rejectChildren(indent, 'Text lines cannot have children')
-
-      return
-    }
-
-    if (this.src[start] === '@') {
-      siblings.push(this.parseSlot(indent))
-
-      return
-    }
-
-    ERROR_HEAD.lastIndex = start
-
-    if (ERROR_HEAD.test(this.src)) {
-      siblings.push(this.parseError(indent))
-
-      return
-    }
-
-    CONST_HEAD.lastIndex = start
-
-    if (CONST_HEAD.test(this.src)) {
+    }],
+    [SLOT_HEAD, (indent, siblings) => siblings.push(this.parseSlot(indent))],
+    [ERROR_HEAD, (indent, siblings) => siblings.push(this.parseError(indent))],
+    [CONST_HEAD, (indent, siblings) => {
       const node = this.parseConst(indent)
 
       if (node)
         siblings.push(node)
+    }],
+    [REASSIGNABLE, (indent, _, head) => this.skipLine(indent, { length: head[1]!.length, message: `A template declares names with \`const\`, not \`${head[1]}\``, note: 'what the template renders follows the values it reads, so nothing in it is reassigned', help: 'write `const`, or keep a value that changes in a signal of the script' })],
+    [PUG_CODE, indent => this.skipLine(indent, { length: 1, message: '`- code` is pug syntax kay does not have', help: 'a template names a value with `const name = value`; other code goes in the script' })],
+    [keyword('if'), (indent, siblings) => siblings.push(this.parseIf(indent))],
+    [keyword('for'), (indent, siblings) => siblings.push(this.parseFor(indent))],
+    [keyword('await'), (indent, siblings) => siblings.push(this.parseAwait(indent))],
+    [keyword('try'), (indent, siblings) => siblings.push(this.parseTry(indent))],
+    [keyword('match'), (indent, siblings) => siblings.push(this.parseMatch(indent))],
+    [keyword('when'), indent => this.skipLine(indent, { length: 4, message: '`when` sits in a `match` block', help: '`match status`, then one `when \'draft\'` line per case below it' })],
+    [keyword('then|catch'), (indent, siblings, head) => this.attachAwaitBranch(indent, siblings.at(-1), head[0] as 'then' | 'catch')],
+    [keyword('else[ \\t]+if|else'), (indent, siblings, head) => this.attachElse(indent, siblings.at(-1), head[0] !== 'else')],
+    [PUG_KEYWORD, (indent, _, head) => this.skipLine(indent, { length: head[0].length, message: `\`${head[0]}\` is pug syntax kay does not have`, help: PUG_HINTS[head[0]] })],
+    [NAMED_SLOT, (indent, siblings, head) => siblings.push(this.parseOutlet(indent, head))],
+  ]
 
-      return
+  private parseLine(indent: number, siblings: Node[]) {
+    for (const [head, parse] of this.lineKinds) {
+      head.lastIndex = this.pos
+      const found = head.exec(this.src)
+
+      if (found) {
+        parse(indent, siblings, found)
+
+        return
+      }
     }
 
-    REASSIGNABLE.lastIndex = start
-    const reassignable = REASSIGNABLE.exec(this.src)?.[1]
-
-    if (reassignable !== undefined) {
-      this.error(start, start + reassignable.length, `A template declares names with \`const\`, not \`${reassignable}\``, { note: 'what the template renders follows the values it reads, so nothing in it is reassigned', help: 'write `const`, or keep a value that changes in a signal of the script' })
-      this.pos = this.lineEnd(start)
-      this.skipChildren(indent)
-
-      return
-    }
-
-    if (this.src[start] === '-' && (this.src[start + 1] === ' ' || this.atLineEnd(start + 1))) {
-      this.error(start, start + 1, '`- code` is pug syntax kay does not have', { help: 'a template names a value with `const name = value`; other code goes in the script' })
-      this.pos = this.lineEnd(start)
-      this.skipChildren(indent)
-
-      return
-    }
-
-    KEYWORD.lastIndex = start
-    const keyword = KEYWORD.exec(this.src)?.[1]
-
-    if (keyword === 'if') {
-      siblings.push(this.parseIf(indent))
-
-      return
-    }
-
-    if (keyword === 'for') {
-      siblings.push(this.parseFor(indent))
-
-      return
-    }
-
-    if (keyword === 'await') {
-      siblings.push(this.parseAwait(indent))
-
-      return
-    }
-
-    if (keyword === 'try') {
-      siblings.push(this.parseTry(indent))
-
-      return
-    }
-
-    if (keyword === 'match') {
-      siblings.push(this.parseMatch(indent))
-
-      return
-    }
-
-    if (keyword === 'when') {
-      this.error(start, start + 4, '`when` sits in a `match` block', { help: '`match status`, then one `when \'draft\'` line per case below it' })
-      this.pos = this.lineEnd(start)
-      this.skipChildren(indent)
-
-      return
-    }
-
-    if (keyword === 'then' || keyword === 'catch') {
-      this.attachAwaitBranch(indent, siblings.at(-1), keyword)
-
-      return
-    }
-
-    if (keyword !== undefined) {
-      this.attachElse(indent, siblings.at(-1), keyword !== 'else')
-
-      return
-    }
-
-    PUG_KEYWORD.lastIndex = start
-    const pug = PUG_KEYWORD.exec(this.src)?.[1]
-
-    if (pug !== undefined) {
-      this.error(start, start + pug.length, `\`${pug}\` is pug syntax kay does not have`, { help: PUG_HINTS[pug] })
-      this.pos = this.lineEnd(start)
-      this.skipChildren(indent)
-
-      return
-    }
-
-    NAMED_SLOT.lastIndex = start
-    const outlet = NAMED_SLOT.exec(this.src)
-
-    if (outlet) {
-      siblings.push(this.parseOutlet(indent, outlet))
-
-      return
-    }
-
+    const start = this.pos
     const element = this.parseElement(start, '\n')
 
     if (!element) {
-      this.error(start, this.lineEnd(start), 'Expected an element, text (`| text`), `if`, `for` or a `@slot`')
-      this.pos = this.lineEnd(start)
-      this.skipChildren(indent)
+      this.skipLine(indent, { message: 'Expected an element, text (`| text`), `if`, `for` or a `@slot`' })
 
       return
     }
@@ -374,6 +283,21 @@ class TemplateParser {
     siblings.push(element)
   }
 
+  // Leaves the line and the lines indented under it, reporting `problem` from the cursor over `length` characters, or to the end of the line.
+  private skipLine(indent: number, problem?: Details & { message: string, length?: number }) {
+    const start = this.pos
+    const end = this.scan.lineEnd(start)
+
+    if (problem) {
+      const { message, length, ...details } = problem
+
+      this.error(start, length === undefined ? end : start + length, message, details)
+    }
+
+    this.pos = end
+    this.skipChildren(indent)
+  }
+
   private parseOutlet(indent: number, match: RegExpExecArray): ElementNode {
     const start = this.pos
     const [nameStart, nameEnd] = match.indices![1]!
@@ -382,7 +306,7 @@ class TemplateParser {
     this.pos = nameEnd
 
     if (this.src[this.pos] === '(') {
-      const close = this.scanBalanced(this.pos)
+      const close = this.scan.balanced(this.pos)
 
       args = { start: this.pos + 1, end: close - 1 }
       this.pos = close
@@ -402,7 +326,7 @@ class TemplateParser {
 
     if (!match) {
       this.error(start, start + 1, 'Expected a slot name after `@`, such as `@fallback`')
-      this.pos = this.lineEnd(start)
+      this.pos = this.scan.lineEnd(start)
 
       return { kind: 'slot', start, end: this.pos, name: { start, end: start + 1 }, children: this.parseBlock(indent) }
     }
@@ -414,7 +338,7 @@ class TemplateParser {
     this.pos = name.end
 
     if (this.src[this.pos] === '(') {
-      const close = this.scanBalanced(this.pos)
+      const close = this.scan.balanced(this.pos)
 
       params = { start: this.pos + 1, end: close - 1 }
       this.pos = close
@@ -433,7 +357,7 @@ class TemplateParser {
     return { kind: 'if', start, end: branch.end, branches: [branch] }
   }
 
-  private parseBranch(testStart: number, indent: number) {
+  private parseBranch(testStart: number, indent: number): IfBranch {
     const start = this.pos
 
     this.pos = testStart
@@ -443,28 +367,47 @@ class TemplateParser {
     if (test.start === test.end)
       this.error(start, test.end, 'Expected a condition')
 
-    let alias: Span | undefined
-    const match = ALIAS.exec(this.src.slice(test.start, test.end))
-    const group = match?.indices?.[1]
-
-    if (match?.[1] !== undefined && group && !TYPE_KEYWORDS.has(match[1])) {
-      alias = { start: test.start + group[0], end: test.start + group[1] }
-      test.end = test.start + match.index
-    }
-
+    const alias = this.alias(test)
     const children = this.parseBlock(indent)
 
     return { start, end: this.lastContentEnd(), test, alias, children }
   }
 
+  // `if user() as u` names the value it tests, which reads as TypeScript's `as` with a type named `u`: a type it names any other way, `as string` or `as const`, is a cast.
+  // Found, it is cut off the end of `test`.
+  private alias(test: Span): Span | undefined {
+    const code = this.src.slice(test.start, test.end)
+
+    if (!MAY_ALIAS.test(code))
+      return undefined
+
+    let expression: t.Expression
+
+    try {
+      expression = parseExpression(code, { plugins: ['typescript'] })
+    }
+    catch {
+      return undefined
+    }
+
+    const type = expression.type === 'TSAsExpression' && expression.extra?.parenthesized !== true && expression.typeAnnotation.type === 'TSTypeReference' && !expression.typeAnnotation.typeParameters ? expression.typeAnnotation.typeName : undefined
+
+    if (type?.type !== 'Identifier' || type.name === 'const')
+      return undefined
+
+    test.end = test.start + (expression as t.TSAsExpression).expression.end!
+
+    return { start: test.start + type.start!, end: test.start + type.end! }
+  }
+
   // Only `when` lines and a last `else` sit in a `match`, each holding the markup of its case.
-  private parseMatch(indent: number): IfNode {
+  private parseMatch(indent: number): MatchNode {
     const start = this.pos
 
     this.pos = start + 'match'.length
     this.skipSpaces()
     const subject = this.scanToLineEnd()
-    const node: IfNode = { kind: 'if', start, end: subject.end, subject, branches: [] }
+    const node: MatchNode = { kind: 'match', start, end: subject.end, subject, cases: [] }
     let blockIndent = -1
 
     if (subject.start === subject.end)
@@ -489,9 +432,10 @@ class TemplateParser {
       this.pos += lineIndent
       const lineStart = this.pos
 
-      if (this.src.startsWith('//', lineStart)) {
-        this.pos = this.lineEnd(lineStart)
-        this.skipChildren(lineIndent)
+      COMMENT_HEAD.lastIndex = lineStart
+
+      if (COMMENT_HEAD.test(this.src)) {
+        this.skipLine(lineIndent)
 
         continue
       }
@@ -499,12 +443,8 @@ class TemplateParser {
       MATCH_LINE.lastIndex = lineStart
       const keyword = MATCH_LINE.exec(this.src)?.[1]
 
-      const afterElse = node.branches.length > 0 && node.branches.at(-1)!.test === undefined
-
-      if (keyword === undefined || afterElse) {
-        this.error(lineStart, this.lineEnd(lineStart), keyword === undefined ? 'A `match` holds `when` lines and a last `else`' : '`else` comes last in a `match`')
-        this.pos = this.lineEnd(lineStart)
-        this.skipChildren(lineIndent)
+      if (keyword === undefined || node.fallback) {
+        this.skipLine(lineIndent, { message: keyword === undefined ? 'A `match` holds `when` lines and a last `else`' : '`else` comes last in a `match`' })
 
         continue
       }
@@ -513,20 +453,21 @@ class TemplateParser {
 
       if (keyword === 'else') {
         this.expectLineEnd('`else` takes no value in a `match`')
-        node.branches.push({ start: lineStart, end: lineStart + 4, children: this.parseBlock(lineIndent) })
+        node.fallback = { start: lineStart, end: lineStart, children: this.parseBlock(lineIndent) }
+        node.fallback.end = this.lastContentEnd()
       }
       else {
         this.skipSpaces()
         const { test, values } = this.scanValues()
 
-        node.branches.push({ start: lineStart, end: test.end, test, values, children: this.parseBlock(lineIndent) })
+        node.cases.push({ start: lineStart, end: test.end, test, values, children: this.parseBlock(lineIndent) })
+        node.cases.at(-1)!.end = this.lastContentEnd()
       }
 
-      node.branches.at(-1)!.end = this.lastContentEnd()
       node.end = this.lastContentEnd()
     }
 
-    if (!node.branches.some(branch => branch.test))
+    if (node.cases.length === 0)
       this.error(start, subject.end, '`match` has no `when` line', { help: 'one `when \'draft\'` line per case below it, then an optional `else`' })
 
     return node
@@ -563,13 +504,13 @@ class TemplateParser {
       }
 
       if (char === '"' || char === '\'')
-        i = this.skipString(i, char)
+        i = this.scan.string(i, char)
       else if (char === '`')
-        i = this.skipTemplate(i)
+        i = this.scan.template(i)
       else if (char === '{' || char === '(' || char === '[')
-        i = this.scanBalanced(i)
-      else if (char === '/' && this.skipRegex(test.start, i) !== -1)
-        i = this.skipRegex(test.start, i)
+        i = this.scan.balanced(i)
+      else if (char === '/' && this.scan.regex(test.start, i) !== -1)
+        i = this.scan.regex(test.start, i)
       else
         i++
     }
@@ -580,7 +521,7 @@ class TemplateParser {
   private attachElse(indent: number, previous: Node | undefined, hasTest: boolean) {
     const start = this.pos
 
-    if (previous?.kind === 'if' && !previous.subject && previous.branches.at(-1)?.test) {
+    if (previous?.kind === 'if' && !previous.fallback) {
       if (hasTest) {
         const testStart = this.src.indexOf('if', start + 4)
         const branch = this.parseBranch(testStart + 2, indent)
@@ -595,7 +536,7 @@ class TemplateParser {
       this.expectLineEnd('`else` takes no condition', { help: 'use `else if <condition>`' })
       const children = this.parseBlock(indent)
 
-      previous.branches.push({ start, end: this.lastContentEnd(), children })
+      previous.fallback = { start, end: this.lastContentEnd(), children }
       previous.end = this.lastContentEnd()
 
       return
@@ -610,9 +551,7 @@ class TemplateParser {
       return
     }
 
-    this.error(start, this.lineEnd(start), '`else` must directly follow an `if`, an `else if` or a `for` at the same indentation')
-    this.pos = this.lineEnd(start)
-    this.skipChildren(indent)
+    this.skipLine(indent, { message: '`else` must directly follow an `if`, an `else if` or a `for` at the same indentation' })
   }
 
   private parseAwait(indent: number): AwaitNode {
@@ -661,8 +600,8 @@ class TemplateParser {
     const valid = previous?.kind === 'try' ? keyword === 'catch' && !previous.rejected : previous?.kind === 'await' && (keyword === 'then' ? !previous.resolved : previous.resolved !== undefined && !previous.rejected)
 
     if (!valid || !previous || (previous.kind !== 'try' && previous.kind !== 'await')) {
-      this.error(start, this.lineEnd(start), keyword === 'then' ? '`then` must directly follow an `await` at the same indentation' : '`catch` must directly follow a `try`, or the `then` of an `await`, at the same indentation')
-      this.pos = this.lineEnd(start)
+      this.error(start, this.scan.lineEnd(start), keyword === 'then' ? '`then` must directly follow an `await` at the same indentation' : '`catch` must directly follow a `try`, or the `then` of an `await`, at the same indentation')
+      this.pos = this.scan.lineEnd(start)
       this.skipChildren(indent)
 
       return
@@ -694,7 +633,7 @@ class TemplateParser {
 
     FOR_HEAD.lastIndex = start
     const head = FOR_HEAD.exec(this.src)
-    const end = this.lineEnd(start)
+    const end = this.scan.lineEnd(start)
     const itemIndices = head?.indices?.[1]
 
     if (!head || !itemIndices) {
@@ -717,7 +656,7 @@ class TemplateParser {
 
     if (keyMatch) {
       const open = each.end + keyMatch[0].length - 1
-      const close = this.scanBalanced(open)
+      const close = this.scan.balanced(open)
 
       key = { start: open + 1, end: close - 1 }
       this.pos = close
@@ -776,7 +715,7 @@ class TemplateParser {
 
   private parseConst(indent: number): ConstNode | undefined {
     const start = this.pos
-    const lineEnd = this.lineEnd(start)
+    const lineEnd = this.scan.lineEnd(start)
 
     this.pos += 'const'.length
     this.skipSpaces()
@@ -785,7 +724,7 @@ class TemplateParser {
     let pattern: Span | undefined
 
     if (this.src[this.pos] === '{' || this.src[this.pos] === '[') {
-      this.pos = this.scanBalanced(this.pos)
+      this.pos = this.scan.balanced(this.pos)
       pattern = { start: patternStart, end: this.pos }
     }
     else {
@@ -873,7 +812,7 @@ class TemplateParser {
 
       if (keyword !== undefined) {
         this.error(this.pos, this.pos + keyword.length, `\`${keyword}\` starts a line of its own`, { help: `put it on the next line, indented under <${name}>` })
-        this.pos = this.lineEnd(this.pos)
+        this.pos = this.scan.lineEnd(this.pos)
         this.target = element
 
         return element
@@ -886,7 +825,7 @@ class TemplateParser {
         element.end = child.end
       }
       else {
-        this.error(this.pos, this.lineEnd(this.pos), 'Expected an element after `: `')
+        this.error(this.pos, this.scan.lineEnd(this.pos), 'Expected an element after `: `')
         this.target = element
       }
 
@@ -908,8 +847,8 @@ class TemplateParser {
     }
 
     if (!this.atLineEnd() && !(terminator === ']' && next === ']')) {
-      this.error(this.pos, this.lineEnd(this.pos), `Unexpected \`${next}\` after <${name}>`, { help: name === 'key' && next === '=' ? 'a `for`\'s key goes on the `for` line: `for todo of todos key={todo.slug}`' : `inline text needs a space before it: \`${name} Hello\`` })
-      this.pos = this.lineEnd(this.pos)
+      this.error(this.pos, this.scan.lineEnd(this.pos), `Unexpected \`${next}\` after <${name}>`, { help: name === 'key' && next === '=' ? 'a `for`\'s key goes on the `for` line: `for todo of todos key={todo.slug}`' : `inline text needs a space before it: \`${name} Hello\`` })
+      this.pos = this.scan.lineEnd(this.pos)
     }
 
     this.target = element
@@ -981,7 +920,7 @@ class TemplateParser {
       }
 
       if (char === '{') {
-        const end = this.scanBalanced(this.pos)
+        const end = this.scan.balanced(this.pos)
         const inner = this.src.slice(this.pos + 1, end - 1)
         const spreadAt = inner.indexOf('...')
 
@@ -1029,7 +968,7 @@ class TemplateParser {
     if (quote === '"' || quote === '\'') {
       const end = this.src.indexOf(quote, this.pos + 1)
 
-      if (end === -1 || end > this.lineEnd(this.pos)) {
+      if (end === -1 || end > this.scan.lineEnd(this.pos)) {
         this.error(this.pos, this.pos + 1, 'Unclosed string')
         this.pos = this.src.length
 
@@ -1044,7 +983,7 @@ class TemplateParser {
     }
 
     if (quote === '{') {
-      const end = this.scanBalanced(this.pos)
+      const end = this.scan.balanced(this.pos)
       const expression = { start: this.pos + 1, end: end - 1 }
 
       this.pos = end
@@ -1087,7 +1026,7 @@ class TemplateParser {
 
       if (char === '{') {
         flush()
-        const end = this.scanBalanced(this.pos)
+        const end = this.scan.balanced(this.pos)
         const expression = { start: this.pos + 1, end: end - 1 }
 
         if (this.src.slice(expression.start, expression.end).trim() === '')
@@ -1135,156 +1074,6 @@ class TemplateParser {
     return { kind: 'text', start, end: this.pos, parts }
   }
 
-  // Returns the position just past the bracket matching the one at `open`, skipping strings, template literals and comments.
-  private scanBalanced(open: number): number {
-    const closers: string[] = []
-    let i = open
-
-    while (i < this.src.length) {
-      const char = this.src[i]!
-
-      if (char === '"' || char === '\'') {
-        i = this.skipString(i, char)
-
-        continue
-      }
-
-      if (char === '`') {
-        i = this.skipTemplate(i)
-
-        continue
-      }
-
-      if (char === '/' && this.src[i + 1] === '/') {
-        i = this.lineEnd(i)
-
-        continue
-      }
-
-      if (char === '/' && this.src[i + 1] !== '*') {
-        const end = this.skipRegex(open, i)
-
-        if (end !== -1) {
-          i = end
-
-          continue
-        }
-      }
-
-      if (char === '/' && this.src[i + 1] === '*') {
-        i = this.skipBlockComment(i)
-
-        continue
-      }
-
-      i++
-
-      if (char === '{' || char === '(' || char === '[') {
-        closers.push(CLOSERS[char])
-
-        continue
-      }
-
-      if (char !== '}' && char !== ')' && char !== ']')
-        continue
-
-      if (closers.pop() !== char) {
-        this.error(i - 1, i, `Unbalanced \`${char}\``)
-
-        return i
-      }
-
-      if (closers.length === 0)
-        return i
-    }
-
-    this.error(open, open + 1, `Unclosed \`${this.src[open]}\``)
-
-    return this.src.length
-  }
-
-  private skipTemplate(open: number): number {
-    let i = open + 1
-
-    while (i < this.src.length && this.src[i] !== '`') {
-      if (this.src[i] === '\\') {
-        i += 2
-
-        continue
-      }
-
-      if (this.src[i] === '$' && this.src[i + 1] === '{') {
-        i = this.scanBalanced(i + 1)
-
-        continue
-      }
-
-      i++
-    }
-
-    if (i >= this.src.length) {
-      this.error(open, open + 1, 'Unclosed template literal')
-
-      return this.src.length
-    }
-
-    return i + 1
-  }
-
-  private skipBlockComment(open: number): number {
-    const close = this.src.indexOf('*/', open + 2)
-
-    return close === -1 ? this.src.length : close + 2
-  }
-
-  private skipString(open: number, quote: string): number {
-    let i = open + 1
-
-    while (i < this.src.length && this.src[i] !== quote && this.src[i] !== '\n')
-      i += this.src[i] === '\\' ? 2 : 1
-
-    return this.src[i] === quote ? i + 1 : i
-  }
-
-  // Returns the position just past the regex literal starting at `at`, or -1 when a `/` there divides or the literal does not close on its line; `from` bounds the look back at the previous token.
-  private skipRegex(from: number, at: number): number {
-    let before = at - 1
-
-    while (before >= from && WHITESPACE.test(this.src[before]!))
-      before--
-
-    const previous = before < from ? '{' : this.src[before]!
-    const word = WORD_BEFORE.exec(this.src.slice(from, before + 1))?.[0]
-    const doubled = (previous === '+' || previous === '-') && this.src[before - 1] === previous
-
-    if (doubled || !(REGEX_PRECEDERS.has(previous) || (word !== undefined && REGEX_KEYWORDS.has(word))))
-      return -1
-
-    let inClass = false
-
-    for (let i = at + 1; i < this.src.length && this.src[i] !== '\n'; i++) {
-      const char = this.src[i]
-
-      if (char === '\\') {
-        i++
-      }
-      else if (char === '[') {
-        inClass = true
-      }
-      else if (char === ']') {
-        inClass = false
-      }
-      else if (char === '/' && !inClass) {
-        REGEX_FLAGS.lastIndex = i + 1
-        REGEX_FLAGS.test(this.src)
-
-        return REGEX_FLAGS.lastIndex
-      }
-    }
-
-    return -1
-  }
-
   // Scans an expression running to the end of the line; brackets may span lines. With `stopAtKey`, a top-level ` key={` ends it.
   private scanToLineEnd(stopAtKey = false): Span {
     const start = this.pos
@@ -1304,19 +1093,19 @@ class TemplateParser {
       }
 
       if (char === '"' || char === '\'') {
-        i = this.skipString(i, char)
+        i = this.scan.string(i, char)
 
         continue
       }
 
       if (char === '`') {
-        i = this.skipTemplate(i)
+        i = this.scan.template(i)
 
         continue
       }
 
       if (char === '/') {
-        const end = this.skipRegex(start, i)
+        const end = this.scan.regex(start, i)
 
         if (end !== -1) {
           i = end
@@ -1326,7 +1115,7 @@ class TemplateParser {
       }
 
       if (char === '{' || char === '(' || char === '[') {
-        i = this.scanBalanced(i)
+        i = this.scan.balanced(i)
 
         continue
       }
@@ -1355,7 +1144,7 @@ class TemplateParser {
 
   private skipBlankLines() {
     while (this.pos < this.src.length) {
-      const end = this.lineEnd(this.pos)
+      const end = this.scan.lineEnd(this.pos)
 
       if (this.src.slice(this.pos, end).trim() !== '')
         return
@@ -1366,10 +1155,10 @@ class TemplateParser {
 
   // Skips the lines indented deeper than `indent`, leaving the cursor on the next line that is not.
   private skipChildren(indent: number) {
-    let lineStart = this.lineEnd(this.pos) + 1
+    let lineStart = this.scan.lineEnd(this.pos) + 1
 
     while (lineStart < this.src.length) {
-      const end = this.lineEnd(lineStart)
+      const end = this.scan.lineEnd(lineStart)
 
       if (this.src.slice(lineStart, end).trim() !== '') {
         if (this.indentAt(lineStart) <= indent)
@@ -1399,8 +1188,8 @@ class TemplateParser {
     this.skipSpaces()
 
     if (!this.atLineEnd()) {
-      this.error(this.pos, this.lineEnd(this.pos), message, details)
-      this.pos = this.lineEnd(this.pos)
+      this.error(this.pos, this.scan.lineEnd(this.pos), message, details)
+      this.pos = this.scan.lineEnd(this.pos)
     }
   }
 
@@ -1432,12 +1221,6 @@ class TemplateParser {
     const char = this.src[at]
 
     return char === undefined || char === '\n' || (char === '\r' && this.src[at + 1] === '\n')
-  }
-
-  private lineEnd(from: number): number {
-    const end = this.src.indexOf('\n', from)
-
-    return end === -1 ? this.src.length : end
   }
 
   // The end of the last non-blank character consumed, so a node's span never swallows trailing blank lines.

@@ -48,8 +48,8 @@ interface IdUse {
   repeated: boolean
 }
 
-// How the checks walk into each kind of node: the blocks of an `if`, `for`, `await` or `try` are alternatives, each rendering on its own.
-const WALKS: Record<Node['kind'], 'element' | 'within' | 'alternatives' | 'none'> = { element: 'element', text: 'within', slot: 'within', if: 'alternatives', for: 'alternatives', await: 'alternatives', try: 'alternatives', const: 'none', error: 'none' }
+// How the checks walk into each kind of node: the blocks of an `if`, `match`, `for`, `await` or `try` are alternatives, each rendering on its own.
+const WALKS: Record<Node['kind'], 'element' | 'within' | 'alternatives' | 'none'> = { element: 'element', text: 'within', slot: 'within', if: 'alternatives', match: 'alternatives', for: 'alternatives', await: 'alternatives', try: 'alternatives', const: 'none', error: 'none' }
 
 // What a page needs to be used without seeing it, read off the markup alone: a control with no label, a button or link with nothing to announce, a heading skipping a level.
 export function accessibilityLints(file: KayFile): Diagnostic[] {
@@ -312,7 +312,7 @@ export function accessibilityLints(file: KayFile): Diagnostic[] {
 
         alternatives(context, children.length, (index, branch) => {
           // Each branch is another page: the heading before the block leads each, not the branch shown before it.
-          if (node.kind === 'if')
+          if (node.kind === 'if' || node.kind === 'match')
             heading = before
 
           visit(children[index]!, { ...branch, repeated: branch.repeated || (node.kind === 'for' && index === 0) })
