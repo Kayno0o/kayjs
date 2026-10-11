@@ -58,6 +58,8 @@ import { serveFiles } from './storage'
 import { serveViolationReports } from './violations'
 import { agreeOnWildcards } from './wildcards'
 
+const READS = new Set(['GET', 'HEAD'])
+
 // Options given here win over the project's `kay.config.ts`.
 export interface PagesOptions extends KayConfig {
   // Project root: island ids and `.kay/` output are relative to it. Defaults to the working directory.
@@ -84,11 +86,12 @@ async function servedRoutes({ routes, i18n, collections }: PageSetup, required: 
 }
 
 // onRequest runs for every route of the app, its own included; a header the app set before is kept.
+// A file route answers only GET and HEAD with its own: any other method gets Elysia's 404 or 405 off the context.
 function sendSecurityHeaders(app: App, security: Record<string, string>, filePaths: ReadonlySet<string>) {
   const headers = Object.entries(security)
 
   app.onRequest(({ request, set }) => {
-    if (!filePaths.has(pathOf(request.url)))
+    if (!READS.has(request.method) || !filePaths.has(pathOf(request.url)))
       setSecurityHeaders(set, headers)
   })
 }

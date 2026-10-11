@@ -156,6 +156,15 @@ describe('security headers', () => {
         expect(response.headers.get('content-security-policy')?.startsWith(app === own ? 'default-src *' : 'default-src \'self\'')).toBe(true)
       }
     }
+
+    // A file route answers no other method, which gets Elysia's own answer, secured as any other.
+    for (const path of paths) {
+      const response = await stock.handle(new Request(`http://localhost${path}`, { method: 'POST' }))
+
+      expect(response.status).toBeGreaterThanOrEqual(400)
+      expect(response.headers.get('x-frame-options')).toBe('SAMEORIGIN')
+      expect(response.headers.get('content-security-policy')?.startsWith('default-src \'self\'')).toBe(true)
+    }
   })
 
   it('allows the live-reload script in development, as the server\'s mode says whatever its config holds', async () => {
