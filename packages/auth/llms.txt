@@ -1,0 +1,427 @@
+# kayjs-auth
+
+> Auth for kay apps, built on kay's `session()`: OAuth sign-in with any provider, passwords, mailed links (email verification, password reset, magic links, email change), TOTP two-factor with recovery codes, bearer tokens for devices and API clients, security mails, a CAPTCHA hook, a breached-password check, a fail-closed gate for routes, and prebuilt sign-in and account pages. It works in kay pages, actions and guards, and in a plain Elysia app. Its data lives in a store: in memory for tests, in Postgres through pg-orm, or in any object keeping the store contract.
+
+## Rules that are easy to get wrong
+
+- The signed-in state lives in the app's kay session. kayjs-auth sets no cookie of its own: the app's session data type includes `AuthSessionData`.
+- `auth.user()` is a method returning a promise, resolved once per request: `const user = await ctx.locals.auth.user()`.
+- A method that can fail answers `{ ok: true, ... }` or `{ ok: false, error }`, and field errors come as `errors` holding codes such as `'too-short'` or `'taken'`, never messages: the page words them in its own language.
+- A mailed link opens an app page that shows a button, or the new password's form, posting the token to an action. The page never spends the token on load: mail scanners open links.
+- A sign-in may stop at the second factor. `signInWithPassword`, `signInWithMagicLink`, `resetPassword` and the OAuth callback then answer the `twoFactorPage` as where to go, and the user is signed in once `verifyTwoFactor` gets the code. Redirect to the `redirect` they answer, never to a path of your own.
+- An action that redirects writes `return ctx.redirect(...)`, with the `return`, so `kay check` types `ctx.failed(action)` right.
+- A link to an OAuth route changes the session on GET: give it `data-no-prefetch`, so a hover starts nothing.
+
+## Setup
+
+kayjs-auth is published as `@kaynooo/kayjs-auth` to `https://git.kaynooo.fr/api/packages/kaynooo/npm/`, beside kay. kay, Elysia and, for the Postgres store, `@kaynooo/pg-orm` are peer dependencies.
+
+```ts
+// src/auth.ts
+import type { AuthSessionData } from '@kaynooo/kayjs-auth'
+import { createAuth, discordProvider } from '@kaynooo/kayjs-auth'
+import { authTables, pgStore } from '@kaynooo/kayjs-auth/pg'
+import { Database } from '@kaynooo/pg-orm'
+import { session } from 'kay/server'
+import { mail } from './mail'
+import { Posts } from './tables'
+
+export const db = new Database({ url: process.env.DATABASE_URL!, tables: [...authTables, Posts] })
+
+export const auth = createAuth({
+  sessions: session<AuthSessionData & { cart: string[] }>({ secret: process.env.SESSION_SECRET! }),
+  secret: process.env.AUTH_SECRET!,
+  store: pgStore(db),
+  url: 'https://example.com',
+  site: 'Example',
+  signInPage: '/login',
+  oauth: { discord: { provider: discordProvider(), clientId: process.env.DISCORD_CLIENT_ID!, clientSecret: process.env.DISCORD_CLIENT_SECRET! } },
+  email: { mailer: { send: mail.enqueue }, links: { 'verify-email': '/verify', 'reset-password': '/reset', 'magic-link': '/magic', 'change-email': '/confirm-email' } },
+  roles: { admin: ['editor'], editor: [] },
+})
+```
+
+```ts
+// kay.config.ts
+import { authPages } from '@kaynooo/kayjs-auth'
+import { defineConfig } from 'kay/server'
+
+export default defineConfig({
+  extensions: [authPages({ server: async () => (await import('./src/auth')).auth.plugin })],
+})
+```
+
+The extension hands `pages()` the plugin, used before the pages: the app mounts nothing else and declares no `Register`, `kay check` typing `ctx.locals.auth` and checking links to kayjs-auth's routes off it. `server` is a function so that kay.config.ts never loads the app's database: kay calls it only when `pages()` builds the app, never for `kay check`, the editor or `kay build`. `authPages` also brings the prebuilt pages (see Prebuilt pages); an app keeping its own lists the plugin alone, `{ name: 'auth', server: async () => (await import('./src/auth')).auth.plugin }`.
+
+A plain Elysia app, or one mounting the plugin by hand, uses it before the pages, `new Elysia().use(auth.plugin).use(await pages())`, and registers `locals: LocalsOf<typeof auth.plugin>` and `app: typeof auth.plugin` (or its own Elysia instance) in kay's `Register` for `kay check`. The plugin may also sit inside a plugin of the app's own, at any depth: `auth` reaches every route declared after it. The session plugin then goes on the app itself, or is left to `auth.plugin`: used first inside that plugin, it stays there, and every route outside it answers 500 with an error saying so. The plugin uses the session plugin itself, puts `auth` in every request's context (`ctx.locals.auth` in pages, actions and guards, `({ auth })` in Elysia routes), and serves the OAuth routes. `db.sync()` creates kayjs-auth's tables with the app's. What it logs, a mailer, a hook or a check that failed, goes where the app's `log` setting sends kay's messages, headed `kayjs-auth:`, as text, as JSON or to the app's function, under the request being answered.
+
+`createAuth` options:
+
+- `sessions`: the plugin kay's `session()` returns, its data type including `AuthSessionData`.
+- `secret`: at least 32 characters, from the environment, and not the session's secret: kayjs-auth cannot derive the session's keys, so the two stay apart only when the app keeps them apart. Each use gets its own key derived from it: encrypting TOTP secrets and provider tokens, and digesting where a sign-in came from. A list rotates secrets: the first writes, every one reads. After a rotation each user gets one `new-sign-in` mail, since the digest of where they sign in from changes with the secret.
+- `store`: see Stores.
+- `url`: the site's public origin, needed for OAuth callbacks and mailed links; `createAuth` throws without it when either is configured. `site`: the site's name in mails and authenticator apps, the URL's host by default.
+- `prefix`: where the OAuth routes live, `/auth` by default.
+- `signInPage`: where a failed OAuth sign-in goes with `?error=`, `/` by default. `failurePage`: where every failed OAuth sign-in goes instead, with no reason in the URL, so that whether an account may sign in does not leak through an `allow` list. `twoFactorPage`: where a sign-in goes to ask for the code, `/two-factor` by default. `pages`: see Prebuilt pages, which these then default to.
+- `oauth`, `allow`, `onSignUp`, `onProviderProfile`: see OAuth. `email`: see Mailed links. `onDelete`: see Account. `onEvent`: see Security mails. `roles`, `defaultRoles`, `authorize`: see Guards and gates. `scopes`: see Bearer tokens. `limits`: see Limits. `captcha`, `breachedPasswords`: see Bots and breached passwords. `sessionMaxAge`, `rememberMaxAge`, `browserSessionMaxAge`, `sessionsPage`, `locate`: see Sessions. `passkeys`: see Passkeys. `audit`: see Events and the audit log. `admin`: see Admin. `organizations`: see Organizations.
+
+## Prebuilt pages
+
+kayjs-auth ships every sign-in and account page as a kay extension, styled with kayjs-ui, in English and French. `authPages()` in kay.config.ts, as in Setup, serves them, and `createAuth` sends users to them:
+
+```ts
+// src/auth.ts
+export const auth = createAuth({ /* ... */ pages: true })
+```
+
+- `authPages({ prefix, home, server })` and `createAuth({ pages: { prefix, home } })` take the same `prefix` and `home`: `prefix` where the pages live, `/auth` by default, and `home` where a sign-in goes when nothing asked for another page and where a sign-out goes, `/` by default. `pages: true` takes the defaults.
+- The pages: `sign-in` (providers, password, magic link or code, passkey, remember me), `register`, `two-factor`, `reset-password`, `verify-email`, `magic-link`, `confirm-email`, and under `account`: the profile (address, username, verification), `security` (password, two-factor with its QR code and recovery codes, passkeys), `sessions`, `connections` (shown with providers), `tokens` and `data` (download, deletion). Each works without JavaScript but passkeys, and shows only what the config enables.
+- With `pages`, `signInPage`, `twoFactorPage`, `sessionsPage` and every `email.links` default to those pages, and `auth.guard()` without `redirect` sends an anonymous visitor to the sign-in page, `?redirect=` back. Without `pages`, `email.links` names a page for each kind, or `createAuth` throws.
+- An app file at a page's path replaces that page alone: `src/routes/auth/magic-link.kay` is the app's own magic-link page. Its texts live under `auth` in kay's messages: a key in the app's `src/messages/en.ts`, such as `auth: { signIn: { title: 'Welcome back' } }`, replaces that text and keeps the rest.
+- The pages reached before signing in, `sign-in`, `register`, `two-factor`, `reset-password`, `verify-email`, `magic-link` and `confirm-email`, set `guards: false`: none of the app's guards above them runs there, whatever it checks. An app's root `_guard.ts` asking for a session, `export default auth.guard()`, keeps the rest of the site to signed-in users and still lets visitors sign in, the `account` pages keeping it; but a guard for maintenance, an IP allow-list or invite-only access skips those pages too. An app needing such a guard on one of them replaces that page with its own, which the app's guards cover unless it sets `guards: false`; an app page replacing one under a guard asking for a session sets it. kayjs-auth's own routes, OAuth and the rest, are its plugin's, which page guards never reach.
+- `captcha.widget`, `turnstileWidget(siteKey)` or `hcaptchaWidget(siteKey)`, is the widget the pages show where `captchaRequired` asks for one.
+- A provider's button reads its `label`, set on each preset (`GitHub`, `Google`) and overridden by `oauth.<name>.label`.
+- kayjs-ui is a peer of kayjs-auth, 0.4.28 or any later 0.x, so the pages render with the app's own copy; the app keeps `@iconify-json/tabler` and Tailwind, kayjs-ui's peers.
+- kayjs-auth needs kay 1.37 or later.
+
+`auth.features()` tells any page, prebuilt or the app's own, what the config enables: `{ providers: [{ name, label }], email, codes, requireVerified, passkeys, captcha, scopes, prefix, signInPage, pages }`.
+
+## The signed-in user
+
+```kay
+--- server
+const user = await ctx.locals.auth.user()
+---
+if user as signedIn
+  p Signed in as {signedIn.email}
+else
+  a(href="/login") Sign in
+```
+
+- `user()` answers `{ id, email, emailVerified, username, roles, hasPassword, twoFactor, locale, guest }`, or `null`. Secrets never leave the store: no hash, no TOTP secret, no token.
+- It reads the session first, then the request's `Authorization: Bearer` token. `via()` says which: `'session'`, `'bearer'` or `null`.
+- `signOut()` signs this session out under a new session id, keeping the rest of the app's session data, and takes it off the user's sessions, so a copy of the cookie is worth nothing either. `signOutEverywhere()` ends every session of the user, copied cookies included, and every bearer token they hold; `signOutEverywhere({ keepThisOne: true })` keeps this session, the tokens still ending.
+- `signIn({ id })` signs a user in directly, without their second factor, for a way of signing in the app proves itself. kayjs-auth's own flows all go through the second factor.
+- A deleted user, one signed out everywhere since, or a session ended or unseen past its lifetime, reads as `null`, and the stale entry leaves the session.
+- A websocket route on an app using the plugin reads its user as `await ws.data.auth.user()`, off the cookie or token its upgrade carried. `auth.socketUser(ws)` does the same for a handler typed for any socket, `null` for an anonymous one or one opened without the plugin.
+
+## Sessions
+
+Each sign-in is kept on the user's list of sessions in the store, whatever holds the session itself, so one can be ended from another browser:
+
+- `sessions()` lists `{ id, current, device, userAgent, ip, place, createdAt, lastSeenAt }`, oldest first, `current` the browser asking. `device` is the user agent read as `{ browser, os, mobile }`, such as `Firefox` and `Windows`, `null` for what it does not know. `place` is what `locate(ip)` answers, an option of the app's over a geolocation database of its own, `null` without one or when it throws. A visit is recorded at most every five minutes, or at once from a new address.
+- `endSession(id)` ends one of them, effective on that browser's next request; ending the current one signs out. It answers false when the user has no session with that id.
+- A session unseen for `sessionMaxAge` seconds, 30 days by default, is over even when its cookie lives on. Set it to the session plugin's own lifetime or shorter.
+- "Remember me": `remember: true` keeps the session `rememberMaxAge` seconds unseen, 90 days by default; `remember: false` gives it a cookie the browser drops on closing, over after `browserSessionMaxAge` unseen, a day by default as kay's session `browserMaxAge` is (keep the two alike). Without `remember` the session takes `sessionMaxAge`, whatever a sign-in before chose in that browser. It goes in as `signInWithPassword({ ..., remember })`, `register({ ..., remember })`, `requestMagicLink(email, redirect, { remember })` (for the link opened, or the code typed, in that browser), `signInWithPasskey(response, redirect, { remember })`, `signIn(user, { remember })` and `?remember=1` or `?remember=0` on an OAuth link, and holds through the second factor. It needs kay 1.23 or later.
+- A password change, a reset and `signOutEverywhere` end the other sessions, which leave the list.
+- Through a bearer token, `sessions()` is empty and `endSession` ends nothing: the list belongs to the browsers.
+- `sessionsPage`, such as `/account/sessions`, is where the app lists them: `new-sign-in` mails link to it, so a user who does not know the sign-in can end it.
+- A sign-in from before the list existed goes on it at its next request.
+
+## Guards and gates
+
+A `_guard.ts` default-exports kayjs-auth's guard:
+
+```ts
+import { auth } from '../../auth'
+
+export default auth.guard({ redirect: '/login', require: 'editor' })
+```
+
+- An anonymous visitor goes to `redirect`, with where they were going as `?redirect=`, a path to hand to `signInWithPassword` or an OAuth link. Without `redirect`, and for any post, the answer is a 401. A user who does not meet `require` gets a 403.
+- A requirement is a role, a predicate `(user, ctx) => boolean`, or a list of which any one passes. A role includes the roles `roles` lists under it: with `{ admin: ['editor'], editor: [] }`, an admin meets `'editor'`. A user's roles are `UserRecord.roles` in the store. `defaultRoles: ['user']` gives every new user those roles, by password or by provider; a store leaves them to kayjs-auth rather than filling them in itself, so it knows which roles were given on purpose.
+- `auth.hasRole('admin')` is the predicate form, `auth.isGranted('admin', user)` the plain check.
+- `authorize: (user, requirement, level, ctx) => Promise<boolean>` replaces the decision, for grants on single records: `decide(grantStore, user, requirement, level, ctx)` reads a `GrantStore` of the app's. `level` is `'read'` for GET and HEAD, `'write'` otherwise.
+
+Plain Elysia routes, such as an API, close behind a gate, which uses the plugin itself:
+
+```ts
+const api = new Elysia({ prefix: '/api' })
+  .use(auth.gate())
+  .get('/me', ({ auth }) => auth.user())
+  .get('/stats', () => stats(), { auth: 'admin' })
+  .get('/health', () => 'ok', { auth: false })
+```
+
+- Every route the instance declares after `.use(auth.gate())` needs a signed-in user, or `gate({ require })`'s requirement. A route asks for more with `auth: <requirement>` and stays open with `auth: false`. Routes added through `group`, `guard`, `route`, `all`, `ws` or a used plugin are closed too, so a route that forgets `auth:` stays closed. A route declared before the gate stays open: use the gate first.
+- `auth.gate()` brings `auth.plugin` along, so `auth` reaches the routes declared after the gate's instance too.
+- Gates nest: a sub-router behind `auth.gate({ require: 'admin' })` inside an app behind `auth.gate()` needs both.
+- 401 to an anonymous caller, 403 to a signed-in one who is denied. A bearer token passes as its user.
+
+## OAuth
+
+Each entry of `oauth` names a provider app: `{ provider, clientId, clientSecret }`. Its routes are `/auth/<name>` and `/auth/<name>/callback`, and the callback URL to register at the provider is `url` + `/auth/<name>/callback`.
+
+```kay
+a(href="/auth/discord?redirect=/account" data-no-prefetch) Sign in with Discord
+a(href="/auth/github?link=1&redirect=/account" data-no-prefetch) Link GitHub
+```
+
+- `discordProvider({ scopes })` (`identify` and `email` by default) and `githubProvider({ scopes })` are presets; any `OAuthProvider` works. A provider's `normalizeUser` reports an `email` only when the provider verified it, as the presets do. The Discord preset gives `avatar` and `banner` as CDN URLs, a gif for an animated one, null without one.
+- OpenID Connect providers take `{ scopes, params }`, `params` added to the authorize URL, such as Google's `{ access_type: 'offline', prompt: 'consent' }` for a refresh token. Their ID token is checked before anything is read off it: signed by a key of the provider's JWKS, by its issuer, for this `clientId`, unexpired, and carrying the nonce the flow sent.
+  - `oidcProvider({ issuer, name })`: any provider by its issuer URL (Keycloak, Authentik, Auth0, Okta, Zitadel...), its endpoints read once off `<issuer>/.well-known/openid-configuration` on first use; a discovery that fails is `unavailable` and tried again on the next sign-in. Its `preferred_username` is the username.
+  - `googleProvider()`.
+  - `microsoftProvider({ tenant })`: `common` (personal and work accounts, the default), `consumers`, `organizations` or one tenant's id. A work account's email is kept only with the `xms_edov` optional claim on the app registration, saying the domain's owner vouches for it.
+  - `gitlabProvider({ url })`: gitlab.com, or a self-hosted instance at `url`.
+  - `appleProvider({ teamId, keyId, privateKey })`: `privateKey` is the `.p8` key's PEM text, the app's `clientId` its Services ID, and it takes no `clientSecret`: the preset signs one. Apple comes back with a POST to the callback, which kayjs-auth turns into a GET so the session cookie rides along. Apple names the user only on their first sign-in, so `profile.displayName` reaches `onSignUp` then and never again.
+- The flow keeps its state and PKCE verifier in the session, so a callback works once, in the browser that started it, within ten minutes. `redirect` is kept to a path on the site. `safeRedirect(path, fallback?)`, exported, does that for the app's own redirects: it answers the path normalised, dot segments resolved, and `fallback` for anything that would leave the site once resolved or decoded, such as `/.//evil.com`.
+- A provider account signs into the user it is linked to. A new one signs up a new user, taking its email and its name only when no other user has them: no account is ever merged into another by email. `onSignUp(user, profile)` runs for every new user, to create the app's own records; `profile` is `undefined` for a password sign-up.
+- `onProviderProfile(user, profile)` runs whenever a provider answers for a user: every OAuth sign-in, the first included after `onSignUp`, and a link. It runs before any second factor, to refresh what the app keeps from the profile, such as an avatar or a display name. A failure in it is logged and the sign-in goes on.
+- `allow(profile)` is asked before any user is touched; false refuses, as an allowlist of provider ids does.
+- `?link=1` links the provider account to the signed-in user instead, refused when another user has it linked. A linked provider is a way in that outlives every sign-out, so linking needs a session that signed in or re-proved in the last ten minutes (see Re-proof): past that the link goes to `signInPage?error=stale`, and the page asks for `auth.reprove(proof)` first.
+- A failure goes to `failurePage` as it is when set, else to `signInPage?error=<code>`: `oauth` (a state or code that did not check out, or a provider account without an id), `cancelled`, `refused`, `taken`, `unavailable` (the provider failed), `signed-out` (a link without a signed-in user), `stale` (a link without a recent proof).
+- `providerToken('discord')` gives the signed-in user's access token, refreshed when about to expire, or `null` when it cannot be: the tokens are forgotten once the provider refuses the refresh token, and kept through an outage. Provider tokens are stored encrypted. `identities()` lists the providers the user linked.
+
+## Passwords
+
+```kay
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+export const signIn = action(t.Object({ identifier: t.String({ maxLength: 254 }), password: t.String() }), async (input, ctx) => {
+  const result = await ctx.locals.auth.signInWithPassword({ ...input, redirect: ctx.url.searchParams.get('redirect') ?? '/' })
+
+  if (!result.ok)
+    return ctx.fail(400, { error: result.error })
+
+  return ctx.redirect(result.redirect)
+})
+
+const failure = ctx.failed(signIn)
+---
+form(action={signIn})
+  input(name="identifier" autocomplete="username")
+  input(name="password" type="password" autocomplete="current-password")
+  button Sign in
+if failure?.data?.error === 'invalid'
+  p.error Wrong email or password
+```
+
+- `register({ email, password, username?, locale? })` answers `{ ok: true, user, signedIn }`, or `errors` by field (`email`: `'invalid'` or `'taken'`; `password`: `'too-short'` or `'too-long'`; `username`: `'length'`, `'characters'`, `'mixed-scripts'` or `'taken'`), or `error: 'limited'` or `'captcha'`. `'mixed-scripts'` (and `'invalid'` for an address before its `@`) catches a name mixing Latin, Cyrillic and Greek letters only: a name written wholly in Cyrillic that looks Latin passes, so show names next to something they cannot fake, such as an avatar. It signs the user in unless the app requires verified addresses, and mails a verification link when the app sends mail.
+- `signInWithPassword({ identifier, password, redirect? })` takes an email, or a username when it holds no `@`. A wrong password and an unknown account answer alike, `'invalid'`, in the same time. `'unverified'` comes once the password is right, when `email.requireVerified` is set: the page then offers `sendVerification()`, which this browser may call from then on. `'limited'` past the attempts allowed: six tries at one account in 15 minutes hold it until the window ends, the right password included, a lockout anyone who knows the address can cause. The tries count against the account, its email and every spelling of its name alike, and each is counted before its password is checked, so parallel guesses do not slip past; a right password clears the count.
+- Passwords are hashed with argon2id; a hash made weaker, or by bcrypt in an older app, is rehashed on the next sign-in.
+- The rules are browser-safe, so an island refuses before posting: `passwordProblem`, `emailProblem`, `usernameProblem`, `normalizeEmail` and `normalizeUsername` from `@kaynooo/kayjs-auth/rules`. Passwords are 10 to 128 characters, usernames 2 to 32. Emails and usernames are stored NFKC-folded, emails lowercased, usernames compared without case, and a name or an email's local part mixing Latin with Cyrillic or Greek is refused.
+
+## Guests
+
+- `signInAsGuest({ captcha? })` signs the browser in as a new user with `guest: true`, no email and no password, so the app keeps their cart or their drafts before they sign up; `onSignUp` runs for them then. It is counted and CAPTCHA-checked as registering is, answers the guest signed in already as is, and `{ ok: false, error: 'signed-in' }` to anyone else.
+- `register(...)` from a guest's browser makes the guest that account, keeping their id and so the app's data; it stays signed in even with `requireVerified`, and `onSignUp` does not run again. An OAuth sign-in with a provider account no user has does the same; one a user has already signs in as that user, leaving the guest behind.
+- A guest's way back in is their session: once it ends, the guest is left in the store. `listUsers` shows them, `guest: true`.
+
+## Mailed links
+
+```ts
+email: {
+  mailer: { send: mail.enqueue },
+  links: { 'verify-email': '/verify', 'reset-password': '/reset', 'magic-link': '/magic', 'change-email': '/confirm-email' },
+  templates: { 'magic-link': ({ site, url }) => ({ subject: `Your ${site} link`, text: url!, html: `<a href="${url}">Sign in</a>` }) },
+  requireVerified: true,
+}
+```
+
+- `mailer.send(mail)` gets `{ to, kind, site, locale, subject, text, html, url?, code?, detail? }`, filled from the templates keyed by `kind`, and is awaited, its result ignored. An app with its own templating reads `kind`, `locale`, `url` and `code`, with `site`, the site's name, and `detail`, the organization an invitation is to or the provider, passkey, token or new address an event is about.
+- Mails are written in the user's language: `locale` on the user, a BCP 47 tag kept from the browser's `Accept-Language` on signing up, from `register({ locale })`, or set with `setLocale(tag)`; the browser's when the user has none. `email.locales` lists the languages the site writes, `['en']` by default, the first for anyone else: a tag picks its own, else one of its language (`fr-CA` gets `fr`). kayjs-auth writes English (`defaultTemplates`) and French (`frenchTemplates`); `templates` goes over them in every language, and `translations: { de: {...} }` over both for its own.
+- With `@kaynooo/kayjs-mail`, `mailer: authMailer(mail.enqueue)` renders each mail through its components and its own wording, which the app overrides line by line in its messages or replaces with its own view per kind, themed by the app's mail settings and in the mail's language, and leaves it to its queue, which retries a mail server that is away; `authMailer(mail.send)` sends it before the call answers. Its llms.txt shows the setup. A mailer of it also fits as it is, `{ send: mail.enqueue }`, sending kayjs-auth's own html. In development and tests the mails go to its outbox, listed at `/_kay/mail`.
+- `links` names the app's page for each kind, the prebuilt pages' by default with `pages`; the link is `url` + that path + `?token=`. The page shows a button posting the token to an action, so opening the link spends nothing:
+
+```kay
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+export const query = t.Object({ token: t.Optional(t.String()) })
+
+export const spend = action(t.Object({ token: t.String() }), async ({ token }, ctx) => {
+  const result = await ctx.locals.auth.signInWithMagicLink(token)
+
+  if (!result.ok)
+    return ctx.fail(400, { error: result.error })
+
+  return ctx.redirect(result.redirect)
+})
+
+const failure = ctx.failed(spend)
+---
+form(action={spend})
+  input(type="hidden" name="token" value={ctx.query.token ?? ''})
+  button Sign in
+if failure
+  p.error This link has expired or was already used
+```
+
+- `requestMagicLink(email, redirect?)` and `requestPasswordReset(email)` answer alike whether or not an account has that address: counted per address either way, and mailed off the response's path, so neither the answer nor its time tells which addresses exist. They answer `{ ok: true }`, `'limited'` past the mails allowed, `'captcha'` (see Bots and breached passwords), or `'unavailable'` without a mailer. `signInWithMagicLink(token)` signs in, to where the link was asked for, and verifies the address.
+- `resetPassword(token, password)` sets the password (`errors.password` as `register`'s, `'breached'` included), verifies the address, ends every other session and bearer token, voids the other mailed links and signs in. A refused password leaves the link usable.
+- `sendVerification()` mails the signed-in user a new link or, with nobody signed in, the account this browser last registered or proved the password of with an `'unverified'` answer, until it signs out; `'signed-out'` otherwise. `verifyEmail(token, password?)` verifies the address and never signs in: whoever opens the mail may be confirming an account a stranger registered with their address. It verifies in the browser signed in as the account, that registered it, or that proved its password with an `'unverified'` answer; elsewhere it takes the account's password, and answers `{ ok: false, error: 'confirm' }` to ask for it, the link still usable (`'limited'` past the sign-in tries, which it shares). It answers `/` as where to go when this session is the user's, `signInPage` otherwise.
+- A magic link or a reset that proves an address for the first time hands the account over clean: whatever was set on it before, perhaps by someone who registered the address first, is dropped (the password, the second factor and its recovery codes, linked providers, bearer tokens), and every other session ends. A user who registered with a password and never verified the address loses that password this way, and sets another.
+- `changeEmail(proof, email)` mails a link to the new address (`errors.email` `'invalid'`, `'taken'` or `'unchanged'` otherwise); `confirmEmailChange(token)` moves the account to it, ends its other sessions and warns the address it left, when that one was verified.
+- `codes: 'code'` (or `'both'`, or per kind: `{ 'magic-link': 'both' }`) makes magic link and verification mails carry a six-digit code instead of the link, or beside it. A link opened on another device, or in a mail app's own browser, signs in there; a code is typed where it was asked for, and works in that browser's session only. `requestMagicLink`, `register` and `sendVerification` park the code in the session, whether or not an account has the address. `emailCodePending()` answers `{ type: 'sign-in' | 'verify', email }` or null, for the page to show the code field. `signInWithEmailCode(code)` signs in to where the link was asked for, verifying the address as a magic link does; `verifyEmailCode(code)` verifies the address. Both answer `{ ok: true, redirect }`, or `'invalid'`, `'expired'` (no code waiting in this session, past its 10 minutes, or killed after five misses) or `'limited'` (`emailCode` 30 per client and `emailCodeAccount` 10 per address per 15 minutes). Spaces and dashes in the code are ignored. A code works once, even when two requests spend it together; spending the code spends the link of the same mail, and the other way round. Codes are stored as keyed digests, bound to the session's nonce. The mail's `code` field holds it, and templates get it as `code` beside `url`, either one missing when the mail does not carry it.
+- A link works once, even when two requests spend it together: verification for 24 hours, a reset and an email change for one hour, a magic link for 15 minutes. A new link of a kind voids the last one, a link to an address the account has since left opens nothing, and links are stored as digests only. A spent or unknown link answers `'invalid'`.
+- `requireVerified` refuses password sign-in until the address is verified and signs no one in on registering. An address registered and never verified can then be registered again, so no one squats an address they do not own; an account with a role beyond `defaultRoles` or a linked provider is never replaced this way, while an invited one holding only default roles counts as unclaimed: give it another role, or verify its address.
+
+## Two-factor
+
+- `setUpTwoFactor(proof)` answers `setup: { secret, uri, qr }`: the base32 secret to type in, its `otpauth://` URI, and the URI as a QR code, an SVG data URI for an `img`. `enableTwoFactor(code)` turns the factor on once the authenticator gives a right code, and answers ten recovery codes, `abcde-fghij-klmno`, to show this once. Its tries count as a sign-in code's do, `'limited'` past them.
+- From then on every way of signing in stops at the `twoFactorPage`. `twoFactorPending()` says whether a sign-in waits there (for ten minutes), and `verifyTwoFactor(code)` finishes it with an authenticator code or a recovery code, answering `{ ok: true, redirect }`, or `'invalid'`, `'expired'` or `'limited'`.
+- An authenticator code works once, even at two sign-ins at the same moment, and the step either side of now is accepted. A recovery code works once and mails a warning. Eight tries in 15 minutes stop the account's attempts.
+- `regenerateRecoveryCodes(proof)` voids the old set, `recoveryCodesLeft()` counts the unused ones, `disableTwoFactor(proof)` turns the factor off and voids the codes. TOTP secrets are stored encrypted, bound to their user.
+- A user with a passkey may answer the `twoFactorPage` with it instead of a code: see Passkeys.
+
+## Passkeys
+
+Passkeys are made for `url`'s host and checked against its origin: `passkeys: { rpId, origins }` widens them to a parent domain, or lists every origin the pages are served from. The browser side is `@simplewebauthn/browser`'s `startRegistration` and `startAuthentication`, in an island; each method below gives the options to pass it, kept as a challenge in the session that works once, for five minutes.
+
+```ts
+// In an island on the account page, `passkeyOptions` and `addPasskey` being the app's actions calling `auth.passkeyRegistrationOptions()` and `auth.registerPasskey(response, name)`
+const { options } = await actions.passkeyOptions()
+await actions.addPasskey({ response: await startRegistration({ optionsJSON: options }), name })
+```
+
+- `passkeyRegistrationOptions()` and `registerPasskey(response, name?)` add a passkey to the signed-in user, named as given or after the browser and system it was made on (`Safari on macOS`), and mail them. A passkey is a way in, so adding one needs a session that signed in or re-proved in the last ten minutes, `'stale'` past that, as linking a provider does. The passkey is kept on the authenticator, so it signs in without a name typed first.
+- `passkeys()` lists `{ id, name, multiDevice, backedUp, createdAt, lastUsedAt }`; `renamePasskey(id, name)`; `removePasskey(id, proof)` re-proves first, refuses the last passkey of an account with no other way in (`'last-way-in'`), and mails the user.
+- `passkeySignInOptions()` and `signInWithPasskey(response, redirect?)` sign in with a passkey alone: the options name no account, so the browser offers every passkey it holds for the site, and with `startAuthentication({ optionsJSON, useBrowserAutofill: true })` offers them in the autofill of a field with `autocomplete="username webauthn"`. The passkey must verify the user (a PIN, a fingerprint), so it is two factors in one and no second factor is asked after it. Errors: `'expired'` (no challenge, or one spent), `'invalid'`, `'limited'`.
+- `twoFactorPasskeyOptions()` and `verifyTwoFactorPasskey(response)` answer a sign-in waiting at the `twoFactorPage` with one of the user's passkeys, as `verifyTwoFactor` does with a code.
+- `passkeyProofOptions()` gives the options for a re-proof; the answer goes in as `{ passkey: response }` wherever a proof is asked, and stands for the password and the second factor both.
+- The authenticator's signature counter is checked: an answer that does not count past the last one, as a cloned key sends, is refused. Passkeys are stored as their public key only.
+
+## Re-proof
+
+Changing what protects the account takes a `proof`: `changePassword`, `changeEmail`, `setUpTwoFactor`, `disableTwoFactor`, `regenerateRecoveryCodes`, `unlink`, `removePasskey`, `deleteAccount` and `createToken`.
+
+- `{ passkey }`, the answer to `passkeyProofOptions()`, from any user with a passkey.
+- `{ password }` when the user has a password; otherwise `{ code }`, an authenticator or recovery code, when they have a second factor. `disableTwoFactor` and `regenerateRecoveryCodes` take the `{ code }` even from a user with a password, so the password alone cannot undo what stands behind it.
+- A user with neither proves nothing but a sign-in under ten minutes old: past that, the method answers `'stale'` and the page asks them to sign in again first. A stolen session thus cannot set a password and an address and keep the account.
+- `auth.reprove(proof)` proves the user without changing anything, as before linking a provider. Any proof counts for ten minutes, as a sign-in does.
+- `'proof'` for a wrong or missing proof, `'limited'` after six tries in 15 minutes, `'signed-out'` without a user, `'impersonating'` while an admin acts as the user.
+
+## Account
+
+- `changePassword(proof, password)` sets the password, or a first one (`errors.password` as `register`'s), ends the user's other sessions and bearer tokens, and voids the links mailed before.
+- `changeUsername(username)` names the signed-in user, or renames them, normalised and checked as `register` does: `{ ok: true, user }`, `errors: { username }` with `'length'`, `'characters'`, `'mixed-scripts'`, `'taken'` or `'unchanged'`, or `'signed-out'`. Recasing one's own name is allowed. It takes no proof and sends no mail, a name being no credential, but needs a session: a bearer token answers `'signed-out'`. Renames are not limited, a name being public anyway. A page asks a user without one for it, as after an OAuth sign-up whose name was taken.
+- `exportData()` gives the signed-in user everything kayjs-auth keeps about them, for a download of their data: `{ ok: true, data: { exportedAt, user, identities, sessions, passkeys, tokens, recoveryCodesLeft, organizations, audit, app } }`, `user` with `createdAt`, `emailVerifiedAt` and `twoFactorEnabledAt`, no hash, secret or token among it. `onExport(user)` gives `app`, what the app keeps about them. It needs a session: a bearer token answers `'signed-out'`. Each call counts against the `export` limit, 6 per account per hour, past which it answers `'limited'`. `GET <prefix>/export` downloads it as `<site>-data.json`, 401 to anyone signed out and 429 past the limit.
+- `unlink(provider, proof)` unlinks a provider: `'not-linked'` when it is not, `'last-way-in'` when the user would have no password, no other provider and no verified address to get a magic link at.
+- `deleteAccount(proof)` deletes the user with everything kayjs-auth keeps for them, calls `onDelete(user)` for the app's own records, and signs out. The only user meeting the `admin` option is refused (`last-admin`) before the proof is spent, so a deployment never loses its last admin. Asking the user to type their name first is the page's job.
+
+## Bearer tokens
+
+- `createToken(proof, label, { scopes?, expiresIn? })` answers `{ ok: true, token, id }`: the token, shown this once, for a device or an API client to send as `Authorization: Bearer <token>`. It is minted from a session only, never with another token. `'label'` for an empty label or one over 64 characters, `'scope'` for an empty list or a scope the app did not declare, `'expiry'` for an `expiresIn` (seconds) that is not above 0.
+- `scopes: ['posts:read', 'posts:write']` in `createAuth` declares what a token may be limited to, typed from then on. A token given `scopes` passes a gated route only when the route names one of them, `.get('/posts', handler, { scope: ['posts:read', 'posts:write'] })`, any one passing; a route naming none refuses it with a 403, so a route that forgets `scope:` stays closed to limited tokens, and `scope: false` lets every token through. `auth.gate({ scope })` sets the scope of its routes naming none, and `auth.guard({ scope })` does the same for pages. A token made without `scopes`, and a session, pass every scope. `auth.scopes()` answers the request's token's scopes, null for a session or a token with every scope, and `auth.hasScope(scope)` checks one, for an app's own checks.
+- An expired token reads as no token at all, in `user()`, gates and `userFromToken`.
+- `auth.issueToken(userId, label, { scopes, expiresIn, token })` mints a token on the server, with no proof and no mail or event: for a flow the app gates itself, such as pairing a device whose owner signed in by provider longer than ten minutes ago, or a script. `token` adopts one the app handed out before, 16 to 4096 characters without whitespace, such as a device's JWT, so its devices keep working once kayjs-auth reads them. It answers `{ ok: true, token, id }`, or `not-found`, `banned`, `token` and what `createToken` refuses.
+- `tokens()` lists `{ id, label, scopes, createdAt, lastUsedAt, expiresAt, expired }`, since only the token's digest is stored; `revokeToken(id)` revokes one. A use is recorded at most every five minutes. A token ends with a password change, a reset and `signOutEverywhere`, each of which may answer a stolen device, so the devices sign in again after one.
+- A token reads as its user in `user()`, guards and gates. A websocket checks the token its first message carries with `auth.userFromToken(token)`, which `createWsAuthStore(verify)` keeps per connection: the handshake for a client that cannot send a cookie or a header with its upgrade, such as a device's browser widget on another origin.
+
+## Security mails
+
+A change to what protects an account is mailed to its verified address, never an unverified one, and handed to `onEvent` (see Events and the audit log). A mailer or an `onEvent` that throws is logged, never turned into a failed sign-in:
+
+- `new-sign-in`: a device or network the account had not used before; the first sign-in has nothing to compare against. The mail links to `sessionsPage` when the app has one.
+- `password-changed`, `two-factor-enabled`, `two-factor-disabled`, `recovery-code-used`, `recovery-codes-regenerated`, `account-deleted`.
+- `signed-out-everywhere`, from `signOutEverywhere` and the sessions page's button, `detail` `this-one-kept` when the session asking stayed signed in.
+- `email-changed`, mailed to the address left, `detail` the new one.
+- `provider-linked` and `provider-unlinked`, `detail` the provider; `passkey-added` and `passkey-removed`, `detail` its name; `token-created`, `detail` its label.
+
+## Events and the audit log
+
+`onEvent(event, user, detail, context)` hears every security mail's event above, mailed or not, and these, never mailed:
+
+- `signed-in`, `detail` how: `password`, `register`, `reset-password`, `magic-link`, `email-code`, `oauth:<provider>`, `passkey`, `guest`, or `app` for `auth.signIn`. A sign-in through the second factor is heard once it is answered, with its first factor.
+- `signed-out`.
+- `sign-in-failed`, for an account that exists only: `detail` `password`, `two-factor` or `passkey`.
+- An admin's doing, `actor` the admin: `role-granted` and `role-revoked`, `detail` the role; `banned`, `detail` the reason; `unbanned`; `impersonation-started` and `impersonation-ended`.
+- In an organization, `detail` its id: `organization-created` and `organization-deleted`; `member-joined` and `member-roles-changed`, `detail` the id then the roles given, space-separated; `member-left`; `member-removed`. A manager's doing names them as `actor`.
+
+`context` is `{ ip, userAgent, actor }`, `actor` the user who acted when it was not the one it happened to, such as an admin.
+
+With `audit: true`, or `{ maxAge }` in seconds (a year by default), the same events are kept in the store's audit log too, pruned of older ones at most hourly. `auditLog({ before, limit })` gives the signed-in user their own, newest first: `{ id, userId, event, detail, ip, userAgent, actorId, at }`. The log is kept past a user's deletion, so it still says what happened. Writing it never fails what it records: a failure is logged.
+
+`describeAuditEntry(entry, { locale, wording })` words an entry for a person, its detail included (`Role editor granted`, `Signed in with discord`), in English or French as the pages are, English for another locale. `wording` takes the app's own phrase for any event, a string or a function of the detail, over kayjs-auth's; `auditWording` holds kayjs-auth's by language.
+
+## Admin
+
+`admin: 'admin'`, any requirement a guard takes, names who may manage users; without it, and to anyone else or to an admin acting as someone, every method below answers `{ ok: false, error: 'forbidden' }`.
+
+- `listUsers({ search, offset, limit })` gives `{ ok: true, users, total }`, newest first, 50 a page by default and 200 at most; `search` matches part of an email or a username whatever its case, or a whole id. `getUser(id)` gives one. Each is a `User` with `createdAt` and `ban`, `{ at, until, reason }` while banned, else null.
+- `grantRole(id, role)` and `revokeRole(id, role)` take a role the `roles` option declares (`unknown-role` otherwise), effective on the user's next request. An admin taking back a role of their own that leaves them no longer an admin is refused (`self`).
+- `banUser(id, { reason, until })` bars the user from signing in, for good or until that date (`until` in the past answers `until`), and signs them out everywhere, bearer tokens revoked. Every sign-in of theirs answers `{ ok: false, error: 'banned' }`, an OAuth one `?error=banned`, and `auth.signIn` throws. An admin cannot ban themselves (`self`) or another admin (`admin`): revoke the role first. `unbanUser(id)` lifts it.
+- `deleteUser(id)` deletes the user with everything kayjs-auth keeps for them, calls `onDelete(user)` for the app's own records and mails them the `account-deleted` notice when `email` is set and their address is verified. The audit log keeps an `account-deleted` entry with the admin as `actorId`, and `onEvent` gets the admin as `context.actor`. It gives `{ ok: true }`, or `{ ok: false, error }` with `forbidden`, `not-found`, `self` or `admin` as for `banUser`.
+- `impersonate(id)` signs the admin's browser in as the user, keeping the admin's own sign-in; `impersonator()` gives the admin, to show a banner, and `stopImpersonating()` signs them back in as themselves, or out when their own sign-in ended meanwhile. Meanwhile nothing taking a proof passes (`reprove` answers `impersonating`, and the sign-in counts as stale), no new sign-in mail goes out, and the impersonation ends once the admin is signed out everywhere, banned or no longer an admin. Another admin, oneself and a banned user cannot be impersonated. `signOut()` ends both sign-ins.
+- `adminAuditLog({ userId, before, limit })` gives `{ ok: true, entries }`, everyone's audit log or one user's.
+
+## Organizations
+
+Teams or workspaces users belong to, with roles of their own in each:
+
+```ts
+createAuth({
+  // ...
+  organizations: {
+    roles: { owner: ['admin'], admin: ['member'], member: [] },
+    owner: 'owner',
+    manage: 'admin',
+    defaultRoles: ['member'],
+    invitationPage: '/invitation',
+  },
+})
+```
+
+- `roles` is a hierarchy as the site's `roles` is, typed the same way. Whoever creates an organization holds `owner`: owners alone delete it, and the last one cannot leave, be removed or lose the role (`last-owner`). `manage`, `owner` by default, is what renaming, inviting, removing members and changing their roles take. `create`, any requirement a guard takes, limits who may create one; anyone signed in by default.
+- `createOrganization({ name, slug? })` answers `{ ok: true, membership }`, or `invalid-name` (1 to 100 characters), `invalid-slug` (lowercase letters, digits and dashes, 64 at most, lowercased first) or `slug-taken`. A membership is `{ organization: { id, name, slug, createdAt }, roles, joinedAt }`.
+- `organizations()` lists the user's memberships; `organization(ref)` gives one, by id or slug, null unless a member; `isMember(ref, role?)` says whether they are one, holding `role` when given. `updateOrganization(ref, { name, slug })` renames it, `slug: null` clearing the slug, and `deleteOrganization(ref)` deletes it with its memberships and invitations.
+- `members(ref)` gives `{ ok: true, members }`, each `{ user: { id, email, username }, roles, joinedAt }`, for any member to see. `setMemberRoles(ref, userId, roles)` replaces a member's roles, `removeMember(ref, userId)` removes one, and `leaveOrganization(ref)` leaves. A manager gives only roles they hold, to a member holding none above theirs: an admin cannot make an owner nor demote or remove one (`forbidden`).
+- `invite(ref, email, roles?)` mails the address a link to `invitationPage` + `?invitation=<id>` (`unavailable` without it, or without a mailer, or when the mailer throws), giving `roles`, `defaultRoles` without them, once accepted: `member` when the address belongs to a member already, `limited` past `invite`, 30 an hour per manager. Inviting an address again replaces its invitation. `invitations(ref)` lists the open ones for managers and `revokeInvitation(ref, id)` revokes one. An invitation lasts `invitationMaxAge` seconds, a week by default. The mail's `kind` is `'invitation'`, the organization's name its template's `detail`.
+- The page reads `invitation(id)`, `{ id, organization, email, roles, invitedBy, createdAt, expiresAt }` or null once revoked, accepted or expired, and posts to an action calling `acceptInvitation(id)`: only an account verified at the invited address joins (`wrong-account`, `unverified`), which an invitee without an account reaches by registering with it. `myInvitations()` lists those open to the user's verified address, `declineInvitation(id)` turns one down.
+- Any failure above may also be `signed-out`, `not-found` (no such organization, or one the user is no member of, so its existence does not leak) or `forbidden` (a member whose roles do not reach).
+- `auth.memberOf(role?)` is a requirement met by a member of the organization the route's `org` param names, by id or slug, holding `role` there when given: `src/routes/orgs/[org]/_guard.ts` exporting `auth.guard({ redirect: '/login', require: auth.memberOf('admin') })`, or `.get('/orgs/:org/settings', handler, { auth: auth.memberOf('admin') })` behind a gate. `organizations.param`, or `memberOf(role, { param })`, names another param. A guard checks a page's actions against the params of the page they are posted from, so an action scopes what it touches by `ctx.params.org`, never by its input. A route without the param, or kay before 1.23, whose guards get no params, is refused, never let through.
+- Deleting a user deletes their memberships; an organization whose last owner deletes their account stays without one. `exportData()` lists the user's memberships as `organizations`.
+
+## Bots and breached passwords
+
+```ts
+import { createAuth, turnstile } from '@kaynooo/kayjs-auth'
+
+createAuth({
+  // ...
+  captcha: { verify: turnstile(process.env.TURNSTILE_SECRET!), on: { 'sign-in': 3, 'reset': 'always' } },
+  breachedPasswords: true,
+})
+```
+
+- `captcha.verify(token, action)` checks the token the page's widget posted, for `action` one of `'register'`, `'sign-in'`, `'reset'` and `'magic-link'`. `turnstile(secret)` and `hcaptcha(secret)` are presets calling the provider's siteverify; their widgets post the token as `cf-turnstile-response` and `h-captcha-response`, which the action passes on.
+- The token goes in as `register({ ..., captcha })`, `signInWithPassword({ ..., captcha })`, `requestPasswordReset(email, { captcha })` and `requestMagicLink(email, redirect, { captcha })`. A missing or refused token answers `{ ok: false, error: 'captcha' }`, and so does a `verify` that throws. The request still counts against the client's limit.
+- `captcha.on` sets each request to `'always'` (every one, by default), `false`, or a number: asked only once this client made that many of it in the limit's window, so people rarely see it. `auth.captchaRequired(action)` says whether the next one needs it, for the page to show the widget. `captcha.widget` names that widget for the prebuilt pages and `features()`.
+- `breachedPasswords: true` refuses a new password Have I Been Pwned lists, on `register`, `resetPassword` and `changePassword`, as `errors.password: 'breached'`. Only the first five characters of the password's SHA-1 leave the server, the answer padded with decoys. A function `(password) => boolean` checks against a list of the app's own instead. A check that fails or takes over three seconds lets the password through, logged: an outage never stops anyone registering. `pwnedPassword(password)` is exported for a check of the app's own.
+
+## Limits
+
+Attempts are counted in the store, so every process shares them, per client address (read as kay's `rateLimit` reads it, through `proxy` in kay.config.ts) and per account. A plain Elysia app that kay's `pages()` does not serve passes the same setting to `createAuth` as `proxy`, `{ hops: 1 }` behind nginx, or every client counts as the proxy. `limits` overrides any of `DEFAULT_LIMITS`, each `{ max, window }` with `window` in seconds:
+
+- `signIn` 40 and `signInAccount` 6 per 15 minutes; the account counts failures only, and a success clears it.
+- `register` 6 per hour.
+- `resend`, `forgot` and `magicLink` 12 per client and 3 per account per hour (`resendAccount`, `forgotAccount` and `magicLinkAccount`, the last two counted per address); `emailChange` 12 and `emailChangeAccount` 5.
+- `invite` 30 per manager per hour.
+- `export` 6 per account per hour, for `exportData()` and `GET <prefix>/export`.
+- `twoFactor` 30 and `twoFactorAccount` 8 per 15 minutes, for signing in and for turning the factor on; `reprove` 6 per 15 minutes; `link` 40 per hour; `emailCode` 30 per client and `emailCodeAccount` 10 per address per 15 minutes.
+
+## Stores
+
+- `memoryStore()` keeps everything in the process: for tests, and for trying kayjs-auth before a database is wired.
+- `pgStore(db)` from `@kaynooo/kayjs-auth/pg` keeps it in Postgres through pg-orm, once `authTables` are among the `Database`'s tables: `auth_user`, `auth_identity`, `auth_token`, `auth_recovery_code`, `auth_bearer_token`, `auth_session`, `auth_passkey`, `auth_audit`, `auth_organization`, `auth_member`, `auth_invitation` and `auth_attempt`; what belongs to a user, the audit log and their invitations aside, is deleted with them, and members and invitations with their organization.
+- Any object with the `AuthStore` methods is a store: `users`, `identities`, `tokens`, `recoveryCodes`, `bearerTokens`, `sessions`, `passkeys` and `attempts`, plus `audit` for the `audit` option and `organizations`, `members` and `invitations` for the `organizations` option, each method sync or async. What must hold is written on each method: emails are looked up exactly, usernames without case; a mailed token, a recovery code and a TOTP step are spent once even by two requests together; deleting a user deletes what kayjs-auth keeps for them; `users.list` pages newest first and searches emails and usernames without case.
+- A store over an app's own tables: `users.create(user)` answers the user as stored when the store picks its own id, such as a serial column's, `user` whole with only its `id` changed, and kayjs-auth goes on with it (ids are strings, so the store converts); answering nothing keeps the id kayjs-auth picked. TOTP secrets are stored sealed with the auth `secret`: a store whose rows hold plain base32 secrets from before seals each on read with `sealTotpSecret(secret, userId, plain)`, from `@kaynooo/kayjs-auth`, `secret` being the value `createAuth` takes, a list included. A plain base32 value matches `/^[A-Z2-7]+=*$/`, which a sealed one in practice never does, and what kayjs-auth writes afterwards is sealed already.
+
+## Testing
+
+kay's `testSite` builds the site as `pages()` does, the plugin mounted by the extension before the pages, so a test signs in through the site's own forms and stays signed in. An app mounting the plugin by hand passes it as `testSite({ use: [auth.plugin] })`.
+
+```ts
+import { testSite } from 'kay/test'
+import { signIn } from '../src/routes/login.kay'
+
+const site = await testSite()
+const page = await site.submit(signIn, { identifier: 'ada@example.com', password: 'correct horse battery' }, { from: '/login' })
+```
+
+A test needing a signed-in request without going through a form takes `await auth.sessionCookie(userId)`, the `Cookie` header of a new session signed in as that user, as `signIn` makes it, against the app's own auth, to send by hand: `app.handle(new Request(url, { headers: { cookie } }))`.
+
+Each `testSite` keeps its own cookies, one browser each. `memoryStore()` keeps each test's users apart, and a mailer pushing into an array hands the test the links it would have mailed, `url` included; with kayjs-mail, its `outbox` holds what was sent.

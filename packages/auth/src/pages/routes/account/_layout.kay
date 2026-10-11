@@ -1,0 +1,34 @@
+--- server
+import { action } from 'kay'
+import { localize, t } from 'kay/i18n'
+import { schemas } from '../../forms'
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import TabNav from '@kaynooo/kayjs-ui/tab-nav.kay'
+
+export const signOut = action(schemas.nothing, async (_input, ctx) => {
+  await ctx.locals.auth.signOut()
+
+  return ctx.redirect(localize(ctx.locals.auth.features().pages?.home ?? '/'))
+})
+
+const features = ctx.locals.auth.features()
+const current = ctx.url.pathname
+const base = localize(`${features.pages?.prefix ?? features.prefix}/account`)
+const links = [
+  { href: base, label: t('auth.account.nav.profile') },
+  { href: `${base}/security`, label: t('auth.account.nav.security') },
+  { href: `${base}/sessions`, label: t('auth.account.nav.sessions') },
+  ...features.providers.length > 0 ? [{ href: `${base}/connections`, label: t('auth.account.nav.connections') }] : [],
+  { href: `${base}/tokens`, label: t('auth.account.nav.tokens') },
+  { href: `${base}/data`, label: t('auth.account.nav.data') },
+]
+---
+head
+  title {t('auth.account.title')}
+.kayjs-auth.mx-auto.flex.w-full.max-w-3xl.flex-col.gap-6.px-4.py-8
+  .flex.flex-wrap.items-center.justify-between.gap-4
+    h1.kui-heading-section {t('auth.account.title')}
+    form(action={signOut})
+      Button(type="submit" label={t('auth.account.signOut')})
+  TabNav(links={links} current={current} label={t('auth.account.nav.label')})
+  slot

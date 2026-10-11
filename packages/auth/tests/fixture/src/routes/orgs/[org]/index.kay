@@ -1,0 +1,17 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+// Scoped by the organization the guard checked, a string once it passed, never by the input.
+export const rename = action(t.Object({ name: t.String({ maxLength: 100 }) }), async ({ name }, ctx) => {
+  const result = await ctx.locals.auth.updateOrganization(String(ctx.params.org), { name })
+
+  return result.ok ? result.organization.name : ctx.fail(400, { error: result.error })
+})
+
+const membership = (await ctx.locals.auth.organization(ctx.params.org))!
+---
+h1#organization {membership.organization.name}
+form#rename(action={rename})
+  input(name="name" aria-label="name")
+  button Rename

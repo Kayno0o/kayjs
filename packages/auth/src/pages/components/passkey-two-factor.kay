@@ -1,0 +1,35 @@
+---
+import { onMount, signal } from 'kay'
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import { passkey, passkeyOptions } from '../routes/two-factor.kay'
+
+const { label, failed } = props<{ label: string, failed: string }>()
+
+const supported = signal(false)
+const error = signal('')
+
+// Shown once the browser proves it can, since a passkey needs script; the WebAuthn JSON methods are the browser's own.
+onMount(() => supported.set(typeof PublicKeyCredential !== 'undefined' && 'parseRequestOptionsFromJSON' in PublicKeyCredential))
+
+async function verify() {
+  error.set('')
+
+  try {
+    const options = await passkeyOptions({}, { refresh: false })
+    // @simplewebauthn types the prf extension's values as BufferSource where the DOM's JSON type has strings, for the same JSON.
+    const credential = await navigator.credentials.get({ publicKey: PublicKeyCredential.parseRequestOptionsFromJSON(options as unknown as PublicKeyCredentialRequestOptionsJSON) })
+
+    if (credential instanceof PublicKeyCredential)
+      await passkey({ response: credential.toJSON() })
+  }
+  catch (caught) {
+    // Dismissing the browser's prompt is no failure.
+    if (!(caught instanceof DOMException && caught.name === 'NotAllowedError'))
+      error.set(failed)
+  }
+}
+---
+if supported()
+  Button(label={label} onClick={verify} busy={passkey.pending()})
+  if error()
+    p.kayjs-auth-error.text-kui-error(role="alert") {error()}

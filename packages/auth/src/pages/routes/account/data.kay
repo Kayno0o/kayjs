@@ -1,0 +1,34 @@
+--- server
+import { action } from 'kay'
+import { localize, t } from 'kay/i18n'
+import Message from '../../components/message.kay'
+import Proof from '../../components/proof.kay'
+import { failure, proofOf, schemas } from '../../forms'
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
+
+export const remove = action(schemas.proof, async (input, ctx) => {
+  const result = await ctx.locals.auth.deleteAccount(proofOf(input))
+
+  if (!result.ok)
+    return ctx.fail(400, { error: result.error })
+
+  return ctx.redirect(localize(ctx.locals.auth.features().pages?.home ?? '/'))
+})
+
+const auth = ctx.locals.auth
+const user = (await auth.user())!
+const features = auth.features()
+const refused = ctx.failed(remove)?.data?.error
+---
+PageSection(title={t('auth.account.data.export')})
+  .flex.flex-col.items-start.gap-3
+    p {t('auth.account.data.exportIntro')}
+    Button(href={`${features.prefix}/export`} label={t('auth.account.data.export')} download data-no-prefetch)
+PageSection(title={t('auth.account.data.delete')})
+  form.flex.flex-col.gap-3(action={remove})
+    p {t('auth.account.data.deleteIntro')}
+    Proof(user={user})
+    if refused
+      Message(text={failure(refused)})
+    Button(type="submit" variant="danger" label={t('auth.account.data.confirmDelete')})

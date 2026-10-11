@@ -1,0 +1,13 @@
+---
+import { t } from 'kay/i18n'
+import CopyButton from '@kaynooo/kayjs-ui/copy-button.kay'
+
+const { codes } = props<{ codes: string[] }>()
+---
+.flex.flex-col.gap-2
+  strong {t('auth.account.twoFactor.recoveryCodes')}
+  p {t('auth.account.twoFactor.recoveryIntro')}
+  ul#kayjs-auth-recovery-codes.grid.grid-cols-2.gap-1.font-mono
+    for code of codes key={code}
+      li {code}
+  CopyButton(text={codes.join('\n')} label={t('auth.account.twoFactor.copy')})

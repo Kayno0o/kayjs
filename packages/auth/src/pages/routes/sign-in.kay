@@ -1,0 +1,121 @@
+--- server
+import { action } from 'kay'
+import { localize, t } from 'kay/i18n'
+import { safeRedirect } from '../../oauth/redirect'
+import Captcha from '../components/captcha.kay'
+import Message from '../components/message.kay'
+import Panel from '../components/panel.kay'
+import PasskeySignIn from '../components/passkey-sign-in.kay'
+import Separator from '../components/separator.kay'
+import { captchaOf, failure, oauthFailure, schemas } from '../forms'
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+
+// Visitors reach this page before signing in, so none of the app's guards run here, whatever they check: one asking for a session would keep everyone out.
+export const page = { guards: false }
+
+export const password = action(schemas.signIn, async (input, ctx) => {
+  const result = await ctx.locals.auth.signInWithPassword({ identifier: input.identifier, password: input.password, remember: input.remember === true, ...(input.redirect === undefined ? {} : { redirect: input.redirect }), captcha: captchaOf(input) })
+
+  if (!result.ok)
+    return ctx.fail(400, { error: result.error === 'invalid' ? 'credentials' : result.error })
+
+  return ctx.redirect(result.redirect)
+})
+
+export const magicLink = action(schemas.magicLink, async (input, ctx) => {
+  const result = await ctx.locals.auth.requestMagicLink(input.email, input.redirect, { captcha: captchaOf(input), remember: input.remember })
+
+  return result.ok ? input.email : ctx.fail(400, { error: result.error })
+})
+
+export const emailCode = action(schemas.emailCode, async ({ code }, ctx) => {
+  const result = await ctx.locals.auth.signInWithEmailCode(code)
+
+  if (!result.ok)
+    return ctx.fail(400, { error: result.error === 'invalid' ? 'code' : result.error })
+
+  return ctx.redirect(result.redirect)
+})
+
+export const passkeyOptions = action(schemas.nothing, async (_input, ctx) => ctx.locals.auth.passkeySignInOptions())
+
+export const passkey = action(schemas.passkey, async (input, ctx) => {
+  const result = await ctx.locals.auth.signInWithPasskey(input.response as never, input.redirect, { remember: input.remember === true })
+
+  if (!result.ok)
+    return ctx.fail(400, { error: result.error })
+
+  return ctx.redirect(result.redirect)
+})
+
+const auth = ctx.locals.auth
+const features = auth.features()
+const prefix = features.pages?.prefix ?? features.prefix
+const redirect = safeRedirect(ctx.url.searchParams.get('redirect'), localize(features.pages?.home ?? '/'))
+const user = await auth.user()
+
+// A guest signs in to keep what they did; anyone else is signed in already.
+if (user && !user.guest)
+  ctx.redirect(redirect)
+
+const [captchaSignIn, captchaMagic] = await Promise.all([auth.captchaRequired('sign-in'), auth.captchaRequired('magic-link')])
+const pending = await auth.emailCodePending()
+const oauthError = oauthFailure(ctx.url.searchParams.get('error'))
+const signInError = ctx.failed(password)?.data?.error
+const mailError = ctx.failed(magicLink)?.data?.error
+const codeError = ctx.failed(emailCode)?.data?.error
+const mailedTo = ctx.succeeded(magicLink)?.data
+const codes = features.codes?.['magic-link'] ?? 'link'
+---
+head
+  title {t('auth.signIn.title')}
+Panel(title={t('auth.signIn.title')})
+  if oauthError
+    Message(text={oauthError})
+  if features.providers.length > 0
+    .flex.flex-col.gap-2
+      for provider of features.providers key={provider.name}
+        Button(href={`${features.prefix}/${provider.name}?redirect=${encodeURIComponent(redirect)}`} label={t('auth.signIn.provider', { provider: provider.label })} data-no-prefetch)
+    Separator
+  if pending?.type === 'sign-in'
+    form.flex.flex-col.gap-3(action={emailCode})
+      p {t('auth.signIn.codeSent', { email: pending.email })}
+      FormField(label={t('auth.code')} required)
+        input(name="code" inputmode="numeric" autocomplete="one-time-code" required)
+      if codeError
+        Message(text={failure(codeError)})
+      Button(type="submit" variant="accent" label={t('auth.signIn.codeSubmit')})
+  form.flex.flex-col.gap-3(action={password})
+    input(type="hidden" name="redirect" value={redirect})
+    FormField(label={t('auth.signIn.identifier')} required)
+      input(name="identifier" autocomplete="username webauthn" required)
+    FormField(label={t('auth.password')} required)
+      input(name="password" type="password" autocomplete="current-password" required)
+    label.flex.items-center.gap-2
+      input(name="remember" type="checkbox")
+      span {t('auth.remember')}
+    if features.captcha && captchaSignIn
+      Captcha(widget={features.captcha})
+    if signInError
+      Message(text={failure(signInError)})
+    Button(type="submit" variant="accent" label={t('auth.signIn.submit')})
+    if features.email
+      a(href={localize(`${prefix}/reset-password`)}) {t('auth.signIn.forgot')}
+  if features.passkeys
+    PasskeySignIn(redirect={redirect} label={t('auth.signIn.passkey')} failed={failure('invalid')})
+  if features.email
+    Separator
+    if mailedTo && codes === 'link'
+      Message(tone="success" text={t('auth.signIn.sent')})
+    form.flex.flex-col.gap-3(action={magicLink})
+      input(type="hidden" name="redirect" value={redirect})
+      FormField(label={t('auth.email')} required)
+        input(name="email" type="email" autocomplete="email" required)
+      if features.captcha && captchaMagic
+        Captcha(widget={features.captcha})
+      if mailError
+        Message(text={failure(mailError)})
+      Button(type="submit" label={codes === 'link' ? t('auth.signIn.magic') : t('auth.signIn.magicCode')})
+  p.text-center
+    | {t('auth.signIn.noAccount')} #[a(href={localize(`${prefix}/register?redirect=${encodeURIComponent(redirect)}`)}) {t('auth.signIn.register')}]

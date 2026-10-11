@@ -1,0 +1,50 @@
+--- server
+import { action } from 'kay'
+import { formatRelativeTime, localize, t } from 'kay/i18n'
+import { schemas } from '../../forms'
+import Badge from '@kaynooo/kayjs-ui/badge.kay'
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import CardRow from '@kaynooo/kayjs-ui/card-row.kay'
+import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
+
+// Ending this device's own session signs it out, so it leaves the account pages.
+export const end = action(schemas.id, async ({ id }, ctx) => {
+  const auth = ctx.locals.auth
+  const current = (await auth.sessions()).find(session => session.current)?.id === id
+
+  await auth.endSession(id)
+
+  return current ? ctx.redirect(localize(auth.features().pages?.home ?? '/')) : 'ended'
+})
+
+export const endOthers = action(schemas.nothing, async (_input, ctx) => {
+  await ctx.locals.auth.signOutEverywhere({ keepThisOne: true })
+
+  return 'ended'
+})
+
+const sessions = await ctx.locals.auth.sessions()
+const describe = (session: (typeof sessions)[number]) => [session.device.browser, session.device.os].filter(Boolean).join(', ') || t('auth.account.sessions.unknown')
+---
+PageSection(title={t('auth.account.sessions.title')})
+  @actions
+    if sessions.length > 1
+      form(action={endOthers})
+        Button(type="submit" label={t('auth.account.sessions.endOthers')})
+  .flex.flex-col.gap-2
+    for session of sessions key={session.id}
+      CardRow(data-session={session.id})
+        @right
+          form(action={end})
+            input(type="hidden" name="id" value={session.id})
+            Button(type="submit" label={t('auth.account.sessions.end')})
+        .flex.flex-col
+          span.flex.flex-wrap.items-center.gap-2
+            strong {describe(session)}
+            if session.device.mobile
+              span.text-kui-muted {t('auth.account.sessions.mobile')}
+            if session.current
+              Badge(label={t('auth.account.sessions.current')} tone="accent")
+          span.text-kui-muted
+            | {[session.place, session.ip].filter(Boolean).join(' · ')}
+          span.text-kui-muted {t('auth.account.sessions.lastSeen', { date: formatRelativeTime(session.lastSeenAt) })}
