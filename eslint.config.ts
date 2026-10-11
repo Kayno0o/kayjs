@@ -3,7 +3,7 @@ import { defineConfig } from '@kaynooo/eslint'
 export default defineConfig({
   strict: true,
   // The fixtures are apps of their own, outside the tsconfig. The Astro, Next and Nuxt bench apps are type-checked by their own tools in `bench:check`: their programs loaded here too run eslint out of memory.
-  filesTypeAware: ['*.ts', 'src/**/*.ts', 'tests/*.ts', 'bench/*.ts', 'bench/{shared,sites}/**/*.ts', 'bench/apps/{kay,solid,svelte}/**/*.ts'],
+  filesTypeAware: ['*.ts', 'scripts/*.ts', 'src/**/*.ts', 'tests/*.ts', 'bench/*.ts', 'bench/{shared,sites}/**/*.ts', 'bench/apps/{kay,solid,svelte}/**/*.ts'],
 }, {
   rules: { 'ts/no-explicit-any': 'error' },
 }, {

@@ -26,7 +26,7 @@ const KEBAB = /-(\w)/g
 const FIRST = /^\w/
 const KAY_FILE = /\.kay$/
 
-// Each library's llms.txt, from the package installed at the root, listed after kay's own reference: the version it describes is the one published.
+// Each library's llms.txt, from its package under packages/ as the workspace links it at the root, listed after kay's own reference: it describes the version kay releases it at.
 export async function loadLibraries(): Promise<LibraryReference[]> {
   return Promise.all(LIBRARIES.map(async (name, order) => {
     const text = await Bun.file(join(PACKAGES, name, 'llms.txt')).text()

@@ -1,6 +1,6 @@
 # kay
 
-A Bun web framework: `.kay` components (pug-like templates over TypeScript), compiled to HTML on the server and to kay's own DOM runtime in islands. `llms.txt` and `llms/` are what an app's author reads; `src/` is the framework, `docs/` the documentation site built with kay itself.
+A Bun web framework: `.kay` components (pug-like templates over TypeScript), compiled to HTML on the server and to kay's own DOM runtime in islands. `llms.txt` and `llms/` are what an app's author reads; `src/` is the framework, `docs/` the documentation site built with kay itself, `packages/` kay's libraries (kayjs-auth, kayjs-ui, kayjs-mail, kayjs-cms) as Bun workspaces, each with its own tests, `llms.txt` and eslint config.
 
 ## Design rule
 
@@ -8,7 +8,7 @@ Every feature asks the least of the app: the fewest declarations, the easiest se
 
 ## Checks
 
-- Before a commit: `bun run lint:fix`, `bun run check` (kay check: types, templates included), `bun run bench:check` and the tests.
+- Before a commit: `bun run lint:fix`, `bun run check` (kay check: types, templates included), `bun run bench:check` and the tests. A change under `packages/<name>` runs `bun run check` and `bun run test` in that folder too; the root lint already covers it, ESLint taking each file's nearest config.
 - `bun test tests/<file>.test.ts` while working; the whole suite as `bun run test`, every file at once in this checkout (`bun test --parallel`, the slowest first by `tests/timings.json`, which `bun run test:timings` measures again), as CI runs it. A test that writes into a fixture works on `fixtureCopy()` from `tests/scratch.ts`, and its scratch files go under `scratchDir()`, so no other file's build meets them.
 - The slow files: `new.test.ts` (scaffolds and type-checks apps), `browser.test.ts` (Chromium through `BUN_CHROME_PATH`), `check.test.ts`, `forms.test.ts`.
 - `examples.test.ts` and the app template's own tests run only with `TEST_DATABASE_URL`, a Postgres whose user may create databases.
@@ -22,4 +22,4 @@ Every feature asks the least of the app: the fewest declarations, the easiest se
 
 ## Releases
 
-`just patch` or `just minor` bumps, tags and pushes both at once; the tag's workflow publishes to the Forgejo npm registry.
+`just patch` or `just minor` moves kay and every library to one version (`scripts/version.ts`: versions, each library's peer on kay, the lockfile), tags and pushes both at once; the tag's workflow publishes kay and each library not marked `private` (kayjs-cms, until it ships) to the Forgejo npm registry. A library's ranges on another are `workspace:~`, which publishing writes as that version.

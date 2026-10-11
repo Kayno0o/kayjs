@@ -5,3 +5,7 @@ preload = [
   "./tests/one-run.ts",
   "./src/test/browser.ts"
 ]
+
+[install]
+# One node_modules at the root, as before the packages joined: kay resolves to this checkout under one path, its types with it.
+linker = "hoisted"

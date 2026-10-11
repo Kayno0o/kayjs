@@ -11,7 +11,7 @@ description: A set of kay components styled by one theme you restyle from your o
 bun add @kaynooo/kayjs-ui @iconify-json/tabler
 ```
 
-The `@kaynooo` scope must point at the Forgejo registry in your `.npmrc`. kay and Tailwind v4 are peers, and the default icons are Tabler's.
+The `@kaynooo` scope must point at the Forgejo registry in your `.npmrc`. kay and Tailwind v4 are peers, and the default icons are Tabler's. It is released with kay, at kay's own version, and peers on the kay of that version: install the one matching your kay, and move them together.
 
 ## Theme
 

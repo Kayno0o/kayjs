@@ -15,7 +15,7 @@ env:
 jobs:
   publish:
     runs-on: alpine
-    timeout-minutes: 15
+    timeout-minutes: 20
 
     steps:
       - name: Checkout code
@@ -31,10 +31,15 @@ jobs:
           key: bun-${{ runner.os }}-${{ hashFiles('bun.lock', 'bench/apps/*/bun.lock') }}
           restore-keys: bun-${{ runner.os }}-
 
-      # The checks below are skipped once the Tests workflow, which makes them all, passed this tree: on the tagged commit itself when code commits were pushed with it, as the runner takes one job at a time and ran Tests first, or on its parent when the tagged commit only changes the version. Anything else, or a status that cannot be read, runs them all.
+      # The checks below are skipped once the Tests workflow, which makes them all, passed this tree: on the tagged commit itself when code commits were pushed with it, as the runner takes one job at a time and ran Tests first, or on its parent when the tagged commit only changes the versions: those of kay and its libraries, their peer on kay and the lockfile recording them. Anything else, or a status that cannot be read, runs them all.
       - name: Find whether this tree was already tested
         id: tested
         run: |
+          versions_only() {
+            for manifest in package.json packages/*/package.json; do
+              [ "$(git show "HEAD^:$manifest" | jq -S "del(.version, .peerDependencies.kay)")" = "$(jq -S "del(.version, .peerDependencies.kay)" "$manifest")" ] || return 1
+            done
+          }
           verdict() {
             curl -sf -H "Authorization: token $TOKEN" "$API/repos/$GITHUB_REPOSITORY/commits/$1/status" | jq -r '[.statuses[]? | select(.context | startswith("Tests /")) | .status // .state] | first // empty' || true
           }
@@ -43,7 +48,7 @@ jobs:
           echo "The Tests workflow on this commit: ${own:-none}"
           if [ "$own" = success ]; then
             tested=true
-          elif git diff --quiet HEAD^ HEAD -- . ":!package.json" && [ "$(git show HEAD^:package.json | jq -S "del(.version)")" = "$(jq -S "del(.version)" package.json)" ]; then
+          elif git diff --quiet HEAD^ HEAD -- . ":!package.json" ":!packages/*/package.json" ":!bun.lock" && versions_only; then
             parent=$(verdict "$(git rev-parse HEAD^)")
             echo "The Tests workflow on its parent: ${parent:-none}"
             [ "$parent" = success ] && tested=true
@@ -88,10 +93,22 @@ jobs:
           su postgres -c "pg_ctl -D /var/lib/postgresql/data -o '-c listen_addresses=127.0.0.1 -c unix_socket_directories=/run/postgresql' -w start"
           su postgres -c "psql -c \"CREATE USER test WITH PASSWORD 'test' SUPERUSER;\""
           echo "TEST_DATABASE_URL=postgres://test:test@127.0.0.1:5432/kay_app_test" >> "$GITHUB_ENV"
+          su postgres -c "createdb -O test kayjs_auth_test"
+          echo "KAYJS_AUTH_TEST_DATABASE_URL=postgres://test:test@127.0.0.1:5432/kayjs_auth_test" >> "$GITHUB_ENV"
 
       - name: Tests
         if: steps.tested.outputs.tested != 'true'
         run: bun run test
+
+      - name: Check and test the libraries
+        if: steps.tested.outputs.tested != 'true'
+        run: |
+          for dir in packages/*/; do
+            echo "$dir"
+            (cd "$dir" && bun run check && bun run test) || exit 1
+          done
+        env:
+          KAYJS_AUTH_REQUIRE_DATABASE: '1'
 
       - name: Configure npm authentication
         run: |
@@ -100,9 +117,13 @@ jobs:
         env:
           PACKAGE_TOKEN: ${{ secrets.PACKAGE_TOKEN }}
 
-      # prepack writes what the exports point at: the declarations under types/ and the Node build of kay/eslint under dist/.
+      # prepack writes what the exports point at: the declarations under types/ and the Node build of kay/eslint under dist/. Each library publishes at kay's version, its `workspace:` ranges written as that version; one marked private is not released yet.
       - name: Publish to Forgejo npm registry
-        run: bun publish --access public
+        run: |
+          bun publish --access public
+          for dir in packages/*/; do
+            [ "$(jq -r '.private // false' "$dir/package.json")" = true ] || (cd "$dir" && bun publish --access public) || exit 1
+          done
         env:
           PACKAGE_TOKEN: ${{ secrets.PACKAGE_TOKEN }}
 

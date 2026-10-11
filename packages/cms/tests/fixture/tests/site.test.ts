@@ -19,7 +19,7 @@ beforeAll(async () => {
 })
 
 test('kay check passes on the fixture, the editor\'s components included', async () => {
-  const check = Bun.spawn([process.execPath, join(ROOT, '..', '..', 'node_modules', '.bin', 'kay'), 'check'], { cwd: ROOT, stdout: 'pipe', stderr: 'pipe' })
+  const check = Bun.spawn([process.execPath, join(ROOT, '..', '..', '..', '..', 'src', 'cli.ts'), 'check'], { cwd: ROOT, stdout: 'pipe', stderr: 'pipe' })
 
   expect(await new Response(check.stdout).text() + await new Response(check.stderr).text()).toMatch(CLEAN)
   expect(await check.exited).toBe(0)
@@ -151,7 +151,7 @@ test('saving a file entry hands the file kay wrote to the saver, as a commit', a
   saved.length = 0
 
   expect(await send('POST', 'posts/hello', { data: { title: 'Hello again', tags: ['kay'] }, body: 'New body.\n' })).toEqual({ status: 200, answer: { saved: true, commit: { sha: 'c0ffee' } } })
-  expect(saved.map(({ repoPath, message }) => [repoPath, message])).toEqual([['tests/fixture/src/content/posts/hello.md', 'content(posts): update hello']])
+  expect(saved.map(({ repoPath, message }) => [repoPath, message])).toEqual([['packages/cms/tests/fixture/src/content/posts/hello.md', 'content(posts): update hello']])
   expect(saved[0]?.text).toContain('title: Hello again')
   expect(saved[0]?.text).toContain('New body.')
 })
@@ -172,7 +172,7 @@ test('a nested slug is published and deleted through its file', async () => {
   expect((await send('POST', 'posts/notes%2Fgarden/publish')).answer).toHaveProperty('saved', true)
   expect(saved[0]?.text).toContain('draft: false')
   expect((await send('DELETE', 'posts/notes%2Fgarden')).answer).toHaveProperty('saved', true)
-  expect(saved.map(({ repoPath, text }) => [repoPath, text])[1]).toEqual(['tests/fixture/src/content/posts/notes/garden.md', undefined])
+  expect(saved.map(({ repoPath, text }) => [repoPath, text])[1]).toEqual(['packages/cms/tests/fixture/src/content/posts/notes/garden.md', undefined])
 })
 
 test('a loaded entry is created and removed through its loader', async () => {
@@ -220,7 +220,7 @@ test('a file that does not parse lists as broken, and is written over or deleted
 
     expect((await send('POST', 'posts/broken', { data: { title: 'Mended' } })).answer).toHaveProperty('saved', true)
     expect((await send('DELETE', 'posts/broken')).answer).toHaveProperty('saved', true)
-    expect(saved.map(({ repoPath, text }) => [repoPath, text === undefined ? undefined : JSON.parse(text)])).toEqual([['tests/fixture/src/content/posts/broken.json', { title: 'Mended' }], ['tests/fixture/src/content/posts/broken.json', undefined]])
+    expect(saved.map(({ repoPath, text }) => [repoPath, text === undefined ? undefined : JSON.parse(text)])).toEqual([['packages/cms/tests/fixture/src/content/posts/broken.json', { title: 'Mended' }], ['packages/cms/tests/fixture/src/content/posts/broken.json', undefined]])
   }
   finally {
     await rm(file, { force: true })

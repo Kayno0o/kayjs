@@ -1,16 +1,17 @@
 {
   "name": "@kaynooo/kayjs-auth",
   "type": "module",
-  "version": "0.15.3",
+  "version": "1.38.1",
   "description": "Auth for kay apps on kay sessions: OAuth, passwords, two-factor, magic links and bearer tokens",
   "author": "Kaynooo <https://git.kaynooo.fr/kaynooo>",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://git.kaynooo.fr/kaynooo/kayjs-auth"
+    "url": "https://git.kaynooo.fr/kaynooo/kayjs",
+    "directory": "packages/auth"
   },
   "bugs": {
-    "url": "https://git.kaynooo.fr/kaynooo/kayjs-auth/issues"
+    "url": "https://git.kaynooo.fr/kaynooo/kayjs/issues"
   },
   "publishConfig": {
     "registry": "https://git.kaynooo.fr/api/packages/kaynooo/npm/"
@@ -49,10 +50,10 @@
     "test": "bun test"
   },
   "peerDependencies": {
-    "@kaynooo/kayjs-ui": ">=0.4.28 <1",
+    "@kaynooo/kayjs-ui": "workspace:~",
     "@kaynooo/pg-orm": "^7.0.0",
     "elysia": "^1.4.30",
-    "kay": "~1.37.0 || ~1.38.0"
+    "kay": "~1.38.1"
   },
   "peerDependenciesMeta": {
     "@kaynooo/pg-orm": {
@@ -67,13 +68,12 @@
   },
   "devDependencies": {
     "@kaynooo/eslint": "^6.0.1",
-    "@kaynooo/kayjs-mail": "^0.3.0",
-    "@kaynooo/kayjs-ui": "^0.8.0",
+    "@kaynooo/kayjs-mail": "workspace:~",
+    "@kaynooo/kayjs-ui": "workspace:~",
     "@kaynooo/pg-orm": "^7.0.1",
     "@types/bun": "^1.4.2",
     "@typescript/native-preview": "^7.0.0-dev.20260707.2",
     "elysia": "^1.4.30",
-    "kay": "npm:@kaynooo/kayjs@~1.38.1",
     "typescript": "^6.0.3"
   }
 }

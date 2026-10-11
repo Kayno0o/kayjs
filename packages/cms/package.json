@@ -1,16 +1,18 @@
 {
   "name": "@kaynooo/kayjs-cms",
   "type": "module",
-  "version": "0.0.0",
+  "version": "1.38.1",
+  "private": true,
   "description": "A CMS for kay sites: collection screens, and content edited on the page it renders",
   "author": "Kaynooo <https://git.kaynooo.fr/kaynooo>",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://git.kaynooo.fr/kaynooo/kayjs-cms"
+    "url": "https://git.kaynooo.fr/kaynooo/kayjs",
+    "directory": "packages/cms"
   },
   "bugs": {
-    "url": "https://git.kaynooo.fr/kaynooo/kayjs-cms/issues"
+    "url": "https://git.kaynooo.fr/kaynooo/kayjs/issues"
   },
   "publishConfig": {
     "registry": "https://git.kaynooo.fr/api/packages/kaynooo/npm/"
@@ -34,7 +36,7 @@
     "bun": ">=1.4.3"
   },
   "scripts": {
-    "prepare": "bun scripts/link-fixture.ts",
+    "prepare": "$npm_execpath scripts/link-fixture.ts",
     "check": "$npm_execpath check",
     "build:types": "rm -rf types && tsgo -p tsconfig.build.json",
     "prepack": "bun run build:types",
@@ -45,17 +47,16 @@
     "test:dom": "bun --config=tests-dom/bunfig.toml test"
   },
   "peerDependencies": {
-    "@kaynooo/kayjs-ui": "^0.8.0",
-    "kay": "~1.38.0"
+    "@kaynooo/kayjs-ui": "workspace:~",
+    "kay": "~1.38.1"
   },
   "devDependencies": {
     "@happy-dom/global-registrator": "^20.14.5",
     "@kaynooo/eslint": "^6.0.1",
-    "@kaynooo/kayjs-ui": "^0.8.0",
+    "@kaynooo/kayjs-ui": "workspace:~",
     "@types/bun": "^1.4.2",
     "@typescript/native-preview": "^7.0.0-dev.20260707.2",
     "bun-plugin-tailwind": "^0.1.2",
-    "kay": "npm:@kaynooo/kayjs@~1.38.0",
     "tailwindcss": "^4.3.3",
     "typescript": "^6.0.3"
   }

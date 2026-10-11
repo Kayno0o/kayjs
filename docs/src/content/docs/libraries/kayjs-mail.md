@@ -11,7 +11,7 @@ description: Send mail from kay apps with SMTP, mails written as .kay components
 bun add @kaynooo/kayjs-mail
 ```
 
-The `@kaynooo` scope must point at the Forgejo registry in your `.npmrc` (a project made by `kay new` has it). kay 1.28 or later and Elysia are peers.
+The `@kaynooo` scope must point at the Forgejo registry in your `.npmrc` (a project made by `kay new` has it). kay and Elysia are peers. It is released with kay, at kay's own version, and peers on the kay of that version: install the one matching your kay, and move them together.
 
 ## Setup
 

@@ -22,7 +22,7 @@ jobs:
     # A release's version commit, `v1.2.3`, pushed alone, is tested by the publish workflow its tag starts, on the same tree; no other commit title starts with a `v`. Code commits pushed along with it still get the steps only this workflow runs.
     if: github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'v') || github.event.commits[1] != null
     runs-on: alpine
-    timeout-minutes: 15
+    timeout-minutes: 20
 
     steps:
       - uses: actions/checkout@v4
@@ -62,10 +62,23 @@ jobs:
           su postgres -c "pg_ctl -D /var/lib/postgresql/data -o '-c listen_addresses=127.0.0.1 -c unix_socket_directories=/run/postgresql' -w start"
           su postgres -c "psql -c \"CREATE USER test WITH PASSWORD 'test' SUPERUSER;\""
           echo "TEST_DATABASE_URL=postgres://test:test@127.0.0.1:5432/kay_app_test" >> "$GITHUB_ENV"
+          su postgres -c "createdb -O test kayjs_auth_test"
+          echo "KAYJS_AUTH_TEST_DATABASE_URL=postgres://test:test@127.0.0.1:5432/kayjs_auth_test" >> "$GITHUB_ENV"
 
       # Every test file at once in this one checkout, a worker per core, the slowest files first by tests/timings.json.
       - name: Tests
         run: bun run test
+
+      # The lint above already took each library with its own eslint.config.ts, the nearest one to every file.
+      - name: Check and test the libraries
+        run: |
+          for dir in packages/*/; do
+            echo "$dir"
+            (cd "$dir" && bun run check && bun run test) || exit 1
+          done
+        env:
+          # kayjs-auth refuses to skip its pg store's tests for want of a database.
+          KAYJS_AUTH_REQUIRE_DATABASE: '1'
 
       - name: Check the benchmark apps
         run: bun run bench:check
@@ -73,8 +86,8 @@ jobs:
       - name: Check that kay's bench pages leave hydration markers to islands
         run: bun test ./bench -t 'leave hydration markers'
 
-      # Last, as it moves the lockfile: the libraries the last bump tested pass above, their newest releases go through the example here.
-      - name: Test the example app on the latest library releases
+      # Last, as it moves the lockfile: kay's own libraries are this checkout's packages/, pg-orm's newest release goes through the example here.
+      - name: Test the example app on the latest pg-orm release
         run: |
-          bun update --latest @kaynooo/kayjs-auth @kaynooo/kayjs-mail @kaynooo/kayjs-ui @kaynooo/pg-orm
+          bun update --latest @kaynooo/pg-orm
           bun test ./tests/examples.test.ts

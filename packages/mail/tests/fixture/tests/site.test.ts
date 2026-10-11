@@ -14,7 +14,7 @@ const site = await testSite({ root: ROOT })
 beforeEach(() => outbox.clear())
 
 test('kay check passes on the fixture, the library\'s components its mails render included', async () => {
-  const check = Bun.spawn([process.execPath, join(ROOT, '..', '..', 'node_modules', '.bin', 'kay'), 'check'], { cwd: ROOT, stdout: 'pipe', stderr: 'pipe' })
+  const check = Bun.spawn([process.execPath, join(ROOT, '..', '..', '..', '..', 'src', 'cli.ts'), 'check'], { cwd: ROOT, stdout: 'pipe', stderr: 'pipe' })
 
   expect(await new Response(check.stdout).text() + await new Response(check.stderr).text()).toMatch(CLEAN)
   expect(await check.exited).toBe(0)

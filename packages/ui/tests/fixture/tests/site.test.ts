@@ -34,7 +34,7 @@ async function element(path: string, id: string): Promise<string> {
 }
 
 test('kay check passes on the fixture, the library\'s components it renders and this test included', async () => {
-  const check = Bun.spawn([process.execPath, join(ROOT, '..', '..', 'node_modules', '.bin', 'kay'), 'check'], { cwd: ROOT, stdout: 'pipe', stderr: 'pipe' })
+  const check = Bun.spawn([process.execPath, join(ROOT, '..', '..', '..', '..', 'src', 'cli.ts'), 'check'], { cwd: ROOT, stdout: 'pipe', stderr: 'pipe' })
 
   expect(await new Response(check.stdout).text() + await new Response(check.stderr).text()).toMatch(CLEAN)
   expect(await check.exited).toBe(0)

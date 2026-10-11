@@ -7,11 +7,11 @@ minor: (release "minor") # v0.X.0
 
 major: (release "major") # vX.0.0
 
-# bump, then push the branch and its new tag in one atomic push; a rejected push drops the bump so a retry starts clean
+# bump kay and every library to one version, then push the branch and its new tag in one atomic push; a rejected push drops the bump so a retry starts clean
 release level:
 	#!/usr/bin/env bash
 	set -euo pipefail
-	bun pm version {{level}}
+	bun scripts/version.ts {{level}}
 	tag=$(git tag --points-at HEAD)
 	before=$(tea actions runs ls -o json --limit 1 | jq -r '.[0].id // 0')
 	if ! git push --atomic origin HEAD "$tag"; then
