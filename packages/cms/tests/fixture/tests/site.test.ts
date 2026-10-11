@@ -7,7 +7,6 @@ import { BODY, parseMarker } from '../../../src/markers'
 import { outage, products } from '../src/products'
 import { saved } from '../src/saved'
 
-// Until kay renders the editor in edit mode (kaynooo/kayjs#262), the fixture's pages render it themselves.
 const ROOT = join(import.meta.dir, '..')
 // kay check prints this line on success since kay 1.18, nothing before.
 const CLEAN = /^(?:checked with no problems in \d+ ms\n)?$/
@@ -26,17 +25,19 @@ test('kay check passes on the fixture, the editor\'s components included', async
   expect(await check.exited).toBe(0)
 }, 60_000)
 
-test('the editor renders a form per entry the page read, each loading in the browser', async () => {
-  const page = await site.visit('/')
+test('kay renders the editor in edit mode alone, a form per entry the page read, each loading in the browser', async () => {
+  expect((await site.visit('/blog/hello')).find('aside.kcms-editor')).toEqual([])
+
+  const page = await editor.visit('/admin/page?path=/blog/hello')
 
   expect(page.find('aside.kcms-editor-open')[0]?.attributes['aria-label']).toBe('Content editor')
-  expect(page.find('.kcms-entry-title').map(title => title.text)).toEqual(['Posts', 'Pages'])
-  expect(page.find('.kcms-entry-slug').map(slug => slug.text)).toEqual(['hello', 'about (fr)'])
-  expect(page.find('.kcms-entry-loading')).toHaveLength(2)
+  expect(page.find('.kcms-entry-title').map(title => title.text)).toEqual(['Posts'])
+  expect(page.find('.kcms-entry-slug').map(slug => slug.text)).toEqual(['hello'])
+  expect(page.find('.kcms-entry-loading')).toHaveLength(1)
 })
 
 test('the editor says when nothing on the page comes from a collection', async () => {
-  const page = await site.visit('/empty')
+  const page = await editor.visit('/empty')
 
   expect(page.find('.kcms-editor-empty')[0]?.text).toBe('Nothing on this page comes from a collection.')
 })

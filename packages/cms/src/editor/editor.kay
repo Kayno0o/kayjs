@@ -1,4 +1,5 @@
 ---
+import type { EditorProps } from 'kay/edit'
 import type { EntryRef } from '../kay/contract'
 import type { FieldMarker, FieldPath } from '../markers'
 import IconButton from '@kaynooo/kayjs-ui/icon-button.kay'
@@ -9,7 +10,7 @@ import EntryForm from './entry-form.kay'
 import './editor.css'
 
 // kay renders it at the end of the page in edit mode only, kept across page swaps, with the entries the page read.
-const { entries } = props<{ entries: EntryRef[] }>()
+const { entries } = props<EditorProps>()
 
 const open = signal(true)
 const focused = signal<FieldMarker>()

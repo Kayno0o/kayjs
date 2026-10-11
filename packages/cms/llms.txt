@@ -1,6 +1,6 @@
 # kayjs-cms
 
-> A CMS for kay sites: content edited on the page it renders, and collection screens. Work in progress: kay renders the editor in edit mode once kaynooo/kayjs#262 ships its last part; everything else it needs from kay has landed.
+> A CMS for kay sites: content edited on the page it renders, and collection screens.
 
 ## Rules that are easy to get wrong
 

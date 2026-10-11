@@ -1,5 +1,1 @@
----
-import Editor from '@kaynooo/kayjs-cms/editor.kay'
----
 p Nothing here
-Editor(entries={[]})

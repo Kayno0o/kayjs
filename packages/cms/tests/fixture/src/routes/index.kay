@@ -1,5 +1,0 @@
----
-import Editor from '@kaynooo/kayjs-cms/editor.kay'
----
-h1(data-kay-field="posts:hello:title") Hello
-Editor(entries={[{ collection: 'posts', slug: 'hello' }, { collection: 'pages', slug: 'about', locale: 'fr' }]})
