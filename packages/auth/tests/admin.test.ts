@@ -1,10 +1,11 @@
 import type { User } from '../src/auth'
 import type { AuthEvent, EventContext } from '../src/events'
+import type { Mail } from '../src/mail'
 import { afterEach, describe, expect, setSystemTime, test } from 'bun:test'
 import { testApp } from './helpers/app'
 
 const PASSWORD = 'correct horse battery'
-const ADMIN_EVENTS = new Set<AuthEvent>(['role-granted', 'role-revoked', 'banned', 'unbanned', 'impersonation-started', 'impersonation-ended'])
+const ADMIN_EVENTS = new Set<AuthEvent>(['role-granted', 'role-revoked', 'banned', 'unbanned', 'account-deleted', 'impersonation-started', 'impersonation-ended'])
 
 afterEach(() => {
   setSystemTime()
@@ -54,6 +55,7 @@ describe('admin', () => {
     expect(await ada.browser.call('getUser', admin.id)).toEqual({ ok: false, error: 'forbidden' })
     expect(await ada.browser.call('grantRole', ada.id, 'admin')).toEqual({ ok: false, error: 'forbidden' })
     expect(await ada.browser.call('banUser', admin.id)).toEqual({ ok: false, error: 'forbidden' })
+    expect(await ada.browser.call('deleteUser', admin.id)).toEqual({ ok: false, error: 'forbidden' })
     expect(await ada.browser.call('impersonate', admin.id)).toEqual({ ok: false, error: 'forbidden' })
     expect(await ada.browser.call('adminAuditLog')).toEqual({ ok: false, error: 'forbidden' })
   })
@@ -123,6 +125,44 @@ describe('admin', () => {
 
     expect(await admin.browser.post('/ban', { id: admin.id })).toEqual({ ok: false, error: 'self' })
     expect(await admin.browser.post('/ban', { id: other.id })).toEqual({ ok: false, error: 'admin' })
+  })
+
+  test('an admin cannot delete themselves or another admin, and a missing user is not found', async () => {
+    const { admin, member, store } = await setup()
+    const other = await member('second@example.com', ['admin'])
+
+    expect(await admin.browser.call('deleteUser', admin.id)).toEqual({ ok: false, error: 'self' })
+    expect(await admin.browser.call('deleteUser', other.id)).toEqual({ ok: false, error: 'admin' })
+    expect(await admin.browser.call('deleteUser', 'nobody')).toEqual({ ok: false, error: 'not-found' })
+    expect(await store.users.get(other.id)).toBeTruthy()
+  })
+
+  test('deleting a user removes them, tells the app, mails them and logs the admin as the actor', async () => {
+    const deleted: User[] = []
+    const mails: Mail[] = []
+    const { admin, ada, store, said, browser } = await setup({
+      audit: true,
+      url: 'https://site.test',
+      email: { mailer: { send: (mail: Mail) => void mails.push(mail) }, links: { 'verify-email': '/v', 'reset-password': '/r', 'magic-link': '/m', 'change-email': '/c' } },
+      onDelete: (user: User) => {
+        deleted.push(user)
+      },
+    })
+
+    await store.users.update(ada.id, { emailVerifiedAt: new Date() })
+    mails.length = 0
+
+    expect(await admin.browser.call('deleteUser', ada.id)).toEqual({ ok: true })
+    expect(await store.users.get(ada.id)).toBeUndefined()
+    expect(deleted.map(user => user.email)).toEqual(['ada@example.com'])
+    expect(mails.map(mail => [mail.kind, mail.to])).toEqual([['account-deleted', 'ada@example.com']])
+    expect(said()).toEqual([['account-deleted', 'ada@example.com', undefined, 'root@example.com']])
+    expect(await ada.browser.json('/me')).toBe('anonymous')
+    expect(await browser().post('/password', { identifier: 'ada@example.com', password: PASSWORD })).toEqual({ ok: false, error: 'invalid' })
+
+    const log = await admin.browser.call('adminAuditLog', { userId: ada.id })
+
+    expect(log.entries.find((entry: { event: string }) => entry.event === 'account-deleted')?.actorId).toBe(admin.id)
   })
 
   test('impersonating signs the admin in as the user with no proof to give, and stopping signs them back in as themselves', async () => {

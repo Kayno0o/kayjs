@@ -3,7 +3,7 @@ import type { DefinitionBase, EphemeralType, MetadataBase, RouteBase, SingletonB
 import type { Guard } from 'kay'
 import type { KayConfig, Session } from 'kay/server'
 import type { ChangeUsernameResult } from './account'
-import type { AdminFailure, BanResult, ManagedUser, RoleResult } from './admin'
+import type { AdminFailure, BanResult, DeleteResult, ManagedUser, RoleResult } from './admin'
 import type { BearerToken, CreateTokenResult, TokenOptions } from './bearer'
 import type { CaptchaAction, CaptchaOptions } from './captcha'
 import type { AuthSessionData, Core, OAuthApp, Profile, SignedIn, User } from './core'
@@ -27,7 +27,7 @@ import type { Level, PolicyContext, Predicate, Requirement } from './types'
 import { Elysia } from 'elysia'
 import { clientAddress, rateKey } from 'kay/server'
 import { changePassword, changeUsername, deleteAccount, unlink } from './account'
-import { actingAdmin, adminAuditLog, banUser, changeRole, getUser, isAdmin, listUsers, unbanUser } from './admin'
+import { actingAdmin, adminAuditLog, banUser, changeRole, deleteUser, getUser, isAdmin, listUsers, unbanUser } from './admin'
 import { bearerUser, createToken, listTokens, revokeToken, tokenUser } from './bearer'
 import { pwnedPassword } from './breached'
 import { admit, captchaRequired } from './captcha'
@@ -569,6 +569,11 @@ export class Auth<Scope extends string = string, Role extends string = string, O
 
   async unbanUser(userId: string): Promise<{ ok: true, user: ManagedUser } | { ok: false, error: AdminFailure }> {
     return unbanUser(this[STATE], userId)
+  }
+
+  // Deletes a user with everything kayjs-auth keeps for them, calling `onDelete` and mailing them the account-deleted notice; oneself and another admin are refused.
+  async deleteUser(userId: string): Promise<DeleteResult> {
+    return deleteUser(this[STATE], userId)
   }
 
   // Everyone's audit log, or `userId`'s, newest first.

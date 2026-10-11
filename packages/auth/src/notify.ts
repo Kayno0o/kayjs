@@ -7,10 +7,10 @@ import { writing } from './mail'
 
 // Tells the user and the app of a change to what protects the account; mail goes to a verified address only, so a typo never warns a stranger.
 // A failure is logged, not thrown: the change is made by then, and a mail outage must not turn every sign-in into an error.
-export async function notify(state: RequestState, record: UserRecord, event: SecurityEvent, detail?: string, to = record.emailVerifiedAt === null ? null : record.email): Promise<void> {
+export async function notify(state: RequestState, record: UserRecord, event: SecurityEvent, detail?: string, to = record.emailVerifiedAt === null ? null : record.email, actor?: UserRecord): Promise<void> {
   const { core } = state
 
-  await report(state, record, event, detail)
+  await report(state, record, event, detail, actor)
 
   const mail = core.email
 

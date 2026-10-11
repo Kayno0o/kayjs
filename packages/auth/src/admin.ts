@@ -6,6 +6,7 @@ import { clamp } from '@kaynooo/utils'
 import { banned, publicUser } from './core'
 import { revokeBearerTokens } from './email'
 import { auditEntries, report } from './events'
+import { notify } from './notify'
 
 const USER_PAGE_MAX = 200
 const BAN_REASON_MAX_LENGTH = 500
@@ -23,6 +24,8 @@ export type AdminFailure = 'forbidden' | 'not-found'
 export type RoleResult = { ok: true, user: ManagedUser } | { ok: false, error: AdminFailure | 'unknown-role' }
 
 export type BanResult = { ok: true, user: ManagedUser } | { ok: false, error: AdminFailure | 'self' | 'admin' | 'until' }
+
+export type DeleteResult = { ok: true } | { ok: false, error: AdminFailure | 'self' | 'admin' }
 
 export function managedUser(record: UserRecord): ManagedUser {
   return {
@@ -147,6 +150,31 @@ export async function unbanUser(state: RequestState, userId: string): Promise<{ 
   await report(state, updated, 'unbanned', undefined, actor)
 
   return { ok: true, user: managedUser(updated) }
+}
+
+// Deletes the user with everything kayjs-auth keeps for them, calls `onDelete` and mails them the account-deleted notice. Another admin is refused: revoke their role first.
+export async function deleteUser(state: RequestState, userId: string): Promise<DeleteResult> {
+  const actor = await actingAdmin(state)
+
+  if (!actor)
+    return { ok: false, error: 'forbidden' }
+
+  const record = await state.core.store.users.get(userId)
+
+  if (!record)
+    return { ok: false, error: 'not-found' }
+
+  if (record.id === actor.id)
+    return { ok: false, error: 'self' }
+
+  if (await isAdmin(state, record))
+    return { ok: false, error: 'admin' }
+
+  await notify(state, record, 'account-deleted', undefined, undefined, actor)
+  await state.core.store.users.delete(record.id)
+  await state.core.onDelete?.(publicUser(record))
+
+  return { ok: true }
 }
 
 // Everyone's audit log, or one user's, newest first.
