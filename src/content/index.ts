@@ -17,8 +17,8 @@ import { contentMode, loadEntries } from './load'
 import { compileMarkdown, MarkdownError } from './markdown'
 import { ContentError, decodeEntries } from './validate'
 
-export type { CollectionInfo, FieldKind, SourceEntry } from './edit'
-export { collections, entries, fileField, imageField, markdownField, reference } from './edit'
+export type { CollectionInfo, EntryFile, FieldKind, SourceEntry, WrittenEntry } from './edit'
+export { collections, entries, entrySource, fileField, imageField, markdownField, reference, removeEntry, saveEntry } from './edit'
 export type { FeedItem, FeedOptions } from './feed'
 export type { Heading, Highlighter, RenderedMarkdown } from './markdown'
 export { highlightCode, renderMarkdown } from './markdown'
@@ -67,6 +67,10 @@ export interface ContentLoader {
   ttl?: Duration | undefined
   // Keeps the entries across restarts and processes, as `cached` does.
   store?: CacheStore | undefined
+  // Writes an entry a CMS saved, new or changed, once its collection accepts it: what `saveEntry` from `kay/content` hands on.
+  save?: ((entry: { slug: string, locale?: string | undefined, data: unknown, body?: string | undefined }) => void | Promise<void>) | undefined
+  // Deletes an entry, which `removeEntry` from `kay/content` asks.
+  remove?: ((entry: { slug: string, locale?: string | undefined }) => void | Promise<void>) | undefined
 }
 
 export interface CollectionOptions<Schema extends TSchema> {
@@ -84,6 +88,8 @@ export interface CollectionOptions<Schema extends TSchema> {
   feed?: FeedOptions<Static<Schema>> | undefined
   // Each entry sits in a folder named after its locale, `fr/hello.md`, a translation sharing its slug: `all()` and `get()` read the request's locale, the default locale's entry standing in for one it lacks, and the feed is served once per locale.
   localized?: boolean | undefined
+  // The path of the page showing an entry, under the base, which a CMS opens it on; by default the page whose `prerender` lists the collection.
+  url?: ((entry: { slug: string, locale?: string | undefined, data: Static<Schema> }) => string) | undefined
 }
 
 export interface Collection<Data, Components extends Record<string, Component<never>> = Record<string, Component<never>>, FeedPath extends string = string> {

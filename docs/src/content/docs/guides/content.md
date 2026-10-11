@@ -174,6 +174,6 @@ Setting `preview: { secret }` in `kay.config.ts` lets an editor see drafts on th
 
 ## A CMS editing the collections
 
-A CMS running in the app's server reads the collections through `collections()` and `entries(name)` from `kay/content`: each collection's schema as JSON Schema, its folder in the repository and its draft field, and each entry as its file or loader holds it, drafts included. `reference('authors')`, `imageField()`, `fileField()` and `markdownField()` mark the string fields it edits apart, and `draft: 'draft'` names a boolean field holding entries back, which the CMS publishes by writing false.
+A CMS running in the app's server reads the collections through `collections()` and `entries(name)` from `kay/content`: each collection's schema as JSON Schema, its folder in the repository and its draft field, and each entry as its file or loader holds it, drafts included, with the page showing it. `entrySource(name, slug, data)` gives a folder entry's file as the editor wrote it, for the CMS to commit, and `saveEntry` and `removeEntry` hand a loaded entry to the loader's `save` and `remove`; each checks the entry against the collection first. `reference('authors')`, `imageField()`, `fileField()` and `markdownField()` mark the string fields it edits apart, and `draft: 'draft'` names a boolean field holding entries back, which the CMS publishes by writing false.
 
 <ReadMore href="/llms/content">Syntax highlighting, `renderMarkdown`, the caches, atom feeds and the loader options are in the full content reference.</ReadMore>

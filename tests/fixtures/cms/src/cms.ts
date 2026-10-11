@@ -20,3 +20,14 @@ export function resetCms(): void {
 }
 
 resetCms()
+
+// What a CMS's API would do with an entry an editor saved or deleted.
+export function saveToCms(entry: { slug: string, data: unknown, body?: string | undefined }): void {
+  const { title, published } = entry.data as { title: string, published: boolean }
+
+  cms.entries = [...cms.entries.filter(each => each.slug !== entry.slug), { slug: entry.slug, title, published, body: entry.body ?? '' }]
+}
+
+export function removeFromCms(entry: { slug: string }): void {
+  cms.entries = cms.entries.filter(each => each.slug !== entry.slug)
+}

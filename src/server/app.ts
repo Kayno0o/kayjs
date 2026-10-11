@@ -12,6 +12,7 @@ import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { Elysia } from 'elysia'
 import { extensionServers, pageHooks } from '../config'
+import { registerEntryUrls } from '../content/edit'
 import { clearContentMode } from '../content/load'
 import { serveFeeds } from '../content/server'
 import { offlineOf } from '../project'
@@ -27,6 +28,7 @@ import { serveCards } from './card'
 import { compressResponse, fixedTexts } from './compress'
 import { DEV_A11Y, DEV_AXE, DEV_EVENTS, DEV_INSPECTOR, DEV_OPEN, DEV_PATCH, devA11y, devAxe, devEvents, devInspector, devPatch, hotSwap, openInEditor } from './dev'
 import { claimEndpoints, serveEndpoints } from './endpoints'
+import { entryUrls } from './entry-urls'
 import { servePublicEnv } from './env'
 import { serveErrorReports } from './errors'
 import { FAVICON_DIR, faviconSource, serveFavicons } from './favicon'
@@ -266,6 +268,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   serveImages(app, imageRoute)
   serveCards(app, cards, imageRoute)
   serveFeeds(app, served, collections, site, mode.dev, i18n)
+  registerEntryUrls(entryUrls(routes, base, options.trailingSlash, i18n?.settings))
 
   if (site !== undefined)
     serveSitemap(app, served, routes, site, { dev: mode.dev, onError: options.onError, trailingSlash: options.trailingSlash, locales: i18n?.settings })

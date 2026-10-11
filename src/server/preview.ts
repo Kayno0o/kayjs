@@ -7,8 +7,7 @@ import type { DraftEntry, DraftIssue } from '../runtime/edit'
 import type { EntryDraft, PreviewMode, PreviewState } from '../runtime/preview'
 import type { BodyLimit } from './body'
 import { AsyncLocalStorage } from 'node:async_hooks'
-import { compileMarkdown, MarkdownError } from '../content/markdown'
-import { dataIssues, unknownComponents } from '../content/validate'
+import { entryIssues } from '../content/edit'
 import { durationSeconds } from '../runtime/duration'
 import { exportNameOf } from '../runtime/fields'
 import { setPreviewScope } from '../runtime/preview'
@@ -90,22 +89,17 @@ export function serveDrafts(app: Elysia, collections: Collection<unknown>[]): vo
 
     for (const { collection, slug, locale, data, body } of posted.entries) {
       const found = collections.find(each => exportNameOf(each.name) === collection)
-      const entry = { collection, slug, ...locale !== undefined && { locale } }
 
       if (!found) {
-        issues.push({ ...entry, path: '', message: 'names no collection the content config exports' })
+        issues.push({ collection, slug, ...locale !== undefined && { locale }, path: '', message: 'names no collection the content config exports' })
 
         continue
       }
 
-      const localized = found.options.localized === true
+      const checked = await entryIssues(collection, found, { slug, locale, data, body })
+      const compiled = checked.compiled
 
-      if (localized !== (locale !== undefined))
-        issues.push({ ...entry, path: '', message: localized ? 'names no locale, which each entry of a localized collection has' : 'names a locale, which the collection is not localized by' })
-
-      const compiled = body === undefined ? undefined : await draftBody(found, body, issue => issues.push({ ...entry, path: '', body: true, message: issue }))
-
-      issues.push(...dataIssues(found.options.schema, data).map(issue => ({ ...entry, ...issue })))
+      issues.push(...checked.issues)
       drafts.set(found.name, [...drafts.get(found.name) ?? [], { slug, locale, data, body, compiled }])
     }
 
@@ -129,26 +123,6 @@ export function serveDrafts(app: Elysia, collections: Collection<unknown>[]): vo
       pendingDrafts.delete(id)
     }
   })
-}
-
-// A draft's body compiled as its collection compiles one, reporting a component the collection does not name, which would fail the render.
-async function draftBody(collection: Collection<unknown>, body: string, report: (issue: string) => void): Promise<EntryDraft['compiled']> {
-  try {
-    const compiled = await compileMarkdown(body, 1, collection.options.highlight)
-
-    for (const { component, line } of unknownComponents(compiled.segments, collection.components))
-      report(`uses <${component}> on line ${line}, which the collection's components do not name`)
-
-    return compiled
-  }
-  catch (error) {
-    if (!(error instanceof MarkdownError))
-      throw error
-
-    report(`${error.message} on line ${error.line}`)
-
-    return undefined
-  }
 }
 
 async function postedDrafts(request: Request): Promise<{ path: string, entries: DraftEntry[] } | undefined> {

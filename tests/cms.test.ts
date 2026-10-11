@@ -1,10 +1,11 @@
+import type { ServedRoute } from '../src/server/guards'
 import { rm } from 'node:fs/promises'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { afterEach, describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { t } from 'elysia'
 import { outputDir } from '../src/build/assets'
-import { collection, collections, entries } from '../src/content'
+import { collection, collections, entries, entrySource, removeEntry, saveEntry } from '../src/content'
 import { ContentError } from '../src/content/validate'
 import { resolveProject } from '../src/project'
 import { cached } from '../src/runtime/cache'
@@ -13,6 +14,7 @@ import { child, loop } from '../src/runtime/html'
 import { editing, previewing } from '../src/runtime/preview'
 import { editRequested, enterPreview, pages, previewUrl } from '../src/server'
 import { readClient, readManifest, writeManifest } from '../src/server/client'
+import { entryUrls } from '../src/server/entry-urls'
 import { prerenderPages } from '../src/server/prerender'
 import { inPreview, previewRequested, requestDrafts } from '../src/server/preview'
 import { cms, resetCms } from './fixtures/cms/src/cms'
@@ -159,14 +161,47 @@ describe('the collections a CMS edits', () => {
 
   it('lists entries as their source holds them, drafts included and told apart, one locale\'s when asked', async () => {
     expect(await entries('news')).toEqual([
-      { slug: 'launch', data: { title: 'Launch day', published: true, tags: ['launch'] }, body: '## What ships\n\nEverything.', draft: false },
-      { slug: 'roadmap', data: { title: 'Next year', published: false, tags: ['roadmap'] }, body: 'Not yet.', draft: true },
+      { slug: 'launch', data: { title: 'Launch day', published: true, tags: ['launch'] }, body: '## What ships\n\nEverything.', draft: false, url: '/news/launch' },
+      { slug: 'roadmap', data: { title: 'Next year', published: false, tags: ['roadmap'] }, body: 'Not yet.', draft: true, url: '/news/roadmap' },
     ])
     expect(cms.loads).toEqual([true])
-    expect(await entries('articles', { locale: 'fr' })).toEqual([{ slug: 'hello', locale: 'fr', path: 'tests/fixtures/cms/src/content/articles/fr/hello.md', data: { title: 'Bonjour' }, body: '\nSalut.\n', draft: false }])
+    expect(await entries('articles', { locale: 'fr' })).toEqual([{ slug: 'hello', locale: 'fr', path: 'tests/fixtures/cms/src/content/articles/fr/hello.md', data: { title: 'Bonjour' }, body: '\nSalut.\n', draft: false, url: '/articles/hello' }])
     expect((await entries('articles')).map(entry => [entry.locale, entry.draft])).toEqual([['en', true], ['fr', false]])
     expect(await articles.all('en')).toEqual([])
     expect(await rejection(entries('posts'))).toMatchObject({ message: 'kay: no collection is exported from the content config as posts; it exports articles, news' })
+  })
+
+  it('finds an entry\'s page from the route prerendering its collection, in its locale, under the base, on its domain', async () => {
+    const route = { pattern: '/news/:slug', file: resolve(`${FIXTURE}/src/routes/news/[slug].kay`), params: ['slug'], layouts: [], special: {}, guards: [] } as unknown as ServedRoute
+    const settings = { locales: ['en', 'fr'], defaultLocale: 'en', prefixDefault: false }
+    const urls = entryUrls([route], '/site', 'always', settings)
+
+    expect(await urls(news, { slug: 'launch' })).toBe('/site/news/launch/')
+    expect(await urls(news, { slug: 'launch', locale: 'fr' })).toBe('/site/fr/news/launch/')
+    expect(await urls(articles, { slug: 'hello', locale: 'fr' })).toBeUndefined()
+    expect(await entryUrls([route], '', undefined, { ...settings, hosts: { en: 'news.example', fr: 'nouvelles.example' } })(news, { slug: 'launch', locale: 'fr' })).toBe('https://nouvelles.example/news/launch')
+  })
+
+  it('gives a folder entry\'s file as the editor wrote it, keeping its format and body, for the CMS to commit', async () => {
+    const hello = 'tests/fixtures/cms/src/content/articles/fr/hello.md'
+
+    expect(await entrySource('articles', 'hello', { title: 'Salut', published: '2026-01-01T00:00:00.000Z' }, { locale: 'fr' })).toEqual({ file: { path: hello, absolute: join(process.cwd(), hello), repoPath: hello, text: '---\ntitle: Salut\npublished: 2026-01-01T00:00:00.000Z\n---\n\nSalut.\n' } })
+    expect(await entrySource('articles', 'new-one', { title: 'New' }, { locale: 'en', body: '# Hi' })).toMatchObject({ file: { path: 'tests/fixtures/cms/src/content/articles/en/new-one.md', text: '---\ntitle: New\n---\n\n# Hi\n' } })
+    expect(await entrySource('articles', '../escape', { title: 3 })).toEqual({ issues: [
+      { collection: 'articles', slug: '../escape', path: '', message: 'has a slug naming no file of the collection: its parts are neither empty, . nor ..' },
+      { collection: 'articles', slug: '../escape', path: '', message: 'names no locale, which each entry of a localized collection has' },
+      { collection: 'articles', slug: '../escape', path: 'title', message: expect.any(String) },
+    ] })
+    expect(await rejection(entrySource('news', 'launch', {}))).toMatchObject({ message: expect.stringContaining('saveEntry()') })
+  })
+
+  it('hands a loaded entry to its loader\'s save and remove, then reads the collection afresh', async () => {
+    expect(await saveEntry('news', { slug: 'later', data: { title: 'Later on', published: true, tags: [] }, body: 'Soon.' })).toEqual({})
+    expect((await news.get('later'))?.data.title).toBe('Later on')
+    expect(await saveEntry('news', { slug: 'later', data: { title: 3 } })).toMatchObject({ issues: [{ collection: 'news', slug: 'later', path: 'published' }, { path: 'tags' }, { path: 'title' }] })
+    expect(await removeEntry('news', 'later')).toEqual({})
+    expect(await news.get('later')).toBeUndefined()
+    expect(await rejection(saveEntry('articles', { slug: 'hello', locale: 'fr', data: { title: 'T' } }))).toMatchObject({ message: expect.stringContaining('entrySource()') })
   })
 })
 
