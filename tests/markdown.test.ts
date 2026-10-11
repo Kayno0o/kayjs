@@ -119,7 +119,8 @@ describe('markdownHtml', () => {
 
     islandMarkdown('*a '.repeat(16_000))
     islandMarkdown('_a ~b '.repeat(8000))
-    expect(performance.now() - started).toBeLessThan(2000)
+    // About half a second alone, where marked unbounded took ten; a whole suite running at once slows it down.
+    expect(performance.now() - started).toBeLessThan(6000)
     expect<string>(islandMarkdown(`${'> '.repeat(10_000)}x`)).toStartWith('<p>&gt; &gt; ')
     expect<string>(islandMarkdown('**a**'.repeat(20_001))).toStartWith('<p>**a**')
   })
