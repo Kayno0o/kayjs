@@ -142,12 +142,12 @@
     "lint:fix": "keslint --fix --cache",
     "test": "bun test --parallel --timings=tests/timings.json",
     "test:timings": "bun test --parallel --timings=tests/timings.json --update-timings",
-    "bench": "bun bench/run.ts",
-    "bench:origins": "bun bench/origins.ts",
-    "bench:sites": "bun bench/sites/run.ts",
-    "bench:test": "bun test ./bench",
+    "bench": "$npm_execpath bench/run.ts",
+    "bench:origins": "$npm_execpath bench/origins.ts",
+    "bench:sites": "$npm_execpath bench/sites/run.ts",
+    "bench:test": "$npm_execpath test ./bench",
     "docs:build": "bun docs/search-index.ts && bun src/cli.ts build docs --static",
-    "bench:check": "bun src/cli.ts check bench/apps/kay && tsgo --noEmit -p bench/apps/solid && tsgo --noEmit -p bench/apps/svelte"
+    "bench:check": "$npm_execpath src/cli.ts check bench/apps/kay && tsgo --noEmit -p bench/apps/solid && tsgo --noEmit -p bench/apps/svelte"
   },
   "peerDependencies": {
     "@types/bun": "^1.4.2"

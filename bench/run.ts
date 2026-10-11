@@ -3,9 +3,10 @@ import type { LoadResult, OperationResult } from './browser'
 import { existsSync } from 'node:fs'
 import { cpus } from 'node:os'
 import { join } from 'node:path'
+import { parseArgs } from 'node:util'
 import { APPS } from './apps'
 import { assertHydrated, launch, measureLoad, measureOperations, serve } from './browser'
-import { kilobytes, milliseconds, table } from './format'
+import { kilobytes, medianOf, milliseconds, table } from './format'
 import { clientRows, PATHS, serverMarkup } from './markup'
 
 interface SsrResult {
@@ -22,6 +23,13 @@ interface AppResult {
 }
 
 const NANOSECONDS_PER_MS = 1e6
+const DEFAULT_RUNS = 3
+// Single runs disagree by a third on some operations and flip close winners, so each value is the median of several full runs.
+const { values: { runs: runsOption } } = parseArgs({ options: { runs: { type: 'string', default: String(DEFAULT_RUNS) } } })
+const RUNS = Number(runsOption)
+
+if (!Number.isInteger(RUNS) || RUNS < 1)
+  throw new Error(`--runs takes a whole number of runs, not ${runsOption}`)
 
 // Solid and Svelte live in their own packages; install them on first run.
 async function installApps() {
@@ -93,7 +101,7 @@ function report(apps: AppResult[], environment: string[]): string {
     '',
     ...environment.map(line => `- ${line}`),
     '',
-    'Every app renders the same markup from the same data behind the same Elysia server, checked before measuring, table rows included. Bold is the best of a row, the factor how far a value is from it. Reproduce with `bun run bench`.',
+    `Every app renders the same markup from the same data behind the same Elysia server, checked before measuring, table rows included. Bold is the best of a row, the factor how far a value is from it. Reproduce with \`bun run bench${RUNS === DEFAULT_RUNS ? '' : ` --runs ${RUNS}`}\`.`,
     '',
     'What differs by design:',
     '',
@@ -136,20 +144,14 @@ async function version(app: string, name: string): Promise<string> {
   return `${name} ${manifest.version}`
 }
 
-await installApps()
+async function measure(browser: Browser, run: number): Promise<AppResult[]> {
+  const of = RUNS > 1 ? ` (run ${run} of ${RUNS})` : ''
+  const ssrResults: SsrResult[] = []
 
-const ssrResults: SsrResult[] = []
-
-for (const app of APPS) {
-  console.error(`server rendering: ${app}`)
-  ssrResults.push(await ssr(app))
-}
-
-const browser = await launch()
-
-try {
-  console.error('checking markup')
-  await assertSameMarkup(browser)
+  for (const app of APPS) {
+    console.error(`server rendering: ${app}${of}`)
+    ssrResults.push(await ssr(app))
+  }
 
   const results: AppResult[] = []
 
@@ -157,7 +159,7 @@ try {
     const server = await serve(app)
 
     try {
-      console.error(`browser: ${app}`)
+      console.error(`browser: ${app}${of}`)
       await assertHydrated(browser, server.url)
       results.push({
         ssr: ssrResults[index]!,
@@ -171,11 +173,29 @@ try {
     }
   }
 
+  return results
+}
+
+await installApps()
+
+const browser = await launch()
+
+try {
+  console.error('checking markup')
+  await assertSameMarkup(browser)
+
+  const runs: AppResult[][] = []
+
+  for (let run = 1; run <= RUNS; run++)
+    runs.push(await measure(browser, run))
+
+  const results = medianOf(runs)
+
   const environment = [
     `${cpus()[0]?.model ?? 'unknown CPU'}, ${cpus().length} threads`,
     `Bun ${Bun.version}, Chromium ${browser.version()} headless`,
     `${await version('kay', 'kay')}, ${await version('solid', 'solid-js')}, ${await version('svelte', 'svelte')}`,
-    `run on ${new Date().toISOString().slice(0, 10)}`,
+    `run on ${new Date().toISOString().slice(0, 10)}${RUNS > 1 ? `, each value the median of ${RUNS} runs` : ''}`,
   ]
   const markdown = report(results, environment)
 
