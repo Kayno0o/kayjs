@@ -166,7 +166,8 @@ function hidden(attributes: string): boolean {
   return attribute(attributes, 'aria-hidden') === 'true' || DISPLAY_NONE.test(attribute(attributes, 'style') ?? '') || BOOLEAN_HIDDEN.test(attributes.replace(QUOTED, '""'))
 }
 
-function decode(text: string): string {
+// Text with the entities of html written out as their characters.
+export function decode(text: string): string {
   return text.replace(ENTITY, (entity, code: string) => {
     if (!code.startsWith('#'))
       return NAMED[code.toLowerCase()]!

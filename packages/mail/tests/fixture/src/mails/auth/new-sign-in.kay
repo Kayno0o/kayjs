@@ -1,0 +1,9 @@
+---
+import type { AuthMail } from '@kaynooo/kayjs-mail'
+import AuthNotice from '@kaynooo/kayjs-mail/auth-notice.kay'
+import Paragraph from '@kaynooo/kayjs-mail/paragraph.kay'
+
+const { mail } = props<{ mail: AuthMail }>()
+---
+AuthNotice(mail={mail} review="Your sessions:" ending="Write to us if it was not you.")
+  Paragraph(muted) {mail.detail ?? 'An unknown device'}

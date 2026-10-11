@@ -1,6 +1,8 @@
 import type { AuthMail } from '@kaynooo/kayjs-mail'
 import { authMailer, mailer, outbox } from '@kaynooo/kayjs-mail'
 import { beforeEach, describe, expect, it } from 'bun:test'
+import { AUTH_LINK_KINDS, AUTH_NOTICE_KINDS } from '../../../src/auth'
+import { authSample } from '../../../src/auth-samples'
 
 const URL = 'https://site.test/verify?token=a&b'
 
@@ -73,15 +75,34 @@ describe('authMailer', () => {
     expect(html).toContain('If this was not you, reset your password and check your account at once.</p>')
   })
 
+  it('writes every kind in English and French, each line filled', async () => {
+    for (const locale of ['en', 'fr']) {
+      for (const kind of [...AUTH_LINK_KINDS, ...AUTH_NOTICE_KINDS]) {
+        const { subject, text } = await authMailer(mail.render).send({ ...authSample(kind), locale })
+
+        expect(`${locale} ${kind}: ${subject}`).not.toMatch(/mail\.auth|[{}]|: $/)
+        expect(`${locale} ${kind}: ${text}`).not.toMatch(/mail\.auth|[{}]/)
+      }
+    }
+  })
+
   it('renders a kind through the app\'s own view, which keeps the shipped one around its own lines', async () => {
-    const views = { 'reset-password': async () => await import('../src/mails/auth/reset-password.kay') }
+    const views = { 'reset-password': async () => await import('../src/mails/auth/reset-password.kay'), 'new-sign-in': async () => await import('../src/mails/auth/new-sign-in.kay') }
     const { subject, html } = await authMailer(mail.render, { views }).send({ ...link, kind: 'reset-password', locale: 'en', code: undefined })
     const other = await authMailer(mail.render, { views }).send(link)
+    const signIn = await authMailer(mail.render, { views }).send({ ...notice, detail: 'Firefox on Linux' })
 
     expect(subject).toBe('Reset your Site password')
+    expect(html).toContain('>Password help</h1>')
     expect(html).toContain('Forgot your Site password?')
     expect(html).toContain('We never ask for it by mail.')
-    expect(html).toContain('Choose a new password')
+    expect(html).toContain('Pick a password')
+    expect(html).not.toContain('Choose a new password')
+    expect(signIn.html).toContain('>New sign-in on Site</h1>')
+    expect(signIn.html).toContain('Firefox on Linux')
+    expect(signIn.html).toContain('Your sessions: <a class="km-link" href="https://site.test/sessions"')
+    expect(signIn.html).toContain('Write to us if it was not you.</p>')
+    expect(signIn.html).not.toContain('reset your password')
     expect(html).toContain('The link works for one hour. If you did not ask for it, ignore this mail: your password stays as it is.</p>')
     expect(other.html).not.toContain('Forgot your')
   })

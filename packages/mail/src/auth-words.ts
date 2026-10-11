@@ -1,6 +1,6 @@
-import type { AuthLinkKind, AuthMail } from './auth'
+import type { AuthMail } from './auth'
 import { t } from 'kay/i18n'
-import { AUTH_LINK_KINDS } from './auth'
+import { LINK_KINDS } from './auth'
 
 export interface AuthWords {
   subject: string
@@ -22,7 +22,7 @@ export function authWords(mail: AuthMail): AuthWords {
   // Keys built from the kind: the messages type each one, not a template of them.
   const say = t as unknown as (key: string, values?: Record<string, string>) => string
   const of = (line: string): string => say(`mail.auth.${mail.kind}.${line}`, { site: mail.site, email: mail.to, detail: mail.detail ?? '', what: say(mail.url === undefined ? 'mail.auth.code' : 'mail.auth.link') })
-  const link = AUTH_LINK_KINDS.includes(mail.kind as AuthLinkKind)
+  const link = LINK_KINDS.has(mail.kind)
   // How long a link works, left unsaid when its `lasts` is empty.
   const lasts = link && mail.url !== undefined ? of('lasts') : ''
   const ending = [lasts === '' ? undefined : say('mail.auth.linkWorks', { duration: lasts }), mail.code === undefined ? undefined : say('mail.auth.codeWorks'), of('ending')]
