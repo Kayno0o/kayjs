@@ -55,8 +55,14 @@ afterEach(() => {
 test('kay check passes on the fixture, its links to kayjs-auth routes, its use of ctx.locals.auth and this test included', async () => {
   const check = Bun.spawn([process.execPath, join(ROOT, '..', '..', 'node_modules', '.bin', 'kay'), 'check'], { cwd: ROOT, stdout: 'pipe', stderr: 'pipe' })
 
-  expect(await new Response(check.stdout).text() + await new Response(check.stderr).text()).toMatch(CLEAN)
-  expect(await check.exited).toBe(0)
+  // A run the timeout cuts short leaves no check behind.
+  try {
+    expect(await new Response(check.stdout).text() + await new Response(check.stderr).text()).toMatch(CLEAN)
+    expect(await check.exited).toBe(0)
+  }
+  finally {
+    check.kill()
+  }
 }, 60_000)
 
 describe('the prebuilt pages', () => {
@@ -83,9 +89,18 @@ describe('the prebuilt pages', () => {
 
   test('kayjs-auth\'s own magic-link page, which the fixture replaces, opens under the same guard on a site replacing none, and spends the mailed link', async () => {
     const run = Bun.spawn([process.execPath, join(import.meta.dir, 'shipped.ts')], { stdout: 'pipe', stderr: 'pipe' })
-    const [out, errors] = [await new Response(run.stdout).text(), await new Response(run.stderr).text()]
+    let out: string
 
-    expect({ errors, exited: await run.exited }).toEqual({ errors: '', exited: 0 })
+    // A run the timeout cuts short leaves no site behind.
+    try {
+      const [printed, errors] = [await new Response(run.stdout).text(), await new Response(run.stderr).text()]
+
+      out = printed
+      expect({ errors, exited: await run.exited }).toEqual({ errors: '', exited: 0 })
+    }
+    finally {
+      run.kill()
+    }
 
     const { link, ...steps } = JSON.parse(out) as { link: string }
 
