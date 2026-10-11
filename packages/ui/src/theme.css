@@ -160,7 +160,7 @@
 
   .kui-btn {
     --kui-shell-fill: var(--color-kui-canvas);
-    @apply inline-flex cursor-pointer items-center justify-center gap-kui-inline border-0 px-3 py-1 text-xs font-kui-label tracking-kui-action text-kui-text uppercase transition-[color] duration-150;
+    @apply inline-flex cursor-pointer items-center justify-center gap-kui-inline border-0 px-3 py-1 text-xs whitespace-nowrap font-kui-label tracking-kui-action text-kui-text uppercase transition-[color] duration-150;
   }
 
   .kui-btn-accent {
@@ -455,7 +455,7 @@
   }
 
   .kui-dialog-footer {
-    @apply flex shrink-0 justify-end gap-2 border-t border-kui-surface2 px-5 py-4;
+    @apply flex shrink-0 flex-wrap justify-end gap-2 border-t border-kui-surface2 px-5 py-4;
   }
 
   .kui-empty-state {
@@ -552,11 +552,11 @@
   }
 
   .kui-form-dialog-footer {
-    @apply flex w-full items-center gap-2;
+    @apply flex w-full flex-wrap items-center gap-2;
   }
 
   .kui-form-dialog-actions {
-    @apply ml-auto flex gap-2;
+    @apply ml-auto flex flex-wrap justify-end gap-2;
   }
 
   .kui-icon-grid {
@@ -757,9 +757,9 @@
     @apply flex items-center gap-1.5 text-xs text-kui-subtext0;
   }
 
-  /* Takes field-input's look beside its own class, so a text box and the editor stay one style. */
+  /* Takes field-input's look beside its own class, so a text box and the editor stay one style. Grows with its text between about 12 lines and most of the screen, where browsers size a field by its content. */
   .kui-markdown-editor {
-    @apply w-full resize-none font-mono;
+    @apply max-h-[70dvh] min-h-[12lh] w-full resize-y font-mono field-sizing-content;
 
     &:where([aria-busy='true']) {
       @apply cursor-progress;
@@ -1212,7 +1212,7 @@
   }
 
   .kui-side-panel-footer {
-    @apply flex shrink-0 justify-end gap-2 border-t border-kui-surface2 px-5 py-4;
+    @apply flex shrink-0 flex-wrap justify-end gap-2 border-t border-kui-surface2 px-5 py-4;
   }
 
   .kui-site-favicon {
@@ -1388,6 +1388,10 @@
 
   .kui-table-wrap {
     @apply w-full overflow-x-auto border border-kui-surface2 bg-kui-surface0;
+
+    &:where([data-narrow='stack']) {
+      container: kui-table / inline-size;
+    }
   }
 
   /* Sticky, so it stays in view while a wide table scrolls under it. */
@@ -1457,6 +1461,48 @@
 
   .kui-table-empty-cell {
     @apply px-3 py-8 text-center text-xs text-kui-subtext0;
+  }
+
+  /* A narrow table stacks each row as a card, a line per cell with its header beside it, and keeps only its sortable headers, as a row of buttons. */
+  @container kui-table (width < 30rem) {
+    .kui-table,
+    .kui-table :where(thead, tbody, tr),
+    .kui-table-empty-cell {
+      @apply block;
+    }
+
+    .kui-table :where(thead tr) {
+      @apply flex flex-wrap gap-x-4 gap-y-1 border-b border-kui-surface2 px-3 py-2;
+    }
+
+    .kui-table :where(thead:not(:has(.kui-table-sort-btn))) {
+      @apply hidden;
+    }
+
+    .kui-table-head-cell {
+      @apply border-0 p-0;
+
+      &:where(:not(:has(.kui-table-sort-btn))) {
+        @apply hidden;
+      }
+    }
+
+    .kui-table-row {
+      @apply py-2;
+    }
+
+    .kui-table-cell {
+      @apply block py-1;
+
+      &:where([data-label]) {
+        @apply relative pl-[40%];
+      }
+
+      &:where([data-label])::before {
+        content: attr(data-label);
+        @apply absolute top-1 left-3 w-[calc(40%-1.5rem)] truncate text-left text-kui-micro leading-5 font-kui-label tracking-kui-label text-kui-subtext0 uppercase;
+      }
+    }
   }
 
   .kui-toaster {

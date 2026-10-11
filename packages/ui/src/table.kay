@@ -5,7 +5,7 @@ import { effect, persisted, signal } from 'kay'
 import Icon from './icon.kay'
 import { cellText, drawnByBlock, nextSort, resolvedColumn, rowKeyOf, rowMatches, sortedRows } from './table'
 
-const { columns: given, rows, rowKey, sort, serverSort = false, onSort, cell, empty, filter, filterLabel = 'Filter', filterPlaceholder, filterParam, noMatch, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
+const { columns: given, rows, rowKey, sort, serverSort = false, onSort, cell, empty, filter, filterLabel = 'Filter', filterPlaceholder, filterParam, noMatch, narrow = "stack", class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
   columns: Column<Row>[]
   rows: Row[]
   rowKey: RowKey<Row>
@@ -28,6 +28,8 @@ const { columns: given, rows, rowKey, sort, serverSort = false, onSort, cell, em
   filterParam?: string | undefined
   // Shown in place of the rows when the filter hides every one; `empty` otherwise.
   noMatch?: JSX.Element
+  // Below 30rem of width, rows stack as cards labelled by their headers, or the table scrolls sideways.
+  narrow?: "stack" | "scroll" | undefined
   class?: string | undefined
 }>()
 
@@ -61,7 +63,7 @@ function ariaSort(column: Column<Row>): 'ascending' | 'descending' | undefined {
   return current()?.direction === 'asc' ? 'ascending' : 'descending'
 }
 ---
-.kui-table-wrap({...rest} class={className})
+.kui-table-wrap({...rest} data-narrow={narrow} class={className})
   if filter
     label.kui-table-filter
       span.kui-label-text {filterLabel}
@@ -82,7 +84,7 @@ function ariaSort(column: Column<Row>): 'ascending' | 'descending' | undefined {
       for row of shown() key={rowKeyOf(row, rowKey)}
         tr.kui-table-row
           for column of columns() key={column.key}
-            td.kui-table-cell(data-align={column.align ?? 'start'} data-numeric={column.numeric ? '' : undefined})
+            td.kui-table-cell(data-label={column.header || undefined} data-align={column.align ?? 'start'} data-numeric={column.numeric ? '' : undefined})
               if cell && drawnByBlock(column, given)
                 | {cell(row, column)}
               else

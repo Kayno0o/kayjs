@@ -9,3 +9,5 @@ main
     Table(columns={columns} rows={planets} rowKey="id" sort={{ key: 'name', direction: 'asc' }})
   #filtered
     Table(columns={columns} rows={planets} rowKey="id" filter={['name'] as const} filterParam="q")
+  #scrolling
+    Table(columns={[{ key: 'name', header: '' }]} rows={planets} rowKey="id" narrow="scroll")

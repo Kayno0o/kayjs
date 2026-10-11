@@ -70,18 +70,28 @@ test('Toaster is an island rendering an empty manual popover, filled in the brow
 test('Table renders sorted on the server from a static page, its sortable headers buttons and the rest text', async () => {
   // An island's hydration markers left out.
   const table = (await element('/table', 'static')).replaceAll(/<!--[^>]*-->/g, '')
-  const cells = [...table.matchAll(/<td class="kui-table-cell" data-align="(\w+)">([^<]*)<\/td>/g)].map(([, align, text]) => `${align}:${text}`)
+  const cells = [...table.matchAll(/<td class="kui-table-cell" data-label="\w+" data-align="(\w+)">([^<]*)<\/td>/g)].map(([, align, text]) => `${align}:${text}`)
 
   expect(cells).toEqual(['start:Earth', 'end:1', 'start:Mars', 'end:2', 'start:Venus', 'end:0'])
   expect(table).toMatch(/<th class="kui-table-head-cell" scope="col" data-align="start" aria-sort="ascending"><button class="kui-table-sort-btn" type="button" data-direction="asc">Name<svg/)
   expect(table).toContain('<th class="kui-table-head-cell" scope="col" data-align="end">Moons</th>')
 })
 
+test('Table stacks when narrow, its cells labelled by their headers, unless it scrolls or a header is blank', async () => {
+  const stacking = (await element('/table', 'static')).replaceAll(/<!--[^>]*-->/g, '')
+  const scrolling = (await element('/table', 'scrolling')).replaceAll(/<!--[^>]*-->/g, '')
+
+  expect(stacking).toContain('<div data-narrow="stack" class="kui-table-wrap">')
+  expect(stacking).toContain('<td class="kui-table-cell" data-label="Moons" data-align="end">1</td>')
+  expect(scrolling).toContain('<div data-narrow="scroll" class="kui-table-wrap">')
+  expect(scrolling).toContain('<td class="kui-table-cell" data-align="start">Earth</td>')
+})
+
 test('Table filters on the server by the text its query param holds, shown in its search box', async () => {
   const table = (await element('/table?q=EAR', 'filtered')).replaceAll(/<!--[^>]*-->/g, '')
 
   expect(table).toContain('<label class="kui-table-filter"><span class="kui-label-text">Filter</span><input class="kui-field-input kui-table-filter-input" type="search" value="EAR" autocomplete="off"></label>')
-  expect([...table.matchAll(/<td class="kui-table-cell" data-align="start">([^<]*)<\/td>/g)].map(([, text]) => text)).toEqual(['Earth'])
+  expect([...table.matchAll(/<td class="kui-table-cell" data-label="Name" data-align="start">([^<]*)<\/td>/g)].map(([, text]) => text)).toEqual(['Earth'])
 })
 
 describe('controls', () => {

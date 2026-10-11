@@ -97,6 +97,7 @@ Each component spreads the other attributes it is given onto its root element, `
 - `Icon(icon="close")`: an `svg.kui-icon`. It is decorative unless `label` names it for screen readers. `icon` is a slot or an imported `~icons` icon.
 - `Button(label="Save" variant="accent" icon="plus")`:
   - `variant` is `default`, `accent` or `danger`.
+  - Its label stays on one line; a row of buttons wraps whole buttons, as the dialog and panel footers do.
   - `busy` shows a spinner in place of the icon and sets `aria-busy`; it does not disable the button.
   - `expanded` sets `aria-expanded`, for a button that opens a panel.
   - `type` defaults to `button`, so a button inside a form never submits it by accident: pass `type="submit"` to submit. Children render after `label`.
@@ -179,6 +180,7 @@ Table(columns={columns} rows={posts} rowKey="id" filter={['title', 'author']} fi
 - With `sortValue: true`, dates sort by time, booleans as 0 and 1, and a missing value sorts last in either direction.
 - `rowKey` is a field of the row or a function of it, and tells rows apart across a sort.
 - `filter` shows a search box above the rows, `filterLabel` (`Filter`) naming it, and keeps the rows where a value it reads holds the typed text, case and surrounding spaces ignored: the fields it names, or what a function of the row returns, `filter={post => [post.title, post.author.name]}`. `filterParam="q"` keeps the text in the page's URL as `?q=`, which the server reads too, so a reload or a shared link renders filtered. `@noMatch` shows when the filter hides every row, `@empty` when there are none.
+- Narrower than 30rem, its own width and not the screen's, so a table in a sidebar does it too, each row stacks as a card: a line per cell, its column `header` beside it as the label, an `end`-aligned column such as the row's actions at the end, and only the sortable headers kept, as a row of sort buttons. A column with an empty `header` spans the card's width. `narrow="scroll"` keeps the table whole and scrolls it sideways instead. A stacking table's wrapper is a size container, so it takes its width from its parent and never from its content: in an `auto`-sized grid column it collapses, where `narrow="scroll"` does not.
 
 ### Segmented, TabNav, SiteNav, Tabs, Toggle
 
@@ -392,6 +394,7 @@ ul
   - Ctrl or Cmd with B, I or K wraps the selection in bold, italics or a link; Enter continues a list, and Tab indents a list item, leaving Tab alone elsewhere so the keyboard can leave the field. These go through the browser's own editing, so Ctrl+Z undoes them like typing.
   - A page pasted as HTML turns into markdown.
   - With `onImage(file)`, a pasted or dropped image is embedded behind an `![Uploading …]()` placeholder at once, swapped for `![](url)` once `onImage` resolves with its url, or removed with `uploadFailure` toasted if it throws (or a refusal of the whole call such as a limit, as `attempt` does). Writing goes on meanwhile, and a finished upload never takes focus back; the field is `aria-busy` while one is under way.
+  - It shows about 12 lines and grows with its text up to 70% of the screen, where the browser sizes a field by its content (Chromium); it can be resized by hand.
   - `onInput(value)` reports the text after every change, typed or applied. A parent passing other text replaces it; passing back what it was given leaves the caret alone.
 
 ### MediaGallery, Carousel, Masonry, WhenVisible, ZoomPane, ImageCropper
