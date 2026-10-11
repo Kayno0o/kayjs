@@ -3,8 +3,7 @@ import { news } from '../../content.config'
 
 const entry = await news.get(ctx.params.slug) ?? ctx.notFound()
 const { Content } = entry
----
----
+--- script
 import DraftEditor from '../../components/draft-editor.kay'
 import Headline from '../../components/headline.kay'
 import IslandTitle from '../../components/island-title.kay'
