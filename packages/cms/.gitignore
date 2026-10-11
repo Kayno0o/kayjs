@@ -1,0 +1,6 @@
+node_modules
+.eslintcache
+*.tsbuildinfo
+/types
+.kay
+tests/fixture/data

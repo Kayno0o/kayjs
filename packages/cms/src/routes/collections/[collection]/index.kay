@@ -1,0 +1,34 @@
+--- server
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
+import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
+import Pagination from '@kaynooo/kayjs-ui/pagination.kay'
+import { s } from 'kay'
+import EntryTable from '../../../components/entry-table.kay'
+import { humanize } from '../../../fields'
+import { entries } from '../../../kay/content'
+import { newEntryPath, pageOf, rowsOf, searchRows } from '../../../listing'
+import { settings } from '../../../settings'
+import { findCollection } from '../../../store'
+
+export const page = { query: s.Object({ q: s.Optional(s.String()), page: s.Optional(s.Integer()) }) }
+
+const { prefix } = settings()
+const collection = await findCollection(ctx.params.collection) ?? ctx.notFound()
+const search = ctx.query.q ?? ''
+const listed = pageOf(searchRows(rowsOf(collection, collection.problem === undefined ? await entries(collection.name) : []), search), ctx.query.page ?? 1)
+const url = ctx.url
+---
+head
+  title {humanize(collection.name)}
+PageSection(title={humanize(collection.name)})
+  @actions
+    if collection.problem === undefined
+      Button(href={newEntryPath(prefix, collection.name)} label="New entry" icon="plus" variant="accent")
+  if collection.problem as problem
+    EmptyState(title="This collection cannot be read" description={problem})
+  else
+    form.kcms-search(method="get" role="search")
+      input.kui-field-input(type="search" name="q" value={search} placeholder="Search" aria-label="Search entries")
+    EntryTable(prefix={prefix} collection={collection} rows={listed.rows} searched={search !== ""})
+    Pagination(page={listed.page} pages={listed.pages} url={url})

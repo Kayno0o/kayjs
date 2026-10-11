@@ -1,0 +1,71 @@
+---
+import type { EntryRef } from '../kay/contract'
+import type { FieldPath } from '../markers'
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import { resource } from 'kay'
+import entriesApi from '../api/entries'
+import { humanize } from '../fields'
+import { BODY } from '../markers'
+import { drafts } from './drafts'
+import EntryFields from './entry-fields.kay'
+import { saveDraft } from './save'
+
+const { entry, focus } = props<{ entry: EntryRef, focus?: FieldPath | undefined }>()
+
+const source = resource(entriesApi, '/:collection/:slug', {
+  params: { collection: entry.collection, slug: entry.slug },
+  query: entry.locale === undefined ? {} : { locale: entry.locale },
+})
+const saving = signal(false)
+let box: HTMLElement | undefined
+
+effect(() => {
+  const answer = source.value()
+
+  // A file that does not parse opens empty, and saving writes the form over it.
+  if (answer)
+    drafts.open({ ...entry, data: answer.entry.data ?? {}, body: answer.entry.body })
+})
+
+// A click on the page brings its field into view and puts the caret in it, once the form has loaded.
+effect(() => {
+  const path = focus
+
+  if (path === undefined || !source.value() || !box)
+    return
+
+  const selector = path === BODY ? '[data-kcms-body]' : `[data-kcms-path="${CSS.escape(path)}"]`
+  const field = box.querySelector(selector)
+
+  field?.scrollIntoView({ block: 'nearest' })
+  field?.querySelector<HTMLElement>('input, textarea, select')?.focus()
+})
+
+async function save(): Promise<void> {
+  saving = true
+
+  try {
+    await saveDraft(drafts, entry)
+  }
+  finally {
+    saving = false
+  }
+}
+---
+section.kcms-entry(ref={element => box = element})
+  header.kcms-entry-head
+    hgroup
+      h3.kcms-entry-title {humanize(entry.collection)}
+      p.kcms-entry-slug {entry.locale === undefined ? entry.slug : `${entry.slug} (${entry.locale})`}
+    if drafts.changed(entry)
+      .kcms-entry-actions
+        Button(label="Reset" disabled={saving} onClick={() => drafts.reset(entry)})
+        Button(label={saving ? 'Saving…' : 'Save'} variant="accent" busy={saving} onClick={save})
+  if source.status() === 'failed'
+    p.kcms-entry-failure Could not load this entry: {source.error()?.message}
+  else if source.value() as answer
+    if answer.entry.problem as problem
+      p.kcms-entry-failure(role="alert") This entry's file does not parse: {problem}. Saving writes the form over it.
+    EntryFields(drafts={drafts} entry={entry} collection={answer.collection})
+  else
+    p.kcms-entry-loading Loading…

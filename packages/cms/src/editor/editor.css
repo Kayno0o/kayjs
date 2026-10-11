@@ -1,0 +1,122 @@
+.kcms-editor {
+  position: fixed;
+  z-index: 2147483000;
+  right: 1rem;
+  bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+  color: var(--color-kui-text);
+  background: var(--color-kui-mantle);
+  border: 1px solid var(--color-kui-surface2);
+  border-radius: 0.75rem;
+  box-shadow: 0 0.5rem 2rem rgb(0 0 0 / 0.25);
+}
+
+.kcms-editor-open {
+  top: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  width: min(24rem, 100vw);
+  border-width: 0 0 0 1px;
+  border-radius: 0;
+}
+
+.kcms-editor-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem 0.5rem 0.5rem 1rem;
+  border-bottom: 1px solid var(--color-kui-surface2);
+}
+
+.kcms-editor:not(.kcms-editor-open) .kcms-editor-head {
+  padding: 0.25rem;
+  border: 0;
+}
+
+.kcms-editor-title {
+  margin: 0 auto 0 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.kcms-editor-body {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.kcms-editor-failure,
+.kcms-entry-failure {
+  margin: 1rem;
+  color: var(--color-kui-error);
+}
+
+.kcms-editor-empty,
+.kcms-entry-loading {
+  margin: 1rem;
+  color: var(--color-kui-subtext0);
+}
+
+.kcms-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  border-bottom: 1px solid var(--color-kui-surface2);
+}
+
+.kcms-entry-head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.kcms-entry-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.kcms-entry-slug {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--color-kui-subtext0);
+  overflow-wrap: anywhere;
+}
+
+/* The page makes room for the open editor beside it, and shows what a click would edit. */
+@media (min-width: 64rem) {
+  html.kcms-editing body {
+    margin-right: 24rem;
+  }
+}
+
+/* On a phone the editor takes the lower part of the screen, leaving the page above it to tap. */
+@media (max-width: 40rem) {
+  .kcms-editor-open {
+    top: auto;
+    height: 60dvh;
+    width: 100vw;
+    border-width: 1px 0 0;
+  }
+
+  html.kcms-editing body {
+    padding-bottom: 60dvh;
+  }
+}
+
+html.kcms-editing [data-kay-field]:hover,
+html.kcms-editing [data-kay-body]:hover {
+  outline: 2px dashed var(--color-kui-accent);
+  outline-offset: 2px;
+  cursor: pointer;
+}
+
+.kcms-entry-actions {
+  display: flex;
+  gap: 0.5rem;
+}

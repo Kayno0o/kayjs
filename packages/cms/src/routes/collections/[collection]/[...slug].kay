@@ -1,0 +1,26 @@
+--- server
+import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
+import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
+import { s } from 'kay'
+import EntryEditor from '../../../components/entry-editor.kay'
+import { humanize } from '../../../fields'
+import { collectionPath } from '../../../listing'
+import { settings } from '../../../settings'
+import { entryOf, findCollection } from '../../../store'
+
+export const page = { query: s.Object({ locale: s.Optional(s.String()) }) }
+
+const { prefix } = settings()
+const collection = await findCollection(ctx.params.collection) ?? ctx.notFound()
+const entry = collection.problem === undefined ? await entryOf({ collection: collection.name, slug: ctx.params.slug, locale: ctx.query.locale }) ?? ctx.notFound() : undefined
+const name = ctx.query.locale === undefined ? ctx.params.slug : `${ctx.params.slug} (${ctx.query.locale})`
+---
+head
+  title {name} - {humanize(collection.name)}
+PageSection(title={name})
+  @actions
+    a(href={collectionPath(prefix, collection.name)}) {humanize(collection.name)}
+  if entry
+    EntryEditor(prefix={prefix} collection={collection} entry={entry})
+  else
+    EmptyState(title="This collection cannot be read" description={collection.problem})

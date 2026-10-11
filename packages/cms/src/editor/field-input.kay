@@ -1,0 +1,88 @@
+---
+import type { Drafts } from '../drafts'
+import type { Field } from '../fields'
+import type { EntryRef } from '../kay/contract'
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+import IconButton from '@kaynooo/kayjs-ui/icon-button.kay'
+import MarkdownEditor from '@kaynooo/kayjs-ui/markdown-editor.kay'
+import Select from '@kaynooo/kayjs-ui/select.kay'
+import Textarea from '@kaynooo/kayjs-ui/textarea.kay'
+import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
+import Toggle from '@kaynooo/kayjs-ui/toggle.kay'
+import { emptyValue, itemAt } from '../fields'
+import { joinPath } from '../paths'
+import FieldInput from './field-input.kay'
+import FileInput from './file-input.kay'
+import './fields.css'
+
+const { drafts, entry, field, path } = props<{ drafts: Drafts, entry: EntryRef, field: Field, path: string }>()
+
+const jsonIssue = signal<string>()
+
+const value = () => drafts.value(entry, path)
+const text = () => value() === undefined || value() === null ? '' : String(value())
+const items = () => Array.isArray(value()) ? value() as unknown[] : []
+const issue = () => jsonIssue() ?? drafts.issues(entry, path)[0]?.message
+
+function set(next: unknown): void {
+  drafts.set(entry, path, next)
+}
+
+function setNumber(next: string): void {
+  set(next === '' ? undefined : Number(next))
+}
+
+function setJson(next: string): void {
+  try {
+    set(next.trim() === '' ? undefined : JSON.parse(next))
+    jsonIssue = undefined
+  }
+  catch {
+    jsonIssue = 'Not valid JSON'
+  }
+}
+---
+.kcms-field(data-kcms-path={path})
+  const current = field
+  match current.kind
+    when 'boolean'
+      Toggle(label={current.label} checked={value() === true} onChange={set})
+    when 'list'
+      FormField(label={current.label} hint={current.hint} issue={issue()} required={current.required} group)
+        for item, i of items() key={i}
+          .kcms-list-item
+            FieldInput(drafts={drafts} entry={entry} field={itemAt(current, i)} path={joinPath(path, i)})
+            IconButton(icon="delete" label="Remove" variant="ghost" size="sm" onClick={() => set(items().filter((_, at) => at !== i))})
+        Button(label="Add" icon="plus" onClick={() => set([...items(), emptyValue(current.item)])})
+    when 'group'
+      FormField(label={current.label} hint={current.hint} issue={issue()} required={current.required} group)
+        for child of current.fields key={child.key}
+          FieldInput(drafts={drafts} entry={entry} field={child} path={joinPath(path, child.key)})
+    when 'textarea'
+      FormField(label={current.label} hint={current.hint} issue={issue()} required={current.required})
+        Textarea(rows="4" value={text()} onInput={set})
+    when 'markdown'
+      FormField(label={current.label} hint={current.hint} issue={issue()} required={current.required})
+        MarkdownEditor(value={text()} onInput={set})
+    when 'number', 'integer'
+      FormField(label={current.label} hint={current.hint} issue={issue()} required={current.required})
+        TextInput(type="number" step={current.kind === 'integer' ? '1' : 'any'} value={text()} onInput={setNumber})
+    when 'date'
+      FormField(label={current.label} hint={current.hint} issue={issue()} required={current.required})
+        TextInput(type="date" value={text().slice(0, 10)} onInput={set})
+    when 'datetime'
+      FormField(label={current.label} hint={current.hint} issue={issue()} required={current.required})
+        TextInput(type="datetime-local" value={text().slice(0, 16)} onInput={set})
+    when 'select'
+      FormField(label={current.label} hint={current.hint} issue={issue()} required={current.required})
+        Select(value={text()} options={current.options} emptyOption={!current.required} onChange={next => set(current.options.find(option => option.value === next)?.raw)})
+    when 'image', 'file'
+      FormField(label={current.label} hint={current.hint} issue={issue()} required={current.required} group)
+        FileInput(value={text()} image={current.kind === 'image'} collection={entry.collection} onChange={set})
+    when 'json'
+      FormField(label={current.label} hint={current.hint ?? 'JSON'} issue={issue()} required={current.required})
+        Textarea.kcms-json(rows="4" value={value() === undefined ? '' : JSON.stringify(value(), null, 2)} onChange={setJson})
+    else
+      FormField(label={current.label} hint={current.hint} issue={issue()} required={current.required})
+        TextInput(value={text()} onInput={set})

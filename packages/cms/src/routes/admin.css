@@ -1,0 +1,61 @@
+.kcms-admin {
+  padding: 1rem;
+}
+
+.kcms-admin-head {
+  padding-block: 0.5rem 1rem;
+}
+
+.kcms-admin-home {
+  font-weight: 600;
+  color: var(--color-kui-text);
+  text-decoration: none;
+}
+
+.kcms-search {
+  margin-bottom: 1rem;
+}
+
+.kcms-search input {
+  width: min(24rem, 100%);
+}
+
+.kcms-failure {
+  margin: 0;
+  color: var(--color-kui-error);
+}
+
+.kcms-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: end;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.kcms-entry-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* Save stays in reach while scrolling a long entry. */
+.kcms-entry-editor-bar {
+  position: sticky;
+  top: env(safe-area-inset-top, 0px);
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding-block: 0.5rem;
+  background: var(--color-kui-canvas);
+}
+
+.kcms-entry-editor-bar .kcms-entry-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-left: auto;
+}

@@ -1,0 +1,87 @@
+---
+import type { EditorProps } from 'kay/edit'
+import type { EntryRef } from '../kay/contract'
+import type { FieldMarker, FieldPath } from '../markers'
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import IconButton from '@kaynooo/kayjs-ui/icon-button.kay'
+import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
+import TooltipHost from '@kaynooo/kayjs-ui/tooltip-host.kay'
+import { attempt } from '@kaynooo/kayjs-ui'
+import { call, listen, refresh } from 'kay'
+import previewApi from '../api/preview'
+import { entryKey, fieldsAt } from '../markers'
+import { drafts } from './drafts'
+import EntryForm from './entry-form.kay'
+import './editor.css'
+
+// kay renders it at the end of the page in edit mode only, kept across page swaps, with the entries the page read.
+const { entries } = props<EditorProps>()
+
+const open = signal(true)
+const focused = signal<FieldMarker>()
+const leaving = signal(false)
+let panel: HTMLElement | undefined
+
+// The field a click on the page asked for, when it belongs to that entry.
+function focusIn(entry: EntryRef): FieldPath | undefined {
+  const marker = focused()
+
+  return marker && entryKey(marker) === entryKey(entry) ? marker.path : undefined
+}
+
+// The text node under the pointer, so a click on a field marked by a comment pair inside a larger element finds that field.
+function clickedNode(event: MouseEvent): Node | undefined {
+  const target = event.target instanceof Node ? event.target : undefined
+  const caret = document.caretPositionFromPoint(event.clientX, event.clientY)?.offsetNode
+
+  return caret?.nodeType === Node.TEXT_NODE && caret.parentNode === target ? caret : target
+}
+
+// While the editor is open, a click on a marked element edits its field instead of following a link or a button there.
+listen(() => document, 'click', (event) => {
+  const node = open() ? clickedNode(event) : undefined
+  const [field] = node && !panel?.contains(node) ? fieldsAt(node) : []
+
+  if (!field)
+    return
+
+  event.preventDefault()
+  event.stopPropagation()
+  focused = field.marker
+}, { capture: true })
+
+// Renders the page again as visitors see it, once kay forgot the edit mode.
+async function stopEditing(): Promise<void> {
+  leaving = true
+
+  if (!await attempt(() => call(previewApi, '/exit', { method: 'post' }), 'Could not leave edit mode')) {
+    leaving = false
+
+    return
+  }
+
+  await refresh()
+}
+
+// The page outlines its fields while the editor is open. The Toaster and TooltipHost below give way to a site page's own.
+effect(() => {
+  document.documentElement.classList.toggle('kcms-editing', open())
+  onCleanup(() => document.documentElement.classList.remove('kcms-editing'))
+})
+---
+aside.kcms-editor(ref={element => panel = element} class={{ 'kcms-editor-open': open }} aria-label="Content editor")
+  header.kcms-editor-head
+    if open
+      h2.kcms-editor-title Edit this page
+      Button(label={leaving ? 'Leaving…' : 'Stop editing'} busy={leaving} onClick={stopEditing})
+    IconButton(icon={open ? 'close' : 'menu'} label={open ? 'Hide the editor' : 'Edit this page'} variant="ghost" onClick={() => open = !open})
+  if open
+    .kcms-editor-body
+      if drafts.failure() as failure
+        p.kcms-editor-failure(role="alert") The page could not show your changes: {failure}
+      for entry of entries key={entryKey(entry)}
+        EntryForm(entry={entry} focus={focusIn(entry)})
+      else
+        p.kcms-editor-empty Nothing on this page comes from a collection.
+Toaster
+TooltipHost

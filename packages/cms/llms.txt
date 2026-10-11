@@ -1,0 +1,46 @@
+# kayjs-cms
+
+> A CMS for kay sites: content edited on the page it renders, and collection screens.
+
+## Rules that are easy to get wrong
+
+- The app writes no marker: in edit mode kay marks each element rendering an entry's field itself, `data-kay-field="<collection>:<slug>[@<locale>]:<path>"`, each segment URI-encoded, the path dotted with list indexes (`sections.1.heading`). A field in an attribute is `data-kay-field-<attribute>`, a field sharing its element's text sits between `<!--kay-field …-->` and `<!--/kay-field-->`, and a Markdown body is `data-kay-body="<collection>:<slug>"` or a `kay-body` comment pair.
+- The body's path is the `BODY` symbol, never a string, so a data field named `body` stays a data field.
+- Outside edit mode the page is unchanged and the editor is not rendered.
+- Draft rendering happens on the server: the editor sends the changed entries, kay renders the page with them and swaps it in, islands kept.
+- Every change goes through one API, `POST` and `DELETE /api/cms/entries/:collection/:slug` and `POST …/:slug/publish`, from the sidebar and from the screens alike. kay validates the data against the schema and names the file; kay writes nothing, the configured `files` saver does.
+- An `imageField()` or `fileField()` holds a path the site serves. A file dropped or picked on it goes to `POST /api/cms/files/:collection`, 20 MB at most, which stores it public through kay's `files.put` in a folder named for the collection, and the field keeps `files.url(key)`, `/_kay/files/<key>`; a typed path works as well, so a page renders either with `img(src={entry.data.photo})`. Replacing a file leaves the old one stored.
+- The app imports kayjs-ui's theme. The screens and the editor render their own `Toaster` and `TooltipHost`, which since kayjs-ui 0.6.0 render nothing while the app's are mounted; kayjs-ui is a peer dependency, so both resolve the one copy that guard lives in.
+- The screens are closed without a `guard`: kayjs-cms has no users of its own.
+- Edit mode is kay's preview mode, so the app sets `preview.secret`. The API admits a request when `editRequested(request)` from `kay/server` says so, or the guard does.
+
+## Setup
+
+```ts
+import { cms, forgejo } from '@kaynooo/kayjs-cms'
+import { defineConfig } from 'kay/server'
+
+export default defineConfig({ extensions: [cms({ guard: auth.guard({ require: 'editor' }), files: forgejo({ url, repo: 'me/site', token }) })] })
+```
+
+- `cms({ prefix, guard, files })`: `prefix` is where the screens live (`/admin`), `guard` who may use them and the API outside edit mode, `files` where a folder entry's file goes, `workingTree()` by default.
+- `forgejo({ url, repo, branch?, token, fetch? })`: commits each file through Forgejo's contents API, reading the file's current sha first, so the last write wins. Throws `ForgeError` with Forgejo's `status` and message.
+- `workingTree()`: writes or deletes the file in place, for `kay dev`.
+- A folder collection's source files ship with the server: kay throws for a folder missing from the build, and for one outside the repository. Slugs follow kay's rules, and a file that does not parse lists as broken, its form opening empty to write over it, a Markdown file keeping its body. A collection whose loader throws is listed as one that cannot be read, its screens showing why.
+
+## Screens
+
+- `<prefix>`: each collection with its entry count.
+- `<prefix>/collections/<collection>`: its entries, 50 a page, titled by their first one-line text field, searched by title and slug (`?q=`), with Publish for a draft, Edit on page for an entry kay knows the page of, and Delete.
+- `<prefix>/collections/<collection>/<slug>` (`?locale=`): the entry's form, with Save, Reset, Publish, Delete and Edit on page.
+- `<prefix>/new/<collection>` (`?locale=`): a new entry, its slug typed, and in a localized collection its locale, one the site serves.
+- `<prefix>/page?path=`: opens the page in edit mode.
+
+## API
+
+- `fieldsOf(schema)`: the form fields of a collection's JSON Schema, in order, each `{ key, label, required, hint, kind }`. Kinds: `text`, `textarea` (a string whose `maxLength` is over 120), `markdown`, `number`, `integer`, `boolean`, `date`, `datetime`, `image`, `file`, `json` (any shape without a control), `select` (an enum or a union of literals, with `options`), `reference` (with `collection`), `list` (with `item`) and `group` (with `fields`). kay's `x-kay: { kind }` hint wins over the type. A nullable field is optional.
+- `emptyValue(field)`: what a new list item starts as.
+- `parseMarker(value, body?)`, `formatMarker(marker)`, `entryKey(ref)`: read and write kay's markers.
+- `fieldsAt(node)`: the fields rendered at a node, innermost first.
+- `createDrafts({ show, delay })`: the unsaved edits of a page's entries. `open(entry)`, `value(ref, path)`, `set(ref, path, value)`, `changed(ref)`, `reset(ref)`, `issues(ref, path?)`, `failure()` and `rendering()`. Each change renders the page with every changed entry once typing pauses `delay` ms (150), keeping only the latest render's issues.
+- `valueAt(data, path)`, `withValueAt(data, path, value)`, `joinPath(parent, key)`: field paths.

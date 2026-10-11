@@ -1,0 +1,54 @@
+---
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import FileDrop from '@kaynooo/kayjs-ui/file-drop.kay'
+import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
+import { attempt } from '@kaynooo/kayjs-ui'
+import { call } from 'kay'
+import filesApi from '../api/files'
+
+// An image or file field: the path of an upload dropped or picked, or one typed.
+const { value, image, collection, onChange } = props<{ value: string, image: boolean, collection: string, onChange: (path: string) => void }>()
+
+// The share of the upload sent, from 0 to 1, while one is under way.
+const sent = signal<number>()
+
+function label(): string {
+  const share = sent()
+
+  if (share === undefined)
+    return value === '' ? 'Upload' : 'Replace'
+
+  return `Uploading ${Math.round(share * 100)}%`
+}
+
+async function upload([file]: File[]): Promise<void> {
+  if (!file)
+    return
+
+  const form = new FormData()
+
+  form.append('file', file)
+  sent = 0
+
+  try {
+    const answer = await attempt(() => call(filesApi, '/:collection', { method: 'post', params: { collection }, body: form, progress: share => sent = share }), 'Could not upload')
+
+    if (answer)
+      onChange(answer.path)
+  }
+  finally {
+    sent = undefined
+  }
+}
+---
+.kcms-file
+  if value !== ''
+    if image
+      img.kcms-file-preview(src={value} alt="")
+    else
+      a.kcms-file-link(href={value}) {value.split('/').at(-1)}
+  FileDrop.kcms-file-drop(accept={image ? 'image/*' : undefined} disabled={sent !== undefined} onFiles={upload})
+    @content(zone)
+      Button(label={label()} busy={sent !== undefined} onClick={zone.open})
+      span.kcms-file-hint {zone.dragging() ? 'Drop to upload' : 'or drop a file here'}
+  TextInput(value={value} placeholder="Or a path the site serves" aria-label="Path" onInput={onChange})
