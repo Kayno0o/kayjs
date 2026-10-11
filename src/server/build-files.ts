@@ -7,6 +7,7 @@ import { SEARCH_MANIFEST } from '../runtime/search'
 import { encodedCopies, encodedPath, filesUnder, preferredEncoding } from './compress'
 import { decodePath } from './routes'
 import { headerCopies, ownHeaders } from './security'
+import { wildcardRoute } from './wildcards'
 
 const SOURCE_MAP = '.js.map'
 
@@ -25,6 +26,7 @@ export async function serveBuildFiles(app: Elysia, client: ClientBuild, { dev, s
   // Outside development the build's files never change, so each is looked up once: a lookup costs more than sending the file, in an executable most of all.
   const assets = new Map<string, Bun.BunFile>()
 
+  wildcardRoute(app, `${ASSET_PREFIX}*`)
   app.get(`${ASSET_PREFIX}*`, async ({ params, status, request, set }) => {
     const name = decodePath(params['*'])
     // A NUL byte makes Bun.file throw, with the server path in its message.

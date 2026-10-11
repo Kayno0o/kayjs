@@ -89,6 +89,9 @@ const POLL_MS = 25
 // What `within` resolves with when the page did not answer in time.
 const TIMED_OUT = Symbol('timed out')
 // Loaded, no page swap in flight, and every island hydrating on load done: `_$k` is set on an island once hydrated.
+// The files the page failed to load, such as the scripts that would hydrate its islands.
+const FAILED_FILES = `performance.getEntriesByType('resource').filter(entry => entry.responseStatus >= 400).map(entry => new URL(entry.name).pathname + ' answered ' + entry.responseStatus)`
+const FAILED_WAIT_MS = 1000
 const SETTLED = `document.readyState === 'complete' && !document.documentElement.hasAttribute('aria-busy') && [...document.querySelectorAll('${ISLAND}:not([data-hydrate=visible]):not([data-hydrate=idle])')].every(island => island._$k)`
 
 // What kay makes for the Chrome of a process, named after it so a later run removes what a killed one left.
@@ -233,12 +236,32 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
     }
   }
 
+  // Waits for the page to settle, naming the files it failed to load when it does not.
+  const settle = async (expression: string, wanted: string) => {
+    try {
+      await poll(expression, wanted)
+    }
+    catch (error) {
+      let failed: string[] | typeof TIMED_OUT = []
+
+      try {
+        failed = await within(view.evaluate<string[]>(FAILED_FILES), FAILED_WAIT_MS)
+      }
+      catch {}
+
+      if (Array.isArray(failed) && failed.length > 0 && error instanceof Error)
+        throw new Error(`${error.message}; the page failed to load ${failed.join(', ')}`, { cause: error })
+
+      throw error
+    }
+  }
+
   const traverse = async (step: string) => {
     const entry = await view.evaluate<string>('navigation.currentEntry.key')
 
     // `history`, not the view's own back and forward, which wait for a load a swapped page never fires.
     await view.evaluate(`void ${step}`)
-    await poll(`navigation.currentEntry.key !== ${JSON.stringify(entry)} && ${SETTLED}`, 'the page to settle')
+    await settle(`navigation.currentEntry.key !== ${JSON.stringify(entry)} && ${SETTLED}`, 'the page to settle')
   }
 
   const page: TestPage = {
@@ -249,7 +272,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
 
       origin = target.origin
       await view.navigate(target.href)
-      await poll(SETTLED, `${target.pathname} to load and hydrate its islands`)
+      await settle(SETTLED, `${target.pathname} to load and hydrate its islands`)
     }),
     path: async () => serial(async () => view.evaluate<string>('location.pathname + location.search')),
     click: async (selector, wait = {}) => serial(async () => {
@@ -326,7 +349,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
     forward: async () => serial(async () => traverse('history.forward()')),
     reload: async () => serial(async () => {
       await view.reload()
-      await poll(SETTLED, 'the page to reload and hydrate its islands')
+      await settle(SETTLED, 'the page to reload and hydrate its islands')
     }),
     close: () => {
       attempt(() => view.close())

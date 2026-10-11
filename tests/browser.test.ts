@@ -344,6 +344,25 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('publicEnv'
   }, 60_000)
 })
 
+describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a docs-like site in a browser', () => {
+  it('opens a page of params with several islands, each in its own chunk, hydrated: Bun\'s router sends its files to /_kay/* rather than to the page', async () => {
+    const site = await testSite({ routes: 'tests/fixtures/docs-like/src/routes', browser: { path } })
+
+    try {
+      const page = await site.open('/guide/start')
+
+      for (const name of ['search', 'toc', 'example'])
+        await page.click(`button.${name}`)
+
+      expect([await page.text('button.search'), await page.text('button.toc'), await page.text('button.example')]).toEqual(['search 1', 'toc 1', 'example 1'])
+      expect(page.errors).toEqual([])
+    }
+    finally {
+      await site.close()
+    }
+  }, 60_000)
+})
+
 describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the browser\'s profile', () => {
   const LOCKED = 'kay-chrome-999999998-locked'
   const kinds = (names: string[]) => names.filter(name => name !== LOCKED).map(name => name.startsWith('kay-chrome-') ? 'kay' : name.endsWith('.bun-chrome') ? 'bun' : name.startsWith('org.chromium.') ? 'chrome' : name).sort()

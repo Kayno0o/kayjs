@@ -18,6 +18,8 @@ Pages live in `src/routes/`:
 | `_error.kay` | Rendered with status 500 when a load or render throws, and for 404s with no `_404.kay`. |
 | `_guard.ts` | Runs before every page and every action in its directory and below; see [Guards](server.md#guards). |
 
+Where two pages match a URL, the first segment telling them apart decides: static wins over a param, a param over a catch-all, so `/docs/intro` goes to `docs/[...path].kay` before `[section]/[page].kay`, and `/_kay/` stays kay's own files. That holds over a listening server as through `app.handle()`.
+
 A page URL ending in a slash redirects with 308 to the one without, query kept: `/about/` to `/about`. `trailingSlash` in kay.config.ts changes that: `'always'` redirects `/about` to `/about/` instead, `'ignore'` serves both.
 
 A matcher checks a param, `[name=matcher]` or `[[name=matcher]]`: it returns the value `ctx.params` hands the page, typed as it returns it, or `undefined` to refuse the URL. kay ships `integer`, `uuid` and `slug` in `kay/params`: a safe whole number, as a number, a UUID, lowercased, and lowercase words joined by dashes; a project adds its own as `src/params/<name>.ts`, beside `src/routes/`, its default export the matcher, and one of that name wins over kay's. A matcher nobody provides stops the server.

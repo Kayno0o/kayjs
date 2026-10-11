@@ -40,6 +40,8 @@ h1 {post.title}
 | `[[page]].kay` | `/blog` and `/blog/2` |
 | `[id=integer].kay` | `/items/42` only, `ctx.params.id` a `number` |
 
+When two pages match a URL, the first segment telling them apart decides: a fixed name wins over a param, and a param over a catch-all. `/docs/intro` goes to `docs/[...path].kay` rather than `[section]/[page].kay`.
+
 <Callout type="tip">
 
 `ctx.params` is typed from the file name: `[id=integer]` gives a `number`, `[[page]]` a `string | undefined`.

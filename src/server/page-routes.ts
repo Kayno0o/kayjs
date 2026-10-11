@@ -29,6 +29,7 @@ import { revalidateStale } from './revalidate'
 import { decodePath, withoutSlash } from './routes'
 import { serveServerIslands } from './server-islands'
 import { answered, SERVER_SPAN, traced } from './trace'
+import { wildcardRoute } from './wildcards'
 
 // Every slash at either end of a path.
 const EDGE_SLASHES = /^\/+|\/+$/g
@@ -206,6 +207,10 @@ export function servePageRoutes(app: Elysia, { table, served: claims, matchers, 
 
     if (served.size === 0)
       continue
+
+    // A catch-all page, such as `/docs/*`.
+    if (path.endsWith('/*'))
+      wildcardRoute(app, path)
 
     app.get(path, async (context) => {
       const url = new URL(context.request.url)

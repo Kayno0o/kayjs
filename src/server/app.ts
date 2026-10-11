@@ -53,6 +53,7 @@ import { setupPages } from './setup'
 import { serveSitemap } from './sitemap'
 import { serveFiles } from './storage'
 import { serveViolationReports } from './violations'
+import { agreeOnWildcards } from './wildcards'
 
 // Options given here win over the project's `kay.config.ts`.
 export interface PagesOptions extends KayConfig {
@@ -287,6 +288,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   const respond = withPageHeaders(pageResponder({ client, renderOptions, prerendered, settings: i18n?.settings, transforms: pageHooks(options.extensions), pageFile: assetFiles({ clientDir: client.dir, publicDir: paths.public, base, aspects: options.images?.aspects }) }), securityOptions, security)
 
   servePageRoutes(app, { table, served, matchers, i18n, locales, client, renderOptions, trailingSlash: options.trailingSlash ?? 'never', fallback: source.fallback(paths.routes, mounts), respond })
+  agreeOnWildcards(app)
 
   return { app, served }
 }

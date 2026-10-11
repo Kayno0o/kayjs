@@ -1,0 +1,8 @@
+--- script
+import Example from '../../components/example.kay'
+import Search from '../../components/search.kay'
+import Toc from '../../components/toc.kay'
+---
+Search
+Toc
+Example

@@ -1,8 +1,10 @@
 import type { ServedPage } from '../src/server/render'
+import { readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
-import { pages } from '../src/server'
+import { Elysia } from 'elysia'
+import { files, memoryFiles, pages } from '../src/server'
 import { readClient } from '../src/server/client'
 import { loadGuards } from '../src/server/guards'
 import { localeSettings } from '../src/server/i18n'
@@ -93,4 +95,49 @@ describe('pageResponder', () => {
       expect(html).toContain('href="/b/favicon.ico"')
     }
   })
+})
+
+describe('over a listening server', () => {
+  it('serves kay\'s files and a catch-all page where a page of params would take them from Bun\'s router, as app.handle() does', async () => {
+    const dir = await scratchDir('wildcards-')
+    const storage = memoryFiles()
+
+    await Promise.all([
+      Bun.write(join(dir, '[section]/[page].kay'), '--- server\nconst { section, page } = ctx.params\n---\np.page {section} {page}\n'),
+      Bun.write(join(dir, '[a]/[b]/[c].kay'), 'p.deep Deep\n'),
+      Bun.write(join(dir, 'docs/[...rest].kay'), '--- server\nconst rest = ctx.params.rest\n---\np.docs {rest}\n'),
+      Bun.write(join(dir, 'counter.kay'), '--- script\nimport { signal } from \'kay\'\n\nconst count = signal(0)\n---\nbutton(onClick={() => count.set(count() + 1)}) Clicked {count()}\n'),
+    ])
+
+    const app = new Elysia().use(await pages({ routes: dir, prebuilt: false, storage }))
+    const client = (await readClient(process.cwd()))!
+    const asset = (await readdir(client.dir)).find(file => file.endsWith('.js'))!
+    const key = await files.put(new File(['hello'], 'hello.txt'))
+
+    app.listen({ port: 0, hostname: 'localhost' })
+
+    try {
+      const paths = [`/_kay/${asset}`, `/_kay/files/${key}`, '/docs/intro', '/docs/a/b', '/guide/start', '/x/y/z']
+      const answers = async (get: (path: string) => Promise<Response>) => Promise.all(paths.map(async (path) => {
+        const response = await get(path)
+        const text = await response.text()
+
+        return [path, response.status, text.match(/<p class="(\w+)">([^<]*)/)?.slice(1).join(' ') ?? text.slice(0, 5)]
+      }))
+      const served = await answers(async path => fetch(`http://localhost:${app.server!.port}${path}`))
+
+      expect(served).toEqual(await answers(async path => app.handle(new Request(`http://localhost${path}`))))
+      expect(served.map(([path, status, text]) => [path, status, String(text).replace(/^[^ ]*$/, 'file')])).toEqual([
+        [`/_kay/${asset}`, 200, 'file'],
+        [`/_kay/files/${key}`, 200, 'file'],
+        ['/docs/intro', 200, 'docs intro'],
+        ['/docs/a/b', 200, 'docs a/b'],
+        ['/guide/start', 200, 'page guide start'],
+        ['/x/y/z', 200, 'deep Deep'],
+      ])
+    }
+    finally {
+      await app.stop()
+    }
+  }, 60_000)
 })

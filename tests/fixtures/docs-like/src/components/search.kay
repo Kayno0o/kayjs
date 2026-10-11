@@ -1,0 +1,4 @@
+---
+const count = signal(0)
+---
+button.search(onClick={() => count.set(count() + 1)}) search {count}
