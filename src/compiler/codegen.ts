@@ -82,12 +82,12 @@ export function defaultName(index: number): string {
 }
 
 // What a pass builds: JSX, which the analysis pass reads, the same JSX with `kay check`'s assertions, or the code that runs, markup strings on the server or the browser's DOM.
-export type OutputMode = 'jsx' | 'check' | 'html' | 'dom'
+type OutputMode = 'jsx' | 'check' | 'html' | 'dom'
 
 // Where a component stands toward islands: an island root; a static component rendering through its hydratable twin inside one, which may also render as an island itself where it must (`promotable twin`, or `promotable` without a twin); a static component only islands render; or a plain one.
-export type IslandKind = 'island' | 'twin' | 'promotable twin' | 'promotable' | 'inside island' | 'static'
+type IslandKind = 'island' | 'twin' | 'promotable twin' | 'promotable' | 'inside island' | 'static'
 
-export function outputMode(options: GenerateOptions): OutputMode {
+function outputMode(options: GenerateOptions): OutputMode {
   // Only the final pass builds what runs.
   if (options.rewrites && options.output !== undefined)
     return options.output
@@ -95,7 +95,7 @@ export function outputMode(options: GenerateOptions): OutputMode {
   return options.check ? 'check' : 'jsx'
 }
 
-export function islandKind(options: GenerateOptions): IslandKind {
+function islandKind(options: GenerateOptions): IslandKind {
   if (options.island !== undefined)
     return 'island'
 
@@ -125,7 +125,7 @@ class ModuleShell {
   private readonly facts: TemplateFacts
   // Server values an `await` block renders by name: `load` defers each where it is declared, so the template changes how the server fence runs.
   private readonly deferred: Set<string>
-  private readonly jsx: JsxTemplate
+  private jsxTemplate: JsxTemplate | undefined
 
   constructor(private readonly file: KayFile, private readonly script: ScriptAnalysis, private readonly server: ServerAnalysis | undefined, private readonly options: GenerateOptions) {
     this.src = file.source
@@ -135,7 +135,11 @@ class ModuleShell {
     this.fence = options.includeServer === false ? undefined : server
     this.facts = templateFacts(file)
     this.deferred = deferredData(this.facts, this.fence)
-    this.jsx = new JsxTemplate(this.b, this.src, this.facts, {
+  }
+
+  // Only the jsx and check outputs render through it.
+  private get jsx(): JsxTemplate {
+    return this.jsxTemplate ??= new JsxTemplate(this.b, this.src, this.facts, {
       check: this.mode === 'check',
       staticLoops: this.staticLoops,
       sendsIslandProps: this.kind === 'static' || this.kind === 'twin',

@@ -270,6 +270,15 @@ describe('links from the root', () => {
   })
 })
 
+describe('a select\'s value', () => {
+  it('takes the last of `value` and `bind:value` in the browser, as on the server', () => {
+    const select = (attributes: string) => compileKay(`---\nconst b = signal('x')\nconst a = () => 'y'\n---\nselect(${attributes})\n  option x\n`, 'test.kay', { output: 'dom' }).tsx
+
+    expect(select('value={a()} bind:value={b}')).not.toContain('"value", (a())')
+    expect(select('bind:value={b} value={a()}')).toContain('"value", (a())')
+  })
+})
+
 describe('islands', () => {
   it('rejects hydrate inside an island, which hydrates as a whole', () => {
     expect(errors('---\nimport { signal } from "kay"\nimport Counter from "./counter.kay"\n---\nCounter(hydrate="visible")')).toEqual([expect.stringContaining('`hydrate` has no effect inside an island')])
@@ -328,6 +337,13 @@ describe('head', () => {
     expect(errors('div\n  head\n    title a')).toEqual(['A `head` block sits at the top level of a template'])
     expect(errors('head\n  div x\n  if a\n    title a')).toEqual([expect.stringContaining('holds `title`'), expect.stringContaining('holds `title`')])
     expect(errors('head\n  title Read #[b this]')).toEqual(['`title` holds text only'])
+  })
+
+  it('reports what a head tag\'s attributes get wrong in a build, as kay check does', () => {
+    const source = 'head\n  meta(name="a" onclick={go})\n  link(rel="x" class="a" class="b")\np x'
+
+    for (const output of ['html', 'dom'] as const)
+      expect(compileKay(source, 'test.kay', { output }).diagnostics.map(d => d.message)).toEqual(['`onclick` does not attach a handler', 'An element takes one `class` attribute'])
   })
 })
 

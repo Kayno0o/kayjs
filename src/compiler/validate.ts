@@ -5,7 +5,7 @@ import type { PageSettingName } from './page-settings'
 import type { ImportBinding, ScriptAnalysis, ServerAnalysis } from './script'
 import { FIELD_ATTRIBUTE, FIELD_ELEMENTS, isHead, isSlot, serverIslandOf, templateFacts } from './ast'
 
-export type ValidateOptions = Pick<GenerateOptions, 'island' | 'insideIsland' | 'check' | 'special' | 'includeServer'>
+type ValidateOptions = Pick<GenerateOptions, 'island' | 'insideIsland' | 'check' | 'special' | 'includeServer'>
 
 const BINDABLE = new Set(['input', 'textarea', 'select'])
 const TRANSITION_PART = 'transition:'
@@ -25,7 +25,7 @@ const REQUIRED_TEXT = new Map<string, [attribute: string, message: string, help:
   ['iframe', ['title', 'An `iframe` needs a `title`', 'name what it holds, which screen readers announce']],
 ])
 
-// What a component's code generation reports, in a pass of its own: the fences' imports and page rules, then the template as it is written.
+// What the compiler reports of a component's fences and template, in a pass of its own beside code generation: the fences' imports and page rules, then the template as it is written.
 export function validate(file: KayFile, script: ScriptAnalysis, server: ServerAnalysis | undefined, options: ValidateOptions): Diagnostic[] {
   return new Validator(file, options).run(script, server)
 }

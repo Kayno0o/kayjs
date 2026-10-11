@@ -410,9 +410,9 @@ export class DomTemplate extends TemplateWriter {
             })
 
             break
-          // Set once the options are in.
+          // Set once the options are in, unless a `bind:value` after it takes over, as the server reads the last of them.
           case 'selected':
-            selected = attribute.expression
+            selected = plan.selected!.bound ? undefined : attribute.expression
 
             break
           case 'value':
