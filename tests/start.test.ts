@@ -1,5 +1,5 @@
 import type { Subprocess } from 'bun'
-import { chmod, rm, utimes } from 'node:fs/promises'
+import { chmod, rename, rm, utimes } from 'node:fs/promises'
 import { join, relative } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
@@ -14,7 +14,11 @@ const SERVER = `import process from 'node:process'
 import { Elysia } from 'elysia'
 import { pages } from 'kay/server'
 
-const app = new Elysia().get('/mode', () => \`\${process.env.NODE_ENV} \${process.env.FROM_DOTENV}\`).use(await pages()).listen(Number(process.env.PORT ?? 0))
+const app = new Elysia().get('/mode', () => \`\${process.env.NODE_ENV} \${process.env.FROM_DOTENV}\`).get('/slow', async () => {
+  await Bun.sleep(30_000)
+
+  return 'late'
+}).use(await pages()).listen(Number(process.env.PORT ?? 0))
 
 console.log(\`listening \${app.server?.port}\`)
 `
@@ -28,8 +32,8 @@ function startGroup(dir: string, ...args: string[]): Subprocess<'ignore', 'pipe'
   return Bun.spawn([process.execPath, cli, 'start', dir, ...args], { stdin: 'ignore', stdout: 'pipe', stderr: 'pipe', detached: true })
 }
 
-// Runs `whileUp` once the server listens, then stops it with `signal`, as a deployment would: the port it listened on, what `kay start` warned and how it exited.
-async function listening(child: Subprocess<'ignore', 'pipe', 'pipe'>, whileUp?: (port: string) => Promise<void>, signal: NodeJS.Signals = 'SIGTERM', group = false): Promise<{ port: string, warned: string, code: number }> {
+// Runs `whileUp` once the server listens, then stops it with `signal`, as a deployment would: the port it listened on, what `kay start` warned, what the server printed after listening and how it exited.
+async function listening(child: Subprocess<'ignore', 'pipe', 'pipe'>, whileUp?: (port: string) => Promise<void>, signal: NodeJS.Signals = 'SIGTERM', group = false): Promise<{ port: string, warned: string, printed: string, code: number }> {
   const reader = child.stdout.getReader()
   let output = ''
 
@@ -42,9 +46,8 @@ async function listening(child: Subprocess<'ignore', 'pipe', 'pipe'>, whileUp?: 
     output += new TextDecoder().decode(value)
   }
 
-  reader.releaseLock()
-
   const port = LISTENING.exec(output)![1]!
+  const listened = output.indexOf('\n', LISTENING.exec(output)!.index) + 1
 
   try {
     await whileUp?.(port)
@@ -56,10 +59,46 @@ async function listening(child: Subprocess<'ignore', 'pipe', 'pipe'>, whileUp?: 
       child.kill(signal)
   }
 
+  for (let read = await reader.read(); !read.done; read = await reader.read())
+    output += new TextDecoder().decode(read.value)
+
   const [warned, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
 
-  return { port, warned, code }
+  return { port, warned, printed: output.slice(listened), code }
 }
+
+// Whether nothing listens on the port any more, waiting up to `ms` for it to close.
+async function released(port: string, ms = 5000): Promise<boolean> {
+  for (const until = Date.now() + ms; ; await Bun.sleep(100)) {
+    try {
+      void Bun.serve({ port: Number(port), fetch: () => new Response() }).stop(true)
+
+      return true
+    }
+    catch {
+      if (Date.now() > until)
+        return false
+    }
+  }
+}
+
+// What a kay server does not do itself: counts the SIGINTs it gets, then exits a moment after the first.
+const COUNTING = `import process from 'node:process'
+
+let signals = 0
+
+process.on('SIGINT', () => {
+  if (signals++ === 0)
+    setTimeout(() => {
+      console.log(\`signals \${signals}\`)
+      process.exit(0)
+    }, 300)
+})
+
+const server = Bun.serve({ port: Number(process.env.PORT ?? 0), fetch: () => new Response() })
+
+console.log(\`listening \${server.port}\`)
+`
 
 function freePort(): number {
   const probe = Bun.serve({ port: 0, fetch: () => new Response() })
@@ -107,7 +146,7 @@ describe('kay start', () => {
       expect(await (await fetch(`http://localhost:${port}/`)).text()).toContain('Home</h1>')
     })
 
-    expect(served).toEqual({ port, warned: '', code: 0 })
+    expect(served).toMatchObject({ port, warned: '', code: 0 })
 
     const later = new Date(Date.now() + 60_000)
 
@@ -169,7 +208,77 @@ describe('kay start', () => {
 
       expect(interrupted.code).toBe(0)
       // The server drained and exited before `kay start` did.
-      expect(async () => Bun.serve({ port: Number(port), fetch: () => new Response() }).stop(true)).not.toThrow()
+      expect(await released(port, 0)).toBe(true)
     }
+
+    // A server without kay's own handling dies of SIGQUIT, as it would run alone.
+    expect((await listening(start(dir), undefined, 'SIGQUIT')).code).toBe(131)
   }, 60_000)
+
+  it('passes a Ctrl-C sent to the whole group on once, and stops the server at a second one while it drains', async () => {
+    const counting = relative(process.cwd(), join(dir, 'counting.ts'))
+
+    await Bun.write(counting, COUNTING)
+    expect((await listening(startGroup(dir, '--entry', counting), undefined, 'SIGINT', true)).printed).toBe('signals 1\n')
+
+    const port = String(freePort())
+    const child = start(dir, '--port', port)
+    let interrupted = 0
+    // Cut off as the server stops.
+    const slow = async () => {
+      try {
+        await fetch(`http://localhost:${port}/slow`)
+      }
+      catch {}
+    }
+    const stopped = await listening(child, async () => {
+      // An open request keeps the server draining for its `shutdownTimeout`, 10 seconds, until the second Ctrl-C.
+      void slow()
+      await Bun.sleep(200)
+      child.kill('SIGINT')
+      interrupted = performance.now()
+      await Bun.sleep(500)
+    }, 'SIGINT')
+
+    expect(stopped.printed).toContain('SIGINT received; finishing open requests')
+    expect(stopped.code).toBe(0)
+    expect(performance.now() - interrupted).toBeLessThan(5000)
+  }, 60_000)
+
+  it('stops the server once kay start is killed with its group, which no signal it passes on reaches', async () => {
+    const port = String(freePort())
+    const child = startGroup(dir, '--port', port)
+
+    await listening(child, undefined, 'SIGKILL', true)
+
+    expect(await released(port)).toBe(true)
+  }, 30_000)
+
+  it('runs the executable `kay build --compile` made, from wherever the project moved', async () => {
+    const build = Bun.spawn([process.execPath, cli, 'build', dir, '--no-check', '--compile', join(dir, 'bin/server')], { stdout: 'ignore', stderr: 'pipe' })
+
+    expect(await build.exited).toBe(0)
+    expect(await Bun.file(join(outputDir(dir), 'executable')).text()).toBe('bin/server')
+
+    const moved = `${dir}-moved`
+
+    await rename(dir, moved)
+
+    try {
+      await rm(join(moved, 'src/server.ts'))
+
+      const port = String(freePort())
+      const served = await listening(start(moved, '--port', port), async () => {
+        expect(await (await fetch(`http://localhost:${port}/mode`)).text()).toBe('production production')
+      })
+
+      // Only an earlier test's source dated ahead is newer than the build.
+      expect(served.warned).not.toContain('executable')
+      expect(served.code).toBe(0)
+    }
+    finally {
+      await rename(moved, dir)
+      await Bun.write(join(dir, 'src/server.ts'), SERVER)
+    }
+  }, 120_000)
 })

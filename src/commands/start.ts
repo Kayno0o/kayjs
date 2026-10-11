@@ -9,9 +9,11 @@ import { loadConfig } from '../config'
 import { environmentWithoutDotenv, PAGES_ENTRY, serverSources } from '../dev'
 import { projectPaths } from '../project'
 import { EXECUTABLE_RECORD, MANIFEST } from '../server/client'
+import { START_PARENT } from '../server/lifecycle'
 import { count, isPort, projectRoot } from './command'
 
 // The server runs in a process group of its own, so each of these reaches it once, through `kay start`, whether a terminal sent it to the group or a supervisor to `kay start` alone: a second Ctrl-C stops it mid-drain, as it would run alone.
+// A kill of the group that `kay start` cannot pass on, SIGKILL, leaves the server to notice it is gone, through `START_PARENT`.
 const FORWARDED = ['SIGINT', 'SIGTERM', 'SIGHUP', 'SIGQUIT'] as const
 // The signals asking the server to stop: dying of one `kay start` passed on is a stop, not a failure.
 const STOPS = new Set<string>(['SIGINT', 'SIGTERM', 'SIGHUP'])
@@ -47,7 +49,7 @@ export const start: Command = {
     let server: Bun.Subprocess
 
     try {
-      server = Bun.spawn(command, { cwd: root, env: { ...env, NODE_ENV: 'production', ...typeof port === 'string' && { PORT: port } }, stdio: ['inherit', 'inherit', 'inherit'], detached: true })
+      server = Bun.spawn(command, { cwd: root, env: { ...env, NODE_ENV: 'production', [START_PARENT]: String(process.pid), ...typeof port === 'string' && { PORT: port } }, stdio: ['inherit', 'inherit', 'inherit'], detached: true })
     }
     catch (error) {
       console.error(`kay start: cannot run ${relative(process.cwd(), command.at(-1)!)}: ${error instanceof Error ? error.message : String(error)}`)

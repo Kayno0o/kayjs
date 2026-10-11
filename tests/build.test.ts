@@ -707,6 +707,15 @@ describe('kay build checks the project first', () => {
       expect(built).toMatchObject({ checked: [], linted: [{ code: 'untitled-page', severity: 'warning' }, { code: 'undescribed-page', severity: 'warning' }], built: { islands: 0, stylesheets: 0, prerendered: 1, entries: 0 }, exported: { pages: 1, dir: join(root, 'dist') } })
       expect(built.failed).toBeUndefined()
       expect(await Bun.file(join(root, 'dist/index.html')).text()).toContain('>Home</a>')
+
+      // A callback that throws once the output is written puts the last build back.
+      await Bun.write(join(root, 'src/routes/index.kay'), '--- server\nexport const page = { prerender: true }\n---\na(href="/") Away\n')
+      const script = `import { buildProject } from ${JSON.stringify(join(import.meta.dir, '../src/build/pipeline'))}\n\ntry {\n  await buildProject(${JSON.stringify(root)}, {}, { onStage: (stage) => { if (stage === 'output') throw new Error('printer down') } })\n}\ncatch (error) {\n  console.log(error.message)\n}\n`
+      const child = Bun.spawn([process.execPath, '-e', script], { cwd: root, stdout: 'pipe', stderr: 'pipe' })
+
+      expect(await new Response(child.stdout).text()).toBe('printer down\n')
+      expect(await Bun.file(join(outputDir(root), 'pages/index.html')).text()).toContain('>Home</a>')
+      expect(existsSync(`${outputDir(root)}-previous`)).toBe(false)
     }
     finally {
       await rm(root, { recursive: true, force: true })

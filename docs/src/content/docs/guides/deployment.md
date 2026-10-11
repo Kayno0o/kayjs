@@ -73,7 +73,7 @@ export default defineConfig({
 })
 ```
 
-On SIGTERM or SIGINT the server stops taking connections, lets open requests finish, runs the `onStop` hooks and exits. Requests still open after `shutdownTimeout`, 10 seconds by default, are closed.
+On SIGTERM, SIGINT or SIGHUP the server stops taking connections, lets open requests finish, runs the `onStop` hooks and exits. Requests still open after `shutdownTimeout`, 10 seconds by default, are closed.
 
 ## Logs and tracing
 

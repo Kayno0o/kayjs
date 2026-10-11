@@ -149,7 +149,7 @@ export async function printProblems(diagnostics: CheckDiagnostic[], denyWarnings
       sources.set(diagnostic.file, await readSource(diagnostic.file))
   }
 
-  const problems = diagnostics.map(diagnostic => printedProblem(diagnostic, sources.get(diagnostic.file)))
+  const problems = diagnostics.map(diagnostic => printedProblem(diagnostic, sources.get(diagnostic.file), format))
   const warnings = diagnostics.filter(diagnostic => diagnostic.severity === 'warning').length
   const errors = diagnostics.length - warnings
 
@@ -172,14 +172,36 @@ export async function printProblems(diagnostics: CheckDiagnostic[], denyWarnings
   return { failing: errors + (denyWarnings ? warnings : 0), found: diagnostics.length }
 }
 
-function printedProblem(diagnostic: CheckDiagnostic, source: string | undefined): PrintedProblem {
+// A check that could not run, on a missing path or a config that does not load: on stderr as always, and as one error in JSON or an Actions annotation, which a tool reading stdout would otherwise get nothing from.
+export function printFailure(command: string, failure: unknown, format: ProblemFormat): void {
+  console.error(typeof failure === 'string' ? `kay ${command}: ${failure}` : failure)
+
+  if (format === 'text')
+    return
+
+  // Bun's error for a module that does not parse tells where.
+  const { message, position } = (typeof failure === 'object' && failure !== null ? failure : {}) as { message?: unknown, position?: { file: string, line: number, column: number } | null }
+  const problem = { ...position && { file: shownPath(position.file, format), line: position.line, column: position.column }, severity: 'error' as const, code: null, message: typeof failure === 'string' ? failure : typeof message === 'string' ? message : String(failure) }
+
+  if (format === 'json')
+    console.log(JSON.stringify({ errors: 1, warnings: 0, problems: [problem] }))
+  else
+    console.log(workflowCommand(problem))
+}
+
+// GitHub and Forgejo resolve an annotation's file from the repository's root, where the job checked it out, whatever directory the step ran in.
+function shownPath(file: string, format: ProblemFormat): string {
+  return relative(format === 'github' ? process.env.GITHUB_WORKSPACE ?? process.cwd() : process.cwd(), file)
+}
+
+function printedProblem(diagnostic: CheckDiagnostic, source: string | undefined, format: ProblemFormat): PrintedProblem {
   const { line, column, label, note, help } = diagnostic
   const start = source === undefined ? undefined : offsetAt(source, diagnostic)
   const end = source !== undefined && diagnostic.end !== undefined ? positionAt(source, diagnostic.end) : undefined
   const related = source === undefined ? undefined : diagnostic.related?.map(place => ({ ...positionAt(source, place.start), label: place.label }))
 
   return {
-    file: relative(process.cwd(), diagnostic.file),
+    file: shownPath(diagnostic.file, format),
     line,
     column,
     ...end && start !== undefined && diagnostic.end! > start && { endLine: end.line, endColumn: end.column },
@@ -194,7 +216,7 @@ function printedProblem(diagnostic: CheckDiagnostic, source: string | undefined)
 }
 
 // `::error file=src/a.kay,line=4,col=3,title=missing-alt::An img needs alt`, which an Actions runner shows on the diff; the note and the help go on lines of their own.
-function workflowCommand(problem: PrintedProblem): string {
+function workflowCommand(problem: Omit<PrintedProblem, 'file' | 'line' | 'column'> & Partial<Pick<PrintedProblem, 'file' | 'line' | 'column'>>): string {
   const properties = [['file', problem.file], ['line', problem.line], ['col', problem.column], ['endLine', problem.endLine], ['endColumn', problem.endColumn], ['title', problem.code ?? 'kay check']] as const
   const text = [problem.message, ...problem.note === undefined ? [] : [`note: ${problem.note}`], ...problem.help === undefined ? [] : [`help: ${problem.help}`]].join('\n')
 

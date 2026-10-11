@@ -136,7 +136,11 @@ const tsconfig = JSON.stringify({
 // Runs `kay check` on the project as a user would, answering its exit code and what it printed.
 // What `kay check` reports: what it did on stdout, the problems it found on stderr.
 async function runCheck(root: string, ...flags: string[]): Promise<{ code: number, output: string, report: string }> {
-  const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'check', root, ...flags], { stdout: 'pipe', stderr: 'pipe' })
+  return runCheckIn({}, root, ...flags)
+}
+
+async function runCheckIn(env: Record<string, string>, root: string, ...flags: string[]): Promise<{ code: number, output: string, report: string }> {
+  const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'check', root, ...flags], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, ...env } })
   const [report, output, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
 
   return { code, output, report }
@@ -1454,6 +1458,30 @@ describe('kay check, unused code', () => {
       expect(document).toMatchObject({ errors: 1, warnings: 1 })
       expect(document.problems.map(problem => [problem.file, problem.line, problem.severity, problem.code])).toEqual([[file, 4, 'warning', 'positional-key'], [file, 6, 'error', 'missing-alt']])
       expect(await runCheck(root, '--format', 'xml')).toEqual({ code: 1, output: 'kay check: --format takes `text`, `github`, `json`, not `xml`\n', report: '' })
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('tells why a check could not run in its format too, and annotates a file from the repository\'s root', async () => {
+    const root = await scratchProject({ 'kay.config.ts': 'export default {\n', 'src/a.kay': 'img(src="/a.png")\n' })
+    const config = join(root, 'kay.config.ts')
+
+    try {
+      const broken = await runCheck(root, '--format', 'json')
+
+      expect(broken.code).toBe(1)
+      expect(broken.output).toContain('Expected identifier but found end of file')
+      expect(JSON.parse(broken.report)).toEqual({ errors: 1, warnings: 0, problems: [{ file: relative(process.cwd(), config), line: 1, column: 17, severity: 'error', code: null, message: 'Expected identifier but found end of file' }] })
+
+      const missing = await runCheck(root, '--format', 'github', join(root, 'src/nope.kay'))
+
+      expect(missing).toEqual({ code: 1, output: `kay check: ${join(root, 'src/nope.kay')} does not exist\n`, report: `::error title=kay check::${join(root, 'src/nope.kay')} does not exist\n` })
+
+      await Bun.write(config, 'export default {}\n')
+
+      expect((await runCheckIn({ GITHUB_WORKSPACE: root }, root, '--format', 'github')).report).toStartWith('::error file=src/a.kay,line=1,col=1,')
     }
     finally {
       await rm(root, { recursive: true, force: true })

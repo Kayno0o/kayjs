@@ -156,7 +156,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
 
   const env = await environmentWithoutDotenv()
   const buildClientNow = async (): Promise<BuildOutcome | undefined> => {
-    if (ownClient)
+    if (ownClient || stopping)
       return undefined
 
     if (builderStale || builder?.gone() === true) {
@@ -182,7 +182,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     // Gone on its own while building, as when the config failed to load: the next build starts it again.
     if (current !== undefined && current === builder && !stopping && !ownClient) {
       if (!builderExitSaid)
-        log(`${stamp()} the process building the client exited; servers build their own until the next change`)
+        log(`${stamp()} the process building the client exited; each change starts it again, the servers building their own until one build succeeds`)
 
       builderExitSaid = true
     }

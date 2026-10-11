@@ -10,7 +10,7 @@ import { isLint, isLintGroup, LINT_GROUPS, LINTS } from '../compiler/lints'
 import { CONFIG_FILE, loadConfig } from '../config'
 import { watchProject } from '../dev'
 import { buildingWithoutEnv } from '../server/env'
-import { count, done, isProblemFormat, printProblems, PROBLEM_FORMATS, projectRoot } from './command'
+import { count, done, isProblemFormat, printFailure, printProblems, PROBLEM_FORMATS, projectRoot } from './command'
 
 // What makes a directory given first the project rather than a path to report on.
 const PROJECT_FILES = [CONFIG_FILE, 'package.json', 'tsconfig.json']
@@ -48,7 +48,7 @@ export const check: Command = {
     const missing = paths.find(path => !existsSync(path))
 
     if (missing !== undefined) {
-      console.error(`kay check: ${missing} does not exist`)
+      printFailure('check', `${missing} does not exist`, format)
 
       return 1
     }
@@ -62,14 +62,23 @@ export const check: Command = {
     buildingWithoutEnv()
 
     const scope = paths.map(path => resolve(path))
+    // A config that does not load, or a fix that cannot be written, fails this run alone: `--watch` checks again on the next change.
     const run = async () => {
       const started = performance.now()
-      const { failing, found } = await checkProject(root, await loadConfig(root), typeof project === 'string' ? project : 'tsconfig.json', typeof entry === 'string' ? relative(root, resolve(entry)) : undefined, { denyWarnings: values['deny-warnings'] === true, fix: values.fix === true, only, launch: only === 'seo', format, scope })
 
-      if (found === 0 && format !== 'json')
-        done('checked', 'with no problems', performance.now() - started)
+      try {
+        const { failing, found } = await checkProject(root, await loadConfig(root), typeof project === 'string' ? project : 'tsconfig.json', typeof entry === 'string' ? relative(root, resolve(entry)) : undefined, { denyWarnings: values['deny-warnings'] === true, fix: values.fix === true, only, launch: only === 'seo', format, scope })
 
-      return failing > 0 ? 1 : 0
+        if (found === 0 && format !== 'json')
+          done('checked', 'with no problems', performance.now() - started)
+
+        return failing > 0 ? 1 : 0
+      }
+      catch (error) {
+        printFailure('check', error, format)
+
+        return 1
+      }
     }
 
     if (values.watch !== true)

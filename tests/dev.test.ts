@@ -840,6 +840,52 @@ describe('kay dev', () => {
     }
   }, 60_000)
 
+  it('says once that the process building the client exited, until a build succeeds again', async () => {
+    const scratch = join(import.meta.dir, '../node_modules/.cache')
+
+    await mkdir(scratch, { recursive: true })
+    const root = await mkdtemp(join(scratch, 'dev-builder-exit-'))
+    const lines: string[] = []
+    const exits = () => lines.filter(line => line.includes('the process building the client exited')).length
+    const counter = (step: number) => `---\nimport { signal } from 'kay'\n\nconst count = signal(${step})\n---\nbutton(onClick={() => count.set(n => n + 1)}) {count()}\n`
+    // No line for a while: the restarts and the builds a change started are over.
+    const settled = async () => {
+      for (let seen = lines.length, quiet = Date.now(); Date.now() - quiet < 1500; await Bun.sleep(100)) {
+        if (lines.length !== seen) {
+          seen = lines.length
+          quiet = Date.now()
+        }
+      }
+    }
+
+    await Bun.write(join(root, 'kay.config.ts'), 'export default {}\n')
+    await Bun.write(join(root, 'src/counter.kay'), counter(0))
+    await Bun.write(join(root, 'src/routes/index.kay'), '---\nimport Counter from \'../counter.kay\'\n---\nCounter\n')
+    const stop = await dev(root, { log: line => lines.push(line) })
+
+    try {
+      await until(() => lines.length === 1, 20_000)
+
+      // A config that does not load ends every process building the client mid-build.
+      await Bun.write(join(root, 'kay.config.ts'), 'export default {\n')
+      await until(() => exits() === 1, 20_000)
+      await Bun.write(join(root, 'src/counter.kay'), counter(1))
+      await settled()
+
+      expect(exits()).toBe(1)
+
+      await Bun.write(join(root, 'kay.config.ts'), 'export default {}\n')
+      await until(() => lines.at(-1)!.includes('restarted'), 20_000)
+      await settled()
+      await Bun.write(join(root, 'kay.config.ts'), 'export default {\n')
+      await until(() => exits() === 2, 20_000)
+    }
+    finally {
+      await stop()
+      await rm(root, { recursive: true, force: true })
+    }
+  }, 90_000)
+
   it('serves the compile errors of a project that failed to boot, and the reload stream', async () => {
     const source = 'p ok\nelse\n  p no\n'
     const error = new KayCompileError([{ file: join(process.cwd(), 'src/broken.kay'), source, start: 5, end: 9, message: '`else` must directly follow an `if`' }])

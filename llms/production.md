@@ -25,7 +25,7 @@ Every response carries its request's id as `X-Request-Id`, time-ordered, made by
 
 `/_kay/health` answers `200 ok` while the server takes requests, for a load balancer or a container's health check. `health: { path: '/up', check: async () => await db.ping() }` in kay.config.ts moves it and adds a check: one returning `false`, throwing, or taking over 5 s answers 503, the error logged. `health: false` leaves the route out. An executable `kay build --compile` made checks a server it started, rather than starting one, when run as `./server --health`: it exits with 0 when the health route on `PORT`, 3000 by default, answers 200, else 1, for a container image with no curl: `HEALTHCHECK CMD ["./server", "--health"]`.
 
-On SIGTERM or SIGINT, a server started with `.listen()` stops taking connections, lets open requests and streams finish, then runs the app's `onStop` hooks and exits with 0. New connections are refused from the signal on, so a load balancer stops sending any; a client on a connection kept alive gets 503 from the health route meanwhile. Requests still open after `shutdownTimeout`, 10 seconds by default, are closed and the process exits with 1. `kay dev` restarts at once instead.
+On SIGTERM, SIGINT or SIGHUP, a server started with `.listen()` stops taking connections, lets open requests and streams finish, then runs the app's `onStop` hooks and exits with 0. New connections are refused from the signal on, so a load balancer stops sending any; a client on a connection kept alive gets 503 from the health route meanwhile. Requests still open after `shutdownTimeout`, 10 seconds by default, are closed and the process exits with 1. `kay dev` restarts at once instead.
 
 ## Background jobs
 
