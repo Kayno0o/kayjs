@@ -13,12 +13,13 @@ import { editableEntries } from '../runtime/fields'
 import { child, localLinks } from '../runtime/html'
 import { localeState } from '../runtime/locale-state'
 import { previewing, previewState } from '../runtime/preview'
+import { isDraft } from './drafts'
 import { contentMode, loadEntries } from './load'
 import { compileMarkdown, MarkdownError } from './markdown'
 import { ContentError, decodeEntries } from './validate'
 
 export type { CollectionInfo, EntryFile, FieldKind, SourceEntry, WrittenEntry } from './edit'
-export { collections, entries, entrySource, fileField, imageField, markdownField, reference, removeEntry, saveEntry } from './edit'
+export { collections, entries, entrySource, fileField, imageField, markdownField, reference, removeEntry, repositoryRoot, saveEntry } from './edit'
 export type { FeedItem, FeedOptions } from './feed'
 export type { Heading, Highlighter, RenderedMarkdown } from './markdown'
 export { highlightCode, renderMarkdown } from './markdown'
@@ -73,6 +74,9 @@ export interface ContentLoader {
   remove?: ((entry: { slug: string, locale?: string | undefined }) => void | Promise<void>) | undefined
 }
 
+// The fields of the data holding a boolean, which `draft` may name.
+type BooleanField<Data> = { [Name in keyof Data]-?: Data[Name] extends boolean | undefined ? Name : never }[keyof Data] & string
+
 export interface CollectionOptions<Schema extends TSchema> {
   // What each entry's frontmatter, or a data file's content, holds; an entry it refuses fails `kay check` and the build.
   schema: Schema
@@ -81,7 +85,7 @@ export interface CollectionOptions<Schema extends TSchema> {
   // Highlights code blocks when the entries compile, at build time, such as with Shiki.
   highlight?: Highlighter | undefined
   // Entries left out everywhere but `kay dev` and preview mode: from `all()`, `get()`, prerendering, the sitemap and the feed. A boolean field's name, `'draft'`, leaves out those where it is true, which a CMS then reads and writes.
-  draft?: ((entry: Entry<Static<Schema>>) => boolean) | (keyof Static<Schema> & string) | undefined
+  draft?: ((entry: Entry<Static<Schema>>) => boolean) | BooleanField<Static<Schema>> | undefined
   // The order `all()` lists entries in; by slug otherwise.
   sort?: ((a: Entry<Static<Schema>>, b: Entry<Static<Schema>>) => number) | undefined
   // An RSS or Atom feed of the collection, served at its path.
@@ -219,7 +223,6 @@ export function collection<Schema extends TSchema, Components extends Record<str
       preview.loads.set(draftKey, drafted = (async () => {
         const raw = [...raws.get(entries) ?? []]
 
-        // Every entry is decoded again, once per draft render: cheap beside the render, and a collection's decoded entries are never shared with one.
         for (const draft of drafts) {
           const slug = localized ? `${draft.locale}/${draft.slug}` : draft.slug
           const at = raw.findIndex(entry => entry.slug === slug)
@@ -231,6 +234,7 @@ export function collection<Schema extends TSchema, Components extends Record<str
             raw[at] = entry
         }
 
+        // Every entry is decoded again, once per draft render: cheap beside the render, and a collection's decoded entries are never shared with one.
         return decode(raw)
       })())
     }
@@ -330,11 +334,6 @@ export type FeedPathsOf<Module> = { [Name in keyof Module]: Module[Name] extends
 
 export function isCollection(value: unknown): value is Collection<unknown> {
   return typeof value === 'object' && value !== null && COLLECTION in value
-}
-
-// Whether the collection's `draft` holds an entry back: its function, or its boolean field set.
-export function isDraft<Data>(draft: ((entry: Entry<Data>) => boolean) | string, entry: Entry<Data>): boolean {
-  return typeof draft === 'string' ? (entry.data as Record<string, unknown> | undefined)?.[draft] === true : draft(entry)
 }
 
 function toEntry<Data>(entry: RawEntry, data: Data, components: Record<string, Component<never>>, localized: boolean): Entry<Data> {

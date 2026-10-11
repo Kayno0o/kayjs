@@ -12,13 +12,14 @@ export interface DraftEntry {
   body?: string | undefined
 }
 
-// Where a draft fails its collection's schema, by its field's dotted path, `tags.0`; `''` for the data as a whole, or for its Markdown body with `body` set, which no data field named `body` is taken for.
+// Where a draft fails its collection, by its field's dotted path, `tags.0`; `''` for the data as a whole, for its Markdown body with `body` set, or for its slug or locale as `key` names, which no data field of that name is taken for.
 export interface DraftIssue {
   collection: string
   slug: string
   locale?: string
   path: string
   body?: true
+  key?: 'slug' | 'locale'
   message: string
 }
 
@@ -38,20 +39,13 @@ export async function showDraft(entries: DraftEntry[]): Promise<{ issues?: Draft
   // A navigation started since, or one already underway that has shown its page, wins over the draft of the page it left.
   const isCurrent = () => controller === latest && token === navigation.current && shownPage() === page
   let response: Response
-  let html: string
+  let text: string
 
   latest = controller
 
   try {
     response = await fetch(withBase(DRAFT_ROUTE), { method: 'POST', headers: { 'content-type': 'application/json', [NAVIGATE_HEADER]: '1' }, body: JSON.stringify({ path: withoutBase(location.pathname) + location.search, entries }), signal: controller.signal })
-
-    if (response.status === 422)
-      return await response.json() as { issues: DraftIssue[] }
-
-    if (!response.ok)
-      throw new Error(`kay: showDraft was answered ${response.status}: ${await response.text()}`)
-
-    html = await response.text()
+    text = await response.text()
   }
   catch (error) {
     if (controller.signal.aborted)
@@ -60,15 +54,21 @@ export async function showDraft(entries: DraftEntry[]): Promise<{ issues?: Draft
     throw error
   }
 
-  if (!navigation.hooks)
-    throw new Error('kay: showDraft needs the page swap, which `navigation: false` in kay.config.ts turns off')
-
   if (!isCurrent())
     return {}
 
+  if (response.status === 422)
+    return JSON.parse(text) as { issues: DraftIssue[] }
+
+  if (!response.ok)
+    throw new Error(`kay: showDraft was answered ${response.status}: ${text}`)
+
+  if (!navigation.hooks)
+    throw new Error('kay: showDraft needs the page swap, which `navigation: false` in kay.config.ts turns off')
+
   const { show } = await import('./page-swap')
 
-  await show({ url: location.href, type: response.headers.get('content-type') ?? '', html }, '', { intent: 'refresh', focused: document.activeElement }, isCurrent)
+  await show({ url: location.href, type: response.headers.get('content-type') ?? '', html: text }, '', { intent: 'refresh', focused: document.activeElement }, isCurrent)
 
   return {}
 }

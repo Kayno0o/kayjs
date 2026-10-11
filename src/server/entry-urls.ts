@@ -1,5 +1,5 @@
 import type { TrailingSlash } from '../config'
-import type { EntryUrls } from '../content/edit'
+import type { EditSite } from '../content/edit'
 import type { LocaleSettings } from '../runtime/i18n'
 import type { ServedRoute } from './guards'
 import { isCollection } from '../content'
@@ -10,7 +10,7 @@ import { pathOf } from './prerendered'
 import { slashedPath } from './routes'
 
 // An entry's page: the route whose `prerender` lists its collection, its one param the entry's slug, in the entry's locale, under the base; another domain's page whole.
-export function entryUrls(routes: ServedRoute[], base: string, trailingSlash?: TrailingSlash, settings?: LocaleSettings): EntryUrls {
+export function entryUrls(routes: ServedRoute[], base: string, trailingSlash?: TrailingSlash, settings?: LocaleSettings): EditSite['urls'] {
   let listing: Promise<Map<string, ServedRoute>> | undefined
 
   return async (collection, entry) => {

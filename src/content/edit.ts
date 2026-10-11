@@ -5,12 +5,13 @@ import type { CompiledMarkdown } from './markdown'
 import { existsSync } from 'node:fs'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import { t } from 'elysia'
-import { isDraft } from './index'
-import { contentPlace } from './load'
-import { compileMarkdown, MarkdownError, splitFrontmatter } from './markdown'
+import { isDraft } from './drafts'
+import { contentPlace, entryFiles, parseEntry, slugOf } from './load'
+import { compileMarkdown, MarkdownError } from './markdown'
 import { dataIssues, decodeEntries, unknownComponents } from './validate'
 
 // What a CMS reads of the collections the content config exports, to edit their entries: kay's server API, kay writing nothing itself.
+// It gives drafts and files to whoever calls it: a CMS serves it from routes only an editor reaches.
 
 // The kinds of string field a CMS edits apart from plain text, as `x-kay: { kind }` in the schema says.
 export type FieldKind = 'image' | 'file' | 'markdown' | 'reference'
@@ -21,15 +22,17 @@ export interface CollectionInfo {
   kind: 'folder' | 'loaded'
   // The schema as JSON Schema, a field of a kind kay knows carrying `x-kay: { kind, collection? }`.
   schema: Record<string, unknown>
-  // Entries hold a Markdown body beside their data: a folder holding Markdown files, or any loaded collection.
+  // Entries hold a Markdown body beside their data: a folder holding Markdown or no entry yet, a loader giving one or no entry yet.
   body?: { kind: 'markdown' } | undefined
+  // The components a body may use, by the name it writes them with.
+  components: string[]
   localized: boolean
-  // A folder collection's folder, relative to `repoRoot`.
+  // The locales the site serves, which a localized collection's entries are written in.
+  locales?: string[] | undefined
+  // A folder collection's folder, relative to the repository root.
   dir?: string | undefined
   // The boolean field `draft: 'field'` names, true for a draft: publishing writes false to it.
   draftField?: string | undefined
-  // The repository holding the project, where `dir` and each entry's `path` are relative to; the project root outside one.
-  repoRoot: string
 }
 
 // An entry as its source holds it, drafts included: a folder's file as written, a loader's entry as it gives it in preview.
@@ -49,7 +52,7 @@ export interface SourceEntry {
 // An entry as an editor wrote it, which `entrySource` and `saveEntry` take.
 export type WrittenEntry = Omit<DraftEntry, 'collection'>
 
-// The file a folder entry is written to: its path relative to the project root, absolute and relative to the repository root, and its text.
+// The file a folder entry is written to: its path relative to the project root, absolute and relative to the repository root, and its text; `absolute` is the server's, never for the editor's browser.
 export interface EntryFile {
   path: string
   absolute: string
@@ -57,12 +60,12 @@ export interface EntryFile {
   text: string
 }
 
-// The page of an entry, which the server knows from its routes.
-export type EntryUrls = (collection: Collection<unknown>, entry: { slug: string, locale?: string | undefined }) => Promise<string | undefined>
+// What the server knows of the site: the page of an entry, from its routes, and the locales it serves.
+export interface EditSite {
+  urls: (collection: Collection<unknown>, entry: { slug: string, locale?: string | undefined }) => Promise<string | undefined>
+  locales?: readonly string[] | undefined
+}
 
-const ENTRY_FILES = new Bun.Glob('**/*.{md,json,yaml,yml}')
-const EXTENSION = /\.(?:md|json|ya?ml)$/
-const INDEX = /(?:^|\/)index$/
 const MARKDOWN = /\.md$/
 const JSON_FILE = /\.json$/
 const YAML_FILE = /\.ya?ml$/
@@ -73,15 +76,20 @@ type StringOptions = Parameters<typeof t.String>[0]
 type ContentLoaderOf<Name extends 'save' | 'remove'> = NonNullable<Collection<unknown>['loader']>[Name]
 
 let registered: [string, Collection<unknown>][] = []
-let entryUrls: EntryUrls | undefined
+let site: EditSite | undefined
 
 // The collections the content config exports, by name, as the server read them when it started.
 export function registerCollections(named: [string, Collection<unknown>][]): void {
   registered = named
 }
 
-export function registerEntryUrls(urls: EntryUrls | undefined): void {
-  entryUrls = urls
+// Gives back what was registered before, for a test to put back.
+export function registerEditSite(served: EditSite | undefined): EditSite | undefined {
+  const previous = site
+
+  site = served
+
+  return previous
 }
 
 // A string field naming an entry of another collection by its slug.
@@ -111,25 +119,29 @@ export async function collections(): Promise<CollectionInfo[]> {
   return Promise.all(registered.map(async ([name, collection]) => {
     const { draft, localized = false, schema } = collection.options
     const dir = collection.dir === undefined ? undefined : folderOf(collection.dir)
-    const body = dir === undefined || (await folderFiles(dir)).some(file => MARKDOWN.test(file))
 
     return {
       name,
       kind: dir === undefined ? 'loaded' : 'folder',
       schema: jsonSchema(schema),
-      ...body && { body: { kind: 'markdown' } },
+      ...await holdsBody(collection, dir) && { body: { kind: 'markdown' } },
+      components: Object.keys(collection.components),
       localized,
+      ...localized && site?.locales && { locales: [...site.locales] },
       ...dir !== undefined && { dir: repoPath(repoRoot, dir) },
       ...typeof draft === 'string' && { draftField: draft },
-      repoRoot,
     }
   }))
 }
 
-// The entries of the collection exported as `name`, drafts included, as their source holds them; one locale's alone when given.
+// The entries of the collection exported as `name`, drafts included, as their source holds them now, a loader's loaded afresh as preview mode loads them; one locale's alone when given.
 export async function entries(name: string, options: { locale?: string } = {}): Promise<SourceEntry[]> {
   const collection = collectionNamed(name)
   const { localized = false } = collection.options
+
+  if (options.locale !== undefined && !localized)
+    throw new Error(`kay: entries() was asked for the ${options.locale} entries of ${name}, which is not localized`)
+
   const found = collection.dir === undefined ? await loadedEntries(collection) : await folderEntries(folderOf(collection.dir))
   const placed = found.map(({ slug, ...entry }) => {
     const split = localized ? slug.indexOf('/') : -1
@@ -139,14 +151,14 @@ export async function entries(name: string, options: { locale?: string } = {}): 
 
   return Promise.all(placed.filter(entry => options.locale === undefined || entry.locale === options.locale).map(async (entry) => {
     const data = decodedData(collection, entry)
-    const url = collection.options.url ? collection.options.url({ slug: entry.slug, locale: entry.locale, data }) : await entryUrls?.(collection, entry)
+    const url = collection.options.url ? collection.options.url({ slug: entry.slug, locale: entry.locale, data }) : await site?.urls(collection, entry)
 
     return { ...entry, draft: draftOf(collection, entry, data), ...url !== undefined && { url } }
   }))
 }
 
 // Where an entry an editor wrote fails its collection: a slug or a locale naming another place, a locale missing from a localized collection's entry or given to another's, the schema, or a component its body uses that the collection does not name.
-// A body's issue is flagged `body`, apart from a data field named `body`; the body comes back compiled when it compiles.
+// A body's issue is flagged `body`, a slug's or a locale's `key`, apart from a data field of that name; the body comes back compiled when it compiles.
 export async function entryIssues(name: string, collection: Collection<unknown>, entry: WrittenEntry): Promise<{ issues: DraftIssue[], compiled?: CompiledMarkdown | undefined }> {
   const { slug, locale, data, body } = entry
   const at = { collection: name, slug, ...locale !== undefined && { locale } }
@@ -154,13 +166,12 @@ export async function entryIssues(name: string, collection: Collection<unknown>,
   const issues: DraftIssue[] = []
 
   if (!slug.split('/').every(part => PATH_PART.test(part)))
-    issues.push({ ...at, path: '', message: 'has a slug naming no file of the collection: its parts are neither empty, . nor ..' })
-
-  if (locale !== undefined && !PATH_PART.test(locale))
-    issues.push({ ...at, path: '', message: 'has a locale naming no folder of the collection' })
+    issues.push({ ...at, path: '', key: 'slug', message: 'has a slug naming no file of the collection: its parts are neither empty, . nor ..' })
 
   if (localized !== (locale !== undefined))
-    issues.push({ ...at, path: '', message: localized ? 'names no locale, which each entry of a localized collection has' : 'names a locale, which the collection is not localized by' })
+    issues.push({ ...at, path: '', key: 'locale', message: localized ? 'names no locale, which each entry of a localized collection has' : 'names a locale, which the collection is not localized by' })
+  else if (locale !== undefined && (site?.locales ? !site.locales.includes(locale) : !PATH_PART.test(locale)))
+    issues.push({ ...at, path: '', key: 'locale', message: site?.locales ? `names a locale the site does not serve: it serves ${site.locales.join(', ')}` : 'has a locale naming no folder of the collection' })
 
   const compiled = body === undefined ? undefined : await compiledBody(collection, body, message => issues.push({ ...at, path: '', body: true, message }))
 
@@ -186,10 +197,10 @@ export async function entrySource(name: string, slug: string, data: unknown, opt
   const dir = folderOf(collection.dir)
   const files = await folderFiles(dir)
   const place = options.locale === undefined ? slug : `${options.locale}/${slug}`
-  const existing = files.find(file => (file.replace(EXTENSION, '').replace(INDEX, '') || 'index') === place)
+  const existing = files.find(file => slugOf(file) === place)
   const relativeFile = existing ?? `${place}.${options.body !== undefined || files.some(file => MARKDOWN.test(file)) ? 'md' : 'json'}`
   const absolute = join(dir, relativeFile)
-  const body = options.body ?? (existing !== undefined && MARKDOWN.test(existing) ? splitFrontmatter(await Bun.file(absolute).text()).body : undefined)
+  const body = options.body ?? (existing === undefined ? undefined : (await readEntry(dir, existing)).body)
 
   return { file: { path: repoPath(contentPlace().root, absolute), absolute, repoPath: repoPath(repositoryRoot(), absolute), text: entryText(relativeFile, data, body) } }
 }
@@ -219,7 +230,7 @@ export async function removeEntry(name: string, slug: string, locale?: string): 
   return {}
 }
 
-export function collectionNamed(name: string): Collection<unknown> {
+function collectionNamed(name: string): Collection<unknown> {
   const found = registered.find(([exported]) => exported === name)?.[1]
 
   if (!found)
@@ -228,6 +239,7 @@ export function collectionNamed(name: string): Collection<unknown> {
   return found
 }
 
+// The repository the project sits in, which `dir`, an entry's `path` and a file's `repoPath` are relative to; the project root outside one. The server's own path, never for the editor's browser.
 export function repositoryRoot(): string {
   const { root } = contentPlace()
 
@@ -240,43 +252,56 @@ export function repositoryRoot(): string {
   }
 }
 
-export function repoPath(repoRoot: string, file: string): string {
+function repoPath(repoRoot: string, file: string): string {
   return relative(repoRoot, file).split(sep).join('/')
 }
 
-export function folderOf(dir: string): string {
+function folderOf(dir: string): string {
   return resolve(contentPlace().base, dir)
 }
 
 async function folderFiles(dir: string): Promise<string[]> {
-  return existsSync(dir) ? (await Array.fromAsync(ENTRY_FILES.scan({ cwd: dir, onlyFiles: true }))).map(file => file.split(sep).join('/')).sort() : []
+  return existsSync(dir) ? entryFiles(dir) : []
 }
 
 async function folderEntries(dir: string): Promise<Omit<SourceEntry, 'draft'>[]> {
   const repoRoot = repositoryRoot()
 
-  return Promise.all((await folderFiles(dir)).map(async (file) => {
-    const absolute = join(dir, file)
-    const source = await Bun.file(absolute).text()
-    const slug = file.replace(EXTENSION, '').replace(INDEX, '') || 'index'
-    const path = repoPath(repoRoot, absolute)
+  return Promise.all((await folderFiles(dir)).map(async file => ({ slug: slugOf(file), path: repoPath(repoRoot, join(dir, file)), ...await readEntry(dir, file) })))
+}
 
-    if (JSON_FILE.test(file))
-      return { slug, path, data: JSON.parse(source) as unknown }
+// A folder entry's data and body as the collection reads them, a file that does not parse named in the error.
+async function readEntry(dir: string, file: string): Promise<{ data: unknown, body?: string }> {
+  const absolute = join(dir, file)
 
-    if (!MARKDOWN.test(file))
-      return { slug, path, data: Bun.YAML.parse(source) }
+  try {
+    const { data, body } = parseEntry(file, await Bun.file(absolute).text())
 
-    const { frontmatter, body } = splitFrontmatter(source)
+    return { data, ...body !== undefined && { body } }
+  }
+  catch (error) {
+    if (!(error instanceof MarkdownError))
+      throw error
 
-    return { slug, path, data: frontmatter === undefined ? {} : Bun.YAML.parse(frontmatter), body }
-  }))
+    throw new Error(`kay: ${repoPath(contentPlace().root, absolute)}:${error.line} ${error.message}`)
+  }
 }
 
 async function loadedEntries(collection: Collection<unknown>): Promise<Omit<SourceEntry, 'draft'>[]> {
-  const loader = collection.loader!
+  return (await collection.loader!.load({ preview: true })).map(({ slug, data, body }) => ({ slug, data, ...body !== undefined && { body } }))
+}
 
-  return (await loader.load({ preview: true })).map(({ slug, data, body }) => ({ slug, data, ...body !== undefined && { body } }))
+// Whether a collection's entries hold a Markdown body: a folder's in Markdown files, a loader's as `body` rather than `html`; one with no entry yet may.
+async function holdsBody(collection: Collection<unknown>, dir: string | undefined): Promise<boolean> {
+  if (dir !== undefined) {
+    const files = await folderFiles(dir)
+
+    return files.length === 0 || files.some(file => MARKDOWN.test(file))
+  }
+
+  const loaded = await collection.loader!.load({ preview: true })
+
+  return loaded.length === 0 || loaded.some(entry => typeof entry.body === 'string')
 }
 
 // The entry's data as the schema decodes it, or as written when the schema refuses it.

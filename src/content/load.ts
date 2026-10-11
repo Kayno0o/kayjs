@@ -111,7 +111,7 @@ async function compileDirectory(dir: string, highlight?: Highlighter): Promise<R
   const cacheDir = projectCache(root, 'content')
   // Bun's Markdown output and the highlighter's source are part of every key; a highlighter whose output changes with no change to its source, such as a new theme passed in, needs the cache cleared.
   const salt = `${CACHE_VERSION}:${Bun.version}:${highlight?.toString() ?? ''}`
-  const files = (await Array.fromAsync(ENTRY_FILES.scan({ cwd: absolute, onlyFiles: true }))).sort()
+  const files = await entryFiles(absolute)
   const problems: ContentProblem[] = []
   const entries: RawEntry[] = []
 
@@ -130,7 +130,7 @@ async function compileDirectory(dir: string, highlight?: Highlighter): Promise<R
         return cached
 
       try {
-        const entry = await compileEntry(name.split(sep).join('/'), file, source, highlight)
+        const entry = await compileEntry(name, file, source, highlight)
 
         await writeAtomically(cacheFile, JSON.stringify(entry))
 
@@ -178,25 +178,54 @@ async function writeAtomically(file: string, text: string): Promise<void> {
   await rename(temporary, file)
 }
 
-async function compileEntry(name: string, file: string, source: string, highlight?: Highlighter): Promise<RawEntry> {
-  const slug = name.replace(EXTENSION, '').replace(INDEX, '') || 'index'
+// A folder's entry files, by their path in it written with `/`, sorted.
+export async function entryFiles(dir: string): Promise<string[]> {
+  return (await Array.fromAsync(ENTRY_FILES.scan({ cwd: dir, onlyFiles: true }))).map(name => name.split(sep).join('/')).sort()
+}
 
+// The slug of the entry a folder's file holds: its path without the extension, `blog/index.md` giving `blog`.
+export function slugOf(name: string): string {
+  return name.replace(EXTENSION, '').replace(INDEX, '') || 'index'
+}
+
+// An entry file's data and, for Markdown, its body and the line it starts on; a file that does not parse throws a MarkdownError at its line.
+export function parseEntry(name: string, source: string): { data: unknown, body?: string, bodyLine?: number, frontmatter?: string } {
   if (name.endsWith('.json'))
-    return { slug, file, data: JSON.parse(source), lines: fieldLines(source, true) }
+    return { data: parseJson(source) }
 
   if (!name.endsWith('.md'))
-    return { slug, file, data: parseYaml(source, 1), lines: fieldLines(source) }
+    return { data: parseYaml(source, 1) }
 
   const { frontmatter, body, bodyLine } = splitFrontmatter(source)
-  const compiled = await compileMarkdown(body, bodyLine, highlight)
+
+  return { data: frontmatter === undefined ? {} : parseYaml(frontmatter, 2), body, bodyLine, ...frontmatter !== undefined && { frontmatter } }
+}
+
+async function compileEntry(name: string, file: string, source: string, highlight?: Highlighter): Promise<RawEntry> {
+  const slug = slugOf(name)
+  const { data, body, bodyLine, frontmatter } = parseEntry(name, source)
+
+  if (body === undefined)
+    return { slug, file, data, lines: fieldLines(source, name.endsWith('.json')) }
+
+  const compiled = await compileMarkdown(body, bodyLine!, highlight)
 
   return {
     slug,
     file,
-    data: frontmatter === undefined ? {} : parseYaml(frontmatter, 2),
+    data,
     lines: frontmatter === undefined ? {} : fieldLines(frontmatter, false, 1),
     segments: compiled.segments,
     headings: compiled.headings,
+  }
+}
+
+function parseJson(text: string): unknown {
+  try {
+    return JSON.parse(text)
+  }
+  catch (error) {
+    throw new MarkdownError(`the JSON does not parse: ${error instanceof Error ? error.message : String(error)}`, 1)
   }
 }
 

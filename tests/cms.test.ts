@@ -6,11 +6,16 @@ import { afterEach, describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { t } from 'elysia'
 import { outputDir } from '../src/build/assets'
 import { collection, collections, entries, entrySource, removeEntry, saveEntry } from '../src/content'
+import { registerEditSite } from '../src/content/edit'
+import { parseEntry } from '../src/content/load'
+import { MarkdownError } from '../src/content/markdown'
 import { ContentError } from '../src/content/validate'
 import { resolveProject } from '../src/project'
 import { cached } from '../src/runtime/cache'
+import { showDraft } from '../src/runtime/edit'
 import { editableEntry, editMarks, placeFieldMarks, withFieldMarks } from '../src/runtime/fields'
 import { child, loop } from '../src/runtime/html'
+import { navigation } from '../src/runtime/navigation'
 import { editing, previewing } from '../src/runtime/preview'
 import { editRequested, enterPreview, pages, previewUrl } from '../src/server'
 import { readClient, readManifest, writeManifest } from '../src/server/client'
@@ -149,12 +154,12 @@ describe('a CMS behind a collection', () => {
 describe('the collections a CMS edits', () => {
   it('describes each exported collection: its JSON Schema with the kinds kay knows, its folder in the repository and its draft field', async () => {
     const found = await collections()
-    const repoRoot = process.cwd()
     const articles = found.find(each => each.name === 'articles')!
 
     expect(found.map(each => each.name)).toEqual(['articles', 'news'])
-    expect(found[1]).toEqual({ name: 'news', kind: 'loaded', schema: expect.objectContaining({ type: 'object', required: ['title', 'published', 'tags'] }), body: { kind: 'markdown' }, localized: false, repoRoot })
-    expect(articles).toMatchObject({ kind: 'folder', body: { kind: 'markdown' }, localized: true, dir: 'tests/fixtures/cms/src/content/articles', draftField: 'hidden', repoRoot })
+    expect(found[1]).toEqual({ name: 'news', kind: 'loaded', schema: expect.objectContaining({ type: 'object', required: ['title', 'published', 'tags'] }), body: { kind: 'markdown' }, components: [], localized: false })
+    expect(articles).toMatchObject({ kind: 'folder', body: { kind: 'markdown' }, components: [], localized: true, dir: 'tests/fixtures/cms/src/content/articles', draftField: 'hidden' })
+    expect(articles).not.toHaveProperty('repoRoot')
     expect(articles.schema.properties).toMatchObject({ author: { 'type': 'string', 'x-kay': { kind: 'reference', collection: 'news' } }, cover: { 'type': 'string', 'x-kay': { kind: 'image' } } })
     expect(JSON.stringify(articles.schema)).not.toContain('"Date"')
   })
@@ -169,6 +174,26 @@ describe('the collections a CMS edits', () => {
     expect((await entries('articles')).map(entry => [entry.locale, entry.draft])).toEqual([['en', true], ['fr', false]])
     expect(await articles.all('en')).toEqual([])
     expect(await rejection(entries('posts'))).toMatchObject({ message: 'kay: no collection is exported from the content config as posts; it exports articles, news' })
+    expect(await rejection(entries('news', { locale: 'fr' }))).toMatchObject({ message: 'kay: entries() was asked for the fr entries of news, which is not localized' })
+    expect(() => parseEntry('broken.json', '{')).toThrow(MarkdownError)
+  })
+
+  it('takes as draft field a boolean one alone', () => {
+    // @ts-expect-error title holds a string
+    expect(collection('content/none', { schema: t.Object({ title: t.String(), hidden: t.Optional(t.Boolean()) }), draft: 'title' }).name).toBe('content/none')
+    expect(collection('content/none', { schema: t.Object({ title: t.String(), hidden: t.Optional(t.Boolean()) }), draft: 'hidden' }).name).toBe('content/none')
+  })
+
+  it('names the locales the site serves, and refuses an entry written in another', async () => {
+    const before = registerEditSite({ urls: async () => undefined, locales: ['en', 'fr'] })
+
+    try {
+      expect((await collections())[0]).toMatchObject({ name: 'articles', locales: ['en', 'fr'] })
+      expect(await entrySource('articles', 'hello', { title: 'Hallo' }, { locale: 'de' })).toEqual({ issues: [{ collection: 'articles', slug: 'hello', locale: 'de', path: '', key: 'locale', message: 'names a locale the site does not serve: it serves en, fr' }] })
+    }
+    finally {
+      registerEditSite(before)
+    }
   })
 
   it('finds an entry\'s page from the route prerendering its collection, in its locale, under the base, on its domain', async () => {
@@ -188,8 +213,8 @@ describe('the collections a CMS edits', () => {
     expect(await entrySource('articles', 'hello', { title: 'Salut', published: '2026-01-01T00:00:00.000Z' }, { locale: 'fr' })).toEqual({ file: { path: hello, absolute: join(process.cwd(), hello), repoPath: hello, text: '---\ntitle: Salut\npublished: 2026-01-01T00:00:00.000Z\n---\n\nSalut.\n' } })
     expect(await entrySource('articles', 'new-one', { title: 'New' }, { locale: 'en', body: '# Hi' })).toMatchObject({ file: { path: 'tests/fixtures/cms/src/content/articles/en/new-one.md', text: '---\ntitle: New\n---\n\n# Hi\n' } })
     expect(await entrySource('articles', '../escape', { title: 3 })).toEqual({ issues: [
-      { collection: 'articles', slug: '../escape', path: '', message: 'has a slug naming no file of the collection: its parts are neither empty, . nor ..' },
-      { collection: 'articles', slug: '../escape', path: '', message: 'names no locale, which each entry of a localized collection has' },
+      { collection: 'articles', slug: '../escape', path: '', key: 'slug', message: 'has a slug naming no file of the collection: its parts are neither empty, . nor ..' },
+      { collection: 'articles', slug: '../escape', path: '', key: 'locale', message: 'names no locale, which each entry of a localized collection has' },
       { collection: 'articles', slug: '../escape', path: 'title', message: expect.any(String) },
     ] })
     expect(await rejection(entrySource('news', 'launch', {}))).toMatchObject({ message: expect.stringContaining('saveEntry()') })
@@ -398,6 +423,7 @@ describe('preview mode', () => {
     const post = async (entries: unknown[], path = '/marks/launch') => app.handle(new Request('http://localhost/_kay/draft', { method: 'POST', headers: { 'cookie': edit, 'content-type': 'application/json' }, body: JSON.stringify({ path, entries }) }))
     const refused = await post([
       { collection: 'news', slug: 'launch', data: { title: 'T', published: true, tags: [] }, body: 'Hi\n\n<Nope />' },
+      { collection: 'news', slug: 'roadmap', data: { title: 'T', published: true, tags: [] }, body: '<Callout>\nx' },
       { collection: 'news', slug: 'launch', locale: 'fr', data: { title: 'T', published: true, tags: [] } },
       { collection: 'articles', slug: 'hello', data: { title: 'T' } },
     ])
@@ -405,8 +431,9 @@ describe('preview mode', () => {
     expect(refused.status).toBe(422)
     expect(await refused.json()).toEqual({ issues: [
       { collection: 'news', slug: 'launch', path: '', body: true, message: 'uses <Nope> on line 3, which the collection\'s components do not name' },
-      { collection: 'news', slug: 'launch', locale: 'fr', path: '', message: 'names a locale, which the collection is not localized by' },
-      { collection: 'articles', slug: 'hello', path: '', message: 'names no locale, which each entry of a localized collection has' },
+      { collection: 'news', slug: 'roadmap', path: '', body: true, message: '<Callout> is never closed: end it with </Callout>, or write <Callout /> on line 1' },
+      { collection: 'news', slug: 'launch', locale: 'fr', path: '', key: 'locale', message: 'names a locale, which the collection is not localized by' },
+      { collection: 'articles', slug: 'hello', path: '', key: 'locale', message: 'names no locale, which each entry of a localized collection has' },
     ] })
 
     const created = await post([{ collection: 'articles', slug: 'nouveau', locale: 'fr', data: { title: 'Nouveau' }, body: 'Tout neuf.' }], '/articles/nouveau')
@@ -512,5 +539,41 @@ describe('preview mode', () => {
     finally {
       await pages({ ...options, prebuilt: false })
     }
+  })
+})
+
+describe('showDraft', () => {
+  const globals = globalThis as unknown as Record<string, unknown>
+
+  // Answers the draft with `status`, a navigation starting while it is in flight when `overtaken`.
+  async function drafted(status: number, overtaken: boolean): Promise<unknown> {
+    const fetched = spyOn(globalThis, 'fetch').mockImplementation((async () => {
+      if (overtaken)
+        navigation.current++
+
+      return new Response(status === 422 ? JSON.stringify({ issues: [{ collection: 'news', slug: 'launch', path: 'title', message: 'Expected string' }] }) : 'Broken', { status })
+    }) as unknown as typeof fetch)
+
+    globals.document = { activeElement: null, querySelector: () => null }
+    globals.location = new URL('http://localhost/marks/launch')
+
+    try {
+      return await showDraft([{ collection: 'news', slug: 'launch', data: { title: 3 } }])
+    }
+    catch (error) {
+      return error
+    }
+    finally {
+      fetched.mockRestore()
+      delete globals.document
+      delete globals.location
+    }
+  }
+
+  it('resolves where the draft fails, or throws when refused, unless a navigation overtook it', async () => {
+    expect(await drafted(422, false)).toEqual({ issues: [{ collection: 'news', slug: 'launch', path: 'title', message: 'Expected string' }] })
+    expect(await drafted(500, false)).toMatchObject({ message: 'kay: showDraft was answered 500: Broken' })
+    expect(await drafted(422, true)).toEqual({})
+    expect(await drafted(500, true)).toEqual({})
   })
 })
