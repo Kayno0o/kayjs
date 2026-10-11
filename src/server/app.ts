@@ -10,10 +10,11 @@ import { tmpdir } from 'node:os'
 import { join, normalize, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { Elysia } from 'elysia'
-import { ASSET_PREFIX, testWorker } from '../build/assets'
+import { ASSET_PREFIX, testWorker, underKayDev } from '../build/assets'
 import { mapBundleToKay } from '../build/sourcemap'
 import { extensionServers, pageHooks } from '../config'
 import { projectCollections, serveFeeds } from '../content/server'
+import { cacheDir, projectPaths } from '../project'
 import { localePath, splitLocale, untranslatedPath } from '../runtime/i18n'
 import { IMAGE_ROUTE } from '../runtime/image'
 import { localeState, runInLocale } from '../runtime/locale-state'
@@ -37,7 +38,7 @@ import { loadGuard, loadGuards } from './guards'
 import { cookieLocale, hostLocale, implicitI18n, loadI18n, localeCookie, localePattern, localePrefixes, preferredLocale, prerenderKey, refuseLocaleClashes, routedSettings, serveLocales, stateFor } from './i18n'
 import { applyImageConfig, avifQuality, serveImages } from './image'
 import { HEALTH_PATH, serveHealth, stopOnSignal } from './lifecycle'
-import { registerLoader, underKayDev } from './loader'
+import { registerLoader } from './loader'
 import { announceStart, answeringRequest, logRequests, pathOf, useLogger } from './log'
 import { serveServiceWorker } from './offline'
 import { openApiDocument, openApiSettings, refuseOpenApiClashes, serveOpenApi } from './openapi'
@@ -186,7 +187,8 @@ function remembered(response: Response, request: Request, locale: string): Respo
 
 // The Elysia app behind `pages()`, serving whatever browser build `loadClient` provides.
 export async function servePages(root: string, options: PagesOptions, loadClient: () => Promise<ClientBuild>) {
-  const routesDir = resolve(root, options.routes ?? 'src/routes')
+  const paths = projectPaths(root, options)
+  const routesDir = paths.routes
   const mounts = routeMounts(root, options.extensions)
 
   // An executable carries its routes and modules compiled; anything else finds them on disk and compiles them as they load.
@@ -365,7 +367,7 @@ export async function servePages(root: string, options: PagesOptions, loadClient
 
   const matchers = await loadMatchers(routesDir, routes)
   const actionOptions = { dev: options.dev, onError: options.onError, i18n: locales, base }
-  const [actionLimits, publicUrls, apiModules] = await Promise.all([registerActionRoutes(app, routes, routeMatch(routes, i18n?.settings, matchers), actionOptions), servePublic(app, resolve(root, options.publicDir ?? 'public'), routes), bundle?.api ?? projectApi(root, options)])
+  const [actionLimits, publicUrls, apiModules] = await Promise.all([registerActionRoutes(app, routes, routeMatch(routes, i18n?.settings, matchers), actionOptions), servePublic(app, paths.public, routes), bundle?.api ?? projectApi(root, options)])
 
   const api = await serveApi(app, apiModules, actionOptions)
   const endpoints = bundle?.endpoints ?? await scanEndpoints(routesDir, mounts)
@@ -399,7 +401,7 @@ export async function servePages(root: string, options: PagesOptions, loadClient
 
   // An executable runs from wherever it was copied, away from the project it was built in.
   const lookup = options.images?.resolve
-  const imageCache = bundle ? join(tmpdir(), 'kay-images') : join(root, '.kay', 'cache', `images${testWorker()}`)
+  const imageCache = bundle ? join(tmpdir(), 'kay-images') : cacheDir(root, `images${testWorker()}`)
   const imageRoute = {
     clientDir: client.dir,
     cacheDir: imageCache,
@@ -448,7 +450,7 @@ export async function servePages(root: string, options: PagesOptions, loadClient
 
   // What the extensions' page hooks did to the prerendered pages, done again to each the server renders afresh.
   const transforms = pageHooks(options.extensions)
-  const pageFile = assetFiles({ clientDir: client.dir, publicDir: resolve(root, options.publicDir ?? 'public'), base, aspects: options.images?.aspects })
+  const pageFile = assetFiles({ clientDir: client.dir, publicDir: paths.public, base, aspects: options.images?.aspects })
 
   for (const pages of prerendered.values())
     trackPrerendered(pages, page => moved || page.readsSite === true)

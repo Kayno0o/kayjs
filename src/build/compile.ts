@@ -4,13 +4,12 @@ import type { Route, SpecialPages } from '../server/routes'
 import { existsSync } from 'node:fs'
 import { basename, dirname, join, resolve } from 'node:path'
 import { CONFIG_FILE } from '../config'
-import { CONTENT_CONFIG } from '../content/server'
+import { projectPaths } from '../project'
 import { projectApi } from '../server/api'
 import { AVIF_WORKER_SOURCE } from '../server/avif'
 import { DEFAULT_LANG, extensionMessageFiles, messagesFile } from '../server/i18n'
 import { matcherFile } from '../server/params'
 import { refuseClashes, routeMounts, routeTrees, scanEndpoints, scanRoutes, specialPagesOf } from '../server/routes'
-import { outputDir } from './assets'
 import { kay } from './plugin'
 import { runtimeConfig, withoutPlugins } from './runtime-config'
 import { withoutStyles } from './styles'
@@ -43,10 +42,8 @@ function withoutCompiler(): BunPlugin {
 // Bundles the server, its pages and the client build `kay build` wrote into one executable, which runs as `NODE_ENV=production bun <entry>` would.
 // The entry it generates registers every route module before the server entry calls `pages()`, which then reads nothing from disk but the embedded files.
 export async function compileServer(root: string, config: KayConfig, options: CompileOptions): Promise<string> {
-  const routesDir = resolve(root, config.routes ?? 'src/routes')
-  const publicDir = resolve(root, config.publicDir ?? 'public')
-  const clientBase = outputDir(root)
-  const entry = resolve(root, options.entry ?? 'src/server.ts')
+  const paths = projectPaths(root, { ...config, entry: options.entry })
+  const { routes: routesDir, public: publicDir, output: clientBase, entry } = paths
   const outfile = resolve(root, options.outfile)
 
   if (!existsSync(entry))
@@ -61,7 +58,7 @@ export async function compileServer(root: string, config: KayConfig, options: Co
   refuseClashes(routesDir, routes)
 
   const fallback = specialPagesOf(routeTrees(routesDir, mounts), '')
-  const contentConfig = resolve(root, config.content ?? CONTENT_CONFIG)
+  const contentConfig = paths.content
   // The content config too, which the server reads the collections and their feeds from, the project's own param matchers and every locale's messages, its extensions' included.
   const matcherFiles = [...new Set(routes.flatMap(route => Object.values(route.matchers ?? {})))].map(name => matcherFile(routesDir, name)).filter(file => existsSync(file))
   const locales = config.i18n?.locales ?? [config.lang ?? DEFAULT_LANG]
@@ -72,7 +69,7 @@ export async function compileServer(root: string, config: KayConfig, options: Co
   const endpoints = await scanEndpoints(routesDir, mounts)
   const modules = [...new Set([...routeModules(routes, fallback), ...existsSync(contentConfig) ? [contentConfig] : [], ...matcherFiles, ...messageFiles, ...[...api, ...endpoints].flatMap(module => [module.file, ...module.guards.map(guard => guard.file)])])]
   const configFile = join(root, CONFIG_FILE)
-  const generated = join(root, '.kay', 'compile', 'entry.ts')
+  const generated = join(paths.compile, 'entry.ts')
   const embedded = (dir: string) => `join(import.meta.dir, ${JSON.stringify(basename(dir))})`
 
   await Bun.write(generated, [
@@ -127,7 +124,7 @@ export async function compileServer(root: string, config: KayConfig, options: Co
     // The production code of the app and its packages, as `NODE_ENV=production` gives a server started with Bun.
     define: { 'process.env.NODE_ENV': JSON.stringify('production') },
     // Stylesheets reach pages through the client build, already embedded.
-    plugins: [...configPlugins, withoutStyles(), withoutCompiler(), kay({ target: 'ssr', root, cacheDir: join(root, '.kay', 'cache'), settings: config.settings }), ...config.plugins ?? []],
+    plugins: [...configPlugins, withoutStyles(), withoutCompiler(), kay({ target: 'ssr', root, cacheDir: paths.cache, settings: config.settings }), ...config.plugins ?? []],
   })
 
   if (!build.success)

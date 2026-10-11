@@ -6,6 +6,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import { importedSignals } from '../build/signals'
 import { compileKay } from '../compiler'
+import { projectPaths } from '../project'
 import * as builtInMatchers from '../runtime/params'
 import { matcherFile } from '../server/params'
 import { routeOf } from '../server/routes'
@@ -52,7 +53,7 @@ export function readShadowSettings(root: string): ShadowSettings {
     return { routesDir: resolve(root, saved.routes), islandOnly: new Set(saved.islandOnly.map(file => resolve(root, file))) }
   }
   catch {
-    return { routesDir: resolve(root, 'src/routes'), islandOnly: new Set() }
+    return { routesDir: projectPaths(root).routes, islandOnly: new Set() }
   }
 }
 

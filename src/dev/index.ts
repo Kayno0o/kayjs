@@ -7,6 +7,7 @@ import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { IGNORED_DIRS } from '../build/files'
 import { writeShadowTypes } from '../check'
+import { projectPaths } from '../project'
 import { inspectorProxy } from './inspector'
 
 export interface DevOptions {
@@ -63,7 +64,7 @@ const WS_SCHEME = /^ws:\/\//
 // Resolves once watching, with a function stopping the watchers and the server.
 export async function dev(projectRoot: string, options: DevOptions = {}): Promise<() => Promise<void>> {
   const root = resolve(projectRoot)
-  const entry = resolve(root, options.entry ?? 'src/server.ts')
+  const entry = projectPaths(root, options).entry
   let child: Subprocess<'pipe'> | undefined
   let spare: Subprocess<'pipe'> | undefined
   let spareEntry: string | undefined

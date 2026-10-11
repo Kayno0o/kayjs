@@ -1,7 +1,7 @@
-import { join } from 'node:path'
-import process from 'node:process'
 import { plugin } from 'bun'
+import { underKayDev } from '../build/assets'
 import { loadConfig } from '../config'
+import { projectPaths } from '../project'
 
 // `early` when `kay dev` registered it ahead of the entry, guessing the project from the working directory and its `kay.config.ts`.
 let registered: { root: string, settings: string, early: boolean } | undefined
@@ -52,10 +52,5 @@ export async function registerEarlyLoader(root: string): Promise<void> {
 async function register(root: string, settings: Record<string, string>): Promise<void> {
   const { kay } = await import('../build/plugin')
 
-  await plugin(kay({ target: 'ssr', root, cacheDir: join(root, '.kay', 'cache'), settings, inspect: underKayDev() }))
-}
-
-// A server `kay dev` started, which it tells how many changes came before it.
-export function underKayDev(): boolean {
-  return process.env.KAY_DEV_CODE !== undefined
+  await plugin(kay({ target: 'ssr', root, cacheDir: projectPaths(root).cache, settings, inspect: underKayDev() }))
 }

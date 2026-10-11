@@ -1,10 +1,11 @@
 import type { CheckDiagnostic, CheckOptions } from '.'
 import type { LocaleSettings } from '../runtime/i18n'
-import { join, resolve } from 'node:path'
+import { join } from 'node:path'
 import { islandId } from '../compiler'
 import { parseKay } from '../compiler/parser'
 import { analyzeServer } from '../compiler/script'
 import { CONFIG_FILE } from '../config'
+import { projectPaths } from '../project'
 import { actionUrl } from '../runtime/action'
 import { actionClash } from '../server/actions'
 import { basePath } from '../server/base'
@@ -20,8 +21,7 @@ import { siteOrigin } from '../server/seo'
 export async function bootProblems(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
   const diagnostics: CheckDiagnostic[] = []
   const config = join(root, CONFIG_FILE)
-  const routesDir = resolve(root, options.routes ?? 'src/routes')
-  const publicDir = resolve(root, options.publicDir ?? 'public')
+  const { routes: routesDir, public: publicDir } = projectPaths(root, options)
   const [routes, files] = await Promise.all([scanRoutes(routesDir, routeMounts(root, options.extensions)), publicFiles(publicDir)])
 
   const refused = (file: string, run: () => void) => {

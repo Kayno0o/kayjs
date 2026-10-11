@@ -33,6 +33,7 @@ import { formatFiles } from './format'
 import { startServer } from './lsp/server'
 import { migrateAstroProject } from './migrate/project'
 import { createProject, FEATURE_NAMES, pickFeatures, PRESET_NAMES, PRESETS, refuseTarget } from './new'
+import { cacheDir, clientOptionsOf, projectPaths } from './project'
 import { linkVariantFiles } from './runtime/image'
 import { setAvifThreads } from './server/avif'
 import { basePath } from './server/base'
@@ -387,7 +388,7 @@ async function bundleClient(root: string, config: KayConfig, exported: boolean, 
   if (exported)
     refuseStaticConfig(config)
 
-  const client = await buildClient(root, { minify: config.minify ?? true, plugins: config.plugins, routes: config.routes, extensions: config.extensions, api: config.api, navigation: config.navigation, base: basePath(config.base), settings: config.settings, publicEnv: config.publicEnv !== undefined, exported, report: analyze ? 'modules' : 'sizes' })
+  const client = await buildClient(root, clientOptionsOf(config, { dev: false, underKayDev: false }, { exported, report: analyze ? 'modules' : 'sizes' }))
 
   // A static host cannot pick a format by `Accept`, so an export links WebP alone.
   const avif = exported ? undefined : avifQuality(config.images)
@@ -395,7 +396,7 @@ async function bundleClient(root: string, config: KayConfig, exported: boolean, 
   // Each AVIF holds a thread for up to a second, while WebP encodes on Bun's own.
   setAvifThreads(Math.min(4, availableParallelism()))
   // The prerender may import more images, so the cache is pruned once it has.
-  await writeImageVariants(client.dir, config.images?.quality, join(root, '.kay', 'cache', 'variants'), { prune: false, avif })
+  await writeImageVariants(client.dir, config.images?.quality, cacheDir(root, 'variants'), { prune: false, avif })
 
   return client
 }
@@ -417,18 +418,18 @@ async function finishOutput(root: string, config: KayConfig, exported: boolean, 
   const { failing } = checking ? await printProblems(pageSeoLints(config, rendered, exported)) : { failing: 0 }
 
   // Remote originals are kept between builds, revalidated as the image route does.
-  const remote = remoteImages(join(root, '.kay', 'cache', 'remote'), remotePatterns(config.images?.remote))
+  const remote = remoteImages(cacheDir(root, 'remote'), remotePatterns(config.images?.remote))
 
-  await writeImageVariants(client.dir, config.images?.quality, join(root, '.kay', 'cache', 'variants'), { avif: exported ? undefined : avifQuality(config.images) })
+  await writeImageVariants(client.dir, config.images?.quality, cacheDir(root, 'variants'), { avif: exported ? undefined : avifQuality(config.images) })
   await writeRemoteVariants(client.dir, remote, config.images?.quality)
-  await writeCards(client.dir, join(root, '.kay', 'cache', 'cards'), remote)
+  await writeCards(client.dir, cacheDir(root, 'cards'), remote)
 
   const favicon = faviconSource(root, config.favicon, config.manifest)
 
   if (favicon !== undefined)
     await writeFavicons(favicon, join(client.dir, '..', FAVICON_DIR))
 
-  await hookPrerendered(root, pageHooks(config.extensions), { clientDir: client.dir, publicDir: resolve(root, config.publicDir ?? 'public'), base: basePath(config.base), aspects: config.images?.aspects })
+  await hookPrerendered(root, pageHooks(config.extensions), { clientDir: client.dir, publicDir: projectPaths(root, config).public, base: basePath(config.base), aspects: config.images?.aspects })
   await Promise.all([compressFiles(client.dir), compressFiles(join(outputDir(root), PRERENDERED_DIR))])
 
   return { prerendered, entries, failing }

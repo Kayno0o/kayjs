@@ -11,6 +11,7 @@ import { builtinModules } from 'node:module'
 import { join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { formatDiagnostic } from '../compiler'
+import { projectPaths } from '../project'
 import { apiStubs, apiTrees } from '../server/api'
 import { rebaseCss } from '../server/base'
 import { fromManifest, MANIFEST, PRERENDERED_DIR, writeManifest } from '../server/client'
@@ -95,7 +96,7 @@ export async function buildClient(root: string, options: ClientOptions = {}): Pr
   const files = [...own, ...mounted, ...fromLibraries.components]
   const sources = await Promise.all(files.map(async file => Bun.file(file).text()))
 
-  const cacheDir = join(root, '.kay', 'cache')
+  const cacheDir = projectPaths(root).cache
   const analyses = await Promise.all(files.map(async (file, index) => analyzeKayCached(sources[index]!, file, root, cacheDir, options.hot, options.lints)))
   const problems: string[] = []
 
@@ -131,7 +132,7 @@ export async function buildClient(root: string, options: ClientOptions = {}): Pr
 
   const base = outputDir(root)
   const dir = clientDir(root)
-  const routesDir = resolve(root, options.routes ?? 'src/routes')
+  const routesDir = projectPaths(root, options).routes
 
   // A failed build must not leave the previous manifest pointing at files that are gone.
   await Promise.all([rm(dir, { recursive: true, force: true }), rm(join(base, PRERENDERED_DIR), { recursive: true, force: true }), rm(join(base, MANIFEST), { force: true })])
@@ -197,7 +198,7 @@ async function buildIslands(root: string, base: string, islands: Map<string, str
   // Bun resolves packages' `development` export condition unless NODE_ENV is defined as production, which would ship a package's dev build.
   const define: Record<string, string> = { 'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV === 'development' ? 'development' : 'production'), ...options.exported === true && { KAY_STATIC_EXPORT: 'true' } }
   const external = publicEnv !== undefined ? [publicEnv] : []
-  const plugins = async (anchor?: string) => [withoutStyles(), api, kay({ target: 'dom', root, cacheDir: join(root, '.kay', 'cache'), settings: options.settings, anchor, inspect: options.inspect }), ...options.plugins ?? []]
+  const plugins = async (anchor?: string) => [withoutStyles(), api, kay({ target: 'dom', root, cacheDir: projectPaths(root).cache, settings: options.settings, anchor, inspect: options.inspect }), ...options.plugins ?? []]
 
   await Bun.write(entryFile, `import ${JSON.stringify(bootFile)}\n`)
 
@@ -230,7 +231,7 @@ async function buildIslands(root: string, base: string, islands: Map<string, str
     throw new AggregateError(build.logs, 'kay: client build failed')
   }
 
-  await refuseServerOnlyReads(root, clientDir(root), build.metafile!.outputs, join(root, '.kay', 'cache'))
+  await refuseServerOnlyReads(root, clientDir(root), build.metafile!.outputs, projectPaths(root).cache)
 
   const manifest = islandManifest(root, build.metafile!.outputs, islands, entryFile, options.hot === true)
 

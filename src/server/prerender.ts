@@ -3,11 +3,12 @@ import type { KayConfig } from '../config'
 import type { ClientBuild, PrerenderedPage } from './client'
 import type { Route } from './routes'
 import { mkdir } from 'node:fs/promises'
-import { dirname, join, relative, resolve } from 'node:path'
+import { dirname, join, relative } from 'node:path'
 import { outputDir } from '../build/assets'
 import { elementsIn, serverIslandOf } from '../compiler/ast'
 import { parseKay } from '../compiler/parser'
 import { analyzeServer } from '../compiler/script'
+import { projectPaths } from '../project'
 import { isAction } from '../runtime/action'
 import { durationSeconds } from '../runtime/duration'
 import { IMAGE_ROUTE } from '../runtime/image'
@@ -73,7 +74,7 @@ export async function prerenderPages(root: string, config: KayConfig, client: Cl
   const pages: Record<string, PrerenderedPage> = {}
   const paths = new Map<string, string>()
 
-  const routesDir = resolve(root, config.routes ?? 'src/routes')
+  const routesDir = projectPaths(root, config).routes
   const routes = await scanRoutes(routesDir, routeMounts(root, config.extensions))
 
   refuseClashes(routesDir, routes)

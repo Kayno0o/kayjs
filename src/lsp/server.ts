@@ -19,6 +19,7 @@ import { offsetAt, positionAt } from '../compiler/mapping'
 import { parseKay } from '../compiler/parser'
 import { analyzeScript, analyzeServer } from '../compiler/script'
 import { loadConfig } from '../config'
+import { projectPaths } from '../project'
 import { Connection } from './rpc'
 
 // Where a file tsgo names is for the editor: its .kay source for a shadow file, the file itself outside the shadow tree.
@@ -278,7 +279,7 @@ export class KayLanguageServer {
     const config = await projectConfig(project.root)
 
     project.options = { routes: (project.root === this.root ? this.routesSetting : undefined) ?? config.routes, extensions: config.extensions, publicDir: config.publicDir, i18n: config.i18n, lang: config.lang, api: config.api, settings: config.settings, lints: config.lints }
-    project.routesDir = resolve(project.root, project.options.routes ?? 'src/routes')
+    project.routesDir = projectPaths(project.root, project.options).routes
     project.configured = true
   }
 
@@ -287,7 +288,7 @@ export class KayLanguageServer {
     let project = this.projects.get(root)
 
     if (!project)
-      this.projects.set(root, project = { root, options: {}, routesDir: resolve(root, 'src/routes'), shadowTree: `${resolve(root, SHADOW_DIR)}/`, shadowFiles: new Set(), islandOnly: new Set(), configured: false })
+      this.projects.set(root, project = { root, options: {}, routesDir: projectPaths(root).routes, shadowTree: `${resolve(root, SHADOW_DIR)}/`, shadowFiles: new Set(), islandOnly: new Set(), configured: false })
 
     return project
   }

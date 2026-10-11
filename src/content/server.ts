@@ -5,7 +5,8 @@ import type { Collection } from './index'
 import type { Segment } from './markdown'
 import type { ContentProblem } from './validate'
 import { existsSync } from 'node:fs'
-import { dirname, relative, resolve } from 'node:path'
+import { dirname, relative } from 'node:path'
+import { projectPaths } from '../project'
 import { localePath } from '../runtime/i18n'
 import { runInLocale } from '../runtime/locale-state'
 import { bundled, importModule } from '../server/bundle'
@@ -17,7 +18,6 @@ import { loadEntries, manifestFile, setContentPlace } from './load'
 import { ContentError, decodeEntries } from './validate'
 
 // The module declaring a project's collections, which `kay build`, `kay check` and the server read them from.
-export const CONTENT_CONFIG = 'src/content.config.ts'
 const TRAILING_SLASH = /\/$/
 
 // Starts the line `kay check` reads the content problems from.
@@ -44,7 +44,7 @@ export async function projectCollections(root: string, config?: string): Promise
 
 // The collections by the name the content config exports each under.
 async function namedCollections(root: string, config?: string): Promise<[string, Collection<unknown>][]> {
-  const file = resolve(root, config ?? CONTENT_CONFIG)
+  const file = projectPaths(root, { content: config }).content
 
   setContentPlace(root, dirname(file))
 
@@ -92,7 +92,7 @@ export async function contentProblems(root: string, config?: string, site = true
 
   for (const [name, collection] of await namedCollections(root, config)) {
     if (collection.options.feed && !site)
-      problems.push({ file: relative(root, resolve(root, config ?? CONTENT_CONFIG)), line: 1, message: feedNeedsSite(collection).message })
+      problems.push({ file: relative(root, projectPaths(root, { content: config }).content), line: 1, message: feedNeedsSite(collection).message })
 
     if (collection.dir === undefined)
       continue

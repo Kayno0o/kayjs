@@ -29,7 +29,8 @@ import { isLaunchLint, isLint, isLintGroup, LEVELS, lintLevels, typeLint } from 
 import { offsetAt, positionAt } from '../compiler/mapping'
 import { cssImportsWithoutText, deprecatedSchemaNames } from '../compiler/script'
 import { CONFIG_FILE } from '../config'
-import { CONTENT_CONFIG, PROBLEMS_MARKER, USES_MARKER } from '../content/server'
+import { PROBLEMS_MARKER, USES_MARKER } from '../content/server'
+import { projectPaths } from '../project'
 import { projectApi } from '../server/api'
 import { FAVICON_PATHS } from '../server/favicon'
 import { DEFAULT_LANG, extensionMessageFiles, localePattern, localePrefixes, localeSettings, messagesFile } from '../server/i18n'
@@ -45,7 +46,6 @@ import { configSeoLints } from './seo'
 import { compileShadow, matcherSource, serializeShadowSettings, SHADOW_DIR, SHADOW_SETTINGS, shadowPath } from './shadow'
 
 const KAY_FILE = /\.kay$/
-const SERVER_ENTRY = 'src/server.ts'
 const SETTINGS_CHECK = 'kay-settings.ts'
 const EXPORTS_CHECK = 'kay-exports.ts'
 const CONTENT_CHECK = 'kay-content.ts'
@@ -132,7 +132,6 @@ const TSGO_PACKAGE = fileURLToPath(import.meta.resolve('@typescript/native-previ
 
 export const TSGO = join(dirname(TSGO_PACKAGE), 'bin', 'tsgo')
 // Where `kay check` keeps tsgo's build info and what its last clean run read.
-const CHECK_STATE = join('.kay', 'cache', 'check')
 // A filesystem stamps writes off a coarse clock, milliseconds behind on Linux and up to a second on some, so a file written that close before a run counts as written after it.
 const CLOCK_SLACK = 1000
 
@@ -141,7 +140,8 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
   const root = resolve(projectRoot)
   const files = new Map<string, ShadowFile>()
   const diagnostics: CheckDiagnostic[] = []
-  const routesDir = resolve(root, options.routes ?? 'src/routes')
+  const paths = projectPaths(root, options)
+  const routesDir = paths.routes
 
   const environmentPath = join(root, SHADOW_DIR, 'kay-env.d.ts')
   const assetsPath = join(root, SHADOW_DIR, 'kay-assets.d.ts')
@@ -152,7 +152,7 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
   const settingsFile = join(root, SHADOW_DIR, SHADOW_SETTINGS)
   const own = await findKayFiles(root, { project: true, ownOnly: true, ownKayOnly: true })
   const sources = new Map(await Promise.all(own.map(async file => [file, await Bun.file(file).text()] as const)))
-  const cacheDir = join(root, '.kay', 'cache')
+  const cacheDir = paths.cache
   const islands = new Set((await Promise.all(own.map(async file => await rendersAsIslandCached(cacheDir, file, sources.get(file)!) ? [file] : []))).flat())
   const islandOnly = await islandOnlyComponents(root, routesDir, own, sources, file => islands.has(file))
 
@@ -167,7 +167,7 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
       diagnostics.push(fromCompile(file, source, diagnostic))
   }
 
-  const [routes, found, apiModules, endpoints] = await Promise.all([scanRoutes(routesDir, routeMounts(root, options.extensions)), publicFiles(resolve(root, options.publicDir ?? 'public')), apiModulesOf(root, options, diagnostics), endpointsOf(routesDir, routeMounts(root, options.extensions))])
+  const [routes, found, apiModules, endpoints] = await Promise.all([scanRoutes(routesDir, routeMounts(root, options.extensions)), publicFiles(paths.public), apiModulesOf(root, options, diagnostics), endpointsOf(routesDir, routeMounts(root, options.extensions))])
   const publicPaths = [...found, ...htmlFallbacks(found, servedPaths(routes))]
 
   // A param a matcher kay ships checks is named after it, `:integer`, so a link filling it with a literal is checked as the matcher would; any other is `:`.
@@ -189,10 +189,10 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
   const apiMounts = apiModules.map(module => ({ mount: module.mount, module: relative(dirname(environmentPath), module.file).replace(TS_EXTENSION, '') }))
 
   const config = existsSync(join(root, CONFIG_FILE)) ? relative(dirname(environmentPath), join(root, CONFIG_FILE)).replace(TS_EXTENSION, '') : undefined
-  const entry = resolve(root, options.entry ?? SERVER_ENTRY)
+  const entry = paths.entry
   const app = await exportsApp(entry) ? relative(dirname(environmentPath), entry).replace(TS_EXTENSION, '') : undefined
   const servers = (options.extensions ?? []).some(extension => extension.server !== undefined)
-  const contentConfig = resolve(root, options.content ?? CONTENT_CONFIG)
+  const contentConfig = paths.content
   const content = existsSync(contentConfig) ? relative(dirname(environmentPath), contentConfig).replace(TS_EXTENSION, '') : undefined
 
   // `t()` reads the default locale's catalogs, or without `i18n` the site's one language's, when it has any.
@@ -408,7 +408,7 @@ async function apiModulesOf(root: string, options: CheckOptions, diagnostics: Ch
     return await projectApi(root, options)
   }
   catch (error) {
-    diagnostics.push({ file: resolve(root, options.api ?? 'src/api'), line: 1, column: 1, message: error instanceof Error ? error.message : String(error) })
+    diagnostics.push({ file: projectPaths(root, options).api, line: 1, column: 1, message: error instanceof Error ? error.message : String(error) })
 
     return []
   }
@@ -556,7 +556,7 @@ export async function check(root: string, options: CheckOptions = {}): Promise<C
   const contentFile = join(resolve(root), SHADOW_DIR, CONTENT_CHECK)
   // The props Markdown entries give their components are typed with the rest, so the collections are read first.
   const content = await checkContent(root, options.content, options.site !== undefined)
-  const props = contentPropsCheck(resolve(root), resolve(root, options.content ?? CONTENT_CONFIG), content.uses)
+  const props = contentPropsCheck(resolve(root), projectPaths(root, options).content, content.uses)
 
   await writeIfChanged(contentFile, props.code)
 
@@ -678,14 +678,14 @@ function problemsIn(root: string, output: string): CheckDiagnostic[] {
 
 // The collections' entries that fail to compile or to match their schema, read in a process of its own.
 async function checkContent(root: string, config: string | undefined, site: boolean): Promise<{ problems: CheckDiagnostic[], uses: ComponentUse[] }> {
-  if (config === undefined && !existsSync(resolve(root, CONTENT_CONFIG)))
+  if (config === undefined && !existsSync(projectPaths(root).content))
     return { problems: [], uses: [] }
 
   const child = Bun.spawn([process.execPath, CONTENT_PROBLEMS, resolve(root), config ?? '', site ? 'site' : ''], { cwd: root, stdout: 'pipe', stderr: 'pipe' })
   const [output, errors, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
 
   if (code !== 0)
-    return { problems: [{ file: resolve(root, config ?? CONTENT_CONFIG), line: 1, column: 1, message: errors.trim() || `reading the collections exited with code ${code}` }], uses: [] }
+    return { problems: [{ file: projectPaths(root, { content: config }).content, line: 1, column: 1, message: errors.trim() || `reading the collections exited with code ${code}` }], uses: [] }
 
   const uses = output.split('\n').find(text => text.startsWith(USES_MARKER))?.slice(USES_MARKER.length)
 
@@ -766,7 +766,7 @@ function unusedCodesOf(shown: string | undefined): Set<number> {
 
 // Runs tsgo incrementally, or not at all when its last run was clean and nothing it read has changed since: tsgo's own incremental mode still parses every file, most of a warm run's time.
 async function typecheck(root: string, tsconfig: string, shown: string | undefined): Promise<{ output: string, errors: string, code: number }> {
-  const state = join(resolve(root), CHECK_STATE)
+  const state = join(projectPaths(root).cache, 'check')
   const shadowDir = join(resolve(root), SHADOW_DIR)
   const buildInfo = join(state, 'tsbuildinfo')
   const args = ['--noEmit', '--pretty', 'false', '--noUnusedLocals', '-p', tsconfig, '--incremental', '--tsBuildInfoFile', buildInfo]

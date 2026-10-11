@@ -10,8 +10,9 @@ import type { MountedApi } from './openapi'
 import type { RouteMount } from './routes'
 import type { Span } from './trace'
 import { existsSync } from 'node:fs'
-import { basename, dirname, join, relative, resolve, sep } from 'node:path'
+import { basename, dirname, join, relative, sep } from 'node:path'
 import { Cookie, Elysia, ElysiaCustomStatusResponse, ElysiaFile } from 'elysia'
+import { projectPaths } from '../project'
 import { API_MOUNT, END_EVENT, ERROR_EVENT } from '../runtime/live'
 import { kayLog } from '../runtime/log'
 import { encodeValue, unsendable } from '../runtime/wire'
@@ -75,7 +76,7 @@ export async function projectApi(root: string, config: Pick<KayConfig, 'api' | '
 
 // The app's API directory at the root of the API tree, then each extension's under its prefix.
 export function apiTrees(root: string, config: Pick<KayConfig, 'api' | 'extensions'>): RouteMount[] {
-  return [{ dir: resolve(root, config.api ?? 'src/api'), prefix: '' }, ...apiMounts(root, config.extensions)]
+  return [{ dir: projectPaths(root, config).api, prefix: '' }, ...apiMounts(root, config.extensions)]
 }
 
 // Every module under `apiDir`, mounted at `/api` plus its path there, then each mounted library's under its prefix that no module before it is served at.

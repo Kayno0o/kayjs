@@ -1,7 +1,8 @@
 import type { KayConfig, SeoConfig, TrailingSlash } from '../config'
 import type { HeadOptions, HeadTag, ImageSize } from '../runtime/head'
 import type { LocaleCopy } from './i18n'
-import { join, resolve } from 'node:path'
+import { join } from 'node:path'
+import { projectPaths } from '../project'
 import { inlineText } from '../runtime/head'
 import { CARD, CARD_ROUTE, IMAGE_ROUTE, importedSize, RESIZABLE, VARIANTS } from '../runtime/image'
 import { localeState } from '../runtime/locale-state'
@@ -54,7 +55,7 @@ export async function configHead(root: string, config: KayConfig, clientDir: str
   }
 
   const social = config.site !== undefined || config.seo !== undefined
-  const sizeOf = social ? await cardImageSizes(resolve(root, config.publicDir ?? 'public')) : undefined
+  const sizeOf = social ? await cardImageSizes(projectPaths(root, config).public) : undefined
 
   return { head: seoHead(config.site, config.seo, extra, config.trailingSlash, basePath(config.base), sizeOf), scripts, styles }
 }

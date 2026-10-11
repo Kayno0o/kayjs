@@ -4,6 +4,7 @@ import { mkdir, rename } from 'node:fs/promises'
 import { join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { outputDir } from '../build/assets'
+import { cacheDir as projectCache } from '../project'
 import { bundled } from '../server/bundle'
 import { compileMarkdown, MarkdownError, splitFrontmatter } from './markdown'
 import { ContentError } from './validate'
@@ -83,7 +84,7 @@ async function builtEntries(dir: string): Promise<RawEntry[] | undefined> {
 async function compileDirectory(dir: string, highlight?: Highlighter): Promise<RawEntry[]> {
   const root = rootOf()
   const absolute = resolve(baseOf(), dir)
-  const cacheDir = join(root, '.kay', 'cache', 'content')
+  const cacheDir = projectCache(root, 'content')
   // Bun's Markdown output and the highlighter's source are part of every key; a highlighter whose output changes with no change to its source, such as a new theme passed in, needs the cache cleared.
   const salt = `${CACHE_VERSION}:${Bun.version}:${highlight?.toString() ?? ''}`
   const files = (await Array.fromAsync(ENTRY_FILES.scan({ cwd: absolute, onlyFiles: true }))).sort()
