@@ -2,6 +2,7 @@ import { existsSync, readFileSync, realpathSync } from 'node:fs'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import { parseKay } from '../compiler/parser'
 import { findKayFiles, scriptLoader, transpilerFor } from './files'
+import { globbedFiles } from './glob'
 
 // A package shipping `.kay` components, which the consuming project compiles as its own.
 export interface KayLibrary {
@@ -204,27 +205,14 @@ export async function reachableLibraryFiles(root: string, libraries: KayLibrary[
   if (libraries.length === 0)
     return { components: [], scripts: [] }
 
-  const project = root + sep
+  const project = realpathSync(root) + sep
   const seen = new Set(entries)
   const components: string[] = []
   const scripts: string[] = []
   const visit = async (file: string): Promise<void> => {
-    const imports = await importsOf(file)
-
-    await Promise.all(imports.map(async (specifier) => {
-      let path: string
-
-      try {
-        path = Bun.resolveSync(specifier, dirname(file))
-      }
-      catch {
-        return
-      }
-
-      const library = libraryOf(libraries, path)
-      const followed = KAY_FILE.test(path) ? library !== undefined : SCRIPT_FILE.test(path) && (library !== undefined || (path.startsWith(project) && !path.includes(`${sep}node_modules${sep}`)))
-
-      if (!followed || seen.has(path))
+    await Promise.all((await followedImports(root, project, libraries, file)).map(async ({ path, library }) => {
+      // The project's own components are entries already.
+      if ((KAY_FILE.test(path) && library === undefined) || seen.has(path))
         return
 
       seen.add(path)
@@ -243,6 +231,7 @@ export async function reachableLibraryFiles(root: string, libraries: KayLibrary[
 
 // Whether `from` reaches one of `targets`, real paths, through its imports: the project's own modules and its kay libraries', never another package's. `edges` keeps each module's imports for the calls of one build.
 export async function reachesAny(root: string, libraries: KayLibrary[], from: string, targets: ReadonlySet<string>, edges = new Map<string, Promise<string[]>>()): Promise<boolean> {
+  const project = realpathSync(root) + sep
   const seen = new Set([from])
   const queue = [from]
 
@@ -250,7 +239,7 @@ export async function reachesAny(root: string, libraries: KayLibrary[], from: st
     let next = edges.get(file)
 
     if (next === undefined) {
-      next = followedImports(root + sep, libraries, file)
+      next = (async () => (await followedImports(root, project, libraries, file)).map(({ path }) => path))()
       edges.set(file, next)
     }
 
@@ -268,24 +257,26 @@ export async function reachesAny(root: string, libraries: KayLibrary[], from: st
   return false
 }
 
-async function followedImports(project: string, libraries: KayLibrary[], file: string): Promise<string[]> {
-  const found: string[] = []
+// The modules `file` imports, its `import.meta.glob` matches included, that a build follows, by real path as Bun resolves them: `project`'s own, the root's real path, and its kay libraries', `library` naming which; never another package's.
+async function followedImports(root: string, project: string, libraries: KayLibrary[], file: string): Promise<{ path: string, library: KayLibrary | undefined }[]> {
+  const source = await Bun.file(file).text()
+  const kay = KAY_FILE.test(file)
+  const paths = globbedFiles(kay ? fences(source) : source, file, root, kay ? 'ts' : scriptLoader(file)).map(found => realpathSync(found))
 
-  for (const specifier of await importsOf(file)) {
-    let path: string
-
+  for (const specifier of await importsOf(file, source)) {
     try {
-      path = realpathSync(Bun.resolveSync(specifier, dirname(file)))
+      paths.push(realpathSync(Bun.resolveSync(specifier, dirname(file))))
     }
     catch {
-      continue
+      // A builtin, `node:fs` say, or a module that is not there.
     }
-
-    if ((KAY_FILE.test(path) || SCRIPT_FILE.test(path)) && (libraryOf(libraries, path) !== undefined || (path.startsWith(project) && !path.includes(`${sep}node_modules${sep}`))))
-      found.push(path)
   }
 
-  return found
+  return paths.flatMap((path) => {
+    const library = libraryOf(libraries, path)
+
+    return (KAY_FILE.test(path) || SCRIPT_FILE.test(path)) && (library !== undefined || (path.startsWith(project) && !path.slice(project.length - 1).includes(`${sep}node_modules${sep}`))) ? [{ path, library }] : []
+  })
 }
 
 // The words of a file, as Tailwind would read them off a file of the app: class names among them, in a template or a string of a script.

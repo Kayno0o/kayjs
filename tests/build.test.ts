@@ -9,7 +9,7 @@ import process from 'node:process'
 import tailwind from 'bun-plugin-tailwind'
 import { describe, expect, it } from 'bun:test'
 import { ASSET_FILE, clientDir, outputDir, writeAsset } from '../src/build/assets'
-import { buildClient } from '../src/build/client'
+import { buildClient, readClientSources } from '../src/build/client'
 import { writeIfChanged } from '../src/build/files'
 import { formatSizeReport } from '../src/build/report'
 import { anchorModule } from '../src/build/runtime-chunk'
@@ -66,6 +66,39 @@ describe('kay build', () => {
     }
     finally {
       await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('gives a static component that may render as an island a chunk once it reaches one, directly, through a barrel, a library or a glob, under a linked root too', async () => {
+    const passing = (imports: string) => `---\n${imports}\nimport { go } from '../go'\n---\nIsl(format={go})\n`
+    const root = await scratchProject({
+      'package.json': JSON.stringify({ name: 'app', private: true, dependencies: { 'ui-lib': '1.0.0' } }),
+      'node_modules/ui-lib/package.json': JSON.stringify({ name: 'ui-lib', version: '1.0.0', type: 'module', peerDependencies: { kay: '*' }, exports: { './*.kay': './src/*.kay' } }),
+      'node_modules/ui-lib/src/card.kay': '---\nimport { signal } from \'kay\'\n\nconst { format } = props<{ format: (n: number) => string }>()\nconst n = signal(0)\n---\nbutton(type="button" onClick={() => n.set(n() + 1)}) {format(n())}\n',
+      'src/cards/isl.kay': '---\nimport { signal } from \'kay\'\n\nconst { format } = props<{ format: (n: number) => string }>()\nconst n = signal(0)\n---\nbutton(type="button" onClick={() => n.set(n() + 1)}) {format(n())}\n',
+      'src/go.ts': 'export function go(n: number): string {\n  return String(n)\n}\n',
+      'src/ui/barrel.ts': 'export { default as Isl } from \'../cards/isl.kay\'\n',
+      'src/ui/direct.kay': passing('import Isl from \'../cards/isl.kay\''),
+      'src/ui/barreled.kay': passing('import { Isl } from \'./barrel\''),
+      'src/ui/library.kay': passing('import Isl from \'ui-lib/card.kay\''),
+      'src/ui/glob.kay': passing('const { \'../cards/isl.kay\': Isl } = import.meta.glob(\'../cards/*.kay\', { eager: true, import: \'default\' })'),
+      // Reaching no island, it never renders as one.
+      'src/ui/label.kay': '---\nconst { text } = props<{ text: string }>()\n---\nspan {text}\n',
+      'src/ui/plain.kay': '---\nimport { go } from \'../go\'\nimport Label from \'./label.kay\'\n---\nLabel(text={go(1)})\n',
+    })
+    const linked = `${root}-linked`
+
+    await symlink(root, linked)
+
+    try {
+      const islands = ['node_modules/ui-lib/src/card.kay', 'src/cards/isl.kay', 'src/ui/barreled.kay', 'src/ui/direct.kay', 'src/ui/glob.kay', 'src/ui/library.kay']
+
+      expect(Object.keys((await buildClient(root)).islands).sort()).toEqual(islands)
+      // Bun resolves imports to real paths, which a project's own modules are found under too.
+      expect([...(await readClientSources(linked)).islands.keys()].filter(id => id.startsWith('src/')).sort()).toEqual(islands.slice(1))
+    }
+    finally {
+      await Promise.all([rm(root, { recursive: true, force: true }), rm(linked, { force: true })])
     }
   })
 
