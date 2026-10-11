@@ -57,7 +57,7 @@
     "@types/bun": "^1.4.2",
     "@typescript/native-preview": "^7.0.0-dev.20260707.2",
     "elysia": "^1.4.30",
-    "kay": "npm:@kaynooo/kayjs@~1.37.0",
+    "kay": "npm:@kaynooo/kayjs@~1.37.3",
     "typescript": "^6.0.3"
   }
 }
