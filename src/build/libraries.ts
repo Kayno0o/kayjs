@@ -229,9 +229,8 @@ export async function reachableLibraryFiles(root: string, libraries: KayLibrary[
   return { components: components.sort(), scripts: scripts.sort() }
 }
 
-// Whether `from` reaches one of `targets`, real paths, through its imports: the project's own modules and its kay libraries', never another package's. `edges` keeps each module's imports for the calls of one build.
-export async function reachesAny(root: string, libraries: KayLibrary[], from: string, targets: ReadonlySet<string>, edges = new Map<string, Promise<string[]>>()): Promise<boolean> {
-  const project = realpathSync(root) + sep
+// Whether `from` reaches one of `targets`, real paths, through its imports: the project's own modules and its kay libraries', never another package's. `edges` keeps each module's imports for the calls of one build, `project` the root's real path.
+export async function reachesAny(root: string, libraries: KayLibrary[], from: string, targets: ReadonlySet<string>, edges = new Map<string, Promise<string[]>>(), project = realpathSync(root) + sep): Promise<boolean> {
   const seen = new Set([from])
   const queue = [from]
 
@@ -261,7 +260,14 @@ export async function reachesAny(root: string, libraries: KayLibrary[], from: st
 async function followedImports(root: string, project: string, libraries: KayLibrary[], file: string): Promise<{ path: string, library: KayLibrary | undefined }[]> {
   const source = await Bun.file(file).text()
   const kay = KAY_FILE.test(file)
-  const paths = globbedFiles(kay ? fences(source) : source, file, root, kay ? 'ts' : scriptLoader(file)).map(found => realpathSync(found))
+  let paths: string[] = []
+
+  try {
+    paths = globbedFiles(kay ? fences(source) : source, file, root, kay ? 'ts' : scriptLoader(file)).map(found => realpathSync(found))
+  }
+  catch {
+    // A glob the build cannot read, which the check or the build reports as it reaches the module.
+  }
 
   for (const specifier of await importsOf(file, source)) {
     try {

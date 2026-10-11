@@ -8,7 +8,7 @@ import type { FileDiagnostic } from './transform'
 import { existsSync, realpathSync } from 'node:fs'
 import { mkdir, rm } from 'node:fs/promises'
 import { builtinModules } from 'node:module'
-import { join, relative, resolve } from 'node:path'
+import { join, relative, resolve, sep } from 'node:path'
 import { formatDiagnostic } from '../compiler'
 import { projectPaths } from '../project'
 import { apiStubs, apiTrees } from '../server/api'
@@ -152,10 +152,11 @@ export async function readClientSources(root: string, options: ClientOptions = {
   // One reaching no island through its imports never does, and its chunk would only bundle for the browser what its script imports, a library's server code included.
   const islandFiles = new Set([...islands.values()].map(file => realpathSync(file)))
   const edges = new Map<string, Promise<string[]>>()
+  const project = realpathSync(root) + sep
   const promoted = await Promise.all(files.map(async (file, index) => {
     const { island, promote } = analyses[index]!
 
-    return island === undefined && promote !== undefined && islandFiles.size > 0 && await reachesAny(root, libraries, realpathSync(file), islandFiles, edges) ? promote : undefined
+    return island === undefined && promote !== undefined && islandFiles.size > 0 && await reachesAny(root, libraries, realpathSync(file), islandFiles, edges, project) ? promote : undefined
   }))
 
   for (const [index, promote] of promoted.entries()) {

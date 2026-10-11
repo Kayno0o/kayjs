@@ -208,6 +208,20 @@ describe('kay libraries', () => {
     expect(await Bun.file(join(out, 'index.html')).text()).toContain('<h1 style="color: red">Follow it</h1>')
   })
 
+  it('leaves a glob it cannot read to the check or the build reporting it, finding the library\'s components the rest reach', async () => {
+    const project = await newProject()
+
+    await write(project, {
+      'src/globbed.ts': 'const pattern = \'./notes/*.ts\'\n\nexport const notes = import.meta.glob(pattern)\n',
+      'src/routes/notes.kay': '---\nimport Badge from \'kay-lib/badge.kay\'\nimport { notes } from \'../globbed\'\n---\nBadge(label={String(Object.keys(notes).length)})\n',
+    })
+
+    const { code, output } = await run('check', project)
+
+    expect(output).not.toContain('takes its patterns as strings written in the call')
+    expect(code).toBe(0)
+  })
+
   it('renders with the app\'s settings under kay test, whose preload registers the loader', async () => {
     const project = await newProject()
 
