@@ -7,7 +7,7 @@ import IconButton from '@kaynooo/kayjs-ui/icon-button.kay'
 import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
 import TooltipHost from '@kaynooo/kayjs-ui/tooltip-host.kay'
 import { attempt } from '@kaynooo/kayjs-ui'
-import { call, listen } from 'kay'
+import { call, listen, onCleanup, refresh } from 'kay'
 import previewApi from '../api/preview'
 import { entryKey, fieldsAt } from '../markers'
 import { drafts } from './drafts'
@@ -50,7 +50,7 @@ listen(() => document, 'click', (event) => {
   focused = field.marker
 }, { capture: true })
 
-// Loads the page again as visitors see it, once kay forgot the edit mode.
+// Renders the page again as visitors see it, once kay forgot the edit mode.
 async function stopEditing(): Promise<void> {
   leaving = true
 
@@ -60,12 +60,13 @@ async function stopEditing(): Promise<void> {
     return
   }
 
-  location.reload()
+  await refresh()
 }
 
 // The page outlines its fields while the editor is open. The Toaster and TooltipHost below give way to a site page's own.
 effect(() => {
   document.documentElement.classList.toggle('kcms-editing', open())
+  onCleanup(() => document.documentElement.classList.remove('kcms-editing'))
 })
 ---
 aside.kcms-editor(ref={element => panel = element} class={{ 'kcms-editor-open': open }} aria-label="Content editor")
