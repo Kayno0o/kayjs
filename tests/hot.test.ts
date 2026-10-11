@@ -167,6 +167,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('kay dev in 
     expect(await sameDocument()).toBe(true)
     expect(await page.evaluate(() => (window as { kaySources?: number }).kaySources)).toBe(0)
     expect(await page.evaluate(() => [...document.scripts].filter(script => script.textContent.includes('/_kay/dev/events')).length)).toBe(1)
+    expect(await page.locator('meta[name=kay-boot]').count()).toBe(1)
     expect(refused).toEqual([])
   }, 180_000)
 

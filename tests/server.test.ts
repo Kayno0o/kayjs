@@ -1546,7 +1546,7 @@ describe('special pages', () => {
 
       expect(html).toContain('<p class="message">Kaboom</p>')
       expect(html).toMatch(/<pre class="stack">Error: Kaboom\n\s+at load \(\S+\/boom\.kay:10:13\)/)
-      expect(html).toContain('new EventSource("/_kay/dev/events")')
+      expect(html).toMatch(/<meta name="kay-boot" content="[\w-]+"><script>[^<]*new EventSource\("\/_kay\/dev\/events"\)/)
       expect((await dev.handle(new Request('http://localhost/_kay/dev/events'))).headers.get('content-type')).toBe('text/event-stream')
 
       const page = await dev.handle(new Request('http://localhost/'))

@@ -936,6 +936,14 @@ describe('the dev patch', () => {
     expect(live.body.lastElementChild).toBe(panel)
   })
 
+  it('leaves the live reload\'s boot id to it, the restarted server\'s render naming another', () => {
+    const before = page('<p>Text</p>', '<title>Home</title><meta name="kay-boot" content="a">')
+    const live = parse(before)
+
+    expect(patch(parse(before), parse(page('<p>Text</p>', '<title>Home</title><meta name="kay-boot" content="b">')), live)).toBe(true)
+    expect(live.querySelector('meta[name=kay-boot]')!.getAttribute('content')).toBe('a')
+  })
+
   it('removes an attribute and a class the server dropped, and inserts and removes nodes between the common ends', () => {
     const before = page('<h1>Title</h1><p class="a b" hidden>One</p><p>Two</p><footer>End</footer>')
     const live = parse(before)
