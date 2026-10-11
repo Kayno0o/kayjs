@@ -650,11 +650,11 @@ async function runDev(args: string[]): Promise<number> {
 
   warnOtherKay('dev', root)
   const entry = typeof option === 'string' ? resolve(option) : inDir ? undefined : path
-  const { routes, extensions, publicDir, api, settings, i18n, lang } = await loadConfig(root)
+  const config = await loadConfig(root)
   let stop: () => Promise<void>
 
   try {
-    stop = await dev(root, { entry, port: typeof port === 'string' ? Number(port) : undefined, inspect: typeof inspect === 'string' ? inspectorAddress(inspect) : undefined, open: open === true, routes, extensions, publicDir, api, settings, i18n, lang })
+    stop = await dev(root, { entry, port: typeof port === 'string' ? Number(port) : undefined, inspect: typeof inspect === 'string' ? inspectorAddress(inspect) : undefined, open: open === true, config })
   }
   catch (error) {
     if (!(error instanceof InspectorAddressInUse))

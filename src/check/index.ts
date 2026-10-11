@@ -248,7 +248,7 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
 
   await writeIfChanged(settingsPath, replaced.code)
   await writeIfChanged(exportsPath, exported.code)
-  await writeIfChanged(settingsFile, serializeShadowSettings(root, { routesDir, islandOnly }))
+  await writeIfChanged(settingsFile, serializeShadowSettings(root, { routesDir, islandOnly, lints: options.lints }))
 
   // Rewriting in place keeps every shadow file present for editors reading the tree meanwhile; only stale ones go.
   const stale = (await readdir(join(root, SHADOW_DIR), { recursive: true, withFileTypes: true }))

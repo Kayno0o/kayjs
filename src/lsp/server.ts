@@ -11,7 +11,7 @@ import process from 'node:process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { findKayFiles, TSCONFIG } from '../build/files'
 import { importedSignals } from '../build/signals'
-import { TSGO, UNUSED_CODES, writeShadowTypes } from '../check'
+import { configCheckOptions, TSGO, UNUSED_CODES, writeShadowTypes } from '../check'
 import { compileShadow, SHADOW_DIR, shadowPath, shadowSource } from '../check/shadow'
 import { formatKay } from '../compiler/format'
 import { lintLevels, typeLint } from '../compiler/lints'
@@ -278,7 +278,7 @@ export class KayLanguageServer {
   private async configure(project: Project) {
     const config = await projectConfig(project.root)
 
-    project.options = { routes: (project.root === this.root ? this.routesSetting : undefined) ?? config.routes, extensions: config.extensions, publicDir: config.publicDir, i18n: config.i18n, lang: config.lang, api: config.api, settings: config.settings, lints: config.lints }
+    project.options = { ...configCheckOptions(config), routes: (project.root === this.root ? this.routesSetting : undefined) ?? config.routes }
     project.routesDir = projectPaths(project.root, project.options).routes
     project.configured = true
   }
@@ -694,7 +694,7 @@ export class KayLanguageServer {
     const file = shadowSource(project.root, path)
     const source = Bun.file(file)
 
-    return await source.exists() ? compileShadow(project.root, project.routesDir, file, await source.text(), project.islandOnly.has(file)).shadow : undefined
+    return await source.exists() ? compileShadow(project.root, project.routesDir, file, await source.text(), project.islandOnly.has(file), project.options.lints).shadow : undefined
   }
 
   // `offset` is the position in the .kay source.

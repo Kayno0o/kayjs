@@ -29,6 +29,8 @@ export interface ShadowFile {
 export interface ShadowSettings {
   routesDir: string
   islandOnly: Set<string>
+  // The levels kay.config.ts gives the lints, which the compiler reports by.
+  lints?: LintLevels | undefined
 }
 
 // A file outside the project, such as a library a workspace installs in a `node_modules` above it, goes under one `__` folder per level climbed, so it stays inside the tree and its sibling components still resolve beside it. A project folder named `__` would share that path.
@@ -42,15 +44,15 @@ export function shadowSource(root: string, shadow: string): string {
 }
 
 export function serializeShadowSettings(root: string, settings: ShadowSettings): string {
-  return `${JSON.stringify({ routes: relative(root, settings.routesDir), islandOnly: [...settings.islandOnly].map(file => relative(root, file)).sort() }, null, 2)}\n`
+  return `${JSON.stringify({ routes: relative(root, settings.routesDir), islandOnly: [...settings.islandOnly].map(file => relative(root, file)).sort(), ...settings.lints && { lints: settings.lints } }, null, 2)}\n`
 }
 
 // The settings the shadow tree was written with, or the defaults when no `kay check`, `kay dev` or LSP has written it yet.
 export function readShadowSettings(root: string): ShadowSettings {
   try {
-    const saved = JSON.parse(readFileSync(join(root, SHADOW_DIR, SHADOW_SETTINGS), 'utf8')) as { routes: string, islandOnly: string[] }
+    const saved = JSON.parse(readFileSync(join(root, SHADOW_DIR, SHADOW_SETTINGS), 'utf8')) as { routes: string, islandOnly: string[], lints?: LintLevels }
 
-    return { routesDir: resolve(root, saved.routes), islandOnly: new Set(saved.islandOnly.map(file => resolve(root, file))) }
+    return { routesDir: resolve(root, saved.routes), islandOnly: new Set(saved.islandOnly.map(file => resolve(root, file))), lints: saved.lints }
   }
   catch {
     return { routesDir: projectPaths(root).routes, islandOnly: new Set() }

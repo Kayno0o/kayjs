@@ -7,6 +7,7 @@ import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { buildClient } from '../src/build/client'
 import { KayCompileError } from '../src/build/transform'
+import { readShadowSettings } from '../src/check/shadow'
 import { dev, watchProject } from '../src/dev'
 import { inspectorProxy } from '../src/dev/inspector'
 import { bootFailure, hotSwap } from '../src/server/dev'
@@ -178,17 +179,18 @@ describe('the dev watcher', () => {
 })
 
 describe('kay dev', () => {
-  it('restarts the server on a change and keeps the generated types current', async () => {
+  it('restarts the server on a change and keeps the generated types current, written from the config as kay check writes them', async () => {
     const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
     const children: Subprocess[] = []
 
     await Bun.write(join(root, 'src/server.ts'), 'setInterval(() => undefined, 1000)\n')
     await Bun.write(join(root, 'src/routes/index.kay'), 'p Home\n')
-    const stop = await dev(root, { onRestart: child => children.push(child) })
+    const stop = await dev(root, { config: { lints: { 'unread-name': 'allow' } }, onRestart: child => children.push(child) })
 
     try {
       expect(children).toHaveLength(1)
       expect(await Bun.file(join(root, '.kay/types/src/routes/index.kay.tsx')).exists()).toBe(true)
+      expect(readShadowSettings(root).lints).toEqual({ 'unread-name': 'allow' })
 
       await Bun.write(join(root, 'src/routes/about.kay'), 'p About\n')
       await until(() => children.length === 2)

@@ -53,7 +53,7 @@ export const processor = {
     const file = resolve(filename)
     const root = projectRoot(file)
     const settings = readShadowSettings(root)
-    const { shadow } = compileShadow(root, settings.routesDir, file, text, settings.islandOnly.has(file))
+    const { shadow } = compileShadow(root, settings.routesDir, file, text, settings.islandOnly.has(file), settings.lints)
     const parsed = parseKay(text)
 
     compiled.set(filename, { source: text, tsx: shadow.tsx, map: shadow.map, fences: [parsed.script, parsed.server].filter(span => span !== undefined) })

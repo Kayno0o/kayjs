@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 import { writeShadowTypes } from '../src/check'
+import { readShadowSettings } from '../src/check/shadow'
 import { positionAt } from '../src/compiler/mapping'
 import { processor, shadowParser } from '../src/eslint'
 
@@ -55,7 +56,7 @@ describe('kay/eslint', () => {
     expect(processor.postprocess([[{ ruleId: null, fatal: true, message: 'Parsing error: no type information yet', line: 0, column: 0 }]], FILE)).toEqual([expect.objectContaining({ line: 1, column: 1, fatal: true })])
   })
 
-  it('compiles with the routes directory the last kay check wrote the shadow tree with', async () => {
+  it('compiles with the routes directory and lint levels the last kay check wrote the shadow tree with', async () => {
     const root = await mkdtemp(join(tmpdir(), 'kay-eslint-'))
     const page = join(root, 'pages', 'posts', '[id].kay')
     const source = '--- server\nconst id = ctx.params.id\n---\np {id}\n'
@@ -67,9 +68,11 @@ describe('kay/eslint', () => {
       // Read with the default `src/routes`, the page is no route, and its params are untyped.
       expect(processor.preprocess(source, page)[0]!.text).not.toContain('"id": string')
 
-      await writeShadowTypes(root, { routes: 'pages' })
+      await writeShadowTypes(root, { routes: 'pages', lints: { 'unread-name': 'allow' } })
 
       expect(processor.preprocess(source, page)[0]!.text).toContain('"id": string')
+      // And the lint levels it compiled with.
+      expect(readShadowSettings(root).lints).toEqual({ 'unread-name': 'allow' })
     }
     finally {
       await rm(root, { recursive: true, force: true })
