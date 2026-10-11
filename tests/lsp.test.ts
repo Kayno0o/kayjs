@@ -1,11 +1,12 @@
 import type { CodeAction, CompletionItem, CompletionList, Diagnostic, DocumentHighlight, Hover, Location, LocationLink, Range, TextEdit, WorkspaceEdit } from '../src/lsp/protocol'
 import { cp, mkdir, mkdtemp, readdir, rm, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { pathToFileURL } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { Connection } from '../src/lsp/rpc'
+import { fixtureCopy } from './scratch'
 
 const fixtures = join(import.meta.dir, 'fixtures')
 const cli = join(import.meta.dir, '..', 'src', 'cli.ts')
@@ -114,9 +115,17 @@ function brief(diagnostics: Diagnostic[]) {
   return diagnostics.map(diagnostic => ({ ...diagnostic.range, code: diagnostic.code }))
 }
 
+// Copies, as the editor writes its shadow tree into the project while check.test.ts and build.test.ts read the fixtures.
+const brokenCopy = resolve(await fixtureCopy('broken'))
+const siteCopy = resolve(await fixtureCopy('site'))
+
+afterAll(async () => {
+  await Promise.all([rm(brokenCopy, { recursive: true, force: true }), rm(siteCopy, { recursive: true, force: true })])
+})
+
 describe('kay lsp', () => {
-  const broken = new Editor(join(fixtures, 'broken'))
-  const site = new Editor(join(fixtures, 'site'))
+  const broken = new Editor(brokenCopy)
+  const site = new Editor(siteCopy)
 
   beforeAll(async () => {
     await Promise.all([broken.start(), site.start()])
@@ -180,7 +189,7 @@ describe('kay lsp', () => {
 
   it('completes the keys of a page\'s settings', async () => {
     const path = 'src/routes/search.kay'
-    const text = await Bun.file(join(fixtures, 'site', path)).text()
+    const text = await Bun.file(join(siteCopy, path)).text()
 
     await site.open(path)
     await site.change(path, '--- server\nexport const page = { noindex: true,  }\n---\np x\n', 2)

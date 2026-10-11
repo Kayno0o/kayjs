@@ -12,6 +12,7 @@ import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { parse, stringify } from 'devalue'
 import { Elysia } from 'elysia'
+import { outputDir } from '../src/build/assets'
 import { ActionError } from '../src/runtime'
 import { inlineScriptHashes, pages } from '../src/server'
 import { readClient, readInlineStyles, readManifest, writeManifest } from '../src/server/client'
@@ -52,7 +53,7 @@ let hydrated = false
 
 // The entry hydrates the document it loads in; a module is evaluated once per process, so later documents go through its `hydrate`.
 async function hydrateFrom(html: string): Promise<void> {
-  await import(join(process.cwd(), '.kay/client/dist', ENTRY.exec(html)![1]!))
+  await import(join(outputDir(process.cwd()), 'dist', ENTRY.exec(html)![1]!))
   const { $kayHydrate: hydrate } = globalThis as unknown as ClientEntry
 
   await (hydrated ? hydrate() : hydrate.ready)
@@ -126,7 +127,7 @@ describe('pages', () => {
   })
 
   it('preloads the chunks of the islands a page renders, from a manifest a prebuilt server reads', async () => {
-    const manifestFile = Bun.file(join(process.cwd(), '.kay/client/manifest.json'))
+    const manifestFile = Bun.file(join(outputDir(process.cwd()), 'manifest.json'))
     const manifest = await manifestFile.json() as ClientManifest
     const counter = manifest.islands['tests/fixtures/site/src/components/counter.kay']!
     const home = (await get('/')).html
@@ -207,7 +208,7 @@ describe('pages', () => {
   })
 
   it('ships the entry to a page whose islands all wait, without preloading their chunks', async () => {
-    const manifest = await Bun.file(join(process.cwd(), '.kay/client/manifest.json')).json() as ClientManifest
+    const manifest = await Bun.file(join(outputDir(process.cwd()), 'manifest.json')).json() as ClientManifest
     const { html } = await get('/lazy')
 
     expect(html).toContain('data-hydrate="idle"')
@@ -216,7 +217,7 @@ describe('pages', () => {
   })
 
   it('serves the files components import at one content-hashed URL, the same on the server and in islands', async () => {
-    const manifest = await Bun.file(join(process.cwd(), '.kay/client/manifest.json')).json() as ClientManifest
+    const manifest = await Bun.file(join(outputDir(process.cwd()), 'manifest.json')).json() as ClientManifest
     const { html } = await get('/assets')
     // An imported image goes out as the variant of its size, which names the file it was made from.
     const logoSrc = (/<img class="static" src="([^"]+)"/).exec(html)![1]!
@@ -610,7 +611,7 @@ describe('route params in guards and actions', () => {
 
     try {
       await prerenderPages(root, { routes: dir }, (await readClient(root))!)
-      const file = await Bun.file(join(root, '.kay/client/pages/orgs/acme/report.html')).text()
+      const file = await Bun.file(join(outputDir(root), 'pages/orgs/acme/report.html')).text()
       const prerendered = await pages({ routes: dir, prebuilt: true })
       const acme = await prerendered.handle(new NativeRequest('http://localhost/orgs/acme/report'))
       const other = await prerendered.handle(new NativeRequest('http://localhost/orgs/other/report'))
@@ -621,7 +622,7 @@ describe('route params in guards and actions', () => {
       expect(other.headers.get('x-guarded')).toBe('{"org":"other"}')
     }
     finally {
-      await rm(join(root, '.kay/client/pages'), { recursive: true, force: true })
+      await rm(join(outputDir(root), 'pages'), { recursive: true, force: true })
       await writeManifest(root, manifest)
     }
   })
@@ -835,7 +836,7 @@ describe('prerendering', () => {
 
     try {
       expect(await prerenderPages(root, { routes }, (await readClient(root))!)).toBe(4)
-      const file = await Bun.file(join(root, '.kay/client/pages/admin/report.html')).text()
+      const file = await Bun.file(join(outputDir(root), 'pages/admin/report.html')).text()
       const signedIn = new Elysia().use(auth).use(await pages({ routes, publicDir: 'tests/fixtures/site/public', prebuilt: true }))
       const visit = async (user: string, headers: Record<string, string> = {}) => signedIn.handle(new NativeRequest('http://localhost/admin/report', { headers: { 'x-user': user, ...headers } }))
       const served = await visit('ada')
@@ -850,7 +851,7 @@ describe('prerendering', () => {
       expect((await visit('bob')).status).toBe(403)
     }
     finally {
-      await rm(join(root, '.kay/client/pages'), { recursive: true, force: true })
+      await rm(join(outputDir(root), 'pages'), { recursive: true, force: true })
       await writeManifest(root, manifest)
     }
   })
@@ -861,14 +862,14 @@ describe('prerendering', () => {
 
     try {
       await prerenderPages(root, { routes, inlineStyles: true }, (await readClient(root))!)
-      const file = await Bun.file(join(root, '.kay/client/pages/admin/report.html')).text()
+      const file = await Bun.file(join(outputDir(root), 'pages/admin/report.html')).text()
 
       expect(file).toContain('<style>')
       expect(file).toContain('background: url("/paper.png")')
       expect(file).not.toContain('rel="stylesheet"')
     }
     finally {
-      await rm(join(root, '.kay/client/pages'), { recursive: true, force: true })
+      await rm(join(outputDir(root), 'pages'), { recursive: true, force: true })
       await writeManifest(root, manifest)
     }
   })
@@ -886,8 +887,8 @@ describe('prerendering', () => {
         return { html: (await response.text()), etag: response.headers.get('etag') }
       }
 
-      expect(await Bun.file(join(root, '.kay/client/pages/docs/guide/intro.html')).text()).toBe((await get('/docs/guide/intro')).html)
-      expect(await Bun.file(join(root, '.kay/client/pages/docs/a%20b.html')).exists()).toBe(true)
+      expect(await Bun.file(join(outputDir(root), 'pages/docs/guide/intro.html')).text()).toBe((await get('/docs/guide/intro')).html)
+      expect(await Bun.file(join(outputDir(root), 'pages/docs/a%20b.html')).exists()).toBe(true)
       expect(await visit('/docs/guide/intro')).toMatchObject({ html: expect.stringContaining('<p class="path">Docs at guide/intro</p>'), etag: expect.any(String) })
       expect(await visit('/docs/a%20b')).toMatchObject({ html: expect.stringContaining('<p class="path">Docs at a b</p>'), etag: expect.any(String) })
       expect(await visit('/docs/other')).toMatchObject({ html: expect.stringContaining('<p class="path">Docs at other</p>'), etag: null })
@@ -897,7 +898,7 @@ describe('prerendering', () => {
         expect(await visit(spelling)).toMatchObject({ html: expect.stringContaining('<p class="path">Docs at a@b+c/d,e</p>'), etag: expect.any(String) })
     }
     finally {
-      await rm(join(root, '.kay/client/pages'), { recursive: true, force: true })
+      await rm(join(outputDir(root), 'pages'), { recursive: true, force: true })
       await writeManifest(root, manifest)
     }
   })
@@ -909,7 +910,7 @@ describe('prerendering', () => {
 
     try {
       await prerenderPages(root, { routes }, client)
-      await Promise.all([compressFiles(client.dir), compressFiles(join(root, '.kay/client/pages'))])
+      await Promise.all([compressFiles(client.dir), compressFiles(join(outputDir(root), 'pages'))])
       const served = new Elysia().use(await pages({ routes, publicDir: 'tests/fixtures/site/public', prebuilt: true }))
       const fetch = async (path: string, headers: Record<string, string> = {}) => served.handle(new NativeRequest(`http://localhost${path}`, { headers }))
       const plain = await fetch(manifest.entry!)
@@ -941,7 +942,7 @@ describe('prerendering', () => {
         lookup.mockRestore()
       }
 
-      const file = await Bun.file(join(root, '.kay/client/pages/docs/guide/intro.html')).text()
+      const file = await Bun.file(join(outputDir(root), 'pages/docs/guide/intro.html')).text()
       const page = await fetch('/docs/guide/intro', { 'accept-encoding': 'br' })
       const etag = page.headers.get('etag')!
 
@@ -963,7 +964,7 @@ describe('prerendering', () => {
     finally {
       for (const copy of new Bun.Glob('**/*.{br,gz}').scanSync(client.dir))
         await rm(join(client.dir, copy))
-      await rm(join(root, '.kay/client/pages'), { recursive: true, force: true })
+      await rm(join(outputDir(root), 'pages'), { recursive: true, force: true })
       await writeManifest(root, manifest)
     }
   })
@@ -1017,7 +1018,7 @@ describe('prerendering', () => {
     }
     finally {
       await rm(dir, { recursive: true, force: true })
-      await rm(join(root, '.kay/client/pages'), { recursive: true, force: true })
+      await rm(join(outputDir(root), 'pages'), { recursive: true, force: true })
       await writeManifest(root, manifest)
     }
   })

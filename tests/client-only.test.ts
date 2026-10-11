@@ -1,4 +1,4 @@
-import { mkdtemp, readdir, rm } from 'node:fs/promises'
+import { readdir, rm } from 'node:fs/promises'
 import { join, relative } from 'node:path'
 import process from 'node:process'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
@@ -11,6 +11,7 @@ import { compileKay } from '../src/compiler'
 import { parseKay } from '../src/compiler/parser'
 import { analyzeScript } from '../src/compiler/script'
 import { child } from '../src/runtime/html'
+import { scratchDir } from './scratch'
 
 await plugin(kay())
 
@@ -35,7 +36,7 @@ let html: string
 let ids: Record<string, string>
 
 beforeAll(async () => {
-  dir = await mkdtemp(join(import.meta.dir, '.dom-'))
+  dir = await scratchDir('dom-')
   await Promise.all(Object.entries(FILES).map(async ([name, text]) => Bun.write(join(dir, name), text)))
   ids = Object.fromEntries(['chart', 'panel', 'plain', 'width'].map(name => [name, relative(process.cwd(), join(dir, `${name}.kay`))]))
 

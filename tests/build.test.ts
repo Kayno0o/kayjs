@@ -7,7 +7,7 @@ import { dirname, join } from 'node:path'
 import process from 'node:process'
 import tailwind from 'bun-plugin-tailwind'
 import { describe, expect, it } from 'bun:test'
-import { ASSET_FILE, clientDir, writeAsset } from '../src/build/assets'
+import { ASSET_FILE, clientDir, outputDir, writeAsset } from '../src/build/assets'
 import { buildClient } from '../src/build/client'
 import { formatSizeReport } from '../src/build/report'
 import { anchorModule } from '../src/build/runtime-chunk'
@@ -15,6 +15,7 @@ import { runtimeConfig, withoutPlugins } from '../src/build/runtime-config'
 import { mapBundleToKay, mapStack } from '../src/build/sourcemap'
 import { analyzeKayCached, transformKayCached } from '../src/build/transform'
 import { loadConfig, withConfig } from '../src/config'
+import { scratchDir } from './scratch'
 
 const root = join(import.meta.dir, 'fixtures/islands')
 
@@ -197,7 +198,7 @@ describe('kay build', () => {
       expect(await Bun.file(join(client.dir, layout.slice('/_kay/'.length))).text()).toContain('.from-plugin')
     }
     finally {
-      await rm(join(site, '.kay/client'), { recursive: true, force: true })
+      await rm(outputDir(site), { recursive: true, force: true })
     }
   })
 
@@ -223,8 +224,8 @@ describe('kay build', () => {
   })
 
   it('puts the stylesheets of the components and the stylesheets a server fence imports in the page, and none of its modules\'', async () => {
-    // Beside the fixtures, where `kay` resolves, rather than under node_modules, whose components the stylesheet build never follows.
-    const project = await mkdtemp(join(import.meta.dir, 'fixtures/server-styles-'))
+    // In the checkout, where `kay` resolves, rather than under node_modules, whose components the stylesheet build never follows.
+    const project = await scratchDir('server-styles-')
     const files = {
       'src/layout.kay': '---\nimport \'./layout.css\'\n---\nmain\n  slot\n',
       'src/layout.css': '.layout-marker { color: red }\n',
@@ -256,7 +257,7 @@ describe('kay build', () => {
       expect((await readdir(join(client.dir, 'assets'))).sort()).toEqual([expect.stringMatching(/^logo-\w+\.png$/), expect.stringMatching(/^og-\w+\.svg$/)])
     }
     finally {
-      await rm(join(site, '.kay/client'), { recursive: true, force: true })
+      await rm(outputDir(site), { recursive: true, force: true })
     }
   })
 
@@ -286,8 +287,8 @@ describe('kay build', () => {
     try {
       const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', root, '--no-check'], { stdout: 'pipe', stderr: 'pipe' })
       const [report, code] = await Promise.all([new Response(child.stdout).text(), child.exited])
-      const manifest = await Bun.file(join(root, '.kay/client/manifest.json')).json() as { entry: string, islands: Record<string, string[]> }
-      const entryFile = join(root, '.kay/client/dist', manifest.entry.slice('/_kay/'.length))
+      const manifest = await Bun.file(join(outputDir(root), 'manifest.json')).json() as { entry: string, islands: Record<string, string[]> }
+      const entryFile = join(outputDir(root), 'dist', manifest.entry.slice('/_kay/'.length))
       const entry = await Bun.file(entryFile).text()
 
       expect(code).toBe(0)
@@ -504,7 +505,7 @@ describe('kay build checks the project first', () => {
       expect(refused.report).toContain('/nowhere')
       expect(refused.report).toContain('kay build: nothing built, as kay check found the problems above; --no-check builds anyway')
       expect(refused.code).toBe(1)
-      expect(await Bun.file(join(root, '.kay/client/manifest.json')).exists()).toBe(false)
+      expect(await Bun.file(join(outputDir(root), 'manifest.json')).exists()).toBe(false)
 
       const built = await build(root, '--no-check')
 
@@ -521,9 +522,9 @@ describe('kay build checks the project first', () => {
     const ran = join(root, 'ran')
     // A prerendered page that records it ran, which the build does once the check passed.
     const page = async (text: string, code = '') => Bun.write(join(root, 'src/routes/index.kay'), `--- server\nexport const page = { prerender: true }\nawait Bun.write(${JSON.stringify(ran)}, '${text}')\n${code}---\np ${text}\n`)
-    const prerendered = join(root, '.kay/client/pages/index.html')
-    const output = join(root, '.kay/client')
-    const previous = join(root, '.kay/client-previous')
+    const prerendered = join(outputDir(root), 'pages/index.html')
+    const output = outputDir(root)
+    const previous = `${outputDir(root)}-previous`
 
     try {
       await page('First')

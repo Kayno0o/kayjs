@@ -1,6 +1,6 @@
 import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { Database } from 'bun:sqlite'
 import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { kay } from '../src/build/plugin'
@@ -10,10 +10,11 @@ import { dispatch, readEvents, resource, socket } from '../src/runtime/live'
 import { apiStubs, scanApi } from '../src/server/api'
 import { rooms, sqliteRooms } from '../src/server/rooms'
 import { testSite } from '../src/test'
+import { fixtureCopy } from './scratch'
 
-const fixture = join(import.meta.dir, 'fixtures/live')
-const apiDir = join(fixture, 'src/api')
-// Written for this file only: any other test building the repository's root as one project would bundle the island's server imports, missing the fixture's API directory.
+// Written into a copy, for this file only: any other test building the repository's root as one project would bundle the island's server imports, missing the fixture's API directory.
+const fixture = await fixtureCopy('live')
+const apiDir = resolve(fixture, 'src/api')
 const components = {
   'src/components/chat.kay': '---\nimport { resource, socket, stream } from \'kay\'\nimport chat from \'../api/chat\'\n\nconst { room } = props<{ room: string }>()\nconst messages = socket(chat, \'/:room\', { params: { room } })\nconst ticks = stream(chat, \'/ticks\', { query: { count: 3 } })\nconst rooms = resource(chat, \'/rooms\', () => ({ query: { prefix: room.slice(0, 1) } }))\n---\nsection\n  p.status {messages.status()}\n  p.last {messages.last()?.text ?? \'Nothing yet\'}\n  p.tick {ticks.last()?.tick ?? 0}\n  p.rooms {rooms.status()}: {rooms.value()?.map(found => found.name).join(\', \')}\n  button(onClick={() => messages.send({ text: \'hello\' })}) Send\n',
   'src/routes/index.kay': '---\nimport Chat from \'../components/chat.kay\'\n---\nh1 Live\nChat(room="general")\na(href="/api/chat/ticks") Ticks\n',
@@ -21,7 +22,7 @@ const components = {
 
 await Promise.all(Object.entries(components).map(async ([path, source]) => Bun.write(join(fixture, path), source)))
 const reported: unknown[] = []
-const site = await testSite({ routes: 'tests/fixtures/live/src/routes', api: 'tests/fixtures/live/src/api', locals: request => ({ user: request.headers.get('x-user') ?? undefined }), onError: error => void reported.push(error) })
+const site = await testSite({ routes: `${fixture}/src/routes`, api: `${fixture}/src/api`, locals: request => ({ user: request.headers.get('x-user') ?? undefined }), onError: error => void reported.push(error) })
 // Imported once the site is up: the modules it mounted, where their routes are served.
 const { default: chat } = await import(join(apiDir, 'chat.ts')) as typeof import('./fixtures/live/src/api/chat')
 const { default: secret } = await import(join(apiDir, 'private/index.ts')) as typeof import('./fixtures/live/src/api/private/index')
@@ -33,7 +34,7 @@ function upgrade(path: string, headers: Record<string, string> = {}): Request {
 
 afterAll(async () => {
   await site.close()
-  await Promise.all(['src/components', 'src/routes'].map(async dir => rm(join(fixture, dir), { recursive: true, force: true })))
+  await rm(fixture, { recursive: true, force: true })
 })
 
 describe('API modules', () => {

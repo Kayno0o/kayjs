@@ -1,13 +1,14 @@
-import { mkdtemp, rm } from 'node:fs/promises'
+import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { t as elysiaSchema } from 'elysia'
 import { s, t } from 'kay'
+import { scratchDir } from './scratch'
 
 let dir: string
 
 beforeAll(async () => {
-  dir = await mkdtemp(join(import.meta.dir, '.schema-'))
+  dir = await scratchDir('schema-')
 })
 
 afterAll(async () => rm(dir, { recursive: true, force: true }))

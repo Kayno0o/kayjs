@@ -11,6 +11,7 @@ import { describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { parse, stringify } from 'devalue'
 import { Elysia, t } from 'elysia'
 import { version } from '../package.json'
+import { outputDir } from '../src/build/assets'
 import { check } from '../src/check'
 import { compileKay } from '../src/compiler'
 import { action } from '../src/runtime'
@@ -26,6 +27,7 @@ import { clientAddress, countSucceeded, memoryRates, protectionRefusal, rateKey,
 import { signStamp, stampTime, useStampSecret } from '../src/server/stamp'
 import { CspViolation } from '../src/server/violations'
 import { testSite } from '../src/test'
+import { fixtureCopy } from './scratch'
 
 const ROUTES = 'tests/fixtures/seo/src/routes'
 
@@ -591,17 +593,18 @@ describe('action protection', () => {
   })
 
   it('types the honeypot as one of the form\'s fields for kay check, a misspelt one still refused', async () => {
-    const typo = join(FIXTURE, 'src/routes/typo.kay')
-
-    expect(await check(FIXTURE)).toEqual([])
+    const copy = await fixtureCopy('production')
+    const typo = join(copy, 'src/routes/typo.kay')
 
     try {
+      expect(await check(copy)).toEqual([])
+
       await Bun.write(typo, '---\nimport { send } from \'./contact.kay\'\nimport { enquire } from \'./enquiry.kay\'\n---\nform(action={send})\n  input(name="websit" aria-label="Website")\nform(action={enquire})\n  input(name="nectar" aria-label="Nectar")\n')
 
-      expect((await check(FIXTURE)).map(diagnostic => diagnostic.line)).toEqual([6])
+      expect((await check(copy)).map(diagnostic => diagnostic.line)).toEqual([6])
     }
     finally {
-      await rm(typo, { force: true })
+      await rm(copy, { recursive: true, force: true })
     }
   })
 })
@@ -747,7 +750,7 @@ describe('revalidation', () => {
     finally {
       setSystemTime()
       news.edition = 1
-      await rm(join(root, '.kay/client/pages'), { recursive: true, force: true })
+      await rm(join(outputDir(root), 'pages'), { recursive: true, force: true })
       await writeManifest(root, manifest)
     }
   })
@@ -786,7 +789,7 @@ describe('revalidation', () => {
       logged.mockRestore()
       news.edition = 1
       news.failing = false
-      await rm(join(root, '.kay/client/pages'), { recursive: true, force: true })
+      await rm(join(outputDir(root), 'pages'), { recursive: true, force: true })
       await writeManifest(root, manifest)
     }
   })
@@ -816,7 +819,7 @@ describe('revalidation', () => {
     }
     finally {
       warned.mockRestore()
-      await rm(join(root, '.kay/client/pages'), { recursive: true, force: true })
+      await rm(join(outputDir(root), 'pages'), { recursive: true, force: true })
       await writeManifest(root, manifest)
     }
   })
@@ -840,7 +843,7 @@ describe('revalidation', () => {
     }
     finally {
       warned.mockRestore()
-      await rm(join(root, '.kay/client/pages'), { recursive: true, force: true })
+      await rm(join(outputDir(root), 'pages'), { recursive: true, force: true })
       await writeManifest(root, manifest)
     }
   })
@@ -880,7 +883,7 @@ describe('revalidation', () => {
     }
     finally {
       news.edition = 1
-      await rm(join(root, '.kay/client/pages'), { recursive: true, force: true })
+      await rm(join(outputDir(root), 'pages'), { recursive: true, force: true })
       await writeManifest(root, manifest)
     }
   })
@@ -913,7 +916,7 @@ describe('revalidation', () => {
     }
     finally {
       news.edition = 1
-      await rm(join(root, '.kay/client/pages'), { recursive: true, force: true })
+      await rm(join(outputDir(root), 'pages'), { recursive: true, force: true })
       await writeManifest(root, manifest)
     }
   })
@@ -921,15 +924,15 @@ describe('revalidation', () => {
   it('refuses a revalidate that is no positive duration', async () => {
     const root = process.cwd()
     const manifest = (await readManifest(root))!
-    const page = join(routes, 'broken.kay')
+    const copy = await fixtureCopy('production')
 
     try {
-      await Bun.write(page, '--- server\nexport const page = { prerender: true, revalidate: \'hourly\' }\n---\np Broken\n')
+      await Bun.write(join(copy, 'src/routes/broken.kay'), '--- server\nexport const page = { prerender: true, revalidate: \'hourly\' }\n---\np Broken\n')
 
-      await expect(prerenderPages(root, { routes }, (await readClient(root))!)).rejects.toThrow('broken.kay\'s revalidate is \'hourly\'; it takes a positive duration')
+      await expect(prerenderPages(root, { routes: `${copy}/src/routes` }, (await readClient(root))!)).rejects.toThrow('broken.kay\'s revalidate is \'hourly\'; it takes a positive duration')
     }
     finally {
-      await rm(page, { force: true })
+      await rm(copy, { recursive: true, force: true })
       await writeManifest(root, manifest)
     }
   })
@@ -991,7 +994,7 @@ describe('a prerendered page posted to', () => {
       expect(after.headers.get('cache-control')).toBe('public, max-age=0, must-revalidate')
     }
     finally {
-      await rm(join(root, '.kay/client/pages'), { recursive: true, force: true })
+      await rm(join(outputDir(root), 'pages'), { recursive: true, force: true })
       await writeManifest(root, manifest)
     }
   })
@@ -1003,7 +1006,7 @@ describe('a prerendered page posted to', () => {
 
     try {
       await prerenderPages(root, { routes }, (await readClient(root))!)
-      expect(await Bun.file(join(root, '.kay/client/pages/brochure.html')).text()).toContain('name="kay_since" value="kay-stamp:')
+      expect(await Bun.file(join(outputDir(root), 'pages/brochure.html')).text()).toContain('name="kay_since" value="kay-stamp:')
 
       const app = await pages({ routes, prebuilt: true, security: false })
       const { order } = await import(BROCHURE) as { order: Action<{ address: string }, number> }
@@ -1036,7 +1039,7 @@ describe('a prerendered page posted to', () => {
     }
     finally {
       setSystemTime()
-      await rm(join(root, '.kay/client/pages'), { recursive: true, force: true })
+      await rm(join(outputDir(root), 'pages'), { recursive: true, force: true })
       await writeManifest(root, manifest)
     }
   })

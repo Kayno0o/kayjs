@@ -9,10 +9,10 @@ Every feature asks the least of the app: the fewest declarations, the easiest se
 ## Checks
 
 - Before a commit: `bun run lint:fix`, `bun run check` (kay check: types, templates included), `bun run bench:check` and the tests.
-- `bun test tests/<file>.test.ts` while working; the whole suite runs faster as `bun tests/shards.ts 3`, three shards in copies of the checkout, as CI runs it.
+- `bun test tests/<file>.test.ts` while working; the whole suite as `bun run test`, every file at once in this checkout (`bun test --parallel`, the slowest first by `tests/timings.json`, which `bun run test:timings` measures again), as CI runs it. A test that writes into a fixture works on `fixtureCopy()` from `tests/scratch.ts`, and its scratch files go under `scratchDir()`, so no other file's build meets them.
 - The slow files: `new.test.ts` (scaffolds and type-checks apps), `browser.test.ts` (Chromium through `BUN_CHROME_PATH`), `check.test.ts`, `forms.test.ts`.
 - `examples.test.ts` and the app template's own tests run only with `TEST_DATABASE_URL`, a Postgres whose user may create databases.
-- Test runs in one checkout wait for each other (`tests/one-run.ts`), as they build into the same `.kay/client`. Work in parallel from a worktree instead: `just worktree <name>`, which Claude Code's own worktrees also go through (`.claude/hooks/worktree.ts`), starts at HEAD with its dependencies installed.
+- Test runs in one checkout wait for each other (`tests/one-run.ts`), as they build into the same `.kay` and fixtures; the workers of one parallel run share its turn. Work in parallel from a worktree instead: `just worktree <name>`, which Claude Code's own worktrees also go through (`.claude/hooks/worktree.ts`), starts at HEAD with its dependencies installed.
 
 ## A change is done when
 

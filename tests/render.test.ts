@@ -1,6 +1,6 @@
 import type { JSX } from '../src/runtime/jsx'
 import type { Todo } from './fixtures/app/src/todo'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { plugin } from 'bun'
 import { afterAll, describe, expect, it } from 'bun:test'
@@ -10,6 +10,7 @@ import { transformKay } from '../src/build/transform'
 import { collectHead } from '../src/runtime/head'
 import { child } from '../src/runtime/html'
 import { renderToString } from '../src/server/string'
+import { scratchDir } from './scratch'
 
 await plugin(kay())
 
@@ -52,7 +53,7 @@ interface InlineModule {
   load?: (context: unknown) => Promise<Record<string, unknown>>
 }
 
-const scratch = await mkdtemp(join(import.meta.dir, '.render-'))
+const scratch = await scratchDir('render-')
 let cases = 0
 
 afterAll(async () => {

@@ -2,18 +2,19 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'bun:test'
+import { outputDir } from '../src/build/assets'
 import { PRERENDERED_DIR, readManifest, writeManifest } from '../src/server/client'
 import { applyPageHooks, assetFiles, hookPrerendered } from '../src/server/page-hook'
 import { pageEtag } from '../src/server/prerendered'
 
 const scratch = await mkdtemp(join(tmpdir(), 'kay-page-hook-'))
-const clientDir = join(scratch, '.kay/client/dist')
+const clientDir = join(outputDir(scratch), 'dist')
 const publicDir = join(scratch, 'public')
 
 await Promise.all([
   Bun.write(join(clientDir, 'page-1a2b.css'), 'p{}'),
   Bun.write(join(clientDir, 'images/hero-640w.webp'), 'webp'),
-  Bun.write(join(scratch, '.kay/client/favicon/icon-192.png'), 'png'),
+  Bun.write(join(outputDir(scratch), 'favicon/icon-192.png'), 'png'),
   Bun.write(join(publicDir, 'post script.js'), 'console.log(1)'),
   Bun.write(join(scratch, 'secret.txt'), 'outside'),
 ])
@@ -28,7 +29,7 @@ describe('page hooks', () => {
 
     expect(await file('/repo/_kay/page-1a2b.css')).toBe(join(clientDir, 'page-1a2b.css'))
     expect(await file('/repo/_kay/images/hero-640w.webp')).toBe(join(clientDir, 'images/hero-640w.webp'))
-    expect(await file('/repo/icon-192.png')).toBe(join(scratch, '.kay/client/favicon/icon-192.png'))
+    expect(await file('/repo/icon-192.png')).toBe(join(outputDir(scratch), 'favicon/icon-192.png'))
     expect(await file('/repo/post%20script.js?v=1')).toBe(join(publicDir, 'post script.js'))
   })
 
@@ -55,7 +56,7 @@ describe('page hooks', () => {
     let running = 0
     let most = 0
 
-    await Promise.all(paths.map(async path => Bun.write(join(scratch, '.kay/client', PRERENDERED_DIR, `${path.slice(1)}.html`), `<p>${path}</p>`)))
+    await Promise.all(paths.map(async path => Bun.write(join(outputDir(scratch), PRERENDERED_DIR, `${path.slice(1)}.html`), `<p>${path}</p>`)))
     await writeManifest(scratch, { entryImports: [], islands: {}, styles: {}, pages })
     await hookPrerendered(scratch, [async ({ path, html }) => {
       most = Math.max(most, ++running)
@@ -70,7 +71,7 @@ describe('page hooks', () => {
     expect(most).toBe(8)
 
     for (const path of paths) {
-      const html = await Bun.file(join(scratch, '.kay/client', PRERENDERED_DIR, written[path]!.file)).text()
+      const html = await Bun.file(join(outputDir(scratch), PRERENDERED_DIR, written[path]!.file)).text()
 
       expect(html).toBe(`<p>${path} hooked ${path}</p>`)
       expect(written[path]!.etag).toBe(pageEtag(html))

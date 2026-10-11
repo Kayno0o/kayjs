@@ -1,7 +1,9 @@
 import { rm } from 'node:fs/promises'
+import { join } from 'node:path'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { mount, readPersisted, settle, writePersisted } from '../src/test'
+import { scratchDir } from './scratch'
 
 beforeAll(() => {
   GlobalRegistrator.register()
@@ -71,7 +73,8 @@ describe('mount', () => {
   })
 
   it('reports a component that does not compile, and builds it again once fixed', async () => {
-    const file = 'tests/fixtures/mount/.broken.kay'
+    const dir = await scratchDir('mount-')
+    const file = join(dir, 'broken.kay')
 
     try {
       await Bun.write(file, 'p {\n')
@@ -86,7 +89,7 @@ describe('mount', () => {
       unmount()
     }
     finally {
-      await rm(file, { force: true })
+      await rm(dir, { recursive: true, force: true })
     }
   })
 })

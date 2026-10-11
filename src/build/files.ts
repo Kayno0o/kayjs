@@ -1,5 +1,5 @@
 import type { Dirent } from 'node:fs'
-import { mkdir, readdir, readFile } from 'node:fs/promises'
+import { mkdir, readdir, readFile, rename } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 
 // Never source at any depth: dependencies, kay's own output and version control.
@@ -108,13 +108,16 @@ async function readable(dir: string): Promise<Dirent[]> {
   }
 }
 
-// Leaves an unchanged file alone, so watchers and editors reading it see no change.
+// Leaves an unchanged file alone, so watchers and editors reading it see no change, and moves a changed one into place whole, so a build reading it beside another process writing it never reads half of it.
 export async function writeIfChanged(path: string, content: string) {
   const file = Bun.file(path)
 
   if (await file.exists() && await file.text() === content)
     return
 
+  const draft = `${path}.${crypto.randomUUID()}.tmp`
+
   await mkdir(dirname(path), { recursive: true })
-  await Bun.write(path, content)
+  await Bun.write(draft, content)
+  await rename(draft, path)
 }

@@ -4,6 +4,7 @@ import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { inflateSync } from 'node:zlib'
 import { afterAll, describe, expect, it } from 'bun:test'
+import { clientDir } from '../src/build/assets'
 import { registerImage, setCardMaker, shareCard } from '../src/runtime/image'
 import { pages } from '../src/server'
 import { setupCards, writeCards } from '../src/server/card'
@@ -232,7 +233,7 @@ describe('share cards', () => {
   })
 
   it('writes at build time the cards prerendered pages asked for, which the route then serves as files', async () => {
-    const client = resolve('.kay/client/dist')
+    const client = clientDir(process.cwd())
     const hero = registerImage('/_kay/assets/card-hero.png', 1000, 600)
     const cache = await mkdtemp(join(tmpdir(), 'kay-cards-'))
     let name: string | undefined
@@ -268,7 +269,7 @@ describe('share cards', () => {
 
   it('reads the face and makes its key only once a card is linked, the key readable by its owner alone', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'kay-card-key-'))
-    const client = resolve('.kay/client/dist')
+    const client = clientDir(process.cwd())
 
     try {
       await pages(config)

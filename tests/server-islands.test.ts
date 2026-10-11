@@ -4,6 +4,7 @@ import process from 'node:process'
 import { gunzipSync } from 'node:zlib'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
+import { outputDir } from '../src/build/assets'
 import { compileKay } from '../src/compiler'
 import { hydrateIslands } from '../src/runtime/client'
 import { ISLAND_HEADER } from '../src/runtime/server-islands'
@@ -37,7 +38,7 @@ describe('server islands', () => {
       expect(written['/deferred']!.islands).toEqual(['defer'])
       expect(written['/plain']).toBeUndefined()
 
-      const built = await Bun.file(join(root, '.kay/client/pages/index.html')).text()
+      const built = await Bun.file(join(outputDir(root), 'pages/index.html')).text()
       const placeholder = DEFERRED.exec(built)![0]
 
       expect(built).toContain(INLINE)
@@ -108,18 +109,18 @@ describe('server islands', () => {
 
       expect(deferred.headers.get('cache-control')).toBe('public, max-age=0, must-revalidate')
       expect(deferred.headers.get('etag')).toBeTruthy()
-      expect(await deferred.text()).toBe(await Bun.file(join(root, '.kay/client/pages/deferred.html')).text())
+      expect(await deferred.text()).toBe(await Bun.file(join(outputDir(root), 'pages/deferred.html')).text())
 
       // One whose deferred island holds the form of a `minTime` action too: the island's fetch signs the stamp.
       const asking = await visit('/ask')
 
       expect(written['/ask']!.stamps).toBeUndefined()
       expect(asking.headers.get('etag')).toBeTruthy()
-      expect(await asking.text()).toBe(await Bun.file(join(root, '.kay/client/pages/ask.html')).text())
+      expect(await asking.text()).toBe(await Bun.file(join(outputDir(root), 'pages/ask.html')).text())
       expect(await (await visit('/ask?kay_island=0', { [ISLAND_HEADER]: '1' })).text()).toMatch(/<input type="hidden" name="kay_since" value="[\da-z]+\.[\w-]+">/)
     }
     finally {
-      await rm(join(root, '.kay/client/pages'), { recursive: true, force: true })
+      await rm(join(outputDir(root), 'pages'), { recursive: true, force: true })
       await writeManifest(root, manifest)
     }
   })
@@ -135,7 +136,7 @@ describe('server islands', () => {
       await expect(exporting).rejects.toThrow('deferred.kay: it holds a server island, which only a server renders per request')
     }
     finally {
-      await rm(join(root, '.kay/client/pages'), { recursive: true, force: true })
+      await rm(join(outputDir(root), 'pages'), { recursive: true, force: true })
       await writeManifest(root, manifest)
     }
   })

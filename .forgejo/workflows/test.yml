@@ -63,9 +63,9 @@ jobs:
           su postgres -c "psql -c \"CREATE USER test WITH PASSWORD 'test' SUPERUSER;\""
           echo "TEST_DATABASE_URL=postgres://test:test@127.0.0.1:5432/kay_app_test" >> "$GITHUB_ENV"
 
-      # Three shards at once in this one job, as the runner takes one job at a time: tests/shards.ts copies the checkout for each shard past the first.
+      # Every test file at once in this one checkout, a worker per core, the slowest files first by tests/timings.json.
       - name: Tests
-        run: bun tests/shards.ts 3
+        run: bun run test
 
       - name: Check the benchmark apps
         run: bun run bench:check

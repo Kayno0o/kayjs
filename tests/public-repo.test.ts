@@ -1,12 +1,10 @@
 import { join } from 'node:path'
-import process from 'node:process'
 import { $ } from 'bun'
 import { expect, it } from 'bun:test'
 
 // Spelled in parts so this file does not match itself.
 const privateDomain = ['kevyn', 'fr'].join('.')
-// A shard runs in a copy without `.git`: tests/shards.ts names the checkout it copied.
-const checkout = process.env.KAY_CHECKOUT ?? join(import.meta.dir, '..')
+const checkout = join(import.meta.dir, '..')
 
 it('names the forge and registry under kaynooo.fr only, a lockfile\'s tarball URLs included', async () => {
   const grep = await $`git -C ${checkout} grep -lIiF ${privateDomain}`.nothrow().quiet()

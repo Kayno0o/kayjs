@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
+import { outputDir } from '../src/build/assets'
 import { check } from '../src/check'
 import { localPath } from '../src/runtime/base'
 import { integer } from '../src/runtime/params'
@@ -12,6 +13,7 @@ import { routerShapes, shapeParams } from '../src/server/params'
 import { prerenderPages } from '../src/server/prerender'
 import { readRedirects, redirectProblems } from '../src/server/redirects'
 import { routeOf } from '../src/server/routes'
+import { fixtureCopy } from './scratch'
 
 const FIXTURE = 'tests/fixtures/routing'
 const routes = `${FIXTURE}/src/routes`
@@ -74,15 +76,15 @@ describe('param matchers', () => {
   })
 
   it('stop the server when one names a matcher nobody provides', async () => {
-    const dir = join(process.cwd(), FIXTURE, 'src/routes/x')
+    const copy = await fixtureCopy('routing')
 
     try {
-      await Bun.write(join(dir, '[id=nothing].kay'), 'p x\n')
+      await Bun.write(join(copy, 'src/routes/x/[id=nothing].kay'), 'p x\n')
 
-      await expect(pages({ routes, prebuilt: false })).rejects.toThrow('names the matcher nothing, which is neither')
+      await expect(pages({ routes: `${copy}/src/routes`, prebuilt: false })).rejects.toThrow('names the matcher nothing, which is neither')
     }
     finally {
-      await rm(dir, { recursive: true, force: true })
+      await rm(copy, { recursive: true, force: true })
     }
   })
 })
@@ -196,11 +198,11 @@ describe('prerendering', () => {
 
     try {
       expect(await prerenderPages(root, { routes }, (await readClient(root))!)).toBe(2)
-      expect(await Bun.file(join(root, '.kay/client/pages/blog.html')).text()).toContain('<p class="page">Page 1, a undefined</p>')
-      expect(await Bun.file(join(root, '.kay/client/pages/blog/2.html')).text()).toContain('<p class="page">Page 2, a number</p>')
+      expect(await Bun.file(join(outputDir(root), 'pages/blog.html')).text()).toContain('<p class="page">Page 1, a undefined</p>')
+      expect(await Bun.file(join(outputDir(root), 'pages/blog/2.html')).text()).toContain('<p class="page">Page 2, a number</p>')
     }
     finally {
-      await rm(join(root, '.kay/client/pages'), { recursive: true, force: true })
+      await rm(join(outputDir(root), 'pages'), { recursive: true, force: true })
       await writeManifest(root, manifest)
     }
   })
@@ -216,15 +218,16 @@ describe('kay check', () => {
   })
 
   it('reports a matcher nobody provides at the page naming it', async () => {
-    const page = join(FIXTURE, 'src/routes/x/[id=nothing].kay')
+    const copy = await fixtureCopy('routing')
+    const page = join(copy, 'src/routes/x/[id=nothing].kay')
 
     try {
       await Bun.write(page, 'p x\n')
 
-      expect((await check(FIXTURE)).map(({ file, message }) => ({ file: file.slice(file.indexOf(FIXTURE)), message }))).toEqual([{ file: page, message: 'names the matcher nothing, which is neither src/params/nothing.ts nor one kay ships: integer, slug, uuid' }])
+      expect((await check(copy)).map(({ file, message }) => ({ file: file.slice(file.indexOf(copy)), message }))).toEqual([{ file: page, message: 'names the matcher nothing, which is neither src/params/nothing.ts nor one kay ships: integer, slug, uuid' }])
     }
     finally {
-      await rm(join(FIXTURE, 'src/routes/x'), { recursive: true, force: true })
+      await rm(copy, { recursive: true, force: true })
     }
   })
 })

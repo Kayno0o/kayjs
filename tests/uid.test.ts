@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from 'node:fs/promises'
+import { rm } from 'node:fs/promises'
 import { join, relative } from 'node:path'
 import process from 'node:process'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
@@ -9,6 +9,7 @@ import { attempt, child, FAILED_MARKER } from '../src/runtime/html'
 import { collectIslands } from '../src/runtime/island.server'
 import { uid, withIds } from '../src/runtime/uid'
 import { settle } from '../src/test'
+import { scratchDir } from './scratch'
 
 await plugin(kay())
 
@@ -33,7 +34,7 @@ let menu: string
 let render: () => ReturnType<typeof collectIslands<string>>
 
 beforeAll(async () => {
-  dir = await mkdtemp(join(import.meta.dir, '.dom-'))
+  dir = await scratchDir('dom-')
   await Promise.all(Object.entries(FILES).map(async ([name, text]) => Bun.write(join(dir, name), text)))
   menu = relative(process.cwd(), join(dir, 'menu.kay'))
 

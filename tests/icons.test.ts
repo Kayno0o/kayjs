@@ -10,6 +10,7 @@ import { check } from '../src/check'
 import { iconNames, iconProps as setIconProps } from '../src/runtime/icons'
 import { trustHtml } from '../src/runtime/sanitize'
 import { pages } from '../src/server'
+import { fixtureCopy } from './scratch'
 
 const FIXTURE = join(import.meta.dir, 'fixtures/icons')
 const scratch = await mkdtemp(join(tmpdir(), 'kay-icons-'))
@@ -99,18 +100,18 @@ describe('icons', () => {
   })
 
   it('declares each installed icon as a module, so kay check reports a misspelt one', async () => {
-    const typo = join(FIXTURE, 'src/routes/typo.kay')
-
-    expect(iconTypes(FIXTURE)).toContain('declare module \'~icons/tabler/home\' {\n  const icon: import(\'kay/icons\').IconProps\n  export default icon\n}\n')
-    expect(await check(FIXTURE)).toEqual([])
+    const copy = await fixtureCopy('icons')
 
     try {
-      await Bun.write(typo, '---\nimport home from \'~icons/tabler/hom\'\n---\nsvg({...home})\n')
+      expect(iconTypes(copy)).toContain('declare module \'~icons/tabler/home\' {\n  const icon: import(\'kay/icons\').IconProps\n  export default icon\n}\n')
+      expect(await check(copy)).toEqual([])
 
-      expect((await check(FIXTURE)).map(diagnostic => [diagnostic.line, diagnostic.code])).toEqual([[2, 'TS2307']])
+      await Bun.write(join(copy, 'src/routes/typo.kay'), '---\nimport home from \'~icons/tabler/hom\'\n---\nsvg({...home})\n')
+
+      expect((await check(copy)).map(diagnostic => [diagnostic.line, diagnostic.code])).toEqual([[2, 'TS2307']])
     }
     finally {
-      await rm(typo, { force: true })
+      await rm(copy, { recursive: true, force: true })
     }
   })
 })

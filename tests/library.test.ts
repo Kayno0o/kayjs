@@ -1,8 +1,9 @@
-import { mkdtemp, readdir, rm, symlink } from 'node:fs/promises'
+import { readdir, rm, symlink } from 'node:fs/promises'
 import { join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { throughLinks } from '../src/build/links'
+import { scratchDir } from './scratch'
 
 const CLI = resolve('src/cli.ts')
 
@@ -56,7 +57,7 @@ function reported(output: string): string[] {
 }
 
 async function newProject(): Promise<string> {
-  const dir = await mkdtemp(join(import.meta.dir, '.dom-'))
+  const dir = await scratchDir('dom-')
 
   projects.push(dir)
   await write(dir, PROJECT)
@@ -75,8 +76,8 @@ describe.each(['@kaynooo/kayjs', '@kaynooo/kay'] as const)('a linked kay library
   let library: string
 
   beforeAll(async () => {
-    linked = await mkdtemp(join(import.meta.dir, '.dom-'))
-    library = await mkdtemp(join(import.meta.dir, '.dom-'))
+    linked = await scratchDir('dom-')
+    library = await scratchDir('dom-')
     await write(linked, { ...PROJECT, 'kay.config.ts': 'export default {}\n' })
     await write(library, { ...LIBRARY, 'package.json': manifest(kay) })
     await Bun.write(join(linked, 'node_modules/.keep'), '')
@@ -111,7 +112,7 @@ describe('a kay library hoisted above the project', () => {
   let project: string
 
   beforeAll(async () => {
-    workspace = await mkdtemp(join(import.meta.dir, '.dom-'))
+    workspace = await scratchDir('dom-')
     project = join(workspace, 'apps/site')
     await write(project, { ...PROJECT, 'kay.config.ts': 'export default {}\n', 'src/routes/index.kay': '---\nimport Framed from \'kay-lib/framed.kay\'\n---\nmain\n  Framed(label="hi")\n' })
     await write(join(workspace, 'node_modules/kay-lib'), { ...LIBRARY, 'src/framed.kay': '---\nimport Badge from \'./badge.kay\'\n\nconst { label } = props<{ label: string }>()\n---\ndiv.frame\n  Badge(label={label})\n' })
@@ -137,7 +138,7 @@ describe('a kay library hoisted above the project', () => {
 
 describe('throughLinks', () => {
   it('names a file of a linked package by its path under node_modules, scoped ones included, and leaves any other file as it is', async () => {
-    const tree = await mkdtemp(join(import.meta.dir, '.dom-'))
+    const tree = await scratchDir('dom-')
     const app = join(tree, 'app')
 
     projects.push(tree)
@@ -217,7 +218,7 @@ describe('kay libraries', () => {
   })
 
   it('renders a project nested below the working directory under kay test, named by KAY_ROOT', async () => {
-    const outer = await mkdtemp(join(import.meta.dir, '.dom-'))
+    const outer = await scratchDir('dom-')
 
     projects.push(outer)
     await write(join(outer, 'fixture'), PROJECT)
@@ -234,7 +235,7 @@ describe('kay libraries', () => {
 
   // A library linked from its own repository may hold the app checking it, as a playground does: the app's files stay its own.
   it.each(['installed', 'linked', 'linked around the app'] as const)('leaves errors inside a library\'s own modules to it, a missing optional peer included, and reports the app\'s calls into them, the library %s', async (layout) => {
-    const library = layout === 'installed' ? undefined : await mkdtemp(join(import.meta.dir, '.dom-'))
+    const library = layout === 'installed' ? undefined : await scratchDir('dom-')
     const project = layout === 'linked around the app' ? join(library!, 'playground') : await newProject()
 
     if (library !== undefined) {

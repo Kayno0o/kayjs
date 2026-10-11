@@ -8,6 +8,7 @@ import { patch } from '../src/runtime/dev-patch'
 import { cappedSizes } from '../src/runtime/image'
 import { DEV_PROBLEMS, LIVE_RELOAD, problemsBlock } from '../src/server/dev'
 import { settle } from '../src/test'
+import { scratchDir } from './scratch'
 
 interface ClientModule {
   mount: (element: HTMLElement) => () => void
@@ -18,7 +19,7 @@ let client: ClientModule
 
 // Bundles `main.kay` and the files beside it for the browser, and mounts it in a fresh element.
 async function mountKay(files: Record<string, string | Blob>): Promise<{ root: HTMLElement, dispose: () => Promise<void> }> {
-  const dir = await mkdtemp(join(import.meta.dir, '.dom-'))
+  const dir = await scratchDir('dom-')
 
   try {
     await Promise.all(Object.entries({ ...files, 'entry.ts': 'import { render } from \'kay/dom\'\nimport Main from \'./main.kay\'\n\nexport function mount(element: HTMLElement) {\n  return render(() => Main({}), element)\n}\n' }).map(async ([name, text]) => Bun.write(join(dir, name), text)))
@@ -755,7 +756,7 @@ describe('match blocks', () => {
 
 describe('bind:value on a number input', () => {
   it('keeps the signal\'s last number while the input is empty', async () => {
-    const dir = await mkdtemp(join(import.meta.dir, '.dom-'))
+    const dir = await scratchDir('dom-')
 
     try {
       await Bun.write(join(dir, 'number.kay'), '---\nimport { signal } from \'kay\'\nconst n = signal<number>(5)\n---\ninput#num(type="number" bind:value={n})\ninput#range(type="range" min="0" max="10" bind:value={n})\np#out {n()}\n')

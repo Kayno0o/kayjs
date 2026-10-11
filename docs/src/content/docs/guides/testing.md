@@ -60,7 +60,7 @@ const admin = await testSite({
 
 ## In a browser
 
-For what only a browser does, `testSite({ browser: true })` builds the islands and `site.open(path)` loads the page in headless Chrome:
+For what only a browser does, `testSite({ browser: true })` builds the islands and `site.open(path)` loads the page in headless Chrome. The build goes to `.kay/client`, or `.kay/client-<n>` in each worker of `bun test --parallel`, so test files running at once never overwrite each other's:
 
 ```ts
 import { afterAll, expect, it } from 'bun:test'

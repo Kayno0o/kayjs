@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { Elysia, t } from 'elysia'
+import { outputDir } from '../src/build/assets'
 import { check } from '../src/check'
 import { collection, highlightCode, renderMarkdown } from '../src/content'
 import { feedXml } from '../src/content/feed'
@@ -15,6 +16,7 @@ import { sanitizeHtml } from '../src/runtime'
 import { pages } from '../src/server'
 import { readClient, readManifest, writeManifest } from '../src/server/client'
 import { prerenderPages } from '../src/server/prerender'
+import { fixtureCopy } from './scratch'
 
 const FIXTURE = 'tests/fixtures/content'
 const routes = `${FIXTURE}/src/routes`
@@ -93,14 +95,14 @@ describe('prerendering a collection', () => {
     const manifest = (await readManifest(root))!
 
     try {
-      expect(await writeContentManifests(root, join(root, '.kay/client'), content)).toBe(5)
+      expect(await writeContentManifests(root, outputDir(root), content)).toBe(5)
       expect(await prerenderPages(root, { routes, content }, (await readClient(root))!)).toBe(2)
-      expect(await Bun.file(join(root, '.kay/client/pages/blog/hello.html')).text()).toContain('<h1 class="title">Hello world</h1>')
-      expect(await Bun.file(join(root, '.kay/client/pages/blog/draft.html')).exists()).toBe(false)
+      expect(await Bun.file(join(outputDir(root), 'pages/blog/hello.html')).text()).toContain('<h1 class="title">Hello world</h1>')
+      expect(await Bun.file(join(outputDir(root), 'pages/blog/draft.html')).exists()).toBe(false)
     }
     finally {
-      await rm(join(root, '.kay/client/pages'), { recursive: true, force: true })
-      await rm(join(root, '.kay/client/content'), { recursive: true, force: true })
+      await rm(join(outputDir(root), 'pages'), { recursive: true, force: true })
+      await rm(join(outputDir(root), 'content'), { recursive: true, force: true })
       await writeManifest(root, manifest)
     }
   })
@@ -108,27 +110,27 @@ describe('prerendering a collection', () => {
 
 describe('kay check', () => {
   it('types loads from the schema and reports an entry the schema or the components refuse, at its line', async () => {
-    const posts = join(FIXTURE, 'src/content/posts')
-    const page = join(FIXTURE, 'src/routes/typo.kay')
-
-    expect(await check(FIXTURE, { site: SITE, lints: { seo: 'allow' } })).toEqual([])
+    const copy = await fixtureCopy('content')
+    const posts = join(copy, 'src/content/posts')
+    const page = join(copy, 'src/routes/typo.kay')
 
     try {
+      expect(await check(copy, { site: SITE, lints: { seo: 'allow' } })).toEqual([])
+
       await Bun.write(join(posts, 'broken.md'), '---\ntitle: Broken\ndate: someday\n---\n\n<Missing />\n\n<Counter start="2" />\n\n<Callout kind="warn">\nText\n</Callout>\n')
       await Bun.write(page, '--- server\nimport { posts } from \'../content.config\'\n\nconst first = (await posts.all())[0]!\n---\np {first.data.titel}\n')
 
-      const diagnostics = (await check(FIXTURE, { site: SITE })).map(({ file, line, message }) => ({ file: file.slice(file.indexOf(FIXTURE)), line, message }))
+      const diagnostics = (await check(copy, { site: SITE })).map(({ file, line, message }) => ({ file: file.slice(file.indexOf(copy)), line, message }))
 
-      expect(diagnostics).toContainEqual({ file: `${FIXTURE}/src/content/posts/broken.md`, line: 3, message: expect.stringContaining('date: ') })
-      expect(diagnostics).toContainEqual({ file: `${FIXTURE}/src/content/posts/broken.md`, line: 6, message: 'uses <Missing>, which the collection\'s components do not name' })
-      expect(diagnostics.some(diagnostic => diagnostic.file === `${FIXTURE}/src/routes/typo.kay` && diagnostic.message.includes('titel'))).toBe(true)
+      expect(diagnostics).toContainEqual({ file: `${copy}/src/content/posts/broken.md`, line: 3, message: expect.stringContaining('date: ') })
+      expect(diagnostics).toContainEqual({ file: `${copy}/src/content/posts/broken.md`, line: 6, message: 'uses <Missing>, which the collection\'s components do not name' })
+      expect(diagnostics.some(diagnostic => diagnostic.file === `${copy}/src/routes/typo.kay` && diagnostic.message.includes('titel'))).toBe(true)
       // A component's props are typed as a template's would be: a string where it takes a number, a prop it does not take.
-      expect(diagnostics).toContainEqual({ file: `${FIXTURE}/src/content/posts/broken.md`, line: 8, message: expect.stringMatching(/^<Counter> takes other props: Type 'string' is not assignable to type 'number'/) })
-      expect(diagnostics).toContainEqual({ file: `${FIXTURE}/src/content/posts/broken.md`, line: 10, message: expect.stringMatching(/^<Callout> takes other props: Object literal may only specify known properties, and 'kind' does not exist/) })
+      expect(diagnostics).toContainEqual({ file: `${copy}/src/content/posts/broken.md`, line: 8, message: expect.stringMatching(/^<Counter> takes other props: Type 'string' is not assignable to type 'number'/) })
+      expect(diagnostics).toContainEqual({ file: `${copy}/src/content/posts/broken.md`, line: 10, message: expect.stringMatching(/^<Callout> takes other props: Object literal may only specify known properties, and 'kind' does not exist/) })
     }
     finally {
-      await rm(join(posts, 'broken.md'), { force: true })
-      await rm(page, { force: true })
+      await rm(copy, { recursive: true, force: true })
     }
   }, 30_000)
 })

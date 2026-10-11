@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { afterEach, describe, expect, it, setSystemTime } from 'bun:test'
 import { t } from 'elysia'
+import { outputDir } from '../src/build/assets'
 import { collection } from '../src/content'
 import { ContentError } from '../src/content/validate'
 import { cached } from '../src/runtime/cache'
@@ -223,7 +224,7 @@ describe('preview mode', () => {
       expect((await visit()).html).toContain('<h1>Launch moved</h1>')
     }
     finally {
-      await rm(join(root, '.kay/client/pages/news'), { recursive: true, force: true })
+      await rm(join(outputDir(root), 'pages/news'), { recursive: true, force: true })
       await writeManifest(root, manifest)
     }
   })

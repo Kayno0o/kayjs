@@ -1,9 +1,9 @@
 import type { ClientBuild } from '../src/server/client'
-import { join } from 'node:path'
 import process from 'node:process'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { t, ValidationError } from 'elysia'
+import { clientDir } from '../src/build/assets'
 import { persisted, signal } from '../src/runtime'
 import { action } from '../src/runtime/action'
 import { hydrateIslands } from '../src/runtime/client'
@@ -25,7 +25,7 @@ const FIELD = /^\/([^/]*)/
 // Made at module level, as an app's shared state is.
 const shared = createSignal('default')
 const FORMS = /<script type="application\/json" data-kay-forms>(.*?)<\/script>/
-const client: ClientBuild = { entry: '/_kay/entry.js', entryImports: [], islands: {}, styles: new Map(), pages: new Map(), dir: join(process.cwd(), '.kay', 'client', 'dist'), navigation: true }
+const client: ClientBuild = { entry: '/_kay/entry.js', entryImports: [], islands: {}, styles: new Map(), pages: new Map(), dir: clientDir(process.cwd()), navigation: true }
 const app = await servePages(process.cwd(), { routes, security: false }, async () => client)
 
 async function html(path: string): Promise<string> {

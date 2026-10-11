@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll } from 'bun:test'
 
-// The suite builds into this checkout's `.kay/client` and prerenders over it, so two runs at once, as from two terminals or sessions, break each other's tests: a second run waits for the first.
+// The suite builds into this checkout's `.kay` and its fixtures', and prerenders over them, so two runs at once, as from two terminals or sessions, break each other's tests: a second run waits for the first.
 const DIR = join(import.meta.dir, '..', '.kay')
 const LOCK = join(DIR, 'test-run.lock')
 // Passed on to the `bun test` runs the suite spawns itself, which must not wait for their parent.
@@ -94,7 +94,9 @@ function clearStale(stale: string) {
 }
 
 if (process.env[HELD] === undefined) {
-  const own = identity(process.pid)
+  // Under `bun test --parallel` the run is the parent process, whose workers all share the lock the first of them took.
+  const worker = process.env.BUN_TEST_WORKER_ID !== undefined
+  const own = identity(worker ? process.ppid : process.pid)
   let told = false
 
   mkdirSync(DIR, { recursive: true })
@@ -105,6 +107,9 @@ if (process.env[HELD] === undefined) {
 
   while (!take(own)) {
     const held = read(LOCK)
+
+    if (held === own)
+      break
 
     if (held !== undefined && !running(held)) {
       clearStale(held)
@@ -121,9 +126,12 @@ if (process.env[HELD] === undefined) {
   }
 
   process.env[HELD] = String(process.pid)
-  // `bun test` runs no `exit` listener, and a run stopped short leaves the lock to the next one, which finds its process gone.
-  afterAll(() => {
-    if (read(LOCK) === own)
-      rmSync(LOCK, { force: true })
-  })
+
+  // `bun test` runs no `exit` listener, and a run stopped short leaves the lock to the next one, which finds its process gone; so does a parallel run, as no worker knows it ends last.
+  if (!worker) {
+    afterAll(() => {
+      if (read(LOCK) === own)
+        rmSync(LOCK, { force: true })
+    })
+  }
 }

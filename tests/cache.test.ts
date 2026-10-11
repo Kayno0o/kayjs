@@ -5,11 +5,13 @@ import process from 'node:process'
 import { Database } from 'bun:sqlite'
 import { afterAll, afterEach, describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { Elysia } from 'elysia'
+import { outputDir } from '../src/build/assets'
 import { cached, invalidate, sqliteCache } from '../src/runtime/cache.server'
 import { pages } from '../src/server'
 import { readClient, readManifest, writeManifest } from '../src/server/client'
 import { prerenderPages } from '../src/server/prerender'
 import { feed } from './fixtures/production/src/news'
+import { scratchDir } from './scratch'
 
 afterEach(() => {
   setSystemTime()
@@ -216,7 +218,7 @@ describe('cached with a store', () => {
     }
     finally {
       news.edition = 1
-      await rm(join(root, '.kay/client/pages'), { recursive: true, force: true })
+      await rm(join(outputDir(root), 'pages'), { recursive: true, force: true })
       await writeManifest(root, manifest)
     }
   })
@@ -249,7 +251,7 @@ describe('cached with a store', () => {
   })
 
   it('builds for the browser, where kay/cache leaves SQLite out', async () => {
-    const dir = await mkdtemp(join(import.meta.dir, '.dom-'))
+    const dir = await scratchDir('dom-')
 
     dirs.push(dir)
     await Bun.write(join(dir, 'entry.ts'), 'import { cached } from \'kay/cache\'\n\nexport const posts = cached(\'posts\', 60, () => [])\n')
