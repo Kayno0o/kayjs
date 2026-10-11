@@ -1,0 +1,16 @@
+---
+import type { JSX } from 'kay'
+
+const { tone = 'info', label, compact = false, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'role'> & {
+  // An error is an alert, read out at once; the other tones are a status, read once the reader is idle.
+  tone?: 'info' | 'success' | 'warning' | 'error' | undefined
+  label?: string | undefined
+  // A line of text without the box, such as under a form's fields.
+  compact?: boolean | undefined
+  class?: string | undefined
+}>()
+---
+// A form's outcome or a refusal, in place: what a toast says in passing, said where the page stays.
+.kui-notice({...rest} role={tone === 'error' ? 'alert' : 'status'} data-tone={tone} data-compact={compact ? '' : undefined} class={className})
+  | {label}
+  slot

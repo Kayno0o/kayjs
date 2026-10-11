@@ -1,0 +1,31 @@
+---
+import { Board } from '@kaynooo/kayjs-ui/dnd'
+import { signal } from 'kay'
+
+// Columns whose cards really move in keyed lists, so a test sees where a later key press starts from.
+const columns = signal([
+  { id: 'todo', cards: [{ id: 1, title: 'Plan' }, { id: 2, title: 'Build' }] },
+  { id: 'done', cards: [{ id: 3, title: 'Ship' }] },
+])
+
+const board = new Board({
+  onMove: ({ item, from, to, index }) => columns.set((list) => {
+    const card = list.find(column => column.id === from)!.cards.find(entry => entry.id === item)!
+
+    return list.map((column) => {
+      const cards = column.cards.filter(entry => entry.id !== item)
+
+      if (column.id === to)
+        cards.splice(index, 0, card)
+
+      return { ...column, cards }
+    })
+  }),
+})
+---
+for column of columns() key={column.id}
+  div(role="group" aria-label={column.id} ref={board.container(column.id)})
+    for card of column.cards key={card.id}
+      button(type="button" ref={board.item(card.id, column.id)}) {card.title}
+if board.drop()
+  .bar(style={`left: ${board.drop()!.bar.left}px`})

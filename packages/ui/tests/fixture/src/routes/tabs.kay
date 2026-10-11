@@ -1,0 +1,6 @@
+---
+import PlanetTabs from '../components/planet-tabs.kay'
+---
+main
+  article#planets
+    PlanetTabs

@@ -1,0 +1,34 @@
+---
+import { signal } from 'kay'
+import Segmented from '@kaynooo/kayjs-ui/segmented.kay'
+import Toggle from '@kaynooo/kayjs-ui/toggle.kay'
+
+// `onPublish` and `onShare` stand for actions behind the switch and the group, answering once the test settles them.
+// With `mirror`, the page keeps their values as its own state, set before the change is saved.
+const { onRange, onDigest, onPublish, onShare, mirror = false } = props<{ onRange: (value: string) => void, onDigest: (checked: boolean) => void, onPublish?: (checked: boolean) => unknown, onShare?: (value: string) => unknown, mirror?: boolean }>()
+
+const published = signal(false)
+const sharing = signal<'private' | 'link' | 'public'>('private')
+const shares = [{ value: 'private', label: 'Private' }, { value: 'link', label: 'Link' }, { value: 'public', label: 'Public' }] as const
+
+function publish(checked: boolean) {
+  if (mirror)
+    published.set(checked)
+
+  return onPublish?.(checked)
+}
+
+function share(value: 'private' | 'link' | 'public') {
+  if (mirror)
+    sharing.set(value)
+
+  return onShare?.(value)
+}
+
+const ranges = [{ value: 'day', label: 'Day' }, { value: 'week', label: 'Week' }] as const
+---
+form#form
+  Segmented(label="Range" name="range" options={ranges} value="day" onChange={onRange})
+  Toggle(name="digest" label="Daily digest" onChange={onDigest})
+  Toggle#publish(name="public" label="Public" checked={published()} onChange={publish})
+  Segmented#share(label="Sharing" name="sharing" options={shares} value={sharing()} onChange={share})

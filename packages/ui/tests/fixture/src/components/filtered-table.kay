@@ -1,0 +1,28 @@
+---
+import type { Column } from '@kaynooo/kayjs-ui'
+import Table from '@kaynooo/kayjs-ui/table.kay'
+
+interface Moon {
+  name: string
+  planet: string
+  radius: number
+}
+
+const { rows, filterParam } = props<{ rows: Moon[], filterParam?: string }>()
+
+const columns: Column<Moon>[] = [
+  { key: 'name', header: 'Name', sortValue: true, defaultDirection: 'asc' },
+  { key: 'planet', header: 'Planet', cell: false },
+  { key: 'radius', header: 'Radius', numeric: true },
+]
+---
+Table(columns={columns} rows={rows} rowKey="name" filter={['name', 'planet']} filterLabel="Filter moons" filterParam={filterParam})
+  @cell(moon, column)
+    if column.key === 'name'
+      strong {moon.name}
+    else
+      | {moon.radius} km
+  @empty
+    p.nothing No moons
+  @noMatch
+    p.no-match No moon matches

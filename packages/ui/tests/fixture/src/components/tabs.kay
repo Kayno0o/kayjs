@@ -1,0 +1,6 @@
+---
+import TabNav from '@kaynooo/kayjs-ui/tab-nav.kay'
+
+const links = ['profile', 'keys', 'billing', 'danger'].map(name => ({ href: `/settings/${name}`, label: name }))
+---
+TabNav#tabs(links={links} current="/settings/billing" label="Settings")

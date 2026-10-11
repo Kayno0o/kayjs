@@ -1,0 +1,35 @@
+--- server
+const page = Number(ctx.url.searchParams.get('page') ?? 1)
+const here = ctx.url
+---
+---
+import Pagination from '@kaynooo/kayjs-ui/pagination.kay'
+import QrCode from '@kaynooo/kayjs-ui/qr-code.kay'
+---
+main
+  article#first
+    Pagination(page={1} pages={3} url="/posts?tag=kay")
+  article#middle
+    Pagination(page={page} pages={20} url={here} label="Posts" previousLabel="Précédent" nextLabel="Suivant")
+  article#paged
+    Pagination(of={{ page: 2, pages: 3, href: n => n === 1 ? '/blog' : `/blog/${n}` }})
+  article#single
+    Pagination(page={1} pages={1} url="/posts")
+  article#open
+    Pagination(page={2} more url="/gallery?tag=kay")
+  article#offset
+    Pagination(offset={40} limit={20} more={false} url="/gallery?offset=40&tag=kay")
+  article#open-single
+    Pagination(offset={0} limit={20} more={false} url="/gallery")
+  article#qr
+    QrCode(value="https://kaynooo.fr" label="kaynooo.fr" size={160})
+  article#qr-other
+    QrCode(value="https://kaynooo.fr/t" label="Tier lists")
+  article#qr-styled
+    QrCode(value="https://kaynooo.fr" label="Styled" options={{ foreground: '#7aa2f7' }})
+  article#qr-inline
+    QrCode(value="https://kaynooo.fr" label="Inline" size={120} inline options={{ foreground: 'currentColor', eyeColor: 'var(--color-accent)' }})
+  article#qr-decor
+    QrCode(value="https://kaynooo.fr")
+  article#qr-decor-inline
+    QrCode(value="https://kaynooo.fr" inline)

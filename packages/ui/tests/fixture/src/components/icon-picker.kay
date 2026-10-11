@@ -1,0 +1,13 @@
+---
+import type { IconChoice } from '@kaynooo/kayjs-ui'
+import IconPicker from '@kaynooo/kayjs-ui/icon-picker.kay'
+import { signal } from 'kay'
+
+// The test stands in for the app's search and reads back each pick; `#choose` passes the picker another icon, as a parent would.
+const { search, value, onChange } = props<{ search: (query: string, limit: number) => Promise<IconChoice[]>, value?: string, onChange: (name: string) => void }>()
+
+const chosen = signal(value)
+---
+form#form
+  IconPicker#picker(search={search} value={chosen()} name="icon" onChange={onChange})
+  button#choose(type="button" onClick={() => chosen.set('tabler:shape-3')}) Choose

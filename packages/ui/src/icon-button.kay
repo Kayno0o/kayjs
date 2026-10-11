@@ -1,0 +1,21 @@
+---
+import type { JSX } from 'kay'
+import type { IconProps } from 'kay/icons'
+import type { IconSlot } from './defaults'
+import Icon from './icon.kay'
+
+const { icon, label, size = 'md', variant = 'solid', type = 'button', class: className, ...rest } = props<Omit<JSX.IntrinsicElements['button'], 'type' | 'class' | 'children'> & {
+  icon: IconSlot | IconProps
+  // Names the action for screen readers and, as its tooltip, for everyone else, since the button shows nothing but the icon.
+  label: string
+  size?: 'xs' | 'sm' | 'md' | 'lg' | undefined
+  variant?: 'solid' | 'ghost' | 'inline' | 'danger' | undefined
+  type?: 'button' | 'submit' | 'reset' | undefined
+  class?: string | undefined
+}>()
+
+// Only the solid and danger variants are framed by the shell's hairline.
+const framed = () => variant === 'solid' || variant === 'danger'
+---
+button.kui-icon-btn({...rest} type={type} aria-label={label} data-tooltip={label} data-size={size} data-variant={variant} class={[{ 'kui-shell': framed(), 'kui-shell-danger': variant === 'danger' }, className]})
+  Icon(icon={icon})

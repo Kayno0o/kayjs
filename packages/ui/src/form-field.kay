@@ -1,0 +1,63 @@
+---
+import type { JSX } from 'kay'
+import { formIssues } from './forms'
+
+const { label, name, issue, hint, required = false, group = false, compact = false, action, class: className } = props<{
+  label: string
+  // The field the control posts as: inside a FormDialog, the message its call was refused with for that field shows here.
+  name?: string | undefined
+  // A message of the page's own, such as `ctx.failed(add)?.errors.title` after a plain form post.
+  issue?: string | undefined
+  // What the control takes or what it does, under it and above any message.
+  hint?: string | undefined
+  required?: boolean | undefined
+  // A control made of several inputs, such as a picker, is a labelled group rather than one label.
+  group?: boolean | undefined
+  // Sized by its control rather than the row, for a filter bar of fields side by side; it holds no message unless given a `name` or an `issue`.
+  compact?: boolean | undefined
+  // Sits on the label's line, pushed right: a preset button, a unit, a count.
+  action?: JSX.Element
+  class?: string | undefined
+}>()
+
+const refused = formIssues.use()
+const reports = () => !compact || name !== undefined || issue !== undefined
+const messages = () => [name === undefined ? undefined : refused?.()[name], issue].filter(message => message !== undefined)
+---
+// The control, as children, takes the `kui-field-input` look with no class of its own.
+// The hint and the messages sit outside the label, so the control is named by its label alone; the action too, since a button inside a label would take the label from the control.
+if group
+  fieldset.kui-form-field.kui-form-field-group(data-compact={compact ? '' : undefined} class={className})
+    legend.kui-form-field-head
+      span.kui-label-text
+        | {label}
+        if required
+          span.kui-form-field-required(aria-hidden="true") *
+    slot
+    if action
+      span.kui-form-field-action
+        | {action}
+    if hint
+      span.kui-form-field-hint {hint}
+    if reports()
+      span.kui-form-field-issues(aria-live="polite" data-field={name})
+        for message, index of messages() key={index}
+          span.kui-form-field-issue {message}
+else
+  .kui-form-field(data-compact={compact ? '' : undefined} class={className})
+    label.kui-form-field-label
+      span.kui-form-field-head
+        span.kui-label-text
+          | {label}
+          if required
+            span.kui-form-field-required(aria-hidden="true") *
+      slot
+    if action
+      span.kui-form-field-action
+        | {action}
+    if hint
+      span.kui-form-field-hint {hint}
+    if reports()
+      span.kui-form-field-issues(aria-live="polite" data-field={name})
+        for message, index of messages() key={index}
+          span.kui-form-field-issue {message}

@@ -1,0 +1,8 @@
+{
+  "name": "kayjs-ui-fixture",
+  "private": true,
+  "dependencies": {
+    "@iconify-json/tabler": "*",
+    "@kaynooo/kayjs-ui": "link:../.."
+  }
+}

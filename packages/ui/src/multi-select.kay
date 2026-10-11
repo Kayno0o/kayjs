@@ -1,0 +1,83 @@
+---
+import type { JSX } from 'kay'
+import type { MultiSelectOption } from './multi-select'
+import type { PopoverPlacement } from './popover'
+import { effect, signal } from 'kay'
+import Icon from './icon.kay'
+import { pickedShown, selectionSummary, toggledValue } from './multi-select'
+import Popover from './popover.kay'
+
+// Past this many options the panel opens on a search box.
+const SEARCH_FROM = 8
+
+const { id, options, value = [], label, placeholder = 'Any', searchLabel = 'Search', name, search, disabled = false, placement = 'bottom-start', onChange, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'id' | 'class' | 'children' | 'onChange'> & {
+  // The panel's id, unique on the page; one is drawn when none is given.
+  id?: string | undefined
+  options: readonly MultiSelectOption[]
+  // The values picked to start with; a control whose parent passes others follows them.
+  value?: string[] | undefined
+  // Names the control for screen readers.
+  label: string
+  // What the trigger reads while nothing is picked.
+  placeholder?: string | undefined
+  // The search box's placeholder, and with `label` after it, its name for screen readers.
+  searchLabel?: string | undefined
+  // Submits each picked value under this name, for a control inside a form.
+  name?: string | undefined
+  // Opens on a search box; on by default past eight options.
+  search?: boolean | undefined
+  disabled?: boolean | undefined
+  placement?: PopoverPlacement | undefined
+  onChange?: ((value: string[]) => void) | undefined
+  class?: string | undefined
+}>()
+
+const picked = signal<string[]>(value)
+const query = signal('')
+let root: HTMLElement | undefined
+
+effect(() => picked.set(value))
+
+const searchable = () => search ?? options.length > SEARCH_FROM
+
+const shown = () => {
+  const needle = query().trim().toLowerCase()
+
+  return needle ? options.filter(option => option.label.toLowerCase().includes(needle)) : options
+}
+
+function set(next: string[]) {
+  picked.set(next)
+  onChange?.(next)
+}
+
+// The panel only shows once the browser has opened the popover, so focus moves on its toggle rather than on the click; closing clears the search.
+function toggled(open: boolean) {
+  if (open)
+    root?.querySelector<HTMLInputElement>('.kui-multi-select-search, .kui-multi-select-checkbox')?.focus()
+  else
+    query.set('')
+}
+---
+.kui-multi-select({...rest} ref={element => root = element} class={className})
+  Popover(id={id} placement={placement} class="kui-multi-select-panel" aria-label={label} onToggle={toggled})
+    @trigger(attributes)
+      button.kui-field-input.kui-multi-select-trigger({...attributes} type="button" aria-label={label} disabled={disabled} data-empty={picked().length === 0 || undefined})
+        span.kui-multi-select-summary {selectionSummary(options, picked(), placeholder)}
+        Icon(icon="chevron" class="kui-multi-select-chevron")
+    if searchable()
+      input.kui-field-input.kui-multi-select-search(type="search" placeholder={searchLabel} aria-label={`${searchLabel} ${label}`} value={query()} onInput={event => query.set(event.currentTarget.value)})
+    .kui-multi-select-bar
+      // Under a search, All and None pick and drop only the options it shows.
+      button.kui-multi-select-action(type="button" disabled={shown().every(option => picked().includes(option.value))} onClick={() => set(pickedShown(options, picked(), shown(), true))}) All
+      button.kui-multi-select-action(type="button" disabled={!shown().some(option => picked().includes(option.value))} onClick={() => set(pickedShown(options, picked(), shown(), false))}) None
+    .kui-multi-select-options(role="group" aria-label={label})
+      for option of shown() key={option.value}
+        label.kui-multi-select-option
+          input.kui-multi-select-checkbox(type="checkbox" checked={picked().includes(option.value)} onChange={() => set(toggledValue(options, picked(), option.value))})
+          span.kui-multi-select-label {option.label}
+      if shown().length === 0
+        p.kui-multi-select-empty No match
+  if name
+    for entry of picked() key={entry}
+      input(type="hidden" name={name} value={entry} disabled={disabled})

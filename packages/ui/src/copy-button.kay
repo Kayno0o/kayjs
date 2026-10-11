@@ -1,0 +1,37 @@
+---
+import type { JSX } from 'kay'
+import { copy } from '@kaynooo/utils/browser/clipboard'
+import { signal } from 'kay'
+import { attempt } from './toast'
+
+const COPIED_MS = 2000
+
+const { text, label, html, variant = 'default', copiedLabel = 'Copied!', failure = 'Could not copy to the clipboard', class: className, ...rest } = props<Omit<JSX.IntrinsicElements['button'], 'class' | 'children' | 'onClick' | 'type'> & {
+  text: string
+  label: string
+  // A rendered version copied alongside `text`, which rich editors paste instead.
+  html?: string | undefined
+  variant?: 'default' | 'accent' | 'danger' | undefined
+  // What the button says for two seconds once the copy went through.
+  copiedLabel?: string | undefined
+  // Toasted when the browser refuses the copy.
+  failure?: string | undefined
+  class?: string | undefined
+}>()
+
+const copied = signal(false)
+
+async function press() {
+  if (!text)
+    return
+
+  const done = await attempt(async () => copy(text, html === undefined ? {} : { html }), failure)
+
+  if (!done)
+    return
+
+  copied.set(true)
+  setTimeout(() => copied.set(false), COPIED_MS)
+}
+---
+button.kui-btn.kui-copy-btn({...rest} type="button" class={[{ 'kui-btn-accent': variant === 'accent', 'kui-btn-danger': variant === 'danger' }, className]} onClick={press}) {copied() ? copiedLabel : label}

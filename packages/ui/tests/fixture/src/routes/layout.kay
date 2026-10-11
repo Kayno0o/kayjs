@@ -1,0 +1,43 @@
+---
+import Badge from '@kaynooo/kayjs-ui/badge.kay'
+import CardRow from '@kaynooo/kayjs-ui/card-row.kay'
+import CollapsibleSection from '@kaynooo/kayjs-ui/collapsible-section.kay'
+import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
+import SiteNav from '@kaynooo/kayjs-ui/site-nav.kay'
+import Widget from '@kaynooo/kayjs-ui/widget.kay'
+---
+main
+  article#section
+    PageSection(title="Moons")
+      @actions
+        a(href="/table") New
+      p Phobos
+  article#collapsed
+    CollapsibleSection(title="Older" open={false} boxed)
+      @meta
+        Badge(label={2})
+      p Deimos
+  article#widget
+    Widget(title="Visits" icon="info")
+      @actions
+        a(href="/content") All
+      p 42
+  article#empty-widget
+    Widget(title="Visits" isEmpty)
+      @empty
+        p.none No visits yet
+      p 42
+  article#hidden-widget
+    Widget(title="Visits" isEmpty)
+      p 42
+  article#row
+    CardRow
+      @left
+        span.dot
+      @right
+        span 3 moons
+      @actions
+        a(href="/form") Edit
+      | Mars
+  article#site-nav
+    SiteNav(id="main-links" links={[{ href: '/', label: 'Home' }, { href: '/chart', label: 'Chart' }, { href: '/charts', label: 'Charts' }, { href: '/charts/moons', label: 'Moons' }, { href: '/data', label: 'Data' }]} current="/charts/moons/" label="Main" menuLabel="Ouvrir le menu")

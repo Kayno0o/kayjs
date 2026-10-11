@@ -1,0 +1,27 @@
+---
+import { signal } from 'kay'
+import SidePanel from '@kaynooo/kayjs-ui/side-panel.kay'
+import SplitLayout from '@kaynooo/kayjs-ui/split-layout.kay'
+
+// What the test reads back: how often the panel closed.
+const { onClose, listWidthKey } = props<{ onClose: () => void, listWidthKey?: string }>()
+
+const open = signal(false)
+const sidebarOpen = signal(true)
+---
+button#open(onClick={() => open.set(true)}) Open
+button#shut(onClick={() => open.set(false)}) Shut
+SidePanel#panel(open={open()} title="Mars" onClose={() => { open.set(false); onClose() }})
+  @actions
+    button#next Next
+  @footer
+    button#save Save
+  p#body Fourth planet
+SplitLayout#split(sidebarOpen={sidebarOpen()} onSidebarClose={() => sidebarOpen.set(false)} sidebarTitle="Planets" resizableList listWidthKey={listWidthKey} detailOpen)
+  @sidebar
+    nav Inner, outer
+  @list
+    ul#list
+      li Mars
+  @detail
+    p#detail Mars

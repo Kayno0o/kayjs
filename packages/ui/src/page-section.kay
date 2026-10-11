@@ -1,0 +1,16 @@
+---
+import type { JSX } from 'kay'
+
+const { title, actions, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['section'], 'class' | 'title'> & {
+  title: string
+  // The end of the head line: a `+` IconButton, a link, a row of controls.
+  actions?: JSX.Element
+  class?: string | undefined
+}>()
+---
+// A titled stretch of a page, its title one level under the page's own.
+section.kui-page-section({...rest} class={className})
+  .kui-page-section-head
+    h2.kui-heading-section.kui-page-section-title {title}
+    | {actions}
+  slot

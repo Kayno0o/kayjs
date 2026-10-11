@@ -1,0 +1,16 @@
+---
+import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
+import TooltipHost from '@kaynooo/kayjs-ui/tooltip-host.kay'
+import { toast } from '@kaynooo/kayjs-ui'
+
+// The app's hosts, which an extension's own come after, as a layout wraps its pages.
+const app = signal(true)
+---
+button#saved(onClick={() => toast.success('Saved')}) Save
+button#unmount(onClick={() => app.set(false)}) Unmount
+button#tip(data-tooltip="Copy") Copy
+if app()
+  Toaster
+  TooltipHost
+Toaster
+TooltipHost

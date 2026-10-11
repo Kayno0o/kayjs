@@ -1,0 +1,40 @@
+---
+import type { IconSlot } from './defaults'
+import type { ToastType } from './toast'
+import { effect, signal } from 'kay'
+import { claim } from './claim'
+import Icon from './icon.kay'
+import IconButton from './icon-button.kay'
+import { dismissToast, holdToasts, toasts } from './toast'
+
+const ICONS: Record<ToastType, IconSlot> = { error: 'alert', success: 'success', info: 'info' }
+
+const toaster = signal<HTMLElement>()
+// An extension rendering its own Toaster inside an app that has one shows each toast once.
+const owns = claim('toaster')
+
+// A manual popover lives in the top layer, and showing it again lifts it above any dialog opened since.
+effect(() => {
+  const shown = toasts().length > 0
+
+  const element = toaster()
+
+  // The element is gone while another Toaster owns the job, and a detached one cannot show as a popover.
+  if (!element?.isConnected)
+    return
+
+  if (element.matches(':popover-open'))
+    element.hidePopover()
+
+  if (shown)
+    element.showPopover()
+})
+---
+if owns()
+  // Holding still while the pointer is on the toasts or focus is in them, as timed content must let itself be paused.
+  .kui-toaster(ref={element => toaster.set(element)} popover="manual" onPointerEnter={() => holdToasts('pointer', true)} onPointerLeave={() => holdToasts('pointer', false)} onFocusIn={() => holdToasts('focus', true)} onFocusOut={event => toaster()?.contains(event.relatedTarget as Node | null) || holdToasts('focus', false)})
+    for item of toasts() key={item.id}
+      .kui-toast(role={item.type === 'error' ? 'alert' : 'status'} data-type={item.type})
+        Icon(icon={ICONS[item.type]} class="kui-toast-icon")
+        p.kui-toast-message {item.message}
+        IconButton(icon="close" label="Dismiss notification" size="sm" variant="inline" class="kui-toast-dismiss" onClick={() => dismissToast(item.id)})

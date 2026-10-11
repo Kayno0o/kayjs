@@ -1,0 +1,98 @@
+--- <Output>
+import type { Action, Failure, FailureData, JSX } from 'kay'
+import { ActionError, effect, signal, uid } from 'kay'
+import Button from './button.kay'
+import Dialog from './dialog.kay'
+import { formIssues } from './forms'
+import { toast } from './toast'
+
+
+const { open, title, action, submitLabel, failure, refused, onSaved, onClose, extra, id, class: className } = props<{
+  // Shows the dialog; the parent sets it back to false in `onClose`.
+  open: boolean
+  title: string
+  // The page's action the form calls with its fields, imported from the page: the server reads them as a plain form post, coercing numbers, booleans and lists.
+  action: Action<never, Output>
+  submitLabel: string
+  // Toasted when the call fails other than on a field; a refused field shows its message on its FormField.
+  failure: string
+  // What a refusal of the action's handler says, from the data it passed to `ctx.fail`: a message per field, each shown on its FormField, or one message, toasted. Without it, or when it answers undefined or an empty message, `failure` is toasted.
+  refused?: ((data: FailureData<Output>) => Record<string, string> | string | undefined) | undefined
+  // What the action returned, for the page to patch into what it shows. The dialog closes once it has run.
+  onSaved?: ((result: Exclude<Output, Failure<unknown>>) => void) | undefined
+  // Called however the dialog closes, saved or not.
+  onClose: () => void
+  // The left end of the footer, for a delete button.
+  extra?: JSX.Element
+  // Pairs the footer's submit button with the form; one unique on the page is drawn when none is given.
+  id?: string | undefined
+  class?: string | undefined
+}>()
+
+const formId = id ?? uid()
+const issues = signal<Record<string, string>>({})
+let form: HTMLFormElement | undefined
+
+formIssues.provide(issues)
+
+// The dialog drops its content once closed, which empties the form; however it closed, its messages are cleared too, so the next open starts afresh.
+effect(() => {
+  if (!open)
+    issues.set({})
+})
+
+// Whether a FormField of the form shows the messages refused for `name`.
+function shown(name: string) {
+  return [...form?.querySelectorAll('[data-field]') ?? []].some(field => field.getAttribute('data-field') === name)
+}
+
+async function submit(event: SubmitEvent) {
+  event.preventDefault()
+
+  if (action.pending())
+    return
+
+  let result: Exclude<Output, Failure<unknown>>
+
+  try {
+    result = await action(new FormData(form))
+  }
+  catch (error) {
+    // The schema refuses fields; the handler refuses with data of its own, which `refused` reads, a single message going under the empty name as the whole form's.
+    const said = error instanceof ActionError && error.data !== undefined ? refused?.(error.data as FailureData<Output>) : undefined
+    const byField = { ...error instanceof ActionError ? error.errors : {}, ...typeof said === 'string' ? said === '' ? {} : { '': said } : said }
+    const messages = Object.entries(byField)
+
+    issues.set(byField)
+
+    // A message no FormField shows, such as a limit or a refusal of the whole form under the empty name, is toasted rather than lost; a failure carrying none toasts the page's own message.
+    for (const message of messages.length === 0 ? [failure] : messages.filter(([name]) => !shown(name)).map(([, message]) => message))
+      toast.error(message)
+
+    return
+  }
+
+  // Outside the `try`, so a page failing to patch the saved result in surfaces as the bug it is rather than as a refused save.
+  onSaved?.(result)
+  onClose()
+}
+
+// Enter in a single-line field submits on its own; a textarea keeps Enter for new lines and takes Ctrl+Enter.
+function submitOnCtrlEnter(event: KeyboardEvent) {
+  if (event.key !== 'Enter' || !event.ctrlKey)
+    return
+
+  event.preventDefault()
+  form?.requestSubmit()
+}
+---
+// Only a click outside or Escape closes the dialog while `open` is still true; every other way has already closed it.
+Dialog(open={open} title={title} dirty={action.pending()} class={className} onClose={() => open && onClose()})
+  @footer
+    .kui-form-dialog-footer
+      | {extra}
+      .kui-form-dialog-actions
+        Button(label="Cancel" disabled={action.pending()} onClick={() => onClose()})
+        Button(label={action.pending() ? 'Saving…' : submitLabel} type="submit" form={formId} variant="accent" busy={action.pending()} disabled={action.pending()})
+  form.kui-form-grid(id={formId} ref={element => form = element} onSubmit={submit} onKeyDown={submitOnCtrlEnter})
+    slot
