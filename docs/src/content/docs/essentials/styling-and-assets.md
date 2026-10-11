@@ -126,7 +126,7 @@ export default defineConfig({
 })
 ```
 
-`image('/media/42', { width, height })` then resizes that `src`. The answers are private to the browser, revalidated by their ETag, and `resolve` gets the guard's `ctx` too. The `src` is whatever a visitor asks for: look it up, never join it to a directory, since the path `resolve` returns is read as it is. A static export has no image route, so it refuses `resolve`.
+`image('/media/42', { width, height })` then resizes that `src`. The answers are private to the browser, revalidated by their ETag, and `resolve` gets the guard's `ctx` too. There `ctx.locals` holds what the app's plugins add, such as the session, but not Elysia's `cookie`, `query`, `headers` or `body`: read `ctx.cookies`, `ctx.url` and `ctx.request` instead. The `src` is whatever a visitor asks for: look it up, never join it to a directory, since the path `resolve` returns is read as it is. A static export has no image route, so it refuses `resolve`.
 
 ## Fonts
 

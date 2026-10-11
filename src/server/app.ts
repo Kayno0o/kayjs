@@ -43,7 +43,7 @@ import { withPageHeaders } from './page-headers'
 import { assetFiles } from './page-hook'
 import { loadPrerendered, pageResponder, servePageRoutes } from './page-routes'
 import { DRAFT_BODY_LIMIT, serveDrafts, servePreview } from './preview'
-import { requestId, trustProxy } from './protection'
+import { REQUEST_ID_HEADER, requestId, trustProxy } from './protection'
 import { claimPublic, publicFiles, servePublic } from './public'
 import { claimRedirects, readRedirects, serveRedirects } from './redirects'
 import { remoteImages, remotePatterns } from './remote'
@@ -202,7 +202,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
 
   // After the rewrite, which hands the request served in its place the id it had.
   app.onRequest(({ request, set }) => {
-    set.headers['x-request-id'] = requestId(request)
+    set.headers[REQUEST_ID_HEADER] = requestId(request)
   })
 
   if (base !== '')

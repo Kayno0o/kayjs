@@ -2,7 +2,7 @@ import type { AnyElysia, Elysia } from 'elysia'
 import type { Duration } from './duration'
 import type { Component, JSX } from './jsx'
 
-// Types behind the checks `kay check` adds to generated code; nothing here runs.
+// Types behind the checks `kay check` adds to generated code; nothing here runs but the one message `kay check` reads back.
 
 declare const ISLAND: unique symbol
 
@@ -94,13 +94,16 @@ type IsRoute<Path extends string> = [RoutePatterns] extends [never]
 // The route tree of a module under `src/api`, from its default export.
 export type ApiRoutesOf<Module> = Module extends { default: { '~Routes': infer Routes } } ? Routes : Record<never, never>
 
+// What a site-relative path nothing serves fails with, which `kay check` reads to leave an extension the paths outside its prefix.
+export const UNSERVED_MESSAGE = 'No page, public file or app route serves'
+
 // A site-relative literal must match a page; opaque strings, relative paths, other schemes and what kay serves under `/_kay/`, such as resized images, are not checked.
 export type CheckedHref<Href extends string> = string extends Href
   ? unknown
   : Href extends `//${string}` | `/_kay/${string}`
     ? unknown
     : Href extends `/${string}`
-      ? IsRoute<PathOf<Href>> extends true ? unknown : { kayError: `No page, public file or app route serves ${PathOf<Href>}` }
+      ? IsRoute<PathOf<Href>> extends true ? unknown : { kayError: `${typeof UNSERVED_MESSAGE} ${PathOf<Href>}` }
       : unknown
 
 type Digit = '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9'

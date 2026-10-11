@@ -2,12 +2,15 @@
 import type { KayLibrary } from '../build/libraries'
 import type { Span } from '../compiler/ast'
 import type { LintLevel, LintName } from '../compiler/lints'
+import type { I18nConfig } from '../config'
 import type { RouteMount } from '../server/routes'
 import type { ShadowFile } from './shadow'
 import { existsSync, realpathSync } from 'node:fs'
 import { relative, resolve, sep } from 'node:path'
 import { libraryOf } from '../build/libraries'
 import { typeLint } from '../compiler/lints'
+import { UNSERVED_MESSAGE } from '../runtime/checks'
+import { localePrefixes, localeSettings } from '../server/i18n'
 import { sourceSpan } from './shadow'
 
 // What `noUnusedLocals` reports: `kay check` turns it on for .kay files, and leaves other files to the project's tsconfig.
@@ -21,7 +24,7 @@ const LEADING_NAME = /^[a-z_$][\w$]*/i
 const MEMBER_OF = /([a-z_$][\w$]*)\??\.$/i
 const KAY_FILE = /\.kay$/
 // The error `CheckedHref` gives a site-relative path nothing serves.
-const UNSERVED = /No page, public file or app route serves (\/[^"'`;\s]*)/
+const UNSERVED = new RegExp(`${UNSERVED_MESSAGE} (/[^"'\`;\\s]*)`)
 
 // What tsgo reports, at offsets into the file it read.
 export interface TsgoDiagnostic {
@@ -93,16 +96,29 @@ export function unusedCodesOf(shown: string | undefined): Set<number> {
   return compilerOptions?.noUnusedLocals === true ? UNUSED_CODES : compilerOptions?.noUnusedParameters === true ? UNUSED_PARAMETER_CODES : new Set()
 }
 
-// A path an extension's routes name outside its own prefix, such as `/` to go back to the site, is the app's, which no extension can know: only a path into its own routes is checked.
-export function servedByTheApp(file: string, message: string, mounts: RouteMount[]): boolean {
-  const path = UNSERVED.exec(message)?.[1]
+// A path an extension's routes name outside its own prefix, such as `/` to go back to the site, is the app's, which no extension can know: only a path into its own routes is checked, under a locale's prefix too.
+export function servedByTheApp(file: string, message: string, mounts: RouteMount[], locales: string[]): boolean {
+  const named = UNSERVED.exec(message)?.[1]
 
-  if (path === undefined)
+  if (named === undefined)
     return false
+
+  const locale = locales.find(locale => named === `/${locale}` || named.startsWith(`/${locale}/`))
+  const path = locale === undefined ? named : named.slice(locale.length + 1) || '/'
 
   const mount = mounts.find(({ dir }) => [dir, existsSync(dir) ? realpathSync(dir) : dir].some(root => file.startsWith(root + sep)))
 
   return mount !== undefined && (mount.prefix === '' || (path !== mount.prefix && !path.startsWith(`${mount.prefix}/`)))
+}
+
+// The prefixes the locales serve pages under, none where the config is one the server refuses, which `kay check` reports itself.
+export function servedLocales(config: I18nConfig | undefined): string[] {
+  try {
+    return config ? localePrefixes(localeSettings(config)) : []
+  }
+  catch {
+    return []
+  }
 }
 
 // A library's own modules are its to check, as `skipLibCheck` leaves a declaration file's, a missing optional peer included: only its components compile as the app's. An app inside a linked library's repository keeps its own files.

@@ -679,7 +679,7 @@ describe('preview mode', () => {
     expect(await edited('/news')).toBe('<li>news:launch</li><li>news:roadmap</li>')
     expect(await edited('/articles/hello')).toBe('<li>articles:hello@fr</li>')
     expect((await get('/marks/launch', preview)).html).not.toContain('draft-editor')
-    // The editor's own extension's screens render none, nor do what they fail with or a path under its prefix nothing serves, the app's error pages included; an app page replacing one of its screens and another extension's page do.
+    // The editor's own extension's screens render none, nor do what they fail with, the app's error pages included; an app page replacing one of its screens and another extension's page do.
     const shown = async (path: string, text: string) => {
       const { html } = await get(path, edit)
 
@@ -692,7 +692,9 @@ describe('preview mode', () => {
     expect(await shown('/admin/screens/broken', 'Screen failed')).toBe(false)
     expect(await shown('/admin/broken', 'Admin failed')).toBe(false)
     expect(await shown('/admin/locked', 'Admin failed')).toBe(false)
+    // A URL no page serves is answered outside preview mode, under the prefix or not.
     expect(await shown('/admin/nope', 'Nothing here')).toBe(false)
+    expect(await shown('/nope', 'Nothing here')).toBe(false)
     expect(await shown('/admin/settings', '<h1>Settings</h1>')).toBe(true)
     expect((await get('/admin/settings', edit)).html).not.toContain('extension')
     expect(await shown('/blog', '<h1>Blog</h1>')).toBe(true)

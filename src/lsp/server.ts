@@ -15,7 +15,7 @@ import { KAY_DIR } from '../build/assets'
 import { findKayFiles } from '../build/files'
 import { importedSignals } from '../build/signals'
 import { configCheckOptions, configProblems, contentChecks, generatedChecks, generatedProblem, projectProblems, stopProbes, TSGO, writeShadowTypes } from '../check'
-import { diagnoseShadow, reportsTypeErrors, servedByTheApp } from '../check/diagnose'
+import { diagnoseShadow, reportsTypeErrors, servedByTheApp, servedLocales } from '../check/diagnose'
 import { compileShadow, generatedSpan, shadowPath, shadowSource, sourceSpan } from '../check/shadow'
 import { formatKay } from '../compiler/format'
 import { lintLevels } from '../compiler/lints'
@@ -39,8 +39,11 @@ interface Project {
   root: string
   options: CheckOptions
   routesDir: string
-  // The routes its extensions mount.
+  // The routes its extensions mount, and their directories, which every compile reads.
   mounts: RouteMount[]
+  mountDirs: string[]
+  // The prefixes its locales serve pages under.
+  locales: string[]
   shadowTree: string
   shadowFiles: Set<string>
   // As of the last shadow write: the static components only islands render, the library components the app never imports, whose errors are the library's, and the libraries.
@@ -324,6 +327,8 @@ export class KayLanguageServer {
     project.options = { ...configCheckOptions(config), routes: (project.root === this.root ? this.routesSetting : undefined) ?? config.routes }
     project.routesDir = projectPaths(project.root, project.options).routes
     project.mounts = routeMounts(project.root, project.options.extensions)
+    project.mountDirs = project.mounts.map(mount => mount.dir)
+    project.locales = servedLocales(project.options.i18n)
     project.configured = true
   }
 
@@ -332,7 +337,7 @@ export class KayLanguageServer {
     let project = this.projects.get(root)
 
     if (!project)
-      this.projects.set(root, project = { root, options: {}, routesDir: projectPaths(root).routes, mounts: [], shadowTree: `${projectPaths(root).types}/`, shadowFiles: new Set(), islandOnly: new Set(), unreached: new Set(), libraries: [], configured: false })
+      this.projects.set(root, project = { root, options: {}, routesDir: projectPaths(root).routes, mounts: [], mountDirs: [], locales: [], shadowTree: `${projectPaths(root).types}/`, shadowFiles: new Set(), islandOnly: new Set(), unreached: new Set(), libraries: [], configured: false })
 
     return project
   }
@@ -353,7 +358,7 @@ export class KayLanguageServer {
     const project = this.projectAt(projectRootOf(file, this.root))
     const insideIsland = project.islandOnly.has(file)
     const signals = importedSignals(file, source)
-    const { shadow, diagnostics } = compileShadow(project.root, file, source, { routesDir: project.routesDir, mounts: project.mounts.map(mount => mount.dir), insideIsland, lints: project.options.lints, signals })
+    const { shadow, diagnostics } = compileShadow(project.root, file, source, { routesDir: project.routesDir, mounts: project.mountDirs, insideIsland, lints: project.options.lints, signals })
     const document = { ...shadow, uri, shadowUri: pathToFileURL(shadowPath(project.root, file)).href, version, diagnostics, insideIsland, signals: JSON.stringify(signals) }
 
     this.documents.set(uri, document)
@@ -483,7 +488,7 @@ export class KayLanguageServer {
       const start = toOffset(document.tsx, diagnostic.range.start)
       const diagnosed = diagnoseShadow(document, { code: typeof diagnostic.code === 'number' ? diagnostic.code : undefined, message: diagnostic.message, start, end: toOffset(document.tsx, diagnostic.range.end) }, levelAt)
 
-      if (!diagnosed || servedByTheApp(document.file, diagnosed.message, project.mounts))
+      if (!diagnosed || servedByTheApp(document.file, diagnosed.message, project.mounts, project.locales))
         return []
 
       return [{
@@ -824,7 +829,7 @@ export class KayLanguageServer {
     const file = shadowSource(project.root, path)
     const source = Bun.file(file)
 
-    return await source.exists() ? compileShadow(project.root, file, await source.text(), { routesDir: project.routesDir, mounts: project.mounts.map(mount => mount.dir), insideIsland: project.islandOnly.has(file), lints: project.options.lints }).shadow : undefined
+    return await source.exists() ? compileShadow(project.root, file, await source.text(), { routesDir: project.routesDir, mounts: project.mountDirs, insideIsland: project.islandOnly.has(file), lints: project.options.lints }).shadow : undefined
   }
 
   // `offset` is the position in the .kay source.

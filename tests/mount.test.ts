@@ -70,7 +70,7 @@ describe('mount', () => {
     unmount()
   })
 
-  it('stops revealing where a beforematch listener hides the element again', async () => {
+  it('stops revealing where a beforematch listener hides the element again or shows it itself, as the spec does', async () => {
     const focused: boolean[] = []
     const { root, unmount } = await mount('tests/fixtures/mount/until-found.kay', { onFocused: (took: boolean) => focused.push(took) })
 
@@ -82,6 +82,18 @@ describe('mount', () => {
     expect(root.querySelector('details')!.open).toBe(false)
     expect(root.querySelector('.outer')!.getAttribute('hidden')).toBe('until-found')
     unmount()
+
+    // A tab list showing its panel on the event: the panels around it stay as they are.
+    const shown = await mount('tests/fixtures/mount/until-found.kay', { onFocused: (took: boolean) => focused.push(took) })
+
+    shown.root.addEventListener('beforematch', event => (event.target as Element).removeAttribute('hidden'))
+    shown.root.querySelector<HTMLButtonElement>('.save')!.click()
+    await answered(focused, 2)
+
+    expect(shown.root.querySelector('.inner')!.hasAttribute('hidden')).toBe(false)
+    expect(shown.root.querySelector('details')!.open).toBe(false)
+    expect(shown.root.querySelector('.outer')!.getAttribute('hidden')).toBe('until-found')
+    shown.unmount()
   })
 
   it('reveals nothing for a field that cannot take focus', async () => {

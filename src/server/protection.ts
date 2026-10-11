@@ -52,6 +52,9 @@ const limitLists = new WeakMap<object, ActionLimit[]>()
 const memories = new Map<string, ReturnType<typeof memoryRates>>()
 let warnedUnconfigured = false
 const requestIds = new WeakMap<Request, string>()
+
+// The header a request's id comes in from a trusted proxy and goes out on, every context holding it.
+export const REQUEST_ID_HEADER = 'x-request-id'
 // What an id a proxy passed on may hold, so it can neither forge a log line nor swell one.
 const PASSED_ID = /^[\w.:+/=@-]{1,128}$/
 
@@ -391,7 +394,7 @@ export function keepRequestId(request: Request, id: string): void {
 }
 
 function passedId(request: Request): string | undefined {
-  const id = request.headers.get('x-request-id')
+  const id = request.headers.get(REQUEST_ID_HEADER)
 
   if (id === null || !proxies.get(request) || !PASSED_ID.test(id))
     return undefined

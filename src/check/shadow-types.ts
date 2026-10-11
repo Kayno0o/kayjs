@@ -51,6 +51,8 @@ export interface ShadowTypes {
   exports: Map<number, { file: string, wanted: string }>
   // The static components only islands render, which compile as rendered inline with them.
   islandOnly: Set<string>
+  // The routes the extensions mount.
+  mounts: RouteMount[]
 }
 
 // What the project serves, which links are checked against.
@@ -80,7 +82,7 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
   const problems: CheckDiagnostic[] = []
   const mounts = routeMounts(root, options.extensions)
   const own = await ownShadows(root, options, tree, mounts)
-  const served = await servedProject(root, options, problems)
+  const served = await servedProject(root, options, problems, mounts)
   const libraries = await libraryShadows(root, options, own.files, tree, mounts)
 
   await tree.write('kay-env.d.ts', await environmentTypes(root, options, served))
@@ -104,7 +106,7 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
   // `contentChecks` writes the props check once it read the collections.
   await tree.removeStale([CONTENT_CHECK])
 
-  return { files: tree.shadows, diagnostics: [...own.diagnostics, ...libraries.diagnostics], problems, unreached: libraries.unreached, libraries: libraries.libraries, settings: replaced.lines, exports: exported.lines, islandOnly: own.islandOnly }
+  return { files: tree.shadows, diagnostics: [...own.diagnostics, ...libraries.diagnostics], problems, unreached: libraries.unreached, libraries: libraries.libraries, settings: replaced.lines, exports: exported.lines, islandOnly: own.islandOnly, mounts }
 }
 
 function shadowTree(dir: string): ShadowTree {
@@ -219,9 +221,8 @@ function packageRoot(dir: string): string {
 }
 
 // The pages, public files, API modules and endpoints, with the locale settings, each with the reason the server would refuse it reported.
-async function servedProject(root: string, options: CheckOptions, problems: CheckDiagnostic[]): Promise<ServedProject> {
+async function servedProject(root: string, options: CheckOptions, problems: CheckDiagnostic[], mounts: RouteMount[]): Promise<ServedProject> {
   const paths = projectPaths(root, options)
-  const mounts = routeMounts(root, options.extensions)
   const [routes, found, apiModules, endpoints] = await Promise.all([scanRoutes(paths.routes, mounts), publicFiles(paths.public), apiModulesOf(root, options, problems), endpointsOf(paths.routes, mounts)])
   const settings = options.i18n && i18nSettings(root, options.i18n, problems)
 

@@ -6,6 +6,7 @@ import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { parse } from 'devalue'
 import { t } from 'elysia'
+import { servedByTheApp, servedLocales } from '../src/check/diagnose'
 import { readShadowSettings } from '../src/check/shadow'
 import { mergeConfig } from '../src/config'
 import { apiStubs } from '../src/server/api'
@@ -394,8 +395,8 @@ const LOCAL_CHECKED: Record<string, string> = {
   // Typed by its own path: `id` is no param of it.
   'lib/routes/[slug].kay': '--- server\nconst slug: string = ctx.params.slug\nconst id = ctx.params.id\n---\np {slug} {id}\n',
   'lib/routes/broken.kay': '---\nconst wrong: number = \'beside\'\n---\np {wrong}\n',
-  // Paths the app may serve or not, which only it knows, and one into the extension's own routes, still checked.
-  'lib/routes/out.kay': '--- server\nimport { localPath } from \'kay\'\n\nconst back = localPath(ctx.url.searchParams.get(\'next\'), \'/welcome\')\n\nif (back === \'/old\')\n  ctx.redirect(\'/gone\')\n---\na(href={back}) Back\na(href="/settings") Settings\na(href="/auth/no/such/page") Nope\n',
+  // Paths the app may serve or not, which only it knows, `/authx` among them as it only begins like the prefix, and one into the extension's own routes, still checked.
+  'lib/routes/out.kay': '--- server\nimport { localPath } from \'kay\'\n\nconst back = localPath(ctx.url.searchParams.get(\'next\'), \'/welcome\')\n\nif (back === \'/old\')\n  ctx.redirect(\'/gone\')\n---\na(href={back}) Back\na(href="/settings") Settings\na(href="/authx/page") Beside\na(href="/auth/no/such/page") Nope\n',
   // The app's matchers type an extension's params as they do its own.
   'lib/routes/codes/[id=code].kay': '--- server\nconst id: number = ctx.params.id\n---\np {id}\n',
   'lib/routes/codes/[id=code]/label.kay': '--- server\nconst label: string = ctx.params.id\n---\np {label}\n',
@@ -774,6 +775,18 @@ describe('a library\'s route tree', () => {
 
       expect(Object.fromEntries(routes.map(route => [route.pattern, route.file]))).toEqual({ '/': join(root, 'src/routes/index.kay'), '/about': join(root, 'one/about.kay'), '/contact': join(root, 'two/contact.kay') })
     })
+  })
+
+  it('leaves the app what an extension\'s routes name outside their prefix, a locale\'s prefix read past', () => {
+    const mounts = [{ dir: '/nowhere/lib/routes', prefix: '/auth' }]
+    const locales = servedLocales({ locales: ['en', 'fr'], defaultLocale: 'en' })
+    const left = (path: string) => servedByTheApp('/nowhere/lib/routes/login.kay', `No page, public file or app route serves ${path}`, mounts, locales)
+
+    expect(locales).toEqual(['fr'])
+    expect(['/', '/authx', '/authx/page', '/fr', '/fr/authx', '/en/auth/x'].filter(left)).toEqual(['/', '/authx', '/authx/page', '/fr', '/fr/authx', '/en/auth/x'])
+    expect(['/auth', '/auth/x', '/fr/auth', '/fr/auth/x'].some(left)).toBe(false)
+    // A page outside every extension checks its paths whole.
+    expect(servedByTheApp('/nowhere/src/routes/index.kay', 'No page, public file or app route serves /nope', mounts, locales)).toBe(false)
   })
 })
 

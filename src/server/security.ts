@@ -6,6 +6,7 @@ import { isNotEmpty } from 'elysia/utils'
 import { offlineOf } from '../project'
 import { basePath } from './base'
 import { inlineScriptHashes, sourceHash } from './csp'
+import { REQUEST_ID_HEADER } from './protection'
 import { CSP_ENDPOINT, CSP_REPORTS } from './violations'
 
 export interface SecurityOptions {
@@ -52,9 +53,6 @@ const FALLBACKS: Record<string, string[]> = {
   'frame-src': ['child-src', 'default-src'],
 }
 const FETCH_DIRECTIVE = /-src(?:-elem|-attr)?$/
-
-// Set on every context, as `app.ts` does.
-const REQUEST_ID = 'x-request-id'
 
 const HEADERS: Record<string, string> = {
   'x-content-type-options': 'nosniff',
@@ -143,9 +141,9 @@ export function ownHeaders(set: Context['set'], copies: HeaderCopies): Record<st
   const id = requestIdAlone(set.headers)
 
   if (id !== undefined) {
-    delete set.headers[REQUEST_ID]
+    delete set.headers[REQUEST_ID_HEADER]
 
-    return { ...copies.secured, [REQUEST_ID]: id }
+    return { ...copies.secured, [REQUEST_ID_HEADER]: id }
   }
 
   if (!isNotEmpty(set.headers))
@@ -160,7 +158,7 @@ function requestIdAlone(headers: Context['set']['headers']): string | undefined 
   let id: string | undefined
 
   for (const name in headers) {
-    if (name !== REQUEST_ID)
+    if (name !== REQUEST_ID_HEADER)
       return undefined
 
     id = headers[name]
