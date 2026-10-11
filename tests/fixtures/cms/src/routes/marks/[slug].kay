@@ -7,6 +7,7 @@ const { Content } = entry
 ---
 import DraftEditor from '../../components/draft-editor.kay'
 import Headline from '../../components/headline.kay'
+import IslandTitle from '../../components/island-title.kay'
 ---
 h1 {entry.data.title}
 Headline(title={entry.data.title})
@@ -19,3 +20,5 @@ textarea Draft: {entry.data.title}
 article
   Content
 DraftEditor
+IslandTitle(title={entry.data.title})
+  em.slotted {entry.data.title}

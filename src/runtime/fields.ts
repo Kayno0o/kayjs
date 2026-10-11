@@ -10,38 +10,47 @@ export interface EntryRef {
   locale?: string
 }
 
-// What one request in edit mode read of the entries: each field by an index the markers carry, the field each text value and the last read came from, and every entry read.
+// What one request in edit mode read of the entries: each field by an index the markers carry, the fields whose text was read and not rendered yet, by that text, the number read last, and every entry read.
 export interface FieldMarks {
   refs: string[]
   indexes: Map<string, number>
-  texts: Map<string, number>
-  last: { value: unknown, ref: number } | undefined
+  unrendered: Map<string, number[]>
+  last: { value: number, ref: number } | undefined
   entries: Map<string, EntryRef>
   wrapped: WeakMap<object, object>
+  // Set apart from any text an entry holds, which may use these private-use characters too, an icon font's glyphs say.
+  nonce: string
+  fence: RegExp
 }
 
 type Kind = 'field' | 'body' | 'list'
 
 interface Editable { slug: string, locale?: string | undefined, data: unknown, Content: (props: never) => unknown }
 
+interface Fence {
+  start: number
+  end: number
+  open: { kind: Kind, ref: number } | undefined
+}
+
 const FIELD_REF = Symbol('kay.fieldRef')
-// Private-use characters fencing what a helper rendered from a field, the kind and the field's index after the opening one, which `placeFieldMarks` turns into markers: no entry's text holds them.
-const OPEN = ''
-const REF_END = ''
-const CLOSE = ''
+// Private-use characters fencing what a helper rendered from a field, with the request's nonce, which `placeFieldMarks` turns into markers: `OPEN nonce kind ref END` and `CLOSE nonce END`.
+const OPEN = '\uE000'
+const CLOSE = '\uE002'
+const END = '\uE001'
 const KIND_CODE: Record<Kind, string> = { field: 'f', body: 'b', list: 'l' }
 const CODE_KIND: Record<string, Kind> = { f: 'field', b: 'body', l: 'list' }
 const ATTRIBUTE: Record<Kind, string> = { field: 'data-kay-field', body: 'data-kay-body', list: 'data-kay-list' }
 const COMMENT: Record<Kind, string> = { field: 'kay-field', body: 'kay-body', list: 'kay-list' }
-const FENCE = /([fbl])(\d+)|/g
 const TAG_NAME = /^[a-z][^\s/>]*/i
-// Elements whose text the browser never parses as markup, where a comment would show.
-const RAW_TEXT = ['title', 'textarea', 'script', 'style']
+// Elements whose text the browser never parses as markup, where a comment would show, as they open and close.
+const RAW_TEXT_TAG = /<(\/?)(title|textarea|script|style)(?=[\s/>])/gi
+const BLANK = /^\s*$/
 
 // Each collection's export name in the content config, by the name it is loaded under, which the CMS knows it by.
 const exportNames = new Map<string, string>()
 
-// The marks of the page rendering now, set only while a page renders in edit mode, outside its islands.
+// The marks of the page rendering now, set only while a page renders in edit mode, outside its islands: a module's, so the render they are set around stays synchronous.
 export const fieldMarks: { marking: FieldMarks | undefined } = { marking: undefined }
 
 export function nameCollection(name: string, exportName: string): void {
@@ -56,7 +65,16 @@ export function exportNameOf(name: string): string {
 export function editMarks(): FieldMarks | undefined {
   const state = previewState()
 
-  return state?.edit === true ? state.marks ??= { refs: [], indexes: new Map(), texts: new Map(), last: undefined, entries: new Map(), wrapped: new WeakMap() } : undefined
+  if (state?.edit !== true)
+    return undefined
+
+  if (!state.marks) {
+    const nonce = crypto.randomUUID().slice(0, 8)
+
+    state.marks = { refs: [], indexes: new Map(), unrendered: new Map(), last: undefined, entries: new Map(), wrapped: new WeakMap(), nonce, fence: new RegExp(`${OPEN}${nonce}([fbl])(\\d+)${END}|${CLOSE}${nonce}${END}`, 'g') }
+  }
+
+  return state.marks
 }
 
 // The entries a collection gives a page, wrapped in edit mode.
@@ -97,7 +115,7 @@ export function editableEntry<E extends Editable>(marks: FieldMarks, collection:
     Content: () => {
       const rendered = Content() as { t: string }
 
-      return fieldMarks.marking === undefined ? rendered : { t: fenced('body', body, rendered.t) }
+      return fieldMarks.marking === undefined ? rendered : { t: fenced(fieldMarks.marking, 'body', body, rendered.t) }
     },
   }
 
@@ -107,11 +125,11 @@ export function editableEntry<E extends Editable>(marks: FieldMarks, collection:
   return editable
 }
 
-// A text or a number a helper renders, fenced when it is what a field read last gave, a text when any field gave it.
+// A text or a number a helper renders, fenced when a field gave it: a text a field read and not rendered yet, the first such when several were, or the number read last.
 export function markedText(value: string | number, markup: string): string {
   const ref = fieldOf(value)
 
-  return ref === undefined ? markup : fenced('field', ref, markup)
+  return ref === undefined ? markup : fenced(fieldMarks.marking!, 'field', ref, markup)
 }
 
 // ` data-kay-field-<name>="..."` beside an attribute whose value a field gave.
@@ -125,57 +143,71 @@ export function markedAttribute(name: string, value: unknown): string {
 export function markedList(each: unknown, markup: string): string {
   const ref = typeof each === 'object' && each !== null ? (each as { [FIELD_REF]?: number })[FIELD_REF] : undefined
 
-  return ref === undefined ? markup : fenced('list', ref, markup)
+  return ref === undefined ? markup : fenced(fieldMarks.marking!, 'list', ref, markup)
 }
 
-// The markers of a page rendered in edit mode: a fenced part that is the whole content of an element marks that element, any other one sits between comments, or is left unmarked inside an element whose text is never markup.
+// The markers of a page rendered in edit mode: a fenced part that is the whole content of an element marks that element, any other one sits between comments, or is left unmarked inside an element whose text is never markup or inside a tag.
+// One pass over the page: the fences found in order, then the page written once around them.
 export function placeFieldMarks(html: string, marks: FieldMarks): string {
-  const opened: { start: number, after: number, kind: Kind, ref: number }[] = []
+  const fences: Fence[] = []
+
+  for (const match of html.matchAll(marks.fence))
+    fences.push({ start: match.index, end: match.index + match[0].length, open: match[1] === undefined ? undefined : { kind: CODE_KIND[match[1]]!, ref: Number(match[2]) } })
+
   const edits: { at: number, end: number, text: string }[] = []
+  const opened: { from: number, raw: boolean }[] = []
+  const rawText = rawTextTracker(html)
 
-  for (const match of html.matchAll(FENCE)) {
-    if (match[1] !== undefined) {
-      opened.push({ start: match.index, after: match.index + match[0].length, kind: CODE_KIND[match[1]]!, ref: Number(match[2]) })
+  for (const [index, fence] of fences.entries()) {
+    edits.push({ at: fence.start, end: fence.end, text: '' })
 
-      continue
-    }
-
-    const fence = opened.pop()
-
-    if (!fence)
-      continue
-
-    const value = marks.refs[fence.ref]!
-    const tag = wholeContentOf(html, fence.start, match.index + 1)
-
-    if (tag !== undefined) {
-      edits.push({ at: tag, end: tag, text: ` ${ATTRIBUTE[fence.kind]}="${value}"` }, { at: fence.start, end: fence.after, text: '' }, { at: match.index, end: match.index + 1, text: '' })
+    if (fence.open) {
+      opened.push({ from: index, raw: rawText(fence.start) })
 
       continue
     }
 
-    const comment = fence.kind !== 'list' && !insideRawText(html, fence.start) && !insideTag(html, fence.start)
+    const { from, raw } = opened.pop() ?? {}
 
-    edits.push({ at: fence.start, end: fence.after, text: comment ? `<!--${COMMENT[fence.kind]} ${value}-->` : '' }, { at: match.index, end: match.index + 1, text: comment ? `<!--/${COMMENT[fence.kind]}-->` : '' })
+    if (from === undefined)
+      continue
+
+    const open = fences[from]!
+    const { kind, ref } = open.open!
+    const value = marks.refs[ref]!
+    const tag = wholeContentOf(html, fences, from, index)
+
+    if (tag !== undefined)
+      edits.push({ at: tag, end: tag, text: ` ${ATTRIBUTE[kind]}="${value}"` })
+    else if (kind !== 'list' && raw === false && !insideTag(html, open.start))
+      edits.push({ at: open.start, end: open.start, text: `<!--${COMMENT[kind]} ${value}-->` }, { at: fence.end, end: fence.end, text: `<!--/${COMMENT[kind]}-->` })
   }
 
-  // Applied from the end, an attribute before the fence of the same place, so each offset still holds.
-  edits.sort((a, b) => b.at - a.at || b.end - a.end)
+  // In page order, an insertion before the removal of the fence at the same place, which sorts after it by its end.
+  edits.sort((a, b) => a.at - b.at || a.end - b.end)
 
-  let marked = html
+  const parts: string[] = []
+  let cursor = 0
 
-  for (const { at, end, text } of edits)
-    marked = marked.slice(0, at) + text + marked.slice(end)
+  for (const { at, end, text } of edits) {
+    parts.push(html.slice(cursor, at), text)
+    cursor = end
+  }
 
-  return marked
+  parts.push(html.slice(cursor))
+
+  return parts.join('')
 }
 
-function fenced(kind: Kind, ref: number, markup: string): string {
-  return `${OPEN}${KIND_CODE[kind]}${ref}${REF_END}${markup}${CLOSE}`
+function fenced(marks: FieldMarks, kind: Kind, ref: number, markup: string): string {
+  return `${OPEN}${marks.nonce}${KIND_CODE[kind]}${ref}${END}${markup}${CLOSE}${marks.nonce}${END}`
 }
 
 function fieldOf(value: string | number): number | undefined {
   const marks = fieldMarks.marking!
+
+  if (typeof value === 'string')
+    return marks.unrendered.get(value)?.shift()
 
   // Taken once, so a number rendered later, a row's index say, is not taken for the field.
   if (marks.last?.value === value) {
@@ -186,7 +218,7 @@ function fieldOf(value: string | number): number | undefined {
     return ref
   }
 
-  return typeof value === 'string' ? marks.texts.get(value) : undefined
+  return undefined
 }
 
 function refIndex(marks: FieldMarks, ref: string): number {
@@ -210,7 +242,7 @@ function wrap(marks: FieldMarks, value: unknown, name: string, path: string[]): 
   if (known)
     return known
 
-  const ref = () => refIndex(marks, `${name}:${path.map(encodeURIComponent).join('.')}`)
+  const ref = () => refIndex(marks, fieldPath(name, path))
   const proxy = new Proxy(value, {
     get(target, key, receiver) {
       if (key === FIELD_REF)
@@ -221,16 +253,22 @@ function wrap(marks: FieldMarks, value: unknown, name: string, path: string[]): 
       if (typeof key === 'symbol' || !Object.hasOwn(target, key) || !configurable(target, key) || (key === 'length' && Array.isArray(target)))
         return read
 
-      if (typeof read === 'string' || typeof read === 'number') {
-        const field = refIndex(marks, `${name}:${[...path, key].map(encodeURIComponent).join('.')}`)
+      if (typeof read === 'number')
+        marks.last = { value: read, ref: refIndex(marks, fieldPath(name, [...path, key])) }
 
-        marks.last = { value: read, ref: field }
+      // A blank text tells nothing apart: `''` is what any empty branch renders.
+      if (typeof read === 'string' && !BLANK.test(read)) {
+        const field = refIndex(marks, fieldPath(name, [...path, key]))
+        const waiting = marks.unrendered.get(read)
 
-        if (typeof read === 'string')
-          marks.texts.set(read, field)
-
-        return read
+        if (!waiting)
+          marks.unrendered.set(read, [field])
+        else if (!waiting.includes(field))
+          waiting.push(field)
       }
+
+      if (typeof read === 'string' || typeof read === 'number')
+        return read
 
       return wrap(marks, read, name, [...path, key])
     },
@@ -239,6 +277,10 @@ function wrap(marks: FieldMarks, value: unknown, name: string, path: string[]): 
   marks.wrapped.set(value, proxy)
 
   return proxy
+}
+
+function fieldPath(name: string, path: string[]): string {
+  return `${name}:${path.map(encodeURIComponent).join('.')}`
 }
 
 function isPlainObject(value: object): boolean {
@@ -254,37 +296,27 @@ function configurable(target: object, key: string): boolean {
   return descriptor === undefined || descriptor.configurable || descriptor.writable === true
 }
 
-// Where to write an attribute on the element whose whole content runs from `start` to `end`: before the `>` of its open tag, or undefined when it holds more.
-function wholeContentOf(html: string, start: number, end: number): number | undefined {
-  let before = start
+// Where to write an attribute on the element whose whole content the fences `from` and `to` hold, past fences right around them: before the `>` of its open tag, or undefined when it holds more.
+function wholeContentOf(html: string, fences: Fence[], from: number, to: number): number | undefined {
+  let first = from
+  let last = to
 
-  while (before > 0 && isFence(html, before - 1))
-    before = fenceStart(html, before - 1)
+  while (first > 0 && fences[first - 1]!.open && fences[first - 1]!.end === fences[first]!.start)
+    first--
 
-  let after = end
+  while (last < fences.length - 1 && !fences[last + 1]!.open && fences[last + 1]!.start === fences[last]!.end)
+    last++
 
-  while (html[after] === CLOSE)
-    after++
+  const before = fences[first]!.start
+  const after = fences[last]!.end
 
-  if (html[before - 1] !== '>' || !html.startsWith('</', after))
+  if (html[before - 1] !== '>' || !html.startsWith('</', after) || html[before - 2] === '/' || html[before - 2] === '-')
     return undefined
 
   const open = openTagStart(html, before - 1)
-  const name = open === undefined ? undefined : TAG_NAME.exec(html.slice(open + 1))?.[0]
+  const name = open === undefined ? undefined : TAG_NAME.exec(html.slice(open + 1, before))?.[0]
 
-  if (name === undefined || html[before - 2] === '/' || html[before - 2] === '-')
-    return undefined
-
-  return html.slice(after + 2, after + 2 + name.length).toLowerCase() === name.toLowerCase() ? before - 1 : undefined
-}
-
-// Whether the character at `index` ends an opening fence.
-function isFence(html: string, index: number): boolean {
-  return html[index] === REF_END
-}
-
-function fenceStart(html: string, index: number): number {
-  return html.lastIndexOf(OPEN, index)
+  return name !== undefined && html.slice(after + 2, after + 2 + name.length).toLowerCase() === name.toLowerCase() ? before - 1 : undefined
 }
 
 // The `<` of the tag whose `>` is at `close`, past the double-quoted values attributes are written with.
@@ -308,8 +340,18 @@ function insideTag(html: string, index: number): boolean {
   return html.lastIndexOf('<', index) > html.lastIndexOf('>', index)
 }
 
-function insideRawText(html: string, index: number): boolean {
-  const lower = html.slice(0, index).toLowerCase()
+// Whether a place of the page, asked of in page order, sits inside `title`, `textarea`, `script` or `style`: each tag read once.
+function rawTextTracker(html: string): (index: number) => boolean {
+  const tags = new RegExp(RAW_TEXT_TAG)
+  let inside = false
+  let next = tags.exec(html)
 
-  return RAW_TEXT.some(name => lower.lastIndexOf(`<${name}`) > lower.lastIndexOf(`</${name}`))
+  return (index) => {
+    while (next !== null && next.index < index) {
+      inside = next[1] === ''
+      next = tags.exec(html)
+    }
+
+    return inside
+  }
 }

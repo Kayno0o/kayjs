@@ -66,8 +66,8 @@ export function island<P extends object>(id: string, component: ((props: P) => J
     if (depth > 0)
       return browserOnly ? { t: '' } as unknown as JSX.Element : component!(own)
 
-    // Rendered here, in the parent, so an island among them is one of its own.
-    const slots = staticSlots(own)
+    // Rendered here, in the parent, so an island among them is one of its own; unmarked in edit mode, as the island's own markup is.
+    const slots = withFieldMarks(undefined, () => staticSlots(own))
     const given = slots.length === 0 ? own : withSlots(own, slots)
     const serialized = serializeProps(`${id} ${why}`, own, slots)
     // The browser counts the island's ids from it again as it hydrates.

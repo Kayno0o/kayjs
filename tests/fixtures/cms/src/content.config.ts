@@ -14,3 +14,9 @@ export const news = collection({
   draft: entry => !entry.data.published,
   feed: { path: '/news/rss.xml', title: 'News', item: entry => ({ title: entry.data.title, path: `/news/${entry.slug}`, date: new Date(0) }) },
 })
+
+// A folder collection exported under another name than its folder's.
+export const articles = collection('content/articles', {
+  schema: t.Object({ title: t.String() }),
+  localized: true,
+})

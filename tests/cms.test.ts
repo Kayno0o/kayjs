@@ -9,7 +9,7 @@ import { ContentError } from '../src/content/validate'
 import { resolveProject } from '../src/project'
 import { cached } from '../src/runtime/cache'
 import { editableEntry, editMarks, placeFieldMarks, withFieldMarks } from '../src/runtime/fields'
-import { child } from '../src/runtime/html'
+import { child, loop } from '../src/runtime/html'
 import { editing, previewing } from '../src/runtime/preview'
 import { editRequested, enterPreview, pages, previewUrl } from '../src/server'
 import { readClient, readManifest, writeManifest } from '../src/server/client'
@@ -215,7 +215,14 @@ describe('preview mode', () => {
     expect(html).toContain('<textarea>Draft: Launch day</textarea>')
     expect(html).toContain('<article data-kay-body="news:launch"><h2 id="what-ships">')
     expect(html).not.toMatch(/[\uE000-\uE004]/)
+    // An island's markup and its static slots, which hydration claims node by node, stay unmarked.
+    expect(html).toContain('<button class="island-title">Launch day</button><div class="island-slot"><!--kay-slot:0--><em class="slotted">Launch day</em><!--/kay-slot--></div></slot>')
     expect((await get('/news', edit)).html).toContain('<li data-kay-field="news:roadmap:title">Next year</li>')
+
+    const article = (await get('/articles/hello', edit)).html
+
+    expect(article).toContain('<h1 data-kay-field="articles:hello@fr:title">Bonjour</h1>')
+    expect(article).toContain('<article data-kay-body="articles:hello@fr">')
 
     const plain = (await get('/marks/launch', preview)).html
 
@@ -232,6 +239,34 @@ describe('preview mode', () => {
 
       expect(entry.data.at).toBeInstanceOf(Date)
       expect(placeFieldMarks(html, marks)).toBe('<div data-kay-field="news:a:title">T</div><div><!--kay-field news:a:count-->3<!--/kay-field--> 3</div><a title="T">T</a><section data-kay-body="news:a"><p>x</p></section>')
+    }, true)
+  })
+
+  it('marks a text rendered after the field read it, never a blank one, one already rendered, or a field\'s own private-use characters', () => {
+    inPreview(() => {
+      const marks = editMarks()!
+      const entry = editableEntry(marks, 'news', { slug: 'a', data: { title: 'Same', subtitle: 'Same', note: '', icon: '\uE002\uE000f0\uE001' }, Content: () => ({ t: '' }) })
+      const html = withFieldMarks(marks, () => {
+        const { note, title, subtitle, icon } = entry.data
+
+        return `<p>${note === '' ? child('') : ''}x</p><h1>${child(title)}</h1><h2>${child(subtitle)}</h2><p>${child('Same')}</p><i>${child(icon)}</i>`
+      })
+
+      expect(placeFieldMarks(html, marks)).toBe('<p>x</p><h1 data-kay-field="news:a:title">Same</h1><h2 data-kay-field="news:a:subtitle">Same</h2><p>Same</p><i data-kay-field="news:a:icon">\uE002\uE000f0\uE001</i>')
+    }, true)
+  })
+
+  it('places the marks of a long listing in one pass', () => {
+    inPreview(() => {
+      const marks = editMarks()!
+      const entry = editableEntry(marks, 'news', { slug: 'a', data: { rows: Array.from({ length: 3000 }, (_, index) => `Row ${index}`) }, Content: () => ({ t: '' }) })
+      const html = withFieldMarks(marks, () => `<title>Rows</title><ul>${loop(entry.data.rows, row => `<li>Row: ${child(row)}</li>`)}</ul>`)
+      const started = performance.now()
+      const marked = placeFieldMarks(html, marks)
+
+      expect(performance.now() - started).toBeLessThan(200)
+      expect(marked).toStartWith('<title>Rows</title><ul data-kay-list="news:a:rows"><li>Row: <!--kay-field news:a:rows.0-->Row 0<!--/kay-field--></li>')
+      expect(marked).toEndWith('<li>Row: <!--kay-field news:a:rows.2999-->Row 2999<!--/kay-field--></li></ul>')
     }, true)
   })
 
