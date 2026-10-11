@@ -19,7 +19,7 @@ function serverLog(variant: Variant): string {
 
 // A variant's server as production runs it: Astro's standalone entry under Bun (its image aliases node to bun), kay's compiled executable.
 export function startServer(variant: Variant): Subprocess {
-  return Bun.spawn(variant.kind === 'astro' ? ['bun', 'dist/server/entry.mjs'] : ['./server'], {
+  return Bun.spawn(variant.kind === 'astro' ? [process.execPath, 'dist/server/entry.mjs'] : ['./server'], {
     cwd: variant.dir,
     stdout: 'ignore',
     stderr: Bun.file(serverLog(variant)),

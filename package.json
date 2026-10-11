@@ -146,7 +146,7 @@
     "bench:origins": "$npm_execpath bench/origins.ts",
     "bench:sites": "$npm_execpath bench/sites/run.ts",
     "bench:test": "$npm_execpath test ./bench",
-    "docs:build": "bun docs/search-index.ts && bun src/cli.ts build docs --static",
+    "docs:build": "$npm_execpath docs/search-index.ts && $npm_execpath src/cli.ts build docs --static",
     "bench:check": "$npm_execpath src/cli.ts check bench/apps/kay && tsgo --noEmit -p bench/apps/solid && tsgo --noEmit -p bench/apps/svelte"
   },
   "peerDependencies": {

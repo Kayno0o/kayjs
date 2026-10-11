@@ -101,7 +101,7 @@ export async function prepare() {
       await Bun.write(file, JSON.stringify(manifest, null, 2))
     }
 
-    run(['bun', 'install'], variant.dir)
+    run([process.execPath, 'install'], variant.dir)
   }
 }
 

@@ -19,11 +19,13 @@ export interface Footprint {
 }
 
 const BUILDS = 3
+// The Bun running the bench, never the npm `bun` a package's peer puts first on a script's PATH.
+const BUNX = [process.execPath, 'x']
 const OUTPUTS = ['dist', '.astro', 'node_modules/.astro', 'node_modules/.vite', '.kay']
 
 // `kay build` checks the project as `kay check` does first; `astro build` checks nothing, so kay is timed without the check too.
 export function buildCommands(variant: Variant): string[][] {
-  return variant.kind === 'astro' ? [['bunx', '--bun', 'astro', 'build']] : [['bunx', 'kay', 'build'], ['bunx', 'kay', 'build', '--no-check']]
+  return variant.kind === 'astro' ? [[...BUNX, '--bun', 'astro', 'build']] : [[...BUNX, 'kay', 'build'], [...BUNX, 'kay', 'build', '--no-check']]
 }
 
 // Clean builds, medians of `BUILDS`: wall seconds, CPU seconds of every process, peak memory of the largest.
@@ -43,12 +45,12 @@ export async function timeBuild(variant: Variant, command: string[]): Promise<Bu
 
     const usage = proc.resourceUsage()!
 
-    runs.push({ command: command.filter(word => word !== 'bunx' && word !== '--bun').join(' '), wall: (performance.now() - started) / 1000, cpu: Number(usage.cpuTime.total) / 1e6, rss: usage.maxRSS })
+    runs.push({ command: command.slice(BUNX.length).filter(word => word !== '--bun').join(' '), wall: (performance.now() - started) / 1000, cpu: Number(usage.cpuTime.total) / 1e6, rss: usage.maxRSS })
   }
 
   // The servers run what the last build left, the executable included.
   if (variant.kind === 'kay')
-    run(['bunx', 'kay', 'build', '--compile', 'server'], variant.dir, variant.site.env)
+    run([...BUNX, 'kay', 'build', '--compile', 'server'], variant.dir, variant.site.env)
 
   return { command: runs[0]!.command, wall: median(runs.map(r => r.wall)), cpu: median(runs.map(r => r.cpu)), rss: median(runs.map(r => r.rss)) }
 }
@@ -78,7 +80,7 @@ export function footprint(variant: Variant): Footprint {
 
   rmSync(prod, { recursive: true, force: true })
   cpSync(variant.dir, prod, { recursive: true, filter: source => !source.slice(variant.dir.length).includes('/node_modules') })
-  run(['bun', 'install', '--production', '--ignore-scripts'], prod)
+  run([process.execPath, 'install', '--production', '--ignore-scripts'], prod)
 
   return { lines: cloc([join(variant.dir, 'src'), ...configs]), testLines: 0, deploy: size(join(prod, 'node_modules')) + size(join(variant.dir, 'dist')) }
 }
