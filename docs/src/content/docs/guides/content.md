@@ -39,7 +39,7 @@ ul
     li: a(href={`/blog/${post.slug}`}) {post.data.title}
 ```
 
-An entry has `slug`, `data`, `headings` (for a table of contents) and `Content`, the component rendering its body. Entries marked as drafts show in `kay dev` only.
+An entry has `slug`, `data`, `headings` (for a table of contents) and `Content`, the component rendering its body. Entries marked as drafts show in development only: under `kay dev`, or when the server's `dev` option is on, whatever `NODE_ENV` says.
 
 ## A page per entry
 

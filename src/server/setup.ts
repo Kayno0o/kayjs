@@ -8,6 +8,7 @@ import type { RenderOptions } from './render'
 import type { Route, RouteMount } from './routes'
 import type { ProjectSource } from './source'
 import { join } from 'node:path'
+import { setContentMode } from '../content/load'
 import { projectCollections } from '../content/server'
 import { renderOptionsOf } from '../project'
 import { setSite } from '../runtime/site'
@@ -43,7 +44,7 @@ export interface PageSetup {
 }
 
 // What serving pages and prerendering them both start from: the routes and their param matchers, the collections, the locales, the head and the render options.
-// It installs what every render reads outside its request too: the `.kay` loader, the site, the image config, the share cards, the content's place, the locales and the preview secret, with the tracer and the file store when serving, as a build traces nothing and an export links its files itself.
+// It installs what every render reads outside its request too: the `.kay` loader, the site, the image config, the share cards, the content's place and mode, the locales and the preview secret, with the tracer and the file store when serving, as a build traces nothing and an export links its files itself.
 export async function setupPages(project: Project, loadClient: () => Promise<ClientBuild>, prerendering = false): Promise<PageSetup> {
   const { root, config, paths, mode } = project
   const mounts = routeMounts(root, config.extensions)
@@ -68,6 +69,7 @@ export async function setupPages(project: Project, loadClient: () => Promise<Cli
 
   setSite(site, config.trailingSlash, prerendering)
   setupPreview(config.preview, base)
+  setContentMode(mode)
 
   if (!prerendering) {
     setTracer(config.tracer)

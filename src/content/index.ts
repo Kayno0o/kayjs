@@ -7,13 +7,12 @@ import type { FeedOptions } from './feed'
 import type { RawEntry } from './load'
 import type { Heading, Highlighter, Segment } from './markdown'
 import type { ContentProblem } from './validate'
-import process from 'node:process'
 import { cached, invalidate } from '../runtime/cache'
 import { durationSeconds } from '../runtime/duration'
 import { child, localLinks } from '../runtime/html'
 import { localeState } from '../runtime/locale-state'
 import { previewing, previewState } from '../runtime/preview'
-import { loadEntries } from './load'
+import { contentMode, loadEntries } from './load'
 import { compileMarkdown, MarkdownError } from './markdown'
 import { ContentError, decodeEntries } from './validate'
 
@@ -180,7 +179,7 @@ export function collection<Schema extends TSchema, Components extends Record<str
       return loads
     }
 
-    const raw = await cached(key, loader!.ttl === undefined ? FOREVER : durationSeconds(loader!.ttl, `the collection ${name}'s ttl`), async () => fetchLoaded(process.env.NODE_ENV === 'development'), { store: loader!.store })
+    const raw = await cached(key, loader!.ttl === undefined ? FOREVER : durationSeconds(loader!.ttl, `the collection ${name}'s ttl`), async () => fetchLoaded(contentMode().dev), { store: loader!.store })
     let entries = decoded.get(raw)
 
     if (!entries)
@@ -190,7 +189,7 @@ export function collection<Schema extends TSchema, Components extends Record<str
   }
 
   const loaded = loader ? fromLoader : fromFolder
-  const hidden = (entry: Entry<Data>) => draft !== undefined && process.env.NODE_ENV !== 'development' && !previewing() && draft(entry)
+  const hidden = (entry: Entry<Data>) => draft !== undefined && !contentMode().dev && !previewing() && draft(entry)
   // A draft translation is left out as a missing one is, the default locale's entry standing in.
   const shown = (entry: Entry<Data> | undefined) => entry !== undefined && !hidden(entry) ? entry : undefined
 

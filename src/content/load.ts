@@ -1,12 +1,15 @@
+import type { Mode } from '../project'
 import type { Heading, Highlighter, Segment } from './markdown'
 import type { ContentProblem } from './validate'
 import { mkdir, rename } from 'node:fs/promises'
 import { join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
-import { cacheDir as projectCache } from '../project'
+import { modeOf, cacheDir as projectCache } from '../project'
 import { projectSource } from '../server/source'
 import { compileMarkdown, MarkdownError, splitFrontmatter } from './markdown'
 import { ContentError } from './validate'
+
+type ContentMode = Pick<Mode, 'dev' | 'prebuilt'>
 
 // What an entry compiles to, before its data meets the schema: what the build writes and the cache keeps.
 export interface RawEntry {
@@ -38,6 +41,17 @@ export function setContentPlace(root: string, base: string): void {
   place = { root, base }
 }
 
+let mode: ContentMode | undefined
+
+// The running server's, which shows drafts and the loaders' preview in development and reads the build's entries when prebuilt; a script that started none takes `NODE_ENV`'s.
+export function setContentMode(value: ContentMode): void {
+  mode = value
+}
+
+export function contentMode(): ContentMode {
+  return mode ?? modeOf()
+}
+
 function rootOf(): string {
   return place?.root ?? process.cwd()
 }
@@ -64,7 +78,7 @@ export function manifestFile(base: string, dir: string): string {
 
 async function builtEntries(dir: string): Promise<RawEntry[] | undefined> {
   const source = projectSource()
-  const base = source.contentBuild(rootOf())
+  const base = source.contentBuild(rootOf(), contentMode().prebuilt)
 
   if (base === undefined)
     return undefined

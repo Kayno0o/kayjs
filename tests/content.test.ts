@@ -9,7 +9,7 @@ import { outputDir } from '../src/build/assets'
 import { check } from '../src/check'
 import { collection, highlightCode, renderMarkdown } from '../src/content'
 import { feedXml } from '../src/content/feed'
-import { setContentPlace } from '../src/content/load'
+import { setContentMode, setContentPlace } from '../src/content/load'
 import { compileMarkdown, MarkdownError } from '../src/content/markdown'
 import { writeContentManifests } from '../src/content/server'
 import { resolveProject } from '../src/project'
@@ -61,6 +61,29 @@ describe('Markdown entries', () => {
     // A draft only shows in `kay dev`.
     expect((await posts.all()).map(post => post.slug)).toEqual(['second', 'hello'])
     expect(await posts.get('draft')).toBeUndefined()
+  })
+
+  it('show drafts as the app\'s dev option says, over NODE_ENV', async () => {
+    const previous = process.env.NODE_ENV
+    const draftStatus = async (env: string, dev: boolean) => {
+      process.env.NODE_ENV = env
+      const served = await pages({ routes, content, prebuilt: false, dev, security: false, site: SITE })
+
+      return (await served.handle(new Request('http://localhost/blog/draft'))).status
+    }
+
+    try {
+      expect(await draftStatus('production', true)).toBe(200)
+      expect(await draftStatus('development', false)).toBe(404)
+    }
+    finally {
+      if (previous === undefined)
+        delete process.env.NODE_ENV
+      else
+        process.env.NODE_ENV = previous
+
+      setContentMode({ dev: false, prebuilt: false })
+    }
   })
 })
 

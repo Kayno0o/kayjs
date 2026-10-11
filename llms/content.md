@@ -52,7 +52,7 @@ article
   Content
 ```
 
-- `all()` gives every entry in the collection's `sort` order, by slug without one; filter and sort it like any array. `get(slug)` gives one entry or `undefined`. An entry `draft` returns true for shows in `kay dev` and to a visitor in preview mode only: everywhere else it is left out of `all()`, `get()`, prerendering, the sitemap and the feed. Two files giving one slug, `guides.md` and `guides/index.md`, fail the collection.
+- `all()` gives every entry in the collection's `sort` order, by slug without one; filter and sort it like any array. `get(slug)` gives one entry or `undefined`. An entry `draft` returns true for shows in development (`kay dev`, or the server's `dev` option, which wins over `NODE_ENV`) and to a visitor in preview mode only: everywhere else it is left out of `all()`, `get()`, prerendering, the sitemap and the feed. Two files giving one slug, `guides.md` and `guides/index.md`, fail the collection.
 - An entry has `slug`, its path in the folder without the extension (`guides/intro`; an `index` file takes its folder's), `data`, `headings` (`{ depth, id, text }` in order, for a table of contents), `Content`, the component rendering its body, and `file`. A data file's `headings` is empty and its `Content` renders nothing.
 - A Markdown file starts with YAML frontmatter between `---` lines. Every entry's data is read against the schema: defaults filled in, an `s.Date()` decoded from its text. An entry it refuses, or one that does not parse, fails `kay check` at the field's line, and fails `kay build` and the first load.
 - Headings get ids, deduplicated, and link to themselves. Bare URLs become links.
@@ -92,7 +92,7 @@ export const news = collection({
 ```
 
 - `load` gives an array of `{ slug, data, body }` or `{ slug, data, html }`: `data` is read against the schema, defaults filled in and dates decoded; `body` is Markdown, compiled as a file's body, headings listed, code highlighted and the collection's components usable; `html` is rendered as it is, trusted as a file entry's is. An entry's `file` is the collection's name and its slug, `news/launch`. An entry the schema refuses, one with no slug or with another entry's, or a load giving anything but an array, fails the read with every problem named, and the next read loads again.
-- `load` gets `preview: true` for a visitor in preview mode and in `kay dev`, for a CMS that serves drafts apart.
+- `load` gets `preview: true` for a visitor in preview mode and in development (`kay dev`, or the server's `dev` option), for a CMS that serves drafts apart.
 - The entries are loaded on the first read and kept as `cached` keeps a value (see [Caching](rendering.md#caching)): concurrent first reads share one load; with `ttl`, a read past it gets them as they were and refreshes them in the background; without, they are kept until `invalidate()` or a restart. `store: sqliteCache(path)` keeps them across restarts and has `invalidate()` reach every process sharing it.
 - `prerender`, `sitemap` and a feed take a loaded collection as a folder's: `kay build` loads it to prerender, so it needs the CMS to answer. `kay check` types it from the schema but never calls the loader, and `kay build` writes nothing of it for production, which reads it when the server runs.
 - A CMS's webhook refreshes it through an API route, and refreshes the prerendered pages showing it:

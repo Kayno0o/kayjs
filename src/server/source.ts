@@ -38,7 +38,7 @@ export interface ProjectSource {
   runtimeRoot: (root: string) => string
   imageCache: (root: string) => string
   // The client build the content manifests were written into, if any is read.
-  contentBuild: (root: string) => string | undefined
+  contentBuild: (root: string, prebuilt: boolean) => string | undefined
 }
 
 const DISK: ProjectSource = {
@@ -72,7 +72,7 @@ const DISK: ProjectSource = {
   extensionCatalogs: (_, files) => files.filter(file => existsSync(file)),
   runtimeRoot: root => root,
   imageCache: root => cacheDir(root, `images${testWorker()}`),
-  contentBuild: root => process.env.NODE_ENV === 'production' ? outputDir(root) : undefined,
+  contentBuild: (root, prebuilt) => prebuilt ? outputDir(root) : undefined,
 }
 
 function embeddedSource(bundle: Bundle): ProjectSource {
