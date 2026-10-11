@@ -103,7 +103,7 @@ export function serveDrafts(app: Elysia, collections: Collection<unknown>[]): vo
       if (localized !== (locale !== undefined))
         issues.push({ ...entry, path: '', message: localized ? 'names no locale, which each entry of a localized collection has' : 'names a locale, which the collection is not localized by' })
 
-      const compiled = body === undefined ? undefined : await draftBody(found, body, issue => issues.push({ ...entry, path: 'body', message: issue }))
+      const compiled = body === undefined ? undefined : await draftBody(found, body, issue => issues.push({ ...entry, path: '', body: true, message: issue }))
 
       issues.push(...dataIssues(found.options.schema, data).map(issue => ({ ...entry, ...issue })))
       drafts.set(found.name, [...drafts.get(found.name) ?? [], { slug, locale, data, body, compiled }])

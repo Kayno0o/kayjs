@@ -12,12 +12,13 @@ export interface DraftEntry {
   body?: string | undefined
 }
 
-// Where a draft fails its collection's schema, by its field's dotted path, `tags.0`; `''` for the data as a whole.
+// Where a draft fails its collection's schema, by its field's dotted path, `tags.0`; `''` for the data as a whole, or for its Markdown body with `body` set, which no data field named `body` is taken for.
 export interface DraftIssue {
   collection: string
   slug: string
   locale?: string
   path: string
+  body?: true
   message: string
 }
 

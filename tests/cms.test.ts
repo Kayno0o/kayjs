@@ -369,7 +369,7 @@ describe('preview mode', () => {
 
     expect(refused.status).toBe(422)
     expect(await refused.json()).toEqual({ issues: [
-      { collection: 'news', slug: 'launch', path: 'body', message: 'uses <Nope> on line 3, which the collection\'s components do not name' },
+      { collection: 'news', slug: 'launch', path: '', body: true, message: 'uses <Nope> on line 3, which the collection\'s components do not name' },
       { collection: 'news', slug: 'launch', locale: 'fr', path: '', message: 'names a locale, which the collection is not localized by' },
       { collection: 'articles', slug: 'hello', path: '', message: 'names no locale, which each entry of a localized collection has' },
     ] })
