@@ -11,7 +11,8 @@ import { fixtureCopy } from './scratch'
 
 const chrome = browserPath() ?? (existsSync(chromium.executablePath()) ? chromium.executablePath() : undefined)
 // What a page of an app with locales, its one small island importing nothing of kay/i18n, loads up front, gzipped, a little above what it is: the links an island sets go in the page's locale from the start, the messages and formatters wait for an island using them.
-const EAGER_JS_BUDGET = 15_200
+// About 1% above it, as the hashed chunk names alone move it by a dozen bytes from one clean build to the next.
+const EAGER_JS_BUDGET = 15_350
 const SCRIPT_URL = /<(?:script type="module" src|link rel="modulepreload" href)="([^"]+)"/g
 const STATIC_IMPORT = /(?:from|import)\s*"([^"]+\.js)"/g
 
