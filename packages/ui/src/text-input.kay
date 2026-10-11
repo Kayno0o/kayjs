@@ -2,7 +2,7 @@
 import type { JSX } from 'kay'
 import { effect, untrack } from 'kay'
 
-const { value, onInput, onChange, type = 'text', class: className, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'value' | 'type' | 'class' | 'children' | 'onInput' | 'onChange' | 'onBlur'> & {
+const { value, onInput, onChange, onBlur, type = 'text', class: className, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'value' | 'type' | 'class' | 'children' | 'onInput' | 'onChange'> & {
   // Without it, the box starts empty and keeps what is typed, for a form posting it by its `name`.
   value?: string | undefined
   onInput?: ((value: string) => void) | undefined
@@ -29,5 +29,13 @@ effect(() => {
   if (box && next !== undefined && !reads(box, next))
     box.value = next
 })
+
+// A number box shows the figure its parent holds once left, the spelling typed going with the focus.
+function left(event: FocusEvent & { currentTarget: HTMLInputElement, target: Element }) {
+  if (event.currentTarget.type === 'number' && value !== undefined)
+    event.currentTarget.value = value
+
+  onBlur?.(event)
+}
 ---
-input.kui-field-input({...rest} ref={element => box = element} type={type} value={untrack(() => value)} class={className} onInput={event => halfTyped(event.currentTarget) || onInput?.(event.currentTarget.value)} onChange={event => halfTyped(event.currentTarget) || onChange?.(event.currentTarget.value)} onBlur={event => event.currentTarget.type === 'number' && value !== undefined && (event.currentTarget.value = value)})
+input.kui-field-input({...rest} ref={element => box = element} type={type} value={untrack(() => value)} class={className} onInput={event => halfTyped(event.currentTarget) || onInput?.(event.currentTarget.value)} onChange={event => halfTyped(event.currentTarget) || onChange?.(event.currentTarget.value)} onBlur={left})

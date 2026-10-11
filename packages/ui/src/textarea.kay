@@ -2,7 +2,7 @@
 import type { JSX } from 'kay'
 import { effect, untrack } from 'kay'
 
-const { value, onInput, onChange, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['textarea'], 'value' | 'class' | 'children' | 'onInput' | 'onChange' | 'onBlur'> & {
+const { value, onInput, onChange, onBlur, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['textarea'], 'value' | 'class' | 'children' | 'onInput' | 'onChange'> & {
   // Without it, the box starts empty and keeps what is typed, for a form posting it by its `name`.
   value?: string | undefined
   onInput?: ((value: string) => void) | undefined
@@ -23,4 +23,4 @@ function sync(left = false) {
 
 effect(() => sync())
 ---
-textarea.kui-field-input({...rest} ref={element => box = element} value={untrack(() => value)} class={className} onInput={event => onInput?.(event.currentTarget.value)} onChange={event => onChange?.(event.currentTarget.value)} onBlur={() => sync(true)})
+textarea.kui-field-input({...rest} ref={element => box = element} value={untrack(() => value)} class={className} onInput={event => onInput?.(event.currentTarget.value)} onChange={event => onChange?.(event.currentTarget.value)} onBlur={event => { sync(true); onBlur?.(event) }})

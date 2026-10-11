@@ -7,16 +7,18 @@ let mounted: Mounted | undefined
 const planets: string[] = []
 const commits: string[] = []
 const filters: string[] = []
+const left: string[] = []
 
 afterEach(() => {
   mounted?.unmount()
   planets.length = 0
   commits.length = 0
   filters.length = 0
+  left.length = 0
 })
 
 async function fields() {
-  mounted = await mount('src/components/fields.kay', { onPlanet: (value: string) => planets.push(value), onCommit: (value: string) => commits.push(value), onFilter: (query: string) => filters.push(query) })
+  mounted = await mount('src/components/fields.kay', { onPlanet: (value: string) => planets.push(value), onCommit: (value: string) => commits.push(value), onFilter: (query: string) => filters.push(query), onLeave: (id: string) => left.push(id) })
 
   return mounted.root
 }
@@ -44,6 +46,17 @@ describe('TextInput', () => {
 
     expect(commits).toEqual(['Grace'])
     expect(input.value).toBe('')
+  })
+
+  test('hands its own blur to an onBlur it is given', async () => {
+    const root = await fields()
+    const input = root.querySelector<HTMLInputElement>('#name')!
+
+    input.focus()
+    input.blur()
+    await settle()
+
+    expect(left).toEqual(['name'])
   })
 
   test('leaves a number being typed as it is spelled when its parent writes back the same figure', async () => {
@@ -89,6 +102,7 @@ describe('Textarea', () => {
     await settle()
 
     expect(area.value).toBe('Ada\nGrace\nLin')
+    expect(left).toEqual(['roster'])
   })
 })
 
