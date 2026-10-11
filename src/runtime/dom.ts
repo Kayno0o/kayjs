@@ -507,7 +507,8 @@ export function insert(element: Node | null, start: Node | null, end: Node | nul
 
     current = next
 
-    if (focused)
+    // Tested again, so the build drops the warning with the call.
+    if (process.env.NODE_ENV !== 'production' && focused)
       warnRedrawn(focused, next, fn)
   }
 

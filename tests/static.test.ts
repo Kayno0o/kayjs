@@ -13,8 +13,8 @@ import { fixtureCopy } from './scratch'
 const FIXTURE = resolve('tests/fixtures/static')
 const CLI = resolve('src/cli.ts')
 const BASE = '/repo'
-// The gzipped JS a page with one small island loads before anything is clicked, a little above what it is: a change growing it raises this in the same commit, on purpose.
-const EAGER_JS_BUDGET = 8_650
+// The gzipped JS a page with one small island loads before anything is clicked, a little above what it is: a change growing it pays for its bytes with a cut elsewhere in the eager runtime, never by raising this.
+const EAGER_JS_BUDGET = 8_600
 const SCRIPT_URL = /<(?:script type="module" src|link rel="modulepreload" href)="([^"]+)"/g
 const STATIC_IMPORT = /(?:from|import)\s*"([^"]+\.js)"/g
 
