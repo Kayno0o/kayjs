@@ -153,7 +153,7 @@ head
         ModuleCard(title="Navigation" use="kay" href="/essentials/islands#page-navigation")
           @icon
             Route
-          | Links swap the next page in without a reload, keeping what stays, and a persist island plays on from page to page.
+          | A page with an island or a form swaps the next one in without a reload, keeping what stays, and a persist island plays on.
         ModuleCard(title="Server islands" use="server" href="/essentials/routing#server-islands")
           @icon
             ServerBolt

@@ -122,4 +122,4 @@ head
 
 `seo.jsonLd` in the config takes the same data for every page.
 
-<ReadMore href="/llms/head">Raw titles, breadcrumb lists, `siteUrl()`, the offline service worker and every favicon and manifest option are in the full head reference.</ReadMore>
+<ReadMore href="/llms/head">Raw titles, breadcrumb lists, `siteUrl()`, what the offline worker keeps and skips, and every favicon and manifest option are in the full head reference.</ReadMore>

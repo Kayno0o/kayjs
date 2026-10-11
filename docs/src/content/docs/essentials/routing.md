@@ -178,4 +178,4 @@ Its pages serve under their prefix, `/auth/login`, inside your layouts and guard
 
 <ReadMore href="/llms/components#extensions">Writing an extension, its layouts, messages, API modules and config, and page hooks.</ReadMore>
 
-<ReadMore href="/llms/routing">Matchers, server islands, rewrites, base path and static export are in the full routing reference.</ReadMore>
+<ReadMore href="/llms/routing">Matchers, server island options such as `noscript`, rewrites, base path and static export are in the full routing reference.</ReadMore>

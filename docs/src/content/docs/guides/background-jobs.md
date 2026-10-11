@@ -24,7 +24,7 @@ A cron has five fields or a nickname such as `@daily`, and a cron that can never
 
 ## Long-running work
 
-`background(work)` starts work with the server and keeps it running, such as a consumer reading another service's queue. On shutdown its signal aborts and the server waits for it to return:
+`background(work)` starts work with the server and keeps it running, such as a consumer reading another service's queue. On shutdown its signal aborts and the server waits for it to return. Work that throws is logged and not started again:
 
 ```ts
 import { background } from 'kay/server'
@@ -46,7 +46,7 @@ import { queue } from 'kay/server'
 export const welcomeMails = queue(
   'welcome-mails',
   async ({ to }: { to: string }) => sendWelcome(to),
-  { attempts: 5, backoff: '30s' },
+  { attempts: 5, backoff: '30s', onFailed: reportFailedMail },
 )
 ```
 
