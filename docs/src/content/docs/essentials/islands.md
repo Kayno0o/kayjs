@@ -107,7 +107,7 @@ button(onClick={() => navigate('/todos')}) Todos
 
 `navigate({ query: { sort: 'name', page: null } })` changes the current page's query in place, keeping the scroll and the focus; a null or empty value drops its param.
 
-A link with `data-reload` loads its page fully. So does every link to a page whose `page` sets `reload: true`, and to a page whose cross-origin isolation differs from the current one, since a document cannot change it in place:
+A link with `data-reload` loads its page fully. So does every link to a page whose `page` sets `reload: true`, and to a page whose cross-origin isolation differs from the current one, since a document cannot change it in place, though a link to that same page with another query, or a refresh, still swaps it:
 
 ```kay
 --- server

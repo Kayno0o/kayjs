@@ -90,6 +90,19 @@ describe('security headers', () => {
     expect(securityHeaders({ islands, security: false })).toBeUndefined()
   })
 
+  it('starts a directive a page adds from the policy before the page, whatever order the page lists its directives in', () => {
+    const policy = (csp: Record<string, string[]>) => directives(securityHeaders({}, [{ csp }])!['content-security-policy']!)
+    const cdn = 'https://cdn.example.com'
+    const player = 'https://player.example.com'
+    const [first, second] = [policy({ 'worker-src': ['blob:'], 'script-src': [cdn], 'child-src': [player], 'frame-src': ['https://frame.example.com'] }), policy({ 'frame-src': ['https://frame.example.com'], 'child-src': [player], 'script-src': [cdn], 'worker-src': ['blob:'] })]
+
+    for (const name of ['worker-src', 'frame-src', 'script-src', 'child-src'])
+      expect(first.get(name)).toEqual(second.get(name))
+
+    expect(first.get('worker-src')).not.toContain(cdn)
+    expect(first.get('frame-src')).not.toContain(player)
+  })
+
   it('sends them on the build\'s files and image variants too, under a header the app set itself', async () => {
     const routes = 'tests/fixtures/images/src/routes'
     const stock = await pages({ routes, prebuilt: false })

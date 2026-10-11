@@ -108,7 +108,7 @@ h1 Sign in
 export default api({ guards: false }).post('/webhook', handle)
 ```
 
-With `requireGuards: true` in `kay.config.ts`, a site fails closed: every page, action, endpoint and API module of the app that no guard covers and that does not set `guards: false` answers 403, the OpenAPI document too unless a guard covers every module not setting `guards: false`, and `kay check` reports each one as `unguarded-route`. A page added outside a guarded directory is then refused rather than public. A library's routes keep the guards it gives them.
+With `requireGuards: true` in `kay.config.ts`, a site fails closed: every page, action, endpoint and API module of the app that no guard covers and that does not set `guards: false` answers 403, the OpenAPI document too unless a guard covers every module not setting `guards: false`, and `kay check` reports each one as `unguarded-route`; `kay build --static` refuses to export such a page or endpoint. A layout a library mounts asks no guard of its actions, which still run the guards above it. A page added outside a guarded directory is then refused rather than public. A library's routes keep the guards it gives them.
 
 ## Environment variables
 

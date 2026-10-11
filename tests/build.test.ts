@@ -1006,11 +1006,14 @@ describe('a stylesheet imported as text', () => {
 })
 
 describe('a compiled server with layouts', () => {
-  it('boots with its sources gone, each layout\'s actions behind the guards of its own directory', async () => {
+  it('boots with its sources gone, each layout\'s actions behind the guards of its own directory, a library\'s too', async () => {
     const action = (name: string, settings = '') => `--- server\nimport { t } from 'elysia'\nimport { action } from 'kay'\n\n${settings}export const ${name} = action(t.Object({}), () => '${name}')\n---\nslot\n`
     const root = await scratchProject({
       'tsconfig.json': tsconfig,
-      'kay.config.ts': 'export default { favicon: false, requireGuards: true }\n',
+      'kay.config.ts': 'export default { favicon: false, requireGuards: true, extensions: [{ name: \'lib\', routes: { dir: \'lib/routes\', prefix: \'/lib\' } }] }\n',
+      'lib/routes/_guard.ts': 'import { guard } from \'kay\'\n\nexport default guard(({ request, deny }) => {\n  if (!request.headers.has(\'x-lib\'))\n    deny(403)\n})\n',
+      'lib/routes/_layout.kay': action('track'),
+      'lib/routes/index.kay': 'h1 Library\n',
       'src/routes/_layout.kay': action('leave', 'export const page = { guards: false }\n'),
       'src/routes/index.kay': '--- server\nexport const page = { guards: false }\n---\nh1 Home\n',
       'src/routes/staff/_guard.ts': 'import { guard } from \'kay\'\n\nexport default guard(({ request, deny }) => {\n  if (!request.headers.has(\'x-admin\'))\n    deny(403, \'Admins only\')\n})\n',
@@ -1023,7 +1026,7 @@ import { pages } from 'kay/server'
 const app = new Elysia().use(await pages({ security: false }))
 const post = async (file: string, name: string, headers: Record<string, string> = {}) => (await app.handle(new Request(\`http://localhost/_kay/action/src/routes/\${file}/\${name}\`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-kay-action': '1', 'referer': 'http://localhost/', ...headers }, body: '[{}]' }))).status
 
-console.log(JSON.stringify({ home: (await app.handle(new Request('http://localhost/'))).status, leave: await post('_layout.kay', 'leave'), promote: await post('staff/_layout.kay', 'promote'), admin: await post('staff/_layout.kay', 'promote', { 'x-admin': '1' }) }))
+console.log(JSON.stringify({ home: (await app.handle(new Request('http://localhost/'))).status, leave: await post('_layout.kay', 'leave'), promote: await post('staff/_layout.kay', 'promote'), admin: await post('staff/_layout.kay', 'promote', { 'x-admin': '1' }), track: await post('../../lib/routes/_layout.kay', 'track'), tracked: await post('../../lib/routes/_layout.kay', 'track', { 'x-lib': '1' }) }))
 process.exit(0)
 `,
     })
@@ -1035,11 +1038,12 @@ process.exit(0)
       expect(code).toBe(0)
       // The executable reads nothing from the sources, the layouts' settings included.
       await rename(join(root, 'src'), join(root, 'moved'))
+      await rename(join(root, 'lib'), join(root, 'moved-lib'))
       const child = Bun.spawn([join(root, 'server')], { cwd: root, env: { ...process.env, NODE_ENV: 'production' }, stdout: 'pipe', stderr: 'pipe' })
       const [output, errors, exited] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
 
       expect({ exited, errors }).toEqual({ exited: 0, errors: expect.any(String) })
-      expect(JSON.parse(output.trim().split('\n').at(-1)!)).toEqual({ home: 200, leave: 200, promote: 403, admin: 200 })
+      expect(JSON.parse(output.trim().split('\n').at(-1)!)).toEqual({ home: 200, leave: 200, promote: 403, admin: 200, track: 403, tracked: 200 })
     }
     finally {
       await rm(root, { recursive: true, force: true })

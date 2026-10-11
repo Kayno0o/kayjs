@@ -242,8 +242,8 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   limitBodies(app, options.bodyLimit ?? DEFAULT_BODY_LIMIT, actionLimits, api.limits)
 
   if (servesOpenApi) {
-    // On a site requiring guards, the document is refused unless a guard covers every module not setting `guards: false`.
-    const guards = requiredGuards(await Promise.all(sharedGuards(apiModules).map(async file => loadGuard({ file, special: {} }))), { file: paths.api }, {}, options.requireGuards)
+    // On a site requiring guards, the document is refused unless a guard covers every module not setting `guards: false`, or every module is open.
+    const guards = requiredGuards(await Promise.all(sharedGuards(apiModules).map(async file => loadGuard({ file, special: {} }))), { file: paths.api, open: apiModules.every(module => module.open === true) || undefined }, {}, options.requireGuards)
 
     serveOpenApi(app, openApiDocument(api.mounted, { title: openapi.title ?? options.seo?.name ?? 'API', version: openapi.version ?? '1.0.0', base }), openapi, guards, actionOptions)
   }

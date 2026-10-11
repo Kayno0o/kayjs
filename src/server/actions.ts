@@ -22,7 +22,7 @@ import { sizeText } from './body'
 import { importModule } from './bundle'
 import { cookieJar } from './cookies'
 import { handOver, submittedValues, writeSuccess } from './flash'
-import { requiredGuards, runGuards } from './guards'
+import { requiredGuards, runGuards, unguarded } from './guards'
 import { requestLocale, stateFor } from './i18n'
 import { answeringRequest } from './log'
 import { countSucceeded, PRETEND, protectionRefusal, requestId } from './protection'
@@ -210,7 +210,8 @@ function actionFiles(routes: ServedRoute[], required: boolean | undefined): Map<
       }
 
       // A layout runs the guards of its own directory and above, whichever page the scan met it under; a page those of its route.
-      const { guards, open } = file === route.file ? route : route.layoutGuards?.[index] ?? { guards: [] }
+      // A route built by hand, with no `layoutAccess`, refuses its layouts' actions rather than serve them unguarded.
+      const { guards, open } = file === route.file ? route : route.layoutGuards?.[index] ?? { guards: [{ file, special: route.special, check: unguarded }] }
 
       files.set(file, { guards: requiredGuards(guards, { file, open }, route.special, required), routes: [route], params: route.params })
     }

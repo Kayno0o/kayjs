@@ -138,6 +138,28 @@ describe('the OpenAPI document on a site requiring guards', () => {
     expect(await status()).toBe(403)
     expect(await status({ 'x-admin': '1' })).toBe(200)
   })
+
+  it('stays behind the guards of a library\'s modules, which a library leaves open, and is served when every module is open', async () => {
+    const lib = join(dir, 'lib/api')
+    const LIB_GUARD = 'import { guard } from \'kay\'\n\nexport default guard(({ request, deny }) => {\n  if (!request.headers.has(\'x-lib\'))\n    deny(403)\n})\n'
+
+    await Promise.all([
+      Bun.write(join(lib, '_guard.ts'), LIB_GUARD),
+      Bun.write(join(lib, 'm.ts'), 'import { api } from \'kay/server\'\n\nexport default api().get(\'/\', () => \'m\')\n'),
+      Bun.write(join(dir, 'open-api/health.ts'), 'import { api } from \'kay/server\'\n\nexport default api({ guards: false }).get(\'/\', () => \'up\')\n'),
+    ])
+    const extensions = [{ name: 'lib', api: { dir: lib, prefix: 'lib' } }]
+    const status = async (app: Awaited<ReturnType<typeof pages>>, headers: Record<string, string> = {}) => (await app.handle(new Request('http://localhost/api/openapi.json', { headers }))).status
+
+    for (const requireGuards of [false, true]) {
+      const app = await pages({ routes: join(dir, 'routes'), api: join(dir, 'none'), prebuilt: false, requireGuards, openapi: true, extensions })
+
+      expect(await status(app)).toBe(403)
+      expect(await status(app, { 'x-lib': '1' })).toBe(200)
+    }
+
+    expect(await status(await pages({ routes: join(dir, 'routes'), api: join(dir, 'open-api'), prebuilt: false, requireGuards: true, openapi: true }))).toBe(200)
+  })
 })
 
 describe('falseKeys', () => {
@@ -148,8 +170,9 @@ describe('falseKeys', () => {
     expect(falseKeys('export default api({ cors: { origins: [] }, guards: false })\n', /\bapi\s*\(\s*\{/)).toEqual(new Set(['guards']))
   })
 
-  it('reads only a literal false, not an expression starting with it', () => {
+  it('reads only a literal false, not an expression starting with it, past any comment between', () => {
     expect(falseKeys('export const page = { guards: false || open, layouts: false ? 1 : 2, noindex: false // why\n, sitemap: false }\n')).toEqual(new Set(['noindex', 'sitemap']))
+    expect(falseKeys('export const page = { guards: false /* x */ || open, layouts: false // note\n && open, sitemap: False, noindex: false /* last */ }\n')).toEqual(new Set(['noindex']))
   })
 
   it('skips a page object written in a comment, a string or a template literal', () => {

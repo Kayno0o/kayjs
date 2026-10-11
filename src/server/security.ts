@@ -164,12 +164,15 @@ function policy(layers: Record<string, string[] | false>[], hashes: string[], st
   }
 
   for (const sources of added) {
+    // A directive the layer adds starts from what the policy held before it, whatever order the layer lists them in.
+    const before = new Map(directives)
+
     for (const [name, value] of Object.entries(sources)) {
       if (value === false) {
         directives.delete(name)
       }
       else {
-        const own = directives.get(name) ?? fallbackSources(directives, name)
+        const own = before.get(name) ?? fallbackSources(before, name)
 
         directives.set(name, [...new Set([...own.filter(source => source !== NONE), ...value])])
       }

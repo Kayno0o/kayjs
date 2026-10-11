@@ -73,8 +73,7 @@ const OPTIONAL_SEGMENT = /^\[\[([A-Z_$][\w$]*)(?:=([A-Z_$][\w$-]*))?\]\]$/i
 const GROUP_SEGMENT = /^\(.+\)$/
 // A file whose `page` sets `layouts: false` is not wrapped by the layouts above it: a page by none, a layout by its parent directories' ones; a page setting `guards: false` runs none of the guards above it, nor do its actions, and a layout setting it opens its own actions.
 const PAGE_EXPORT = /^export\s+const\s+page\s*=\s*\{/m
-// A key set to the literal `false`, not to an expression starting with it.
-const FALSE_KEY = /(?:([A-Z_$][\w$]*)|'([^'\n]*)'|"([^"\n]*)")\s*:\s*false(?=\s*(?:[,}]|\/[/*]))/iy
+const FALSE_KEY = /(?:([A-Za-z_$][\w$]*)|'([^'\n]*)'|"([^"\n]*)")\s*:\s*false(?![\w$])/y
 const SPACE = /\s/
 const KAY_EXTENSION = /\.kay$/
 const LAYOUT = '_layout.kay'
@@ -165,6 +164,15 @@ export async function scanRoutes(routesDir: string, mounts: RouteMount[] = []): 
   const routes: Route[] = []
   const read: LayoutsRead = new Map()
   const served = new Set<string>()
+  const access = new Map<string, LayoutAccess<GuardFile>>()
+  const accessOf = (layout: string) => {
+    let found = access.get(layout)
+
+    if (!found)
+      access.set(layout, found = layoutAccess(trees, layout, read))
+
+    return found
+  }
 
   for (const tree of trees) {
     const own: Route[] = []
@@ -178,7 +186,7 @@ export async function scanRoutes(routesDir: string, mounts: RouteMount[] = []): 
 
         const layouts = layoutsOf(trees, at, file, read)
 
-        own.push({ ...route, layouts, layoutAccess: layouts.map(layout => layoutAccess(trees, layout, read)), special: specialPagesOf(trees, at, read), guards: open ? [] : guardsOf(trees, at, read), ...(open || tree !== trees[0]) && { open: true } })
+        own.push({ ...route, layouts, layoutAccess: layouts.map(accessOf), special: specialPagesOf(trees, at, read), guards: open ? [] : guardsOf(trees, at, read), ...(open || tree !== trees[0]) && { open: true } })
       }
     }
 
@@ -321,8 +329,10 @@ export function falseKeys(source: string, head = PAGE_EXPORT): Set<string> {
   const keyAt = (at: number) => {
     FALSE_KEY.lastIndex = at
     const key = FALSE_KEY.exec(source)
+    // The literal itself, not an expression starting with it: a comma or the closing brace follows.
+    const next = key ? source[codeAfter(source, FALSE_KEY.lastIndex)] : undefined
 
-    if (key)
+    if (key && (next === ',' || next === '}'))
       keys.add(key[1] ?? key[2] ?? key[3]!)
   }
 
@@ -386,6 +396,22 @@ function codeMatch(source: string, pattern: RegExp): RegExpExecArray | undefined
   }
 
   return undefined
+}
+
+// Where the code past `start` resumes, after spaces and comments.
+function codeAfter(source: string, start: number): number {
+  let at = start
+
+  while (at < source.length) {
+    if (SPACE.test(source[at]!))
+      at++
+    else if (source[at] === '/' && (source[at + 1] === '/' || source[at + 1] === '*'))
+      at = literalEnd(source, at) + 1
+    else
+      break
+  }
+
+  return at
 }
 
 // Where the comment, string or template literal starting at `start` ends, its last character; -1 when none starts there.
