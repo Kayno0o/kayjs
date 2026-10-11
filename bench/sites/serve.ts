@@ -1,7 +1,7 @@
 import type { Subprocess } from 'bun'
 import type { Variant } from './sites'
-import { existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { existsSync, mkdirSync, readdirSync, readFileSync, readlinkSync } from 'node:fs'
+import { join, sep } from 'node:path'
 import { run, VARIANTS, WORK } from './sites'
 
 const NGINX = join(WORK, 'nginx')
@@ -15,20 +15,66 @@ const DIGITS = /^\d+$/
 // Where nginx keeps its dynamic modules: Arch's and Debian's path unless `NGINX_MODULES` says otherwise.
 const MODULES = process.env.NGINX_MODULES ?? '/usr/lib/nginx/modules'
 const NOT_WORD = /\W/g
+// Every process the bench started and has not seen exit, which an interrupted run stops.
+const running = new Set<Subprocess>()
 
 // Where a variant's server writes its stderr, the last start's only.
 function serverLog(variant: Variant): string {
   return join(variant.dir, 'server.log')
 }
 
+// A process the bench started, stopped with every other if the run is interrupted.
+export function tracked<Process extends Subprocess>(process: Process): Process {
+  running.add(process)
+  void (async () => {
+    await process.exited
+    running.delete(process)
+  })()
+
+  return process
+}
+
+// What an interrupted run leaves: every process it started and each one's own, then what still runs in `dirs`, as a dev server's spare respawned while it stopped.
+export async function stopEverything(dirs: string[]): Promise<void> {
+  const pids = [...running].flatMap(process => processTree(process.pid))
+
+  killAll([...pids, ...dirs.flatMap(processesIn)])
+  await Promise.all([...running].map(async process => process.exited))
+}
+
+export function killAll(pids: number[]) {
+  for (const pid of new Set(pids)) {
+    try {
+      process.kill(pid, 'SIGKILL')
+    }
+    catch {}
+  }
+}
+
+// Fails when something already answers on `port`, as a server an interrupted run left would: the next one would move to another port, or be timed against it.
+export async function ensureFree(port: number, what: string): Promise<void> {
+  try {
+    const socket = await Bun.connect({ hostname: '127.0.0.1', port, socket: { data: () => undefined } })
+
+    socket.end()
+  }
+  catch {
+    return
+  }
+
+  throw new Error(`${what}: something already answers on port ${port}, a server an interrupted run left? Stop it, then run again`)
+}
+
 // A variant's server as production runs it: Astro's standalone entry under Bun (its image aliases node to bun), kay's compiled executable.
-export function startServer(variant: Variant): Subprocess {
-  return Bun.spawn(variant.kind === 'astro' ? [process.execPath, 'dist/server/entry.mjs'] : ['./server'], {
+export async function startServer(variant: Variant): Promise<Subprocess> {
+  await ensureFree(variant.ports.backend, variant.dir)
+
+  return tracked(Bun.spawn(variant.kind === 'astro' ? [process.execPath, 'dist/server/entry.mjs'] : ['./server'], {
     cwd: variant.dir,
     stdout: 'ignore',
     stderr: Bun.file(serverLog(variant)),
     env: { PATH: process.env.PATH!, HOME: process.env.HOME!, NODE_ENV: 'production', HOST: '127.0.0.1', PORT: String(variant.ports.backend), CACHE_PATH: ':memory:', ...variant.site.env },
-  })
+  }))
 }
 
 // Milliseconds until the server answers its home page with a 200; what it printed on stderr if it exits or never does.
@@ -80,7 +126,7 @@ export function processTree(pid: number): number[] {
       continue
     }
 
-    const parent = Number(STAT_PARENT.exec(stat.slice(stat.lastIndexOf(')')))?.[1])
+    const parent = parentOf(stat)
 
     children.set(parent, [...children.get(parent) ?? [], Number(name)])
   }
@@ -93,16 +139,39 @@ export function processTree(pid: number): number[] {
   return tree
 }
 
+// The parent of a process, from its `/proc/<pid>/stat` line.
+export function parentOf(stat: string): number {
+  return Number(STAT_PARENT.exec(stat.slice(stat.lastIndexOf(')')))?.[1])
+}
+
+// The processes running in `dir` or below it, whoever started them.
+export function processesIn(dir: string): number[] {
+  return readdirSync('/proc').filter(name => DIGITS.test(name)).flatMap((name) => {
+    try {
+      const cwd = readlinkSync(`/proc/${name}/cwd`)
+
+      return cwd === dir || cwd.startsWith(dir + sep) ? [Number(name)] : []
+    }
+    catch {
+      return []
+    }
+  })
+}
+
 // Proportional and resident memory of a process tree, in bytes: resident memory counts the pages its processes share once each, which proportional memory divides between them.
 export function treeMemory(pid: number): { pss: number, rss: number, processes: number } {
   const tree = processTree(pid)
   let pss = 0
   let rss = 0
 
+  // A process that exits between the two reads counts in neither.
   for (const member of tree) {
     try {
-      pss += Number(PSS.exec(readFileSync(`/proc/${member}/smaps_rollup`, 'utf8'))![1]) * 1024
-      rss += memory(member).rss
+      const proportional = Number(PSS.exec(readFileSync(`/proc/${member}/smaps_rollup`, 'utf8'))![1]) * 1024
+      const resident = memory(member).rss
+
+      pss += proportional
+      rss += resident
     }
     catch {}
   }
@@ -163,26 +232,32 @@ ${servers}
 }
 `)
 
-  return Bun.spawn(['nginx', '-p', NGINX, '-c', join(NGINX, 'nginx.conf'), '-e', join(NGINX, 'error.log')], { stdout: 'ignore', stderr: 'ignore' })
+  for (const variant of VARIANTS) {
+    await ensureFree(variant.ports.http, `nginx for ${variant.dir}`)
+    await ensureFree(variant.ports.https, `nginx for ${variant.dir}`)
+  }
+
+  return tracked(Bun.spawn(['nginx', '-p', NGINX, '-c', join(NGINX, 'nginx.conf'), '-e', join(NGINX, 'error.log')], { stdout: 'ignore', stderr: 'ignore' }))
 }
 
-// Every variant's server and nginx in front, until `stop`.
-export async function startAll(): Promise<{ servers: Map<Variant, Subprocess>, nginx: Subprocess, stop: () => void }> {
+// Every variant's server and nginx in front, until `stop` saw them exit.
+export async function startAll(): Promise<{ servers: Map<Variant, Subprocess>, nginx: Subprocess, stop: () => Promise<void> }> {
   const nginx = await startNginx()
-  const servers = new Map(VARIANTS.map(variant => [variant, startServer(variant)]))
-
-  const stop = () => {
-    for (const server of servers.values())
+  const servers = new Map<Variant, Subprocess>()
+  const stop = async () => {
+    for (const server of [...servers.values(), nginx])
       server.kill()
-    nginx.kill()
+    await Promise.all([...servers.values(), nginx].map(async server => server.exited))
   }
 
   try {
     for (const variant of VARIANTS)
+      servers.set(variant, await startServer(variant))
+    for (const variant of VARIANTS)
       await waitReady(variant, servers.get(variant)!)
   }
   catch (error) {
-    stop()
+    await stop()
 
     throw error
   }

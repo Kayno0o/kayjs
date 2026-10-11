@@ -2,6 +2,7 @@ import type { Variant } from './sites'
 import { cpSync, existsSync, rmSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { median } from '../format'
+import { tracked } from './serve'
 import { run } from './sites'
 
 export interface BuildTime {
@@ -37,7 +38,7 @@ export async function timeBuild(variant: Variant, command: string[]): Promise<Bu
       rmSync(join(variant.dir, output), { recursive: true, force: true })
 
     const started = performance.now()
-    const proc = Bun.spawn(command, { cwd: variant.dir, env: { ...process.env, ...variant.site.env }, stdout: 'ignore', stderr: 'pipe' })
+    const proc = tracked(Bun.spawn(command, { cwd: variant.dir, env: { ...process.env, ...variant.site.env }, stdout: 'ignore', stderr: 'pipe' }))
     const errors = await new Response(proc.stderr).text()
 
     if (await proc.exited !== 0)

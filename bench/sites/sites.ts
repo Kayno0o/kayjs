@@ -61,21 +61,38 @@ const CONFIG = resolve(parseArgs({ args: Bun.argv.slice(2), options: { config: {
 // Outside any project: inside this repository, the sites' Tailwind and Vite would scan kay's own files, and kay's tests would scan the sites'.
 export const WORK = join(process.env.XDG_CACHE_HOME ?? join(homedir(), '.cache'), 'kay-bench-sites')
 
-if (!existsSync(CONFIG))
-  throw new Error(`no sites to measure: write ${CONFIG} after ${EXAMPLE}, or pass --config <file>`)
-
-export const SITES: Site[] = ((await import(CONFIG)) as { default: Site[] }).default.map(site => ({ ...site, repo: resolve(dirname(CONFIG), site.repo) }))
+// None without a config, which run.ts reports; the bench's tests read none.
+export const SITES: Site[] = existsSync(CONFIG) ? ((await import(CONFIG)) as { default: Site[] }).default.map(site => ({ ...site, repo: resolve(dirname(CONFIG), site.repo) })) : []
+export const NO_SITES = `no sites to measure: write ${CONFIG} after ${EXAMPLE}, or pass --config <file>`
 
 // `KIND=kay` measures the kay side only, keeping the Astro figures of an earlier run; the ports stay those of a full run.
-export const KIND = process.env.KIND as Variant['kind'] | undefined
-// `PHASE=prod` measures the production builds only, `PHASE=dev` the dev servers only.
-export const PHASE = process.env.PHASE as 'prod' | 'dev' | undefined
+export const KIND = oneOf('KIND', ['astro', 'kay'] as const)
+// `PHASE=prod` measures the production builds only, `PHASE=dev` the dev servers only, of the sites naming what to edit.
+export const PHASE = oneOf('PHASE', ['prod', 'dev'] as const)
+// `KAY_PACKAGE` runs the kay dev copies on another kay than the one each site pins: `checkout` for this checkout, packed, a version from the registry, or any dependency specifier (`file:`, `npm:`).
+const KAY_PACKAGE = process.env.KAY_PACKAGE ?? ''
+const CHECKOUT = join(import.meta.dir, '../..')
+const PUBLISHED = '@kaynooo/kayjs'
+// Beside a kay dev copy's install: where its kay came from.
+const KAY_SOURCE = 'kay-bench-source.txt'
 
 export const VARIANTS: Variant[] = SITES.flatMap((site, index) => (['astro', 'kay'] as const).map((kind, offset) => {
   const slot = index * 2 + offset + 1
 
   return { site, kind, dir: join(WORK, `${site.name}-${kind}`), devDir: join(WORK, `${site.name}-${kind}-dev`), ports: { backend: 47200 + slot, http: 47080 + slot, https: 47440 + slot, dev: 47320 + slot } }
-})).filter(variant => KIND === undefined || variant.kind === KIND)
+})).filter(variant => (KIND === undefined || variant.kind === KIND) && (PHASE !== 'dev' || variant.site.dev !== undefined))
+
+function oneOf<const Value extends string>(name: string, values: readonly Value[]): Value | undefined {
+  const value = process.env[name]
+
+  if (value === undefined || value === '')
+    return undefined
+
+  if (!values.includes(value as Value))
+    throw new Error(`${name}=${value}: expected ${values.join(' or ')}`)
+
+  return value as Value
+}
 
 export function run(cmd: string[], cwd: string, env: Record<string, string> = {}): string {
   const result = Bun.spawnSync(cmd, { cwd, env: { ...process.env, ...env }, stdout: 'pipe', stderr: 'pipe' })
@@ -106,9 +123,27 @@ function refOf(variant: Variant): string {
   return variant.kind === 'astro' ? variant.site.astro : process.env.KAY_REF ?? variant.site.kay ?? 'HEAD'
 }
 
+// The dependency the kay dev copies install kay from and what the results call it, or none for the version each site pins.
+function kayPackage(): { specifier: string, source: string } | undefined {
+  if (KAY_PACKAGE === '')
+    return undefined
+
+  if (KAY_PACKAGE === 'checkout') {
+    const commit = run(['git', 'rev-parse', '--short', 'HEAD'], CHECKOUT).trim()
+    const changed = run(['git', 'status', '--porcelain', '--untracked-files=no'], CHECKOUT).trim() !== ''
+
+    run([process.execPath, 'pm', 'pack', '--filename', join(WORK, 'kay-checkout.tgz'), '--quiet'], CHECKOUT)
+
+    return { specifier: `file:${join(WORK, 'kay-checkout.tgz')}`, source: `this checkout at ${commit}${changed ? ' with uncommitted changes' : ''}, packed` }
+  }
+
+  return KAY_PACKAGE.includes(':') ? { specifier: KAY_PACKAGE, source: KAY_PACKAGE } : { specifier: `npm:${PUBLISHED}@${KAY_PACKAGE}`, source: 'the registry' }
+}
+
 // Exports each site at its Astro commit and at its kay ref and installs them, once for the production builds, which build.ts then builds as they deploy, and once for the dev servers.
 export async function prepare() {
   mkdirSync(WORK, { recursive: true })
+  const kay = PHASE === 'prod' ? undefined : kayPackage()
 
   for (const variant of VARIANTS) {
     if (variant.kind === 'astro')
@@ -119,15 +154,21 @@ export async function prepare() {
     for (const dir of dirs) {
       exportCommit(variant.site.repo, refOf(variant), dir)
 
-      if (variant.kind === 'astro' && variant.site.patch !== undefined) {
-        const file = Bun.file(join(dir, 'package.json'))
-        const manifest = await file.json() as Manifest
+      const file = Bun.file(join(dir, 'package.json'))
+      const manifest = await file.json() as Manifest
+      const pinned = manifest.dependencies.kay
 
-        variant.site.patch(manifest)
-        await Bun.write(file, JSON.stringify(manifest, null, 2))
-      }
+      if (variant.kind === 'astro')
+        variant.site.patch?.(manifest)
 
+      if (variant.kind === 'kay' && dir === variant.devDir && kay !== undefined)
+        manifest.dependencies.kay = kay.specifier
+
+      await Bun.write(file, JSON.stringify(manifest, null, 2))
       run([process.execPath, 'install'], dir)
+
+      if (variant.kind === 'kay')
+        await Bun.write(join(dir, KAY_SOURCE), dir === variant.devDir && kay !== undefined ? kay.source : `the site's own ${pinned}`)
 
       if (dir === variant.devDir)
         await variant.site.prepareDev?.(dir, variant.kind)
@@ -139,10 +180,18 @@ export function commitOf(variant: Variant): string {
   return run(['git', '-C', variant.site.repo, 'rev-parse', '--short', refOf(variant)], WORK).trim()
 }
 
-export async function kayVersion(variant: Variant): Promise<string> {
-  const manifest = await Bun.file(join(PHASE === 'dev' ? variant.devDir : variant.dir, 'node_modules/kay/package.json')).json() as { version: string }
+// The version of `name` installed in `dir`.
+export async function versionIn(dir: string, name: string): Promise<string> {
+  const manifest = await Bun.file(join(dir, 'node_modules', name, 'package.json')).json() as { version: string }
 
   return manifest.version
+}
+
+// The kay a kay copy installed, and where from.
+export async function kayIn(dir: string): Promise<string> {
+  const source = Bun.file(join(dir, KAY_SOURCE))
+
+  return `kay ${await versionIn(dir, 'kay')}${await source.exists() ? `, ${await source.text()}` : ''}`
 }
 
 export function label(variant: Variant): string {

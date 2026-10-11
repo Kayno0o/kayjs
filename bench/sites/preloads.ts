@@ -116,7 +116,7 @@ async function load(browser: Browser, path: string, rewrite: (html: string) => s
 }
 
 const nginx = await startNginx()
-const server = startServer(variant)
+const server = await startServer(variant)
 let browser: Browser | undefined
 
 try {

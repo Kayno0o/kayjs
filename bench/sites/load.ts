@@ -32,7 +32,7 @@ export async function coldStart(variant: Variant): Promise<ColdStart> {
   const runs: ColdStart[] = []
 
   for (let run = 0; run < COLD_STARTS; run++) {
-    const server = startServer(variant)
+    const server = await startServer(variant)
 
     runs.push({ ms: await waitReady(variant, server), rss: memory(server.pid).rss })
     server.kill()

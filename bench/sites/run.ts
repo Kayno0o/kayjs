@@ -5,7 +5,7 @@ import type { DevResult } from './dev'
 import type { ColdStart, Load } from './load'
 import type { Variant } from './sites'
 import type { Weight } from './weigh'
-import { cpus } from 'node:os'
+import { constants, cpus } from 'node:os'
 import { join } from 'node:path'
 import { launch } from '../browser'
 import { kilobytes, milliseconds, table } from '../format'
@@ -13,8 +13,8 @@ import { PROFILES, vitals } from './browser'
 import { buildCommands, footprint, timeBuild } from './build'
 import { development, devSection } from './dev'
 import { coldStart, load } from './load'
-import { memory, startAll } from './serve'
-import { commitOf, kayVersion, KIND, label, PHASE, prepare, SITES, VARIANTS } from './sites'
+import { memory, startAll, stopEverything } from './serve'
+import { commitOf, KIND, label, NO_SITES, PHASE, prepare, SITES, VARIANTS, versionIn } from './sites'
 import { VIEWPORTS, weigh } from './weigh'
 
 interface Result {
@@ -41,6 +41,22 @@ async function stylesheet(variant: Variant): Promise<string> {
   return sizes.toSorted((a, b) => b.size - a.size)[0]!.href
 }
 
+if (VARIANTS.length === 0)
+  throw new Error(SITES.length === 0 ? NO_SITES : 'PHASE=dev: no site in the config names what its dev phase edits, `dev`')
+
+let browser: Browser | undefined
+
+// An interrupted run stops what it started, so no server it leaves holds a port the next run would be timed against.
+for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) {
+  process.on(signal, () => {
+    void (async () => {
+      await stopEverything(VARIANTS.map(variant => variant.devDir))
+      await browser?.close()
+      process.exit(128 + constants.signals[signal])
+    })()
+  })
+}
+
 if ((process.env.SKIP_PREPARE ?? '') === '') {
   console.error('exporting, installing and building the sites')
   await prepare()
@@ -65,13 +81,12 @@ for (const variant of producing ? VARIANTS : []) {
 }
 
 const lab = producing ? await startAll() : undefined
-let browser: Browser
 
 try {
   browser = await launch()
 }
 catch (error) {
-  lab?.stop()
+  await lab?.stop()
 
   throw error
 }
@@ -99,7 +114,7 @@ try {
   }
 
   // The dev servers run on a machine the production servers left.
-  lab?.stop()
+  await lab?.stop()
 
   const dev = PHASE === 'prod' ? new Map<Variant, DevResult>() : await development(browser)
   const header = ['', ...VARIANTS.map(label)]
@@ -109,8 +124,8 @@ try {
   const environment = [
     `${cpus()[0]?.model ?? 'unknown CPU'}, ${cpus().length} threads`,
     `Bun ${Bun.version}, Chromium ${browser.version()} headless, ${nginxVersion()}`,
-    ...await Promise.all(SITES.map(async (site) => {
-      const sides = await Promise.all(VARIANTS.filter(variant => variant.site === site).map(async variant => variant.kind === 'astro' ? `Astro at ${commitOf(variant)}` : `kay ${await kayVersion(variant)} at ${commitOf(variant)}`))
+    ...await Promise.all(SITES.filter(site => VARIANTS.some(variant => variant.site === site)).map(async (site) => {
+      const sides = await Promise.all(VARIANTS.filter(variant => variant.site === site).map(async variant => variant.kind === 'astro' ? `Astro at ${commitOf(variant)}` : `kay ${await versionIn(producing ? variant.dir : variant.devDir, 'kay')} at ${commitOf(variant)}`))
 
       return `${site.name}: ${sides.join(', ')}`
     })),
@@ -187,7 +202,7 @@ try {
 }
 finally {
   await browser.close()
-  lab?.stop()
+  await lab?.stop()
 }
 
 // nginx prints its version on stderr.
