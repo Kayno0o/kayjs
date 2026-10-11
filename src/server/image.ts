@@ -1,14 +1,19 @@
 import type { Context, Elysia } from 'elysia'
+import type { Guard, GuardContext } from '../runtime'
 import type { Aspect, ImageVariant } from '../runtime/image'
+import type { ActionOptions, GuardedRequest } from './actions'
+import type { LoadedGuard } from './guards'
 import type { RemoteImages } from './remote'
 import type { HeaderCopies } from './security'
 import { existsSync } from 'node:fs'
 import { readdir, rename, rm, stat } from 'node:fs/promises'
 import { basename, extname, join, normalize, resolve, sep } from 'node:path'
 import { ASSET_PREFIX } from '../build/assets'
-import { aspectKey, CARD, croppedSize, DEFAULT_ASPECTS, DEFAULT_MAX_DENSITY, FILES_ROUTE, IMAGE_ROUTE, IMAGE_WIDTHS, parseAspect, requestedRemoteVariants, requestedVariants, RESIZABLE, setAspects, setMaxDensity, setRemoteImages, variantHeight, variantSuffix } from '../runtime/image'
+import { aspectKey, CARD, croppedSize, DEFAULT_ASPECTS, DEFAULT_MAX_DENSITY, FILES_ROUTE, IMAGE_ROUTE, IMAGE_WIDTHS, parseAspect, requestedRemoteVariants, requestedVariants, RESIZABLE, setAspects, setMaxDensity, setRemoteImages, setResolvedImages, variantHeight, variantSuffix } from '../runtime/image'
+import { inLocale, passGuards } from './actions'
 import { AVIF_SPEED, DEFAULT_AVIF_QUALITY, encodeAvif } from './avif'
 import { coverImage } from './crop'
+import { decodable, imageHeader } from './image-format'
 import { limiter } from './limit'
 import { clientAddress } from './protection'
 import { revalidated } from './public'
@@ -33,6 +38,8 @@ export interface ImageRouteOptions {
   remote?: RemoteImages | undefined
   // The security headers, which the route's answers carry themselves.
   security?: Record<string, string> | undefined
+  // `images.resolve`, giving an absolute path, run after `images.guard` in the request's locale, as `actions` set it.
+  resolve?: { find: (src: string, ctx: GuardContext) => Promise<string | undefined>, guard?: Guard | undefined, actions: ActionOptions } | undefined
 }
 
 export const VARIANTS_DIR = 'images'
@@ -86,7 +93,7 @@ export async function writeVariant(source: string | Uint8Array, variant: number 
   const partial = `${target}.${crypto.randomUUID()}.tmp`
 
   // Read through Bun.file, which also reaches the files an executable embeds, where Bun.Image given a path does not.
-  const file = typeof source === 'string' ? Bun.file(source) : source
+  const file = typeof source === 'string' ? await decodable(Bun.file(source)) : source
   const shape = typeof variant === 'number' ? { width: variant } : variant
 
   if (shape === 'card') {
@@ -116,7 +123,11 @@ export async function writeImageVariants(clientDir: string, quality = DEFAULT_QU
 
   await Promise.all(names.filter(name => RESIZABLE.test(name)).map(async name => decoding(async () => {
     const source = join(assets, name)
-    const { width } = await new Bun.Image(source).metadata()
+    const { width, animated } = await imageHeader(Bun.file(source))
+
+    // Imported, an animated GIF is linked as it is, with no variants.
+    if (animated)
+      return
 
     const variants = [...IMAGE_WIDTHS.filter(step => step < width), width, ...requestedVariants(name)]
     // The share card stays a JPEG, which social sites read best.
@@ -144,7 +155,7 @@ export async function writeImageVariants(clientDir: string, quality = DEFAULT_QU
       return
 
     // Decoded once for all its variants, each width and format resizing these pixels rather than decoding the source again.
-    const decoded = await new Bun.Image(Bun.file(source)).png({ compressionLevel: 0 }).bytes()
+    const decoded = await new Bun.Image(await decodable(Bun.file(source))).png({ compressionLevel: 0 }).bytes()
 
     await Promise.all(missing.map(async ({ variant, format, target, cached }) => {
       await writeVariant(decoded, variant, cached ?? target, format === 'avif' ? avif : quality, format)
@@ -166,7 +177,7 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
   const pending = new Map<string, Promise<void>>()
   const allowed = new Set((options.aspects ?? DEFAULT_ASPECTS).map(text => aspectKey(parseAspect(text)!)))
   // An imported image is named after its content, so its size and the variants already found never change: a request for one waits on no file system call.
-  const importedSizes = new Map<string, { width: number, height: number }>()
+  const importedSizes = new Map<string, { width: number, height: number, animated: boolean }>()
   const importedVariants = new Map<string, Bun.BunFile>()
   // An imported variant by the URL that asked for it and whether its `Accept` takes AVIF, so a repeated request skips parsing the URL.
   const answered = new Map<string, { file: Bun.BunFile, headers: HeaderCopies }>()
@@ -176,7 +187,8 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
   const revalidatedAs = headerCopies({}, options.security)
   const negotiatedRevalidated = headerCopies({ vary: 'accept' }, options.security)
 
-  app.get(IMAGE_ROUTE, async ({ request, server, set }) => {
+  app.get(IMAGE_ROUTE, async (context) => {
+    const { request, server, set } = context
     const key = options.avif === undefined ? request.url : `${request.url}\n${acceptsAvif(request.headers.get('accept'))}`
     const known = answered.get(key)
 
@@ -187,7 +199,24 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
 
     const url = new URL(request.url)
     const src = url.searchParams.get('src') ?? ''
-    const source = await findSource(src, options, clientAddress(request, server))
+    let source = await findSource(src, options, clientAddress(request, server))
+    let passed: GuardedRequest | undefined
+
+    if (!source && options.resolve) {
+      const found = await resolvedSource(src, context, options.resolve)
+
+      if (found instanceof Response) {
+        for (const [name, value] of Object.entries(options.security ?? {})) {
+          if (!found.headers.has(name))
+            found.headers.set(name, value)
+        }
+
+        return found
+      }
+
+      source = found?.source
+      passed = found?.passed
+    }
 
     if (!source)
       return fail('Not found', 404)
@@ -195,13 +224,14 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
     if ('status' in source)
       return fail(source.message, source.status)
 
+    const { path } = source
     let stats: { size: number, mtimeMs: number } | undefined
-    let own = source.immutable ? importedSizes.get(source.path) : undefined
+    let own = source.immutable ? importedSizes.get(path) : undefined
 
     if (!own) {
       try {
-        stats = await stat(source.path)
-        own = await new Bun.Image(Bun.file(source.path), source.immutable ? {} : { maxPixels: MAX_UPLOAD_PIXELS }).metadata()
+        stats = await stat(path)
+        own = await imageHeader(Bun.file(path), source.immutable ? undefined : MAX_UPLOAD_PIXELS)
       }
       catch (error) {
         if ((error as { code?: string }).code === 'ERR_IMAGE_TOO_MANY_PIXELS')
@@ -211,7 +241,7 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
       }
 
       if (source.immutable)
-        importedSizes.set(source.path, own)
+        importedSizes.set(path, own)
     }
 
     const variant = requestedVariant(url, own, allowed)
@@ -219,12 +249,35 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
     if (typeof variant === 'string' && variant !== 'card')
       return fail(variant, 400)
 
+    // What the guards set goes out with the image; its URL may carry a signed link, or `images.resolve` admit only some, so no shared cache keeps it.
+    const answer = (response: Response) => {
+      if (source.private === true)
+        response.headers.set('cache-control', 'private, no-cache')
+
+      for (const [name, value] of passed?.headers ?? [])
+        response.headers.set(name, value)
+
+      passed?.jar.writeTo(response.headers)
+
+      return response
+    }
+
+    // An animated GIF goes as it is at every width, a variant flattening it to its first frame; its card is still drawn from that frame.
+    if (own.animated && variant !== 'card') {
+      const original = Bun.file(path, { type: 'image/gif' })
+
+      if (source.immutable)
+        return remembered(key, original, immutable, set)
+
+      return answer(revalidated(request, `W/"${Bun.hash(`${path}\n${stats!.size}\n${stats!.mtimeMs}`).toString(36)}"`, () => original, ownHeaders(set, revalidatedAs)))
+    }
+
     // Both formats answer the same URL, so a cache keeps one per `Accept`.
     const negotiated = options.avif !== undefined && variant !== 'card'
     const format = negotiated && acceptsAvif(request.headers.get('accept')) ? 'avif' : 'webp'
     const headers = negotiated ? negotiatedImmutable : immutable
     // An imported image is named after its content; a runtime one may change in place, so its size and time, read above since its size is never kept, go in the name, after its key for a remote one, whose variants go when its original does.
-    const name = source.immutable ? variantName(source.path, variant, format) : inFormat(`${source.key === undefined ? '' : `remote-${source.key}-`}${Bun.hash(`${source.path}\n${stats!.size}\n${stats!.mtimeMs}`).toString(36)}${variantSuffix(variant)}`, format)
+    const name = source.immutable ? variantName(path, variant, format) : inFormat(`${source.key === undefined ? '' : `remote-${source.key}-`}${Bun.hash(`${path}\n${stats!.size}\n${stats!.mtimeMs}`).toString(36)}${variantSuffix(variant)}`, format)
     const found = source.immutable ? importedVariants.get(name) : undefined
 
     if (found)
@@ -241,7 +294,7 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
       if (!writing) {
         writing = (async () => {
           try {
-            await drawing(async () => writeVariant(source.path, variant, cached, format === 'avif' ? options.avif : options.quality, format))
+            await drawing(async () => writeVariant(path, variant, cached, format === 'avif' ? options.avif : options.quality, format))
           }
           finally {
             pending.delete(cached)
@@ -268,13 +321,7 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
       return remembered(key, variantFile, headers, set)
     }
 
-    const response = revalidated(request, `W/"${name}"`, () => Bun.file(file), ownHeaders(set, negotiated ? negotiatedRevalidated : revalidatedAs))
-
-    // Its URL carries the signed link, which no shared cache should keep.
-    if (source.private === true)
-      response.headers.set('cache-control', 'private, no-cache')
-
-    return response
+    return answer(revalidated(request, `W/"${name}"`, () => Bun.file(file), ownHeaders(set, negotiated ? negotiatedRevalidated : revalidatedAs)))
   })
 
   function remembered(key: string, file: Bun.BunFile, headers: HeaderCopies, set: Context['set']): Response {
@@ -321,7 +368,7 @@ export async function builtVariant(url: URL, clientDir: string, aspects?: readon
     return undefined
 
   try {
-    const variant = requestedVariant(url, await new Bun.Image(Bun.file(source.path)).metadata(), new Set((aspects ?? DEFAULT_ASPECTS).map(text => aspectKey(parseAspect(text)!))))
+    const variant = requestedVariant(url, await imageHeader(Bun.file(source.path)), new Set((aspects ?? DEFAULT_ASPECTS).map(text => aspectKey(parseAspect(text)!))))
     const file = typeof variant === 'string' ? undefined : join(clientDir, VARIANTS_DIR, variantName(source.path, variant))
 
     return file !== undefined && await Bun.file(file).exists() ? file : undefined
@@ -329,6 +376,21 @@ export async function builtVariant(url: URL, clientDir: string, aspects?: readon
   catch {
     return undefined
   }
+}
+
+// The file `images.resolve` gives for a `src`, once `images.guard` let the request through, or the answer of the one that stopped it.
+async function resolvedSource(src: string, context: { request: Request }, { find, guard, actions }: NonNullable<ImageRouteOptions['resolve']>): Promise<Response | { source: { path: string, immutable: false, private: true }, passed: GuardedRequest } | undefined> {
+  let path: string | undefined
+  const lookup: LoadedGuard = { file: 'images.resolve', special: {}, check: async (ctx) => {
+    path = await find(src, ctx)
+  } }
+  const guards = guard ? [{ file: 'images.guard', special: {}, check: guard }, lookup] : [lookup]
+  const passed = await inLocale(context.request, actions, async () => passGuards(guards, context, {}, actions))
+
+  if (passed instanceof Response)
+    return passed
+
+  return path === undefined ? undefined : { source: { path, immutable: false, private: true }, passed }
 }
 
 // The file a `src` names, a remote image's downloaded copy or a stored one included, or why the remote or private one is refused.
@@ -375,8 +437,8 @@ export function sourceFile(src: string, options: ImageRouteOptions): { path: str
   return undefined
 }
 
-// `images.maxDensity`, `images.aspects` and `images.remote`, checked and set for every image this process renders, served or prerendered; returns the density.
-export function applyImageConfig(images: { maxDensity?: number | undefined, aspects?: string[] | undefined, remote?: string[] | undefined } | undefined): number {
+// `images.maxDensity`, `images.aspects`, `images.remote` and whether `images.resolve` is set, checked and set for every image this process renders, served or prerendered; returns the density.
+export function applyImageConfig(images: { maxDensity?: number | undefined, aspects?: string[] | undefined, remote?: string[] | undefined, resolve?: unknown } | undefined): number {
   const maxDensity = images?.maxDensity ?? DEFAULT_MAX_DENSITY
 
   if (!(maxDensity >= 1))
@@ -387,6 +449,7 @@ export function applyImageConfig(images: { maxDensity?: number | undefined, aspe
   setMaxDensity(maxDensity)
   setAspects(images?.aspects ?? DEFAULT_ASPECTS)
   setRemoteImages(src => remoteAllowed(src, patterns))
+  setResolvedImages(images?.resolve !== undefined)
 
   return maxDensity
 }
@@ -437,6 +500,7 @@ export interface ProcessedImage {
 // An image a user uploaded, resized and encoded for the app to store: `await processImage(file, { width: 200, height: 200, fit: 'cover' })` squares it to a 200px WebP.
 export async function processImage(input: Blob | Uint8Array | ArrayBuffer, options: ProcessImageOptions = {}): Promise<ProcessedImage> {
   const source = input instanceof ArrayBuffer ? new Uint8Array(input) : input
+  const maxPixels = options.maxPixels ?? MAX_UPLOAD_PIXELS
   const { width: ownWidth, height: ownHeight } = await imageSize(source, options)
   const format = options.format ?? 'webp'
   const quality = options.quality ?? DEFAULT_QUALITY
@@ -446,10 +510,10 @@ export async function processImage(input: Blob | Uint8Array | ArrayBuffer, optio
     if (options.width === undefined || options.height === undefined)
       throw new Error('kay: processImage() covers a box given both its width and its height')
 
-    image = new Bun.Image(await coverImage(source, options.width, options.height, options.maxPixels ?? MAX_UPLOAD_PIXELS))
+    image = new Bun.Image(await coverImage(source, options.width, options.height, maxPixels))
   }
   else {
-    image = new Bun.Image(source, { maxPixels: options.maxPixels ?? MAX_UPLOAD_PIXELS })
+    image = new Bun.Image(await decodable(source, maxPixels), { maxPixels })
 
     if (options.width !== undefined || options.height !== undefined)
       image = image.resize(options.width ?? ownWidth, options.height ?? ownHeight, { fit: 'inside', withoutEnlargement: true })
@@ -463,5 +527,7 @@ export async function processImage(input: Blob | Uint8Array | ArrayBuffer, optio
 
 // An image's size and format, from its header, refused past `maxPixels`, 50 million by default.
 export async function imageSize(input: Blob | Uint8Array | ArrayBuffer, options: { maxPixels?: number | undefined } = {}): Promise<{ width: number, height: number, format: string }> {
-  return new Bun.Image(input instanceof ArrayBuffer ? new Uint8Array(input) : input, { maxPixels: options.maxPixels ?? MAX_UPLOAD_PIXELS }).metadata()
+  const { width, height, format } = await imageHeader(input instanceof ArrayBuffer ? new Uint8Array(input) : input, options.maxPixels ?? MAX_UPLOAD_PIXELS)
+
+  return { width, height, format }
 }

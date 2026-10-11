@@ -1,4 +1,5 @@
 import { nodeZlib } from './builtins'
+import { decodable } from './image-format'
 
 // Bun.Image resizes but cannot cut: an image is written as a PNG this reads back row by row, and the middle of it written again.
 const SIGNATURE = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])
@@ -19,7 +20,8 @@ export interface Png {
 
 // `source` resized to cover `width` by `height`, its middle kept, as a PNG.
 // Shrunk, it is resized first, so the cut reads few pixels; enlarged, it is cut first, so a thin image is never blown up whole.
-export async function coverImage(source: Blob | Uint8Array, width: number, height: number, maxPixels?: number): Promise<Uint8Array> {
+export async function coverImage(input: Blob | Uint8Array, width: number, height: number, maxPixels?: number): Promise<Uint8Array> {
+  const source = await decodable(input, maxPixels)
   const limit = maxPixels === undefined ? {} : { maxPixels }
   const own = await new Bun.Image(source, limit).metadata()
   const scale = Math.max(width / own.width, height / own.height)

@@ -26,6 +26,8 @@ const LAST_WORD = /\S+$/
 export const DEFAULT_MAX_DENSITY = 2
 const DENSITY_META = 'meta[name="kay-max-density"]'
 
+export const RESOLVED_META = 'kay-resolved-images'
+
 // What `img` takes to load the right size: spread it, `img({...image(hero)} alt="")`.
 export interface ImageProps {
   src: string
@@ -64,10 +66,16 @@ const requested = new Map<string, Map<string, ImageVariant>>()
 const requestedRemote = new Map<string, Map<string, ImageVariant>>()
 // Whether `images.remote` covers a URL, on the server; the browser checks none.
 let remoteListed: ((src: string) => boolean) | undefined
+// Whether `images.resolve` looks sources up, which the browser reads off the page.
+let resolved: boolean | undefined
 
 // `images.maxDensity` on the server; the browser reads it off the page, where the server wrote it unless it is the default.
 export function setMaxDensity(density: number): void {
   maxDensity = density
+}
+
+export function setResolvedImages(on: boolean): void {
+  resolved = on
 }
 
 export function setRemoteImages(listed: ((src: string) => boolean) | undefined): void {
@@ -184,8 +192,15 @@ function currentMaxDensity(): number {
   return maxDensity ?? DEFAULT_MAX_DENSITY
 }
 
-// What Bun.Image reads and the route resizes, a query after the name allowed.
-export const RESIZABLE = /\.(?:png|jpe?g|webp)(?:\?.*)?$/i
+// What the route resizes, a query after the name allowed.
+export const RESIZABLE = /\.(?:png|jpe?g|webp|gif|avif)(?:\?.*)?$/i
+
+// A file the route resizes or, with `images.resolve` set, any path of the site, which the app looks up with no file extension to go by.
+function resizable(src: string): boolean {
+  resolved ??= typeof document !== 'undefined' && document.querySelector(`meta[name="${RESOLVED_META}"]`) !== null
+
+  return RESIZABLE.test(src) || (resolved && src.startsWith('/') && !src.startsWith('//'))
+}
 
 // What an image module exports: its URL, its size recorded for `image()`.
 export function registerImage(url: string, width: number, height: number): string {
@@ -210,7 +225,7 @@ export function storedSize(src: string): { width: number, height: number } | und
 export function image(src: string, options: ImageOptions = {}): ImageProps {
   const own = sizes.get(src) ?? storedSize(src) ?? (options.width !== undefined && options.height !== undefined ? { width: options.width, height: options.height } : undefined)
 
-  if (!own || !RESIZABLE.test(src) || unlisted(src, 'image()'))
+  if (!own || !resizable(src) || unlisted(src, 'image()'))
     return Object.assign(options.sizes === undefined ? { src } : { src, sizes: options.sizes }, own)
 
   const aspect = options.aspect === undefined ? undefined : allowedAspect(options.aspect)
@@ -241,7 +256,7 @@ function allowedAspect(text: string): Aspect {
 // The URL of an imported image, or one from `images.dirs` or `images.remote`, cut to the 1200x630 share card social sites show, as a JPEG, for `og:image`: `meta(property="og:image" content={shareImage(hero)})` in a `head` block. Smaller images are enlarged to fill it.
 export function shareImage(src: string): string {
   if (!RESIZABLE.test(src))
-    throw new Error(`kay: shareImage() cannot cut ${src}: it takes a PNG, JPEG or WebP`)
+    throw new Error(`kay: shareImage() cannot cut ${src}: it takes a PNG, JPEG, WebP, GIF or AVIF`)
 
   if (unlisted(src, 'shareImage()'))
     return src
@@ -359,7 +374,7 @@ export function setCardMaker(maker: typeof cardMaker): void {
 // The URL of a 1200x630 share card drawn for the page, its title over the image if one is given, for `og:image`: `meta(property="og:image" content={shareCard({ title: post.title, image: post.cover })})` in a `head` block.
 export function shareCard(card: ShareCardOptions): string {
   if (card.image !== undefined && !RESIZABLE.test(card.image))
-    throw new Error(`kay: shareCard() cannot draw on ${card.image}: it takes a PNG, JPEG or WebP`)
+    throw new Error(`kay: shareCard() cannot draw on ${card.image}: it takes a PNG, JPEG, WebP, GIF or AVIF`)
 
   if (card.image !== undefined && remoteListed && REMOTE.test(card.image) && !remoteListed(card.image))
     throw new Error(`kay: shareCard() was given ${card.image}, on a host images.remote in kay.config.ts does not list, so the card cannot be drawn on it`)

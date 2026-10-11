@@ -21,7 +21,7 @@ for key of photos key={key}
 
 - `files.put(file, options)` stores a `File` or `Blob` and resolves with its new key, `photos/1f3a9c0b2d4e6f8a0b1c.1600x1200.jpg`, for the app to save where it keeps its data. The extension is the file name's, else its type's, else `bin`; an image's key holds its size, which `img` and `image()` read off it without opening the file. A key is never written twice, so replacing a file stores a new one: `files.put(file, { replace: user.avatar })` deletes the old one once the new one is in. `folder` is letters, digits, `-` and `_` in segments split by `/`.
 - `files.url(key)` is where a page links it, a path of the site as a template's `href` is, written without the base: `/_kay/files/<key>`. The route serves it with its type, cached for good since a key never changes, and answers the range a video player asks for. A file a browser could run as the site, HTML or SVG say, is sent as a download, every file with `X-Content-Type-Options: nosniff`.
-- `img(src={files.url(key)})` and `image(files.url(key), { sizes })` give a stored PNG, JPEG or WebP the same variants as an imported image, with its size; a GIF or AVIF keeps its URL and gets its size. `shareImage` and `shareCard` take one too.
+- `img(src={files.url(key)})` and `image(files.url(key), { sizes })` give a stored PNG, JPEG, WebP, GIF or AVIF the same variants as an imported image, with its size; an animated GIF is answered as it is. `shareImage` and `shareCard` take one too.
 - `files.get(key)` resolves with the file as a `Blob`, or `undefined`; `files.delete(key)` deletes it, a key with no file being no error. Each throws on a key `files.put` never gives, `../` say.
 
 ## Private files

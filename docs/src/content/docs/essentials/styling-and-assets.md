@@ -85,7 +85,7 @@ An island, and any package it imports, names a file shipped beside a module with
 
 ## Responsive images
 
-An imported PNG, JPEG or WebP used as an `img` `src` gets a `srcset` of WebP variants, with AVIF for browsers that take it, and its `width` and `height`. Write `sizes` to say how large it shows:
+An imported PNG, JPEG, WebP, GIF or AVIF used as an `img` `src` gets a `srcset` of WebP variants, with AVIF for browsers that take it, and its `width` and `height`. Write `sizes` to say how large it shows:
 
 ```kay
 ---
@@ -103,6 +103,30 @@ import hero from '../hero.jpg'
 ---
 img({...image(hero, { aspect: '16/9', sizes: '100vw' })} alt="The workshop")
 ```
+
+An animated GIF keeps its frames: it gets no variants and is served as it is.
+
+### Private images
+
+Images the app keeps behind a session, looked up its own way such as by a database id, go through the same variants once `images.resolve` gives their file and `images.guard` admits the request:
+
+```ts
+import { defineConfig } from 'kay/server'
+import { guard } from 'kay'
+import { mediaPath } from './src/media'
+
+export default defineConfig({
+  images: {
+    guard: guard((ctx) => {
+      if (!ctx.locals.session.get('userId'))
+        ctx.deny(401)
+    }),
+    resolve: async src => src.startsWith('/media/') ? mediaPath(src.slice(7)) : undefined,
+  },
+})
+```
+
+`image('/media/42', { width, height })` then resizes that `src`. The answers are private to the browser, revalidated by their ETag, and `resolve` gets the guard's `ctx` too.
 
 ## Fonts
 

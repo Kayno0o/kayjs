@@ -22,7 +22,7 @@ import { escapeAttribute } from '../runtime/escape'
 import { collectHead } from '../runtime/head'
 import { component, newServerIslands, withServerIslands } from '../runtime/html'
 import { textDirection } from '../runtime/i18n'
-import { DEFAULT_MAX_DENSITY } from '../runtime/image'
+import { DEFAULT_MAX_DENSITY, RESOLVED_META } from '../runtime/image'
 import { localeState } from '../runtime/locale-state'
 import { kayLog } from '../runtime/log'
 import { encodeValue, unsendable } from '../runtime/wire'
@@ -77,6 +77,8 @@ export interface RenderOptions {
   base?: string | undefined
   // `images.maxDensity`, written for the islands when it is not the default.
   maxDensity?: number | undefined
+  // Whether `images.resolve` is set, written for the islands.
+  resolvedImages?: boolean | undefined
   // Times each load and the render in a `Server-Timing` header, as development always does.
   serverTiming?: boolean | undefined
   // Registers the service worker `offline` turns on.
@@ -556,7 +558,7 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
   const scripts = shipsEntry ? islandScripts(client, islands.eager, streamed, hasIslands) + (posts ? formsScript(forms) : '') : ''
   const locale = localeState()
   const lang = locale?.locale ?? options.lang ?? DEFAULT_LANG
-  const start = `<!doctype html><html lang="${escapeAttribute(lang)}"${textDirection(lang) === 'rtl' ? ' dir="rtl"' : ''}><head>${head.charset ? '' : CHARSET}${head.prelude}${head.viewport ? '' : VIEWPORT}${head.styles}${stylesheets(client, files)}${head.html}${scripts}${hasIslands ? messagesScript(islands.messages, true) + outcomeScript(rendering.outcome()) + queryScript(rules) : ''}${options.base !== undefined && options.base !== '' ? `<meta name="kay-base" content="${escapeAttribute(options.base)}">` : ''}${hasIslands && options.maxDensity !== undefined && options.maxDensity !== DEFAULT_MAX_DENSITY ? `<meta name="kay-max-density" content="${options.maxDensity}">` : ''}${speculationRules(options.prefetch, options.base)}${options.offline ? registerScript(options.base ?? '') : ''}${options.dev ? problemsBlock(client?.problems) + LIVE_RELOAD + DEV_PROBLEMS + A11Y_SCRIPT + inspectorScript() : ''}</head><body>${body}`
+  const start = `<!doctype html><html lang="${escapeAttribute(lang)}"${textDirection(lang) === 'rtl' ? ' dir="rtl"' : ''}><head>${head.charset ? '' : CHARSET}${head.prelude}${head.viewport ? '' : VIEWPORT}${head.styles}${stylesheets(client, files)}${head.html}${scripts}${hasIslands ? messagesScript(islands.messages, true) + outcomeScript(rendering.outcome()) + queryScript(rules) : ''}${options.base !== undefined && options.base !== '' ? `<meta name="kay-base" content="${escapeAttribute(options.base)}">` : ''}${hasIslands && options.maxDensity !== undefined && options.maxDensity !== DEFAULT_MAX_DENSITY ? `<meta name="kay-max-density" content="${options.maxDensity}">` : ''}${hasIslands && options.resolvedImages === true ? `<meta name="${RESOLVED_META}">` : ''}${speculationRules(options.prefetch, options.base)}${options.offline ? registerScript(options.base ?? '') : ''}${options.dev ? problemsBlock(client?.problems) + LIVE_RELOAD + DEV_PROBLEMS + A11Y_SCRIPT + inspectorScript() : ''}</head><body>${body}`
 
   if (!streamed)
     return `${start}</body></html>`

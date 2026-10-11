@@ -227,7 +227,7 @@ describe('share cards', () => {
 
     expect((await fontless.handle(new Request('http://localhost/plain'))).status).toBe(500)
     expect(() => shareCard({ title: 'Hello' })).toThrow('which lists none')
-    expect(() => shareCard({ title: 'Hello', image: '/logo.svg' })).toThrow('takes a PNG, JPEG or WebP')
+    expect(() => shareCard({ title: 'Hello', image: '/logo.svg' })).toThrow('takes a PNG, JPEG, WebP, GIF or AVIF')
     setCardMaker(undefined)
     expect(() => shareCard({ title: 'Hello' })).toThrow('draws on the server')
   })

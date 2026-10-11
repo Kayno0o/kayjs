@@ -3,6 +3,7 @@ import type { AnyElysia } from 'elysia'
 import type { LintLevels } from './compiler/lints'
 import type { Duration } from './runtime/duration'
 import type { HeadTag } from './runtime/head'
+import type { Guard, GuardContext } from './runtime/index'
 import type { JsonLd } from './runtime/seo'
 import type { EnvSchema } from './server/env'
 import type { Logger } from './server/log'
@@ -229,6 +230,10 @@ export interface ImagesConfig {
   aspects?: string[] | undefined
   // How `shareCard()` draws a page's card.
   card?: CardConfig | undefined
+  // The file of an image `src` no import, stored file, `dirs` entry or remote host names, looked up the app's own way: `(src, ctx) => mediaPath(src.slice('/media/'.length))`. A path relative to the root, or undefined for a 404; `ctx` is a guard's, its `deny()` and `redirect()` included. `image(src, { width, height })` then resizes any `src` starting with `/`, and these answers are private to the browser.
+  resolve?: ((src: string, ctx: GuardContext) => string | undefined | Promise<string | undefined>) | undefined
+  // Run before `resolve`, as a page guard: `guard(ctx => { if (!ctx.locals.session.get('user')) ctx.deny(401) })` resizes those images for signed-in users alone.
+  guard?: Guard | undefined
 }
 
 export interface CardConfig {

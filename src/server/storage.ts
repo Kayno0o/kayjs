@@ -4,6 +4,7 @@ import { rename, rm } from 'node:fs/promises'
 import { basename, join, resolve } from 'node:path'
 import { durationSeconds } from '../runtime/duration'
 import { FILES_ROUTE } from '../runtime/image'
+import { imageHeader } from './image-format'
 import { signedText, signText } from './stamp'
 
 // Where files are kept: `diskFiles`, `s3Files` and `memoryFiles` make one, an app may write its own. Keys are never written twice, so a store needs no locking.
@@ -308,7 +309,7 @@ function fileExtension(data: Blob): string {
 
 async function imageSize(data: Blob): Promise<{ width: number, height: number } | undefined> {
   try {
-    const { width, height } = await new Bun.Image(data).metadata()
+    const { width, height } = await imageHeader(data)
 
     return { width, height }
   }

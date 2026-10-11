@@ -30,6 +30,18 @@ export function setAvifThreads(count: number): void {
 // The image encoded as AVIF on a worker thread, the main thread kept free; a worker starts on the first call.
 export async function encodeAvif(image: Bun.Image, quality: number): Promise<Uint8Array> {
   const png = await image.png({ compressionLevel: 0 }).bytes()
+
+  return run(id => ({ id, png, quality, speed: AVIF_SPEED }), png)
+}
+
+// An AVIF decoded to a PNG on the same threads, as Bun.Image reads no AVIF on Linux.
+export async function decodeAvif(avif: Uint8Array): Promise<Uint8Array> {
+  const bytes = avif.slice()
+
+  return run(id => ({ id, avif: bytes }), bytes)
+}
+
+async function run(task: (id: number) => AvifTask, bytes: Uint8Array): Promise<Uint8Array> {
   const encoder = encoders.length < most && encoders.every(({ tasks }) => tasks.size > 0) ? startEncoder() : encoders.reduce((least, next) => next.tasks.size < least.tasks.size ? next : least)
   const id = nextId++
 
@@ -38,7 +50,7 @@ export async function encodeAvif(image: Bun.Image, quality: number): Promise<Uin
 
   return new Promise((resolve, reject) => {
     encoder.tasks.set(id, { resolve, reject })
-    encoder.worker.postMessage({ id, png, quality, speed: AVIF_SPEED } satisfies AvifTask, [png.buffer])
+    encoder.worker.postMessage(task(id), [bytes.buffer])
   })
 }
 
@@ -51,7 +63,7 @@ function startEncoder(): Encoder {
     encoder.tasks.delete(data.id)
 
     if ('error' in data)
-      task?.reject(new Error(`kay: AVIF encoding failed: ${data.error}`))
+      task?.reject(new Error(`kay: AVIF coding failed: ${data.error}`))
     else
       task?.resolve(data.bytes)
 

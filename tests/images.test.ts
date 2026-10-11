@@ -472,7 +472,7 @@ describe('crops and share cards', () => {
     expect(card.status).toBe(200)
     expect(card.headers.get('content-type')).toBe('image/jpeg')
     expect(await new Bun.Image(await card.bytes()).metadata()).toEqual({ width: 1200, height: 630, format: 'jpeg' })
-    expect(() => shareImage('/logo.svg')).toThrow('takes a PNG, JPEG or WebP')
+    expect(() => shareImage('/logo.svg')).toThrow('takes a PNG, JPEG, WebP, GIF or AVIF')
   })
 
   it('cuts a thin image before enlarging it, never blowing it up whole', async () => {

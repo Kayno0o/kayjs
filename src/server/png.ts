@@ -72,3 +72,33 @@ function predict(filter: number | undefined, left: number, above: number, corner
       throw new Error(`PNG filter type ${filter} is none of 0 to 4`)
   }
 }
+
+// RGBA pixels as an 8-bit PNG Bun.Image reads, for an image it cannot decode itself.
+export function encodePng(pixels: Uint8Array, width: number, height: number): Uint8Array {
+  const stride = width * 4
+  const filtered = new Uint8Array((stride + 1) * height)
+
+  for (let y = 0; y < height; y++)
+    filtered.set(pixels.subarray(y * stride, (y + 1) * stride), y * (stride + 1) + 1)
+
+  const header = new Uint8Array(13)
+  const view = new DataView(header.buffer)
+
+  view.setUint32(0, width)
+  view.setUint32(4, height)
+  header.set([8, 6, 0, 0, 0], 8)
+
+  return Buffer.concat([Uint8Array.from(PNG_SIGNATURE), chunk('IHDR', header), chunk('IDAT', nodeZlib().deflateSync(filtered, { level: 1 })), chunk('IEND', new Uint8Array(0))])
+}
+
+function chunk(type: string, data: Uint8Array): Uint8Array {
+  const out = new Uint8Array(12 + data.length)
+  const view = new DataView(out.buffer)
+
+  view.setUint32(0, data.length)
+  out.set(new TextEncoder().encode(type), 4)
+  out.set(data, 8)
+  view.setUint32(8 + data.length, Bun.hash.crc32(out.subarray(4, 8 + data.length)))
+
+  return out
+}

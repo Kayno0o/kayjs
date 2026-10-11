@@ -1,4 +1,5 @@
 import type { KayConfig, TrailingSlash } from '../config'
+import type { GuardContext } from '../runtime'
 import type { LocaleSettings } from '../runtime/i18n'
 import type { RouteMatch } from './actions'
 import type { ClientBuild } from './client'
@@ -228,7 +229,7 @@ export async function servePages(root: string, options: PagesOptions, loadClient
     client.inlineStyles = await readInlineStyles(client, base)
 
   const { head, scripts, styles } = await configHead(root, options, client.dir, bundle !== undefined)
-  const renderOptions = { lang: options.lang, dev: options.dev, serverTiming: options.serverTiming ?? options.dev, prefetch: options.prefetch, onError: options.onError, head, base, maxDensity, offline: options.offline !== undefined && !options.dev }
+  const renderOptions = { lang: options.lang, dev: options.dev, serverTiming: options.serverTiming ?? options.dev, prefetch: options.prefetch, onError: options.onError, head, base, maxDensity, resolvedImages: options.images?.resolve !== undefined, offline: options.offline !== undefined && !options.dev }
 
   const app = new Elysia({ name: 'kay/pages', seed: root })
   // Hashed as they go out, under the mount point.
@@ -397,6 +398,7 @@ export async function servePages(root: string, options: PagesOptions, loadClient
     servePreview(app)
 
   // An executable runs from wherever it was copied, away from the project it was built in.
+  const lookup = options.images?.resolve
   const imageCache = bundle ? join(tmpdir(), 'kay-images') : join(root, '.kay', 'cache', `images${testWorker()}`)
   const imageRoute = {
     clientDir: client.dir,
@@ -408,6 +410,11 @@ export async function servePages(root: string, options: PagesOptions, loadClient
     aspects: options.images?.aspects,
     remote: remoteImages(join(imageCache, 'remote'), remotePatterns(options.images?.remote), imageCache),
     security,
+    resolve: lookup && { find: async (src: string, ctx: GuardContext) => {
+      const path = await lookup(src, ctx)
+
+      return path === undefined ? undefined : resolve(bundle ? process.cwd() : root, path)
+    }, guard: options.images?.guard, actions: actionOptions },
   }
 
   setupStorage(options.storage, join(imageCache, 'stored'))

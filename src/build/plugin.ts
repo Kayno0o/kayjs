@@ -6,6 +6,7 @@ import { dirname, join, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { ISLAND_TWIN, withoutTwin } from '../compiler'
 import { RESIZABLE } from '../runtime/image'
+import { imageHeader } from '../server/image-format'
 import { ASSET_FILE, clientDir, writeAsset } from './assets'
 import { scriptLoader } from './files'
 import { expandGlobs } from './glob'
@@ -48,15 +49,18 @@ async function assetModule(path: string, url: string): Promise<string> {
   if (!RESIZABLE.test(path))
     return `export default ${JSON.stringify(url)}`
 
-  let size: { width: number, height: number }
+  let size: { width: number, height: number, animated: boolean }
 
-  // A file Bun cannot decode is still served at its URL, with no variants.
+  // A file kay cannot decode is still served at its URL, with no variants, and so is an animated GIF, which a variant would flatten.
   try {
-    size = await new Bun.Image(path).metadata()
+    size = await imageHeader(Bun.file(path))
   }
   catch {
     return `export default ${JSON.stringify(url)}`
   }
+
+  if (size.animated)
+    return `export default ${JSON.stringify(url)}`
 
   return `import { registerImage } from 'kay/internal'
 export default registerImage(${JSON.stringify(url)}, ${size.width}, ${size.height})`
