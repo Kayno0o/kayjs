@@ -46,17 +46,18 @@ export interface InspectorProxy {
 export function inspectorProxy(address: string, current: () => string | undefined): InspectorProxy {
   const url = new URL(address)
   let count = 0
+  const inUse = `kay dev: the debugger address ${url.host} is in use`
   let server: Server<Link>
 
-  try {
-    if (url.hostname === 'localhost' && loopbackTaken(Number(url.port)))
-      throw Object.assign(new Error(`${url.host} is in use`), { code: 'EADDRINUSE' })
+  if (url.hostname === 'localhost' && loopbackTaken(Number(url.port)))
+    throw new InspectorAddressInUse(inUse)
 
+  try {
     server = serve(url, current)
   }
   catch (error) {
     if ((error as { code?: unknown }).code === 'EADDRINUSE')
-      throw new InspectorAddressInUse(`kay dev: the debugger address ${url.host} is in use`, { cause: error })
+      throw new InspectorAddressInUse(inUse, { cause: error })
 
     throw error
   }

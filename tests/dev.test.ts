@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, rename, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
-import { describe, expect, it } from 'bun:test'
+import { describe, expect, it, spyOn } from 'bun:test'
 import { testWorker } from '../src/build/assets'
 import { buildClient } from '../src/build/client'
 import { KayCompileError } from '../src/build/transform'
@@ -32,6 +32,18 @@ function clientBuilders(real: string): string[] {
 // Written by a server, which creates the file before it writes it: read as soon as it exists, it may still be empty.
 function filled(path: string): boolean {
   return (statSync(path, { throwIfNoEntry: false })?.size ?? 0) > 0
+}
+
+// Whether this host has the loopback address: one without IPv6 has no ::1.
+function binds(hostname: string): boolean {
+  try {
+    Bun.listen({ hostname, port: 0, socket: { data: () => undefined } }).stop(true)
+
+    return true
+  }
+  catch {
+    return false
+  }
 }
 
 async function until(condition: () => boolean, timeout = 5000) {
@@ -607,14 +619,37 @@ describe('kay dev', () => {
     }
   })
 
-  it('takes localhost\'s port as in use when either loopback address holds it, as Bun would bind the other', () => {
-    const held = Bun.listen({ hostname: '127.0.0.1', port: 0, socket: { data: () => undefined } })
+  it.each(['127.0.0.1', '::1'].filter(binds))('takes localhost\'s port as in use when %s holds it, as Bun would bind the other address', (hostname) => {
+    const held = Bun.listen({ hostname, port: 0, socket: { data: () => undefined } })
 
     try {
       expect(() => inspectorProxy(`ws://localhost:${held.port}/kay`, () => undefined)).toThrow(InspectorAddressInUse)
     }
     finally {
       held.stop(true)
+    }
+  })
+
+  // Whatever the host: ::1 held, as only a dual-stack one shows, while 127.0.0.1 is free.
+  it('takes localhost\'s port as in use when only ::1 holds it, on a host without IPv6 too', () => {
+    const free = Bun.listen({ hostname: '127.0.0.1', port: 0, socket: { data: () => undefined } })
+    const { port } = free
+
+    free.stop(true)
+
+    const listen = Bun.listen.bind(Bun)
+    const probed = spyOn(Bun, 'listen').mockImplementation(((options: Parameters<typeof Bun.listen>[0]) => {
+      if ('hostname' in options && options.hostname === '::1')
+        throw Object.assign(new Error('in use'), { code: 'EADDRINUSE' })
+
+      return listen(options)
+    }) as typeof Bun.listen)
+
+    try {
+      expect(() => inspectorProxy(`ws://localhost:${port}/kay`, () => undefined)).toThrow(InspectorAddressInUse)
+    }
+    finally {
+      probed.mockRestore()
     }
   })
 
