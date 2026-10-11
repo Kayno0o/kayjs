@@ -1,10 +1,10 @@
 import type { AwaitNode, ElementNode, ErrorMessages, ErrorNode, ForNode, IfBranch, IfNode, NamedAttribute, Node, Span, TryNode } from './ast'
 import type { DynamicItem, Item } from './items'
 import type { CodeBuilder } from './mapping'
-import { actionOf, describedByOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, formFieldOf, keyedByPosition, marksServerIsland, serverIslandOf } from './ast'
+import { actionOf, keyedByPosition, marksServerIsland, serverIslandOf } from './ast'
 import { decodeEntities } from './expression'
 import { childItems, constDeclaration, errorParagraphArguments, slotValue, soleDynamic } from './items'
-import { BEHAVIOUR, CONTENT_PROPERTIES, describedValue, END_MARKER, escapeStaticAttribute, escapeText, helperName, RAW_ELEMENTS, START_MARKER, TemplateWriter, VOID_ELEMENTS } from './markup'
+import { BEHAVIOUR, describedValue, END_MARKER, escapeStaticAttribute, escapeText, helperName, RAW_ELEMENTS, START_MARKER, TemplateWriter, VOID_ELEMENTS } from './markup'
 
 // The `kay/html` helpers static server output calls, each imported under a `Kay` name.
 const HTML_HELPERS = ['attempt', 'attribute', 'child', 'className', 'component', 'componentClass', 'currentPage', 'dynamic', 'element', 'errorParagraph', 'formConstraints', 'head', 'imageAttributes', 'localHref', 'loop', 'memo', 'merge', 'nonEmptyAttribute', 'omit', 'raw', 'refillOptions', 'selectOptions', 'serverIsland', 'show', 'style', 'untrack']
@@ -363,68 +363,45 @@ export class HtmlTemplate extends TemplateWriter {
   private plainElement(element: ElementNode, markup: Markup): void {
     const { b } = this
     const name = element.name
-    const classAttribute = this.classAttribute(element)
     const children = element.children.filter(child => child.kind !== 'slot')
-    // What writes the content or the selected value: a bound one reads its signal.
-    let content: (() => void) | undefined
-    let staticContent: string | undefined
-    let rawContent = false
-    let selected: (() => void) | undefined
     const read = (expression: Span, call: boolean) => () => void b.add('(').addSource(expression).add(call ? ')()' : ')')
     const target = this.formTarget
-    const field = target && formFieldOf(element, this.src)
-    const action = actionOf(element, this.src)
-    const described = field ? field.invalid ? describedByOf(element, this.src, this.options.errors, target, field.name) : undefined : action && describedByOf(element, this.src, this.options.errors, action.expression, '')
+    const plan = this.plan(element, target, this.options.errors)
+    const { field, action, described } = plan
+    // What writes the content or the selected value: a bound one reads its signal.
+    let content = plan.content && read(plan.content.expression, plan.content.bound)
+    const selected = plan.selected && read(plan.selected.expression, plan.selected.bound)
     // The attribute a refused post's value goes back in, and what the template gives it otherwise.
     const filled = field?.fill === 'value' || field?.fill === 'checked' ? field.fill : undefined
     let ownFill: (() => void) | undefined
     let checkboxValue: (() => void) | undefined
-    const imageSizes = this.imageSizes(element)
-
-    const errorId = this.options.errors?.ids.get(element)
 
     markup.text(`<${name}`)
 
-    if (element.id)
-      markup.text(` id="${escapeStaticAttribute(this.source(element.id))}"`)
-    else if (errorId !== undefined)
-      markup.text(` id="${escapeStaticAttribute(errorId)}"`)
+    if (plan.id !== undefined)
+      markup.text(` id="${escapeStaticAttribute(plan.id)}"`)
 
-    if (element.classes.length > 0) {
-      const shorthand = this.shorthand(element)
+    if (plan.classes?.expression) {
+      const { text, expression } = plan.classes
 
-      if (classAttribute?.kind === 'expression') {
-        markup.text(' class="')
-        markup.dynamic(() => b.add(`${helperName('className')}([${JSON.stringify(shorthand)}, (`).addSource(classAttribute.expression).add(')])'))
-        markup.text('"')
-      }
-      else {
-        markup.text(` class="${escapeStaticAttribute(classAttribute?.kind === 'static' ? `${shorthand} ${decodeEntities(classAttribute.text)}` : shorthand)}"`)
-      }
+      markup.text(' class="')
+      markup.dynamic(() => b.add(`${helperName('className')}([${JSON.stringify(text)}, (`).addSource(expression).add(')])'))
+      markup.text('"')
+    }
+    else if (plan.classes) {
+      markup.text(` class="${escapeStaticAttribute(plan.classes.text)}"`)
     }
 
-    for (const attribute of element.attributes) {
-      if (attribute.kind === 'spread' || (element.classes.length > 0 && attribute === classAttribute) || attribute === imageSizes)
+    for (const attribute of plan.attributes) {
+      if (attribute.kind === 'behaviour' || (attribute.kind === 'bind' && name === 'textarea' && attribute.property === 'value'))
         continue
 
-      const attributeName = this.source(attribute.name)
-
       // A bound value renders as the property it binds, read off its signal.
-      if (attributeName.startsWith('bind:') && attribute.kind === 'expression') {
-        const property = attributeName.slice(5)
+      if (attribute.kind === 'bind') {
         const value = read(attribute.expression, true)
 
-        if (name === 'textarea' && property === 'value') {
-          content = value
-
-          continue
-        }
-
-        if (name === 'select' && property === 'value')
-          selected = value
-
         markup.dynamic(() => {
-          b.add(`${helperName('attribute')}(${JSON.stringify(property)}, `)
+          b.add(`${helperName('attribute')}(${JSON.stringify(attribute.property)}, `)
           value()
           b.add(')')
         })
@@ -432,108 +409,68 @@ export class HtmlTemplate extends TemplateWriter {
         continue
       }
 
-      if (BEHAVIOUR.test(attributeName) || (described?.own !== undefined && attributeName === 'aria-describedby'))
-        continue
+      const written = attribute.kind === 'image' ? 'src' : attribute.kind === 'selected' ? 'value' : attribute.name
 
-      if (attributeName === filled) {
-        ownFill = attribute.kind === 'expression' ? read(attribute.expression, false) : () => void b.add(attribute.kind === 'boolean' ? 'true' : JSON.stringify(decodeEntities(attribute.text)))
-
-        continue
-      }
-
-      if (filled === 'checked' && attributeName === 'value')
-        checkboxValue = attribute.kind === 'expression' ? read(attribute.expression, false) : () => void b.add(attribute.kind === 'boolean' ? '""' : JSON.stringify(decodeEntities(attribute.text)))
-
-      if (attribute.kind === 'boolean') {
-        markup.text(` ${attributeName}`)
+      if (written === filled) {
+        ownFill = attribute.kind === 'boolean' ? () => void b.add('true') : attribute.kind === 'text' || attribute.kind === 'rooted' ? () => void b.add(JSON.stringify(attribute.text)) : read(attribute.expression, false)
 
         continue
       }
 
-      if (attribute.kind === 'static') {
-        if (attributeName === FIELD_ATTRIBUTE && FIELD_ELEMENTS.has(name)) {
-          markup.text(` name="${escapeStaticAttribute(decodeEntities(attribute.text))}"`)
+      if (filled === 'checked' && written === 'value')
+        checkboxValue = attribute.kind === 'boolean' ? () => void b.add('""') : attribute.kind === 'text' || attribute.kind === 'rooted' ? () => void b.add(JSON.stringify(attribute.text)) : read(attribute.expression, false)
 
-          continue
-        }
+      switch (attribute.kind) {
+        case 'boolean':
+          markup.text(` ${attribute.name}`)
 
-        if (field?.fill === 'content' && attributeName === 'value') {
-          content = () => void b.add(JSON.stringify(decodeEntities(attribute.text)))
+          break
+        case 'text':
+          markup.text(attribute.bare ? ` ${attribute.name}` : ` ${attribute.name}="${escapeStaticAttribute(attribute.text)}"`)
 
-          continue
-        }
+          break
+        case 'rooted':
+          if (attribute.name === 'href' && this.localLink(element))
+            markup.dynamic(() => b.add(`${helperName('attribute')}("href", ${helperName('localHref')}(${JSON.stringify(attribute.text)}))`))
+          else
+            markup.text(` ${attribute.name}="${escapeStaticAttribute(attribute.text)}"`)
 
-        if (attributeName === 'innerHTML') {
-          staticContent = attribute.text
+          break
+        case 'class':
+        case 'style':
+          markup.dynamic(() => b.add(`${helperName('nonEmptyAttribute')}(${JSON.stringify(attribute.name)}, ${helperName(attribute.kind === 'class' ? 'className' : 'style')}((`).addSource(attribute.expression).add(')))'))
 
-          continue
-        }
+          break
+        case 'image':
+          markup.dynamic(() => {
+            b.add(`${helperName('imageAttributes')}((`).addSource(attribute.expression).add(`), ${attribute.sized}`)
+            this.sizesArgument(plan.sizes)
+            b.add(')')
+          })
 
-        if (CONTENT_PROPERTIES.has(attributeName) || (name === 'textarea' && attributeName === 'value')) {
-          staticContent = escapeText(decodeEntities(attribute.text))
+          break
+        case 'selected':
+        case 'value':
+          markup.dynamic(() => {
+            b.add(`${helperName('attribute')}(${JSON.stringify(written)}, `)
 
-          continue
-        }
+            if (attribute.kind === 'value' && attribute.action)
+              b.add('KayFormAction((').addSource(attribute.expression).add('))')
+            else if (written === 'href' && this.localLink(element))
+              b.add(`${helperName('localHref')}((`).addSource(attribute.expression).add('))')
+            else
+              b.add('(').addSource(attribute.expression).add(')')
 
-        if (attributeName === 'href' && this.localLink(element) && decodeEntities(attribute.text).startsWith('/')) {
-          markup.dynamic(() => b.add(`${helperName('attribute')}("href", ${helperName('localHref')}(${JSON.stringify(decodeEntities(attribute.text))}))`))
+            b.add(')')
+          })
 
-          continue
-        }
-
-        markup.text(attribute.text === '' ? ` ${attributeName}` : ` ${attributeName}="${escapeStaticAttribute(decodeEntities(attribute.text))}"`)
-
-        continue
+          break
       }
-
-      const expression = attribute.expression
-
-      if (CONTENT_PROPERTIES.has(attributeName) || (name === 'textarea' && (attributeName === 'value' || attributeName === 'defaultValue'))) {
-        content = read(expression, false)
-        rawContent = attributeName === 'innerHTML' || RAW_ELEMENTS.has(name)
-
-        continue
-      }
-
-      if (name === 'select' && attributeName === 'value')
-        selected = read(expression, false)
-
-      if (attributeName === 'class' || attributeName === 'style') {
-        markup.dynamic(() => b.add(`${helperName('nonEmptyAttribute')}(${JSON.stringify(attributeName)}, ${helperName(attributeName === 'class' ? 'className' : 'style')}((`).addSource(expression).add(')))'))
-
-        continue
-      }
-
-      // An imported image loads the size it shows at, unless the template writes its own `srcset`.
-      if (name === 'img' && attributeName === 'src' && !this.named(element, 'srcset')) {
-        const sized = this.named(element, 'width') || this.named(element, 'height')
-
-        markup.dynamic(() => {
-          b.add(`${helperName('imageAttributes')}((`).addSource(expression).add(`), ${sized}`)
-          this.sizesArgument(imageSizes)
-          b.add(')')
-        })
-
-        continue
-      }
-
-      markup.dynamic(() => {
-        b.add(`${helperName('attribute')}(${JSON.stringify(attributeName)}, `)
-
-        if (attribute === actionOf(element, this.src))
-          b.add('KayFormAction((').addSource(expression).add('))')
-        else if (attributeName === 'href' && this.localLink(element))
-          b.add(`${helperName('localHref')}((`).addSource(expression).add('))')
-        else
-          b.add('(').addSource(expression).add(')')
-
-        b.add(')')
-      })
     }
 
     this.currentLink(element, markup)
 
-    if (field) {
+    if (field && target) {
       const fieldArguments = () => void b.add('((').addSource(target).add(`), ${JSON.stringify(field.name)}`)
 
       if (field.marked) {
@@ -586,7 +523,7 @@ export class HtmlTemplate extends TemplateWriter {
       }
 
       if (field.fill === 'content') {
-        const own = content
+        const own = content ?? (plan.valueText === undefined ? undefined : () => void b.add(JSON.stringify(plan.valueText)))
 
         content = () => {
           b.add('KayFormValue')
@@ -598,11 +535,11 @@ export class HtmlTemplate extends TemplateWriter {
     }
 
     if (action) {
-      if (!this.named(element, 'method'))
+      if (action.method)
         markup.text(' method="post"')
 
       // Multipart whatever the schema, so file inputs post too; Elysia parses either encoding alike.
-      if (!this.named(element, 'enctype'))
+      if (action.enctype)
         markup.text(' enctype="multipart/form-data"')
 
       if (described)
@@ -621,8 +558,11 @@ export class HtmlTemplate extends TemplateWriter {
 
     const outerTarget = this.formTarget
 
-    this.formTarget = actionOf(element, this.src)?.expression ?? outerTarget
+    this.formTarget = action?.expression ?? outerTarget
     this.honeypot(element, () => markup.dynamic(() => this.honeypotField(element)))
+
+    // A refused post's text takes the place of the textarea's static value.
+    const staticContent = field?.fill === 'content' && plan.valueText !== undefined ? undefined : plan.staticContent
 
     if (children.length > 0 && field?.fill === 'selected' && target) {
       const own = selected
@@ -663,7 +603,7 @@ export class HtmlTemplate extends TemplateWriter {
     }
     else if (content) {
       markup.dynamic(() => {
-        b.add(`${helperName(rawContent ? 'raw' : 'child')}(`)
+        b.add(`${helperName(plan.content?.raw === true ? 'raw' : 'child')}(`)
         content()
         b.add(')')
       })

@@ -1,19 +1,16 @@
-import type { Attribute, AwaitNode, ConstNode, ElementNode, ErrorMessages, ForNode, IfNode, Node, Span, TryNode } from './ast'
+import type { AwaitNode, ConstNode, ElementNode, ErrorMessages, ForNode, IfNode, Node, Span, TryNode } from './ast'
 import type { DynamicItem } from './items'
 import type { CodeBuilder } from './mapping'
-import { URL_ATTRIBUTES } from '../runtime/base'
-import { actionOf, describedByOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, formFieldOf, keyedByPosition, marksServerIsland } from './ast'
+import type { PlannedAttribute } from './markup'
+import { actionOf, keyedByPosition, marksServerIsland } from './ast'
 import { decodeEntities, isFunctionExpression } from './expression'
 import { childItems, constDeclaration, errorParagraphArguments, slotValue, soleDynamic } from './items'
-import { BEHAVIOUR, CONTENT_PROPERTIES, describedValue, END_MARKER, escapeStaticAttribute, escapeText, helperName, RAW_ELEMENTS, START_MARKER, TemplateWriter, VOID_ELEMENTS } from './markup'
+import { describedValue, END_MARKER, escapeStaticAttribute, escapeText, helperName, RAW_ELEMENTS, START_MARKER, TemplateWriter, VOID_ELEMENTS } from './markup'
 
 // The `kay/dom` helpers browser output calls, each imported under a `Kay` name.
 const DOM_HELPERS = ['append', 'attempt', 'attribute', 'awaited', 'branches', 'close', 'component', 'componentClass', 'dynamic', 'effect', 'errorParagraph', 'fragment', 'image', 'insert', 'listen', 'loop', 'markers', 'memo', 'merge', 'omit', 'property', 'ref', 'rowKey', 'setClass', 'setStyle', 'spread', 'template', 'text', 'transition', 'untrack']
 const NUMERIC_INPUTS = new Set(['number', 'range'])
 const TRANSITION_PART = 'transition:'
-// A static URL an island sets itself rather than in its template, so the browser puts it under `base` as the server does: a root-relative one, or a `srcset` holding one.
-const BASED = new Set([...URL_ATTRIBUTES, 'srcset'])
-const ROOT_PATH = /(?:^|,)\s*\/(?!\/)/
 
 export function domHelperImport(): string {
   return `import { ${DOM_HELPERS.map(helper => `${helper} as ${helperName(helper)}`).join(', ')} } from 'kay/dom'\n`
@@ -364,134 +361,106 @@ export class DomTemplate extends TemplateWriter {
       own.push(variable => this.spreadBinding(element, variable(node), children.length === 0))
     }
     else {
-      const errorId = this.errors?.ids.get(element)
+      const plan = this.plan(element, this.formTarget, this.errors)
+      const { field, action, described } = plan
 
-      if (element.id)
-        html += ` id="${escapeStaticAttribute(this.source(element.id))}"`
-      else if (errorId !== undefined)
-        html += ` id="${escapeStaticAttribute(errorId)}"`
+      if (plan.id !== undefined)
+        html += ` id="${escapeStaticAttribute(plan.id)}"`
 
-      const classAttribute = this.classAttribute(element)
-      const imageSizes = this.imageSizes(element)
+      if (plan.classes?.expression) {
+        const { text, expression } = plan.classes
 
-      if (element.classes.length > 0) {
-        const shorthand = this.shorthand(element)
-
-        if (classAttribute?.kind === 'expression')
-          own.push(variable => b.add(`KayEffect(() => KaySetClass(${variable(node)}, [${JSON.stringify(shorthand)}, (`).addSource(classAttribute.expression).add(')]));'))
-        else
-          html += ` class="${escapeStaticAttribute(classAttribute?.kind === 'static' ? `${shorthand} ${decodeEntities(classAttribute.text)}` : shorthand)}"`
+        own.push(variable => b.add(`KayEffect(() => KaySetClass(${variable(node)}, [${JSON.stringify(text)}, (`).addSource(expression).add(')]));'))
+      }
+      else if (plan.classes) {
+        html += ` class="${escapeStaticAttribute(plan.classes.text)}"`
       }
 
-      for (const attribute of element.attributes) {
-        if (attribute.kind === 'spread' || (element.classes.length > 0 && attribute === classAttribute) || attribute === imageSizes)
-          continue
+      for (const attribute of plan.attributes) {
+        switch (attribute.kind) {
+          case 'bind':
+          case 'behaviour': {
+            const binding = this.behaviour(element, attribute, node)
 
-        const attributeName = this.source(attribute.name)
+            if (binding)
+              own.push(binding)
 
-        if (BEHAVIOUR.test(attributeName)) {
-          const binding = this.behaviour(element, attribute, attributeName, node)
+            break
+          }
+          case 'boolean':
+            html += ` ${attribute.name}`
 
-          if (binding)
-            own.push(binding)
+            break
+          case 'text':
+            html += attribute.bare ? ` ${attribute.name}` : ` ${attribute.name}="${escapeStaticAttribute(attribute.text)}"`
 
-          continue
+            break
+          case 'rooted':
+            own.push(variable => b.add(`KayAttribute(${variable(node)}, ${JSON.stringify(attribute.name)}, ${JSON.stringify(attribute.text)}${this.writtenLink(element, attribute.name) ? ', true' : ''});`))
+
+            break
+          case 'class':
+          case 'style':
+            own.push(variable => b.add(`KayEffect(() => ${attribute.kind === 'class' ? 'KaySetClass' : 'KaySetStyle'}(${variable(node)}, (`).addSource(attribute.expression).add(')));'))
+
+            break
+          case 'image':
+            own.push((variable) => {
+              b.add(`KayEffect(() => KayImage(${variable(node)}, (`).addSource(attribute.expression).add(`), ${attribute.sized}`)
+              this.sizesArgument(plan.sizes)
+              b.add('));')
+            })
+
+            break
+          case 'selected':
+            break
+          case 'value':
+            own.push((variable) => {
+              b.add(`KayEffect(() => KayProperty(${variable(node)}, ${JSON.stringify(attribute.name)}, `)
+
+              if (attribute.action)
+                b.add('KayFormAction((').addSource(attribute.expression).add('))')
+              else
+                b.add('(').addSource(attribute.expression).add(')')
+
+              b.add(`${this.writtenLink(element, attribute.name) ? ', true' : ''}));`)
+            })
+
+            break
         }
-
-        if (attribute.kind === 'boolean') {
-          html += ` ${attributeName}`
-
-          continue
-        }
-
-        if (attribute.kind === 'static') {
-          if (attributeName === FIELD_ATTRIBUTE && FIELD_ELEMENTS.has(name))
-            html += ` name="${escapeStaticAttribute(decodeEntities(attribute.text))}"`
-          else if (attributeName === 'innerHTML')
-            content = attribute.text
-          else if (CONTENT_PROPERTIES.has(attributeName) || (name === 'textarea' && attributeName === 'value'))
-            content = escapeText(decodeEntities(attribute.text))
-          else if (BASED.has(attributeName) && ROOT_PATH.test(attribute.text))
-            own.push(variable => b.add(`KayAttribute(${variable(node)}, ${JSON.stringify(attributeName)}, ${JSON.stringify(decodeEntities(attribute.text))}${this.writtenLink(element, attributeName) ? ', true' : ''});`))
-          else
-            html += attribute.text === '' ? ` ${attributeName}` : ` ${attributeName}="${escapeStaticAttribute(decodeEntities(attribute.text))}"`
-
-          continue
-        }
-
-        const expression = attribute.expression
-
-        if (CONTENT_PROPERTIES.has(attributeName) || (name === 'textarea' && (attributeName === 'value' || attributeName === 'defaultValue'))) {
-          const property = attributeName === 'defaultValue' || attributeName === 'value' ? 'value' : attributeName
-
-          contentBinding = variable => b.add(`KayEffect(() => KayProperty(${variable(node)}, ${JSON.stringify(property)}, (`).addSource(expression).add(')));')
-
-          continue
-        }
-
-        if (name === 'select' && attributeName === 'value') {
-          selected = expression
-
-          continue
-        }
-
-        if (attributeName === 'class' || attributeName === 'style') {
-          own.push(variable => b.add(`KayEffect(() => ${attributeName === 'class' ? 'KaySetClass' : 'KaySetStyle'}(${variable(node)}, (`).addSource(expression).add(')));'))
-
-          continue
-        }
-
-        if (name === 'img' && attributeName === 'src' && !this.named(element, 'srcset')) {
-          const sized = this.named(element, 'width') || this.named(element, 'height')
-
-          own.push((variable) => {
-            b.add(`KayEffect(() => KayImage(${variable(node)}, (`).addSource(expression).add(`), ${sized}`)
-            this.sizesArgument(imageSizes)
-            b.add('));')
-          })
-
-          continue
-        }
-
-        own.push((variable) => {
-          b.add(`KayEffect(() => KayProperty(${variable(node)}, ${JSON.stringify(attributeName)}, `)
-
-          if (attribute === actionOf(element, this.src))
-            b.add('KayFormAction((').addSource(expression).add('))')
-          else
-            b.add('(').addSource(expression).add(')')
-
-          b.add(`${this.writtenLink(element, attributeName) ? ', true' : ''}));`)
-        })
       }
 
-      const action = actionOf(element, this.src)
+      content = plan.staticContent
+
+      // A bound textarea's value and select's value are set by the binding.
+      if (plan.content && !plan.content.bound) {
+        const { property, expression } = plan.content
+
+        contentBinding = variable => b.add(`KayEffect(() => KayProperty(${variable(node)}, ${JSON.stringify(property)}, (`).addSource(expression).add(')));')
+      }
+
+      if (plan.selected && !plan.selected.bound)
+        selected = plan.selected.expression
 
       if (action) {
-        if (!this.named(element, 'method'))
+        if (action.method)
           html += ' method="post"'
 
-        if (!this.named(element, 'enctype'))
+        if (action.enctype)
           html += ' enctype="multipart/form-data"'
 
-        const described = describedByOf(element, this.src, this.errors, action.expression, '')
-
-        if (described)
+        if (described && !field)
           own.push(variable => b.add(`KayEffect(() => KayProperty(${variable(node)}, "aria-describedby", KayFormInvalid((`).addSource(action.expression).add(`), ""${describedValue(described)}));`))
       }
-    }
 
-    const field = this.formTarget && !spreads ? formFieldOf(element, this.src) : undefined
+      if (field?.invalid) {
+        const target = this.formTarget!
 
-    if (field?.invalid) {
-      const target = this.formTarget!
+        own.push(variable => b.add(`KayEffect(() => KayProperty(${variable(node)}, "aria-invalid", KayFormInvalid((`).addSource(target).add(`), ${JSON.stringify(field.name)})));`))
 
-      own.push(variable => b.add(`KayEffect(() => KayProperty(${variable(node)}, "aria-invalid", KayFormInvalid((`).addSource(target).add(`), ${JSON.stringify(field.name)})));`))
-
-      const described = describedByOf(element, this.src, this.errors, target, field.name)
-
-      if (described)
-        own.push(variable => b.add(`KayEffect(() => KayProperty(${variable(node)}, "aria-describedby", KayFormInvalid((`).addSource(target).add(`), ${JSON.stringify(field.name)}${describedValue(described)}));`))
+        if (described)
+          own.push(variable => b.add(`KayEffect(() => KayProperty(${variable(node)}, "aria-describedby", KayFormInvalid((`).addSource(target).add(`), ${JSON.stringify(field.name)}${describedValue(described)}));`))
+      }
     }
 
     const located = this.located?.(element)
@@ -584,8 +553,14 @@ export class DomTemplate extends TemplateWriter {
   }
 
   // A handler, a ref, a binding or a transition: what only the browser attaches.
-  private behaviour(element: ElementNode, attribute: Attribute, name: string, node: TemplateNode): Binding | undefined {
+  private behaviour(element: ElementNode, planned: Extract<PlannedAttribute, { kind: 'bind' | 'behaviour' }>, node: TemplateNode): Binding | undefined {
     const { b } = this
+    const { name } = planned
+
+    if (planned.kind === 'bind')
+      return variable => this.bind(element, planned.expression, planned.property, variable(node))
+
+    const { attribute } = planned
 
     if (name === 'transition' || name.startsWith(TRANSITION_PART)) {
       const part = name === 'transition' ? 'name' : name.slice(TRANSITION_PART.length)
@@ -610,9 +585,6 @@ export class DomTemplate extends TemplateWriter {
     if (name === 'ref')
       return variable => b.add(`KayRef(${variable(node)}, (`).addSource(expression).add('));')
 
-    if (name.startsWith('bind:'))
-      return variable => this.bind(element, attribute, name.slice(5), variable(node))
-
     if (!name.startsWith('on') || name.startsWith('on:'))
       return undefined
 
@@ -630,20 +602,20 @@ export class DomTemplate extends TemplateWriter {
   }
 
   // `bind:value={name}` reads the signal and writes it back from the matching input event.
-  private bind(element: ElementNode, attribute: Extract<Attribute, { kind: 'expression' }>, property: string, variable: string): void {
+  private bind(element: ElementNode, expression: Span, property: string, variable: string): void {
     const { b } = this
     const inputType = this.staticAttribute(element, 'type') ?? 'text'
     const event = property === 'checked' || element.name === 'select' ? 'onChange' : 'onInput'
     const read = property === 'checked' ? 'checked' : NUMERIC_INPUTS.has(inputType) ? 'valueAsNumber' : 'value'
 
-    b.add(`KayEffect(() => KayProperty(${variable}, ${JSON.stringify(property)}, (`).addSource(attribute.expression).add(')())); ')
+    b.add(`KayEffect(() => KayProperty(${variable}, ${JSON.stringify(property)}, (`).addSource(expression).add(')())); ')
     b.add(`KayListen(${variable}, ${JSON.stringify(event)}, (kayEvent) => `)
 
     // An emptied number input has no number: the signal keeps its last one rather than take a NaN.
     if (read === 'valueAsNumber')
-      b.add('{ const kayValue = kayEvent.currentTarget.valueAsNumber; if (!Number.isNaN(kayValue)) (').addSource(attribute.expression).add(').set(kayValue) });')
+      b.add('{ const kayValue = kayEvent.currentTarget.valueAsNumber; if (!Number.isNaN(kayValue)) (').addSource(expression).add(').set(kayValue) });')
     else
-      b.add('(').addSource(attribute.expression).add(`).set(kayEvent.currentTarget.${read}));`)
+      b.add('(').addSource(expression).add(`).set(kayEvent.currentTarget.${read}));`)
   }
 
   private spreadBinding(element: ElementNode, variable: string, content: boolean): void {

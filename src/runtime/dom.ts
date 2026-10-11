@@ -61,7 +61,7 @@ export function playTransitions(given: Transitions): void {
 }
 
 // Gives a link an island writes its copy in the page's locale, set by kay/i18n, so a page of an app without locales ships none of its code.
-let localizeHref: ((href: string) => string) | undefined
+let localizeHref = (href: string) => href
 
 export function localizeLinks(given: (href: string) => string): void {
   localizeHref = given
@@ -1107,7 +1107,7 @@ export function attribute(element: Element, name: string, value: unknown, writte
   else if (given === true)
     element.setAttribute(name, '')
   else
-    element.setAttribute(name, safeUrl(name, rebasedAttribute(name, name === 'href' && !written && localizeHref && element.localName === 'a' ? localizeHref(given) : given)))
+    element.setAttribute(name, safeUrl(name, rebasedAttribute(name, name === 'href' && !written && element.localName === 'a' ? localizeHref(given) : given)))
 }
 
 // An `img` source, with the variants, `sizes` and size of an imported image; a later source clears what an earlier one set.

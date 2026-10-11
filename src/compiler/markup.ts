@@ -1,7 +1,8 @@
-import type { ElementNode, NamedAttribute, Node, SlotNode, Span, TextNode } from './ast'
+import type { Attribute, ElementNode, ErrorMessages, FormField, NamedAttribute, Node, SlotNode, Span, TextNode } from './ast'
 import type { CodeBuilder } from './mapping'
+import { URL_ATTRIBUTES } from '../runtime/base'
 import { PART_END, PART_START } from '../runtime/markers'
-import { actionOf } from './ast'
+import { actionOf, describedByOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, formFieldOf } from './ast'
 import { decodeEntities, isFunctionExpression } from './expression'
 
 export const VOID_ELEMENTS = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'keygen', 'link', 'menuitem', 'meta', 'param', 'source', 'track', 'wbr'])
@@ -13,6 +14,9 @@ export const BEHAVIOUR = /^(?:on|ref$|bind:|transition(?::|$))/
 const LESS_THAN = /</g
 const STATIC_ATTRIBUTE = /["<]|&(?!(?:#\d+|#x[\da-f]+|[a-z][a-z\d]*);)/gi
 const ATTRIBUTE_ENTITY: Record<string, string> = { '"': '&quot;', '<': '&lt;', '&': '&amp;' }
+// The attributes naming URLs of the site, which a path from its root in goes under its base.
+const BASED = new Set([...URL_ATTRIBUTES, 'srcset'])
+const ROOT_PATH = /(?:^|,)\s*\/(?!\/)/
 
 // Around a dynamic part of an island's markup, so the browser finds where it starts and ends.
 export const START_MARKER = `<!--${PART_START}-->`
@@ -38,6 +42,41 @@ export function describedValue(described: { refused: string, own?: string }): st
   return `) ? ${JSON.stringify(described.refused)} : ${described.own === undefined ? 'undefined' : JSON.stringify(described.own)}`
 }
 
+// An attribute of an element without spreads, as both templates read it; a static text is decoded.
+export type PlannedAttribute
+  = | { kind: 'boolean', name: string }
+    | { kind: 'text', name: string, text: string, bare: boolean }
+  // A static path from the site's root, which goes under its base and, for a link, to the page's locale's copy.
+    | { kind: 'rooted', name: string, text: string }
+    | { kind: 'class' | 'style', name: string, expression: Span }
+  // An `img` source, which loads the size the image shows at.
+    | { kind: 'image', expression: Span, sized: boolean }
+  // A `select`'s value, which picks its option.
+    | { kind: 'selected', expression: Span }
+    | { kind: 'bind', name: string, property: string, expression: Span }
+    | { kind: 'behaviour', name: string, attribute: Attribute }
+    | { kind: 'value', name: string, expression: Span, action: boolean }
+
+// What an element without spreads renders, decided once for the server's markup and the browser's template.
+export interface ElementPlan {
+  id: string | undefined
+  // The class shorthand, merged with a static `class`, or beside an expression one.
+  classes: { text: string, expression?: Span } | undefined
+  attributes: PlannedAttribute[]
+  // The `sizes` an image source caps, left out of the attributes.
+  sizes: NamedAttribute | undefined
+  // Markup written as the content; a textarea's static `value` is also kept as its text.
+  staticContent: string | undefined
+  valueText: string | undefined
+  // An expression setting the content, read off its signal when `bound`.
+  content: { expression: Span, property: string, raw: boolean, bound: boolean } | undefined
+  selected: { expression: Span, bound: boolean } | undefined
+  action: { expression: Span, method: boolean, enctype: boolean } | undefined
+  field: FormField | undefined
+  // The `aria-describedby` a refused field or form takes.
+  described: { refused: string, own?: string } | undefined
+}
+
 // What the server and browser templates write alike: an element's attributes as props objects and a component's props.
 export abstract class TemplateWriter {
   constructor(protected readonly b: CodeBuilder, protected readonly src: string) {}
@@ -47,6 +86,101 @@ export abstract class TemplateWriter {
 
   // An attribute the props leave out.
   protected abstract skips(element: ElementNode, name: string): boolean
+
+  // An element's plan, `target` the action of the form it sits in.
+  protected plan(element: ElementNode, target: Span | undefined, errors: ErrorMessages | undefined): ElementPlan {
+    const name = element.name
+    const classAttribute = this.classAttribute(element)
+    const sizes = this.imageSizes(element)
+    const field = target && formFieldOf(element, this.src)
+    const action = actionOf(element, this.src)
+    const described = field ? field.invalid ? describedByOf(element, this.src, errors, target, field.name) : undefined : action && describedByOf(element, this.src, errors, action.expression, '')
+    const plan: ElementPlan = {
+      id: element.id ? this.source(element.id) : errors?.ids.get(element),
+      classes: undefined,
+      attributes: [],
+      sizes,
+      staticContent: undefined,
+      valueText: undefined,
+      content: undefined,
+      selected: undefined,
+      action: action && { expression: action.expression, method: !this.named(element, 'method'), enctype: !this.named(element, 'enctype') },
+      field,
+      described,
+    }
+
+    if (element.classes.length > 0) {
+      const shorthand = this.shorthand(element)
+
+      plan.classes = classAttribute?.kind === 'expression' ? { text: shorthand, expression: classAttribute.expression } : { text: classAttribute?.kind === 'static' ? `${shorthand} ${decodeEntities(classAttribute.text)}` : shorthand }
+    }
+
+    for (const attribute of element.attributes) {
+      if (attribute.kind === 'spread' || (plan.classes && attribute === classAttribute) || attribute === sizes)
+        continue
+
+      const attributeName = this.source(attribute.name)
+
+      if (attributeName.startsWith('bind:') && attribute.kind === 'expression') {
+        const property = attributeName.slice(5)
+
+        if (name === 'textarea' && property === 'value')
+          plan.content = { expression: attribute.expression, property, raw: false, bound: true }
+        else if (name === 'select' && property === 'value')
+          plan.selected = { expression: attribute.expression, bound: true }
+
+        plan.attributes.push({ kind: 'bind', name: attributeName, property, expression: attribute.expression })
+      }
+      else if (BEHAVIOUR.test(attributeName)) {
+        plan.attributes.push({ kind: 'behaviour', name: attributeName, attribute })
+      }
+      else if (described?.own !== undefined && attributeName === 'aria-describedby') {
+        continue
+      }
+      else if (attribute.kind === 'boolean') {
+        plan.attributes.push({ kind: 'boolean', name: attributeName })
+      }
+      else if (attribute.kind === 'static') {
+        const text = decodeEntities(attribute.text)
+
+        if (attributeName === FIELD_ATTRIBUTE && FIELD_ELEMENTS.has(name)) {
+          plan.attributes.push({ kind: 'text', name: 'name', text, bare: false })
+        }
+        else if (attributeName === 'innerHTML') {
+          plan.staticContent = attribute.text
+        }
+        else if (CONTENT_PROPERTIES.has(attributeName) || (name === 'textarea' && attributeName === 'value')) {
+          plan.staticContent = escapeText(text)
+          plan.valueText = attributeName === 'value' ? text : undefined
+        }
+        else if (BASED.has(attributeName) && ROOT_PATH.test(text)) {
+          plan.attributes.push({ kind: 'rooted', name: attributeName, text })
+        }
+        else {
+          plan.attributes.push({ kind: 'text', name: attributeName, text, bare: attribute.text === '' })
+        }
+      }
+      else if (CONTENT_PROPERTIES.has(attributeName) || (name === 'textarea' && (attributeName === 'value' || attributeName === 'defaultValue'))) {
+        plan.content = { expression: attribute.expression, property: attributeName === 'defaultValue' ? 'value' : attributeName, raw: attributeName === 'innerHTML' || RAW_ELEMENTS.has(name), bound: false }
+      }
+      else if (name === 'select' && attributeName === 'value') {
+        plan.selected = { expression: attribute.expression, bound: false }
+        plan.attributes.push({ kind: 'selected', expression: attribute.expression })
+      }
+      else if (attributeName === 'class' || attributeName === 'style') {
+        plan.attributes.push({ kind: attributeName, name: attributeName, expression: attribute.expression })
+      }
+      // An imported image loads the size it shows at, unless the template writes its own `srcset`.
+      else if (name === 'img' && attributeName === 'src' && !this.named(element, 'srcset')) {
+        plan.attributes.push({ kind: 'image', expression: attribute.expression, sized: this.named(element, 'width') || this.named(element, 'height') })
+      }
+      else {
+        plan.attributes.push({ kind: 'value', name: attributeName, expression: attribute.expression, action: attribute === action })
+      }
+    }
+
+    return plan
+  }
 
   // A component's props: its attributes, then its slots and children, each read through a getter or a function so it renders where the component puts it.
   protected componentProps(element: ElementNode, getters: boolean): void {

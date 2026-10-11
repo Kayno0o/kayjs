@@ -12,7 +12,7 @@ describe('markers', () => {
     const copies: string[] = []
 
     for await (const file of new Glob('**/*.ts').scan(SRC)) {
-      if (file !== 'runtime/markers.ts' && (await Bun.file(join(SRC, file)).text()).includes(`'${ISLAND}'`))
+      if (file !== 'runtime/markers.ts' && (await Bun.file(join(SRC, file)).text()).includes(ISLAND))
         copies.push(file)
     }
 
