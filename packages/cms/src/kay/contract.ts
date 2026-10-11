@@ -56,6 +56,8 @@ export interface CollectionInfo {
   locales?: string[] | undefined
   draftField?: string | undefined
   dir?: string | undefined
+  // Why its entries cannot be read, a loader throwing say; the screens show it in their place.
+  problem?: string | undefined
 }
 
 export interface SourceEntry {

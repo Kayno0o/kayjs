@@ -1,6 +1,6 @@
 import { s } from 'kay'
 import { collection } from 'kay/content'
-import { products as stock } from './products'
+import { outage, products as stock } from './products'
 
 export const posts = collection('content/posts', {
   schema: s.Object({ title: s.String(), draft: s.Optional(s.Boolean()), tags: s.Array(s.String(), { default: [] }) }),
@@ -10,7 +10,12 @@ export const posts = collection('content/posts', {
 // A loader keeping its entries in memory, as a database would.
 export const products = collection({
   name: 'products',
-  load: () => stock.map(({ slug, data }) => ({ slug, data })),
+  load: () => {
+    if (outage.message !== undefined)
+      throw new Error(outage.message)
+
+    return stock.map(({ slug, data }) => ({ slug, data }))
+  },
   save: (entry) => {
     stock.splice(0, stock.length, ...stock.filter(product => product.slug !== entry.slug), { slug: entry.slug, data: entry.data as { name: string } })
   },

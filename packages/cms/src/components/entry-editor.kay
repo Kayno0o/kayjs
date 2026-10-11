@@ -64,7 +64,7 @@ async function remove(): Promise<void> {
 ---
 form.kcms-entry-editor(novalidate onSubmit={event => { event.preventDefault(); void save() }})
   if entry?.problem as problem
-    p.kcms-entry-failure(role="alert") This entry's file does not parse: {problem}. Saving writes the form over it.
+    p.kcms-failure(role="alert") This entry's file does not parse: {problem}. Saving writes the form over it.
   .kcms-entry-editor-bar
     if draft()
       Badge(tone="warning" label="Draft")

@@ -25,7 +25,7 @@ export default defineConfig({ extensions: [cms({ guard: auth.guard({ require: 'e
 - `cms({ prefix, guard, files })`: `prefix` is where the screens live (`/admin`), `guard` who may use them and the API outside edit mode, `files` where a folder entry's file goes, `workingTree()` by default.
 - `forgejo({ url, repo, branch?, token, fetch? })`: commits each file through Forgejo's contents API, reading the file's current sha first, so the last write wins. Throws `ForgeError` with Forgejo's `status` and message.
 - `workingTree()`: writes or deletes the file in place, for `kay dev`.
-- A folder collection's source files ship with the server: kay throws for a folder missing from the build, and for one outside the repository. Slugs follow kay's rules, and a file that does not parse lists as broken, its form opening empty to write over it.
+- A folder collection's source files ship with the server: kay throws for a folder missing from the build, and for one outside the repository. Slugs follow kay's rules, and a file that does not parse lists as broken, its form opening empty to write over it, a Markdown file keeping its body. A collection whose loader throws is listed as one that cannot be read, its screens showing why.
 
 ## Screens
 

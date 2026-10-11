@@ -4,7 +4,7 @@ import process from 'node:process'
 import { beforeAll, expect, test } from 'bun:test'
 import { testSite } from 'kay/test'
 import { BODY, parseMarker } from '../../../src/markers'
-import { products } from '../src/products'
+import { outage, products } from '../src/products'
 import { saved } from '../src/saved'
 
 // Until kay renders the editor in edit mode (kaynooo/kayjs#262), the fixture's pages render it themselves.
@@ -180,7 +180,7 @@ test('a file that does not parse lists as broken, and is written over or deleted
 
     const page = await site.visit('/admin/collections/posts/broken')
 
-    expect(page.text('.kcms-entry-failure')).toContain('does not parse')
+    expect(page.text('.kcms-failure')).toContain('does not parse')
     expect(page.find('[data-kcms-path]').map(field => field.attributes['data-kcms-path'])).toEqual(['title', 'draft', 'tags'])
 
     saved.length = 0
@@ -188,6 +188,36 @@ test('a file that does not parse lists as broken, and is written over or deleted
     expect((await send('POST', 'posts/broken', { data: { title: 'Mended' } })).answer).toHaveProperty('saved', true)
     expect((await send('DELETE', 'posts/broken')).answer).toHaveProperty('saved', true)
     expect(saved.map(({ repoPath, text }) => [repoPath, text === undefined ? undefined : JSON.parse(text)])).toEqual([['tests/fixture/src/content/posts/broken.json', { title: 'Mended' }], ['tests/fixture/src/content/posts/broken.json', undefined]])
+  }
+  finally {
+    await rm(file, { force: true })
+  }
+})
+
+test('a collection whose loader throws shows why on its screens, the others still listed', async () => {
+  outage.message = 'the database is down'
+
+  try {
+    const index = await site.visit('/admin')
+
+    expect(index.find('.kui-badge').map(badge => [badge.text, badge.attributes['data-tooltip']])).toEqual([['Cannot be read', expect.stringContaining('the database is down')]])
+    expect(index.text('main')).toContain('2 entries')
+
+    for (const path of ['/admin/collections/products', '/admin/collections/products/mug', '/admin/new/products'])
+      expect((await site.visit(path)).text('main')).toContain('the database is down')
+  }
+  finally {
+    outage.message = undefined
+  }
+})
+
+test('a Markdown file whose frontmatter does not parse opens with its body kept', async () => {
+  const file = join(ROOT, 'src/content/posts/torn.md')
+
+  await Bun.write(file, '---\ntitle: [unclosed\n---\nThe body survives.\n')
+
+  try {
+    expect((await site.visit('/admin/collections/posts/torn')).text('[data-kcms-body] textarea')).toContain('The body survives.')
   }
   finally {
     await rm(file, { force: true })

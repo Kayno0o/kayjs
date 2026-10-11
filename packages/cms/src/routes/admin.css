@@ -22,6 +22,11 @@
   width: min(24rem, 100%);
 }
 
+.kcms-failure {
+  margin: 0;
+  color: var(--color-kui-error);
+}
+
 .kcms-row-actions {
   display: flex;
   flex-wrap: wrap;
@@ -51,6 +56,8 @@
 }
 
 .kcms-entry-editor-bar .kcms-entry-actions {
+  display: flex;
   flex-wrap: wrap;
+  gap: 0.5rem;
   margin-left: auto;
 }
