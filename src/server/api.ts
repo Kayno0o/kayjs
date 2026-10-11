@@ -9,7 +9,7 @@ import type { LoadedGuard } from './guards'
 import type { MountedApi } from './openapi'
 import type { RouteMount } from './routes'
 import type { Span } from './trace'
-import { existsSync } from 'node:fs'
+import { existsSync, realpathSync } from 'node:fs'
 import { basename, dirname, join, relative, sep } from 'node:path'
 import { Cookie, Elysia, ElysiaCustomStatusResponse, ElysiaFile } from 'elysia'
 import { projectPaths } from '../project'
@@ -444,11 +444,14 @@ function encodeEvent(value: unknown): string {
 // In the browser build an island imports a module of one of the API `trees` for its routes' types only: it gets where they are served, and none of the server code.
 // A library module the app replaced gives the app's mount, which is the same path, so a library island importing it still builds.
 export function apiStubs(trees: RouteMount[]): BunPlugin {
+  // A tree reached through a link, a library linked into the app, is matched by its real path too, which Bun hands for a module imported from the real side.
+  const reached = trees.flatMap(tree => [...new Set([tree.dir, existsSync(tree.dir) ? realpathSync(tree.dir) : tree.dir])].map(dir => ({ dir, prefix: tree.prefix })))
+
   return {
     name: 'kay-api',
     setup(build) {
-      build.onLoad({ filter: new RegExp(`^(?:${trees.map(({ dir }) => (dir + sep).replace(REGEX_SYNTAX, '\\$&')).join('|')}).*\\.ts$`) }, ({ path }) => {
-        const { dir, prefix } = trees.find(tree => path.startsWith(tree.dir + sep))!
+      build.onLoad({ filter: new RegExp(`^(?:${reached.map(({ dir }) => (dir + sep).replace(REGEX_SYNTAX, '\\$&')).join('|')}).*\\.ts$`) }, ({ path }) => {
+        const { dir, prefix } = reached.find(tree => path.startsWith(tree.dir + sep))!
         const name = relative(dir, path).split(sep).join('/')
 
         if (NOT_A_MODULE.test(name))
