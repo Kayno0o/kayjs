@@ -1,8 +1,24 @@
+import type { Subprocess } from 'bun'
 import { mkdtempSync, realpathSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 import { cpuTicks, ensureFree, isRunning, killAll, parentOf, processesIn, processTree, stopEverything, tracked, treeCpu, treeMemory } from './serve'
+
+// Burns 200 ms of CPU, however busy the machine.
+const BURN = 'while (process.cpuUsage().user < 200_000);'
+
+// Once the process printed that it burnt its CPU time.
+async function burnt(process: Subprocess<'ignore', 'pipe'>): Promise<void> {
+  let output = ''
+
+  for await (const chunk of process.stdout) {
+    output += new TextDecoder().decode(chunk)
+
+    if (output.includes('burnt'))
+      return
+  }
+}
 
 // Polls until `done` holds, a second at most.
 async function until(done: () => boolean): Promise<void> {
@@ -20,6 +36,7 @@ describe('parentOf', () => {
 describe('cpuTicks', () => {
   it('adds a process\'s user and system time to those of the children it reaped', () => {
     expect(cpuTicks('4242 (a (b) c) S 17 4242 4242 0 -1 4194560 900 30 0 0 120 30 400 50 20 0 9 0')).toBe(600)
+    expect(cpuTicks('4242 (a (b) c) S 17 4242 4242 0 -1 4194560 900 30 0 0 120 30 400 50 20 0 9 0', { own: true })).toBe(150)
   })
 })
 
@@ -87,23 +104,35 @@ describe('processesIn', () => {
 })
 
 describe('treeCpu', () => {
-  it('counts a busy tree\'s CPU time, and that of a process in its folder that left the tree', async () => {
+  it('counts a tree\'s CPU time, a child it reaped included, and that of a process in its folder that left the tree', async () => {
     const dir = realpathSync(mkdtempSync(join(tmpdir(), 'kay-bench-cpu-')))
-    const busy = 'const end = Date.now() + 400; while (Date.now() < end);'
-    const shell = Bun.spawn(['sh', '-c', `${process.execPath} -e "${busy}"; sleep 30`])
-    const orphan = Bun.spawn([process.execPath, '-e', `${busy} await Bun.sleep(30000)`], { cwd: dir })
+    const shell = Bun.spawn(['sh', '-c', `${process.execPath} -e '${BURN}'; echo burnt; sleep 30`], { stdout: 'pipe' })
+    const orphan = Bun.spawn([process.execPath, '-e', `${BURN}; console.log("burnt"); await Bun.sleep(30000)`], { cwd: dir, stdout: 'pipe' })
 
     try {
-      await until(() => treeCpu(shell.pid) >= 150)
-      expect(treeCpu(shell.pid)).toBeGreaterThanOrEqual(150)
-
+      await Promise.all([burnt(shell), burnt(orphan)])
       const tree = treeCpu(shell.pid)
 
-      await until(() => treeCpu(shell.pid, dir) - tree >= 150)
-      expect(treeCpu(shell.pid, dir) - tree).toBeGreaterThanOrEqual(150)
+      expect(tree).toBeGreaterThanOrEqual(190)
+      expect(treeCpu(shell.pid, dir) - tree).toBeGreaterThanOrEqual(190)
     }
     finally {
       await killAll([...processTree(shell.pid), orphan.pid])
+    }
+  })
+
+  it('counts a process both in the tree and in the folder once', async () => {
+    const dir = realpathSync(mkdtempSync(join(tmpdir(), 'kay-bench-once-')))
+    const shell = Bun.spawn(['sh', '-c', `${process.execPath} -e '${BURN}; console.log("burnt"); await Bun.sleep(30000)'`], { cwd: dir, stdout: 'pipe' })
+
+    try {
+      await burnt(shell)
+
+      expect(treeCpu(shell.pid)).toBeGreaterThanOrEqual(190)
+      expect(Math.abs(treeCpu(shell.pid, dir) - treeCpu(shell.pid))).toBeLessThan(50)
+    }
+    finally {
+      await killAll(processTree(shell.pid))
     }
   })
 })

@@ -2,7 +2,7 @@ import type { Subprocess } from 'bun'
 import type { Variant } from './sites'
 import { readFileSync } from 'node:fs'
 import { median } from '../format'
-import { CLOCK_TICKS, cpuTicks, memory, startServer, waitReady } from './serve'
+import { clockTicks, cpuTicks, memory, startServer, waitReady } from './serve'
 
 export interface ColdStart {
   ms: number
@@ -41,7 +41,7 @@ export async function coldStart(variant: Variant): Promise<ColdStart> {
 }
 
 function cpuSeconds(pid: number): number {
-  return cpuTicks(readFileSync(`/proc/${pid}/stat`, 'utf8')) / CLOCK_TICKS
+  return cpuTicks(readFileSync(`/proc/${pid}/stat`, 'utf8'), { own: true }) / clockTicks()
 }
 
 function nginxCpuSeconds(nginx: Subprocess): number {

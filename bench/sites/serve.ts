@@ -13,8 +13,7 @@ const PSS = /^Pss:\s+(\d+)/m
 const STAT_PARENT = /^\) \S (\d+)/
 const DIGITS = /^\d+$/
 
-// What /proc counts CPU time in, per second.
-export const CLOCK_TICKS = Number(Bun.spawnSync(['getconf', 'CLK_TCK'], { stdout: 'pipe' }).stdout.toString().trim()) || 100
+let ticks: number | undefined
 // How long a killed process may take to be gone.
 const GONE_TIMEOUT_MS = 5000
 const STAT_STATE = /^\) (\S)/
@@ -212,14 +211,28 @@ export function treeCpu(pid: number, dir?: string): number {
   const stats = processStats()
   const members = new Set([...processTree(pid, stats), ...dir === undefined ? [] : processesIn(dir)])
 
-  return [...members].reduce((sum, member) => sum + (stats.has(member) ? cpuTicks(stats.get(member)!) : 0), 0) * 1000 / CLOCK_TICKS
+  return [...members].reduce((sum, member) => sum + (stats.has(member) ? cpuTicks(stats.get(member)!) : 0), 0) * 1000 / clockTicks()
 }
 
-// User and system time of a process and of its reaped children, from its `/proc/<pid>/stat` line.
-export function cpuTicks(stat: string): number {
+// What /proc counts CPU time in, per second, 100 where `getconf` cannot say.
+export function clockTicks(): number {
+  if (ticks === undefined) {
+    try {
+      ticks = Number(Bun.spawnSync(['getconf', 'CLK_TCK'], { stdout: 'pipe' }).stdout.toString().trim()) || 100
+    }
+    catch {
+      ticks = 100
+    }
+  }
+
+  return ticks
+}
+
+// User and system time of a process and, unless `own`, of its reaped children, from its `/proc/<pid>/stat` line.
+export function cpuTicks(stat: string, { own = false } = {}): number {
   const fields = stat.slice(stat.lastIndexOf(')') + 2).split(' ')
 
-  return [11, 12, 13, 14].reduce((sum, index) => sum + Number(fields[index]), 0)
+  return (own ? [11, 12] : [11, 12, 13, 14]).reduce((sum, index) => sum + Number(fields[index]), 0)
 }
 
 // Proportional and resident memory of a process tree, in bytes: resident memory counts the pages its processes share once each, which proportional memory divides between them.

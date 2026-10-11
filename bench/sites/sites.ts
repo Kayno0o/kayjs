@@ -129,16 +129,41 @@ function kayPackage(): { specifier: string, source: string } | undefined {
     return undefined
 
   if (KAY_PACKAGE === 'checkout') {
-    const commit = run(['git', 'rev-parse', '--short', 'HEAD'], CHECKOUT).trim()
-    // Untracked files included, which the pack takes when its `files` cover them.
-    const changed = run(['git', 'status', '--porcelain'], CHECKOUT).trim() !== ''
+    const source = checkoutSource()
 
     run([process.execPath, 'pm', 'pack', '--filename', join(WORK, 'kay-checkout.tgz'), '--quiet'], CHECKOUT)
 
-    return { specifier: `file:${join(WORK, 'kay-checkout.tgz')}`, source: `this checkout at ${commit}${changed ? ' with uncommitted changes' : ''}, packed` }
+    return { specifier: `file:${join(WORK, 'kay-checkout.tgz')}`, source }
   }
 
   return KAY_PACKAGE.includes(':') ? { specifier: KAY_PACKAGE, source: KAY_PACKAGE } : { specifier: `npm:${PUBLISHED}@${KAY_PACKAGE}`, source: 'the registry' }
+}
+
+function checkoutSource(): string {
+  const commit = run(['git', 'rev-parse', '--short', 'HEAD'], CHECKOUT).trim()
+  // Untracked files included, which the pack takes when its `files` cover them.
+  const changed = run(['git', 'status', '--porcelain'], CHECKOUT).trim() !== ''
+
+  return `this checkout at ${commit}${changed ? ' with uncommitted changes' : ''}, packed`
+}
+
+// Under `SKIP_PREPARE`, the kay dev copies whose install is not what `KAY_PACKAGE` names now, as after the checkout moved, and copies of uncommitted changes, which may not be the ones packed then.
+export async function staleInstalls(): Promise<string[]> {
+  if (KAY_PACKAGE === '' || PHASE === 'prod' || KIND === 'astro')
+    return []
+
+  const wanted = KAY_PACKAGE === 'checkout' ? checkoutSource() : KAY_PACKAGE.includes(':') ? KAY_PACKAGE : 'the registry'
+  const warnings = await Promise.all(VARIANTS.filter(variant => variant.kind === 'kay').map(async (variant) => {
+    const source = Bun.file(join(variant.devDir, KAY_SOURCE))
+    const installed = await source.exists() ? await source.text() : 'an unknown kay'
+
+    if (installed !== wanted)
+      return [`SKIP_PREPARE: ${label(variant)} runs ${installed}, not ${wanted}; prepare again to measure that`]
+
+    return installed.includes('uncommitted') ? [`SKIP_PREPARE: ${label(variant)} runs uncommitted changes as packed by the last prepare, which may differ from the checkout's now`] : []
+  }))
+
+  return warnings.flat()
 }
 
 // Exports each site at its Astro commit and at its kay ref and installs them, once for the production builds, which build.ts then builds as they deploy, and once for the dev servers.

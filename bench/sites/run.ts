@@ -14,7 +14,7 @@ import { buildCommands, footprint, timeBuild } from './build'
 import { development, devSection } from './dev'
 import { coldStart, load } from './load'
 import { memory, startAll, stopEverything } from './serve'
-import { commitOf, KIND, label, NO_SITES, PHASE, prepare, SITES, VARIANTS, versionIn } from './sites'
+import { commitOf, KIND, label, NO_SITES, PHASE, prepare, SITES, staleInstalls, VARIANTS, versionIn } from './sites'
 import { VIEWPORTS, weigh } from './weigh'
 
 interface Result {
@@ -29,7 +29,7 @@ interface Result {
 
 const STYLESHEET = /<link rel="stylesheet" href="([^"]+)"/g
 const MB = 1024 * 1024
-const BROWSER_CLOSE_MS = 5000
+const STOP_MS = 10_000
 
 const average = (values: number[]) => values.reduce((sum, value) => sum + value, 0) / values.length
 const megabytes = (bytes: number) => `${(bytes / MB).toFixed(0)} MB`
@@ -48,7 +48,7 @@ if (VARIANTS.length === 0)
 let browser: Browser | undefined
 let stopping = false
 
-// An interrupted run stops what it started, so no server it leaves holds a port the next run would be timed against; a second signal meanwhile changes nothing, and a browser slow to close is left behind.
+// An interrupted run stops what it started, so no server it leaves holds a port the next run would be timed against; a second signal meanwhile changes nothing, and what is slow to stop or fails to is left behind.
 for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) {
   process.on(signal, () => {
     if (stopping)
@@ -56,9 +56,13 @@ for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) {
 
     stopping = true
     void (async () => {
-      await stopEverything(VARIANTS.map(variant => variant.devDir))
-      await Promise.race([browser?.close(), Bun.sleep(BROWSER_CLOSE_MS)])
-      process.exit(128 + constants.signals[signal])
+      try {
+        await Promise.race([stopEverything(VARIANTS.map(variant => variant.devDir)), Bun.sleep(STOP_MS)])
+        await Promise.race([browser?.close(), Bun.sleep(STOP_MS)])
+      }
+      finally {
+        process.exit(128 + constants.signals[signal])
+      }
     })()
   })
 }
@@ -66,6 +70,10 @@ for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) {
 if ((process.env.SKIP_PREPARE ?? '') === '') {
   console.error('exporting, installing and building the sites')
   await prepare()
+}
+else {
+  for (const warning of await staleInstalls())
+    console.error(warning)
 }
 
 const results = new Map<Variant, Result>()

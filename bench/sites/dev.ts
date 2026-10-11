@@ -20,7 +20,7 @@ interface Edit {
   field?: boolean | undefined
   // What the dev server logged its restarts within the edit took, summed; none for a server that logs none, as Astro's.
   restart?: number | undefined
-  // CPU time of the dev server's processes over `EDIT_WINDOW_MS` from the write, or until shown when later, in ms.
+  // CPU time of the dev server's processes from just before the write to `EDIT_WINDOW_MS` after it, or until shown when later, in ms.
   cpu: number
 }
 
@@ -51,9 +51,6 @@ interface BenchWindow {
 }
 
 // Each side runs this many sessions, the sides alternating, the order reversed every other session.
-const SESSIONS = count('DEV_SESSIONS', 3)
-const WARM_STARTS = count('DEV_STARTS', 5)
-const EDIT_ROUNDS = count('DEV_EDITS', 7)
 const KINDS: EditKind[] = ['template', 'style', 'server']
 const READY_TIMEOUT_MS = 60_000
 const SHOW_TIMEOUT_MS = 10_000
@@ -69,8 +66,6 @@ const VIEWPORT = { width: 1280, height: 800 }
 const UNSERVED = '/kay-bench-ready'
 // How `kay dev` reports a restart in its output.
 const RESTARTED = /restarted in (\d+) ms/g
-// How `kay dev` and Vite say their port was taken, before moving to another.
-const PORT_TAKEN = /was in use|is in use/
 const LOGS = ['dev.out.log', 'dev.err.log']
 // The field the bench types into on the edit page, when it has one: a text input or a text area.
 const FIELD = 'input:is(:not([type]), [type=text], [type=email], [type=search], [type=tel], [type=url]), textarea'
@@ -120,6 +115,13 @@ const WATCH = `(() => {
 
 const now = () => performance.timeOrigin + performance.now()
 
+// The counts the environment sets, read once the dev phase runs, so a bad one fails it alone.
+let chosen: { sessions: number, starts: number, rounds: number } | undefined
+
+function counts() {
+  return chosen ??= { sessions: count('DEV_SESSIONS', 3), starts: count('DEV_STARTS', 5), rounds: count('DEV_EDITS', 7) }
+}
+
 // A count from the environment, `fallback` when unset.
 function count(name: string, fallback: number): number {
   const value = process.env[name]
@@ -140,18 +142,20 @@ export async function development(browser: Browser): Promise<Map<Variant, DevRes
   const variants = VARIANTS.filter(variant => variant.site.dev !== undefined)
   const results = new Map<Variant, DevResult>(await Promise.all(variants.map(async (variant): Promise<[Variant, DevResult]> => [variant, { software: variant.kind === 'astro' ? `Astro ${await versionIn(variant.devDir, 'astro')}` : await kayIn(variant.devDir), cold: [], warm: [], loads: [], idle: [], edits: { template: [], style: [], server: [] }, rest: [], edited: [] }])))
 
-  for (let session = 0; session < SESSIONS; session++) {
+  const { sessions, starts } = counts()
+
+  for (let session = 0; session < sessions; session++) {
     for (const variant of session % 2 === 0 ? variants : variants.toReversed()) {
       const result = results.get(variant)!
 
-      console.error(`dev server ${session + 1}/${SESSIONS}: ${label(variant)}`)
+      console.error(`dev server ${session + 1}/${sessions}: ${label(variant)}`)
 
       for (const cache of CACHES[variant.kind])
         rmSync(join(variant.devDir, cache), { recursive: true, force: true })
 
       result.cold.push(await startup(variant))
 
-      for (let start = 0; start < WARM_STARTS; start++)
+      for (let start = 0; start < starts; start++)
         result.warm.push(await startup(variant))
 
       const server = await startDev(variant)
@@ -236,9 +240,7 @@ async function untilServed(variant: Variant, server: Subprocess, path: string): 
     }
     catch {}
 
-    const logs = await Promise.all(LOGS.map(async log => Bun.file(join(variant.devDir, log)).text()))
-
-    if (logs.some(log => PORT_TAKEN.test(log)))
+    if (await portTaken(variant))
       throw new Error(`${label(variant)}: the dev server found ${variant.ports.dev} taken and moved to another port; see dev.out.log in ${variant.devDir}`)
 
     await Bun.sleep(5)
@@ -247,13 +249,35 @@ async function untilServed(variant: Variant, server: Subprocess, path: string): 
   throw new Error(`${label(variant)}: the dev server did not serve ${path} on ${variant.ports.dev}, exit code ${server.exitCode}; see dev.err.log in ${variant.devDir}`)
 }
 
+// Whether the dev server said its port was taken, as `kay dev` and Vite do before moving to another.
+async function portTaken(variant: Variant): Promise<boolean> {
+  const said = new RegExp(`\\b${variant.ports.dev} (?:was|is) in use`)
+
+  for (const name of LOGS) {
+    const log = Bun.file(join(variant.devDir, name))
+
+    if (await log.exists() && said.test(await log.text()))
+      return true
+  }
+
+  return false
+}
+
 // The dev server and every process it started, as kay's spare server and client builder, and whatever still runs in its copy, as a spare it respawned while stopping, which left its tree.
 async function stopDev(variant: Variant, server: Subprocess): Promise<void> {
   const tree = processTree(server.pid)
 
   server.kill()
   await Promise.race([server.exited, Bun.sleep(STOP_TIMEOUT_MS)])
-  await killAll([...tree, ...processTree(server.pid), ...processesIn(variant.devDir)])
+
+  // A process still running is left to the next start, which finds its port taken, rather than hiding the error a session failed with.
+  try {
+    await killAll([...tree, ...processTree(server.pid), ...processesIn(variant.devDir)])
+  }
+  catch (error) {
+    console.error(`${label(variant)}: ${String(error)}`)
+  }
+
   await server.exited
 }
 
@@ -324,15 +348,14 @@ async function editSession(browser: Browser, variant: Variant, server: Subproces
     result.idle.push(cpuSince(variant, server, resting))
     result.rest.push(treeMemory(server.pid))
 
-    for (let round = 0; round <= EDIT_ROUNDS; round++) {
+    for (let round = 0; round <= counts().rounds; round++) {
       for (const kind of KINDS) {
         const token = `kb${++sequence}q`
         const logged = Bun.file(log).size
         const before = treeCpu(server.pid, variant.devDir)
-        const started = now()
-        const edit = await timeEdit(page, kind, token, files[kind], edited(kind, token))
+        const { written, ...edit } = await timeEdit(page, kind, token, files[kind], edited(kind, token))
 
-        await Bun.sleep(Math.max(0, started + EDIT_WINDOW_MS - now()))
+        await Bun.sleep(Math.max(0, written + EDIT_WINDOW_MS - now()))
         const cpu = cpuSince(variant, server, before)
 
         await Bun.sleep(SETTLE_MS)
@@ -352,7 +375,7 @@ async function editSession(browser: Browser, variant: Variant, server: Subproces
 }
 
 // From the file write to the page showing the edit's word, or from a reload by hand when the dev server shows nothing by itself.
-async function timeEdit(page: Page, kind: EditKind, token: string, file: string, content: string): Promise<Omit<Edit, 'restart' | 'cpu'>> {
+async function timeEdit(page: Page, kind: EditKind, token: string, file: string, content: string): Promise<Omit<Edit, 'restart' | 'cpu'> & { written: number }> {
   const scrolled = await page.evaluate((scroll) => {
     (window as unknown as BenchWindow).__kayBenchMarker = true
     // Past a smooth scroll the sites may set, which would still be moving when read.
@@ -394,7 +417,7 @@ async function timeEdit(page: Page, kind: EditKind, token: string, file: string,
   const kept = await page.evaluate(scroll => (window as unknown as BenchWindow).__kayBenchMarker === true && Math.abs(scrollY - scroll) <= 1, scrolled)
   const field = typed ? await page.evaluate(selector => document.querySelector<HTMLInputElement | HTMLTextAreaElement>(selector)?.value, FIELD) === TYPED : undefined
 
-  return { ms: shown - from, by, kept, field }
+  return { ms: shown - from, by, kept, field, written }
 }
 
 // When the page showed the word, across the reloads the dev server makes; undefined past the deadline.
@@ -448,6 +471,7 @@ export function devSection(results: Map<Variant, DevResult>): string[] {
   if (variants.length === 0)
     return []
 
+  const { sessions, starts, rounds } = counts()
   const spread = (values: number[], format = milliseconds) => values.length === 0 ? '-' : `${format(median(values))} (${format(Math.min(...values))} to ${format(Math.max(...values))})`
   const mebibytes = (bytes: number) => (bytes / 1024 / 1024).toFixed(0)
   const memory = (memories: Memory[]) => memories.length === 0 ? '-' : `${mebibytes(median(memories.map(entry => entry.pss)))} (${mebibytes(median(memories.map(entry => entry.rss)))}), ${median(memories.map(entry => entry.processes))} processes`
@@ -469,13 +493,13 @@ export function devSection(results: Map<Variant, DevResult>): string[] {
   return [
     '## Dev server',
     '',
-    `Each side's dev server (\`astro dev\` under Bun, \`kay dev\`) run from a copy of the site on its own port, ${SESSIONS} sessions a side, the sides alternating. Figures are medians, with the range in brackets. Browser: headless Chromium, ${VIEWPORT.width}x${VIEWPORT.height}, unthrottled over loopback, the site's own CSP enforced.`,
+    `Each side's dev server (\`astro dev\` under Bun, \`kay dev\`) run from a copy of the site on its own port, ${sessions} sessions a side, the sides alternating. Figures are medians, with the range in brackets. Browser: headless Chromium, ${VIEWPORT.width}x${VIEWPORT.height}, unthrottled over loopback, the site's own CSP enforced.`,
     '',
-    `- **Startup:** from spawning the dev server to its first 200 on the home page, once with its caches cleared (\`.astro\` and \`node_modules/.vite\`, or \`.kay\`) and ${WARM_STARTS} times warm, every session.`,
+    `- **Startup:** from spawning the dev server to its first 200 on the home page, once with its caches cleared (\`.astro\` and \`node_modules/.vite\`, or \`.kay\`) and ${starts} times warm, every session.`,
     `- **First load:** every page once, each in a fresh browser context, on a server that has only answered \`${UNSERVED}\`, a path no page serves, which may have built its not-found page and started its bundler: load events and requests summed over the pages.`,
-    `- **Edits:** the site's edit page is open with a marker set on \`window\` and scrolled ${SCROLL} px. One edit a kind in turn, a first round as a warm-up, then ${EDIT_ROUNDS} rounds a session, each timed from the file write to the frame after the one that painted it, its word in the page's visible text, checked after every DOM mutation and every task. Of that, the server restart is what \`kay dev\` logs its restarts within the edit took; the rest is the browser's. The template edit adds a word to a text of the page's template, the style edit appends a rule to the site's stylesheet, the server code edit adds a word to a value the page's server code renders (Astro's frontmatter, kay's page script), only in the copies, whose config the site's \`prepareDev\` may adjust to run locally (jb-peinture's Astro config sends Vite's reloads to its public host, which its copy sends to the dev server). An edit not shown after ${SHOW_TIMEOUT_MS / 1000} s is shown by reloading the page by hand, timed from that reload. The state kept is the marker and the scroll position, and apart, a value typed into the page's first text field when it has one.`,
-    `- **CPU:** beside each figure, the median CPU time the dev server's whole process tree spent meanwhile, in ms, the servers a restart stopped included: until the first 200 for a startup, over the first loads, and for an edit over the ${EDIT_WINDOW_MS / 1000} s from its write, or until shown when that took longer. Idle CPU is read ${SETTLE_MS / 1000} s after the edit page loaded.`,
-    `- **Memory:** proportional (resident) memory of the dev server's whole process tree, in MiB: at rest with the edit page open, then after the ${KINDS.length * EDIT_ROUNDS} edits of a session. Resident memory counts the pages its processes share once each.`,
+    `- **Edits:** the site's edit page is open with a marker set on \`window\` and scrolled ${SCROLL} px. One edit a kind in turn, a first round as a warm-up, then ${rounds} rounds a session, each timed from the file write to the frame after the one that painted it, its word in the page's visible text, checked after every DOM mutation and every task. Of that, the server restart is what \`kay dev\` logs its restarts within the edit took; the rest is the browser's. The template edit adds a word to a text of the page's template, the style edit appends a rule to the site's stylesheet, the server code edit adds a word to a value the page's server code renders (Astro's frontmatter, kay's page script), only in the copies, whose config the site's \`prepareDev\` may adjust to run locally (jb-peinture's Astro config sends Vite's reloads to its public host, which its copy sends to the dev server). An edit not shown after ${SHOW_TIMEOUT_MS / 1000} s is shown by reloading the page by hand, timed from that reload. The state kept is the marker and the scroll position, and apart, a value typed into the page's first text field when it has one.`,
+    `- **CPU:** beside each figure, the median CPU time the dev server's whole process tree spent meanwhile, in ms, the servers a restart stopped included: until the first 200 for a startup, over the first loads, and for an edit from just before its write to ${EDIT_WINDOW_MS / 1000} s after it, or until shown when that took longer. Idle CPU is read ${SETTLE_MS / 1000} s after the edit page loaded.`,
+    `- **Memory:** proportional (resident) memory of the dev server's whole process tree, in MiB: at rest with the edit page open, then after the ${KINDS.length * rounds} edits of a session. Resident memory counts the pages its processes share once each.`,
     '',
     table(['', ...variants.map(label)], [
       row('dev server', result => result.software),
