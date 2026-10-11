@@ -12,6 +12,8 @@ const PSS = /^Pss:\s+(\d+)/m
 // A process's parent, after the name in parentheses, which may hold spaces and parentheses of its own.
 const STAT_PARENT = /^\) \S (\d+)/
 const DIGITS = /^\d+$/
+// What /proc counts CPU time in, per second.
+const CLOCK_TICKS = 100
 // Where nginx keeps its dynamic modules: Arch's and Debian's path unless `NGINX_MODULES` says otherwise.
 const MODULES = process.env.NGINX_MODULES ?? '/usr/lib/nginx/modules'
 const NOT_WORD = /\W/g
@@ -156,6 +158,29 @@ export function processesIn(dir: string): number[] {
       return []
     }
   })
+}
+
+// The CPU time a process tree spent, in ms: each process's own and that of the children it reaped, so a server a restart stopped still counts.
+export function treeCpu(pid: number): number {
+  let ticks = 0
+
+  for (const member of processTree(pid)) {
+    try {
+      const stat = readFileSync(`/proc/${member}/stat`, 'utf8')
+
+      ticks += cpuTicks(stat)
+    }
+    catch {}
+  }
+
+  return ticks * 1000 / CLOCK_TICKS
+}
+
+// User and system time of a process and of its reaped children, from its `/proc/<pid>/stat` line.
+export function cpuTicks(stat: string): number {
+  const fields = stat.slice(stat.lastIndexOf(')') + 2).split(' ')
+
+  return [11, 12, 13, 14].reduce((sum, index) => sum + Number(fields[index]), 0)
 }
 
 // Proportional and resident memory of a process tree, in bytes: resident memory counts the pages its processes share once each, which proportional memory divides between them.

@@ -10,7 +10,7 @@ function variant(kind: Variant['kind']): Variant {
 }
 
 function result(software: string, edits: DevResult['edits']): DevResult {
-  return { software, cold: [900], warm: [400, 380, 420], loads: [{ ms: 1200, requests: 30 }], edits, rest: [MEMORY], edited: [MEMORY] }
+  return { software, cold: [{ ms: 900, cpu: 1500 }], warm: [{ ms: 400, cpu: 600 }, { ms: 380, cpu: 640 }, { ms: 420, cpu: 620 }], loads: [{ ms: 1200, cpu: 800, requests: 30 }], idle: [4], edits, rest: [MEMORY], edited: [MEMORY] }
 }
 
 describe('restartsIn', () => {
@@ -22,8 +22,8 @@ describe('restartsIn', () => {
 
 describe('devSection', () => {
   it('names each dev server, and splits the restarts off the edits that logged one', () => {
-    const astro = { ms: 60, by: 'itself' as const, kept: false }
-    const kay = (ms: number, restart?: number) => ({ ms, by: 'itself' as const, kept: true, restart })
+    const astro = { ms: 60, by: 'itself' as const, kept: false, cpu: 40 }
+    const kay = (ms: number, restart?: number) => ({ ms, by: 'itself' as const, kept: true, restart, cpu: ms * 2 })
     const section = devSection(new Map([
       [variant('astro'), result('Astro 6.4.6', { template: [astro], style: [astro], server: [{ ...astro, by: 'reload' }] })],
       [variant('kay'), result('kay 1.38.0, the registry', { template: [kay(300, 250), kay(320, 270), kay(310)], style: [kay(90)], server: [kay(330, 280)] })],
@@ -31,9 +31,11 @@ describe('devSection', () => {
 
     expect(section).toContain('|  | bakery astro | bakery kay |')
     expect(section).toContain('| dev server | Astro 6.4.6 | kay 1.38.0, the registry |')
-    expect(section).toContain('| template edit to screen (ms) | 60.0 (60.0 to 60.0) | 310 (300 to 320) |')
+    expect(section).toContain('| startup, warm (ms) | 400 (380 to 420); CPU 620 | 400 (380 to 420); CPU 620 |')
+    expect(section).toContain('| template edit to screen (ms) | 60.0 (60.0 to 60.0); CPU 40.0 | 310 (300 to 320); CPU 620 |')
     expect(section).toContain('| of which server restart (ms) | none logged | 260 (250 to 270), in 2 of 3 |')
-    expect(section).toContain('| server code edit to screen (ms) | never by itself; 60.0 (60.0 to 60.0) from a reload by hand | 330 (330 to 330) |')
+    expect(section).toContain('| server code edit to screen (ms) | never by itself; 60.0 (60.0 to 60.0) from a reload by hand; CPU 40.0 | 330 (330 to 330); CPU 660 |')
+    expect(section).toContain('| CPU while the edit page sits open 2 s (ms) | 4.0 (4.0 to 4.0) | 4.0 (4.0 to 4.0) |')
     expect(section).toContain('| page state kept through the edit (template / style / server) | 0 / 0 / 0 of 1 | 3 / 1 / 1 of 3 |')
     expect(section).toContain('| memory at rest, PSS (RSS) | 200 (300), 3 processes | 200 (300), 3 processes |')
   })

@@ -4,7 +4,7 @@ import type { Variant } from './sites'
 import { rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { median, milliseconds, table } from '../format'
-import { ensureFree, killAll, processesIn, processTree, tracked, treeMemory } from './serve'
+import { ensureFree, killAll, processesIn, processTree, tracked, treeCpu, treeMemory } from './serve'
 import { kayIn, label, VARIANTS, versionIn } from './sites'
 
 type EditKind = 'template' | 'style' | 'server'
@@ -18,15 +18,25 @@ interface Edit {
   kept: boolean
   // What the dev server logged its restarts within the edit took, summed; none for a server that logs none, as Astro's.
   restart?: number | undefined
+  // CPU time of the dev server's processes from the write to the end of the second after it, in ms.
+  cpu: number
+}
+
+// Latency and the CPU time the dev server's processes spent meanwhile, in ms.
+interface Timed {
+  ms: number
+  cpu: number
 }
 
 export interface DevResult {
   // What the dev server is, as `kay 1.38.0, the registry`.
   software: string
-  cold: number[]
-  warm: number[]
+  cold: Timed[]
+  warm: Timed[]
   // Per session: every page's first load, load events and requests summed.
-  loads: { ms: number, requests: number }[]
+  loads: (Timed & { requests: number })[]
+  // CPU time the dev server spent while the edit page sat open, before the edits.
+  idle: number[]
   edits: Record<EditKind, Edit[]>
   rest: Memory[]
   edited: Memory[]
@@ -104,7 +114,7 @@ const devUrl = (variant: Variant, path: string) => `http://127.0.0.1:${variant.p
 // Each side's dev server on each site that names what to edit, interleaved: startups cold and warm, every page's first load, edits timed to the screen, and memory before and after them.
 export async function development(browser: Browser): Promise<Map<Variant, DevResult>> {
   const variants = VARIANTS.filter(variant => variant.site.dev !== undefined)
-  const results = new Map<Variant, DevResult>(await Promise.all(variants.map(async (variant): Promise<[Variant, DevResult]> => [variant, { software: variant.kind === 'astro' ? `Astro ${await versionIn(variant.devDir, 'astro')}` : await kayIn(variant.devDir), cold: [], warm: [], loads: [], edits: { template: [], style: [], server: [] }, rest: [], edited: [] }])))
+  const results = new Map<Variant, DevResult>(await Promise.all(variants.map(async (variant): Promise<[Variant, DevResult]> => [variant, { software: variant.kind === 'astro' ? `Astro ${await versionIn(variant.devDir, 'astro')}` : await kayIn(variant.devDir), cold: [], warm: [], loads: [], idle: [], edits: { template: [], style: [], server: [] }, rest: [], edited: [] }])))
 
   for (let session = 0; session < SESSIONS; session++) {
     for (const variant of session % 2 === 0 ? variants : variants.toReversed()) {
@@ -124,7 +134,10 @@ export async function development(browser: Browser): Promise<Map<Variant, DevRes
 
       try {
         await untilServed(variant, server, UNSERVED)
-        result.loads.push(await firstLoads(browser, variant))
+        const before = treeCpu(server.pid)
+        const loads = await firstLoads(browser, variant)
+
+        result.loads.push({ ...loads, cpu: treeCpu(server.pid) - before })
         await editSession(browser, variant, server, result)
       }
       finally {
@@ -146,6 +159,10 @@ async function startDev(variant: Variant): Promise<Subprocess> {
 function spawnDev(variant: Variant): Subprocess {
   const port = String(variant.ports.dev)
 
+  // Written over from its start, a longer log of the last server would keep its size, and an edit's restarts be read from its old lines.
+  for (const log of ['dev.out.log', 'dev.err.log'])
+    rmSync(join(variant.devDir, log), { force: true })
+
   return tracked(Bun.spawn(variant.kind === 'astro' ? [process.execPath, 'x', '--bun', 'astro', 'dev', '--port', port, '--host', '127.0.0.1'] : [process.execPath, 'x', 'kay', 'dev', '--port', port], {
     cwd: variant.devDir,
     stdout: Bun.file(join(variant.devDir, 'dev.out.log')),
@@ -154,8 +171,8 @@ function spawnDev(variant: Variant): Subprocess {
   }))
 }
 
-// Milliseconds from spawning the dev server to its first 200 on the home page.
-async function startup(variant: Variant): Promise<number> {
+// From spawning the dev server to its first 200 on the home page.
+async function startup(variant: Variant): Promise<Timed> {
   await ensureFree(variant.ports.dev, label(variant))
 
   const started = performance.now()
@@ -164,7 +181,7 @@ async function startup(variant: Variant): Promise<number> {
   try {
     await untilServed(variant, server, '/')
 
-    return performance.now() - started
+    return { ms: performance.now() - started, cpu: treeCpu(server.pid) }
   }
   finally {
     await stopDev(variant, server)
@@ -260,19 +277,23 @@ async function editSession(browser: Browser, variant: Variant, server: Subproces
     const page = await context.newPage()
 
     await page.goto(devUrl(variant, path), { waitUntil: 'load', timeout: READY_TIMEOUT_MS })
+    const resting = treeCpu(server.pid)
+
     await Bun.sleep(REST_MS)
+    result.idle.push(treeCpu(server.pid) - resting)
     result.rest.push(treeMemory(server.pid))
 
     for (let round = 0; round <= EDIT_ROUNDS; round++) {
       for (const kind of KINDS) {
         const token = `kb${++sequence}q`
         const logged = Bun.file(log).size
+        const cpu = treeCpu(server.pid)
         const edit = await timeEdit(page, kind, token, files[kind], edited(kind, token))
 
         await Bun.sleep(SETTLE_MS)
 
         if (round > 0)
-          result.edits[kind].push({ ...edit, restart: restartsIn(await Bun.file(log).slice(logged).text()) })
+          result.edits[kind].push({ ...edit, restart: restartsIn(await Bun.file(log).slice(logged).text()), cpu: treeCpu(server.pid) - cpu })
       }
     }
 
@@ -286,7 +307,7 @@ async function editSession(browser: Browser, variant: Variant, server: Subproces
 }
 
 // From the file write to the page showing the edit's word, or from a reload by hand when the dev server shows nothing by itself.
-async function timeEdit(page: Page, kind: EditKind, token: string, file: string, content: string): Promise<Edit> {
+async function timeEdit(page: Page, kind: EditKind, token: string, file: string, content: string): Promise<Omit<Edit, 'restart' | 'cpu'>> {
   const scrolled = await page.evaluate((scroll) => {
     (window as unknown as BenchWindow).__kayBenchMarker = true
     // Past a smooth scroll the sites may set, which would still be moving when read.
@@ -376,11 +397,13 @@ export function devSection(results: Map<Variant, DevResult>): string[] {
   const spread = (values: number[], format = milliseconds) => values.length === 0 ? '-' : `${format(median(values))} (${format(Math.min(...values))} to ${format(Math.max(...values))})`
   const mebibytes = (bytes: number) => (bytes / 1024 / 1024).toFixed(0)
   const memory = (memories: Memory[]) => memories.length === 0 ? '-' : `${mebibytes(median(memories.map(entry => entry.pss)))} (${mebibytes(median(memories.map(entry => entry.rss)))}), ${median(memories.map(entry => entry.processes))} processes`
+  const cpu = (entries: { cpu: number }[]) => entries.length === 0 ? '' : `; CPU ${milliseconds(median(entries.map(entry => entry.cpu)))}`
+  const timed = (entries: Timed[]) => `${spread(entries.map(entry => entry.ms))}${cpu(entries)}`
   const edit = (edits: Edit[]) => {
     const itself = edits.filter(entry => entry.by === 'itself')
     const reloaded = edits.filter(entry => entry.by === 'reload')
 
-    return itself.length === 0 ? `never by itself; ${spread(reloaded.map(entry => entry.ms))} from a reload by hand` : `${spread(itself.map(entry => entry.ms))}${reloaded.length === 0 ? '' : `, ${reloaded.length} only after a reload by hand`}`
+    return `${itself.length === 0 ? `never by itself; ${spread(reloaded.map(entry => entry.ms))} from a reload by hand` : `${spread(itself.map(entry => entry.ms))}${reloaded.length === 0 ? '' : `, ${reloaded.length} only after a reload by hand`}`}${cpu(edits)}`
   }
   const restarts = (edits: Edit[]) => {
     const restarted = edits.flatMap(entry => entry.restart ?? [])
@@ -397,19 +420,21 @@ export function devSection(results: Map<Variant, DevResult>): string[] {
     `- **Startup:** from spawning the dev server to its first 200 on the home page, once with its caches cleared (\`.astro\` and \`node_modules/.vite\`, or \`.kay\`) and ${WARM_STARTS} times warm, every session.`,
     `- **First load:** every page once, each in a fresh browser context, on a server that has only answered \`${UNSERVED}\`, a path no page serves, which may have built its not-found page and started its bundler: load events and requests summed over the pages.`,
     `- **Edits:** the site's edit page is open with a marker set on \`window\` and scrolled ${SCROLL} px. One edit a kind in turn, a first round as a warm-up, then ${EDIT_ROUNDS} rounds a session, each timed from the file write to the frame after the one that painted it, its word in the page's visible text, checked after every DOM mutation and every task. Of that, the server restart is what \`kay dev\` logs its restarts within the edit took; the rest is the browser's. The template edit adds a word to a text of the page's template, the style edit appends a rule to the site's stylesheet, the server code edit adds a word to a value the page's server code renders (Astro's frontmatter, kay's page script), only in the copies, whose config the site's \`prepareDev\` may adjust to run locally (jb-peinture's Astro config sends Vite's reloads to its public host, which its copy sends to the dev server). An edit not shown after ${SHOW_TIMEOUT_MS / 1000} s is shown by reloading the page by hand, timed from that reload. The state kept is the marker and the scroll position; neither site's edit page has a form field to keep a value in.`,
+    `- **CPU:** beside each figure, the median CPU time the dev server's whole process tree spent meanwhile, in ms, the servers a restart stopped included: until the first 200 for a startup, over the first loads, and from the write to the end of the ${SETTLE_MS / 1000} s after it for an edit.`,
     `- **Memory:** proportional (resident) memory of the dev server's whole process tree, in MiB: at rest with the edit page open, then after the ${KINDS.length * EDIT_ROUNDS} edits of a session. Resident memory counts the pages its processes share once each.`,
     '',
     table(['', ...variants.map(label)], [
       row('dev server', result => result.software),
-      row('startup, caches cleared (ms)', result => spread(result.cold)),
-      row('startup, warm (ms)', result => spread(result.warm)),
-      row('first load of every page, load events summed (ms)', result => spread(result.loads.map(load => load.ms))),
+      row('startup, caches cleared (ms)', result => timed(result.cold)),
+      row('startup, warm (ms)', result => timed(result.warm)),
+      row('first load of every page, load events summed (ms)', result => timed(result.loads)),
       row('requests for them', result => spread(result.loads.map(load => load.requests), count => count.toFixed(0))),
       ...KINDS.flatMap(kind => [
         row(`${kind === 'server' ? 'server code' : kind} edit to screen (ms)`, result => edit(result.edits[kind])),
         row('of which server restart (ms)', result => restarts(result.edits[kind])),
       ]),
       row('page state kept through the edit (template / style / server)', result => `${KINDS.map(kind => result.edits[kind].filter(entry => entry.kept).length).join(' / ')} of ${result.edits.template.length}`),
+      row(`CPU while the edit page sits open ${REST_MS / 1000} s (ms)`, result => spread(result.idle)),
       row('memory at rest, PSS (RSS)', result => memory(result.rest)),
       row('memory after the edits, PSS (RSS)', result => memory(result.edited)),
     ]),

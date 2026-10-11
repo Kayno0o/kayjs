@@ -1,10 +1,16 @@
 import { describe, expect, it } from 'bun:test'
-import { ensureFree, parentOf, processTree, treeMemory } from './serve'
+import { cpuTicks, ensureFree, parentOf, processTree, treeMemory } from './serve'
 
 describe('parentOf', () => {
   it('reads the parent after the name, whatever spaces and parentheses the name holds', () => {
     expect(parentOf('4242 (bun) S 17 4242 4242 0 -1')).toBe(17)
     expect(parentOf('4242 (a (b) c) S) R 99 4242 4242 0 -1')).toBe(99)
+  })
+})
+
+describe('cpuTicks', () => {
+  it('adds a process\'s user and system time to those of the children it reaped', () => {
+    expect(cpuTicks('4242 (a (b) c) S 17 4242 4242 0 -1 4194560 900 30 0 0 120 30 400 50 20 0 9 0')).toBe(600)
   })
 })
 
