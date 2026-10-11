@@ -84,7 +84,7 @@ export const cart = signal<string[]>([])
 export const theme = persisted('theme', 'light')
 ```
 
-`persisted` keeps its value across pages and visits in a cookie the server reads too, so the first paint is right. `persisted('q', '', { storage: 'query' })` keeps a string in the page's URL instead, as `?q=...`, so a filter survives a reload and a shared link: it is `queryParam('q')`, below, with `''` as its default, which a write leaves out of the URL.
+`persisted` keeps its value across pages and visits in a cookie the server reads too, so the first paint is right. `persisted('q', '', { storage: 'query' })` keeps a string in the page's URL instead, as `?q=...`, so a filter survives a reload and a shared link: it is `queryParam('q')`, below, with `''` as its default, which a write leaves out of the URL. On a page whose `query` schema names the param, the signal reads it as the schema does, typed to match, as in `persisted<number>('page', 1, { storage: 'query' })`, and a param left out reads the schema's default before the value given, so the island and the page's loads agree.
 
 `const current = queryParam<number>('page')` holds one param of the page's [query](/essentials/data-loading), typed and read as the page's `query` schema reads it: `current.set(n => n + 1)` writes `?page=3`, and the schema's default leaves the param out. A value the schema refuses reads as the default.
 

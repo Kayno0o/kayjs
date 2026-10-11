@@ -4,7 +4,7 @@ import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
-import { afterAll, beforeAll, describe, expect, it, jest } from 'bun:test'
+import { afterAll, beforeAll, describe, expect, it, jest, spyOn } from 'bun:test'
 import { Elysia, t } from 'elysia'
 import { chromium } from 'playwright-core'
 import { outputDir } from '../src/build/assets'
@@ -624,6 +624,15 @@ describe('in the browser', () => {
       document.body.innerHTML = '<script type="application/json" data-kay-i18n>{"messages":{"items":{"one":"{count} item","other":"{count} items"}}}</script>'
 
       expect(t('items', { count: 2 })).toBe('2 items')
+
+      // A payload that does not parse is reported once, and the others still read.
+      const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+
+      document.body.innerHTML = '<script type="application/json" data-kay-i18n>{broken</script><script type="application/json" data-kay-i18n>{"messages":{"after.broken":"Still read"}}</script>'
+      expect(t('after.broken')).toBe('Still read')
+      expect(t('after.broken')).toBe('Still read')
+      expect(logged).toHaveBeenCalledTimes(1)
+      logged.mockRestore()
 
       const { T } = await import('../src/runtime/i18n.client')
       const { render } = await import('../src/runtime/dom')

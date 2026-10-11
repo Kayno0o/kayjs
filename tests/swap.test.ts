@@ -12,6 +12,7 @@ import { attempt, hydrate, HydrationMismatch } from '../src/runtime/dom'
 import { formInput } from '../src/runtime/form'
 import { child } from '../src/runtime/html'
 import { island } from '../src/runtime/island.server'
+import { pageData } from '../src/runtime/page-data'
 import { createSignal } from '../src/runtime/reactive'
 import { checkForm } from '../src/runtime/validate'
 import { encodeValue } from '../src/runtime/wire'
@@ -260,33 +261,70 @@ describe('page swap, checking a form in the browser', () => {
   })
 
   it('keeps a persisted query param as queryParam does, leaving out its value and the schema\'s default', () => {
+    const setURL = (url: string) => (window as unknown as { happyDOM: { setURL: (url: string) => void } }).happyDOM.setURL(url)
+
     document.head.innerHTML = '<script type="application/json" data-kay-query>{"page":{"type":"integer","default":1}}</script>'
-    ;(window as unknown as { happyDOM: { setURL: (url: string) => void } }).happyDOM.setURL('http://localhost/list?q=kay&page=3')
+    setURL('http://localhost/list?q=kay&page=3')
 
     const query = persisted('q', 'all', { storage: 'query' })
-    const page = persisted('page', '2', { storage: 'query' })
+    const page = persisted<number>('page', 2, { storage: 'query' })
 
     expect<unknown[]>([query(), page()]).toEqual(['kay', 3])
 
     query.set('all')
-    page.set('5')
+    page.set(5)
     expect(location.search).toBe('?page=5')
 
-    page.set(1 as unknown as string)
+    page.set(1)
     expect(location.search).toBe('')
 
-    page.set('5')
-    page.set('2')
+    page.set(5)
+    page.set(2)
     expect(location.search).toBe('')
 
     query.set('bun')
     expect(location.search).toBe('?q=bun')
+
+    // Left out, the param reads as the schema's default, as the page's loads read it, before the value given.
+    setURL('http://localhost/list')
+    expect(persisted<number>('page', 2, { storage: 'query' })()).toBe(1)
+    expect(persisted('q', 'all', { storage: 'query' })()).toBe('all')
     document.head.innerHTML = ''
   })
 
-  it('keeps only a string in the query, which the URL holds', () => {
-    // @ts-expect-error -- a query param is a string
+  it('keeps a string in the query unless the signal is typed otherwise, as the URL holds text', () => {
+    // @ts-expect-error -- a query param is a string unless typed otherwise
     expect(persisted('page', 1, { storage: 'query' })()).toBe(1)
+    expect(persisted<number>('page', 1, { storage: 'query' })()).toBe(1)
+  })
+
+  it('parses each page data script once, a script a swap brings afresh, and skips one that does not parse after reporting it once', () => {
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+    const seen: string[] = []
+    const parse = (text: string) => {
+      seen.push(text)
+
+      return JSON.parse(text) as unknown
+    }
+
+    try {
+      document.body.innerHTML = '<script type="application/json" data-test>{"a":1}</script><script type="application/json" data-test>{broken</script><script type="application/json" data-test>{"b":2}</script>'
+
+      const first = pageData<object>('script[data-test]', parse)
+
+      expect(first).toEqual([{ a: 1 }, { b: 2 }])
+      expect(pageData<object>('script[data-test]', parse)[0]).toBe(first[0])
+      expect(seen).toHaveLength(3)
+      expect(logged).toHaveBeenCalledTimes(1)
+
+      document.body.innerHTML = '<script type="application/json" data-test>{"a":1}</script>'
+      expect(pageData<object>('script[data-test]', parse)[0]).not.toBe(first[0]!)
+      expect(seen).toHaveLength(4)
+    }
+    finally {
+      logged.mockRestore()
+      document.body.innerHTML = ''
+    }
   })
 
   it('leaves markup a try block would not claim to its island, which renders afresh', () => {

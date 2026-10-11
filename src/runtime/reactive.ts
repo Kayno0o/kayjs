@@ -24,7 +24,7 @@ interface SignalNode<T> extends Source {
 export interface ServerScope {
   values: WeakMap<object, unknown>
   cookie: (name: string) => string | undefined
-  // A query param as the page's `query` schema reads it, for `queryParam`.
+  // A query param as the page's `query` schema reads it, for `queryParam` and a persisted signal kept in the query.
   param: (name: string) => unknown
   report: (error: unknown) => void
   // The path of the page being rendered, percent-encoded as requested.
