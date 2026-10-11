@@ -1368,8 +1368,13 @@
     }
   }
 
+  /* A hidden panel is hidden until found, which keeps its box with its content skipped: it takes no room. */
   .kui-tabs-panel {
     @apply pt-4 outline-none;
+
+    &:where([hidden]) {
+      @apply p-0;
+    }
   }
 
   .kui-table-wrap {

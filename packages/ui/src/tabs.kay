@@ -19,6 +19,7 @@ const { tabs, value, label, onChange, panel, class: className, ...rest } = props
   label: string
   onChange?: ((value: Value) => void) | undefined
   // Draws each tab's panel: `@panel(tab)`, given the tab's value. Every panel is drawn once and hidden while its tab is not shown, so what it holds survives a switch.
+  // A hidden panel is hidden until found: find in page, a link to an id inside it, or kay's `focusInvalid` reaching a field in it shows its tab.
   panel: (value: Value) => JSX.Element
   class?: string | undefined
 }>()
@@ -59,6 +60,6 @@ function keyDown(event: KeyboardEvent) {
     for tab, index of tabs key={tab.value}
       button.kui-tabs-tab(type="button" role="tab" id={`${id}-tab-${index}`} aria-controls={`${id}-panel-${index}`} aria-selected={shown() === tab.value ? 'true' : 'false'} tabindex={shown() === tab.value ? 0 : -1} onClick={() => show(tab.value)}) {tab.label}
   for tab, index of tabs key={tab.value}
-    .kui-tabs-panel(role="tabpanel" id={`${id}-panel-${index}`} aria-labelledby={`${id}-tab-${index}`} tabindex="0" hidden={shown() !== tab.value})
+    .kui-tabs-panel(ref={element => element.addEventListener('beforematch', () => show(tab.value))} role="tabpanel" id={`${id}-panel-${index}`} aria-labelledby={`${id}-tab-${index}`} tabindex={shown() === tab.value ? 0 : undefined} hidden={shown() === tab.value ? undefined : 'until-found'})
       // Untracked, so a tab relabelled, such as with a count, keeps its panel and the focus inside it.
       | {untrack(() => panel(tab.value))}

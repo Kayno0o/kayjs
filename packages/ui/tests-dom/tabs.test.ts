@@ -98,3 +98,17 @@ test('keeps a panel, and the focus inside it, when the tabs are relabelled', asy
   expect(root.querySelectorAll('[role="tab"]')[1]?.textContent).toBe('venus (1)')
   expect(document.activeElement).toBe(input)
 })
+
+test('shows the tab of a panel hidden until found once the browser finds something in it, such as a field it reveals', async () => {
+  const { root, shown, visible } = await tabs()
+  const earth = root.querySelectorAll<HTMLElement>('[role="tabpanel"]')[2]!
+
+  expect(earth.getAttribute('hidden')).toBe('until-found')
+  expect(earth.hasAttribute('tabindex')).toBe(false)
+
+  earth.dispatchEvent(new Event('beforematch', { bubbles: true }))
+  await settle()
+
+  expect([shown(), visible(), changes]).toEqual([['Earth'], ['earth'], ['earth']])
+  expect(earth.getAttribute('tabindex')).toBe('0')
+})
