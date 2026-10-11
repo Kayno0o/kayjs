@@ -78,9 +78,9 @@ Server code importing one `with { type: 'file' }` keeps Bun's meaning, the file'
 An island, and any package it imports, names a file shipped beside a module with `new URL('./file', import.meta.url)`. kay writes that file with the assets and bundles a script on its own as a worker, its imports included, so `new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })` works in development, in a build and in a compiled executable. The URL is relative to the island's chunk, so it holds under a `base`.
 
 - A package starting itself as its threads' worker, as an emscripten build does, gets a bundle of its own, and one building its worker from a blob, as qr-scanner does, works as it is.
-- Only a relative path written as a string is shipped: one naming no file, or an expression, is left as written.
-- A worker bundles with kay's plugin alone, not the config's `plugins`.
-- When an island or its worker compiles wasm, kay's content security policy adds `'wasm-unsafe-eval'` to `script-src`, and `worker-src 'self' blob:` when one starts a worker from a blob. A `csp` setting its own `script-src` or `worker-src` replaces them, so it lists them itself.
+- Only a relative path written as a string, naming a file, is shipped: a directory, a template with a part, an absolute path or a call inside a comment is left as written.
+- A worker bundles as an island does, its stylesheets dropped and its API imports as stubs, but without the config's `plugins`. One that fails to build fails the build, each error at its `file:line:column`.
+- When an island or its worker compiles wasm, kay's content security policy adds `'wasm-unsafe-eval'` to `script-src`, and `worker-src 'self' blob:` when one starts a worker from a blob. They join a `csp` setting its own `script-src` or `worker-src` too, unless it sets that directive to `false` or `'none'`.
 - Threads sharing memory need a page isolated from other origins: set `security: { headers: { 'cross-origin-embedder-policy': 'credentialless' } }`; kay already sends `cross-origin-opener-policy: same-origin`.
 
 ## Responsive images

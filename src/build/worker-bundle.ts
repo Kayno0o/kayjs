@@ -1,7 +1,9 @@
 import type { KayPluginOptions } from './plugin'
 import { basename } from 'node:path'
 import process from 'node:process'
+import { apiStubs } from '../server/api'
 import { kayPlugin } from './plugin'
+import { withoutStyles } from './styles'
 
 // What a browser build hands the process bundling one of its workers.
 export interface WorkerBundle {
@@ -24,13 +26,14 @@ if (import.meta.main) {
     format: 'esm',
     minify: bundle.minify,
     define: bundle.define,
+    external: bundle.options.external ?? [],
     naming: { entry: '[name]-[hash].[ext]', chunk: '[name]-[hash].[ext]', asset: '[name]-[hash].[ext]' },
-    plugins: [kayPlugin(bundle.options, bundle.workers)],
+    plugins: [withoutStyles(), ...bundle.options.api ? [apiStubs(bundle.options.api)] : [], kayPlugin(bundle.options, bundle.workers)],
     throw: false,
   })
 
   if (!out.success) {
-    console.error(out.logs.join('\n'))
+    console.error(out.logs.map(log => log.position ? `${log.position.file}:${log.position.line}:${log.position.column}: ${log.message}` : log.message).join('\n'))
     process.exit(1)
   }
 

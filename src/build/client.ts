@@ -165,7 +165,8 @@ async function buildIslands(root: string, base: string, islands: Map<string, str
 
   const entryFile = join(base, 'entry.ts')
   const bootFile = join(base, 'boot.ts')
-  const api = apiStubs(apiTrees(root, options))
+  const trees = apiTrees(root, options)
+  const api = apiStubs(trees)
   const registry = [...islands].map(([id, file]) => `  ${JSON.stringify(id)}: () => import(${JSON.stringify(file)}),`).join('\n')
 
   // `hydrate` re-runs over a root whose markup was swapped in after load; a block a streamed page sends later calls it as `$kayHydrate`.
@@ -198,7 +199,7 @@ async function buildIslands(root: string, base: string, islands: Map<string, str
   // Bun resolves packages' `development` export condition unless NODE_ENV is defined as production, which would ship a package's dev build.
   const define: Record<string, string> = { 'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV === 'development' ? 'development' : 'production'), ...options.exported === true && { KAY_STATIC_EXPORT: 'true' } }
   const external = publicEnv !== undefined ? [publicEnv] : []
-  const plugins = async (anchor?: string) => [withoutStyles(), api, kay({ target: 'dom', root, cacheDir: projectPaths(root).cache, settings: options.settings, anchor, inspect: options.inspect }), ...options.plugins ?? []]
+  const plugins = async (anchor?: string) => [withoutStyles(), api, kay({ target: 'dom', root, cacheDir: projectPaths(root).cache, settings: options.settings, anchor, inspect: options.inspect, api: trees, external }), ...options.plugins ?? []]
 
   await Bun.write(entryFile, `import ${JSON.stringify(bootFile)}\n`)
 

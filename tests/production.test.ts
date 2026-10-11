@@ -24,6 +24,7 @@ import { useLogger } from '../src/server/log'
 import { hookPrerendered } from '../src/server/page-hook'
 import { prerenderPages } from '../src/server/prerender'
 import { clientAddress, countSucceeded, memoryRates, protectionRefusal, rateKey, rateLimit, sqliteRates } from '../src/server/protection'
+import { securityHeaders } from '../src/server/security'
 import { signStamp, stampTime, useStampSecret } from '../src/server/stamp'
 import { CspViolation } from '../src/server/violations'
 import { testSite } from '../src/test'
@@ -69,6 +70,20 @@ describe('security headers', () => {
       expect(response.headers.has('content-security-policy-report-only')).toBe(false)
       expect(response.headers.has('reporting-endpoints')).toBe(false)
     }
+  })
+
+  it('adds what the islands run to the app\'s own directives, unless it removes one or sets it to none', () => {
+    const islands = { 'script-src': ['\'wasm-unsafe-eval\''], 'worker-src': ['\'self\'', 'blob:'] }
+    const own = securityHeaders({ islands, security: { csp: { 'script-src': ['\'self\'', 'https://cdn.example.com'], 'worker-src': false }, reportOnly: { 'worker-src': ['\'none\''] } } })!
+    const enforced = directives(own['content-security-policy']!)
+    const trial = directives(own['content-security-policy-report-only']!)
+
+    expect(enforced.get('script-src')).toEqual(['\'self\'', 'https://cdn.example.com', '\'wasm-unsafe-eval\'', ...inlineScriptHashes()])
+    expect(enforced.has('worker-src')).toBe(false)
+    expect(trial.get('worker-src')).toEqual(['\'none\''])
+    expect(trial.get('script-src')).toContain('\'wasm-unsafe-eval\'')
+    expect(directives(securityHeaders({ islands })!['content-security-policy']!).get('worker-src')).toEqual(['\'self\'', 'blob:'])
+    expect(securityHeaders({ islands, security: false })).toBeUndefined()
   })
 
   it('sends them on the build\'s files and image variants too, under a header the app set itself', async () => {

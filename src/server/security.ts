@@ -12,7 +12,7 @@ export interface SecurityOptions {
   dev?: boolean | undefined
   base?: string | undefined
   offline?: KayConfig['offline'] | undefined
-  // The sources the islands need, added to kay's directives under the app's own: see ClientManifest.
+  // The sources the islands need, added to kay's directives and the app's own: see ClientManifest.
   islands?: Record<string, string[]> | undefined
   // The inline scripts and styles kay writes in every head, such as the fonts' rules.
   scripts?: string[] | undefined
@@ -37,6 +37,7 @@ const DIRECTIVES: Record<string, string[]> = {
 const SCRIPT_DIRECTIVES = ['script-src', 'script-src-elem']
 const STYLE_DIRECTIVES = ['style-src', 'style-src-elem']
 const UNSAFE_INLINE = '\'unsafe-inline\''
+const NONE = '\'none\''
 
 const HEADERS: Record<string, string> = {
   'x-content-type-options': 'nosniff',
@@ -114,17 +115,27 @@ export function ownHeaders(set: Context['set'], copies: HeaderCopies): Record<st
 // `report-uri` is for browsers that predate `report-to`, which those that know it read instead.
 function policy(layers: Record<string, string[] | false>[], hashes: string[], styles: string[], reportTo: string | undefined, islands: Record<string, string[]> = {}): string {
   const directives = new Map(Object.entries(DIRECTIVES))
-
-  for (const [name, sources] of Object.entries(islands))
-    directives.set(name, [...directives.get(name) ?? [], ...sources])
+  const removed = new Set<string>()
 
   for (const overrides of layers) {
     for (const [name, sources] of Object.entries(overrides)) {
-      if (sources === false)
+      if (sources === false) {
         directives.delete(name)
-      else
+        removed.add(name)
+      }
+      else {
         directives.set(name, sources)
+        removed.delete(name)
+      }
     }
+  }
+
+  // What the islands run is a fact of the build, so it joins the app's own sources too, unless the app removed that directive or set it to 'none'.
+  for (const [name, sources] of Object.entries(islands)) {
+    const own = directives.get(name)
+
+    if (!removed.has(name) && !own?.includes(NONE))
+      directives.set(name, [...new Set([...own ?? [], ...sources])])
   }
 
   if (reportTo !== undefined) {

@@ -1,7 +1,8 @@
 import type { BunPlugin } from 'bun'
+import type { RouteMount } from '../server/routes'
 import type { Target } from './transform'
 import type { WorkerBundle } from './worker-bundle'
-import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs'
+import { readFileSync, realpathSync, statSync } from 'node:fs'
 import { dirname, join, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { ISLAND_TWIN, withoutTwin } from '../compiler'
@@ -29,6 +30,9 @@ export interface KayPluginOptions {
   anchor?: string | undefined
   // Development: every element carries its source position, for `kay dev`'s inspector.
   inspect?: boolean | undefined
+  // A browser build's API trees, whose modules islands get as stubs, and the modules it leaves to the page, which a worker's bundle takes as the islands do.
+  api?: RouteMount[] | undefined
+  external?: string[] | undefined
 }
 
 // A static component imports its `?island` twin, the build of it that renders inside islands, as a module of its own.
@@ -92,7 +96,7 @@ export function kayPlugin(options: KayPluginOptions, workers: string[]): BunPlug
         const [name, problems, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
 
         if (code !== 0)
-          throw new Error(`kay: the worker ${path} failed to build: ${problems}`)
+          throw new Error(`kay: the worker ${path} failed to build:\n${problems.trim()}`)
 
         return name
       }
@@ -100,7 +104,7 @@ export function kayPlugin(options: KayPluginOptions, workers: string[]): BunPlug
       const fileUrl = async (file: string, specifier: string): Promise<string | undefined> => {
         const path = resolve(dirname(file), specifier)
 
-        if (!existsSync(path))
+        if (statSync(path, { throwIfNoEntry: false })?.isFile() !== true)
           return undefined
 
         // An emscripten module starts itself as its threads' worker.
@@ -128,13 +132,14 @@ export function kayPlugin(options: KayPluginOptions, workers: string[]): BunPlug
         return JSON.stringify(`./${workers.length > 0 ? '' : 'assets/'}${name}`)
       }
 
-      const shippingFiles = async (source: string, file: string): Promise<string> => {
+      const shippingFiles = async (source: string, file: string, loader: Bun.JavaScriptLoader): Promise<string> => {
         if (!browser || !source.includes('import.meta.url'))
           return source
 
         const urls = new Map<string, string | undefined>()
 
-        for (const [, , specifier] of source.matchAll(FILE_URL)) {
+        // Read off the transpiled code, which drops comments, so a call a comment shows ships nothing.
+        for (const [, , specifier] of new Bun.Transpiler({ loader }).transformSync(source).matchAll(FILE_URL)) {
           if (!urls.has(specifier!))
             urls.set(specifier!, await fileUrl(file, specifier!))
         }
@@ -149,7 +154,7 @@ export function kayPlugin(options: KayPluginOptions, workers: string[]): BunPlug
       const load = async (file: string) => {
         const source = await Bun.file(withoutTwin(file)).text()
 
-        const contents = await shippingFiles(expandGlobs(await transformKayCached(source, file, { target, hydratable: options.hydratable ?? true, root: options.root, cacheDir: options.cacheDir, inspect: options.inspect }), withoutTwin(file), root, 'ts'), withoutTwin(file))
+        const contents = await shippingFiles(expandGlobs(await transformKayCached(source, file, { target, hydratable: options.hydratable ?? true, root: options.root, cacheDir: options.cacheDir, inspect: options.inspect }), withoutTwin(file), root, 'ts'), withoutTwin(file), 'ts')
 
         return { contents: options.anchor !== undefined && options.anchor !== '' ? `${contents}\nimport ${JSON.stringify(options.anchor)}\n` : contents, loader: 'ts' as const }
       }
@@ -185,7 +190,7 @@ export function kayPlugin(options: KayPluginOptions, workers: string[]): BunPlug
       build.onResolve({ filter: WASM_FILE }, ({ path, importer }) => {
         // Bun resolves some imports a second time from the importer's directory.
         if (statSync(importer, { throwIfNoEntry: false })?.isFile() === true && new RegExp(`(["'])${RegExp.escape(path)}\\1\\s*with\\s*\\{\\s*type\\s*:\\s*(["'])file\\2`).test(readFileSync(importer, 'utf8')))
-          fileImports.add(Bun.resolveSync(path, dirname(importer)))
+          fileImports.add(realpathSync(Bun.resolveSync(path, dirname(importer))))
 
         return undefined
       })
@@ -203,16 +208,19 @@ export function kayPlugin(options: KayPluginOptions, workers: string[]): BunPlug
       build.onLoad({ filter: projectScript }, async ({ path }) => {
         const source = await Bun.file(path).text()
         const loader = scriptLoader(path)
-        const contents = await shippingFiles(expandGlobs(source, path, root, loader), path)
+        const contents = await shippingFiles(expandGlobs(source, path, root, loader), path, loader)
 
         return contents === source && build.config !== undefined ? undefined : { contents, loader }
       })
 
-      // A package's modules, read only for the files they point at.
+      // A package's modules, read only for the files they point at; the project's own were read above.
       if (browser) {
         build.onLoad({ filter: SCRIPT_FILE }, async ({ path }) => {
+          if (projectScript.test(path))
+            return undefined
+
           const source = await Bun.file(path).text()
-          const contents = await shippingFiles(source, path)
+          const contents = await shippingFiles(source, path, scriptLoader(path))
 
           return contents === source ? undefined : { contents, loader: scriptLoader(path) }
         })

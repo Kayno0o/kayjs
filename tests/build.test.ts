@@ -272,8 +272,15 @@ describe('kay build', () => {
       'node_modules/scanner/package.json': JSON.stringify({ name: 'scanner', type: 'module', exports: './index.js' }),
       'node_modules/scanner/index.js': 'export const scan = async () => (await import("./worker.js")).start()\n',
       'node_modules/scanner/worker.js': 'export const start = () => new Worker(URL.createObjectURL(new Blob(["onmessage = () => {}"])))\n',
-      'src/echo.ts': 'postMessage(new URL(\'./add.wasm\', import.meta.url).href)\n',
-      'src/lab.kay': '---\nimport { scan } from \'scanner\'\nimport { missing, start, wasm } from \'threads\'\nimport add from \'./add.wasm\'\n\nonMount(() => {\n  new Worker(new URL(\'./echo.ts\', import.meta.url), { type: \'module\' })\n  start()\n  void scan()\n  void WebAssembly.instantiateStreaming(fetch(add))\n  void fetch(wasm())\n  void fetch(missing())\n})\n---\np lab\n',
+      // A worker gets the stubs and the stylesheet handling islands get.
+      'src/echo.ts': 'import notes from \'./api/notes\'\nimport \'./echo.css\'\n\npostMessage([new URL(\'./add.wasm\', import.meta.url).href, String(notes)])\n',
+      'src/echo.css': 'p { color: red }\n',
+      'src/api/notes.ts': 'export default \'server only\'\n',
+      'src/data/one.json': '{}\n',
+      'src/commented.ts': 'postMessage(1)\n',
+      // Each left as written: a directory, an absolute path, a template with a part, and a call a comment shows.
+      'src/others.ts': '// new Worker(new URL("./commented.ts", import.meta.url))\nexport const others = (name: string) => [new URL("./data", import.meta.url), new URL("/abs.js", import.meta.url), new URL(`./${name}.js`, import.meta.url)]\n',
+      'src/lab.kay': '---\nimport { scan } from \'scanner\'\nimport { missing, start, wasm } from \'threads\'\nimport add from \'./add.wasm\'\nimport { others } from \'./others\'\n\nonMount(() => {\n  others(\'x\')\n  new Worker(new URL(\'./echo.ts\', import.meta.url), { type: \'module\' })\n  start()\n  void scan()\n  void WebAssembly.instantiateStreaming(fetch(add))\n  void fetch(wasm())\n  void fetch(missing())\n})\n---\np lab\n',
       'src/routes/index.kay': '---\nimport Lab from \'../lab.kay\'\n---\nLab\n',
     }
 
@@ -297,9 +304,44 @@ describe('kay build', () => {
       expect(island).toMatch(/new URL\("\.\/assets\/threads-\w+\.wasm", import\.meta\.url\)/)
       expect(island).toContain('new URL("./missing.js", import.meta.url)')
       expect(echo).toMatch(/new URL\("\.\/add-\w+\.wasm", import\.meta\.url\)/)
+      expect(echo).not.toContain('server only')
+      expect(island).toContain('new URL("./data", import.meta.url)')
+      expect(island).toContain('new URL("/abs.js", import.meta.url)')
       // The worker a module starts from itself is its own bundle.
       expect(threads).toContain('new URL(import.meta.url, import.meta.url)')
       expect(client.directives).toEqual({ 'script-src': ['\'wasm-unsafe-eval\''], 'worker-src': ['\'self\'', 'blob:'] })
+    }
+    finally {
+      await rm(project, { recursive: true, force: true })
+    }
+  })
+
+  it('fails the build on a worker starting its starter again, and on one that does not build, naming the file and position', async () => {
+    const project = await scratchDir('worker-failures-')
+    const failure = async () => {
+      try {
+        await buildClient(project)
+      }
+      catch (error) {
+        return (error as AggregateError).errors.map(String).join('\n')
+      }
+
+      return ''
+    }
+    const lab = (worker: string) => `---\nonMount(() => {\n  new Worker(new URL('./${worker}', import.meta.url), { type: 'module' })\n})\n---\np lab\n`
+
+    try {
+      await Promise.all([
+        Bun.write(join(project, 'src/ping.ts'), 'new Worker(new URL("./pong.ts", import.meta.url))\n'),
+        Bun.write(join(project, 'src/pong.ts'), 'new Worker(new URL("./ping.ts", import.meta.url))\n'),
+        Bun.write(join(project, 'src/broken.ts'), 'postMessage(1)\nconst = 2\n'),
+        Bun.write(join(project, 'src/lab.kay'), lab('ping.ts')),
+        Bun.write(join(project, 'src/routes/index.kay'), '---\nimport Lab from \'../lab.kay\'\n---\nLab\n'),
+      ])
+      expect(await failure()).toMatch(/the worker \S+\/ping\.ts starts itself again through \S+\/pong\.ts/)
+
+      await Bun.write(join(project, 'src/lab.kay'), lab('broken.ts'))
+      expect(await failure()).toMatch(/the worker \S+\/broken\.ts failed to build:\n\S+\/broken\.ts:2:\d+: /)
     }
     finally {
       await rm(project, { recursive: true, force: true })
