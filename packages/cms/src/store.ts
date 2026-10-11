@@ -33,16 +33,13 @@ function refused(ref: EntryRef, message: string, key?: Issue['key']): SaveOutcom
 export async function saveEntry(entry: DraftEntry, { create = false, verb }: { create?: boolean | undefined, verb?: string | undefined } = {}): Promise<SaveOutcome> {
   const collection = await collectionNamed(entry.collection)
 
-  if (create && await entryOf(entry))
-    return refused(entry, `${entry.slug} already exists`, 'slug')
-
   if (collection.kind === 'loaded') {
-    const { issues } = await saveLoaded(collection.name, { slug: entry.slug, locale: entry.locale, data: entry.data, body: entry.body })
+    const { issues } = await saveLoaded(collection.name, { slug: entry.slug, locale: entry.locale, data: entry.data, body: entry.body }, { create })
 
     return issues?.length ? { issues } : { saved: true }
   }
 
-  const source = await entrySource(collection.name, entry.slug, entry.data, { locale: entry.locale, body: entry.body })
+  const source = await entrySource(collection.name, entry.slug, entry.data, { locale: entry.locale, body: entry.body, create })
 
   if ('issues' in source)
     return source

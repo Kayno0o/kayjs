@@ -7,6 +7,8 @@ import { configure } from '../src/settings'
 const posts: CollectionInfo = { name: 'posts', kind: 'folder', schema: { type: 'object', properties: { title: { type: 'string' }, draft: { type: 'boolean' } } }, components: [], localized: false, draftField: 'draft' }
 const products: CollectionInfo = { name: 'products', kind: 'loaded', schema: { type: 'object', properties: { name: { type: 'string' } } }, components: [], localized: false }
 
+const TAKEN = 'names an entry the collection already holds'
+
 let saved: FileChange[]
 let loaded: { slug: string, data: unknown }[]
 let removed: string[]
@@ -16,10 +18,15 @@ let stored: Record<string, SourceEntry[]>
 const content: typeof Content = {
   collections: async () => [posts, products],
   entries: async collection => stored[collection] ?? [],
-  entrySource: async (collection, slug, data, options) => data.title === ''
-    ? { issues: [{ collection, slug, path: 'title', message: 'Required' }] }
-    : { file: { path: `${slug}.md`, absolute: `/site/content/${collection}/${slug}.md`, repoPath: `content/${collection}/${slug}.md`, text: `${JSON.stringify(data)}\n${options?.body ?? ''}` } },
-  saveEntry: async (_collection, entry) => {
+  entrySource: async (collection, slug, data, options) => options?.create && stored[collection]?.some(entry => entry.slug === slug)
+    ? { issues: [{ collection, slug, path: '', key: 'slug', message: TAKEN }] }
+    : data.title === ''
+      ? { issues: [{ collection, slug, path: 'title', message: 'Required' }] }
+      : { file: { path: `${slug}.md`, absolute: `/site/content/${collection}/${slug}.md`, repoPath: `content/${collection}/${slug}.md`, text: `${JSON.stringify(data)}\n${options?.body ?? ''}` } },
+  saveEntry: async (collection, entry, options) => {
+    if (options?.create && stored[collection]?.some(stock => stock.slug === entry.slug))
+      return { issues: [{ collection, slug: entry.slug, path: '', key: 'slug', message: TAKEN }] }
+
     loaded.push(entry)
 
     return {}
@@ -63,8 +70,9 @@ describe('saveEntry', () => {
     expect(saved).toEqual([])
   })
 
-  test('refuses a new entry under a slug taken', async () => {
-    expect(await saveEntry({ collection: 'posts', slug: 'hello', data: { title: 'Again' } }, { create: true })).toHaveProperty('issues.0.message', 'hello already exists')
+  test('creates through kay, which refuses a slug already taken', async () => {
+    expect(await saveEntry({ collection: 'posts', slug: 'hello', data: { title: 'Again' } }, { create: true })).toHaveProperty('issues.0.message', TAKEN)
+    expect(await saveEntry({ collection: 'products', slug: 'mug', data: { name: 'Mug' } }, { create: true })).toHaveProperty('issues.0.key', 'slug')
     expect(await saveEntry({ collection: 'posts', slug: 'notes/new', data: { title: 'New' } }, { create: true })).toHaveProperty('saved', true)
     expect(saved.map(change => change.message)).toEqual(['content(posts): add notes/new'])
   })

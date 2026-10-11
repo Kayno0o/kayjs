@@ -131,7 +131,7 @@ test('a save kay\'s schema refuses comes back as issues, and nothing is written'
   const { answer } = await send('POST', 'posts/hello', { data: { title: 3 } }) as { answer: { issues: { path: string }[] } }
 
   expect(answer.issues.map(issue => issue.path)).toContain('title')
-  expect((await send('POST', 'posts/hello', { data: { title: 'Again' }, create: true })).answer).toEqual({ issues: [{ collection: 'posts', slug: 'hello', path: '', key: 'slug', message: 'hello already exists' }] })
+  expect((await send('POST', 'posts/hello', { data: { title: 'Again' }, create: true })).answer).toEqual({ issues: [{ collection: 'posts', slug: 'hello', path: '', key: 'slug', message: 'names an entry the collection already holds' }] })
   expect(saved).toEqual([])
 })
 

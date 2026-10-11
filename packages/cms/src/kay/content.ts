@@ -13,6 +13,6 @@ export async function entries(collection: string, options: { locale?: string | u
 }
 
 // A folder entry's file, once its data passes the schema.
-export async function entrySource(collection: string, slug: string, data: Record<string, unknown>, options: { locale?: string | undefined, body?: string | undefined } = {}): Promise<{ file: EntryFile } | { issues: Issue[] }> {
+export async function entrySource(collection: string, slug: string, data: Record<string, unknown>, options: { locale?: string | undefined, body?: string | undefined, create?: boolean | undefined } = {}): Promise<{ file: EntryFile } | { issues: Issue[] }> {
   return kayEntrySource(collection, slug, data, options)
 }
