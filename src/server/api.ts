@@ -11,7 +11,7 @@ import type { RouteMount } from './routes'
 import type { Span } from './trace'
 import { existsSync } from 'node:fs'
 import { basename, dirname, join, relative, resolve, sep } from 'node:path'
-import { Elysia } from 'elysia'
+import { Cookie, Elysia, ElysiaCustomStatusResponse, ElysiaFile } from 'elysia'
 import { API_MOUNT, END_EVENT, ERROR_EVENT } from '../runtime/live'
 import { kayLog } from '../runtime/log'
 import { encodeValue, unsendable } from '../runtime/wire'
@@ -43,6 +43,8 @@ export const API_PREFIX = '/api'
 const GUARD = '_guard.ts'
 // Tests, declarations, and files or directories starting with `_`, guards and helpers, are no modules.
 const NOT_A_MODULE = /(?:^|\/)_|\.(?:test|spec|d)\.ts$/
+// What a body Elysia streams, awaits or asks for its response has: a generator, a thenable, an object with `toResponse()`.
+const STREAMED = ['next', 'then', 'toResponse']
 const TS_FILE = /\.ts$/
 const INDEX = /(?:^|\/)index$/
 const TRAILING_SLASH = /\/$/
@@ -193,7 +195,7 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
         // A route of the module's own answering OPTIONS, `.all()` included, leaves a browser's preflight to kay.
         .onBeforeHandle(({ request }) => cors && request.method === 'OPTIONS' && request.headers.has('access-control-request-method') ? preflight(cors, methods, request) : undefined)
         .onBeforeHandle(async context => inLocale(context.request, options, async () => admit(guards, context, options, cors)))
-        .mapResponse(({ responseValue, set }) => withBigints(responseValue, set))
+        .mapResponse(({ responseValue, set }) => withBigints(sendable(responseValue), set))
         .onError(({ request, error, set }) => {
           const span = spans.get(request)
 
@@ -238,6 +240,25 @@ function reportThrown({ request, error, code, set }: { request: Request, error: 
   set.headers['content-type'] = TEXT['content-type']
 
   return 'Internal Server Error'
+}
+
+// A class instance or a Map, which Elysia would answer as `200 [object Object]`, is a mistake in the route: thrown, so it is logged and answers 500.
+function sendable(value: unknown): unknown {
+  if (typeof value !== 'object' || value === null || Array.isArray(value) || Object.getPrototypeOf(value) === Object.prototype || (value).toString !== Object.prototype.toString || sentAsIs(value))
+    return value
+
+  throw new TypeError(`kay: an API route answered a ${value.constructor?.name ?? 'value'}, which would reach the client as "${Object.prototype.toString.call(value)}": answer a plain object or array, or a Response`)
+}
+
+// Bodies Elysia or `Response` send as they are, though they write as `[object ...]`.
+function sentAsIs(value: object): boolean {
+  if (value instanceof Response || value instanceof Blob || value instanceof FormData || value instanceof ReadableStream || value instanceof ArrayBuffer || ArrayBuffer.isView(value))
+    return true
+
+  if (value instanceof ElysiaFile || value instanceof ElysiaCustomStatusResponse || value instanceof Cookie)
+    return true
+
+  return STREAMED.some(method => typeof (value as Record<string, unknown>)[method] === 'function')
 }
 
 // JSON has no bigint, which JSON.stringify throws on: a plain object or array holding one is answered with each written as its digits, as a database's bigint ids usually are.

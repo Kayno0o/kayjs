@@ -621,6 +621,42 @@ describe('API routes', () => {
     expect(created.headers.get('x-ledger')).toBe('kept')
     expect(await created.json()).toEqual(['3'])
   })
+
+  it('answer 500 to a class instance or a Map, logging the route and what it answered, where Elysia would send 200 [object Object]', async () => {
+    const copy = await fixtureCopy('production')
+    const entries: LogEntry[] = []
+
+    try {
+      await Bun.write(join(copy, 'src/api/rows.ts'), `import { api } from 'kay/server'
+
+class Row {
+  id = 1n
+}
+
+export default api()
+  .get('/', () => new Row())
+  .get('/map', () => new Map([['a', 1]]))
+  .get('/blob', () => new Blob(['raw']))
+  .get('/nested', () => ({ at: new Row() }))
+`)
+
+      const app = await pages({ routes: join(copy, 'src/routes'), api: join(copy, 'src/api'), prebuilt: false, log: entry => entries.push(entry) })
+      const row = await app.handle(new Request('http://localhost/api/rows'))
+      const map = await app.handle(new Request('http://localhost/api/rows/map'))
+
+      expect([row.status, await row.text()]).toEqual([500, 'Internal Server Error'])
+      expect(map.status).toBe(500)
+      expect(entries.map(entry => [entry.level, 'request' in entry && entry.request?.path, 'error' in entry && entry.error?.message])).toEqual([
+        ['error', '/api/rows', expect.stringContaining('answered a Row')],
+        ['error', '/api/rows/map', expect.stringContaining('answered a Map')],
+      ])
+      expect(await (await app.handle(new Request('http://localhost/api/rows/blob'))).text()).toBe('raw')
+      expect(await (await app.handle(new Request('http://localhost/api/rows/nested'))).json()).toEqual({ at: { id: '1' } })
+    }
+    finally {
+      await rm(copy, { recursive: true, force: true })
+    }
+  })
 })
 
 describe('SQLite stores', () => {
