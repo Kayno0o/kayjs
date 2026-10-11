@@ -16,6 +16,9 @@ export const publish = action(s.Object({ edition: s.Integer({ minimum: 1, maximu
 if (news.failing)
   throw new Error('the news feed is down')
 
+if (news.delay > 0)
+  await Bun.sleep(news.delay)
+
 const edition = news.edition
 ---
 h1 Edition {edition}

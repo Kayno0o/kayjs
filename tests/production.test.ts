@@ -45,6 +45,17 @@ async function refusalOf(...args: Parameters<typeof protectionRefusal>): Promise
   return await protectionRefusal(...args) as ProtectionRefusal | undefined
 }
 
+async function until(holds: () => Promise<boolean>, timeout = 10_000): Promise<void> {
+  const end = performance.now() + timeout
+
+  while (!await holds()) {
+    if (performance.now() > end)
+      throw new Error('timed out')
+
+    await Bun.sleep(10)
+  }
+}
+
 function directives(policy: string | null): Map<string, string[]> {
   return new Map(policy!.split('; ').map((directive) => {
     const [name, ...sources] = directive.split(' ')
@@ -953,13 +964,15 @@ describe('revalidation', () => {
       const etag = built.headers.get('etag')!
 
       news.edition = 2
+      news.delay = 200
       expect(await built.text()).toContain('<h1>Edition 1</h1>')
       expect(await (await visit()).text()).toContain('<h1>Edition 1</h1>')
 
       setSystemTime(Date.now() + 61_000)
-      // The first request past the period still gets the page as it was built.
+      // The first request past the period still gets the page as it was built, as does one while the new render runs.
       expect(await (await visit()).text()).toContain('<h1>Edition 1</h1>')
-      await Bun.sleep(50)
+      expect(await (await visit()).text()).toContain('<h1>Edition 1</h1>')
+      await until(async () => (await (await visit()).text()).includes('<h1>Edition 2</h1>'))
 
       const fresh = await visit({ 'if-none-match': etag, 'accept-encoding': 'br' })
 
@@ -970,6 +983,7 @@ describe('revalidation', () => {
     finally {
       setSystemTime()
       news.edition = 1
+      news.delay = 0
       await rm(join(outputDir(root), 'pages'), { recursive: true, force: true })
       await writeManifest(root, manifest)
     }
@@ -989,9 +1003,8 @@ describe('revalidation', () => {
       news.failing = true
       setSystemTime(Date.now() + 61_000)
       await visit()
-      await Bun.sleep(50)
+      await until(async () => logged.mock.calls.length > 0)
       expect(await visit()).toContain('<h1>Edition 1</h1>')
-      expect(logged).toHaveBeenCalled()
 
       news.failing = false
       news.edition = 3
@@ -1001,8 +1014,7 @@ describe('revalidation', () => {
 
       setSystemTime(Date.now() + 122_000)
       await visit()
-      await Bun.sleep(50)
-      expect(await visit()).toContain('<h1>Edition 3</h1>')
+      await until(async () => (await visit()).includes('<h1>Edition 3</h1>'))
     }
     finally {
       setSystemTime()
