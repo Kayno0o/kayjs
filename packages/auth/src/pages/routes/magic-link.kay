@@ -1,6 +1,6 @@
 --- server
 import { action } from 'kay'
-import { localize, t } from 'kay/i18n'
+import { t } from 'kay/i18n'
 import Message from '../components/message.kay'
 import Panel from '../components/panel.kay'
 import { failure, schemas } from '../forms'

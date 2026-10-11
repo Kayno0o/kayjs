@@ -16,7 +16,8 @@ async function signIn() {
 
   try {
     const options = await passkeyOptions({}, { refresh: false })
-    const credential = await navigator.credentials.get({ publicKey: PublicKeyCredential.parseRequestOptionsFromJSON(options) })
+    // @simplewebauthn types the prf extension's values as BufferSource where the DOM's JSON type has strings, for the same JSON.
+    const credential = await navigator.credentials.get({ publicKey: PublicKeyCredential.parseRequestOptionsFromJSON(options as unknown as PublicKeyCredentialRequestOptionsJSON) })
 
     if (credential instanceof PublicKeyCredential)
       await passkey({ response: credential.toJSON(), redirect })

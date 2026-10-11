@@ -24,10 +24,11 @@ async function add(event: SubmitEvent) {
     proof.delete('name')
 
     const options = await passkeyOptions(proof, { refresh: false })
-    const credential = await navigator.credentials.create({ publicKey: PublicKeyCredential.parseCreationOptionsFromJSON(options) })
+    // @simplewebauthn types the prf extension's values as BufferSource where the DOM's JSON type has strings, for the same JSON.
+    const credential = await navigator.credentials.create({ publicKey: PublicKeyCredential.parseCreationOptionsFromJSON(options as unknown as PublicKeyCredentialCreationOptionsJSON) })
 
     if (credential instanceof PublicKeyCredential)
-      await addPasskey({ response: credential.toJSON(), name: name() || undefined })
+      await addPasskey({ response: credential.toJSON(), ...(name() ? { name: name() } : {}) })
   }
   catch (caught) {
     if (caught instanceof ActionError) {

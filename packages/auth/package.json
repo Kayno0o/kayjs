@@ -52,7 +52,7 @@
     "@kaynooo/kayjs-ui": ">=0.4.28 <1",
     "@kaynooo/pg-orm": "^7.0.0",
     "elysia": "^1.4.30",
-    "kay": "~1.37.0"
+    "kay": "~1.37.0 || ~1.38.0"
   },
   "peerDependenciesMeta": {
     "@kaynooo/pg-orm": {
@@ -73,7 +73,7 @@
     "@types/bun": "^1.4.2",
     "@typescript/native-preview": "^7.0.0-dev.20260707.2",
     "elysia": "^1.4.30",
-    "kay": "npm:@kaynooo/kayjs@~1.37.0",
+    "kay": "npm:@kaynooo/kayjs@~1.38.1",
     "typescript": "^6.0.3"
   }
 }

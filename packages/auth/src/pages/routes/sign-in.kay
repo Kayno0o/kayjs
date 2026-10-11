@@ -15,7 +15,7 @@ import FormField from '@kaynooo/kayjs-ui/form-field.kay'
 export const page = { guards: false }
 
 export const password = action(schemas.signIn, async (input, ctx) => {
-  const result = await ctx.locals.auth.signInWithPassword({ identifier: input.identifier, password: input.password, remember: input.remember === true, redirect: input.redirect, captcha: captchaOf(input) })
+  const result = await ctx.locals.auth.signInWithPassword({ identifier: input.identifier, password: input.password, remember: input.remember === true, ...(input.redirect === undefined ? {} : { redirect: input.redirect }), captcha: captchaOf(input) })
 
   if (!result.ok)
     return ctx.fail(400, { error: result.error === 'invalid' ? 'credentials' : result.error })
