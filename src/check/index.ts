@@ -12,7 +12,7 @@ import process from 'node:process'
 import { formatReport } from '../compiler/frame'
 import { lintLevels } from '../compiler/lints'
 import { offsetAt, positionAt } from '../compiler/mapping'
-import { diagnoseShadow, reportsTypeErrors, servedByTheApp, servedLocales, shownOutsideKay, unusedCodesOf } from './diagnose'
+import { diagnoseShadow, reportsTypeErrors, servedByTheApp, shownOutsideKay, unusedCodesOf } from './diagnose'
 import { generatedProblem } from './generated'
 import { configProblems, contentChecks, lintConfigTypeError, projectProblems } from './project'
 import { writeShadowTypes } from './shadow-types'
@@ -90,8 +90,7 @@ export function configCheckOptions(config: KayConfig): CheckOptions {
 export async function check(root: string, options: CheckOptions = {}): Promise<CheckDiagnostic[]> {
   const tsconfig = options.tsconfig ?? 'tsconfig.json'
   const types = await writeShadowTypes(root, options)
-  const { files, diagnostics, unreached, libraries, mounts } = types
-  const locales = servedLocales(options.i18n)
+  const { files, diagnostics, unreached, libraries, mounts, locales } = types
   // The props entries give their components are typed with the rest, so the collections are read first.
   const content = await contentChecks(root, options)
   const shown = await resolvedConfig(root, tsconfig)

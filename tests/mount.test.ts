@@ -1,5 +1,6 @@
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
+import process from 'node:process'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { mount, readPersisted, settle, writePersisted } from '../src/test'
@@ -70,7 +71,7 @@ describe('mount', () => {
     unmount()
   })
 
-  it('stops revealing where a beforematch listener hides the element again or shows it itself, as the spec does', async () => {
+  it('stops revealing where a beforematch listener hides the element again, shows it itself or opens a details above it, as the spec does', async () => {
     const focused: boolean[] = []
     const { root, unmount } = await mount('tests/fixtures/mount/until-found.kay', { onFocused: (took: boolean) => focused.push(took) })
 
@@ -94,6 +95,32 @@ describe('mount', () => {
     expect(shown.root.querySelector('details')!.open).toBe(false)
     expect(shown.root.querySelector('.outer')!.getAttribute('hidden')).toBe('until-found')
     shown.unmount()
+
+    // An accordion opening its own section: the details found open ends the reveal, the panel around it left hidden.
+    const opened = await mount('tests/fixtures/mount/until-found.kay', { onFocused: (took: boolean) => focused.push(took) })
+
+    opened.root.addEventListener('beforematch', (event) => {
+      const details = (event.target as Element).closest('details')
+
+      if (details)
+        details.open = true
+    })
+    opened.root.querySelector<HTMLButtonElement>('.save')!.click()
+    await answered(focused, 3)
+
+    expect(opened.root.querySelector('.inner')!.hasAttribute('hidden')).toBe(false)
+    expect(opened.root.querySelector('details')!.open).toBe(true)
+    expect(opened.root.querySelector('.outer')!.getAttribute('hidden')).toBe('until-found')
+    opened.unmount()
+  })
+
+  it('focuses the field as it is when the reveal fails to load, as a chunk a deploy replaced does', async () => {
+    // A process of its own, as the reveal this file loaded already stays loaded.
+    const child = Bun.spawn([process.execPath, 'tests/fixtures/mount/reveal-fails.ts'], { stdout: 'pipe', stderr: 'pipe' })
+    const [output, errors, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+
+    expect({ code, errors }).toEqual({ code: 0, errors: '' })
+    expect(JSON.parse(output)).toEqual({ focused: true, open: false })
   })
 
   it('reveals nothing for a field that cannot take focus', async () => {

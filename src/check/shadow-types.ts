@@ -22,7 +22,7 @@ import { positionAt } from '../compiler/mapping'
 import { CONFIG_FILE } from '../config'
 import { projectPaths } from '../project'
 import { projectApi } from '../server/api'
-import { localeSettings } from '../server/i18n'
+import { localePrefixes, localeSettings } from '../server/i18n'
 import { htmlFallbacks, publicFiles } from '../server/public'
 import { redirectProblems } from '../server/redirects'
 import { extensionEditor, patternShapes, routeMounts, scanEndpoints, scanRoutes, servedPaths } from '../server/routes'
@@ -51,8 +51,9 @@ export interface ShadowTypes {
   exports: Map<number, { file: string, wanted: string }>
   // The static components only islands render, which compile as rendered inline with them.
   islandOnly: Set<string>
-  // The routes the extensions mount.
+  // The routes the extensions mount, and the prefixes the locales serve them under too.
   mounts: RouteMount[]
+  locales: string[]
 }
 
 // What the project serves, which links are checked against.
@@ -106,7 +107,7 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
   // `contentChecks` writes the props check once it read the collections.
   await tree.removeStale([CONTENT_CHECK])
 
-  return { files: tree.shadows, diagnostics: [...own.diagnostics, ...libraries.diagnostics], problems, unreached: libraries.unreached, libraries: libraries.libraries, settings: replaced.lines, exports: exported.lines, islandOnly: own.islandOnly, mounts }
+  return { files: tree.shadows, diagnostics: [...own.diagnostics, ...libraries.diagnostics], problems, unreached: libraries.unreached, libraries: libraries.libraries, settings: replaced.lines, exports: exported.lines, islandOnly: own.islandOnly, mounts, locales: served.settings ? localePrefixes(served.settings) : [] }
 }
 
 function shadowTree(dir: string): ShadowTree {

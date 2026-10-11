@@ -17,6 +17,7 @@ export function reveal(field: HTMLElement): boolean {
 
   for (const step of hidden) {
     if ('details' in step) {
+      // "If ancestorToReveal has an open attribute, then return": a listener that opened it ends the reveal, the panels around it left as they are.
       if (!step.details.isConnected || step.details.open)
         break
 
@@ -40,6 +41,7 @@ export function reveal(field: HTMLElement): boolean {
   return hidden.length > 0
 }
 
+// Exactly what `MAY_HIDE` in focus.ts lets through loosely.
 function untilFound(element: Element): boolean {
   return element.getAttribute('hidden')?.toLowerCase() === 'until-found'
 }

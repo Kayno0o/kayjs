@@ -9,6 +9,7 @@ import { t } from 'elysia'
 import { servedByTheApp, servedLocales } from '../src/check/diagnose'
 import { readShadowSettings } from '../src/check/shadow'
 import { mergeConfig } from '../src/config'
+import { UNSERVED_MESSAGE } from '../src/runtime/checks'
 import { apiStubs } from '../src/server/api'
 import { routeMounts, scanRoutes } from '../src/server/routes'
 import { scratchDir } from './scratch'
@@ -780,13 +781,13 @@ describe('a library\'s route tree', () => {
   it('leaves the app what an extension\'s routes name outside their prefix, a locale\'s prefix read past', () => {
     const mounts = [{ dir: '/nowhere/lib/routes', prefix: '/auth' }]
     const locales = servedLocales({ locales: ['en', 'fr'], defaultLocale: 'en' })
-    const left = (path: string) => servedByTheApp('/nowhere/lib/routes/login.kay', `No page, public file or app route serves ${path}`, mounts, locales)
+    const left = (path: string) => servedByTheApp('/nowhere/lib/routes/login.kay', `${UNSERVED_MESSAGE} ${path}`, mounts, locales)
 
     expect(locales).toEqual(['fr'])
     expect(['/', '/authx', '/authx/page', '/fr', '/fr/authx', '/en/auth/x'].filter(left)).toEqual(['/', '/authx', '/authx/page', '/fr', '/fr/authx', '/en/auth/x'])
     expect(['/auth', '/auth/x', '/fr/auth', '/fr/auth/x'].some(left)).toBe(false)
     // A page outside every extension checks its paths whole.
-    expect(servedByTheApp('/nowhere/src/routes/index.kay', 'No page, public file or app route serves /nope', mounts, locales)).toBe(false)
+    expect(servedByTheApp('/nowhere/src/routes/index.kay', `${UNSERVED_MESSAGE} /nope`, mounts, locales)).toBe(false)
   })
 })
 

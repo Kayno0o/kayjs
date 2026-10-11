@@ -635,12 +635,12 @@ describe('kay lsp on an extension listed from beside the app', () => {
     dir = await scratchDir('lsp-extension-')
     await Promise.all([
       Bun.write(join(dir, 'app/tsconfig.json'), await Bun.file(join(fixtures, 'site/tsconfig.json')).text()),
-      Bun.write(join(dir, 'app/kay.config.ts'), 'export default { extensions: [{ name: \'lib\', routes: { dir: \'../lib/routes\', prefix: \'/lib\' } }] }\n'),
+      Bun.write(join(dir, 'app/kay.config.ts'), 'export default { i18n: { locales: [\'en\', \'fr\'], defaultLocale: \'en\' }, extensions: [{ name: \'lib\', routes: { dir: \'../lib/routes\', prefix: \'/lib\' } }] }\n'),
       Bun.write(join(dir, 'app/src/routes/index.kay'), 'p Home\n'),
       Bun.write(join(dir, 'app/src/params/code.ts'), 'export default (value: string): number | undefined => (/^\\d+$/).test(value) ? Number(value) : undefined\n'),
       Bun.write(join(dir, 'lib/package.json'), JSON.stringify({ name: 'lib' })),
       Bun.write(join(dir, 'lib/routes/codes/[id=code]/label.kay'), '--- server\nconst label: string = ctx.params.id\n---\np {label}\n'),
-      Bun.write(join(dir, 'lib/routes/out.kay'), 'a(href="/welcome") Back\na(href="/libx/page") Beside\na(href="/lib/no/such") Nope\n'),
+      Bun.write(join(dir, 'lib/routes/out.kay'), 'a(href="/welcome") Back\na(href="/libx/page") Beside\na(href="/lib/no/such") Nope\na(href="/fr/welcome") Retour\na(href="/fr/lib/no/such") Non\n'),
     ])
     editor = new Editor(join(dir, 'app'))
     await editor.start()
@@ -655,8 +655,8 @@ describe('kay lsp on an extension listed from beside the app', () => {
     expect((await editor.open('../lib/routes/codes/[id=code]/label.kay')).map(diagnostic => [diagnostic.range.start.line, diagnostic.message])).toEqual([[1, 'Type \'number\' is not assignable to type \'string\'.']])
   })
 
-  it('checks a path the extension\'s routes name only under its own prefix, as kay check does', async () => {
-    expect((await editor.open('../lib/routes/out.kay')).map(diagnostic => [diagnostic.range.start.line, diagnostic.message.match(/serves (\S+?)"/)?.[1]])).toEqual([[2, '/lib/no/such']])
+  it('checks a path the extension\'s routes name only under its own prefix, a locale\'s before it or not, as kay check does', async () => {
+    expect((await editor.open('../lib/routes/out.kay')).map(diagnostic => [diagnostic.range.start.line, diagnostic.message.match(/serves (\S+?)"/)?.[1]])).toEqual([[2, '/lib/no/such'], [4, '/fr/lib/no/such']])
   })
 })
 
