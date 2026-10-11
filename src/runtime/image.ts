@@ -151,12 +151,12 @@ export function variantHeight(width: number, [aspectWidth, aspectHeight]: Aspect
   return Math.min(most, Math.max(1, Math.round(width * aspectHeight / aspectWidth)))
 }
 
-// What a variant's file name ends with, after the image's own name.
 // A card, a crop, or a width below `width`: the ladder's own widths aside, what a page asks for.
 export function cutOrBelow(variant: ImageVariant, width: number): boolean {
   return variant === 'card' || variant.aspect !== undefined || variant.width < width
 }
 
+// What a variant's file name ends with, after the image's own name.
 export function variantSuffix(variant: ImageVariant): string {
   if (variant === 'card')
     return '-card.jpg'
