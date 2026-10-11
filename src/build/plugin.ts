@@ -1,11 +1,12 @@
 import type { BunPlugin } from 'bun'
 import type { Target } from './transform'
-import { realpathSync } from 'node:fs'
-import { dirname, resolve, sep } from 'node:path'
+import type { WorkerBundle } from './worker-bundle'
+import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs'
+import { dirname, join, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { ISLAND_TWIN, withoutTwin } from '../compiler'
 import { RESIZABLE } from '../runtime/image'
-import { ASSET_FILE, writeAsset } from './assets'
+import { ASSET_FILE, clientDir, writeAsset } from './assets'
 import { scriptLoader } from './files'
 import { expandGlobs } from './glob'
 import { iconModule, iconNames, installedIconSets } from './icons'
@@ -37,6 +38,11 @@ const TWIN_NAMESPACE = 'kay-island'
 const ICON_SPECIFIER = /^~icons\//
 const ICON_NAMESPACE = 'kay-icon'
 const ANY = /.*/
+// `new URL('file', import.meta.url)`, the way a module names a file shipped beside it: a relative path with no scheme, query or template part.
+const FILE_URL = /new\s+URL\(\s*(["'`])((?:\.{1,2}\/)*[\w@-][^"'`\n$?#:]*)\1\s*,\s*import\.meta\.url\s*\)/g
+const SCRIPT_FILE = /\.(?:[cm]?[jt]s|[jt]sx)$/
+const WASM_FILE = /\.wasm$/i
+const WORKER_BUNDLE = join(import.meta.dir, 'worker-bundle.ts')
 
 async function assetModule(path: string, url: string): Promise<string> {
   if (!RESIZABLE.test(path))
@@ -57,6 +63,11 @@ export default registerImage(${JSON.stringify(url)}, ${size.width}, ${size.heigh
 }
 
 export function kay(options: KayPluginOptions = {}): BunPlugin {
+  return kayPlugin(options, [])
+}
+
+// `workers`: in a worker's own bundle, the modules started as workers on the way to it, itself last.
+export function kayPlugin(options: KayPluginOptions, workers: string[]): BunPlugin {
   return {
     name: 'kay',
     setup(build) {
@@ -65,10 +76,76 @@ export function kay(options: KayPluginOptions = {}): BunPlugin {
       // The project's TypeScript modules, read for their `import.meta.glob` calls, by their real path as Bun loads them.
       const projectScript = new RegExp(`^${RegExp.escape(realpathSync(root) + sep)}(?!(?:.*/)?node_modules/).*\\.(?:m?ts|tsx)$`)
 
+      // A browser build ships the files its modules point at with `new URL`: a script bundled as a worker of its own, anything else as an asset. Each URL is relative to the module's chunk, so it holds under any base.
+      // A build kept in memory, such as the one finding the runtime's chunk, writes nothing and leaves them as written.
+      const browser = build.config?.target === 'browser' && build.config.outdir !== undefined
+      const config = build.config
+      const bundled = new Map<string, Promise<string>>()
+
+      const bundleWorker = async (path: string): Promise<string> => {
+        const bundle: WorkerBundle = { entry: path, outdir: join(clientDir(root), 'assets'), minify: config.minify ?? false, define: config.define ?? {}, options: { ...options, root, anchor: undefined }, workers: [...workers, path] }
+        const child = Bun.spawn([process.execPath, WORKER_BUNDLE, JSON.stringify(bundle)], { cwd: root, stdout: 'pipe', stderr: 'pipe' })
+        const [name, problems, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+
+        if (code !== 0)
+          throw new Error(`kay: the worker ${path} failed to build: ${problems}`)
+
+        return name
+      }
+
+      const fileUrl = async (file: string, specifier: string): Promise<string | undefined> => {
+        const path = resolve(dirname(file), specifier)
+
+        if (!existsSync(path))
+          return undefined
+
+        // An emscripten module starts itself as its threads' worker.
+        if (path === workers.at(-1))
+          return 'import.meta.url'
+
+        if (workers.includes(path))
+          throw new Error(`kay: the worker ${path} starts itself again through ${workers.slice(workers.indexOf(path) + 1).join(', ')}`)
+
+        let name: string
+
+        if (SCRIPT_FILE.test(path)) {
+          if (!bundled.has(path))
+            bundled.set(path, bundleWorker(path))
+
+          name = await bundled.get(path)!
+        }
+        else {
+          const url = await writeAsset(path, root)
+
+          name = url.slice(url.lastIndexOf('/') + 1)
+        }
+
+        // A worker's bundle sits in the assets beside the files it points at, the islands' chunks one directory up.
+        return JSON.stringify(`./${workers.length > 0 ? '' : 'assets/'}${name}`)
+      }
+
+      const shippingFiles = async (source: string, file: string): Promise<string> => {
+        if (!browser || !source.includes('import.meta.url'))
+          return source
+
+        const urls = new Map<string, string | undefined>()
+
+        for (const [, , specifier] of source.matchAll(FILE_URL)) {
+          if (!urls.has(specifier!))
+            urls.set(specifier!, await fileUrl(file, specifier!))
+        }
+
+        return source.replace(FILE_URL, (call: string, _quote: string, specifier: string) => {
+          const url = urls.get(specifier)
+
+          return url === undefined ? call : `new URL(${url}, import.meta.url)`
+        })
+      }
+
       const load = async (file: string) => {
         const source = await Bun.file(withoutTwin(file)).text()
 
-        const contents = expandGlobs(await transformKayCached(source, file, { target, hydratable: options.hydratable ?? true, root: options.root, cacheDir: options.cacheDir, inspect: options.inspect }), withoutTwin(file), root, 'ts')
+        const contents = await shippingFiles(expandGlobs(await transformKayCached(source, file, { target, hydratable: options.hydratable ?? true, root: options.root, cacheDir: options.cacheDir, inspect: options.inspect }), withoutTwin(file), root, 'ts'), withoutTwin(file))
 
         return { contents: options.anchor !== undefined && options.anchor !== '' ? `${contents}\nimport ${JSON.stringify(options.anchor)}\n` : contents, loader: 'ts' as const }
       }
@@ -98,17 +175,44 @@ export function kay(options: KayPluginOptions = {}): BunPlugin {
           build.onLoad({ filter: new RegExp(`^${RegExp.escape(path)}$`) }, () => ({ contents: `export * from ${JSON.stringify(replacement)}\nexport { default } from ${JSON.stringify(replacement)}\n`, loader: 'ts' }))
       }
 
+      // `with { type: 'file' }` asks for a wasm module's own path, as a server reading it does; a plugin sees no import's attributes, so they are read in the importer.
+      const fileImports = new Set<string>()
+
+      build.onResolve({ filter: WASM_FILE }, ({ path, importer }) => {
+        // Bun resolves some imports a second time from the importer's directory.
+        if (statSync(importer, { throwIfNoEntry: false })?.isFile() === true && new RegExp(`(["'])${RegExp.escape(path)}\\1\\s*with\\s*\\{\\s*type\\s*:\\s*(["'])file\\2`).test(readFileSync(importer, 'utf8')))
+          fileImports.add(Bun.resolveSync(path, dirname(importer)))
+
+        return undefined
+      })
+
       // `import logo from './logo.png'` gives the URL the server serves it at, on the server and in islands alike; an image also records its size for `image()`.
-      build.onLoad({ filter: ASSET_FILE }, async ({ path }) => ({ contents: await assetModule(path, await writeAsset(path, root)), loader: 'js' }))
+      build.onLoad({ filter: ASSET_FILE }, async ({ path }) => {
+        // Bun has no default to fall back on here: returning nothing from a wasm module's load crashes it.
+        if (fileImports.has(path))
+          return build.config === undefined ? { exports: { default: path }, loader: 'object' } : { contents: await Bun.file(path).bytes(), loader: 'file' }
+
+        return { contents: await assetModule(path, await writeAsset(path, root)), loader: 'js' }
+      })
 
       // Last, as it takes every module: the runtime loader hands a module without a call back as it is, where the bundler loads it itself.
       build.onLoad({ filter: projectScript }, async ({ path }) => {
         const source = await Bun.file(path).text()
         const loader = scriptLoader(path)
-        const contents = expandGlobs(source, path, root, loader)
+        const contents = await shippingFiles(expandGlobs(source, path, root, loader), path)
 
         return contents === source && build.config !== undefined ? undefined : { contents, loader }
       })
+
+      // A package's modules, read only for the files they point at.
+      if (browser) {
+        build.onLoad({ filter: SCRIPT_FILE }, async ({ path }) => {
+          const source = await Bun.file(path).text()
+          const contents = await shippingFiles(source, path)
+
+          return contents === source ? undefined : { contents, loader: scriptLoader(path) }
+        })
+      }
     },
   }
 }

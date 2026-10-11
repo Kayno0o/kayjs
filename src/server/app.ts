@@ -232,7 +232,7 @@ export async function servePages(root: string, options: PagesOptions, loadClient
 
   const app = new Elysia({ name: 'kay/pages', seed: root })
   // Hashed as they go out, under the mount point.
-  const security = securityHeaders({ ...options, scripts, styles: [...styles, ...client.inlineStyles?.values() ?? []].map(style => rebaseCss(style, base)) })
+  const security = securityHeaders({ ...options, islands: client.directives, scripts, styles: [...styles, ...client.inlineStyles?.values() ?? []].map(style => rebaseCss(style, base)) })
   // The paths of the build's files and the image route, whose responses carry the security headers themselves.
   const filePaths = new Set<string>([IMAGE_ROUTE])
 

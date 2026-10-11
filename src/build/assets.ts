@@ -3,7 +3,7 @@ import process from 'node:process'
 import { underKayDev } from '../server/loader'
 
 // Files a component or module imports for their URL.
-export const ASSET_EXTENSIONS = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'avif', 'svg', 'ico', 'bmp', 'woff', 'woff2', 'ttf', 'otf', 'mp4', 'webm', 'ogg', 'mp3', 'wav', 'pdf']
+export const ASSET_EXTENSIONS = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'avif', 'svg', 'ico', 'bmp', 'woff', 'woff2', 'ttf', 'otf', 'mp4', 'webm', 'ogg', 'mp3', 'wav', 'pdf', 'wasm']
 export const ASSET_FILE = new RegExp(`\\.(?:${ASSET_EXTENSIONS.join('|')})$`, 'i')
 // Where the browser build and imported assets are served from, out of `clientDir`.
 export const ASSET_PREFIX = '/_kay/'

@@ -23,6 +23,8 @@ export interface ClientManifest {
   navigation?: boolean
   // In development, the source files each chunk of an island holds, by chunk URL and relative to the root: an edited island swaps in everywhere its code runs.
   chunkInputs?: Record<string, string[]>
+  // The sources the islands need beyond kay's policy, by directive: compiling wasm, starting a worker from a blob.
+  directives?: Record<string, string[]>
 }
 
 export interface PrerenderedPage {

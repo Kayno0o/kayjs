@@ -261,6 +261,50 @@ describe('kay build', () => {
     }
   })
 
+  it('ships the files islands and packages point at with new URL, a script as a worker of its own, and opens the policy to what they run', async () => {
+    const project = await scratchDir('workers-')
+    const files: Record<string, string> = {
+      // As an emscripten build with threads ships: the module starts itself as its worker and names its wasm bare.
+      'node_modules/threads/package.json': JSON.stringify({ name: 'threads', type: 'module', exports: './index.js' }),
+      'node_modules/threads/index.js': 'export const start = () => new Worker(new URL("index.js", import.meta.url), { type: "module" })\nexport const wasm = () => new URL("threads.wasm", import.meta.url)\nexport const missing = () => new URL("./missing.js", import.meta.url)\n',
+      // As qr-scanner ships: a chunk loaded on demand starts its worker from a blob.
+      'node_modules/scanner/package.json': JSON.stringify({ name: 'scanner', type: 'module', exports: './index.js' }),
+      'node_modules/scanner/index.js': 'export const scan = async () => (await import("./worker.js")).start()\n',
+      'node_modules/scanner/worker.js': 'export const start = () => new Worker(URL.createObjectURL(new Blob(["onmessage = () => {}"])))\n',
+      'src/echo.ts': 'postMessage(new URL(\'./add.wasm\', import.meta.url).href)\n',
+      'src/lab.kay': '---\nimport { scan } from \'scanner\'\nimport { missing, start, wasm } from \'threads\'\nimport add from \'./add.wasm\'\n\nonMount(() => {\n  new Worker(new URL(\'./echo.ts\', import.meta.url), { type: \'module\' })\n  start()\n  void scan()\n  void WebAssembly.instantiateStreaming(fetch(add))\n  void fetch(wasm())\n  void fetch(missing())\n})\n---\np lab\n',
+      'src/routes/index.kay': '---\nimport Lab from \'../lab.kay\'\n---\nLab\n',
+    }
+
+    await Promise.all([
+      ...Object.entries(files).map(async ([file, content]) => Bun.write(join(project, file), content)),
+      Bun.write(join(project, 'src/add.wasm'), Bun.file(join(import.meta.dir, 'fixtures/workers/src/add.wasm'))),
+      Bun.write(join(project, 'node_modules/threads/threads.wasm'), Bun.file(join(import.meta.dir, 'fixtures/workers/src/add.wasm'))),
+    ])
+
+    try {
+      const client = await buildClient(project)
+      const assets = (await readdir(join(client.dir, 'assets'))).sort()
+      const island = await Bun.file(join(client.dir, client.islands['src/lab.kay']!.find(url => url.startsWith('/_kay/lab-'))!.slice('/_kay/'.length))).text()
+      const echo = await Bun.file(join(client.dir, 'assets', assets.find(file => file.startsWith('echo-'))!)).text()
+      const threads = await Bun.file(join(client.dir, 'assets', assets.find(file => file.startsWith('index-'))!)).text()
+
+      expect(assets).toEqual([expect.stringMatching(/^add-\w+\.wasm$/), expect.stringMatching(/^echo-\w+\.js$/), expect.stringMatching(/^index-\w+\.js$/), expect.stringMatching(/^threads-\w+\.wasm$/)])
+      // Relative to the chunk, so the URLs hold under any base.
+      expect(island).toMatch(/new URL\("\.\/assets\/echo-\w+\.js", import\.meta\.url\)/)
+      expect(island).toMatch(/new URL\("\.\/assets\/index-\w+\.js", import\.meta\.url\)/)
+      expect(island).toMatch(/new URL\("\.\/assets\/threads-\w+\.wasm", import\.meta\.url\)/)
+      expect(island).toContain('new URL("./missing.js", import.meta.url)')
+      expect(echo).toMatch(/new URL\("\.\/add-\w+\.wasm", import\.meta\.url\)/)
+      // The worker a module starts from itself is its own bundle.
+      expect(threads).toContain('new URL(import.meta.url, import.meta.url)')
+      expect(client.directives).toEqual({ 'script-src': ['\'wasm-unsafe-eval\''], 'worker-src': ['\'self\'', 'blob:'] })
+    }
+    finally {
+      await rm(project, { recursive: true, force: true })
+    }
+  })
+
   it('names an asset in its URL the way a browser reads it back', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'kay-asset-'))
 

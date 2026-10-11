@@ -12,6 +12,8 @@ export interface SecurityOptions {
   dev?: boolean | undefined
   base?: string | undefined
   offline?: KayConfig['offline'] | undefined
+  // The sources the islands need, added to kay's directives under the app's own: see ClientManifest.
+  islands?: Record<string, string[]> | undefined
   // The inline scripts and styles kay writes in every head, such as the fonts' rules.
   scripts?: string[] | undefined
   styles?: string[] | undefined
@@ -65,10 +67,10 @@ export function securityHeaders(options: SecurityOptions): Record<string, string
     headers['reporting-endpoints'] = `${CSP_ENDPOINT}="${reportTo}"`
 
   if (csp !== false)
-    headers['content-security-policy'] = policy([csp ?? {}], hashes, styles, reportTo)
+    headers['content-security-policy'] = policy([csp ?? {}], hashes, styles, reportTo, options.islands)
 
   if (reportOnly)
-    headers['content-security-policy-report-only'] = policy([csp === false || csp === undefined ? {} : csp, reportOnly], hashes, styles, reportTo)
+    headers['content-security-policy-report-only'] = policy([csp === false || csp === undefined ? {} : csp, reportOnly], hashes, styles, reportTo, options.islands)
 
   for (const [name, value] of Object.entries(options.security?.headers ?? {})) {
     if (value === false)
@@ -107,11 +109,14 @@ export function ownHeaders(set: Context['set'], copies: HeaderCopies): Record<st
   return copies.plain
 }
 
-// kay's directives with each layer of the app's merged over them in turn, a directive given `false` left out; `script-src` and `script-src-elem` always keep the hashes of kay's inline scripts, and `style-src` and `style-src-elem` those of its inline styles.
+// kay's directives, plus the sources its islands need, with each layer of the app's merged over them in turn, a directive given `false` left out; `script-src` and `script-src-elem` always keep the hashes of kay's inline scripts, and `style-src` and `style-src-elem` those of its inline styles.
 // A hash switches `'unsafe-inline'` off, so a style directive allowing it gets none.
 // `report-uri` is for browsers that predate `report-to`, which those that know it read instead.
-function policy(layers: Record<string, string[] | false>[], hashes: string[], styles: string[], reportTo: string | undefined): string {
+function policy(layers: Record<string, string[] | false>[], hashes: string[], styles: string[], reportTo: string | undefined, islands: Record<string, string[]> = {}): string {
   const directives = new Map(Object.entries(DIRECTIVES))
+
+  for (const [name, sources] of Object.entries(islands))
+    directives.set(name, [...directives.get(name) ?? [], ...sources])
 
   for (const overrides of layers) {
     for (const [name, sources] of Object.entries(overrides)) {

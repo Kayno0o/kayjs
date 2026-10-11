@@ -71,6 +71,11 @@ type Outputs = Record<string, MetafileOutput>
 const LEADING_DOT_SLASH = /^\.\//
 const JS_OUTPUT = /\.js$/
 const CSS_OUTPUT = /\.css$/
+const COMPILES_WASM = /\bWebAssembly\./
+const STARTS_WORKER = /\bnew\s+(?:Shared)?Worker\(/
+const OBJECT_URL = /\bcreateObjectURL\(/
+// A worker bundle, as kay names it from a chunk or from another worker.
+const WORKER_URL = /["']\.\/(?:assets\/)?([\w.~-]+\.js)["']/g
 // Every builtin, the ones Bun polyfills included: one whose polyfill lacks an export would fail the build that only looks for the way to the others.
 const BUILTINS = [...builtinModules, 'node:*', 'bun', 'bun:*']
 
@@ -234,8 +239,43 @@ async function buildIslands(root: string, base: string, islands: Map<string, str
     manifest.entryImports.push(PUBLIC_ENV_PATH)
 
   const inputs = Object.fromEntries(Object.entries(build.metafile!.outputs).map(([output, meta]) => [output.replace(LEADING_DOT_SLASH, ''), meta.inputs]))
+  const directives = await islandDirectives(root, build.outputs)
 
-  return { manifest: { ...manifest, navigation }, inputs }
+  return { manifest: { ...manifest, navigation, ...directives && { directives } }, inputs }
+}
+
+// What kay's policy refuses and the islands' chunks or the workers they start need: `'wasm-unsafe-eval'` to compile wasm, `blob:` workers for a package building its worker in memory, as qr-scanner does.
+// A worker is found through the URL its chunk names it by, as the assets also hold files a server or an earlier build wrote.
+async function islandDirectives(root: string, outputs: Bun.BuildArtifact[]): Promise<Record<string, string[]> | undefined> {
+  const workers = join(clientDir(root), 'assets')
+  const code: string[] = []
+  const seen = new Set<string>()
+  const read = async (file: string) => {
+    const text = await Bun.file(file).text()
+
+    code.push(text)
+    for (const [, name] of text.matchAll(WORKER_URL)) {
+      const worker = join(workers, name!)
+
+      if (!seen.has(worker) && existsSync(worker)) {
+        seen.add(worker)
+        await read(worker)
+      }
+    }
+  }
+
+  for (const output of outputs.filter(output => JS_OUTPUT.test(output.path)))
+    await read(output.path)
+
+  const directives: Record<string, string[]> = {}
+
+  if (code.some(text => COMPILES_WASM.test(text)))
+    directives['script-src'] = ['\'wasm-unsafe-eval\'']
+
+  if (code.some(text => STARTS_WORKER.test(text) && OBJECT_URL.test(text)))
+    directives['worker-src'] = ['\'self\'', 'blob:']
+
+  return Object.keys(directives).length > 0 ? directives : undefined
 }
 
 // Bun names the module importing a builtin a browser lacks, not the island reaching it: the same build with every builtin left out, in memory, gives the imports leading there.

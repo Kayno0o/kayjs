@@ -50,7 +50,32 @@ import logo from '../logo.png'
 img(src={logo} alt="Logo")
 ```
 
-The same goes for fonts, video, audio and PDF files.
+The same goes for fonts, video, audio, PDF and wasm files.
+
+## Wasm and workers
+
+A `.wasm` file is imported for its URL as well, then loaded from it:
+
+```kay
+---
+import add from '../add.wasm'
+
+onMount(async () => {
+  const { instance } = await WebAssembly.instantiateStreaming(fetch(add))
+})
+---
+p Ready
+```
+
+Server code importing one `with { type: 'file' }` keeps Bun's meaning, the file's own path, embedded in an executable.
+
+An island, and any package it imports, names a file shipped beside a module with `new URL('./file', import.meta.url)`. kay writes that file with the assets and bundles a script on its own as a worker, its imports included, so `new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })` works in development, in a build and in a compiled executable. The URL is relative to the island's chunk, so it holds under a `base`.
+
+- A package starting itself as its threads' worker, as an emscripten build does, gets a bundle of its own, and one building its worker from a blob, as qr-scanner does, works as it is.
+- Only a relative path written as a string is shipped: one naming no file, or an expression, is left as written.
+- A worker bundles with kay's plugin alone, not the config's `plugins`.
+- When an island or its worker compiles wasm, kay's content security policy adds `'wasm-unsafe-eval'` to `script-src`, and `worker-src 'self' blob:` when one starts a worker from a blob. A `csp` setting its own `script-src` or `worker-src` replaces them, so it lists them itself.
+- Threads sharing memory need a page isolated from other origins: set `security: { headers: { 'cross-origin-embedder-policy': 'credentialless' } }`; kay already sends `cross-origin-opener-policy: same-origin`.
 
 ## Responsive images
 

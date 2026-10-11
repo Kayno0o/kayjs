@@ -1,7 +1,7 @@
 import type { Subprocess } from 'bun'
 import { mkdir, mkdtemp, readdir, rm, stat, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { parse, stringify } from 'devalue'
@@ -569,6 +569,8 @@ describe('kay build --compile', () => {
         'src/content/notes/first.md': '---\ntitle: First note\ndate: 2026-09-01\n---\n\n## Read me\n',
         'src/routes/notes/[slug].kay': '--- server\nimport { notes } from \'../../content.config\'\n\nconst note = await notes.get(ctx.params.slug) ?? ctx.notFound()\nconst { Content } = note\n---\nh1 {note.data.title}\nContent\n',
         'src/routes/photo.kay': '---\nimport { image } from \'kay/image\'\nimport hero from \'../hero.png\'\n---\nimg({...image(hero)} alt="Hero")\n',
+        // An island loading wasm and starting a module worker, which the executable serves from its build.
+        'src/routes/lab.kay': '---\nimport { onMount, signal } from \'kay\'\nimport wasm from \'../add.wasm\'\n\nconst echoed = signal(\'\')\n\nonMount(() => {\n  const worker = new Worker(new URL(\'../echo.ts\', import.meta.url), { type: \'module\' })\n\n  worker.onmessage = (event: MessageEvent<string>) => echoed.set(event.data)\n})\n---\np.wasm {wasm}\np {echoed()}\n',
         'src/api/ping.ts': 'import { Elysia } from \'elysia\'\n\nexport default new Elysia().get(\'/\', () => \'pong\')\n',
         'src/api/members/_guard.ts': 'import { guard } from \'kay\'\n\nexport default guard(({ deny }) => deny(403, \'Members only\'))\n',
         'src/api/members/index.ts': 'import { Elysia } from \'elysia\'\n\nexport default new Elysia().get(\'/\', () => \'secret\')\n',
@@ -591,6 +593,8 @@ describe('kay build --compile', () => {
         Bun.write(join(dir, 'src/hero.png'), Bun.file(join(repo, 'tests/fixtures/images/src/hero.png'))),
         Bun.write(join(dir, 'src/favicon.png'), Bun.file(join(repo, 'tests/fixtures/seo/src/favicon.png'))),
         Bun.write(join(dir, 'src/display.woff2'), Bun.file(join(repo, 'tests/fixtures/seo/src/fonts/display.woff2'))),
+        Bun.write(join(dir, 'src/add.wasm'), Bun.file(join(repo, 'tests/fixtures/workers/src/add.wasm'))),
+        Bun.write(join(dir, 'src/echo.ts'), Bun.file(join(repo, 'tests/fixtures/workers/src/echo.ts'))),
       ])
 
       const manifest = await Bun.file(join(dir, 'package.json')).json() as { dependencies: Record<string, string> }
@@ -643,6 +647,15 @@ describe('kay build --compile', () => {
         expect(await get('/api/ping')).toEqual({ status: 200, text: 'pong' })
         expect(await get('/api/members')).toEqual({ status: 403, text: 'Members only' })
         expect((await get('/missing')).text).toContain('Nothing here</h1>')
+
+        const lab = await fetch(`${origin}/lab`)
+        const wasm = await fetch(`${origin}${(/<p class="wasm">([^<]+)</).exec(await lab.text())![1]!}`)
+        const worker = [...new Bun.Glob('.kay/*/dist/assets/echo-*.js').scanSync({ cwd: dir, dot: true })]
+
+        expect(lab.headers.get('content-security-policy')).toContain('\'wasm-unsafe-eval\'')
+        expect([wasm.status, wasm.headers.get('content-type')]).toEqual([200, 'application/wasm'])
+        expect(worker).toHaveLength(1)
+        expect(await (await fetch(`${origin}/_kay/assets/${basename(worker[0]!)}`)).text()).toContain('instantiateStreaming')
 
         const photo = await get('/photo')
         const variant = (/srcset="([^ "]+) 320w/).exec(photo.text)![1]!.replaceAll('&amp;', '&')
