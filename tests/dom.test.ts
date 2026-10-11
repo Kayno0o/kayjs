@@ -247,9 +247,9 @@ describe('event handlers', () => {
 })
 
 describe('kay without imports', () => {
-  it('runs signal, memo, effect and onMount a script uses unimported', async () => {
+  it('runs signal, memo, effect, onMount and onCleanup a script uses unimported', async () => {
     const { root, dispose } = await mountKay({
-      'main.kay': '---\nconst count = signal(1)\nconst double = memo(() => count() * 2)\nconst seen = signal(0)\nconst mounted = signal(false)\n\neffect(() => seen.set(count()))\nonMount(() => mounted.set(true))\n---\nbutton(onClick={() => count.set(c => c + 1)}) {double()} {seen()} {mounted() ? \'mounted\' : \'not yet\'}\n',
+      'main.kay': '---\nconst count = signal(1)\nconst double = memo(() => count() * 2)\nconst seen = signal(0)\nconst mounted = signal(false)\n\neffect(() => seen.set(count()))\nonMount(() => mounted.set(true))\nonCleanup(() => { document.body.dataset.cleaned = \'yes\' })\n---\nbutton(onClick={() => count.set(c => c + 1)}) {double()} {seen()} {mounted() ? \'mounted\' : \'not yet\'}\n',
     })
 
     try {
@@ -258,10 +258,13 @@ describe('kay without imports', () => {
       root.querySelector('button')!.click()
       await settle()
       expect(root.querySelector('button')!.textContent).toBe('4 2 mounted')
+      expect(document.body.dataset.cleaned).toBeUndefined()
     }
     finally {
       await dispose()
     }
+    expect(document.body.dataset.cleaned).toBe('yes')
+    delete document.body.dataset.cleaned
   })
 })
 

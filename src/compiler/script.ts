@@ -16,7 +16,7 @@ const REACTIVE_I18N = new Set(['relativeTime'])
 const SIGNAL_TYPES: Record<string, SignalKind> = { Signal: 'signal', Memo: 'memo' }
 
 // What a component script, and a server fence, use from `kay` with no import, as they use `props<T>()`: the compiler imports them.
-export const SCRIPT_GLOBALS = ['signal', 'memo', 'effect', 'onMount']
+export const SCRIPT_GLOBALS = ['signal', 'memo', 'effect', 'onMount', 'onCleanup']
 export const SERVER_GLOBALS = ['action']
 // Each of those names written as a name of its own, not a member or part of a longer one.
 const GLOBAL_NAME = new Map([...SCRIPT_GLOBALS, ...SERVER_GLOBALS].map(name => [name, new RegExp(`(?<![\\w$.])${name}(?![\\w$])`)]))

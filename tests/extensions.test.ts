@@ -385,7 +385,7 @@ describe('a library\'s routes', () => {
 const LOCAL_CHECKED: Record<string, string> = {
   'app/package.json': JSON.stringify({ name: 'app', dependencies: { 'linked-lib': 'link:../linked' } }),
   'app/tsconfig.json': TSCONFIG,
-  'app/kay.config.ts': 'import { defineConfig } from \'kay/server\'\nimport { linkedPages } from \'linked-lib\'\n\nexport default defineConfig({ extensions: [{ name: \'lib\', routes: { dir: \'../lib/routes\', prefix: \'/auth\' } }, linkedPages(), { name: \'abs\', routes: { dir: `${import.meta.dir}/../abs/routes`, prefix: \'/abs\' } }, { name: \'sub\', routes: { dir: \'../abs/sub/routes\', prefix: \'/sub\' } }] })\n',
+  'app/kay.config.ts': 'import { defineConfig } from \'kay/server\'\nimport { linkedPages } from \'linked-lib\'\n\nexport default defineConfig({ extensions: [{ name: \'lib\', routes: { dir: \'../lib/routes\', prefix: \'/auth\' } }, linkedPages(), { name: \'abs\', routes: { dir: `${import.meta.dir}/../abs/routes`, prefix: \'/abs\' } }, { name: \'sub\', routes: { dir: \'../abs/sub/routes\', prefix: \'/sub\' } }, { name: \'edit\', editor: \'../edit/editor.kay\' }] })\n',
   'app/src/routes/index.kay': 'p.home home\n',
   'app/src/params/code.ts': 'export default (value: string): number | undefined => (/^\\d+$/).test(value) ? Number(value) : undefined\n',
   'lib/package.json': JSON.stringify({ name: 'lib' }),
@@ -408,10 +408,14 @@ const LOCAL_CHECKED: Record<string, string> = {
   'linked/routes/fine.kay': '---\nimport Badge from \'../badge.kay\'\n---\nBadge\n',
   'linked/badge.kay': '---\nconst wrong: number = \'reached\'\n---\nspan {wrong}\n',
   'linked/unused.kay': '---\nconst wrong: number = \'unreached\'\n---\nspan {wrong}\n',
+  // An editor alone, no routes beside it, and what it reaches.
+  'edit/package.json': JSON.stringify({ name: 'edit' }),
+  'edit/editor.kay': '---\nimport Part from \'./part.kay\'\n\nconst wrong: number = \'editor\'\nonCleanup(() => undefined)\nnope()\n---\nPart\np {wrong}\n',
+  'edit/part.kay': '---\nconst wrong: number = \'edited\'\n---\nspan {wrong}\n',
 }
 
 describe('an extension listed from beside the app', () => {
-  it('has kay check report the errors of its pages and what they reach as the app\'s own, linked or not', async () => {
+  it('has kay check report the errors of its pages and editor and what they reach as the app\'s own, linked or not', async () => {
     const dir = await scratchDir('extension-local-')
 
     try {
@@ -423,13 +427,17 @@ describe('an extension listed from beside the app', () => {
       const output = `${stdout}${stderr}`
 
       expect(code).toBe(1)
-      expect([...output.matchAll(/\| const wrong: number = '(\w+)'/g)].map(match => match[1]).sort()).toEqual(['absolute', 'beside', 'linked', 'reached'])
+      // A frame shows the lines before its own, so the editor's `nope()` shows its `wrong` again.
+      expect([...new Set(output.matchAll(/\| const wrong: number = '(\w+)'/g).map(match => match[1]))].sort()).toEqual(['absolute', 'beside', 'edited', 'editor', 'linked', 'reached'])
       expect(output.split('error[missing-alt]').length).toBe(2)
       expect(output).not.toContain('codes/[id=code].kay')
       expect(output.split('label.kay').length).toBe(2)
       expect(output).toContain('Type \'number\' is not assignable to type \'string\'.\n --> ../lib/routes/codes/[id=code]/label.kay:2:')
       expect(output).toContain('--> ../lib/routes/[slug].kay:3:')
-      expect(output).toContain('7 errors')
+      // A name the compiled script does not get, as `onCleanup` now does.
+      expect(output).toContain('Cannot find name \'nope\'.')
+      expect(output).not.toContain('Cannot find name \'onCleanup\'')
+      expect(output).toContain('10 errors')
       // What the ESLint processor types the pages by.
       expect(readShadowSettings(join(dir, 'app')).mounts).toContain(join(dir, 'lib/routes'))
     }

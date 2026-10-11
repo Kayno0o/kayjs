@@ -25,7 +25,7 @@ import { projectApi } from '../server/api'
 import { localeSettings } from '../server/i18n'
 import { htmlFallbacks, publicFiles } from '../server/public'
 import { redirectProblems } from '../server/redirects'
-import { patternShapes, routeMounts, scanEndpoints, scanRoutes, servedPaths } from '../server/routes'
+import { extensionEditor, patternShapes, routeMounts, scanEndpoints, scanRoutes, servedPaths } from '../server/routes'
 import { ownFile } from './diagnose'
 import { ASSET_TYPES, environmentTypes, KAY_PATHS, packageTypes } from './env-types'
 import { CONTENT_CHECK, EXPORTS_CHECK, exportsCheck, SETTINGS_CHECK, settingsCheck } from './generated'
@@ -157,15 +157,18 @@ async function ownShadows(root: string, options: CheckOptions, tree: ShadowTree,
 }
 
 // A library's components compile against the app's types, and the ones it reaches are reported as its own: `kay build` compiles those.
-// So are the pages of an extension not installed from the registry, as a library's own example or fixture app lists it, and what they reach of its package.
+// So are the pages and the editor of an extension not installed from the registry, as a library's own example or fixture app lists it, and what they reach of its package.
 async function libraryShadows(root: string, options: CheckOptions, own: string[], tree: ShadowTree, mounts: RouteMount[]): Promise<{ libraries: KayLibrary[], pages: string[], diagnostics: CheckDiagnostic[], unreached: Set<string> }> {
   const { routes: routesDir, cache: cacheDir } = projectPaths(root, options)
   const libraries = await findKayLibraries(root)
   // The app's own directories are checked already; a linked library has its real path outside any `node_modules`, an installed one inside.
-  const local = mounts.filter(mount => !ownFile(root, mount.dir) && existsSync(mount.dir) && !realpathSync(mount.dir).split(sep).includes('node_modules'))
-  const followed = [...libraries, ...await extensionPackages(root, libraries, local)]
+  const linked = (path: string) => !ownFile(root, path) && existsSync(path) && !realpathSync(path).split(sep).includes('node_modules')
+  const local = mounts.filter(mount => linked(mount.dir))
+  const editor = extensionEditor(root, options.extensions)
+  const localEditor = editor !== undefined && linked(editor) ? editor : undefined
+  const followed = [...libraries, ...await extensionPackages(root, libraries, [...local.map(mount => mount.dir), ...localEditor === undefined ? [] : [dirname(localEditor)]])]
   const files = [...new Set(followed.flatMap(library => library.files))]
-  const pages = files.filter(file => local.some(mount => file.startsWith(mount.dir + sep)))
+  const pages = files.filter(file => file === localEditor || local.some(mount => file.startsWith(mount.dir + sep)))
   const reached = new Set([...pages, ...(await reachableLibraryFiles(root, followed, [...own, ...pages])).components.map((file) => {
     const library = libraryOf(followed, file)
 
@@ -193,9 +196,9 @@ async function libraryShadows(root: string, options: CheckOptions, own: string[]
   return { libraries, pages, diagnostics, unreached }
 }
 
-// The package holding each extension's routes that no kay library holds, the nearest directory above them with a package.json, as a library: its components are shadowed and reached as one's are.
-async function extensionPackages(root: string, libraries: KayLibrary[], mounts: RouteMount[]): Promise<KayLibrary[]> {
-  const dirs = new Set(mounts.filter(mount => libraryOf(libraries, join(mount.dir, 'page.kay')) === undefined).map(mount => packageRoot(mount.dir)))
+// The package holding each of `extensionDirs`, an extension's routes or its editor's directory, that no kay library holds, the nearest directory above them with a package.json, as a library: its components are shadowed and reached as one's are.
+async function extensionPackages(root: string, libraries: KayLibrary[], extensionDirs: string[]): Promise<KayLibrary[]> {
+  const dirs = new Set(extensionDirs.filter(dir => libraryOf(libraries, join(dir, 'page.kay')) === undefined).map(packageRoot))
 
   return Promise.all([...dirs].map(async (dir) => {
     // Left out: the app itself, when the package holds it as a fixture; the other projects inside it, to their own checks; a kay library's files, to the library.

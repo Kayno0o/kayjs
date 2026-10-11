@@ -43,7 +43,7 @@ p {greeting}
 Badge(label="new")
 ```
 
-`props`, `signal`, `memo`, `effect`, `onMount` and the translation `t` need no import. The rest of `kay`, such as `persisted` or `navigate`, is imported.
+`props`, `signal`, `memo`, `effect`, `onMount`, `onCleanup` and the translation `t` need no import. The rest of `kay`, such as `persisted` or `navigate`, is imported.
 
 ## Props
 

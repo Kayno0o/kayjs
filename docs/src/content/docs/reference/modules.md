@@ -11,7 +11,7 @@ import { defineConfig, pages, session } from 'kay/server'
 import { collection } from 'kay/content'
 ```
 
-`signal`, `memo`, `effect`, `onMount`, `props`, a server fence's `action` and the translation `t` from `kay/i18n` need no import inside a `.kay` file.
+`signal`, `memo`, `effect`, `onMount`, `onCleanup`, `props`, a server fence's `action` and the translation `t` from `kay/i18n` need no import inside a `.kay` file.
 
 ## kay
 
