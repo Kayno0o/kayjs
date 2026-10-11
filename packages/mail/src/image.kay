@@ -1,0 +1,5 @@
+---
+const { src, alt, width, height } = props<{ src: string, alt: string, width: number, height?: number | undefined }>()
+---
+// Outlook sizes an image by its attributes alone; other clients scale it down to a narrow screen.
+img(src={src} alt={alt} width={width} height={height} style="display:block;max-width:100%;height:auto;border:0;outline:none;text-decoration:none")

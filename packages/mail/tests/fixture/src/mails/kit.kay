@@ -1,0 +1,23 @@
+---
+import Code from '@kaynooo/kayjs-mail/code.kay'
+import Column from '@kaynooo/kayjs-mail/column.kay'
+import Divider from '@kaynooo/kayjs-mail/divider.kay'
+import Heading from '@kaynooo/kayjs-mail/heading.kay'
+import Image from '@kaynooo/kayjs-mail/image.kay'
+import Layout from '@kaynooo/kayjs-mail/layout.kay'
+import Link from '@kaynooo/kayjs-mail/link.kay'
+import Paragraph from '@kaynooo/kayjs-mail/paragraph.kay'
+import Row from '@kaynooo/kayjs-mail/row.kay'
+---
+Layout
+  Image(src="https://fixture.test/logo.png" alt="Fixture" width={120} height={40})
+  Heading Your code
+  Code 482 913
+  Divider
+  Heading(level={2}) Details
+  Row
+    Column
+      Paragraph Left
+    Column
+      Paragraph Right
+  Paragraph Read #[Link(href="https://fixture.test/help") the help].

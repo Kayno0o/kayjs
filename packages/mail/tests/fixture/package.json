@@ -1,0 +1,7 @@
+{
+  "name": "kayjs-mail-fixture",
+  "private": true,
+  "dependencies": {
+    "@kaynooo/kayjs-mail": "link:../.."
+  }
+}

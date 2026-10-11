@@ -1,0 +1,63 @@
+{
+  "name": "@kaynooo/kayjs-mail",
+  "type": "module",
+  "version": "0.9.1",
+  "description": "Mail for kay apps: SMTP configured from typed env variables, mails written as .kay components, a development outbox page, a test outbox and queued sending",
+  "author": "Kaynooo <https://git.kaynooo.fr/kaynooo>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://git.kaynooo.fr/kaynooo/kayjs-mail"
+  },
+  "bugs": {
+    "url": "https://git.kaynooo.fr/kaynooo/kayjs-mail/issues"
+  },
+  "publishConfig": {
+    "registry": "https://git.kaynooo.fr/api/packages/kaynooo/npm/"
+  },
+  "kay": {
+    "settings": "./src/settings.ts"
+  },
+  "exports": {
+    "./*.kay": "./src/*.kay",
+    ".": {
+      "types": "./types/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "files": [
+    "LICENSE",
+    "README.md",
+    "llms.txt",
+    "src",
+    "types"
+  ],
+  "engines": {
+    "bun": ">=1.4.2"
+  },
+  "scripts": {
+    "prepare": "bun scripts/link-fixture.ts",
+    "check": "$npm_execpath check",
+    "build:types": "rm -rf types && tsgo -p tsconfig.build.json",
+    "prepack": "bun run build:types",
+    "postpack": "rm -rf types",
+    "lint": "keslint --cache",
+    "lint:fix": "keslint --fix --cache",
+    "test": "bun test"
+  },
+  "peerDependencies": {
+    "elysia": "^1.4.30",
+    "kay": "~1.37.0 || ~1.38.0"
+  },
+  "dependencies": {
+    "nodemailer": "^10.0.16"
+  },
+  "devDependencies": {
+    "@kaynooo/eslint": "^6.1.0",
+    "@types/bun": "^1.4.2",
+    "@typescript/native-preview": "^7.0.0-dev.20260707.2",
+    "elysia": "^1.4.30",
+    "kay": "npm:@kaynooo/kayjs@~1.38.0",
+    "typescript": "^6.0.3"
+  }
+}

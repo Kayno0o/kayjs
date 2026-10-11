@@ -1,0 +1,21 @@
+---
+import type { Field } from './types'
+import { withBreaks } from './breaks'
+import settings from './settings'
+
+// `empty` stands in for a value left out or blank, `-` by default.
+const { fields, empty = '-' } = props<{ fields: Field[], empty?: string | undefined }>()
+---
+// Row headers, which the text part writes as `Label: value`, one field to a line.
+table(role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 16px")
+  for field, i of fields key={i}
+    tr
+      th(class="km-muted" scope="row" align="left" valign="top" style={`padding:6px 16px 6px 0;font-size:12px;line-height:1.6;font-weight:400;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;vertical-align:top;text-align:left;color:${settings.muted}`}) {field.label}
+      if field.value?.trim()
+        td(class="km-text" valign="top" width="100%" style={`padding:6px 0;font-size:15px;line-height:1.6;color:${settings.text};word-break:break-word;overflow-wrap:anywhere`})
+          if field.href as href
+            a(class="km-link" href={href} style={`color:${settings.accent};text-decoration:underline`}) {field.value}
+          else
+            | {withBreaks(field.value)}
+      else
+        td(class="km-muted" valign="top" width="100%" style={`padding:6px 0;font-size:15px;line-height:1.6;color:${settings.muted}`}) {empty}
