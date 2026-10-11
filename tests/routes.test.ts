@@ -21,7 +21,7 @@ describe('kay routes', () => {
       Bun.write(join(root, 'src/server.ts'), 'export {}\n'),
       Bun.write(join(root, 'src/routes/about.kay'), '--- server\nexport const page = { guards: false }\n---\nh1 About\n'),
       Bun.write(join(root, 'src/routes/items/[id=integer].kay'), '--- server\nconst ids = [{ id: 1 }]\n\nexport const page = { guards: false, prerender: ids }\n---\nh1 Item\n'),
-      Bun.write(join(root, 'src/api/chat.ts'), 'import { Elysia } from \'elysia\'\n\nconsole.log(\'connecting\')\n\nexport default new Elysia().ws(\'/\', { message() {} }).options(\'/\', () => \'\')\n'),
+      Bun.write(join(root, 'src/api/chat.ts'), 'import { Elysia } from \'elysia\'\n\nconsole.log(\'connecting\')\nconsole.debug(\'debugging\')\nconsole.dir({ ok: 1 })\nprocess.stdout.write(\'written\\n\')\n\nexport default new Elysia().ws(\'/\', { message() {} }).options(\'/\', () => \'\')\n'),
       Bun.write(join(root, 'src/api/exits.ts'), 'process.exit(7)\n'),
       Bun.write(join(root, 'lib/api/_guard.ts'), 'import { guard } from \'kay\'\n\nexport default guard(() => {})\n'),
       Bun.write(join(root, 'lib/api/session.ts'), 'import { Elysia } from \'elysia\'\n\nexport default new Elysia().get(\'/\', () => 1)\n'),
@@ -33,6 +33,9 @@ describe('kay routes', () => {
       Bun.write(join(root, 'src/routes/llms.txt.ts'), 'export function GET() {\n  return \'hi\'\n}\n'),
       Bun.write(join(root, 'src/api/items.ts'), 'import { Elysia } from \'elysia\'\nimport { api } from \'kay/server\'\n\napi({ guards: false })\n\nexport default new Elysia().get(\'/\', () => []).post(\'/:id\', () => 1)\n'),
       Bun.write(join(root, 'src/api/broken.ts'), 'throw new Error(\'no database\')\n'),
+      Bun.write(join(root, 'src/api/Status.ts'), 'import { Elysia } from \'elysia\'\n\nexport default new Elysia().get(\'/\', () => \'ok\')\n'),
+      Bun.write(join(root, 'src/routes/greet.kay'), '--- server\nimport Hello from \'../components/hello.kay\'\n\nexport const page = { guards: false }\n---\nHello(server)\n'),
+      Bun.write(join(root, 'src/components/hello.kay'), 'p Hi\n'),
     ])
 
     try {
@@ -40,7 +43,7 @@ describe('kay routes', () => {
       const [listing, errors, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
       const lines = listing.trim().split('\n').map(line => line.trim().replaceAll(/ {2,}/g, ' | '))
 
-      expect(errors).toBe('connecting\n')
+      expect(errors).toBe('connecting\ndebugging\n{ ok: 1 }\nwritten\n')
       expect(code).toBe(0)
       expect(lines).toEqual([
         'GET | /about | page | src/routes/about.kay, en, open',
@@ -50,6 +53,9 @@ describe('kay routes', () => {
         'layouts src/routes/_layout.kay',
         'guards | src/routes/admin/_guard.ts',
         'GET | /fr/admin/report | page | src/routes/admin/report.kay, fr, prerendered',
+        'GET | /greet | page | src/routes/greet.kay, en, prerendered, open',
+        'layouts src/routes/_layout.kay',
+        'GET | /fr/greet | page | src/routes/greet.kay, fr, prerendered, open',
         'GET | / | page | src/routes/index.kay, en, open',
         'layouts src/routes/_layout.kay',
         'GET | /fr | page | src/routes/index.kay, fr, open',
@@ -63,6 +69,7 @@ describe('kay routes', () => {
         'GET | /llms.txt | endpoint | src/routes/llms.txt.ts, 403: no guard under requireGuards',
         'GET | /api/lib/session | api | lib/api/session.ts',
         'guards | lib/api/_guard.ts',
+        'GET | /api/Status | api | src/api/Status.ts, 403: no guard under requireGuards',
         '? | /api/broken/* | api | src/api/broken.ts, not loaded: no database, 403: no guard under requireGuards',
         'WS | /api/chat | api | src/api/chat.ts, 403: no guard under requireGuards',
         'OPTIONS | /api/chat | api | src/api/chat.ts, 403: no guard under requireGuards',
@@ -88,6 +95,29 @@ describe('kay routes', () => {
         'GET | /sw.js | kay | service worker',
         '',
         'Not listed: the routes src/server.ts and the extension built\'s server plugin add when the server starts.',
+      ])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  }, 30_000)
+
+  it('lists a page once per locale\'s host with domains', async () => {
+    const root = await scratchDir('routes-domains-')
+
+    await Promise.all([
+      Bun.write(join(root, 'kay.config.ts'), 'export default { i18n: { locales: [\'en\', \'fr\'], defaultLocale: \'en\', domains: { en: \'example.com\', fr: \'example.fr\' }, paths: { \'/about\': { fr: \'/a-propos\' } } } }\n'),
+      Bun.write(join(root, 'src/routes/about.kay'), 'h1 About\n'),
+    ])
+
+    try {
+      const child = Bun.spawn([process.execPath, cli, 'routes'], { cwd: root, stdout: 'pipe', stderr: 'pipe' })
+      const [listing, code] = await Promise.all([new Response(child.stdout).text(), child.exited])
+
+      expect(code).toBe(0)
+      expect(listing.split('\n').slice(0, 2).map(line => line.trim().replaceAll(/ {2,}/g, ' | '))).toEqual([
+        'GET | /about | page | src/routes/about.kay, en at example.com',
+        'GET | /a-propos | page | src/routes/about.kay, fr at example.fr',
       ])
     }
     finally {

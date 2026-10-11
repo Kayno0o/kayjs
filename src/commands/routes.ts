@@ -2,6 +2,7 @@ import type { KayConfig } from '../config'
 import type { LocaleSettings } from '../runtime/i18n'
 import type { GuardFile, Route } from '../server/routes'
 import type { Command } from './command'
+import { Console } from 'node:console'
 import { existsSync } from 'node:fs'
 import { relative } from 'node:path'
 import process from 'node:process'
@@ -45,6 +46,8 @@ interface Listed {
 
 const ROUTE_METHODS = /^(?:get|post|put|patch|delete|head|options|all|ws)$/i
 const PARAM = /:([^/?]+)/g
+// What the console writes to stdout, where the listing goes.
+const STDOUT_METHODS = ['log', 'info', 'debug', 'dir', 'dirxml', 'table', 'group', 'groupCollapsed', 'groupEnd', 'count', 'countReset', 'time', 'timeEnd', 'timeLog']
 const SVG_ICON = '/favicon.svg'
 const MASKABLE_ICON = /^\/icon-maskable-/
 
@@ -134,12 +137,17 @@ async function apiRoutes(root: string, config: KayConfig): Promise<Listed[]> {
   return listed
 }
 
-// An API module runs as it is imported: what it prints goes to stderr, off the listing, and its `process.exit()` fails it alone.
+// An API module runs as it is imported: what it writes to stdout goes to stderr, off the listing, and its `process.exit()` fails it alone.
 async function importApi(file: string): Promise<{ default?: unknown }> {
-  const { log, info } = console
-  const exit = process.exit.bind(process)
+  const toStderr = new Console({ stdout: process.stderr, stderr: process.stderr })
+  const saved = STDOUT_METHODS.map(name => [name, Reflect.get(console, name)] as const)
+  const write: unknown = Reflect.get(process.stdout, 'write')
+  const exit: unknown = Reflect.get(process, 'exit')
 
-  console.log = console.info = console.error
+  for (const name of STDOUT_METHODS)
+    Reflect.set(console, name, (Reflect.get(toStderr, name) as (...args: unknown[]) => void).bind(toStderr))
+
+  Reflect.set(process.stdout, 'write', process.stderr.write.bind(process.stderr))
   process.exit = (code?: number) => {
     throw new Error(`it calls process.exit(${code ?? ''})`)
   }
@@ -148,9 +156,11 @@ async function importApi(file: string): Promise<{ default?: unknown }> {
     return await importModule<{ default?: unknown }>(file)
   }
   finally {
-    console.log = log
-    console.info = info
-    process.exit = exit
+    for (const [name, method] of saved)
+      Reflect.set(console, name, method)
+
+    Reflect.set(process.stdout, 'write', write)
+    Reflect.set(process, 'exit', exit)
   }
 }
 

@@ -182,6 +182,24 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     await fresh.close()
   })
 
+  it('reloads the page in its own history entry on a refresh when the swap cannot load', async () => {
+    const fresh = await browser.newPage()
+
+    await fresh.route(/\/page-swap-[^/]*\.js$/, async route => route.abort())
+    await fresh.goto(origin)
+    await fresh.evaluate(() => {
+      (window as { kayAlive?: boolean }).kayAlive = true
+    })
+
+    const entries = await fresh.evaluate(() => history.length)
+
+    await fresh.click('button.bump')
+    await fresh.waitForFunction(() => (window as { kayAlive?: boolean }).kayAlive === undefined && document.readyState === 'complete')
+
+    expect(await fresh.evaluate(() => [location.pathname, history.length])).toEqual(['/', entries])
+    await fresh.close()
+  })
+
   it('leaves a form to the server when its checks cannot load, reporting no error', async () => {
     const fresh = await browser.newPage()
     const posts: string[] = []

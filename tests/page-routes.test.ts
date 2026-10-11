@@ -36,12 +36,14 @@ describe('routeTable', () => {
     expect(match(about, '/orgs/acme')).toBeUndefined()
   })
 
-  it('tries the pages a matcher checks before the one without, then by file', () => {
+  it('tries the pages a matcher checks before the one without, then by file path in code-point order, upper case first', () => {
     const plain = served('items/[id].kay')
     const even = served('items/[id=even].kay')
-    const table = routeTable([plain, even], undefined)
+    const admin = served('(admin)/items/[id=odd].kay')
+    const site = served('(Site)/items/[id=prime].kay')
+    const table = routeTable([plain, admin, even, site], undefined)
 
-    expect(table.paths.get('/items/:p2')!.get(undefined)!.candidates.map(candidate => candidate.route)).toEqual([even, plain])
+    expect(table.paths.get('/items/:p2')!.get(undefined)!.candidates.map(candidate => candidate.route)).toEqual([site, admin, even, plain])
   })
 })
 

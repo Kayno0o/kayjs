@@ -15,6 +15,13 @@ import { NativeRequest, withNatives } from '../src/test/natives'
 import { readPage } from '../src/test/page'
 import { resetTodos } from './fixtures/site/src/data'
 
+async function until(condition: () => boolean, timeout = 5000): Promise<void> {
+  for (const start = Date.now(); !condition(); await Bun.sleep(5)) {
+    if (Date.now() - start > timeout)
+      throw new Error('timed out')
+  }
+}
+
 const routes = 'tests/fixtures/site/src/routes'
 
 // The schema of the admin page's actions, which take a name.
@@ -335,14 +342,13 @@ describe('kay/test', () => {
 
     try {
       void readActionResponse(new Response(null, { status: 303, headers: { 'x-kay-redirect': '/about' } }), '/_kay/action/test/go')
-      await Bun.sleep(10)
+      await until(() => asked.length > 0)
       expect([asked, window.location.href]).toEqual([['/about'], 'http://localhost/admin'])
 
       leaving = true
       void readActionResponse(new Response(null, { status: 303, headers: { 'x-kay-redirect': '/about' } }), '/_kay/action/test/go')
-      // The swap is imported first, which takes a tick.
-      await Bun.sleep(10)
-      expect(window.location.href).toBe('http://localhost/about')
+      // The swap is imported first.
+      await until(() => window.location.href === 'http://localhost/about')
       await expect(readActionResponse(new Response(null, { status: 303, headers: { 'x-kay-redirect': 'javascript:alert(1)' } }), '/_kay/action/test/go')).rejects.toThrow('which is no page')
       expect(window.location.href).toBe('http://localhost/about')
     }

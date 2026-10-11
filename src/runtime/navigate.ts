@@ -151,8 +151,8 @@ async function follow(url: URL, swap: Swap): Promise<void> {
     swapper = await loadSwap()
   }
   catch {
-    // Going back made its entry already; a refresh loads the URL shown, which the browser takes no new entry for either.
-    leave(url, swap.intent === 'traverse' || swap.intent === 'refresh')
+    // Going back made its entry already; a refresh loads the URL shown, which the browser replaces rather than adds an entry for.
+    leave(url, swap.intent === 'traverse')
 
     return
   }
