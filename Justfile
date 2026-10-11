@@ -25,9 +25,9 @@ release level:
 watch-runs after:
 	#!/usr/bin/env bash
 	set -euo pipefail
-	for _ in $(seq 1 120); do
+	for _ in $(seq 1 240); do
 	  # Sleeping first gives a push's runs time to all appear, so one finishing early is not taken for the lot.
-	  sleep 20
+	  sleep 10
 	  runs=$(tea actions runs ls -o json --limit 10 | jq -c --argjson after {{after}} '[.[] | select((.id | tonumber) > $after) | {id, status}]')
 	  if jq -e 'any(.status == "failure" or .status == "cancelled")' <<<"$runs" >/dev/null; then
 	    echo "a run failed: $runs" >&2
