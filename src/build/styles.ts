@@ -64,7 +64,8 @@ export async function styleSignature(path: string, source: string): Promise<stri
 export function styleImports(root: string, libraries: KayLibrary[] = []): BunPlugin {
   const project = root + sep
   // Tailwind reads the class names of every module the bundle parses, so importing the ones kay collected from the `.class` shorthand hands them over with no `@source` line.
-  const classes = `import ${JSON.stringify(projectPaths(root).classes)}\n`
+  const classesFile = projectPaths(root).classes
+  const classes = `import ${JSON.stringify(classesFile)}\n`
   const resolve = (specifier: string, importer: string): string | undefined => {
     try {
       return Bun.resolveSync(specifier, dirname(importer))
@@ -141,6 +142,8 @@ export function styleImports(root: string, libraries: KayLibrary[] = []): BunPlu
         return { contents: classes + contents + styles + content, loader: 'js' }
       })
       build.onLoad({ filter: SCRIPT_FILE }, async ({ path }) => ({ contents: await imports(await Bun.file(path).text(), path, scriptLoader(path)), loader: 'js' }))
+      // Bun resolves a file through the listing of its directory a build of the same process still running took, which the class list written since may be missing from.
+      build.onResolve({ filter: new RegExp(`^${RegExp.escape(classesFile)}$`) }, () => ({ path: classesFile }))
       // `url(/logo.png)` points at a public file the server serves as is.
       build.onResolve({ filter: ABSOLUTE_URL }, ({ path, importer }) => CSS_FILE.test(importer) ? { path, external: true } : undefined)
     },

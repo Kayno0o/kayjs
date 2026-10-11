@@ -5,7 +5,7 @@ import { rm } from 'node:fs/promises'
 import { join, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { outputDir } from '../build/assets'
-import { bundleIslands, bundleStyles, clearClientOutput, readClientSources, writeClasses } from '../build/client'
+import { bothBundles, bundleIslands, bundleStyles, clearClientOutput, readClientSources, writeClasses } from '../build/client'
 import { sourceWords } from '../build/libraries'
 import { mapBundleToKay } from '../build/sourcemap'
 import { styleSignature } from '../build/styles'
@@ -121,7 +121,7 @@ export function devBuilder(root: string, options: ClientOptions): (changed: stri
 
     await writeClasses(root, sources.classes)
 
-    const [scripts, styles] = await Promise.all([islandsAgain ? bundleIslands(root, sources.islands, options) : undefined, stylesAgain ? bundleStyles(root, sources, options) : undefined])
+    const [scripts, styles] = await bothBundles(islandsAgain ? bundleIslands(root, sources.islands, options) : Promise.resolve(undefined), stylesAgain ? bundleStyles(root, sources, options) : Promise.resolve(undefined))
     const manifest: ClientManifest = { ...scripts?.manifest ?? previous!.islands, styles: styles?.styles ?? previous!.styles, problems: sources.problems, options: key }
     const text = JSON.stringify(manifest)
 

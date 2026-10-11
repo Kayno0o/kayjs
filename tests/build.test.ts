@@ -1037,6 +1037,59 @@ describe('the files a build writes', () => {
     }
   })
 
+  it('finds the class list it writes while another build of the process still reads .kay as it was before', async () => {
+    const root = await scratchProject({ 'src/routes/index.kay': '---\nimport \'./theme.css\'\n---\np.note Hi\n', 'src/routes/theme.css': 'p { color: red }\n', '.kay/held.txt': '' })
+    const listed = Promise.withResolvers<void>()
+    const released = Promise.withResolvers<void>()
+    // Bun lists the directory of a file it resolves once for a build, and a build it starts meanwhile reads that listing.
+    const holding = Bun.build({ entrypoints: [join(root, '.kay/held.txt')], throw: false, plugins: [{ name: 'hold', setup: build => void build.onLoad({ filter: /held\.txt$/ }, async () => {
+      listed.resolve()
+      await released.promise
+
+      return { contents: '', loader: 'js' }
+    }) }] })
+
+    // Released once the stylesheet build started, as the held build would hold its plugins back until then.
+    const started: BunPlugin = { name: 'started', setup: (build) => {
+      if (build.config.entrypoints.some(entry => entry.endsWith('index.kay')))
+        released.resolve()
+    } }
+
+    try {
+      await listed.promise
+      expect((await buildClient(root, { plugins: [started] })).styles.has(join(root, 'src/routes/index.kay'))).toBe(true)
+    }
+    finally {
+      released.resolve()
+      await holding
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('fails a build only once its stylesheets and islands both stopped, so neither writes into the next one', async () => {
+    const root = await scratchProject({ 'src/routes/index.kay': '---\nimport \'./theme.css\'\n---\np Hi\n', 'src/routes/theme.css': 'p { color: red }\n' })
+    let styled = false
+    const plugin: BunPlugin = { name: 'slow', setup: (build) => {
+      if (build.config.entrypoints.some(entry => entry.endsWith('entry.ts')))
+        throw new Error('no islands')
+
+      build.onLoad({ filter: /theme\.css$/ }, async () => {
+        await Bun.sleep(500)
+        styled = true
+
+        return { contents: 'p { color: red }', loader: 'css' }
+      })
+    } }
+
+    try {
+      await expect(buildClient(root, { plugins: [plugin] })).rejects.toThrow('no islands')
+      expect(styled).toBe(true)
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('says an error\'s message when its stack starts with the name alone, in logs and on the page of a server failing to boot', () => {
     const error = new Error('database is locked')
 

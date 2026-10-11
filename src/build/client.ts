@@ -98,7 +98,7 @@ export async function buildClient(root: string, options: ClientOptions = {}): Pr
   await clearClientOutput(root)
   await writeClasses(root, sources.classes)
 
-  const [scripts, styles] = await Promise.all([bundleIslands(root, sources.islands, options), bundleStyles(root, sources, options)])
+  const [scripts, styles] = await bothBundles(bundleIslands(root, sources.islands, options), bundleStyles(root, sources, options))
   const manifest: ClientManifest = { ...scripts.manifest, styles: styles.styles, ...options.hot && { problems: sources.problems } }
 
   await writeManifest(root, manifest)
@@ -109,6 +109,19 @@ export async function buildClient(root: string, options: ClientOptions = {}): Pr
     built.report = await sizeReport(root, clientDir(root), scripts.manifest, sources.islands, options.report === 'modules' ? scripts.inputs : undefined)
 
   return built
+}
+
+// Fails on either only once both stopped, so neither goes on writing into the output of the build after.
+export async function bothBundles<Islands, Styles>(islands: Promise<Islands>, styles: Promise<Styles>): Promise<[Islands, Styles]> {
+  const [scripts, sheets] = await Promise.allSettled([islands, styles])
+
+  if (scripts.status === 'rejected')
+    throw scripts.reason
+
+  if (sheets.status === 'rejected')
+    throw sheets.reason
+
+  return [scripts.value, sheets.value]
 }
 
 // Compiles every component, throwing all of their errors at once.
