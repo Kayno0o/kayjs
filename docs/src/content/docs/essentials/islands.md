@@ -61,7 +61,7 @@ Collapsible(title="Details")
   Counter
 ```
 
-A function, a block with parameters or a class instance cannot be serialized: a component passing one to an island renders as an island itself. A layout or a page with a `--- server` fence cannot, so `kay check` reports it there: move that part to a component.
+A function, a block with parameters or a class instance cannot be serialized: a component passing one to an island renders as an island itself. One whose imports reach no island never does, so its script, server code it imports included, is never built for the browser. A layout or a page with a `--- server` fence cannot, so `kay check` reports it there: move that part to a component.
 
 ## When to hydrate
 

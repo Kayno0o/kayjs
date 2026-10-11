@@ -241,6 +241,53 @@ export async function reachableLibraryFiles(root: string, libraries: KayLibrary[
   return { components: components.sort(), scripts: scripts.sort() }
 }
 
+// Whether `from` reaches one of `targets`, real paths, through its imports: the project's own modules and its kay libraries', never another package's. `edges` keeps each module's imports for the calls of one build.
+export async function reachesAny(root: string, libraries: KayLibrary[], from: string, targets: ReadonlySet<string>, edges = new Map<string, Promise<string[]>>()): Promise<boolean> {
+  const seen = new Set([from])
+  const queue = [from]
+
+  for (let file = queue.pop(); file !== undefined; file = queue.pop()) {
+    let next = edges.get(file)
+
+    if (next === undefined) {
+      next = followedImports(root + sep, libraries, file)
+      edges.set(file, next)
+    }
+
+    for (const path of await next) {
+      if (targets.has(path))
+        return true
+
+      if (!seen.has(path)) {
+        seen.add(path)
+        queue.push(path)
+      }
+    }
+  }
+
+  return false
+}
+
+async function followedImports(project: string, libraries: KayLibrary[], file: string): Promise<string[]> {
+  const found: string[] = []
+
+  for (const specifier of await importsOf(file)) {
+    let path: string
+
+    try {
+      path = realpathSync(Bun.resolveSync(specifier, dirname(file)))
+    }
+    catch {
+      continue
+    }
+
+    if ((KAY_FILE.test(path) || SCRIPT_FILE.test(path)) && (libraryOf(libraries, path) !== undefined || (path.startsWith(project) && !path.includes(`${sep}node_modules${sep}`))))
+      found.push(path)
+  }
+
+  return found
+}
+
 // The words of a file, as Tailwind would read them off a file of the app: class names among them, in a template or a string of a script.
 export function sourceWords(source: string): string[] {
   return source.split(NOT_IN_CLASS).filter(word => word !== '')

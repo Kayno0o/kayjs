@@ -5,7 +5,7 @@ import type { ClientBuild, ClientManifest } from '../server/client'
 import type { KayLibrary } from './libraries'
 import type { ChunkInputs } from './report'
 import type { FileDiagnostic } from './transform'
-import { existsSync } from 'node:fs'
+import { existsSync, realpathSync } from 'node:fs'
 import { mkdir, rm } from 'node:fs/promises'
 import { builtinModules } from 'node:module'
 import { join, relative, resolve } from 'node:path'
@@ -18,7 +18,7 @@ import { PUBLIC_ENV_PATH } from '../server/env'
 import { routeMounts } from '../server/routes'
 import { ASSET_PREFIX, clientDir, outputDir } from './assets'
 import { findKayFiles, writeIfChanged } from './files'
-import { findKayLibraries, reachableLibraryFiles, sourceWords } from './libraries'
+import { findKayLibraries, reachableLibraryFiles, reachesAny, sourceWords } from './libraries'
 import { throughLinks } from './links'
 import { kay } from './plugin'
 import { sizeReport } from './report'
@@ -141,14 +141,26 @@ export async function readClientSources(root: string, options: ClientOptions = {
         problems.push(formatDiagnostic(source, relative(root, file), diagnostic))
     }
 
-    // A static component that may render as an island gets a chunk too, which a page loads only when it does.
-    const island = compiled.island ?? compiled.promote
-
-    if (island !== undefined)
-      islands.set(island, file)
+    if (compiled.island !== undefined)
+      islands.set(compiled.island, file)
 
     for (const name of compiled.classes)
       classes.add(name)
+  }
+
+  // A static component that may render as an island gets a chunk too, which a page loads only when it does: when it hands an island it renders what only an island sends.
+  // One reaching no island through its imports never does, and its chunk would only bundle for the browser what its script imports, a library's server code included.
+  const islandFiles = new Set([...islands.values()].map(file => realpathSync(file)))
+  const edges = new Map<string, Promise<string[]>>()
+  const promoted = await Promise.all(files.map(async (file, index) => {
+    const { island, promote } = analyses[index]!
+
+    return island === undefined && promote !== undefined && islandFiles.size > 0 && await reachesAny(root, libraries, realpathSync(file), islandFiles, edges) ? promote : undefined
+  }))
+
+  for (const [index, promote] of promoted.entries()) {
+    if (promote !== undefined)
+      islands.set(promote, files[index]!)
   }
 
   // Tailwind reads the app's files itself, never a package's, so the words of the library files the app reaches go to it here: its components, and its scripts holding default classes.

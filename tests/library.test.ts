@@ -178,6 +178,36 @@ describe('kay libraries', () => {
     expect(classes).not.toContain('lib-unused-class')
   })
 
+  it('builds a library with no island whose components hand a child what a function of its server code returns, the app\'s settings importing its main entry', async () => {
+    const project = await scratchDir('mail-lib-')
+    const out = join(project, 'out')
+
+    projects.push(project)
+    await write(project, {
+      'package.json': JSON.stringify({ name: 'app', private: true, dependencies: { 'mail-lib': '1.0.0' } }),
+      'tsconfig.json': PROJECT['tsconfig.json']!,
+      'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ settings: { \'mail-lib\': \'./src/mail-settings.ts\' } })\n',
+      'src/mail-settings.ts': 'import { defaults } from \'mail-lib\'\n\nexport default { ...defaults, accent: \'red\' }\n',
+      'src/routes/index.kay': '---\nimport Notice from \'mail-lib/notice.kay\'\n---\nmain\n  Notice(kind="link")\n',
+    })
+    await write(join(project, 'node_modules/mail-lib'), {
+      'package.json': JSON.stringify({ name: 'mail-lib', version: '1.0.0', type: 'module', peerDependencies: { kay: '*' }, exports: { './*.kay': './src/*.kay', '.': './src/index.ts' }, kay: { settings: './src/settings' } }),
+      'src/defaults.ts': 'export const defaults = { accent: \'blue\' }\n',
+      'src/settings.ts': 'export { defaults as default } from \'./defaults\'\n',
+      'src/render.ts': 'import type { JSX } from \'kay\'\nimport { renderToString } from \'kay/server\'\n\nexport const LINKS = new Set([\'link\'])\n\nexport async function render(view: () => JSX.Element): Promise<string> {\n  return renderToString(view)\n}\n',
+      'src/words.ts': 'import { LINKS } from \'./render\'\n\nexport function words(kind: string): string {\n  return LINKS.has(kind) ? \'Follow it\' : \'Read it\'\n}\n',
+      'src/heading.kay': '---\nimport settings from \'./settings\'\n\nconst { text } = props<{ text: string }>()\n---\nh1(style={`color: ${settings.accent}`}) {text}\n',
+      'src/notice.kay': '---\nimport Heading from \'./heading.kay\'\nimport { words } from \'./words\'\n\nconst { kind } = props<{ kind: string }>()\n---\nHeading(text={words(kind)})\n',
+      'src/index.ts': 'export { defaults } from \'./defaults\'\nexport { render } from \'./render\'\nexport { words } from \'./words\'\n',
+    })
+
+    const { code, output } = await run('build', project, '--static', '--outdir', out)
+
+    expect(output).not.toContain('error')
+    expect(code).toBe(0)
+    expect(await Bun.file(join(out, 'index.html')).text()).toContain('<h1 style="color: red">Follow it</h1>')
+  })
+
   it('renders with the app\'s settings under kay test, whose preload registers the loader', async () => {
     const project = await newProject()
 
