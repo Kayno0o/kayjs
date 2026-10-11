@@ -1,9 +1,9 @@
-import type { AwaitNode, ConstNode, ElementNode, ErrorMessages, ForNode, IfNode, Node, Span, TryNode } from './ast'
+import type { AwaitNode, ConstNode, ElementNode, ErrorMessages, ForNode, IfNode, Node, Span, TemplateFacts, TryNode } from './ast'
 import type { DynamicItem } from './items'
 import type { CodeBuilder } from './mapping'
 import type { PlannedAttribute } from './markup'
 import { keyedByPosition, marksServerIsland } from './ast'
-import { decodeEntities, isFunctionExpression } from './expression'
+import { decodeEntities, isFunctionAt } from './expression'
 import { childItems, constDeclaration, errorParagraphArguments, slotValue, soleDynamic } from './items'
 import { describedValue, END_MARKER, escapeStaticAttribute, escapeText, helperName, RAW_ELEMENTS, START_MARKER, TemplateWriter, VOID_ELEMENTS } from './markup'
 
@@ -37,8 +37,8 @@ export class DomTemplate extends TemplateWriter {
 
   // `errors`: what a refused form's fields are described by.
   // `located`, in development: the source position each element carries for `kay dev`'s inspector.
-  constructor(b: CodeBuilder, src: string, forms: ReadonlyMap<Node, Span>, private readonly errors?: ErrorMessages, private readonly located?: (element: ElementNode) => string | undefined) {
-    super(b, src, forms)
+  constructor(b: CodeBuilder, src: string, facts: TemplateFacts, private readonly errors?: ErrorMessages, private readonly located?: (element: ElementNode) => string | undefined) {
+    super(b, src, facts)
   }
 
   // A block: one element, or a fragment of its items, or `null` when empty.
@@ -140,8 +140,8 @@ export class DomTemplate extends TemplateWriter {
 
         break
       case 'error':
-        if (this.forms.has(item.node)) {
-          const target = this.forms.get(item.node)!
+        if (this.facts.forms.has(item.node)) {
+          const target = this.facts.forms.get(item.node)!
 
           b.wrap(item.node, () => {
             b.add(`KayInsert(${at}, () => ${helperName('errorParagraph')}(KayFormError((`).addSource(target).add(`), ${JSON.stringify(item.node.name)}), ${errorParagraphArguments(item.node, this.src, this.errors?.lines.get(item.node))}));`)
@@ -571,7 +571,7 @@ export class DomTemplate extends TemplateWriter {
     return (variable) => {
       b.add(`KayListen(${variable(node)}, ${JSON.stringify(name)}, `)
 
-      if (isFunctionExpression(this.source(expression)))
+      if (isFunctionAt(this.src, expression, this.facts.functions))
         b.add('(').addSource(expression).add(')')
       else
         b.add('(kayEvent) => (').addSource(expression).add(')?.(kayEvent)')

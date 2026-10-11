@@ -420,6 +420,10 @@ export interface TemplateFacts {
   try: boolean
   // The shorthand classes of elements and `error` lines, `.card`, as written.
   classes: string[]
+  // The action of the form each node sits in, from `formTargets`.
+  forms: Map<Node, Span>
+  // Whether each attribute expression asked about, by where it starts, is a function: filled as the passes ask, each parsed once.
+  functions: Map<number, boolean>
 }
 
 export interface KayFile {
@@ -505,4 +509,64 @@ export function formTargets(nodes: readonly Node[], source: string): Map<Node, S
 // Whether `found` holds for a node of the template, nested ones included.
 export function someNode(nodes: readonly Node[], found: (node: Node) => boolean): boolean {
   return nodes.some(node => found(node) || childBlocks(node).some(block => someNode(block, found)))
+}
+
+const INTERACTIVE_ATTRIBUTE = /^(?:on[A-Z]|bind:|ref$)/
+const IDENTIFIER = /^[A-Z_$][\w$]*$/i
+
+// What every output and check of a file reads off its template, found once and kept on the file.
+export function templateFacts(file: KayFile): TemplateFacts {
+  if (file.facts)
+    return file.facts
+
+  const facts: TemplateFacts = { interactive: false, actionForm: false, helpers: new Set(), awaited: new Set(), slot: false, childrenSlot: false, await: false, try: false, classes: [], forms: formTargets(file.template, file.source), functions: new Map() }
+  const text = (span: Span) => file.source.slice(span.start, span.end)
+
+  visitNodes(file.template, (node) => {
+    if (node.kind === 'element') {
+      facts.interactive ||= node.attributes.some(attribute => attribute.kind !== 'spread' && INTERACTIVE_ATTRIBUTE.test(text(attribute.name)))
+      facts.actionForm ||= actionOf(node, file.source) !== undefined
+      facts.slot ||= isSlot(node)
+      facts.childrenSlot ||= isChildrenSlot(node)
+      facts.classes.push(...node.classes.map(text))
+
+      if (mergesComponentClass(node, file.source))
+        facts.helpers.add('componentClass')
+    }
+    else if (node.kind === 'for') {
+      facts.helpers.add('For')
+    }
+    else if (node.kind === 'if' && node.branches.some(branch => branch.alias)) {
+      facts.helpers.add('Show')
+    }
+    else if (node.kind === 'await') {
+      const value = text(node.value).trim()
+
+      facts.await = true
+
+      if (IDENTIFIER.test(value))
+        facts.awaited.add(value)
+    }
+    else if (node.kind === 'try') {
+      facts.try = true
+    }
+    else if (node.kind === 'error') {
+      facts.classes.push(...node.classes.map(text))
+    }
+  })
+
+  return file.facts = facts
+}
+
+// A component call whose `class` merges several parts, which it gets as one string: a shorthand with a `class` expression, or a spread next to a shorthand or a `class`.
+function mergesComponentClass(element: ElementNode, source: string): boolean {
+  if (!element.component)
+    return false
+
+  const attribute = element.attributes.find((attribute): attribute is NamedAttribute => attribute.kind !== 'spread' && source.slice(attribute.name.start, attribute.name.end) === 'class')
+
+  if (element.attributes.some(attribute => attribute.kind === 'spread'))
+    return element.classes.length > 0 || attribute !== undefined
+
+  return element.classes.length > 0 && attribute?.kind === 'expression'
 }

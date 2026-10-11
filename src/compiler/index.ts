@@ -2,17 +2,18 @@ import type { Diagnostic, Node, Span } from './ast'
 import type { LintLevels } from './lints'
 import type { ImportedSignals, SignalKind } from './module-signals'
 import type { FoundRewrites } from './rewrite'
-import type { ScriptAnalysis, ServerAnalysis } from './script'
+import type { ParsedFence, ScriptAnalysis, ServerAnalysis } from './script'
 import { basename, relative } from 'node:path'
 import process from 'node:process'
-import { drawIcons, visitNodes } from './ast'
+import { drawIcons, templateFacts, visitNodes } from './ast'
 import { browserReads } from './browser'
-import { generate, isInteractive, islandMessages, mayPromote, templateFacts } from './codegen'
+import { generate, isInteractive, islandMessages, mayPromote } from './codegen'
+import { cssImportsWithoutText, deprecatedSchemaNames, separatePageSettings, unboundedFields } from './fence-checks'
 import { applyLints, templateLints } from './lints'
 import { SourceMap } from './mapping'
 import { parseKay } from './parser'
 import { findRewrites } from './rewrite'
-import { analyzeScript, analyzeServer, cssImportsWithoutText, deprecatedSchemaNames, unboundedFields } from './script'
+import { analyzeScript, analyzeServer } from './script'
 import { ISLAND_TWIN } from './twin'
 import { validate } from './validate'
 
@@ -121,7 +122,7 @@ export function compileKay(source: string, filename: string, options: CompileOpt
   }
 
   const final = generate(file, script, server, { ...generateOptions, name, rewrites: found.rewrites, translates: found.translates })
-  const diagnostics = [...file.diagnostics, ...script.diagnostics, ...(server?.diagnostics ?? []), ...validate(file, script, server, generateOptions), ...found.diagnostics]
+  const diagnostics = [...file.diagnostics, ...script.diagnostics, ...(server?.diagnostics ?? []), ...server ? separatePageSettings(source, server) : [], ...validate(file, script, server, generateOptions), ...found.diagnostics]
 
   // Code that does not parse usually already has a better diagnostic from the fence or the template; this one is what is left when nothing else explains it.
   if (found.syntaxError && diagnostics.length === 0)
@@ -135,7 +136,7 @@ export function compileKay(source: string, filename: string, options: CompileOpt
   const broken = diagnostics.some(diagnostic => !diagnostic.checkOnly)
 
   if (options.check)
-    diagnostics.push(...unboundedFields(source, file.server), ...[file.script, file.server].flatMap(fence => fence ? fenceSchemaNames(source, fence) : []), ...[file.script, file.server, file.client].flatMap(fence => fence ? cssImportsWithoutText(source.slice(fence.start, fence.end), fence.start) : []), ...broken ? [] : [...unreadNames(source, file.template, script, server, found), ...constantSignals(source, file.script, found)], ...templateLints(file))
+    diagnostics.push(...unboundedFields(server), ...[script.fence, server?.fence].flatMap(fence => fence ? [...fenceSchemaNames(source, fence), ...cssImportsWithoutText(fence)] : []), ...broken ? [] : [...unreadNames(source, file.template, script, server, found), ...constantSignals(source, file.script, found)], ...templateLints(file))
 
   if (file.client && routeFile)
     diagnostics.push({ ...file.client, message: 'A page, layout or special page cannot be `--- client`', note: 'it renders on the server', help: 'move what needs the browser to a component it renders, and make that one `--- client`' })
@@ -158,8 +159,8 @@ export function compileKay(source: string, filename: string, options: CompileOpt
 
 // Props and server data nothing reads: a prop beside a `...rest` is left out of it on purpose, and a name starting with `_` is unused on purpose, as TypeScript takes it.
 // A fence's `t` from 'kay' is renamed in it alone, so a `t.` read anywhere else in the file keeps the name.
-function fenceSchemaNames(source: string, fence: Span): Diagnostic[] {
-  return deprecatedSchemaNames(source.slice(fence.start, fence.end), fence.start, !MEMBER_OF_T.test(`${source.slice(0, fence.start)} ${source.slice(fence.end)}`))
+function fenceSchemaNames(source: string, fence: ParsedFence): Diagnostic[] {
+  return deprecatedSchemaNames(fence, !MEMBER_OF_T.test(`${source.slice(0, fence.offset)} ${source.slice(fence.offset + fence.code.length)}`))
 }
 
 function unreadNames(source: string, template: Node[], script: ScriptAnalysis, server: ServerAnalysis | undefined, found: FoundRewrites): Diagnostic[] {

@@ -26,10 +26,10 @@ import { findKayLibraries, libraryOf, reachableLibraryFiles, settingsReplacement
 import { importedSignals } from '../build/signals'
 import { cacheEntry } from '../build/transform'
 import { componentName, rendersAsIsland, SourceMap } from '../compiler'
+import { moduleChecks } from '../compiler/fence-checks'
 import { formatReport } from '../compiler/frame'
 import { isLaunchLint, isLint, isLintGroup, LEVELS, lintLevels } from '../compiler/lints'
 import { offsetAt, positionAt } from '../compiler/mapping'
-import { cssImportsWithoutText, deprecatedSchemaNames } from '../compiler/script'
 import { CONFIG_FILE } from '../config'
 import { FEEDS_MARKER, PROBLEMS_MARKER, USES_MARKER } from '../content/server'
 import { projectPaths } from '../project'
@@ -607,7 +607,7 @@ async function moduleLints(root: string, levels: LintLevels | undefined): Promis
     const source = await Bun.file(file).text()
     const levelAt = lintLevels(source, levels)
 
-    return [...deprecatedSchemaNames(source, 0), ...cssImportsWithoutText(source, 0)].flatMap((diagnostic) => {
+    return moduleChecks(source).flatMap((diagnostic) => {
       const level = isLint(diagnostic.code) ? levelAt(diagnostic.code, diagnostic.start) : 'deny'
 
       return level === 'allow' ? [] : [fromCompile(file, source, { ...diagnostic, severity: level === 'warn' ? 'warning' : 'error' })]

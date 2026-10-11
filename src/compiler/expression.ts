@@ -1,10 +1,21 @@
 import type * as t from '@babel/types'
+import type { Span } from './ast'
 import { parseExpression } from '@babel/parser'
 
 // The classes whose instances island props carry.
 export const SENDABLE_CLASSES = new Set(['Date', 'Map', 'Set', 'URL', 'URLSearchParams', 'RegExp'])
 
-export function isFunctionExpression(code: string): boolean {
+// Whether the expression at `span` is a function, parsed once however many passes ask, `known` holding the answers so far.
+export function isFunctionAt(source: string, span: Span, known: Map<number, boolean>): boolean {
+  let found = known.get(span.start)
+
+  if (found === undefined)
+    known.set(span.start, found = isFunctionExpression(source.slice(span.start, span.end)))
+
+  return found
+}
+
+function isFunctionExpression(code: string): boolean {
   try {
     const expression = parseExpression(code, { plugins: ['typescript'] })
 

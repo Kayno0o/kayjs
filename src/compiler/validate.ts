@@ -3,7 +3,7 @@ import type { GenerateOptions } from './codegen'
 import type { LintName } from './lints'
 import type { PageSettingName } from './page-settings'
 import type { ImportBinding, ScriptAnalysis, ServerAnalysis } from './script'
-import { FIELD_ATTRIBUTE, FIELD_ELEMENTS, formTargets, isHead, isSlot, serverIslandOf } from './ast'
+import { FIELD_ATTRIBUTE, FIELD_ELEMENTS, isHead, isSlot, serverIslandOf, templateFacts } from './ast'
 
 export type ValidateOptions = Pick<GenerateOptions, 'island' | 'insideIsland' | 'check' | 'special' | 'includeServer'>
 
@@ -83,7 +83,7 @@ class Validator {
 
   constructor(private readonly file: KayFile, private readonly options: ValidateOptions) {
     this.src = file.source
-    this.forms = formTargets(file.template, file.source)
+    this.forms = templateFacts(file).forms
   }
 
   run(script: ScriptAnalysis, server: ServerAnalysis | undefined): Diagnostic[] {

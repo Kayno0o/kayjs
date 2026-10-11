@@ -1,11 +1,10 @@
 import type { ParseResult } from '@babel/parser'
 import type { NodePath } from '@babel/traverse'
 import type * as t from '@babel/types'
-import type { Diagnostic, Fix, Span } from './ast'
+import type { Diagnostic, Span } from './ast'
 import type { SignalKind } from './module-signals'
 import type { PageSettingName } from './page-settings'
 import { parse } from '@babel/parser'
-import { isSecret } from '../runtime/form'
 import { SENDABLE_CLASSES } from './expression'
 import { PAGE, PAGE_SETTINGS } from './page-settings'
 import { loadTraverse, POSITION_SUFFIX } from './rewrite'
@@ -15,8 +14,6 @@ const STATIC_EXPORTS = new Set(['uid', 'sanitizeHtml', 'trustHtml', 'defer'])
 // What `kay/i18n` exports that makes a component an island; the rest of it reads the locale alike on both sides.
 const REACTIVE_I18N = new Set(['relativeTime'])
 const SIGNAL_TYPES: Record<string, SignalKind> = { Signal: 'signal', Memo: 'memo' }
-// A line break before a line with text: a blank line moving into `page` stays blank.
-const LINE_WITH_TEXT = /\n(?=[^\n])/g
 
 // What a component script, and a server fence, use from `kay` with no import, as they use `props<T>()`: the compiler imports them.
 export const SCRIPT_GLOBALS = ['signal', 'memo', 'effect', 'onMount']
@@ -70,6 +67,15 @@ export interface ScriptAnalysis {
   // The names the component body declares that may hold a function, a class or an instance of one, which no page can send an island.
   functions: string[]
   diagnostics: Diagnostic[]
+  fence?: ParsedFence | undefined
+}
+
+// A fence parsed once, which every analysis and check of it reads: `shift` maps a node to its span in the file.
+export interface ParsedFence {
+  code: string
+  offset: number
+  ast: ParseResult<t.File>
+  shift: (node: t.Node | t.Comment) => Span
 }
 
 // Splits a component script into module-level code (imports, types) and the component body, and finds the props macro.
@@ -80,17 +86,68 @@ export function analyzeScript(source: string, script: Span | undefined, serverNa
   if (!script)
     return analysis
 
-  const parsed = parseFence(source, script, analysis.diagnostics)
+  const split = splitFence(source, script, SCRIPT_GLOBALS.filter(name => !serverNames.includes(name)), serverNames, analysis)
 
-  if (!parsed)
+  if (!split)
     return analysis
 
-  const { ast, shift } = parsed
-  const local = bodyTypes(ast.program.body, serverNames, shift, analysis.diagnostics)
-  let cursor = script.start
+  const { ast, shift } = split
 
-  analysis.implicit = undeclared(ast, source.slice(script.start, script.end), SCRIPT_GLOBALS.filter(name => !serverNames.includes(name)))
-  analysis.reactive = analysis.implicit.length > 0
+  analysis.reactive = analysis.implicit.length > 0 || analysis.imports.some(importsReactiveValue)
+
+  for (const { statement, span, gap } of split.statements) {
+    if (gap)
+      analysis.body.push(gap)
+
+    const props = propsDeclaration(statement, ast.program.body, shift, analysis.diagnostics)
+
+    if (props) {
+      if (analysis.props)
+        analysis.diagnostics.push({ ...props.statement, message: 'A component declares its props once' })
+
+      analysis.props = props
+    }
+    else {
+      if (isExport(statement))
+        analysis.diagnostics.push({ ...span, message: 'A component script exports only types', help: 'move the value to a `.ts` module and import it' })
+
+      analysis.functions.push(...functionNames(statement))
+      analysis.body.push(span)
+    }
+  }
+
+  if (split.tail)
+    analysis.body.push(split.tail)
+
+  reportMisplacedProps(ast, analysis, shift)
+
+  return analysis
+}
+
+// A statement a fence keeps out of module level, with the text between it and the statement before it.
+interface FenceStatement {
+  statement: t.Statement
+  span: Span
+  gap: Span | undefined
+}
+
+type FenceAnalysis = Pick<ScriptAnalysis, 'hoisted' | 'imports' | 'specifiers' | 'implicit' | 'diagnostics' | 'fence'>
+
+// Parses a fence once, moves its imports and types to module level and finds which of `globals` it reads undeclared; the other statements are left in order, then what follows the last.
+// `names` are values from elsewhere that a type of the fence may take the type of, which keeps it out of module level too.
+function splitFence(source: string, fence: Span, globals: string[], names: string[], analysis: FenceAnalysis): (ParsedFence & { statements: FenceStatement[], tail: Span | undefined }) | undefined {
+  const parsed = parseFence(source, fence, analysis.diagnostics)
+
+  if (!parsed)
+    return undefined
+
+  const { ast, shift } = parsed
+  const local = bodyTypes(ast.program.body, names, shift, analysis.diagnostics)
+  const statements: FenceStatement[] = []
+  let cursor = fence.start
+
+  analysis.fence = parsed
+  analysis.implicit = undeclared(ast, parsed.code, globals)
 
   for (const statement of ast.program.body) {
     const span = withLeadingComments(statement, shift)
@@ -99,38 +156,15 @@ export function analyzeScript(source: string, script: Span | undefined, serverNa
       analysis.hoisted.push(span)
       analysis.imports.push(...importBindings(statement, shift))
       analysis.specifiers.push(...moduleSpecifier(statement, shift))
-      analysis.reactive ||= importsReactiveValue(statement)
     }
     else {
-      if (span.start > cursor)
-        analysis.body.push({ start: cursor, end: span.start })
-
-      const props = propsDeclaration(statement, ast.program.body, shift, analysis.diagnostics)
-
-      if (props) {
-        if (analysis.props)
-          analysis.diagnostics.push({ ...props.statement, message: 'A component declares its props once' })
-
-        analysis.props = props
-      }
-      else {
-        if (statement.type === 'ExportNamedDeclaration' || statement.type === 'ExportDefaultDeclaration' || statement.type === 'ExportAllDeclaration')
-          analysis.diagnostics.push({ ...span, message: 'A component script exports only types', help: 'move the value to a `.ts` module and import it' })
-
-        analysis.functions.push(...functionNames(statement))
-        analysis.body.push(span)
-      }
+      statements.push({ statement, span, gap: span.start > cursor ? { start: cursor, end: span.start } : undefined })
     }
 
     cursor = span.end
   }
 
-  if (cursor < script.end)
-    analysis.body.push({ start: cursor, end: script.end })
-
-  reportMisplacedProps(ast, analysis, shift)
-
-  return analysis
+  return { ...parsed, statements, tail: cursor < fence.end ? { start: cursor, end: fence.end } : undefined }
 }
 
 // What a body declaration may hold a function or an instance of a class by: writing one, or a call returning one.
@@ -181,7 +215,7 @@ export interface PageSettings {
 type TextOf = (first: t.Node, last?: t.Node) => string
 
 // A setting exported under its own name, as before `page` held them.
-interface SeparateSetting {
+export interface SeparateSetting {
   name: PageSettingName
   local: Span
   statement: Span
@@ -208,7 +242,10 @@ export interface ServerAnalysis {
   implicit: string[]
   // Names declared at the top of the fence: `load` returns them and the template reads them.
   data: ServerData[]
+  // Settings exported under their own names, which belong in `page`.
+  separate: SeparateSetting[]
   diagnostics: Diagnostic[]
+  fence?: ParsedFence | undefined
 }
 
 // Splits a `--- server` fence into module-level code and the body of `load(ctx)`, and lists the names the page receives.
@@ -216,32 +253,20 @@ export function analyzeServer(source: string, server: Span | undefined): ServerA
   if (!server)
     return undefined
 
-  const analysis: ServerAnalysis = { hoisted: [], imports: [], specifiers: [], exports: [], exportNames: [], actionNames: [], body: [], implicit: [], data: [], diagnostics: [] }
-  const parsed = parseFence(source, server, analysis.diagnostics)
+  const analysis: ServerAnalysis = { hoisted: [], imports: [], specifiers: [], exports: [], exportNames: [], actionNames: [], body: [], implicit: [], data: [], separate: [], diagnostics: [] }
+  const split = splitFence(source, server, SERVER_GLOBALS, [], analysis)
 
-  if (!parsed)
+  if (!split)
     return analysis
 
-  const { ast, shift } = parsed
-  const separate: SeparateSetting[] = []
+  const { ast, shift } = split
   const text: TextOf = (first, last = first) => source.slice(shift(first).start, shift(last).end)
-  const local = bodyTypes(ast.program.body, [], shift, analysis.diagnostics)
-  const exported = ast.program.body.filter(statement => !isHoisted(statement, local) && statement.type === 'ExportNamedDeclaration' && statement.declaration !== null && statement.declaration !== undefined)
-  const perRequest = ast.program.body.filter(statement => !isHoisted(statement, local) && !isExport(statement))
-  const shared = sharedWithExports(ast, exported, perRequest, shift, analysis.diagnostics)
-  let cursor = server.start
+  const kept = split.statements.map(({ statement }) => statement)
+  const exported = kept.filter(statement => statement.type === 'ExportNamedDeclaration' && statement.declaration !== null && statement.declaration !== undefined)
+  const shared = sharedWithExports(ast, exported, kept.filter(statement => !isExport(statement)), shift, analysis.diagnostics)
 
-  analysis.implicit = undeclared(ast, source.slice(server.start, server.end), SERVER_GLOBALS)
-
-  for (const statement of ast.program.body) {
-    const span = withLeadingComments(statement, shift)
-
-    if (isHoisted(statement, local)) {
-      analysis.hoisted.push(span)
-      analysis.imports.push(...importBindings(statement, shift))
-      analysis.specifiers.push(...moduleSpecifier(statement, shift))
-    }
-    else if (statement.type === 'ExportNamedDeclaration' && statement.declaration) {
+  for (const { statement, span, gap } of split.statements) {
+    if (statement.type === 'ExportNamedDeclaration' && statement.declaration) {
       analysis.exports.push(span)
       for (const identifier of declaredIdentifiers(statement.declaration)) {
         analysis.exportNames.push(identifier.name)
@@ -253,10 +278,10 @@ export function analyzeServer(source: string, server: Span | undefined): ServerA
             analysis.actionNames.push(declarator.id.name)
         }
 
-        pageSettings(ast, statement, statement.declaration, span, shift, text, analysis, separate)
+        pageSettings(ast, statement, statement.declaration, span, shift, text, analysis)
       }
       else if (statement.declaration.type === 'FunctionDeclaration' && statement.declaration.id && (PAGE_SETTINGS as readonly string[]).includes(statement.declaration.id.name)) {
-        separate.push(separateFunction(ast, statement, statement.declaration, span, shift, text))
+        analysis.separate.push(separateFunction(ast, statement, statement.declaration, span, shift, text))
       }
     }
     else if (isExport(statement)) {
@@ -268,8 +293,8 @@ export function analyzeServer(source: string, server: Span | undefined): ServerA
         analysis.exports.push(span)
       }
       else {
-        if (span.start > cursor)
-          analysis.body.push({ start: cursor, end: span.start })
+        if (gap)
+          analysis.body.push(gap)
 
         analysis.body.push(span)
       }
@@ -279,17 +304,13 @@ export function analyzeServer(source: string, server: Span | undefined): ServerA
           analysis.data.push({ name: identifier.name, local: nameSpan(identifier, shift) })
       }
     }
-
-    cursor = span.end
   }
-
-  analysis.diagnostics.push(...separatePageSettings(source, analysis, separate))
 
   return analysis
 }
 
 // Reads `export const page` as written, and the settings exported under their own names, as they were before `page`.
-function pageSettings(ast: ParseResult<t.File>, statement: t.Statement, declaration: t.VariableDeclaration, span: Span, shift: (node: t.Node) => Span, text: TextOf, analysis: ServerAnalysis, separate: SeparateSetting[]): void {
+function pageSettings(ast: ParseResult<t.File>, statement: t.Statement, declaration: t.VariableDeclaration, span: Span, shift: (node: t.Node) => Span, text: TextOf, analysis: ServerAnalysis): void {
   for (const declarator of declaration.declarations) {
     if (declarator.id.type !== 'Identifier' || !declarator.init)
       continue
@@ -327,7 +348,7 @@ function pageSettings(ast: ParseResult<t.File>, statement: t.Statement, declarat
     else if ((PAGE_SETTINGS as readonly string[]).includes(name)) {
       const references = declaration.declarations.length === 1 && !declarator.id.typeAnnotation ? referenceCount(ast, statement, name) : 1
 
-      separate.push({ name: name as PageSettingName, local: shift(declarator.id), statement: span, value: text(declarator.init), movable: references === 0 })
+      analysis.separate.push({ name: name as PageSettingName, local: shift(declarator.id), statement: span, value: text(declarator.init), movable: references === 0 })
     }
   }
 }
@@ -400,68 +421,6 @@ function referenceCount(ast: ParseResult<t.File>, statement: t.Statement, name: 
   catch {}
 
   return count
-}
-
-// Settings exported under their own names, with a fix moving every one it can into `page` at once: each diagnostic carries the same fix, applied once.
-function separatePageSettings(source: string, server: ServerAnalysis, separate: SeparateSetting[]): Diagnostic[] {
-  // A fence naming a value `page` itself, as a paginated list often does, renames it before `page` can hold the settings.
-  const taken = !server.page && (server.data.some(data => data.name === PAGE) || server.imports.some(binding => binding.local === PAGE))
-  const movable = taken ? [] : separate.filter(setting => setting.movable && !server.page?.settings.has(setting.name))
-  const fix = movable.length > 0 ? moveIntoPage(source, server.page, movable) : undefined
-
-  return separate.map((setting) => {
-    if (server.page?.settings.has(setting.name))
-      return { ...setting.local, message: `\`${setting.name}\` is set twice, in \`page\` and on its own`, help: 'keep the one in `page`' }
-
-    return {
-      ...setting.local,
-      message: `\`${setting.name}\` is a setting of \`page\`, not an export of its own`,
-      note: 'one `export const page = { ... }` holds every setting of a page, typed and completed in the editor',
-      help: taken ? `rename the fence's own \`page\`, then move it into \`export const page = { ${setting.name}: ... }\`` : `move it into \`export const page = { ${setting.name}: ... }\``,
-      fixes: fix && movable.includes(setting) ? [fix] : [],
-    }
-  })
-}
-
-function moveIntoPage(source: string, page: PageSettings | undefined, settings: SeparateSetting[]): Fix {
-  const entries = settings.map(setting => `${setting.name}: ${indentValue(setting.value)}`)
-  const removals = settings.map(setting => ({ start: setting.statement.start, end: lineEnd(source, setting.statement.end), text: '' }))
-  const title = `Move ${settings.length === 1 ? 'it' : 'them'} into \`page\``
-
-  if (!page) {
-    const [first, ...rest] = removals
-    const single = entries.length === 1 && !entries[0]!.includes('\n')
-    const text = single ? `export const page = { ${entries[0]} }\n` : `export const page = {\n${entries.map(entry => `  ${entry},\n`).join('')}}\n`
-
-    return { title, edits: [{ ...first!, text }, ...rest], safe: true }
-  }
-
-  const inside = source.slice(page.object.start + 1, page.object.end - 1)
-  const multiLine = inside.includes('\n')
-  const trimmed = inside.trimEnd()
-  const end = page.object.start + 1 + trimmed.length
-  let text: string
-
-  if (trimmed.trim() === '')
-    text = multiLine ? `\n${entries.map(entry => `  ${entry},`).join('\n')}` : ` ${entries.join(', ')} `
-  else if (multiLine)
-    text = `${trimmed.endsWith(',') ? '' : ','}\n${entries.map(entry => `  ${entry},`).join('\n')}`
-  else
-    text = `${trimmed.endsWith(',') ? '' : ','} ${entries.join(', ')}`
-
-  return { title, edits: [{ start: end, end, text }, ...removals], safe: true }
-}
-
-// A value moving into `page` one level deeper, unless a template literal's own lines would change with it.
-function indentValue(value: string): string {
-  return value.includes('`') ? value : value.replaceAll(LINE_WITH_TEXT, '\n  ')
-}
-
-// Past the line break ending a statement, so its line goes with it.
-function lineEnd(source: string, end: number): number {
-  const at = source.slice(end).search(/\S|\n/)
-
-  return at !== -1 && source[end + at] === '\n' ? end + at + 1 : end
 }
 
 function isExport(statement: t.Statement): boolean {
@@ -627,7 +586,7 @@ function declaredIdentifiers(statement: t.Statement): t.Identifier[] {
   return found
 }
 
-function parseFence(source: string, span: Span, diagnostics: Diagnostic[]): { ast: ParseResult<t.File>, shift: (node: t.Node | t.Comment) => Span } | undefined {
+export function parseFence(source: string, span: Span, diagnostics: Diagnostic[]): ParsedFence | undefined {
   const code = source.slice(span.start, span.end)
   let ast: ParseResult<t.File>
 
@@ -653,7 +612,7 @@ function parseFence(source: string, span: Span, diagnostics: Diagnostic[]): { as
     diagnostics.push({ start: at, end: at + 1, message: error.message.replace(POSITION_SUFFIX, '') })
   }
 
-  return { ast, shift: node => ({ start: span.start + node.start!, end: span.start + node.end! }) }
+  return { code, offset: span.start, ast, shift: node => ({ start: span.start + node.start!, end: span.start + node.end! }) }
 }
 
 // Markup in a fence reads as JSX, which kay never compiles: the template is the only place for it.
@@ -719,13 +678,14 @@ function undeclared(ast: ParseResult<t.File>, code: string, names: string[]): st
   return found
 }
 
-function importsReactiveValue(statement: t.Statement): boolean {
-  if (statement.type !== 'ImportDeclaration' || statement.importKind === 'type')
+function importsReactiveValue(binding: ImportBinding): boolean {
+  if (binding.typeOnly)
     return false
 
-  const from = statement.source.value
+  if (binding.imported === 'default' || binding.imported === '*')
+    return binding.source === 'kay'
 
-  return statement.specifiers.some(specifier => specifier.type !== 'ImportSpecifier' ? from === 'kay' : specifier.importKind !== 'type' && (from === 'kay' ? !STATIC_EXPORTS.has(importedName(specifier)) : from === 'kay/i18n' && REACTIVE_I18N.has(importedName(specifier))))
+  return binding.source === 'kay' ? !STATIC_EXPORTS.has(binding.imported) : binding.source === 'kay/i18n' && REACTIVE_I18N.has(binding.imported)
 }
 
 // The name an import specifier takes from its module, written as an identifier or, as `import { 'a b' as c }`, a string.
@@ -793,171 +753,7 @@ function leftmost(name: t.Node): string | undefined {
   return name.type === 'Identifier' ? name.name : undefined
 }
 
-// What the quick fix bounds a string field to: room for a title or a name.
-const SUGGESTED_MAX_LENGTH = 200
-
-// A string field of an action's schema with no `maxLength` takes whatever a visitor posts into it, up to the request body limit. A secret, such as a password, is checked or hashed rather than kept or shown, so it needs none.
-export function unboundedFields(source: string, server: Span | undefined): Diagnostic[] {
-  if (!server || !source.slice(server.start, server.end).includes('String'))
-    return []
-
-  const parsed = parseFence(source, server, [])
-
-  if (!parsed)
-    return []
-
-  const diagnostics: Diagnostic[] = []
-
-  eachNode(parsed.ast.program, (node) => {
-    if (node.type !== 'CallExpression' || node.callee.type !== 'Identifier' || node.callee.name !== 'action' || !node.arguments[0])
-      return
-
-    schemaStrings(node.arguments[0], undefined, (call, field) => {
-      const options = call.arguments[0]
-      const known = options === undefined || (options.type === 'ObjectExpression' && options.properties.every(property => property.type !== 'SpreadElement'))
-
-      if (!known || (options?.type === 'ObjectExpression' && options.properties.some(property => property.type !== 'SpreadElement' && propertyKey(property) === 'maxLength')) || (field !== undefined && isSecret(field)))
-        return
-
-      const edit = options === undefined
-        ? { at: call.end! - 1, text: `{ maxLength: ${SUGGESTED_MAX_LENGTH} }` }
-        : options.properties.length === 0 ? { at: options.start! + 1, text: ` maxLength: ${SUGGESTED_MAX_LENGTH} ` } : { at: options.properties[0]!.start!, text: `maxLength: ${SUGGESTED_MAX_LENGTH}, ` }
-      const at = server.start + edit.at
-
-      diagnostics.push({
-        ...parsed.shift(call.callee),
-        code: 'unbounded-string',
-        message: `${field === undefined ? 'This string field' : `The string field ${field}`} has no maxLength`,
-        note: 'it takes whatever a visitor posts, up to the request body limit',
-        help: 'give it one',
-        fixes: [{ title: `Give it a maxLength of ${SUGGESTED_MAX_LENGTH}`, edits: [{ start: at, end: at, text: edit.text }] }],
-        checkOnly: true,
-      })
-    })
-  })
-
-  return diagnostics
-}
-
-const KAY_SCHEMA_T = /\{[^}]*\bt\b[^}]*\}\s*from\s*['"]kay['"]/
-
-// `t` imported from 'kay', the schema builder's name before `s`, in `code` starting at `offset` of its file.
-// The fix renames it throughout `code`, or imports `s as t` where `s` is taken or `t` is read where the fix cannot reach, such as a template (`renamable` false).
-export function deprecatedSchemaNames(code: string, offset: number, renamable = true): Diagnostic[] {
-  if (!KAY_SCHEMA_T.test(code))
-    return []
-
-  let ast: ParseResult<t.File>
-
-  try {
-    ast = parse(code, { sourceType: 'module', plugins: ['typescript'], errorRecovery: true })
-  }
-  catch {
-    return []
-  }
-
-  const diagnostics: Diagnostic[] = []
-  const span = (node: t.Node) => ({ start: offset + node.start!, end: offset + node.end! })
-
-  loadTraverse()(ast, {
-    ImportSpecifier(path: NodePath<t.ImportSpecifier>) {
-      const { imported, local } = path.node
-      const declaration = path.parent as t.ImportDeclaration
-
-      if (declaration.source.value !== 'kay' || imported.type !== 'Identifier' || imported.name !== 't')
-        return
-
-      const references = local.name === 't' ? path.scope.getBinding('t')?.referencePaths ?? [] : []
-      const rename = renamable && local.name === 't' && !path.scope.hasBinding('s') && references.every(reference => !reference.scope.hasBinding('s'))
-      const edits = local.name !== 't'
-        ? [{ ...span(imported), text: 's' }]
-        : rename ? [path.node, ...references.map(reference => reference.node)].map(node => ({ ...span(node), text: 's' })) : [{ ...span(path.node), text: 's as t' }]
-
-      diagnostics.push({
-        ...span(imported),
-        code: 'deprecated-schema-name',
-        message: '`t` from \'kay\' is `s` now',
-        note: '`t` is left to translations, which every template reads without an import',
-        help: 'import `s` and build schemas with `s.Object(...)`',
-        fixes: [{ title: rename ? 'Rename it `s`' : 'Import `s`', edits, safe: true }],
-        checkOnly: true,
-      })
-    },
-  })
-
-  return diagnostics
-}
-
-const CSS_BINDING = /\bimport\b[^;'"]+from\s*['"][^'"\n]+\.css['"]/
-
-// A stylesheet imported for a value with no `with { type: 'text' }`, in `code` starting at `offset` of its file: kay types it as the text it gives with the attribute, which Bun gives only with it.
-export function cssImportsWithoutText(code: string, offset: number): Diagnostic[] {
-  if (!CSS_BINDING.test(code))
-    return []
-
-  let ast: ParseResult<t.File>
-
-  try {
-    ast = parse(code, { sourceType: 'module', plugins: ['typescript'], errorRecovery: true })
-  }
-  catch {
-    return []
-  }
-
-  return ast.program.body.flatMap((node) => {
-    if (node.type !== 'ImportDeclaration' || !node.source.value.endsWith('.css') || node.specifiers.length === 0 || node.importKind === 'type')
-      return []
-
-    if ((node.attributes ?? []).some(({ key, value }) => (key.type === 'Identifier' ? key.name : key.value) === 'type' && value.value === 'text'))
-      return []
-
-    return [{
-      start: offset + node.start!,
-      end: offset + node.end!,
-      code: 'css-import-without-text',
-      message: `${node.source.value} is imported for a value without \`with { type: 'text' }\``,
-      note: 'Bun gives such an import its text only with the attribute',
-      help: 'add `with { type: \'text\' }` for the file\'s text, or import it with no name for the page\'s stylesheets',
-      checkOnly: true,
-    }]
-  })
-}
-
-// Every `s.String(...)` call in a schema, with the name of the field it types, the nearest property holding it.
-function schemaStrings(node: t.Node | null | undefined, field: string | undefined, found: (call: t.CallExpression, field: string | undefined) => void): void {
-  if (!node || typeof node.type !== 'string')
-    return
-
-  if (node.type === 'ObjectProperty') {
-    schemaStrings(node.value, propertyKey(node) ?? field, found)
-
-    return
-  }
-
-  if (node.type === 'CallExpression' && node.callee.type === 'MemberExpression' && node.callee.property.type === 'Identifier' && node.callee.property.name === 'String')
-    found(node, field)
-
-  for (const key of Object.keys(node) as (keyof t.Node)[]) {
-    if (key === 'leadingComments' || key === 'trailingComments' || key === 'innerComments' || key === 'loc')
-      continue
-
-    const value = node[key] as unknown
-
-    for (const child of Array.isArray(value) ? value : [value]) {
-      if (child !== null && typeof child === 'object')
-        schemaStrings(child as t.Node, field, found)
-    }
-  }
-}
-
-function propertyKey(property: t.ObjectProperty | t.ObjectMethod): string | undefined {
-  if (property.computed)
-    return undefined
-
-  return property.key.type === 'Identifier' ? property.key.name : property.key.type === 'StringLiteral' ? property.key.value : undefined
-}
-
-function eachNode(node: t.Node | null | undefined, visit: (node: t.Node) => void) {
+export function eachNode(node: t.Node | null | undefined, visit: (node: t.Node) => void) {
   if (!node || typeof node.type !== 'string')
     return
 

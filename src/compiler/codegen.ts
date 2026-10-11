@@ -1,9 +1,9 @@
-import type { ConstNode, ElementNode, KayFile, NamedAttribute, Node, Span, TemplateFacts, TemplateHelper } from './ast'
+import type { ConstNode, ElementNode, KayFile, Node, Span, TemplateFacts, TemplateHelper } from './ast'
 import type { Rewrite } from './mapping'
 import type { PageSettingName } from './page-settings'
 import type { ImportBinding, ScriptAnalysis, ServerAnalysis } from './script'
 import { actionUrl } from '../runtime/action'
-import { actionOf, errorMessages, formTargets, isChildrenSlot, isHead, isSlot, someNode, visitNodes } from './ast'
+import { errorMessages, isHead, someNode, templateFacts } from './ast'
 import { domHelperImport, DomTemplate } from './dom'
 import { mayHoldFunction } from './expression'
 import { htmlHelperImport, HtmlTemplate } from './html'
@@ -68,7 +68,6 @@ const IMPORT_COMMA_BEFORE = /,\s*$/
 const DEFAULT_PREFIX = '__default_'
 // `kay build` renders the page once when it is `true`.
 const PRERENDER: PageSettingName = 'prerender'
-const IDENTIFIER = /^[A-Z_$][\w$]*$/i
 // The page's query schema, which types and validates `ctx.query`.
 const QUERY: PageSettingName = 'query'
 // `t('nav.home')` or `T(key="intro")`: a message key an island's source names as it is written.
@@ -124,8 +123,6 @@ class ModuleShell {
   // The `--- server` fence, unless this output leaves it out, as a browser build does.
   private readonly fence: ServerAnalysis | undefined
   private readonly facts: TemplateFacts
-  // The action of the form each node sits in, so its fields' names are checked against the action's input.
-  private readonly forms: Map<Node, Span>
   // Server values an `await` block renders by name: `load` defers each where it is declared, so the template changes how the server fence runs.
   private readonly deferred: Set<string>
   private readonly jsx: JsxTemplate
@@ -137,9 +134,8 @@ class ModuleShell {
     this.kind = islandKind(options)
     this.fence = options.includeServer === false ? undefined : server
     this.facts = templateFacts(file)
-    this.forms = formTargets(file.template, file.source)
     this.deferred = deferredData(this.facts, this.fence)
-    this.jsx = new JsxTemplate(this.b, this.src, this.forms, {
+    this.jsx = new JsxTemplate(this.b, this.src, this.facts, {
       check: this.mode === 'check',
       staticLoops: this.staticLoops,
       sendsIslandProps: this.kind === 'static' || this.kind === 'twin',
@@ -312,11 +308,11 @@ class ModuleShell {
     const located = this.options.inspect === true ? sourceLocator(src, this.options.moduleId) : undefined
 
     if (mode === 'html') {
-      new HtmlTemplate(b, src, this.forms, { hydratable: this.options.hydratable, accessorLoops: !this.staticLoops, errors, located }).value(visible)
+      new HtmlTemplate(b, src, this.facts, { hydratable: this.options.hydratable, accessorLoops: !this.staticLoops, errors, located }).value(visible)
       b.add('\n}\n')
     }
     else if (mode === 'dom') {
-      const dom = new DomTemplate(b, src, this.forms, errors, located)
+      const dom = new DomTemplate(b, src, this.facts, errors, located)
 
       dom.block(visible)
       b.add('\n}\n')
@@ -661,8 +657,6 @@ class ModuleShell {
   }
 }
 
-const INTERACTIVE_ATTRIBUTE = /^(?:on[A-Z]|bind:|ref$)/
-
 // A component needs the browser when it handles events, binds inputs, takes refs or holds reactive state.
 export function isInteractive(file: KayFile, script: ScriptAnalysis): boolean {
   return script.reactive || templateFacts(file).interactive
@@ -675,68 +669,12 @@ export function mayPromote(file: KayFile, script: ScriptAnalysis): boolean {
   return someNode(file.template, node => node.kind === 'element' && node.component && (node.attributes.some(attribute => (attribute.kind === 'expression' || attribute.kind === 'spread') && mayHoldFunction(file.source.slice(attribute.expression.start, attribute.expression.end), names)) || node.children.some(child => child.kind === 'slot' && child.params !== undefined)))
 }
 
-export function templateFacts(file: KayFile): TemplateFacts {
-  if (file.facts)
-    return file.facts
-
-  const facts: TemplateFacts = { interactive: false, actionForm: false, helpers: new Set(), awaited: new Set(), slot: false, childrenSlot: false, await: false, try: false, classes: [] }
-  const text = (span: Span) => file.source.slice(span.start, span.end)
-
-  visitNodes(file.template, (node) => {
-    if (node.kind === 'element') {
-      facts.interactive ||= node.attributes.some(attribute => attribute.kind !== 'spread' && INTERACTIVE_ATTRIBUTE.test(text(attribute.name)))
-      facts.actionForm ||= actionOf(node, file.source) !== undefined
-      facts.slot ||= isSlot(node)
-      facts.childrenSlot ||= isChildrenSlot(node)
-      facts.classes.push(...node.classes.map(text))
-
-      if (mergesComponentClass(node, file.source))
-        facts.helpers.add('componentClass')
-    }
-    else if (node.kind === 'for') {
-      facts.helpers.add('For')
-    }
-    else if (node.kind === 'if' && node.branches.some(branch => branch.alias)) {
-      facts.helpers.add('Show')
-    }
-    else if (node.kind === 'await') {
-      const value = text(node.value).trim()
-
-      facts.await = true
-
-      if (IDENTIFIER.test(value))
-        facts.awaited.add(value)
-    }
-    else if (node.kind === 'try') {
-      facts.try = true
-    }
-    else if (node.kind === 'error') {
-      facts.classes.push(...node.classes.map(text))
-    }
-  })
-
-  return file.facts = facts
-}
-
 type KayHelper = 'formAction' | 'formValue' | 'formChecked' | 'formInvalid' | 'formError' | 'formProtection' | 'registerActions' | 'actionStub' | 'autoDefer'
 
 type Helper = TemplateHelper | 'omit'
 
 // The members of `TemplateHelpers` in src/runtime/checks.ts.
 type DeclaredHelper = Helper | 'staticFor' | 'Dynamic' | 'head' | 'Try'
-
-// A component call whose `class` merges several parts, which it gets as one string: a shorthand with a `class` expression, or a spread next to a shorthand or a `class`.
-function mergesComponentClass(element: ElementNode, source: string): boolean {
-  if (!element.component)
-    return false
-
-  const attribute = element.attributes.find((attribute): attribute is NamedAttribute => attribute.kind !== 'spread' && source.slice(attribute.name.start, attribute.name.end) === 'class')
-
-  if (element.attributes.some(attribute => attribute.kind === 'spread'))
-    return element.classes.length > 0 || attribute !== undefined
-
-  return element.classes.length > 0 && attribute?.kind === 'expression'
-}
 
 // `T extends Record<string, U>, const U = number` names `T` and `U`: the first identifier of each parameter, split at the commas outside any brackets.
 function typeParameterNames(parameters: string): string[] {

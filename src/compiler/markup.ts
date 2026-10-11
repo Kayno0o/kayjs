@@ -1,9 +1,9 @@
-import type { Attribute, ElementNode, ErrorMessages, FormField, NamedAttribute, Node, SlotNode, Span, TextNode } from './ast'
+import type { Attribute, ElementNode, ErrorMessages, FormField, NamedAttribute, Node, SlotNode, Span, TemplateFacts, TextNode } from './ast'
 import type { CodeBuilder } from './mapping'
 import { URL_ATTRIBUTES } from '../runtime/base'
 import { PART_END, PART_START } from '../runtime/markers'
 import { actionOf, describedByOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, formFieldOf } from './ast'
-import { decodeEntities, isFunctionExpression } from './expression'
+import { decodeEntities, isFunctionAt } from './expression'
 
 export const VOID_ELEMENTS = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'keygen', 'link', 'menuitem', 'meta', 'param', 'source', 'track', 'wbr'])
 export const RAW_ELEMENTS = new Set(['script', 'style'])
@@ -87,8 +87,7 @@ export interface ElementPlan {
 
 // What the server and browser templates write alike: an element's attributes as props objects and a component's props.
 export abstract class TemplateWriter {
-  // `forms`: the action of the form each node sits in, from `formTargets`.
-  constructor(protected readonly b: CodeBuilder, protected readonly src: string, protected readonly forms: ReadonlyMap<Node, Span>) {}
+  constructor(protected readonly b: CodeBuilder, protected readonly src: string, protected readonly facts: TemplateFacts) {}
 
   // Children rendered as the template renders them: markup on the server, a block in the browser.
   protected abstract rendered(nodes: Node[]): void
@@ -98,7 +97,7 @@ export abstract class TemplateWriter {
 
   protected plan(element: ElementNode, errors: ErrorMessages | undefined): ElementPlan {
     const name = element.name
-    const target = this.forms.get(element)
+    const target = this.facts.forms.get(element)
     const classAttribute = this.classAttribute(element)
     const sizes = this.imageSizes(element)
     const field = target && formFieldOf(element, this.src)
@@ -303,7 +302,7 @@ export abstract class TemplateWriter {
         entry(name, () => b.add(JSON.stringify(decodeEntities(attribute.text))), false)
       else if (!element.component && attribute === actionOf(element, this.src))
         entry(name, () => b.add('KayFormAction((').addSource(attribute.expression).add('))'), true)
-      else if (!element.component && name.startsWith('on') && !isFunctionExpression(this.source(attribute.expression)))
+      else if (!element.component && name.startsWith('on') && !isFunctionAt(this.src, attribute.expression, this.facts.functions))
         entry(name, () => b.add('(kayEvent) => (').addSource(attribute.expression).add(')?.(kayEvent)'), false)
       else
         entry(name, () => b.add('(').addSource(attribute.expression).add(')'), true)

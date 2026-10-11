@@ -1,4 +1,4 @@
-import type { AwaitNode, ElementNode, ErrorMessages, ErrorNode, ForNode, IfBranch, IfNode, NamedAttribute, Node, Span, TryNode } from './ast'
+import type { AwaitNode, ElementNode, ErrorMessages, ErrorNode, ForNode, IfBranch, IfNode, NamedAttribute, Node, Span, TemplateFacts, TryNode } from './ast'
 import type { DynamicItem, Item } from './items'
 import type { CodeBuilder } from './mapping'
 import { actionOf, keyedByPosition, marksServerIsland, serverIslandOf } from './ast'
@@ -65,8 +65,8 @@ class Markup {
 
 // A template as code building its markup: what pages, layouts and static components render to outside islands, with no reactive runtime.
 export class HtmlTemplate extends TemplateWriter {
-  constructor(b: CodeBuilder, src: string, forms: ReadonlyMap<Node, Span>, private readonly options: HtmlOptions = {}) {
-    super(b, src, forms)
+  constructor(b: CodeBuilder, src: string, facts: TemplateFacts, private readonly options: HtmlOptions = {}) {
+    super(b, src, facts)
   }
 
   // The nodes' markup as one string expression; an element's content lets a lone dynamic part go without markers.
@@ -193,7 +193,7 @@ export class HtmlTemplate extends TemplateWriter {
   // Outside a form posting to an action, which `kay check` reports, it renders nothing.
   private error(node: ErrorNode): void {
     const { b } = this
-    const target = this.forms.get(node)
+    const target = this.facts.forms.get(node)
 
     if (!target) {
       b.add('""')

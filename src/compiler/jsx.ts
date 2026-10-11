@@ -1,7 +1,7 @@
-import type { Attribute, AwaitBranch, AwaitNode, ConstNode, ElementNode, ErrorNode, ForNode, IfNode, NamedAttribute, Node, SlotNode, Span, TextNode, TryNode } from './ast'
+import type { Attribute, AwaitBranch, AwaitNode, ConstNode, ElementNode, ErrorNode, ForNode, IfNode, NamedAttribute, Node, SlotNode, Span, TemplateFacts, TextNode, TryNode } from './ast'
 import type { CodeBuilder } from './mapping'
 import { actionOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, isSlot, keyedByPosition, serverIslandOf } from './ast'
-import { isFunctionExpression } from './expression'
+import { isFunctionAt } from './expression'
 import { slotValue } from './items'
 import { DYNAMIC_TAG } from './mapping'
 import { helperName } from './markup'
@@ -32,7 +32,7 @@ const EVENT_HANDLER = /^on[A-Z]/
 
 // A template as JSX: what the analysis pass reads for scope, and `kay check` type-checks.
 export class JsxTemplate {
-  constructor(private readonly b: CodeBuilder, private readonly src: string, private readonly forms: ReadonlyMap<Node, Span>, private readonly options: JsxOptions, private readonly accessorSites: Set<number>, private readonly constSites: Set<number>) {}
+  constructor(private readonly b: CodeBuilder, private readonly src: string, private readonly facts: TemplateFacts, private readonly options: JsxOptions, private readonly accessorSites: Set<number>, private readonly constSites: Set<number>) {}
 
   emitRoot(nodes: Node[]): void {
     const visible = this.withoutSlots(nodes)
@@ -137,7 +137,7 @@ export class JsxTemplate {
   // The field's name is typed as a `name` is: one of the action's input.
   private emitError(node: ErrorNode) {
     const { b } = this
-    const target = this.forms.get(node)
+    const target = this.facts.forms.get(node)
 
     if (!target || !this.options.check)
       return
@@ -504,7 +504,7 @@ export class JsxTemplate {
       return false
 
     const name = this.text(attribute.name)
-    const target = this.forms.get(element)
+    const target = this.facts.forms.get(element)
 
     if (name === FIELD_ATTRIBUTE ? !FIELD_ELEMENTS.has(element.name) : name !== 'name' || !FORM_FIELDS.has(element.name))
       return false
@@ -634,7 +634,7 @@ export class JsxTemplate {
         }
 
         // Read at each event rather than once, as the browser build does, so a handler held by a prop, a signal or a loop item stays current.
-        if (!element.component && !this.options.check && EVENT_HANDLER.test(name) && !isFunctionExpression(this.text(attribute.expression))) {
+        if (!element.component && !this.options.check && EVENT_HANDLER.test(name) && !isFunctionAt(this.src, attribute.expression, this.facts.functions)) {
           b.addSource(attribute.name).add('={(kayEvent) => (').addSource(attribute.expression).add(')?.(kayEvent)}')
 
           return
@@ -697,7 +697,7 @@ export class JsxTemplate {
       return false
 
     // A function never reaches an island, and left unwrapped it takes its parameter types from a generic component's other props.
-    if (isFunctionExpression(this.text(attribute.expression))) {
+    if (isFunctionAt(this.src, attribute.expression, this.facts.functions)) {
       this.emitFunctionPropCheck(element, attribute.name)
       b.add(' ').addSource(attribute.name).add('={').addSource(attribute.expression).add('}')
 
