@@ -337,13 +337,15 @@ function takeTurn(name: string): { ready: Promise<void>, done: () => void } {
   })()
 
   saving.set(name, turn)
-
-  return { ready, done: () => {
-    finished.resolve()
+  // Forgotten once settled, never before: a later call finding no turn would run beside one still pending.
+  void (async () => {
+    await turn
 
     if (saving.get(name) === turn)
       saving.delete(name)
-  } }
+  })()
+
+  return { ready, done: finished.resolve }
 }
 
 // Has a loaded collection's `remove` delete one of its entries, then reads the collection afresh; or resolves why it names none, deleting nothing.

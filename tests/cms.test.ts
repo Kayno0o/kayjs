@@ -476,8 +476,10 @@ describe('the collections a CMS edits', () => {
       const removed = removeEntry('refusing', 'kept')
       const next = saveEntry('refusing', { slug: 'taken', data: { title: 'T' } })
 
-      // While the gate holds the save, an invalid save and another collection's resolve, and the remove waits.
+      // While the gate holds the save, an invalid save and another collection's resolve, and the remove and the save after the invalid one wait.
       expect(await saveEntry('refusing', { slug: 'bad', data: { title: 3 } })).toMatchObject({ issues: [{ path: 'title' }] })
+      const later = saveEntry('refusing', { slug: 'later', data: { title: 'T' } })
+
       expect(await saveEntry('other', { slug: 'free', data: { title: 'T' } })).toEqual({})
       expect(order).toEqual(['save taken'])
       gate.resolve()
@@ -486,8 +488,28 @@ describe('the collections a CMS edits', () => {
       expect(await rejection(thrown)).toMatchObject({ message: 'kept by another editor' })
       expect(await removed).toEqual({})
       expect(await next).toEqual({})
-      expect(order).toEqual(['save taken', 'remove kept', 'save taken'])
-      expect(invalidated).toHaveBeenCalledTimes(2)
+      expect(await later).toEqual({})
+      expect(order).toEqual(['save taken', 'remove kept', 'save taken', 'save later'])
+      expect(invalidated).toHaveBeenCalledTimes(3)
+    })
+  })
+
+  it('passes the turn on from a save whose check throws', async () => {
+    let failing = true
+    const flaky = collection({ name: 'flaky', load: () => {
+      if (failing)
+        throw new Error('the CMS is down')
+
+      return []
+    }, save: () => undefined }, { schema: t.Object({ title: t.String() }) })
+
+    await exporting([['flaky', flaky]], async () => {
+      const thrown = saveEntry('flaky', { slug: 'a', data: { title: 'T' } }, { create: true })
+      const next = saveEntry('flaky', { slug: 'b', data: { title: 'T' } })
+
+      expect(await rejection(thrown)).toMatchObject({ message: 'kay: flaky\'s load threw: the CMS is down' })
+      failing = false
+      expect(await next).toEqual({})
     })
   })
 
@@ -757,6 +779,11 @@ describe('preview mode', () => {
       { collection: 'articles', slug: 'hello', locale: 'fr', path: 'title', message: expect.any(String) },
       { collection: 'posts', slug: 'first', path: '', message: 'names no collection the content config exports' },
     ] })
+    // A draft's data is an object of fields, as a save's is.
+    const listed = await post({ path: '/marks/launch', entries: [{ collection: 'news', slug: 'launch', data: ['Draft title'] }] })
+
+    expect(listed.status).toBe(422)
+    expect(await listed.json()).toEqual({ issues: [{ collection: 'news', slug: 'launch', path: '', message: 'holds a list as its data, not an object of fields' }] })
     expect((await post(draft, preview)).status).toBe(403)
     expect((await post(draft, edit, { origin: 'https://evil.example' })).status).toBe(403)
     expect((await post(draft, edit, { 'sec-fetch-site': 'same-site' })).status).toBe(403)
