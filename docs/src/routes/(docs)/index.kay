@@ -66,20 +66,29 @@ const features = [
   { title: 'One file per component', text: 'TypeScript fences, then an indented template. No JSX, no closing tags.', href: '/essentials/templates' },
   { title: 'HTML first', text: 'Pages render to plain HTML on the server. Only interactive components ship JavaScript.', href: '/essentials/islands' },
   { title: 'Typed forms', text: 'Actions take a schema, work without JavaScript and are called like functions from islands.', href: '/essentials/forms-and-actions' },
-  { title: 'Checked templates', text: 'kay check types every template and reports errors at the .kay line.', href: '/reference/checks' },
+  { title: 'Checked templates', text: 'kay check types every template, checks each link against your routes and reports errors at the .kay line.', href: '/reference/checks' },
 ]
 --- script
 import Accessible from '~icons/tabler/accessible'
+import Activity from '~icons/tabler/activity'
 import Api from '~icons/tabler/api'
 import Bolt from '~icons/tabler/bolt'
+import ClockPlay from '~icons/tabler/clock-play'
+import CloudUpload from '~icons/tabler/cloud-upload'
+import Code from '~icons/tabler/code'
 import Files from '~icons/tabler/files'
 import HandClick from '~icons/tabler/hand-click'
 import Icons from '~icons/tabler/icons'
 import Language from '~icons/tabler/language'
 import Photo from '~icons/tabler/photo'
+import Rocket from '~icons/tabler/rocket'
+import Route from '~icons/tabler/route'
+import ServerBolt from '~icons/tabler/server-bolt'
 import Seo from '~icons/tabler/seo'
 import ShieldLock from '~icons/tabler/shield-lock'
+import Terminal2 from '~icons/tabler/terminal-2'
 import TestPipe from '~icons/tabler/test-pipe'
+import WifiOff from '~icons/tabler/wifi-off'
 import ModuleCard from '../../components/module-card.kay'
 import Pager from '../../components/pager.kay'
 import UiShowcase from '../../components/ui-showcase.kay'
@@ -129,6 +138,10 @@ head
           @icon
             Files
           | Markdown, JSON and YAML collections checked against a schema, with components in Markdown, feeds and CMS sources.
+        ModuleCard(title="File storage" use="kay/server" href="/guides/file-storage")
+          @icon
+            CloudUpload
+          | Uploads kept on disk or in S3 under a key, resized for pages, private ones behind signed links, with upload progress in islands.
         ModuleCard(title="Sessions and guards" use="kay/server" href="/guides/sessions-and-guards")
           @icon
             ShieldLock
@@ -137,14 +150,42 @@ head
           @icon
             Api
           | Elysia modules in src/api, mounted at their path, with server-sent events and websockets.
-        ModuleCard(title="Icons" use="~icons" href="/essentials/styling-and-assets#icons")
+        ModuleCard(title="Navigation" use="kay" href="/essentials/islands#page-navigation")
           @icon
-            Icons
-          | Any Iconify set, imported one icon at a time as a tag that sizes to the text and takes its colour.
+            Route
+          | Links swap the next page in without a reload, keeping what stays, and a persist island plays on from page to page.
+        ModuleCard(title="Server islands" use="server" href="/essentials/routing#server-islands")
+          @icon
+            ServerBolt
+          | One component rendered per request inside a prerendered page, sent with it or fetched as it nears the screen.
         ModuleCard(title="Caching and streaming" use="kay/cache" href="/guides/caching-and-streaming")
           @icon
             Bolt
           | Cache a load or a whole page, and stream the slow parts of a page as they resolve.
+        ModuleCard(title="Background jobs" use="kay/server" href="/guides/background-jobs")
+          @icon
+            ClockPlay
+          | Cron schedules, workers running with the server, and queues whose jobs survive a restart and retry when they fail.
+        ModuleCard(title="Offline" use="offline" href="/essentials/head-and-seo#offline")
+          @icon
+            WifiOff
+          | A service worker keeping the build and the pages you pick, so an installed site opens and hydrates with no connection.
+        ModuleCard(title="Icons" use="~icons" href="/essentials/styling-and-assets#icons")
+          @icon
+            Icons
+          | Any Iconify set, imported one icon at a time as a tag that sizes to the text and takes its colour.
+    section.home-section(aria-labelledby="tooling")
+      h2#tooling Tooling
+      p.section-lede From the first scaffold to the server in production, every step knows .kay files.
+      ul.modules
+        ModuleCard(title="Editor" use="kay lsp" href="/getting-started/installation#editor")
+          @icon
+            Code
+          | A language server for VS Code or any LSP editor: errors, completion with auto-import, rename and formatting in .kay files.
+        ModuleCard(title="New projects" use="kay new" href="/reference/cli#kay-new")
+          @icon
+            Terminal2
+          | A static site, a server or an app with sign-in over Postgres, with Tailwind, ESLint, tests, CI and Docker to pick from.
         ModuleCard(title="Dev inspector" use="kay dev" href="/reference/cli#inspector")
           @icon
             HandClick
@@ -153,6 +194,14 @@ head
           @icon
             TestPipe
           | Visit pages, post forms and sign users in from bun test with no server, or open a page in a headless Chrome.
+        ModuleCard(title="Deployment" use="kay build" href="/guides/deployment")
+          @icon
+            Rocket
+          | The server, its pages and the client build as one executable, a static export, or a Docker image with a health check.
+        ModuleCard(title="Logs and tracing" use="tracer" href="/guides/deployment#logs-and-tracing")
+          @icon
+            Activity
+          | One line per request carrying its id, JSON logs for a collector, and OpenTelemetry spans for each load and render.
     section.home-section(aria-labelledby="libraries")
       h2#libraries Libraries
       p.section-lede Packages built on kay, installed when a site needs them.

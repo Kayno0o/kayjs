@@ -134,6 +134,23 @@ Add `revalidate: '1h'` to `page` to rebuild a prerendered page in the background
 
 </Callout>
 
+### Server islands
+
+`server` on a component call renders that component on each request, inside a page otherwise prerendered: a form with a fresh token, a greeting, a stock count. A page reaching one prerenders with no `prerender` key:
+
+```kay
+--- server
+import { issueToken } from '../contact'
+
+const token = issueToken()
+---
+Hero
+ContactForm(server token={token})
+Reviews(server="defer")
+```
+
+`server` renders the island into the page before it is sent. `server="defer"` sends the prerendered page as is, and the browser fetches the island as it nears the screen.
+
 ## Redirects
 
 Old URLs go in `kay.config.ts`:

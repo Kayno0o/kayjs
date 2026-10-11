@@ -13,8 +13,6 @@ bun run build
 NODE_ENV=production bun src/server.ts
 ```
 
-With `NODE_ENV=production`, the server's first line says where it listens, the kay version and how many pages the build prerendered, and every request is logged as one line, `GET /blog/hello 200 12ms AZnLe0vUe9qD0uXq9vLwZw`, ending with the id its response carries as `X-Request-Id`. An error logged while answering it is headed by the same id, and `requestId(request)` from `kay/server` gives it to `onError`. Behind a proxy set in `proxy`, an `X-Request-Id` the proxy passed on is kept. `log: 'json'` writes these lines and kay's own messages, its errors and warnings, as one JSON object each, for a log collector.
-
 ## One executable
 
 `--compile` writes a single executable holding the server, its pages and the client build. It needs neither Bun nor the project where it runs.
@@ -75,6 +73,21 @@ export default defineConfig({
 
 On SIGTERM or SIGINT the server stops taking connections, lets open requests finish, runs the `onStop` hooks and exits. Requests still open after `shutdownTimeout`, 10 seconds by default, are closed.
 
+## Logs and tracing
+
+With `NODE_ENV=production`, the server's first line says where it listens, the kay version and how many pages the build prerendered, and every request is logged as one line, `GET /blog/hello 200 12ms AZnLe0vUe9qD0uXq9vLwZw`, ending with the id its response carries as `X-Request-Id`. An error logged while answering it is headed by the same id, and `requestId(request)` from `kay/server` gives it to `onError`. Behind a proxy set in `proxy`, an `X-Request-Id` the proxy passed on is kept. `log: 'json'` writes these lines and kay's own messages, its errors and warnings, as one JSON object each, for a log collector.
+
+`tracer` takes an OpenTelemetry tracer from the `@opentelemetry/api` and SDK the app installs, kay itself depending on neither. Each page request becomes a span named after its route, with one span per load and one for the render inside it, and each action and API request becomes a span too. `serverTiming: true` sends the same load and render times as a `Server-Timing` header, as development always does.
+
+```ts
+import { trace } from '@opentelemetry/api'
+
+export default defineConfig({
+  log: 'json',
+  tracer: trace.getTracer('my-site'),
+})
+```
+
 ## Behind a proxy
 
 Behind nginx, Caddy or Cloudflare, every request comes from the proxy. Tell kay how many proxies sit in front so that rate limits and `clientAddress` see the visitor:
@@ -87,4 +100,4 @@ export default defineConfig({
 
 Use `hops: 2` for Cloudflare then nginx, or `proxy: { header: 'cf-connecting-ip' }` to read a header the proxy sets.
 
-<ReadMore href="/llms/production">Request logs, tracing, background jobs, security headers and compression are in the full production reference.</ReadMore>
+<ReadMore href="/llms/production">Log entries for your own sink, span attributes, security headers and compression are in the full production reference.</ReadMore>

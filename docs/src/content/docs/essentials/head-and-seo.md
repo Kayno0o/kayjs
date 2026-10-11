@@ -95,6 +95,18 @@ export default defineConfig({
 })
 ```
 
+## Offline
+
+`offline: true` turns on a service worker. It keeps the build's scripts, stylesheets and fonts, the pages listed in `pages` and the prerendered pages no guard covers, so an installed site still opens without a connection and its islands hydrate:
+
+```ts
+export default defineConfig({
+  offline: { pages: ['/', '/menu'], fallback: '/offline' },
+})
+```
+
+Pages are fetched from the network first, and a kept copy answers only when the network fails, then the `fallback` page. Actions and API routes always go to the network. Each deploy names a new cache, so visitors never need to clear anything, and `kay dev` registers no worker.
+
 ## JSON-LD
 
 `jsonLd()` from `kay/seo` writes structured data from typed data, adding the schema.org `@context`:

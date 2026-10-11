@@ -1,0 +1,55 @@
+---
+title: Background jobs
+order: 8.5
+description: Run work on a schedule, keep a worker running with the server, and queue jobs that survive a restart.
+---
+
+## Scheduled jobs
+
+`schedule(cron, job)` from `kay/server` is an Elysia plugin: the server runs the job from `.listen()` until it stops.
+
+```ts
+import { Elysia } from 'elysia'
+import { pages, schedule } from 'kay/server'
+
+new Elysia()
+  .use(schedule('@hourly', purgeExpiredCarts))
+  .use(schedule('30 2 * * MON', sendWeeklyReport, { tz: 'Europe/Paris' }))
+  .use(schedule('30s', collectMetrics))
+  .use(await pages())
+  .listen(3000)
+```
+
+A cron has five fields or a nickname such as `@daily`, and a cron that can never run, such as `0 0 30 2 *`, is a type error. A length such as `'30s'` or `'1h'` runs at each multiple of it. Runs never overlap, and a run that throws is logged without stopping the next. With several server processes, `{ lock: 'weekly-report' }` runs the job once across all of them.
+
+## Long-running work
+
+`background(work)` starts work with the server and keeps it running, such as a consumer reading another service's queue. On shutdown its signal aborts and the server waits for it to return:
+
+```ts
+import { background } from 'kay/server'
+
+app.use(background(async (signal) => {
+  while (!signal.aborted)
+    await handleNextEmail(signal)
+}))
+```
+
+## Queues
+
+A queue holds jobs that must not be lost. An action enqueues one and answers at once, and the server runs the job after the response, or after a restart or a deploy if it has to:
+
+```ts
+// src/jobs.ts
+import { queue } from 'kay/server'
+
+export const welcomeMails = queue(
+  'welcome-mails',
+  async ({ to }: { to: string }) => sendWelcome(to),
+  { attempts: 5, backoff: '30s' },
+)
+```
+
+The server runs it with `.use(welcomeMails)`, and an action calls `await welcomeMails.enqueue({ to: email })`, or `enqueue(payload, { delay: '1h' })` to run it later. A job that throws is retried after a growing wait, and one that runs out of attempts is kept as failed and passed to `onFailed`. Jobs wait in a SQLite file shared by the server processes on one machine, kept in memory under `bun test`, where `site.runJobs()` from `kay/test` runs them.
+
+<ReadMore href="/llms/production#background-jobs">Job stores, concurrency, lost jobs and how shutdown waits for runs in progress are in the full production reference.</ReadMore>
