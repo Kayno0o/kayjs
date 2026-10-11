@@ -120,9 +120,9 @@ export async function scanApi(apiDir: string, mounts: RouteMount[] = []): Promis
   return modules.sort((a, b) => a.file.localeCompare(b.file))
 }
 
-// The guards every module runs, the API directory's own first; with none of its own, those of a directory holding every module.
+// The guards every guarded module runs, the API directory's own first; with none of its own, those of a directory holding every module. An open module, whose guards are its own call, leaves them as they are.
 export function sharedGuards(modules: ApiModule[]): string[] {
-  const [first, ...rest] = modules
+  const [first, ...rest] = modules.filter(module => module.open !== true)
   const shared: string[] = []
 
   for (const [index, guard] of first?.guards.entries() ?? []) {

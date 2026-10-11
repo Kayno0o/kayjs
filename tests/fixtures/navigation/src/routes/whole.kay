@@ -1,6 +1,12 @@
 --- server
+import Search from '../components/search.kay'
+
 export const page = { reload: true }
+
+const sorted = ctx.url.searchParams.get('sort') ?? 'none'
 ---
 head
   title Whole
 h1 Whole
+p.whole-sorted Sorted {sorted}
+Search

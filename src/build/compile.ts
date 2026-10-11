@@ -134,7 +134,7 @@ export async function compileServer(project: Project, options: CompileOptions): 
   return outfile
 }
 
-// Every module a route renders or runs: its page, layouts, special pages and guards.
+// Every module a route renders or runs: its page, layouts, special pages and guards, its layouts' own included.
 function routeModules(routes: Route[], fallback: SpecialPages): Set<string> {
   const files = new Set<string>()
   const addSpecial = (special: SpecialPages) => {
@@ -152,7 +152,7 @@ function routeModules(routes: Route[], fallback: SpecialPages): Set<string> {
 
     addSpecial(route.special)
 
-    for (const guard of route.guards) {
+    for (const guard of [...route.guards, ...(route.layoutAccess ?? []).flatMap(access => access.guards)]) {
       files.add(guard.file)
       addSpecial(guard.special)
     }

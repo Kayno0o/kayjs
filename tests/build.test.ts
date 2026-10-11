@@ -1004,3 +1004,45 @@ describe('a stylesheet imported as text', () => {
     }
   }, 60_000)
 })
+
+describe('a compiled server with layouts', () => {
+  it('boots with its sources gone, each layout\'s actions behind the guards of its own directory', async () => {
+    const action = (name: string, settings = '') => `--- server\nimport { t } from 'elysia'\nimport { action } from 'kay'\n\n${settings}export const ${name} = action(t.Object({}), () => '${name}')\n---\nslot\n`
+    const root = await scratchProject({
+      'tsconfig.json': tsconfig,
+      'kay.config.ts': 'export default { favicon: false, requireGuards: true }\n',
+      'src/routes/_layout.kay': action('leave', 'export const page = { guards: false }\n'),
+      'src/routes/index.kay': '--- server\nexport const page = { guards: false }\n---\nh1 Home\n',
+      'src/routes/staff/_guard.ts': 'import { guard } from \'kay\'\n\nexport default guard(({ request, deny }) => {\n  if (!request.headers.has(\'x-admin\'))\n    deny(403, \'Admins only\')\n})\n',
+      'src/routes/staff/_layout.kay': action('promote'),
+      'src/routes/staff/sign-in.kay': '--- server\nexport const page = { guards: false }\n---\nh1 Staff\n',
+      'src/server.ts': `import process from 'node:process'
+import { Elysia } from 'elysia'
+import { pages } from 'kay/server'
+
+const app = new Elysia().use(await pages({ security: false }))
+const post = async (file: string, name: string, headers: Record<string, string> = {}) => (await app.handle(new Request(\`http://localhost/_kay/action/src/routes/\${file}/\${name}\`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-kay-action': '1', 'referer': 'http://localhost/', ...headers }, body: '[{}]' }))).status
+
+console.log(JSON.stringify({ home: (await app.handle(new Request('http://localhost/'))).status, leave: await post('_layout.kay', 'leave'), promote: await post('staff/_layout.kay', 'promote'), admin: await post('staff/_layout.kay', 'promote', { 'x-admin': '1' }) }))
+process.exit(0)
+`,
+    })
+
+    try {
+      const [report, code] = await printed(Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', root, '--compile', join(root, 'server')], { stdout: 'pipe', stderr: 'pipe' }))
+
+      expect(report).not.toContain('error')
+      expect(code).toBe(0)
+      // The executable reads nothing from the sources, the layouts' settings included.
+      await rename(join(root, 'src'), join(root, 'moved'))
+      const child = Bun.spawn([join(root, 'server')], { cwd: root, env: { ...process.env, NODE_ENV: 'production' }, stdout: 'pipe', stderr: 'pipe' })
+      const [output, errors, exited] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+
+      expect({ exited, errors }).toEqual({ exited: 0, errors: expect.any(String) })
+      expect(JSON.parse(output.trim().split('\n').at(-1)!)).toEqual({ home: 200, leave: 200, promote: 403, admin: 200 })
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  }, 60_000)
+})

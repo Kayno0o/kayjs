@@ -19,7 +19,7 @@ export interface FetchedPage {
   url: string
   type: string
   html: string
-  // A page the browser loads itself: one asking for it, or one whose cross-origin isolation differs from this document's, which cannot change in place.
+  // A page the browser loads itself from another one: one asking for it, or one whose cross-origin isolation differs from this document's, which cannot change in place.
   full?: true
 }
 

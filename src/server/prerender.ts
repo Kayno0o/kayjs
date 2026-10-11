@@ -158,7 +158,7 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
   }
 
   const apiProblems = options.exportAll ? (await projectApi(root, config)).map(module => `${relative(root, module.file)}: an API module answers requests, which only a server does; a file such as src/routes/llms.txt.ts exporting GET is written to a file`) : []
-  const endpointProblems = options.exportAll ? (await exportedEndpoints(root, await scanEndpoints(routesDir, mounts))).problems : []
+  const endpointProblems = options.exportAll ? (await exportedEndpoints(root, await scanEndpoints(routesDir, mounts), config.requireGuards)).problems : []
 
   if (problems.length > 0 || apiProblems.length > 0 || endpointProblems.length > 0)
     throw new ExportError(`kay: ${PARTS.format([count(problems.length, 'page'), count(endpointProblems.length, 'endpoint'), count(apiProblems.length, 'API module')].filter(part => part !== ''))} cannot be exported to static files, which no server answers for:\n${[...problems, ...endpointProblems, ...apiProblems].map(problem => `  ${problem}`).join('\n')}`)

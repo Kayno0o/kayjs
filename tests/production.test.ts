@@ -150,7 +150,7 @@ describe('security headers', () => {
         Bun.write(join(dir, 'index.kay'), 'h1 Home\n'),
         Bun.write(join(dir, 'games/_layout.kay'), `${settings('{ security: { csp: { \'script-src\': [\'https://cdn.example.com\'] } } }')}slot\n`),
         Bun.write(join(dir, 'games/index.kay'), 'h1 Games\n'),
-        Bun.write(join(dir, 'games/emulator.kay'), `${settings('{ security: { headers: { \'cross-origin-embedder-policy\': \'require-corp\', \'x-frame-options\': false }, csp: { \'worker-src\': [\'blob:\'], \'object-src\': false } } }')}h1 Emulator\n`),
+        Bun.write(join(dir, 'games/emulator.kay'), `${settings('{ security: { headers: { \'cross-origin-embedder-policy\': \'require-corp\', \'x-frame-options\': false }, csp: { \'worker-src\': [\'blob:\'], \'frame-src\': [\'https://player.example.com\'], \'object-src\': false } } }')}h1 Emulator\n`),
         Bun.write(join(dir, 'player.kay'), `${settings('{ reload: true }')}h1 Player\n`),
       ])
       const app = await pages({ routes: dir, prebuilt: false, security: { csp: { 'script-src': ['\'self\'', 'https://site.example.com'] } } })
@@ -163,6 +163,8 @@ describe('security headers', () => {
       expect(policy.get('script-src')).toEqual(['\'self\'', 'https://site.example.com', 'https://cdn.example.com', ...inlineScriptHashes()])
       // A directive the policy lacks starts from the one it falls back to: `worker-src` from `script-src`, past `child-src`.
       expect(policy.get('worker-src')).toEqual(['\'self\'', 'https://site.example.com', 'https://cdn.example.com', 'blob:'])
+      // `frame-src` falls back to `child-src`, then `default-src`, never to `script-src`.
+      expect(policy.get('frame-src')).toEqual([...policy.get('default-src')!, 'https://player.example.com'])
       expect(policy.has('object-src')).toBe(false)
       expect(emulator!.headers.get('cross-origin-embedder-policy')).toBe('require-corp')
       expect(emulator!.headers.get('cross-origin-opener-policy')).toBe('same-origin')

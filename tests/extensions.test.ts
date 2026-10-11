@@ -665,6 +665,12 @@ describe('a library\'s route tree', () => {
         { file: theirs('_guard.ts'), special: { notFound: { file: ours('_404.kay'), layouts: [ours('_layout.kay')] }, error: undefined } },
       ])
       expect(at('/auth/admin')[0]!.layouts).toEqual([ours('_layout.kay'), ours('auth/_layout.kay'), theirs('admin/_layout.kay')])
+      // A library's layout runs the guards above it for its actions, and is asked for none of its own, as its pages are.
+      expect(at('/auth/admin')[0]!.layoutAccess!.map(access => [access.guards.map(guard => guard.file), access.open])).toEqual([
+        [[ours('_guard.ts')], undefined],
+        [[ours('_guard.ts'), theirs('_guard.ts')], undefined],
+        [[ours('_guard.ts'), theirs('_guard.ts')], true],
+      ])
     })
   })
 

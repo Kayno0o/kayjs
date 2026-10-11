@@ -469,6 +469,11 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     await page.goto(origin)
     await follow('a.whole', 'Whole')
     expect(await sameDocument()).toBe(false)
+    // The page itself, its query changed, is still swapped in place.
+    await mark()
+    await page.click('button.sort')
+    await page.locator('p.whole-sorted', { hasText: 'Sorted name' }).waitFor()
+    expect(await sameDocument()).toBe(true)
 
     await follow('a.isolated', 'Isolated')
     expect(await sameDocument()).toBe(false)

@@ -10,7 +10,6 @@ import type { CookieJar } from './cookies'
 import type { Flash } from './flash'
 import type { LoadedGuard, ServedRoute } from './guards'
 import type { I18n } from './i18n'
-import { dirname, sep } from 'node:path'
 import { decodeCall, failure, FORM_CALL, isAction, isFailure } from '../runtime/action'
 import { escapeAttribute } from '../runtime/escape'
 import { formInput } from '../runtime/form'
@@ -23,12 +22,11 @@ import { sizeText } from './body'
 import { importModule } from './bundle'
 import { cookieJar } from './cookies'
 import { handOver, submittedValues, writeSuccess } from './flash'
-import { requiredGuards, runGuards, unguarded } from './guards'
+import { requiredGuards, runGuards } from './guards'
 import { requestLocale, stateFor } from './i18n'
 import { answeringRequest } from './log'
 import { countSucceeded, PRETEND, protectionRefusal, requestId } from './protection'
 import { reportServerError } from './report'
-import { setsNoGuards } from './routes'
 import { Denied, Redirect } from './signals'
 import { answered, SERVER_SPAN, traced } from './trace'
 import { visitAs } from './visit'
@@ -201,7 +199,7 @@ function actionFiles(routes: ServedRoute[], required: boolean | undefined): Map<
   const files = new Map<string, ActionPage & { guards: LoadedGuard[] }>()
 
   for (const route of routes) {
-    for (const file of [...route.layouts, route.file]) {
+    for (const [index, file] of [...route.layouts, route.file].entries()) {
       const known = files.get(file)
 
       if (known) {
@@ -211,9 +209,8 @@ function actionFiles(routes: ServedRoute[], required: boolean | undefined): Map<
         continue
       }
 
-      // A layout runs the guards of its own directory and above, unless it sets `guards: false`; a page those of its route.
-      const open = file === route.file ? route.open : setsNoGuards(file) || undefined
-      const guards = file === route.file ? route.guards : open ? [] : route.guards.filter(guard => guard.check !== unguarded && file.startsWith(dirname(guard.file) + sep))
+      // A layout runs the guards of its own directory and above, whichever page the scan met it under; a page those of its route.
+      const { guards, open } = file === route.file ? route : route.layoutGuards?.[index] ?? { guards: [] }
 
       files.set(file, { guards: requiredGuards(guards, { file, open }, route.special, required), routes: [route], params: route.params })
     }

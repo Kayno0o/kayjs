@@ -129,7 +129,7 @@ export function claimEndpoints(served: ServedPaths, endpoints: Endpoint[], root:
 }
 
 // The paths a static export writes each endpoint to: its own path without params, or each its `prerender` lists; what keeps one from it is a problem, named by file.
-export async function exportedEndpoints(root: string, endpoints: Endpoint[]): Promise<{ paths: string[], problems: string[] }> {
+export async function exportedEndpoints(root: string, endpoints: Endpoint[], required?: boolean): Promise<{ paths: string[], problems: string[] }> {
   const paths: string[] = []
   const problems: string[] = []
 
@@ -139,6 +139,9 @@ export async function exportedEndpoints(root: string, endpoints: Endpoint[]): Pr
     try {
       if (endpoint.guards.length > 0)
         throw new Error('a guard covers it, and only a server can run one per request')
+
+      if (required === true && endpoint.open !== true)
+        throw new Error('requireGuards is on and no guard covers it; set `guards: false` in `export const page` to export it')
 
       const prerender = pageSetting(await importModule(endpoint.file), 'prerender')
       const listed = prerender === undefined && endpoint.params.length === 0 ? true : prerender

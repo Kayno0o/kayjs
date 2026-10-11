@@ -121,7 +121,7 @@ export const page = {
 h1 Emulator
 ```
 
-`security` adds CSP sources to the site's directives and merges headers over its own, for this page's responses alone, or every page under a layout setting it.
+`security` adds CSP sources to the site's directives and merges headers over its own, for this page's responses alone, or every page under a layout setting it. It only adds: a page's `'none'` cannot tighten what the site allows, and `'script-src': false` blocks kay's inline scripts, hydration with them. `kay build --static` drops it, and `reload`, as no server sends them.
 
 ## Browser-only code
 

@@ -1,10 +1,8 @@
 import type { CheckDiagnostic, CheckOptions } from '.'
 import type { ServedProject } from './shadow-types'
-import { dirname, sep } from 'node:path'
 import { lintLevel } from '../compiler/lints'
 import { parseKay } from '../compiler/parser'
 import { analyzeServer } from '../compiler/script'
-import { setsNoGuards } from '../server/routes'
 
 const HELP = 'add a `_guard.ts` to its directory or one above it, or, if anyone may reach it, set `guards: false`'
 
@@ -23,15 +21,18 @@ export async function unguardedRoutes(options: CheckOptions, { routes, endpoints
     if (route.guards.length === 0 && route.open !== true)
       found.push(report(route.file, `No guard covers \`${route.pattern}\`, so the server refuses it`, `${HELP} in its \`page\``))
 
-    for (const layout of route.open === true ? [] : route.layouts)
-      layouts.set(layout, (layouts.get(layout) ?? false) || route.guards.some(guard => layout.startsWith(dirname(guard.file) + sep)))
+    for (const [index, layout] of route.layouts.entries()) {
+      const access = route.layoutAccess?.[index]
+
+      layouts.set(layout, access !== undefined && (access.guards.length > 0 || access.open === true))
+    }
   }
 
   for (const [layout, guarded] of layouts) {
     const source = guarded ? '' : await Bun.file(layout).text()
     const actions = guarded ? [] : analyzeServer(source, parseKay(source).server)?.actionNames ?? []
 
-    if (actions.length > 0 && !setsNoGuards(layout))
+    if (actions.length > 0)
       found.push(report(layout, `No guard covers the actions of this layout, ${actions.map(name => `\`${name}\``).join(', ')}, so the server refuses them`, `${HELP} in its \`page\``))
   }
 

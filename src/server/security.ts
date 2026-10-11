@@ -41,15 +41,14 @@ const STYLE_DIRECTIVES = ['style-src', 'style-src-elem']
 const UNSAFE_INLINE = '\'unsafe-inline\''
 const NONE = '\'none\''
 
-// The directive a browser reads in place of one the policy lacks, which a page adding sources to it starts from; any other fetch directive falls back to `default-src`.
-const FALLBACKS: Record<string, string> = {
-  'script-src-elem': 'script-src',
-  'script-src-attr': 'script-src',
-  'style-src-elem': 'style-src',
-  'style-src-attr': 'style-src',
-  'worker-src': 'child-src',
-  'frame-src': 'child-src',
-  'child-src': 'script-src',
+// The directives a browser reads in turn in place of one the policy lacks, as CSP3 has them, which a page adding sources to it starts from; any other fetch directive falls back to `default-src` alone.
+const FALLBACKS: Record<string, string[]> = {
+  'script-src-elem': ['script-src', 'default-src'],
+  'script-src-attr': ['script-src', 'default-src'],
+  'style-src-elem': ['style-src', 'default-src'],
+  'style-src-attr': ['style-src', 'default-src'],
+  'worker-src': ['child-src', 'script-src', 'default-src'],
+  'frame-src': ['child-src', 'default-src'],
 }
 const FETCH_DIRECTIVE = /-src(?:-elem|-attr)?$/
 
@@ -205,7 +204,12 @@ function fallbackSources(directives: Map<string, string[]>, name: string): strin
   if (!FETCH_DIRECTIVE.test(name) || name === 'default-src')
     return []
 
-  const fallback = FALLBACKS[name] ?? 'default-src'
+  for (const fallback of FALLBACKS[name] ?? ['default-src']) {
+    const sources = directives.get(fallback)
 
-  return directives.get(fallback) ?? fallbackSources(directives, fallback)
+    if (sources)
+      return sources
+  }
+
+  return []
 }

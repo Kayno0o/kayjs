@@ -17,10 +17,18 @@ export interface Route {
   matchers?: Record<string, string> | undefined
   // `_layout.kay` files wrapping the page, outermost first.
   layouts: string[]
+  // What each layout's actions are behind, as `layouts` lists them, read at scan time since a compiled server has no source to read.
+  layoutAccess?: LayoutAccess<GuardFile>[] | undefined
   special: SpecialPages
   // `_guard.ts` files covering the page and its actions, outermost first.
   guards: GuardFile[]
   // No guard is asked of it on a site with `requireGuards`: it sets `guards: false`, or a library serves it.
+  open?: true | undefined
+}
+
+// What a layout's actions run: the guards of its own directory and above, none when it sets `guards: false`, and `open` when it does or a library serves it.
+export interface LayoutAccess<Guard> {
+  guards: Guard[]
   open?: true | undefined
 }
 
@@ -63,10 +71,10 @@ const DYNAMIC_SEGMENT = /^\[(\.\.\.)?([A-Z_$][\w$]*)(?:=([A-Z_$][\w$-]*))?\]$/i
 const OPTIONAL_SEGMENT = /^\[\[([A-Z_$][\w$]*)(?:=([A-Z_$][\w$-]*))?\]\]$/i
 // `(marketing)`: groups pages for their layouts and guards, adding nothing to the URL.
 const GROUP_SEGMENT = /^\(.+\)$/
-// A file whose `page` sets `layouts: false` is not wrapped by the layouts above it: a page by none, a layout by its parent directories' ones; one setting `guards: false` runs none of the guards above it, nor do its actions.
+// A file whose `page` sets `layouts: false` is not wrapped by the layouts above it: a page by none, a layout by its parent directories' ones; a page setting `guards: false` runs none of the guards above it, nor do its actions, and a layout setting it opens its own actions.
 const PAGE_EXPORT = /^export\s+const\s+page\s*=\s*\{/m
-const FALSE_KEY = /(?:([A-Z_$][\w$]*)|'([^'\n]*)'|"([^"\n]*)")\s*:\s*false\b/iy
-const QUOTES = new Set(['"', '\'', '`'])
+// A key set to the literal `false`, not to an expression starting with it.
+const FALSE_KEY = /(?:([A-Z_$][\w$]*)|'([^'\n]*)'|"([^"\n]*)")\s*:\s*false(?=\s*(?:[,}]|\/[/*]))/iy
 const SPACE = /\s/
 const KAY_EXTENSION = /\.kay$/
 const LAYOUT = '_layout.kay'
@@ -168,7 +176,9 @@ export async function scanRoutes(routesDir: string, mounts: RouteMount[] = []): 
         const at = virtualDir(trees, dirname(file))
         const open = setsFalse(file, 'guards', read)
 
-        own.push({ ...route, layouts: layoutsOf(trees, at, file, read), special: specialPagesOf(trees, at, read), guards: open ? [] : guardsOf(trees, at, read), ...(open || tree !== trees[0]) && { open: true } })
+        const layouts = layoutsOf(trees, at, file, read)
+
+        own.push({ ...route, layouts, layoutAccess: layouts.map(layout => layoutAccess(trees, layout, read)), special: specialPagesOf(trees, at, read), guards: open ? [] : guardsOf(trees, at, read), ...(open || tree !== trees[0]) && { open: true } })
       }
     }
 
@@ -292,15 +302,18 @@ function setsFalse(file: string, key: string, read: LayoutsRead): boolean {
   return found.has(key)
 }
 
-// Whether a page or a layout sets `guards: false`, running none of the guards above it.
-export function setsNoGuards(file: string): boolean {
-  return falseKeys(readFileSync(file, 'utf8')).has('guards')
+// The guards a layout's actions run, its own directory's and above whichever page it wraps; a library's are open, as its pages are.
+function layoutAccess(trees: RouteMount[], layout: string, read: LayoutsRead): LayoutAccess<GuardFile> {
+  if (setsFalse(layout, 'guards', read))
+    return { guards: [], open: true }
+
+  return { guards: guardsOf(trees, virtualDir(trees, dirname(layout)), read), ...!layout.startsWith(trees[0]!.dir + sep) && { open: true } }
 }
 
 // The keys set to `false` in the object literal `head` opens, `export const page = { ... }` unless named, read without parsing the module: the server never loads a compiler.
 export function falseKeys(source: string, head = PAGE_EXPORT): Set<string> {
   const keys = new Set<string>()
-  const found = head.exec(source)
+  const found = codeMatch(source, head)
 
   if (!found)
     return keys
@@ -320,22 +333,16 @@ export function falseKeys(source: string, head = PAGE_EXPORT): Set<string> {
   for (let i = found.index + found[0].length; i < source.length && depth > 0; i++) {
     const char = source[i]!
 
-    if (QUOTES.has(char)) {
-      if (depth === 1 && atKey) {
+    const end = literalEnd(source, i)
+
+    if (end !== -1) {
+      if (depth === 1 && atKey && (char === '\'' || char === '"'))
         keyAt(i)
-      }
 
-      for (i++; i < source.length && source[i] !== char; i++) {
-        if (source[i] === '\\')
-          i++
-      }
+      if (char !== '/')
+        atKey = false
 
-      atKey = false
-    }
-    else if (char === '/' && (source[i + 1] === '/' || source[i + 1] === '*')) {
-      const end = source[i + 1] === '/' ? source.indexOf('\n', i) : source.indexOf('*/', i) + 1
-
-      i = end <= 0 ? source.length : end
+      i = end
     }
     else if (char === '{' || char === '(' || char === '[') {
       depth++
@@ -357,6 +364,74 @@ export function falseKeys(source: string, head = PAGE_EXPORT): Set<string> {
   }
 
   return keys
+}
+
+// The first match of `pattern` in code, not in a comment, a string or a template literal.
+function codeMatch(source: string, pattern: RegExp): RegExpExecArray | undefined {
+  const global = new RegExp(pattern.source, pattern.flags.includes('g') ? pattern.flags : `${pattern.flags}g`)
+  // Where the code read so far ends.
+  let code = 0
+
+  for (let found = global.exec(source); found; found = global.exec(source)) {
+    while (code < found.index) {
+      const end = literalEnd(source, code)
+
+      code = end === -1 ? code + 1 : end + 1
+    }
+
+    if (code === found.index)
+      return found
+
+    global.lastIndex = code
+  }
+
+  return undefined
+}
+
+// Where the comment, string or template literal starting at `start` ends, its last character; -1 when none starts there.
+function literalEnd(source: string, start: number): number {
+  const char = source[start]
+
+  if (char === '/' && (source[start + 1] === '/' || source[start + 1] === '*')) {
+    const end = source[start + 1] === '/' ? source.indexOf('\n', start) : source.indexOf('*/', start + 2) + 1
+
+    return end <= 0 ? source.length : end
+  }
+
+  if (char !== '\'' && char !== '"' && char !== '`')
+    return -1
+
+  for (let i = start + 1; i < source.length; i++) {
+    if (source[i] === '\\') {
+      i++
+    }
+    else if (source[i] === char) {
+      return i
+    }
+    else if (char === '`' && source.startsWith('${', i)) {
+      i = closingBrace(source, i + 2)
+    }
+  }
+
+  return source.length
+}
+
+// The brace closing a block opened before `start`, past the literals it holds.
+function closingBrace(source: string, start: number): number {
+  let depth = 1
+
+  for (let i = start; i < source.length; i++) {
+    const end = literalEnd(source, i)
+
+    if (end !== -1)
+      i = end
+    else if (source[i] === '{')
+      depth++
+    else if (source[i] === '}' && --depth === 0)
+      return i
+  }
+
+  return source.length
 }
 
 function guardsOf(trees: RouteMount[], at: string, read: LayoutsRead): GuardFile[] {
