@@ -8,11 +8,11 @@ export async function collections(): Promise<CollectionInfo[]> {
 }
 
 // Every locale's entries of a localized collection unless one is named.
-export async function entries(collection: string, { locale }: { locale?: string | undefined } = {}): Promise<SourceEntry[]> {
-  return await kayEntries(collection, locale === undefined ? {} : { locale }) as SourceEntry[]
+export async function entries(collection: string, options: { locale?: string | undefined } = {}): Promise<SourceEntry[]> {
+  return await kayEntries(collection, options) as SourceEntry[]
 }
 
 // A folder entry's file, once its data passes the schema.
-export async function entrySource(collection: string, slug: string, data: Record<string, unknown>, { locale, body }: { locale?: string | undefined, body?: string | undefined } = {}): Promise<{ file: EntryFile } | { issues: Issue[] }> {
-  return kayEntrySource(collection, slug, data, { ...(locale === undefined ? {} : { locale }), ...(body === undefined ? {} : { body }) })
+export async function entrySource(collection: string, slug: string, data: Record<string, unknown>, options: { locale?: string | undefined, body?: string | undefined } = {}): Promise<{ file: EntryFile } | { issues: Issue[] }> {
+  return kayEntrySource(collection, slug, data, options)
 }
