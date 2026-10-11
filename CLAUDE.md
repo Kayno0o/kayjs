@@ -22,4 +22,4 @@ Every feature asks the least of the app: the fewest declarations, the easiest se
 
 ## Releases
 
-`just patch` or `just minor` moves kay and every library to one version (`scripts/version.ts`: versions, each library's peer on kay, the lockfile), tags and pushes both at once; the tag's workflow publishes kay and each library not marked `private` (kayjs-cms, until it ships) to the Forgejo npm registry. A library's ranges on another are `workspace:~`, which publishing writes as that version.
+`just patch` or `just minor` moves kay and every library to one version (`scripts/version.ts`: versions, each library's peer on kay, the lockfile), tags and pushes both at once; the tag's workflow publishes kay and each library not marked `private` to the Forgejo npm registry. A library's ranges on another are `workspace:~`, which publishing writes as that version.
