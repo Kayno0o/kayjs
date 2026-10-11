@@ -1,4 +1,5 @@
 // What `kay check` finds across the project beside each file's compile and type errors, shared with the editor, which reports it on save.
+import type { Subprocess } from 'bun'
 import type { CheckDiagnostic, CheckOptions } from '.'
 import type { LintLevels } from '../compiler/lints'
 import type { I18nConfig, KayExtension } from '../config'
@@ -25,6 +26,12 @@ const SCRIPT_MODULE = /\.(?:[cm]?ts|tsx)$/
 const DECLARATION_FILE = /\.d\.[cm]?ts$/
 const CONTENT_PROBLEMS = fileURLToPath(new URL('../content/problems.ts', import.meta.url))
 const MESSAGE_PROBLEMS = fileURLToPath(new URL('./messages.ts', import.meta.url))
+// Reading a big site's collections takes seconds; past this, the code they run is waiting on something that never comes.
+const PROBE_TIMEOUT = 60_000
+// The checking scripts running, which the editor's language server stops when it exits.
+const probes = new Set<Subprocess>()
+// An unknown property, and a value of the wrong type, with or without a suggestion.
+const LINT_TYPE_ERRORS = new Set(['TS2353', 'TS2322', 'TS2820'])
 
 // The collections as read, and the props their Markdown entries give components, written for tsgo to type with the rest.
 export interface ContentChecks {
@@ -43,12 +50,26 @@ export async function contentChecks(root: string, options: CheckOptions): Promis
   return { problems: content.problems, feeds: content.feeds, props: props.lines }
 }
 
-// The config, the collections, the messages, what the server refuses when it boots and the lints of the project's scripts.
-export async function projectProblems(root: string, options: CheckOptions, types: ShadowTypes, content: ContentChecks): Promise<CheckDiagnostic[]> {
+// What the shadow tree's write and the config tell, reported ahead of the type errors.
+export function configProblems(root: string, options: CheckOptions, types: ShadowTypes): CheckDiagnostic[] {
   const seo = configSeoLints(options, join(root, CONFIG_FILE), [...types.files.values()].map(file => file.source))
+
+  return [...types.problems, ...lintConfigProblems(root, options.lints), ...seo.filter(diagnostic => options.launch === true || !isLaunchLint(diagnostic.code))]
+}
+
+// The collections, the messages, what the server refuses when it boots and the lints of the project's scripts, reported after the type errors.
+export async function projectProblems(root: string, options: CheckOptions, content: ContentChecks): Promise<CheckDiagnostic[]> {
   const [messages, boot, modules] = await Promise.all([checkMessages(root, options.i18n, options.extensions), bootProblems(resolve(root), options, content.feeds), moduleLints(root, options.lints)])
 
-  return [...types.problems, ...lintConfigProblems(root, options.lints), ...seo.filter(diagnostic => options.launch === true || !isLaunchLint(diagnostic.code)), ...content.problems, ...messages, ...boot, ...modules]
+  return [...content.problems, ...messages, ...boot, ...modules]
+}
+
+// A type error tsgo reports in `kay.config.ts` for a lint or level `lints` names that kay does not have, which kay's own message says better.
+export function lintConfigTypeError(root: string, lints: Record<string, string> = {}, diagnostic: CheckDiagnostic): boolean {
+  if (diagnostic.file !== join(root, CONFIG_FILE) || !LINT_TYPE_ERRORS.has(diagnostic.code ?? ''))
+    return false
+
+  return Object.entries(lints).some(([name, level]) => !isLint(name) && !isLintGroup(name) ? diagnostic.message.includes(`'${name}'`) : !LEVELS.has(level) && diagnostic.message.includes(`"${level}"`))
 }
 
 // The lints the compiler finds in fences, in the project's own scripts: the schema builder imported as `t`, and a stylesheet imported for a value with no text attribute.
@@ -69,9 +90,17 @@ async function moduleLints(root: string, levels: LintLevels | undefined): Promis
 }
 
 // What a checking script printed on the lines it marked, whatever else the project's code logged, run in a process of its own so an edited file is read afresh; the reason it failed otherwise.
-async function probe(root: string, script: string, args: string[], reading: string): Promise<{ marked: <Value>(marker: string) => Value | undefined } | { failed: string }> {
-  const child = Bun.spawn([process.execPath, script, resolve(root), ...args], { cwd: root, stdout: 'pipe', stderr: 'pipe' })
+export async function probe(root: string, script: string, args: string[], reading: string, timeout = PROBE_TIMEOUT): Promise<{ marked: <Value>(marker: string) => Value | undefined } | { failed: string }> {
+  const child = Bun.spawn([process.execPath, script, resolve(root), ...args], { cwd: root, stdout: 'pipe', stderr: 'pipe', timeout })
+
+  probes.add(child)
+
   const [output, errors, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+
+  probes.delete(child)
+
+  if (child.signalCode !== null)
+    return { failed: `${reading} did not finish within ${timeout / 1000} s and was stopped: the code it runs waits on something that never comes` }
 
   if (code !== 0)
     return { failed: errors.trim() || `${reading} exited with code ${code}` }
@@ -85,6 +114,11 @@ async function probe(root: string, script: string, args: string[], reading: stri
       return line === undefined ? undefined : JSON.parse(line.slice(marker.length)) as Value
     },
   }
+}
+
+export function stopProbes(): void {
+  for (const child of probes)
+    child.kill()
 }
 
 function problemsOf(root: string, problems: ContentProblem[] = []): CheckDiagnostic[] {

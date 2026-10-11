@@ -7,6 +7,7 @@ import { describe, expect, it } from 'bun:test'
 import { findKayFiles } from '../src/build/files'
 import { applySafeFixes, check } from '../src/check'
 import { islandOnlyComponents } from '../src/check/island-only'
+import { probe } from '../src/check/project'
 import { compileShadow, shadowPath, shadowSource } from '../src/check/shadow'
 import { compileKay } from '../src/compiler'
 import { SHADOW_DIR } from '../src/project'
@@ -680,6 +681,38 @@ describe('kay check, edge cases', () => {
       await rm(root, { recursive: true, force: true })
     }
   })
+
+  it('reads the collections and the messages to the end though their code leaves a timer running, and stops a script that never ends', async () => {
+    const root = await scratchProject({
+      'kay.config.ts': 'export default { i18n: { locales: [\'en\'], defaultLocale: \'en\' } }\n',
+      'src/content.config.ts': 'import { t } from \'elysia\'\nimport { collection } from \'kay/content\'\n\nsetInterval(() => {}, 1000)\n\nexport const notes = collection(\'content/notes\', { schema: t.Object({ title: t.String() }) })\n',
+      'src/content/notes/a.md': '---\ndate: today\n---\nText\n',
+      'src/messages/en.ts': 'import { defineMessages } from \'kay/i18n\'\n\nsetInterval(() => {}, 1000)\n\nexport default defineMessages({ hello: \'Hello\' })\n',
+      'waits.ts': 'setInterval(() => {}, 1000)\nawait new Promise(() => {})\n',
+    })
+
+    try {
+      expect((await check(root)).filter(d => d.file.endsWith('a.md')).map(d => d.line)).toEqual([1])
+      expect(await probe(root, join(root, 'waits.ts'), [], 'reading it', 300)).toEqual({ failed: 'reading it did not finish within 0.3 s and was stopped: the code it runs waits on something that never comes' })
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  }, 30_000)
+
+  it('reports a lint or a level `lints` names that kay does not have once, in kay\'s words rather than also as a type error', async () => {
+    const root = await scratchProject({ 'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ lints: { \'no-such-lint\': \'deny\', \'missing-alt\': \'denyy\' } })\n' })
+
+    try {
+      expect((await check(root, { lints: { 'no-such-lint': 'deny', 'missing-alt': 'denyy' } as unknown as CheckOptions['lints'] })).filter(d => d.file === join(root, 'kay.config.ts')).map(d => d.message)).toEqual([
+        '`lints` names `no-such-lint`, which is no lint or group',
+        'The lint `missing-alt` is set to `denyy`, which is no level',
+      ])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  }, 30_000)
 
   it('lets a static component only islands render pass functions to interactive children, which render inline with the island', async () => {
     const files = {

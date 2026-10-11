@@ -14,13 +14,13 @@ import { lintLevels } from '../compiler/lints'
 import { offsetAt, positionAt } from '../compiler/mapping'
 import { diagnoseShadow, reportsTypeErrors, shownOutsideKay, unusedCodesOf } from './diagnose'
 import { generatedProblem } from './generated'
-import { contentChecks, projectProblems } from './project'
+import { configProblems, contentChecks, lintConfigTypeError, projectProblems } from './project'
 import { writeShadowTypes } from './shadow-types'
 import { parseTscOutput, resolvedConfig, tsgoCode, tsgoDiagnostic, typecheck } from './tsgo'
 
 export { applySafeFixes } from './fixes'
 export { generatedChecks, generatedProblem } from './generated'
-export { contentChecks, projectProblems } from './project'
+export { configProblems, contentChecks, projectProblems, stopProbes } from './project'
 export type { ContentChecks } from './project'
 export { writeShadowTypes } from './shadow-types'
 export type { ShadowTypes } from './shadow-types'
@@ -89,7 +89,7 @@ export async function check(root: string, options: CheckOptions = {}): Promise<C
   const content = await contentChecks(root, options)
   const shown = await resolvedConfig(root, tsconfig)
   const projectUnused = unusedCodesOf(shown)
-  const [{ output, errors, code }, problems] = await Promise.all([typecheck(root, tsconfig, shown), projectProblems(root, options, types, content)])
+  const [{ output, errors, code }, problems] = await Promise.all([typecheck(root, tsconfig, shown), projectProblems(root, options, content)])
   const config = resolve(root, tsconfig)
   const reported = parseTscOutput(output, config, root)
   const scope: TypeScope = { root, broken: new Set(diagnostics.filter(diagnostic => !diagnostic.checkOnly).map(diagnostic => diagnostic.file)), unreached, libraries }
@@ -102,10 +102,15 @@ export async function check(root: string, options: CheckOptions = {}): Promise<C
     return levelAt
   }
 
+  diagnostics.push(...configProblems(root, options, types))
+
   if (errors.trim() !== '')
     diagnostics.push({ file: config, line: 1, column: 1, message: errors.trim() })
 
   for (const diagnostic of reported) {
+    if (lintConfigTypeError(root, options.lints, diagnostic))
+      continue
+
     const shadow = files.get(diagnostic.file)
     const diagnosed = shadow && diagnoseShadow(shadow, tsgoDiagnostic(diagnostic, shadow.tsx), levelsOf(shadow))
 

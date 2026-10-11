@@ -13,3 +13,5 @@ const { problems, uses, feeds } = await contentProblems(root!, config === undefi
 console.log(`${PROBLEMS_MARKER}${JSON.stringify(problems)}`)
 console.log(`${USES_MARKER}${JSON.stringify(uses)}`)
 console.log(`${FEEDS_MARKER}${JSON.stringify(feeds)}`)
+// A timer or a connection the content config left open would keep the check waiting.
+process.exit(0)

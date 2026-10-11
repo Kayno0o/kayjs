@@ -112,7 +112,7 @@ export function routeTable(routes: ServedRoute[], settings: LocaleSettings | und
   return { paths, shapes }
 }
 
-// Two pages serving one path stop the server, as does a name the router misreads; the server, the build and `kay check` call it, the editor, reading routes mid-edit, does not.
+// Two pages serving one path stop the server, as does a name the router misreads.
 export function refuseClashes(routesDir: string, routes: Route[], served = new ServedPaths(), settings?: LocaleSettings): void {
   refuseRouteNames(routesDir, routes)
   routeTable(routes.map(route => ({ ...route, guards: [] })), settings, served)

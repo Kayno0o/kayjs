@@ -6,13 +6,14 @@ import type { Diagnostic as KayDiagnostic } from '../compiler'
 import type { Span } from '../compiler/ast'
 import type { KayConfig } from '../config'
 import type { CodeAction, CodeActionParams, CompletionItem, CompletionList, Diagnostic, DidChangeTextDocumentParams, DocumentDiagnosticReport, DocumentHighlight, FileEvent, Hover, InitializeParams, Location, LocationLink, Position, Range, TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams, TextEdit, WorkspaceEdit } from './protocol'
-import { existsSync } from 'node:fs'
-import { join, resolve } from 'node:path'
+import { existsSync, realpathSync } from 'node:fs'
+import { basename, dirname, join, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { KAY_DIR } from '../build/assets'
 import { findKayFiles } from '../build/files'
 import { importedSignals } from '../build/signals'
-import { configCheckOptions, contentChecks, generatedChecks, generatedProblem, projectProblems, TSGO, writeShadowTypes } from '../check'
+import { configCheckOptions, configProblems, contentChecks, generatedChecks, generatedProblem, projectProblems, stopProbes, TSGO, writeShadowTypes } from '../check'
 import { diagnoseShadow, reportsTypeErrors } from '../check/diagnose'
 import { compileShadow, generatedSpan, shadowPath, shadowSource, sourceSpan } from '../check/shadow'
 import { formatKay } from '../compiler/format'
@@ -21,7 +22,7 @@ import { offsetAt, positionAt } from '../compiler/mapping'
 import { GENERATED_NAME } from '../compiler/names'
 import { parseKay } from '../compiler/parser'
 import { analyzeScript, analyzeServer } from '../compiler/script'
-import { loadConfig } from '../config'
+import { CONFIG_FILE, loadConfig } from '../config'
 import { projectPaths, projectRootOf, SHADOW_DIR } from '../project'
 import { Connection } from './rpc'
 
@@ -84,6 +85,8 @@ const TYPESCRIPT_SETTINGS = { suggest: { autoImports: true }, preferences: { quo
 const TYPESCRIPT_SECTIONS = new Set(['js/ts', 'typescript', 'javascript'])
 // How far a question follows names through generated code.
 const MAX_HOPS = 16
+// The modules of the kay running this server, which a config read again keeps rather than loading a second copy of.
+const OWN_MODULES = `${resolve(import.meta.dir, '..')}${sep}`
 
 // Serves .kay files by compiling each to its shadow TSX, forwarding requests to tsgo's language server and mapping positions both ways.
 export class KayLanguageServer {
@@ -189,19 +192,24 @@ export class KayLanguageServer {
     this.scheduleProjectChecks()
   }
 
-  // A .kay file changing on disk rewrites the shadow tree; any other file goes to tsgo as is. The shadow tree is this server's own to report.
+  // A file changing on disk rewrites the shadow tree, which reads the config, guards, API modules and settings beside the .kay files; any file but a .kay one goes to tsgo as is. What kay writes under `.kay` is its own.
   private async filesChanged(changes: FileEvent[]) {
-    const others = changes.flatMap(change => change.uri.startsWith('file:') && !KAY_FILE.test(change.uri) && !this.shadowProject(fileURLToPath(change.uri)) ? [{ uri: pathToFileURL(fileURLToPath(change.uri)).href, type: change.type }] : [])
+    const changed = changes.flatMap(change => change.uri.startsWith('file:') && !fileURLToPath(change.uri).split(sep).includes(KAY_DIR) ? [{ path: fileURLToPath(change.uri), type: change.type }] : [])
+    const others = changed.filter(change => !change.path.endsWith('.kay')).map(change => ({ uri: pathToFileURL(change.path).href, type: change.type }))
+
+    if (changed.length === 0)
+      return
 
     if (others.length > 0)
       this.server.notify('workspace/didChangeWatchedFiles', { changes: others })
 
-    if (changes.some(change => KAY_FILE.test(change.uri)))
-      await this.saved()
-    else if (others.length > 0)
-      this.scheduleDiagnostics()
+    // `kay.config.ts`, or a module it imported, changing makes every project read its config again.
+    if (changed.some(change => basename(change.path) === CONFIG_FILE || realPath(change.path) in require.cache)) {
+      for (const project of this.projects.values())
+        project.configured = false
+    }
 
-    this.scheduleProjectChecks()
+    await this.saved()
 
     // An open component reads by name the signals a changed module now exports, or stops.
     for (const previous of others.length > 0 ? this.documents.values() : []) {
@@ -246,12 +254,15 @@ export class KayLanguageServer {
 
   // Rewrites the shadow tree on disk, so closed .kay files and the editor's own TypeScript server see the saved code; tsgo hears which shadow files came and went, so imports of them resolve again.
   private async saved() {
+    const options = new Map([...this.projects].map(([root, project]) => [root, project.options]))
+
     this.server.notify('workspace/didChangeWatchedFiles', { changes: await this.writeShadows() })
-    // An open component that came to be rendered only by islands, or stopped being, compiles again as such.
+    // An open component that came to be rendered only by islands, or stopped being, or whose project read its config again, compiles again.
     for (const previous of this.documents.values()) {
       const file = fileURLToPath(previous.uri)
+      const project = this.projects.get(projectRootOf(file, this.root))
 
-      if ((this.projects.get(projectRootOf(file, this.root))?.islandOnly.has(file) ?? false) !== previous.insideIsland)
+      if ((project?.islandOnly.has(file) ?? false) !== previous.insideIsland || (project !== undefined && project.options !== options.get(project.root)))
         this.refresh(previous)
     }
     this.scheduleDiagnostics()
@@ -296,6 +307,14 @@ export class KayLanguageServer {
 
   // The editor's setting wins over the project's `kay.config.ts`, as `pages()` options do; it names the workspace folder's pages, so only that project takes it.
   private async configure(project: Project) {
+    const root = `${realPath(project.root)}${sep}`
+
+    // Read again, the config imports the project's modules afresh rather than as first loaded.
+    for (const path of Object.keys(require.cache)) {
+      if (path.startsWith(root) && !path.startsWith(OWN_MODULES) && !path.split(sep).includes('node_modules'))
+        delete require.cache[path]
+    }
+
     const config = await projectConfig(project.root)
 
     project.options = { ...configCheckOptions(config), routes: (project.root === this.root ? this.routesSetting : undefined) ?? config.routes }
@@ -361,15 +380,16 @@ export class KayLanguageServer {
     }
     finally {
       this.projectChecks = undefined
-    }
 
-    if (this.projectChecksStale) {
-      this.projectChecksStale = false
-      await this.runProjectChecks()
+      // A save during a run, even a failed one, runs the checks again.
+      if (this.projectChecksStale) {
+        this.projectChecksStale = false
+        this.scheduleProjectChecks()
+      }
     }
   }
 
-  // Each file's problems, an open component's along with its own diagnostics, and none any longer for a file that had some.
+  // Each file whose problems changed, an open component's along with its own diagnostics, and none any longer for a file that had some.
   private async publishProblems() {
     const found = new Map<string, Diagnostic[]>()
 
@@ -381,6 +401,9 @@ export class KayLanguageServer {
     this.problems = found
 
     await Promise.all([...new Set([...previous.keys(), ...found.keys()])].map(async (file) => {
+      if (Bun.deepEquals(previous.get(file), found.get(file)))
+        return
+
       const document = [...this.documents.values()].find(open => open.file === file)
 
       if (document)
@@ -397,9 +420,9 @@ export class KayLanguageServer {
       return []
 
     const content = await contentChecks(root, options)
-    const [problems, typeErrors] = await Promise.all([projectProblems(root, options, types, content), this.generatedTypeErrors(root)])
+    const [problems, typeErrors] = await Promise.all([projectProblems(root, options, content), this.generatedTypeErrors(root)])
 
-    return [...problems, ...typeErrors.flatMap(diagnostic => generatedProblem(root, diagnostic, types, content) ?? [])]
+    return [...configProblems(root, options, types), ...typeErrors.flatMap(diagnostic => generatedProblem(root, diagnostic, types, content) ?? []), ...problems]
   }
 
   // What tsgo finds in the modules kay writes for it to check what only types tell, each opened for the question.
@@ -817,6 +840,7 @@ export class KayLanguageServer {
 
   private exit() {
     this.tsgo?.process.kill()
+    stopProbes()
     process.exit(0)
   }
 }
@@ -830,6 +854,18 @@ async function projectConfig(root: string): Promise<KayConfig> {
     console.error('kay lsp: kay.config.ts failed to load', error)
 
     return {}
+  }
+}
+
+// The path as Bun keys its module cache, a symlinked folder resolved, for a file deleted too.
+function realPath(path: string): string {
+  try {
+    return realpathSync(path)
+  }
+  catch {
+    const parent = dirname(path)
+
+    return parent === path ? path : join(realPath(parent), basename(path))
   }
 }
 
@@ -998,7 +1034,6 @@ function toSourceRange(document: ShadowFile, range: Range, mode: SpanMode = 'exa
   return span && { start: toPosition(document.source, span.start), end: toPosition(document.source, span.end) }
 }
 
-// A diagnostic as an editor shows it, its label, note and help on their own lines.
 // A problem of the project, at the start of the line and column it names.
 function problemDiagnostic(problem: CheckDiagnostic): Diagnostic {
   const position = { line: problem.line - 1, character: problem.column - 1 }
@@ -1006,6 +1041,7 @@ function problemDiagnostic(problem: CheckDiagnostic): Diagnostic {
   return { range: { start: position, end: position }, severity: problem.severity === 'warning' ? WARNING : ERROR, source: 'kay', ...problem.code !== undefined && { code: problem.code }, message: editorMessage(problem) }
 }
 
+// A diagnostic as an editor shows it, its label, note and help on their own lines.
 function editorMessage({ message, label, note, help }: Pick<KayDiagnostic, 'message' | 'label' | 'note' | 'help'>): string {
   return [label !== undefined && label !== '' ? `${message} (${label})` : message, ...[['note', note], ['help', help]].flatMap(([kind, text]) => text === undefined ? [] : [`${kind}: ${text}`])].join('\n')
 }

@@ -175,4 +175,6 @@ if (import.meta.main) {
   // The checking machine lacks the server's environment, as `kay build` does.
   buildingWithoutEnv()
   console.log(`${PROBLEMS_MARKER}${JSON.stringify(await messageProblems(root!, JSON.parse(config!) as I18nConfig, JSON.parse(extensions ?? '[]') as KayExtension[]))}`)
+  // A timer or a connection a message file left open would keep the check waiting.
+  process.exit(0)
 }

@@ -511,11 +511,16 @@ describe('kay lsp following files on disk', () => {
 describe('kay lsp reporting what kay check finds across the project', () => {
   let editor: Editor
   let dir: string
+  let real: string
   const entry = 'src/content/notes/a.md'
   let first: Record<string, Promise<Diagnostic[]>>
 
   beforeAll(async () => {
-    dir = await mkdtemp(join(tmpdir(), 'kay-project-'))
+    real = await mkdtemp(join(tmpdir(), 'kay-project-'))
+
+    // Opened through a symlink, while Bun keys the modules a config read again must import afresh by real path.
+    dir = `${real}-link`
+    await symlink(real, dir)
     await Promise.all([
       Bun.write(join(dir, 'tsconfig.json'), await Bun.file(join(fixtures, 'site/tsconfig.json')).text()),
       Bun.write(join(dir, 'kay.config.ts'), 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ lints: { \'no-such-lint\': \'deny\' }, i18n: { locales: [\'fr\', \'en\'], defaultLocale: \'fr\' } })\n'),
@@ -535,7 +540,7 @@ describe('kay lsp reporting what kay check finds across the project', () => {
 
   afterAll(async () => {
     await editor.stop()
-    await rm(dir, { recursive: true, force: true })
+    await Promise.all([rm(dir, { force: true }), rm(real, { recursive: true, force: true })])
   })
 
   it('reports the config, the messages, the collections and the exports kay check reads, at their files, once it started and after a change on disk', async () => {
@@ -548,6 +553,24 @@ describe('kay lsp reporting what kay check finds across the project', () => {
 
     await Bun.write(join(dir, entry), '---\ntitle: A\n---\nText\n')
     expect(await editor.filesChanged(entry, [{ path: entry, type: 2 }])).toEqual([])
+  })
+
+  it('reads the config again, and what guards export, once either changes on disk', async () => {
+    const config = 'kay.config.ts'
+    const messages = (diagnostics: Diagnostic[]) => diagnostics.map(diagnostic => diagnostic.message)
+    const written = async (lints: string) => Bun.write(join(dir, config), `import { defineConfig } from 'kay/server'\n\nexport default defineConfig({ lints: { ${lints} }, i18n: { locales: ['fr', 'en'], defaultLocale: 'fr' } })\n`)
+
+    await written('')
+    expect(await editor.filesChanged(config, [{ path: config, type: 2 }])).toEqual([])
+
+    await written('\'other-lint\': \'warn\'')
+    expect(messages(await editor.filesChanged(config, [{ path: config, type: 2 }]))).toEqual(['`lints` names `other-lint`, which is no lint or group\nhelp: `kay explain` lists them'])
+
+    await rm(join(dir, 'src/routes/_guard.ts'))
+    expect(await editor.filesChanged('src/routes/_guard.ts', [{ path: 'src/routes/_guard.ts', type: 3 }])).toEqual([])
+
+    await Promise.all([Bun.write(join(dir, 'src/routes/sub/_guard.ts'), 'export default 1\n'), Bun.write(join(dir, 'src/routes/sub/index.kay'), 'h1 Sub\n')])
+    expect(messages(await editor.filesChanged('src/routes/sub/_guard.ts', [{ path: 'src/routes/sub/_guard.ts', type: 1 }, { path: 'src/routes/sub/index.kay', type: 1 }]))).toEqual([expect.stringMatching(/^It must export a guard by default: /)])
   })
 })
 

@@ -23,7 +23,6 @@ import { siteOrigin } from '../server/seo'
 import { ServedPaths } from '../server/served-paths'
 
 // What the server refuses when it boots, found by the functions it calls then, so `kay check` and the boot cannot disagree; the collections' feeds come from the process that read them.
-// Only `kay check` and `kay build` look for them: the editor reads routes mid-edit, two pages serving one path among them.
 export async function bootProblems(root: string, options: CheckOptions, feeds: CollectionFeed[] = []): Promise<CheckDiagnostic[]> {
   const diagnostics: CheckDiagnostic[] = []
   const config = join(root, CONFIG_FILE)
