@@ -3,7 +3,7 @@ import { focusInvalid } from 'kay'
 
 const { onFocused } = props<{ onFocused: (focused: boolean) => void }>()
 ---
-button.save(onClick={() => onFocused(focusInvalid())}) Save
+button.save(onClick={async () => onFocused(await focusInvalid())}) Save
 section.outer(hidden="until-found")
   details
     summary More

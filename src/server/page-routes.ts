@@ -23,7 +23,7 @@ import { hookedResponse } from './page-hook'
 import { matchedParams, positionalParams } from './params'
 import { inPreview, previewRequested, requestDrafts } from './preview'
 import { requestId } from './protection'
-import { hasFlash, renderPage, renderUnmatched, servePrerendered } from './render'
+import { hasFlash, renderPage, renderUnmatched, servePrerendered, withEditor } from './render'
 import { reportServerError } from './report'
 import { revalidateStale } from './revalidate'
 import { decodePath, withoutSlash } from './routes'
@@ -200,7 +200,9 @@ export function servePageRoutes(app: Elysia, { table, served: claims, matchers, 
       }
     }
 
-    return renderUnmatched(candidates.at(-1)!.route.special, context, client, renderOptions)
+    const last = candidates.at(-1)!.route
+
+    return renderUnmatched(last.special, context, client, withEditor(last, renderOptions))
   }
 
   for (const [path, offered] of table.paths) {
@@ -233,8 +235,11 @@ export function servePageRoutes(app: Elysia, { table, served: claims, matchers, 
 
       const state = stateFor(i18n, locale, untranslatedPath(settings, rest, locale), context.request)
 
-      if (!own)
-        return runInLocale(state, async () => renderUnmatched(served.values().next().value!.candidates.at(-1)!.route.special, context, client, renderOptions))
+      if (!own) {
+        const last = served.values().next().value!.candidates.at(-1)!.route
+
+        return runInLocale(state, async () => renderUnmatched(last.special, context, client, withEditor(last, renderOptions)))
+      }
 
       const response = await runInLocale(state, async () => answeringRequest(context.request, async () => answer(own.candidates, context, url)))
 

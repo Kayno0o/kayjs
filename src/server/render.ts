@@ -343,9 +343,10 @@ export async function renderServerIslands(route: ServedRoute, context: RequestCo
   const rendering = createRendering(context, params, options)
   const { request } = rendering.ctx
   const report = (error: unknown) => reportServerError(error, request, options.onError)
+  const own = withEditor(route, options)
 
   return withOutcome(rendering.outcome, async () => {
-    const page = await loadRoute(route, rendering, client, withEditor(route, options))
+    const page = await loadRoute(route, rendering, client, own)
 
     if (page instanceof Response)
       return page
@@ -373,7 +374,7 @@ export async function renderServerIslands(route: ServedRoute, context: RequestCo
       } }
     }
     catch (error) {
-      return renderFailure(error, route.special, rendering, page.loaded, client, options)
+      return renderFailure(error, route.special, rendering, page.loaded, client, own)
     }
   })
 }
@@ -577,7 +578,7 @@ async function importAll(files: string[], options: RenderOptions): Promise<PageM
 }
 
 // The editor's own extension's pages, its admin screens say, render no editor over them, nor does what they fail with, whichever page shows it.
-function withEditor(page: { editorOwn?: true | undefined }, options: RenderOptions): RenderOptions {
+export function withEditor(page: { editorOwn?: true | undefined }, options: RenderOptions): RenderOptions {
   return page.editorOwn === true && options.editor !== undefined ? { ...options, editor: undefined } : options
 }
 

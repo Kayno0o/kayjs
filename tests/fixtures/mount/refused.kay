@@ -5,10 +5,10 @@ const { onFocused } = props<{ onFocused: (focused: boolean) => void }>()
 const tab = signal('site')
 const refused = signal(false)
 
-function save() {
+async function save() {
   tab = 'access'
   refused = true
-  onFocused(focusInvalid())
+  onFocused(await focusInvalid())
 }
 ---
 button.save(onClick={save}) Save

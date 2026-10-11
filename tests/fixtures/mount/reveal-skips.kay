@@ -1,0 +1,8 @@
+---
+import { focusInvalid } from 'kay'
+
+const { onFocused } = props<{ onFocused: (focused: boolean) => void }>()
+---
+button.save(onClick={async () => onFocused(await focusInvalid())}) Save
+section.skipped(hidden="until-found")
+  input.off(aria-label="Off" aria-invalid="true" disabled)

@@ -231,7 +231,7 @@ export async function show(page: FetchedPage, hash: string, swap: Swap, isCurren
     if (policy.scroll !== 'keep')
       restoreScroll(swap.saved, hash)
 
-    moveFocus(swap, policy)
+    void moveFocus(swap, policy)
     takeFormChecks(document)
     navigation.hooks!.hydrate(document.body)
   }
@@ -588,8 +588,8 @@ function later(from: ChildNode | null, node: Node): ChildNode | undefined {
 }
 
 // The element focused before, found again on a refreshed page; on a new page its autofocus field or its heading, so a screen reader starts there, the title announced.
-function moveFocus(swap: Swap, policy: Policy): void {
-  if (policy.focus === 'refused' && swap.refused && showRefusal(document.forms[swap.refused.form], swap.refused.control))
+async function moveFocus(swap: Swap, policy: Policy): Promise<void> {
+  if (policy.focus === 'refused' && swap.refused && await showRefusal(document.forms[swap.refused.form], swap.refused.control))
     return
 
   if (policy.focus !== 'page') {
@@ -623,11 +623,11 @@ function moveFocus(swap: Swap, policy: Policy): void {
 }
 
 // Focuses the refused form's first invalid field, which a screen reader reads with its error. Without one, announces the form's own message and focuses the control that posted it again, found by its place in the form.
-function showRefusal(form: HTMLFormElement | undefined, control: number): boolean {
+async function showRefusal(form: HTMLFormElement | undefined, control: number): Promise<boolean> {
   if (!form)
     return false
 
-  if (focusInvalid(form))
+  if (await focusInvalid(form))
     return true
 
   const message = form.getAttribute('aria-describedby')?.split(ID_LIST).map(id => document.getElementById(id)?.textContent?.trim()).filter(Boolean).join(' ')

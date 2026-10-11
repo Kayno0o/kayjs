@@ -679,7 +679,7 @@ describe('preview mode', () => {
     expect(await edited('/news')).toBe('<li>news:launch</li><li>news:roadmap</li>')
     expect(await edited('/articles/hello')).toBe('<li>articles:hello@fr</li>')
     expect((await get('/marks/launch', preview)).html).not.toContain('draft-editor')
-    // The editor's own extension's screens render none, nor do their error pages, the app's included; the app's page under its prefix and another extension's do.
+    // The editor's own extension's screens render none, nor do what they fail with or a path under its prefix nothing serves, the app's error pages included; an app page replacing one of its screens and another extension's page do.
     const shown = async (path: string, text: string) => {
       const { html } = await get(path, edit)
 
@@ -691,7 +691,10 @@ describe('preview mode', () => {
     expect(await shown('/admin', '<h1>Admin</h1>')).toBe(false)
     expect(await shown('/admin/screens/broken', 'Screen failed')).toBe(false)
     expect(await shown('/admin/broken', 'Admin failed')).toBe(false)
+    expect(await shown('/admin/locked', 'Admin failed')).toBe(false)
+    expect(await shown('/admin/nope', 'Nothing here')).toBe(false)
     expect(await shown('/admin/settings', '<h1>Settings</h1>')).toBe(true)
+    expect((await get('/admin/settings', edit)).html).not.toContain('extension')
     expect(await shown('/blog', '<h1>Blog</h1>')).toBe(true)
     // Its stylesheet comes with it, after the page's.
     const sheets = (html: string) => [...html.matchAll(/<link rel="stylesheet" href="([^"]+)">/g)].map(link => link[1]!)

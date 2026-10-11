@@ -39,6 +39,7 @@ describe('mount', () => {
     const { root, unmount } = await mount('tests/fixtures/mount/refused.kay', { onFocused: (took: boolean) => focused.push(took) })
 
     root.querySelector<HTMLButtonElement>('.save')!.click()
+    await answered(focused)
 
     expect(focused).toEqual([true])
     expect(document.activeElement).toBe(root.querySelector('.login'))
@@ -52,12 +53,48 @@ describe('mount', () => {
 
     root.addEventListener('beforematch', event => matched.push((event.target as Element).className))
     root.querySelector<HTMLButtonElement>('.save')!.click()
+    await answered(focused)
 
     expect(matched).toEqual(['inner', 'outer'])
     expect(root.querySelectorAll('[hidden]')).toHaveLength(0)
     expect(root.querySelector('details')!.open).toBe(true)
     expect(focused).toEqual([true])
     expect(document.activeElement).toBe(root.querySelector('.code'))
+
+    // Shown now, in a details left open: nothing to reveal again.
+    root.querySelector<HTMLButtonElement>('.save')!.click()
+    await answered(focused, 2)
+
+    expect(matched).toEqual(['inner', 'outer'])
+    expect(focused).toEqual([true, true])
+    unmount()
+  })
+
+  it('stops revealing where a beforematch listener hides the element again', async () => {
+    const focused: boolean[] = []
+    const { root, unmount } = await mount('tests/fixtures/mount/until-found.kay', { onFocused: (took: boolean) => focused.push(took) })
+
+    root.addEventListener('beforematch', event => (event.target as Element).setAttribute('hidden', ''))
+    root.querySelector<HTMLButtonElement>('.save')!.click()
+    await answered(focused)
+
+    expect(root.querySelector('.inner')!.getAttribute('hidden')).toBe('')
+    expect(root.querySelector('details')!.open).toBe(false)
+    expect(root.querySelector('.outer')!.getAttribute('hidden')).toBe('until-found')
+    unmount()
+  })
+
+  it('reveals nothing for a field that cannot take focus', async () => {
+    const focused: boolean[] = []
+    const matched: string[] = []
+    const { root, unmount } = await mount('tests/fixtures/mount/reveal-skips.kay', { onFocused: (took: boolean) => focused.push(took) })
+
+    root.addEventListener('beforematch', event => matched.push((event.target as Element).className))
+    root.querySelector<HTMLButtonElement>('.save')!.click()
+    await answered(focused)
+
+    expect(matched).toEqual([])
+    expect(root.querySelector('.skipped')!.getAttribute('hidden')).toBe('until-found')
     unmount()
   })
 
@@ -109,3 +146,9 @@ describe('mount', () => {
     }
   })
 })
+
+// Until the island's `focusInvalid()` answered, which may load the reveal first.
+async function answered(focused: boolean[], count = 1): Promise<void> {
+  for (let tries = 0; focused.length < count && tries < 200; tries++)
+    await Bun.sleep(5)
+}
