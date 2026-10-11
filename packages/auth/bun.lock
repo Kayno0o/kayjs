@@ -5,7 +5,7 @@
     "": {
       "name": "@kaynooo/kay-auth",
       "dependencies": {
-        "@kaynooo/kayjs-ui": "^0.4.28 || ^0.5.0",
+        "@kaynooo/kayjs-ui": "^0.4.28 || ^0.5.0 || ^0.6.0 || ^0.7.0",
         "@kaynooo/utils": "^2.27.0",
         "@simplewebauthn/server": "^14.0.3",
         "jose": "^6.2.12",
@@ -152,7 +152,7 @@
 
     "@kaynooo/kayjs-mail": ["@kaynooo/kayjs-mail@0.3.0", "https://git.kaynooo.fr/api/packages/kaynooo/npm/%40kaynooo%2Fkayjs-mail/-/0.3.0/kayjs-mail-0.3.0.tgz", { "dependencies": { "nodemailer": "^10.0.16" }, "peerDependencies": { "elysia": "^1.4.30", "kay": "~1.28.0 || ~1.29.0 || ~1.30.0" } }, "sha512-6d6RcKtb3pFGI9UJmkVqzW1cj7DLN1npYClgqDJsj2Nxq4R381WGBCkyxruGsn9/0ZK9wsYiG46vHm5UdPvtlQ=="],
 
-    "@kaynooo/kayjs-ui": ["@kaynooo/kayjs-ui@0.5.0", "https://git.kaynooo.fr/api/packages/kaynooo/npm/%40kaynooo%2Fkayjs-ui/-/0.5.0/kayjs-ui-0.5.0.tgz", { "dependencies": { "@kaynooo/utils": "^2.24.1" }, "peerDependencies": { "@iconify-json/tabler": "^1.2.41", "chartist": "^1.5.0", "hls.js": "^1.7.0", "kay": "^0.8.1 || ^0.9.0 || ^0.10.0 || ^0.11.0 || ^0.12.0 || ^0.13.0 || ^0.14.0 || ~1.0.0 || ~1.1.0 || ~1.2.0 || ~1.3.0 || ~1.4.0 || ~1.5.0 || ~1.6.0 || ~1.7.0 || ~1.8.0 || ~1.9.0 || ~1.10.0 || ~1.11.0 || ~1.12.0 || ~1.13.0 || ~1.14.0 || ~1.15.0 || ~1.16.0 || ~1.17.0 || ~1.18.0 || ~1.19.0 || ~1.20.0 || ~1.21.0 || ~1.23.0 || ~1.24.0 || ~1.25.0 || ~1.26.0 || ~1.27.0 || ~1.28.0 || ~1.29.0 || ~1.30.0 || ~1.31.0", "tailwindcss": "^4.3.3" } }, "sha512-05zxOd/1Dy/NVJ6MwnURt19OCejJrs4JQorBLty+mn4G0Jiu048DMMEq5tlla44WdefdmivLx03xfkgXwQ9Q9A=="],
+    "@kaynooo/kayjs-ui": ["@kaynooo/kayjs-ui@0.7.1", "https://git.kaynooo.fr/api/packages/kaynooo/npm/%40kaynooo%2Fkayjs-ui/-/0.7.1/kayjs-ui-0.7.1.tgz", { "dependencies": { "@kaynooo/utils": "^2.24.1" }, "peerDependencies": { "@iconify-json/tabler": "^1.2.41", "chartist": "^1.5.0", "hls.js": "^1.7.0", "kay": "^0.8.1 || ^0.9.0 || ^0.10.0 || ^0.11.0 || ^0.12.0 || ^0.13.0 || ^0.14.0 || ~1.0.0 || ~1.1.0 || ~1.2.0 || ~1.3.0 || ~1.4.0 || ~1.5.0 || ~1.6.0 || ~1.7.0 || ~1.8.0 || ~1.9.0 || ~1.10.0 || ~1.11.0 || ~1.12.0 || ~1.13.0 || ~1.14.0 || ~1.15.0 || ~1.16.0 || ~1.17.0 || ~1.18.0 || ~1.19.0 || ~1.20.0 || ~1.21.0 || ~1.23.0 || ~1.24.0 || ~1.25.0 || ~1.26.0 || ~1.27.0 || ~1.28.0 || ~1.29.0 || ~1.30.0 || ~1.31.0 || ~1.32.0 || ~1.33.0 || ~1.34.0 || ~1.35.0 || ~1.37.0", "tailwindcss": "^4.3.3" } }, "sha512-EhYZjvxusQ+mmK8oKNSmh/pEA90+V1imZPaDoK6sb6AK4j2kvqcub0dZxAVVcH4hc9ReLZR/jXwLw7uG3xCQ+Q=="],
 
     "@kaynooo/pg-orm": ["@kaynooo/pg-orm@7.0.1", "https://git.kaynooo.fr/api/packages/kaynooo/npm/%40kaynooo%2Fpg-orm/-/7.0.1/pg-orm-7.0.1.tgz", { "dependencies": { "@kaynooo/utils": "^2.24.1" }, "peerDependencies": { "bun-types": "1.3.14" }, "bin": { "pg-orm": "dist/cli.js" } }, "sha512-xV5rl1xpdjpcpvwlqBggqgD9xBG+3t0lRVn/MG4ibMktCMIPehJ9WJAK++P03Tczj0wN3x6TptmMqeqKW/yGug=="],
 
