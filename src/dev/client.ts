@@ -7,6 +7,8 @@ import { CONFIG_FILE } from '../config'
 export interface ClientBuilder {
   // Undefined once the process is gone, as when the config failed to load.
   build: (changed: string[] | null) => Promise<BuildOutcome | undefined>
+  // The process exited, killed or on its own.
+  gone: () => boolean
   // Whether a change to the file, relative to the root, changes what the process loaded as it started: the config and the project's modules it imports.
   loaded: (file: string) => boolean
   stop: () => Promise<void>
@@ -54,6 +56,7 @@ export function startClientBuilder(root: string, env: Record<string, string | un
 
       return outcome
     },
+    gone: () => gone,
     loaded: file => file === CONFIG_FILE || modules.has(join(realRoot, file)),
     stop: async () => {
       child.kill()

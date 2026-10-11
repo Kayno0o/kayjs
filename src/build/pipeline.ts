@@ -67,6 +67,18 @@ export async function buildProject(root: string, config: KayConfig, options: Bui
   const checking = checkWith !== undefined
   const exported = options.exportTo !== undefined
   const result: BuildResult = { checked: [], linted: [] }
+  // A callback throwing while the last build waits aside puts it back, as a failing stage does.
+  const reportAside = async (stage: BuildStage) => {
+    try {
+      await options.onStage?.(stage, result)
+    }
+    catch (error) {
+      if (checking)
+        await putBack(output, previous)
+
+      throw error
+    }
+  }
 
   // The last build waits aside until this one is known good, which the check decides beside the browser bundle.
   if (checking)
@@ -84,7 +96,7 @@ export async function buildProject(root: string, config: KayConfig, options: Bui
   }
 
   result.checked = checked.value
-  await options.onStage?.('check', result)
+  await reportAside('check')
 
   if (failing(checked.value)) {
     await putBack(output, previous)
@@ -119,7 +131,7 @@ export async function buildProject(root: string, config: KayConfig, options: Bui
   if (!failing(linted))
     result.built = { islands: Object.keys(client.islands).length, stylesheets: client.styles.size, prerendered, entries, report: client.report, ms: performance.now() - started }
 
-  await options.onStage?.('output', result)
+  await reportAside('output')
 
   if (failing(linted)) {
     await putBack(output, previous)

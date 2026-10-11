@@ -87,9 +87,13 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   let address: string | undefined
   // The port the first server asked for and the one it moved to, busy, which every next server takes first.
   let moved: string | undefined
-  // Started once a server asks for the client, and again once a file it loaded changes; none once it exited, until then.
+  // Started once a server asks for the client, and again once a file it loaded changes or it is gone.
   let builder: ClientBuilder | undefined
   let builderStale = true
+  // One build at a time, so a restart never starts a second process while the last build still waits on the first.
+  let lastBuild: Promise<unknown> = Promise.resolve()
+  // Said once until a build succeeds again, as the process's own error already shows.
+  let builderExitSaid = false
   // A server asked for the client, so the next ones will: each restart starts building it at once.
   let wantsClient = false
   // `pages()` was given other options than kay.config.ts holds, so the servers bundle their own until the config changes.
@@ -151,11 +155,11 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   }
 
   const env = await environmentWithoutDotenv()
-  const buildClient = async (): Promise<BuildOutcome | undefined> => {
+  const buildClientNow = async (): Promise<BuildOutcome | undefined> => {
     if (ownClient)
       return undefined
 
-    if (builderStale) {
+    if (builderStale || builder?.gone() === true) {
       await builder?.stop()
       builder = startClientBuilder(root, env)
       builderStale = false
@@ -163,15 +167,42 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     }
 
     const files = unbuilt === null || unbuilt.size > MAX_CHANGED_FILES ? null : [...unbuilt]
+    const current = builder
 
     unbuilt = new Set()
 
-    const outcome = await builder?.build(files)
+    const outcome = await current?.build(files)
 
-    if (!outcome)
-      builder = undefined
+    if (outcome) {
+      builderExitSaid = false
 
-    return outcome
+      return outcome
+    }
+
+    // Gone on its own while building, as when the config failed to load: the next build starts it again.
+    if (current !== undefined && current === builder && !stopping && !ownClient) {
+      if (!builderExitSaid)
+        log(`${stamp()} the process building the client exited; servers build their own until the next change`)
+
+      builderExitSaid = true
+    }
+
+    return undefined
+  }
+  const buildClient = async (): Promise<BuildOutcome | undefined> => {
+    const previous = lastBuild
+    const build = (async () => {
+      try {
+        await previous
+      }
+      catch {}
+
+      return buildClientNow()
+    })()
+
+    lastBuild = build
+
+    return build
   }
   const answerClient = async (server: Subprocess) => {
     const outcome = await (building ??= buildClient())

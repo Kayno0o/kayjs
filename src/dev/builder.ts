@@ -69,7 +69,7 @@ export function devBuilder(root: string, options: ClientOptions): (changed: stri
       if (CSS_FILE.test(file))
         return true
 
-      if (previous.styleInputs.has(file) && (text === undefined || await styleSignature(file, text) !== previous.signatures.get(file)))
+      if (previous.styleInputs.has(file) && (text === undefined || await signatureOf(file, text) !== previous.signatures.get(file)))
         return true
 
       const known = previous.words.get(file)
@@ -88,8 +88,13 @@ export function devBuilder(root: string, options: ClientOptions): (changed: stri
       if (text === undefined)
         return
 
-      if (SCRIPT_OR_COMPONENT.test(file))
-        signatures.set(file, await styleSignature(file, text))
+      // One that does not parse has no signature, so its next edit builds the stylesheets again.
+      if (SCRIPT_OR_COMPONENT.test(file)) {
+        try {
+          signatures.set(file, await styleSignature(file, text))
+        }
+        catch {}
+      }
 
       if (plugins && SCANNED_FILE.test(file))
         words.set(file, new Set(sourceWords(text)))
@@ -190,6 +195,15 @@ async function pointMapsAtKay(maps: string[]): Promise<void> {
       await mapBundleToKay(map)
     }
     catch {}
+  }
+}
+
+async function signatureOf(file: string, text: string): Promise<string | undefined> {
+  try {
+    return await styleSignature(file, text)
+  }
+  catch {
+    return undefined
   }
 }
 

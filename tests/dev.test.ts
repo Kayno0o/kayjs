@@ -1,5 +1,5 @@
 import type { Subprocess } from 'bun'
-import { chmodSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { mkdir, mkdtemp, rename, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -13,6 +13,9 @@ import { dev, watchProject } from '../src/dev'
 import { inspectorProxy } from '../src/dev/inspector'
 import { bootFailure, hotSwap } from '../src/server/dev'
 import { editorCommand } from '../src/server/editor'
+
+// The parent's pid in /proc/<pid>/stat, after the command name and the state.
+const PARENT_PID = /\) \S+ (\d+)/
 
 async function until(condition: () => boolean, timeout = 5000) {
   for (const start = Date.now(); !condition(); await Bun.sleep(20)) {
@@ -771,6 +774,65 @@ describe('kay dev', () => {
 
       expect(await (await fetch(url)).text()).toContain('Grace</h1>')
       expect(children).toHaveLength(4)
+    }
+    finally {
+      await stop()
+      await rm(root, { recursive: true, force: true })
+    }
+  }, 60_000)
+
+  it('keeps one process building the client when the config changes while an island edit builds', async () => {
+    const scratch = join(import.meta.dir, '../node_modules/.cache')
+
+    await mkdir(scratch, { recursive: true })
+    const root = await mkdtemp(join(scratch, 'dev-builders-'))
+    const real = realpathSync(root)
+    const lines: string[] = []
+    const counter = (step: number) => `---\nimport { signal } from 'kay'\n\nconst count = signal(${step})\n---\nbutton(onClick={() => count.set(n => n + 1)}) {count()}\n`
+    // This process's children building the client of this project.
+    const builders = () => readdirSync('/proc').filter((pid) => {
+      try {
+        return PARENT_PID.exec(readFileSync(`/proc/${pid}/stat`, 'utf8'))?.[1] === String(process.pid) && readFileSync(`/proc/${pid}/cmdline`, 'utf8').includes('builder.ts') && readlinkSync(`/proc/${pid}/cwd`) === real
+      }
+      catch {
+        return false
+      }
+    })
+
+    await Bun.write(join(root, 'kay.config.ts'), 'export default {}\n')
+    await Bun.write(join(root, 'src/counter.kay'), counter(0))
+    await Bun.write(join(root, 'src/routes/index.kay'), '---\nimport Counter from \'../counter.kay\'\n---\nCounter\n')
+    const stop = await dev(root, { log: line => lines.push(line) })
+
+    try {
+      await until(() => lines.length === 1, 20_000)
+
+      // The config changing at any moment of the island's build.
+      for (let step = 1; step <= 8; step++) {
+        await Bun.write(join(root, 'src/counter.kay'), counter(step))
+        await Bun.sleep(step * 20)
+        await Bun.write(join(root, 'kay.config.ts'), `export default {}\n// ${step}\n`)
+        await Bun.sleep(300)
+      }
+
+      // Settled: no restart for a while.
+      for (let seen = lines.length, quiet = Date.now(); Date.now() - quiet < 1500; await Bun.sleep(100)) {
+        if (lines.length !== seen) {
+          seen = lines.length
+          quiet = Date.now()
+        }
+      }
+
+      const [first] = builders()
+
+      expect(builders()).toHaveLength(1)
+      expect(lines.join('\n')).not.toContain('the process building the client exited')
+
+      // One gone on its own starts again with the next build.
+      process.kill(Number(first), 'SIGKILL')
+      await until(() => builders().length === 0)
+      await Bun.write(join(root, 'src/counter.kay'), counter(9))
+      await until(() => builders().length === 1 && builders()[0] !== first, 10_000)
     }
     finally {
       await stop()
