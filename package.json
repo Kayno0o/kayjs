@@ -93,9 +93,17 @@
       "types": "./types/runtime/client.d.ts",
       "default": "./src/runtime/client.ts"
     },
+    "./mount": {
+      "types": "./types/runtime/mount.d.ts",
+      "default": "./src/runtime/mount.ts"
+    },
     "./compiler": {
       "types": "./types/compiler/public.d.ts",
       "default": "./src/compiler/public.ts"
+    },
+    "./bun": {
+      "types": "./types/build/bun.d.ts",
+      "default": "./src/build/bun.ts"
     },
     "./eslint": {
       "types": "./types/eslint/index.d.ts",

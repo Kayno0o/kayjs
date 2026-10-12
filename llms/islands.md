@@ -130,3 +130,16 @@ A page shipping kay's script, one with an island or a form posting to an action,
 - The swap prefetches as the speculation rules would, `prefetch` setting when (see [Project setup](project.md#project-setup)), and replaces them, so each page is fetched once: a hovered link's page is kept for 30 seconds and taken as the link is followed. `data-no-prefetch` still opts a link out.
 - A stylesheet holding `@view-transition { navigation: auto; }` animates the swap where the browser has view transitions, as it animates full loads, the rule standing at the top level or inside an `@media` or `@supports` that holds. A visitor asking for reduced motion (`prefers-reduced-motion: reduce`) gets no animation from the swap whatever the stylesheet says; a full load animates for them unless the rule sits in `@media (prefers-reduced-motion: no-preference)`, as the one `kay new` writes does.
 - `navigation: false` in `kay.config.ts` or `pages()` turns it off: pages load fully, and only pages with islands ship a script. Under `kay dev`, such a page still refreshes without a reload when only markup changed, as [Project setup](project.md#project-setup) describes.
+
+## A page kay does not serve
+
+A page another server or tool bundles, such as an HTML file `Bun.serve` imports, renders `.kay` components too. The plugin `kay` from `kay/bun` compiles them, for the browser in a browser build: list `"kay/bun"` under `[serve.static] plugins` in `bunfig.toml`, which `Bun.serve` reads from the directory it starts in, or pass `kay({ root })` to `Bun.build`'s `plugins`, `root` being where `.kay/` goes, the working directory by default. `mount(Component, element, props)` from `kay/mount` renders one into an element, as an island renders but with no server markup to hydrate, and returns what disposes it, ending its effects and emptying the element; `props` may be left out for a component taking none.
+
+```ts
+import { mount } from 'kay/mount'
+import Panel from './panel.kay'
+
+const dispose = mount(Panel, document.querySelector('#panel')!, { title: 'Tickets' })
+```
+
+A signal a `.ts` module exports reaches every component mounted from that module's bundle, so a module feeding signals from a WebSocket keeps them current. Imports of `.kay` files are typed through `.kay/types` as in a kay project, which `kay check` writes, with the tsconfig settings of [Project setup](project.md#project-setup).

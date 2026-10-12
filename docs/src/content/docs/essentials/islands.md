@@ -159,4 +159,15 @@ Reading a browser global while the component renders throws on the server. `kay 
 
 </Callout>
 
+## A page kay does not serve
+
+A page bundled by something else, such as an HTML file `Bun.serve` imports, renders `.kay` components too. List `"kay/bun"` under `[serve.static] plugins` in `bunfig.toml`, or pass `kay({ root })` from `kay/bun` to `Bun.build`, then render one with `mount` from `kay/mount`, which returns what disposes it:
+
+```ts
+import { mount } from 'kay/mount'
+import Panel from './panel.kay'
+
+const dispose = mount(Panel, document.querySelector('#panel')!, { title: 'Tickets' })
+```
+
 <ReadMore href="/llms/islands">Transitions, error fallbacks with `try`, context, `uid`, `guardLeave` and the navigation details are in the full islands reference.</ReadMore>
