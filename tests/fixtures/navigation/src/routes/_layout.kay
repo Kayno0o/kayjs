@@ -9,7 +9,7 @@ const page = ctx.url.pathname
 const bare = page === '/later'
 ---
 head
-  html(class={bare ? undefined : 'served'} data-theme={bare ? undefined : 'light'} data-label={bare ? undefined : 'say "hi" & <b>'})
+  html(class={bare ? undefined : 'served'} data-theme={bare ? undefined : 'light'} data-label={bare ? undefined : 'say "hi" & <b>\r\nbye'})
 nav
   a.home(href="/") Home
   a.second(href="/second") Second

@@ -39,6 +39,9 @@ const PREFETCH_TTL_MS = 30_000
 const STYLESHEET_TIMEOUT_MS = 3000
 
 export const HTML = /^text\/html\b/
+const SPACES = /\s+/
+// A CR, alone or before a LF, which the HTML parser reads as a LF.
+const CARRIAGE_RETURN = /\r\n?/g
 const SPECULATION = 'script[type="speculationrules"]'
 // The line a page without kay's script carries for Back after a reload, which a swapped-in page leaves to this one.
 const HISTORY = 'script[data-kay-history]'
@@ -301,7 +304,7 @@ function applyStreamed(page: Document): void {
   }
 }
 
-// Changes on `<html>` what the server sets differently for the next page as the page is swapped, where a script left it as the server set it, so a theme a toggle changed stays. A class changes token by token, a token the server set being the server's, as nothing tells whether a script added it too. The next page's is read before the heads merge, which moves its meta.
+// Changes on `<html>` what the server sets differently for the next page, read before the heads merge moves its meta, where a script left it as served: a name a script changed, as a theme toggle does, keeps its old served value and stays the script's. A class changes token by token, a token the server set being the server's, as nothing tells whether a script added it too.
 function swapRoot(next: Document): () => void {
   const wanted = servedRoot(next)
 
@@ -309,7 +312,7 @@ function swapRoot(next: Document): () => void {
     const root = document.documentElement
     const leaving = served
 
-    served = wanted
+    served = new Map(wanted)
 
     for (const name of new Set([...leaving.keys(), ...wanted.keys()])) {
       const before = leaving.get(name)
@@ -322,25 +325,34 @@ function swapRoot(next: Document): () => void {
         root.classList.remove(...old.filter(token => !now.includes(token)))
         root.classList.add(...now.filter(token => !old.includes(token)))
       }
-      else if (after !== before && root.getAttribute(name) === (before ?? null)) {
-        if (after === undefined)
-          root.removeAttribute(name)
+      else if (after === before) {
+        continue
+      }
+      else if (root.getAttribute(name) !== (before ?? null)) {
+        if (before === undefined)
+          served.delete(name)
         else
-          root.setAttribute(name, after)
+          served.set(name, before)
+      }
+      else if (after === undefined) {
+        root.removeAttribute(name)
+      }
+      else {
+        root.setAttribute(name, after)
       }
     }
   }
 }
 
-// What the page's layouts set on `<html>`, by name, which kay writes in a meta as the server renders it.
+// What the page's layouts set on `<html>`, by name, which kay writes in a meta as the server renders it: its line breaks as the HTML parser leaves them in the attribute, so the two compare.
 function servedRoot(page: Document): Map<string, string> {
   const content = page.querySelector(`meta[name="${ROOT_ATTRIBUTES}"]`)?.getAttribute('content')
 
-  return new Map(content == null ? [] : Object.entries(JSON.parse(content) as Record<string, string>))
+  return new Map(content == null ? [] : Object.entries(JSON.parse(content) as Record<string, string>).map(([name, value]) => [name, value.replace(CARRIAGE_RETURN, '\n')]))
 }
 
 function tokens(value: string | undefined): string[] {
-  return value?.split(ID_LIST).filter(Boolean) ?? []
+  return value?.split(SPACES).filter(Boolean) ?? []
 }
 
 // Adds what only the next head holds now, and drops what only this one holds as the page is swapped: the page keeps its own styles until the next one's loaded.

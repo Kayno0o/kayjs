@@ -291,40 +291,45 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
   })
 
   it('changes on <html> only what the server sets differently for the next page, where a script left it as served, a class token by token', async () => {
-    const label = 'say "hi" & <b>'
-
-    await page.goto(origin)
-    // A theme toggle, and a class token the server set already, which stays the server's.
-    await page.evaluate(() => {
-      (window as { kayAlive?: boolean }).kayAlive = true
-      document.documentElement.dataset.theme = 'dark'
-      document.documentElement.classList.add('dark', 'served')
-    })
+    // Its CRLF reaches the attribute as a LF, which the served value is compared with.
+    const label = 'say "hi" & <b>\nbye'
     const root = async (): Promise<Record<string, string | string[]>> => page.evaluate(() => {
       const { attributes, classList } = document.documentElement
 
       return { ...Object.fromEntries([...attributes].filter(({ name }) => name !== 'class' && name !== 'aria-busy').map(({ name, value }) => [name, value])), class: [...classList].sort() }
     })
-    const shown = async (heading: string) => {
+    const go = async (link: string, heading: string) => {
+      await page.click(`a.${link}`)
       await page.locator('h1', { hasText: heading }).waitFor()
       expect(await sameDocument()).toBe(true)
     }
 
+    await page.goto(origin)
+    await page.evaluate(() => {
+      (window as { kayAlive?: boolean }).kayAlive = true
+    })
+    expect(await root()).toEqual({ 'lang': 'en', 'data-theme': 'light', 'data-label': label, 'class': ['served'] })
+    // Untouched, the theme follows the server's, and the page's class replaces the layout's.
+    await go('second', 'Second')
+    expect(await root()).toEqual({ 'lang': 'en', 'data-theme': 'dark', 'data-label': label, 'data-second': '', 'class': ['second'] })
+    await go('home', 'Home')
+    expect(await root()).toEqual({ 'lang': 'en', 'data-theme': 'light', 'data-label': label, 'class': ['served'] })
+    // A theme toggle's value stays through a page serving the same and one serving another.
+    await page.evaluate(() => {
+      document.documentElement.dataset.theme = 'dark'
+      document.documentElement.classList.add('dark')
+    })
+    await go('second', 'Second')
+    expect(await root()).toEqual({ 'lang': 'en', 'data-theme': 'dark', 'data-label': label, 'data-second': '', 'class': ['dark', 'second'] })
+    await go('home', 'Home')
     expect(await root()).toEqual({ 'lang': 'en', 'data-theme': 'dark', 'data-label': label, 'class': ['dark', 'served'] })
-    // The page's class replaces the layout's, and the theme the server sets again stays the toggle's.
-    await page.click('a.second')
-    await shown('Second')
-    expect(await root()).toEqual({ 'lang': 'en', 'data-theme': 'dark', 'data-label': label, 'data-second': '', 'class': ['dark', 'second'] })
     // A page whose server sets nothing takes off what the last one's set, but for the theme the toggle changed.
-    await page.click('a.later')
-    await shown('Later')
+    await go('later', 'Later')
     expect(await root()).toEqual({ 'lang': 'en', 'data-theme': 'dark', 'class': ['dark'] })
-    // Back, the server's values come back through the meta's JSON as they were, the toggle's theme still kept.
+    // Back, the server's values come back through the meta's JSON as they were.
     await page.goBack()
-    await shown('Second')
-    expect(await root()).toEqual({ 'lang': 'en', 'data-theme': 'dark', 'data-label': label, 'data-second': '', 'class': ['dark', 'second'] })
-    await page.click('a.home')
-    await shown('Home')
+    await page.locator('h1', { hasText: 'Home' }).waitFor()
+    expect(await sameDocument()).toBe(true)
     expect(await root()).toEqual({ 'lang': 'en', 'data-theme': 'dark', 'data-label': label, 'class': ['dark', 'served'] })
   })
 
