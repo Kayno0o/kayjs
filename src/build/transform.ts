@@ -11,7 +11,7 @@ import { analyzeScript } from '../compiler/script'
 import { readCacheEntry, writeCacheEntry } from './cache'
 import { throughLinks } from './links'
 import { importsBrowserOnly, mayImportPackage } from './probe'
-import { importedSignals } from './signals'
+import { importedSignals, keepImportedSignals } from './signals'
 import { registerSourceMap } from './sourcemap'
 
 export type Target = 'dom' | 'ssr'
@@ -47,7 +47,7 @@ export interface Analysis {
 const COMPILER_PACKAGES = ['@babel/parser/package.json', '@babel/traverse/package.json', '@babel/types/package.json', '@typescript/native-preview/package.json']
 let fingerprint: string | undefined
 // Each file's last analysis in this process, which spares hashing and reading its cache entry again while the inputs stay the same.
-const analyzed = new Map<string, { inputs: string, analysis: Analysis }>()
+const analyzed = new Map<string, { file: string, key: string, analysis: Analysis }>()
 
 export interface FileDiagnostic extends Diagnostic {
   file: string
@@ -106,16 +106,16 @@ export async function analyzeKayCached(source: string, filename: string, root: s
   const kind = check ? 'analysis-check' : 'analysis'
   const inputs = `${root}\0${throughLinks(root, filename)}\0${JSON.stringify(check ? lints ?? {} : {})}\0${JSON.stringify(signals)}\0${source}`
   const slot = `${kind}\0${filename}`
+  const entry = cacheEntry(cacheDir, filename, kind, inputs)
   const last = analyzed.get(slot)
 
-  if (last?.inputs === inputs)
+  if (last?.key === entry.key)
     return last.analysis
 
-  const entry = cacheEntry(cacheDir, filename, kind, inputs)
   const cached = await readCacheEntry<Analysis>(entry)
 
   if (cached !== undefined) {
-    analyzed.set(slot, { inputs, analysis: cached })
+    analyzed.set(slot, { file: filename, key: entry.key, analysis: cached })
 
     return cached
   }
@@ -124,11 +124,21 @@ export async function analyzeKayCached(source: string, filename: string, root: s
   const analysis = { island, promote, classes, diagnostics }
 
   if (diagnostics.every(diagnostic => diagnostic.checkOnly)) {
-    analyzed.set(slot, { inputs, analysis })
+    analyzed.set(slot, { file: filename, key: entry.key, analysis })
     await writeCacheEntry(entry, analysis)
   }
 
   return analysis
+}
+
+// Forgets the analyses of the components not in `files`, gone or no longer built.
+export function keepAnalyses(files: ReadonlySet<string>): void {
+  for (const [slot, { file }] of analyzed) {
+    if (!files.has(file))
+      analyzed.delete(slot)
+  }
+
+  keepImportedSignals(files)
 }
 
 // One slot per source file and kind of output, so an edit replaces its entry rather than adding one.

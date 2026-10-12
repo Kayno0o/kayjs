@@ -26,7 +26,7 @@ import { ANCHOR, runtimeAnchor, runtimeChunk } from './runtime-chunk'
 import { builtinChains, refusedBuiltins, refuseServerOnlyReads } from './server-only'
 import { forgetBundleMaps } from './sourcemap'
 import { styleImports, withoutStyles } from './styles'
-import { analyzeKayCached, KayCompileError } from './transform'
+import { analyzeKayCached, KayCompileError, keepAnalyses } from './transform'
 
 export interface ClientOptions {
   minify?: boolean | undefined
@@ -146,6 +146,14 @@ export async function readClientSources(root: string, options: ClientOptions = {
 
   const cacheDir = projectPaths(root).cache
   const analyses = await Promise.all(files.map(async (file, index) => analyzeKayCached(sources[index]!, file, root, cacheDir, options.hot, options.lints)))
+
+  // What the files gone held, kept no longer.
+  keepAnalyses(new Set(files))
+
+  for (const file of graph.keys()) {
+    if (!existsSync(file))
+      graph.delete(file)
+  }
   const problems: string[] = []
 
   for (const [index, file] of files.entries()) {

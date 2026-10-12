@@ -444,6 +444,44 @@ describe('kay dev', () => {
     }
   })
 
+  it('waits for a source an editor moved to its backup, and a deleted one beside a stale backup, for a moment only', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
+    const server = join(root, 'src/server.ts')
+    const restarts: number[] = []
+    const body = 'setInterval(() => undefined, 1000)\n'
+
+    await Bun.write(server, body)
+    const stop = await dev(root, { onRestart: () => restarts.push(performance.now()) })
+
+    try {
+      await until(() => restarts.length === 1)
+      await Bun.sleep(300)
+
+      // Moved away and never written back: waited for, then restarted once.
+      await rename(server, `${server}~`)
+      await Bun.sleep(150)
+      expect(restarts).toHaveLength(1)
+      await until(() => restarts.length === 2)
+      await Bun.sleep(300)
+      expect(restarts).toHaveLength(2)
+
+      await Bun.write(server, body)
+      await until(() => restarts.length === 3)
+      // Past the wait, so only the backup still beside it holds the next one.
+      await Bun.sleep(400)
+
+      const deleted = performance.now()
+
+      await rm(server)
+      await until(() => restarts.length === 4)
+      expect(restarts[3]! - deleted).toBeGreaterThanOrEqual(150)
+    }
+    finally {
+      await stop()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('serves the pages itself while the project has no server entry, and runs one written meanwhile at the next restart', async () => {
     const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
     // Hidden, so the server writing it restarts nothing.

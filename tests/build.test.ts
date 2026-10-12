@@ -16,7 +16,7 @@ import { formatSizeReport } from '../src/build/report'
 import { anchorModule } from '../src/build/runtime-chunk'
 import { runtimeConfig, withoutPlugins } from '../src/build/runtime-config'
 import { describeThrown, mapBundleToKay, mapStack } from '../src/build/sourcemap'
-import { analyzeKayCached, transformKayCached } from '../src/build/transform'
+import { analyzeKayCached, keepAnalyses, transformKayCached } from '../src/build/transform'
 import { loadConfig, withConfig } from '../src/config'
 import { devBuilder } from '../src/dev/builder'
 import { projectPaths } from '../src/project'
@@ -973,8 +973,14 @@ describe('what a build keeps in memory', () => {
       expect(existsSync(cacheDir)).toBe(false)
 
       await Bun.write(join(dir, 'state.ts'), 'export const count = () => 0\n')
-      expect(await analyzeKayCached(source, file, dir, cacheDir)).not.toBe(analysis)
+      const changed = await analyzeKayCached(source, file, dir, cacheDir)
+
+      expect(changed).not.toBe(analysis)
       expect(await readdir(cacheDir)).toEqual([expect.stringMatching(/-analysis\.json$/)])
+
+      // A file no longer built is forgotten, read from its cache entry again.
+      keepAnalyses(new Set())
+      expect(await analyzeKayCached(source, file, dir, cacheDir)).not.toBe(changed)
     }
     finally {
       await rm(dir, { recursive: true, force: true })
@@ -998,6 +1004,34 @@ describe('what a build keeps in memory', () => {
       await Bun.write(from, 'import \'node:fs\'\n')
       expect(await reachesAny(dir, [], from, new Set([target]), undefined, undefined, graph)).toBe(false)
       expect(graph.get(from)).toMatchObject({ paths: [], missing: [] })
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('finds a module\'s imports again once a module it found is gone with no event, deleted or renamed', async () => {
+    const dir = resolve(await scratchDir('kay-graph-'))
+    const [a, b, c, renamed] = ['a.ts', 'b.ts', 'c.ts', 'e.ts'].map(name => join(dir, name)) as [string, string, string, string]
+    const graph = new Map()
+
+    try {
+      await Bun.write(a, 'import \'./b\'\n')
+      await Bun.write(b, 'import \'./c\'\n')
+      await Bun.write(c, '')
+      expect(await reachesAny(dir, [], a, new Set([c]), undefined, undefined, graph)).toBe(true)
+
+      // As an install drops a library's component its importer still names.
+      await rm(c)
+      expect(await reachesAny(dir, [], a, new Set([c]), undefined, undefined, graph)).toBe(false)
+      expect(graph.get(b)).toMatchObject({ paths: [], missing: ['./c'] })
+
+      await rename(b, renamed)
+      expect(await reachesAny(dir, [], a, new Set([renamed]), undefined, undefined, graph)).toBe(false)
+      expect(graph.get(a)).toMatchObject({ paths: [], missing: ['./b'] })
+
+      await Bun.write(a, 'import \'./e\'\n')
+      expect(await reachesAny(dir, [], a, new Set([renamed]), undefined, undefined, graph)).toBe(true)
     }
     finally {
       await rm(dir, { recursive: true, force: true })

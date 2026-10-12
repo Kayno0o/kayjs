@@ -18,11 +18,12 @@ export interface KayLibrary {
   extension?: true
 }
 
-// What each module imports while its text stays the same, which `kay dev` keeps from one build to the next: the paths found, and the specifiers not found, looked up again each time as a file written since may answer them. A module with a glob is read again each time.
+// What each module imports while its text stays the same, which `kay dev` keeps from one build to the next: the paths found, and the specifiers not found, looked up again each time as a file written since may answer them. A module with a glob is read again each time, and one whose paths found are gone.
+// A file written since that a specifier found would now resolve to, `./foo.ts` beside the `./foo/index.ts` it found, goes unseen until the module changes, as Bun keeps what it resolved anyway.
 export type ImportGraph = Map<string, Imports>
 
 interface Imports {
-  source: string
+  hash: number | bigint
   paths: string[]
   missing: string[]
   globbed: boolean
@@ -292,10 +293,12 @@ export async function reachesAny(root: string, libraries: KayLibrary[], from: st
 // The modules `file` imports, its `import.meta.glob` matches included, that a build follows, by real path as Bun resolves them: `project`'s own, the root's real path, and its kay libraries', `library` naming which; never another package's.
 async function followedImports(root: string, project: string, libraries: KayLibrary[], file: string, graph?: ImportGraph): Promise<{ path: string, library: KayLibrary | undefined }[]> {
   const source = await Bun.file(file).text()
+  const hash = Bun.hash(source)
   let imports = graph?.get(file)
 
-  if (imports?.source !== source) {
-    imports = await importsIn(root, file, source)
+  // A path gone with no event, as an install dropping a library's component, has the imports found again.
+  if (imports?.hash !== hash || !imports.paths.every(path => existsSync(path))) {
+    imports = await importsIn(root, file, source, hash)
 
     if (imports.globbed)
       graph?.delete(file)
@@ -312,7 +315,7 @@ async function followedImports(root: string, project: string, libraries: KayLibr
   })
 }
 
-async function importsIn(root: string, file: string, source: string): Promise<Imports> {
+async function importsIn(root: string, file: string, source: string, hash: number | bigint): Promise<Imports> {
   const kay = KAY_FILE.test(file)
   const code = kay ? fences(source) : source
   const missing: string[] = []
@@ -334,7 +337,7 @@ async function importsIn(root: string, file: string, source: string): Promise<Im
       missing.push(specifier)
   }
 
-  return { source, paths, missing, globbed: code.includes(GLOB_CALL) }
+  return { hash, paths, missing, globbed: code.includes(GLOB_CALL) }
 }
 
 function resolvedPath(specifier: string, importer: string): string | undefined {

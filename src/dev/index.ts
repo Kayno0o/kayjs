@@ -343,14 +343,18 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   }
   let scratchWritten = -Infinity
   let waitingSince: number | undefined
+  let waited = false
   // A deleted source restarts at once, while one a save left missing a moment, its backup beside it or the editor's scratch files just written, is waited for.
   const settle = () => {
     const now = performance.now()
     const saving = (file: string) => !existsSync(join(root, file)) && (now - scratchWritten < GONE_WAIT_MS || SAVE_BACKUPS.some(suffix => existsSync(join(root, file + suffix))))
 
     waitingSince ??= now
+    const wait = now - waitingSince < GONE_WAIT_MS && [...touched].some(saving)
 
-    if (now - waitingSince < GONE_WAIT_MS && [...touched].some(saving)) {
+    // A file seen back on disk has its event still to come, which one more tick gathers instead of restarting again for it.
+    if (wait || waited) {
+      waited = wait
       timer = setTimeout(settle, DEBOUNCE_MS)
 
       return

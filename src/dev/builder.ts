@@ -2,7 +2,7 @@ import type { ClientOptions, ClientSources } from '../build/client'
 import type { ImportGraph } from '../build/libraries'
 import type { ClientManifest } from '../server/client'
 import type { ClassWords } from './tailwind'
-import { existsSync, realpathSync } from 'node:fs'
+import { realpathSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { join, resolve, sep } from 'node:path'
 import process from 'node:process'
@@ -113,10 +113,6 @@ export function devBuilder(root: string, options: ClientOptions): (changed: stri
   }
 
   const build = async (changed: string[] | null): Promise<BuildOutcome> => {
-    // A file gone may leave another's import resolving elsewhere.
-    if (changed === null || changed.some(file => !existsSync(join(realRoot, file))))
-      graph.clear()
-
     const sources = await readClientSources(root, options, graph)
     const previous = changed !== null && last !== undefined && await readText(join(output, MANIFEST)) === last.manifest ? last : undefined
 
