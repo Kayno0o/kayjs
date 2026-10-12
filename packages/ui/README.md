@@ -15,7 +15,7 @@ kayjs-ui is published to the Forgejo registry at git.kaynooo.fr, beside kay. Tel
 bun add @kaynooo/kayjs-ui @iconify-json/tabler
 ```
 
-kay 0.8.1 or later and Tailwind v4 are peers. Two more are optional, installed only by an app using what needs them: `chartist` for LineChart, and `hls.js` for MediaGallery to play `.m3u8` playlists in browsers without native HLS.
+kay and Tailwind v4 are peers. It is released with kay, at kay's own version, and peers on kay's minor: install the one matching your kay, and move them together. An app on a `^0.x` range moves to kay's version by hand, as a caret on 0.x never reaches it. Two more are optional, installed only by an app using what needs them: `chartist` for LineChart, and `hls.js` for MediaGallery to play `.m3u8` playlists in browsers without native HLS.
 
 ## Theme
 

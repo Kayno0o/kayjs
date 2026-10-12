@@ -47,7 +47,7 @@
     "@iconify-json/tabler": "^1.2.41",
     "chartist": "^1.5.0",
     "hls.js": "^1.7.0",
-    "kay": "~1.38.1",
+    "kay": "~1.38.0",
     "tailwindcss": "^4.3.3"
   },
   "peerDependenciesMeta": {

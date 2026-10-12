@@ -1,7 +1,7 @@
 --- server
 import { shareCard } from 'kay/image'
 import { components, reference } from '../../../content.config'
-import { FORGE_ROOT, neighbours } from '../../../pages'
+import { libraryRoot, neighbours } from '../../../pages'
 
 export const page = { prerender: components }
 
@@ -67,7 +67,7 @@ head
       p.spread Attributes it does not declare go onto its root element.
     else
       p It takes no props.
-  Pager(previous={previous} next={next} source={`${FORGE_ROOT}/kayjs-ui/src/branch/main/src/${component.slug}.kay`})
+  Pager(previous={previous} next={next} source={`${libraryRoot('kayjs-ui')}/src/${component.slug}.kay`})
 .ui-stage
   Toaster
   TooltipHost

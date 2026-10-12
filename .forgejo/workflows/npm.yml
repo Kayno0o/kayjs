@@ -39,6 +39,8 @@ jobs:
             for manifest in package.json packages/*/package.json; do
               [ "$(git show "HEAD^:$manifest" | jq -S "del(.version, .peerDependencies.kay)")" = "$(jq -S "del(.version, .peerDependencies.kay)" "$manifest")" ] || return 1
             done
+            # bun.lock records each workspace's version and peer on kay, and nothing else may move.
+            ! git diff -U0 HEAD^ HEAD -- bun.lock | grep '^[-+]' | grep -v '^\(+++\|---\) ' | grep -qv '^[-+] *"\(version\|kay\)": "[^"]*",\?$'
           }
           verdict() {
             curl -sf -H "Authorization: token $TOKEN" "$API/repos/$GITHUB_REPOSITORY/commits/$1/status" | jq -r '[.statuses[]? | select(.context | startswith("Tests /")) | .status // .state] | first // empty' || true
@@ -48,7 +50,7 @@ jobs:
           echo "The Tests workflow on this commit: ${own:-none}"
           if [ "$own" = success ]; then
             tested=true
-          elif git diff --quiet HEAD^ HEAD -- . ":!package.json" ":!packages/*/package.json" ":!bun.lock" && versions_only; then
+          elif git diff --quiet HEAD^ HEAD -- . ":(exclude)package.json" ":(exclude,glob)packages/*/package.json" ":(exclude)bun.lock" && versions_only; then
             parent=$(verdict "$(git rev-parse HEAD^)")
             echo "The Tests workflow on its parent: ${parent:-none}"
             [ "$parent" = success ] && tested=true
@@ -117,12 +119,20 @@ jobs:
         env:
           PACKAGE_TOKEN: ${{ secrets.PACKAGE_TOKEN }}
 
-      # prepack writes what the exports point at: the declarations under types/ and the Node build of kay/eslint under dist/. Each library publishes at kay's version, its `workspace:` ranges written as that version; one marked private is not released yet.
+      # prepack writes what the exports point at: the declarations under types/ and the Node build of kay/eslint under dist/. Each library publishes at kay's version, its `workspace:` ranges written as that version; one marked private is not released yet. A package already on the registry at this version is skipped, so a rerun after a partial failure publishes the rest.
       - name: Publish to Forgejo npm registry
         run: |
-          bun publish --access public
+          publish() {
+            package="$(jq -r '.name + "@" + .version' package.json)"
+            if bun pm view "$package" version > /dev/null 2>&1; then
+              echo "$package is already published"
+            else
+              bun publish --access public
+            fi
+          }
+          publish
           for dir in packages/*/; do
-            [ "$(jq -r '.private // false' "$dir/package.json")" = true ] || (cd "$dir" && bun publish --access public) || exit 1
+            [ "$(jq -r '.private // false' "$dir/package.json")" = true ] || (cd "$dir" && publish) || exit 1
           done
         env:
           PACKAGE_TOKEN: ${{ secrets.PACKAGE_TOKEN }}

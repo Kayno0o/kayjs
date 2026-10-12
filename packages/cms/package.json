@@ -47,7 +47,7 @@
   },
   "peerDependencies": {
     "@kaynooo/kayjs-ui": "workspace:~",
-    "kay": "~1.38.1"
+    "kay": "~1.38.0"
   },
   "devDependencies": {
     "@happy-dom/global-registrator": "^20.14.5",

@@ -23,6 +23,7 @@
         "@iconify-json/tabler": "^1.2.41",
         "@kaynooo/eslint": "^6.1.0",
         "@kaynooo/kayjs-auth": "workspace:*",
+        "@kaynooo/kayjs-cms": "workspace:*",
         "@kaynooo/kayjs-mail": "workspace:*",
         "@kaynooo/kayjs-ui": "workspace:*",
         "@kaynooo/pg-orm": "^7.0.4",
@@ -38,6 +39,13 @@
       },
       "peerDependencies": {
         "@types/bun": "^1.4.2",
+      },
+    },
+    "docs": {
+      "name": "kay-docs",
+      "devDependencies": {
+        "@iconify-json/tabler": "^1.2.41",
+        "@kaynooo/kayjs-ui": "workspace:*",
       },
     },
     "packages/auth": {
@@ -63,7 +71,7 @@
         "@kaynooo/kayjs-ui": "workspace:~",
         "@kaynooo/pg-orm": "^7.0.0",
         "elysia": "^1.4.30",
-        "kay": "~1.38.1",
+        "kay": "~1.38.0",
       },
       "optionalPeers": [
         "@kaynooo/pg-orm",
@@ -84,7 +92,7 @@
       },
       "peerDependencies": {
         "@kaynooo/kayjs-ui": "workspace:~",
-        "kay": "~1.38.1",
+        "kay": "~1.38.0",
       },
     },
     "packages/mail": {
@@ -102,7 +110,7 @@
       },
       "peerDependencies": {
         "elysia": "^1.4.30",
-        "kay": "~1.38.1",
+        "kay": "~1.38.0",
       },
     },
     "packages/ui": {
@@ -126,7 +134,7 @@
         "@iconify-json/tabler": "^1.2.41",
         "chartist": "^1.5.0",
         "hls.js": "^1.7.0",
-        "kay": "~1.38.1",
+        "kay": "~1.38.0",
         "tailwindcss": "^4.3.3",
       },
       "optionalPeers": [
@@ -913,6 +921,8 @@
     "katex": ["katex@0.16.47", "", { "dependencies": { "commander": "^8.3.0" }, "bin": { "katex": "cli.js" } }, "sha512-Eeo8Ys1doU1z+x8AZsPpQu+p/QcZBI5PeOo7QGQdy2x2m0MU/hYagBbGOmXwr5KVbEfVuWv9LpnQWeehogurjg=="],
 
     "kay": ["kay@root:", {}],
+
+    "kay-docs": ["kay-docs@workspace:docs"],
 
     "kebab-case": ["kebab-case@1.0.2", "", {}, "sha512-7n6wXq4gNgBELfDCpzKc+mRrZFs7D+wgfF5WRFLNAr4DA/qtr9Js8uOAVAfHhuLMfAcQ0pRKqbpjx+TcJVdE1Q=="],
 

@@ -7,9 +7,16 @@ export interface PageLink {
   title: string
 }
 
-export const FORGE_ROOT = 'https://git.kaynooo.fr/kaynooo'
+const FORGE_ROOT = 'https://git.kaynooo.fr/kaynooo'
 
 export const FORGE = `${FORGE_ROOT}/kayjs/src/branch/main`
+
+const KAYJS = /^kayjs-/
+
+// A kay library's folder in kay's repository: kayjs-ui lives under packages/ui.
+export function libraryRoot(name: string): string {
+  return `${FORGE}/packages/${name.replace(KAYJS, '')}`
+}
 
 // The pages before and after `slug` in the order the sidebar lists them.
 export function neighbours(entries: { slug: string, data: { title: string } }[], slug: string, href: (slug: string) => string): { previous?: PageLink | undefined, next?: PageLink | undefined } {

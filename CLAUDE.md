@@ -1,6 +1,6 @@
 # kay
 
-A Bun web framework: `.kay` components (pug-like templates over TypeScript), compiled to HTML on the server and to kay's own DOM runtime in islands. `llms.txt` and `llms/` are what an app's author reads; `src/` is the framework, `docs/` the documentation site built with kay itself, `packages/` kay's libraries (kayjs-auth, kayjs-ui, kayjs-mail, kayjs-cms) as Bun workspaces, each with its own tests, `llms.txt` and eslint config.
+A Bun web framework: `.kay` components (pug-like templates over TypeScript), compiled to HTML on the server and to kay's own DOM runtime in islands. `llms.txt` and `llms/` are what an app's author reads; `src/` is the framework, `docs/` the documentation site built with kay itself (a workspace, so it imports kayjs-ui from `packages/`), `packages/` kay's libraries (kayjs-auth, kayjs-ui, kayjs-mail, kayjs-cms) as Bun workspaces, each with its own tests, `llms.txt` and eslint config.
 
 ## Design rule
 
@@ -22,4 +22,4 @@ Every feature asks the least of the app: the fewest declarations, the easiest se
 
 ## Releases
 
-`just patch` or `just minor` moves kay and every library to one version (`scripts/version.ts`: versions, each library's peer on kay, the lockfile), tags and pushes both at once; the tag's workflow publishes kay and each library not marked `private` to the Forgejo npm registry. A library's ranges on another are `workspace:~`, which publishing writes as that version.
+`just patch` or `just minor` moves kay and every library to one version (`scripts/version.ts`: versions, each library's peer on kay's minor, the lockfile; `tests/packages.test.ts` holds them together), tags and pushes both at once; the tag's workflow publishes kay and each library not marked `private` to the Forgejo npm registry. A library's ranges on another are `workspace:~`, which publishing writes as that version.

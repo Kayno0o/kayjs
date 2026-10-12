@@ -62,7 +62,7 @@ describe('the documentation site', () => {
     const libraries = await loadLibraries()
     const ui = libraries.find(library => library.slug === 'kayjs-ui')!
 
-    expect(libraries.map(library => library.slug)).toEqual(['kayjs-auth', 'kayjs-mail', 'kayjs-ui'])
+    expect(libraries.map(library => library.slug)).toEqual(['kayjs-auth', 'kayjs-cms', 'kayjs-mail', 'kayjs-ui'])
     expect(ui.data.version).toBe((await Bun.file(join(root, 'node_modules/@kaynooo/kayjs-ui/package.json')).json() as { version: string }).version)
     // FormDialog posts to an action, which the static site cannot serve, so its page shows code alone.
     expect(components.filter(component => component.data.description === '').map(component => component.slug)).toEqual([])

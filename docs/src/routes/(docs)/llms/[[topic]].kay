@@ -1,7 +1,7 @@
 --- server
 import { shareCard } from 'kay/image'
 import { reference } from '../../../content.config'
-import { FORGE, FORGE_ROOT, neighbours } from '../../../pages'
+import { FORGE, libraryRoot, neighbours } from '../../../pages'
 import { llmsHref } from '../../../reference'
 
 export const page = {
@@ -17,7 +17,7 @@ const { Content } = topic
 const sections = topic.headings.filter(heading => heading.depth === 2 || heading.depth === 3)
 const { previous, next } = neighbours(await reference.all(), topic.slug, llmsHref)
 const { version } = topic.data
-const source = version !== undefined ? `${FORGE_ROOT}/${topic.slug}/src/branch/main/llms.txt` : topic.slug === 'overview' ? `${FORGE}/llms.txt` : `${FORGE}/llms/${topic.slug}.md`
+const source = version !== undefined ? `${libraryRoot(topic.slug)}/llms.txt` : topic.slug === 'overview' ? `${FORGE}/llms.txt` : `${FORGE}/llms/${topic.slug}.md`
 --- script
 import Pager from '../../../components/pager.kay'
 import Toc from '../../../components/toc.kay'

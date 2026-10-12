@@ -15,7 +15,7 @@ kayjs-mail is published to the Forgejo registry at git.kaynooo.fr, beside kay. T
 bun add @kaynooo/kayjs-mail
 ```
 
-kay 1.28 or later and Elysia are peers.
+kay and Elysia are peers. It is released with kay, at kay's own version, and peers on kay's minor: install the one matching your kay, and move them together. An app on a `^0.x` range moves to kay's version by hand, as a caret on 0.x never reaches it.
 
 ## Use
 
@@ -59,4 +59,4 @@ bun run lint
 
 The tests run the fixture app under `tests/fixture`, which installs this library as an app does, linked back to the repository by `scripts/link-fixture.ts`.
 
-kay ships breaking changes as minors, so the `kay` peer lists each minor this library was tested on as a tilde range rather than `>=1.28 <2`: a new kay minor is tested here, added to the peer, and released as a patch.
+kay ships breaking changes as minors, so this library, released with kay from kay's repository, peers on kay's minor as a tilde range, `~<major>.<minor>.0`, which `scripts/version.ts` there moves with each release.

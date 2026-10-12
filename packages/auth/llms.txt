@@ -81,8 +81,8 @@ export const auth = createAuth({ /* ... */ pages: true })
 - The pages reached before signing in, `sign-in`, `register`, `two-factor`, `reset-password`, `verify-email`, `magic-link` and `confirm-email`, set `guards: false`: none of the app's guards above them runs there, whatever it checks. An app's root `_guard.ts` asking for a session, `export default auth.guard()`, keeps the rest of the site to signed-in users and still lets visitors sign in, the `account` pages keeping it; but a guard for maintenance, an IP allow-list or invite-only access skips those pages too. An app needing such a guard on one of them replaces that page with its own, which the app's guards cover unless it sets `guards: false`; an app page replacing one under a guard asking for a session sets it. kayjs-auth's own routes, OAuth and the rest, are its plugin's, which page guards never reach.
 - `captcha.widget`, `turnstileWidget(siteKey)` or `hcaptchaWidget(siteKey)`, is the widget the pages show where `captchaRequired` asks for one.
 - A provider's button reads its `label`, set on each preset (`GitHub`, `Google`) and overridden by `oauth.<name>.label`.
-- kayjs-ui is a peer of kayjs-auth, 0.4.28 or any later 0.x, so the pages render with the app's own copy; the app keeps `@iconify-json/tabler` and Tailwind, kayjs-ui's peers.
-- kayjs-auth needs kay 1.37 or later.
+- kayjs-ui is a peer of kayjs-auth, so the pages render with the app's own copy; the app keeps `@iconify-json/tabler` and Tailwind, kayjs-ui's peers.
+- kayjs-auth and kayjs-ui are released with kay at its version and peer on kay's minor: the app installs the ones matching its kay and moves them together.
 
 `auth.features()` tells any page, prebuilt or the app's own, what the config enables: `{ providers: [{ name, label }], email, codes, requireVerified, passkeys, captcha, scopes, prefix, signInPage, pages }`.
 

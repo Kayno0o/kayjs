@@ -48,7 +48,7 @@
   },
   "peerDependencies": {
     "elysia": "^1.4.30",
-    "kay": "~1.38.1"
+    "kay": "~1.38.0"
   },
   "dependencies": {
     "nodemailer": "^10.0.16"

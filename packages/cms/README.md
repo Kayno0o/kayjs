@@ -17,7 +17,7 @@ kayjs-cms is published to the Forgejo registry at git.kaynooo.fr, beside kay. Te
 bun add @kaynooo/kayjs-cms @iconify-json/tabler
 ```
 
-kay is a peer. The editor is drawn with kayjs-ui, so the app imports its theme as kayjs-ui's README says. kayjs-ui is a peer dependency, so the app and the CMS share one copy: the screens and the editor render their own `Toaster` and `TooltipHost`, which give way to the app's when it renders them.
+kay is a peer. It is released with kay, at kay's own version, and peers on kay's minor: install the one matching your kay, and move them together. An app on a `^0.x` range moves to kay's version by hand, as a caret on 0.x never reaches it. The editor is drawn with kayjs-ui, so the app imports its theme as kayjs-ui's README says. kayjs-ui is a peer dependency, so the app and the CMS share one copy: the screens and the editor render their own `Toaster` and `TooltipHost`, which give way to the app's when it renders them.
 
 ## Set up
 

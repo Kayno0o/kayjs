@@ -3,7 +3,9 @@ title: Checks
 order: 4
 description: What kay check reports, how to fix it and how to change a lint's level.
 ---
-`kay check` type-checks the whole project, `.kay` files included, and reports each problem at its `.kay` line and column, as rustc does:
+`kay check` type-checks the whole project, `.kay` files included, and reports each problem at its `.kay` line and column, as rustc does. A folder of the project holding its own `package.json` or `kay.config.ts`, such as a workspace package or a second kay app, is a project of its own: `kay check` and `kay build` leave its files out of the app's, and the app reaches a package there through `node_modules`, as it would one installed.
+
+A report reads:
 
 ```
 error[missing-alt]: An `img` needs `alt`
