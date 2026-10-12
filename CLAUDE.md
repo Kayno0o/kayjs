@@ -1,6 +1,6 @@
 # kay
 
-A Bun web framework: `.kay` components (pug-like templates over TypeScript), compiled to HTML on the server and to kay's own DOM runtime in islands. `llms.txt` and `llms/` are what an app's author reads; `src/` is the framework, `docs/` the documentation site built with kay itself (a workspace, so it imports kayjs-ui from `packages/`), `packages/` kay's libraries (kayjs-auth, kayjs-ui, kayjs-mail, kayjs-cms) as Bun workspaces, each with its own tests, `llms.txt` and eslint config.
+A Bun web framework: `.kay` components (pug-like templates over TypeScript), compiled to HTML on the server and to kay's own DOM runtime in islands. `llms.txt` and `llms/` are what an app's author reads; `src/` is the framework, `docs/` the documentation site built with kay itself (a workspace, so it imports kayjs-ui from `packages/`), `packages/` kay's libraries (kayjs-auth, kayjs-ui, kayjs-mail, kayjs-cms) as Bun workspaces, each with its own tests, `llms.txt` and eslint config. An issue about a library carries its label (`auth`, `ui`, `mail`, `cms`); kay's own issues carry none.
 
 ## Design rule
 
