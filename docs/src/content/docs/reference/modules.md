@@ -30,7 +30,7 @@ import { collection } from 'kay/content'
 | `resource`, `call`, `socket`, `stream`, `dispatch` | Typed reads and calls of API routes, websockets and event streams from islands; `call` throws `ApiError`. See [API routes](/guides/api-routes) |
 | `publicEnv` | The variables `publicEnv` in the config exposed to islands |
 | `localPath`, `withBase` | A path with the locale prefix or the `base` applied |
-| `sanitizeHtml`, `trustHtml` | Clean untrusted HTML, or mark HTML as safe to render |
+| `sanitizeHtml`, `trustHtml` | Clean untrusted HTML, its options typed `SanitizeOptions`, or mark HTML as safe to render |
 | `uid` | A unique id that matches between server and browser |
 | `previewing` | Whether the visitor is in preview mode |
 | `editing` | Whether the visitor is in edit mode, a CMS editing content on the page |
