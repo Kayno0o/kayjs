@@ -113,6 +113,10 @@ export function devBuilder(root: string, options: ClientOptions): (changed: stri
   }
 
   const build = async (changed: string[] | null): Promise<BuildOutcome> => {
+    // A full build reads every module's imports afresh.
+    if (changed === null)
+      graph.clear()
+
     const sources = await readClientSources(root, options, graph)
     const previous = changed !== null && last !== undefined && await readText(join(output, MANIFEST)) === last.manifest ? last : undefined
 

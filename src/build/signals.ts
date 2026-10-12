@@ -1,5 +1,4 @@
 import type { ImportedSignals, SignalKind } from '../compiler/module-signals'
-import { createHash } from 'node:crypto'
 import { readFileSync, statSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { moduleSignals } from '../compiler/module-signals'
@@ -10,19 +9,23 @@ const KAY_MODULE = /^kay(?:\/|$)/
 const SCRIPT_MODULE = /\.[cm]?[jt]sx?$/
 const scanned = new Map<string, { stamp: string, signals: Record<string, SignalKind> }>()
 // What each component imports, read again only once its text changes.
-const imports = new Map<string, { hash: string, specifiers: string[] }>()
+const imports = new Map<string, { hash: number | bigint, specifiers: string[] }>()
 
 // The signals and memos the modules a component imports export, which its template reads by name; part of every cache key of its compile, so editing such a module compiles the component again.
 // A package is left out, its code too large to scan on every compile, unless a relative import reaches into it, as a library's own components do.
 export function importedSignals(file: string, source: string): ImportedSignals {
   const found: ImportedSignals = {}
-  // Not `Bun.hash`: the ESLint processor runs this under Node.
-  const hash = createHash('sha1').update(source).digest('base64')
-  const known = imports.get(file)
-  let specifiers = known?.hash === hash ? known.specifiers : undefined
+  let hash: number | bigint
+  let specifiers: string[]
 
   try {
-    specifiers ??= [...new Set(transpilerFor('ts').scanImports(fences(source)).map(entry => entry.path))]
+    // Under Node, where the ESLint processor runs this, there is no transpiler: nothing is hashed or scanned.
+    const transpiler = transpilerFor('ts')
+
+    hash = Bun.hash(source)
+    const known = imports.get(file)
+
+    specifiers = known?.hash === hash ? known.specifiers : [...new Set(transpiler.scanImports(fences(source)).map(entry => entry.path))]
   }
   catch {
     return found

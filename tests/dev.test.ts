@@ -458,10 +458,11 @@ describe('kay dev', () => {
       await Bun.sleep(300)
 
       // Moved away and never written back: waited for, then restarted once.
+      const moved = performance.now()
+
       await rename(server, `${server}~`)
-      await Bun.sleep(150)
-      expect(restarts).toHaveLength(1)
       await until(() => restarts.length === 2)
+      expect(restarts[1]! - moved).toBeGreaterThanOrEqual(150)
       await Bun.sleep(300)
       expect(restarts).toHaveLength(2)
 
@@ -469,6 +470,7 @@ describe('kay dev', () => {
       await until(() => restarts.length === 3)
       // Past the wait, so only the backup still beside it holds the next one.
       await Bun.sleep(400)
+      expect(restarts).toHaveLength(3)
 
       const deleted = performance.now()
 

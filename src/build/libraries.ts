@@ -18,8 +18,7 @@ export interface KayLibrary {
   extension?: true
 }
 
-// What each module imports while its text stays the same, which `kay dev` keeps from one build to the next: the paths found, and the specifiers not found, looked up again each time as a file written since may answer them. A module with a glob is read again each time, and one whose paths found are gone.
-// A file written since that a specifier found would now resolve to, `./foo.ts` beside the `./foo/index.ts` it found, goes unseen until the module changes, as Bun keeps what it resolved anyway.
+// What each module imports while its text stays the same, which `kay dev` keeps from one build to the next: the paths found, and the specifiers not found, looked up again each time as a file written since may answer them.
 export type ImportGraph = Map<string, Imports>
 
 interface Imports {
@@ -291,6 +290,7 @@ export async function reachesAny(root: string, libraries: KayLibrary[], from: st
 }
 
 // The modules `file` imports, its `import.meta.glob` matches included, that a build follows, by real path as Bun resolves them: `project`'s own, the root's real path, and its kay libraries', `library` naming which; never another package's.
+// With `graph`, a module with a glob is read again each time, and one whose paths found are gone; a file written since that shadows a path found, `./foo.ts` beside `./foo/index.ts`, goes unseen until the module changes, as Bun keeps what it resolved anyway.
 async function followedImports(root: string, project: string, libraries: KayLibrary[], file: string, graph?: ImportGraph): Promise<{ path: string, library: KayLibrary | undefined }[]> {
   const source = await Bun.file(file).text()
   const hash = Bun.hash(source)

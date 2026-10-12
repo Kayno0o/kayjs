@@ -46,7 +46,7 @@ export interface Analysis {
 // The packages a compile runs through, their versions part of every cache key.
 const COMPILER_PACKAGES = ['@babel/parser/package.json', '@babel/traverse/package.json', '@babel/types/package.json', '@typescript/native-preview/package.json']
 let fingerprint: string | undefined
-// Each file's last analysis in this process, which spares hashing and reading its cache entry again while the inputs stay the same.
+// Each file's last analysis in this process, which spares reading its cache entry from disk again while the inputs stay the same.
 const analyzed = new Map<string, { file: string, key: string, analysis: Analysis }>()
 
 export interface FileDiagnostic extends Diagnostic {
