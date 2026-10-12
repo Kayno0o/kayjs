@@ -23,27 +23,28 @@ const peer = `~${parts[0]}.${parts[1]}.0`
 const libraries = await Array.fromAsync(new Glob('packages/*/package.json').scan())
 const manifests = ['package.json', ...libraries]
 
-for (const path of manifests) {
-  const text = await Bun.file(path).text()
+const texts = await Promise.all(manifests.map(async path => ({ path, text: await Bun.file(path).text() })))
+const missing = texts.filter(({ path, text }) => !VERSION.test(text) || (path !== 'package.json' && !KAY_PEER.test(text))).map(({ path }) => path)
 
-  if (!VERSION.test(text) || (path !== 'package.json' && !KAY_PEER.test(text)))
-    throw new Error(`${path} has no version or no peer on kay to move`)
+if (missing.length > 0)
+  throw new Error(`${missing.join(', ')}: no version or no peer on kay to move`)
 
-  await Bun.write(path, text.replace(VERSION, () => `"version": "${version}"`).replace(KAY_PEER, (_, head: string) => `${head}"${peer}"`))
-}
+const start = (await $`git rev-parse HEAD`.text()).trim()
+const tag = `v${version}`
 
-// bun.lock records each workspace's version and ranges, which the CI's frozen install compares against.
+// The tree was clean, so a failure anywhere goes back to the commit it started from; the tag, made last, is never left behind.
 try {
+  await Promise.all(texts.map(async ({ path, text }) => Bun.write(path, text.replace(VERSION, () => `"version": "${version}"`).replace(KAY_PEER, (_, head: string) => `${head}"${peer}"`))))
+  // bun.lock records each workspace's version and ranges, which the CI's frozen install compares against.
   await $`bun install`.quiet()
+  await $`git add bun.lock ${manifests}`
+  await $`git commit -q -m ${tag}`
+  await $`git tag ${tag}`
 }
 catch (error) {
-  await $`git checkout -- bun.lock ${manifests}`
+  await $`git reset -q --hard ${start}`
 
   throw error
 }
 
-await $`git add bun.lock ${manifests}`
-await $`git commit -q -m ${`v${version}`}`
-await $`git tag ${`v${version}`}`
-
-console.log(`v${version}`)
+console.log(tag)

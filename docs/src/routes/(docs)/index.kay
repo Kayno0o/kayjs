@@ -224,4 +224,9 @@ head
               a(href="/libraries/kayjs-mail") kayjs-mail
             p Mails written as .kay components, rendered to HTML and text, sent over SMTP or queued with retries. Tests read an outbox.
           div(innerHTML={mail})
+        article.library
+          header.library-head
+            h3
+              a(href="/libraries/kayjs-cms") kayjs-cms
+            p Content edited on the page it renders, and screens listing, adding and publishing each collection's entries, saved as Forgejo commits.
   Pager(next={{ href: '/getting-started/introduction', title: 'Introduction' }} source={`${FORGE}/docs/src/routes/(docs)/index.kay`})

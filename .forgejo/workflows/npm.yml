@@ -119,9 +119,10 @@ jobs:
         env:
           PACKAGE_TOKEN: ${{ secrets.PACKAGE_TOKEN }}
 
-      # prepack writes what the exports point at: the declarations under types/ and the Node build of kay/eslint under dist/. Each library publishes at kay's version, its `workspace:` ranges written as that version; one marked private is not released yet. A package already on the registry at this version is skipped, so a rerun after a partial failure publishes the rest.
+      # prepack writes what the exports point at: the declarations under types/ and the Node build of kay/eslint under dist/. Each library publishes at kay's version, its `workspace:` ranges written as that version; one marked private is not released yet.
       - name: Publish to Forgejo npm registry
         run: |
+          # A package already on the registry at this version is skipped, so a rerun after a partial failure publishes the rest.
           publish() {
             package="$(jq -r '.name + "@" + .version' package.json)"
             if bun pm view "$package" version > /dev/null 2>&1; then

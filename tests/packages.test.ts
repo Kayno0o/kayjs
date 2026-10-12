@@ -4,6 +4,8 @@ import { describe, expect, it } from 'bun:test'
 interface Manifest {
   name: string
   version: string
+  dependencies?: Record<string, string>
+  optionalDependencies?: Record<string, string>
   peerDependencies?: Record<string, string>
   devDependencies?: Record<string, string>
 }
@@ -21,7 +23,7 @@ describe('kay\'s libraries', () => {
   })
 
   it.each(libraries)('$path names the other libraries as workspaces', ({ manifest }) => {
-    const ranges = Object.entries({ ...manifest.peerDependencies, ...manifest.devDependencies }).filter(([name]) => names.has(name))
+    const ranges = [manifest.dependencies, manifest.optionalDependencies, manifest.peerDependencies, manifest.devDependencies].flatMap(field => Object.entries(field ?? {})).filter(([name]) => names.has(name))
 
     expect(ranges.filter(([, range]) => range !== 'workspace:~')).toEqual([])
   })

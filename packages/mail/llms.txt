@@ -199,7 +199,7 @@ export default { name: 'Ada', url: 'https://example.com/confirm' } satisfies Par
 
 ## kayjs-auth
 
-`authMailer(send)` is kayjs-auth's `email.mailer`, rendering its verification, password reset, magic link, code, security and invitation mails through the components above, in wording the app overrides line by line, themed by the app's mail settings, rather than kayjs-auth's own html. It needs kayjs-auth 0.11 or later, and `mailExtension` in `kay.config.ts`'s `extensions`, which brings its wording:
+`authMailer(send)` is kayjs-auth's `email.mailer`, rendering its verification, password reset, magic link, code, security and invitation mails through the components above, in wording the app overrides line by line, themed by the app's mail settings, rather than kayjs-auth's own html. It needs `mailExtension` in `kay.config.ts`'s `extensions`, which brings its wording:
 
 ```ts
 // src/auth.ts
