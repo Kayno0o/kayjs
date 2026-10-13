@@ -27,7 +27,7 @@ import { SERVICE_WORKER } from '../server/offline'
 import { OPENAPI_PATH, REFERENCE_PATH } from '../server/openapi'
 import { reachesServerIsland } from '../server/prerender'
 import { PREVIEW_ROUTE } from '../server/preview'
-import { routeMounts, scanEndpoints, scanRoutes } from '../server/routes'
+import { apiRoutePath, endpointPath, ROUTE_METHODS, routeMounts, scanEndpoints, scanRoutes } from '../server/routes'
 import { ROBOTS, SITEMAP } from '../server/sitemap'
 import { CSP_REPORTS } from '../server/violations'
 import { projectRoot } from './command'
@@ -44,7 +44,6 @@ interface Listed {
   guards?: string[] | undefined
 }
 
-const ROUTE_METHODS = /^(?:get|post|put|patch|delete|head|options|all|ws)$/i
 const PARAM = /:([^/?]+)/g
 // What the console writes to stdout, where the listing goes.
 const STDOUT_METHODS = ['log', 'info', 'debug', 'dir', 'dirxml', 'table', 'group', 'groupCollapsed', 'groupEnd', 'count', 'countReset', 'time', 'timeEnd', 'timeLog']
@@ -101,7 +100,7 @@ async function appRoutes(root: string, config: KayConfig): Promise<Listed[]> {
   }
 
   for (const endpoint of endpoints)
-    listed.push({ methods: 'GET', path: endpoint.pattern + (endpoint.suffix ?? ''), kind: 'endpoint', by: shown(endpoint.file), notes: guardNotes(endpoint.guards, endpoint.open, config), guards: endpoint.guards.map(guard => shown(guard.file)) })
+    listed.push({ methods: 'GET', path: endpointPath(endpoint), kind: 'endpoint', by: shown(endpoint.file), notes: guardNotes(endpoint.guards, endpoint.open, config), guards: endpoint.guards.map(guard => shown(guard.file)) })
 
   return listed
 }
@@ -127,7 +126,7 @@ async function apiRoutes(root: string, config: KayConfig): Promise<Listed[]> {
         throw new Error('it exports no Elysia instance by default')
 
       for (const route of instance.routes.filter(route => ROUTE_METHODS.test(route.method)))
-        listed.push({ methods: route.method.toUpperCase(), path: module.mount + (route.path === '/' ? '' : route.path), kind: 'api', by: shown(module.file), notes, guards })
+        listed.push({ methods: route.method.toUpperCase(), path: apiRoutePath(module.mount, route.path), kind: 'api', by: shown(module.file), notes, guards })
     }
     catch (error) {
       listed.push({ methods: '?', path: `${module.mount}/*`, kind: 'api', by: shown(module.file), notes: [`not loaded: ${error instanceof Error ? error.message : String(error)}`, ...notes], guards })

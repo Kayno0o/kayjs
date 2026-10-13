@@ -20,6 +20,7 @@ import { BUILD_FAILURE, clientOptionsKey, fromManifest, readManifest } from './c
 import { editorCommand } from './editor'
 import { localeCopies } from './i18n'
 import { compileErrorPage } from './overlay'
+import { apiRoutePath, endpointPath, ROUTE_METHODS } from './routes'
 
 export const DEV_EVENTS = '/_kay/dev/events'
 export const DEV_PATCH = '/_kay/dev/patch.js'
@@ -38,7 +39,6 @@ const OPEN_HEADER = 'x-kay-dev'
 const POSITION = /^(.+\.(?:kay|[cm]?[jt]sx?)):(\d+):(\d+)$/
 const BACKSLASH = /\\/g
 const SOURCE_FILE = /\.(?:kay|[cm]?[jt]sx?|json|css)$/
-const ROUTE_METHODS = /^(?:get|post|put|patch|delete|head|options|all|ws)$/i
 // A path a request fills in, which the Routes tab cannot link to.
 const PATH_PARAM = /[:*]/
 
@@ -364,6 +364,18 @@ export function bootFailure(error: unknown, root: string): Elysia {
   return app
 }
 
+// What the dev tool's Request tab shows, as a dev page carries it.
+export interface DevRequest {
+  route?: string | undefined
+  page: string
+  layouts: string[]
+  params: Record<string, unknown>
+  locale: string
+  status: number
+  error?: string | undefined
+  loads: { file: string, ms?: number | undefined }[]
+}
+
 // One line of the dev tool's Routes tab.
 export interface DevRoute {
   kind: 'page' | 'endpoint' | 'api'
@@ -388,14 +400,14 @@ export function devRoutes(root: string, pages: ServedRoute[], endpoints: Endpoin
   }
 
   for (const endpoint of endpoints) {
-    const path = endpoint.pattern + (endpoint.suffix ?? '')
+    const path = endpointPath(endpoint)
 
     listed.push({ kind: 'endpoint', method: 'GET', path, file: shown(endpoint.file), href: href(path) })
   }
 
   for (const module of mounted) {
     for (const route of module.instance.routes.filter(route => ROUTE_METHODS.test(route.method))) {
-      const path = module.mount + (route.path === '/' ? '' : route.path)
+      const path = apiRoutePath(module.mount, route.path)
 
       listed.push({ kind: 'api', method: route.method.toUpperCase(), path, file: shown(module.file), href: route.method.toUpperCase() === 'GET' ? href(path) : undefined })
     }

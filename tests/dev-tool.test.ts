@@ -305,6 +305,7 @@ describe('the dev tool', () => {
     expect(built().textContent).toBe('')
     delete (window as { $kayBuilt?: string }).$kayBuilt
   })
+
   it('shows what served the page, its route, files, params, status and loads, and reads the next page\'s as a swap brings it', async () => {
     const block = (request: object) => {
       const script = document.createElement('script')
@@ -326,12 +327,12 @@ describe('the dev tool', () => {
     expect(facts()).toEqual(['Route: /items/:id', 'Status: 200', 'Page: src/routes/items/[id].kay', 'Layouts: src/routes/_layout.kay', 'Params: id = "7"', 'Locale: fr', 'Loads, 44 ms: src/routes/_layout.kay1.5 ms / src/routes/items/[id].kay42 ms'])
 
     // The swap adds the next page's block, then drops this one's.
-    document.head.append(block({ page: 'src/routes/_404.kay', layouts: [], params: {}, status: 404, error: 'Not Found', loads: [] }))
+    document.head.append(block({ page: 'src/routes/_404.kay', layouts: [], params: {}, locale: 'en', status: 404, error: 'Not Found', loads: [] }))
     await Bun.sleep(0)
     document.head.firstElementChild!.remove()
     await Bun.sleep(0)
 
-    expect(facts()).toEqual(['Route: none matched', 'Status: 404 Not Found', 'Page: src/routes/_404.kay', 'Layouts: none', 'Params: none', 'Loads: none'])
+    expect(facts()).toEqual(['Route: none matched', 'Status: 404 Not Found', 'Page: src/routes/_404.kay', 'Layouts: none', 'Params: none', 'Locale: en', 'Loads: none'])
     expect(shadow().querySelector('#kay-dev-request dd .error')?.textContent).toBe('404 Not Found')
 
     tool.setOpener(async (source) => {

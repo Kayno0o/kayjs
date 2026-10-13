@@ -6,6 +6,7 @@ import type { ServedPaths } from './served-paths'
 import { escape } from '../runtime/escape'
 import { inLocale, passGuards } from './actions'
 import { API_PREFIX } from './api'
+import { apiRoutePath } from './routes'
 
 export interface OpenApiConfig {
   // The document's `info`, the site's `seo.name` and `1.0.0` by default.
@@ -66,7 +67,7 @@ type Route = MountedApi['instance']['routes'][number]
 
 // The paths a route answers, as the router reads them: one without each optional param and one with it.
 function routerPaths(module: MountedApi, route: Route): string[] {
-  const path = `${module.mount}${route.path === '/' ? '' : route.path}`.replace(TRAILING_SLASH, '')
+  const path = apiRoutePath(module.mount, route.path).replace(TRAILING_SLASH, '')
   const bare = path.replace(OPTIONAL_SEGMENT, '')
 
   return bare === path ? [path] : [bare || API_PREFIX, path.replaceAll('?', '')]

@@ -9,6 +9,7 @@ import type { Locale } from '../runtime/i18n'
 import type { QueryRules } from '../runtime/query-param'
 import type { ClientBuild, PrerenderedPage } from './client'
 import type { Encoding } from './compress'
+import type { DevRequest } from './dev'
 import type { Flash, SuccessFlash } from './flash'
 import type { ServedRoute } from './guards'
 import type { Revalidation } from './revalidate'
@@ -182,7 +183,7 @@ async function renderRoute(route: ServedRoute, rendering: Rendering, client: Cli
     const started = performance.now()
     const body = traced(`kay.render ${projectPath(route.file)}`, {}, () => renderDocument(page.files, page.modules, page.data, client, rendering, options))
 
-    timed(page, rendering, started)
+    timed(page, rendering, started, options)
 
     return respond(rendering, body)
   }
@@ -220,7 +221,7 @@ async function loadRoute(route: ServedRoute, rendering: Rendering, client: Clien
       rendering.ctx.query = readQuery(query, rendering.ctx.url)
 
     // A prerendered page is stored with its headers and served to everyone, so it carries no one render's timings.
-    const timings = options.serverTiming && !options.prerendering ? Array.from<number>({ length: files.length }) : undefined
+    const timings = (options.serverTiming === true || options.dev === true) && !options.prerendering ? Array.from<number>({ length: files.length }) : undefined
 
     if (options.dev)
       rendering.loads = { files, modules, timings }
@@ -251,9 +252,9 @@ async function runLoads(files: string[], modules: PageModule[], ctx: PageContext
   })
 }
 
-// Times the loads and the render since `started` in a `Server-Timing` header, when they were timed.
-function timed({ files, modules, timings }: LoadedRoute, rendering: Rendering, started: number): void {
-  if (timings)
+// Times the loads and the render since `started` in a `Server-Timing` header, when `serverTiming` asks; development times the loads for the dev tool either way.
+function timed({ files, modules, timings }: LoadedRoute, rendering: Rendering, started: number, options: RenderOptions): void {
+  if (timings && options.serverTiming === true)
     rendering.headers.set('server-timing', serverTiming(files, modules, timings, performance.now() - started))
 }
 
@@ -388,7 +389,7 @@ export async function renderServerIslands(route: ServedRoute, context: RequestCo
 
       // Blocks the islands left out still settle, so one failing reports nothing.
       void Promise.allSettled(deferred.map(async block => block.value))
-      timed(page, rendering, started)
+      timed(page, rendering, started, options)
 
       return { html, path: islands.path, headers: rendering.headers, reply: (body) => {
         rendering.headers.set('cache-control', 'private, no-store')
@@ -688,12 +689,12 @@ function devScripts(client: ClientBuild): string {
 // What the dev tool's Request tab shows: the route matched, the files that rendered, the params, the status, and how long each load took, the matched route's when another page shows its error.
 function requestBlock(files: string[], rendering: Rendering): string {
   const { loads } = rendering
-  const request = {
+  const request: DevRequest = {
     route: rendering.matched,
     page: projectPath(files.at(-1)!),
     layouts: files.slice(0, -1).map(projectPath),
     params: rendering.ctx.params,
-    locale: localeState()?.locale,
+    locale: rendering.ctx.locale,
     status: rendering.status,
     error: (rendering.ctx as Partial<ErrorPageContext>).error?.message,
     loads: loads ? loads.files.flatMap((file, index) => loads.modules[index]!.load ? [{ file: projectPath(file), ms: loads.timings?.[index] }] : []) : [],

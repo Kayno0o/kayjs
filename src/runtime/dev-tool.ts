@@ -1,5 +1,6 @@
 // Loaded by every page a dev server serves: a bar in a corner of the page opens a drawer whose tabs show what kay knows of the page, its problems first; under `kay dev` the inspector adds its own tab and buttons.
 // It runs in the browser from its own route, so it imports types only; its elements live in a shadow root on the root element, which a page swap keeps, styled by an adopted stylesheet, which a policy without inline styles allows.
+import type { DevRequest, DevRoute } from '../server/dev'
 import type { DevProblem, DevProblems } from './dev-boot'
 
 const HOST = 'kay-dev'
@@ -626,18 +627,6 @@ function problemsTab(doc: Document, tool: DevTool, state: DevState, save: () => 
   }
 }
 
-// What the dev server's request block says of the page, as `requestBlock` writes it.
-interface PageRequest {
-  route?: string
-  page: string
-  layouts: string[]
-  params: Record<string, unknown>
-  locale?: string
-  status: number
-  error?: string
-  loads: { file: string, ms?: number }[]
-}
-
 // What served the page: the route it matched, the files that rendered it, its params and status, and how long each load took; read again after each page swap.
 function requestTab(doc: Document, tool: DevTool): { stop: () => void } {
   const tab = tool.tab({ id: 'request', label: 'Request' })
@@ -652,7 +641,7 @@ function requestTab(doc: Document, tool: DevTool): { stop: () => void } {
       return
     }
 
-    const request = JSON.parse(block) as PageRequest
+    const request = JSON.parse(block) as DevRequest
     const fact = (term: string, ...values: (Node | string)[]) => {
       const value = tool.make('dd')
 
@@ -677,8 +666,7 @@ function requestTab(doc: Document, tool: DevTool): { stop: () => void } {
     fact('Layouts', ...lines(request.layouts.map(file => positionButton(tool, file)), 'none'))
     fact('Params', ...lines(params.map(([name, value]) => tool.make('span', 'mono', `${name} = ${JSON.stringify(value)}`)), 'none'))
 
-    if (request.locale !== undefined)
-      fact('Locale', request.locale)
+    fact('Locale', request.locale)
 
     fact(request.loads.length > 1 ? `Loads, ${formatMs(total)}` : 'Loads', ...lines(request.loads.map((load) => {
       const line = tool.make('span')
@@ -701,17 +689,7 @@ function requestTab(doc: Document, tool: DevTool): { stop: () => void } {
   return { stop: () => swaps.disconnect() }
 }
 
-// What the dev server's route list gives, as `devRoutes` writes it.
-interface ListedRoute {
-  kind: 'page' | 'endpoint' | 'api'
-  method: string
-  path: string
-  file: string
-  locale?: string
-  href?: string
-}
-
-const ROUTE_KINDS: Record<ListedRoute['kind'], string> = { page: 'Pages', endpoint: 'Endpoints', api: 'API' }
+const ROUTE_KINDS: Record<DevRoute['kind'], string> = { page: 'Pages', endpoint: 'Endpoints', api: 'API' }
 
 // Every route the server serves, filtered as typed, each opening its file, the GET paths no request fills in linking to themselves; fetched as the tab shows and again after each restart, so it lists what the running server serves.
 function routesTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
@@ -719,7 +697,9 @@ function routesTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
   const actions = tool.make('div', 'actions')
   const filter = tool.make('input', 'filter')
   const body = tool.make('div')
-  let routes: ListedRoute[] = []
+  let routes: DevRoute[] = []
+  // A restart while a fetch is out asks again; the latest answer wins.
+  let asked = 0
   const render = () => {
     const typed = filter.value.trim().toLowerCase()
     const shown = routes.filter(route => typed === '' || route.path.toLowerCase().includes(typed) || route.file.toLowerCase().includes(typed))
@@ -741,16 +721,29 @@ function routesTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
     body.replaceChildren(...sections.length > 0 ? sections : [tool.make('div', 'empty', routes.length === 0 ? 'No routes.' : 'No route matches the filter.')])
   }
   const list = async () => {
+    const ask = ++asked
+
     try {
       const response = await win.fetch(ROUTES_URL, { cache: 'no-store' })
+
+      if (ask !== asked)
+        return
 
       if (!response.ok)
         throw new Error(`the server answered ${response.status}`)
 
-      routes = await response.json() as ListedRoute[]
+      const listed = await response.json() as DevRoute[]
+
+      if (ask !== asked)
+        return
+
+      routes = listed
       render()
     }
     catch (error) {
+      if (ask !== asked)
+        return
+
       body.replaceChildren(tool.make('div', 'empty', `Could not list the routes: ${error instanceof Error ? error.message : String(error)}`))
     }
   }
@@ -768,7 +761,7 @@ function routesTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
   }, { signal })
 }
 
-function routeRow(tool: DevTool, route: ListedRoute, current: string): HTMLElement {
+function routeRow(tool: DevTool, route: DevRoute, current: string): HTMLElement {
   const row = tool.make('div', 'route')
   const link = tool.make('a', 'path link', route.path)
   const file = tool.make('div', 'file')

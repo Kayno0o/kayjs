@@ -92,6 +92,9 @@ const ROUTER_SYNTAX = /[:*']/
 const ENDPOINT_FILE = /\.[a-z\d]+\.ts$/i
 const NOT_ENDPOINT = /\.(?:test|spec|d)\.ts$/
 const SUFFIXED_PARAM = /^(\[\[?[^[\]]+\]\]?)(\.[\w.-]+)$/
+
+// The methods of an Elysia instance's routes that answer requests, as `kay routes` and the dev tool list them.
+export const ROUTE_METHODS = /^(?:get|post|put|patch|delete|head|options|all|ws)$/i
 const TS_EXTENSION = /\.ts$/
 const BRACKETS = /[[\]]/
 const PARAM_NAME = /:[^/]+/g
@@ -254,6 +257,16 @@ function endpointOf(routesDir: string, file: string, prefix: string): Omit<Endpo
     throw new Error(`kay: ${file} has a [, ], :, * or ' in its name outside a [name] param, which the router cannot serve; rename it`)
 
   return { pattern: route.pattern, file, params: route.params, ...suffixed && { suffix: suffixed[2] } }
+}
+
+// Where an endpoint answers: `/feeds/:slug.json` for `feeds/[slug].json.ts`.
+export function endpointPath(endpoint: Pick<Endpoint, 'pattern' | 'suffix'>): string {
+  return endpoint.pattern + (endpoint.suffix ?? '')
+}
+
+// Where an API module's route answers, a module's `/` at its mount.
+export function apiRoutePath(mount: string, path: string): string {
+  return mount + (path === '/' ? '' : path)
 }
 
 // What two endpoints compare by: their router path, params unnamed, and the extension of the last.

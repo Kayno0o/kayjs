@@ -1,4 +1,4 @@
-import type { DevRoute } from '../src/server/dev'
+import type { DevRequest, DevRoute } from '../src/server/dev'
 import { join, relative } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it, spyOn } from 'bun:test'
@@ -37,12 +37,12 @@ describe('the dev tool\'s data', () => {
       const request = async (path: string) => {
         const html = await (await dev.handle(new Request(`http://localhost${path}`))).text()
 
-        return JSON.parse(REQUEST_BLOCK.exec(html)![1]!) as Record<string, unknown> & { loads: { file: string, ms: number }[] }
+        return JSON.parse(REQUEST_BLOCK.exec(html)![1]!) as DevRequest
       }
 
       const item = await request('/items/a%3C1')
 
-      expect(item).toMatchObject({ route: '/items/:id', page: `${routes}/items/[id].kay`, layouts: [`${routes}/_layout.kay`], params: { id: 'a<1' }, status: 200 })
+      expect(item).toMatchObject({ route: '/items/:id', page: `${routes}/items/[id].kay`, layouts: [`${routes}/_layout.kay`], params: { id: 'a<1' }, locale: 'en', status: 200 })
       expect(item.loads.map(load => load.file)).toEqual([`${routes}/_layout.kay`, `${routes}/items/[id].kay`])
       expect(item.loads[1]!.ms).toBeGreaterThanOrEqual(4)
 
@@ -60,6 +60,13 @@ describe('the dev tool\'s data', () => {
         `page GET /broken ${routes}/broken.kay /broken`,
         `page GET /items/:id ${routes}/items/[id].kay -`,
       ])
+
+      // An app sending no `Server-Timing` still sees its loads timed in the dev tool.
+      const untimed = await pages({ routes, api, dev: true, serverTiming: false })
+      const response = await untimed.handle(new Request('http://localhost/items/1'))
+
+      expect(response.headers.has('server-timing')).toBe(false)
+      expect((JSON.parse(REQUEST_BLOCK.exec(await response.text())![1]!) as DevRequest).loads[1]!.ms).toBeGreaterThanOrEqual(4)
 
       const served = await pages({ routes, api })
 
