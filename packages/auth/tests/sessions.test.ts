@@ -195,7 +195,7 @@ describe('sessions', () => {
     const { browser } = await setup({
       url: 'https://site.test',
       sessionsPage: '/account/sessions',
-      email: { mailer: { send: mail => void mails.push(mail) }, links: { 'verify-email': '/v', 'reset-password': '/r', 'magic-link': '/m', 'change-email': '/c' } },
+      email: { mailer: { send: mail => void mails.push(mail) }, links: { 'verify-email': '/v', 'reset-password': '/r', 'magic-link': '/m', 'change-email': '/c' }, requireVerified: false },
     })
     const bob = browser()
 

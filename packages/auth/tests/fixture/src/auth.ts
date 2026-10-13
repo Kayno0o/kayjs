@@ -26,6 +26,7 @@ export const auth = createAuth({
         mails.push(mail)
       },
     },
+    requireVerified: false,
   },
   organizations: { roles: { owner: ['admin'], admin: ['member'], member: [] }, owner: 'owner', manage: 'admin' },
 })

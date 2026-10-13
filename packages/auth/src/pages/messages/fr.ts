@@ -30,7 +30,7 @@ export default defineMessages({
       submit: 'Créer le compte',
       haveAccount: 'Déjà un compte ?',
       signIn: 'Se connecter',
-      checkMail: 'Votre compte est prêt : ouvrez le lien reçu par e-mail pour vérifier votre adresse, puis connectez-vous.',
+      checkMail: 'Consultez vos e-mails pour continuer.',
     },
     twoFactor: {
       title: 'Validation en deux étapes',

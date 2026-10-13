@@ -191,7 +191,7 @@ describe('admin', () => {
     const { admin, ada, store, said, browser } = await setup({
       audit: true,
       url: 'https://site.test',
-      email: { mailer: { send: (mail: Mail) => void mails.push(mail) }, links: { 'verify-email': '/v', 'reset-password': '/r', 'magic-link': '/m', 'change-email': '/c' } },
+      email: { mailer: { send: (mail: Mail) => void mails.push(mail) }, links: { 'verify-email': '/v', 'reset-password': '/r', 'magic-link': '/m', 'change-email': '/c' }, requireVerified: false },
       onDelete: (user: User) => {
         deleted.push(user)
       },

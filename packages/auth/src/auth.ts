@@ -1074,7 +1074,7 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
     email: options.email && {
       ...options.email,
       links: emailLinks(options.email.links, paths?.links),
-      requireVerified: options.email.requireVerified ?? false,
+      requireVerified: options.email.requireVerified ?? true,
       locales,
       templates: localeTemplates(locales, options.email.templates, options.email.translations),
       codes: typeof options.email.codes === 'string' ? { 'magic-link': options.email.codes, 'verify-email': options.email.codes } : { 'magic-link': 'link', 'verify-email': 'link', ...options.email.codes },

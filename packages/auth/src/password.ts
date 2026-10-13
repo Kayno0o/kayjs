@@ -73,14 +73,19 @@ export async function register(state: RequestState, input: RegisterInput): Promi
   const holder = errors.email ? undefined : await store.users.findByEmail(email)
   const requireVerified = state.core.email?.requireVerified ?? false
   // An address registered and never verified, where unverified accounts cannot sign in, holds nothing worth keeping: registering again replaces it, so no one can squat an address they do not own. An account given roles beyond the default ones was set up on purpose, as by an admin inviting someone, and stays.
-  const unclaimed = holder !== null && holder !== undefined && requireVerified && holder.emailVerifiedAt === null && holder.roles.every(role => state.core.defaultRoles.includes(role)) && (await store.identities.listByUser(holder.id)).length === 0
+  const unclaimed = holder !== undefined && requireVerified && holder.emailVerifiedAt === null && holder.roles.every(role => state.core.defaultRoles.includes(role)) && (await store.identities.listByUser(holder.id)).length === 0
 
   // Where registering signs no one in, an address already held is answered as a new one is, so the answer tells nothing of which addresses exist.
   if (holder && !unclaimed && !requireVerified)
     errors.email = 'taken'
 
-  if (username !== null && !errors.username && await store.users.findByUsername(username))
-    errors.username = 'taken'
+  // The unclaimed holder's own name is free with its address.
+  if (username !== null && !errors.username) {
+    const named = await store.users.findByUsername(username)
+
+    if (named && !(unclaimed && named.id === holder?.id))
+      errors.username = 'taken'
+  }
 
   if (errors.email || errors.password || errors.username)
     return { ok: false, errors: withoutUndefined(errors) }
@@ -137,12 +142,13 @@ export async function register(state: RequestState, input: RegisterInput): Promi
   return { ok: true, user, signedIn: true }
 }
 
-// Spends the time hashing a new password takes, so a held address answers no faster than a free one.
+// Spends the time hashing a new password takes, so a held address answers no faster than a free one, and leaves this session as a new account's: registered as an account that does not exist, which `sendVerification` answers as it does a new one, mailing no one.
 async function answerHeld(state: RequestState, holder: UserRecord, password: string | null): Promise<RegisterResult> {
   if (password !== null)
     await hashPassword(password)
 
-  await warnHolder(state, holder, holder.email!)
+  await state.session.set('authRegistered', crypto.randomUUID())
+  await warnHolder(state, holder)
 
   return { ok: true, signedIn: false }
 }

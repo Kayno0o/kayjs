@@ -30,7 +30,7 @@ export default defineMessages({
       submit: 'Create the account',
       haveAccount: 'Already have an account?',
       signIn: 'Sign in',
-      checkMail: 'Your account is ready: open the link mailed to you to verify your address, then sign in.',
+      checkMail: 'Check your mail to continue.',
     },
     twoFactor: {
       title: 'Two-step verification',

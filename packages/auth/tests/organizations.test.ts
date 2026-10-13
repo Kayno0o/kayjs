@@ -26,6 +26,7 @@ async function setup(options: { invitationPage?: string | undefined, create?: 'a
         },
       },
       links: { 'verify-email': '/verify', 'reset-password': '/reset', 'magic-link': '/magic', 'change-email': '/confirm-email' },
+      requireVerified: false,
     },
     organizations: {
       roles: { owner: ['admin'], admin: ['member'], member: [] },

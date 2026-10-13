@@ -19,6 +19,7 @@ function setup(email: Partial<EmailOptions> = {}) {
         },
       },
       links: LINKS,
+      requireVerified: false,
       ...email,
     },
   })

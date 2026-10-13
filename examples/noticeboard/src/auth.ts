@@ -16,5 +16,7 @@ export const auth = createAuth({
   email: {
     mailer: { send: mail.enqueue },
     links: { 'verify-email': '/verify', 'reset-password': '/reset', 'magic-link': '/magic', 'change-email': '/confirm-email' },
+    // Members join signed in, and confirm their address to hear of new notices; joining with a taken address says so.
+    requireVerified: false,
   },
 })

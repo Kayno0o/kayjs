@@ -85,7 +85,7 @@ form(action={signIn})
   button Sign in
 ```
 
-`register({ email, password, username })` creates an account the same way, answering `errors` by field.
+`register({ email, password, username })` creates an account the same way, answering `errors` by field. With a mailer, it signs no one in until the address is verified, and answers a held address as a free one, mailing its holder instead; `email: { requireVerified: false }` signs in at once and answers `'taken'` for a held address, telling anyone which addresses have an account.
 
 ## Guarding routes
 

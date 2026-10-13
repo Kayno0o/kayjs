@@ -213,7 +213,7 @@ export const auth = createAuth({
 })
 ```
 
-- `authMailer(mail.enqueue)` renders each mail at once and leaves it to the queue, which retries a mail server that is away; `authMailer(mail.send)` sends it before kayjs-auth's call answers.
+- `authMailer(mail.enqueue)` renders each mail at once and leaves it to the queue, which retries a mail server that is away; `authMailer(mail.send)` sends it at once, before kayjs-auth's call answers for the mails it awaits.
 - A mail with a link shows a button, the link written out and the code when it carries one; news of a change to the account shows the link to review it when it carries one. Each ends on how long the link or code works, then on what to do when it was not asked for or not the user. The text part is drawn from the html, as for any view.
 - The mail's `locale` becomes its `lang`, its `<html lang>` and the locale its subject and view render `t()` in, so kayjs-auth's `email.locales` must be among the site's. kayjs-auth's `templates` and `translations` options do not reach these mails.
 

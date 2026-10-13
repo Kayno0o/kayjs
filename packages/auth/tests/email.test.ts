@@ -1,3 +1,4 @@
+import type { CodeMode } from '../src/email'
 import type { Mail } from '../src/mail'
 import { describe, expect, test } from 'bun:test'
 import { testApp, userRecord } from './helpers/app'
@@ -6,7 +7,7 @@ import { authenticator } from './helpers/authenticator'
 const PASSWORD = 'correct horse battery'
 const LINKS = { 'verify-email': '/verify', 'reset-password': '/reset', 'magic-link': '/magic', 'change-email': '/confirm-email' }
 
-function setup(options: { requireVerified?: boolean, defaultRoles?: ('admin' | 'editor')[] } = {}) {
+function setup(options: { requireVerified?: boolean, defaultRoles?: ('admin' | 'editor')[], codes?: CodeMode } = {}) {
   const mails: Mail[] = []
   const app = testApp({
     defaultRoles: options.defaultRoles,
@@ -19,7 +20,8 @@ function setup(options: { requireVerified?: boolean, defaultRoles?: ('admin' | '
         },
       },
       links: LINKS,
-      requireVerified: options.requireVerified,
+      requireVerified: options.requireVerified ?? false,
+      codes: options.codes,
     },
   })
 
@@ -145,10 +147,77 @@ describe('verifying an email', () => {
 
     expect(await fresh.call('register', { email: 'bob@example.com', password: PASSWORD })).toEqual({ ok: true, signedIn: false })
     expect(await held.call('register', { email: 'ada@example.com', password: PASSWORD })).toEqual({ ok: true, signedIn: false })
+    expect([...held.cookies.keys()]).toEqual([...fresh.cookies.keys()])
     expect(await held.call('emailCodePending')).toEqual(await fresh.call('emailCodePending'))
     expect(await store.users.get('u1')).toMatchObject({ email: 'ada@example.com', passwordHash: null })
     await Bun.sleep(0)
     expect(mails.findLast(mail => mail.to === 'ada@example.com')).toMatchObject({ kind: 'account-exists', url: 'https://site.test/', subject: 'You already have a Site account' })
+
+    // The resend button answers alike too, mailing the holder nothing more.
+    const sent = mails.length
+
+    expect(await held.call('sendVerification')).toEqual(await fresh.call('sendVerification'))
+    expect(await held.call('verifyEmailCode', '000000')).toEqual(await fresh.call('verifyEmailCode', '000000'))
+    await Bun.sleep(0)
+    expect(mails.slice(sent).map(mail => mail.to)).toEqual(['bob@example.com'])
+  })
+
+  test('with `requireVerified` and codes, an address already held leaves a code waiting as a free one does', async () => {
+    const { browser, store, mails } = setup({ requireVerified: true, codes: 'code' })
+
+    await store.users.create(userRecord({ id: 'u1', email: 'ada@example.com', emailVerifiedAt: new Date() }))
+
+    const fresh = browser()
+    const held = browser()
+
+    expect(await fresh.call('register', { email: 'bob@example.com', password: PASSWORD })).toEqual({ ok: true, signedIn: false })
+    expect(await held.call('register', { email: 'ada@example.com', password: PASSWORD })).toEqual({ ok: true, signedIn: false })
+    expect(await held.call('emailCodePending')).toEqual({ type: 'verify', email: 'ada@example.com' })
+    expect(await held.call('verifyEmailCode', '000000')).toEqual(await fresh.call('verifyEmailCode', '000000'))
+    expect(await held.call('sendVerification')).toEqual(await fresh.call('sendVerification'))
+    expect(await held.call('emailCodePending')).toEqual({ type: 'verify', email: 'ada@example.com' })
+    await Bun.sleep(0)
+    expect(mails.filter(mail => mail.to === 'ada@example.com').map(mail => mail.kind)).toEqual(['account-exists'])
+  })
+
+  test('with `requireVerified`, the holder of an address is told at most 3 times an hour', async () => {
+    const { browser, store, mails } = setup({ requireVerified: true })
+
+    await store.users.create(userRecord({ id: 'u1', email: 'ada@example.com', emailVerifiedAt: new Date() }))
+
+    for (let i = 0; i < 4; i++)
+      expect(await browser().call('register', { email: 'ada@example.com', password: PASSWORD })).toEqual({ ok: true, signedIn: false })
+
+    await Bun.sleep(0)
+    expect(mails.filter(mail => mail.kind === 'account-exists')).toHaveLength(3)
+  })
+
+  test('with `requireVerified`, an address taken between the check and the write answers as a free one', async () => {
+    const { browser, store, mails } = setup({ requireVerified: true })
+    const findByEmail = store.users.findByEmail.bind(store.users)
+
+    await store.users.create(userRecord({ id: 'u1', email: 'ada@example.com', emailVerifiedAt: new Date() }))
+    // The first lookup misses, as it would before another request's write.
+    store.users.findByEmail = async () => {
+      store.users.findByEmail = findByEmail
+
+      return undefined
+    }
+
+    expect(await browser().call('register', { email: 'ada@example.com', password: PASSWORD })).toEqual({ ok: true, signedIn: false })
+    await Bun.sleep(0)
+    expect(mails.map(mail => mail.kind)).toEqual(['account-exists'])
+  })
+
+  test('with `requireVerified`, an unverified account\'s username is free with its address, and another account\'s is not', async () => {
+    const { browser, store } = setup({ requireVerified: true })
+
+    await browser().call('register', { email: 'ada@example.com', username: 'ada', password: 'squatter password' })
+    await store.users.create(userRecord({ id: 'u2', email: 'bob@example.com', username: 'bob', emailVerifiedAt: new Date() }))
+
+    expect(await browser().call('register', { email: 'ada@example.com', username: 'ada', password: PASSWORD })).toEqual({ ok: true, signedIn: false })
+    expect(await store.users.findByUsername('ada')).toMatchObject({ email: 'ada@example.com' })
+    expect(await browser().call('register', { email: 'ada@example.com', username: 'bob', password: PASSWORD })).toEqual({ ok: false, errors: { username: 'taken' } })
   })
 
   test('with `requireVerified`, a refused registration leaves the unverified holder in place', async () => {
@@ -214,19 +283,21 @@ describe('verifying an email', () => {
   })
 
   test('with `requireVerified`, resending through a proved password is limited per account, and ends with the account', async () => {
-    const { browser } = setup({ requireVerified: true })
+    const { browser, mails } = setup({ requireVerified: true })
     const ada = browser()
 
     await browser().call('register', { email: 'ada@example.com', password: 'squatter password' })
     await ada.post('/password', { identifier: 'ada@example.com', password: 'squatter password' })
-    const answers = [await ada.call('sendVerification'), await ada.call('sendVerification'), await ada.call('sendVerification'), await ada.call('sendVerification')]
 
-    expect(answers.at(-1)).toEqual({ ok: false, error: 'limited' })
+    expect(await ada.call('sendVerification')).toEqual({ ok: true })
 
-    // The address registered again replaces the account this browser proved the password of.
+    // The address registered again replaces the account this browser proved the password of: the answers go on as before, mailing no one.
     await browser().call('register', { email: 'ada@example.com', password: PASSWORD })
+    const sent = mails.length
+    const answers = [await ada.call('sendVerification'), await ada.call('sendVerification'), await ada.call('sendVerification')]
 
-    expect(await ada.call('sendVerification')).toEqual({ ok: false, error: 'signed-out' })
+    expect(answers).toEqual([{ ok: true }, { ok: true }, { ok: false, error: 'limited' }])
+    expect(mails).toHaveLength(sent)
   })
 
   test('with `requireVerified`, a browser that proved a password forgets it on signing out, and serves whoever is signed in first', async () => {

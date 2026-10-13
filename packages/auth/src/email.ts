@@ -85,18 +85,35 @@ export type ResetPasswordResult = LinkResult | { ok: false, errors: { password: 
 
 export type ChangeEmailResult = { ok: true } | { ok: false, error: ProofFailure | 'unavailable' } | { ok: false, errors: { email: EmailProblem | 'taken' | 'unchanged' } }
 
-// Mails a new verification link to the signed-in user or, with nobody signed in, to the account this browser registered or proved the password of.
+// Mails a new verification link to the signed-in user or, with nobody signed in, to the account this browser registered or proved the password of, off the response's path.
 export async function sendVerification(state: RequestState): Promise<MailRequestResult | { ok: false, error: 'signed-out' | 'verified' }> {
   const registered = await state.session.get('authRegistered')
   const record = await state.current() ?? (registered === undefined ? undefined : await state.core.store.users.get(registered))
+  // Registered here for an address another account holds, under an id no account has: answered as a new account's resend is, mailing no one.
+  const held = !record && registered !== undefined
 
-  if (!record?.email)
+  if (!held && !record?.email)
     return { ok: false, error: 'signed-out' }
 
-  if (record.emailVerifiedAt !== null)
+  if (record && record.emailVerifiedAt !== null)
     return { ok: false, error: 'verified' }
 
-  return mailFor(state, record, 'verify-email', record.email, null, 'resend')
+  if (!state.core.email)
+    return { ok: false, error: 'unavailable' }
+
+  const refused = await spendResend(state, record?.id ?? registered!, 'resend')
+
+  if (refused)
+    return refused
+
+  // A new code replaces the one this session waits for, the held address's too, so the session changes alike.
+  const email = record?.email ?? (await state.session.get('authEmailCode'))?.email
+  const nonce = email ? await bindCode(state, 'verify-email', email) : undefined
+
+  if (record)
+    void issueQuietly(state, record, 'verify-email', record.email!, null, nonce)
+
+  return { ok: true }
 }
 
 // Verifies the address for the browser signed in as the account, the one that registered it or the one that proved its password; any other must give the account's password, since whoever opens the mail may be confirming an account a stranger registered with their address, which verified would stay the stranger's.
@@ -212,7 +229,7 @@ export async function changeEmail(state: RequestState, proof: Proof, email: stri
   if (await state.core.store.users.findByEmail(address))
     return { ok: false, errors: { email: 'taken' } }
 
-  return mailFor(state, record, 'change-email', address, null, 'emailChange')
+  return mailFor(state, record, 'change-email', address, null)
 }
 
 // Moves the account to the address the link was sent to, and ends the user's other sessions.
@@ -246,11 +263,12 @@ export async function welcome(state: RequestState, record: UserRecord): Promise<
 }
 
 // A registration for an address an account holds already, where registering signs no one in: this session is left as a new account's would be, and the holder is told, off the response's path and at most a few times an hour.
-export async function warnHolder(state: RequestState, holder: UserRecord, email: string): Promise<void> {
+export async function warnHolder(state: RequestState, holder: UserRecord): Promise<void> {
   const { core } = state
   const mail = core.email
+  const email = holder.email
 
-  if (!mail)
+  if (!mail || !email)
     return
 
   await bindCode(state, 'verify-email', email)
@@ -397,19 +415,28 @@ async function issueQuietly(state: RequestState, record: UserRecord, type: LinkT
   }
 }
 
-// Counted per client and per account, so neither one sender nor many can flood an inbox.
-async function mailFor(state: RequestState, record: UserRecord, type: LinkType, email: string, redirect: string | null, limit: 'resend' | 'emailChange'): Promise<{ ok: true } | { ok: false, error: 'limited' | 'unavailable' }> {
+async function mailFor(state: RequestState, record: UserRecord, type: LinkType, email: string, redirect: string | null): Promise<{ ok: true } | { ok: false, error: 'limited' | 'unavailable' }> {
   const { core } = state
 
   if (!core.email)
     return { ok: false, error: 'unavailable' }
 
-  if (await spend(core.store, `${limit}:${state.client}`, core.limits[limit]) || await spend(core.store, `${limit}:${record.id}`, core.limits[`${limit}Account`]))
-    return { ok: false, error: 'limited' }
+  const refused = await spendResend(state, record.id, 'emailChange')
+
+  if (refused)
+    return refused
 
   await issue(state, record, type, email, redirect, await bindCode(state, type, email))
 
   return { ok: true }
+}
+
+// Counted per client and per account, so neither one sender nor many can flood an inbox.
+async function spendResend(state: RequestState, id: string, limit: 'resend' | 'emailChange'): Promise<{ ok: false, error: 'limited' } | undefined> {
+  const { core } = state
+
+  if (await spend(core.store, `${limit}:${state.client}`, core.limits[limit]) || await spend(core.store, `${limit}:${id}`, core.limits[`${limit}Account`]))
+    return { ok: false, error: 'limited' }
 }
 
 // One live link and code per kind and user: a new one replaces the last. A code goes only with the nonce of the session that asked for it.

@@ -1,6 +1,6 @@
 import type { User } from '../src/auth'
 import { describe, expect, test } from 'bun:test'
-import { testApp } from './helpers/app'
+import { testApp, userRecord } from './helpers/app'
 
 const PASSWORD = 'correct horse battery'
 
@@ -46,6 +46,17 @@ describe('guests', () => {
     expect(await guest.json('/me')).toMatchObject({ id: user.id, guest: false, hasPassword: true })
     expect((await store.users.list({ offset: 0, limit: 10 })).total).toBe(1)
     expect(signUps).toHaveLength(1)
+  })
+
+  test('where addresses must be verified, a guest registering a held address stays a guest', async () => {
+    const { browser, store } = setup({ email: { mailer: { send: () => undefined }, links: { 'verify-email': '/verify', 'reset-password': '/reset', 'magic-link': '/magic', 'change-email': '/confirm-email' } }, url: 'https://site.test' })
+
+    await store.users.create(userRecord({ id: 'u1', email: 'ada@example.com', emailVerifiedAt: new Date() }))
+    const guest = browser()
+    const { user } = await guest.call('signInAsGuest')
+
+    expect(await guest.call('register', { email: 'ada@example.com', password: PASSWORD })).toEqual({ ok: true, signedIn: false })
+    expect(await guest.json('/me')).toMatchObject({ id: user.id, guest: true, email: null })
   })
 
   test('a register refused leaves the guest as they were', async () => {

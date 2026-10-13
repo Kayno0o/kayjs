@@ -25,6 +25,7 @@ function setup(options: Parameters<typeof testApp>[0] = {}) {
         },
       },
       links: LINKS,
+      requireVerified: false,
     },
     ...options,
   })

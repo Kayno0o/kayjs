@@ -201,7 +201,7 @@ describe('signing in with a second factor', () => {
 
   test('a magic link sign-in asks for the code too', async () => {
     const mails: Mail[] = []
-    const { browser } = testApp({ url: 'https://site.test', email: { mailer: { send: mail => void mails.push(mail) }, links: { 'verify-email': '/v', 'reset-password': '/r', 'magic-link': '/m', 'change-email': '/c' } } })
+    const { browser } = testApp({ url: 'https://site.test', email: { mailer: { send: mail => void mails.push(mail) }, links: { 'verify-email': '/v', 'reset-password': '/r', 'magic-link': '/m', 'change-email': '/c' }, requireVerified: false } })
     const ada = browser()
 
     await ada.call('register', { email: 'ada@example.com', password: PASSWORD })

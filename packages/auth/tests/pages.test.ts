@@ -9,7 +9,7 @@ const mailer = (mails: Mail[]) => ({ send: (mail: Mail) => void mails.push(mail)
 describe('createAuth with the prebuilt pages', () => {
   test('the sign-in, two-factor and sessions pages and every mailed link default to the pages under their prefix', async () => {
     const mails: Mail[] = []
-    const { browser, store } = testApp({ url: 'http://localhost', pages: authPages({ prefix: '/account-pages' }), oauth: { discord: { provider: discordProvider(), clientId: 'id', clientSecret: 'secret' } }, email: { mailer: mailer(mails), links: { 'magic-link': '/magic' } } })
+    const { browser, store } = testApp({ url: 'http://localhost', pages: authPages({ prefix: '/account-pages' }), oauth: { discord: { provider: discordProvider(), clientId: 'id', clientSecret: 'secret' } }, email: { mailer: mailer(mails), links: { 'magic-link': '/magic' }, requireVerified: false } })
     const ada = browser()
 
     await store.users.create(userRecord({ id: 'u1', email: 'ada@example.com', emailVerifiedAt: new Date() }))
@@ -42,7 +42,7 @@ describe('features', () => {
       providers: [{ name: 'github', label: 'GitHub' }, { name: 'chat', label: 'Our chat' }],
       email: true,
       codes: { 'magic-link': 'code', 'verify-email': 'link' },
-      requireVerified: false,
+      requireVerified: true,
       passkeys: true,
       captcha: null,
       scopes: ['posts:read'],
