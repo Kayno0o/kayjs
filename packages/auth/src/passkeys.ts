@@ -10,7 +10,7 @@ import { report } from './events'
 import { spend } from './limits'
 import { notify } from './notify'
 import { safeRedirect } from './oauth/redirect'
-import { provedLately, reprove } from './twoFactor'
+import { reprove } from './twoFactor'
 import { generateAuthenticationOptions, generateRegistrationOptions, verifyAuthenticationResponse, verifyRegistrationResponse } from './webauthn'
 
 const CHALLENGE_MAX_AGE_MS = 5 * 60 * 1000
@@ -46,22 +46,26 @@ export interface Passkey {
   lastUsedAt: Date | null
 }
 
-export type PasskeyOptionsResult<Options> = { ok: true, options: Options } | { ok: false, error: 'signed-out' | 'stale' | 'none' | 'expired' }
+export type PasskeyOptionsResult<Options, Failure extends string = 'signed-out' | 'none' | 'expired'> = { ok: true, options: Options } | { ok: false, error: Failure }
 
 export type RegisterPasskeyResult = { ok: true, passkey: Passkey } | { ok: false, error: 'signed-out' | 'expired' | 'invalid' }
 
 export type PasskeySignInResult = { ok: true, redirect: string } | { ok: false, error: 'expired' | 'invalid' | 'limited' | 'banned' }
 
-// The options for the browser's `navigator.credentials.create`, through `startRegistration` of `@simplewebauthn/browser`. A new passkey is a way in, so it needs a session that signed in or re-proved lately.
-export async function passkeyRegistrationOptions(state: RequestState): Promise<PasskeyOptionsResult<PublicKeyCredentialCreationOptionsJSON>> {
+// The options for the browser's `navigator.credentials.create`, through `startRegistration` of `@simplewebauthn/browser`, once `proof` re-proves the user.
+// A passkey is a way in that skips the second factor and outlives every sign-out, so a stolen session alone may not add one, and the second factor proves it when it is on.
+export async function passkeyRegistrationOptions(state: RequestState, proof: Proof): Promise<PasskeyOptionsResult<PublicKeyCredentialCreationOptionsJSON, ProofFailure>> {
   const relying = relyingParty(state.core)
-  const record = await state.current()
 
-  if (!record || state.via() !== 'session')
+  if (!(await state.current()) || state.via() !== 'session')
     return { ok: false, error: 'signed-out' }
 
-  if (!(await provedLately(state)))
-    return { ok: false, error: 'stale' }
+  const proved = await reprove(state, proof, { secondFactor: true })
+
+  if (!proved.ok)
+    return proved
+
+  const { record } = proved
 
   const options = await generateRegistrationOptions({
     rpName: relying.name,

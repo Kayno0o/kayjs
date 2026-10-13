@@ -19,6 +19,7 @@ const browser = () => testSite({ root: ROOT })
 await browser()
 const { signOut } = await import(join(PAGES, 'account', '_layout.kay'))
 const { changeEmail } = await import(join(PAGES, 'account', 'index.kay'))
+const { connect } = await import(join(PAGES, 'account', 'connections.kay'))
 const { disable, enable, setUp } = await import(join(PAGES, 'account', 'security.kay'))
 const { end, endOthers } = await import(join(PAGES, 'account', 'sessions.kay'))
 const { create, revoke } = await import(join(PAGES, 'account', 'tokens.kay'))
@@ -265,6 +266,24 @@ describe('the prebuilt pages', () => {
     expect(text(await visitor.visit('/auth/sign-in'), 'h1')).toBe('Welcome back')
     expect(text(await visitor.visit('/fr/auth/sign-in'), 'h1')).toBe('Connexion')
     expect(text(await visitor.visit('/fr/auth/register'), 'h1')).toBe('Créer un compte')
+  })
+
+  test('a provider is connected from the connections page once the password proves it is still the user', async () => {
+    globalThis.fetch = (async (input: string | URL | Request) => String(input).endsWith('/oauth2/token')
+      ? Response.json({ access_token: 'token', expires_in: 3600 })
+      : Response.json({ id: '43', username: 'connected', email: null, verified: true })) as typeof fetch
+
+    const ada = await signedUp('connect@example.com')
+
+    expect((await ada.visit('/auth/account/connections')).find('input[name="password"]')).toHaveLength(1)
+    expect(text(await ada.submit(connect, { provider: 'discord' }, { from: '/auth/account/connections' }), '[role="alert"]')).toBe('Wrong password or code.')
+
+    const leaving = await ada.submit(connect, { provider: 'discord', password: PASSWORD }, { from: '/auth/account/connections' })
+    const location = new URL(leaving.headers.get('location')!)
+
+    expect(location.href).toStartWith('https://discord.com/oauth2/authorize?')
+    expect(await ada.visit(`/auth/discord/callback?code=abc&state=${location.searchParams.get('state')}`)).toMatchObject({ url: '/auth/account/connections', status: 200 })
+    expect((await store.identities.find('discord', '43'))?.userId).toBe((await store.users.findByEmail('connect@example.com'))!.id)
   })
 
   test('the sign-in page shows what the config enables, and why a provider sign-in failed', async () => {

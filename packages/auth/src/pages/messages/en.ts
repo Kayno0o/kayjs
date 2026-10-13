@@ -214,7 +214,6 @@ export default defineMessages({
       'taken': 'Another account already uses that address: sign in to it, then connect this provider.',
       'unavailable': 'Signing in with that provider is not available.',
       'signed-out': 'Sign in first.',
-      'stale': 'For your safety, sign in again before connecting an account.',
       'banned': 'This account is suspended.',
     },
     fields: {

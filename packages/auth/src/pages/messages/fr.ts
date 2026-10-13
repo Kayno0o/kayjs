@@ -214,7 +214,6 @@ export default defineMessages({
       'taken': 'Un autre compte utilise déjà cette adresse : connectez-vous à celui-ci, puis liez ce fournisseur.',
       'unavailable': 'La connexion avec ce fournisseur n’est pas disponible.',
       'signed-out': 'Connectez-vous d’abord.',
-      'stale': 'Par sécurité, reconnectez-vous avant de lier un compte.',
       'banned': 'Ce compte est suspendu.',
     },
     fields: {

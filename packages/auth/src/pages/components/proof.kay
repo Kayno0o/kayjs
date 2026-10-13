@@ -5,8 +5,8 @@ import FormField from '@kaynooo/kayjs-ui/form-field.kay'
 
 const { user, secondFactor = false } = props<{ user: User, secondFactor?: boolean }>()
 ---
-// What proves it is still the user: their password, or a code where they have none or the change is to the second factor itself. An account with neither proves it by a recent sign-in.
-if user.hasPassword && !secondFactor
+// What proves it is still the user: their password, or a code where they have none or the change asks for the second factor while it is on. An account with neither proves it by a recent sign-in.
+if user.hasPassword && !(secondFactor && user.twoFactor)
   FormField(label={t('auth.proof.password')} required)
     input(name="password" type="password" autocomplete="current-password" required)
 else if user.twoFactor

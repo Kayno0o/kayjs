@@ -1,6 +1,7 @@
 import type { Core, Profile } from '../core'
 import type { RequestState } from '../state'
 import type { IdentityRecord, UserRecord } from '../store'
+import type { Proof, ProofFailure } from '../twoFactor'
 import type { OAuthTokens } from './types'
 import { newUserRecord, publicUser, sameText } from '../core'
 import { randomToken } from '../keys'
@@ -8,7 +9,7 @@ import { log } from '../log'
 import { notify } from '../notify'
 import { normalizeEmail, normalizeUsername, usernameProblem } from '../rules'
 import { chooseRemember } from '../sessions'
-import { provedLately } from '../twoFactor'
+import { reprove } from '../twoFactor'
 import { OAuthExchangeError } from './client'
 import { createPkcePair } from './pkce'
 import { safeRedirect } from './redirect'
@@ -16,7 +17,7 @@ import { safeRedirect } from './redirect'
 const FLOW_MAX_AGE_MS = 10 * 60 * 1000
 
 // Why an OAuth sign-in failed, sent to the sign-in page as `?error=`.
-export type OAuthFailure = 'oauth' | 'cancelled' | 'refused' | 'taken' | 'unavailable' | 'signed-out' | 'stale' | 'banned'
+export type OAuthFailure = 'oauth' | 'cancelled' | 'refused' | 'taken' | 'unavailable' | 'signed-out' | 'banned'
 
 // What a sign-in in progress keeps in the session between leaving for the provider and coming back.
 export interface OAuthFlow {
@@ -31,24 +32,43 @@ export interface OAuthFlow {
   expires: number
 }
 
-// The provider's authorize URL, the flow parked in the session; undefined for a provider the app has not configured.
-export async function startOAuth(state: RequestState, provider: string, options: { redirect?: string | undefined, link?: boolean | undefined, remember?: boolean | undefined }): Promise<string | { error: OAuthFailure } | undefined> {
-  const entry = state.core.oauth.get(provider)
+export type LinkProviderResult = { ok: true, url: string } | { ok: false, error: ProofFailure | 'not-found' | 'unavailable' }
 
-  if (!entry)
+// The provider's authorize URL for a sign-in, the flow parked in the session; undefined for a provider the app has not configured.
+export async function startOAuth(state: RequestState, provider: string, options: { redirect?: string | undefined, remember?: boolean | undefined }): Promise<string | { error: OAuthFailure } | undefined> {
+  if (!state.core.oauth.has(provider))
     return undefined
 
-  const current = options.link ? await state.current() : undefined
+  const url = await leave(state, provider, options.redirect, null)
 
-  // A linked provider is a way in that outlives every sign-out, so a stolen session alone may not add one.
-  if (options.link) {
-    if (!current || state.via() !== 'session')
-      return { error: 'signed-out' }
+  if (typeof url === 'string')
+    await chooseRemember(state, options.remember)
 
-    if (!(await provedLately(state)))
-      return { error: 'stale' }
-  }
+  return url
+}
 
+// The provider's authorize URL for linking it to the signed-in user, once `proof` re-proves them.
+// A linked provider is a way in that outlives every sign-out, so a stolen session alone may not add one, and the second factor proves it when it is on.
+export async function startLink(state: RequestState, provider: string, proof: Proof, redirect: string | undefined): Promise<LinkProviderResult> {
+  if (!state.core.oauth.has(provider))
+    return { ok: false, error: 'not-found' }
+
+  if (!(await state.current()) || state.via() !== 'session')
+    return { ok: false, error: 'signed-out' }
+
+  const proved = await reprove(state, proof, { secondFactor: true })
+
+  if (!proved.ok)
+    return proved
+
+  const url = await leave(state, provider, redirect, proved.record.id)
+
+  return typeof url === 'string' ? { ok: true, url } : { ok: false, error: 'unavailable' }
+}
+
+// Parks the flow in the session and answers where the browser goes to meet the provider.
+async function leave(state: RequestState, provider: string, redirect: string | undefined, link: string | null): Promise<string | { error: 'unavailable' }> {
+  const entry = state.core.oauth.get(provider)!
   const pkce = await createPkcePair()
   const flowState = randomToken()
   const nonce = randomToken()
@@ -65,10 +85,7 @@ export async function startOAuth(state: RequestState, provider: string, options:
     throw error
   }
 
-  if (!options.link)
-    await chooseRemember(state, options.remember)
-
-  await state.session.set('authOAuth', { provider, state: flowState, verifier: pkce.verifier, nonce, redirect: safeRedirect(options.redirect), link: current?.id ?? null, expires: Date.now() + FLOW_MAX_AGE_MS })
+  await state.session.set('authOAuth', { provider, state: flowState, verifier: pkce.verifier, nonce, redirect: safeRedirect(redirect), link, expires: Date.now() + FLOW_MAX_AGE_MS })
 
   return url
 }

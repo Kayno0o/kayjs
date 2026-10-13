@@ -13,7 +13,7 @@ import { provePasskey } from './passkeys'
 import { generateTotpSecret, otpauthUri, verifyTotp } from './totp'
 
 const CHALLENGE_MAX_AGE_MS = 10 * 60 * 1000
-// How long a sign-in or a re-proof counts as proved: for an account with neither a password nor a second factor, and for linking a provider.
+// How long a sign-in or a re-proof counts as proved: for an account with neither a password nor a second factor, and for an admin's changes to other users.
 const FRESH_SIGN_IN_MS = 10 * 60 * 1000
 const RECOVERY_CODE_COUNT = 10
 // No 0, o, 1 or l, since these get copied by hand.

@@ -50,7 +50,7 @@ else if supported()
   form.flex.flex-col.gap-3(onSubmit={add} novalidate)
     FormField(label={nameLabel})
       input(name="name" bind:value={name})
-    Proof(user={user})
+    Proof(user={user} secondFactor)
     if error()
       p.kayjs-auth-error.text-kui-error(role="alert") {error()}
     Button(type="submit" label={label} busy={passkeyOptions.pending() || addPasskey.pending()})

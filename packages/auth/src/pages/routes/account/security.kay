@@ -50,18 +50,8 @@ export const disable = action(schemas.proof, async (input, ctx) => {
   return result.ok ? 'disabled' : ctx.fail(400, { error: result.error })
 })
 
-// A proof given with the request renews the recent one a new passkey needs.
 export const passkeyOptions = action(schemas.proof, async (input, ctx) => {
-  const auth = ctx.locals.auth
-
-  if (input.password !== undefined || input.code !== undefined) {
-    const proved = await auth.reprove(proofOf(input))
-
-    if (!proved.ok)
-      return ctx.fail(400, { error: proved.error })
-  }
-
-  const result = await auth.passkeyRegistrationOptions()
+  const result = await ctx.locals.auth.passkeyRegistrationOptions(proofOf(input))
 
   return result.ok ? result.options : ctx.fail(400, { error: result.error })
 })

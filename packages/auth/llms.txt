@@ -154,7 +154,6 @@ Each entry of `oauth` names a provider app: `{ provider, clientId, clientSecret 
 
 ```kay
 a(href="/auth/discord?redirect=/account" data-no-prefetch) Sign in with Discord
-a(href="/auth/github?link=1&redirect=/account" data-no-prefetch) Link GitHub
 ```
 
 - `discordProvider({ scopes })` (`identify` and `email` by default) and `githubProvider({ scopes })` are presets; any `OAuthProvider` works. A provider's `normalizeUser` reports an `email` only when the provider verified it, as the presets do. The Discord preset gives `avatar` and `banner` as CDN URLs, a gif for an animated one, null without one.
@@ -168,8 +167,8 @@ a(href="/auth/github?link=1&redirect=/account" data-no-prefetch) Link GitHub
 - A provider account signs into the user it is linked to. A new one signs up a new user, taking its email and its name only when no other user has them: no account is ever merged into another by email. `onSignUp(user, profile)` runs for every new user, to create the app's own records; `profile` is `undefined` for a password sign-up.
 - `onProviderProfile(user, profile)` runs whenever a provider answers for a user: every OAuth sign-in, the first included after `onSignUp`, and a link. It runs before any second factor, to refresh what the app keeps from the profile, such as an avatar or a display name. A failure in it is logged and the sign-in goes on.
 - `allow(profile)` is asked before any user is touched; false refuses, as an allowlist of provider ids does.
-- `?link=1` links the provider account to the signed-in user instead, refused when another user has it linked. A linked provider is a way in that outlives every sign-out, so linking needs a session that signed in or re-proved in the last ten minutes (see Re-proof): past that the link goes to `signInPage?error=stale`, and the page asks for `auth.reprove(proof)` first.
-- A failure goes to `failurePage` as it is when set, else to `signInPage?error=<code>`: `oauth` (a state or code that did not check out, or a provider account without an id), `cancelled`, `refused`, `taken`, `unavailable` (the provider failed, answered nonsense or took over 10 seconds to answer), `signed-out` (a link without a signed-in user), `stale` (a link without a recent proof).
+- `linkProvider(provider, proof, { redirect })` links a provider account to the signed-in user instead, refused when another user has it linked: from an action, `ctx.redirect(result.url)` sends the browser to the provider, which comes back to `redirect`. A linked provider is a way in that outlives every sign-out, so linking takes a proof, the second factor when it is on (see Re-proof); `'not-found'` for a provider the app did not configure, `'unavailable'` when the provider failed.
+- A failure goes to `failurePage` as it is when set, else to `signInPage?error=<code>`: `oauth` (a state or code that did not check out, or a provider account without an id), `cancelled`, `refused`, `taken`, `unavailable` (the provider failed, answered nonsense or took over 10 seconds to answer), `signed-out` (a link whose user signed out before coming back).
 - `providerToken('discord')` gives the signed-in user's access token, refreshed when about to expire, or `null` when it cannot be: the tokens are forgotten once the provider refuses the refresh token, and kept through an outage, a provider taking over 10 seconds counting as one. Provider tokens are stored encrypted. `identities()` lists the providers the user linked.
 
 ## Passwords
@@ -272,12 +271,12 @@ if failure
 Passkeys are made for `url`'s host and checked against its origin: `passkeys: { rpId, origins }` widens them to a parent domain, or lists every origin the pages are served from. The browser side is `@simplewebauthn/browser`'s `startRegistration` and `startAuthentication`, in an island; each method below gives the options to pass it, kept as a challenge in the session that works once, for five minutes.
 
 ```ts
-// In an island on the account page, `passkeyOptions` and `addPasskey` being the app's actions calling `auth.passkeyRegistrationOptions()` and `auth.registerPasskey(response, name)`
-const { options } = await actions.passkeyOptions()
+// In an island on the account page, `passkeyOptions` and `addPasskey` being the app's actions calling `auth.passkeyRegistrationOptions(proof)` and `auth.registerPasskey(response, name)`
+const { options } = await actions.passkeyOptions({ password })
 await actions.addPasskey({ response: await startRegistration({ optionsJSON: options }), name })
 ```
 
-- `passkeyRegistrationOptions()` and `registerPasskey(response, name?)` add a passkey to the signed-in user, named as given or after the browser and system it was made on (`Safari on macOS`), and mail them. A passkey is a way in, so adding one needs a session that signed in or re-proved in the last ten minutes, `'stale'` past that, as linking a provider does. The passkey is kept on the authenticator, so it signs in without a name typed first.
+- `passkeyRegistrationOptions(proof)` and `registerPasskey(response, name?)` add a passkey to the signed-in user, named as given or after the browser and system it was made on (`Safari on macOS`), and mail them. A passkey is a way in that skips the second factor and outlives every sign-out, so adding one takes a proof, the second factor when it is on, as linking a provider does (see Re-proof). The passkey is kept on the authenticator, so it signs in without a name typed first.
 - `passkeys()` lists `{ id, name, multiDevice, backedUp, createdAt, lastUsedAt }`; `renamePasskey(id, name)`; `removePasskey(id, proof)` re-proves first, refuses the last passkey of an account with no other way in (`'last-way-in'`), and mails the user.
 - `passkeySignInOptions()` and `signInWithPasskey(response, redirect?)` sign in with a passkey alone: the options name no account, so the browser offers every passkey it holds for the site, and with `startAuthentication({ optionsJSON, useBrowserAutofill: true })` offers them in the autofill of a field with `autocomplete="username webauthn"`. The passkey must verify the user (a PIN, a fingerprint), so it is two factors in one and no second factor is asked after it. Errors: `'expired'` (no challenge, or one spent), `'invalid'`, `'limited'`.
 - `twoFactorPasskeyOptions()` and `verifyTwoFactorPasskey(response)` answer a sign-in waiting at the `twoFactorPage` with one of the user's passkeys, as `verifyTwoFactor` does with a code.
@@ -286,12 +285,12 @@ await actions.addPasskey({ response: await startRegistration({ optionsJSON: opti
 
 ## Re-proof
 
-Changing what protects the account takes a `proof`: `changePassword`, `changeEmail`, `setUpTwoFactor`, `disableTwoFactor`, `regenerateRecoveryCodes`, `unlink`, `removePasskey`, `deleteAccount` and `createToken`.
+Changing what protects the account takes a `proof`: `changePassword`, `changeEmail`, `setUpTwoFactor`, `disableTwoFactor`, `regenerateRecoveryCodes`, `passkeyRegistrationOptions`, `removePasskey`, `linkProvider`, `unlink`, `deleteAccount` and `createToken`.
 
 - `{ passkey }`, the answer to `passkeyProofOptions()`, from any user with a passkey.
-- `{ password }` when the user has a password; otherwise `{ code }`, an authenticator or recovery code, when they have a second factor. `disableTwoFactor` and `regenerateRecoveryCodes` take the `{ code }` even from a user with a password, so the password alone cannot undo what stands behind it.
+- `{ password }` when the user has a password; otherwise `{ code }`, an authenticator or recovery code, when they have a second factor. `disableTwoFactor`, `regenerateRecoveryCodes`, `passkeyRegistrationOptions` and `linkProvider` take the `{ code }` even from a user with a password, so the password alone cannot undo or get around what stands behind it.
 - A user with neither proves nothing but a sign-in under ten minutes old: past that, the method answers `'stale'` and the page asks them to sign in again first. A stolen session thus cannot set a password and an address and keep the account.
-- `auth.reprove(proof)` proves the user without changing anything, as before linking a provider. Any proof counts for ten minutes, as a sign-in does.
+- `auth.reprove(proof)` proves the user without changing anything, as before an app's own sensitive change. Any proof counts for ten minutes, as a sign-in does.
 - `'proof'` for a wrong or missing proof, `'limited'` after six tries in 15 minutes, `'signed-out'` without a user, `'impersonating'` while an admin acts as the user.
 
 ## Account

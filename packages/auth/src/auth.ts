@@ -12,7 +12,7 @@ import type { AuditEntry, AuthEvent, EventContext } from './events'
 import type { DataExport } from './export'
 import type { ScopeRequirement } from './gate'
 import type { Limits } from './limits'
-import type { OAuthFailure } from './oauth/flow'
+import type { LinkProviderResult, OAuthFailure } from './oauth/flow'
 import type { AcceptResult, CreateOrganizationResult, Invitation, InviteResult, Member, MemberResult, Membership, OrganizationFailure, OrganizationsOptions, UpdateOrganizationResult } from './organizations'
 import type { AuthFeatures, AuthPagesOptions } from './pages'
 import type { Passkey, PasskeyOptionsResult, PasskeySignInResult, RegisterPasskeyResult } from './passkeys'
@@ -43,7 +43,7 @@ import { log } from './log'
 import { localeTemplates } from './mail'
 import { noteSignIn, notify } from './notify'
 import { createOAuthClient } from './oauth/client'
-import { finishOAuth, providerToken, sealTokens, startOAuth } from './oauth/flow'
+import { finishOAuth, providerToken, sealTokens, startLink, startOAuth } from './oauth/flow'
 import { createOAuthTokenRefresher } from './oauth/refresher'
 import { acceptInvitation, createOrganization, declineInvitation, deleteOrganization, getInvitation, getMembership, holdsInOrganization, invite, listInvitations, listMembers, listMemberships, myInvitations, organizationsCore, removeMember, revokeInvitation, setMemberRoles, updateOrganization } from './organizations'
 import { featuresOf, pagePaths, pagesOf } from './pages'
@@ -399,7 +399,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     return verifyTwoFactor(this[STATE], code, (record, method) => this.establish(record, method))
   }
 
-  // Re-proves the signed-in user, as before linking a provider: a proof counts for ten minutes, as a sign-in does.
+  // Re-proves the signed-in user, as before an app's own sensitive change: a proof counts for ten minutes, as a sign-in does.
   async reprove(proof: Proof): Promise<{ ok: true } | { ok: false, error: ProofFailure }> {
     const proved = await reprove(this[STATE], proof)
 
@@ -440,6 +440,11 @@ export class Auth<Scope extends string = string, Role extends string = string, O
   // Names the signed-in user, or renames them, under the rules register checks; no proof, a name being no credential.
   async changeUsername(username: string): Promise<ChangeUsernameResult> {
     return changeUsername(this[STATE], username)
+  }
+
+  // Where to send the browser to link `provider` to the signed-in user once `proof` re-proves them, the second factor when it is on; it comes back to `redirect`.
+  async linkProvider(provider: string, proof: Proof, options: { redirect?: string } = {}): Promise<LinkProviderResult> {
+    return startLink(this[STATE], provider, proof, options.redirect)
   }
 
   // Unlinks a provider from the signed-in user, unless it is their last way in.
@@ -491,9 +496,9 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     return this.core.store.sessions.delete(record.id, id)
   }
 
-  // The options for `startRegistration` of `@simplewebauthn/browser`, to make a passkey for the signed-in user; `stale` past ten minutes since signing in or re-proving.
-  async passkeyRegistrationOptions(): Promise<PasskeyOptionsResult<PublicKeyCredentialCreationOptionsJSON>> {
-    return passkeyRegistrationOptions(this[STATE])
+  // The options for `startRegistration` of `@simplewebauthn/browser`, to make a passkey for the signed-in user once `proof` re-proves them, the second factor when it is on.
+  async passkeyRegistrationOptions(proof: Proof): Promise<PasskeyOptionsResult<PublicKeyCredentialCreationOptionsJSON, ProofFailure>> {
+    return passkeyRegistrationOptions(this[STATE], proof)
   }
 
   // Keeps the passkey `startRegistration` made, under `name` or the browser and system it was made on.
@@ -868,7 +873,7 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
     // A GET, so a sign-in link works without JavaScript: give it `data-no-prefetch` so a hover starts nothing.
     // Typed as their literal paths, so `kay check` checks links to them once the app registers its Elysia app.
     .get(`${core.prefix}/:provider` as `${Prefix}/:provider`, async ({ auth, params, query, redirect, status }) => {
-      const started = await startOAuth(auth[STATE], params.provider, { redirect: text(query.redirect), link: query.link === '1', remember: query.remember === undefined ? undefined : query.remember === '1' })
+      const started = await startOAuth(auth[STATE], params.provider, { redirect: text(query.redirect), remember: query.remember === undefined ? undefined : query.remember === '1' })
 
       if (started === undefined)
         return status(404, 'Not Found')

@@ -316,7 +316,7 @@ describe('magic links', () => {
     const device = authenticator()
 
     await stranger.call('register', { email: 'ada@example.com', password: 'squatter password' })
-    const { options } = await stranger.call('passkeyRegistrationOptions')
+    const { options } = await stranger.call('passkeyRegistrationOptions', { password: 'squatter password' })
 
     expect(await stranger.call('registerPasskey', await device.create(options))).toMatchObject({ ok: true })
 

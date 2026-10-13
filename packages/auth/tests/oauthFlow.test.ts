@@ -1,4 +1,5 @@
 import type { Profile, User } from '../src/auth'
+import type { Proof } from '../src/twoFactor'
 import { afterEach, describe, expect, setSystemTime, spyOn, test } from 'bun:test'
 import { discordProvider, githubProvider } from '../src/oauth/providers'
 import { totpCode, totpStep } from '../src/totp'
@@ -79,6 +80,14 @@ async function signInWith(visitor: Browser, provider: string, account: string, s
   return { response: await visitor.fetch(back), back }
 }
 
+// Leaves for the provider to link `account` to the visitor's user once `proof` re-proves them, and comes back with its code.
+async function linkWith(visitor: Browser, provider: string, account: string, proof: Proof = {}, redirect?: string) {
+  const started = await visitor.call('linkProvider', provider, proof, { redirect })
+  const state = new URL(started.url).searchParams.get('state')!
+
+  return { response: await visitor.fetch(`/auth/${provider}/callback?code=code-${account}&state=${state}`) }
+}
+
 describe('starting an OAuth sign-in', () => {
   test('sends the browser to the provider with a state, a PKCE challenge and the callback URL', async () => {
     const { browser } = setup()
@@ -149,7 +158,7 @@ describe('coming back from the provider', () => {
     await signInWith(ada, 'discord', '1')
     providers({ 1: { id: '1', username: 'ada-renamed' }, 7: { id: '7', username: 'ada-gh' } })
     await signInWith(browser(), 'discord', '1')
-    await signInWith(ada, 'github', '7', '/auth/github?link=1')
+    await linkWith(ada, 'github', '7')
     const id = signUps[0]!.user.id
 
     expect(profiles).toEqual([`${id} discord ada`, `${id} discord ada-renamed`, `${id} github ada-gh`])
@@ -162,7 +171,7 @@ describe('coming back from the provider', () => {
     const ada = browser()
 
     await signInWith(ada, 'discord', '1')
-    await signInWith(ada, 'github', '7', '/auth/github?link=1')
+    await linkWith(ada, 'github', '7')
 
     expect(heard.at(-1)).toMatchObject({ email: 'ada@example.com', emailVerified: true })
   })
@@ -332,7 +341,7 @@ describe('linking a provider', () => {
     const ada = browser()
 
     await signInWith(ada, 'discord', '1')
-    const { response } = await signInWith(ada, 'github', '7', '/auth/github?link=1&redirect=/account')
+    const { response } = await linkWith(ada, 'github', '7', {}, '/account')
 
     expect(response.headers.get('location')).toBe('/account')
     expect(signUps).toHaveLength(1)
@@ -354,8 +363,9 @@ describe('linking a provider', () => {
     await signInWith(ada, 'discord', '1')
     await signInWith(bob, 'discord', '2')
 
-    expect((await signInWith(ada, 'discord', '2', '/auth/discord?link=1')).response.headers.get('location')).toBe('/login?error=taken')
-    expect((await browser().fetch('/auth/discord?link=1')).headers.get('location')).toBe('/login?error=signed-out')
+    expect((await linkWith(ada, 'discord', '2')).response.headers.get('location')).toBe('/login?error=taken')
+    expect(await browser().call('linkProvider', 'discord', {})).toEqual({ ok: false, error: 'signed-out' })
+    expect(await ada.call('linkProvider', 'gitlab', {})).toEqual({ ok: false, error: 'not-found' })
   })
 
   test('joins the provider to the account that asked for it, not to one signed in since in the same browser', async () => {
@@ -366,8 +376,8 @@ describe('linking a provider', () => {
     await browser().call('register', { email: 'bob@example.com', password: 'correct horse battery' })
     await signInWith(shared, 'discord', '1')
 
-    const leaving = await shared.fetch('/auth/github?link=1')
-    const state = new URL(leaving.headers.get('location')!).searchParams.get('state')!
+    const leaving = await shared.call('linkProvider', 'github', {})
+    const state = new URL(leaving.url).searchParams.get('state')!
 
     await shared.call('signInWithPassword', { identifier: 'bob@example.com', password: 'correct horse battery' })
 
@@ -375,7 +385,7 @@ describe('linking a provider', () => {
     expect(await store.identities.find('github', '7')).toBeUndefined()
   })
 
-  test('needs a sign-in or a proof from the last ten minutes, so a stolen session alone adds no way in', async () => {
+  test('an account with neither a password nor two-factor links within ten minutes of signing in', async () => {
     providers({ 1: { id: '1', username: 'ada' }, 7: { id: '7', username: 'ada-gh' } })
     const { browser, store } = setup()
     const ada = browser()
@@ -383,29 +393,46 @@ describe('linking a provider', () => {
     await signInWith(ada, 'discord', '1')
     setSystemTime(new Date(Date.now() + 11 * 60 * 1000))
 
-    expect((await ada.fetch('/auth/github?link=1')).headers.get('location')).toBe('/login?error=stale')
-    expect(await ada.call('reprove', {})).toEqual({ ok: false, error: 'stale' })
+    expect(await ada.call('linkProvider', 'github', {})).toEqual({ ok: false, error: 'stale' })
 
     await signInWith(ada, 'discord', '1')
-    await signInWith(ada, 'github', '7', '/auth/github?link=1')
+    await linkWith(ada, 'github', '7')
 
     expect(await store.identities.find('github', '7')).toBeDefined()
   })
 
-  test('a proof makes an older sign-in fresh again', async () => {
+  test('an account with a password links once the password proves it, even right after signing in, so a stolen session alone adds no way in', async () => {
+    providers({ 7: { id: '7', username: 'ada-gh' }, 8: { id: '8', username: 'other-gh' } })
+    const { browser, store } = setup()
+    const ada = browser()
+    const { user } = await ada.call('register', { email: 'ada@example.com', password: 'correct horse battery' })
+
+    expect(await ada.call('linkProvider', 'github', {})).toEqual({ ok: false, error: 'proof' })
+    expect(await ada.call('linkProvider', 'github', { password: 'wrong password!' })).toEqual({ ok: false, error: 'proof' })
+
+    // The provider's own route only ever signs in.
+    await signInWith(browser(), 'github', '8', '/auth/github?link=1')
+
+    expect((await store.identities.find('github', '8'))?.userId).not.toBe(user.id)
+
+    await linkWith(ada, 'github', '7', { password: 'correct horse battery' })
+
+    expect((await store.identities.find('github', '7'))?.userId).toBe(user.id)
+  })
+
+  test('with two-factor on, the password alone links nothing: the code does', async () => {
     providers({ 7: { id: '7', username: 'ada-gh' } })
     const { browser, store } = setup()
     const ada = browser()
+    const { user } = await ada.call('register', { email: 'ada@example.com', password: 'correct horse battery' })
+    const { setup: twoFactor } = await ada.call('setUpTwoFactor', { password: 'correct horse battery' })
+    const { recoveryCodes } = await ada.call('enableTwoFactor', await totpCode(twoFactor.secret, totpStep()))
 
-    await ada.call('register', { email: 'ada@example.com', password: 'correct horse battery' })
-    setSystemTime(new Date(Date.now() + 11 * 60 * 1000))
+    expect(await ada.call('linkProvider', 'github', { password: 'correct horse battery' })).toEqual({ ok: false, error: 'proof' })
 
-    expect(await ada.call('reprove', { password: 'wrong password!' })).toEqual({ ok: false, error: 'proof' })
-    expect(await ada.call('reprove', { password: 'correct horse battery' })).toEqual({ ok: true })
+    await linkWith(ada, 'github', '7', { code: recoveryCodes[0] })
 
-    await signInWith(ada, 'github', '7', '/auth/github?link=1')
-
-    expect(await store.identities.find('github', '7')).toBeDefined()
+    expect((await store.identities.find('github', '7'))?.userId).toBe(user.id)
   })
 })
 
