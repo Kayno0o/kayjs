@@ -572,8 +572,7 @@ async function bodyHeld(name: string, collection: Collection<unknown>, dir: stri
   }
 }
 
-// Whether a collection's entries hold a Markdown body: a folder's in Markdown files, a loader's as `body` rather than `html`; one with no entry yet, or a folder missing, as beside a build alone, may.
-// A folder's files are listed, never read.
+// Whether a collection's entries hold a Markdown body, and how many: a folder's in Markdown files, listed and never read, a loader's as `body` rather than `html`; one with no entry yet, or a folder missing, as beside a build alone, may.
 async function holdsBody(name: string, collection: Collection<unknown>, dir: string | undefined): Promise<{ body: boolean, count: number }> {
   if (dir !== undefined) {
     const files = existsSync(dir) ? await entryFiles(dir) : []

@@ -233,7 +233,8 @@ export function collection<Schema extends TSchema, Components extends Record<str
         for (const draft of drafts) {
           const slug = localized ? `${draft.locale}/${draft.slug}` : draft.slug
 
-          written.set(slug, { ...raw.find(entry => entry.slug === slug) ?? { file: `${name}/${slug}` }, slug, data: draft.data, lines: {}, ...draft.compiled })
+          // A second draft of an entry goes over the first.
+          written.set(slug, { ...written.get(slug) ?? raw.find(entry => entry.slug === slug) ?? { file: `${name}/${slug}` }, slug, data: draft.data, lines: {}, ...draft.compiled })
         }
 
         // The drafted entries alone are decoded; the others are copied when localized, as indexing sets their translations and the collection's own are shared with every request.

@@ -20,7 +20,7 @@ let stored: Record<string, SourceEntry[]>
 const content: typeof Content = {
   collections: async () => [posts, products, outside],
   collectionInfo: async name => [posts, products, outside].find(collection => collection.name === name),
-  entries: async (collection, filter) => (stored[collection] ?? []).filter(entry => filter?.slug === undefined || entry.slug === filter.slug),
+  entries: async (collection, filter) => (stored[collection] ?? []).filter(entry => (filter?.slug === undefined || entry.slug === filter.slug) && (filter?.locale === undefined || entry.locale === filter.locale)),
   entrySource: async (collection, slug, data, options) => options?.create && stored[collection]?.some(entry => entry.slug === slug)
     ? { issues: [{ collection, slug, path: '', key: 'slug', message: TAKEN }] }
     : (data as Record<string, unknown>).title === ''
@@ -52,7 +52,7 @@ const content: typeof Content = {
 void mock.module('../src/kay/content', () => content)
 
 // Imported once the mock is in place, so the store reads it.
-const { deleteEntry, publishEntry, saveEntry, UnknownCollection } = await import('../src/store')
+const { deleteEntry, entryOf, publishEntry, saveEntry, UnknownCollection } = await import('../src/store')
 
 beforeEach(() => {
   saved = []
@@ -123,6 +123,15 @@ describe('deleteEntry', () => {
     expect(await deleteEntry({ collection: 'products', slug: 'mug' })).toEqual({ saved: true })
     expect(await deleteEntry({ collection: 'products', slug: 'nope' })).toHaveProperty('issues.0.key', 'slug')
     expect(removed).toEqual(['mug'])
+  })
+})
+
+describe('entryOf', () => {
+  test('asks kay for the entry of that slug and locale alone', async () => {
+    stored.posts = [{ slug: 'hello', locale: 'en', data: { title: 'Hello' }, draft: false }, { slug: 'hello', locale: 'fr', data: { title: 'Bonjour' }, draft: false }]
+
+    expect((await entryOf({ collection: 'posts', slug: 'hello', locale: 'fr' }))?.data).toEqual({ title: 'Bonjour' })
+    expect(await entryOf({ collection: 'posts', slug: 'gone' })).toBeUndefined()
   })
 })
 
