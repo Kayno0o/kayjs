@@ -1,6 +1,6 @@
 # kay
 
-A Bun web framework: `.kay` components (pug-like templates over TypeScript), compiled to HTML on the server and to kay's own DOM runtime in islands. `llms.txt` and `llms/` are what an app's author reads; `src/` is the framework, `docs/` the documentation site built with kay itself (a workspace, so it imports kayjs-ui from `packages/`), `packages/` kay's libraries (kayjs-auth, kayjs-ui, kayjs-mail, kayjs-cms) as Bun workspaces, each with its own tests, `llms.txt` and eslint config. An issue about a library carries its label (`auth`, `ui`, `mail`, `cms`); kay's own issues carry none.
+A Bun web framework: `.kay` components (pug-like templates over TypeScript), compiled to HTML on the server and to kay's own DOM runtime in islands. `llms.txt` and `llms/` are what an app's author reads; `src/` is the framework, `docs/` the documentation site built with kay itself (a workspace, so it imports kayjs-ui from `packages/`), `packages/` kay's libraries (kayjs-auth, kayjs-ui, kayjs-mail, kayjs-cms) as Bun workspaces, each with its own tests, `llms.txt` and eslint config. An issue about a library carries its label (`auth`, `ui`, `mail`, `cms`); kay's own issues carry none. Every issue also carries one priority: `priority/high` (breaks apps or CI, or blocks a migration), `priority/medium` (a real cost to apps or sessions) or `priority/low` (exploration, polish); a new issue gets one when filed.
 
 ## Design rule
 
@@ -10,7 +10,7 @@ Every feature asks the least of the app: the fewest declarations, the easiest se
 
 Each session works alone, with no coordinator:
 
-1. Take an open issue by assigning it (`tea issues edit <n> --add-assignees kaynooo`, then a comment naming the session), so no other session takes it; skip one already assigned.
+1. Take an open issue, the highest priority first (`tea issues ls -L priority/high`), by assigning it (`tea issues edit <n> --add-assignees kaynooo`, then a comment naming the session), so no other session takes it; skip one already assigned.
 2. Work in a worktree (`just worktree <name>`), and commit with `bun run lint:fix` and the tests of what changed.
 3. Review the commit once, through the `requesting-code-review` skill, at an effort matching the diff: none for docs, tests or a few lines, `low` for a contained change, `high` for the runtime, the compiler or anything an app sees. Its fixes go in a follow-up commit, not reviewed again unless they reshape the change.
 4. `just land` (`scripts/land.ts`): one landing at a time, it rebases on origin's main, lints, checks, runs the tests the changes reach (`bun test --changed` plus the tests reading `llms/`, `docs/`, `examples/`, `packages/` or a fixture as files, the full suite for a root config, a library's own suite), pushes main and moves the main checkout to it. Never run the full suite locally: CI runs it on every push, and a red run on main is fixed by whoever landed it.
