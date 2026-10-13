@@ -47,6 +47,13 @@ export default defineMessages({
         lasts: '',
         ending: 'If you did not expect it, ignore this mail.',
       },
+      'account-exists': {
+        subject: 'You already have a {site} account',
+        lead: 'Someone tried to create a {site} account for {email}, which has one already. Sign in to it, or ask for a new password on the sign-in page if you forgot yours.',
+        button: 'Sign in',
+        lasts: '',
+        ending: 'If this was not you, ignore this mail: nothing changed on your account.',
+      },
       'new-sign-in': {
         subject: 'New sign-in on {site}',
         lead: 'Your {site} account was just signed into from a device or network it had not used before.',

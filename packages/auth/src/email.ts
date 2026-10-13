@@ -242,7 +242,33 @@ export async function confirmEmailChange(state: RequestState, token: string): Pr
 // On registering: the verification mail, when the app sends mail.
 export async function welcome(state: RequestState, record: UserRecord): Promise<void> {
   if (state.core.email && record.email)
-    await issue(state, record, 'verify-email', record.email, null, await bindCode(state, 'verify-email', record.email))
+    void issueQuietly(state, record, 'verify-email', record.email, null, await bindCode(state, 'verify-email', record.email))
+}
+
+// A registration for an address an account holds already, where registering signs no one in: this session is left as a new account's would be, and the holder is told, off the response's path and at most a few times an hour.
+export async function warnHolder(state: RequestState, holder: UserRecord, email: string): Promise<void> {
+  const { core } = state
+  const mail = core.email
+
+  if (!mail)
+    return
+
+  await bindCode(state, 'verify-email', email)
+
+  if (await spend(core.store, `account-exists:${holder.id}`, core.limits.resendAccount))
+    return
+
+  void (async () => {
+    try {
+      const { locale, templates } = writing(mail, [holder.locale, ...state.languages])
+      const url = `${core.url}${core.signInPage}`
+
+      await mail.mailer.send({ to: email, kind: 'account-exists', site: core.site, locale, url, ...templates['account-exists']({ site: core.site, email, url, locale }) })
+    }
+    catch (error) {
+      log.error('mailing account-exists failed', error)
+    }
+  })()
 }
 
 // Signs in with the code a magic link mail carried, in the session that asked for it.

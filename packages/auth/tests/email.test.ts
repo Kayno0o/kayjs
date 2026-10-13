@@ -131,8 +131,34 @@ describe('verifying an email', () => {
 
     await store.users.create(userRecord({ id: 'u1', email: 'ada@example.com', roles: ['admin'] }))
 
-    expect(await browser().call('register', { email: 'ada@example.com', password: PASSWORD })).toEqual({ ok: false, errors: { email: 'taken' } })
+    expect(await browser().call('register', { email: 'ada@example.com', password: PASSWORD })).toEqual({ ok: true, signedIn: false })
     expect(await store.users.get('u1')).toMatchObject({ roles: ['admin'] })
+  })
+
+  test('with `requireVerified`, an address already held answers as a free one, leaves the session alike and mails its holder instead', async () => {
+    const { browser, store, mails } = setup({ requireVerified: true })
+
+    await store.users.create(userRecord({ id: 'u1', email: 'ada@example.com', emailVerifiedAt: new Date() }))
+
+    const fresh = browser()
+    const held = browser()
+
+    expect(await fresh.call('register', { email: 'bob@example.com', password: PASSWORD })).toEqual({ ok: true, signedIn: false })
+    expect(await held.call('register', { email: 'ada@example.com', password: PASSWORD })).toEqual({ ok: true, signedIn: false })
+    expect(await held.call('emailCodePending')).toEqual(await fresh.call('emailCodePending'))
+    expect(await store.users.get('u1')).toMatchObject({ email: 'ada@example.com', passwordHash: null })
+    await Bun.sleep(0)
+    expect(mails.findLast(mail => mail.to === 'ada@example.com')).toMatchObject({ kind: 'account-exists', url: 'https://site.test/', subject: 'You already have a Site account' })
+  })
+
+  test('with `requireVerified`, a refused registration leaves the unverified holder in place', async () => {
+    const { browser, store } = setup({ requireVerified: true })
+
+    await browser().call('register', { email: 'ada@example.com', password: PASSWORD })
+    const holder = await store.users.findByEmail('ada@example.com')
+
+    expect(await browser().call('register', { email: 'ada@example.com', password: 'short' })).toMatchObject({ ok: false, errors: { password: 'too-short' } })
+    expect(await store.users.findByEmail('ada@example.com')).toEqual(holder)
   })
 
   test('with `requireVerified`, an unverified account holding only the default roles is replaced, and one holding more is not', async () => {
@@ -141,8 +167,10 @@ describe('verifying an email', () => {
     await browser().call('register', { email: 'ada@example.com', password: 'squatter password' })
     await store.users.create(userRecord({ id: 'u2', email: 'bob@example.com', roles: ['editor', 'admin'] }))
 
-    expect(await browser().call('register', { email: 'ada@example.com', password: PASSWORD })).toMatchObject({ ok: true, user: { roles: ['editor'] } })
-    expect(await browser().call('register', { email: 'bob@example.com', password: PASSWORD })).toEqual({ ok: false, errors: { email: 'taken' } })
+    expect(await browser().call('register', { email: 'ada@example.com', password: PASSWORD })).toEqual({ ok: true, signedIn: false })
+    expect(await browser().call('register', { email: 'bob@example.com', password: PASSWORD })).toEqual({ ok: true, signedIn: false })
+    expect(await store.users.findByEmail('ada@example.com')).toMatchObject({ roles: ['editor'], passwordHash: expect.any(String) })
+    expect(await store.users.get('u2')).toMatchObject({ roles: ['editor', 'admin'] })
   })
 
   test('with `requireVerified`, an unverified account holding only the default roles and a linked provider is not replaced', async () => {
@@ -151,7 +179,8 @@ describe('verifying an email', () => {
     await store.users.create(userRecord({ id: 'u1', email: 'ada@example.com', roles: ['editor'] }))
     await store.identities.create({ provider: 'discord', providerId: '1', userId: 'u1', accessToken: null, refreshToken: null, tokenExpiresAt: null, createdAt: new Date() })
 
-    expect(await browser().call('register', { email: 'ada@example.com', password: PASSWORD })).toEqual({ ok: false, errors: { email: 'taken' } })
+    expect(await browser().call('register', { email: 'ada@example.com', password: PASSWORD })).toEqual({ ok: true, signedIn: false })
+    expect(await store.users.get('u1')).toMatchObject({ email: 'ada@example.com' })
   })
 
   test('resending gives a new link and voids the last', async () => {

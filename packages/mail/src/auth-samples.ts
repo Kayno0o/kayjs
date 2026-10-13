@@ -11,6 +11,7 @@ const CARRIES: Partial<Record<AuthKind, Partial<AuthMail>>> = {
   'magic-link': { url: LINK, code: CODE },
   'change-email': { url: LINK },
   'invitation': { url: 'https://example.com/invitation?invitation=sample', detail: 'Acme' },
+  'account-exists': { url: 'https://example.com/sign-in' },
   'new-sign-in': { url: 'https://example.com/account/sessions' },
   'email-changed': { detail: 'ada@example.org' },
   'provider-linked': { detail: 'GitHub' },

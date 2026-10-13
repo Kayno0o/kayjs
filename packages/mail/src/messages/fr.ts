@@ -46,6 +46,13 @@ export default defineMessages({
         lasts: '',
         ending: 'Si vous ne l\'attendiez pas, ignorez ce message.',
       },
+      'account-exists': {
+        subject: 'Vous avez déjà un compte {site}',
+        lead: 'Quelqu\'un a tenté de créer un compte {site} pour {email}, qui en a déjà un. Connectez-vous-y, ou demandez un nouveau mot de passe depuis la page de connexion si vous l\'avez oublié.',
+        button: 'Me connecter',
+        lasts: '',
+        ending: 'Si ce n\'était pas vous, ignorez ce message : rien n\'a changé sur votre compte.',
+      },
       'new-sign-in': {
         subject: 'Nouvelle connexion sur {site}',
         lead: 'Votre compte {site} vient d\'être utilisé depuis un appareil ou un réseau qu\'il n\'avait jamais utilisé.',

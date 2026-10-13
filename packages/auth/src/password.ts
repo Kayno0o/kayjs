@@ -6,7 +6,7 @@ import { comparePasswords, hashPassword, passwordNeedsRehash } from '@kaynooo/ut
 import { newPasswordProblem } from './breached'
 import { admit } from './captcha'
 import { newUserRecord, publicUser } from './core'
-import { welcome } from './email'
+import { warnHolder, welcome } from './email'
 import { report } from './events'
 import { randomToken } from './keys'
 import { spend } from './limits'
@@ -34,8 +34,8 @@ export interface RegisterErrors {
   username?: UsernameProblem | 'taken' | undefined
 }
 
-// `signedIn` is false when the app wants the address verified first.
-export type RegisterResult = { ok: true, user: User, signedIn: boolean } | { ok: false, errors: RegisterErrors } | { ok: false, error: 'limited' | 'captcha' }
+// `signedIn` is false, with no user, when the app wants the address verified first: the same answer whether the address was free or held, its holder mailed instead.
+export type RegisterResult = { ok: true, user: User, signedIn: true } | { ok: true, signedIn: false } | { ok: false, errors: RegisterErrors } | { ok: false, error: 'limited' | 'captcha' }
 
 export interface PasswordSignInInput {
   // An email, or a username when it holds no `@`.
@@ -72,21 +72,26 @@ export async function register(state: RequestState, input: RegisterInput): Promi
 
   const holder = errors.email ? undefined : await store.users.findByEmail(email)
   const requireVerified = state.core.email?.requireVerified ?? false
-
   // An address registered and never verified, where unverified accounts cannot sign in, holds nothing worth keeping: registering again replaces it, so no one can squat an address they do not own. An account given roles beyond the default ones was set up on purpose, as by an admin inviting someone, and stays.
-  if (holder && requireVerified && holder.emailVerifiedAt === null && holder.roles.every(role => state.core.defaultRoles.includes(role)) && (await store.identities.listByUser(holder.id)).length === 0) {
-    await store.users.delete(holder.id)
-    await state.core.onDelete?.(publicUser(holder))
-  }
-  else if (holder) {
+  const unclaimed = holder !== null && holder !== undefined && requireVerified && holder.emailVerifiedAt === null && holder.roles.every(role => state.core.defaultRoles.includes(role)) && (await store.identities.listByUser(holder.id)).length === 0
+
+  // Where registering signs no one in, an address already held is answered as a new one is, so the answer tells nothing of which addresses exist.
+  if (holder && !unclaimed && !requireVerified)
     errors.email = 'taken'
-  }
 
   if (username !== null && !errors.username && await store.users.findByUsername(username))
     errors.username = 'taken'
 
   if (errors.email || errors.password || errors.username)
     return { ok: false, errors: withoutUndefined(errors) }
+
+  if (holder && !unclaimed)
+    return await answerHeld(state, holder, input.password)
+
+  if (holder) {
+    await store.users.delete(holder.id)
+    await state.core.onDelete?.(publicUser(holder))
+  }
 
   const current = await state.current()
   const guest = current?.guest && state.via() === 'session' ? current : undefined
@@ -99,7 +104,12 @@ export async function register(state: RequestState, input: RegisterInput): Promi
   }
   // Another request took the email or the name in between; any other failure is the store's.
   catch (error) {
-    if (await store.users.findByEmail(email))
+    const taken = await store.users.findByEmail(email)
+
+    if (taken && requireVerified)
+      return await answerHeld(state, taken, null)
+
+    if (taken)
       return { ok: false, errors: { email: 'taken' } }
 
     if (username !== null && await store.users.findByUsername(username))
@@ -120,11 +130,21 @@ export async function register(state: RequestState, input: RegisterInput): Promi
 
   // A guest stays signed in: the account was theirs already.
   if (requireVerified && !guest)
-    return { ok: true, user, signedIn: false }
+    return { ok: true, signedIn: false }
 
   await state.complete(record, '/', 'register')
 
   return { ok: true, user, signedIn: true }
+}
+
+// Spends the time hashing a new password takes, so a held address answers no faster than a free one.
+async function answerHeld(state: RequestState, holder: UserRecord, password: string | null): Promise<RegisterResult> {
+  if (password !== null)
+    await hashPassword(password)
+
+  await warnHolder(state, holder, holder.email!)
+
+  return { ok: true, signedIn: false }
 }
 
 export async function signInWithPassword(state: RequestState, input: PasswordSignInInput): Promise<PasswordSignInResult> {
