@@ -128,6 +128,36 @@ describe('organizations', () => {
     expect(await grace.browser.call('acceptInvitation', invitation.id)).toMatchObject({ ok: true, membership: { roles: ['member'] } })
   })
 
+  test('only a manager with a verified address invites, and one address is invited 5 times a day at most, whoever invites it', async () => {
+    const { ada, org, mails, person } = await setup()
+    const mallory = await person('mallory@example.com', false)
+    const grace = await person('grace@example.com')
+    const theirs = (await mallory.browser.call('createOrganization', { name: 'Support' })).membership.organization.id
+    const other = (await grace.browser.call('createOrganization', { name: 'Other' })).membership.organization.id
+    const sent = mails.length
+
+    expect(await mallory.browser.call('invite', theirs, 'joan@example.com')).toEqual({ ok: false, error: 'unverified' })
+    expect(mails).toHaveLength(sent)
+
+    for (let i = 0; i < 5; i++)
+      expect(await ada.browser.call('invite', org, 'joan@example.com')).toMatchObject({ ok: true })
+
+    expect(await ada.browser.call('invite', org, 'Joan@Example.com')).toEqual({ ok: false, error: 'limited' })
+    expect(await grace.browser.call('invite', other, 'joan@example.com')).toEqual({ ok: false, error: 'limited' })
+    expect(await grace.browser.call('invite', other, 'alan@example.com')).toMatchObject({ ok: true })
+    expect(mails).toHaveLength(sent + 6)
+  })
+
+  test('an organization\'s name refuses control characters, line breaks and direction overrides', async () => {
+    const { ada, org } = await setup()
+
+    for (const name of ['Acme\nYour account is locked', 'Acme\r\nBcc: x', 'Acme\tInc', 'Acme\u0000', 'Acme\u2028Inc', '\u202Emoc.live'])
+      expect(await ada.browser.call('createOrganization', { name })).toEqual({ ok: false, error: 'invalid-name' })
+
+    expect(await ada.browser.call('updateOrganization', org, { name: 'Acme\nInc' })).toEqual({ ok: false, error: 'invalid-name' })
+    expect(await ada.browser.call('createOrganization', { name: 'Ünïcode Acme 東京 🚀' })).toMatchObject({ ok: true })
+  })
+
   test('the invited user sees their invitations, accepts one, and joins with its roles', async () => {
     const { ada, org, person, store, events } = await setup()
     const grace = await person('grace@example.com')

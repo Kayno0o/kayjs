@@ -12,6 +12,8 @@ import { emailProblem, normalizeEmail } from './rules'
 
 const DEFAULT_INVITATION_MAX_AGE = 7 * 24 * 60 * 60
 const NAME_MAX_LENGTH = 100
+// Control characters, line and paragraph separators, and the marks that turn text around.
+const UNPRINTABLE = /[\p{Cc}\p{Zl}\p{Zp}\u061C\u200E\u200F\u202A-\u202E\u2066-\u2069]/u
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 const SLUG_MAX_LENGTH = 64
 
@@ -105,7 +107,7 @@ export type UpdateOrganizationResult = { ok: true, organization: Organization } 
 // `last-owner` keeps an organization from being left without one.
 export type MemberResult = { ok: true } | { ok: false, error: OrganizationFailure | 'unknown-role' | 'last-owner' }
 
-export type InviteResult<Role extends string = string> = { ok: true, invitation: Invitation<Role> } | { ok: false, error: OrganizationFailure | 'unknown-role' | 'invalid-email' | 'member' | 'limited' | 'unavailable' }
+export type InviteResult<Role extends string = string> = { ok: true, invitation: Invitation<Role> } | { ok: false, error: OrganizationFailure | 'unverified' | 'unknown-role' | 'invalid-email' | 'member' | 'limited' | 'unavailable' }
 
 // `wrong-account` when the signed-in user's address is not the one invited, `unverified` while it is but unproven.
 export type AcceptResult<Role extends string = string> = { ok: true, membership: Membership<Role> } | { ok: false, error: 'signed-out' | 'not-found' | 'wrong-account' | 'unverified' | 'member' }
@@ -343,6 +345,10 @@ export async function invite(state: RequestState, ref: string, email: string, ro
   if (!found.ok)
     return found
 
+  // The mail goes out from the site's domain in the inviter's words, the organization's name: only someone who proved an address of their own may send it.
+  if (found.record.emailVerifiedAt === null)
+    return { ok: false, error: 'unverified' }
+
   const given = roles ?? config.defaultRoles
 
   if (given.some(role => !config.roles.has(role)))
@@ -365,8 +371,8 @@ export async function invite(state: RequestState, ref: string, email: string, ro
   if (invitee && await store.members.get(found.organization.id, invitee.id))
     return { ok: false, error: 'member' }
 
-  // Each mail goes to an inbox someone else owns, so a manager may not flood it.
-  if (await spend(core.store, `invite:${found.record.id}`, core.limits.invite))
+  // Each mail goes to an inbox someone else owns, so neither a manager nor many managers together may flood it.
+  if (await spend(core.store, `invite:${found.record.id}`, core.limits.invite) || await spend(core.store, `invite-address:${address}`, core.limits.inviteAddress))
     return { ok: false, error: 'limited' }
 
   for (const earlier of await store.invitations.listByOrganization(found.organization.id)) {
@@ -557,8 +563,9 @@ async function reportOn(state: RequestState, userId: string, event: 'member-role
     await report(state, record, event, detail, actor)
 }
 
+// A name goes into the invitation mail's subject and lead, where a line break or a direction override would let it pass for something else.
 function validName(name: string): boolean {
-  return name.length > 0 && name.length <= NAME_MAX_LENGTH
+  return name.length > 0 && name.length <= NAME_MAX_LENGTH && !UNPRINTABLE.test(name)
 }
 
 function validSlug(slug: string): boolean {

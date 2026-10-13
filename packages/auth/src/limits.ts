@@ -2,6 +2,7 @@ import type { AuthStore } from './store'
 
 const MINUTE = 60
 const HOUR = 60 * MINUTE
+const DAY = 24 * HOUR
 
 export interface Limit {
   max: number
@@ -31,8 +32,9 @@ export const DEFAULT_LIMITS = {
   // Guesses at an emailed code, on top of the few misses each code takes.
   emailCode: { max: 30, window: 15 * MINUTE },
   emailCodeAccount: { max: 10, window: 15 * MINUTE },
-  // Each invitation mails an inbox someone else owns, so a manager may not flood one.
+  // Each invitation mails an inbox someone else owns, with the organization's name in it: neither one manager nor many may flood one.
   invite: { max: 30, window: HOUR },
+  inviteAddress: { max: 5, window: DAY },
   // An export walks every table the app's onExport reads, so asking for one again and again is not free.
   export: { max: 6, window: HOUR },
   // Guessing a token is hopeless; this keeps trying from being free.
