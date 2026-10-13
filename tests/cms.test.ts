@@ -8,10 +8,11 @@ import { afterEach, describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { t } from 'elysia'
 import { outputDir } from '../src/build/assets'
 import { readClientSources } from '../src/build/client'
-import { collection, collections, entries, entryFile, entrySource, removeEntry, saveEntry } from '../src/content'
+import { collection, collectionInfo, collections, entries, entryFile, entrySource, removeEntry, saveEntry } from '../src/content'
 import { entryIssues, registerCollections, registerEditSite } from '../src/content/edit'
 import { contentPlace, parseEntry, setContentPlace } from '../src/content/load'
 import { MarkdownError } from '../src/content/markdown'
+import * as validate from '../src/content/validate'
 import { ContentError } from '../src/content/validate'
 import { resolveProject } from '../src/project'
 import { cached } from '../src/runtime/cache'
@@ -197,12 +198,36 @@ describe('the collections a CMS edits', () => {
     const articles = found.find(each => each.name === 'articles')!
 
     expect(found.map(each => each.name)).toEqual(['articles', 'news', 'notes', 'pages'])
-    expect(found[1]).toEqual({ name: 'news', kind: 'loaded', schema: expect.objectContaining({ type: 'object', required: ['title', 'published', 'tags'] }), body: { kind: 'markdown' }, components: [], localized: false })
-    expect(found[2]).toEqual({ name: 'notes', kind: 'loaded', schema: expect.objectContaining({ type: 'object' }), components: [], localized: true })
-    expect(articles).toMatchObject({ kind: 'folder', body: { kind: 'markdown' }, components: [], localized: true, dir: 'tests/fixtures/cms/src/content/articles', draftField: 'hidden' })
+    expect(found[1]).toEqual({ name: 'news', kind: 'loaded', schema: expect.objectContaining({ type: 'object', required: ['title', 'published', 'tags'] }), body: { kind: 'markdown' }, components: [], localized: false, count: 2 })
+    expect(found[2]).toEqual({ name: 'notes', kind: 'loaded', schema: expect.objectContaining({ type: 'object' }), components: [], localized: true, count: 2 })
+    expect(articles).toMatchObject({ kind: 'folder', body: { kind: 'markdown' }, components: [], localized: true, dir: 'tests/fixtures/cms/src/content/articles', draftField: 'hidden', count: 2 })
     expect(articles).not.toHaveProperty('repoRoot')
     expect(articles.schema.properties).toMatchObject({ author: { 'type': 'string', 'x-kay': { kind: 'reference', collection: 'news' } }, cover: { 'type': 'string', 'x-kay': { kind: 'image' } } })
     expect(JSON.stringify(articles.schema)).not.toContain('"Date"')
+  })
+
+  it('describes one collection by name, running no other collection\'s loader', async () => {
+    const info = await collectionInfo('articles')
+
+    expect([cms.loads, await collectionInfo('posts')]).toEqual([[], undefined])
+    expect(info).toEqual((await collections()).find(each => each.name === 'articles'))
+  })
+
+  it('reads the entries a filter keeps alone, in their order, a folder no other file', async () => {
+    const read = spyOn(Bun, 'file')
+
+    try {
+      expect(await entries('articles', { slug: 'hello', locale: 'fr' })).toMatchObject([{ slug: 'hello', locale: 'fr', data: { title: 'Bonjour' } }])
+      expect(read.mock.calls.filter(([file]) => String(file).includes('articles'))).toHaveLength(1)
+    }
+    finally {
+      read.mockRestore()
+    }
+
+    expect((await entries('articles', { offset: 1, limit: 1 })).map(entry => entry.locale)).toEqual(['fr'])
+    expect((await entries('news', { offset: 1 })).map(entry => entry.slug)).toEqual(['roadmap'])
+    expect((await entries('notes', { slug: 'hello' })).map(entry => entry.locale)).toEqual(['en', 'fr'])
+    expect(await entries('news', { slug: 'nothing' })).toEqual([])
   })
 
   it('lists entries as their source holds them, drafts included and told apart, one locale\'s when asked', async () => {
@@ -774,6 +799,25 @@ describe('preview mode', () => {
       expect(marked).toStartWith('<title>Rows</title><ul data-kay-list="news:a:rows"><li>Row: <!--kay-field news:a:rows.0-->Row 0<!--/kay-field--></li>')
       expect(marked).toEndWith('<li>Row: <!--kay-field news:a:rows.2999-->Row 2999<!--/kay-field--></li></ul>')
     }, true)
+  })
+
+  it('decodes the drafted entries alone, leaving those every other request shares as they are', async () => {
+    const shared = await articles.get('hello', 'fr')
+    const decoded = spyOn(validate, 'decodeEntries')
+
+    try {
+      const drafts = new Map([[articles.name, [{ slug: 'hello', locale: 'de', data: { title: 'Hallo' } }]]])
+      const drafted = await inPreview(async () => Promise.all([articles.get('hello', 'fr'), articles.get('hello', 'de')]), true, drafts)
+
+      expect(drafted.map(entry => [entry?.data.title, entry?.translations])).toEqual([['Bonjour', ['de', 'en', 'fr']], ['Hallo', ['de', 'en', 'fr']]])
+      expect(decoded.mock.calls.map(([raw]) => raw.map(entry => entry.slug))).toEqual([['de/hello']])
+    }
+    finally {
+      decoded.mockRestore()
+    }
+
+    expect((await articles.get('hello', 'fr'))?.translations).toEqual(shared?.translations)
+    expect(shared?.translations).toEqual(['en', 'fr'])
   })
 
   it('renders a page with the entries an editor has not saved, for a visitor in edit mode alone, refusing a draft its schema refuses', async () => {

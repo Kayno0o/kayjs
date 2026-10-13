@@ -1,4 +1,4 @@
-import type { CollectionInfo, EntryRef, SourceEntry } from './kay/contract'
+import type { CollectionInfo, EntryFilter, EntryRef, SourceEntry } from './kay/contract'
 import { fieldsOf } from './fields'
 
 export interface EntryRow {
@@ -32,10 +32,30 @@ export function searchRows(rows: EntryRow[], search: string): EntryRow[] {
 }
 
 export function pageOf<T>(rows: T[], page: number, size = PAGE_SIZE): { rows: T[], page: number, pages: number } {
-  const pages = Math.max(1, Math.ceil(rows.length / size))
+  const at = pageAt(rows.length, page, size)
+
+  return { rows: rows.slice(at.offset, at.offset + size), page: at.page, pages: at.pages }
+}
+
+// The page asked for, brought within the pages `total` rows fill, and the offset of its first row.
+function pageAt(total: number, page: number, size: number): { page: number, pages: number, offset: number } {
+  const pages = Math.max(1, Math.ceil(total / size))
   const current = Math.min(Math.max(1, Math.trunc(page) || 1), pages)
 
-  return { rows: rows.slice((current - 1) * size, current * size), page: current, pages }
+  return { page: current, pages, offset: (current - 1) * size }
+}
+
+// A page of the collection's rows: a search reads every entry to match their titles, a plain page its own entries alone.
+export async function pageRows(collection: CollectionInfo, search: string, page: number, read: (filter: EntryFilter) => Promise<SourceEntry[]>): Promise<{ rows: EntryRow[], page: number, pages: number }> {
+  if (collection.problem !== undefined)
+    return pageOf([], 1)
+
+  if (search.trim() !== '')
+    return pageOf(searchRows(rowsOf(collection, await read({})), search), page)
+
+  const at = pageAt(collection.count ?? 0, page, PAGE_SIZE)
+
+  return { rows: rowsOf(collection, await read({ offset: at.offset, limit: PAGE_SIZE })), page: at.page, pages: at.pages }
 }
 
 export function collectionPath(prefix: string, collection: string): string {

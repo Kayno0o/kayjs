@@ -18,8 +18,8 @@ import { contentMode, loadEntries } from './load'
 import { compileMarkdown, MarkdownError } from './markdown'
 import { ContentError, decodeEntries } from './validate'
 
-export type { CollectionInfo, DataValue, EntryFile, EntryPath, FieldKind, JsonSchema, SourceEntry, WrittenEntry } from './edit'
-export { collections, entries, entryFile, entrySource, fileField, imageField, markdownField, reference, removeEntry, repositoryRoot, saveEntry } from './edit'
+export type { CollectionInfo, DataValue, EntryFile, EntryFilter, EntryPath, FieldKind, JsonSchema, SourceEntry, WrittenEntry } from './edit'
+export { collectionInfo, collections, entries, entryFile, entrySource, fileField, imageField, markdownField, reference, removeEntry, repositoryRoot, saveEntry } from './edit'
 export type { FeedItem, FeedOptions } from './feed'
 export type { Heading, Highlighter, RenderedMarkdown } from './markdown'
 export { highlightCode, renderMarkdown } from './markdown'
@@ -136,8 +136,10 @@ export function collection<Schema extends TSchema, Components extends Record<str
   const raws = new WeakMap<Entries<Data>, RawEntry[]>()
   const { draft, localized = false } = options
 
-  const decode = (raw: RawEntry[]): Entries<Data> => {
-    const entries = decodeEntries(raw, options.schema, components, localized).map(({ entry, data }) => toEntry<Data>(entry, data as Data, components, localized))
+  const decodeEach = (raw: RawEntry[]) => decodeEntries(raw, options.schema, components, localized).map(({ entry, data }) => toEntry<Data>(entry, data as Data, components, localized))
+
+  // Sorts the entries and maps them by slug and locale, setting each one's translations.
+  const indexed = (entries: Entry<Data>[]): Entries<Data> => {
     const byLocale = new Map<string, Map<string, Entry<Data>>>()
 
     entries.sort(options.sort ?? ((a, b) => a.slug < b.slug ? -1 : a.slug > b.slug ? 1 : a.locale! < b.locale! ? -1 : 1))
@@ -156,7 +158,11 @@ export function collection<Schema extends TSchema, Components extends Record<str
         entry.translations = [...byLocale].filter(([, slugs]) => slugs.has(entry.slug)).map(([locale]) => locale).sort()
     }
 
-    const result = { list: entries, bySlug: new Map(entries.map(entry => [entry.slug, entry])), byLocale }
+    return { list: entries, bySlug: new Map(entries.map(entry => [entry.slug, entry])), byLocale }
+  }
+
+  const decode = (raw: RawEntry[]): Entries<Data> => {
+    const result = indexed(decodeEach(raw))
 
     raws.set(result, raw)
 
@@ -221,21 +227,19 @@ export function collection<Schema extends TSchema, Components extends Record<str
 
     if (!drafted) {
       preview.loads.set(draftKey, drafted = (async () => {
-        const raw = [...raws.get(entries) ?? []]
+        const raw = raws.get(entries) ?? []
+        const written = new Map<string, RawEntry>()
 
         for (const draft of drafts) {
           const slug = localized ? `${draft.locale}/${draft.slug}` : draft.slug
-          const at = raw.findIndex(entry => entry.slug === slug)
-          const entry: RawEntry = { ...raw[at] ?? { file: `${name}/${slug}` }, slug, data: draft.data, lines: {}, ...draft.compiled }
 
-          if (at === -1)
-            raw.push(entry)
-          else
-            raw[at] = entry
+          written.set(slug, { ...raw.find(entry => entry.slug === slug) ?? { file: `${name}/${slug}` }, slug, data: draft.data, lines: {}, ...draft.compiled })
         }
 
-        // Every entry is decoded again, once per draft render: cheap beside the render, and a collection's decoded entries are never shared with one.
-        return decode(raw)
+        // The drafted entries alone are decoded; the others are copied when localized, as indexing sets their translations and the collection's own are shared with every request.
+        const kept = entries.list.filter(entry => !written.has(localized ? `${entry.locale}/${entry.slug}` : entry.slug))
+
+        return indexed([...localized ? kept.map(entry => ({ ...entry })) : kept, ...decodeEach([...written.values()])])
       })())
     }
 

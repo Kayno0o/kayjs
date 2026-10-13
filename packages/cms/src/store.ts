@@ -1,6 +1,6 @@
 import type { Commit } from './files'
 import type { CollectionInfo, DraftEntry, EntryRef, Issue, SourceEntry } from './kay/contract'
-import { collections, entries, entryFile, entrySource, removeEntry, saveEntry as saveLoaded } from './kay/content'
+import { collectionInfo, entries, entryFile, entrySource, removeEntry, saveEntry as saveLoaded } from './kay/content'
 import { settings } from './settings'
 
 export type SaveOutcome = { issues: Issue[] } | { saved: true, commit?: Commit | undefined }
@@ -8,7 +8,7 @@ export type SaveOutcome = { issues: Issue[] } | { saved: true, commit?: Commit |
 export class UnknownCollection extends Error {}
 
 export async function findCollection(name: string): Promise<CollectionInfo | undefined> {
-  return (await collections()).find(collection => collection.name === name)
+  return collectionInfo(name)
 }
 
 export async function collectionNamed(name: string): Promise<CollectionInfo> {
@@ -21,7 +21,7 @@ export async function collectionNamed(name: string): Promise<CollectionInfo> {
 }
 
 export async function entryOf({ collection, slug, locale }: EntryRef): Promise<SourceEntry | undefined> {
-  return (await entries(collection, locale === undefined ? {} : { locale })).find(entry => entry.slug === slug)
+  return (await entries(collection, { slug, locale }))[0]
 }
 
 function refused(ref: EntryRef, message: string, key?: Issue['key']): SaveOutcome {

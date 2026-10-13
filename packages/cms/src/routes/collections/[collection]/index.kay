@@ -7,7 +7,7 @@ import { s } from 'kay'
 import EntryTable from '../../../components/entry-table.kay'
 import { humanize } from '../../../fields'
 import { entries } from '../../../kay/content'
-import { newEntryPath, pageOf, rowsOf, searchRows } from '../../../listing'
+import { newEntryPath, pageRows } from '../../../listing'
 import { settings } from '../../../settings'
 import { findCollection } from '../../../store'
 
@@ -16,7 +16,7 @@ export const page = { query: s.Object({ q: s.Optional(s.String()), page: s.Optio
 const { prefix } = settings()
 const collection = await findCollection(ctx.params.collection) ?? ctx.notFound()
 const search = ctx.query.q ?? ''
-const listed = pageOf(searchRows(rowsOf(collection, collection.problem === undefined ? await entries(collection.name) : []), search), ctx.query.page ?? 1)
+const listed = await pageRows(collection, search, ctx.query.page ?? 1, async filter => entries(collection.name, filter))
 const url = ctx.url
 ---
 head

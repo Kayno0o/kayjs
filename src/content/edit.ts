@@ -56,8 +56,18 @@ export interface CollectionInfo {
   dir?: string | undefined
   // The boolean field `draft: 'field'` names, true for a draft: publishing writes false to it.
   draftField?: string | undefined
+  // How many entries it holds, every locale's; absent when `problem` says why they fail to read.
+  count?: number | undefined
   // Why its entries fail to read, a loader throwing say; `body` is then assumed.
   problem?: string | undefined
+}
+
+// Which entries `entries()` reads: one locale's, those of a slug, a stretch of them in their order; the others are never read.
+export interface EntryFilter {
+  locale?: string | undefined
+  slug?: string | undefined
+  offset?: number | undefined
+  limit?: number | undefined
 }
 
 // An entry as its source holds it, drafts included: a folder's file as written, a loader's entry as it gives it in preview.
@@ -162,43 +172,49 @@ export function markdownField(options?: StringOptions): ReturnType<typeof t.Stri
 export async function collections(): Promise<CollectionInfo[]> {
   const repoRoot = repositoryRoot()
 
-  return Promise.all(registered.map(async ([name, collection]) => {
-    const { draft, localized = false, schema } = collection.options
-    const dir = collection.dir === undefined ? undefined : folderOf(collection.dir)
-    const inRepo = dir === undefined ? undefined : repoPath(repoRoot, dir)
-    const { body, problem } = await bodyHeld(name, collection, dir)
-
-    return {
-      name,
-      kind: dir === undefined ? 'loaded' : 'folder',
-      schema: jsonSchema(schema),
-      ...body && { body: { kind: 'markdown' } },
-      components: Object.keys(collection.components),
-      localized,
-      ...localized && site?.locales && { locales: [...site.locales] },
-      ...inRepo !== undefined && { dir: inRepo },
-      ...typeof draft === 'string' && { draftField: draft },
-      ...problem !== undefined && { problem },
-    }
-  }))
+  return Promise.all(registered.map(async ([name, collection]) => infoOf(name, collection, repoRoot)))
 }
 
-// The entries of the collection exported as `name`, drafts included, as their source holds them now, a loader's loaded afresh as preview mode loads them; one locale's alone when given.
-export async function entries(name: string, options: { locale?: string | undefined } = {}): Promise<SourceEntry[]> {
+// The collection exported as `name`, as a CMS edits it, reading no other; undefined when none is.
+export async function collectionInfo(name: string): Promise<CollectionInfo | undefined> {
+  const found = registered.find(([exported]) => exported === name)?.[1]
+
+  return found && infoOf(name, found, repositoryRoot())
+}
+
+async function infoOf(name: string, collection: Collection<unknown>, repoRoot: string): Promise<CollectionInfo> {
+  const { draft, localized = false, schema } = collection.options
+  const dir = collection.dir === undefined ? undefined : folderOf(collection.dir)
+  const inRepo = dir === undefined ? undefined : repoPath(repoRoot, dir)
+  const { body, count, problem } = await bodyHeld(name, collection, dir)
+
+  return {
+    name,
+    kind: dir === undefined ? 'loaded' : 'folder',
+    schema: jsonSchema(schema),
+    ...body && { body: { kind: 'markdown' } },
+    components: Object.keys(collection.components),
+    localized,
+    ...localized && site?.locales && { locales: [...site.locales] },
+    ...inRepo !== undefined && { dir: inRepo },
+    ...typeof draft === 'string' && { draftField: draft },
+    ...count !== undefined && { count },
+    ...problem !== undefined && { problem },
+  }
+}
+
+// The entries of the collection exported as `name`, drafts included, as their source holds them now, a loader's loaded afresh as preview mode loads them; those the filter keeps alone, a folder reading no other file.
+export async function entries(name: string, filter: EntryFilter = {}): Promise<SourceEntry[]> {
   const collection = collectionNamed(name)
   const { localized = false } = collection.options
 
-  if (options.locale !== undefined && !localized)
-    throw new Error(`kay: entries() was asked for the ${options.locale} entries of ${name}, which is not localized`)
+  if (filter.locale !== undefined && !localized)
+    throw new Error(`kay: entries() was asked for the ${filter.locale} entries of ${name}, which is not localized`)
 
-  const found = collection.dir === undefined ? await loadedEntries(name, collection) : await folderEntries(name, folderOf(collection.dir))
-  const placed = found.map(({ slug, ...entry }) => {
-    const split = localized ? slug.indexOf('/') : -1
+  const found = collection.dir === undefined ? kept(await loadedEntries(name, collection), localized, filter) : await folderEntries(name, folderOf(collection.dir), localized, filter)
+  const placed = found.map(({ slug, ...entry }) => ({ ...placeOf(slug, localized), ...entry }))
 
-    return split === -1 ? { slug, ...entry } : { slug: slug.slice(split + 1), locale: slug.slice(0, split), ...entry }
-  })
-
-  return Promise.all(placed.filter(entry => options.locale === undefined || entry.locale === options.locale).map(async (entry) => {
+  return Promise.all(placed.map(async (entry) => {
     const decoded = entry.problem === undefined ? decodedData(collection, entry) : undefined
     const { url: urlOf } = collection.options
     // The collection's `url` reads the data as the schema decodes it, so an entry the schema refuses takes the route's page.
@@ -473,12 +489,14 @@ async function folderFiles(name: string, dir: string): Promise<string[]> {
   return entryFiles(dir)
 }
 
-async function folderEntries(name: string, dir: string): Promise<Omit<SourceEntry, 'draft'>[]> {
+// The entries of the folder's files the filter keeps, reading those alone.
+async function folderEntries(name: string, dir: string, localized: boolean, filter: EntryFilter): Promise<Omit<SourceEntry, 'draft'>[]> {
   const repoRoot = repositoryRoot()
+  const files = kept((await folderFiles(name, dir)).map(file => ({ slug: slugOf(file), file })), localized, filter)
 
-  return Promise.all((await folderFiles(name, dir)).map(async (file) => {
+  return Promise.all(files.map(async ({ slug, file }) => {
     const path = repoPath(repoRoot, join(dir, file))
-    const at = { slug: slugOf(file), ...path !== undefined && { path } }
+    const at = { slug, ...path !== undefined && { path } }
 
     return { ...at, ...await readEntry(dir, file) }
   }))
@@ -544,10 +562,10 @@ function valueKind(value: unknown): string {
   return Array.isArray(value) ? 'a list' : `a ${typeof value}`
 }
 
-// Whether a collection's entries hold a Markdown body, or why they fail to read, one then assumed.
-async function bodyHeld(name: string, collection: Collection<unknown>, dir: string | undefined): Promise<{ body: boolean, problem?: string }> {
+// Whether a collection's entries hold a Markdown body and how many there are, or why they fail to read, a body then assumed.
+async function bodyHeld(name: string, collection: Collection<unknown>, dir: string | undefined): Promise<{ body: boolean, count?: number, problem?: string }> {
   try {
-    return { body: await holdsBody(name, collection, dir) }
+    return await holdsBody(name, collection, dir)
   }
   catch (error) {
     return { body: true, problem: error instanceof Error ? error.message : String(error) }
@@ -555,16 +573,37 @@ async function bodyHeld(name: string, collection: Collection<unknown>, dir: stri
 }
 
 // Whether a collection's entries hold a Markdown body: a folder's in Markdown files, a loader's as `body` rather than `html`; one with no entry yet, or a folder missing, as beside a build alone, may.
-async function holdsBody(name: string, collection: Collection<unknown>, dir: string | undefined): Promise<boolean> {
+// A folder's files are listed, never read.
+async function holdsBody(name: string, collection: Collection<unknown>, dir: string | undefined): Promise<{ body: boolean, count: number }> {
   if (dir !== undefined) {
     const files = existsSync(dir) ? await entryFiles(dir) : []
 
-    return files.length === 0 || files.some(file => MARKDOWN.test(file))
+    return { body: files.length === 0 || files.some(file => MARKDOWN.test(file)), count: files.length }
   }
 
   const loaded = await loadedEntries(name, collection)
 
-  return loaded.length === 0 || loaded.some(entry => entry.body !== undefined)
+  return { body: loaded.length === 0 || loaded.some(entry => entry.body !== undefined), count: loaded.length }
+}
+
+// A slug as a folder or a loader gives it, its locale first in a localized collection.
+function placeOf(place: string, localized: boolean): { slug: string, locale?: string } {
+  const split = localized ? place.indexOf('/') : -1
+
+  return split === -1 ? { slug: place } : { slug: place.slice(split + 1), locale: place.slice(0, split) }
+}
+
+// The items the filter keeps, each named by its slug as a folder or a loader gives it, in their order.
+function kept<Item extends { slug: string }>(items: Item[], localized: boolean, { locale, slug, offset = 0, limit }: EntryFilter): Item[] {
+  const matching = locale === undefined && slug === undefined
+    ? items
+    : items.filter((item) => {
+      const place = placeOf(item.slug, localized)
+
+      return (locale === undefined || place.locale === locale) && (slug === undefined || place.slug === slug)
+    })
+
+  return matching.slice(offset, limit === undefined ? undefined : offset + limit)
 }
 
 // The entry's data as the schema decodes it, or undefined when the schema refuses it.

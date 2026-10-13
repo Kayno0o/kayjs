@@ -64,7 +64,7 @@ Types include `Component`, `Signal`, `Guard`, `Duration`, `PageContext`, `Endpoi
 
 | Entry | Exports |
 | --- | --- |
-| `kay/content` | `collection`, `paginate`, `renderMarkdown`, `highlightCode`; for a CMS, `collections`, `entries`, `entrySource`, `entryFile`, `saveEntry`, `removeEntry`, `repositoryRoot`, `reference`, `imageField`, `fileField`, `markdownField`. See [Content](/guides/content) |
+| `kay/content` | `collection`, `paginate`, `renderMarkdown`, `highlightCode`; for a CMS, `collections`, `collectionInfo`, `entries`, `entrySource`, `entryFile`, `saveEntry`, `removeEntry`, `repositoryRoot`, `reference`, `imageField`, `fileField`, `markdownField`. See [Content](/guides/content) |
 | `kay/edit` | `showDraft`, which shows the page with an editor's unsaved entries in edit mode, and the `EditorProps` an extension's `editor` is given. See [Content](/guides/content) |
 | `kay/markdown` | `markdownHtml`, sanitized Markdown on the server and in an island. See [Content](/guides/content#markdown-in-an-island) |
 | `kay/seo` | `siteUrl`, `siteOrigin`, `jsonLd`, `breadcrumbList`. See [Head and SEO](/essentials/head-and-seo) |

@@ -4,23 +4,23 @@ import CardRow from '@kaynooo/kayjs-ui/card-row.kay'
 import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
 import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
 import { humanize } from '../fields'
-import { collections, entries } from '../kay/content'
+import { collections } from '../kay/content'
 import { collectionPath } from '../listing'
 import { settings } from '../settings'
 
 const { prefix } = settings()
-const listed = await Promise.all((await collections()).map(async collection => ({ collection, count: collection.problem === undefined ? (await entries(collection.name)).length : 0 })))
+const listed = await collections()
 ---
 head
   title Content
 PageSection(title="Content")
-  for item of listed key={item.collection.name}
+  for collection of listed key={collection.name}
     CardRow
       @right
-        if item.collection.problem as problem
+        if collection.problem as problem
           Badge(tone="danger" label="Cannot be read" data-tooltip={problem})
         else
-          span {item.count === 1 ? '1 entry' : `${item.count} entries`}
-      a(href={collectionPath(prefix, item.collection.name)}) {humanize(item.collection.name)}
+          span {collection.count === 1 ? '1 entry' : `${collection.count ?? 0} entries`}
+      a(href={collectionPath(prefix, collection.name)}) {humanize(collection.name)}
   else
     EmptyState(title="No collections" description="This site declares no content collection in its content config.")

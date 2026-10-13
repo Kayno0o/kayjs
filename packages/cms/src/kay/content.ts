@@ -1,1 +1,1 @@
-export { collections, entries, entryFile, entrySource, removeEntry, saveEntry } from 'kay/content'
+export { collectionInfo, collections, entries, entryFile, entrySource, removeEntry, saveEntry } from 'kay/content'

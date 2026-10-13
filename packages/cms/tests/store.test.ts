@@ -19,7 +19,8 @@ let stored: Record<string, SourceEntry[]>
 // kay's content API, answering from `stored` and recording what a loader was handed.
 const content: typeof Content = {
   collections: async () => [posts, products, outside],
-  entries: async collection => stored[collection] ?? [],
+  collectionInfo: async name => [posts, products, outside].find(collection => collection.name === name),
+  entries: async (collection, filter) => (stored[collection] ?? []).filter(entry => filter?.slug === undefined || entry.slug === filter.slug),
   entrySource: async (collection, slug, data, options) => options?.create && stored[collection]?.some(entry => entry.slug === slug)
     ? { issues: [{ collection, slug, path: '', key: 'slug', message: TAKEN }] }
     : (data as Record<string, unknown>).title === ''
