@@ -10,6 +10,7 @@ import { brotliDecompressSync, constants } from 'node:zlib'
 import { describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { parse, stringify } from 'devalue'
 import { Elysia, t } from 'elysia'
+import { sucrose } from 'elysia/sucrose'
 import { version } from '../package.json'
 import { outputDir } from '../src/build/assets'
 import { check } from '../src/check'
@@ -346,6 +347,19 @@ describe('action protection', () => {
   const CONTACT = './fixtures/production/src/routes/contact.kay'
   const ENQUIRY = './fixtures/production/src/routes/enquiry.kay'
   const QUOTE = './fixtures/production/src/routes/quote.kay'
+
+  it('leaves Elysia parsing no cookie, query or header on a page, action or API route that reads none', async () => {
+    const app = await pages({ routes: `${FIXTURE}/src/routes`, api: `${FIXTURE}/src/api`, prebuilt: false, security: false })
+    const routes = (app as unknown as { routes: { method: string, path: string, handler: unknown, hooks: object }[] }).routes
+    const parsing = routes.filter(route => route.method !== 'WS').filter((route) => {
+      const inferred = sucrose({ handler: route.handler, ...route.hooks } as never)
+
+      return inferred.cookie || inferred.query || inferred.headers
+    })
+
+    expect(routes.map(route => route.path)).toEqual(expect.arrayContaining(['/contact', expect.stringMatching(/^\/_kay\/action\//), expect.stringMatching(/^\/api\//)]))
+    expect(parsing.map(route => `${route.method} ${route.path}`)).toEqual([])
+  })
 
   it('refuses a form whose honeypot is filled in, with a message on the field, the handler never running', async () => {
     const site = await testSite({ routes: `${FIXTURE}/src/routes`, security: false })

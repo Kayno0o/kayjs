@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
+import { sucrose } from 'elysia/sucrose'
 import { pages } from '../src/server'
 import { claimEndpoints, exportedEndpoints } from '../src/server/endpoints'
 import { claimPublic } from '../src/server/public'
@@ -37,6 +38,13 @@ describe('endpoint files', () => {
   it('serve what their GET returns at their path, a string typed by its extension', async () => {
     expect(await get('/llms.txt')).toMatchObject({ status: 200, type: 'text/plain;charset=utf-8', body: '# Site\n\nServed at /llms.txt\n' })
     expect((await get('/format')).status).toBe(404)
+  })
+
+  it('leave Elysia parsing no cookie, query or header for them', () => {
+    const route = (app as unknown as { routes: { path: string, handler: unknown, hooks: object }[] }).routes.find(route => route.path === '/llms.txt')!
+    const inferred = sucrose({ handler: route.handler, ...route.hooks } as never)
+
+    expect([inferred.cookie, inferred.query, inferred.headers]).toEqual([false, false, false])
   })
 
   it('take their last param before its extension, a Response going out as it is and a Blob typed by the extension', async () => {

@@ -204,7 +204,7 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
         // A route of the module's own answering OPTIONS, `.all()` included, leaves a browser's preflight to kay.
         .onBeforeHandle(({ request }) => cors && request.method === 'OPTIONS' && request.headers.has('access-control-request-method') ? preflight(cors, methods, request) : undefined)
         // The guards are kay's call, so what they log carries the request; the handler runs in Elysia's.
-        .onBeforeHandle(async context => answeringRequest(context.request, async () => inLocale(context.request, options, async () => admit(guards, context, options, cors))))
+        .onBeforeHandle(async context => answeringRequest(context.request, async () => inLocale(context.request, options, async () => admit(guards, { ...context }, options, cors))))
         .mapResponse(({ responseValue, set }) => withBigints(sendable(responseValue), set))
         .onError(({ request, error, set }) => {
           const span = spans.get(request)

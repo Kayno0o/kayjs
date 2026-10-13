@@ -54,7 +54,7 @@ export async function serveEndpoints(app: Elysia, endpoints: Endpoint[], options
 
       const params = Object.fromEntries(endpoint.params.map((name, index) => [name, index === values.length - 1 && endpoint.suffix !== undefined ? last.slice(0, -endpoint.suffix.length) : values[index]!]))
 
-      return answeringRequest(context.request, async () => answer(endpoint, context, params, options))
+      return answeringRequest(context.request, async () => answer(endpoint, { ...context }, params, options))
     })
   }
 }

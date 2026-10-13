@@ -211,7 +211,9 @@ export function servePageRoutes(app: Elysia, { table, served: claims, matchers, 
     if (served.size === 0)
       continue
 
-    app.get(path, async (context) => {
+    // A copy of the context, the app's derived values kept for `ctx.locals`: Elysia's Sucrose reads a handler passing its whole context to a function, `context,` or `context)`, as using all of it, so it would parse the cookies, query and body of every page request.
+    app.get(path, async (given) => {
+      const context = { ...given }
       const url = new URL(context.request.url)
       // On a host, the path is served in the host's locale, or not at all when only another locale's translation names it.
       const locale = settings?.hosts ? hostLocale(settings, context.request) : served.keys().next().value
@@ -251,7 +253,8 @@ export function servePageRoutes(app: Elysia, { table, served: claims, matchers, 
   if (!(fallback.notFound ?? fallback.error))
     return
 
-  app.get('/*', async (context) => {
+  app.get('/*', async (given) => {
+    const context = { ...given }
     const url = new URL(context.request.url)
 
     if (!i18n || !settings)
