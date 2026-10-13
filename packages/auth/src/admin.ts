@@ -7,6 +7,7 @@ import { banned, publicUser } from './core'
 import { revokeBearerTokens } from './email'
 import { auditEntries, report } from './events'
 import { notify } from './notify'
+import { provedLately } from './twoFactor'
 
 const USER_PAGE_MAX = 200
 const BAN_REASON_MAX_LENGTH = 500
@@ -18,14 +19,19 @@ export interface ManagedUser extends User {
   ban: { at: Date, until: Date | null, reason: string | null } | null
 }
 
-// `forbidden` when the user asking does not meet the `admin` option, or acts as someone else.
+// `forbidden` when the user asking does not meet the `admin` option, acts as someone else or came with a bearer token.
 export type AdminFailure = 'forbidden' | 'not-found'
 
-export type RoleResult = { ok: true, user: ManagedUser } | { ok: false, error: AdminFailure | 'unknown-role' | 'self' }
+// `stale` when the admin's session neither signed in nor re-proved in the last ten minutes.
+export type AdminChangeFailure = AdminFailure | 'stale'
 
-export type BanResult = { ok: true, user: ManagedUser } | { ok: false, error: AdminFailure | 'self' | 'admin' | 'until' }
+export type RoleResult = { ok: true, user: ManagedUser } | { ok: false, error: AdminChangeFailure | 'unknown-role' | 'self' }
 
-export type DeleteResult = { ok: true } | { ok: false, error: AdminFailure | 'self' | 'admin' }
+export type BanResult = { ok: true, user: ManagedUser } | { ok: false, error: AdminChangeFailure | 'self' | 'admin' | 'until' }
+
+export type UnbanResult = { ok: true, user: ManagedUser } | { ok: false, error: AdminChangeFailure }
+
+export type DeleteResult = { ok: true } | { ok: false, error: AdminChangeFailure | 'self' | 'admin' }
 
 export function managedUser(record: UserRecord): ManagedUser {
   return {
@@ -35,14 +41,24 @@ export function managedUser(record: UserRecord): ManagedUser {
   }
 }
 
-// The user asking, when they meet the `admin` option as themselves.
+// The user asking, when they meet the `admin` option as themselves, signed in on this session: a bearer token, however scoped, manages no one.
 export async function actingAdmin(state: RequestState): Promise<UserRecord | null> {
   const record = await state.current()
 
-  if (!record || (await state.session.get('auth'))?.impersonator)
+  if (!record || state.via() !== 'session' || (await state.session.get('auth'))?.impersonator)
     return null
 
   return await isAdmin(state, record) ? record : null
+}
+
+// The admin changing a user, who must have signed in or re-proved lately, so a session left open or stolen grants, bans and deletes no one.
+async function changingAdmin(state: RequestState): Promise<{ ok: true, actor: UserRecord } | { ok: false, error: 'forbidden' | 'stale' }> {
+  const actor = await actingAdmin(state)
+
+  if (!actor)
+    return { ok: false, error: 'forbidden' }
+
+  return await provedLately(state) ? { ok: true, actor } : { ok: false, error: 'stale' }
 }
 
 export async function isAdmin(state: RequestState, record: UserRecord): Promise<boolean> {
@@ -93,10 +109,12 @@ export async function getUser(state: RequestState, userId: string): Promise<{ ok
 
 // Takes effect on the user's next request, roles being read with the user each time.
 export async function changeRole(state: RequestState, userId: string, role: string, granted: boolean): Promise<RoleResult> {
-  const actor = await actingAdmin(state)
+  const acting = await changingAdmin(state)
 
-  if (!actor)
-    return { ok: false, error: 'forbidden' }
+  if (!acting.ok)
+    return acting
+
+  const { actor } = acting
 
   if (state.core.roles && !state.core.roles.has(role))
     return { ok: false, error: 'unknown-role' }
@@ -123,10 +141,12 @@ export async function changeRole(state: RequestState, userId: string, role: stri
 
 // Bars the user from signing in, for good or `until` then, and signs them out everywhere, devices included. Another admin is refused: revoke their role first.
 export async function banUser(state: RequestState, userId: string, options: { reason?: string | undefined, until?: Date | undefined }): Promise<BanResult> {
-  const actor = await actingAdmin(state)
+  const acting = await changingAdmin(state)
 
-  if (!actor)
-    return { ok: false, error: 'forbidden' }
+  if (!acting.ok)
+    return acting
+
+  const { actor } = acting
 
   if (options.until !== undefined && !(options.until.getTime() > Date.now()))
     return { ok: false, error: 'until' }
@@ -152,11 +172,13 @@ export async function banUser(state: RequestState, userId: string, options: { re
   return { ok: true, user: managedUser(updated) }
 }
 
-export async function unbanUser(state: RequestState, userId: string): Promise<{ ok: true, user: ManagedUser } | { ok: false, error: AdminFailure }> {
-  const actor = await actingAdmin(state)
+export async function unbanUser(state: RequestState, userId: string): Promise<UnbanResult> {
+  const acting = await changingAdmin(state)
 
-  if (!actor)
-    return { ok: false, error: 'forbidden' }
+  if (!acting.ok)
+    return acting
+
+  const { actor } = acting
 
   const record = await state.core.store.users.get(userId)
 
@@ -176,10 +198,12 @@ export async function unbanUser(state: RequestState, userId: string): Promise<{ 
 
 // Deletes the user with everything kayjs-auth keeps for them, calls `onDelete` and mails them the account-deleted notice. Another admin is refused: revoke their role first.
 export async function deleteUser(state: RequestState, userId: string): Promise<DeleteResult> {
-  const actor = await actingAdmin(state)
+  const acting = await changingAdmin(state)
 
-  if (!actor)
-    return { ok: false, error: 'forbidden' }
+  if (!acting.ok)
+    return acting
+
+  const { actor } = acting
 
   const record = await state.core.store.users.get(userId)
 

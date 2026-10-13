@@ -60,6 +60,39 @@ describe('admin', () => {
     expect(await ada.browser.call('adminAuditLog')).toEqual({ ok: false, error: 'forbidden' })
   })
 
+  test('an admin\'s bearer token manages no one, whatever it may do elsewhere', async () => {
+    const { admin, ada, browser } = await setup()
+    const { token } = await admin.browser.call('createToken', { password: PASSWORD }, 'CLI')
+    const withToken = (method: string, ...args: unknown[]) => browser().json(`/call/${method}`, {
+      method: 'POST',
+      headers: { 'authorization': `Bearer ${token}`, 'content-type': 'application/json' },
+      body: JSON.stringify(args),
+    })
+
+    expect(await withToken('listUsers')).toEqual({ ok: false, error: 'forbidden' })
+    expect(await withToken('getUser', ada.id)).toEqual({ ok: false, error: 'forbidden' })
+    expect(await withToken('grantRole', ada.id, 'admin')).toEqual({ ok: false, error: 'forbidden' })
+    expect(await withToken('banUser', ada.id)).toEqual({ ok: false, error: 'forbidden' })
+    expect(await withToken('deleteUser', ada.id)).toEqual({ ok: false, error: 'forbidden' })
+    expect(await withToken('adminAuditLog')).toEqual({ ok: false, error: 'forbidden' })
+  })
+
+  test('an admin changes users only within ten minutes of signing in or re-proving, and reads them any time', async () => {
+    const { admin, ada } = await setup()
+
+    setSystemTime(new Date(Date.now() + 11 * 60_000))
+
+    expect(await admin.browser.call('grantRole', ada.id, 'admin')).toEqual({ ok: false, error: 'stale' })
+    expect(await admin.browser.call('revokeRole', ada.id, 'admin')).toEqual({ ok: false, error: 'stale' })
+    expect(await admin.browser.call('banUser', ada.id)).toEqual({ ok: false, error: 'stale' })
+    expect(await admin.browser.call('unbanUser', ada.id)).toEqual({ ok: false, error: 'stale' })
+    expect(await admin.browser.call('deleteUser', ada.id)).toEqual({ ok: false, error: 'stale' })
+    expect(await admin.browser.call('getUser', ada.id)).toMatchObject({ ok: true })
+
+    expect(await admin.browser.call('reprove', { password: PASSWORD })).toEqual({ ok: true })
+    expect(await admin.browser.call('banUser', ada.id)).toMatchObject({ ok: true })
+  })
+
   test('users list newest first, a page at a time, searched', async () => {
     const { admin, member } = await setup()
 

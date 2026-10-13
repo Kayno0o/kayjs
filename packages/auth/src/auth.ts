@@ -3,7 +3,7 @@ import type { DefinitionBase, EphemeralType, MetadataBase, RouteBase, SingletonB
 import type { Guard } from 'kay'
 import type { KayConfig, Session } from 'kay/server'
 import type { ChangeUsernameResult } from './account'
-import type { AdminFailure, BanResult, DeleteResult, ManagedUser, RoleResult } from './admin'
+import type { AdminFailure, BanResult, DeleteResult, ManagedUser, RoleResult, UnbanResult } from './admin'
 import type { BearerToken, CreateTokenResult, IssueTokenResult, TokenOptions } from './bearer'
 import type { CaptchaAction, CaptchaOptions } from './captcha'
 import type { AuthSessionData, Core, OAuthApp, Profile, SignedIn, User } from './core'
@@ -570,7 +570,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     return banUser(this[STATE], userId, options)
   }
 
-  async unbanUser(userId: string): Promise<{ ok: true, user: ManagedUser } | { ok: false, error: AdminFailure }> {
+  async unbanUser(userId: string): Promise<UnbanResult> {
     return unbanUser(this[STATE], userId)
   }
 
@@ -589,7 +589,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     const actor = await actingAdmin(this[STATE])
     const own = await this.session.get('auth')
 
-    if (!actor || this.source !== 'session' || !own)
+    if (!actor || !own)
       return { ok: false, error: 'forbidden' }
 
     const record = await this.core.store.users.get(userId)
