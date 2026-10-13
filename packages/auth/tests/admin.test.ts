@@ -208,9 +208,30 @@ describe('admin', () => {
     expect(await ada.browser.json('/me')).toBe('anonymous')
     expect(await browser().post('/password', { identifier: 'ada@example.com', password: PASSWORD })).toEqual({ ok: false, error: 'invalid' })
 
-    const log = await admin.browser.call('adminAuditLog', { userId: ada.id })
+    // The entry stays, under a name that no longer leads to the user.
+    const log = await admin.browser.call('adminAuditLog', {})
+    const entry = log.entries.find((found: { event: string }) => found.event === 'account-deleted')
 
-    expect(log.entries.find((entry: { event: string }) => entry.event === 'account-deleted')?.actorId).toBe(admin.id)
+    expect(entry).toMatchObject({ actorId: admin.id })
+    expect(entry.userId).not.toBe(ada.id)
+    expect((await admin.browser.call('adminAuditLog', { userId: ada.id })).entries).toEqual([])
+  })
+
+  test('a deleted admin is no longer named in what they did to others', async () => {
+    const { admin, ada, member, store } = await setup({ audit: true })
+
+    // Another admin, so this one is not the last.
+    await member('grace@example.com', ['admin'])
+
+    await admin.browser.call('grantRole', ada.id, 'editor')
+
+    expect(await admin.browser.call('deleteAccount', { password: PASSWORD })).toEqual({ ok: true })
+
+    const granted = (await store.audit!.list({ userId: ada.id, limit: 10 })).find(entry => entry.event === 'role-granted')!
+
+    expect(granted).toMatchObject({ userId: ada.id, detail: 'editor', ip: '', userAgent: '' })
+    expect(granted.actorId).not.toBe(admin.id)
+    expect(granted.actorId).not.toBeNull()
   })
 
   test('impersonating signs the admin in as the user with no proof to give, and stopping signs them back in as themselves', async () => {

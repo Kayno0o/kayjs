@@ -7,6 +7,7 @@ import { newPasswordProblem } from './breached'
 import { admit } from './captcha'
 import { newUserRecord, publicUser } from './core'
 import { warnHolder, welcome } from './email'
+import { erase } from './erase'
 import { report } from './events'
 import { randomToken } from './keys'
 import { spend } from './limits'
@@ -93,10 +94,8 @@ export async function register(state: RequestState, input: RegisterInput): Promi
   if (holder && !unclaimed)
     return await answerHeld(state, holder, input.password)
 
-  if (holder) {
-    await store.users.delete(holder.id)
-    await state.core.onDelete?.(publicUser(holder))
-  }
+  if (holder)
+    await erase(state, holder)
 
   const current = await state.current()
   const guest = current?.guest && state.via() === 'session' ? current : undefined

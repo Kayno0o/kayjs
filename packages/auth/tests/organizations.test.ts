@@ -257,6 +257,18 @@ describe('organizations', () => {
     expect(await store.members!.listByOrganization(org)).toHaveLength(1)
   })
 
+  test('deleting a user takes the invitations to their address', async () => {
+    const { ada, org, person, store } = await setup()
+    const grace = await person('grace@example.com')
+
+    await ada.browser.call('invite', org, 'grace@example.com')
+    await ada.browser.call('invite', org, 'alan@example.com')
+
+    expect(await grace.browser.call('deleteAccount', { password: PASSWORD })).toEqual({ ok: true })
+    expect(await store.invitations!.listByEmail('grace@example.com')).toEqual([])
+    expect(await store.invitations!.listByEmail('alan@example.com')).toHaveLength(1)
+  })
+
   test('a gate and a guard let through members holding the role in the organization the route names, and a guard without params refuses', async () => {
     const { ada, org, person, join, site } = await setup()
     const grace = await person('grace@example.com')

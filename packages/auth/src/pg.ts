@@ -239,6 +239,10 @@ export function pgStore(db: Database): AuthStore {
       async prune(before) {
         await audit.write.deleteMany({ at: { lt: before } })
       },
+      async forget(userId, pseudonym) {
+        await audit.write.updateMany({ user_id: pseudonym, detail: null, ip: '', user_agent: '' }, { user_id: userId }, { pk: true })
+        await audit.write.updateMany({ actor_id: pseudonym, ip: '', user_agent: '' }, { actor_id: userId }, { pk: true })
+      },
     },
     organizations: {
       async create(organization) {

@@ -7,6 +7,7 @@ import { hashPassword } from '@kaynooo/utils'
 import { lastAdmin } from './admin'
 import { newPasswordProblem } from './breached'
 import { publicUser } from './core'
+import { erase } from './erase'
 import { notify } from './notify'
 import { normalizeUsername, usernameProblem } from './rules'
 import { endOtherSessions } from './sessions'
@@ -120,9 +121,7 @@ export async function deleteAccount(state: RequestState, proof: Proof, signOut: 
   if (!proved.ok)
     return proved
 
-  await notify(state, proved.record, 'account-deleted')
-  await state.core.store.users.delete(proved.record.id)
-  await state.core.onDelete?.(publicUser(proved.record))
+  await erase(state, proved.record, {})
   await signOut()
 
   return { ok: true }

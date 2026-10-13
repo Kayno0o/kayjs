@@ -70,7 +70,7 @@ export interface SessionRecord {
   maxAge: number | null
 }
 
-// A line of the audit log, kept past its user's deletion so the log still tells what happened.
+// A line of the audit log, kept past its user's deletion so the log still tells what happened, under a name that no longer leads to them.
 export interface AuditRecord {
   id: string
   userId: string
@@ -212,6 +212,8 @@ export interface AuthStore {
     list: (query: { userId?: string, before?: Date, limit: number }) => MaybePromise<AuditRecord[]>
     // Deletes the entries older than `before`.
     prune: (before: Date) => MaybePromise<void>
+    // Strips a deleted user from the log: `userId` becomes `pseudonym` in their entries, which lose their address, browser and detail, and in the entries they acted in, which lose their address and browser.
+    forget: (userId: string, pseudonym: string) => MaybePromise<void>
   }
   // Needed only with the `organizations` option, as are `members` and `invitations`.
   organizations?: {

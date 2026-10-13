@@ -227,6 +227,14 @@ export function memoryStore(): AuthStore {
       prune(before) {
         audit = audit.filter(entry => entry.at >= before)
       },
+      forget(userId, pseudonym) {
+        audit = audit.map((entry) => {
+          if (entry.userId === userId)
+            return { ...entry, userId: pseudonym, detail: null, ip: '', userAgent: '' }
+
+          return entry.actorId === userId ? { ...entry, actorId: pseudonym, ip: '', userAgent: '' } : entry
+        })
+      },
     },
     bearerTokens: {
       create(token) {

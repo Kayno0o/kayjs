@@ -210,6 +210,22 @@ export function storeContract(name: string, fresh: () => Promise<AuthStore>) {
       expect((await store.audit!.list({ limit: 10 })).map(found => found.id)).toEqual(['a3', 'a2'])
     })
 
+    test('the audit log forgets a user, in their entries and in those they acted in', async () => {
+      const entry = (id: string, userId: string, actorId: string | null) => ({ id, userId, event: 'role-granted', detail: 'editor', ip: '10.0.0.1', userAgent: 'Firefox', actorId, at: new Date('2026-01-01T00:00:00Z') })
+
+      await store.audit!.add(entry('a1', 'u1', null))
+      await store.audit!.add(entry('a2', 'u2', 'u1'))
+      await store.audit!.add(entry('a3', 'u2', null))
+      await store.audit!.forget('u1', 'gone')
+
+      expect(await store.audit!.list({ userId: 'u1', limit: 10 })).toEqual([])
+      expect((await store.audit!.list({ userId: 'gone', limit: 10 })).map(({ id, detail, ip, userAgent, actorId }) => ({ id, detail, ip, userAgent, actorId }))).toEqual([{ id: 'a1', detail: null, ip: '', userAgent: '', actorId: null }])
+      expect((await store.audit!.list({ userId: 'u2', limit: 10 })).map(({ id, detail, ip, userAgent, actorId }) => ({ id, detail, ip, userAgent, actorId })).sort((a, b) => a.id.localeCompare(b.id))).toEqual([
+        { id: 'a2', detail: 'editor', ip: '', userAgent: '', actorId: 'gone' },
+        { id: 'a3', detail: 'editor', ip: '10.0.0.1', userAgent: 'Firefox', actorId: null },
+      ])
+    })
+
     test('deleting a user takes everything kept for them', async () => {
       await store.users.create(userRecord({ id: 'u1', email: 'ada@example.com' }))
       await store.identities.create(identity('discord', '1', 'u1'))

@@ -195,6 +195,43 @@ describe('deleting the account', () => {
     expect(await browser().post('/password', { identifier: 'ada@example.com', password: PASSWORD })).toEqual({ ok: false, error: 'invalid' })
   })
 
+  test('an onDelete that throws leaves the account in place, to delete again', async () => {
+    let fail = true
+    const { ada, store } = await registered({
+      onDelete: () => {
+        if (fail)
+          throw new Error('app down')
+      },
+    })
+
+    expect((await ada.fetch('/call/deleteAccount', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify([{ password: PASSWORD }]) })).status).toBe(500)
+    expect(await store.users.findByEmail('ada@example.com')).toBeDefined()
+    expect(await ada.json('/me')).toMatchObject({ email: 'ada@example.com' })
+
+    fail = false
+
+    expect(await ada.call('deleteAccount', { password: PASSWORD })).toEqual({ ok: true })
+    expect(await store.users.findByEmail('ada@example.com')).toBeUndefined()
+  })
+
+  test('keeps what happened in the audit log, but nothing that leads back to the user', async () => {
+    const { ada, browser, store } = await registered({ audit: true })
+    const id = (await store.users.findByEmail('ada@example.com'))!.id
+
+    await ada.call('changeEmail', { password: PASSWORD }, 'ada@new.example')
+    await browser().post('/password', { identifier: 'ada@example.com', password: 'wrong password!' })
+
+    expect(await ada.call('deleteAccount', { password: PASSWORD })).toEqual({ ok: true })
+
+    const entries = await store.audit!.list({ limit: 100 })
+    const pseudonym = entries[0]!.userId
+
+    expect(entries.map(entry => entry.event)).toContain('account-deleted')
+    expect(entries.map(entry => entry.event)).toContain('sign-in-failed')
+    expect(pseudonym).not.toBe(id)
+    expect(entries.every(entry => entry.userId === pseudonym && entry.ip === '' && entry.userAgent === '' && entry.detail === null)).toBe(true)
+  })
+
   test('refuses the last admin before spending the proof, and lets them go once another admin exists', async () => {
     const { ada, browser, store } = await registered({ admin: 'admin' })
     const adaRecord = (await store.users.findByEmail('ada@example.com'))!
