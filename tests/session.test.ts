@@ -1,9 +1,11 @@
 import type { Action } from '../src/runtime'
 import type { SessionStore } from '../src/server'
 import { afterEach, describe, expect, it, setSystemTime } from 'bun:test'
+import { stringify } from 'devalue'
 import { Elysia } from 'elysia'
-import { setSite } from '../src/runtime/site'
+import { configuredSite, setSite } from '../src/runtime/site'
 import { memoryStore, pages, session, sqliteStore } from '../src/server'
+import { seal } from '../src/server/session'
 
 const SECRET = 'a test secret that is long enough to seal'
 const COOKIE_VALUE = /^session=([^;]*)/
@@ -214,21 +216,65 @@ describe('sessions', () => {
     expect((await counter({ domain: 'example.com' }).handle(new Request('http://localhost/count', { headers: https }))).headers.getSetCookie()[0]).toMatch(/^session=.*; Domain=example\.com; .*Secure/i)
   })
 
-  it('marks the cookie Secure in production when the configured site is https, whatever the proxy says', async () => {
+  it('in production with an https site, takes a request without X-Forwarded-Proto as https, one with it as it says', async () => {
     const env = process.env.NODE_ENV ?? 'test'
+    const before = configuredSite()
+    const app = counter()
+    const count = async (headers: Record<string, string>) => (await app.handle(new Request('http://localhost/count', { headers }))).headers.getSetCookie()[0]!
 
     setSite('https://example.com')
     process.env.NODE_ENV = 'production'
 
     try {
-      expect((await counter().handle(new Request('http://localhost/count'))).headers.getSetCookie()[0]).toMatch(/^__Host-session=.*; Secure/i)
+      const set = await count({})
+
+      expect(set).toMatch(/^__Host-session=.*; Secure/i)
+      expect(await count({ 'x-forwarded-proto': 'http' })).toMatch(/^session=(?!.*Secure)/i)
+      expect(await count({ 'x-forwarded-proto': 'https' })).toMatch(/^__Host-session=.*; Secure/i)
+
+      // A websocket upgrade a proxy passes on without the header reads the session as the pages do.
+      const cookie = (/^[^;]*/).exec(set)![0]
+      const upgrade = await app.handle(new Request('http://localhost/peek', { headers: { cookie, connection: 'upgrade', upgrade: 'websocket' } }))
+
+      expect(await upgrade.text()).toBe('1')
     }
     finally {
       process.env.NODE_ENV = env
-      setSite(undefined)
+      setSite(before?.origin, before?.slashed ? 'always' : undefined)
     }
 
-    expect((await counter().handle(new Request('http://localhost/count'))).headers.getSetCookie()[0]).toMatch(/^session=(?!.*Secure)/i)
+    expect(await count({})).toMatch(/^session=(?!.*Secure)/i)
+  })
+
+  it('reads a cookie from before kay counted a session\'s start, counting it from when it was written', async () => {
+    const key = new Bun.CryptoHasher('sha256').update(SECRET).digest()
+    const now = Math.floor(Date.now() / 1000)
+    const legacy = (issued: number) => `session=${seal(stringify({ data: { count: 1 }, issued }), key, 'session')}`
+    const app = counter({ maxAge: 200, absoluteMaxAge: 150 })
+    const peek = async (cookie: string) => (await app.handle(new Request('http://localhost/peek', { headers: { cookie } }))).text()
+
+    expect(await peek(legacy(now - 60))).toBe('1')
+    setSystemTime(Date.now() + 91_000)
+    // Within its idle lifetime, but written 151 seconds ago: over.
+    expect(await peek(legacy(now - 60))).toBe('none')
+  })
+
+  it('caps a browser session\'s lifetime in the store too, and refuses an absoluteMaxAge it cannot read', async () => {
+    const lifetimes: number[] = []
+    const memory = memoryStore()
+    const visit = browser(counter({ absoluteMaxAge: 30, browserMaxAge: 50, store: { ...memory, async set(id, data, maxAge) {
+      lifetimes.push(maxAge)
+      await memory.set(id, data, maxAge)
+    } } }))
+
+    await visit('/count')
+    await visit('/remember/browser')
+    expect(lifetimes).toEqual([30, 30])
+    expect(() => counter({ absoluteMaxAge: 'forever' as never })).toThrow('the session absoluteMaxAge is \'forever\'; it takes a positive duration')
+  })
+
+  it('leaves a cookie name the app prefixed itself as it is over https', async () => {
+    expect((await counter({ cookie: '__x' }).handle(new Request('http://localhost/count', { headers: { 'x-forwarded-proto': 'https' } }))).headers.getSetCookie()[0]).toMatch(/^__x=.*; Secure/i)
   })
 
   it('keeps a lifetime a session chose through its extensions and a regenerate, until it is destroyed', async () => {

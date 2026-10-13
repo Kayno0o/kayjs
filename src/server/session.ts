@@ -135,7 +135,6 @@ class RequestSession<Data extends object> implements Session<Data> {
   // An id `regenerate` or `destroy` left behind, deleted from the store on commit.
   private retired: string | undefined
   private oldKey = false
-
   private readonly secure: boolean
   // `__Host-` keeps the cookie to this host over https, so no other host of the site can set it; a Domain rules the prefix out.
   private readonly name: string
@@ -278,7 +277,7 @@ class RequestSession<Data extends object> implements Session<Data> {
 }
 
 // AES-256-GCM: the cookie can be neither read nor altered without the secret, nor passed off under another cookie's name.
-function seal(text: string, key: Buffer, name: string): string {
+export function seal(text: string, key: Buffer, name: string): string {
   const { createCipheriv, randomBytes } = nodeCrypto()
   const iv = randomBytes(IV_BYTES)
   const cipher = createCipheriv('aes-256-gcm', key, iv)

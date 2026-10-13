@@ -142,6 +142,14 @@ describe('sessions', () => {
       setSystemTime(new Date(Date.now() + 30 * 60 * 1000))
       expect(await laptop.json('/me')).toBe('anonymous')
       expect(await store.sessions.listByUser('u1')).toHaveLength(1)
+
+      // Signing in again starts the count over.
+      await laptop.fetch('/sign-in/u1', from('10.0.0.1', FIREFOX))
+
+      for (let i = 0; i < 2; i++) {
+        setSystemTime(new Date(Date.now() + 50 * 60 * 1000))
+        expect(await laptop.json('/me')).toMatchObject({ id: 'u1' })
+      }
     }
     finally {
       setSystemTime()
