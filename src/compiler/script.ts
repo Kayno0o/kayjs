@@ -904,7 +904,7 @@ function propsDeclaration(statement: t.Statement, body: t.Statement[], shift: (n
   return declaration
 }
 
-// The props a props type writes as `Signal<T>` or `Memo<T>` from `kay`, inline or through an interface or a type alias of the script: those the template reads by name.
+// The props a props type writes as `Signal<T>` or `Memo<T>` from `kay`, inline or through an interface or a type alias of the script: those the component writes by assigning, and reads by calling.
 function signalProps(type: t.TSType | undefined, body: t.Statement[]): Map<string, SignalKind> {
   const kinds = new Map<string, SignalKind>()
   const found = new Map<string, SignalKind>()

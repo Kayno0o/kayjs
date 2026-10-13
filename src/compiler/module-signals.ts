@@ -10,7 +10,7 @@ export type ImportedSignals = Record<string, Record<string, SignalKind>>
 const MADE: Record<string, SignalKind> = { signal: 'signal', persisted: 'signal', linked: 'signal', queryParam: 'signal', memo: 'memo' }
 const NAMES_KAY = /["']kay["']/
 
-// The names a module exports as `export const name = signal(...)`, or `persisted`, `linked`, `queryParam` or `memo`, called as imported from `kay`: what a template importing them reads by name.
+// The names a module exports as `export const name = signal(...)`, or `persisted`, `linked`, `queryParam` or `memo`, called as imported from `kay`: what a component importing them writes by assigning, and reads by calling.
 export function moduleSignals(source: string, jsx = false): Record<string, SignalKind> {
   if (!NAMES_KAY.test(source))
     return {}

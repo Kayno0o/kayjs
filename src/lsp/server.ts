@@ -218,7 +218,7 @@ export class KayLanguageServer {
 
     await this.saved()
 
-    // An open component reads by name the signals a changed module now exports, or stops.
+    // An open component takes as signals those a changed module now exports, or stops.
     for (const previous of others.length > 0 ? this.documents.values() : []) {
       if (JSON.stringify(importedSignals(fileURLToPath(previous.uri), previous.source)) !== previous.signals)
         this.refresh(previous)

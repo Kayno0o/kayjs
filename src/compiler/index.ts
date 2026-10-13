@@ -47,7 +47,7 @@ export interface CompileOptions {
   clientOnly?: boolean | undefined
   // Type-checking a static component only islands render: its children render inline with it, so the props it passes them are not serialized.
   insideIsland?: boolean | undefined
-  // The signals and memos of the modules the component imports, which its template reads by name: `importedSignals` from kay's build finds them.
+  // The signals and memos of the modules the component imports, which it writes by assigning and the check reports read uncalled: `importedSignals` from kay's build finds them.
   importedSignals?: ImportedSignals | undefined
   // Development: every element carries `data-kay-src`, its file and position, for `kay dev`'s inspector.
   inspect?: boolean | undefined

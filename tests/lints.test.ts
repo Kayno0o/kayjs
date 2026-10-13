@@ -265,6 +265,44 @@ describe('uncalled-signal', () => {
 
     expect(compileKay(source, 'list.kay', { check: true }).diagnostics.filter(d => d.code === 'uncalled-signal')).toEqual([])
   })
+
+  it('still reads the value of a signal left uncalled, in the server and the browser output alike', () => {
+    const source = '---\nconst count = signal(0)\n---\np {count} and {`${count}`}\n'
+
+    for (const output of ['html', 'dom'] as const) {
+      const { tsx, diagnostics } = compileKay(source, 'count.kay', { output, hydratable: true })
+
+      expect(diagnostics).toEqual([])
+      expect(tsx).toContain('(count())')
+      expect(tsx).toContain('`${count()}`')
+    }
+  })
+
+  it('writes the source its fixes call, which reports nothing more', () => {
+    const source = script('const count = signal(0)', 'p(title={JSON.stringify({ count })}) {count}\nif count > 1\n  p many')
+    const edits = compileKay(source, 'list.kay', { check: true }).diagnostics.filter(d => d.code === 'uncalled-signal').flatMap(d => d.fixes![0]!.edits)
+    const fixed = edits.sort((a, b) => b.start - a.start).reduce((text, edit) => text.slice(0, edit.start) + edit.text + text.slice(edit.end), source)
+
+    expect(fixed).toBe(script('const count = signal(0)', 'p(title={JSON.stringify({ count: count() })}) {count()}\nif count() > 1\n  p many'))
+    expect(compileKay(fixed, 'list.kay', { check: true }).diagnostics.filter(d => d.code === 'uncalled-signal')).toEqual([])
+  })
+
+  it('reports a signal a module exports and a prop typed Signal<T> or Memo<T>, as the script\'s own', () => {
+    const source = '---\nimport type { Memo, Signal } from \'kay\'\nimport { cart } from \'./cart\'\n\nconst { open, total } = props<{ open: Signal<boolean>, total: Memo<number> }>()\n---\np {cart.length} {open ? \'open\' : \'closed\'} {total}\n'
+    const found = compileKay(source, 'cart.kay', { check: true, importedSignals: { './cart': { cart: 'signal' } } }).diagnostics.filter(d => d.code === 'uncalled-signal')
+
+    expect(found.map(d => [source.slice(d.start, d.end), d.message])).toEqual([
+      ['cart', '`cart` is a signal, read by calling it'],
+      ['open', '`open` is a signal, read by calling it'],
+      ['total', '`total` is a memo, read by calling it'],
+    ])
+  })
+
+  it('takes a component whose name only starts with Kay for the app\'s own, handing it the signal', () => {
+    const source = '---\nimport KayakCard from \'./kayak-card.kay\'\n\nconst open = signal(false)\n---\nKayakCard(open={open})\n'
+
+    expect(compileKay(source, 'list.kay', { check: true }).diagnostics.filter(d => d.code === 'uncalled-signal')).toEqual([])
+  })
 })
 
 describe('uncaught-await', () => {

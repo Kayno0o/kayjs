@@ -153,6 +153,7 @@ function signalName(diagnostic: TsgoDiagnostic, source: string, offset: number):
   return diagnostic.code === MISSING_PROPERTY ? MEMBER_OF.exec(source.slice(0, offset))?.[1] : undefined
 }
 
+// A condition on any function is always true, a signal's or another's, so its help says so before naming signals.
 function signalHelp(diagnostic: TsgoDiagnostic, name: string | undefined): string {
   const call = name === undefined ? 'calling it' : `calling it, \`${name}()\``
 

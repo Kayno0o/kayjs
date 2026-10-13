@@ -93,6 +93,8 @@ if open()
 
 ### Show a fallback when a widget throws
 
+A `try` block renders its `catch` block when what it renders throws, on the server and in an island:
+
 ```kay
 ---
 import Chart from './chart.kay'
@@ -185,6 +187,8 @@ Player(persist)
 
 ### Go to a page from code
 
+`navigate` from `kay` goes to a page as a link would, swapping it in place:
+
 ```kay
 ---
 import { navigate } from 'kay'
@@ -193,6 +197,8 @@ button(onClick={() => navigate('/todos')}) Todos
 ```
 
 ### Ask before leaving unsaved changes
+
+`guardLeave` from `kay` asks before the page is left while its function returns true:
 
 ```kay
 ---
@@ -206,6 +212,8 @@ textarea(bind:value={draft} aria-label="Draft")
 ```
 
 ### Render a component on a page kay does not serve
+
+With `"kay/bun"` listed under `[serve.static] plugins` in `bunfig.toml`, `mount` from `kay/mount` renders one into an element and returns what disposes it:
 
 ```ts
 import { mount } from 'kay/mount'

@@ -11,7 +11,7 @@ const scanned = new Map<string, { stamp: string, signals: Record<string, SignalK
 // What each component imports, read again only once its text changes.
 const imports = new Map<string, { hash: number | bigint, specifiers: string[] }>()
 
-// The signals and memos the modules a component imports export, which its template reads by name; part of every cache key of its compile, so editing such a module compiles the component again.
+// The signals and memos the modules a component imports export, which its template reads and writes as its own; part of every cache key of its compile, so editing such a module compiles the component again.
 // A package is left out, its code too large to scan on every compile, unless a relative import reaches into it, as a library's own components do.
 export function importedSignals(file: string, source: string): ImportedSignals {
   const found: ImportedSignals = {}

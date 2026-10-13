@@ -11,6 +11,8 @@ import { CURRENT, defaultName, PROPS, VALUES } from './names'
 
 const IDENTIFIER = /^[A-Z_$][\w$]*$/i
 const CAPITAL = /^[A-Z]/
+// The names the compiler gives its own helpers and tags, `KayIdentityKey` or `KayLoopFor`.
+const COMPILER_NAME = /^Kay[A-Z]/
 // What `kay` exports that is read by calling it, in the template as in the script.
 const ACCESSORS = new Set(['signal', 'memo', 'persisted', 'linked', 'queryParam'])
 
@@ -63,7 +65,7 @@ export interface RewritePlan {
   rewrites: Rewrites
   // True when the component reads a `t` nothing declares or imports: the translation function, which the compiler imports.
   translates: boolean
-  // Type checking: the value of each signal the template reads, by name, which `VALUES` holds.
+  // Type checking: the value of each signal the template reads, which `VALUES` holds.
   values: Map<string, string>
 }
 
@@ -249,21 +251,22 @@ class RewriteFinder {
 
   // A signal or memo the template names uncalled where only its value fits, as in `{count}` or `count > 1`: kay still reads it there, reported as `uncalled-signal` until it is written `count()`.
   // A call, `.set`, `bind:`, and the signal handed on whole, as a component's prop or a function's argument, take the signal itself.
-  private readonly uncalled = (reference: NodePath): boolean => {
+  // Gives the source offset of such a name, undefined for any other reference.
+  private readonly uncalled = (reference: NodePath): number | undefined => {
     const { node, parent } = reference
     const source = this.input.map.isExact(node.start!) ? this.input.map.toSource(node.start!) : undefined
 
     if (source === undefined || source < this.input.templateStart || tagPosition(reference) !== undefined || typeQueryOf(reference) !== undefined)
-      return false
+      return undefined
 
     if ((parent.type === 'CallExpression' || parent.type === 'OptionalCallExpression' || parent.type === 'NewExpression') && (parent.callee === node || !compilerCall(parent.callee)))
-      return false
+      return undefined
 
     if ((parent.type === 'MemberExpression' || parent.type === 'OptionalMemberExpression') && parent.object === node && !parent.computed && parent.property.type === 'Identifier' && parent.property.name === 'set')
-      return false
+      return undefined
 
     // `count++` writes it.
-    return parent.type !== 'UpdateExpression' && !handedToComponent(reference)
+    return parent.type === 'UpdateExpression' || handedToComponent(reference) ? undefined : source
   }
 
   // Reports a signal read uncalled, its fix calling it, when type checking.
@@ -377,7 +380,7 @@ class RewriteFinder {
 
     for (const reference of binding.referencePaths) {
       const values = this.input.values && !this.deferred(reference)
-      const uncalled = this.uncalled(reference) ? this.input.map.toSource(reference.node.start!) : undefined
+      const uncalled = this.uncalled(reference)
 
       if (uncalled !== undefined)
         this.reportUncalled(reference, uncalled, name, kind)
@@ -480,8 +483,10 @@ class RewriteFinder {
 
       const values = this.input.values && !this.deferred(reference)
 
-      if (this.uncalled(reference)) {
-        this.reportUncalled(reference, this.input.map.toSource(reference.node.start!)!, name, signal)
+      const uncalled = this.uncalled(reference)
+
+      if (uncalled !== undefined) {
+        this.reportUncalled(reference, uncalled, name, signal)
 
         return values ? this.valueRead(name, access) : { ...access, after: `${access.after ?? ''}()` }
       }
@@ -574,13 +579,13 @@ export function importedFromKay(scope: Scope, callee: t.Node, module = 'kay'): s
 }
 
 // Whether every use of the binding reads the signal, a call with no arguments or its name left uncalled in the template: a `.set`, or the signal handed on, may write it.
-function onlyRead(binding: Binding | undefined, uncalled: (reference: NodePath) => boolean): boolean {
-  return binding !== undefined && binding.constant && binding.referencePaths.length > 0 && binding.referencePaths.every(reference => (reference.parent.type === 'CallExpression' && reference.parent.callee === reference.node && reference.parent.arguments.length === 0) || uncalled(reference))
+function onlyRead(binding: Binding | undefined, uncalled: (reference: NodePath) => number | undefined): boolean {
+  return binding !== undefined && binding.constant && binding.referencePaths.length > 0 && binding.referencePaths.every(reference => (reference.parent.type === 'CallExpression' && reference.parent.callee === reference.node && reference.parent.arguments.length === 0) || uncalled(reference) !== undefined)
 }
 
 // A helper the compiler wraps a template expression in, such as `KayIdentityKey`, which hands nothing on.
 function compilerCall(callee: t.Node): boolean {
-  return callee.type === 'Identifier' && callee.name.startsWith('Kay')
+  return callee.type === 'Identifier' && COMPILER_NAME.test(callee.name)
 }
 
 // Whether the name is the whole value of a component's prop, `Toggle(open={open})`, which hands the signal itself to it; the compiler's own tags, such as `KayLoopFor`, read values.
@@ -594,7 +599,7 @@ function handedToComponent(reference: NodePath): boolean {
 
   const tag = element.name
 
-  return tag.type === 'JSXMemberExpression' || (tag.type === 'JSXIdentifier' && CAPITAL.test(tag.name) && !tag.name.startsWith('Kay'))
+  return tag.type === 'JSXMemberExpression' || (tag.type === 'JSXIdentifier' && CAPITAL.test(tag.name) && !COMPILER_NAME.test(tag.name))
 }
 
 // Babel's message ends in the position within the generated code, which means nothing to the user; the error lands on the source it was generated from.

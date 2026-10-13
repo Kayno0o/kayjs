@@ -596,8 +596,8 @@ describe('relativeTime', () => {
     }
   })
 
-  it('makes a component an island, read by name in its template as a memo', () => {
-    const compiled = compileKay('---\nimport { relativeTime } from \'kay/i18n\'\n\nconst { date } = props<{ date: number }>()\nconst ago = relativeTime(() => date)\n---\ntime {ago}\n', join(process.cwd(), 'ago.kay'), { output: 'html', hydratable: true })
+  it('makes a component an island, read by calling it in its template as a memo', () => {
+    const compiled = compileKay('---\nimport { relativeTime } from \'kay/i18n\'\n\nconst { date } = props<{ date: number }>()\nconst ago = relativeTime(() => date)\n---\ntime {ago()}\n', join(process.cwd(), 'ago.kay'), { output: 'html', hydratable: true })
 
     expect(compiled.tsx).toContain('KayIsland(')
     expect(compiled.tsx).toContain('KayChild((ago()))')
