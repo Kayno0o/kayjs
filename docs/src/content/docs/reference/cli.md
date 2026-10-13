@@ -101,6 +101,7 @@ Every page a dev server serves carries a bar at the bottom left, `kay` and a cou
   - what `kay check` reports of the project without type checking.
 
   A problem logged again shows once with how many times it came. Under `kay dev`, a `.kay` file a problem names opens in the editor on a click. Dismiss, or Dismiss all, hides a problem for the rest of the browser tab, until its text changes; those the page logged go when it is left.
+- Under `kay dev`, the bar says for a few seconds after each restart or stylesheet swap what changed and how long it took, as `src/routes/index.kay: restarted in 58 ms`. A page the restart reloaded says it too. It never takes the focus.
 - The drawer follows the system's light or dark theme and docks left or right. Its open tab and side stay for the browser tab, across page swaps and reloads.
 
 Production pages never carry it.

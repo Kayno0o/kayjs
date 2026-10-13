@@ -268,4 +268,33 @@ describe('the dev tool', () => {
     expect(copy!.textContent).toBe('Copied')
     document.body.innerHTML = ''
   })
+
+  it('says on the bar what kay dev rebuilt and how long it took, once a browser tab saw a build, again on the page it reloaded, then fades', async () => {
+    const built = () => shadow().querySelector<HTMLElement>('.bar .built')!
+    const announce = (data: object) => window.dispatchEvent(new CustomEvent('kay-dev-built', { detail: JSON.stringify(data) }))
+
+    tool = startDevTool()
+    // A tab's first page says nothing of a build that came before it.
+    announce({ id: 'a', changed: 'src/routes/index.kay', ms: 58 })
+    expect(built().hidden).toBe(true)
+
+    announce({ id: 'b', changed: 'src/app.css', ms: 24, styles: true })
+    expect(built().hidden).toBe(false)
+    expect(built().textContent).toBe('src/app.css: stylesheets swapped in 24 ms')
+    expect(built().getAttribute('role')).toBe('status')
+
+    // The page that build reloaded, whose live reload script heard of it first, says it for what time is left.
+    tool.stop()
+    sessionStorage.setItem('kay-dev', JSON.stringify({ ...JSON.parse(sessionStorage.getItem('kay-dev')!), built: { id: 'c', at: Date.now() - 3980 } }))
+    Object.assign(window, { $kayBuilt: JSON.stringify({ id: 'c', changed: 'src/name.ts', ms: 412 }) })
+    tool = startDevTool()
+    expect(built().textContent).toBe('src/name.ts: restarted in 412 ms')
+    expect(document.activeElement).toBe(document.body)
+
+    await Bun.sleep(60)
+    expect(built().classList.contains('fading')).toBe(true)
+    await Bun.sleep(450)
+    expect(built().hidden).toBe(true)
+    delete (window as { $kayBuilt?: string }).$kayBuilt
+  })
 })

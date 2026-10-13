@@ -9,6 +9,11 @@ const CHECK_PROBLEMS = 'kay-check-problems'
 const MAX_DISMISSED = 200
 // How long an error page's copy button says it copied.
 const COPIED_MS = 1500
+// How long the bar says what `kay dev` rebuilt, then how long it fades.
+const BUILT_MS = 4000
+const FADE_MS = 400
+// The event the live reload script fires for each restart or stylesheet swap `kay dev` announces.
+const BUILT_EVENT = 'kay-dev-built'
 // A path segment, kay's `(group)`, `[param]`, `[[optional]]` and `[...rest]` names included.
 const SEGMENT = String.raw`(?:\([\w@.+=-]+\)|\[{1,2}(?:\.{3})?[\w-]+\]{1,2}|[\w@.+=-])+`
 
@@ -45,6 +50,9 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .bar > button[aria-pressed=true], .bar > button[aria-expanded=true] { background: var(--accent-soft); }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .mark { font-weight: 700; color: var(--accent); letter-spacing: .02em; }
+.built { max-width: min(28rem, calc(100vw - 160px)); padding: 3px 10px 3px 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); transition: opacity ${FADE_MS}ms; }
+.built.fading { opacity: 0; }
+@media (prefers-reduced-motion: reduce) { .built { transition: none; } }
 .error { color: var(--error); }
 .warn { color: var(--warn); }
 .drawer { position: fixed; bottom: 52px; left: 12px; z-index: 2147483647; display: flex; flex-direction: column; width: min(36rem, calc(100vw - 24px)); max-height: min(60vh, 36rem); border: 1px solid var(--border); border-radius: 10px; background: var(--bg); box-shadow: var(--shadow); overflow: hidden; }
@@ -86,6 +94,16 @@ interface DevState {
   tab: string
   side: 'left' | 'right'
   dismissed: string[]
+  // The last build this browser tab heard of, and when, so a page the build reloads says it again.
+  built?: { id: string, at: number } | undefined
+}
+
+// What `kay dev` says of a restart, or of a stylesheet edit it swapped in without one.
+interface Built {
+  id: string
+  changed: string
+  ms: number
+  styles?: boolean
 }
 
 export interface DevTabOptions {
@@ -123,7 +141,7 @@ export interface DevTool {
 }
 
 export function startDevTool(doc: Document = document): DevTool {
-  const win = doc.defaultView! as Window & { $kayProblems?: DevProblems }
+  const win = doc.defaultView! as Window & { $kayProblems?: DevProblems, $kayBuilt?: string }
   const state = readState(win)
   const host = doc.createElement(HOST)
   const root = host.attachShadow({ mode: 'open' })
@@ -145,6 +163,7 @@ export function startDevTool(doc: Document = document): DevTool {
   const side = make('button', 'tool')
   const close = make('button', 'tool', 'Close')
   const status = make('span', 'sr')
+  const built = make('span', 'built')
   const tabs: { options: DevTabOptions, button: HTMLButtonElement, panel: HTMLElement, badge: HTMLButtonElement }[] = []
   const save = () => writeState(win, state)
 
@@ -159,11 +178,13 @@ export function startDevTool(doc: Document = document): DevTool {
   mark.setAttribute('aria-label', 'kay dev tools (Alt+Shift+K)')
   mark.setAttribute('aria-controls', drawer.id)
   status.setAttribute('role', 'status')
+  built.setAttribute('role', 'status')
+  built.hidden = true
   side.type = 'button'
   close.type = 'button'
   head.append(tabList, side, close)
   drawer.append(head)
-  bar.append(mark, status)
+  bar.append(mark, status, built)
   ui.append(drawer, bar)
   root.append(ui)
   host.setAttribute('data-kay-dev', '')
@@ -346,8 +367,42 @@ export function startDevTool(doc: Document = document): DevTool {
       box.hidden = true
   }
 
-  // The buttons kay's error pages carry, which need a script and have no other.
-  const pageClicks = new AbortController()
+  // The buttons kay's error pages carry, which need a script and have no other, and what `kay dev` rebuilt.
+  const listening = new AbortController()
+  let fading: ReturnType<typeof setTimeout> | undefined
+  let hiding: ReturnType<typeof setTimeout> | undefined
+
+  // Said once in each browser tab: again on the page it reloaded, never on a page opened long after.
+  const sayBuilt = (data: string) => {
+    const build = JSON.parse(data) as Built
+    const now = Date.now()
+    const shown = state.built === undefined ? undefined : build.id === state.built.id ? state.built.at : now
+    const left = shown === undefined ? 0 : BUILT_MS - (now - shown)
+
+    if (state.built?.id !== build.id) {
+      state.built = { id: build.id, at: state.built === undefined ? 0 : now }
+      save()
+    }
+
+    if (left <= 0)
+      return
+
+    clearTimeout(fading)
+    clearTimeout(hiding)
+    built.textContent = `${build.changed}: ${build.styles === true ? 'stylesheets swapped' : 'restarted'} in ${build.ms} ms`
+    built.hidden = false
+    built.classList.remove('fading')
+    fading = setTimeout(() => built.classList.add('fading'), left)
+    hiding = setTimeout(() => {
+      built.hidden = true
+    }, left + FADE_MS)
+  }
+
+  // The live reload script keeps the last one, which may come before this loaded.
+  win.addEventListener(BUILT_EVENT, event => sayBuilt((event as CustomEvent<string>).detail), { signal: listening.signal })
+
+  if (win.$kayBuilt !== undefined)
+    sayBuilt(win.$kayBuilt)
 
   const tool: DevTool = {
     root,
@@ -367,7 +422,9 @@ export function startDevTool(doc: Document = document): DevTool {
     stop: () => {
       problems?.stop()
       win.removeEventListener('keydown', onKeyDown, true)
-      pageClicks.abort()
+      listening.abort()
+      clearTimeout(fading)
+      clearTimeout(hiding)
       host.remove()
     },
   }
@@ -378,7 +435,7 @@ export function startDevTool(doc: Document = document): DevTool {
 
     if (target)
       void answerErrorPage(tool, target)
-  }, { signal: pageClicks.signal })
+  }, { signal: listening.signal })
 
   return tool
 }

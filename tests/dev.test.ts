@@ -53,6 +53,17 @@ async function until(condition: () => boolean, timeout = 5000) {
   }
 }
 
+// What a stream sent up to the first event named `name`, however its chunks split it.
+async function eventsUntil(reader: ReadableStreamDefaultReader<Uint8Array>, name: string): Promise<string> {
+  const decoder = new TextDecoder()
+  let text = ''
+
+  while (!text.includes(`event: ${name}\ndata: `) || !text.endsWith('\n\n'))
+    text += decoder.decode((await reader.read()).value)
+
+  return text
+}
+
 async function firstEvent(response: Response): Promise<string> {
   const reader = response.body!.getReader()
   const { value } = await reader.read()
@@ -948,7 +959,8 @@ describe('kay dev', () => {
       await Bun.write(join(root, 'src/app.css'), 'h1 { color: blue }\n')
       await until(() => lines.some(line => line.includes('src/app.css: stylesheets swapped in')), 10_000)
 
-      expect(new TextDecoder().decode((await events.read()).value)).toStartWith('event: styles\n')
+      // The dev tool says what was swapped in, and how long it took.
+      expect(await eventsUntil(events, 'built')).toMatch(/^event: styles\ndata: \d+\n\nevent: built\ndata: \{"id":"[\w-]+","changed":"src\/app\.css","ms":\d+,"styles":true\}\n\n$/)
       expect(await stylesheet()).toContain('#00f')
       expect(children).toHaveLength(1)
       await events.cancel()
@@ -960,6 +972,8 @@ describe('kay dev', () => {
 
       expect(await (await fetch(url)).text()).toContain('Grace</h1>')
       expect(written()).toEqual(before)
+      // As it does of a restart, to a page connecting after it.
+      expect(await eventsUntil((await fetch(`${url}/_kay/dev/events`)).body!.getReader(), 'built')).toMatch(/\nevent: built\ndata: \{"id":"[\w-]+","changed":"src\/name\.ts","ms":\d+\}\n\n$/)
 
       await Bun.write(join(root, 'src/routes/index.kay'), `${page}else\n  p no\n`)
       await until(() => lines.length === 4, 10_000)

@@ -37,6 +37,8 @@ const SOURCE_FILE = /\.(?:kay|[cm]?[jt]sx?|json|css)$/
 const BOOT_ID = crypto.randomUUID()
 // The event streams open on this server, which a stylesheet edit is pushed to.
 const streams = new Set<ReadableStreamDefaultController<string>>()
+// What `kay dev` said of the last restart or stylesheet swap, for the pages connecting after it.
+let lastBuilt: string | undefined
 // Once its server went away, a page connects again every 10 ms for about a restart's length, then less and less often, down to four times a second, so a server that stays down is not polled hard.
 const FAST_RETRY_MS = 10
 const FAST_RETRIES = 50
@@ -46,7 +48,7 @@ const SLOW_RETRY_MS = 250
 // The old links go once the new ones loaded, so the page never shows unstyled, and a page that no longer answers as it did reloads instead. A stylesheet edit swaps them the same way without a restart, on a `styles` event.
 // A server restarted for edited islands only also names their new chunks: a page on the code it replaced swaps them in through `$kayHot`, keeping its state, then its stylesheets.
 // The id is a meta beside the script, so the script reads the same on every server: a page swap keeps it rather than running a copy that connects again, and a policy allows it by one hash.
-export const LIVE_RELOAD = `<meta name="kay-boot" content="${BOOT_ID}"><script>(()=>{let b=document.querySelector('meta[name=kay-boot]')?.content,v,s,n=0,q=Promise.resolve();const load=async()=>{try{const r=await fetch(location.href,{cache:'no-store',headers:{accept:'text/html'}});return r.ok&&!r.redirected?new DOMParser().parseFromString(await r.text(),'text/html'):null}catch{return null}},css=async(d,i)=>{const o=[...document.querySelectorAll('link[rel=stylesheet]')],u=new Set(o.map(l=>l.getAttribute('href')));await Promise.all([...d.querySelectorAll('link[rel=stylesheet]')].map(l=>new Promise(r=>{const k=document.createElement('link'),h=l.getAttribute('href');k.rel='stylesheet';k.dataset.kayDev='';k.href=u.has(h)?h+(h.includes('?')?'&':'?')+'kay-dev='+i:h;k.onload=k.onerror=r;document.head.append(k)})));for(const l of o)l.remove()},on=x=>{x.onerror=()=>{x.close();setTimeout(()=>on(new EventSource(${JSON.stringify(DEV_EVENTS)})),n++<${FAST_RETRIES}?${FAST_RETRY_MS}:Math.min(${SLOW_RETRY_MS},${FAST_RETRY_MS}*2**(n-${FAST_RETRIES})))};x.addEventListener('styles',e=>q=q.then(async()=>{try{const d=await load();if(!d)return location.reload();if(s)s=d;await css(d,e.data)}catch{location.reload()}}));x.addEventListener('boot',e=>(n=0,q=q.then(async()=>{let p=false;const d=e.data,s0=d.indexOf(' '),t=d.indexOf(' ',s0+1),i=d.slice(0,s0),c=t<0?d.slice(s0+1):d.slice(s0+1,t),h=t<0?null:JSON.parse(d.slice(t+1));if(i===b){v??=c;if(!window.$kayRefresh)s??=await load();return}if(c!==v){let ok=false;try{ok=!!h&&String(h.from)===v&&!!window.$kayHot&&await window.$kayHot(h)}catch{}if(!ok){if(c===i)return location.reload();if(window.$kayRefresh){try{await window.$kayRefresh()}catch{return location.reload()}}else p=true}v=c}b=i;try{const d=await load();if(!d)return location.reload();if(p){const m=await import(${JSON.stringify(DEV_PATCH)});if(!s||!m.patch(s,d))return location.reload();s=d}await css(d,i)}catch{location.reload()}})))};on(new EventSource(${JSON.stringify(DEV_EVENTS)}))})()</script>`
+export const LIVE_RELOAD = `<meta name="kay-boot" content="${BOOT_ID}"><script>(()=>{let b=document.querySelector('meta[name=kay-boot]')?.content,v,s,n=0,q=Promise.resolve();const load=async()=>{try{const r=await fetch(location.href,{cache:'no-store',headers:{accept:'text/html'}});return r.ok&&!r.redirected?new DOMParser().parseFromString(await r.text(),'text/html'):null}catch{return null}},css=async(d,i)=>{const o=[...document.querySelectorAll('link[rel=stylesheet]')],u=new Set(o.map(l=>l.getAttribute('href')));await Promise.all([...d.querySelectorAll('link[rel=stylesheet]')].map(l=>new Promise(r=>{const k=document.createElement('link'),h=l.getAttribute('href');k.rel='stylesheet';k.dataset.kayDev='';k.href=u.has(h)?h+(h.includes('?')?'&':'?')+'kay-dev='+i:h;k.onload=k.onerror=r;document.head.append(k)})));for(const l of o)l.remove()},on=x=>{x.onerror=()=>{x.close();setTimeout(()=>on(new EventSource(${JSON.stringify(DEV_EVENTS)})),n++<${FAST_RETRIES}?${FAST_RETRY_MS}:Math.min(${SLOW_RETRY_MS},${FAST_RETRY_MS}*2**(n-${FAST_RETRIES})))};x.addEventListener('built',e=>{window.$kayBuilt=e.data;dispatchEvent(new CustomEvent('kay-dev-built',{detail:e.data}))});x.addEventListener('styles',e=>q=q.then(async()=>{try{const d=await load();if(!d)return location.reload();if(s)s=d;await css(d,e.data)}catch{location.reload()}}));x.addEventListener('boot',e=>(n=0,q=q.then(async()=>{let p=false;const d=e.data,s0=d.indexOf(' '),t=d.indexOf(' ',s0+1),i=d.slice(0,s0),c=t<0?d.slice(s0+1):d.slice(s0+1,t),h=t<0?null:JSON.parse(d.slice(t+1));if(i===b){v??=c;if(!window.$kayRefresh)s??=await load();return}if(c!==v){let ok=false;try{ok=!!h&&String(h.from)===v&&!!window.$kayHot&&await window.$kayHot(h)}catch{}if(!ok){if(c===i)return location.reload();if(window.$kayRefresh){try{await window.$kayRefresh()}catch{return location.reload()}}else p=true}v=c}b=i;try{const d=await load();if(!d)return location.reload();if(p){const m=await import(${JSON.stringify(DEV_PATCH)});if(!s||!m.patch(s,d))return location.reload();s=d}await css(d,i)}catch{location.reload()}})))};on(new EventSource(${JSON.stringify(DEV_EVENTS)}))})()</script>`
 
 // Keeps each problem kay logs before the dev tool loads, which then lists them; the page carries the function itself, so a policy allows it by one hash.
 export const DEV_BOOT = `<script>(${bootDevTool.toString()})(window)</script>`
@@ -218,6 +220,9 @@ export function devEvents(failed = false, hot?: HotSwap): Response {
       own = controller
       streams.add(controller)
       controller.enqueue(`event: boot\ndata: ${BOOT_ID} ${failed ? BOOT_ID : process.env.KAY_DEV_CODE ?? BOOT_ID}${hot && !failed ? ` ${JSON.stringify(hot)}` : ''}\n\n`)
+
+      if (lastBuilt !== undefined)
+        controller.enqueue(lastBuilt)
     },
     cancel() {
       streams.delete(own!)
@@ -296,19 +301,36 @@ function followStyles(root: string, client: ClientBuild): ClientBuild {
       return
 
     client.styles = new Map(Object.entries(message.styles as Record<string, string>).map(([file, url]) => [resolve(root, file), url]))
-
-    for (const stream of streams) {
-      try {
-        stream.enqueue(`event: styles\ndata: ${Date.now()}\n\n`)
-      }
-      catch {
-        streams.delete(stream)
-      }
-    }
+    broadcast(`event: styles\ndata: ${Date.now()}\n\n`)
   })
   process.send!({ followsStyles: true })
 
   return client
+}
+
+// `kay dev` says what each restart and stylesheet swap rebuilt and how long it took, which the dev tool on each open page shows.
+export function followBuilds(): void {
+  if (process.send === undefined)
+    return
+
+  process.on('message', (message: unknown) => {
+    if (typeof message !== 'object' || message === null || !('built' in message))
+      return
+
+    lastBuilt = `event: built\ndata: ${JSON.stringify({ id: crypto.randomUUID(), ...message.built as object })}\n\n`
+    broadcast(lastBuilt)
+  })
+}
+
+function broadcast(event: string): void {
+  for (const stream of streams) {
+    try {
+      stream.enqueue(event)
+    }
+    catch {
+      streams.delete(stream)
+    }
+  }
 }
 
 // What a dev server serves when the project failed to boot: the errors on every page, until a fix restarts it.

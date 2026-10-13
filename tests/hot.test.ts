@@ -134,6 +134,8 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('kay dev in 
     await page.locator('p.static', { hasText: 'Hello' }).waitFor({ timeout: 30_000 })
     await Bun.write(join(root, 'src/greeting.ts'), 'export const greeting = \'Welcome\'\n')
     await page.locator('p.static', { hasText: 'Welcome' }).waitFor({ timeout: 30_000 })
+    // The dev tool's bar says what restarted the server.
+    await page.locator('kay-dev .bar .built', { hasText: /^src\/greeting\.ts: restarted in \d+ ms$/ }).waitFor()
 
     expect(await sameDocument()).toBe(true)
     expect(await page.textContent('.solo button.count')).toBe('Pressed 3')
@@ -148,6 +150,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('kay dev in 
     await rm(join(root, '.port'))
     await Bun.write(join(root, 'src/app.css'), 'p.static { color: rgb(0, 0, 255) }\n')
     await until(async () => await color() === 'rgb(0, 0, 255)')
+    await page.locator('kay-dev .bar .built', { hasText: /^src\/app\.css: stylesheets swapped in \d+ ms$/ }).waitFor()
 
     expect(await sameDocument()).toBe(true)
     expect(existsSync(join(root, '.port'))).toBe(false)

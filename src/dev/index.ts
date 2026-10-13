@@ -149,6 +149,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     }
     else {
       log(`${stamp()} ${describe(restartedFor)}: restarted in ${took}${url === address ? '' : `, now on ${url}`}`)
+      tell(server, { built: { changed: describe(restartedFor), ms: Math.round(performance.now() - restartedAt) } })
     }
 
     address = url
@@ -259,10 +260,11 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     if (!outcome || outcome.failed || server !== child)
       return false
 
-    if (outcome.styles)
-      server.send({ styles: outcome.styles })
+    const changed = describe(changedFilesNamed(root, files))
+    const ms = Math.round(performance.now() - started)
 
-    log(`${stamp()} ${describe(changedFilesNamed(root, files))}: stylesheets swapped in ${Math.round(performance.now() - started)} ms`)
+    tell(server, { ...outcome.styles && { styles: outcome.styles }, built: { changed, ms, styles: true } })
+    log(`${stamp()} ${changed}: stylesheets swapped in ${ms} ms`)
 
     return true
   }
@@ -427,6 +429,14 @@ function openBrowser(url: string, log: (line: string) => void): void {
 }
 
 // The files a restart came from, as its report names them.
+// A server killed for a restart meanwhile takes no message.
+function tell(server: Subprocess, message: object): void {
+  try {
+    server.send(message)
+  }
+  catch {}
+}
+
 function describe(files: string[]): string {
   const [first] = files
 
