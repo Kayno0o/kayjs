@@ -10,7 +10,7 @@ Every feature asks the least of the app: the fewest declarations, the easiest se
 
 Each session works alone, with no coordinator:
 
-1. Take an open issue, the highest priority first (`tea issues ls -L priority/high`), by assigning it (`tea issues edit <n> --add-assignees kaynooo`, then a comment naming the session), so no other session takes it; skip one already assigned.
+1. Take an open issue, the highest priority first (`tea issues ls -L priority/high`), with a comment naming the session (`tea comment <n> "Taken by session <name>."`), so no other session takes it; skip one whose latest comments show another session took it.
 2. Work in a worktree (`just worktree <name>`), and commit with `bun run lint:fix` and the tests of what changed.
 3. Review the commit once, through the `requesting-code-review` skill, at an effort matching the diff: none for docs, tests or a few lines, `low` for a contained change, `high` for the runtime, the compiler or anything an app sees. Its fixes go in a follow-up commit, not reviewed again unless they reshape the change.
 4. `just land` (`scripts/land.ts`): one landing at a time, it rebases on origin's main, lints, checks, runs the tests the changes reach (`bun test --changed` plus the tests reading `llms/`, `docs/`, `examples/`, `packages/` or a fixture as files, the full suite for a root config, a library's own suite), pushes main and moves the main checkout to it. Never run the full suite locally: CI runs it on every push, and a red run on main is fixed by whoever landed it.
