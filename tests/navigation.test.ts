@@ -309,9 +309,9 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
       (window as { kayAlive?: boolean }).kayAlive = true
     })
     expect(await root()).toEqual({ 'lang': 'en', 'data-theme': 'light', 'data-label': label, 'class': ['served'] })
-    // Untouched, the theme follows the server's, and the page's class replaces the layout's.
+    // Untouched, the theme follows the server's, and the page's class tokens join the layout's, then go with the page.
     await go('second', 'Second')
-    expect(await root()).toEqual({ 'lang': 'en', 'data-theme': 'dark', 'data-label': label, 'data-second': '', 'class': ['second'] })
+    expect(await root()).toEqual({ 'lang': 'en', 'data-theme': 'dark', 'data-label': label, 'data-second': '', 'class': ['second', 'served'] })
     await go('home', 'Home')
     expect(await root()).toEqual({ 'lang': 'en', 'data-theme': 'light', 'data-label': label, 'class': ['served'] })
     // A theme toggle's value stays through a page serving the same and one serving another.
@@ -320,7 +320,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
       document.documentElement.classList.add('dark')
     })
     await go('second', 'Second')
-    expect(await root()).toEqual({ 'lang': 'en', 'data-theme': 'dark', 'data-label': label, 'data-second': '', 'class': ['dark', 'second'] })
+    expect(await root()).toEqual({ 'lang': 'en', 'data-theme': 'dark', 'data-label': label, 'data-second': '', 'class': ['dark', 'second', 'served'] })
     await go('home', 'Home')
     expect(await root()).toEqual({ 'lang': 'en', 'data-theme': 'dark', 'data-label': label, 'class': ['dark', 'served'] })
     // A page whose server sets nothing takes off what the last one's set, but for the theme the toggle changed.
