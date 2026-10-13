@@ -1066,6 +1066,16 @@ describe('the dev patch', () => {
     expect(live.querySelector('meta[name=kay-boot]')!.getAttribute('content')).toBe('a')
   })
 
+  it('replaces the dev tool\'s request block, which differs on every render, rather than loading the page fully', () => {
+    const block = (ms: number) => `<title>Home</title><script type="application/json" id="kay-dev-request">{"loads":[{"ms":${ms}}]}</script>`
+    const before = page('<p>Text</p>', block(1))
+    const live = parse(before)
+
+    expect(patch(parse(before), parse(page('<p>New</p>', block(2))), live)).toBe(true)
+    expect(live.getElementById('kay-dev-request')!.textContent).toBe('{"loads":[{"ms":2}]}')
+    expect(live.body.innerHTML).toBe('<p>New</p>')
+  })
+
   it('removes an attribute and a class the server dropped, and inserts and removes nodes between the common ends', () => {
     const before = page('<h1>Title</h1><p class="a b" hidden>One</p><p>Two</p><footer>End</footer>')
     const live = parse(before)

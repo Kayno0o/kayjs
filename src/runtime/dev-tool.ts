@@ -5,6 +5,8 @@ import type { DevProblem, DevProblems } from './dev-boot'
 const HOST = 'kay-dev'
 const STATE_KEY = 'kay-dev'
 const CHECK_PROBLEMS = 'kay-check-problems'
+const REQUEST = 'kay-dev-request'
+const ROUTES_URL = '/_kay/dev/routes'
 // The most problem texts a tab remembers as dismissed.
 const MAX_DISMISSED = 200
 // How long an error page's copy button says it copied.
@@ -19,7 +21,7 @@ const SEGMENT = String.raw`(?:\([\w@.+=-]+\)|\[{1,2}(?:\.{3})?[\w-]+\]{1,2}|[\w@
 
 // A `.kay` file a problem names, with its line and column when it gives them, not one inside a URL.
 const KAY_POSITION = new RegExp(String.raw`(?<![\w@.+=:/\\)\]-])(?:[A-Za-z]:)?[\\/]?(?:${SEGMENT}[\\/])*${SEGMENT}\.kay(?::\d+(?::\d+)?)?(?!\.?\w)`, 'g')
-const OPENED_POSITION = /^(.+\.kay)(?::(\d+))?(?::(\d+))?$/
+const OPENED_POSITION = /^(.+\.\w+)(?::(\d+))?(?::(\d+))?$/
 
 type ProblemKind = 'uncaught' | 'kay' | 'policy' | 'a11y' | 'check'
 
@@ -84,6 +86,19 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .value { white-space: pre-wrap; word-break: break-all; }
 .note { color: var(--muted); }
 .outline { position: fixed; z-index: 2147483646; pointer-events: none; border: 2px solid var(--accent); border-radius: 2px; background: var(--accent-soft); }
+.facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 14px; margin: 0; }
+.facts dt { color: var(--muted); }
+.facts dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.facts dd > div + div { margin-top: 2px; }
+.ms { margin-left: 8px; color: var(--muted); }
+.filter { flex: 1; padding: 4px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--fg); font: inherit; }
+.filter:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.route { display: grid; grid-template-columns: 4.5em minmax(0, 1fr) auto; gap: 2px 10px; align-items: baseline; padding: 5px 4px; border-bottom: 1px solid var(--border); }
+.route:last-child { border-bottom: 0; }
+.route[aria-current] { background: var(--accent-soft); border-radius: 4px; }
+.route .method { color: var(--muted); }
+.route .path { overflow-wrap: anywhere; }
+.route .file { grid-column: 2 / -1; color: var(--muted); }
 .label { position: fixed; z-index: 2147483647; pointer-events: none; padding: 2px 6px; border-radius: 4px; background: var(--accent); color: var(--on-accent); white-space: nowrap; }
 @media (max-width: 480px) {
   .drawer, .right .drawer { left: 8px; right: 8px; width: auto; max-height: 55vh; }
@@ -333,6 +348,7 @@ export function startDevTool(doc: Document = document): DevTool {
   const boxes: HTMLElement[] = []
   let opener: ((source: string) => Promise<string | undefined>) | undefined
   let problems: { stop: () => void } | undefined
+  let request: { stop: () => void } | undefined
 
   label.hidden = true
   root.append(label)
@@ -416,6 +432,7 @@ export function startDevTool(doc: Document = document): DevTool {
     },
     stop: () => {
       problems?.stop()
+      request?.stop()
       win.removeEventListener('keydown', onKeyDown, true)
       listening.abort()
       clearTimeout(fading)
@@ -425,6 +442,8 @@ export function startDevTool(doc: Document = document): DevTool {
   }
 
   problems = problemsTab(doc, tool, state, save)
+  request = requestTab(doc, tool)
+  routesTab(doc, tool, listening.signal)
   doc.addEventListener('click', (event) => {
     const target = event.target instanceof Element ? event.target.closest<HTMLButtonElement>('button[data-kay-open],button[data-kay-copy]') : null
 
@@ -607,6 +626,188 @@ function problemsTab(doc: Document, tool: DevTool, state: DevState, save: () => 
   }
 }
 
+// What the dev server's request block says of the page, as `requestBlock` writes it.
+interface PageRequest {
+  route?: string
+  page: string
+  layouts: string[]
+  params: Record<string, unknown>
+  locale?: string
+  status: number
+  error?: string
+  loads: { file: string, ms?: number }[]
+}
+
+// What served the page: the route it matched, the files that rendered it, its params and status, and how long each load took; read again after each page swap.
+function requestTab(doc: Document, tool: DevTool): { stop: () => void } {
+  const tab = tool.tab({ id: 'request', label: 'Request' })
+  const read = () => {
+    // A swap adds the next page's block before it drops this one's.
+    const block = [...doc.querySelectorAll(`script#${REQUEST}`)].at(-1)?.textContent
+    const facts = tool.make('dl', 'facts')
+
+    if (block === undefined || block === null) {
+      tab.panel.replaceChildren(tool.make('div', 'empty', 'kay served no request block with this page.'))
+
+      return
+    }
+
+    const request = JSON.parse(block) as PageRequest
+    const fact = (term: string, ...values: (Node | string)[]) => {
+      const value = tool.make('dd')
+
+      value.append(...values)
+      facts.append(tool.make('dt', '', term), value)
+    }
+    const lines = (nodes: Node[], none: string) => nodes.length === 0
+      ? [tool.make('span', 'note', none)]
+      : nodes.map((node) => {
+        const line = tool.make('div')
+
+        line.append(node)
+
+        return line
+      })
+    const params = Object.entries(request.params)
+    const total = request.loads.reduce((sum, load) => sum + (load.ms ?? 0), 0)
+
+    fact('Route', request.route === undefined ? tool.make('span', 'note', 'none matched') : tool.make('span', 'mono', request.route))
+    fact('Status', tool.make('span', request.status >= 400 ? 'error' : '', request.error === undefined ? String(request.status) : `${request.status} ${request.error}`))
+    fact('Page', positionButton(tool, request.page))
+    fact('Layouts', ...lines(request.layouts.map(file => positionButton(tool, file)), 'none'))
+    fact('Params', ...lines(params.map(([name, value]) => tool.make('span', 'mono', `${name} = ${JSON.stringify(value)}`)), 'none'))
+
+    if (request.locale !== undefined)
+      fact('Locale', request.locale)
+
+    fact(request.loads.length > 1 ? `Loads, ${formatMs(total)}` : 'Loads', ...lines(request.loads.map((load) => {
+      const line = tool.make('span')
+
+      line.append(positionButton(tool, load.file), tool.make('span', 'ms mono', load.ms === undefined ? 'not timed' : formatMs(load.ms)))
+
+      return line
+    }), 'none'))
+    tab.panel.replaceChildren(facts)
+  }
+  // A page swap, or the patch a page without one gets, brings the next page's block.
+  const swaps = new MutationObserver((records) => {
+    if (records.some(record => [...record.addedNodes, ...record.removedNodes].some(node => (node as Element).id === REQUEST)))
+      read()
+  })
+
+  read()
+  swaps.observe(doc.head, { childList: true })
+
+  return { stop: () => swaps.disconnect() }
+}
+
+// What the dev server's route list gives, as `devRoutes` writes it.
+interface ListedRoute {
+  kind: 'page' | 'endpoint' | 'api'
+  method: string
+  path: string
+  file: string
+  locale?: string
+  href?: string
+}
+
+const ROUTE_KINDS: Record<ListedRoute['kind'], string> = { page: 'Pages', endpoint: 'Endpoints', api: 'API' }
+
+// Every route the server serves, filtered as typed, each opening its file, the GET paths no request fills in linking to themselves; fetched as the tab shows and again after each restart, so it lists what the running server serves.
+function routesTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
+  const win = doc.defaultView!
+  const actions = tool.make('div', 'actions')
+  const filter = tool.make('input', 'filter')
+  const body = tool.make('div')
+  let routes: ListedRoute[] = []
+  const render = () => {
+    const typed = filter.value.trim().toLowerCase()
+    const shown = routes.filter(route => typed === '' || route.path.toLowerCase().includes(typed) || route.file.toLowerCase().includes(typed))
+    const sections = Object.entries(ROUTE_KINDS).flatMap(([kind, label]) => {
+      const ofKind = shown.filter(route => route.kind === kind)
+
+      if (ofKind.length === 0)
+        return []
+
+      const section = tool.make('section', 'group')
+      const list = tool.make('div', 'mono')
+
+      list.append(...ofKind.map(route => routeRow(tool, route, win.location.pathname)))
+      section.append(tool.make('h3', 'heading', `${label} (${ofKind.length})`), list)
+
+      return [section]
+    })
+
+    body.replaceChildren(...sections.length > 0 ? sections : [tool.make('div', 'empty', routes.length === 0 ? 'No routes.' : 'No route matches the filter.')])
+  }
+  const list = async () => {
+    try {
+      const response = await win.fetch(ROUTES_URL, { cache: 'no-store' })
+
+      if (!response.ok)
+        throw new Error(`the server answered ${response.status}`)
+
+      routes = await response.json() as ListedRoute[]
+      render()
+    }
+    catch (error) {
+      body.replaceChildren(tool.make('div', 'empty', `Could not list the routes: ${error instanceof Error ? error.message : String(error)}`))
+    }
+  }
+  const tab = tool.tab({ id: 'routes', label: 'Routes', shown: () => void list() })
+
+  filter.type = 'search'
+  filter.placeholder = 'Filter by path or file'
+  filter.setAttribute('aria-label', 'Filter the routes by path or file')
+  filter.oninput = render
+  actions.append(filter)
+  tab.panel.append(actions, body)
+  win.addEventListener(BUILT_EVENT, () => {
+    if (tab.panel.hidden === false)
+      void list()
+  }, { signal })
+}
+
+function routeRow(tool: DevTool, route: ListedRoute, current: string): HTMLElement {
+  const row = tool.make('div', 'route')
+  const link = tool.make('a', 'path link', route.path)
+  const file = tool.make('div', 'file')
+
+  if (route.href === current)
+    row.setAttribute('aria-current', 'page')
+
+  if (route.href !== undefined)
+    link.href = route.href
+
+  file.append(positionButton(tool, route.file))
+  row.append(tool.make('span', 'method', route.method), route.href === undefined ? tool.make('span', 'path', route.path) : link, tool.make('span', 'note', route.locale ?? ''), file)
+
+  return row
+}
+
+function formatMs(ms: number): string {
+  return `${ms < 10 ? ms.toFixed(1) : Math.round(ms)} ms`
+}
+
+// A file, or a position in one, as a button opening it in the editor once the inspector says how; a file named alone opens at its first line.
+function positionButton(tool: DevTool, source: string): HTMLButtonElement {
+  const position = tool.make('button', 'position', source)
+
+  position.type = 'button'
+  position.disabled = !tool.opens()
+  position.onclick = async () => {
+    const failed = await tool.open(withLine(source))
+    const note = position.nextElementSibling?.classList.contains('note') === true ? position.nextElementSibling : undefined
+
+    note?.remove()
+
+    if (failed !== undefined)
+      position.after(tool.make('span', 'note', ` (${failed})`))
+  }
+
+  return position
+}
+
 const copyResets = new WeakMap<HTMLButtonElement, ReturnType<typeof setTimeout>>()
 
 // Opens the position an error page's button names, saying why it could not, or copies the error, saying so a moment.
@@ -635,7 +836,7 @@ async function answerErrorPage(tool: DevTool, target: HTMLButtonElement): Promis
   }, COPIED_MS))
 }
 
-// A `.kay` file named alone or by its line opens at its first line or column.
+// A file named alone or by its line opens at its first line or column.
 function withLine(source: string): string {
   const [, file, line = '1', column = '1'] = OPENED_POSITION.exec(source) ?? []
 
@@ -659,20 +860,8 @@ function withPositions(text: string, tool: DevTool): Node[] {
 
   for (const match of text.matchAll(KAY_POSITION)) {
     const [source] = match
-    const position = tool.make('button', 'position', source)
 
-    position.type = 'button'
-    position.disabled = !tool.opens()
-    position.onclick = async () => {
-      const failed = await tool.open(withLine(source))
-      const note = position.nextElementSibling?.classList.contains('note') === true ? position.nextElementSibling : undefined
-
-      note?.remove()
-
-      if (failed !== undefined)
-        position.after(tool.make('span', 'note', ` (${failed})`))
-    }
-    nodes.push(textNode(text.slice(last, match.index)), position)
+    nodes.push(textNode(text.slice(last, match.index)), positionButton(tool, source))
     last = match.index + source.length
   }
 

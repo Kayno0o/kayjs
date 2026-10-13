@@ -1,6 +1,6 @@
 import type { DevTool } from '../src/runtime/dev-tool'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test'
+import { afterAll, afterEach, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { startDevTool } from '../src/runtime/dev-tool'
 import { reportError } from '../src/runtime/reactive'
 import { DEV_BOOT, problemsBlock } from '../src/server/dev'
@@ -77,6 +77,8 @@ describe('the dev tool', () => {
     expect(shadow().querySelector('.empty')?.textContent).toBe('No problems on this page.')
 
     key({ key: 'ArrowRight' }, shadow().activeElement!)
+    expect(shadow().activeElement?.id).toBe('kay-dev-tab-request')
+    key({ key: 'End' }, shadow().activeElement!)
     expect(shadow().activeElement?.id).toBe('kay-dev-tab-other')
     expect(shadow().querySelector<HTMLElement>('#kay-dev-other')!.hidden).toBe(false)
     key({ key: 'Home' }, shadow().activeElement!)
@@ -302,5 +304,97 @@ describe('the dev tool', () => {
     await Bun.sleep(500)
     expect(built().textContent).toBe('')
     delete (window as { $kayBuilt?: string }).$kayBuilt
+  })
+  it('shows what served the page, its route, files, params, status and loads, and reads the next page\'s as a swap brings it', async () => {
+    const block = (request: object) => {
+      const script = document.createElement('script')
+
+      script.type = 'application/json'
+      script.id = 'kay-dev-request'
+      script.textContent = JSON.stringify(request)
+
+      return script
+    }
+    const facts = () => [...shadow().querySelectorAll('#kay-dev-request dt')].map(term => `${term.textContent}: ${[...term.nextElementSibling!.children].map(line => line.textContent).join(' / ') || term.nextElementSibling!.textContent}`)
+    const opened: string[] = []
+
+    document.head.append(block({ route: '/items/:id', page: 'src/routes/items/[id].kay', layouts: ['src/routes/_layout.kay'], params: { id: '7' }, locale: 'fr', status: 200, loads: [{ file: 'src/routes/_layout.kay', ms: 1.5 }, { file: 'src/routes/items/[id].kay', ms: 42.4 }] }))
+    tool = startDevTool()
+    shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-request')!.click()
+    await Bun.sleep(0)
+
+    expect(facts()).toEqual(['Route: /items/:id', 'Status: 200', 'Page: src/routes/items/[id].kay', 'Layouts: src/routes/_layout.kay', 'Params: id = "7"', 'Locale: fr', 'Loads, 44 ms: src/routes/_layout.kay1.5 ms / src/routes/items/[id].kay42 ms'])
+
+    // The swap adds the next page's block, then drops this one's.
+    document.head.append(block({ page: 'src/routes/_404.kay', layouts: [], params: {}, status: 404, error: 'Not Found', loads: [] }))
+    await Bun.sleep(0)
+    document.head.firstElementChild!.remove()
+    await Bun.sleep(0)
+
+    expect(facts()).toEqual(['Route: none matched', 'Status: 404 Not Found', 'Page: src/routes/_404.kay', 'Layouts: none', 'Params: none', 'Loads: none'])
+    expect(shadow().querySelector('#kay-dev-request dd .error')?.textContent).toBe('404 Not Found')
+
+    tool.setOpener(async (source) => {
+      opened.push(source)
+
+      return undefined
+    })
+    shadow().querySelector<HTMLButtonElement>('#kay-dev-request button.position')!.click()
+    await Bun.sleep(0)
+
+    expect(opened).toEqual(['src/routes/_404.kay:1:1'])
+  })
+
+  it('lists the routes the server serves as the tab shows and after each restart, filtered as typed, linking the paths no request fills in, the page shown marked', async () => {
+    const fetched: string[] = []
+    const { happyDOM } = window as unknown as { happyDOM: { setURL: (url: string) => void } }
+    const { href } = location
+    let status = 200
+
+    happyDOM.setURL('http://localhost/broken')
+    const fetching = spyOn(window, 'fetch').mockImplementation((async (url: string) => {
+      fetched.push(url)
+
+      return new Response(JSON.stringify([
+        { kind: 'page', method: 'GET', path: '/broken', file: 'src/routes/broken.kay', href: '/broken' },
+        { kind: 'page', method: 'GET', path: '/items/:id', file: 'src/routes/items/[id].kay' },
+        { kind: 'page', method: 'GET', path: '/fr/a-propos', file: 'src/routes/about.kay', locale: 'fr', href: '/fr/a-propos' },
+        { kind: 'api', method: 'POST', path: '/api/stock/:id', file: 'src/api/stock.ts' },
+      ]), { status })
+    }) as unknown as typeof window.fetch)
+
+    const rows = () => [...shadow().querySelectorAll('#kay-dev-routes .route')].map(row => [...row.children].map(cell => cell.textContent).join(' | '))
+    const filter = () => shadow().querySelector<HTMLInputElement>('#kay-dev-routes input')!
+
+    try {
+      tool = startDevTool()
+      shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-routes')!.click()
+      await Bun.sleep(0)
+
+      expect(fetched).toEqual(['/_kay/dev/routes'])
+      expect(groups()).toEqual(['Pages (3)', 'API (1)'])
+      expect(rows()).toEqual(['GET | /broken |  | src/routes/broken.kay', 'GET | /items/:id |  | src/routes/items/[id].kay', 'GET | /fr/a-propos | fr | src/routes/about.kay', 'POST | /api/stock/:id |  | src/api/stock.ts'])
+      expect([...shadow().querySelectorAll<HTMLAnchorElement>('#kay-dev-routes a')].map(link => link.getAttribute('href'))).toEqual(['/broken', '/fr/a-propos'])
+      expect(shadow().querySelector('#kay-dev-routes [aria-current=page] .path')?.textContent).toBe('/broken')
+
+      filter().value = 'ABOUT'
+      filter().dispatchEvent(new Event('input'))
+      expect(rows()).toEqual(['GET | /fr/a-propos | fr | src/routes/about.kay'])
+      filter().value = 'nothing'
+      filter().dispatchEvent(new Event('input'))
+      expect(shadow().querySelector('#kay-dev-routes .empty')?.textContent).toBe('No route matches the filter.')
+
+      // A restart may change the routes: the tab shown asks again.
+      status = 500
+      window.dispatchEvent(new CustomEvent('kay-dev-built', { detail: JSON.stringify({ id: 'b', at: 0, changed: 'src/routes/x.kay', ms: 1 }) }))
+      await Bun.sleep(0)
+
+      expect(fetched).toHaveLength(2)
+      expect(shadow().querySelector('#kay-dev-routes .empty')?.textContent).toBe('Could not list the routes: the server answered 500')
+    }
+    finally {
+      fetching.mockRestore()
+      happyDOM.setURL(href)
+    }
   })
 })

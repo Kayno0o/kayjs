@@ -2,7 +2,11 @@ import type { ClientOptions } from '../build/client'
 import type { KayCompileError } from '../build/transform'
 import type { BuildFailure } from '../dev/builder'
 import type { HotSwap } from '../runtime/client'
+import type { LocaleSettings } from '../runtime/i18n'
 import type { ClientBuild } from './client'
+import type { ServedRoute } from './guards'
+import type { MountedApi } from './openapi'
+import type { Endpoint } from './routes'
 import { readFileSync, statSync } from 'node:fs'
 import { basename, isAbsolute, join, relative, resolve } from 'node:path'
 import process from 'node:process'
@@ -14,6 +18,7 @@ import { kayLog } from '../runtime/log'
 import { isCrossSite } from './actions'
 import { BUILD_FAILURE, clientOptionsKey, fromManifest, readManifest } from './client'
 import { editorCommand } from './editor'
+import { localeCopies } from './i18n'
 import { compileErrorPage } from './overlay'
 
 export const DEV_EVENTS = '/_kay/dev/events'
@@ -23,6 +28,7 @@ export const DEV_INSPECTOR = '/_kay/dev/inspector.js'
 export const DEV_OPEN = '/_kay/dev/open'
 export const DEV_A11Y = '/_kay/dev/a11y.js'
 export const DEV_AXE = '/_kay/dev/axe.js'
+export const DEV_ROUTES = '/_kay/dev/routes'
 const PATCH_SOURCE = resolve(import.meta.dir, '../runtime/dev-patch.ts')
 const TOOL_SOURCE = resolve(import.meta.dir, '../runtime/dev-tool.ts')
 const INSPECTOR_SOURCE = resolve(import.meta.dir, '../runtime/dev-inspector.ts')
@@ -32,6 +38,9 @@ const OPEN_HEADER = 'x-kay-dev'
 const POSITION = /^(.+\.(?:kay|[cm]?[jt]sx?)):(\d+):(\d+)$/
 const BACKSLASH = /\\/g
 const SOURCE_FILE = /\.(?:kay|[cm]?[jt]sx?|json|css)$/
+const ROUTE_METHODS = /^(?:get|post|put|patch|delete|head|options|all|ws)$/i
+// A path a request fills in, which the Routes tab cannot link to.
+const PATH_PARAM = /[:*]/
 
 // One per server process: `kay dev` restarts the process on every change, so a new id means new code.
 const BOOT_ID = crypto.randomUUID()
@@ -353,6 +362,46 @@ export function bootFailure(error: unknown, root: string): Elysia {
   app.get('/*', () => new Response(html, { status: 500, headers: { 'content-type': 'text/html; charset=utf-8' } }))
 
   return app
+}
+
+// One line of the dev tool's Routes tab.
+export interface DevRoute {
+  kind: 'page' | 'endpoint' | 'api'
+  method: string
+  path: string
+  // The file serving it, from the project's root.
+  file: string
+  locale?: string | undefined
+  // Where the tab links to, for a GET path no request fills in, served on this host.
+  href?: string | undefined
+}
+
+// Every page, endpoint and API route the server serves, as `kay routes` lists them, each locale's copy of a page on its own line.
+export function devRoutes(root: string, pages: ServedRoute[], endpoints: Endpoint[], mounted: MountedApi[], settings: LocaleSettings | undefined, base: string): DevRoute[] {
+  const shown = (file: string) => relative(root, file).replace(BACKSLASH, '/')
+  const href = (path: string, host?: string) => host === undefined && !PATH_PARAM.test(path) ? base + path : undefined
+  const listed: DevRoute[] = []
+
+  for (const page of pages) {
+    for (const copy of localeCopies(settings, page.pattern))
+      listed.push({ kind: 'page', method: 'GET', path: copy.path, file: shown(page.file), locale: copy.locale, href: href(copy.path, copy.host) })
+  }
+
+  for (const endpoint of endpoints) {
+    const path = endpoint.pattern + (endpoint.suffix ?? '')
+
+    listed.push({ kind: 'endpoint', method: 'GET', path, file: shown(endpoint.file), href: href(path) })
+  }
+
+  for (const module of mounted) {
+    for (const route of module.instance.routes.filter(route => ROUTE_METHODS.test(route.method))) {
+      const path = module.mount + (route.path === '/' ? '' : route.path)
+
+      listed.push({ kind: 'api', method: route.method.toUpperCase(), path, file: shown(module.file), href: route.method.toUpperCase() === 'GET' ? href(path) : undefined })
+    }
+  }
+
+  return listed
 }
 
 // The data block the dev tool reads: a script of another type never runs, so the policy has nothing to allow.

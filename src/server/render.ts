@@ -151,6 +151,9 @@ interface Rendering {
   base: string
   // The form post the browser came back from, if any.
   outcome: () => Outcome | null
+  // Development only, for the dev tool: the route the request matched, and its loads as they were timed.
+  matched?: string | undefined
+  loads?: Pick<LoadedRoute, 'files' | 'modules' | 'timings'> | undefined
 }
 
 const CHARSET = '<meta charset="utf-8">'
@@ -197,6 +200,9 @@ async function refused(route: ServedRoute, rendering: Rendering, client: ClientB
 
 // Past the route's guards, its modules and their loads; a refusal or a failed load answers as the page would.
 async function loadRoute(route: ServedRoute, rendering: Rendering, client: ClientBuild, options: RenderOptions): Promise<LoadedRoute | Response> {
+  if (options.dev)
+    rendering.matched = route.pattern
+
   const refusal = await refused(route, rendering, client, options)
 
   if (refusal)
@@ -215,6 +221,9 @@ async function loadRoute(route: ServedRoute, rendering: Rendering, client: Clien
 
     // A prerendered page is stored with its headers and served to everyone, so it carries no one render's timings.
     const timings = options.serverTiming && !options.prerendering ? Array.from<number>({ length: files.length }) : undefined
+
+    if (options.dev)
+      rendering.loads = { files, modules, timings }
 
     return { files, modules, data: await runLoads(files, modules, rendering.ctx, loaded, timings), loaded, timings }
   }
@@ -643,7 +652,7 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
   const scripts = shipsEntry ? islandScripts(client, islands.eager, streamed, hasIslands) + (posts ? formsScript(forms) : '') + workScript(forms, options.prerendering === true) : ''
   const lang = localeState()?.locale ?? options.lang ?? DEFAULT_LANG
   const islandData = hasIslands ? messagesScript(islands.messages, true) + outcomeScript(rendering.outcome()) + queryScript(rules) : ''
-  const written = `${htmlOpen(lang, head.root)}<head>${headStart(head)}${stylesheets(client, styled)}${head.html}${scripts}${islandData}${kayMetas(options, hasIslands)}${speculationRules(options.prefetch, options.base)}${client.navigation === true && !shipsEntry ? historyScript : ''}${options.offline ? registerScript(options.base ?? '') : ''}${options.dev ? devScripts(client) : ''}</head><body>${body}`
+  const written = `${htmlOpen(lang, head.root)}<head>${headStart(head)}${stylesheets(client, styled)}${head.html}${scripts}${islandData}${kayMetas(options, hasIslands)}${speculationRules(options.prefetch, options.base)}${client.navigation === true && !shipsEntry ? historyScript : ''}${options.offline ? registerScript(options.base ?? '') : ''}${options.dev ? devScripts(client) + (options.prerendering ? '' : requestBlock(files, rendering)) : ''}</head><body>${body}`
   const start = marks === undefined ? written : placeFieldMarks(written, marks)
 
   if (!streamed)
@@ -674,6 +683,25 @@ function kayMetas(options: RenderOptions, hasIslands: boolean): string {
 
 function devScripts(client: ClientBuild): string {
   return problemsBlock(client.problems) + LIVE_RELOAD + DEV_BOOT + devToolScripts() + A11Y_SCRIPT
+}
+
+// What the dev tool's Request tab shows: the route matched, the files that rendered, the params, the status, and how long each load took, the matched route's when another page shows its error.
+function requestBlock(files: string[], rendering: Rendering): string {
+  const { loads } = rendering
+  const request = {
+    route: rendering.matched,
+    page: projectPath(files.at(-1)!),
+    layouts: files.slice(0, -1).map(projectPath),
+    params: rendering.ctx.params,
+    locale: localeState()?.locale,
+    status: rendering.status,
+    error: (rendering.ctx as Partial<ErrorPageContext>).error?.message,
+    loads: loads ? loads.files.flatMap((file, index) => loads.modules[index]!.load ? [{ file: projectPath(file), ms: loads.timings?.[index] }] : []) : [],
+  }
+  // A matcher may give a param any value, which shows as its text when JSON has none.
+  const json = JSON.stringify(request, (_, value: unknown) => typeof value === 'bigint' || typeof value === 'symbol' ? String(value) : value)
+
+  return `<script type="application/json" id="kay-dev-request">${json.replaceAll('<', '\\u003c')}</script>`
 }
 
 // The post the page answers, for its islands to render what the server did as they hydrate, then read through the action.

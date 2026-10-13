@@ -5,6 +5,8 @@ const ISLAND = 'slot[data-component]'
 const UNSAFE = `${ISLAND},script`
 // The path of `DEV_EVENTS`, which names the live-reload script.
 const LIVE_RELOAD = '/_kay/dev/events'
+// The dev tool's request block, render.ts's, which differs on every render and is replaced whole.
+const REQUEST = 'kay-dev-request'
 
 // False when the change cannot be applied in place, for the caller to load the page fully; the page may be half patched then.
 export function patch(before: Document, after: Document, live: Document = document): boolean {
@@ -24,21 +26,29 @@ function apply(before: Document, after: Document, live: Document): boolean {
   if (!sameAttributes(before.documentElement, after.documentElement))
     return false
 
-  return children(before.head, after.head, live.head) && element(before.body, after.body, live.body)
+  if (!children(before.head, after.head, live.head) || !element(before.body, after.body, live.body))
+    return false
+
+  const request = after.getElementById(REQUEST)
+
+  if (request)
+    live.getElementById(REQUEST)?.replaceWith(live.importNode(request, true))
+
+  return true
 }
 
 function sameAttributes(left: Element, right: Element): boolean {
   return left.attributes.length === right.attributes.length && [...left.attributes].every(attribute => right.getAttribute(attribute.name) === attribute.value)
 }
 
-// What the live reload adds to a page itself: the stylesheets it swaps in.
+// What the live reload adds to a page itself, the stylesheets it swaps in, and the request block, replaced once the rest is patched.
 function ignored(node: Node): boolean {
   if (!(node instanceof Element))
     return false
 
   const name = node.localName
 
-  return (name === 'link' && node.getAttribute('rel') === 'stylesheet') || (name === 'script' && node.textContent.includes(LIVE_RELOAD)) || (name === 'meta' && node.getAttribute('name') === 'kay-boot')
+  return (name === 'link' && node.getAttribute('rel') === 'stylesheet') || (name === 'script' && node.textContent.includes(LIVE_RELOAD)) || (name === 'meta' && node.getAttribute('name') === 'kay-boot') || node.id === REQUEST
 }
 
 function kept(parent: Node): ChildNode[] {
