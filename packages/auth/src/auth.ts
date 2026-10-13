@@ -238,6 +238,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
 
     await this.session.unset('auth')
     await this.session.unset('authRegistered')
+    await this.session.unset('authHeld')
     await this.session.regenerate()
     this.source = null
     this.resolving = Promise.resolve(null)

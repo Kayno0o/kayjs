@@ -131,6 +131,7 @@ export async function register(state: RequestState, input: RegisterInput): Promi
 
   // This browser may verify the address without signing in, as with `requireVerified` it cannot.
   await state.session.set('authRegistered', record.id)
+  await state.session.unset('authHeld')
   await welcome(state, record)
 
   // A guest stays signed in: the account was theirs already.
@@ -142,12 +143,13 @@ export async function register(state: RequestState, input: RegisterInput): Promi
   return { ok: true, user, signedIn: true }
 }
 
-// Spends the time hashing a new password takes, so a held address answers no faster than a free one, and leaves this session as a new account's: registered as an account that does not exist, which `sendVerification` answers as it does a new one, mailing no one.
+// Spends the time hashing a new password takes, so a held address answers no faster than a free one, and leaves this session as a new account's, which `sendVerification` answers alike, mailing no one.
 async function answerHeld(state: RequestState, holder: UserRecord, password: string | null): Promise<RegisterResult> {
   if (password !== null)
     await hashPassword(password)
 
-  await state.session.set('authRegistered', crypto.randomUUID())
+  await state.session.unset('authRegistered')
+  await state.session.set('authHeld', holder.email!)
   await warnHolder(state, holder)
 
   return { ok: true, signedIn: false }

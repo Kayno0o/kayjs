@@ -25,7 +25,7 @@ export interface AuthFeatures {
   email: boolean
   // What sign-in and verification mails carry, a link, a code or both; null without mail.
   codes: Record<CodedLink, CodeMode> | null
-  // Whether password sign-in waits for a verified address.
+  // Whether password sign-in waits for a verified address, the default with mail.
   requireVerified: boolean
   passkeys: boolean
   // The CAPTCHA widget to show where `captchaRequired` says one is needed; null without one.

@@ -23,8 +23,10 @@ export interface AuthSessionData {
   authPasskey?: PasskeyChallenge
   // Whether the sign-in under way asked to be remembered, from the call that started it.
   authRemember?: boolean
-  // The account this browser registered, or proved the password of while its address was unverified: it may have the link resent and verify it without signing in.
+  // The account this browser registered, or proved the password of while its address was unverified: it may have the link resent and verify it without signing in. Gone once a later registration replaced it.
   authRegistered?: string
+  // The address this browser registered while another account held it, for the resend button to answer as it does a new account's, mailing no one.
+  authHeld?: string
 }
 
 export interface SignedIn {

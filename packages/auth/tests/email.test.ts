@@ -173,11 +173,35 @@ describe('verifying an email', () => {
     expect(await fresh.call('register', { email: 'bob@example.com', password: PASSWORD })).toEqual({ ok: true, signedIn: false })
     expect(await held.call('register', { email: 'ada@example.com', password: PASSWORD })).toEqual({ ok: true, signedIn: false })
     expect(await held.call('emailCodePending')).toEqual({ type: 'verify', email: 'ada@example.com' })
-    expect(await held.call('verifyEmailCode', '000000')).toEqual(await fresh.call('verifyEmailCode', '000000'))
+    expect(await fresh.call('emailCodePending')).toEqual({ type: 'verify', email: 'bob@example.com' })
+
+    // The code dies after five misses, and a resend parks a new one for the address registered, held or not.
+    for (let i = 0; i < 5; i++)
+      expect(await held.call('verifyEmailCode', '000000')).toEqual(await fresh.call('verifyEmailCode', '000000'))
+
+    expect(await held.call('emailCodePending')).toEqual(await fresh.call('emailCodePending'))
     expect(await held.call('sendVerification')).toEqual(await fresh.call('sendVerification'))
     expect(await held.call('emailCodePending')).toEqual({ type: 'verify', email: 'ada@example.com' })
+    expect(await fresh.call('emailCodePending')).toEqual({ type: 'verify', email: 'bob@example.com' })
+
+    // A magic link asked for in between leaves the resend to the address registered too.
+    await held.call('requestMagicLink', 'carol@example.com')
+    await fresh.call('requestMagicLink', 'carol@example.com')
+
+    expect(await held.call('sendVerification')).toEqual(await fresh.call('sendVerification'))
+    expect(await held.call('emailCodePending')).toEqual({ type: 'verify', email: 'ada@example.com' })
+    expect(await fresh.call('emailCodePending')).toEqual({ type: 'verify', email: 'bob@example.com' })
     await Bun.sleep(0)
     expect(mails.filter(mail => mail.to === 'ada@example.com').map(mail => mail.kind)).toEqual(['account-exists'])
+  })
+
+  test('with a mailer, addresses must be verified unless the app says otherwise', async () => {
+    const { browser } = testApp({ url: 'https://site.test', email: { mailer: { send: () => undefined }, links: LINKS } })
+    const { browser: open } = testApp({ url: 'https://site.test', email: { mailer: { send: () => undefined }, links: LINKS, requireVerified: false } })
+
+    expect(await browser().call('register', { email: 'ada@example.com', password: PASSWORD })).toEqual({ ok: true, signedIn: false })
+    expect(await open().call('register', { email: 'ada@example.com', password: PASSWORD })).toMatchObject({ ok: true, signedIn: true })
+    expect(await testApp().browser().call('register', { email: 'ada@example.com', password: PASSWORD })).toMatchObject({ ok: true, signedIn: true })
   })
 
   test('with `requireVerified`, the holder of an address is told at most 3 times an hour', async () => {
@@ -289,14 +313,15 @@ describe('verifying an email', () => {
     await browser().call('register', { email: 'ada@example.com', password: 'squatter password' })
     await ada.post('/password', { identifier: 'ada@example.com', password: 'squatter password' })
 
-    expect(await ada.call('sendVerification')).toEqual({ ok: true })
+    const answers = [await ada.call('sendVerification'), await ada.call('sendVerification'), await ada.call('sendVerification'), await ada.call('sendVerification')]
 
-    // The address registered again replaces the account this browser proved the password of: the answers go on as before, mailing no one.
+    expect(answers.at(-1)).toEqual({ ok: false, error: 'limited' })
+
+    // The address registered again replaces the account this browser proved the password of.
     await browser().call('register', { email: 'ada@example.com', password: PASSWORD })
     const sent = mails.length
-    const answers = [await ada.call('sendVerification'), await ada.call('sendVerification'), await ada.call('sendVerification')]
 
-    expect(answers).toEqual([{ ok: true }, { ok: true }, { ok: false, error: 'limited' }])
+    expect(await ada.call('sendVerification')).toEqual({ ok: false, error: 'signed-out' })
     expect(mails).toHaveLength(sent)
   })
 

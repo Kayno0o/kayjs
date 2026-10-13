@@ -55,7 +55,7 @@ export interface EmailOptions {
   locales?: string[] | undefined
   // Templates by language, over `templates`: `{ de: germanTemplates }`.
   translations?: Record<string, Partial<Templates>> | undefined
-  // Refuses password sign-in until the address is verified, and signs no one in on registering.
+  // Refuses password sign-in until the address is verified, and signs no one in on registering, so registering answers alike whether or not the address is held. On by default; `false` signs in on registering and answers `'taken'` for a held address.
   requireVerified?: boolean | undefined
   // Whether magic links and verification mails carry a code, for both kinds at once or for each: `'both'`, `{ 'magic-link': 'code' }`. A link only by default.
   codes?: CodeMode | Partial<Record<CodedLink, CodeMode>> | undefined
@@ -85,14 +85,16 @@ export type ResetPasswordResult = LinkResult | { ok: false, errors: { password: 
 
 export type ChangeEmailResult = { ok: true } | { ok: false, error: ProofFailure | 'unavailable' } | { ok: false, errors: { email: EmailProblem | 'taken' | 'unchanged' } }
 
-// Mails a new verification link to the signed-in user or, with nobody signed in, to the account this browser registered or proved the password of, off the response's path.
+// Mails a new verification link to the signed-in user or, with nobody signed in, off the response's path to the account this browser registered or proved the password of.
 export async function sendVerification(state: RequestState): Promise<MailRequestResult | { ok: false, error: 'signed-out' | 'verified' }> {
-  const registered = await state.session.get('authRegistered')
-  const record = await state.current() ?? (registered === undefined ? undefined : await state.core.store.users.get(registered))
-  // Registered here for an address another account holds, under an id no account has: answered as a new account's resend is, mailing no one.
-  const held = !record && registered !== undefined
+  const current = await state.current()
+  const registered = current ? undefined : await state.session.get('authRegistered')
+  const record = current ?? (registered === undefined ? undefined : await state.core.store.users.get(registered))
+  // Registered here for an address another account holds: answered as a new account's resend is, mailing no one.
+  const held = record ? undefined : await state.session.get('authHeld')
+  const email = record?.email ?? held
 
-  if (!held && !record?.email)
+  if (!email)
     return { ok: false, error: 'signed-out' }
 
   if (record && record.emailVerifiedAt !== null)
@@ -101,17 +103,18 @@ export async function sendVerification(state: RequestState): Promise<MailRequest
   if (!state.core.email)
     return { ok: false, error: 'unavailable' }
 
-  const refused = await spendResend(state, record?.id ?? registered!, 'resend')
+  const refused = await spendResend(state, record?.id ?? `held:${email}`, 'resend')
 
   if (refused)
     return refused
 
-  // A new code replaces the one this session waits for, the held address's too, so the session changes alike.
-  const email = record?.email ?? (await state.session.get('authEmailCode'))?.email
-  const nonce = email ? await bindCode(state, 'verify-email', email) : undefined
+  const nonce = await bindCode(state, 'verify-email', email)
 
-  if (record)
-    void issueQuietly(state, record, 'verify-email', record.email!, null, nonce)
+  // The signed-in user's own address tells nothing, so a failing mailer fails the call.
+  if (current)
+    await issue(state, current, 'verify-email', email, null, nonce)
+  else if (record)
+    void issueQuietly(state, record, 'verify-email', email, null, nonce)
 
   return { ok: true }
 }
