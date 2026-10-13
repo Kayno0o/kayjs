@@ -215,12 +215,13 @@ async function askProvider(name: string, what: string, url: string, init: Reques
   }
 }
 
+// The body stays out of the error: a successful answer may hold tokens.
 function parseJson(name: string, what: string, text: string): any {
   try {
     return JSON.parse(text)
   }
   catch {
-    throw new OAuthExchangeError(502, `OAuth ${what} failed (${name}): the answer is not JSON: ${redactBody(text)}`)
+    throw new OAuthExchangeError(502, `OAuth ${what} failed (${name}): the answer is not JSON`)
   }
 }
 
