@@ -119,8 +119,9 @@ export function devTool(): Response {
   return devModule(TOOL_SOURCE, '\nwindow.$kayDev = startDevTool()\n')
 }
 
+// Joins the dev tool, unless it failed to start, whose error the console already shows.
 export function devInspector(): Response {
-  return devModule(INSPECTOR_SOURCE, '\nstartInspector(window.$kayDev)\n')
+  return devModule(INSPECTOR_SOURCE, '\nif (window.$kayDev) startInspector(window.$kayDev)\n')
 }
 
 // Checks each page the dev server serves with axe-core once it settles, its violations showing in the dev tool's problems.

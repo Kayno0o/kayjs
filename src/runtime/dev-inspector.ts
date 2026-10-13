@@ -132,7 +132,10 @@ export function startInspector(tool: DevTool, doc: Document = document): Inspect
     outlined(event.altKey || inspecting ? sourceOf(event) : undefined)
   }
   const onKeyDown = (event: KeyboardEvent) => {
+    // The Escape ending Inspect is the inspector's, not the page's dialogs'.
     if (event.key === 'Escape' && inspecting) {
+      event.preventDefault()
+      event.stopImmediatePropagation()
       setInspecting(false)
 
       return

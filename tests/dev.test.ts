@@ -842,7 +842,7 @@ describe('kay dev', () => {
 
       expect(page).toContain('<h1 data-kay-src="src/routes/index.kay:2:3">Home</h1>')
       expect(page).toContain('<script type="module" src="/_kay/dev/tool.js"></script><script type="module" src="/_kay/dev/inspector.js"></script>')
-      expect(await (await fetch(`${url}/_kay/dev/inspector.js`)).text()).toContain('startInspector(window.$kayDev)')
+      expect(await (await fetch(`${url}/_kay/dev/inspector.js`)).text()).toContain('if (window.$kayDev) startInspector(window.$kayDev)')
       expect(await (await fetch(`${url}/_kay/dev/tool.js`)).text()).toContain('window.$kayDev = startDevTool()')
 
       const open = async (source: string, headers: Record<string, string> = { 'x-kay-dev': '1' }) => fetch(`${url}/_kay/dev/open`, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify({ source }) })

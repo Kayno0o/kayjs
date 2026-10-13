@@ -24,6 +24,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .bar > button { padding: 3px 10px; border-radius: 999px; white-space: nowrap; }
 .bar > button:hover { background: var(--surface); }
 .bar > button[aria-pressed=true], .bar > button[aria-expanded=true] { background: var(--accent-soft); }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .mark { font-weight: 700; color: var(--accent); letter-spacing: .02em; }
 .error { color: var(--error); }
 .warn { color: var(--warn); }
@@ -67,6 +68,8 @@ export interface DevTabOptions {
   label: string
   // What the bar says for a count above zero, as `3 islands`; without it the count shows in the tab only.
   summary?: (count: number) => string
+  // Says the bar's text politely to a screen reader as it changes.
+  announce?: boolean
   // Called as the tab shows and hides, so it works only while shown.
   shown?: () => void
   hidden?: () => void
@@ -110,6 +113,7 @@ export function startDevTool(doc: Document = document): DevTool {
   const tabList = make('div', 'tabs')
   const side = make('button', 'tool')
   const close = make('button', 'tool', 'Close')
+  const status = make('span', 'sr')
   const tabs: { options: DevTabOptions, button: HTMLButtonElement, panel: HTMLElement, badge: HTMLButtonElement }[] = []
   const save = () => writeState(win, state)
 
@@ -123,11 +127,12 @@ export function startDevTool(doc: Document = document): DevTool {
   mark.type = 'button'
   mark.setAttribute('aria-label', 'kay dev tools (Alt+Shift+K)')
   mark.setAttribute('aria-controls', drawer.id)
+  status.setAttribute('role', 'status')
   side.type = 'button'
   close.type = 'button'
   head.append(tabList, side, close)
   drawer.append(head)
-  bar.append(mark)
+  bar.append(mark, status)
   ui.append(drawer, bar)
   root.append(ui)
   host.setAttribute('data-kay-dev', '')
@@ -145,6 +150,7 @@ export function startDevTool(doc: Document = document): DevTool {
 
       tab.button.setAttribute('aria-selected', String(selected))
       tab.button.tabIndex = selected ? 0 : -1
+      tab.badge.setAttribute('aria-expanded', String(selected && state.open))
 
       if (tab.panel.hidden !== (selected && state.open))
         continue
@@ -195,10 +201,11 @@ export function startDevTool(doc: Document = document): DevTool {
     panel.setAttribute('aria-labelledby', button.id)
     badge.type = 'button'
     badge.hidden = true
+    badge.setAttribute('aria-controls', drawer.id)
     badge.onclick = () => state.open && state.tab === options.id ? closeDrawer() : openTab(options.id)
     tabList.append(button)
     drawer.append(panel)
-    bar.insertBefore(badge, bar.children[1 + tabs.length] ?? null)
+    bar.insertBefore(badge, bar.children[2 + tabs.length] ?? null)
     tabs.push(entry)
     // Once the caller is done setting the tab up, as showing it runs its `shown`.
     queueMicrotask(render)
@@ -212,6 +219,9 @@ export function startDevTool(doc: Document = document): DevTool {
         badge.hidden = value === 0 || options.summary === undefined
         badge.textContent = options.summary?.(value) ?? ''
         badge.className = tone ?? ''
+
+        if (options.announce === true)
+          status.textContent = value === 0 ? '' : options.summary?.(value) ?? ''
       },
     }
   }
@@ -235,21 +245,24 @@ export function startDevTool(doc: Document = document): DevTool {
     render()
   }
 
-  // Arrow keys move between the tabs, as a tab list's do.
+  // Arrow keys, Home and End move between the tabs, as a tab list's do.
   tabList.onkeydown = (event) => {
     const index = tabs.findIndex(tab => tab.button === root.activeElement)
-    const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0
+    const next = { ArrowRight: index + 1, ArrowLeft: index - 1, Home: 0, End: tabs.length - 1 }[event.key]
 
-    if (index < 0 || step === 0)
+    if (index < 0 || next === undefined)
       return
 
     event.preventDefault()
-    openTab(tabs[(index + step + tabs.length) % tabs.length]!.options.id, true)
+    openTab(tabs[(next + tabs.length) % tabs.length]!.options.id, true)
   }
 
   const onKeyDown = (event: KeyboardEvent) => {
     if (event.altKey && event.shiftKey && event.code === 'KeyK') {
       event.preventDefault()
+
+      if (event.repeat)
+        return
 
       if (state.open)
         closeDrawer(true)
@@ -282,7 +295,7 @@ export function startDevTool(doc: Document = document): DevTool {
 // What kay logged, what `kay check` found and what the accessibility check found, a problem listed once; those the page logged leave with it on a page swap.
 function problemsTab(doc: Document, tool: Pick<DevTool, 'tab' | 'make'>, state: DevState, save: () => void): { stop: () => void } {
   const win = doc.defaultView! as Window & { $kayProblems?: DevProblems }
-  const tab = tool.tab({ id: 'problems', label: 'Problems', summary: count => `${count} problem${count === 1 ? '' : 's'}` })
+  const tab = tool.tab({ id: 'problems', label: 'Problems', summary: count => `${count} problem${count === 1 ? '' : 's'}`, announce: true })
   const actions = tool.make('div', 'actions')
   const clear = tool.make('button', 'tool', 'Dismiss all')
   const list = tool.make('div', 'mono')
@@ -292,7 +305,6 @@ function problemsTab(doc: Document, tool: Pick<DevTool, 'tab' | 'make'>, state: 
 
   clear.type = 'button'
   actions.append(clear)
-  list.setAttribute('aria-live', 'polite')
   tab.panel.append(actions, empty, list)
 
   const update = () => {
@@ -325,8 +337,24 @@ function problemsTab(doc: Document, tool: Pick<DevTool, 'tab' | 'make'>, state: 
     update()
   }
 
-  for (const text of JSON.parse(doc.getElementById(CHECK_PROBLEMS)?.textContent ?? '[]') as string[])
-    add({ level: text.startsWith('error') ? 'error' : 'warn', text }, true)
+  // What `kay check` finds now, as the page carries it: a swap brings the block of the code the server runs.
+  const readChecks = () => {
+    const texts = new Set(JSON.parse(doc.getElementById(CHECK_PROBLEMS)?.textContent ?? '[]') as string[])
+
+    for (const [text, { element, check }] of shown) {
+      if (check && !texts.has(text)) {
+        element.remove()
+        shown.delete(text)
+      }
+    }
+
+    for (const text of texts)
+      add({ level: text.startsWith('error') ? 'error' : 'warn', text }, true)
+
+    update()
+  }
+
+  readChecks()
 
   // What was logged before this loaded, then each problem as it is logged, a microtask later so a failure here never breaks the call that logged.
   const early = Array.isArray(win.$kayProblems) ? win.$kayProblems as DevProblem[] : []
@@ -343,10 +371,13 @@ function problemsTab(doc: Document, tool: Pick<DevTool, 'tab' | 'make'>, state: 
   for (const problem of early)
     add(problem)
 
-  // A page swap marks the document busy until the new page is in: the old page's problems go as it starts.
+  // A page swap marks the document busy until the new page is in: the old page's problems go as it starts, and what `kay check` finds is read again once it ends.
   const swaps = new MutationObserver(() => {
-    if (!doc.documentElement.hasAttribute('aria-busy'))
+    if (!doc.documentElement.hasAttribute('aria-busy')) {
+      readChecks()
+
       return
+    }
 
     for (const [text, { element, check }] of shown) {
       if (!check) {

@@ -50,11 +50,17 @@ describe('the dev tool', () => {
     expect(problems()).toEqual([['error', check], ['error', 'island a.kay did not match its server markup'], ['warn', 'the persisted signal note could not be kept']])
     expect(bar()).toEqual(['kay', '3 problems'])
     expect(shadow().querySelector('.bar > button.error')?.textContent).toBe('3 problems')
+    expect(shadow().querySelector('[role=status]')?.textContent).toBe('3 problems')
   })
 
-  it('opens on the bar or Alt+Shift+K, closes on Escape from inside it, and keeps its tab and dock side for the browser tab', async () => {
+  it('opens on the bar or Alt+Shift+K, moves between tabs by arrow keys, closes on Escape from inside it, and keeps its tab and dock side for the browser tab', async () => {
     tool = startDevTool()
+    tool.tab({ id: 'other', label: 'Other' })
     await Bun.sleep(0)
+
+    // Styled by an adopted sheet alone, which a policy without inline styles allows.
+    expect(shadow().adoptedStyleSheets).toHaveLength(1)
+    expect(shadow().querySelector('style, [style]')).toBeNull()
 
     expect(drawer().hidden).toBe(true)
 
@@ -62,6 +68,12 @@ describe('the dev tool', () => {
     expect(drawer().hidden).toBe(false)
     expect(shadow().activeElement?.id).toBe('kay-dev-tab-problems')
     expect(shadow().querySelector('.empty')?.textContent).toBe('No problems on this page.')
+
+    key({ key: 'ArrowRight' }, shadow().activeElement!)
+    expect(shadow().activeElement?.id).toBe('kay-dev-tab-other')
+    expect(shadow().querySelector<HTMLElement>('#kay-dev-other')!.hidden).toBe(false)
+    key({ key: 'Home' }, shadow().activeElement!)
+    expect(shadow().activeElement?.id).toBe('kay-dev-tab-problems')
 
     // Escape from the page is the page's own.
     key({ key: 'Escape' })
@@ -82,7 +94,7 @@ describe('the dev tool', () => {
     expect(shadow().querySelector('.ui.right')).not.toBeNull()
   })
 
-  it('dismisses the problems shown for the rest of the browser tab, and drops what the page logged as a swap starts, what kay check found staying', async () => {
+  it('dismisses the problems shown for the rest of the browser tab, drops what the page logged as a swap starts, and reads what kay check finds again as it ends', async () => {
     document.head.innerHTML = problemsBlock(['warning[missing-title]: a page needs a title'])
     console.warn = () => undefined
     boot()
@@ -109,5 +121,10 @@ describe('the dev tool', () => {
     document.documentElement.setAttribute('aria-busy', 'true')
     await Bun.sleep(0)
     expect(problems()).toEqual([['warn', 'warning[missing-alt]: an img needs alt']])
+
+    document.head.innerHTML = problemsBlock(['error[unread-prop]: a prop nothing reads'])
+    document.documentElement.removeAttribute('aria-busy')
+    await Bun.sleep(0)
+    expect(problems()).toEqual([['error', 'error[unread-prop]: a prop nothing reads']])
   })
 })
