@@ -27,6 +27,11 @@ function stamps(html: string): string[] {
 }
 
 describe('server islands', () => {
+  // Boots the site, which builds the browser bundle and manifest the tests read: a worker of `bun test --parallel` has its own, which no file before this one may have built.
+  beforeAll(async () => {
+    await pages({ routes, prebuilt: false })
+  }, 60_000)
+
   it('prerenders a page reaching one, and renders each per request: spliced in, or fetched by the browser', async () => {
     const root = process.cwd()
     const manifest = (await readManifest(root))!
