@@ -50,12 +50,15 @@ describe('the error page', () => {
     process.env.KAY_DEV_CODE = 'test'
 
     expect(errorPage({ status: 500, message: 'down', stack: 'Error: down\n    at connect (/elsewhere/db.ts:1:1)' })).toContain('<pre>Error: down\n    at connect (/elsewhere/db.ts:1:1)</pre>')
+    // A hint said in place of the message is copied too.
+    expect(errorPage({ status: 500, message: 'window is browser-only', stack: 'ReferenceError: window is not defined\n    at x (/a.ts:1:1)' })).toContain('<pre id="kay-error-text" hidden>window is browser-only\n\nReferenceError: window is not defined')
 
-    const source = 'p ok\nelse\n  p no\n'
-    const html = compileErrorPage([{ file: join(process.cwd(), 'src/routes/[id].kay'), source, start: 5, end: 9, message: '`else` must directly follow an `if`' }], undefined)
+    const source = 'p ok src/other.kay:1:1\nelse\n  p no\n'
+    const html = compileErrorPage([{ file: join(process.cwd(), 'src/routes/[id].kay'), source, start: 23, end: 27, message: '`else` must directly follow an `if`' }], undefined)
 
     expect(html).toContain('<h1>1 compile error</h1>')
     expect(html).toContain(' --&gt; <button type="button" data-kay-open="src/routes/[id].kay:2:1">src/routes/[id].kay:2:1</button>\n')
+    expect(html.match(/data-kay-open/g)).toHaveLength(1)
   })
 
   it('carries the dev tool on a page that failed to render and on a server that failed to boot, with scripts the policy allows', async () => {

@@ -13,7 +13,7 @@ const COPIED_MS = 1500
 const SEGMENT = String.raw`(?:\([\w@.+=-]+\)|\[{1,2}(?:\.{3})?[\w-]+\]{1,2}|[\w@.+=-])+`
 
 // A `.kay` file a problem names, with its line and column when it gives them, not one inside a URL.
-export const KAY_POSITION = new RegExp(String.raw`(?<![\w@.+=:/\\)\]-])(?:[A-Za-z]:)?[\\/]?(?:${SEGMENT}[\\/])*${SEGMENT}\.kay(?::\d+(?::\d+)?)?(?!\.?\w)`, 'g')
+const KAY_POSITION = new RegExp(String.raw`(?<![\w@.+=:/\\)\]-])(?:[A-Za-z]:)?[\\/]?(?:${SEGMENT}[\\/])*${SEGMENT}\.kay(?::\d+(?::\d+)?)?(?!\.?\w)`, 'g')
 const OPENED_POSITION = /^(.+\.kay)(?::(\d+))?(?::(\d+))?$/
 
 type ProblemKind = 'uncaught' | 'kay' | 'policy' | 'a11y' | 'check'
@@ -555,6 +555,8 @@ function problemsTab(doc: Document, tool: DevTool, state: DevState, save: () => 
   }
 }
 
+const copyResets = new WeakMap<HTMLButtonElement, ReturnType<typeof setTimeout>>()
+
 // Opens the position an error page's button names, saying why it could not, or copies the error, saying so a moment.
 async function answerErrorPage(tool: DevTool, target: HTMLButtonElement): Promise<void> {
   const { kayOpen: source, kayCopy: copied } = target.dataset
@@ -575,9 +577,10 @@ async function answerErrorPage(tool: DevTool, target: HTMLButtonElement): Promis
     target.textContent = 'Copy failed'
   }
 
-  setTimeout(() => {
+  clearTimeout(copyResets.get(target))
+  copyResets.set(target, setTimeout(() => {
     target.textContent = 'Copy'
-  }, COPIED_MS)
+  }, COPIED_MS))
 }
 
 // A `.kay` file named alone or by its line opens at its first line or column.

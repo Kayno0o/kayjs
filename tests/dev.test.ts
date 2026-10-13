@@ -853,7 +853,9 @@ describe('kay dev', () => {
       expect(await (await open('src/routes/index.kay:2:3')).json()).toEqual({ opened: true })
       await until(() => filled(seen))
       expect(JSON.parse(readFileSync(seen, 'utf8'))).toEqual([join(root, 'src/routes/index.kay')])
-      expect(await (await open('src/routes/index.kay:2:3')).json()).toEqual({ opened: false, failed: true })
+      // A script's position too, as an error page names, the recording editor failing this time.
+      expect((await open('../outside.ts:1:1')).status).toBe(404)
+      expect(await (await open('record.ts:2:1')).json()).toEqual({ opened: false, failed: true })
     }
     finally {
       await stop()

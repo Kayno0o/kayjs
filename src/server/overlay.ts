@@ -7,11 +7,12 @@ import { fileURLToPath } from 'node:url'
 import { underKayDev } from '../build/assets'
 import { mappedStack } from '../build/sourcemap'
 import { formatDiagnostic } from '../compiler/frame'
-import { KAY_POSITION } from '../runtime/dev-tool'
 
 // kay's own source, whose frames fold away with the dependencies'.
 const KAY_SOURCE = resolve(import.meta.dir, '..') + sep
 const FRAME = /^\s*at (?:(.*?) \()?(.+?):(\d+):(\d+)\)?$/
+// The line of a compile error naming its position, as `kay check` prints it, once escaped.
+const ARROW = /^( *--&gt; )(\S+:\d+:\d+)$/gm
 // The lines shown around the failing one.
 const BEFORE = 3
 const AFTER = 2
@@ -56,7 +57,10 @@ interface Frame {
 export function errorPage(error: PageError): string {
   const stack = error.stack ?? ''
 
-  return document(`${error.status} ${error.message}`, `${heading(`${error.status} error`, error.message)}${stackOf(stack)}${copyText(stack === '' ? error.message : stack)}`)
+  // A hint said in place of the message is copied along with the stack, which only holds the message.
+  const copied = stack === '' ? error.message : stack.includes(error.message) ? stack : `${error.message}\n\n${stack}`
+
+  return document(`${error.status} ${error.message}`, `${heading(`${error.status} error`, error.message)}${stackOf(stack)}${copyText(copied)}`)
 }
 
 // Development only: every compile error at its `.kay` line, or the error that stopped the server from booting.
@@ -65,14 +69,14 @@ export function compileErrorPage(diagnostics: FileDiagnostic[], error: unknown):
     const stack = error instanceof Error ? mappedStack(error) ?? error.message : String(error)
     const message = error instanceof Error ? error.message : stack
 
-    return document('Boot failed', `${heading('Boot failed', message === '' ? 'The server failed to boot' : message)}${stackOf(stack)}${copyText(stack)}`)
+    return document('Boot failed', `${heading('Boot failed', message === '' ? 'The server failed to boot' : message)}${stack === message ? '' : stackOf(stack)}${copyText(stack)}`)
   }
 
   // As `kay check` prints them, with the labels under the code and the note and help after it.
   const texts = diagnostics.map(diagnostic => formatDiagnostic(diagnostic.source, relative(process.cwd(), diagnostic.file), diagnostic))
   const count = `${diagnostics.length} compile error${diagnostics.length === 1 ? '' : 's'}`
 
-  return document('Compile error', `${heading('Compile error', count)}${texts.map(text => `<pre>${withPositions(text)}</pre>`).join('')}${copyText(texts.join('\n\n'))}`)
+  return document('Compile error', `${heading('Compile error', count)}${texts.map(text => `<pre>${withPosition(text)}</pre>`).join('')}${copyText(texts.join('\n\n'))}`)
 }
 
 // The project's own frames, the first with the lines around it, those of kay and the dependencies folded; the stack as it is when none is the project's.
@@ -82,7 +86,7 @@ function stackOf(stack: string): string {
   const others = frames.filter(frame => !ownFile(frame.file))
 
   if (own.length === 0)
-    return stack === '' ? '' : `<pre>${withPositions(stack)}</pre>`
+    return stack === '' ? '' : `<pre>${Bun.escapeHTML(stack)}</pre>`
 
   const folded = others.length === 0 ? '' : `<details><summary>${others.length} frame${others.length === 1 ? '' : 's'} in kay and dependencies</summary>${frameList(others)}</details>`
 
@@ -108,7 +112,7 @@ function parseFrames(stack: string): Frame[] {
       continue
 
     const [, fn, location, row, column] = match
-    const file = location!.startsWith('file://') ? fileURLToPath(location!) : location!
+    const file = location!.startsWith('file:///') ? fileURLToPath(location!) : location!
 
     frames.push({ fn, file, line: Number(row), column: Number(column) })
   }
@@ -139,10 +143,11 @@ function position(frame: Frame): string {
   return underKayDev() && ownFile(frame.file) ? `<button type="button" data-kay-open="${text}">${text}</button>` : `<code>${text}</code>`
 }
 
-function withPositions(text: string): string {
+// A compile error's position, under its message, as a button; not a path its code frame happens to hold.
+function withPosition(text: string): string {
   const escaped = Bun.escapeHTML(text)
 
-  return underKayDev() ? escaped.replace(KAY_POSITION, source => `<button type="button" data-kay-open="${source}">${source}</button>`) : escaped
+  return underKayDev() ? escaped.replace(ARROW, (_, arrow: string, source: string) => `${arrow}<button type="button" data-kay-open="${source}">${source}</button>`) : escaped
 }
 
 // The lines around where the first of the project's frames failed, a caret under its column.

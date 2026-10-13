@@ -1249,7 +1249,8 @@ describe('the files a build writes', () => {
     const stackless = new Error('no port free')
 
     stackless.stack = ''
-    expect(compileErrorPage([], stackless)).toContain('<pre>no port free</pre>')
+    expect(compileErrorPage([], stackless)).toContain('<h1>no port free</h1>')
+    expect(compileErrorPage([], stackless)).not.toContain('<pre>no port free</pre>')
     const bare = new Error('kept')
 
     bare.message = ''
