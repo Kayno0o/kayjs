@@ -291,9 +291,7 @@ describe('Board, by pointer', () => {
 
     expect(moves).toHaveLength(1)
   })
-})
 
-describe('Board, by pointer', () => {
   test('measures the boxes once per drag and again after a scroll, not on every move', () => {
     const board = new Board({ onMove: () => undefined })
     const area = stage()
@@ -383,6 +381,27 @@ describe('Board, from the keyboard', () => {
     // Either way, since a removed node sorts against the page in no set order.
     press(area.querySelector('#plan')!, 'ArrowDown')
     press(area.querySelector('#plan')!, 'ArrowUp')
+
+    expect(moves).toEqual([])
+  })
+
+  test('forgets an item the page no longer renders, even put back without registering again', () => {
+    const moves: unknown[] = []
+    const board = new Board({ onMove: move => void moves.push(move) })
+    const area = stage()
+
+    area.innerHTML = '<div id="todo"><button id="plan">Plan</button><button id="build">Build</button></div>'
+    board.container('todo')(area.querySelector<HTMLElement>('#todo')!)
+    board.item('plan', 'todo')(area.querySelector<HTMLElement>('#plan')!)
+    board.item('build', 'todo')(area.querySelector<HTMLElement>('#build')!)
+
+    const plan = area.querySelector<HTMLElement>('#plan')!
+
+    plan.remove()
+    // Any read of the layout forgets it.
+    press(area.querySelector('#build')!, 'ArrowUp')
+    area.querySelector('#todo')!.append(plan)
+    press(plan, 'ArrowLeft')
 
     expect(moves).toEqual([])
   })
