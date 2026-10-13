@@ -31,7 +31,7 @@ jobs:
       # For the examples' tests driving pages in a real browser, which Bun.WebView finds through BUN_CHROME_PATH.
       - name: Install Chromium
         run: |
-          apk add --no-cache chromium ttf-freefont
+          apk info -e chromium ttf-freefont >/dev/null || apk add --no-cache chromium ttf-freefont
           echo "BUN_CHROME_PATH=$(command -v chromium || command -v chromium-browser)" >> "$GITHUB_ENV"
 
       # The examples' own tests copy a database per test file, here on the cluster the runner image holds, started as pg-orm's CI starts it.

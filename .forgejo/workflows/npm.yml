@@ -83,7 +83,7 @@ jobs:
       - name: Install Chromium
         if: steps.tested.outputs.tested != 'true'
         run: |
-          apk add --no-cache chromium ttf-freefont
+          apk info -e chromium ttf-freefont >/dev/null || apk add --no-cache chromium ttf-freefont
           echo "BUN_CHROME_PATH=$(command -v chromium || command -v chromium-browser)" >> "$GITHUB_ENV"
 
       # The app template's own tests need a Postgres under CI, started as in the Tests workflow.
