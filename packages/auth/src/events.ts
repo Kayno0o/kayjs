@@ -36,9 +36,17 @@ export interface AuditEntry {
   at: Date
 }
 
+// The admin acting as the user this browser is signed in as, when one is.
+export async function impersonatorOf(state: RequestState): Promise<string | undefined> {
+  return state.via() === 'bearer' ? undefined : (await state.session.get('auth'))?.impersonator?.user
+}
+
 // Hands `event` to the app's `onEvent` and to the audit log when it is kept. A failure is logged, not thrown: what happened is done by then.
-export async function report(state: RequestState, record: UserRecord, event: AuthEvent, detail?: string, actor?: UserRecord): Promise<void> {
+// While an admin acts as a user, whatever happens is the admin's doing, named as the actor.
+export async function report(state: RequestState, record: UserRecord, event: AuthEvent, detail?: string, by?: UserRecord): Promise<void> {
   const { core } = state
+  const impersonator = await impersonatorOf(state)
+  const actor = impersonator === undefined ? by : await core.store.users.get(impersonator) ?? by
 
   try {
     await core.onEvent?.(event, publicUser(record), detail, { ip: state.address, userAgent: state.userAgent, actor: actor ? publicUser(actor) : null })

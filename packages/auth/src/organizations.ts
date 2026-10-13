@@ -3,7 +3,7 @@ import type { RequestState } from './state'
 import type { AuthStore, InvitationRecord, MemberRecord, OrganizationRecord, UserRecord } from './store'
 import type { Requirement } from './types'
 import { publicUser } from './core'
-import { report } from './events'
+import { impersonatorOf, report } from './events'
 import { spend } from './limits'
 import { log } from './log'
 import { writing } from './mail'
@@ -244,13 +244,16 @@ export async function updateOrganization(state: RequestState, ref: string, patch
   return updated ? { ok: true, organization: publicOrganization(updated) } : { ok: false, error: 'not-found' }
 }
 
-// Owners only: every membership and invitation goes with it.
-export async function deleteOrganization(state: RequestState, ref: string): Promise<{ ok: true } | { ok: false, error: OrganizationFailure }> {
+// Owners only: every membership and invitation goes with it. Never for an admin acting as the owner, as it cannot be undone.
+export async function deleteOrganization(state: RequestState, ref: string): Promise<{ ok: true } | { ok: false, error: OrganizationFailure | 'impersonating' }> {
   const { config, store } = organizationsOf(state.core)
   const found = await asMember(state, ref, config.owner)
 
   if (!found.ok)
     return found
+
+  if (await impersonatorOf(state) !== undefined)
+    return { ok: false, error: 'impersonating' }
 
   await store.organizations.delete(found.organization.id)
   await report(state, found.record, 'organization-deleted', found.organization.id)

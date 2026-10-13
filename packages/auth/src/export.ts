@@ -7,6 +7,7 @@ import type { UserSession } from './sessions'
 import type { RequestState } from './state'
 import { listTokens } from './bearer'
 import { publicUser } from './core'
+import { impersonatorOf } from './events'
 import { spend } from './limits'
 import { listMemberships } from './organizations'
 import { listPasskeys } from './passkeys'
@@ -31,12 +32,16 @@ export interface DataExport {
   app: unknown
 }
 
-export async function exportData(state: RequestState): Promise<{ ok: true, data: DataExport } | { ok: false, error: 'signed-out' | 'limited' }> {
+// Not for an admin acting as the user: they see what the user sees, not a copy of everything kept about them.
+export async function exportData(state: RequestState): Promise<{ ok: true, data: DataExport } | { ok: false, error: 'signed-out' | 'limited' | 'impersonating' }> {
   const { core } = state
   const record = await state.current()
 
   if (!record || state.via() !== 'session')
     return { ok: false, error: 'signed-out' }
+
+  if (await impersonatorOf(state) !== undefined)
+    return { ok: false, error: 'impersonating' }
 
   if (await spend(core.store, `export:${record.id}`, core.limits.export))
     return { ok: false, error: 'limited' }

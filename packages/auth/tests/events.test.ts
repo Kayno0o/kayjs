@@ -145,3 +145,52 @@ describe('the audit log', () => {
     expect((await store.audit!.list({ limit: 10 })).map(entry => entry.event)).toEqual(['signed-out'])
   })
 })
+
+describe('impersonation', () => {
+  test('what an admin does as a user names the admin as the actor, to `onEvent` and in the audit log', async () => {
+    const { browser, store, events } = setup({ admin: 'admin', audit: true, organizations: { roles: { owner: ['admin'], admin: ['member'], member: [] }, owner: 'owner', manage: 'admin' } })
+    const ada = browser()
+    const root = browser()
+    const { user } = await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
+    const { user: admin } = await root.call('register', { email: 'root@example.com', password: PASSWORD })
+
+    await store.users.update(admin.id, { roles: ['admin'] })
+    await ada.call('createOrganization', { name: 'Acme' })
+    await root.call('impersonate', user.id)
+    await root.call('createOrganization', { name: 'Support' })
+    await root.fetch('/sign-out-everywhere?keep=1', { method: 'POST' })
+    await root.call('stopImpersonating')
+
+    const heard = events.filter(entry => ['organization-created', 'signed-out-everywhere', 'impersonation-started', 'impersonation-ended'].includes(entry.event)).map(entry => [entry.event, entry.user.email, entry.context.actor?.email ?? null])
+
+    expect(heard).toEqual([
+      ['organization-created', 'ada@example.com', null],
+      ['impersonation-started', 'ada@example.com', 'root@example.com'],
+      ['organization-created', 'ada@example.com', 'root@example.com'],
+      ['signed-out-everywhere', 'ada@example.com', 'root@example.com'],
+      ['impersonation-ended', 'ada@example.com', 'root@example.com'],
+    ])
+
+    const logged = (await store.audit!.list({ userId: user.id, limit: 50 })).filter(entry => entry.event === 'organization-created').map(entry => entry.actorId)
+
+    expect(logged.sort()).toEqual([admin.id, null].sort())
+  })
+
+  test('an admin acting as a user neither deletes their organizations nor downloads their data', async () => {
+    const { browser, store } = setup({ admin: 'admin', organizations: { roles: { owner: ['admin'], admin: ['member'], member: [] }, owner: 'owner', manage: 'admin' } })
+    const ada = browser()
+    const root = browser()
+    const { user } = await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
+    const { user: admin } = await root.call('register', { email: 'root@example.com', password: PASSWORD })
+
+    await store.users.update(admin.id, { roles: ['admin'] })
+    const { membership } = await ada.call('createOrganization', { name: 'Acme' })
+
+    await root.call('impersonate', user.id)
+
+    expect(await root.call('deleteOrganization', membership.organization.id)).toEqual({ ok: false, error: 'impersonating' })
+    expect(await root.call('exportData')).toEqual({ ok: false, error: 'impersonating' })
+    expect((await root.fetch('/auth/export')).status).toBe(403)
+    expect(await ada.call('organization', membership.organization.id)).toMatchObject({ organization: { name: 'Acme' } })
+  })
+})

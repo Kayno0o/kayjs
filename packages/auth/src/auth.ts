@@ -662,7 +662,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
   }
 
   // Everything kayjs-auth keeps about the signed-in user, secrets left out, with the app's own from `onExport`: for a download of their data.
-  async exportData(): Promise<{ ok: true, data: DataExport } | { ok: false, error: 'signed-out' | 'limited' }> {
+  async exportData(): Promise<{ ok: true, data: DataExport } | { ok: false, error: 'signed-out' | 'limited' | 'impersonating' }> {
     return exportData(this[STATE])
   }
 
@@ -694,7 +694,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
   }
 
   // For members holding `owner`.
-  async deleteOrganization(ref: string): Promise<{ ok: true } | { ok: false, error: OrganizationFailure }> {
+  async deleteOrganization(ref: string): Promise<{ ok: true } | { ok: false, error: OrganizationFailure | 'impersonating' }> {
     return deleteOrganization(this[STATE], ref)
   }
 
@@ -864,7 +864,7 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
       const exported = await auth.exportData()
 
       if (!exported.ok)
-        return exported.error === 'limited' ? status(429, 'Too many exports; try again later') : status(401, 'Sign in to continue')
+        return exported.error === 'limited' ? status(429, 'Too many exports; try again later') : exported.error === 'impersonating' ? status(403, 'Not while acting as the user') : status(401, 'Sign in to continue')
 
       set.headers['content-disposition'] = `attachment; filename="${core.site.replaceAll(/[^\w.-]/g, '-')}-data.json"`
       set.headers['cache-control'] = 'no-store'
