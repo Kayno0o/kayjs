@@ -9,6 +9,9 @@ declare const ISLAND: unique symbol
 // When an island hydrates: right away, once the browser is idle, or once it scrolls near the viewport; `client` renders it in the browser only, right away.
 export type HydrateWhen = 'load' | 'idle' | 'visible' | 'client'
 
+// What an `if` renders its block on, its condition's type without the falsy values, `false` and `0` included as `NonNullable` keeps them.
+export type Truthy<T> = Exclude<T, false | 0 | 0n | '' | null | undefined>
+
 // Lets the checker tell islands from plain components.
 export interface IslandBrand { readonly [ISLAND]: true }
 
@@ -206,7 +209,7 @@ export interface TemplateHelpers {
     <T>(props: { each: readonly T[] | null | undefined | false, keyed: (item: T) => unknown, fallback?: JSX.Element, children: (item: T, index: number) => JSX.Element }): JSX.Element
     <T>(props: { each: readonly T[] | null | undefined | false, keyed: false, fallback?: JSX.Element, children: (item: T, index: number) => JSX.Element }): JSX.Element
   }
-  Show: <T>(props: { when: T, fallback?: JSX.Element, children: (value: NonNullable<T>) => JSX.Element }) => JSX.Element
+  Show: <T>(props: { when: T, fallback?: JSX.Element, children: (value: Truthy<T>) => JSX.Element }) => JSX.Element
   staticFor: <T>(each: readonly T[] | null | undefined | false, render: (item: T, index: number) => JSX.Element, fallback?: () => JSX.Element) => JSX.Element
   Dynamic: <Tag>(props: { component: Tag } & PropsOf<Tag>) => JSX.Element
   componentClass: (list: readonly unknown[]) => string | undefined

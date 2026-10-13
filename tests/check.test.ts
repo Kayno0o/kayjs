@@ -534,6 +534,22 @@ describe('kay check, edge cases', () => {
     }
   })
 
+  it('types an if\'s alias as the truthy part of its condition, an `&&` that can give false, 0 or \'\' included', async () => {
+    const template = 'if !query && row as found\n  p {found.label}\nif count && row as other\n  p {other.label}\nif row && query as text\n  p {text.length}\n'
+    const script = '---\nconst { query, row, count } = props<{ query: string, row?: { label: string }, count: number }>()\n'
+    const root = await scratchProject({
+      'src/static.kay': `${script}---\n${template}`,
+      'src/island.kay': `${script.replace('---\n', '---\nimport { signal } from \'kay\'\n\n')}const open = signal(false)\n---\nbutton(onClick={() => open.set(o => !o)}) x\n${template}`,
+    })
+
+    try {
+      expect(await check(root)).toEqual([])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('narrows a match\'s subject and its object per when, reporting a value its type cannot hold, in an island as in a static component', async () => {
     const template = 'ul\n  for shape of shapes key={shape.kind}\n    match shape.kind\n      when \'circle\'\n        li {shape.r}\n      when \'square\', \'rect\'\n        li {shape.side}\n      else\n        li {JSON.stringify(shape)}\n'
     const script = '---\ntype Shape = { kind: \'circle\', r: number } | { kind: \'square\', side: number }\nconst { shapes } = props<{ shapes: Shape[] }>()\n'

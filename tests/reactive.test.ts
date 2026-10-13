@@ -729,6 +729,38 @@ describe('every', () => {
     }
   })
 
+  it('runs at once as its timer starts with `immediate`, each time its condition turns true', async () => {
+    jest.useFakeTimers()
+
+    try {
+      const active = signal(true)
+      let runs = 0
+      const dispose = root((dispose) => {
+        every(100, () => runs++, { while: active, immediate: true })
+
+        return dispose
+      })
+
+      flush()
+      expect(runs).toBe(1)
+
+      await Promise.resolve()
+      jest.advanceTimersByTime(100)
+      await Promise.resolve()
+      expect(runs).toBe(2)
+
+      active.set(false)
+      flush()
+      active.set(true)
+      flush()
+      expect(runs).toBe(3)
+      dispose()
+    }
+    finally {
+      jest.useRealTimers()
+    }
+  })
+
   it('starts no timer while the server renders', () => {
     jest.useFakeTimers()
 

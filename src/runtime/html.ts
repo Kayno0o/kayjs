@@ -1,6 +1,7 @@
 // What pages, layouts and static components render to on the server: markup built as strings, with no reactive runtime.
 // A rendered value is `{ t: markup }`: what a component or an island rendered goes into its parent's markup as it is.
 
+import type { Truthy } from './checks'
 import type { FieldSchema } from './form'
 import { isAction } from './action'
 import { escape, escapeAttribute } from './escape'
@@ -333,11 +334,11 @@ export function attempt(render: () => string, fallback?: (error: unknown) => str
 }
 
 // An `if` naming its value: the branch reads it through a function, as the island build of the same template does.
-export function show<T>(value: T, render: (value: () => NonNullable<T>) => string, fallback?: () => string): string {
+export function show<T>(value: T, render: (value: () => Truthy<T>) => string, fallback?: () => string): string {
   if (Boolean(value) === false)
     return fallback?.() ?? ''
 
-  return render(() => value as NonNullable<T>)
+  return render(() => value as Truthy<T>)
 }
 
 // A `for`: each row's markup, or the fallback's when there is nothing to list.

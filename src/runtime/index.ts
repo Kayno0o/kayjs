@@ -69,6 +69,8 @@ export function queryParam<T = string | undefined>(name: string): Signal<T> {
 export interface EveryOptions {
   // Read as an effect reads: the timer starts as it turns true and stops as it turns false.
   while?: (() => boolean) | undefined
+  // Runs `run` as the timer starts too, rather than one interval later: a poll showing fresh data the moment it starts.
+  immediate?: boolean | undefined
 }
 
 // Runs `run` every `ms` milliseconds while the island lives, and while `options.while` holds: `every(3000, refresh, { while: () => issuing })` polls the page until nothing is issuing.
@@ -95,6 +97,9 @@ export function every(ms: number, run: () => unknown, options?: EveryOptions): v
     const timer = setInterval(() => void tick(), ms)
 
     onCleanup(() => clearInterval(timer))
+
+    if (options?.immediate)
+      void tick()
   })
 }
 
