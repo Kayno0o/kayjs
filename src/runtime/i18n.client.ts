@@ -23,7 +23,7 @@ const messages = new Map<string, Message>()
 let settings: LocaleSettings | undefined
 let pageLocale = ''
 let renderedAt: number | undefined
-// Whether a read ran once the page was parsed: the locale and settings are known from then on, a swap to another locale loading the page afresh, so only a missing message reads again.
+// Whether a read ran once the page was parsed: the locale and settings are known from then on, a swap to another locale loading the page afresh, so only a missing message and `relativeTime`, for the render time, read again.
 let settled = false
 
 // Reads the scripts not read yet, so messages a streamed part brought are found too.
