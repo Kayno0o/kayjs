@@ -57,6 +57,8 @@ export type { AuthSessionData, OAuthApp, Profile, User } from './core'
 
 const READ_METHODS = new Set(['GET', 'HEAD'])
 const STATE = Symbol('kayjs-auth.state')
+// How long a user read stays good. A request is over long before; a websocket, which keeps its `Auth` for its life, reads its user again past it, so a sign-out, a revoked token or a ban reaches it.
+const USER_FRESH_MS = 30 * 1000
 const TRAILING_SLASH = /\/$/
 // kay's own session lifetime, 30 days.
 const DEFAULT_SESSION_MAX_AGE = 30 * 24 * 60 * 60
@@ -66,6 +68,10 @@ const DEFAULT_BROWSER_SESSION_MAX_AGE = 24 * 60 * 60
 const DEFAULT_AUDIT_MAX_AGE = 365 * 24 * 60 * 60
 const LINK_TYPES: LinkType[] = ['verify-email', 'reset-password', 'magic-link', 'change-email']
 // What a provider posting back to the callback may say, carried over to the GET.
+// The close code of a socket whose user is gone: a policy violation.
+const SOCKET_USER_GONE = 1008
+// The sockets `socketUser` answered a user for, to close once that user is gone.
+const servedSockets = new WeakSet<object>()
 const FORM_POST_FIELDS = ['code', 'state', 'error', 'user']
 
 // What a route, a guard or a gate asks of the user: a role, a predicate, or a list of which any one passes.
@@ -148,7 +154,7 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
 // Auth for one request, as `auth` in the context: `ctx.locals.auth` in a page, an action or a guard.
 export class Auth<Scope extends string = string, Role extends string = string, OrgRole extends string = string> {
   readonly [STATE]: RequestState
-  private resolving?: Promise<UserRecord | null> | undefined
+  private known?: { record: Promise<UserRecord | null>, at: number } | undefined
   private source: 'session' | 'bearer' | null = null
   private tokenScopes: string[] | null = null
 
@@ -180,7 +186,15 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     }
   }
 
-  // The signed-in user, or the owner of the request's `Authorization: Bearer` token, or null; read once per request, on first use.
+  private get resolving(): Promise<UserRecord | null> | undefined {
+    return this.known?.record
+  }
+
+  private set resolving(record: Promise<UserRecord | null> | undefined) {
+    this.known = record && { record, at: Date.now() }
+  }
+
+  // The signed-in user, or the owner of the request's `Authorization: Bearer` token, or null; read on first use, and again past 30 seconds on a websocket.
   async user(): Promise<User | null> {
     const record = await this.record()
 
@@ -796,9 +810,10 @@ export class Auth<Scope extends string = string, Role extends string = string, O
   }
 
   private async record(): Promise<UserRecord | null> {
-    this.resolving ??= this.resolve()
+    if (!this.known || Date.now() - this.known.at > USER_FRESH_MS)
+      this.resolving = this.resolve()
 
-    return this.resolving
+    return this.resolving!
   }
 
   private async resolve(): Promise<UserRecord | null> {
@@ -976,12 +991,22 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
       }).join('; ')
     },
 
-    // Who opened a websocket, read off the session cookie or bearer token its upgrade carried, which the plugin hands the socket as `ws.data.auth`: null for an anonymous one, or a socket opened on an app without the plugin.
-    async socketUser(ws: { data?: unknown }): Promise<User | null> {
+    // Who opened a websocket, read off the session cookie or bearer token its upgrade carried, which the plugin hands the socket as `ws.data.auth`, and read again past 30 seconds: null for an anonymous one, or a socket opened on an app without the plugin. A socket whose user is gone since, signed out, revoked or banned, is closed.
+    async socketUser(ws: { data?: unknown, close?: ((code?: number, reason?: string) => void) | undefined }): Promise<User | null> {
       const data = ws.data
       const state = typeof data === 'object' && data !== null && 'auth' in data ? data.auth : undefined
 
-      return state instanceof Auth ? state.user() : null
+      if (!(state instanceof Auth))
+        return null
+
+      const user = await state.user()
+
+      if (user)
+        servedSockets.add(state)
+      else if (servedSockets.delete(state))
+        ws.close?.(SOCKET_USER_GONE, 'signed out')
+
+      return user
     },
 
     // A bearer token for `userId` taking no proof and sending no mail, for a flow the app gates itself, such as pairing a device, or a script. `token` adopts one the app handed out before, so its devices keep working through a migration.
@@ -989,11 +1014,11 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
       return issueToken(core, userId, label, tokenOptions)
     },
 
-    // The user a bearer token belongs to, for a websocket handshake sending one in its first message.
+    // The user a bearer token belongs to, for a websocket handshake sending one in its first message; null for a banned one.
     async userFromToken(token: string): Promise<User | null> {
       const owner = await tokenUser(core, token)
 
-      return owner ? publicUser(owner.record) : null
+      return owner && !banned(owner.record) ? publicUser(owner.record) : null
     },
 
     // Closes every route of the Elysia instance it is used on unless the user meets `require`, signed in by default. A route takes `auth: <requirement>` to ask for more and `auth: false` to stay open.
