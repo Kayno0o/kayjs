@@ -24,6 +24,8 @@ const SCHEME = /([^{}\n]*[^{}\s])\s*\{\s*color-scheme: (\w+);/g
 const QUOTED = /'([a-z][\w-]*)'/g
 // What chartist draws itself, styled here but written by no source of the library, and Tailwind's `group`, which the app writes on what holds a stamp.
 const THIRD_PARTY = /^(?:ct-|group$)/
+// The tokens of a skin's offset shadows and press-down, with their value.
+const PRESS_TOKEN = /(--kui-(?:shadow-raised|shadow-press|press-travel)): ([^;]+);/g
 
 // The theme namespace a scale utility reads, by its prefix.
 const NAMESPACE: Record<string, string> = { text: 'text', font: 'font-weight', tracking: 'tracking', rounded: 'radius' }
@@ -94,15 +96,18 @@ describe('theme.css', () => {
     expect(theme).not.toContain('@theme {')
   })
 
-  test('lets a skin set offset shadows and a press-down through tokens alone', async () => {
+  test('draws no offset shadow nor press-down unless a skin sets their tokens alone', async () => {
     const tailwind = Bun.resolveSync('tailwindcss/theme.css', ROOT)
-    const skin = '@theme { --kui-shadow-raised: 4px 4px 0 black; --kui-shadow-press: 3px 3px 0 black; --kui-press-travel: 3px; }'
-    const compiler = await compile(`@import 'tailwindcss/theme.css' layer(theme);\n${theme}\n${skin}`, { base: ROOT, loadStylesheet: async (_, base) => ({ path: tailwind, base, content: await Bun.file(tailwind).text() }) })
-    const css = compiler.build([])
-    const flat = css.replaceAll(/\s+/g, ' ')
+    const build = async (skin: string) => {
+      const compiler = await compile(`@import 'tailwindcss/theme.css' layer(theme);\n${theme}\n${skin}`, { base: ROOT, loadStylesheet: async (_, base) => ({ path: tailwind, base, content: await Bun.file(tailwind).text() }) })
+      const css = compiler.build([])
 
-    expect([...css.matchAll(/(--kui-(?:shadow-raised|shadow-press|press-travel)): ([^;]+);/g)].map(([, token, value]) => `${token} ${value}`)).toEqual(['--kui-shadow-raised 4px 4px 0 black', '--kui-shadow-press 3px 3px 0 black', '--kui-press-travel 3px'])
-    expect(flat).toContain(':is(.kui-card, .kui-card-row, .kui-widget, .kui-toast) { box-shadow: var(--kui-shadow-raised); }')
-    expect(flat).toContain('.kui-btn, .kui-icon-btn:where(.kui-shell) { box-shadow: var(--kui-shadow-press); &:active { translate: 0 var(--kui-press-travel); box-shadow: none; } }')
+      return [...css.matchAll(PRESS_TOKEN)].map(([, token, value]) => `${token} ${value}`)
+    }
+
+    expect(await build('')).toEqual(['--kui-shadow-raised none', '--kui-shadow-press none', '--kui-press-travel 0px'])
+    expect(await build('@theme { --kui-shadow-raised: 4px 4px 0 black; --kui-shadow-press: 3px 3px 0 black; --kui-press-travel: 3px; }')).toEqual(['--kui-shadow-raised 4px 4px 0 black', '--kui-shadow-press 3px 3px 0 black', '--kui-press-travel 3px'])
+    expect(theme).toMatch(/\.kui-card-row, \.kui-widget, \.kui-toast\) \{\s*box-shadow: var\(--kui-shadow-raised\);/)
+    expect(theme).toMatch(/\.kui-icon-btn:where\(\.kui-shell\) \{\s*box-shadow: var\(--kui-shadow-press\);\s*&:active \{\s*translate: 0 var\(--kui-press-travel\);\s*box-shadow: none;/)
   })
 })
