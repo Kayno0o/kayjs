@@ -28,12 +28,14 @@ const dragging = signal(false)
 const points = new Map<number, { x: number, y: number }>()
 let pane: HTMLDivElement | undefined
 let wandered = 0
+// Where the pane stood when the pointers pressed, which every move of theirs reads instead of measuring the pane again.
+let grabbedAt: DOMRect | undefined
 
 const frame = () => ({ width: pane?.clientWidth ?? 0, height: pane?.clientHeight ?? 0 })
 
 // Where a screen point falls on the pane, which is what every gesture is measured against.
 function at(point: { clientX: number, clientY: number }): { x: number, y: number } {
-  const rect = pane?.getBoundingClientRect()
+  const rect = grabbedAt ?? pane?.getBoundingClientRect()
 
   return { x: point.clientX - (rect?.left ?? 0), y: point.clientY - (rect?.top ?? 0) }
 }
@@ -68,6 +70,7 @@ function grab(event: PointerEvent) {
   if (event.button !== 0)
     return
 
+  grabbedAt = pane?.getBoundingClientRect()
   points.set(event.pointerId, at(event))
   wandered = 0
 }
@@ -108,8 +111,10 @@ function drop(event: PointerEvent) {
   if (pane?.hasPointerCapture(event.pointerId))
     pane.releasePointerCapture(event.pointerId)
 
-  if (points.size === 0)
+  if (points.size === 0) {
+    grabbedAt = undefined
     dragging.set(false)
+  }
 }
 
 const KEYS: Partial<Record<string, () => void>> = {

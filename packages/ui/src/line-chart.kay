@@ -3,7 +3,7 @@ import type { Axis, ChartRect, LineChartOptions } from 'chartist'
 import type { JSX } from 'kay'
 import type { ChartSeries } from './plot'
 import { LineChart } from 'chartist'
-import { effect, onCleanup, onMount, signal } from 'kay'
+import { effect, memo, onCleanup, onMount, signal } from 'kay'
 import { chartData, indexAt, labelTimes, positionOf, xAxisOptions } from './chart-axis'
 
 const PALETTE = ['var(--kui-chart-1)', 'var(--kui-chart-2)', 'var(--kui-chart-3)', 'var(--kui-chart-4)', 'var(--kui-chart-5)', 'var(--kui-chart-6)']
@@ -29,8 +29,8 @@ const { labels, series, formatValue = (value: number) => value.toLocaleString(),
   class?: string | undefined
 }>()
 
-const times = () => labelTimes(labels)
-const colors = () => series.map((item, index) => item.color ?? PALETTE[index % PALETTE.length]!)
+const times = memo(() => labelTimes(labels))
+const colors = memo(() => series.map((item, index) => item.color ?? PALETTE[index % PALETTE.length]!))
 
 const settings = (): LineChartOptions => {
   const padding = typeof options?.chartPadding === 'object' ? options.chartPadding : {}

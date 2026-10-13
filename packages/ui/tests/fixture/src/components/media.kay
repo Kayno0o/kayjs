@@ -6,8 +6,12 @@ import MediaGallery from '@kaynooo/kayjs-ui/media-gallery.kay'
 import WhenVisible from '@kaynooo/kayjs-ui/when-visible.kay'
 import ZoomPane from '@kaynooo/kayjs-ui/zoom-pane.kay'
 
-// What the test reads back: each turn of the gallery, each crop, and each call for more rows.
-const { onIndexChange, onCrop, onMore } = props<{ onIndexChange: (index: number) => void, onCrop: (crop: { x: number, y: number, w: number, h: number }) => void, onMore: () => void }>()
+// What the test reads back: each turn of the gallery, each crop, and each call for more rows; `onTiles` hands it a way to change the masonry's tiles.
+const { onIndexChange, onCrop, onMore, onTiles } = props<{ onIndexChange: (index: number) => void, onCrop: (crop: { x: number, y: number, w: number, h: number }) => void, onMore: () => void, onTiles?: (set: (tiles: string[]) => void) => void }>()
+
+const tiles = signal(['a', 'b', 'c'])
+
+onTiles?.(next => tiles.set(next))
 
 const items: MediaItem[] = [
   { key: 1, kind: 'image', thumb: '/a-thumb.png', preview: '/a.png', full: '/a-full.png', title: 'Mars' },
@@ -21,7 +25,7 @@ ZoomPane#zoom(label="Map")
 ImageCropper#cropper(src="/photo.png" ratio={2} onCrop={onCrop})
   @footer(reset)
     button#reset(type="button" onClick={reset}) Reset
-Masonry#masonry(items={['a', 'b', 'c']} key={item => item})
+Masonry#masonry(items={tiles()} key={item => item})
   @tile(item)
     p {item}
 WhenVisible(onVisible={onMore})

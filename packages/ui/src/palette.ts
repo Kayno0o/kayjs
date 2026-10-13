@@ -32,6 +32,8 @@ export interface PaletteSection {
 // The heading the recently followed links sit under, first, while the query is empty.
 export const RECENT_GROUP = 'Recent'
 
+const COLLATOR = new Intl.Collator()
+
 export function isPaletteLink(entry: PaletteEntry): entry is PaletteLink {
   return 'href' in entry
 }
@@ -82,7 +84,7 @@ export function paletteMatches(entries: PaletteEntry[], query: string, groups: s
   return entries
     .map(entry => ({ entry, score: paletteScore(entry, needle) }))
     .filter(match => match.score > 0)
-    .sort((a, b) => b.score - a.score || rank(a.entry.group) - rank(b.entry.group) || a.entry.label.localeCompare(b.entry.label))
+    .sort((a, b) => b.score - a.score || rank(a.entry.group) - rank(b.entry.group) || COLLATOR.compare(a.entry.label, b.entry.label))
     .map(match => match.entry)
 }
 
@@ -90,9 +92,10 @@ export function paletteMatches(entries: PaletteEntry[], query: string, groups: s
 export function paletteSections(entries: PaletteEntry[], recent: string[] = [], groups: string[] = []): PaletteSection[] {
   const byHref = new Map(entries.filter(isPaletteLink).map(entry => [entry.href, entry]))
   const recents = recent.flatMap(href => byHref.get(href) ?? [])
+  const rank = groupRank(groups)
   const sections = [...Map.groupBy(entries, entry => entry.group)]
     .map(([group, members]) => ({ group, entries: members }))
-    .sort((a, b) => groupRank(groups)(a.group) - groupRank(groups)(b.group))
+    .sort((a, b) => rank(a.group) - rank(b.group))
 
   return recents.length > 0 ? [{ group: RECENT_GROUP, entries: recents }, ...sections] : sections
 }

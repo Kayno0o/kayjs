@@ -1,6 +1,6 @@
 import type { Column } from '../src/table'
 import { describe, expect, test } from 'bun:test'
-import { cellText, drawnByBlock, nextSort, resolvedColumn, rowKeyOf, rowMatches, sortedRows } from '../src/table'
+import { cellText, drawnByBlock, nextSort, resolvedColumn, rowKeyOf, rowsMatching, sortedRows } from '../src/table'
 
 interface Planet { id: number, name: string, moons: number | null }
 
@@ -66,7 +66,7 @@ test('the @cell block draws every column but a cell: false one, or only the cell
 })
 
 test('a filter keeps a row whose fields or function values hold the text, its case and spaces ignored', () => {
-  expect(planets.filter(planet => rowMatches(planet, ['name'], ' AR ')).map(planet => planet.name)).toEqual(['Mars', 'Earth'])
-  expect(planets.filter(planet => rowMatches(planet, row => [row.name, row.moons], '2')).map(planet => planet.name)).toEqual(['Mars'])
-  expect(planets.filter(planet => rowMatches(planet, ['moons'], ''))).toHaveLength(3)
+  expect(rowsMatching(planets, ['name'], ' AR ').map(planet => planet.name)).toEqual(['Mars', 'Earth'])
+  expect(rowsMatching(planets, row => [row.name, row.moons], '2').map(planet => planet.name)).toEqual(['Mars'])
+  expect(rowsMatching(planets, ['moons'], '')).toBe(planets)
 })

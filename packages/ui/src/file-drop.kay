@@ -1,6 +1,6 @@
 ---
 import type { JSX } from 'kay'
-import { onCleanup, onMount, signal } from 'kay'
+import { listen, signal } from 'kay'
 import { acceptsFile } from './accept'
 
 const { accept, multiple = false, paste = false, disabled = false, onFiles, content, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role'> & {
@@ -80,17 +80,14 @@ function picked(event: Event) {
 function pasted(event: ClipboardEvent) {
   const target = event.target instanceof Element ? event.target : null
 
-  if (!paste || target?.closest('input, textarea, [contenteditable]'))
+  if (target?.closest('input, textarea, [contenteditable]'))
     return
 
   if (take(event.clipboardData?.files ?? []))
     event.preventDefault()
 }
 
-onMount(() => {
-  window.addEventListener('paste', pasted)
-  onCleanup(() => window.removeEventListener('paste', pasted))
-})
+listen(() => paste ? window : undefined, 'paste', pasted)
 ---
 .kui-file-drop({...rest} role="group" class={className} data-dragging={dragging() || undefined} data-disabled={disabled || undefined} onDragOver={dragOver} onDragLeave={dragLeave} onDrop={drop})
   input.kui-file-drop-input(ref={element => input = element} type="file" tabindex="-1" aria-hidden="true" accept={accept} multiple={multiple} disabled={disabled} onChange={picked})

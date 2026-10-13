@@ -1,6 +1,6 @@
 import type { Mounted } from 'kay/test'
 import type { RangeValue } from '../src/range'
-import { afterEach, describe, expect, test } from 'bun:test'
+import { afterEach, describe, expect, spyOn, test } from 'bun:test'
 import { mount, settle } from 'kay/test'
 import { click } from './dom'
 
@@ -191,6 +191,24 @@ describe('FileDrop', () => {
     paste(document.body)
 
     expect(seen.files).toEqual([['moon.png']])
+  })
+
+  test('listens to no paste unless asked', async () => {
+    const listened = spyOn(window, 'addEventListener')
+    let types: string[] = []
+
+    try {
+      await inputs()
+      types = listened.mock.calls.map(([type]) => type)
+    }
+    finally {
+      listened.mockRestore()
+    }
+
+    document.body.dispatchEvent(Object.assign(new Event('paste', { bubbles: true, cancelable: true }), { clipboardData: { files: files('moon.png') } }))
+
+    expect(types).not.toContain('paste')
+    expect(seen.files).toEqual([])
   })
 })
 

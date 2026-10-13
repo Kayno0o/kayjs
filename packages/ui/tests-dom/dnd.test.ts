@@ -1,5 +1,5 @@
 import type { Mounted } from 'kay/test'
-import { afterEach, describe, expect, test } from 'bun:test'
+import { afterEach, describe, expect, spyOn, test } from 'bun:test'
 import { mount, settle } from 'kay/test'
 import { Board } from '../src/dnd/board'
 import { DropTargets } from '../src/dnd/drop-targets'
@@ -290,6 +290,45 @@ describe('Board, by pointer', () => {
     await settle()
 
     expect(moves).toHaveLength(1)
+  })
+})
+
+describe('Board, by pointer', () => {
+  test('measures the boxes once per drag and again after a scroll, not on every move', () => {
+    const board = new Board({ onMove: () => undefined })
+    const area = stage()
+
+    area.innerHTML = '<div id="todo"><button id="plan">Plan</button><button id="build">Build</button></div><div id="done"><button id="ship">Ship</button></div>'
+
+    for (const id of ['todo', 'done'])
+      board.container(id)(area.querySelector<HTMLElement>(`#${id}`)!)
+
+    for (const [id, container] of [['plan', 'todo'], ['build', 'todo'], ['ship', 'done']] as const)
+      board.item(id, container)(area.querySelector<HTMLElement>(`#${id}`)!)
+
+    const measured = spyOn(Element.prototype, 'getBoundingClientRect')
+
+    try {
+      pointer(area.querySelector('#plan')!, 'pointerdown', 5, 5)
+      pointer(document, 'pointermove', 5, 40)
+
+      const started = measured.mock.calls.length
+
+      for (const y of [41, 42, 43])
+        pointer(document, 'pointermove', 5, y)
+
+      expect(started).toBeGreaterThan(0)
+      expect(measured).toHaveBeenCalledTimes(started)
+
+      document.dispatchEvent(new Event('scroll'))
+      pointer(document, 'pointermove', 5, 44)
+
+      expect(measured.mock.calls.length).toBeGreaterThan(started)
+    }
+    finally {
+      pointer(document, 'pointerup', 5, 44)
+      measured.mockRestore()
+    }
   })
 })
 

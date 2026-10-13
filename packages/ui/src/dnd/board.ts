@@ -34,6 +34,22 @@ interface Drag {
   pointer: Point
   scroller: HTMLElement | null
   frame: number
+  // The layout and its boxes as the drag found them, measured again once anything scrolls.
+  measured: Measured | null
+  stopWatching: () => void
+}
+
+interface Placed {
+  id: Id
+  el: HTMLElement
+  items: { id: Id, el: HTMLElement }[]
+}
+
+interface Measured {
+  containers: Placed[]
+  boxes: Box[]
+  // The boxes of each container's items, the dragged one left out, measured once the pointer first nears it.
+  others: Map<Id, Box[]>
 }
 
 function byDocumentOrder(a: HTMLElement, b: HTMLElement): number {
@@ -59,7 +75,7 @@ export class Board {
     this.#onMove = options.onMove
   }
 
-  // An element the page no longer renders is left out wherever the layout is read, rather than unregistered.
+  // An element the page no longer renders is forgotten the next time the layout is read.
   container = (id: Id) => (el: HTMLElement): void => {
     this.#containers.set(id, el)
   }
@@ -72,17 +88,33 @@ export class Board {
   }
 
   // The containers still on the page in page order, each with its items in page order.
-  #layout(): { id: Id, el: HTMLElement, items: { id: Id, el: HTMLElement }[] }[] {
-    const containers = [...this.#containers.entries()].filter(([, el]) => el.isConnected).sort(([, a], [, b]) => byDocumentOrder(a, b))
+  #layout(): Placed[] {
+    for (const [id, el] of this.#containers) {
+      if (!el.isConnected)
+        this.#containers.delete(id)
+    }
+
+    for (const [id, item] of this.#items) {
+      if (!item.el.isConnected)
+        this.#items.delete(id)
+    }
+
+    const containers = [...this.#containers.entries()].sort(([, a], [, b]) => byDocumentOrder(a, b))
 
     return containers.map(([id, el]) => ({
       id,
       el,
       items: [...this.#items.entries()]
-        .filter(([, item]) => item.container === id && item.el.isConnected)
+        .filter(([, item]) => item.container === id)
         .map(([itemId, item]) => ({ id: itemId, el: item.el }))
         .sort((a, b) => byDocumentOrder(a.el, b.el)),
     }))
+  }
+
+  #measure(): Measured {
+    const containers = this.#layout()
+
+    return { containers, boxes: containers.map(({ el }) => el.getBoundingClientRect()), others: new Map() }
   }
 
   #arm(id: Id, event: PointerEvent): void {
@@ -113,21 +145,25 @@ export class Board {
 
     item.el.style.opacity = '0.3'
 
-    this.#drag = { id, from: item.container, el: item.el, ghost, origin, pointer: origin, scroller: scrollerOf(item.el), frame: 0 }
+    const stopWatching = on(document, 'scroll', () => {
+      if (this.#drag)
+        this.#drag.measured = null
+    }, { capture: true, passive: true })
+
+    this.#drag = { id, from: item.container, el: item.el, ghost, origin, pointer: origin, scroller: scrollerOf(item.el), frame: 0, measured: null, stopWatching }
     this.dragging.set(id)
     this.#follow(this.#drag)
     this.#tick()
   }
 
-  // Moves the ghost under the pointer and finds the slot beneath it, from where the items stand right now.
+  // Moves the ghost under the pointer and finds the slot beneath it, from where the items stood when the drag started or last scrolled.
   #follow(drag: Drag): void {
     drag.ghost.style.transform = `translate(${drag.pointer.x - drag.origin.x}px, ${drag.pointer.y - drag.origin.y}px)`
 
-    const containers = this.#layout()
-    const boxes: Box[] = containers.map(({ el }) => el.getBoundingClientRect())
-    const index = nearestBox(drag.pointer, boxes)
-    const container = containers[index]
-    const box = boxes[index]
+    const measured = drag.measured ??= this.#measure()
+    const index = nearestBox(drag.pointer, measured.boxes)
+    const container = measured.containers[index]
+    const box = measured.boxes[index]
 
     if (!container || !box) {
       this.drop.set(null)
@@ -135,7 +171,13 @@ export class Board {
       return
     }
 
-    const others = container.items.filter(item => item.id !== drag.id).map(({ el }) => el.getBoundingClientRect())
+    let others = measured.others.get(container.id)
+
+    if (!others) {
+      others = container.items.filter(item => item.id !== drag.id).map(({ el }) => el.getBoundingClientRect())
+      measured.others.set(container.id, others)
+    }
+
     const slot = readingIndex(others, drag.pointer)
 
     this.drop.set({ container: container.id, index: slot, bar: insertionBar(box, others, slot) })
@@ -152,6 +194,7 @@ export class Board {
 
       if (step) {
         drag.scroller.scrollTop += step
+        drag.measured = null
         this.#follow(drag)
       }
     }
@@ -170,6 +213,7 @@ export class Board {
     this.dragging.set(null)
     this.drop.set(null)
     cancelAnimationFrame(drag.frame)
+    drag.stopWatching()
     drag.ghost.remove()
     drag.el.style.opacity = ''
 

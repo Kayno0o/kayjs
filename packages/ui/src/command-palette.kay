@@ -1,6 +1,6 @@
 ---
 import type { PaletteAction, PaletteEntry, PaletteLink } from './palette'
-import { effect, onCleanup, onMount, signal, uid } from 'kay'
+import { effect, memo, onCleanup, onMount, signal, uid } from 'kay'
 import { stepIndex } from './cycle'
 import Icon from './icon.kay'
 import { isPaletteLink, paletteMatches, paletteSections, withRecent } from './palette'
@@ -40,16 +40,16 @@ effect(() => shown.set(open))
 effect(() => followedRecently.set(recent))
 
 // Headed groups while the query is empty, one flat ranked list once it is not.
-const sections = () => {
+const sections = memo(() => {
   let index = 0
   const numbered = (members: PaletteEntry[]): Row[] => members.map(entry => ({ entry, index: index++ }))
 
   return query().trim()
     ? [{ group: null, rows: numbered(paletteMatches(entries, query(), groups)) }]
     : paletteSections(entries, followedRecently(), groups).map(section => ({ group: section.group as string | null, rows: numbered(section.entries) }))
-}
+})
 
-const rows = () => sections().flatMap(section => section.rows)
+const rows = memo(() => sections().flatMap(section => section.rows))
 
 const optionId = (index: number) => `${id}-option-${index}`
 

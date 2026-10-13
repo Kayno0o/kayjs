@@ -1,6 +1,6 @@
 --- <Item>
 import type { JSX } from 'kay'
-import { onCleanup, onMount, signal } from 'kay'
+import { memo, onCleanup, onMount, signal } from 'kay'
 import { laneCount, masonryLayout } from './masonry'
 
 type Key = string | number
@@ -26,9 +26,9 @@ const keys = new WeakMap<Element, Key>()
 let root: HTMLElement | undefined
 let observer: ResizeObserver | undefined
 
-const lanes = () => laneCount(width(), minWidth, gap)
+const lanes = memo(() => laneCount(width(), minWidth, gap))
 // Until the width is known, as on the server, the tiles stay in a plain grid of the same lanes.
-const layout = () => width() > 0 ? masonryLayout(items.map(item => heights().get(key(item))), lanes(), gap) : null
+const layout = memo(() => width() > 0 ? masonryLayout(items.map(item => heights().get(key(item))), lanes(), gap) : null)
 
 const place = (index: number) => layout()?.places[index]
 
@@ -58,10 +58,11 @@ onMount(() => {
   onCleanup(() => observer?.disconnect())
 })
 
-// A tile rendered after mounting is measured from then on.
+// A tile rendered after mounting is measured from then on, until it leaves.
 function measure(node: HTMLElement, id: Key) {
   keys.set(node, id)
   observer?.observe(node)
+  onCleanup(() => observer?.unobserve(node))
 }
 ---
 // Tiles placed absolutely inside the layout's own box, so padding goes on a wrapper, never on the Masonry.

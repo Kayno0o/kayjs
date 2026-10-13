@@ -32,22 +32,27 @@ export function drawnByBlock<Row>(column: Column<Row>, columns: Column<Row>[]): 
 // What a filter box reads off a row: the row's fields named, or what a function of it returns.
 export type RowFilter<Row> = readonly (keyof Row & string)[] | ((row: Row) => (string | number | null | undefined)[])
 
-// Whether any value the filter reads holds the typed text, its case and surrounding spaces ignored; empty text keeps every row.
-export function rowMatches<Row>(row: Row, filter: RowFilter<Row>, text: string): boolean {
+// The rows where any value the filter reads holds the typed text, its case and surrounding spaces ignored; empty text keeps every row.
+export function rowsMatching<Row>(rows: Row[], filter: RowFilter<Row>, text: string): Row[] {
   const needle = text.trim().toLowerCase()
-  const values = typeof filter === 'function' ? filter(row) : filter.map(key => row[key])
+  const valuesOf = typeof filter === 'function' ? filter : (row: Row) => filter.map(key => row[key])
 
-  return needle === '' || values.some(value => (typeof value === 'string' || typeof value === 'number') && String(value).toLowerCase().includes(needle))
+  if (needle === '')
+    return rows
+
+  return rows.filter(row => valuesOf(row).some(value => (typeof value === 'string' || typeof value === 'number') && String(value).toLowerCase().includes(needle)))
 }
 
 // How a table tells its rows apart: a field of the row, or a function of it.
 export type RowKey<Row> = (keyof Row & string) | ((row: Row) => string | number)
 
+const COLLATOR = new Intl.Collator()
+
 export function compareValues(a: string | number, b: string | number): number {
   if (typeof a === 'number' && typeof b === 'number')
     return a - b
 
-  return String(a).localeCompare(String(b))
+  return COLLATOR.compare(String(a), String(b))
 }
 
 export function rowKeyOf<Row>(row: Row, key: RowKey<Row>): unknown {

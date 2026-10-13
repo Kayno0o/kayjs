@@ -1,9 +1,9 @@
 --- <Row>
 import type { JSX } from 'kay'
 import type { Column, RowFilter, RowKey, SortState } from './table'
-import { effect, persisted, signal } from 'kay'
+import { effect, memo, persisted, signal } from 'kay'
 import Icon from './icon.kay'
-import { cellText, drawnByBlock, nextSort, resolvedColumn, rowKeyOf, rowMatches, sortedRows } from './table'
+import { cellText, drawnByBlock, nextSort, resolvedColumn, rowKeyOf, rowsMatching, sortedRows } from './table'
 
 const { columns: given, rows, rowKey, sort, serverSort = false, onSort, cell, empty, filter, filterLabel = 'Filter', filterPlaceholder, filterParam, noMatch, narrow = "stack", class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
   columns: Column<Row>[]
@@ -33,21 +33,16 @@ const { columns: given, rows, rowKey, sort, serverSort = false, onSort, cell, em
   class?: string | undefined
 }>()
 
-const columns = () => given.map(resolvedColumn)
+const columns = memo(() => given.map(resolvedColumn))
 const current = signal(sort)
 const typed = filterParam === undefined ? signal('') : persisted(filterParam, '', { storage: 'query' })
 
 effect(() => current.set(sort))
 
-const shown = () => serverSort ? kept() : sortedRows(kept(), columns(), current())
-const sorting = (column: Column<Row>) => column.sortValue !== undefined && current()?.key === column.key
-
 // The rows the filter keeps, all of them without one.
-function kept(): Row[] {
-  const by = filter
-
-  return by === undefined ? rows : rows.filter(row => rowMatches(row, by, typed()))
-}
+const kept = memo(() => filter === undefined ? rows : rowsMatching(rows, filter, typed()))
+const shown = memo(() => serverSort ? kept() : sortedRows(kept(), columns(), current()))
+const sorting = (column: Column<Row>) => column.sortValue !== undefined && current()?.key === column.key
 
 function toggle(column: Column<Row>) {
   const next = nextSort(current(), column)

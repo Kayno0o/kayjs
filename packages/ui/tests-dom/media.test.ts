@@ -1,5 +1,5 @@
 import type { Mounted } from 'kay/test'
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test'
 import { mount, settle } from 'kay/test'
 import { click } from './dom'
 
@@ -16,13 +16,17 @@ class Observer {
     this.observed.push(element)
   }
 
-  // Stopping matters to no test: an observer only fires when one calls it.
-  unobserve = () => undefined
+  unobserve(element: Element) {
+    this.observed = this.observed.filter(observed => observed !== element)
+  }
+
+  // Disconnecting matters to no test: an observer only fires when one calls it.
   disconnect = () => undefined
 }
 
 const { IntersectionObserver, ResizeObserver } = globalThis
 let mounted: Mounted | undefined
+let setTiles: (tiles: string[]) => void = () => undefined
 const seen: { index: number[], crops: { x: number, y: number, w: number, h: number }[], more: number } = { index: [], crops: [], more: 0 }
 
 beforeEach(() => {
@@ -39,7 +43,7 @@ afterEach(() => {
 })
 
 async function media() {
-  mounted = await mount('src/components/media.kay', { onIndexChange: (index: number) => seen.index.push(index), onCrop: (crop: typeof seen.crops[number]) => seen.crops.push(crop), onMore: () => seen.more++ })
+  mounted = await mount('src/components/media.kay', { onIndexChange: (index: number) => seen.index.push(index), onCrop: (crop: typeof seen.crops[number]) => seen.crops.push(crop), onMore: () => seen.more++, onTiles: (set: typeof setTiles) => setTiles = set })
 
   return mounted.root
 }
@@ -197,11 +201,15 @@ describe('ZoomPane', () => {
 
     expect(Number(plate().getPropertyValue('--kui-zoom-scale'))).toBeCloseTo(1.15 ** 3)
 
+    const measured = spyOn(pane, 'getBoundingClientRect')
+
     pointer(pane, 'pointerdown', 100, 50)
     pointer(pane, 'pointermove', 101, 50)
     await settle()
 
     expect(pane.hasAttribute('data-dragging')).toBe(false)
+    // Measured once as the pointer pressed, not again as it moves.
+    expect(measured).toHaveBeenCalledTimes(1)
 
     const before = plate().transform
 
@@ -290,6 +298,21 @@ describe('Masonry and WhenVisible', () => {
     expect(masonry.style.getPropertyValue('--kui-masonry-lanes')).toBe('2')
     expect(tiles.map(tile => [tile.style.getPropertyValue('--kui-masonry-lane'), tile.style.getPropertyValue('--kui-masonry-top')])).toEqual([['0', '0px'], ['1', '0px'], ['1', '52px']])
     expect(masonry.style.height).toBe('112px')
+  })
+
+  test('stops measuring a tile once it leaves', async () => {
+    const root = await media()
+    const masonry = root.querySelector<HTMLElement>('#masonry')!
+    const observer = Observer.made.find(made => made.observed.includes(masonry))!
+    const leaving = masonry.querySelectorAll('.kui-masonry-item')[1]!
+
+    expect(observer.observed).toContain(leaving)
+
+    setTiles(['a', 'c'])
+    await settle()
+
+    expect(observer.observed).not.toContain(leaving)
+    expect(observer.observed).toHaveLength(3)
   })
 
   test('asks for more once the sentinel comes into view', async () => {
