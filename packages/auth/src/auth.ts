@@ -65,6 +65,8 @@ const DEFAULT_SESSION_MAX_AGE = 30 * 24 * 60 * 60
 const DEFAULT_REMEMBER_MAX_AGE = 90 * 24 * 60 * 60
 // kay's own lifetime of a session whose cookie dies with the browser, a day.
 const DEFAULT_BROWSER_SESSION_MAX_AGE = 24 * 60 * 60
+// kay's own absolute session lifetime, 90 days.
+const DEFAULT_SESSION_ABSOLUTE_MAX_AGE = 90 * 24 * 60 * 60
 const DEFAULT_AUDIT_MAX_AGE = 365 * 24 * 60 * 60
 const LINK_TYPES: LinkType[] = ['verify-email', 'reset-password', 'magic-link', 'change-email']
 // The close code of a socket whose user is gone: a policy violation.
@@ -133,6 +135,8 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   rememberMaxAge?: number | undefined
   // Seconds a session lives unseen when its sign-in asked not to be, `remember: false`, its cookie dying with the browser: kay's session `browserMaxAge`, a day by default as kay's is.
   browserSessionMaxAge?: number | undefined
+  // Seconds a session lives from its sign-in, however much it is used: kay's session `absoluteMaxAge`, 90 days by default as kay's is. Past it the user signs in again, "remember me" included.
+  sessionAbsoluteMaxAge?: number | undefined
   // The app's page listing where the user is signed in, linked from new sign-in mails: `/account/sessions`.
   sessionsPage?: string | undefined
   // Where an address is, shown beside each session, from a geolocation database of the app's: `ip => cityOf(ip)`.
@@ -1089,6 +1093,7 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
     sessionMaxAge: options.sessionMaxAge ?? DEFAULT_SESSION_MAX_AGE,
     rememberMaxAge: options.rememberMaxAge ?? DEFAULT_REMEMBER_MAX_AGE,
     browserSessionMaxAge: options.browserSessionMaxAge ?? DEFAULT_BROWSER_SESSION_MAX_AGE,
+    sessionAbsoluteMaxAge: options.sessionAbsoluteMaxAge ?? DEFAULT_SESSION_ABSOLUTE_MAX_AGE,
     sessionsPage: options.sessionsPage ?? paths?.sessions,
     locate: options.locate,
     scopes: new Set(options.scopes),

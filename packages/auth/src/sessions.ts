@@ -33,7 +33,7 @@ export async function openSession(core: Core, record: UserRecord, ip: string, us
   return id
 }
 
-// Whether `signedIn` still names a live session of `record`: not ended, not signed out everywhere since, and seen within the session's lifetime. A visit is recorded on the way.
+// Whether `signedIn` still names a live session of `record`: not ended, not signed out everywhere since, seen within the session's lifetime and signed in within `sessionAbsoluteMaxAge`. A visit is recorded on the way.
 export async function liveSession(core: Core, signedIn: SignedIn & { session: string }, record: UserRecord, ip: string): Promise<boolean> {
   const found = await core.store.sessions.get(signedIn.session)
   const now = Date.now()
@@ -81,7 +81,7 @@ export async function listSessions(state: RequestState): Promise<UserSession[]> 
 }
 
 function live(core: Core, session: SessionRecord, record: UserRecord, now: number): boolean {
-  return session.version === record.sessionVersion && now - session.lastSeenAt.getTime() < (session.maxAge ?? core.sessionMaxAge) * 1000
+  return session.version === record.sessionVersion && now - session.lastSeenAt.getTime() < (session.maxAge ?? core.sessionMaxAge) * 1000 && now - session.createdAt.getTime() < core.sessionAbsoluteMaxAge * 1000
 }
 
 // A failure is logged, not thrown: a lookup service down must not hide the list.

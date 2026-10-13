@@ -129,6 +129,25 @@ describe('sessions', () => {
     }
   })
 
+  test('a session signed in longer than sessionAbsoluteMaxAge ago is over, however often it was seen', async () => {
+    const { signedIn, store } = await setup({ sessionMaxAge: 3600, sessionAbsoluteMaxAge: 7200 })
+    const laptop = await signedIn()
+
+    try {
+      for (let i = 0; i < 2; i++) {
+        setSystemTime(new Date(Date.now() + 50 * 60 * 1000))
+        expect(await laptop.json('/me')).toMatchObject({ id: 'u1' })
+      }
+
+      setSystemTime(new Date(Date.now() + 30 * 60 * 1000))
+      expect(await laptop.json('/me')).toBe('anonymous')
+      expect(await store.sessions.listByUser('u1')).toHaveLength(1)
+    }
+    finally {
+      setSystemTime()
+    }
+  })
+
   test('a visit from a new address is recorded', async () => {
     const { signedIn, store } = await setup()
     const laptop = await signedIn()

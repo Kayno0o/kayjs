@@ -308,9 +308,9 @@ export function isCrossSite(request: Request): boolean {
   return (origin !== null && !sameHost(request, origin)) || (site !== null && !SAME_SITE_FETCH.has(site))
 }
 
-// Over https, kay's cookies never travel in clear; behind a proxy, `X-Forwarded-Proto` says how the browser came.
+// Over https, kay's cookies never travel in clear; behind a proxy, `X-Forwarded-Proto` says how the browser came, and in production an https `site` in kay.config.ts says so of every request, for a proxy that does not pass it on.
 export function overHttps(request: Request): boolean {
-  return new URL(request.url).protocol === 'https:' || FORWARDED_HTTPS.test(request.headers.get('x-forwarded-proto') ?? '')
+  return new URL(request.url).protocol === 'https:' || FORWARDED_HTTPS.test(request.headers.get('x-forwarded-proto') ?? '') || (process.env.NODE_ENV === 'production' && configuredSite()?.origin.startsWith('https:') === true)
 }
 
 export function inLocale<T>(request: Request, options: ActionOptions, run: () => T): T {

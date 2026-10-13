@@ -88,6 +88,8 @@ export interface Core {
   rememberMaxAge: number
   // Seconds a session signed in with `remember: false` lives unseen, kay's session `browserMaxAge`.
   browserSessionMaxAge: number
+  // Seconds a session lives from its sign-in however much it is used, kay's session `absoluteMaxAge`.
+  sessionAbsoluteMaxAge: number
   // The app's page listing the user's sessions, linked from new sign-in mails.
   sessionsPage?: string | undefined
   // Where an address is, such as a city, shown beside each session.

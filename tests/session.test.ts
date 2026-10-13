@@ -2,6 +2,7 @@ import type { Action } from '../src/runtime'
 import type { SessionStore } from '../src/server'
 import { afterEach, describe, expect, it, setSystemTime } from 'bun:test'
 import { Elysia } from 'elysia'
+import { setSite } from '../src/runtime/site'
 import { memoryStore, pages, session, sqliteStore } from '../src/server'
 
 const SECRET = 'a test secret that is long enough to seal'
@@ -153,6 +154,81 @@ describe('sessions', () => {
     expect((await visit('/peek')).text).toBe('1')
     setSystemTime(Date.now() + 101_000)
     expect((await visit('/peek')).text).toBe('none')
+  })
+
+  it('ends a session absoluteMaxAge after it started or was regenerated, however much it is used, its cookie living no longer', async () => {
+    const visit = browser(counter({ maxAge: 100, absoluteMaxAge: 250 }))
+
+    await visit('/count')
+    setSystemTime(Date.now() + 60_000)
+    expect((await visit('/count')).set).toMatch(/Max-Age=100;/)
+    setSystemTime(Date.now() + 60_000)
+    expect((await visit('/count')).set).toMatch(/Max-Age=100;/)
+    setSystemTime(Date.now() + 60_000)
+    expect((await visit('/count')).set).toMatch(/Max-Age=70;/)
+    setSystemTime(Date.now() + 71_000)
+    expect((await visit('/peek')).text).toBe('none')
+
+    // A regenerate, as on signing in, starts it again.
+    await visit('/count')
+    setSystemTime(Date.now() + 90_000)
+    await visit('/count')
+    setSystemTime(Date.now() + 90_000)
+    await visit('/count')
+    setSystemTime(Date.now() + 60_000)
+    expect((await visit('/rotate')).set).toMatch(/Max-Age=100;/)
+    setSystemTime(Date.now() + 90_000)
+    expect((await visit('/peek')).text).toBe('3')
+  })
+
+  it('ends a session 90 days after it started by default, a store told so', async () => {
+    const lifetimes: number[] = []
+    const memory = memoryStore()
+    const visit = browser(counter({ store: { ...memory, async set(id, data, maxAge) {
+      lifetimes.push(maxAge)
+      await memory.set(id, data, maxAge)
+    } } }))
+    const DAY = 24 * 60 * 60
+
+    await visit('/count')
+    await visit('/remember/31536000')
+    expect(lifetimes).toEqual([30 * DAY, 90 * DAY])
+    setSystemTime(Date.now() + 89 * DAY * 1000)
+    expect((await visit('/peek')).text).toBe('1')
+    setSystemTime(Date.now() + 2 * DAY * 1000)
+    expect((await visit('/peek')).text).toBe('none')
+  })
+
+  it('names the cookie __Host- and marks it Secure over https, reading it under that name only', async () => {
+    const app = counter()
+    const https = { 'x-forwarded-proto': 'https' }
+    const set = (await app.handle(new Request('http://localhost/count', { headers: https }))).headers.getSetCookie()[0]!
+    const value = (/^__Host-session=([^;]*)/).exec(set)![1]
+
+    expect(set).toMatch(/^__Host-session=[\w-]+; Path=\/; Max-Age=2592000; Secure; HttpOnly; SameSite=Lax$/i)
+    expect(await (await app.handle(new Request('http://localhost/peek', { headers: { ...https, cookie: `__Host-session=${value}` } }))).text()).toBe('1')
+    // A cookie another host of the site could have set, under the name without the prefix, is no session.
+    expect(await (await app.handle(new Request('http://localhost/peek', { headers: { ...https, cookie: `session=${value}` } }))).text()).toBe('none')
+    expect((await counter({ cookie: 'admin' }).handle(new Request('http://localhost/count', { headers: https }))).headers.getSetCookie()[0]).toMatch(/^__Host-admin=/)
+    // A Domain rules __Host- out.
+    expect((await counter({ domain: 'example.com' }).handle(new Request('http://localhost/count', { headers: https }))).headers.getSetCookie()[0]).toMatch(/^session=.*; Domain=example\.com; .*Secure/i)
+  })
+
+  it('marks the cookie Secure in production when the configured site is https, whatever the proxy says', async () => {
+    const env = process.env.NODE_ENV ?? 'test'
+
+    setSite('https://example.com')
+    process.env.NODE_ENV = 'production'
+
+    try {
+      expect((await counter().handle(new Request('http://localhost/count'))).headers.getSetCookie()[0]).toMatch(/^__Host-session=.*; Secure/i)
+    }
+    finally {
+      process.env.NODE_ENV = env
+      setSite(undefined)
+    }
+
+    expect((await counter().handle(new Request('http://localhost/count'))).headers.getSetCookie()[0]).toMatch(/^session=(?!.*Secure)/i)
   })
 
   it('keeps a lifetime a session chose through its extensions and a regenerate, until it is destroyed', async () => {

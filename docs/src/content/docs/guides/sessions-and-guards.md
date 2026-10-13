@@ -40,6 +40,8 @@ Use it before the pages: `new Elysia().use(sessions).use(await pages())`.
 
 Without a store the data travels in the cookie, sealed but limited to about 3.5 KB and impossible to revoke. With a store the cookie only carries an id. `memoryStore()` is for development, `sqliteStore(path)` for one machine, and any object with `get`, `set` and `delete` works.
 
+A session lasts `maxAge` without use, 30 days by default, and never longer than `absoluteMaxAge` from its start or its last `regenerate()`, 90 days by default. Over https the cookie is `Secure` and named `__Host-session`, so no other host of the site can set it; in production an https `site` in kay.config.ts counts as https even behind a proxy that does not say so.
+
 ## Signing in and out
 
 `regenerate()` right after signing in, `destroy()` to sign out. All methods return promises.
