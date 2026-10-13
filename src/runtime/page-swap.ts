@@ -1,4 +1,4 @@
-import type { FetchedPage, Intent, Swap } from './navigation'
+import type { FetchedPage, HeadElement, Intent, Swap } from './navigation'
 import { focusInvalid } from './focus'
 import { ISLAND } from './markers'
 import { historyState, leave, navigation, pageKey, prefetched, restoreScroll, saveScroll, takeFormChecks } from './navigation'
@@ -8,7 +8,7 @@ import { decodeValue } from './wire'
 
 // The page swap itself, which `./navigate` loads once a visitor is about to follow a link, and `./forms` once a form is posted.
 // The body's content becomes the next page's, morphed so what renders again stays the same element, islands kept only by `persist` or a refresh.
-// Everything else follows one rule: what the server served changes as the next page serves it, what a script changed or added since stays the script's. The served state is `served` for `<html>`, read from the server's meta, `servedHead` for the head, and none for `<body>`, which the server writes bare.
+// Everything else follows one rule: what the server served changes as the next page serves it, what a script changed or added since stays the script's. The served state is `served` for `<html>`, read from the server's meta, each head element's own `_$s` for the head, and none for `<body>`, which the server writes bare.
 
 // How a swap goes, read off its intent: the one place a swap decides it.
 interface Policy {
@@ -47,19 +47,18 @@ const CARRIAGE_RETURN = /\r\n?/g
 const SPECULATION = 'script[type="speculationrules"]'
 // The line a page without kay's script carries for Back after a reload, which a swapped-in page leaves to this one.
 const HISTORY = 'script[data-kay-history]'
+// The head elements a swap leaves to itself rather than merging.
+const UNMERGED = `title,${SPECULATION},${HISTORY}`
 const SWAP_PATTERN = /\$kayAwait/
 // Scripts the browser runs; any other type, such as `application/json` or `application/ld+json`, holds data of the page it came with.
 const RUNNABLE_TYPES = new Set(['', 'module', 'text/javascript', 'application/javascript', 'importmap'])
 const REDUCED_MOTION = '(prefers-reduced-motion: reduce)'
-const ID_LIST = /\s+/
 const ISOLATING_EMBEDDERS = new Set(['require-corp', 'credentialless'])
 // What follows a policy's value, such as `; report-to="endpoint"`.
 const POLICY_PARAMS = /;.*/
 
 // What the server set on `<html>` for the page shown, by name: read from its meta as the swap loads, then kept as each swap commits, since a navigation dropped midway may have merged its own meta into the head.
 let served = typeof document === 'undefined' ? new Map<string, string>() : servedRoot(document)
-// Each head element the server put in, as it put it: those of the page loaded first, read as navigation started, then each one a swap adds.
-const servedHead = new WeakMap(navigation.head)
 
 interface KeptIsland extends HTMLElement {
   // Set by the entry once the island hydrated: gives it new props.
@@ -362,18 +361,23 @@ function tokens(value: string | undefined): string[] {
 // Adds what the next head serves that this one lacks now, and drops what the server alone served here as the page is swapped: the page keeps its own styles until the next one's loaded.
 // An element a script changed or added since stays the script's, and the next page's copy of it is not added again.
 function mergeHead(next: Document): { loaded: Promise<unknown>, commit: () => void } {
-  const incoming = new Map<string, Element[]>()
+  const incoming = [...next.head.children].filter(element => !element.matches(UNMERGED))
+  const take = (key: string | undefined) => {
+    const at = incoming.findIndex(element => element.outerHTML === key)
 
-  for (const element of next.head.children) {
-    if (element.tagName !== 'TITLE' && !element.matches(SPECULATION) && !element.matches(HISTORY))
-      incoming.set(element.outerHTML, [...incoming.get(element.outerHTML) ?? [], element])
+    if (at !== -1)
+      incoming.splice(at, 1)
+
+    return at !== -1
   }
+  const stale: HeadElement[] = []
 
-  const take = (key: string | undefined) => key !== undefined && incoming.get(key)?.shift() !== undefined
-  const stale: Element[] = []
+  for (const element of document.head.children as HTMLCollectionOf<HeadElement>) {
+    // A stylesheet `kay dev` swapped in for an edited one is the server's as it stands.
+    if (element.matches('[data-kay-dev]'))
+      element._$s = element.outerHTML
 
-  for (const element of document.head.children) {
-    const key = servedHead.get(element)
+    const key = element._$s
 
     if (key !== element.outerHTML) {
       take(element.outerHTML)
@@ -384,26 +388,28 @@ function mergeHead(next: Document): { loaded: Promise<unknown>, commit: () => vo
     }
   }
 
-  const loading: Promise<void>[] = []
+  const loading: Promise<unknown>[] = []
 
-  for (const [key, elements] of incoming) {
-    for (const element of elements) {
-      const added = element.tagName === 'SCRIPT' ? runnable(element as HTMLScriptElement) : document.adoptNode(element)
+  for (const element of incoming) {
+    const key = element.outerHTML
+    const added: HeadElement = element.tagName === 'SCRIPT' ? runnable(element as HTMLScriptElement) : document.adoptNode(element)
 
-      servedHead.set(added, key)
+    added._$s = key
 
-      if (added instanceof HTMLLinkElement && added.rel === 'stylesheet')
-        loading.push(loaded(added))
+    if (added instanceof HTMLLinkElement && added.rel === 'stylesheet')
+      loading.push(loaded(added))
 
-      document.head.append(added)
-    }
+    document.head.append(added)
   }
 
   return {
     loaded: Promise.all(loading),
+    // One a script changed while the next page's styles loaded is the script's by now.
     commit: () => {
-      for (const element of stale)
-        element.remove()
+      for (const element of stale) {
+        if (element._$s === element.outerHTML)
+          element.remove()
+      }
     },
   }
 }
@@ -425,13 +431,11 @@ function runnable(script: HTMLScriptElement): HTMLScriptElement {
   return copy
 }
 
-async function loaded(link: HTMLLinkElement): Promise<void> {
-  await new Promise<void>((resolve) => {
-    const done = () => resolve()
-
-    link.addEventListener('load', done, { once: true })
-    link.addEventListener('error', done, { once: true })
-    setTimeout(done, STYLESHEET_TIMEOUT_MS)
+async function loaded(link: HTMLLinkElement): Promise<unknown> {
+  return new Promise((resolve) => {
+    link.addEventListener('load', resolve)
+    link.addEventListener('error', resolve)
+    setTimeout(resolve, STYLESHEET_TIMEOUT_MS)
   })
 }
 
@@ -706,7 +710,7 @@ async function showRefusal(form: HTMLFormElement | undefined, control: number): 
   if (await focusInvalid(form))
     return true
 
-  const message = form.getAttribute('aria-describedby')?.split(ID_LIST).map(id => document.getElementById(id)?.textContent?.trim()).filter(Boolean).join(' ')
+  const message = form.getAttribute('aria-describedby')?.split(SPACES).map(id => document.getElementById(id)?.textContent?.trim()).filter(Boolean).join(' ')
 
   if (message !== undefined && message !== '')
     announce(message)

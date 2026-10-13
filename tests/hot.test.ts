@@ -50,6 +50,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('kay dev in 
       'src/components/todos.kay': todos('Drop'),
       'src/app.css': 'p.static { color: rgb(255, 0, 0) }\n',
       'src/routes/index.kay': home('Static'),
+      'src/routes/other.kay': '---\nimport Counter from \'../components/counter.kay\'\n---\nh1 Other\np.static Other\nCounter\n',
     }
 
     await Promise.all(Object.entries(files).map(async ([path, content]) => Bun.write(join(root, path), content)))
@@ -196,6 +197,37 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('kay dev in 
     expect(await sameDocument()).toBe(false)
     expect(await page.textContent('p.static')).toBe('Grown')
 
+    await page.click('button.extra')
+    await page.locator('button.extra', { hasText: 'Extra on' }).waitFor()
+  }, 60_000)
+
+  it('drops the stylesheets of the page left once an edited one swapped in, as the server served them', async () => {
+    const color = async () => page.evaluate(() => getComputedStyle(document.querySelector('p.static')!).color)
+    const go = async (href: string, heading: string) => {
+      await page.evaluate((to) => {
+        const link = document.createElement('a')
+
+        link.href = to
+        link.textContent = to
+        document.body.append(link)
+      }, href)
+      await page.click(`a[href="${href}"]`)
+      await page.locator('h1', { hasText: heading }).waitFor()
+      expect(await sameDocument()).toBe(true)
+    }
+
+    await page.evaluate(() => {
+      (window as { kayAlive?: boolean }).kayAlive = true
+    })
+    await rm(join(root, '.port'))
+    await Bun.write(join(root, 'src/app.css'), 'p.static { color: rgb(0, 128, 0) }\n')
+    await until(async () => await color() === 'rgb(0, 128, 0)')
+    // The other page imports no stylesheet.
+    await go('/other', 'Other')
+    expect(await color()).toBe('rgb(0, 0, 0)')
+    await go('/', 'Home')
+    expect(await color()).toBe('rgb(0, 128, 0)')
+    // Back on as the inspector's test expects it.
     await page.click('button.extra')
     await page.locator('button.extra', { hasText: 'Extra on' }).waitFor()
   }, 60_000)

@@ -1,5 +1,5 @@
 import type { CheckedHref } from './checks'
-import type { HistoryState, NavigationHooks, Swap } from './navigation'
+import type { HeadElement, HistoryState, NavigationHooks, Swap } from './navigation'
 import { withBase, withoutBase } from './base'
 import { actionUrl, busyForms, dirtyGuard, dropScrollSave, historyState, leave, mayLeave, nativeSubmits, navigation, onScroll, pageKey, prefetched, restoreScroll, saveScroll, submitNatively, swappable, takeFormCheck, takeFormChecks } from './navigation'
 
@@ -55,7 +55,8 @@ export function startNavigation(given: NavigationHooks): void {
   for (const script of document.querySelectorAll(SPECULATION))
     script.remove()
 
-  navigation.head = Array.from(document.head.children, element => [element, element.outerHTML])
+  for (const element of document.head.children as HTMLCollectionOf<HeadElement>)
+    element._$s = element.outerHTML
 
   takeFormChecks(document)
   history.scrollRestoration = 'manual'

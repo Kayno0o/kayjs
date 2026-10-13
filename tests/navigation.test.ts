@@ -350,11 +350,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     await page.evaluate(() => {
       (window as { kayAlive?: boolean }).kayAlive = true
     })
-    await go('second', 'Second')
-    expect(await state()).toEqual({ themes: ['#ffffff'], added: 0, secondOnly: 1, mode: undefined })
-    await go('home', 'Home')
-    expect(await state()).toEqual({ themes: ['#ffffff'], added: 0, secondOnly: 0, mode: undefined })
-    // A dark mode toggle recolouring the browser's bar, a loader adding a tag, a script marking the body.
+    // A dark mode toggle recolouring the browser's bar, a loader adding a tag, a script marking the body, all before the swap loads.
     await page.evaluate(() => {
       document.querySelector('meta[name="theme-color"]')!.setAttribute('content', '#123456')
       const meta = document.createElement('meta')

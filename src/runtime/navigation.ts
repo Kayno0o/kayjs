@@ -39,6 +39,11 @@ export interface LeaveGuard {
   confirm?: ((to: URL) => boolean | Promise<boolean>) | undefined
 }
 
+// A head element the server put in, holding as `_$s` how it put it, which the swap tells what a script changed or added since by: those of the page loaded first are read as navigation starts.
+export interface HeadElement extends Element {
+  _$s?: string
+}
+
 export interface HistoryState {
   kay: true
   scroll: [number, number]
@@ -54,10 +59,8 @@ const LEAVE_MESSAGE = 'This page has unsaved changes. Leave it anyway?'
 // `hooks`, `navigate` and `refresh` are set once the swap took over the app's links, which an action call then shows its effects through.
 // `shown` is the page shown, by URL without its hash, since going back to an entry of the same page only scrolls; `at` the place of its entry; `page` how many other pages were shown since, which an action call's outcome belongs to one of; `current` the latest swap started, which an earlier one gives way to.
 // `released` lets a full load kay starts itself through `beforeunload`, as one the guards were asked about or one that is no leave.
-// `head` holds each head element the server put in, as it put it, read once navigation starts: the swap tells by it what a script changed or added since.
 export const navigation: {
   hooks?: NavigationHooks
-  head?: [Element, string][]
   navigate?: (href: string) => Promise<void>
   refresh?: () => Promise<void>
   shown: string
