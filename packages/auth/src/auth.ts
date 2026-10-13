@@ -67,11 +67,11 @@ const DEFAULT_REMEMBER_MAX_AGE = 90 * 24 * 60 * 60
 const DEFAULT_BROWSER_SESSION_MAX_AGE = 24 * 60 * 60
 const DEFAULT_AUDIT_MAX_AGE = 365 * 24 * 60 * 60
 const LINK_TYPES: LinkType[] = ['verify-email', 'reset-password', 'magic-link', 'change-email']
-// What a provider posting back to the callback may say, carried over to the GET.
 // The close code of a socket whose user is gone: a policy violation.
 const SOCKET_USER_GONE = 1008
 // The sockets `socketUser` answered a user for, to close once that user is gone.
 const servedSockets = new WeakSet<object>()
+// What a provider posting back to the callback may say, carried over to the GET.
 const FORM_POST_FIELDS = ['code', 'state', 'error', 'user']
 
 // What a route, a guard or a gate asks of the user: a role, a predicate, or a list of which any one passes.
