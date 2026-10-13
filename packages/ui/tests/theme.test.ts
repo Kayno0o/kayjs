@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { compileKay } from 'kay/compiler'
+import { compile } from 'tailwindcss'
 
 const ROOT = new URL('..', import.meta.url).pathname
 
@@ -91,5 +92,17 @@ describe('theme.css', () => {
   test('declares its tokens as defaults, so the app\'s own @theme wins wherever it sits', () => {
     expect(theme).toContain('@theme default {')
     expect(theme).not.toContain('@theme {')
+  })
+
+  test('lets a skin set offset shadows and a press-down through tokens alone', async () => {
+    const tailwind = Bun.resolveSync('tailwindcss/theme.css', ROOT)
+    const skin = '@theme { --kui-shadow-raised: 4px 4px 0 black; --kui-shadow-press: 3px 3px 0 black; --kui-press-travel: 3px; }'
+    const compiler = await compile(`@import 'tailwindcss/theme.css' layer(theme);\n${theme}\n${skin}`, { base: ROOT, loadStylesheet: async (_, base) => ({ path: tailwind, base, content: await Bun.file(tailwind).text() }) })
+    const css = compiler.build([])
+    const flat = css.replaceAll(/\s+/g, ' ')
+
+    expect([...css.matchAll(/(--kui-(?:shadow-raised|shadow-press|press-travel)): ([^;]+);/g)].map(([, token, value]) => `${token} ${value}`)).toEqual(['--kui-shadow-raised 4px 4px 0 black', '--kui-shadow-press 3px 3px 0 black', '--kui-press-travel 3px'])
+    expect(flat).toContain(':is(.kui-card, .kui-card-row, .kui-widget, .kui-toast) { box-shadow: var(--kui-shadow-raised); }')
+    expect(flat).toContain('.kui-btn, .kui-icon-btn:where(.kui-shell) { box-shadow: var(--kui-shadow-press); &:active { translate: 0 var(--kui-press-travel); box-shadow: none; } }')
   })
 })
