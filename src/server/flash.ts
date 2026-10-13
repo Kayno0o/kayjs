@@ -2,8 +2,9 @@ import type { CookieMap } from 'bun'
 import { isSecret } from '../runtime/form'
 import { kayLog } from '../runtime/log'
 import { decodeValue, encodeValue, unsendable } from '../runtime/wire'
+import { openText, sealText } from './stamp'
 
-// A plain form post that succeeded goes back to its page through a redirect; this cookie carries what it returned, for that one page render.
+// A plain form post that succeeded goes back to its page through a redirect; this cookie carries what it returned, sealed, as it may be a secret shown once such as a new API token, for that one page render.
 export const FLASH_COOKIE = 'kay_flash'
 
 export interface Flash {
@@ -57,7 +58,7 @@ function setFlash(cookies: CookieMap, value: SuccessFlash, secure: boolean): str
   let encoded: string
 
   try {
-    encoded = Buffer.from(encodeValue(value)).toString('base64url')
+    encoded = sealText(FLASH_COOKIE, encodeValue(value))
   }
   catch (error) {
     const reason = unsendable(error)
@@ -76,15 +77,16 @@ function setFlash(cookies: CookieMap, value: SuccessFlash, secure: boolean): str
   return undefined
 }
 
-// Anyone can send this cookie, so its shape is checked before a page reads it; a forged one only changes what its own sender sees.
+// Its shape is checked before a page reads it all the same; one that does not open, forged or sealed before a restart changed the secret, reads as none.
 export function readFlash(cookies: CookieMap): SuccessFlash | undefined {
   const value = cookies.get(FLASH_COOKIE)
+  const text = value === null || value === '' ? undefined : openText(FLASH_COOKIE, value)
 
-  if (value === null || value === '')
+  if (text === undefined)
     return undefined
 
   try {
-    const flash = decodeValue(Buffer.from(value, 'base64url').toString()) as Partial<SuccessFlash> | null
+    const flash = decodeValue(text) as Partial<SuccessFlash> | null
 
     return typeof flash === 'object' && flash !== null && typeof flash.action === 'string' && flash.succeeded === true ? flash as SuccessFlash : undefined
   }

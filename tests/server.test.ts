@@ -1352,6 +1352,29 @@ describe('failed actions', () => {
     expect(page.status).toBe(200)
     expect(await page.text()).not.toContain('class="error"')
   })
+
+  it('seals what a plain form post returned, so its cookie shows nothing of it and an altered one reads as none', async () => {
+    const secret = `token-${Bun.randomUUIDv7()}`
+    const posted = await app.handle(new Request('http://localhost/_kay/action/tests/fixtures/site/src/routes/events.kay/schedule', {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded', 'referer': 'http://localhost/events' },
+      body: new URLSearchParams({ title: secret, at: '2026-10-04T10:00:00Z' }),
+    }))
+    const cookie = posted.headers.get('set-cookie')!
+    const value = cookie.slice('kay_flash='.length, cookie.indexOf(';'))
+    const visit = async (flash: string) => (await app.handle(new Request('http://localhost/events', { headers: { cookie: `kay_flash=${flash}` } }))).text()
+
+    expect(posted.status).toBe(303)
+    expect(cookie).toStartWith('kay_flash=')
+    expect(cookie).not.toContain(secret)
+    expect(Buffer.from(value, 'base64url').toString('latin1')).not.toContain(secret)
+    expect(await visit(value)).toContain(`Scheduled ${secret} on`)
+
+    const altered = Buffer.from(value, 'base64url')
+
+    altered[20]! ^= 1
+    expect(await visit(altered.toString('base64url'))).not.toContain('class="done"')
+  })
 })
 
 describe('public files', () => {

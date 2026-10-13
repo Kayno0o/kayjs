@@ -64,7 +64,7 @@ A handler that throws, a mail server down say, is logged and answered the same w
 
 ## Redirecting after success
 
-`ctx.redirect()` in the handler sends the browser elsewhere. Without it the post goes back to the page, where `add.succeeded()` holds what the handler returned for that one render.
+`ctx.redirect()` in the handler sends the browser elsewhere. Without it the post goes back to the page, where `add.succeeded()` holds what the handler returned for that one render. It travels there in a sealed cookie, so a secret shown once, such as a new API token, cannot be read from it.
 
 ```kay
 export const signUp = action(schema, async (input, ctx) => {
