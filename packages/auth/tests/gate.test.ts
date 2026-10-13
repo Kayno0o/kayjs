@@ -109,6 +109,30 @@ describe('createGate', () => {
     expect((await app.handle(req('/admin', { authorization: 'Bearer good' }))).status).toBe(403)
   })
 
+  test('a route asking less of its own gate still meets the stricter gate around it', async () => {
+    const inner = new Elysia().use(createGate(deps)).get('/loose', () => 'secret', { auth: (p: User | null) => p != null })
+    const app = new Elysia().use(createGate<User, string>({ ...deps, defaultRequirement: p => p?.id === 2 })).use(inner)
+
+    expect((await app.handle(req('/loose'))).status).toBe(401)
+    expect((await app.handle(req('/loose', { authorization: 'Bearer good' }))).status).toBe(403)
+  })
+
+  test('auth: false opens a route to its own gate only', async () => {
+    const inner = new Elysia().use(createGate<User, string>({ ...deps, defaultRequirement: p => p?.id === 2 })).get('/health', () => 'ok', { auth: false })
+    const app = new Elysia().use(createGate(deps)).use(inner)
+
+    expect((await app.handle(req('/health'))).status).toBe(401)
+    expect((await app.handle(req('/health', { authorization: 'Bearer good' }))).status).toBe(200)
+  })
+
+  test('a route\'s scope binds its own gate only', async () => {
+    const scoped: GateDeps<User, string> = { ...deps, scopes: async () => ['read'] }
+    const inner = new Elysia().use(createGate(scoped)).get('/read', () => 'ok', { scope: 'read' })
+    const app = new Elysia().use(createGate({ ...scoped, defaultScope: 'admin' })).use(inner)
+
+    expect((await app.handle(req('/read', { authorization: 'Bearer good' }))).status).toBe(403)
+  })
+
   test('a parent that uses an authed plugin keeps its own later routes as they were', async () => {
     const authed = new Elysia().use(createGate(deps)).get('/authed', () => 'ok')
     const app = new Elysia().use(authed).get('/later', () => 'ok').use(new Elysia().get('/later-plugin', () => 'ok'))

@@ -2,9 +2,7 @@ import type { DefinitionBase, Elysia, EphemeralType, MetadataBase, RouteBase, Si
 import type { Level, PolicyContext, Requirement } from './types'
 
 const READ_METHODS = new Set(['GET', 'HEAD'])
-const REQUIREMENT = Symbol('auth.requirement')
 const DECIDED = Symbol('auth.decided')
-const SCOPE = Symbol('auth.scope')
 
 // The scope a route asks of a scoped bearer token, any one of a list, or false to let every token through.
 export type ScopeRequirement<S extends string> = S | S[] | false
@@ -21,13 +19,12 @@ export interface GateDeps<P, G extends string, S extends string = string> {
   defaultScope?: ScopeRequirement<S> | undefined
 }
 
-// The slice of the Elysia context the gate reads, plus the stamps it leaves on it.
+// The slice of the Elysia context the gate reads, plus the stamps it leaves on it, each gate's own under its own symbols.
 interface GateContext<P, G extends string> extends PolicyContext {
   request: Request
   set: { status?: number | string }
-  [REQUIREMENT]?: Requirement<P, G> | false
   [DECIDED]?: Set<Requirement<P, G>>
-  [SCOPE]?: ScopeRequirement<string>
+  [stamp: symbol]: unknown
 }
 
 // Whether `scopes`, a token's, meet what a route asks; a session, or a token with every scope, meets anything.
@@ -43,17 +40,20 @@ export function scopeAllows(scopes: readonly string[] | null, wanted: ScopeRequi
 export function createGate<P, G extends string, S extends string = string>(deps: GateDeps<P, G, S>) {
   // Generic over the app's own types, so what it holds already, such as `auth`, reaches the routes after it.
   return <Base extends string, Single extends SingletonBase, Defs extends DefinitionBase, Meta extends MetadataBase, Routes extends RouteBase, Eph extends EphemeralType, Vol extends EphemeralType>(app: Elysia<Base, Single, Defs, Meta, Routes, Eph, Vol>) => {
+    // Elysia runs a route's `auth:` through the nearest gate's macro only, while every enclosing gate's hook runs: stamped under this gate's own symbols, the route's choice binds this gate alone, and the gates around it keep their own requirement.
+    const ownRequirement = Symbol('auth.requirement')
+    const ownScope = Symbol('auth.scope')
     const gated = app
       .macro({
         auth: (requirement: Requirement<P, G> | false | undefined) => ({
           transform(ctx: object) {
-            (ctx as GateContext<P, G>)[REQUIREMENT] = requirement ?? deps.defaultRequirement
+            (ctx as GateContext<P, G>)[ownRequirement] = requirement ?? deps.defaultRequirement
           },
         }),
         scope: (scope: ScopeRequirement<S> | undefined) => ({
           transform(ctx: object) {
             if (scope !== undefined)
-              (ctx as GateContext<P, G>)[SCOPE] = scope
+              (ctx as GateContext<P, G>)[ownScope] = scope
           },
         }),
       })
@@ -63,7 +63,7 @@ export function createGate<P, G extends string, S extends string = string>(deps:
 
     plain.onBeforeHandle({ as: 'local' }, async (context) => {
       const ctx = context as unknown as GateContext<P, G>
-      const requirement = ctx[REQUIREMENT] ?? deps.defaultRequirement
+      const requirement = (ctx[ownRequirement] as Requirement<P, G> | false | undefined) ?? deps.defaultRequirement
 
       if (requirement === false)
         return
@@ -82,7 +82,7 @@ export function createGate<P, G extends string, S extends string = string>(deps:
         (ctx[DECIDED] ??= new Set()).add(requirement)
       }
 
-      if (deps.scopes && !scopeAllows(await deps.scopes(ctx), ctx[SCOPE] ?? deps.defaultScope)) {
+      if (deps.scopes && !scopeAllows(await deps.scopes(ctx), (ctx[ownScope] as ScopeRequirement<string> | undefined) ?? deps.defaultScope)) {
         ctx.set.status = 403
 
         return 'Forbidden'

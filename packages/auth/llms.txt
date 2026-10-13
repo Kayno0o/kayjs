@@ -145,7 +145,7 @@ const api = new Elysia({ prefix: '/api' })
 
 - Every route the instance declares after `.use(auth.gate())` needs a signed-in user, or `gate({ require })`'s requirement. A route asks for more with `auth: <requirement>` and stays open with `auth: false`. Routes added through `group`, `guard`, `route`, `all`, `ws` or a used plugin are closed too, so a route that forgets `auth:` stays closed. A route declared before the gate stays open: use the gate first.
 - `auth.gate()` brings `auth.plugin` along, so `auth` reaches the routes declared after the gate's instance too.
-- Gates nest: a sub-router behind `auth.gate({ require: 'admin' })` inside an app behind `auth.gate()` needs both.
+- Gates nest: a sub-router behind `auth.gate({ require: 'admin' })` inside an app behind `auth.gate()` needs both. A route's `auth:` and `scope:` change only the gate nearest it, so `auth: false` or a looser requirement in the sub-router still meets every gate around it.
 - 401 to an anonymous caller, 403 to a signed-in one who is denied. A bearer token passes as its user.
 
 ## OAuth
