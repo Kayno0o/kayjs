@@ -849,7 +849,7 @@ describe('kay dev', () => {
 
       expect((await open('src/routes/index.kay:2:3', {})).status).toBe(403)
       expect((await open('../outside.kay:1:1')).status).toBe(404)
-      expect((await open('record.ts:1:1')).status).toBe(404)
+      expect((await open('.env:1:1')).status).toBe(404)
       expect(await (await open('src/routes/index.kay:2:3')).json()).toEqual({ opened: true })
       await until(() => filled(seen))
       expect(JSON.parse(readFileSync(seen, 'utf8'))).toEqual([join(root, 'src/routes/index.kay')])

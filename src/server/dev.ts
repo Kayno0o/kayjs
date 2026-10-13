@@ -29,7 +29,7 @@ const INSPECTOR_SOURCE = resolve(import.meta.dir, '../runtime/dev-inspector.ts')
 const A11Y_SOURCE = resolve(import.meta.dir, '../runtime/dev-a11y.ts')
 // What the inspector sends, which a page of another site cannot without a preflight nothing answers.
 const OPEN_HEADER = 'x-kay-dev'
-const POSITION = /^(.+\.kay):(\d+):(\d+)$/
+const POSITION = /^(.+\.(?:kay|[cm]?[jt]sx?)):(\d+):(\d+)$/
 const BACKSLASH = /\\/g
 const SOURCE_FILE = /\.(?:kay|[cm]?[jt]sx?|json|css)$/
 
@@ -167,7 +167,12 @@ export function devToolScripts(): string {
   return `<script type="module" src="${DEV_TOOL}"></script>${underKayDev() ? `<script type="module" src="${DEV_INSPECTOR}"></script>` : ''}`
 }
 
-// Opens the `.kay` file at the position the inspector names, in the editor `editorCommand` finds; with none, the terminal prints the position.
+// Loads the dev tool on kay's error pages, whose buttons it answers: the copy button, and under `kay dev` each source position.
+export function errorPageScripts(): string {
+  return LIVE_RELOAD + DEV_BOOT + devToolScripts()
+}
+
+// Opens the `.kay` or script file at the position the inspector or an error page names, in the editor `editorCommand` finds; with none, the terminal prints the position.
 export async function openInEditor(root: string, request: Request): Promise<Response> {
   if (request.headers.get(OPEN_HEADER) === null || isCrossSite(request))
     return new Response(null, { status: 403 })
@@ -307,13 +312,20 @@ function followStyles(root: string, client: ClientBuild): ClientBuild {
 }
 
 // What a dev server serves when the project failed to boot: the errors on every page, until a fix restarts it.
-export function bootFailure(error: unknown, seed: string): Elysia {
+export function bootFailure(error: unknown, root: string): Elysia {
   // Told by its name: the class's module loads the compiler, which a production server never needs.
-  const html = compileErrorPage(error instanceof Error && error.name === 'KayCompileError' ? (error as KayCompileError).diagnostics : [], error) + LIVE_RELOAD
+  const html = compileErrorPage(error instanceof Error && error.name === 'KayCompileError' ? (error as KayCompileError).diagnostics : [], error) + errorPageScripts()
 
-  const app = new Elysia({ name: 'kay/pages', seed })
+  const app = new Elysia({ name: 'kay/pages', seed: root })
 
   app.get(DEV_EVENTS, () => devEvents(true))
+  app.get(DEV_TOOL, () => devTool())
+
+  if (underKayDev()) {
+    app.get(DEV_INSPECTOR, () => devInspector())
+    app.post(DEV_OPEN, async ({ request }) => openInEditor(root, request))
+  }
+
   app.get('/*', () => new Response(html, { status: 500, headers: { 'content-type': 'text/html; charset=utf-8' } }))
 
   return app

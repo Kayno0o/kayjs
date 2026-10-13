@@ -103,7 +103,7 @@ describe('the inspector', () => {
       answer = 404
       span.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, altKey: true }))
       await Bun.sleep(0)
-      expect(host().textContent).toContain('src/routes/index.kay:4:3: not a .kay file of this project')
+      expect(host().textContent).toContain('src/routes/index.kay:4:3: not a source file of this project')
     }
     finally {
       answer = true

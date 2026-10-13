@@ -105,6 +105,17 @@ Every page a dev server serves carries a bar at the bottom left, `kay` and a cou
 
 Production pages never carry it.
 
+### Error page
+
+A page that throws, when the app has no `_error.kay`, and a server that failed to boot show an error page in development, in the system's light or dark theme:
+
+- the message, and the lines around where the app's own code threw;
+- the app's stack frames, those of kay and the dependencies folded under one toggle;
+- a Copy button, for the message and the stack as the terminal shows them;
+- a compile error as `kay check` prints it.
+
+Under `kay dev`, each frame and compile error position opens in the editor on a click. The page carries the dev tool too, and reloads itself once the error is fixed.
+
 ### Inspector
 
 Every page `kay dev` serves knows which `.kay` line wrote each element:

@@ -242,4 +242,30 @@ describe('the dev tool', () => {
     expect(opened).toEqual(['src/components/card.kay:1:1', 'src/routes/index.kay:4:3', 'src/routes/about.kay:7:1'])
     expect(problems()[0]![1]).toBe('island src/components/card.kay did not match, see src/routes/index.kay:4:3 (no editor found, set KAY_EDITOR).')
   })
+
+  it('answers the buttons of kay\'s error pages: a source position opens in the editor, Copy copies the error', async () => {
+    const opened: string[] = []
+    const copied: string[] = []
+
+    document.body.innerHTML = '<button type="button" data-kay-open="src/stock.ts:4:11">src/stock.ts:4:11</button><button type="button" data-kay-copy="kay-error-text">Copy</button><pre id="kay-error-text" hidden>Error: no stock</pre>'
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async (copy: string) => void copied.push(copy) } })
+    tool = startDevTool()
+    tool.setOpener(async (source) => {
+      opened.push(source)
+
+      return 'no editor found, set KAY_EDITOR'
+    })
+
+    const [open, copy] = document.querySelectorAll('button')
+
+    open!.click()
+    copy!.click()
+    await Bun.sleep(0)
+
+    expect(opened).toEqual(['src/stock.ts:4:11'])
+    expect(open!.textContent).toBe('src/stock.ts:4:11 (no editor found, set KAY_EDITOR)')
+    expect(copied).toEqual(['Error: no stock'])
+    expect(copy!.textContent).toBe('Copied')
+    document.body.innerHTML = ''
+  })
 })

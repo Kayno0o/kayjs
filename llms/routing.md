@@ -61,7 +61,7 @@ Other files starting with `_` are not routes. Every top-level name the server fe
 
 Layout and page loads run in parallel; when several fail, the outermost one decides the response. In development each response carries a `Server-Timing` header with the time of every load and of the render, shown in the browser's network panel; `serverTiming: true` in kay.config.ts sends it in production too (see [Tracing and timing](production.md#tracing-and-timing)).
 
-The nearest special page wins, wrapped by the layouts of its own directory. `_error.kay` reads `ctx.error`: `status`, `message` and, in development only, `stack`. Logged and displayed stacks point at `.kay` lines. In production the message is generic and the real error goes to `console.error`; without an `_error.kay` the response is plain text, and development shows the stack instead.
+The nearest special page wins, wrapped by the layouts of its own directory. `_error.kay` reads `ctx.error`: `status`, `message` and, in development only, `stack`. Logged and displayed stacks point at `.kay` lines. In production the message is generic and the real error goes to `console.error`; without an `_error.kay` the response is plain text, and development shows an error page with the stack instead, its frames opening in the editor under `kay dev`.
 
 ```kay
 --- server

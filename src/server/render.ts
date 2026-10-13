@@ -35,7 +35,7 @@ import { rebaseHtml } from './base'
 import { importModule } from './bundle'
 import { preferredEncoding, wholeResponse } from './compress'
 import { cookieJar } from './cookies'
-import { A11Y_SCRIPT, DEV_BOOT, devToolScripts, LIVE_RELOAD, problemsBlock } from './dev'
+import { A11Y_SCRIPT, DEV_BOOT, devToolScripts, errorPageScripts, LIVE_RELOAD, problemsBlock } from './dev'
 import { FLASH_COOKIE, handedOverFlash, readFlash } from './flash'
 import { formsScript } from './forms'
 import { runGuards } from './guards'
@@ -550,7 +550,7 @@ async function renderFailure(error: unknown, special: SpecialPages, rendering: R
   if (options.dev && !notFound && !denied) {
     rendering.headers.set('content-type', 'text/html; charset=utf-8')
 
-    return respond(rendering, errorPage(pageError) + LIVE_RELOAD)
+    return respond(rendering, errorPage(pageError) + errorPageScripts())
   }
 
   rendering.headers.set('content-type', TEXT['content-type'])

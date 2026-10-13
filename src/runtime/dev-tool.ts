@@ -7,10 +7,13 @@ const STATE_KEY = 'kay-dev'
 const CHECK_PROBLEMS = 'kay-check-problems'
 // The most problem texts a tab remembers as dismissed.
 const MAX_DISMISSED = 200
+// How long an error page's copy button says it copied.
+const COPIED_MS = 1500
 // A path segment, kay's `(group)`, `[param]`, `[[optional]]` and `[...rest]` names included.
 const SEGMENT = String.raw`(?:\([\w@.+=-]+\)|\[{1,2}(?:\.{3})?[\w-]+\]{1,2}|[\w@.+=-])+`
+
 // A `.kay` file a problem names, with its line and column when it gives them, not one inside a URL.
-const KAY_POSITION = new RegExp(String.raw`(?<![\w@.+=:/\\)\]-])(?:[A-Za-z]:)?[\\/]?(?:${SEGMENT}[\\/])*${SEGMENT}\.kay(?::\d+(?::\d+)?)?(?!\.?\w)`, 'g')
+export const KAY_POSITION = new RegExp(String.raw`(?<![\w@.+=:/\\)\]-])(?:[A-Za-z]:)?[\\/]?(?:${SEGMENT}[\\/])*${SEGMENT}\.kay(?::\d+(?::\d+)?)?(?!\.?\w)`, 'g')
 const OPENED_POSITION = /^(.+\.kay)(?::(\d+))?(?::(\d+))?$/
 
 type ProblemKind = 'uncaught' | 'kay' | 'policy' | 'a11y' | 'check'
@@ -343,6 +346,9 @@ export function startDevTool(doc: Document = document): DevTool {
       box.hidden = true
   }
 
+  // The buttons kay's error pages carry, which need a script and have no other.
+  const pageClicks = new AbortController()
+
   const tool: DevTool = {
     root,
     make,
@@ -361,11 +367,18 @@ export function startDevTool(doc: Document = document): DevTool {
     stop: () => {
       problems?.stop()
       win.removeEventListener('keydown', onKeyDown, true)
+      pageClicks.abort()
       host.remove()
     },
   }
 
   problems = problemsTab(doc, tool, state, save)
+  doc.addEventListener('click', (event) => {
+    const target = event.target instanceof Element ? event.target.closest<HTMLButtonElement>('button[data-kay-open],button[data-kay-copy]') : null
+
+    if (target)
+      void answerErrorPage(tool, target)
+  }, { signal: pageClicks.signal })
 
   return tool
 }
@@ -542,6 +555,38 @@ function problemsTab(doc: Document, tool: DevTool, state: DevState, save: () => 
   }
 }
 
+// Opens the position an error page's button names, saying why it could not, or copies the error, saying so a moment.
+async function answerErrorPage(tool: DevTool, target: HTMLButtonElement): Promise<void> {
+  const { kayOpen: source, kayCopy: copied } = target.dataset
+
+  if (source !== undefined) {
+    const failed = await tool.open(withLine(source))
+
+    target.textContent = failed === undefined ? source : `${source} (${failed})`
+
+    return
+  }
+
+  try {
+    await target.ownerDocument.defaultView!.navigator.clipboard.writeText(target.ownerDocument.getElementById(copied!)?.textContent ?? '')
+    target.textContent = 'Copied'
+  }
+  catch {
+    target.textContent = 'Copy failed'
+  }
+
+  setTimeout(() => {
+    target.textContent = 'Copy'
+  }, COPIED_MS)
+}
+
+// A `.kay` file named alone or by its line opens at its first line or column.
+function withLine(source: string): string {
+  const [, file, line = '1', column = '1'] = OPENED_POSITION.exec(source) ?? []
+
+  return file === undefined ? source : `${file}:${line}:${column}`
+}
+
 // An error's stack, headed by its name and message where the browser leaves them out, or the text logged with it; the island kay caught it in first.
 function problemText({ text, error, island }: DevProblem): string {
   const { name, message, stack } = (typeof error === 'object' && error !== null ? error : {}) as { name?: unknown, message?: unknown, stack?: unknown }
@@ -564,8 +609,7 @@ function withPositions(text: string, tool: DevTool): Node[] {
     position.type = 'button'
     position.disabled = !tool.opens()
     position.onclick = async () => {
-      const [, file, line = '1', column = '1'] = OPENED_POSITION.exec(source)!
-      const failed = await tool.open(`${file}:${line}:${column}`)
+      const failed = await tool.open(withLine(source))
       const note = position.nextElementSibling?.classList.contains('note') === true ? position.nextElementSibling : undefined
 
       note?.remove()

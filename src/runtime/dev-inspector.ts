@@ -23,7 +23,7 @@ type Opened = 'opened' | 'no editor' | 'failed' | 'unknown file' | 'unreachable'
 const FAILURES: Record<Exclude<Opened, 'opened'>, string> = {
   'no editor': 'no editor found, set KAY_EDITOR',
   'failed': 'the editor failed to open it, see the kay dev terminal',
-  'unknown file': 'not a .kay file of this project',
+  'unknown file': 'not a source file of this project',
   'unreachable': 'kay dev did not answer',
 }
 
