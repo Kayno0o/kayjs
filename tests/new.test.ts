@@ -1,9 +1,9 @@
 import type { Subprocess } from 'bun'
-import { mkdir, mkdtemp, readdir, rm, stat, symlink } from 'node:fs/promises'
+import { cp, mkdir, mkdtemp, readdir, rm, stat, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import process from 'node:process'
-import { describe, expect, it } from 'bun:test'
+import { afterAll, describe, expect, it } from 'bun:test'
 import { parse, stringify } from 'devalue'
 import { outputDir } from '../src/build/assets'
 import { buildClient } from '../src/build/client'
@@ -58,25 +58,40 @@ async function checked(dir: string) {
   return check(dir, configCheckOptions(await loadConfig(dir)))
 }
 
-// Stands in for `bun install` of a packed kay: its source and what `prepack` emits, the declarations and the ESLint processor, beside this checkout's dependencies.
+// What `prepack` emits, the declarations and the ESLint processor, made once for every scaffold of the run, as it is the same for each.
+let packed: Promise<string> | undefined
+
+async function pack(): Promise<string> {
+  const dir = await mkdtemp(join(tmpdir(), 'kay-packed-'))
+  const emit = Bun.spawn([join(repo, 'node_modules/.bin/tsgo'), '-p', join(repo, 'tsconfig.build.json'), '--outDir', join(dir, 'types')], { stdout: 'pipe', stderr: 'pipe' })
+
+  expect(await emit.exited).toBe(0)
+
+  const processor = await Bun.build({ entrypoints: [join(repo, 'src/eslint/index.ts')], target: 'node', packages: 'external', outdir: join(dir, 'dist'), naming: 'eslint.js' })
+
+  expect(processor.success).toBe(true)
+
+  return dir
+}
+
+afterAll(async () => {
+  if (packed)
+    await rm(await packed, { recursive: true, force: true })
+})
+
+// Stands in for `bun install` of a packed kay: its source and what `prepack` emits, copied rather than linked so they resolve from the project, beside this checkout's dependencies.
 async function installKay(dir: string) {
   const modules = join(dir, 'node_modules')
   const kay = join(modules, 'kay')
 
+  packed ??= pack()
   await mkdir(kay, { recursive: true })
   await Promise.all([
     // The checkout's own `kay` is a link back to it, which the packed copy below replaces.
     ...(await readdir(join(repo, 'node_modules'))).filter(name => name !== 'kay').map(async name => symlink(join(repo, 'node_modules', name), join(modules, name))),
     ...['package.json', 'src'].map(async name => symlink(join(repo, name), join(kay, name))),
   ])
-
-  const emit = Bun.spawn([join(repo, 'node_modules/.bin/tsgo'), '-p', join(repo, 'tsconfig.build.json'), '--outDir', join(kay, 'types')], { stdout: 'pipe', stderr: 'pipe' })
-
-  expect(await emit.exited).toBe(0)
-
-  const processor = await Bun.build({ entrypoints: [join(repo, 'src/eslint/index.ts')], target: 'node', packages: 'external', outdir: join(kay, 'dist'), naming: 'eslint.js' })
-
-  expect(processor.success).toBe(true)
+  await cp(await packed, kay, { recursive: true })
 }
 
 // The scaffolds the concurrent tests below run at once: each runs tsgo, ESLint and its own tests, and all twenty at once ran a machine out of memory.
