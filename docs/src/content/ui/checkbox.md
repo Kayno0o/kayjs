@@ -10,7 +10,7 @@ description: A labelled checkbox, native so it submits inside a form, with an op
 
 ## Indeterminate
 
-`indeterminate` draws the box as neither ticked nor not, for a box standing over a partly ticked list. The next click ticks it.
+`indeterminate` draws the box as neither ticked nor not, for a box standing over a partly ticked list. A click toggles it from `checked`, and it is drawn so again while the parent keeps `indeterminate`.
 
 <Demo name="checkbox/indeterminate" />
 

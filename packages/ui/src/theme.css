@@ -466,7 +466,7 @@
   }
 
   :where(.kui-chip-input:checked) + .kui-chip-label {
-    @apply border-kui-accent bg-kui-accent text-kui-on-accent;
+    @apply border-kui-accent bg-kui-accent text-kui-on-accent hover:text-kui-on-accent;
   }
 
   :where(.kui-chip-input:focus-visible) + .kui-chip-label {
@@ -1211,7 +1211,7 @@
   }
 
   :where(.kui-segmented-input:checked) + .kui-segmented-label {
-    @apply bg-kui-accent text-kui-on-accent;
+    @apply bg-kui-accent text-kui-on-accent hover:text-kui-on-accent;
   }
 
   :where(.kui-segmented-input:focus-visible) + .kui-segmented-label {

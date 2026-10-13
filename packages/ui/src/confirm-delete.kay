@@ -25,7 +25,7 @@ const { message, onConfirm, failure, refused, trigger = 'icon', ask = 'dialog', 
   // The confirm button's text, and the one it shows while `onConfirm` is pending.
   confirmLabel?: string | undefined
   pendingLabel?: string | undefined
-  // The icon trigger's size and look; the button trigger is always a danger button.
+  // The icon trigger's size and look, `size` sizing the cancel button too when asking inline; the button trigger is always a danger button.
   size?: 'xs' | 'sm' | 'md' | 'lg' | undefined
   variant?: 'solid' | 'ghost' | 'inline' | 'danger' | undefined
   // Goes on the trigger.
@@ -34,8 +34,9 @@ const { message, onConfirm, failure, refused, trigger = 'icon', ask = 'dialog', 
 
 const open = signal(false)
 const pending = signal(false)
-// The trigger asking inline, hidden while armed, which takes the focus back once the pair goes.
+// The trigger asking inline, hidden while armed, which takes the focus back once the pair goes; and the pair, which takes it back after a failed delete.
 let opener: HTMLElement | undefined
+let armed: HTMLElement | undefined
 
 function start(event: MouseEvent) {
   opener = event.currentTarget as HTMLElement
@@ -58,6 +59,8 @@ async function confirm() {
 
   if (deleted)
     close()
+  else if (ask === 'inline')
+    queueMicrotask(() => armed?.querySelector('button')?.focus())
 }
 
 function keyDown(event: KeyboardEvent) {
@@ -76,7 +79,7 @@ else
 if ask === 'inline'
   if open()
     // Armed by a click, so the focus moves onto the button that deletes.
-    span.kui-confirm-delete-armed(ref={element => queueMicrotask(() => element.querySelector('button')?.focus())} role="group" aria-label={message} onKeyDown={keyDown})
+    span.kui-confirm-delete-armed(ref={element => { armed = element; queueMicrotask(() => element.querySelector('button')?.focus()) }} role="group" aria-label={message} onKeyDown={keyDown})
       Button(label={pending() ? pendingLabel : confirmLabel} variant="danger" busy={pending()} disabled={pending()} data-tooltip={message} onClick={confirm})
       IconButton(icon="close" label="Cancel" size={size} variant="ghost" disabled={pending()} onClick={close})
 else

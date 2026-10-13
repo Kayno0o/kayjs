@@ -12,4 +12,6 @@ const decks = [{ value: 'films', label: 'Films' }, { value: 'games', label: 'Gam
 form#form
   Checkbox(name="terms" label="I agree" hint="v2" onChange={onAgree})
   Checkbox#all(label="Select all" indeterminate={mixed()} onChange={() => mixed.set(false)})
+  button#mix(type="button" onClick={() => mixed.set(true)}) Mix
+  Checkbox#kept(label="Some" indeterminate)
   ChipGroup(label="Decks" name="decks" options={decks} value={['games', 'films']} onChange={onDecks})

@@ -3,10 +3,10 @@ import type { JSX } from 'kay'
 import { effect, signal } from 'kay'
 import { changeAccepted } from './change'
 
-const { checked = false, indeterminate = false, label, hint, onChange, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'type' | 'checked' | 'class' | 'children' | 'onChange'> & {
+const { checked = false, indeterminate = false, label, hint, onChange, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'type' | 'checked' | 'class' | 'children' | 'onChange' | 'ref'> & {
   // Whether it starts ticked; a box whose parent passes another value follows it.
   checked?: boolean | undefined
-  // Neither ticked nor not, for a box standing over a partly ticked set; the next click ticks it.
+  // Neither ticked nor not, for a box standing over a partly ticked set; a click toggles it from `checked`, and the box stays drawn so while the parent keeps it.
   indeterminate?: boolean | undefined
   // Shown next to the box; omit it and pass `aria-label` instead to keep the box label-only for screen readers.
   label?: string | undefined
@@ -43,10 +43,15 @@ async function change(input: HTMLInputElement) {
   on.set(next)
 
   // Put back unless the parent set `checked` meanwhile, which has the last word.
-  if (!(await changeAccepted('Checkbox', () => onChange?.(next), busy.set)) && synced === syncedBefore) {
+  const accepted = await changeAccepted('Checkbox', () => onChange?.(next), busy.set)
+
+  if (!accepted && synced === syncedBefore) {
     on.set(before)
     input.checked = before
   }
+
+  // The click cleared it, whatever the parent still says.
+  input.indeterminate = indeterminate
 }
 ---
 // A native checkbox, so it submits inside a form and the keyboard and screen readers know it. A click while a change is under way ticks nothing.

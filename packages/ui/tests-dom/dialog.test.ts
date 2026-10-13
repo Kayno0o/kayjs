@@ -186,6 +186,24 @@ describe('ConfirmDelete', () => {
     click(root.querySelector('.kui-confirm-delete-armed .kui-btn-danger'))
     await settle()
 
-    expect([root.querySelector('.kui-confirm-delete-armed .kui-btn-danger')?.hasAttribute('disabled'), root.querySelector('.kui-toast-message')?.textContent]).toEqual([false, 'Could not remove'])
+    expect([root.querySelector('.kui-confirm-delete-armed .kui-btn-danger')?.hasAttribute('disabled'), root.querySelector('.kui-toast-message')?.textContent, document.activeElement?.textContent]).toEqual([false, 'Could not remove', 'Delete'])
+  })
+
+  test('asked inline, hides a labelled button or a text link as it hides the icon', async () => {
+    const root = await dialogs()
+
+    for (const name of ['unshare', 'forget']) {
+      const trigger = root.querySelector<HTMLButtonElement>(`.${name}`)!
+
+      click(trigger)
+      await settle()
+
+      expect([name, trigger.hidden, root.querySelectorAll('.kui-confirm-delete-armed').length]).toEqual([name, true, 1])
+
+      click(root.querySelector('.kui-confirm-delete-armed .kui-icon-btn'))
+      await settle()
+
+      expect([name, trigger.hidden, document.activeElement]).toEqual([name, false, trigger])
+    }
   })
 })
