@@ -1,6 +1,7 @@
 import type { Mail } from '../src/mail'
 import { describe, expect, test } from 'bun:test'
 import { testApp, userRecord } from './helpers/app'
+import { authenticator } from './helpers/authenticator'
 
 const PASSWORD = 'correct horse battery'
 const LINKS = { 'verify-email': '/verify', 'reset-password': '/reset', 'magic-link': '/magic', 'change-email': '/confirm-email' }
@@ -307,6 +308,27 @@ describe('magic links', () => {
     expect(await stranger.json('/me')).toBe('anonymous')
     expect(await browser().json('/me', { headers: { authorization: `Bearer ${minted.token}` } })).toBe('anonymous')
     expect(await browser().post('/password', { identifier: 'ada@example.com', password: 'squatter password' })).toEqual({ ok: false, error: 'invalid' })
+  })
+
+  test('a passkey the stranger added before the owner claimed the account signs no one in after the claim', async () => {
+    const { browser, tokenOf } = setup()
+    const stranger = browser()
+    const device = authenticator()
+
+    await stranger.call('register', { email: 'ada@example.com', password: 'squatter password' })
+    const { options } = await stranger.call('passkeyRegistrationOptions')
+
+    expect(await stranger.call('registerPasskey', await device.create(options))).toMatchObject({ ok: true })
+
+    const ada = browser()
+
+    await ada.call('requestPasswordReset', 'ada@example.com')
+    await ada.call('resetPassword', tokenOf('reset-password'), 'owner password, at last')
+
+    const signIn = await stranger.call('passkeySignInOptions')
+
+    expect(await stranger.call('signInWithPasskey', await device.get(signIn))).toEqual({ ok: false, error: 'invalid' })
+    expect(await ada.call('passkeys')).toEqual([])
   })
 
   test('a link for an address the account has since left is spent for nothing', async () => {

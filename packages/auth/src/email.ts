@@ -445,6 +445,9 @@ async function claim(core: Core, record: UserRecord): Promise<Partial<UserRecord
   for (const identity of await core.store.identities.listByUser(record.id))
     await core.store.identities.delete(identity.provider, identity.providerId)
 
+  for (const passkey of await core.store.passkeys.listByUser(record.id))
+    await core.store.passkeys.delete(record.id, passkey.id)
+
   await core.store.recoveryCodes.replace(record.id, [])
   await revokeBearerTokens(core, record.id)
   // A link the stranger asked for before, such as moving the account to their own address, would take it back.
