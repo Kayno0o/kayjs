@@ -269,32 +269,38 @@ describe('the dev tool', () => {
     document.body.innerHTML = ''
   })
 
-  it('says on the bar what kay dev rebuilt and how long it took, once a browser tab saw a build, again on the page it reloaded, then fades', async () => {
+  it('says on the bar what kay dev just rebuilt and how long it took, on the page it reloaded for the time left, never a build long past, then fades', async () => {
     const built = () => shadow().querySelector<HTMLElement>('.bar .built')!
     const announce = (data: object) => window.dispatchEvent(new CustomEvent('kay-dev-built', { detail: JSON.stringify(data) }))
 
     tool = startDevTool()
-    // A tab's first page says nothing of a build that came before it.
-    announce({ id: 'a', changed: 'src/routes/index.kay', ms: 58 })
-    expect(built().hidden).toBe(true)
-
-    announce({ id: 'b', changed: 'src/app.css', ms: 24, styles: true })
-    expect(built().hidden).toBe(false)
-    expect(built().textContent).toBe('src/app.css: stylesheets swapped in 24 ms')
     expect(built().getAttribute('role')).toBe('status')
+    expect(built().textContent).toBe('')
 
-    // The page that build reloaded, whose live reload script heard of it first, says it for what time is left.
-    tool.stop()
-    sessionStorage.setItem('kay-dev', JSON.stringify({ ...JSON.parse(sessionStorage.getItem('kay-dev')!), built: { id: 'c', at: Date.now() - 3980 } }))
-    Object.assign(window, { $kayBuilt: JSON.stringify({ id: 'c', changed: 'src/name.ts', ms: 412 }) })
-    tool = startDevTool()
-    expect(built().textContent).toBe('src/name.ts: restarted in 412 ms')
+    // The first build the page hears of, as the next.
+    announce({ id: 'a', at: Date.now(), changed: 'src/routes/index.kay', ms: 58 })
+    expect(built().textContent).toBe('src/routes/index.kay: restarted in 58 ms')
+    announce({ id: 'b', at: Date.now(), changed: 'src/app.css', ms: 24, styles: true })
+    expect(built().textContent).toBe('src/app.css: stylesheets swapped in 24 ms')
     expect(document.activeElement).toBe(document.body)
 
-    await Bun.sleep(60)
+    // A page opened long after a build says nothing of it.
+    tool.stop()
+    Object.assign(window, { $kayBuilt: JSON.stringify({ id: 'c', at: Date.now() - 60_000, changed: 'src/old.ts', ms: 9 }) })
+    tool = startDevTool()
+    expect(built().textContent).toBe('')
+
+    // The page a build reloaded, whose live reload script heard of it first, says it for the time left.
+    tool.stop()
+    Object.assign(window, { $kayBuilt: JSON.stringify({ id: 'd', at: Date.now() - 3800, changed: 'src/name.ts', ms: 412 }) })
+    tool = startDevTool()
+    expect(built().textContent).toBe('src/name.ts: restarted in 412 ms')
+    expect(built().classList.contains('fading')).toBe(false)
+
+    await Bun.sleep(300)
     expect(built().classList.contains('fading')).toBe(true)
-    await Bun.sleep(450)
-    expect(built().hidden).toBe(true)
+    await Bun.sleep(500)
+    expect(built().textContent).toBe('')
     delete (window as { $kayBuilt?: string }).$kayBuilt
   })
 })

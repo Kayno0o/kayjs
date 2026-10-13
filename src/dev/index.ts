@@ -133,7 +133,8 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
       return
 
     const url = message.listening.replace(ROOT_PATH, '')
-    const took = `${Math.round(performance.now() - restartedAt)} ms`
+    const ms = Math.round(performance.now() - restartedAt)
+    const took = `${ms} ms`
     const { asked, port } = message as Partial<Record<'asked' | 'port', number>>
 
     moved = asked !== undefined && port !== undefined && asked !== port ? `${asked}:${port}` : undefined
@@ -148,8 +149,10 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
         openBrowser(url, log)
     }
     else {
-      log(`${stamp()} ${describe(restartedFor)}: restarted in ${took}${url === address ? '' : `, now on ${url}`}`)
-      tell(server, { built: { changed: describe(restartedFor), ms: Math.round(performance.now() - restartedAt) } })
+      const changed = describe(restartedFor)
+
+      log(`${stamp()} ${changed}: restarted in ${took}${url === address ? '' : `, now on ${url}`}`)
+      tell(server, { built: { changed, ms } })
     }
 
     address = url
@@ -428,7 +431,6 @@ function openBrowser(url: string, log: (line: string) => void): void {
   }
 }
 
-// The files a restart came from, as its report names them.
 // A server killed for a restart meanwhile takes no message.
 function tell(server: Subprocess, message: object): void {
   try {
@@ -437,6 +439,7 @@ function tell(server: Subprocess, message: object): void {
   catch {}
 }
 
+// The files a restart came from, as its report names them.
 function describe(files: string[]): string {
   const [first] = files
 

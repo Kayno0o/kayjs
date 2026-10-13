@@ -50,6 +50,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .bar > button[aria-pressed=true], .bar > button[aria-expanded=true] { background: var(--accent-soft); }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .mark { font-weight: 700; color: var(--accent); letter-spacing: .02em; }
+.built:empty { padding: 0; }
 .built { max-width: min(28rem, calc(100vw - 160px)); padding: 3px 10px 3px 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); transition: opacity ${FADE_MS}ms; }
 .built.fading { opacity: 0; }
 @media (prefers-reduced-motion: reduce) { .built { transition: none; } }
@@ -94,13 +95,13 @@ interface DevState {
   tab: string
   side: 'left' | 'right'
   dismissed: string[]
-  // The last build this browser tab heard of, and when, so a page the build reloads says it again.
-  built?: { id: string, at: number } | undefined
 }
 
 // What `kay dev` says of a restart, or of a stylesheet edit it swapped in without one.
 interface Built {
   id: string
+  // When it was done, by the clock of the machine `kay dev` runs on, which the browser's often is.
+  at: number
   changed: string
   ms: number
   styles?: boolean
@@ -179,7 +180,6 @@ export function startDevTool(doc: Document = document): DevTool {
   mark.setAttribute('aria-controls', drawer.id)
   status.setAttribute('role', 'status')
   built.setAttribute('role', 'status')
-  built.hidden = true
   side.type = 'button'
   close.type = 'button'
   head.append(tabList, side, close)
@@ -371,30 +371,25 @@ export function startDevTool(doc: Document = document): DevTool {
   const listening = new AbortController()
   let fading: ReturnType<typeof setTimeout> | undefined
   let hiding: ReturnType<typeof setTimeout> | undefined
+  let saying: string | undefined
 
-  // Said once in each browser tab: again on the page it reloaded, never on a page opened long after.
+  // Said for the time left since the build, so the page it reloaded says it too and one opened long after does not; the live region stays, emptied, so a screen reader hears each.
   const sayBuilt = (data: string) => {
     const build = JSON.parse(data) as Built
-    const now = Date.now()
-    const shown = state.built === undefined ? undefined : build.id === state.built.id ? state.built.at : now
-    const left = shown === undefined ? 0 : BUILT_MS - (now - shown)
+    const left = Math.min(BUILT_MS, BUILT_MS - (Date.now() - build.at))
 
-    if (state.built?.id !== build.id) {
-      state.built = { id: build.id, at: state.built === undefined ? 0 : now }
-      save()
-    }
-
-    if (left <= 0)
+    if (left <= 0 || build.id === saying)
       return
 
+    saying = build.id
     clearTimeout(fading)
     clearTimeout(hiding)
     built.textContent = `${build.changed}: ${build.styles === true ? 'stylesheets swapped' : 'restarted'} in ${build.ms} ms`
-    built.hidden = false
     built.classList.remove('fading')
     fading = setTimeout(() => built.classList.add('fading'), left)
     hiding = setTimeout(() => {
-      built.hidden = true
+      built.textContent = ''
+      saying = undefined
     }, left + FADE_MS)
   }
 

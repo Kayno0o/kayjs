@@ -264,4 +264,14 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('kay dev in 
     await page.locator('#kay-dev-islands', { hasText: 'src/components/extra.kay#1 false' }).waitFor()
     expect(await page.textContent('#kay-dev-islands')).toContain('src/components/counter.kay#1 0#2 ""')
   }, 60_000)
+
+  it('reloads the open page into the error page when an edit does not compile, and back once it does', async () => {
+    await Bun.write(join(root, 'src/routes/index.kay'), `${home('Grown', true)}else\n  p no\n`)
+    await page.locator('h1', { hasText: '1 compile error' }).waitFor({ timeout: 30_000 })
+
+    expect(await page.textContent('pre')).toContain('src/routes/index.kay:')
+
+    await Bun.write(join(root, 'src/routes/index.kay'), home('Grown', true))
+    await page.locator('p.static', { hasText: 'Grown' }).waitFor({ timeout: 30_000 })
+  }, 60_000)
 })

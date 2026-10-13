@@ -39,6 +39,7 @@ const BOOT_ID = crypto.randomUUID()
 const streams = new Set<ReadableStreamDefaultController<string>>()
 // What `kay dev` said of the last restart or stylesheet swap, for the pages connecting after it.
 let lastBuilt: string | undefined
+let followingBuilds = false
 // Once its server went away, a page connects again every 10 ms for about a restart's length, then less and less often, down to four times a second, so a server that stays down is not polled hard.
 const FAST_RETRY_MS = 10
 const FAST_RETRIES = 50
@@ -310,14 +311,15 @@ function followStyles(root: string, client: ClientBuild): ClientBuild {
 
 // `kay dev` says what each restart and stylesheet swap rebuilt and how long it took, which the dev tool on each open page shows.
 export function followBuilds(): void {
-  if (process.send === undefined)
+  if (process.send === undefined || followingBuilds)
     return
 
+  followingBuilds = true
   process.on('message', (message: unknown) => {
     if (typeof message !== 'object' || message === null || !('built' in message))
       return
 
-    lastBuilt = `event: built\ndata: ${JSON.stringify({ id: crypto.randomUUID(), ...message.built as object })}\n\n`
+    lastBuilt = `event: built\ndata: ${JSON.stringify({ id: crypto.randomUUID(), at: Date.now(), ...message.built as object })}\n\n`
     broadcast(lastBuilt)
   })
 }
