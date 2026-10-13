@@ -1,7 +1,7 @@
 import { withBase } from './base'
 import { dispatch, hydrate, render } from './dom'
 import { ISLAND } from './markers'
-import { batch, ownSignal, recordSignals, reportError, root, setErrorReporter } from './reactive'
+import { batch, flush, ownSignal, recordSignals, reportError, root, setErrorReporter } from './reactive'
 import { freshPrefix, withIds } from './uid'
 import { decodeValue } from './wire'
 
@@ -192,6 +192,10 @@ async function hydrateIsland(registry: IslandRegistry, element: HTMLElement): Pr
 
   (element as IslandElement)._$k = true;
   (element as IslandElement)._$p = update
+
+  // Mounted first, its onMount run, as a click on an island already hydrated finds it.
+  if (early.length > 0)
+    flush()
 
   // A click or an input reaches the handlers alone, its default action done already; a change, heard on the element itself, fires again. A target an afresh render replaced is gone with its event.
   for (const event of early) {

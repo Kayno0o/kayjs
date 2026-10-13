@@ -1,0 +1,10 @@
+---
+import { onMount, signal } from 'kay'
+
+// Set as the island mounts, which a click it took while hydrating must find done.
+const start = signal(0)
+const counted = signal(0)
+
+onMount(() => start.set(10))
+---
+button.mounted(onClick={() => counted.set(start() + 1)}) Counted {counted()}

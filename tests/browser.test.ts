@@ -191,9 +191,17 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay/test i
 
   it('scrolls to what it clicks, centered past fixed bars, a click on an island hydrating once visible reaching it', async () => {
     await page.goto('/below')
+    // Replayed once the island mounted, as a click on one already hydrated finds it.
+    await page.click('button.mounted')
+    await page.waitFor('button.mounted', { text: 'Counted 11' })
     await page.click('button.player')
 
     expect(await page.text('button.player')).toBe('Played 1')
+
+    // The scroll restored with the islands in view, they hydrate as the click lands.
+    await page.reload()
+    await page.click('button.mounted')
+    await page.waitFor('button.mounted', { text: 'Counted 11' })
 
     await page.click('a.far')
     await page.waitUntil(() => location.hash === '#far')

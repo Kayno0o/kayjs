@@ -1,4 +1,5 @@
 ---
+import Mounted from '../components/mounted.kay'
 import Player from '../components/player.kay'
 import './below.css'
 ---
@@ -7,6 +8,7 @@ head
 h1 Below
 div(style="height: 3000px")
 Player(hydrate="visible")
+Mounted(hydrate="visible")
 div(style="height: 3000px")
 a.far(href="#far") Far
 // Room under the link, as a page leaves above a fixed bar.
