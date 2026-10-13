@@ -55,6 +55,8 @@ export function startNavigation(given: NavigationHooks): void {
   for (const script of document.querySelectorAll(SPECULATION))
     script.remove()
 
+  navigation.head = Array.from(document.head.children, element => [element, element.outerHTML])
+
   takeFormChecks(document)
   history.scrollRestoration = 'manual'
   document.addEventListener('click', onClick)

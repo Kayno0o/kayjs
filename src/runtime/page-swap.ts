@@ -7,6 +7,8 @@ import { NAVIGATE_HEADER, RELOAD_HEADER } from './swap'
 import { decodeValue } from './wire'
 
 // The page swap itself, which `./navigate` loads once a visitor is about to follow a link, and `./forms` once a form is posted.
+// The body's content becomes the next page's, morphed so what renders again stays the same element, islands kept only by `persist` or a refresh.
+// Everything else follows one rule: what the server served changes as the next page serves it, what a script changed or added since stays the script's. The served state is `served` for `<html>`, read from the server's meta, `servedHead` for the head, and none for `<body>`, which the server writes bare.
 
 // How a swap goes, read off its intent: the one place a swap decides it.
 interface Policy {
@@ -56,6 +58,8 @@ const POLICY_PARAMS = /;.*/
 
 // What the server set on `<html>` for the page shown, by name: read from its meta as the swap loads, then kept as each swap commits, since a navigation dropped midway may have merged its own meta into the head.
 let served = typeof document === 'undefined' ? new Map<string, string>() : servedRoot(document)
+// Each head element the server put in, as it put it: those of the page loaded first, read as navigation started, then each one a swap adds.
+const servedHead = new WeakMap(navigation.head)
 
 interface KeptIsland extends HTMLElement {
   // Set by the entry once the island hydrated: gives it new props.
@@ -355,34 +359,45 @@ function tokens(value: string | undefined): string[] {
   return value?.split(SPACES).filter(Boolean) ?? []
 }
 
-// Adds what only the next head holds now, and drops what only this one holds as the page is swapped: the page keeps its own styles until the next one's loaded.
+// Adds what the next head serves that this one lacks now, and drops what the server alone served here as the page is swapped: the page keeps its own styles until the next one's loaded.
+// An element a script changed or added since stays the script's, and the next page's copy of it is not added again.
 function mergeHead(next: Document): { loaded: Promise<unknown>, commit: () => void } {
-  const keep = new Map<string, Element>()
+  const incoming = new Map<string, Element[]>()
 
-  for (const element of document.head.children)
-    keep.set(element.outerHTML, element)
-
-  const loading: Promise<void>[] = []
-  const wanted = new Set<string>()
-
-  // A copy: adopting an element takes it out of the live collection.
-  for (const element of Array.from(next.head.children)) {
-    const key = element.outerHTML
-
-    wanted.add(key)
-
-    if (keep.has(key) || element.tagName === 'TITLE' || element.matches(SPECULATION) || element.matches(HISTORY))
-      continue
-
-    const added = element.tagName === 'SCRIPT' ? runnable(element as HTMLScriptElement) : document.adoptNode(element)
-
-    if (added instanceof HTMLLinkElement && added.rel === 'stylesheet')
-      loading.push(loaded(added))
-
-    document.head.append(added)
+  for (const element of next.head.children) {
+    if (element.tagName !== 'TITLE' && !element.matches(SPECULATION) && !element.matches(HISTORY))
+      incoming.set(element.outerHTML, [...incoming.get(element.outerHTML) ?? [], element])
   }
 
-  const stale = [...keep].filter(([key, element]) => !wanted.has(key) && element.tagName !== 'TITLE' && !ranAlready(element)).map(([, element]) => element)
+  const take = (key: string | undefined) => key !== undefined && incoming.get(key)?.shift() !== undefined
+  const stale: Element[] = []
+
+  for (const element of document.head.children) {
+    const key = servedHead.get(element)
+
+    if (key !== element.outerHTML) {
+      take(element.outerHTML)
+      take(key)
+    }
+    else if (!take(key) && element.tagName !== 'TITLE' && !ranAlready(element)) {
+      stale.push(element)
+    }
+  }
+
+  const loading: Promise<void>[] = []
+
+  for (const [key, elements] of incoming) {
+    for (const element of elements) {
+      const added = element.tagName === 'SCRIPT' ? runnable(element as HTMLScriptElement) : document.adoptNode(element)
+
+      servedHead.set(added, key)
+
+      if (added instanceof HTMLLinkElement && added.rel === 'stylesheet')
+        loading.push(loaded(added))
+
+      document.head.append(added)
+    }
+  }
 
   return {
     loaded: Promise.all(loading),
@@ -483,7 +498,8 @@ function swapBody(next: Document, policy: Policy): void {
       script.replaceWith(runnable(script))
   }
 
-  morph(old, body)
+  // The server writes `<body>` bare, so every attribute it holds is a script's.
+  morphChildren(old, body)
 
   if (focused && document.activeElement !== focused.element && [...kept].some(island => island.contains(focused.element)))
     focused.restore()

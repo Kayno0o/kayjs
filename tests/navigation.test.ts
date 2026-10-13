@@ -333,6 +333,42 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     expect(await root()).toEqual({ 'lang': 'en', 'data-theme': 'dark', 'data-label': label, 'class': ['dark', 'served'] })
   })
 
+  it('keeps through a swap what a script changed or added in the head and on <body>, and drops what the server alone served', async () => {
+    const state = async () => page.evaluate(() => ({
+      themes: [...document.querySelectorAll('meta[name="theme-color"]')].map(meta => meta.getAttribute('content')),
+      added: document.querySelectorAll('meta[name="script-added"]').length,
+      secondOnly: document.querySelectorAll('meta[name="second-only"]').length,
+      mode: document.body.dataset.mode,
+    }))
+    const go = async (link: string, heading: string) => {
+      await page.click(`a.${link}`)
+      await page.locator('h1', { hasText: heading }).waitFor()
+      expect(await sameDocument()).toBe(true)
+    }
+
+    await page.goto(origin)
+    await page.evaluate(() => {
+      (window as { kayAlive?: boolean }).kayAlive = true
+    })
+    await go('second', 'Second')
+    expect(await state()).toEqual({ themes: ['#ffffff'], added: 0, secondOnly: 1, mode: undefined })
+    await go('home', 'Home')
+    expect(await state()).toEqual({ themes: ['#ffffff'], added: 0, secondOnly: 0, mode: undefined })
+    // A dark mode toggle recolouring the browser's bar, a loader adding a tag, a script marking the body.
+    await page.evaluate(() => {
+      document.querySelector('meta[name="theme-color"]')!.setAttribute('content', '#123456')
+      const meta = document.createElement('meta')
+
+      meta.name = 'script-added'
+      document.head.append(meta)
+      document.body.dataset.mode = 'dark'
+    })
+    await go('second', 'Second')
+    expect(await state()).toEqual({ themes: ['#123456'], added: 1, secondOnly: 1, mode: 'dark' })
+    await go('home', 'Home')
+    expect(await state()).toEqual({ themes: ['#123456'], added: 1, secondOnly: 0, mode: 'dark' })
+  })
+
   it('restores where the page was scrolled to when going back', async () => {
     await page.goto(origin)
     await page.evaluate(() => {
