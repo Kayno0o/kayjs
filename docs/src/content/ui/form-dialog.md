@@ -75,3 +75,37 @@ FormDialog(
 `extra` fills the left end of the footer, for a [ConfirmDelete](/ui/confirm-delete) with `trigger="button"`.
 
 <ReadMore href="/essentials/forms-and-actions">Actions and forms are covered in their own guide.</ReadMore>
+
+## Adding and editing rows
+
+A list adding and editing its rows through one dialog keeps which row is open with `editing()`, from the package: `edit(row)` opens the dialog on a row, `create(draft)` on what a new row starts from, and `close` shuts it, forgetting both.
+
+```kay
+---
+import { editing } from '@kaynooo/kayjs-ui'
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import FormDialog from '@kaynooo/kayjs-ui/form-dialog.kay'
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+import { save } from '../routes/friends.kay'
+
+const { friends } = props<{ friends: Friend[] }>()
+
+const friend = editing<Friend, { name: string }>()
+---
+Button(label="Add" onClick={() => friend.create({ name: '' })})
+for one of friends key={one.id}
+  Button(label={one.name} onClick={() => friend.edit(one)})
+FormDialog(
+  open={friend.open()}
+  title={friend.row() ? 'Edit friend' : 'Add friend'}
+  action={save}
+  submitLabel="Save"
+  failure="Could not save"
+  onClose={friend.close}
+)
+  input(type="hidden" name="id" value={friend.row()?.id ?? ''})
+  FormField(label="Name" name="name" required)
+    input.kui-field-input(name="name" value={friend.row()?.name ?? friend.draft()?.name})
+```
+
+`row()` and `draft()` read undefined while the other is open, and both while it is closed. Leave the draft's type out, `editing<Friend>()`, and `create()` takes nothing.

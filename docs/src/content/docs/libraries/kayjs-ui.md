@@ -50,7 +50,7 @@ TooltipHost
 
 ## Using a component
 
-Import each component by its `.kay` path. Types, `toast` and `attempt` come from the package itself:
+Import each component by its `.kay` path. Types, `toast`, `attempt` and `editing` come from the package itself:
 
 ```kay
 ---

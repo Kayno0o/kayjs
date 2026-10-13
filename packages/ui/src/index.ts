@@ -1,6 +1,8 @@
 export type { ContributionDay } from './contribution'
 export type { IconSlot, Settings } from './defaults'
 export { default as defaults } from './defaults'
+export type { Editing } from './editing'
+export { editing } from './editing'
 export { formIssues } from './forms'
 export type { IconChoice } from './icon-picker'
 export type { MediaItem } from './media'
