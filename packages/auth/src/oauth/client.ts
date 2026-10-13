@@ -1,6 +1,7 @@
 import type { JWTVerifyGetKey } from 'jose'
 import type { OAuthClientConfig, OAuthEndpoints, OAuthProvider, OAuthTokens, OpenIdCheck } from './types'
 import { createRemoteJWKSet, errors, jwtVerify } from 'jose'
+import { PROVIDER_TIMEOUT_MS } from './timeout'
 
 // How far apart the provider's clock and this one may be when an ID token's times are read.
 const CLOCK_TOLERANCE_S = 60
@@ -73,7 +74,7 @@ export function createOAuthClient<Raw = any, User = unknown>(provider: OAuthProv
     if (userUrl === undefined)
       throw new Error(`kayjs-auth: the ${provider.name} provider has neither a userUrl nor an ID token to read the user from`)
 
-    const res = await fetch(userUrl, {
+    const { res, text } = await askProvider(provider.name, 'user fetch', userUrl, {
       headers: {
         Authorization: `Bearer ${accessToken}`,
         ...provider.authHeaders?.(accessToken),
@@ -81,9 +82,9 @@ export function createOAuthClient<Raw = any, User = unknown>(provider: OAuthProv
     })
 
     if (!res.ok)
-      throw new OAuthExchangeError(res.status, `OAuth user fetch failed (${provider.name}): ${res.status} ${redactBody(await res.text())}`)
+      throw new OAuthExchangeError(res.status, `OAuth user fetch failed (${provider.name}): ${res.status} ${redactBody(text)}`)
 
-    return await res.json() as Record<string, unknown>
+    return parseJson(provider.name, 'user fetch', text) as Record<string, unknown>
   }
 
   const checkIdToken = async (idToken: string | undefined, check: OpenIdCheck, nonce: string | undefined): Promise<Record<string, unknown>> => {
@@ -162,12 +163,12 @@ export function createOAuthClient<Raw = any, User = unknown>(provider: OAuthProv
       if (opts.codeVerifier !== undefined)
         body.set('code_verifier', opts.codeVerifier)
 
-      return provider.parseTokens(await postToken(provider.name, provider.tokenAccept, await endpoint('tokenUrl'), await withCredentials(body)))
+      return tokensFrom(provider, await postToken(provider.name, provider.tokenAccept, await endpoint('tokenUrl'), await withCredentials(body)))
     },
 
     /** Refreshes tokens with a refresh token. */
     async refreshTokens(refreshToken: string): Promise<OAuthTokens> {
-      return provider.parseTokens(await postToken(provider.name, provider.tokenAccept, await endpoint('tokenUrl'), await withCredentials(new URLSearchParams({
+      return tokensFrom(provider, await postToken(provider.name, provider.tokenAccept, await endpoint('tokenUrl'), await withCredentials(new URLSearchParams({
         grant_type: 'refresh_token',
         refresh_token: refreshToken,
       }))))
@@ -202,8 +203,42 @@ export function createOAuthClient<Raw = any, User = unknown>(provider: OAuthProv
   }
 }
 
+// The provider's answer read whole: one that hangs past the timeout, or a dropped connection, is the provider down.
+async function askProvider(name: string, what: string, url: string, init: RequestInit): Promise<{ res: Response, text: string }> {
+  try {
+    const res = await fetch(url, { ...init, signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS) })
+
+    return { res, text: await res.text() }
+  }
+  catch (error) {
+    throw new OAuthExchangeError(502, `OAuth ${what} failed (${name}): ${error instanceof Error ? error.message : String(error)}`)
+  }
+}
+
+function parseJson(name: string, what: string, text: string): any {
+  try {
+    return JSON.parse(text)
+  }
+  catch {
+    throw new OAuthExchangeError(502, `OAuth ${what} failed (${name}): the answer is not JSON: ${redactBody(text)}`)
+  }
+}
+
+// A token answer the provider's parser cannot read, an app's own provider included, is the provider misbehaving rather than a server error.
+function tokensFrom(provider: OAuthProvider<any, any>, raw: unknown): OAuthTokens {
+  try {
+    return provider.parseTokens(raw)
+  }
+  catch (error) {
+    if (error instanceof OAuthExchangeError)
+      throw error
+
+    throw new OAuthExchangeError(502, `OAuth token request failed (${provider.name}): ${error instanceof Error ? error.message : String(error)}`)
+  }
+}
+
 async function postToken(name: string, accept: OAuthProvider['tokenAccept'], tokenUrl: string, body: URLSearchParams): Promise<any> {
-  const res = await fetch(tokenUrl, {
+  const { res, text } = await askProvider(name, 'token request', tokenUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
@@ -212,15 +247,13 @@ async function postToken(name: string, accept: OAuthProvider['tokenAccept'], tok
     body,
   })
 
-  const text = await res.text()
-
   if (!res.ok)
     throw new OAuthExchangeError(res.status, `OAuth token request failed (${name}): ${res.status} ${redactBody(text)}`)
 
   const isJson = accept === 'json'
     || (accept !== 'form' && (res.headers.get('content-type') ?? '').includes('json'))
 
-  const parsed = isJson ? JSON.parse(text) : Object.fromEntries(new URLSearchParams(text))
+  const parsed = isJson ? parseJson(name, 'token request', text) : Object.fromEntries(new URLSearchParams(text))
 
   // GitHub answers a refused grant with a 200 carrying `error`, where the spec answers a 400.
   if (typeof parsed?.error === 'string')

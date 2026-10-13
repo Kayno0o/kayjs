@@ -1,5 +1,6 @@
 import type { OAuthProvider, OAuthTokens, OAuthUser } from './types'
 import { importPKCS8, SignJWT } from 'jose'
+import { PROVIDER_TIMEOUT_MS } from './timeout'
 
 const TRAILING_SLASHES = /\/+$/
 // The tenant Microsoft signs personal accounts in under, whatever the app's.
@@ -109,7 +110,7 @@ export function oidcProvider(opts: OpenIdOptions & { issuer: string, name?: stri
     scopes: opts.scopes ?? OPENID_SCOPES,
     ...opts.params === undefined ? {} : { authorizeParams: opts.params },
     discover: async () => {
-      const res = await fetch(`${issuer}/.well-known/openid-configuration`, { headers: { Accept: 'application/json' } })
+      const res = await fetch(`${issuer}/.well-known/openid-configuration`, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS) })
 
       if (!res.ok)
         throw new Error(`discovery document answered ${res.status}`)

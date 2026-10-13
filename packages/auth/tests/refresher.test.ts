@@ -172,6 +172,22 @@ describe('createOAuthTokenRefresher', () => {
     }
   })
 
+  test('a refresh the provider timed out on leaves none pending, so the next call asks again', async () => {
+    let calls = 0
+    const { refresher } = oauthSetup(EXPIRING, async () => {
+      calls++
+
+      if (calls === 1)
+        throw new OAuthExchangeError(502, 'OAuth token request failed (discord): The operation timed out.')
+
+      return { accessToken: 'fresh', expiresAt: Date.now() + 10 * MIN }
+    })
+
+    expect(await refresher.getValidToken({ id: 'u1' })).toBeNull()
+    expect(await refresher.getValidToken({ id: 'u1' })).toBe('fresh')
+    expect(calls).toBe(2)
+  })
+
   test('a persistence failure after a successful refresh is reported but keeps the valid token', async () => {
     const writeError = new Error('db down')
     const { refresher, errors } = oauthSetup(

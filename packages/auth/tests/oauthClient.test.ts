@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from 'bun:test'
 import { createOAuthClient, OAuthExchangeError } from '../src/oauth/client'
-import { discordProvider, githubProvider } from '../src/oauth/providers'
+import { discordProvider, githubProvider, oidcProvider } from '../src/oauth/providers'
 
 const CONFIG = { clientId: 'cid', clientSecret: 'sec', redirectUri: 'https://app.test/cb' }
 
@@ -181,5 +181,56 @@ describe('provider presets', () => {
 
   test('parseTokens rejects a payload with no access_token', () => {
     expect(() => discordProvider().parseTokens({ error: 'invalid_grant' })).toThrow('missing access_token: invalid_grant')
+  })
+})
+
+describe('a provider out of reach or answering nonsense', () => {
+  // What `AbortSignal.timeout` throws once the provider has not answered in time.
+  const timedOut = (): Response => {
+    throw new DOMException('The operation timed out.', 'TimeoutError')
+  }
+
+  async function failure(run: () => Promise<unknown>): Promise<OAuthExchangeError> {
+    let err: unknown
+
+    try {
+      await run()
+    }
+    catch (e) {
+      err = e
+    }
+
+    expect(err).toBeInstanceOf(OAuthExchangeError)
+
+    return err as OAuthExchangeError
+  }
+
+  test('a token, refresh or user request the provider does not answer in time fails as the provider down', async () => {
+    const calls = mockFetch(timedOut)
+    const client = createOAuthClient(discordProvider(), CONFIG)
+
+    expect((await failure(() => client.exchangeCode('c'))).status).toBe(502)
+    expect((await failure(() => client.refreshTokens('rt'))).status).toBe(502)
+    expect((await failure(() => client.fetchUser('tok'))).status).toBe(502)
+    expect(calls.map(call => call.init?.signal instanceof AbortSignal)).toEqual([true, true, true])
+  })
+
+  test('a discovery document the provider does not serve in time fails as the provider down', async () => {
+    const calls = mockFetch(timedOut)
+    const client = createOAuthClient(oidcProvider({ issuer: 'https://idp.test' }), CONFIG)
+
+    expect((await failure(() => client.authorizeUrl())).status).toBe(502)
+    expect(calls[0]!.init?.signal).toBeInstanceOf(AbortSignal)
+  })
+
+  test('a token or user answer that is not JSON, or holds no access token, fails as the provider down', async () => {
+    const client = createOAuthClient(discordProvider(), CONFIG)
+
+    mockFetch(() => new Response('<html>maintenance</html>', { status: 200, headers: { 'content-type': 'application/json' } }))
+    expect((await failure(() => client.exchangeCode('c'))).status).toBe(502)
+    expect((await failure(() => client.fetchUser('tok'))).status).toBe(502)
+
+    mockFetch(() => new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } }))
+    expect((await failure(() => client.exchangeCode('c'))).status).toBe(502)
   })
 })
