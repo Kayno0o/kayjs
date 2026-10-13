@@ -2,7 +2,7 @@ import type { Diagnostic, SourceMap } from '../compiler'
 import type { LintLevels } from '../compiler/lints'
 import type { CacheSlot } from './cache'
 import { readdirSync, readFileSync } from 'node:fs'
-import { join, relative } from 'node:path'
+import { dirname, join, relative } from 'node:path'
 import process from 'node:process'
 import { compileKay, formatDiagnostic, withoutTwin } from '../compiler'
 import { isInteractive } from '../compiler/codegen'
@@ -46,6 +46,7 @@ export interface Analysis {
 // The packages a compile runs through, their versions part of every cache key.
 const COMPILER_PACKAGES = ['@babel/parser/package.json', '@babel/traverse/package.json', '@babel/types/package.json', '@typescript/native-preview/package.json']
 let fingerprint: string | undefined
+const SCRIPT_FILE = /\.tsx?$/
 // Each file's last analysis in this process, which spares reading its cache entry from disk again while the inputs stay the same.
 const analyzed = new Map<string, { file: string, key: string, analysis: Analysis }>()
 
@@ -183,13 +184,13 @@ function compilerFingerprint(): string {
   if (fingerprint === undefined) {
     const hasher = new Bun.CryptoHasher('sha256')
 
-    // What a compile depends on besides its source: kay's compiler, every file of it, and the packages it runs through, tsgo's among them for the browser globals it declares.
+    // What a compile depends on besides its source: kay's compiler with every module it imports, kay's own version, and the packages it runs through, tsgo's among them for the browser globals it declares.
     const compilerDir = join(import.meta.dir, '../compiler')
     const sources = [
-      ...readdirSync(compilerDir, { recursive: true, withFileTypes: true }).filter(entry => entry.isFile()).map(entry => join(entry.parentPath, entry.name)).sort(),
+      ...compilerModules(compilerDir),
       join(import.meta.dir, 'transform.ts'),
       join(import.meta.dir, '../check/shadow.ts'),
-      join(import.meta.dir, '../runtime/action.ts'),
+      join(import.meta.dir, '../../package.json'),
       ...COMPILER_PACKAGES.map(manifest => Bun.resolveSync(manifest, compilerDir)),
     ]
 
@@ -200,4 +201,22 @@ function compilerFingerprint(): string {
   }
 
   return fingerprint
+}
+
+// Every file of the compiler and the kay modules it imports, followed through their own relative imports, sorted.
+export function compilerModules(compilerDir: string): string[] {
+  const transpiler = new Bun.Transpiler({ loader: 'ts' })
+  const found = new Set(readdirSync(compilerDir, { recursive: true, withFileTypes: true }).filter(entry => entry.isFile()).map(entry => join(entry.parentPath, entry.name)))
+
+  for (const file of found) {
+    if (!SCRIPT_FILE.test(file))
+      continue
+
+    for (const { path } of transpiler.scanImports(readFileSync(file, 'utf8'))) {
+      if (path.startsWith('.'))
+        found.add(Bun.resolveSync(path, dirname(file)))
+    }
+  }
+
+  return [...found].sort()
 }

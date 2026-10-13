@@ -4,7 +4,7 @@ import type { KayConfig } from '../src/config'
 import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp, readdir, rename, rm, stat, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { basename, dirname, join, resolve } from 'node:path'
+import { basename, dirname, join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import tailwind from 'bun-plugin-tailwind'
 import { describe, expect, it } from 'bun:test'
@@ -16,7 +16,7 @@ import { formatSizeReport } from '../src/build/report'
 import { anchorModule } from '../src/build/runtime-chunk'
 import { runtimeConfig, withoutPlugins } from '../src/build/runtime-config'
 import { describeThrown, mapBundleToKay, mapStack } from '../src/build/sourcemap'
-import { analyzeKayCached, keepAnalyses, transformKayCached } from '../src/build/transform'
+import { analyzeKayCached, compilerModules, keepAnalyses, transformKayCached } from '../src/build/transform'
 import { loadConfig, withConfig } from '../src/config'
 import { devBuilder } from '../src/dev/builder'
 import { projectPaths } from '../src/project'
@@ -888,6 +888,15 @@ describe('kay build checks the project first', () => {
 })
 
 describe('compile cache', () => {
+  it('keys every entry on the kay modules the compiler imports, outside its own directory too', () => {
+    const src = join(import.meta.dir, '../src')
+    const modules = compilerModules(join(src, 'compiler')).map(file => relative(src, file))
+
+    expect(modules).toContain('compiler/parser.ts')
+    expect(modules).toEqual(expect.arrayContaining(['runtime/markers.ts', 'runtime/base.ts', 'runtime/root.ts', 'runtime/form.ts', 'runtime/action.ts']))
+    expect(modules.filter(file => file.startsWith('server/'))).toEqual([])
+  })
+
   it('serves an unchanged file from the cache, recompiles a changed one, and still maps its stacks', async () => {
     const cacheDir = await mkdtemp(join(tmpdir(), 'kay-cache-'))
     const file = join(cacheDir, 'boom.kay')
