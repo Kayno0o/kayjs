@@ -161,6 +161,10 @@ export async function finishOAuth(state: RequestState, provider: string, query: 
     // A guest becomes the provider account's user, keeping what the app holds for them.
     const guest = current?.guest && state.via() === 'session' ? current : undefined
 
+    // Refused as `allow` refuses, before any user or identity is kept.
+    if (!core.signUp)
+      return { error: 'refused' }
+
     record = await signUp(core, profile, state.languages[0] ?? null, guest)
     // An identity left by a deleted user is replaced.
     await saveIdentity(core, undefined, record.id, profile, tokens, identity !== undefined)

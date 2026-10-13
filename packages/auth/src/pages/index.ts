@@ -25,6 +25,8 @@ export interface AuthFeatures {
   email: boolean
   // What sign-in and verification mails carry, a link, a code or both; null without mail.
   codes: Record<CodedLink, CodeMode> | null
+  // Whether visitors make their own accounts: registering, and signing in with a provider account no user has linked.
+  signUp: boolean
   // Whether password sign-in waits for a verified address, the default with mail.
   requireVerified: boolean
   passkeys: boolean
@@ -47,6 +49,7 @@ export function featuresOf(core: Core): AuthFeatures {
     providers: [...core.oauth].map(([name, { app }]) => ({ name, label: app.label ?? app.provider.label ?? name })),
     email: core.email !== undefined,
     codes: core.email?.codes ?? null,
+    signUp: core.signUp,
     requireVerified: core.email?.requireVerified ?? false,
     passkeys: core.passkeys !== undefined,
     captcha: core.captcha?.widget ?? null,

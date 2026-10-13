@@ -42,6 +42,7 @@ describe('features', () => {
       providers: [{ name: 'github', label: 'GitHub' }, { name: 'chat', label: 'Our chat' }],
       email: true,
       codes: { 'magic-link': 'code', 'verify-email': 'link' },
+      signUp: true,
       requireVerified: true,
       passkeys: true,
       captcha: null,

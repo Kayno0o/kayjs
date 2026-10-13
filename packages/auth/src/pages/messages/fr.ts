@@ -184,6 +184,7 @@ export default defineMessages({
       'captcha': 'Terminez la vérification anti-robot.',
       'unverified': 'Vérifiez d’abord votre adresse : ouvrez le lien reçu par e-mail.',
       'banned': 'Ce compte est suspendu.',
+      'closed': 'Ce site n’accepte pas de nouveaux comptes.',
       'unavailable': 'L’envoi d’e-mails n’est pas configuré sur ce site.',
       'link': 'Ce lien est invalide ou a déjà servi.',
       'code': 'Code incorrect.',

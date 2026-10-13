@@ -1,4 +1,4 @@
-import type { User } from './core'
+import type { Core, User } from './core'
 import type { EmailProblem, PasswordProblem, UsernameProblem } from './rules'
 import type { RequestState } from './state'
 import type { UserRecord } from './store'
@@ -35,8 +35,23 @@ export interface RegisterErrors {
   username?: UsernameProblem | 'taken' | undefined
 }
 
-// `signedIn` is false, with no user, when the app wants the address verified first: the same answer whether the address was free or held, its holder mailed instead.
-export type RegisterResult = { ok: true, user: User, signedIn: true } | { ok: true, signedIn: false } | { ok: false, errors: RegisterErrors } | { ok: false, error: 'limited' | 'captcha' }
+// `signedIn` is false, with no user, when the app wants the address verified first: the same answer whether the address was free or held, its holder mailed instead. `closed` with `signUp: false`.
+export type RegisterResult = { ok: true, user: User, signedIn: true } | { ok: true, signedIn: false } | { ok: false, errors: RegisterErrors } | { ok: false, error: 'limited' | 'captcha' | 'closed' }
+
+export interface CreateUserInput {
+  // At least one of the two, the user signing in with either.
+  email?: string | undefined
+  username?: string | undefined
+  // Without one the user signs in by provider, mailed link or passkey alone.
+  password?: string | undefined
+  // Given beside `defaultRoles`.
+  roles?: string[] | undefined
+  // Whether the address counts as verified, as when the app knows it is theirs: false by default.
+  emailVerified?: boolean | undefined
+  locale?: string | undefined
+}
+
+export type CreateUserResult = { ok: true, user: User } | { ok: false, errors: RegisterErrors }
 
 export interface PasswordSignInInput {
   // An email, or a username when it holds no `@`.
@@ -58,6 +73,10 @@ let decoy: Promise<string> | undefined
 // A new user with a password, signed in on this session; a guest signed in becomes it, keeping their id.
 export async function register(state: RequestState, input: RegisterInput): Promise<RegisterResult> {
   const { store } = state.core
+
+  if (!state.core.signUp)
+    return { ok: false, error: 'closed' }
+
   const refused = await admit(state, 'register', input.captcha)
 
   if (refused)
@@ -140,6 +159,59 @@ export async function register(state: RequestState, input: RegisterInput): Promi
   await state.complete(record, '/', 'register')
 
   return { ok: true, user, signedIn: true }
+}
+
+// A user made by the app, checked as registering is but signing no one in and mailing no one, open with `signUp: false` too.
+export async function createUser(core: Core, input: CreateUserInput): Promise<CreateUserResult> {
+  const email = input.email === undefined ? null : normalizeEmail(input.email)
+  const username = input.username === undefined ? null : normalizeUsername(input.username)
+
+  if (email === null && username === null)
+    throw new Error('kayjs-auth: createUser needs an email or a username to sign in with')
+
+  const errors: RegisterErrors = {
+    email: email === null ? undefined : emailProblem(email),
+    password: input.password === undefined ? undefined : await newPasswordProblem(core, input.password),
+    username: username === null ? undefined : usernameProblem(username),
+  }
+
+  if (email !== null && !errors.email && await core.store.users.findByEmail(email))
+    errors.email = 'taken'
+
+  if (username !== null && !errors.username && await core.store.users.findByUsername(username))
+    errors.username = 'taken'
+
+  if (errors.email || errors.password || errors.username)
+    return { ok: false, errors: withoutUndefined(errors) }
+
+  let record = newUserRecord({
+    email,
+    emailVerifiedAt: email !== null && input.emailVerified === true ? new Date() : null,
+    username,
+    passwordHash: input.password === undefined ? null : await hashPassword(input.password),
+    roles: [...new Set([...core.defaultRoles, ...input.roles ?? []])],
+    locale: input.locale !== undefined && validLocale(input.locale) ? input.locale : null,
+  })
+
+  try {
+    record = (await core.store.users.create(record)) ?? record
+  }
+  // Another request took the email or the name in between; any other failure is the store's.
+  catch (error) {
+    if (email !== null && await core.store.users.findByEmail(email))
+      return { ok: false, errors: { email: 'taken' } }
+
+    if (username !== null && await core.store.users.findByUsername(username))
+      return { ok: false, errors: { username: 'taken' } }
+
+    throw error
+  }
+
+  const user = publicUser(record)
+
+  await core.onSignUp?.(user, undefined)
+
+  return { ok: true, user }
 }
 
 // Spends the time hashing a new password takes, so a held address answers no faster than a free one, and leaves this session as a new account's, which `sendVerification` answers alike, mailing no one.

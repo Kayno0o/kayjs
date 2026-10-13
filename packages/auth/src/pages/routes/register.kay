@@ -28,6 +28,10 @@ export const register = action(schemas.register, async (input, ctx) => {
 
 const auth = ctx.locals.auth
 const features = auth.features()
+
+if (!features.signUp)
+  ctx.notFound()
+
 const prefix = features.pages?.prefix ?? features.prefix
 const redirect = safeRedirect(ctx.url.searchParams.get('redirect'), localize(features.pages?.home ?? '/'))
 const user = await auth.user()

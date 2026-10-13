@@ -314,6 +314,20 @@ describe('coming back from the provider', () => {
     expect(await store.identities.find('discord', '1')).toBeUndefined()
   })
 
+  test('with `signUp: false`, an account no user linked is refused as `allow` refuses, and a linked one still signs in', async () => {
+    providers({ 1: { id: '1', username: 'ada' }, 2: { id: '2', username: 'grace' } })
+    const open = setup()
+
+    await signInWith(open.browser(), 'discord', '2')
+
+    const { browser, signUps, store } = setup({ signUp: false, store: open.store })
+
+    expect((await signInWith(browser(), 'discord', '1')).response.headers.get('location')).toBe('/login?error=refused')
+    expect(signUps).toEqual([])
+    expect(await store.identities.find('discord', '1')).toBeUndefined()
+    expect((await signInWith(browser(), 'discord', '2')).response.headers.get('location')).toBe('/')
+  })
+
   test('with `failurePage`, a refused account and a failed exchange land on the same page with no reason, so the allow list does not leak', async () => {
     providers({ 1: { id: '1', username: 'ada' } }, { tokenStatus: 500 })
     const { browser } = setup({ allow: profile => profile.providerId === '2', failurePage: '/denied' })

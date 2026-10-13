@@ -105,6 +105,8 @@ export interface Core {
   oauth: Map<string, { app: OAuthApp, client: ReturnType<typeof createOAuthClient<any, OAuthUser>> }>
   refreshers: Map<string, ReturnType<typeof createTokenRefresher<string, RefreshSubject>>>
   allow?: ((profile: Profile) => boolean | Promise<boolean>) | undefined
+  // Whether visitors make their own accounts; `createUser` makes them otherwise.
+  signUp: boolean
   defaultRoles: string[]
   // The roles the app declares; any role goes without them.
   roles?: Set<string> | undefined

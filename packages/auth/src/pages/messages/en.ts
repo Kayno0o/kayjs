@@ -184,6 +184,7 @@ export default defineMessages({
       'captcha': 'Complete the check that you are not a robot.',
       'unverified': 'Verify your address first: open the link mailed to you.',
       'banned': 'This account is suspended.',
+      'closed': 'This site does not take new accounts.',
       'unavailable': 'Mail is not set up on this site.',
       'link': 'This link is invalid or was already used.',
       'code': 'Wrong code.',

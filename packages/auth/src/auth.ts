@@ -16,7 +16,7 @@ import type { LinkProviderResult, OAuthFailure } from './oauth/flow'
 import type { AcceptResult, CreateOrganizationResult, Invitation, InviteResult, Member, MemberResult, Membership, OrganizationFailure, OrganizationsOptions, UpdateOrganizationResult } from './organizations'
 import type { AuthFeatures, AuthPagesOptions } from './pages'
 import type { Passkey, PasskeyOptionsResult, PasskeySignInResult, RegisterPasskeyResult } from './passkeys'
-import type { PasswordSignInInput, PasswordSignInResult, RegisterInput, RegisterResult } from './password'
+import type { CreateUserInput, CreateUserResult, PasswordSignInInput, PasswordSignInResult, RegisterInput, RegisterResult } from './password'
 import type { RoleHierarchy } from './roles'
 import type { PasswordProblem } from './rules'
 import type { UserSession } from './sessions'
@@ -48,7 +48,7 @@ import { createOAuthTokenRefresher } from './oauth/refresher'
 import { acceptInvitation, createOrganization, declineInvitation, deleteOrganization, getInvitation, getMembership, holdsInOrganization, invite, listInvitations, listMembers, listMemberships, myInvitations, organizationsCore, removeMember, revokeInvitation, setMemberRoles, updateOrganization } from './organizations'
 import { featuresOf, pagePaths, pagesOf } from './pages'
 import { listPasskeys, passkeyProofOptions, passkeyRegistrationOptions, passkeySignInOptions, registerPasskey, removePasskey, renamePasskey, signInWithPasskey, twoFactorPasskeyOptions, verifyTwoFactorPasskey } from './passkeys'
-import { register, signInWithPassword } from './password'
+import { createUser, register, signInWithPassword } from './password'
 import { createRoleHierarchy } from './roles'
 import { applyLifetime, chooseRemember, listSessions, liveSession, openSession, revokeBearerTokens } from './sessions'
 import { challenged, completeSignIn, disableTwoFactor, enableTwoFactor, regenerateRecoveryCodes, reprove, setUpTwoFactor, verifyTwoFactor } from './twoFactor'
@@ -107,6 +107,8 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   oauth?: Record<string, OAuthApp> | undefined
   // Asked with every provider account before any user is touched; false refuses the sign-in, as an allowlist does.
   allow?: ((profile: Profile) => boolean | Promise<boolean>) | undefined
+  // Whether visitors make their own accounts, by registering, as a guest or with a provider account no user has linked: true by default. Without it users come from `auth.createUser` alone, and the prebuilt pages offer no registering.
+  signUp?: boolean | undefined
   // Called once a new user exists, to create the app's own records for them.
   onSignUp?: ((user: User, profile: Profile | undefined) => void | Promise<void>) | undefined
   // Called with the provider's profile whenever one answers for a user: every OAuth sign-in, the first included after `onSignUp`, and a link. It runs before any second factor, to refresh what the app keeps from the profile, such as an avatar.
@@ -283,11 +285,14 @@ export class Auth<Scope extends string = string, Role extends string = string, O
   }
 
   // Signs this browser in as a new guest, a user with no email and no password whom registering or an OAuth sign-in later makes a real account, keeping their id; the guest signed in already answers as is. Counted and CAPTCHA-checked as registering is.
-  async signInAsGuest(options: { captcha?: string | undefined } = {}): Promise<{ ok: true, user: User } | { ok: false, error: 'limited' | 'captcha' | 'signed-in' }> {
+  async signInAsGuest(options: { captcha?: string | undefined } = {}): Promise<{ ok: true, user: User } | { ok: false, error: 'limited' | 'captcha' | 'signed-in' | 'closed' }> {
     const current = await this.record()
 
     if (current)
       return current.guest ? { ok: true, user: publicUser(current) } : { ok: false, error: 'signed-in' }
+
+    if (!this.core.signUp)
+      return { ok: false, error: 'closed' }
 
     const refused = await admit(this[STATE], 'register', options.captcha)
 
@@ -1013,6 +1018,11 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
       return user
     },
 
+    // A user made by the app, as a script or an admin page makes one: checked as registering is, open with `signUp: false` too, signing no one in and mailing no one.
+    async createUser(input: Omit<CreateUserInput, 'roles'> & { roles?: Role[] | undefined }): Promise<CreateUserResult> {
+      return createUser(core, input)
+    },
+
     // A bearer token for `userId` taking no proof and sending no mail, for a flow the app gates itself, such as pairing a device, or a script. `token` adopts one the app handed out before, so its devices keep working through a migration.
     async issueToken(userId: string, label: string, tokenOptions: TokenOptions<Scope> & { token?: string | undefined } = {}): Promise<IssueTokenResult> {
       return issueToken(core, userId, label, tokenOptions)
@@ -1113,6 +1123,7 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
     oauth,
     refreshers: new Map(),
     allow: options.allow,
+    signUp: options.signUp ?? true,
     defaultRoles: [...(options.defaultRoles ?? [])],
     roles: options.roles && new Set(Object.keys(options.roles)),
     onSignUp: options.onSignUp,

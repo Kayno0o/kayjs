@@ -117,5 +117,6 @@ Panel(title={t('auth.signIn.title')})
       if mailError
         Message(text={failure(mailError)})
       Button(type="submit" label={codes === 'link' ? t('auth.signIn.magic') : t('auth.signIn.magicCode')})
-  p.text-center
-    | {t('auth.signIn.noAccount')} #[a(href={localize(`${prefix}/register?redirect=${encodeURIComponent(redirect)}`)}) {t('auth.signIn.register')}]
+  if features.signUp
+    p.text-center
+      | {t('auth.signIn.noAccount')} #[a(href={localize(`${prefix}/register?redirect=${encodeURIComponent(redirect)}`)}) {t('auth.signIn.register')}]

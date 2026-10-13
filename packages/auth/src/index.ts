@@ -24,7 +24,7 @@ export type { AcceptResult, CreateOrganizationResult, Invitation, InviteResult, 
 export { authPages } from './pages'
 export type { AuthFeatures, AuthPages, AuthPagesOptions } from './pages'
 export type { Passkey, PasskeyOptionsResult, PasskeySignInResult, RegisterPasskeyResult } from './passkeys'
-export type { PasswordSignInInput, PasswordSignInResult, RegisterErrors, RegisterInput, RegisterResult } from './password'
+export type { CreateUserInput, CreateUserResult, PasswordSignInInput, PasswordSignInResult, RegisterErrors, RegisterInput, RegisterResult } from './password'
 export * from './roles'
 export * from './rules'
 export type { UserSession } from './sessions'
