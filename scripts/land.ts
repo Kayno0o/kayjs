@@ -5,19 +5,20 @@ import { $, Glob } from 'bun'
 const FIXTURE = /^tests\/fixtures\/([^/]+)\//
 const PACKAGE = /^packages\/([^/]+)\//
 // Read by every test file or by kay itself rather than imported, so `bun test --changed` cannot follow them.
-const WHOLE_SUITE = /^(?:package\.json|bun\.lock|bunfig\.toml|tsconfig[^/]*\.json|eslint\.config\.ts|src\/.*\.(?!ts$)[^./]+)$/
+const WHOLE_SUITE = /^(?:package\.json|bun\.lock|bunfig\.toml|tsconfig[^/]*\.json|eslint\.config\.ts|src\/(?:.*\/)?[^/]+(?<!\.ts))$/
 // Tests reading these folders as files, which an import graph does not show.
 const READERS: [RegExp, string[]][] = [
-  [/^(?:llms\/|llms\.txt$)/, ['tests/llms.test.ts']],
-  [/^docs\//, ['tests/docs.test.ts']],
-  [/^examples\//, ['tests/examples.test.ts', 'tests/new.test.ts']],
+  [/^(?:llms\/|llms\.txt$)/, ['tests/llms.test.ts', 'tests/docs.test.ts']],
+  [/^docs\//, ['tests/docs.test.ts', 'tests/docs-page-weight.test.ts']],
+  [/^examples\//, ['tests/examples.test.ts', 'tests/new.test.ts', 'tests/docs.test.ts']],
+  [/^packages\//, ['tests/packages.test.ts', 'tests/docs.test.ts', 'tests/docs-page-weight.test.ts', 'tests/examples.test.ts', 'tests/library.test.ts', 'tests/new.test.ts']],
+  [/^tests\/fixtures\//, ['tests/format.test.ts']],
 ]
-const TEST_FLAGS = ['--timeout=20000', '--timings=tests/timings.json']
+// Half the host's cores, as CI runs them, so a landing leaves the machine to the rest.
+const WORKERS = '--parallel=6'
 
 if ((await $`git status --porcelain`.text()).trim() !== '')
   throw new Error('the working tree has changes: commit them first')
-
-const branch = (await $`git rev-parse --abbrev-ref HEAD`.text()).trim()
 
 await $`git fetch -q origin main`
 
@@ -35,38 +36,44 @@ const changed = (await $`git diff --name-only origin/main HEAD`.text()).split('\
 if (changed.length === 0)
   throw new Error('nothing to land: the branch is main')
 
+// Main may have moved the lockfile under this branch.
+await $`bun install --silent --frozen-lockfile`
 await $`bun run lint`
 await $`bun run check`
 
-if (changed.some(path => path.startsWith('bench/') || path === 'bun.lock'))
+if (changed.some(path => path.startsWith('bench/') || path === 'bun.lock')) {
   await $`bun run bench:check`
-else if (changed.some(path => path.startsWith('src/')))
+  await $`bun test ./bench -t ${'leave hydration markers'}`
+}
+else if (changed.some(path => path.startsWith('src/'))) {
   await $`bun run bench:check:kay`
+}
 
 if (changed.some(path => path.startsWith('.forgejo/')))
   await $`just lint-actions`
 
 if (changed.some(path => WHOLE_SUITE.test(path))) {
-  await $`bun run test`
+  await $`bun run test ${WORKERS}`
 }
 else {
-  await $`bun test --parallel --changed=origin/main ${TEST_FLAGS}`
+  await $`bun run test --changed=origin/main ${WORKERS}`
 
   const readers = new Set(READERS.flatMap(([folder, tests]) => changed.some(path => folder.test(path)) ? tests : []))
-
   const fixtures = [...new Set(changed.map(path => FIXTURE.exec(path)?.[1]).filter(name => name !== undefined))]
+  // A fixture's name as a path segment or a quoted string, as in `fixtures/site`, `join(fixtures, 'site')` or `fixtureCopy('site')`.
+  const names = fixtures.map(name => new RegExp(`[/'"\`]${name}[/'"\`]`))
 
-  if (fixtures.length > 0) {
+  if (names.length > 0) {
     for await (const test of new Glob('tests/*.test.ts').scan()) {
       const text = await Bun.file(test).text()
 
-      if (fixtures.some(name => text.includes(`fixtures/${name}`) || text.includes(`fixtureCopy('${name}')`)))
+      if (names.some(name => name.test(text)))
         readers.add(test)
     }
   }
 
   if (readers.size > 0)
-    await $`bun test --parallel ${[...readers]} ${TEST_FLAGS}`
+    await $`bun run test ${[...readers]} ${WORKERS}`
 }
 
 for (const name of new Set(changed.map(path => PACKAGE.exec(path)?.[1]).filter(name => name !== undefined))) {
@@ -74,18 +81,32 @@ for (const name of new Set(changed.map(path => PACKAGE.exec(path)?.[1]).filter(n
   await $`bun run test`.cwd(`packages/${name}`)
 }
 
-try {
-  await $`git push -q origin HEAD:main`
-}
-catch {
-  throw new Error('origin\'s main moved while landing: land again')
+// origin pushes to Forgejo, then mirrors to GitHub: main is Forgejo's, so only its refusal stops a landing.
+const [forge, ...mirrors] = (await $`git remote get-url --push --all origin`.text()).split('\n').filter(Boolean)
+const head = (await $`git rev-parse HEAD`.text()).trim()
+const pushed = await $`git push -q ${forge} HEAD:main`.nothrow()
+
+if (pushed.exitCode !== 0) {
+  await $`git fetch -q origin main`
+
+  if ((await $`git rev-parse origin/main`.text()).trim() !== head)
+    throw new Error(`${forge} refused the push: ${pushed.stderr.toString().trim() || 'main moved while landing'}; land again`)
 }
 
-const head = (await $`git rev-parse --short HEAD`.text()).trim()
+for (const mirror of mirrors) {
+  if ((await $`git push -q ${mirror} HEAD:main`.nothrow()).exitCode !== 0)
+    console.warn(`the mirror ${mirror} refused the push, so it is behind main: \`git push ${mirror} origin/main:main\` once it takes pushes again`)
+}
+
+await $`git fetch -q origin main`
+
 const main = dirname(resolve((await $`git rev-parse --git-common-dir`.text()).trim()))
+const short = head.slice(0, 7)
 
-// The main checkout follows, unless a change of its own in the way refuses the fast-forward: origin has the landing either way.
-if (branch !== 'main' && (await $`git -C ${main} merge -q --ff-only ${branch}`.nothrow()).exitCode !== 0)
-  console.warn(`the main checkout at ${main} could not fast-forward to ${head}: run \`git merge --ff-only origin/main\` there`)
+// The main checkout follows when it is on main, unless a change of its own in the way refuses the fast-forward: origin has the landing either way.
+if ((await $`git -C ${main} symbolic-ref --short HEAD`.nothrow().text()).trim() !== 'main')
+  console.warn(`the main checkout at ${main} is not on main, so it stays where it is`)
+else if ((await $`git -C ${main} merge -q --ff-only ${head}`.nothrow()).exitCode !== 0)
+  console.warn(`the main checkout at ${main} could not fast-forward to ${short}: run \`git merge --ff-only origin/main\` there`)
 
-console.log(`landed ${head} on main`)
+console.log(`landed ${short} on main`)

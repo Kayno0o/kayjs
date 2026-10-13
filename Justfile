@@ -47,7 +47,8 @@ land:
 	set -euo pipefail
 	exec 9>"$(git rev-parse --git-common-dir)/kay-land.lock"
 	flock -n 9 || { echo "waiting for another landing to finish"; flock 9; }
-	bun scripts/land.ts
+	# Only this shell holds the lock: a process the landing leaves running must not keep it.
+	bun scripts/land.ts 9>&-
 
 worktree name: # a worktree at HEAD in .claude/worktrees/<name>, its dependencies installed, as Claude Code's own are made
 	bun .claude/hooks/worktree.ts create {{name}}

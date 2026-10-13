@@ -50,4 +50,4 @@ In production the server serves what `kay build` wrote and bundles nothing at bo
 
 ## Working on kay
 
-`bun test`, `bun run check`, `bun run lint:fix` and `bun run bench:check` must pass before a commit.
+`bun run lint:fix` and the tests of what changed before a commit, then `just land`, which checks the branch and lands it on main; CI runs the whole suite on every push.

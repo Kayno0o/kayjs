@@ -32,7 +32,7 @@ jobs:
         id: changed
         run: |
           verdict() {
-            curl -sf -H "Authorization: token $TOKEN" "$API/repos/$GITHUB_REPOSITORY/commits/$1/status" | jq -r '[.statuses[]? | select(.context | startswith("Tests /")) | .status // .state] | first // empty' || true
+            curl -sf --max-time 10 -H "Authorization: token $TOKEN" "$API/repos/$GITHUB_REPOSITORY/commits/$1/status" | jq -r '[.statuses[]? | select(.context | startswith("Tests /")) | .status // .state] | first // empty' || true
           }
           base=
           if [ "$GITHUB_EVENT_NAME" = push ]; then
@@ -64,6 +64,11 @@ jobs:
           bun install --silent --frozen-lockfile
           bun install --silent --frozen-lockfile --cwd bench/apps/solid
           bun install --silent --frozen-lockfile --cwd bench/apps/svelte
+
+      # Read only by their own checks below, which the lint leaves out.
+      - name: Install the other frameworks' benchmark apps
+        if: steps.changed.outputs.bench == 'true'
+        run: |
           bun install --silent --frozen-lockfile --cwd bench/apps/astro
           bun install --silent --frozen-lockfile --cwd bench/apps/next
           bun install --silent --frozen-lockfile --cwd bench/apps/nuxt
