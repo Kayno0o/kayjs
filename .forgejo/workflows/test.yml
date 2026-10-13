@@ -9,9 +9,6 @@ on:
     paths-ignore:
       - '**.md'
   workflow_dispatch:
-  # Daily, so a library release that breaks the example with kay shows here before a site meets it, kay commit or not.
-  schedule:
-    - cron: '17 5 * * *'
 
 # Pinned so the cache step and bun agree on one folder, whatever HOME the runner image sets.
 env:
@@ -25,7 +22,33 @@ jobs:
     timeout-minutes: 20
 
     steps:
+      # Deep enough to find the last commit these tests passed.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 50
+
+      # Since the last commit these tests passed, as a push cancels the runs before it and is tested for them all; a push reaching no passed commit counts as changing everything.
+      - name: Find what changed since the last tested commit
+        id: changed
+        run: |
+          verdict() {
+            curl -sf -H "Authorization: token $TOKEN" "$API/repos/$GITHUB_REPOSITORY/commits/$1/status" | jq -r '[.statuses[]? | select(.context | startswith("Tests /")) | .status // .state] | first // empty' || true
+          }
+          base=
+          if [ "$GITHUB_EVENT_NAME" = push ]; then
+            for commit in $(git rev-list --max-count=49 HEAD^); do
+              if [ "$(verdict "$commit")" = success ]; then base=$commit; break; fi
+            done
+          fi
+          echo "Last tested commit: ${base:-none}"
+          if [ -n "$base" ] && git diff --quiet "$base" HEAD -- bench/ bun.lock; then
+            echo "bench=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "bench=true" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          API: ${{ github.server_url }}/api/v1
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # A lockfile change still restores the closest older cache, so bun only fetches the packages that moved.
       - name: Cache bun packages
@@ -68,9 +91,9 @@ jobs:
           su postgres -c "createdb -O test kayjs_auth_test"
           echo "KAYJS_AUTH_TEST_DATABASE_URL=postgres://test:test@127.0.0.1:5432/kayjs_auth_test" >> "$GITHUB_ENV"
 
-      # Every test file at once in this one checkout, a worker per core, the slowest files first by tests/timings.json.
+      # Every test file in this one checkout, the slowest first by tests/timings.json, on half the host's 12 cores: a worker per core held the whole machine the runner shares.
       - name: Tests
-        run: bun run test
+        run: bun run test --parallel=6
 
       # The lint above already took each library with its own eslint.config.ts, the nearest one to every file.
       - name: Check and test the libraries
@@ -83,8 +106,13 @@ jobs:
           # kayjs-auth refuses to skip its pg store's tests for want of a database.
           KAYJS_AUTH_REQUIRE_DATABASE: '1'
 
-      - name: Check the benchmark apps
-        run: bun run bench:check
+      - name: Check kay's benchmark app
+        run: bun run bench:check:kay
+
+      # They follow their own frameworks, not kay, so only a change to them or the lockfile can break them.
+      - name: Check the other frameworks' benchmark apps
+        if: steps.changed.outputs.bench == 'true'
+        run: bun run bench:check:apps
 
       - name: Check that kay's bench pages leave hydration markers to islands
         run: bun test ./bench -t 'leave hydration markers'

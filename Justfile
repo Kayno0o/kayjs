@@ -41,6 +41,14 @@ watch-runs after:
 	echo "the runs did not finish in 15 minutes: $runs" >&2
 	exit 1
 
+# land this branch on main: rebased on origin's, checked, the tests its changes reach, pushed; one landing at a time, a second one waiting for the first
+land:
+	#!/usr/bin/env bash
+	set -euo pipefail
+	exec 9>"$(git rev-parse --git-common-dir)/kay-land.lock"
+	flock -n 9 || { echo "waiting for another landing to finish"; flock 9; }
+	bun scripts/land.ts
+
 worktree name: # a worktree at HEAD in .claude/worktrees/<name>, its dependencies installed, as Claude Code's own are made
 	bun .claude/hooks/worktree.ts create {{name}}
 

@@ -1,0 +1,43 @@
+name: Examples
+
+# Daily, so a pg-orm release that breaks the examples with kay shows here before a site meets it, kay commit or not; kay's own libraries are its packages/, tested on every push.
+on:
+  schedule:
+    - cron: '17 5 * * *'
+  workflow_dispatch:
+
+# Pinned so the cache step and bun agree on one folder, whatever HOME the runner image sets.
+env:
+  BUN_INSTALL_CACHE_DIR: /tmp/bun-cache
+
+jobs:
+  examples:
+    runs-on: alpine
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache bun packages
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.BUN_INSTALL_CACHE_DIR }}
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock', 'bench/apps/*/bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: bun install --silent --frozen-lockfile
+
+      # The examples' own tests copy a database per test file, here on the cluster the runner image holds, started as pg-orm's CI starts it.
+      - name: Start PostgreSQL
+        run: |
+          mkdir -p /run/postgresql
+          chown postgres:postgres /run/postgresql
+          su postgres -c "pg_ctl -D /var/lib/postgresql/data -o '-c listen_addresses=127.0.0.1 -c unix_socket_directories=/run/postgresql' -w start"
+          su postgres -c "psql -c \"CREATE USER test WITH PASSWORD 'test' SUPERUSER;\""
+          echo "TEST_DATABASE_URL=postgres://test:test@127.0.0.1:5432/kay_app_test" >> "$GITHUB_ENV"
+
+      - name: Test the examples on the latest pg-orm release
+        run: |
+          bun update --latest @kaynooo/pg-orm
+          bun test ./tests/examples.test.ts
