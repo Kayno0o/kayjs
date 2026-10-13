@@ -23,9 +23,13 @@ const messages = new Map<string, Message>()
 let settings: LocaleSettings | undefined
 let pageLocale = ''
 let renderedAt: number | undefined
+// Whether a read ran once the page was parsed: the locale and settings are known from then on, a swap to another locale loading the page afresh, so only a missing message reads again.
+let settled = false
 
 // Reads the scripts not read yet, so messages a streamed part brought are found too.
 function load(): void {
+  settled = document.readyState !== 'loading'
+
   for (const payload of pageData<Payload>(PAYLOAD)) {
     if (read.has(payload))
       continue
@@ -41,7 +45,8 @@ function load(): void {
 }
 
 function translations() {
-  load()
+  if (!settled)
+    load()
 
   return { locale: pageLocale || document.documentElement.lang, messages }
 }
@@ -67,7 +72,7 @@ export const T = ((props: { key: string }) => fragment((parent) => {
 
 // A link an island sets, in the page's locale as the server writes it; see `localizedLink`.
 export function localizedHref(href: string): string {
-  if (!settings)
+  if (!settings && !settled)
     load()
 
   return settings ? localizedLink(settings, href, pageLocale, location.host) : href

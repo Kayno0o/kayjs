@@ -621,6 +621,15 @@ describe('in the browser', () => {
       expect(alternate('fr')).toBe('/a-propos')
       expect(formatNumber(1234)).toBe('1,234')
 
+      // Once read on a parsed page, a known message, the locale and the settings search the page no more, as a list row each calling them would.
+      const searched = spyOn(document, 'querySelectorAll')
+
+      for (const row of [1, 2, 3])
+        expect([t('counter.label'), formatNumber(row), localize('/about')]).toEqual(['Counter', String(row), '/en/about-us'])
+
+      expect(searched).not.toHaveBeenCalled()
+      searched.mockRestore()
+
       document.body.innerHTML = '<script type="application/json" data-kay-i18n>{"messages":{"items":{"one":"{count} item","other":"{count} items"}}}</script>'
 
       expect(t('items', { count: 2 })).toBe('2 items')
