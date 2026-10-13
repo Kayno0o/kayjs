@@ -36,8 +36,6 @@ export interface Inspector {
 export function startInspector(tool: DevTool, doc: Document = document): Inspector {
   const win = doc.defaultView! as Window & InspectedWindow
   const host = tool.root.host
-  const outline = tool.make('div', 'outline')
-  const label = tool.make('div', 'label mono')
   const inspect = tool.button('Inspect', 'Inspect an element: click it to open its line')
   const islandsTab = tool.tab({ id: 'islands', label: 'Islands', summary: count => `${count} island${count === 1 ? '' : 's'}`, shown: () => watch(true), hidden: () => watch(false) })
   const panel = islandsTab.panel
@@ -49,29 +47,11 @@ export function startInspector(tool: DevTool, doc: Document = document): Inspect
   // Where the pointer last was, so pressing Alt outlines what it rests on without waiting for it to move.
   let pointer: { x: number, y: number } | undefined
 
-  outline.hidden = true
-  label.hidden = true
   inspect.setAttribute('aria-pressed', 'false')
   panel.classList.add('mono')
-  tool.root.append(outline, label)
 
-  const show = (target: Element, text: string) => {
-    const box = boundsOf(target)
-
-    outline.hidden = false
-    label.hidden = false
-    outline.style.left = `${box.left}px`
-    outline.style.top = `${box.top}px`
-    outline.style.width = `${box.width}px`
-    outline.style.height = `${box.height}px`
-    label.textContent = text
-    label.style.left = `${Math.max(0, box.left)}px`
-    label.style.top = `${box.top > 24 ? box.top - 22 : box.bottom + 2}px`
-  }
-  const hide = () => {
-    outline.hidden = true
-    label.hidden = true
-  }
+  const show = (target: Element, text: string) => tool.outline([target], text)
+  const hide = () => tool.hideOutline()
   // Stays a few seconds, whatever the pointer does meanwhile.
   const say = (target: Element, text: string) => {
     show(target, text)
@@ -240,6 +220,11 @@ export function startInspector(tool: DevTool, doc: Document = document): Inspect
   })
 
   inspect.onclick = () => setInspecting(!inspecting)
+  tool.setOpener(async (source) => {
+    const opened = await open(source)
+
+    return opened === 'opened' ? undefined : FAILURES[opened]
+  })
   swaps.observe(doc.documentElement, { attributeFilter: ['aria-busy'] })
   render()
 
@@ -261,25 +246,9 @@ export function startInspector(tool: DevTool, doc: Document = document): Inspect
       win.removeEventListener('keydown', onKeyDown, true)
       win.removeEventListener('keyup', onKeyUp, true)
       win.removeEventListener('blur', hide)
-      outline.remove()
-      label.remove()
       inspect.remove()
     },
   }
-}
-
-// An island's slot lays out as its contents, so its box is theirs.
-function boundsOf(target: Element): DOMRect {
-  const rect = target.getBoundingClientRect()
-
-  if (rect.width > 0 || rect.height > 0 || target.children.length === 0)
-    return rect
-
-  const boxes = [...target.children].map(child => boundsOf(child))
-  const left = Math.min(...boxes.map(box => box.left))
-  const top = Math.min(...boxes.map(box => box.top))
-
-  return new DOMRect(left, top, Math.max(...boxes.map(box => box.right)) - left, Math.max(...boxes.map(box => box.bottom)) - top)
 }
 
 function formatted(value: unknown): string {

@@ -7,6 +7,19 @@ const STATE_KEY = 'kay-dev'
 const CHECK_PROBLEMS = 'kay-check-problems'
 // The most problem texts a tab remembers as dismissed.
 const MAX_DISMISSED = 200
+// A `.kay` file a problem names, with its line and column when it gives them.
+const KAY_POSITION = /(?:[\w@.-]+\/)*[\w@.-]+\.kay(?::\d+:\d+)?(?!\.?\w)/g
+
+type ProblemKind = 'uncaught' | 'kay' | 'policy' | 'a11y' | 'check'
+
+// Each kind of problem under its heading, in the order they show.
+const KINDS: Record<ProblemKind, string> = {
+  uncaught: 'Uncaught errors',
+  kay: 'Recovered by kay',
+  policy: 'Blocked by the policy',
+  a11y: 'Accessibility',
+  check: 'kay check',
+}
 
 const STYLE = `
 :host { all: initial; --bg: #fff; --surface: #f5f5f7; --fg: #1c1c22; --muted: #6a6a76; --border: #e2e2e8; --accent: #6d28d9; --accent-soft: rgb(109 40 217 / 10%); --on-accent: #fff; --error: #c4262e; --warn: #9a5b00; --shadow: 0 8px 28px rgb(0 0 0 / 18%); color-scheme: light; }
@@ -41,7 +54,13 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .panel { flex: 1; overflow: auto; padding: 10px; }
 .actions { display: flex; justify-content: flex-end; margin-bottom: 8px; }
 .empty { color: var(--muted); padding: 8px 2px; }
-.problem { margin: 0 0 8px; padding: 8px 10px; border-left: 3px solid var(--warn); border-radius: 4px; background: var(--surface); white-space: pre-wrap; word-break: break-word; }
+.group + .group { margin-top: 14px; }
+.heading { margin: 0 0 6px; font: 600 11px/1.4 system-ui, sans-serif; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+.problem { margin: 0 0 8px; padding: 8px 10px; border-left: 3px solid var(--warn); border-radius: 4px; background: var(--surface); }
+.problem pre { margin: 0; white-space: pre-wrap; word-break: break-word; }
+.meta { float: right; display: flex; align-items: center; gap: 6px; margin: -4px -6px 0 8px; }
+.position { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+.position:disabled { color: inherit; text-decoration: none; cursor: text; }
 .problem.error { border-left-color: var(--error); }
 .problem.error, .problem.warn { color: var(--fg); }
 .row { padding: 6px 4px 8px; border-bottom: 1px solid var(--border); }
@@ -82,12 +101,18 @@ export interface DevTab {
 }
 
 export interface DevTool {
-  // Where the inspector puts its outline and label, over the page.
   root: ShadowRoot
   make: <K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, text?: string) => HTMLElementTagNameMap[K]
   tab: (options: DevTabOptions) => DevTab
   // A button of its own on the bar.
   button: (text: string, label: string) => HTMLButtonElement
+  // Outlines elements of the page, `text` beside the first, until `hideOutline`.
+  outline: (targets: Element[], text: string) => void
+  hideOutline: () => void
+  // Opens `file:line:column` in the editor, giving back why it could not; only once `setOpener` said how, as the inspector does under `kay dev`.
+  open: (source: string) => Promise<string | undefined>
+  opens: () => boolean
+  setOpener: (open: (source: string) => Promise<string | undefined>) => void
   stop: () => void
 }
 
@@ -277,35 +302,94 @@ export function startDevTool(doc: Document = document): DevTool {
 
   win.addEventListener('keydown', onKeyDown, true)
 
-  const problems = problemsTab(doc, { tab, make }, state, save)
+  const label = make('div', 'label mono')
+  const boxes: HTMLElement[] = []
+  let opener: ((source: string) => Promise<string | undefined>) | undefined
+  let problems: { stop: () => void } | undefined
 
-  return {
+  label.hidden = true
+  root.append(label)
+
+  const outline = (targets: Element[], text: string) => {
+    for (const [index, target] of targets.entries()) {
+      const box = boundsOf(target)
+      const element = boxes[index] ?? root.appendChild(make('div', 'outline'))
+
+      boxes[index] = element
+      element.hidden = false
+      element.style.left = `${box.left}px`
+      element.style.top = `${box.top}px`
+      element.style.width = `${box.width}px`
+      element.style.height = `${box.height}px`
+
+      if (index === 0) {
+        label.hidden = false
+        label.textContent = text
+        label.style.left = `${Math.max(0, box.left)}px`
+        label.style.top = `${box.top > 24 ? box.top - 22 : box.bottom + 2}px`
+      }
+    }
+
+    for (const box of boxes.slice(targets.length))
+      box.hidden = true
+  }
+  const hideOutline = () => {
+    label.hidden = true
+
+    for (const box of boxes)
+      box.hidden = true
+  }
+
+  const tool: DevTool = {
     root,
     make,
     tab,
     button,
+    outline,
+    hideOutline,
+    open: async source => opener ? opener(source) : 'no editor here, run kay dev',
+    opens: () => opener !== undefined,
+    setOpener: (open) => {
+      opener = open
+
+      for (const position of root.querySelectorAll<HTMLButtonElement>('button.position'))
+        position.disabled = false
+    },
     stop: () => {
-      problems.stop()
+      problems?.stop()
       win.removeEventListener('keydown', onKeyDown, true)
       host.remove()
     },
   }
+
+  problems = problemsTab(doc, tool, state, save)
+
+  return tool
 }
 
-// What kay logged, what `kay check` found and what the accessibility check found, a problem listed once; those the page logged leave with it on a page swap.
-function problemsTab(doc: Document, tool: Pick<DevTool, 'tab' | 'make'>, state: DevState, save: () => void): { stop: () => void } {
+// What kay logged, what nothing caught, what the policy blocked, what the accessibility check and `kay check` found, grouped by kind, each listed once with how often it came; those the page logged leave with it on a page swap.
+function problemsTab(doc: Document, tool: DevTool, state: DevState, save: () => void): { stop: () => void } {
   const win = doc.defaultView! as Window & { $kayProblems?: DevProblems }
   const tab = tool.tab({ id: 'problems', label: 'Problems', summary: count => `${count} problem${count === 1 ? '' : 's'}`, announce: true })
   const actions = tool.make('div', 'actions')
   const clear = tool.make('button', 'tool', 'Dismiss all')
-  const list = tool.make('div', 'mono')
   const empty = tool.make('div', 'empty', 'No problems on this page.')
-  const shown = new Map<string, { problem: DevProblem, element: HTMLElement, check: boolean }>()
+  const groups = new Map(Object.entries(KINDS).map(([kind, label]) => {
+    const section = tool.make('section', 'group')
+    const heading = tool.make('h3', 'heading', label)
+    const list = tool.make('div', 'mono')
+
+    section.hidden = true
+    section.append(heading, list)
+
+    return [kind as ProblemKind, { section, heading, list, label }]
+  }))
+  const shown = new Map<string, { problem: DevProblem, kind: ProblemKind, element: HTMLElement, times: HTMLElement, count: number }>()
   const dismissed = new Set(state.dismissed)
 
   clear.type = 'button'
   actions.append(clear)
-  tab.panel.append(actions, empty, list)
+  tab.panel.append(actions, empty, ...[...groups.values()].map(group => group.section))
 
   const update = () => {
     const errors = [...shown.values()].some(({ problem }) => problem.level === 'error')
@@ -313,39 +397,82 @@ function problemsTab(doc: Document, tool: Pick<DevTool, 'tab' | 'make'>, state: 
     tab.count(shown.size, errors ? 'error' : undefined)
     empty.hidden = shown.size > 0
     actions.hidden = shown.size === 0
+
+    for (const [kind, group] of groups) {
+      const count = [...shown.values()].filter(entry => entry.kind === kind).length
+
+      group.section.hidden = count === 0
+      group.heading.textContent = `${group.label} (${count})`
+    }
   }
-  const add = (problem: DevProblem, check = false) => {
-    if (shown.has(problem.text) || dismissed.has(problem.text))
-      return
-
-    const element = tool.make('pre', `problem mono ${problem.level}`, problem.text)
-
-    shown.set(problem.text, { problem, element, check })
-    list.append(element)
-    update()
+  const remove = (text: string) => {
+    shown.get(text)?.element.remove()
+    shown.delete(text)
   }
-
-  clear.onclick = () => {
-    for (const [text, { element }] of shown) {
+  const dismiss = (texts: string[]) => {
+    for (const text of texts) {
       dismissed.add(text)
-      element.remove()
+      remove(text)
     }
 
-    shown.clear()
     state.dismissed = [...dismissed].slice(-MAX_DISMISSED)
     save()
+    tool.hideOutline()
     update()
   }
+  const add = (problem: DevProblem, check = false) => {
+    const known = shown.get(problem.text)
+
+    if (known) {
+      known.count++
+      known.times.hidden = false
+      known.times.textContent = `${known.count} times`
+
+      return
+    }
+
+    if (dismissed.has(problem.text))
+      return
+
+    const kind: ProblemKind = check ? 'check' : problem.kind ?? (problem.text.startsWith('a11y ') ? 'a11y' : 'kay')
+    const element = tool.make('div', `problem ${problem.level}`)
+    const meta = tool.make('div', 'meta')
+    const times = tool.make('span', 'note')
+    const close = tool.make('button', 'tool', 'Dismiss')
+    const text = tool.make('pre', 'mono')
+
+    times.hidden = true
+    close.type = 'button'
+    close.setAttribute('aria-label', 'Dismiss this problem')
+    close.onclick = () => dismiss([problem.text])
+    meta.append(times, close)
+    text.append(...withPositions(problem.text, tool))
+    element.append(meta, text)
+
+    if (kind === 'a11y') {
+      element.onpointerenter = () => {
+        const targets = a11yTargets(doc, problem.text)
+
+        if (targets.length > 0)
+          tool.outline(targets, problem.text.slice(5, problem.text.indexOf(':')))
+      }
+      element.onpointerleave = () => tool.hideOutline()
+    }
+
+    shown.set(problem.text, { problem, kind, element, times, count: 1 })
+    groups.get(kind)!.list.append(element)
+    update()
+  }
+
+  clear.onclick = () => dismiss([...shown.keys()])
 
   // What `kay check` finds now, as the page carries it: a swap brings the block of the code the server runs.
   const readChecks = () => {
     const texts = new Set(JSON.parse(doc.getElementById(CHECK_PROBLEMS)?.textContent ?? '[]') as string[])
 
-    for (const [text, { element, check }] of shown) {
-      if (check && !texts.has(text)) {
-        element.remove()
-        shown.delete(text)
-      }
+    for (const [text, { kind }] of shown) {
+      if (kind === 'check' && !texts.has(text))
+        remove(text)
     }
 
     for (const text of texts)
@@ -379,13 +506,12 @@ function problemsTab(doc: Document, tool: Pick<DevTool, 'tab' | 'make'>, state: 
       return
     }
 
-    for (const [text, { element, check }] of shown) {
-      if (!check) {
-        element.remove()
-        shown.delete(text)
-      }
+    for (const [text, { kind }] of shown) {
+      if (kind !== 'check')
+        remove(text)
     }
 
+    tool.hideOutline()
     update()
   })
 
@@ -399,6 +525,58 @@ function problemsTab(doc: Document, tool: Pick<DevTool, 'tab' | 'make'>, state: 
       win.$kayProblems = [] as DevProblem[]
     },
   }
+}
+
+// The text with each `.kay` file it names, with or without a position, as a button opening it once the inspector says how.
+function withPositions(text: string, tool: DevTool): Node[] {
+  const nodes: Node[] = []
+  let last = 0
+
+  for (const match of text.matchAll(KAY_POSITION)) {
+    const [source] = match
+    const position = tool.make('button', 'position', source)
+
+    position.type = 'button'
+    position.disabled = !tool.opens()
+    position.onclick = async () => {
+      const failed = await tool.open(source.includes(':') ? source : `${source}:1:1`)
+      const note = position.nextElementSibling?.classList.contains('note') === true ? position.nextElementSibling : undefined
+
+      note?.remove()
+
+      if (failed !== undefined)
+        position.after(tool.make('span', 'note', ` (${failed})`))
+    }
+    nodes.push(textNode(text.slice(last, match.index)), position)
+    last = match.index + source.length
+  }
+
+  nodes.push(textNode(text.slice(last)))
+
+  return nodes
+
+  function textNode(part: string): Node {
+    return tool.root.ownerDocument.createTextNode(part)
+  }
+}
+
+// The elements an accessibility problem names, one selector a line under its first, those inside a shadow root left out.
+function a11yTargets(doc: Document, text: string): Element[] {
+  const elements: Element[] = []
+
+  for (const line of text.split('\n').slice(1)) {
+    const selector = line.startsWith('  ') ? line.trim() : ''
+
+    if (selector === '' || selector.includes(' >>> ') || selector.startsWith('and '))
+      continue
+
+    try {
+      elements.push(...doc.querySelectorAll(selector))
+    }
+    catch {}
+  }
+
+  return elements
 }
 
 function readState(win: Window): DevState {
@@ -418,4 +596,18 @@ function writeState(win: Window, state: DevState): void {
     win.sessionStorage.setItem(STATE_KEY, JSON.stringify(state))
   }
   catch {}
+}
+
+// An island's slot lays out as its contents, so its box is theirs.
+function boundsOf(target: Element): DOMRect {
+  const rect = target.getBoundingClientRect()
+
+  if (rect.width > 0 || rect.height > 0 || target.children.length === 0)
+    return rect
+
+  const boxes = [...target.children].map(child => boundsOf(child))
+  const left = Math.min(...boxes.map(box => box.left))
+  const top = Math.min(...boxes.map(box => box.top))
+
+  return new DOMRect(left, top, Math.max(...boxes.map(box => box.right)) - left, Math.max(...boxes.map(box => box.bottom)) - top)
 }

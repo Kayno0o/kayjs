@@ -93,7 +93,14 @@ The `Listening on http://localhost:3000` line an entry scaffolded by an older ka
 
 Every page a dev server serves carries a bar at the bottom left, `kay` and a count of the page's problems, red when one is an error. A click on it, or Alt+Shift+K, opens its drawer; Escape closes it.
 
-- **Problems** lists what kay recovered from in the browser, such as an island that did not match its server markup, what `kay check` reports of the project without type checking, and what axe-core finds on the rendered page. Dismiss all hides those listed for the rest of the browser tab; those the page logged go when it is left.
+- **Problems** lists, each under its heading:
+  - errors nothing caught and unhandled rejections, with their stack;
+  - what kay recovered from in the browser, such as an island that did not match its server markup;
+  - what the Content-Security-Policy blocked, naming the directive and the source;
+  - what axe-core finds on the rendered page; hovering one outlines the elements it names;
+  - what `kay check` reports of the project without type checking.
+
+  A problem logged again shows once with how many times it came. Under `kay dev`, a `.kay` file a problem names opens in the editor on a click. Dismiss, or Dismiss all, hides a problem for the rest of the browser tab, until its text changes; those the page logged go when it is left.
 - The drawer follows the system's light or dark theme and docks left or right. Its open tab and side stay for the browser tab, across page swaps and reloads.
 
 Production pages never carry it.
