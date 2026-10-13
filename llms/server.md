@@ -2,7 +2,7 @@
 
 ## Locals
 
-`ctx.locals` is the Elysia context of the request, typed from the app the server entry exports: what the plugins it uses before the pages add. Elysia's own `cookie`, `query`, `headers` and `body` are not parsed for it: `ctx.cookies`, `ctx.url` and `ctx.request` give them.
+`ctx.locals` is the Elysia context of the request, typed from the app the server entry exports: what the plugins it uses before the pages add. Elysia's own `cookie`, `query`, `headers`, `body`, `url` and `path` are not parsed for it: `ctx.request` and `ctx.url` give them, and `ctx.cookies` outside endpoints. A value for later goes through a plugin's `derive` or `resolve`, not onto `ctx.locals`.
 
 ```ts
 import { Elysia } from 'elysia'

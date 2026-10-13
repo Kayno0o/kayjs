@@ -29,6 +29,7 @@ import { scanRoutes } from '../src/server/routes'
 import { speculationRules } from '../src/server/speculation'
 import { KEEP_ALIVE_MS, streamDocument } from '../src/server/stream'
 import { setTracer } from '../src/server/trace'
+import { parsingRoutes, routePaths } from './elysia'
 import { auth } from './fixtures/site/src/auth'
 import { resetTodos } from './fixtures/site/src/data'
 
@@ -418,6 +419,11 @@ describe('pages', () => {
 })
 
 describe('request context', () => {
+  it('leaves Elysia parsing no cookie, query or header on the fallback page and a guarded action', () => {
+    expect(routePaths(app)).toEqual(expect.arrayContaining(['/*', expect.stringMatching(/^\/_kay\/action\/.*\/admin\/index\.kay\//)]))
+    expect(parsingRoutes(app)).toEqual([])
+  })
+
   const ACCOUNT_ACTION = 'http://localhost/_kay/action/tests/fixtures/site/src/routes/account.kay/remember'
   // An Elysia guard covers an action only when it matches the action's own path, here holding the page's name.
   const guarded = new Elysia()

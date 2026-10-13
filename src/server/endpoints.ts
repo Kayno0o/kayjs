@@ -11,6 +11,7 @@ import { loadGuard, requiredGuards } from './guards'
 import { answeringRequest } from './log'
 import { pageSetting } from './page-settings'
 import { listedParams, pathOf } from './prerendered'
+import { sharedContext } from './render'
 import { reportServerError } from './report'
 import { routerKey } from './routes'
 
@@ -54,7 +55,7 @@ export async function serveEndpoints(app: Elysia, endpoints: Endpoint[], options
 
       const params = Object.fromEntries(endpoint.params.map((name, index) => [name, index === values.length - 1 && endpoint.suffix !== undefined ? last.slice(0, -endpoint.suffix.length) : values[index]!]))
 
-      return answeringRequest(context.request, async () => answer(endpoint, { ...context }, params, options))
+      return answeringRequest(context.request, async () => answer(endpoint, sharedContext(context.request, () => ({ ...context })), params, options))
     })
   }
 }

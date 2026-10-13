@@ -128,6 +128,20 @@ export interface RequestContext {
   request: Request
 }
 
+const copiedContexts = new WeakMap<Request, RequestContext>()
+
+// A request's context as kay's guards and handlers read it, copied once so they share it: Elysia's Sucrose reads a handler passing its whole context to a function, `context,` or `context)`, as using all of it, and would parse the cookies, query, headers and body of every request.
+export function sharedContext<T extends RequestContext>(request: Request, copy: () => T): T {
+  let shared = copiedContexts.get(request) as T | undefined
+
+  if (!shared) {
+    shared = copy()
+    copiedContexts.set(request, shared)
+  }
+
+  return shared
+}
+
 interface Rendering {
   ctx: PageContext<Record<string, unknown>>
   headers: Headers

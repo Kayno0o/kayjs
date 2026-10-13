@@ -6,7 +6,7 @@ description: Share request data with pages through ctx.locals, keep a session, p
 
 ## Locals
 
-`ctx.locals` is the Elysia context of the request, typed from the app that the server entry exports. Whatever a plugin derives before `pages()` reaches every page, action and guard. Elysia's own `cookie`, `query`, `headers` and `body` are not parsed for it, as `ctx.cookies`, `ctx.url` and `ctx.request` give them. `src/server.ts`:
+`ctx.locals` is the Elysia context of the request, typed from the app that the server entry exports. Whatever a plugin derives before `pages()` reaches every page, action and guard. Elysia's own `cookie`, `query`, `headers`, `body`, `url` and `path` are not parsed for it, as `ctx.request` and `ctx.url` give them, and `ctx.cookies` outside endpoints. A value for later goes through a plugin's `derive` or `resolve`, not onto `ctx.locals`. `src/server.ts`:
 
 ```ts
 import { Elysia } from 'elysia'

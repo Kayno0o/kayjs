@@ -3,13 +3,13 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
-import { sucrose } from 'elysia/sucrose'
 import { pages } from '../src/server'
 import { claimEndpoints, exportedEndpoints } from '../src/server/endpoints'
 import { claimPublic } from '../src/server/public'
 import { refuseClashes } from '../src/server/route-table'
 import { scanEndpoints, scanRoutes } from '../src/server/routes'
 import { ServedPaths } from '../src/server/served-paths'
+import { parsingRoutes, routePaths } from './elysia'
 
 const FIXTURE = 'tests/fixtures/endpoints'
 const routes = resolve(FIXTURE, 'src/routes')
@@ -41,10 +41,8 @@ describe('endpoint files', () => {
   })
 
   it('leave Elysia parsing no cookie, query or header for them', () => {
-    const route = (app as unknown as { routes: { path: string, handler: unknown, hooks: object }[] }).routes.find(route => route.path === '/llms.txt')!
-    const inferred = sucrose({ handler: route.handler, ...route.hooks } as never)
-
-    expect([inferred.cookie, inferred.query, inferred.headers]).toEqual([false, false, false])
+    expect(routePaths(app)).toContain('/llms.txt')
+    expect(parsingRoutes(app)).toEqual([])
   })
 
   it('take their last param before its extension, a Response going out as it is and a Blob typed by the extension', async () => {
