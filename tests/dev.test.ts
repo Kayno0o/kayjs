@@ -1019,7 +1019,8 @@ describe('kay dev', () => {
 
       // One gone on its own starts again with the next build.
       process.kill(Number(first), 'SIGKILL')
-      await until(() => builders().length === 0)
+      // A restart still finishing under load may start the next one at once, so the wait is for this one gone, not for none.
+      await until(() => !builders().includes(first!))
       await Bun.write(join(root, 'src/counter.kay'), counter(9))
       await until(() => builders().length === 1 && builders()[0] !== first, 10_000)
     }
