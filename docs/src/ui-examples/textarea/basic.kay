@@ -6,10 +6,10 @@ const saved = signal('Pack the telescope.')
 ---
 .flex.max-w-sm.flex-col.gap-2
   Textarea(
-    value={note}
+    value={note()}
     onInput={note.set}
     onChange={saved.set}
     rows={4}
     aria-label="Note"
   )
-  p.text-kui-subtext0 Saved on blur: {saved}.
+  p.text-kui-subtext0 Saved on blur: {saved()}.

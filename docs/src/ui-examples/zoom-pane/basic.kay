@@ -20,7 +20,7 @@ const named = signal(true)
       circle(cx="100" cy="50" r="12" fill="currentColor")
       for moon of moons key={moon.name}
         circle(cx={moon.x} cy="50" r="3" fill="currentColor")
-        if named
+        if named()
           text(
             x={moon.x}
             y="62"

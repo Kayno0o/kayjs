@@ -69,13 +69,13 @@ effect(() => {
   onCleanup(() => document.documentElement.classList.remove('kcms-editing'))
 })
 ---
-aside.kcms-editor(ref={element => panel = element} class={{ 'kcms-editor-open': open }} aria-label="Content editor")
+aside.kcms-editor(ref={element => panel = element} class={{ 'kcms-editor-open': open() }} aria-label="Content editor")
   header.kcms-editor-head
-    if open
+    if open()
       h2.kcms-editor-title Edit this page
-      Button(label={leaving ? 'Leaving…' : 'Stop editing'} busy={leaving} onClick={stopEditing})
-    IconButton(icon={open ? 'close' : 'menu'} label={open ? 'Hide the editor' : 'Edit this page'} variant="ghost" onClick={() => open = !open})
-  if open
+      Button(label={leaving() ? 'Leaving…' : 'Stop editing'} busy={leaving()} onClick={stopEditing})
+    IconButton(icon={open() ? 'close' : 'menu'} label={open() ? 'Hide the editor' : 'Edit this page'} variant="ghost" onClick={() => open = !open()})
+  if open()
     .kcms-editor-body
       if drafts.failure() as failure
         p.kcms-editor-failure(role="alert") The page could not show your changes: {failure}

@@ -211,6 +211,13 @@ export const LINTS = {
     wrong: 'for post of posts\n  PostRow(slug={post.slug} title={post.title})',
     right: 'for post of posts key={post.slug}\n  PostRow(slug={post.slug} title={post.title})',
   },
+  'uncalled-signal': {
+    level: 'deny',
+    group: 'islands',
+    summary: 'A signal or memo the template names without calling it where its value goes, such as `{count}` or `if count > 1`: a signal is read by calling it, in the template as in the script. Handed on whole, as a component\'s prop or a function\'s argument, it passes the signal itself. `kay check --fix` calls it.',
+    wrong: '---\nimport { signal } from \'kay\'\n\nconst count = signal(0)\n---\nbutton(onClick={() => count++}) {count}',
+    right: '---\nimport { signal } from \'kay\'\n\nconst count = signal(0)\n---\nbutton(onClick={() => count++}) {count()}',
+  },
   'constant-signal': {
     level: 'warn',
     group: 'islands',

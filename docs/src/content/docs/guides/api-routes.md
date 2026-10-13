@@ -87,7 +87,7 @@ import notes from '../api/notes'
 const title = signal('')
 ---
 input(bind:value={title})
-button(onClick={() => call(notes, '/', { method: 'post', body: { title } })}) Add
+button(onClick={() => call(notes, '/', { method: 'post', body: { title: title() } })}) Add
 ```
 
 `signal` aborts a call. A body holding a `File` goes as a multipart form, and `progress: sent => ...` reports how much of it went, from 0 to 1.
@@ -160,7 +160,7 @@ const text = signal('')
 ---
 p {messages.last()?.text}
 input(bind:value={text})
-button(onClick={() => messages.send({ text })}) Send
+button(onClick={() => messages.send({ text: text() })}) Send
 ```
 
 <ReadMore href="/llms/api-routes">Rooms for grouping connections, `dispatch`, sharing rooms between processes, bigint handling and guard details are in the full API routes reference.</ReadMore>

@@ -13,4 +13,4 @@ const span = signal('none yet')
     xLabels
     onRange={(from, to) => span.set(`${labels[from]} to ${labels[to]}`)}
   )
-  p.text-kui-subtext0 Picked: {span}.
+  p.text-kui-subtext0 Picked: {span()}.

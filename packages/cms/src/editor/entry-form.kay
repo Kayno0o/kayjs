@@ -59,8 +59,8 @@ section.kcms-entry(ref={element => box = element})
       p.kcms-entry-slug {entry.locale === undefined ? entry.slug : `${entry.slug} (${entry.locale})`}
     if drafts.changed(entry)
       .kcms-entry-actions
-        Button(label="Reset" disabled={saving} onClick={() => drafts.reset(entry)})
-        Button(label={saving ? 'Saving…' : 'Save'} variant="accent" busy={saving} onClick={save})
+        Button(label="Reset" disabled={saving()} onClick={() => drafts.reset(entry)})
+        Button(label={saving() ? 'Saving…' : 'Save'} variant="accent" busy={saving()} onClick={save})
   if source.status() === 'failed'
     p.kcms-entry-failure Could not load this entry: {source.error()?.message}
   else if source.value() as answer

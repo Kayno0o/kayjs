@@ -7,4 +7,4 @@ const played = signal(0)
 const note = linked(() => page)
 ---
 button.player(onClick={() => played.set(n => n + 1)}) Played {played()}
-button.page-note(onClick={() => note.set('edited')}) {note ?? 'none'}
+button.page-note(onClick={() => note.set('edited')}) {note() ?? 'none'}

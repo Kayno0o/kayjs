@@ -47,8 +47,8 @@ async function upload([file]: File[]): Promise<void> {
       img.kcms-file-preview(src={value} alt="")
     else
       a.kcms-file-link(href={value}) {value.split('/').at(-1)}
-  FileDrop.kcms-file-drop(accept={image ? 'image/*' : undefined} disabled={sent !== undefined} onFiles={upload})
+  FileDrop.kcms-file-drop(accept={image ? 'image/*' : undefined} disabled={sent() !== undefined} onFiles={upload})
     @content(zone)
-      Button(label={label()} busy={sent !== undefined} onClick={zone.open})
+      Button(label={label()} busy={sent() !== undefined} onClick={zone.open})
       span.kcms-file-hint {zone.dragging() ? 'Drop to upload' : 'or drop a file here'}
   TextInput(value={value} placeholder="Or a path the site serves" aria-label="Path" onInput={onChange})

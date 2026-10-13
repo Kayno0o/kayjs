@@ -112,14 +112,14 @@ Card(title="Todos")
 
 ## Signals
 
-`signal(value)` holds state. In the template it is read by its name, in the script by calling it, and written in both by assigning it, `count++`, or with `.set`. `kay check` narrows a signal within the template expression reading it, so `{error && error.message}` checks with `error` a `signal<Error>()`; reads inside a handler or a `.map` callback run later and are not narrowed at all: copy the value into a `const` first, or assert it, `error!`. `memo(fn)` caches a derived value.
+`signal(value)` holds state. It is read by calling it, `{count()}`, and written by assigning it, `count++`, or with `.set`, in the template as in the script. Handed to a component as a prop, `Toggle(open={open})`, it passes the signal itself, for a prop typed `Signal<boolean>` to read and write. `kay check` narrows a signal within the template expression reading it, so `{error && error.message}` checks with `error` a `signal<Error>()`; reads inside a handler or a `.map` callback run later and are not narrowed at all: copy the value into a `const` first, or assert it, `error!`. `memo(fn)` caches a derived value.
 
 ```kay
 ---
 const count = signal(0)
 const double = memo(() => count() * 2)
 ---
-button(onClick={() => count++}) {count} x 2 = {double}
+button(onClick={() => count++}) {count()} x 2 = {double()}
 ```
 
 A component using signals or handlers becomes an island: see [Islands](/essentials/islands).

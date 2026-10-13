@@ -25,9 +25,9 @@ const shown = memo(() =>
     max={500}
     step={5}
     unit="EUR"
-    value={range}
+    value={range()}
     onChange={range.set}
   )
   ul.text-kui-subtext0
-    for item of shown key={item.name}
+    for item of shown() key={item.name}
       li {item.name}, {item.price} EUR

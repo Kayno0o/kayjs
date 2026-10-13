@@ -176,7 +176,7 @@ const shown = memo(() => books.filter(book =>
     input(type="checkbox" bind:checked={unreadOnly})
     |  Unread only
 ul
-  for book of shown
+  for book of shown()
     li
       a(href={`/books/${book.id}`}) {book.title}
       |  by {book.author}
@@ -184,7 +184,7 @@ ul
     li Nothing matches
 ```
 
-The script fence, a bare `---`, runs where the component renders. `signal` holds a value, `memo` derives one, and `bind:value` keeps the field and the signal in step. In the template a signal is read by its name, `{query}`, and in the script by calling it, `query()`. The `else` under the `for` renders when the list is empty.
+The script fence, a bare `---`, runs where the component renders. `signal` holds a value, `memo` derives one, and `bind:value` keeps the field and the signal in step. A signal is read by calling it, `shown()`, in the template as in the script, while `bind:value={query}` takes the signal itself, to write it. The `else` under the `for` renders when the list is empty.
 
 Use it in the page in place of the list: import it in a script fence after the server fence, and pass the books as a prop:
 

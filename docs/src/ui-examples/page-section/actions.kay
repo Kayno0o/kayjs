@@ -16,5 +16,5 @@ PageSection(title="Moons")
   @actions
     IconButton(icon="plus" label="Add a moon" size="sm" onClick={add})
   ul.list-disc.pl-5
-    for moon of moons
+    for moon of moons()
       li {moon}

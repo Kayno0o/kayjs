@@ -1,4 +1,4 @@
 ---
 const count = signal(0)
 ---
-button.toc(onClick={() => count.set(count() + 1)}) toc {count}
+button.toc(onClick={() => count.set(count() + 1)}) toc {count()}

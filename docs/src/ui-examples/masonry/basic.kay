@@ -32,7 +32,7 @@ const shown = memo(() =>
     placeholder="Filter"
     bind:value={query}
   )
-  Masonry(items={shown} key={note => note.id} minWidth={180} gap={12})
+  Masonry(items={shown()} key={note => note.id} minWidth={180} gap={12})
     @tile(note)
       .rounded-lg.bg-kui-surface0.p-3
         h3.font-semibold {note.title}

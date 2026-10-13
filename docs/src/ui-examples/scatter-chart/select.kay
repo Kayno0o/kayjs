@@ -20,4 +20,4 @@ const pick = (point: { label: string, x: number, y: number }) =>
     y={{ label: 'Score' }}
     onSelect={pick}
   )
-  p.rounded.border.border-kui-overlay1.bg-kui-surface0.px-3.py-2 {picked}
+  p.rounded.border.border-kui-overlay1.bg-kui-surface0.px-3.py-2 {picked()}

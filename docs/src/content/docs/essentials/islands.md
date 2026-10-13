@@ -10,12 +10,12 @@ A component is an island when it is interactive: an element has an `on*` handler
 ---
 const count = signal(0)
 ---
-button(onClick={() => count++}) Clicked {count} times
+button(onClick={() => count++}) Clicked {count()} times
 ```
 
 ## Signals, memos and effects
 
-A signal is read by its name in the template and by calling it in the script, and written by assigning it, `count++` or `open = !open`, in both. `memo` derives a value, `effect` runs once the render is done and again when what it read changes.
+A signal is read by calling it, `count()`, and written by assigning it, `count++` or `open = !open()`, in the template as in the script. `memo` derives a value, `effect` runs once the render is done and again when what it read changes.
 
 ```kay
 ---
@@ -28,7 +28,7 @@ effect(() => {
 })
 ---
 input(bind:value={query} aria-label="Search")
-p {matches.length} results
+p {matches().length} results
 ```
 
 ## Props to an island
@@ -90,7 +90,7 @@ export const theme = persisted('theme', 'light')
 
 <Callout type="note">
 
-Outside a component, a signal is read by calling it, `cart()`, and written with `cart.set(...)`. A component importing one its module exports as `export const` reads and writes it by name, `{cart}` and `cart = []`, as its own; a prop typed `Signal<T>` from `kay` does too.
+Outside a component, a signal is written with `cart.set(...)`. A component importing one its module exports as `export const` also writes it by assigning it, `cart = []`, as its own; so does a prop typed `Signal<T>` from `kay`. Both read it by calling it, `{cart().length}`.
 
 </Callout>
 
@@ -135,7 +135,7 @@ onMount(() => {
   width.set(window.innerWidth)
 })
 ---
-p Window is {width}px wide
+p Window is {width()}px wide
 ```
 
 A component that cannot render on the server at all, such as one wrapping a map library, starts its script fence with `--- client`. It renders in the browser only:

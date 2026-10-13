@@ -5,7 +5,7 @@ import Dialog from '@kaynooo/kayjs-ui/dialog.kay'
 const open = signal(false)
 ---
 Button(label="New note" onClick={() => open.set(true)})
-Dialog(open={open} title="New note" onClose={() => open.set(false)})
+Dialog(open={open()} title="New note" onClose={() => open.set(false)})
   @footer
     Button(label="Discard" onClick={() => open.set(false)})
     Button(label="Save" variant="accent" onClick={() => open.set(false)})

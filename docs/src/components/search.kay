@@ -80,7 +80,7 @@ onCleanup(() => window.removeEventListener('keydown', onShortcut))
 button.search-trigger(type="button" aria-haspopup="dialog" onClick={open})
   SearchIcon
   span Search
-  kbd {shortcut}
+  kbd {shortcut()}
 dialog.palette(aria-label="Search the documentation" closedby="any" ref={el => dialog = el})
   .palette-box
     .palette-field
@@ -93,7 +93,7 @@ dialog.palette(aria-label="Search the documentation" closedby="any" ref={el => d
     else
       ul#search-results.palette-results(role="listbox")
         for hit, i of hits() key={i}
-          li(id={`search-${i}`} role="option" aria-selected={i === active} onMouseMove={() => active.set(i)} onClick={() => go(hit)})
+          li(id={`search-${i}`} role="option" aria-selected={i === active()} onMouseMove={() => active.set(i)} onClick={() => go(hit)})
             span.palette-where
               span {hit.page}
               if hit.heading as heading
@@ -107,7 +107,7 @@ dialog.palette(aria-label="Search the documentation" closedby="any" ref={el => d
                   else
                     | {part.text}
         else
-          li.palette-empty Nothing matches “{query}”
+          li.palette-empty Nothing matches “{query()}”
     p.palette-help
       kbd: ArrowUp
       kbd: ArrowDown

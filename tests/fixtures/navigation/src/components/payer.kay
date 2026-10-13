@@ -8,4 +8,4 @@ async function press() {
 }
 ---
 button.payer(onClick={press}) Pay from an island
-p.island-paid {paid}
+p.island-paid {paid()}

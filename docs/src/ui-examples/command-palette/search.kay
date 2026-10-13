@@ -32,7 +32,7 @@ const entries: PaletteEntry[] = [
   Button(label="Open the palette" onClick={() => open.set(true)})
   p.text-kui-subtext0 Try "csv" or "invoice".
 CommandPalette(
-  open={open}
+  open={open()}
   onOpenChange={open.set}
   entries={entries}
   groups={['Actions', 'Pages']}

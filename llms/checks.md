@@ -55,6 +55,7 @@ What the markup alone cannot tell, such as text too faint on its background, con
 | `dangling-label` | warn | a11y | A `label(for="...")` pointing at an id nothing in the template has. |
 | `missing-captions` | warn | a11y | A `video` that is not `muted` with no captions `track`. |
 | `redundant-alt` | warn | a11y | Alt text that is a filename or says it is an image. |
+| `uncalled-signal` | deny | islands | A signal or memo the template names without calling it where its value goes, `{count}` or `if count > 1`: a signal is read by calling it, in the template as in the script, `{count()}`. Handed on whole, as a component prop or a function argument, it passes the signal itself; `--fix` calls it. |
 | `constant-signal` | warn | islands | A signal the component script declares and only ever reads: it never changes, so a plain `const` renders the same without the reactivity. |
 | `deprecated-schema-name` | warn | code | `t` imported from `kay` for the schema builder, now `s`; `--fix` renames it, in `.kay` fences and the project's own modules alike. |
 | `css-import-without-text` | deny | code | A stylesheet imported for a value without `with { type: 'text' }`, whose value Bun and the compiled executable would give apart; in `.kay` fences and the project's own modules alike. |

@@ -121,7 +121,7 @@ const shown = memo(() =>
 ---
 input(type="search" aria-label="Filter posts" bind:value={query})
 ul
-  for post of shown key={post.slug}
+  for post of shown() key={post.slug}
     li: a(href={`/posts/${post.slug}`}) {post.title}
 ```
 
@@ -220,17 +220,17 @@ async function submit(event: SubmitEvent) {
   }
 }
 ---
-if thanked
-  p Thanks, {thanked}!
+if thanked()
+  p Thanks, {thanked()}!
 form(action={comment} novalidate onSubmit={submit})
   label(for="name") Name
   input#name(name="name")
-  if errors.name
-    p.error {errors.name}
+  if errors().name
+    p.error {errors().name}
   label(for="text") Comment
   textarea#text(name="text")
-  if errors.text
-    p.error {errors.text}
+  if errors().text
+    p.error {errors().text}
   button Send
 ```
 

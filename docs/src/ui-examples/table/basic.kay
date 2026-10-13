@@ -24,5 +24,5 @@ const sort = signal<SortState>()
 Table(columns={columns} rows={moons} rowKey="id" onSort={sort.set})
   @cell(moon)
     strong {moon.name}
-if sort as current
+if sort() as current
   p.mt-2.text-kui-subtext0 Sorted by {current.key}, {current.direction}.

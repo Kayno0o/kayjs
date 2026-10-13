@@ -25,4 +25,4 @@ function read(event: Event) {
 ---
 form.flex.flex-col.items-start.gap-2(onInput={read})
   IconPicker(search={search} name="icon")
-  p.text-kui-subtext0 The form holds icon: {submitted || 'nothing'}.
+  p.text-kui-subtext0 The form holds icon: {submitted() || 'nothing'}.

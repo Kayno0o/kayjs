@@ -56,6 +56,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `dangling-label` | warn | a11y | A `label(for)` pointing at no id |
 | `missing-captions` | warn | a11y | A `video` with no captions |
 | `redundant-alt` | warn | a11y | Alt text that says it is an image |
+| `uncalled-signal` | deny | islands | A signal read by name where its value goes, not called |
 | `constant-signal` | warn | islands | A signal that is only ever read |
 | `deprecated-schema-name` | warn | code | The schema builder imported as `t`, now `s` |
 | `css-import-without-text` | deny | code | A stylesheet imported for a value without `with { type: 'text' }` |

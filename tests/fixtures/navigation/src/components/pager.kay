@@ -5,7 +5,7 @@ const current = queryParam<number>('page')
 const tags = queryParam<string[]>('tags')
 const view = queryParam<'grid' | 'list'>('view')
 ---
-p.paged Page {current} {typeof current} {tags.join(',')} {view}
+p.paged Page {current()} {typeof current()} {tags().join(',')} {view()}
 button.next(onClick={() => current.set(at => at + 1)}) Next
 button.first(onClick={() => current.set(1)}) First
 button.tag(onClick={() => tags.set(list => [...list, 'b'])}) Tag

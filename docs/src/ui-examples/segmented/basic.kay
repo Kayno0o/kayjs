@@ -11,8 +11,8 @@ const period = signal('week')
 .flex.flex-col.items-start.gap-2
   Segmented(
     options={PERIODS}
-    value={period}
+    value={period()}
     label="Period"
     onChange={period.set}
   )
-  p Showing one {period}.
+  p Showing one {period()}.

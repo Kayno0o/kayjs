@@ -90,7 +90,7 @@ describe('kay explain', () => {
     const [heading, blank, ...rows] = lintList('islands').split('\n')
 
     expect([heading, blank]).toEqual([`islands: ${LINT_GROUPS.islands}`, ''])
-    expect(rows.map(row => row.split(/\s{2,}/)[0])).toEqual(['positional-key', 'identity-key', 'constant-signal'])
+    expect(rows.map(row => row.split(/\s{2,}/)[0])).toEqual(['positional-key', 'identity-key', 'uncalled-signal', 'constant-signal'])
   })
 
   it('explains a lint with an example it reports and the same written right, indented as code', () => {
@@ -229,17 +229,41 @@ describe('constant-signal', () => {
     expect(diagnostics.map(d => [d.code, d.severity, d.help])).toEqual([['constant-signal', 'warning', 'make it a plain value, `const title = \'Todos\'`, read as `title`']])
   })
 
-  it('reports a signal kay imports by itself too, and one the template reads by name, a prop included', () => {
+  it('reports a signal kay imports by itself too, and one a prop takes the value of', () => {
     expect(lints('---\nconst title = signal(\'Todos\')\n---\nh1 {title()}\n')).toEqual([{ code: 'constant-signal', severity: 'warning', at: 'title' }])
-    expect(lints(script('const open = signal(false)', 'Child(open={open})\np {open}'))).toEqual([{ code: 'constant-signal', severity: 'warning', at: 'open' }])
+    expect(lints(script('const open = signal(false)', 'Child(open={open()})\np {open()}'))).toEqual([{ code: 'constant-signal', severity: 'warning', at: 'open' }])
   })
 
   it('leaves a signal something writes, binds or hands on, and a `signal` that is not kay\'s', () => {
-    expect(lints(script('const name = signal(\'\')', 'input(aria-label="Name" bind:value={name})\np {name}'))).toEqual([])
-    expect(lints(script('const open = signal(false)', 'button(onClick={() => open.set(!open)}) {open}'))).toEqual([])
-    expect(lints(script('const shown = signal(false)\nkeep(shown)', 'p {shown}'))).toEqual([])
+    expect(lints(script('const name = signal(\'\')', 'input(aria-label="Name" bind:value={name})\np {name()}'))).toEqual([])
+    expect(lints(script('const open = signal(false)', 'button(onClick={() => open.set(!open())}) {open()}'))).toEqual([])
+    expect(lints(script('const shown = signal(false)\nkeep(shown)', 'p {shown()}'))).toEqual([])
+    expect(lints(script('const open = signal(false)', 'Child(open={open})'))).toEqual([])
     expect(lints(script('const width = signal(0)\neffect(() => width.set(1))', 'p {width()}'))).toEqual([])
     expect(lints('---\nfunction signal(value: number) {\n  return () => value\n}\n\nconst width = signal(1)\n---\np {width()}\n')).toEqual([])
+  })
+})
+
+describe('uncalled-signal', () => {
+  const script = (body: string, template: string) => `---\nimport { memo, signal } from 'kay'\nimport Toggle from './toggle.kay'\n\n${body}\n---\n${template}\n`
+
+  it('reports a signal or memo the template leaves uncalled where its value goes, and calls it as its fix', () => {
+    const source = script('const count = signal(0)\nconst double = memo(() => count() * 2)', 'button(onClick={() => count = count + 1} title={JSON.stringify({ count })}) {double}\nif count > 1\n  p {count}')
+    const found = compileKay(source, 'list.kay', { check: true }).diagnostics.filter(d => d.code === 'uncalled-signal')
+
+    expect(found.map(d => [source.slice(d.start, d.end), d.message, d.fixes?.[0]?.edits[0]?.text])).toEqual([
+      ['count', '`count` is a signal, read by calling it', '()'],
+      ['count', '`count` is a signal, read by calling it', ': count()'],
+      ['double', '`double` is a memo, read by calling it', '()'],
+      ['count', '`count` is a signal, read by calling it', '()'],
+      ['count', '`count` is a signal, read by calling it', '()'],
+    ])
+  })
+
+  it('leaves a call, a write, a bind and the signal handed whole to a component or a function, which pass the signal itself', () => {
+    const source = script('const open = signal(false)', 'button(onClick={() => open++}) {open()}\ninput(aria-label="Open" bind:checked={open})\nToggle(open={open} label={describe(open)})\nbutton(onClick={() => open.set(true)}) Open')
+
+    expect(compileKay(source, 'list.kay', { check: true }).diagnostics.filter(d => d.code === 'uncalled-signal')).toEqual([])
   })
 })
 

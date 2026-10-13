@@ -73,15 +73,15 @@ form.kcms-entry-editor(novalidate onSubmit={event => { event.preventDefault(); v
         if entry.url as url
           Button(href={onPagePath(prefix, url)} label="Edit on page")
         if draft()
-          Button(label="Publish" disabled={saving} onClick={publish})
+          Button(label="Publish" disabled={saving()} onClick={publish})
         ConfirmDelete(message="Delete this entry? This cannot be undone." failure="Could not delete" trigger="button" onConfirm={remove})
       if drafts.changed(ref)
-        Button(label="Reset" disabled={saving} onClick={() => drafts.reset(ref)})
-      Button(type="submit" label={saving ? 'Saving…' : entry ? 'Save' : 'Create'} variant="accent" busy={saving})
+        Button(label="Reset" disabled={saving()} onClick={() => drafts.reset(ref)})
+      Button(type="submit" label={saving() ? 'Saving…' : entry ? 'Save' : 'Create'} variant="accent" busy={saving()})
   if !entry
     FormField(label="Slug" hint={collection.kind === 'folder' ? "The file's path in the collection's folder, with / between folders" : undefined} required)
-      TextInput(value={slug} onInput={text => slug = text} required)
+      TextInput(value={slug()} onInput={text => slug = text} required)
     if collection.localized
       FormField(label="Locale" required)
-        Select(value={newLocale} options={(collection.locales ?? []).map(code => ({ value: code, label: code }))} onChange={code => newLocale = code})
+        Select(value={newLocale()} options={(collection.locales ?? []).map(code => ({ value: code, label: code }))} onChange={code => newLocale = code})
   EntryFields(drafts={drafts} entry={ref} collection={collection})

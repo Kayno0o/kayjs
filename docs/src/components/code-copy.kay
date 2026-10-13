@@ -33,4 +33,4 @@ onMount(() => document.addEventListener('click', onClick))
 
 onCleanup(() => document.removeEventListener('click', onClick))
 ---
-p.sr-only(aria-live="polite") {said}
+p.sr-only(aria-live="polite") {said()}

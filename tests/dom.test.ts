@@ -269,9 +269,9 @@ describe('kay without imports', () => {
 })
 
 describe('signals in the template', () => {
-  it('read by name, in text, conditions, loops and handlers, a bind still writing the signal', async () => {
+  it('read by calling them, in text, conditions, loops and handlers, a bind still writing the signal', async () => {
     const { root, dispose } = await mountKay({
-      'main.kay': '---\nconst items = signal([\'a\'])\nconst count = memo(() => items().length)\nconst draft = signal(\'b\')\n---\ninput(bind:value={draft})\nbutton(onClick={() => items.set([...items, draft])}) {count} items\nif count > 1\n  p.many many\nul\n  for item of items\n    li {item}\n',
+      'main.kay': '---\nconst items = signal([\'a\'])\nconst count = memo(() => items().length)\nconst draft = signal(\'b\')\n---\ninput(bind:value={draft})\nbutton(onClick={() => items.set([...items(), draft()])}) {count()} items\nif count() > 1\n  p.many many\nul\n  for item of items()\n    li {item}\n',
     })
     const texts = () => [...root.querySelectorAll('li')].map(item => item.textContent)
 
@@ -297,11 +297,11 @@ describe('signals in the template', () => {
 })
 
 describe('signal writes', () => {
-  it('assigns a signal by name, its own, a module\'s and one a prop holds, and reads them all by name', async () => {
+  it('assigns a signal by name, its own, a module\'s and one a prop holds, reads them all by calling them, and hands a component the signal itself', async () => {
     const { root, dispose } = await mountKay({
       'theme.ts': 'import { memo, signal } from \'kay\'\n\nexport const accent = signal(\'red\')\nexport const loud = memo(() => accent().toUpperCase())\n',
-      'toggle.kay': '---\nimport type { Signal } from \'kay\'\n\nconst { open } = props<{ open: Signal<boolean> }>()\n---\nbutton.toggle(onClick={() => open = !open}) {open ? \'open\' : \'closed\'}\n',
-      'main.kay': '---\nimport { accent, loud } from \'./theme\'\nimport Toggle from \'./toggle.kay\'\n\nconst count = signal(0)\nconst open = signal(false)\nconst openState = open\n\nfunction reset() {\n  count = 0\n}\n---\nbutton.more(onClick={() => count++}) {count}\nbutton.ten(onClick={() => count += 10}) ten\nbutton.reset(onClick={reset}) reset\nbutton.accent(onClick={() => accent = accent === \'red\' ? \'blue\' : \'red\'}) {accent} {loud}\nToggle(open={openState})\np.state {open ? \'yes\' : \'no\'}\n',
+      'toggle.kay': '---\nimport type { Signal } from \'kay\'\n\nconst { open } = props<{ open: Signal<boolean> }>()\n---\nbutton.toggle(onClick={() => open = !open()}) {open() ? \'open\' : \'closed\'}\n',
+      'main.kay': '---\nimport { accent, loud } from \'./theme\'\nimport Toggle from \'./toggle.kay\'\n\nconst count = signal(0)\nconst open = signal(false)\n\nfunction reset() {\n  count = 0\n}\n---\nbutton.more(onClick={() => count++}) {count()}\nbutton.ten(onClick={() => count += 10}) ten\nbutton.reset(onClick={reset}) reset\nbutton.accent(onClick={() => accent = accent() === \'red\' ? \'blue\' : \'red\'}) {accent()} {loud()}\nToggle(open={open})\np.state {open() ? \'yes\' : \'no\'}\n',
     })
     const text = (selector: string) => root.querySelector(selector)!.textContent
     const click = async (selector: string) => {

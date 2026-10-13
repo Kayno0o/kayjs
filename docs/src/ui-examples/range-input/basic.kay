@@ -10,7 +10,7 @@ const hours = signal<RangeValue>([2, null])
     min={0}
     max={24}
     unit="h"
-    value={hours}
+    value={hours()}
     onChange={hours.set}
   )
-  p.text-kui-subtext0 From {hours[0] ?? 'any'} to {hours[1] ?? 'any'}.
+  p.text-kui-subtext0 From {hours()[0] ?? 'any'} to {hours()[1] ?? 'any'}.

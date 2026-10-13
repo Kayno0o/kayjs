@@ -140,7 +140,7 @@ function severityOf(level: LintLevel): 'error' | 'warning' {
   return level === 'warn' ? 'warning' : 'error'
 }
 
-// A condition always true for a function, or a signal where its value goes: what reading by its name a signal kay does not see made gives.
+// A condition always true for a function, or a signal where its value goes: what a signal left uncalled gives.
 function unreadSignal(diagnostic: TsgoDiagnostic): boolean {
   return diagnostic.code === ALWAYS_DEFINED || diagnostic.message.includes('\'Signal<')
 }
@@ -153,9 +153,8 @@ function signalName(diagnostic: TsgoDiagnostic, source: string, offset: number):
   return diagnostic.code === MISSING_PROPERTY ? MEMBER_OF.exec(source.slice(0, offset))?.[1] : undefined
 }
 
-// A condition on any function is always true, a signal's or another's, so its help says so before naming signals.
 function signalHelp(diagnostic: TsgoDiagnostic, name: string | undefined): string {
   const call = name === undefined ? 'calling it' : `calling it, \`${name}()\``
 
-  return diagnostic.code === ALWAYS_DEFINED ? `a function is always true here, so its value is read by ${call}: a signal or memo reads by its name only where kay sees it made` : `a signal or memo reads by its name only where kay sees it made, in the script, as a module's \`export const\` or as a prop typed \`Signal<T>\`; any other is read by ${call}`
+  return diagnostic.code === ALWAYS_DEFINED ? `a function is always true here, so its value is read by ${call}` : `a signal or memo is read by ${call}; handed on uncalled, as a prop or an argument, it passes the signal itself`
 }

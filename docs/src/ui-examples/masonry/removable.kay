@@ -23,7 +23,7 @@ function remove(id: number) {
   notes.set(list => list.filter(note => note.id !== id))
 }
 ---
-Masonry(items={notes} key={note => note.id} minWidth={180} gap={12})
+Masonry(items={notes()} key={note => note.id} minWidth={180} gap={12})
   @tile(note)
     .rounded-lg.border.border-kui-overlay1.bg-kui-surface0.p-3
       h3.font-semibold {note.title}

@@ -7,7 +7,7 @@ const tabs = [
 ]
 const shown = signal('details')
 ---
-Tabs(tabs={tabs} value={shown} label="Product" onChange={shown.set})
+Tabs(tabs={tabs} value={shown()} label="Product" onChange={shown.set})
   @panel(tab)
     if tab === 'details'
       p A telescope with a 70 mm lens.

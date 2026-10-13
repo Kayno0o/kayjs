@@ -301,8 +301,8 @@ describe('islands', () => {
     expect(compileKay('---\nconst label = \'signal\'\n---\np {label}\n', 'test.kay').island).toBeUndefined()
   })
 
-  it('reads a signal by name through optional chaining, a shorthand property and await blocks', () => {
-    const code = tsx('---\nconst user = signal<{ name: string }>()\nconst count = memo(() => 1)\nconst later = Promise.resolve(2)\n---\np(title={JSON.stringify({ count })}) {user?.name}\nawait later\n  p {count}\nthen value\n  p {count + value}\n')
+  it('reads a signal by calling it through optional chaining, a property and await blocks', () => {
+    const code = tsx('---\nconst user = signal<{ name: string }>()\nconst count = memo(() => 1)\nconst later = Promise.resolve(2)\n---\np(title={JSON.stringify({ count: count() })}) {user()?.name}\nawait later\n  p {count()}\nthen value\n  p {count() + value}\n')
 
     // Type checking reads each through `__values`, which it narrows.
     expect(code).toContain('const __values = { user: user(), count: count() }')
@@ -706,19 +706,19 @@ describe('read-only diagnostics', () => {
 
 describe('signal writes', () => {
   it('assign a signal through .set, a compound one or ++ through an updater', () => {
-    const code = tsx('---\nconst count = signal(0)\nconst open = signal(false)\nfunction f() {\n  count=count() + 1\n  count *= 2\n  --count\n}\n---\nbutton(onClick={() => { count++; open = !open }}) {count}')
+    const code = tsx('---\nconst count = signal(0)\nconst open = signal(false)\nfunction f() {\n  count=count() + 1\n  count *= 2\n  --count\n}\n---\nbutton(onClick={() => { count++; open = !open() }}) {count()}')
 
     expect(code).toContain('count.set(count() + 1)\n  count.set((KayCurrent) => KayCurrent * (2))\n  count.set((KayCurrent) => KayCurrent - 1)')
     expect(code).toContain('count.set((KayCurrent) => KayCurrent + 1); open.set(!open())')
   })
 
-  it('read and write by name a prop typed Signal, inline or through a type of the script, and a signal a module exports', () => {
-    const typed = '---\nimport type { Signal as S } from \'kay\'\ninterface Props { open: S<boolean>, label: string }\nconst { open, label } = props<Props>()\n---\nbutton(onClick={() => open = false}) {open} {label}'
+  it('read by calling and write by name a prop typed Signal, inline or through a type of the script, and a signal a module exports', () => {
+    const typed = '---\nimport type { Signal as S } from \'kay\'\ninterface Props { open: S<boolean>, label: string }\nconst { open, label } = props<Props>()\n---\nbutton(onClick={() => open = false}) {open()} {label}'
 
     expect(jsx(typed)).toBe('<button onClick={() => __props.open.set(false)}>{(void __props.open, __values.open)} {__props.label}</button>')
     expect(tsx(typed)).toContain('const __values = { open: __props.open() }')
 
-    const imported = compileKay('---\nimport { accent as tone } from \'./theme\'\n---\nbutton(onClick={() => tone += \'!\'}) {tone}', 'test.kay', { importedSignals: { './theme': { accent: 'signal' } } })
+    const imported = compileKay('---\nimport { accent as tone } from \'./theme\'\n---\nbutton(onClick={() => tone += \'!\'}) {tone()}', 'test.kay', { importedSignals: { './theme': { accent: 'signal' } } })
 
     expect(imported.tsx).toContain('<button onClick={() => tone.set((KayCurrent) => KayCurrent + (\'!\'))}>{(void tone, __values.tone)}</button>')
   })

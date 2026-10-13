@@ -13,7 +13,7 @@ let count = signal(start)
 
 onCleanup(onGone)
 ---
-button(onClick={() => count++}) Clicked {count}
+button(onClick={() => count++}) Clicked {count()}
 `
 
 const ENTRY = `import { mount } from 'kay/mount'

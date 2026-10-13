@@ -7,7 +7,7 @@ const shown = memo(() => links.filter(link => link.title.toLowerCase().includes(
 ---
 input(type="search" aria-label={label} placeholder="Filter" bind:value={query})
 ul
-  for link of shown key={link.href}
+  for link of shown() key={link.href}
     li
       a(href={link.href} aria-current={link.href === current ? 'page' : undefined}) {link.title}
   else

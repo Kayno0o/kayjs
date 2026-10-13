@@ -5,8 +5,8 @@ const products = signal([{ id: 1, name: 'Tea', cents: 250, stock: 1 }, { id: 2, 
 const rate = signal(1)
 ---
 section.priced
-  for product of products
-    const price = (product.cents * rate / 100).toFixed(2)
+  for product of products()
+    const price = (product.cents * rate() / 100).toFixed(2)
     const { name, stock } = product
     li.product(class={{ low: stock < 3 }} title={price})
       | {name}: {price}

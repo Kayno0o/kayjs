@@ -23,7 +23,7 @@ const entries: PaletteEntry[] = [
 ---
 Button(label="Open the palette" onClick={() => open.set(true)})
 CommandPalette(
-  open={open}
+  open={open()}
   onOpenChange={open.set}
   entries={entries}
   recent={recent()}

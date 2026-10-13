@@ -204,8 +204,8 @@ async function scratchProject(files: Record<string, string>): Promise<string> {
 }
 
 describe('kay check, edge cases', () => {
-  it('types a signal the template reads by name as its value', async () => {
-    const root = await scratchProject({ 'src/routes/index.kay': '---\nimport { signal } from \'kay\'\n\nconst count = signal(0)\n---\nbutton(onClick={() => count.set(count + 1)}) {count.toFixed(1)} {count.nope}\n' })
+  it('types a signal the template reads by calling it as its value', async () => {
+    const root = await scratchProject({ 'src/routes/index.kay': '---\nimport { signal } from \'kay\'\n\nconst count = signal(0)\n---\nbutton(onClick={() => count.set(count() + 1)}) {count().toFixed(1)} {count().nope}\n' })
 
     try {
       expect((await check(root)).map(d => [d.line, d.code, d.message])).toEqual([[6, 'TS2339', 'Property \'nope\' does not exist on type \'number\'.']])
@@ -215,7 +215,7 @@ describe('kay check, edge cases', () => {
     }
   })
 
-  it('narrows a signal the template reads twice in one expression, by name or by call, but not in a function it writes, which runs later', async () => {
+  it('narrows a signal the template reads twice in one expression, but not in a function it writes, which runs later', async () => {
     const meter = [
       '---',
       'import type { Memo } from \'kay\'',
@@ -226,19 +226,19 @@ describe('kay check, edge cases', () => {
       'const doubled = memo(() => sent() === undefined ? undefined : sent()! * 2)',
       '---',
       'p {sent() === undefined ? \'x\' : sent() * 100}',
-      'p {sent === undefined ? \'x\' : sent * 100}',
-      'p {total() === undefined ? \'x\' : total * 2}',
-      'p {doubled !== undefined && doubled + 1}',
-      'button(onClick={() => sent.set(1)}) {sent * 2}',
-      'p {sent.toFixed(1)} {sent?.toFixed(1)}',
-      'button(onClick={() => { if (sent !== undefined) console.log(sent * 2) }}) Log',
-      'p {sent !== undefined && [1, 2].map(i => sent * i)}',
+      'p {sent() !== undefined && sent().toFixed(1)}',
+      'p {total() === undefined ? \'x\' : total() * 2}',
+      'p {doubled() !== undefined && doubled() + 1}',
+      'button(onClick={() => sent.set(1)}) {sent() * 2}',
+      'p {sent().toFixed(1)} {sent()?.toFixed(1)}',
+      'button(onClick={() => { if (sent() !== undefined) console.log(sent() * 2) }}) Log',
+      'p {sent() !== undefined && [1, 2].map(i => sent() * i)}',
       '',
     ].join('\n')
     const root = await scratchProject({ 'src/components/meter.kay': meter })
 
     try {
-      expect((await check(root)).map(d => [d.line, d.column, d.code, d.message])).toEqual([[13, 38, 'TS2532', 'Object is possibly \'undefined\'.'], [14, 4, 'TS2532', 'Object is possibly \'undefined\'.'], [15, 61, 'TS2532', 'Object is possibly \'undefined\'.'], [16, 42, 'TS2532', 'Object is possibly \'undefined\'.']])
+      expect((await check(root)).map(d => [d.line, d.column, d.code, d.message])).toEqual([[13, 38, 'TS2532', 'Object is possibly \'undefined\'.'], [14, 4, 'TS2532', 'Object is possibly \'undefined\'.'], [15, 63, 'TS2532', 'Object is possibly \'undefined\'.'], [16, 44, 'TS2532', 'Object is possibly \'undefined\'.']])
     }
     finally {
       await rm(root, { recursive: true, force: true })
@@ -346,10 +346,10 @@ describe('kay check, edge cases', () => {
     }
   })
 
-  it('reads by name a signal a module exports as `export const`, and writes it by assigning', async () => {
+  it('reads by calling it a signal a module exports as `export const`, and writes it by assigning', async () => {
     const root = await scratchProject({
       'src/accent.ts': 'import { memo, signal } from \'kay\'\n\nexport const accent = signal(\'red\')\nexport const loud = memo(() => accent().toUpperCase())\n',
-      'src/routes/index.kay': '---\nimport { accent, loud } from \'../accent\'\n---\np {accent}\nif accent === \'red\'\n  span on\np {accent.toUpperCase()} {loud.length}\nbutton(onClick={() => accent = \'blue\'}) blue\nbutton(onClick={() => accent += \'!\'}) more\n',
+      'src/routes/index.kay': '---\nimport { accent, loud } from \'../accent\'\n---\np {accent()}\nif accent() === \'red\'\n  span on\np {accent().toUpperCase()} {loud().length}\nbutton(onClick={() => accent = \'blue\'}) blue\nbutton(onClick={() => accent += \'!\'}) more\n',
     })
 
     try {
@@ -360,7 +360,7 @@ describe('kay check, edge cases', () => {
     }
   })
 
-  it('tells to call a signal it does not see made, read by name where its value goes, its text rendering as it is', async () => {
+  it('tells to call a signal it does not see made where its value goes', async () => {
     const root = await scratchProject({
       'src/accent.ts': 'import { signal } from \'kay\'\n\nconst made = signal(\'red\')\n\nexport { made as accent }\n',
       'src/routes/index.kay': '---\nimport { accent } from \'../accent\'\n---\np {accent}\nif accent\n  span on\np {accent.toUpperCase()}\n',
@@ -368,8 +368,8 @@ describe('kay check, edge cases', () => {
 
     try {
       expect((await check(root)).map(d => [d.line, d.code, d.help])).toEqual([
-        [5, 'TS2774', 'a function is always true here, so its value is read by calling it, `accent()`: a signal or memo reads by its name only where kay sees it made'],
-        [7, 'TS2339', 'a signal or memo reads by its name only where kay sees it made, in the script, as a module\'s `export const` or as a prop typed `Signal<T>`; any other is read by calling it, `accent()`'],
+        [5, 'TS2774', 'a function is always true here, so its value is read by calling it, `accent()`'],
+        [7, 'TS2339', 'a signal or memo is read by calling it, `accent()`; handed on uncalled, as a prop or an argument, it passes the signal itself'],
       ])
     }
     finally {
@@ -1507,7 +1507,7 @@ describe('kay check, unused code', () => {
   })
 
   it('warns of an island\'s for over objects with no id and no key, and of no other list', async () => {
-    const list = '---\nconst posts = signal([{ slug: \'a\', title: \'A\' }])\nconst todos = signal([{ id: 1, title: \'T\' }])\nconst tags = signal([\'x\'])\n---\nul\n  for post of posts\n    li {post.title}\n  // kay-allow identity-key\n  for post of posts\n    li {post.slug}\n  for todo of todos\n    li {todo.title}\n  for tag of tags\n    li {tag}\n  for post of posts key={post.slug}\n    li {post.title}\nbutton(onClick={() => { posts.set([]); todos.set([]); tags.set([]) }}) Clear\n'
+    const list = '---\nconst posts = signal([{ slug: \'a\', title: \'A\' }])\nconst todos = signal([{ id: 1, title: \'T\' }])\nconst tags = signal([\'x\'])\n---\nul\n  for post of posts()\n    li {post.title}\n  // kay-allow identity-key\n  for post of posts()\n    li {post.slug}\n  for todo of todos()\n    li {todo.title}\n  for tag of tags()\n    li {tag}\n  for post of posts() key={post.slug}\n    li {post.title}\nbutton(onClick={() => { posts.set([]); todos.set([]); tags.set([]) }}) Clear\n'
     const root = await scratchProject({
       'src/components/list.kay': list,
       // A page renders once, so its rows are never matched again.

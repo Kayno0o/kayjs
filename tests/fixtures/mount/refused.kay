@@ -12,7 +12,7 @@ async function save() {
 }
 ---
 button.save(onClick={save}) Save
-if tab === 'site'
+if tab() === 'site'
   input.name
 else
-  input.login(aria-invalid={refused ? 'true' : undefined})
+  input.login(aria-invalid={refused() ? 'true' : undefined})

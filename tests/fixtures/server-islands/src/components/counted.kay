@@ -3,4 +3,4 @@ import { queryParam } from 'kay'
 
 const n = queryParam<number | undefined>('n')
 ---
-p.counted {typeof n}:{n}
+p.counted {typeof n()}:{n()}

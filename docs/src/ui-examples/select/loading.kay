@@ -4,7 +4,7 @@ import Select from '@kaynooo/kayjs-ui/select.kay'
 const kind = signal('')
 ---
 Select(
-  value={kind}
+  value={kind()}
   options={[]}
   onChange={kind.set}
   loading

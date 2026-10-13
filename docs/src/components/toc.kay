@@ -31,4 +31,4 @@ nav.toc(aria-label="On this page")
   ul
     for section of sections key={section.id}
       li(class={{ sub: section.depth > 2 }})
-        a(href={`#${section.id}`} aria-current={section.id === current ? 'location' : undefined}) {section.text}
+        a(href={`#${section.id}`} aria-current={section.id === current() ? 'location' : undefined}) {section.text}

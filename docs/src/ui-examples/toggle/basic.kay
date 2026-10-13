@@ -4,6 +4,6 @@ import Toggle from '@kaynooo/kayjs-ui/toggle.kay'
 const published = signal(true)
 ---
 .flex.flex-col.items-start.gap-2
-  Toggle(label="Public" checked={published} onChange={published.set})
+  Toggle(label="Public" checked={published()} onChange={published.set})
   Toggle(label="Email me on replies")
-  p The post is {published ? 'public' : 'private'}.
+  p The post is {published() ? 'public' : 'private'}.

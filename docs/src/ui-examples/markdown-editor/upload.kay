@@ -11,7 +11,7 @@ const upload = async (file: File) => {
 ---
 .max-w-xl
   MarkdownEditor(
-    value={body}
+    value={body()}
     onInput={body.set}
     onImage={upload}
     name="body"

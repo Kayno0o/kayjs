@@ -38,7 +38,7 @@ const shown = memo(() => todos.filter(todo => todo.title.includes(filter())))
 section.todo-list
   input(type="search" bind:value={filter} placeholder="Filter")
   ul
-    for todo, i of shown
+    for todo, i of shown()
       TodoItem(
         todo={todo}
         index={i}
@@ -46,7 +46,7 @@ section.todo-list
       )
     else
       li.empty Nothing matches
-  if selected as todo
+  if selected() as todo
     p Selected #[strong {todo.title}]
 ```
 

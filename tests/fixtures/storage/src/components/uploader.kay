@@ -17,6 +17,6 @@ async function send() {
 }
 ---
 button.send(onClick={send}) Send
-p.key {key}
-p.seen {seen.join(' ')}
+p.key {key()}
+p.seen {seen().join(' ')}
 p.progress {upload.progress() ?? 'none'}

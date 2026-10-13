@@ -416,7 +416,7 @@ describe('kay lsp imports', () => {
   })
 
   it('warns of an island\'s for over objects with no id and no key, as kay check does', async () => {
-    const source = '---\nconst posts = signal([{ slug: \'a\' }])\n---\nfor post of posts\n  button(onClick={() => posts.set([])}) {post.slug}\n'
+    const source = '---\nconst posts = signal([{ slug: \'a\' }])\n---\nfor post of posts()\n  button(onClick={() => posts.set([])}) {post.slug}\n'
     const diagnostics = await editor.change(page, source, 10)
 
     expect(diagnostics.map(diagnostic => [diagnostic.range.start.line, diagnostic.severity, diagnostic.code])).toEqual([[3, 2, 'identity-key']])
@@ -427,7 +427,7 @@ describe('kay lsp imports', () => {
   it('tells to call a function read by name where its value goes, as kay check does', async () => {
     const diagnostics = await editor.change(page, '---\nconst open = () => true\n---\nif open\n  span on\n', 11)
 
-    expect(diagnostics.map(diagnostic => [diagnostic.range.start.line, diagnostic.code, diagnostic.message.split('\n').at(-1)])).toEqual([[3, 2774, 'help: a function is always true here, so its value is read by calling it, `open()`: a signal or memo reads by its name only where kay sees it made']])
+    expect(diagnostics.map(diagnostic => [diagnostic.range.start.line, diagnostic.code, diagnostic.message.split('\n').at(-1)])).toEqual([[3, 2774, 'help: a function is always true here, so its value is read by calling it, `open()`']])
   })
 
   it('reports nothing on the index of a positionally keyed for whose rows do not read it, and renames it with its key', async () => {

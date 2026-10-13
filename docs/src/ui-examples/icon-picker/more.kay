@@ -32,4 +32,4 @@ async function search(query: string, limit: number) {
 ---
 .flex.flex-col.items-start.gap-2
   IconPicker(search={search})
-  p.text-kui-subtext0 Searches made: {calls.join(', ') || 'none yet'}.
+  p.text-kui-subtext0 Searches made: {calls().join(', ') || 'none yet'}.

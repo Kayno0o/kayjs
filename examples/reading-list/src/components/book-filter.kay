@@ -13,7 +13,7 @@ const shown = memo(() => books.filter(book => (!unreadOnly() || !book.read) && `
     input(type="checkbox" bind:checked={unreadOnly})
     |  Unread only
 ul
-  for book of shown
+  for book of shown()
     li
       a(href={`/books/${book.id}`}) {book.title}
       |  by {book.author}

@@ -2,4 +2,4 @@
 const { start } = props<{ start: number }>()
 const count = signal(start)
 ---
-button.count(onClick={() => count.set(count + 1)}) Count {count}
+button.count(onClick={() => count.set(count() + 1)}) Count {count()}

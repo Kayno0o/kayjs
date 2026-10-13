@@ -10,10 +10,10 @@ const kind = signal('')
 ---
 .flex.max-w-sm.flex-col.gap-2
   Select(
-    value={kind}
+    value={kind()}
     options={KINDS}
     onChange={kind.set}
     emptyOption="Any kind"
     aria-label="Kind"
   )
-  p.text-kui-subtext0 Kind: {kind || 'any'}.
+  p.text-kui-subtext0 Kind: {kind() || 'any'}.

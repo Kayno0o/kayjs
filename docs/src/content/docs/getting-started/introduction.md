@@ -24,7 +24,7 @@ A component that reacts to the user is an island. This one has an `onClick` and 
 ---
 const count = signal(0)
 ---
-button(onClick={() => count.set(c => c + 1)}) Clicked {count} times
+button(onClick={() => count.set(c => c + 1)}) Clicked {count()} times
 ```
 
 Saved as `src/components/counter.kay`, a page uses it like any component. The page around it stays plain HTML.

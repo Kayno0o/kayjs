@@ -20,4 +20,4 @@ const describe = (rect: { x: number, y: number, w: number, h: number }) =>
     alt="A pink and blue gradient"
     onCrop={rect => crop.set(describe(rect))}
   )
-  p.text-kui-subtext0 Crop: {crop || 'not loaded yet'}.
+  p.text-kui-subtext0 Crop: {crop() || 'not loaded yet'}.

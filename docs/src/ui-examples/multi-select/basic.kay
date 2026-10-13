@@ -14,7 +14,7 @@ const picked = signal(['mars'])
   MultiSelect(
     label="Planets"
     options={planets}
-    value={picked}
+    value={picked()}
     onChange={picked.set}
   )
-  p.text-kui-subtext0 Picked: {picked.join(', ') || 'none'}.
+  p.text-kui-subtext0 Picked: {picked().join(', ') || 'none'}.

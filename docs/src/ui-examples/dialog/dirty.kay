@@ -15,12 +15,12 @@ function save() {
 ---
 Button(label="Publish" onClick={() => open.set(true)})
 Dialog(
-  open={open}
+  open={open()}
   title="Publish the post"
-  dirty={saving}
+  dirty={saving()}
   onClose={() => open.set(false)}
 )
   @footer
     Button(label="Cancel" onClick={() => open.set(false)})
-    Button(label="Publish" variant="accent" busy={saving} onClick={save})
+    Button(label="Publish" variant="accent" busy={saving()} onClick={save})
   p Publishing takes two seconds, and the dialog ignores Escape while it runs.

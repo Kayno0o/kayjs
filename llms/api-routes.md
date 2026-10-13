@@ -51,7 +51,7 @@ const text = signal('')
 p {messages.status()}
 p {messages.last()?.text}
 input(bind:value={text})
-button(onClick={() => messages.send({ text })}) Send
+button(onClick={() => messages.send({ text: text() })}) Send
 ```
 
 - `socket(module, path, options)` opens one of the module's websocket routes, the path written as the module writes it, `params` and `query` filling it in, all typed from the route. `send` takes the route's `body`, `last()` reads the last message reactively, typed from its `response`, `on(listener)` gets each one and returns what stops it, and `status()` is `connecting`, `open` or `closed`. Messages travel as Elysia sends them, as JSON. What is sent before the connection opens goes once it does. A connection that drops reconnects, waiting longer each time up to 30 seconds, unless the server closed it with code 1000; `close()` closes it for good. `onOpen(listener)` is called each time the connection opens, a reconnect included, before what was queued goes: a client joining rooms by message joins them there, `messages.onOpen(() => messages.send({ type: 'join', room }))`, so it is back in them after a drop.

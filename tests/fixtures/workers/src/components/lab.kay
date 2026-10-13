@@ -23,7 +23,7 @@ onMount(async () => {
   blobbed.set(String(await timesSeven(6)))
 })
 ---
-p.sum {sum}
-p.echo {echoed}
-p.thread {threaded}
-p.blob {blobbed}
+p.sum {sum()}
+p.echo {echoed()}
+p.thread {threaded()}
+p.blob {blobbed()}

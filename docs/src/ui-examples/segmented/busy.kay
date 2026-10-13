@@ -11,8 +11,8 @@ const view = signal('list')
 .flex.flex-col.items-start.gap-2
   Segmented(
     options={VIEWS}
-    value={view}
+    value={view()}
     label="View"
     onChange={async (next) => { await wait(800); view.set(next) }}
   )
-  p Saved view: {view}.
+  p Saved view: {view()}.

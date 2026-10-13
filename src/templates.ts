@@ -232,7 +232,7 @@ function starterFiles(setup: Setup): Record<string, string> {
 const { start } = props<{ start: number }>()
 const count = signal(start)
 ---
-button(onClick={() => count.set(count + 1)}) Clicked {count} times
+button(onClick={() => count++}) Clicked {count()} times
 `,
     'src/routes/_404.kay': lines('head', '  title Nothing here', `h1${setup.tw('.text-2xl.font-bold')} Nothing here`, 'a(href="/") Back home'),
   }
