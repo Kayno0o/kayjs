@@ -1612,8 +1612,9 @@
       @apply grid grid-cols-[fit-content(40%)_1fr] gap-x-4 px-3 py-2;
     }
 
+    /* Every value starts after its label, whatever its column aligns to in a wide table. */
     .kui-table-cell {
-      @apply col-span-full grid grid-cols-subgrid items-baseline px-0 py-1;
+      @apply col-span-full grid grid-cols-subgrid items-baseline px-0 py-1 text-left;
     }
 
     .kui-table-cell-label {

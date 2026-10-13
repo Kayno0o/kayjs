@@ -1,0 +1,12 @@
+---
+import Table from '@kaynooo/kayjs-ui/table.kay'
+import '../app.css'
+
+const planets = [{ id: 1, name: 'Mars', moons: 2 }, { id: 2, name: 'Earth', moons: 1 }]
+const columns = [{ key: 'name', header: 'Name' }, { key: 'moons', header: 'Moons', align: 'end' as const }]
+---
+main
+  .w-96#narrow
+    Table(columns={columns} rows={planets} rowKey="id")
+  .w-240#wide
+    Table(columns={columns} rows={planets} rowKey="id")

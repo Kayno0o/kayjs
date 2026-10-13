@@ -25,10 +25,10 @@
   color: var(--color-kui-error);
 }
 
+/* Inline, so its cell places it: at the end of a wide table's column, after its label in a stacked card. */
 .kcms-row-actions {
-  display: flex;
+  display: inline-flex;
   flex-wrap: wrap;
-  justify-content: end;
   align-items: center;
   gap: 0.5rem;
 }
