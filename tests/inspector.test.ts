@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
 import { compileKay } from '../src/compiler'
 import { startInspector } from '../src/runtime/dev-inspector'
+import { startDevTool } from '../src/runtime/dev-tool'
 import { pages } from '../src/server'
 
 const SOURCE = `---
@@ -57,11 +58,20 @@ describe('the inspector', () => {
     globalThis.fetch = realFetch
   })
 
-  const host = () => document.querySelector('[data-kay-inspector]')!.shadowRoot!
+  const host = () => document.querySelector('kay-dev')!.shadowRoot!
+  const start = () => {
+    const tool = startDevTool()
+    const inspector = startInspector(tool)
+
+    return { ...inspector, stop: () => {
+      inspector.stop()
+      tool.stop()
+    } }
+  }
 
   it('opens the line an element came from on Alt+click, and only then, keeping the click from the page', async () => {
     document.body.innerHTML = '<a href="/away" data-kay-src="src/routes/index.kay:4:3"><span>Away</span></a>'
-    const inspector = startInspector()
+    const inspector = start()
     const span = document.querySelector('span')!
     let reached = 0
 
@@ -99,12 +109,12 @@ describe('the inspector', () => {
       answer = true
       inspector.stop()
     }
-    expect(document.querySelector('[data-kay-inspector]')).toBeNull()
+    expect(document.querySelector('kay-dev')).toBeNull()
   })
 
   it('outlines the element under a resting pointer as soon as Alt is pressed, and stops on its release', () => {
     document.body.innerHTML = '<main data-kay-src="src/routes/index.kay:1:1"><p data-kay-src="src/routes/index.kay:2:3"><em>Hi</em></p></main>'
-    const inspector = startInspector()
+    const inspector = start()
     const em = document.querySelector('em')!
     const points: number[][] = []
     const realFromPoint = document.elementFromPoint.bind(document)
@@ -116,21 +126,21 @@ describe('the inspector', () => {
     }
 
     try {
-      const label = () => [...host().querySelectorAll('div')].find(element => element.textContent.includes('.kay'))
+      const label = () => host().querySelector<HTMLElement>('.label')!
 
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Alt', bubbles: true }))
-      expect(label()).toBeUndefined()
+      expect(label().hidden).toBe(true)
 
       em.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: 40, clientY: 12 }))
-      expect(label()).toBeUndefined()
+      expect(label().hidden).toBe(true)
 
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Alt', bubbles: true }))
       expect(points).toEqual([[40, 12]])
-      expect(label()?.hidden).toBe(false)
-      expect(label()?.textContent).toBe('p  src/routes/index.kay:2:3')
+      expect(label().hidden).toBe(false)
+      expect(label().textContent).toBe('p  src/routes/index.kay:2:3')
 
       document.dispatchEvent(new KeyboardEvent('keyup', { key: 'Alt', bubbles: true }))
-      expect(label()?.hidden).toBe(true)
+      expect(label().hidden).toBe(true)
     }
     finally {
       document.elementFromPoint = realFromPoint
@@ -138,28 +148,30 @@ describe('the inspector', () => {
     }
   })
 
-  it('lists the islands with the values their signals hold now, behind a button showing only when there are some', async () => {
+  it('lists the islands with the values their signals hold now in their tab, polling only while it shows, the bar counting them after each page swap', async () => {
     document.body.innerHTML = '<p>static</p>'
     const values = new Map<Element, unknown[]>()
 
     ;(globalThis as { $kaySignals?: (element: HTMLElement) => unknown[] | undefined }).$kaySignals = element => values.get(element)
-    const inspector = startInspector()
+    const inspector = start()
 
     try {
-      const toggle = host().querySelector('button')!
+      const badge = () => [...host().querySelectorAll<HTMLButtonElement>('.bar > button')].find(button => button.textContent.endsWith('islands'))
 
-      expect(toggle.hidden).toBe(true)
+      expect(badge()?.hidden).toBe(true)
 
+      document.documentElement.setAttribute('aria-busy', 'true')
       document.body.innerHTML = '<slot data-component="src/islands/counter.kay"><button>1</button></slot><slot data-component="src/islands/late.kay"></slot>'
+      document.documentElement.removeAttribute('aria-busy')
       values.set(document.querySelector('slot')!, [1, { open: true }])
-      await Bun.sleep(600)
-      expect(toggle.hidden).toBe(false)
-      expect(toggle.textContent).toBe('2 islands')
+      await Bun.sleep(0)
+      expect(badge()?.hidden).toBe(false)
+      expect(badge()?.textContent).toBe('2 islands')
 
-      toggle.click()
-      expect(toggle.getAttribute('aria-expanded')).toBe('true')
+      badge()!.click()
+      await Bun.sleep(0)
 
-      const panel = host().querySelector('#kay-islands')!
+      const panel = host().querySelector('#kay-dev-islands')!
 
       expect(panel.textContent).toBe('src/islands/counter.kay#1 1#2 {"open":true}src/islands/late.kaynot hydrated')
 
@@ -176,6 +188,44 @@ describe('the inspector', () => {
       opened.length = 0
       panel.querySelector('button')!.click()
       expect(opened).toEqual(['src/islands/counter.kay:1:1'])
+
+      // Closed, the values stop being read.
+      badge()!.click()
+      await Bun.sleep(0)
+      values.set(document.querySelector('slot')!, [3, { open: false }])
+      await Bun.sleep(600)
+      expect(panel.textContent).toContain('#1 2#2')
+    }
+    finally {
+      inspector.stop()
+    }
+  })
+
+  it('opens the line of the element clicked once Inspect is on, the click kept from the page, then turns itself off', async () => {
+    document.body.innerHTML = '<a href="/away" data-kay-src="src/routes/index.kay:4:3"><span>Away</span></a><p>plain</p>'
+    const inspector = start()
+    const inspect = [...host().querySelectorAll<HTMLButtonElement>('.bar > button')].find(button => button.textContent === 'Inspect')!
+
+    try {
+      opened.length = 0
+      inspect.click()
+      expect(inspect.getAttribute('aria-pressed')).toBe('true')
+
+      const click = new MouseEvent('click', { bubbles: true, cancelable: true })
+
+      document.querySelector('span')!.dispatchEvent(click)
+      expect(click.defaultPrevented).toBe(true)
+      expect(opened).toEqual(['src/routes/index.kay:4:3'])
+      expect(inspect.getAttribute('aria-pressed')).toBe('false')
+
+      // Escape turns it off as well, and a click on an element of no .kay line opens nothing.
+      inspect.click()
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+      expect(inspect.getAttribute('aria-pressed')).toBe('false')
+      inspect.click()
+      document.querySelector('p')!.click()
+      expect(opened).toEqual(['src/routes/index.kay:4:3'])
+      expect(inspect.getAttribute('aria-pressed')).toBe('false')
     }
     finally {
       inspector.stop()

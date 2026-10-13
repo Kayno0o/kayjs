@@ -53,7 +53,7 @@ export interface ClientOptions {
   inspect?: boolean | undefined
   // The config declares `publicEnv`: the entry imports its values from the server before any island hydrates.
   publicEnv?: boolean | undefined
-  // The level of each lint the problems panel shows in development.
+  // The level of each lint the dev tool shows in development.
   lints?: LintLevels | undefined
   // `kay build --static`: no server takes the errors the browser meets, so none are sent.
   exported?: boolean | undefined

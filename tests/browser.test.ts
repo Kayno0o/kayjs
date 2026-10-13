@@ -231,7 +231,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay/test i
 
 // The problems the panel lists, but the accessibility check's.
 async function logged(shown: TestPage): Promise<string[]> {
-  return shown.evaluate(() => [...document.querySelector('kay-problems')?.shadowRoot!.querySelectorAll('pre') ?? []].map(pre => pre.textContent).filter(problem => !problem.startsWith('a11y ')))
+  return shown.evaluate(() => [...document.querySelector('kay-dev')?.shadowRoot!.querySelectorAll('pre.problem') ?? []].map(pre => pre.textContent).filter(problem => !problem.startsWith('a11y ')))
 }
 
 describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('history after a reload', () => {
@@ -323,7 +323,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay dev in
       const shown = await dev.open('/mismatch', { strict: false })
 
       // The accessibility check lists its own problems once the page settles.
-      await shown.waitUntil(() => [...document.querySelector('kay-problems')?.shadowRoot!.querySelectorAll('pre') ?? []].some(pre => pre.textContent.startsWith('a11y ')))
+      await shown.waitUntil(() => [...document.querySelector('kay-dev')?.shadowRoot!.querySelectorAll('pre.problem') ?? []].some(pre => pre.textContent.startsWith('a11y ')))
 
       expect(await logged(shown)).toEqual([expect.stringMatching(/^island tests\/fixtures\/navigation\/src\/components\/mismatch\.kay did not match its server markup, rendering it again: /)])
       expect(shown.errors).toHaveLength(1)
@@ -334,18 +334,20 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay dev in
         console.warn('[kay] the persisted signal note could not be kept')
         console.error('not kay')
       })
-      await shown.waitUntil(() => document.querySelector('kay-problems')!.shadowRoot!.textContent.includes('the persisted signal'))
+      await shown.waitUntil(() => document.querySelector('kay-dev')!.shadowRoot!.textContent.includes('the persisted signal'))
 
       expect((await logged(shown)).map(problem => problem.slice(0, 20))).toEqual(['island tests/fixture', 'the persisted signal'])
 
-      await shown.evaluate(() => document.querySelector('kay-problems')!.shadowRoot!.querySelector('button')!.click())
+      // Dismissed, they stay so for the browser tab, a new one showing.
+      await shown.evaluate(() => document.querySelector('kay-dev')!.shadowRoot!.querySelector<HTMLButtonElement>('.actions button')!.click())
 
-      expect(await shown.count('kay-problems')).toBe(0)
+      expect(await shown.evaluate(() => document.querySelector('kay-dev')!.shadowRoot!.querySelectorAll('pre.problem').length)).toBe(0)
 
       await shown.evaluate(() => console.error('[kay] no locale has the message "late"'))
-      await shown.waitFor('kay-problems')
+      await shown.waitUntil(() => document.querySelector('kay-dev')!.shadowRoot!.querySelector('pre.problem') !== null)
 
-      expect(await shown.evaluate(() => document.querySelector('kay-problems')!.shadowRoot!.textContent)).toBe('1 kay problemDismissno locale has the message "late"')
+      expect(await shown.evaluate(() => [...document.querySelector('kay-dev')!.shadowRoot!.querySelectorAll('pre.problem')].map(problem => problem.textContent))).toEqual(['no locale has the message "late"'])
+      expect(await shown.evaluate(() => [...document.querySelector('kay-dev')!.shadowRoot!.querySelectorAll('.bar > button:not([hidden])')].map(button => button.textContent))).toEqual(['kay', '1 problem'])
 
       await shown.click('a.home')
       await shown.waitFor('h1', { text: 'Home' })
@@ -368,11 +370,11 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay dev ch
       // At once, as the dev server's own check starts: the two take turns.
       expect((await shown.a11y()).map(violation => violation.id)).toContain('color-contrast')
 
-      await shown.waitUntil(() => document.querySelector('kay-problems')?.shadowRoot!.textContent.includes('a11y color-contrast'))
+      await shown.waitUntil(() => document.querySelector('kay-dev')?.shadowRoot!.textContent.includes('a11y color-contrast'))
 
-      expect(await shown.evaluate(() => [...document.querySelector('kay-problems')!.shadowRoot!.querySelectorAll('pre')].map(pre => pre.textContent))).toContain('a11y color-contrast: Elements must meet minimum color contrast ratio thresholds\n  .faint\nhttps://dequeuniversity.com/rules/axe/4.14/color-contrast?application=axeAPI')
-      // The panel is kay's, no part of the page a test checks.
-      expect((await shown.a11y()).flatMap(violation => violation.nodes.map(node => node.target))).not.toContainEqual(expect.stringContaining('kay-problems'))
+      expect(await shown.evaluate(() => [...document.querySelector('kay-dev')!.shadowRoot!.querySelectorAll('pre.problem')].map(pre => pre.textContent))).toContain('a11y color-contrast: Elements must meet minimum color contrast ratio thresholds\n  .faint\nhttps://dequeuniversity.com/rules/axe/4.14/color-contrast?application=axeAPI')
+      // The dev tool is kay's, no part of the page a test checks.
+      expect((await shown.a11y()).flatMap(violation => violation.nodes.map(node => node.target))).not.toContainEqual(expect.stringContaining('kay-dev'))
       expect(shown.errors).toEqual([])
     }
     finally {

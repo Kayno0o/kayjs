@@ -1611,10 +1611,10 @@ describe('special pages', () => {
 
       const page = await dev.handle(new Request('http://localhost/'))
       const timing = page.headers.get('server-timing')
-      const script = (/<script>([^<]*kay-problems[^<]*)<\/script>/).exec(await page.text())![1]!
+      const script = (/<script>([^<]*\$kayProblems[^<]*)<\/script>/).exec(await page.text())![1]!
 
       expect(inlineScriptHashes({ dev: true })).toContain(`'sha256-${new Bun.CryptoHasher('sha256').update(script).digest('base64')}'`)
-      expect((await get('/')).html).not.toContain('kay-problems')
+      expect((await get('/')).html).not.toContain('$kayProblems')
 
       expect(timing).toMatch(/^load-0;desc="tests\/fixtures\/site\/src\/routes\/_layout\.kay";dur=\d+\.\d, load-1;desc="tests\/fixtures\/site\/src\/routes\/index\.kay";dur=\d+\.\d, render;dur=\d+\.\d$/)
       expect((await get('/')).headers.get('server-timing')).toBeNull()

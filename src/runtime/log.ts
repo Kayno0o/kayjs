@@ -10,7 +10,7 @@ export type Log = Record<LogLevel, (message: string, error?: unknown) => void>
 const SINK = Symbol.for('kay.log')
 const CONSOLE = { info: 'log', warn: 'warn', error: 'error' } as const
 
-// Logs one of kay's own messages: through the server's logger, else to the console as `[kay] ...`, which the dev problem panel picks up in the browser.
+// Logs one of kay's own messages: through the server's logger, else to the console as `[kay] ...`, which the dev tool picks up in the browser.
 export function kayLog(level: LogLevel, message: string, error?: unknown): void {
   write(level, message, error, 'kay')
 }

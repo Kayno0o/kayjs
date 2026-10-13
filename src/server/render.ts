@@ -35,7 +35,7 @@ import { rebaseHtml } from './base'
 import { importModule } from './bundle'
 import { preferredEncoding, wholeResponse } from './compress'
 import { cookieJar } from './cookies'
-import { A11Y_SCRIPT, DEV_PROBLEMS, inspectorScript, LIVE_RELOAD, problemsBlock } from './dev'
+import { A11Y_SCRIPT, DEV_BOOT, devToolScripts, LIVE_RELOAD, problemsBlock } from './dev'
 import { FLASH_COOKIE, handedOverFlash, readFlash } from './flash'
 import { formsScript } from './forms'
 import { runGuards } from './guards'
@@ -673,7 +673,7 @@ function kayMetas(options: RenderOptions, hasIslands: boolean): string {
 }
 
 function devScripts(client: ClientBuild): string {
-  return problemsBlock(client.problems) + LIVE_RELOAD + DEV_PROBLEMS + A11Y_SCRIPT + inspectorScript()
+  return problemsBlock(client.problems) + LIVE_RELOAD + DEV_BOOT + devToolScripts() + A11Y_SCRIPT
 }
 
 // The post the page answers, for its islands to render what the server did as they hydrate, then read through the action.

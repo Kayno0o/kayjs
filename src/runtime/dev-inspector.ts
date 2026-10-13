@@ -1,5 +1,7 @@
-// Loaded by every page `kay dev` serves: holding Alt outlines the element under the pointer with the `.kay` line that wrote it, Alt+click opens that line in the editor, and a button lists the page's islands with the values their signals hold.
-// It runs in the browser from its own route, so it imports nothing; its elements live in a shadow root outside the body, which a page swap replaces.
+// Loaded by every page `kay dev` serves, into the dev tool: holding Alt, or turning on Inspect, outlines the element under the pointer with the `.kay` line that wrote it, and a click opens that line in the editor; the Islands tab lists the page's islands with the values their signals hold.
+// It runs in the browser from its own route, so it imports types only.
+import type { DevTool } from './dev-tool'
+
 const SOURCE = 'data-kay-src'
 // markers.ts's ISLAND, copied as this file imports nothing.
 const ISLAND = 'slot[data-component]'
@@ -9,7 +11,6 @@ const OPEN_HEADER = 'x-kay-dev'
 const REFRESH_MS = 500
 const MAX_VALUE = 120
 const MESSAGE_MS = 4000
-const FONT = 'font:12px/1.5 ui-monospace,monospace'
 
 // Set by the hot swap in development: the values an island's signals hold now, in the order its script creates them.
 interface InspectedWindow {
@@ -32,38 +33,27 @@ export interface Inspector {
   stop: () => void
 }
 
-export function startInspector(doc: Document = document): Inspector {
+export function startInspector(tool: DevTool, doc: Document = document): Inspector {
   const win = doc.defaultView! as Window & InspectedWindow
-  const make = <K extends keyof HTMLElementTagNameMap>(tag: K, css: string): HTMLElementTagNameMap[K] => {
-    const element = doc.createElement(tag)
-
-    element.style.cssText = css
-
-    return element
-  }
-  const host = make('div', 'all:initial')
-  const root = host.attachShadow({ mode: 'open' })
-  const outline = make('div', 'position:fixed;z-index:2147483646;pointer-events:none;box-sizing:border-box;border:2px solid #7c3aed;background:rgba(124,58,237,.08);border-radius:2px')
-  const label = make('div', `position:fixed;z-index:2147483647;pointer-events:none;padding:2px 6px;background:#7c3aed;color:#fff;border-radius:3px;white-space:nowrap;${FONT}`)
-  const toggle = make('button', `position:fixed;left:.75rem;bottom:.75rem;z-index:2147483647;padding:.25rem .6rem;border:1px solid #7c3aed;border-radius:999px;background:#fff;color:#4c1d95;cursor:pointer;${FONT}`)
-  const panel = make('div', `position:fixed;left:.75rem;bottom:2.75rem;z-index:2147483647;width:min(28rem,calc(100vw - 1.5rem));max-height:50vh;overflow:auto;padding:.5rem;border:1px solid #ddd;border-radius:6px;background:#fff;color:#1a1a1a;box-shadow:0 4px 16px rgba(0,0,0,.15);${FONT}`)
-  let expanded = false
+  const host = tool.root.host
+  const outline = tool.make('div', 'outline')
+  const label = tool.make('div', 'label mono')
+  const inspect = tool.button('Inspect', 'Inspect an element: click it to open its line')
+  const islandsTab = tool.tab({ id: 'islands', label: 'Islands', summary: count => `${count} island${count === 1 ? '' : 's'}`, shown: () => watch(true), hidden: () => watch(false) })
+  const panel = islandsTab.panel
+  let inspecting = false
   // What the panel shows: rebuilt only when it changed, so a click, a selection or the focus inside it survives the refresh.
   let shown: { islands: HTMLElement[], text: string } | undefined
   let message: ReturnType<typeof setTimeout> | undefined
+  let refresh: ReturnType<typeof setInterval> | undefined
   // Where the pointer last was, so pressing Alt outlines what it rests on without waiting for it to move.
   let pointer: { x: number, y: number } | undefined
 
-  host.setAttribute('data-kay-inspector', '')
   outline.hidden = true
   label.hidden = true
-  panel.hidden = true
-  panel.id = 'kay-islands'
-  toggle.type = 'button'
-  toggle.setAttribute('aria-controls', panel.id)
-  toggle.setAttribute('aria-expanded', 'false')
-  root.append(outline, label, panel, toggle)
-  doc.documentElement.append(host)
+  inspect.setAttribute('aria-pressed', 'false')
+  panel.classList.add('mono')
+  tool.root.append(outline, label)
 
   const show = (target: Element, text: string) => {
     const box = boundsOf(target)
@@ -129,11 +119,25 @@ export function startInspector(doc: Document = document): Inspector {
     else if (message === undefined)
       hide()
   }
+  const setInspecting = (on: boolean) => {
+    inspecting = on
+    inspect.setAttribute('aria-pressed', String(on))
+    doc.documentElement.style.cursor = on ? 'crosshair' : ''
+
+    if (!on && message === undefined)
+      hide()
+  }
   const onMove = (event: PointerEvent) => {
     pointer = { x: event.clientX, y: event.clientY }
-    outlined(event.altKey ? sourceOf(event) : undefined)
+    outlined(event.altKey || inspecting ? sourceOf(event) : undefined)
   }
   const onKeyDown = (event: KeyboardEvent) => {
+    if (event.key === 'Escape' && inspecting) {
+      setInspecting(false)
+
+      return
+    }
+
     if (event.key !== 'Alt' || event.repeat || !pointer)
       return
 
@@ -142,7 +146,17 @@ export function startInspector(doc: Document = document): Inspector {
     outlined(under === host ? undefined : under?.closest(`[${SOURCE}]`) ?? undefined)
   }
   const onClick = (event: MouseEvent) => {
-    const target = event.altKey ? sourceOf(event) : undefined
+    if (event.composedPath().includes(host))
+      return
+
+    const target = event.altKey || inspecting ? sourceOf(event) : undefined
+
+    // A click while inspecting is the inspector's, whatever it lands on.
+    if (inspecting) {
+      event.preventDefault()
+      event.stopImmediatePropagation()
+      setInspecting(false)
+    }
 
     if (!target)
       return
@@ -154,24 +168,17 @@ export function startInspector(doc: Document = document): Inspector {
     void openFrom(target, target.getAttribute(SOURCE)!)
   }
   const onKeyUp = (event: KeyboardEvent) => {
-    if (event.key === 'Alt')
+    if (event.key === 'Alt' && !inspecting)
       hide()
   }
+
   const islands = () => [...doc.querySelectorAll<HTMLElement>(ISLAND)]
-  const note = (text: string) => {
-    const element = make('div', 'color:#666')
-
-    element.textContent = text
-
-    return element
-  }
   const render = () => {
     const found = islands()
 
-    toggle.hidden = found.length === 0
-    toggle.textContent = `${found.length} island${found.length === 1 ? '' : 's'}`
+    islandsTab.count(found.length)
 
-    if (!expanded)
+    if (panel.hidden !== false)
       return
 
     const rows = found.map(island => ({ island, component: island.dataset.component ?? '?', values: win.$kaySignals?.(island)?.map(formatted) }))
@@ -182,43 +189,56 @@ export function startInspector(doc: Document = document): Inspector {
 
     shown = { islands: found, text }
     hide()
+
+    if (rows.length === 0) {
+      panel.replaceChildren(tool.make('div', 'empty', 'No islands on this page.'))
+
+      return
+    }
+
     panel.replaceChildren(...rows.map(({ island, component, values }) => {
-      const row = make('div', 'padding:.25rem .25rem .5rem;border-bottom:1px solid #eee')
-      const name = make('button', `padding:0;border:0;background:none;color:#4c1d95;cursor:pointer;text-decoration:underline;${FONT}`)
+      const row = tool.make('div', 'row')
+      const name = tool.make('button', 'link', component)
 
       name.type = 'button'
-      name.textContent = component
       name.onclick = () => void openFrom(island, `${component}:1:1`)
       row.append(name)
       row.onpointerenter = () => show(island, component)
       row.onpointerleave = hide
 
       if (values === undefined)
-        row.append(note('not hydrated'))
+        row.append(tool.make('div', 'note', 'not hydrated'))
 
-      for (const [index, value] of (values ?? []).entries()) {
-        const line = make('div', 'white-space:pre-wrap;word-break:break-all')
-
-        line.textContent = `#${index + 1} ${value}`
-        row.append(line)
-      }
+      for (const [index, value] of (values ?? []).entries())
+        row.append(tool.make('div', 'value', `#${index + 1} ${value}`))
 
       if (values?.length === 0)
-        row.append(note('no signals'))
+        row.append(tool.make('div', 'note', 'no signals'))
 
       return row
     }))
   }
 
-  toggle.onclick = () => {
-    expanded = !expanded
+  // Polls the islands' values only while their tab shows; the count follows each page swap otherwise.
+  function watch(on: boolean) {
+    clearInterval(refresh)
+    refresh = undefined
     shown = undefined
-    panel.hidden = !expanded
-    toggle.setAttribute('aria-expanded', String(expanded))
-    render()
+
+    if (on) {
+      refresh = setInterval(render, REFRESH_MS)
+      render()
+    }
   }
+
+  const swaps = new MutationObserver(() => {
+    if (!doc.documentElement.hasAttribute('aria-busy'))
+      render()
+  })
+
+  inspect.onclick = () => setInspecting(!inspecting)
+  swaps.observe(doc.documentElement, { attributeFilter: ['aria-busy'] })
   render()
-  const refresh = setInterval(render, REFRESH_MS)
 
   win.addEventListener('pointermove', onMove, true)
   win.addEventListener('click', onClick, true)
@@ -229,14 +249,18 @@ export function startInspector(doc: Document = document): Inspector {
   return {
     open,
     stop: () => {
-      clearInterval(refresh)
+      watch(false)
       clearTimeout(message)
+      swaps.disconnect()
+      setInspecting(false)
       win.removeEventListener('pointermove', onMove, true)
       win.removeEventListener('click', onClick, true)
       win.removeEventListener('keydown', onKeyDown, true)
       win.removeEventListener('keyup', onKeyUp, true)
       win.removeEventListener('blur', hide)
-      host.remove()
+      outline.remove()
+      label.remove()
+      inspect.remove()
     },
   }
 }

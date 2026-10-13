@@ -26,7 +26,7 @@ export interface ClientManifest {
   chunkInputs?: Record<string, string[]>
   // The sources the islands need beyond kay's policy, by directive: compiling wasm, starting a worker from a blob.
   directives?: Record<string, string[]>
-  // Development: what `kay check` would report of the project's components without type checking, for the problems panel.
+  // Development: what `kay check` would report of the project's components without type checking, for the dev tool.
   problems?: string[]
   // The build `kay dev` keeps: the options it was made with, as `clientOptionsKey` writes them, so a server given others builds its own.
   options?: string

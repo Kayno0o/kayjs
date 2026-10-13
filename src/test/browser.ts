@@ -340,8 +340,8 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
         while (axe._running)
           await new Promise(resolve => setTimeout(resolve, 25))
 
-        // Leaving out the problem panel and the inspector of a dev server.
-        const { violations } = await axe.run({ include: context === undefined ? document : [[context]], exclude: [['kay-problems'], ['[data-kay-inspector]']] }, { resultTypes: ['violations'] })
+        // Leaving out a dev server's dev tool.
+        const { violations } = await axe.run({ include: context === undefined ? document : [[context]], exclude: [['kay-dev']] }, { resultTypes: ['violations'] })
 
         return violations.map(({ id, impact, help, helpUrl, nodes }) => ({ id, impact, help, helpUrl, nodes: nodes.map(node => ({ target: node.target.map(part => Array.isArray(part) ? part.join(' >>> ') : part).join(' '), html: node.html })) }))
       }, [selector]))

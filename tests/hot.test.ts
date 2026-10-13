@@ -238,7 +238,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('kay dev in 
 
     try {
       const [outlined, heading] = await page.evaluate(() => {
-        const outline = document.querySelector('[data-kay-inspector]')!.shadowRoot!.firstElementChild!
+        const outline = document.querySelector('kay-dev')!.shadowRoot!.querySelector('.outline')!
 
         return [outline, document.querySelector('h1')!].map(element => JSON.stringify(element.getBoundingClientRect()))
       })
@@ -255,10 +255,10 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('kay dev in 
     await until(() => existsSync(join(root, '.opened')))
     expect(JSON.parse(await Bun.file(join(root, '.opened')).text())).toEqual(['-g', `${join(root, 'src/routes/index.kay')}:8:1`])
 
-    await page.click('button[aria-controls="kay-islands"]')
-    await page.locator('#kay-islands', { hasText: 'src/components/extra.kay#1 true' }).waitFor()
+    await page.locator('kay-dev .bar > button', { hasText: /islands?$/ }).click()
+    await page.locator('#kay-dev-islands', { hasText: 'src/components/extra.kay#1 true' }).waitFor()
     await page.click('button.extra')
-    await page.locator('#kay-islands', { hasText: 'src/components/extra.kay#1 false' }).waitFor()
-    expect(await page.textContent('#kay-islands')).toContain('src/components/counter.kay#1 0#2 ""')
+    await page.locator('#kay-dev-islands', { hasText: 'src/components/extra.kay#1 false' }).waitFor()
+    expect(await page.textContent('#kay-dev-islands')).toContain('src/components/counter.kay#1 0#2 ""')
   }, 60_000)
 })

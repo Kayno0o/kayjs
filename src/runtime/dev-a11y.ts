@@ -1,8 +1,8 @@
-// Loaded by every page the dev server serves: once the page settles, axe-core checks what it rendered, each violation showing in the problem panel as a `[kay] a11y ...` warning; a page swap has the new page checked.
+// Loaded by every page the dev server serves: once the page settles, axe-core checks what it rendered, each violation showing in the dev tool's problems as a `[kay] a11y ...` warning; a page swap has the new page checked.
 // It runs in the browser from its own route, so it imports nothing; axe-core loads from another route, on the first check only.
 const AXE_URL = '/_kay/dev/axe.js'
-// The panel and the inspector kay dev adds, which are no part of the page.
-const KAY_DEV = ['kay-problems', '[data-kay-inspector]']
+// The dev tool kay dev adds, no part of the page.
+const KAY_DEV = ['kay-dev']
 const MAX_ELEMENTS = 5
 const WAIT_MS = 25
 

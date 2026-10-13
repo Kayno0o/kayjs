@@ -26,7 +26,7 @@ import { DEFAULT_BODY_LIMIT, limitBodies } from './body'
 import { serveBuildFiles } from './build-files'
 import { serveCards } from './card'
 import { compressResponse, fixedTexts } from './compress'
-import { DEV_A11Y, DEV_AXE, DEV_EVENTS, DEV_INSPECTOR, DEV_OPEN, DEV_PATCH, devA11y, devAxe, devEvents, devInspector, devPatch, hotSwap, openInEditor } from './dev'
+import { DEV_A11Y, DEV_AXE, DEV_EVENTS, DEV_INSPECTOR, DEV_OPEN, DEV_PATCH, DEV_TOOL, devA11y, devAxe, devEvents, devInspector, devPatch, devTool, hotSwap, openInEditor } from './dev'
 import { claimEndpoints, serveEndpoints } from './endpoints'
 import { entryUrls } from './entry-urls'
 import { servePublicEnv } from './env'
@@ -110,6 +110,7 @@ function serveDevRoutes(app: App, root: string, client: ClientBuild, mode: Mode)
 
   app.get(DEV_EVENTS, () => devEvents(false, hot))
   app.get(DEV_PATCH, () => devPatch())
+  app.get(DEV_TOOL, () => devTool())
   app.get(DEV_A11Y, () => devA11y())
   app.get(DEV_AXE, () => devAxe())
 

@@ -114,7 +114,7 @@ form-action 'self';
 frame-ancestors 'self'
 ```
 
-Every inline script kay writes is the same on every page: the hydration bootstrap, the speculation rules, the swap of streamed blocks, with `offline` the service worker's registration, and, in development, live reload and the problems panel. The policy allows them by hash, with no `'unsafe-inline'` and no nonce. `security` in `kay.config.ts` adjusts it:
+Every inline script kay writes is the same on every page: the hydration bootstrap, the speculation rules, the swap of streamed blocks, with `offline` the service worker's registration, and, in development, live reload and what keeps the problems logged before the dev tool loads. The policy allows them by hash, with no `'unsafe-inline'` and no nonce. `security` in `kay.config.ts` adjusts it:
 
 ```ts
 import { defineConfig } from 'kay/server'

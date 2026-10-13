@@ -31,14 +31,14 @@ function sameAttributes(left: Element, right: Element): boolean {
   return left.attributes.length === right.attributes.length && [...left.attributes].every(attribute => right.getAttribute(attribute.name) === attribute.value)
 }
 
-// What the dev server and the live reload add to a page themselves: the stylesheets are swapped by the live reload, and the panel is appended to the body.
+// What the live reload adds to a page itself: the stylesheets it swaps in.
 function ignored(node: Node): boolean {
   if (!(node instanceof Element))
     return false
 
   const name = node.localName
 
-  return name === 'kay-problems' || (name === 'link' && node.getAttribute('rel') === 'stylesheet') || (name === 'script' && node.textContent.includes(LIVE_RELOAD)) || (name === 'meta' && node.getAttribute('name') === 'kay-boot')
+  return (name === 'link' && node.getAttribute('rel') === 'stylesheet') || (name === 'script' && node.textContent.includes(LIVE_RELOAD)) || (name === 'meta' && node.getAttribute('name') === 'kay-boot')
 }
 
 function kept(parent: Node): ChildNode[] {

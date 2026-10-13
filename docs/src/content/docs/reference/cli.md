@@ -89,13 +89,23 @@ kay dev: http://localhost:3000 (ready in 412 ms)
 
 The `Listening on http://localhost:3000` line an entry scaffolded by an older kay prints is left out; kay's own start line only shows in production.
 
+### Dev tool
+
+Every page a dev server serves carries a bar at the bottom left, `kay` and a count of the page's problems, red when one is an error. A click on it, or Alt+Shift+K, opens its drawer; Escape closes it.
+
+- **Problems** lists what kay recovered from in the browser, such as an island that did not match its server markup, what `kay check` reports of the project without type checking, and what axe-core finds on the rendered page. Dismiss all hides those listed for the rest of the browser tab; those the page logged go when it is left.
+- The drawer follows the system's light or dark theme and docks left or right. Its open tab and side stay for the browser tab, across page swaps and reloads.
+
+Production pages never carry it.
+
 ### Inspector
 
 Every page `kay dev` serves knows which `.kay` line wrote each element:
 
 - Hold Alt to outline the element under the pointer with its file, line and column, such as `h1 src/routes/index.kay:12:3`. The outline shows as soon as Alt is pressed, without moving the pointer.
 - Alt+click opens that line in the editor. The click never reaches the page, so a link is not followed.
-- On a page with islands, the button at the bottom left lists each island's component, a click opening its file, with the values its signals hold now. The signals are numbered in the order its script creates them, and hovering a row outlines the island.
+- Inspect, on the dev tool's bar, does what Alt does until the next click or Escape, for a system that keeps Alt+click for itself.
+- The Islands tab, counted on the bar, lists each island's component, a click opening its file, with the values its signals hold now. The signals are numbered in the order its script creates them, and hovering a row outlines the island.
 
 The editor is `KAY_EDITOR`, else `VISUAL` or `EDITOR` when they name VS Code, Cursor, Zed, Sublime Text, a JetBrains IDE or code-server, else the first of them on the `PATH`. `KAY_EDITOR` may be any command: it gets the position the way the editor among its words takes it, a terminal editor such as Vim, Neovim or Helix included, or else the file appended:
 
@@ -106,7 +116,7 @@ KAY_EDITOR="tmux new-window nvim" bun run dev
 
 On a Linux machine with no display, as a server reached over SSH while the browser runs on another machine, only code-server can open a window: the file opens in the code-server window already open on the project, else the last one used, unless `KAY_EDITOR` names another command, such as the tmux one above.
 
-With no editor found the page says so, and the terminal prints the position. An editor command that exits with an error within two seconds shows its error in the terminal, and the page says it failed. Tests, `pages({ dev: true })` and production builds carry none of it.
+With no editor found the page says so, and the terminal prints the position. An editor command that exits with an error within two seconds shows its error in the terminal, and the page says it failed. Tests, `pages({ dev: true })` and production builds carry none of the inspector.
 
 ## kay build
 

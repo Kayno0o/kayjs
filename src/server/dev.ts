@@ -9,6 +9,7 @@ import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { Elysia } from 'elysia'
 import { outputDir, underKayDev } from '../build/assets'
+import { bootDevTool } from '../runtime/dev-boot'
 import { kayLog } from '../runtime/log'
 import { isCrossSite } from './actions'
 import { BUILD_FAILURE, clientOptionsKey, fromManifest, readManifest } from './client'
@@ -17,11 +18,13 @@ import { compileErrorPage } from './overlay'
 
 export const DEV_EVENTS = '/_kay/dev/events'
 export const DEV_PATCH = '/_kay/dev/patch.js'
+export const DEV_TOOL = '/_kay/dev/tool.js'
 export const DEV_INSPECTOR = '/_kay/dev/inspector.js'
 export const DEV_OPEN = '/_kay/dev/open'
 export const DEV_A11Y = '/_kay/dev/a11y.js'
 export const DEV_AXE = '/_kay/dev/axe.js'
 const PATCH_SOURCE = resolve(import.meta.dir, '../runtime/dev-patch.ts')
+const TOOL_SOURCE = resolve(import.meta.dir, '../runtime/dev-tool.ts')
 const INSPECTOR_SOURCE = resolve(import.meta.dir, '../runtime/dev-inspector.ts')
 const A11Y_SOURCE = resolve(import.meta.dir, '../runtime/dev-a11y.ts')
 // What the inspector sends, which a page of another site cannot without a preflight nothing answers.
@@ -45,9 +48,8 @@ const SLOW_RETRY_MS = 250
 // The id is a meta beside the script, so the script reads the same on every server: a page swap keeps it rather than running a copy that connects again, and a policy allows it by one hash.
 export const LIVE_RELOAD = `<meta name="kay-boot" content="${BOOT_ID}"><script>(()=>{let b=document.querySelector('meta[name=kay-boot]')?.content,v,s,n=0,q=Promise.resolve();const load=async()=>{try{const r=await fetch(location.href,{cache:'no-store',headers:{accept:'text/html'}});return r.ok&&!r.redirected?new DOMParser().parseFromString(await r.text(),'text/html'):null}catch{return null}},css=async(d,i)=>{const o=[...document.querySelectorAll('link[rel=stylesheet]')],u=new Set(o.map(l=>l.getAttribute('href')));await Promise.all([...d.querySelectorAll('link[rel=stylesheet]')].map(l=>new Promise(r=>{const k=document.createElement('link'),h=l.getAttribute('href');k.rel='stylesheet';k.dataset.kayDev='';k.href=u.has(h)?h+(h.includes('?')?'&':'?')+'kay-dev='+i:h;k.onload=k.onerror=r;document.head.append(k)})));for(const l of o)l.remove()},on=x=>{x.onerror=()=>{x.close();setTimeout(()=>on(new EventSource(${JSON.stringify(DEV_EVENTS)})),n++<${FAST_RETRIES}?${FAST_RETRY_MS}:Math.min(${SLOW_RETRY_MS},${FAST_RETRY_MS}*2**(n-${FAST_RETRIES})))};x.addEventListener('styles',e=>q=q.then(async()=>{try{const d=await load();if(!d)return location.reload();if(s)s=d;await css(d,e.data)}catch{location.reload()}}));x.addEventListener('boot',e=>(n=0,q=q.then(async()=>{let p=false;const d=e.data,s0=d.indexOf(' '),t=d.indexOf(' ',s0+1),i=d.slice(0,s0),c=t<0?d.slice(s0+1):d.slice(s0+1,t),h=t<0?null:JSON.parse(d.slice(t+1));if(i===b){v??=c;if(!window.$kayRefresh)s??=await load();return}if(c!==v){let ok=false;try{ok=!!h&&String(h.from)===v&&!!window.$kayHot&&await window.$kayHot(h)}catch{}if(!ok){if(c===i)return location.reload();if(window.$kayRefresh){try{await window.$kayRefresh()}catch{return location.reload()}}else p=true}v=c}b=i;try{const d=await load();if(!d)return location.reload();if(p){const m=await import(${JSON.stringify(DEV_PATCH)});if(!s||!m.patch(s,d))return location.reload();s=d}await css(d,i)}catch{location.reload()}})))};on(new EventSource(${JSON.stringify(DEV_EVENTS)}))})()</script>`
 
-// Shows each problem kay logs in the browser, as `[kay] ...`, in a panel on the page as well as in the console; its own shadow root keeps the page's styles off it, and styles set through `style` pass a policy without inline styles.
-// The problems `kay check` would report of the project's components, without type checking, come in a data block the page carries, and show once it loads. A page swap takes the panel away with the body, so the next one lists the new page's problems only. It updates in a microtask, so a failure of its own never breaks the call that logged.
-export const DEV_PROBLEMS = `<script>(()=>{let h,t,c;const s=new Set,a=(n,k)=>{const e=document.createElement(n);e.style.cssText=k;return e},show=m=>{if(h?.isConnected){if(s.has(m))return}else{s.clear();h=a('kay-problems','position:fixed;left:1rem;right:1rem;bottom:1rem;z-index:2147483647;max-height:50vh;overflow:auto;padding:1rem;border:1px solid #b00020;background:#fff;color:#1a1a1a;font:14px/1.5 ui-monospace,monospace;text-align:left');const r=h.attachShadow({mode:'open'}),d=a('div','display:flex;justify-content:space-between;align-items:baseline;gap:1rem'),b=a('button','font:inherit;padding:.25rem .75rem;border:1px solid #ddd;background:#fff;color:inherit;cursor:pointer');t=a('strong','color:#b00020');c=a('div','');b.textContent='Dismiss';b.onclick=()=>h.remove();d.append(t,b);r.append(d,c);document.body.append(h)}s.add(m);const p=a('pre','margin:.75rem 0 0;padding:.75rem;border:1px solid #ddd;white-space:pre-wrap');p.textContent=m;c.append(p);t.textContent=s.size+' kay problem'+(s.size===1?'':'s')};addEventListener('DOMContentLoaded',()=>{for(const m of JSON.parse(document.getElementById('kay-check-problems')?.textContent||'[]'))show(m)});for(const k of['error','warn']){const o=console[k];console[k]=(...x)=>{o.apply(console,x);if(typeof x[0]==='string'&&x[0].startsWith('[kay] '))queueMicrotask(()=>{try{show(x[0].slice(6))}catch{}})}}})()</script>`
+// Keeps each problem kay logs before the dev tool loads, which then lists them; the page carries the function itself, so a policy allows it by one hash.
+export const DEV_BOOT = `<script>(${bootDevTool.toString()})(window)</script>`
 
 // Only islands changed since the last server started: a change to anything else, a page, a module or a startup file, reloads the pages; so does a list too long to pass on.
 // Each swaps in with every island whose chunks hold its code; a chunk the page never loaded may come too when it holds nothing but edited islands, as Bun moves an island another one embeds into a chunk of its own.
@@ -93,32 +95,39 @@ function changedFiles(text: string | undefined): string[] | undefined {
   }
 }
 
-// The module a page without the page swap applies its refresh with, its TypeScript source stripped to what a browser runs.
-let patchModule: string | undefined
+// The browser modules of the dev tools, each its TypeScript source stripped to what a browser runs, then what starts it.
+const devModules = new Map<string, string>()
 
-export function devPatch(): Response {
-  patchModule ??= new Bun.Transpiler({ loader: 'ts' }).transformSync(readFileSync(PATCH_SOURCE, 'utf8'))
+function devModule(source: string, start = ''): Response {
+  let text = devModules.get(source)
 
-  return new Response(patchModule, { headers: { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store' } })
+  if (text === undefined) {
+    text = new Bun.Transpiler({ loader: 'ts' }).transformSync(readFileSync(source, 'utf8')) + start
+    devModules.set(source, text)
+  }
+
+  return new Response(text, { headers: { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store' } })
 }
 
-let inspectorModule: string | undefined
+// The module a page without the page swap applies its refresh with.
+export function devPatch(): Response {
+  return devModule(PATCH_SOURCE)
+}
+
+// The bar and drawer every dev page shows, which the inspector then joins under `kay dev`.
+export function devTool(): Response {
+  return devModule(TOOL_SOURCE, '\nwindow.$kayDev = startDevTool()\n')
+}
 
 export function devInspector(): Response {
-  inspectorModule ??= `${new Bun.Transpiler({ loader: 'ts' }).transformSync(readFileSync(INSPECTOR_SOURCE, 'utf8'))}\nstartInspector()\n`
-
-  return new Response(inspectorModule, { headers: { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store' } })
+  return devModule(INSPECTOR_SOURCE, '\nstartInspector(window.$kayDev)\n')
 }
 
-// Checks each page the dev server serves with axe-core once it settles, its violations showing in the problem panel.
+// Checks each page the dev server serves with axe-core once it settles, its violations showing in the dev tool's problems.
 export const A11Y_SCRIPT = `<script type="module" src="${DEV_A11Y}"></script>`
 
-let a11yModule: string | undefined
-
 export function devA11y(): Response {
-  a11yModule ??= `${new Bun.Transpiler({ loader: 'ts' }).transformSync(readFileSync(A11Y_SOURCE, 'utf8'))}\nstartA11y()\n`
-
-  return new Response(a11yModule, { headers: { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store' } })
+  return devModule(A11Y_SOURCE, '\nstartA11y()\n')
 }
 
 // Read where the dependency installed, never imported, so a compiled server leaves it out.
@@ -152,9 +161,9 @@ async function waited(ms: number): Promise<undefined> {
   return undefined
 }
 
-// Loads the inspector on the pages of a server `kay dev` started, the one whose elements carry their source position.
-export function inspectorScript(): string {
-  return underKayDev() ? `<script type="module" src="${DEV_INSPECTOR}"></script>` : ''
+// Loads the dev tool on every dev page, and the inspector into it on the pages of a server `kay dev` started, the one whose elements carry their source position.
+export function devToolScripts(): string {
+  return `<script type="module" src="${DEV_TOOL}"></script>${underKayDev() ? `<script type="module" src="${DEV_INSPECTOR}"></script>` : ''}`
 }
 
 // Opens the `.kay` file at the position the inspector names, in the editor `editorCommand` finds; with none, the terminal prints the position.
@@ -309,7 +318,7 @@ export function bootFailure(error: unknown, seed: string): Elysia {
   return app
 }
 
-// The data block `DEV_PROBLEMS` reads: a script of another type never runs, so the policy has nothing to allow.
+// The data block the dev tool reads: a script of another type never runs, so the policy has nothing to allow.
 export function problemsBlock(problems: string[] | undefined): string {
   return problems && problems.length > 0 ? `<script type="application/json" id="kay-check-problems">${JSON.stringify(problems).replaceAll('<', '\\u003c')}</script>` : ''
 }

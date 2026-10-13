@@ -13,7 +13,7 @@ error[missing-alt]: An `img` needs `alt`
   = note: `alt=""` marks an image as decoration
 ```
 
-The name in brackets is a lint. `kay build` runs the same check and `kay dev` shows it in a panel in the browser. The editor shows each problem of an open file with the same message, note and help, and leaves out what `kay check` leaves out. What `kay check` finds across the project, such as a content entry against its schema or a message a locale lacks, shows at its file after each save.
+The name in brackets is a lint. `kay build` runs the same check and `kay dev` lists it in the dev tool on the page. The editor shows each problem of an open file with the same message, note and help, and leaves out what `kay check` leaves out. What `kay check` finds across the project, such as a content entry against its schema or a message a locale lacks, shows at its file after each save.
 
 ## What it verifies
 

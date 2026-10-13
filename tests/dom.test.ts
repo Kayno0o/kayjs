@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { kay } from '../src/build/plugin'
 import { patch } from '../src/runtime/dev-patch'
 import { cappedSizes } from '../src/runtime/image'
-import { DEV_PROBLEMS, LIVE_RELOAD, problemsBlock } from '../src/server/dev'
+import { LIVE_RELOAD } from '../src/server/dev'
 import { settle } from '../src/test'
 import { scratchDir } from './scratch'
 
@@ -886,29 +886,6 @@ describe('bind:value on a number input', () => {
   })
 })
 
-describe('the problems panel', () => {
-  it('lists the problems kay check reports that the page carries, once it loads', async () => {
-    const script = (/<script>([\s\S]*)<\/script>/).exec(DEV_PROBLEMS)![1]!
-    const { error, warn } = console
-    const problem = 'src/a.kay:1:1 - An `img` needs `alt`\n1 | img(src="/</script>")'
-
-    document.head.innerHTML = problemsBlock([problem])
-
-    try {
-      // eslint-disable-next-line no-new-func -- runs the inline script a dev page carries
-      (new Function(script) as () => void)()
-      document.dispatchEvent(new Event('DOMContentLoaded', { bubbles: true }))
-
-      expect(document.querySelector('kay-problems')!.shadowRoot!.textContent).toBe(`1 kay problemDismiss${problem}`)
-    }
-    finally {
-      Object.assign(console, { error, warn })
-      document.querySelector('kay-problems')?.remove()
-      document.head.innerHTML = ''
-    }
-  })
-})
-
 describe('the live reload script', () => {
   it('swaps the stylesheets when the server comes back running the same code, and reloads on any other change or a page that fails', async () => {
     const script = (/<script>([\s\S]*)<\/script>/).exec(LIVE_RELOAD)![1]!
@@ -1066,11 +1043,9 @@ describe('the dev patch', () => {
     const live = parse(before)
     const bar = live.querySelector('.bar')!
     const note = live.querySelector('p')!
-    const panel = live.createElement('kay-problems')
 
     bar.classList.add('in-view')
     note.classList.add('seen')
-    live.body.append(panel)
 
     const after = page('<h1>Title</h1><div class="bar" id="a"></div><p class="note wide">New</p><footer>End</footer>', '<title>Next</title>')
 
@@ -1081,7 +1056,6 @@ describe('the dev patch', () => {
     expect(note.className).toBe('note seen wide')
     expect(note.textContent).toBe('New')
     expect(live.title).toBe('Next')
-    expect(live.body.lastElementChild).toBe(panel)
   })
 
   it('leaves the live reload\'s boot id to it, the restarted server\'s render naming another', () => {
