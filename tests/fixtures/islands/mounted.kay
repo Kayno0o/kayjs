@@ -1,0 +1,9 @@
+---
+import { onMount, signal } from 'kay'
+
+const start = signal(0)
+const counted = signal(0)
+
+onMount(() => start.set(10))
+---
+button.mounted(onClick={() => counted.set(start() + 1)}) Counted {counted()}

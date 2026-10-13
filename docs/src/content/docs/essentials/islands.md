@@ -71,7 +71,7 @@ An island hydrates as soon as the page loads. Defer it with `hydrate` on its tag
 Comments(postId={post.id} hydrate="visible")
 ```
 
-`hydrate="visible"` waits until it scrolls near the viewport, `hydrate="idle"` until the browser is idle. A click, input or change on an island still loading is replayed once it hydrated and its `onMount` ran.
+`hydrate="visible"` waits until it scrolls near the viewport, `hydrate="idle"` until the browser is idle. A click, input or change on an island still loading is replayed once it hydrated and its effects ran.
 
 ## Shared and persisted state
 

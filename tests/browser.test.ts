@@ -191,22 +191,25 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay/test i
 
   it('scrolls to what it clicks, centered past fixed bars, a click on an island hydrating once visible reaching it', async () => {
     await page.goto('/below')
-    // Replayed once the island mounted, as a click on one already hydrated finds it.
-    await page.click('button.mounted')
-    await page.waitFor('button.mounted', { text: 'Counted 11' })
     await page.click('button.player')
 
     expect(await page.text('button.player')).toBe('Played 1')
-
-    // The scroll restored with the islands in view, they hydrate as the click lands.
-    await page.reload()
-    await page.click('button.mounted')
-    await page.waitFor('button.mounted', { text: 'Counted 11' })
 
     await page.click('a.far')
     await page.waitUntil(() => location.hash === '#far')
     expect(page.errors).toEqual([])
     await expect(page.click('a.nowhere', { timeout: 100 })).rejects.toThrow('kay: timed out after 100ms waiting for a.nowhere')
+  })
+
+  it('replays a click on an island hydrating once visible after its onMount ran, again after a reload restoring the scroll to it', async () => {
+    await page.goto('/below')
+    await page.click('button.mounted')
+    await page.waitFor('button.mounted', { text: 'Counted 11' })
+
+    await page.reload()
+    await page.click('button.mounted')
+    await page.waitFor('button.mounted', { text: 'Counted 11' })
+    expect(page.errors).toEqual([])
   })
 
   it('checks a page with axe-core, the whole of it or what a selector matches, again after a navigation', async () => {

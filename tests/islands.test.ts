@@ -145,6 +145,23 @@ describe('islands', () => {
     expect((globalThis as { _$K?: Event[] })._$K).toEqual([])
   })
 
+  it('replays a click made before its island hydrated once its effects ran, as on an island already hydrated', async () => {
+    const { default: Mounted } = await import(join(fixtures, 'mounted.kay')) as { default: (props: object) => unknown }
+
+    // eslint-disable-next-line no-new-func -- runs the inline hydration script, which happy-dom does not execute from markup
+    (new Function(HYDRATION_SCRIPT) as () => void)()
+    document.body.innerHTML = child(Mounted({}))
+    const button = document.querySelector('button.mounted')!
+
+    button.dispatchEvent(new Event('click', { bubbles: true }))
+
+    const { hydrateAgain } = await import(join(outdir, 'client.js')) as { hydrateAgain: () => Promise<void> }
+
+    await hydrateAgain()
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(button.textContent).toBe('Counted 11')
+  })
+
   it('keeps what was typed and ticked before its island hydrated, the bound signals taking it', async () => {
     const { default: Typed } = await import(join(fixtures, 'typed.kay')) as { default: (props: object) => unknown }
 
