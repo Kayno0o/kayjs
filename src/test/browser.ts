@@ -115,6 +115,8 @@ const STAT_PARENT = /^\) \S (\d+)/
 const EXIT_WAIT_MS = 5000
 // How long the browser outlives its last page, for the next test's.
 const IDLE_MS = 1000
+// What a page's origin keeps in the browser, cleared before each page.
+const STORAGE_TYPES = 'cookies,local_storage,indexeddb,cache_storage,service_workers,file_systems,shared_storage,storage_buckets'
 
 // The browser of this process's pages. Bun runs one Chrome for every view and leaves the profile it gives it in the temp directory, so kay gives it one of its own and removes it once the browser closes.
 let browser: { dir: string, pages: number, ready: Promise<void>, idle?: Timer } | undefined
@@ -383,8 +385,8 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
 
       errors.push(exceptionDetails.exception?.description ?? exceptionDetails.text)
     })
-    // Pages share one browser, whose cookies and storage outlive a page.
-    await view.cdp('Storage.clearDataForOrigin', { origin, storageTypes: 'all' })
+    // Pages share one browser, whose cookies and storage outlive a page. Named one by one, as `all` takes Chrome 2 to 5 s a page, the rest under a millisecond.
+    await view.cdp('Storage.clearDataForOrigin', { origin, storageTypes: STORAGE_TYPES })
     await page.goto(url)
   }
   catch (error) {
