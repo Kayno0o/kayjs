@@ -2,11 +2,19 @@
 import Badge from '@kaynooo/kayjs-ui/badge.kay'
 import CardRow from '@kaynooo/kayjs-ui/card-row.kay'
 import CollapsibleSection from '@kaynooo/kayjs-ui/collapsible-section.kay'
+import PageHeader from '@kaynooo/kayjs-ui/page-header.kay'
 import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
 import SiteNav from '@kaynooo/kayjs-ui/site-nav.kay'
 import Widget from '@kaynooo/kayjs-ui/widget.kay'
 ---
 main
+  article#header
+    PageHeader(title="Moons")
+      @actions
+        a(href="/table") New
+      p Every moon of Mars.
+  article#bare-header
+    PageHeader(title="Rings")
   article#section
     PageSection(title="Moons")
       @actions

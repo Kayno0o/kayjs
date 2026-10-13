@@ -1,0 +1,8 @@
+---
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import PageHeader from '@kaynooo/kayjs-ui/page-header.kay'
+---
+PageHeader(title="Moons")
+  @actions
+    Button(label="New moon" icon="plus" variant="accent")
+  p Every moon of Jupiter, by distance.

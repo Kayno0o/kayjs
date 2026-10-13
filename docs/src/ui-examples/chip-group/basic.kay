@@ -1,0 +1,9 @@
+---
+import ChipGroup from '@kaynooo/kayjs-ui/chip-group.kay'
+
+const decks = signal(['films'])
+const options = [{ value: 'films', label: 'Films (42)' }, { value: 'games', label: 'Games (17)', icon: 'star' }, { value: 'books', label: 'Books (8)' }, { value: 'music', label: 'Music (0)', disabled: true }] as const
+---
+.flex.flex-col.items-start.gap-2
+  ChipGroup(label="Decks" options={options} value={decks()} onChange={decks.set})
+  p Drawing from {decks().join(', ') || 'nothing'}.

@@ -144,4 +144,48 @@ describe('ConfirmDelete', () => {
 
     expect([dialog.open, dialog.querySelector('.kui-dialog-title')?.textContent, dialog.querySelector('.kui-btn-danger')?.textContent]).toEqual([true, 'Rotate link', 'Rotate'])
   })
+
+  test('asks inline when told to: armed by a click, it deletes or cancels in place, and hands the focus back', async () => {
+    const { promise, resolve: finish } = Promise.withResolvers<void>()
+    const root = await dialogs(async () => promise)
+    const trigger = root.querySelector<HTMLButtonElement>('.kui-icon-btn[aria-label="Remove"]')!
+    const armed = () => root.querySelector('.kui-confirm-delete-armed')
+    const buttons = () => [...armed()?.querySelectorAll('button') ?? []].map(button => [button.textContent || button.getAttribute('aria-label'), button.disabled])
+
+    expect(root.querySelectorAll('dialog')).toHaveLength(5)
+
+    click(trigger)
+    await settle()
+
+    expect([trigger.hidden, armed()?.getAttribute('aria-label'), buttons(), document.activeElement?.textContent]).toEqual([true, 'Its verdicts go with it.', [['Delete', false], ['Cancel', false]], 'Delete'])
+    expect(armed()?.querySelector('.kui-btn-danger')?.getAttribute('data-tooltip')).toBe('Its verdicts go with it.')
+
+    armed()!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    await settle()
+
+    expect([trigger.hidden, armed(), document.activeElement]).toEqual([false, null, trigger])
+
+    click(trigger)
+    await settle()
+    click(armed()!.querySelector('.kui-btn-danger'))
+    await settle()
+
+    expect(buttons()).toEqual([['Deleting…', true], ['Cancel', true]])
+
+    finish()
+    await settle()
+
+    expect([trigger.hidden, armed()]).toEqual([false, null])
+  })
+
+  test('asked inline, toasts a failed delete and stays armed for another try', async () => {
+    const root = await dialogs(async () => Promise.reject(new Error('refused')))
+
+    click(root.querySelector('.kui-icon-btn[aria-label="Remove"]'))
+    await settle()
+    click(root.querySelector('.kui-confirm-delete-armed .kui-btn-danger'))
+    await settle()
+
+    expect([root.querySelector('.kui-confirm-delete-armed .kui-btn-danger')?.hasAttribute('disabled'), root.querySelector('.kui-toast-message')?.textContent]).toEqual([false, 'Could not remove'])
+  })
 })

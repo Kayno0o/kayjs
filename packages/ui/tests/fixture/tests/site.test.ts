@@ -216,6 +216,13 @@ describe('layout', () => {
     expect([...nav.matchAll(/<a class="kui-site-nav-link" href="([^"]*)"(?: aria-current="(\w+)")?>/g)].map(([, href, current]) => `${href}${current ? ` ${current}` : ''}`)).toEqual(['/', '/chart', '/charts true', '/charts/moons page', '/data'])
   })
 
+  test('PageHeader holds the page h1, its actions past the title only when given, and the children under the title line', async () => {
+    expect([await page('header'), await page('bare-header')]).toEqual([
+      '<article id="header"><header class="kui-page-header"><div class="kui-page-header-head"><h1 class="kui-page-header-title">Moons</h1><div class="kui-page-header-actions"><a href="/table">New</a></div></div><p>Every moon of Mars.</p></header></article>',
+      '<article id="bare-header"><header class="kui-page-header"><div class="kui-page-header-head"><h1 class="kui-page-header-title">Rings</h1></div></header></article>',
+    ])
+  })
+
   test('PageSection titles its stretch and holds an actions block at the end of the head line', async () => {
     expect(await page('section')).toBe('<article id="section"><section class="kui-page-section"><div class="kui-page-section-head"><h2 class="kui-heading-section kui-page-section-title">Moons</h2><a href="/table">New</a></div><p>Phobos</p></section></article>')
   })

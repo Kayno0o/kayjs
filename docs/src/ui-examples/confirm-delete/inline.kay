@@ -1,0 +1,14 @@
+---
+import ConfirmDelete from '@kaynooo/kayjs-ui/confirm-delete.kay'
+
+const sessions = signal(['Films and games', 'Books'])
+
+function remove(name: string) {
+  sessions.set(list => list.filter(one => one !== name))
+}
+---
+ul.flex.flex-col.gap-2
+  for session of sessions() key={session}
+    li.flex.items-center.justify-between.gap-4
+      span {session}
+      ConfirmDelete(message="The verdicts no one else gave go with it." failure="Could not delete" onConfirm={() => remove(session)} ask="inline" size="sm")

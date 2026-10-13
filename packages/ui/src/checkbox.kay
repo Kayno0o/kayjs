@@ -1,0 +1,58 @@
+---
+import type { JSX } from 'kay'
+import { effect, signal } from 'kay'
+import { changeAccepted } from './change'
+
+const { checked = false, indeterminate = false, label, hint, onChange, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'type' | 'checked' | 'class' | 'children' | 'onChange'> & {
+  // Whether it starts ticked; a box whose parent passes another value follows it.
+  checked?: boolean | undefined
+  // Neither ticked nor not, for a box standing over a partly ticked set; the next click ticks it.
+  indeterminate?: boolean | undefined
+  // Shown next to the box; omit it and pass `aria-label` instead to keep the box label-only for screen readers.
+  label?: string | undefined
+  // A note after the label, quieter: a count, a shortcut, a code name.
+  hint?: string | number | undefined
+  // A promise holds the box busy until it settles, and puts it back where it was when it rejects (logged) or resolves to false: a refused change never shows as made.
+  // Typed `unknown`, so a callback answering something else, such as `list.push`, still fits.
+  onChange?: ((checked: boolean) => unknown) | undefined
+  class?: string | undefined
+}>()
+
+const on = signal(checked)
+const busy = signal(false)
+let box: HTMLInputElement | undefined
+// How often the parent's `checked` reached the box, so a change under way knows whether the parent answered it.
+let synced = 0
+
+effect(() => {
+  on.set(checked)
+  synced++
+})
+
+// A property only, which no attribute sets.
+effect(() => {
+  if (box)
+    box.indeterminate = indeterminate
+})
+
+async function change(input: HTMLInputElement) {
+  const next = input.checked
+  const before = on()
+  const syncedBefore = synced
+
+  on.set(next)
+
+  // Put back unless the parent set `checked` meanwhile, which has the last word.
+  if (!(await changeAccepted('Checkbox', () => onChange?.(next), busy.set)) && synced === syncedBefore) {
+    on.set(before)
+    input.checked = before
+  }
+}
+---
+// A native checkbox, so it submits inside a form and the keyboard and screen readers know it. A click while a change is under way ticks nothing.
+label.kui-checkbox(class={className})
+  input.kui-checkbox-input({...rest} ref={element => { box = element; element.indeterminate = indeterminate }} type="checkbox" checked={on()} aria-busy={busy() ? 'true' : undefined} onClick={event => { if (busy()) event.preventDefault() }} onChange={event => change(event.currentTarget)})
+  if label
+    span.kui-checkbox-label {label}
+  if hint !== undefined
+    span.kui-checkbox-hint {hint}

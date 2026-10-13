@@ -1,6 +1,6 @@
 # kayjs-ui
 
-> kay components ported from @kaynooo/svelte and @kaynooo/solidjs. They ship as `.kay` sources that the app compiles as its own, and they are styled by the classes of one `theme.css`, which the app restyles from its own stylesheet. The set: buttons and icons, toasts, dialogs and a form dialog that calls a page's action, a sortable table, switches, tabs and segmented controls, inputs, selects and pickers, cards, badges, notices, avatars, popovers and tooltips, page layouts and panels, a command palette, charts, drag and drop, a markdown editor, media galleries, a cropper, pagination, QR codes, and a carousel, a star rating and a site menu for marketing pages.
+> kay components ported from @kaynooo/svelte and @kaynooo/solidjs. They ship as `.kay` sources that the app compiles as its own, and they are styled by the classes of one `theme.css`, which the app restyles from its own stylesheet. The set: buttons and icons, toasts, dialogs and a form dialog that calls a page's action, a sortable table, switches, checkboxes and chips, tabs and segmented controls, inputs, selects and pickers, cards, badges, notices, avatars, popovers and tooltips, page layouts and panels, a command palette, charts, drag and drop, a markdown editor, media galleries, a cropper, pagination, QR codes, and a carousel, a star rating and a site menu for marketing pages.
 
 ## Rules that are easy to get wrong
 
@@ -90,7 +90,7 @@ export default settings
 
 ## Components
 
-Each component spreads the other attributes it is given onto its root element, `id`, `aria-*` and `data-*` included. The exceptions: Toggle spreads them on its checkbox, Popover on its panel, and ConfirmDelete, FormField, FormDialog, Toaster and TooltipHost take none.
+Each component spreads the other attributes it is given onto its root element, `id`, `aria-*` and `data-*` included. The exceptions: Toggle and Checkbox spread them on their checkbox, Popover on its panel, and ConfirmDelete, FormField, FormDialog, Toaster and TooltipHost take none.
 
 ### Icon, Button, IconButton
 
@@ -146,6 +146,7 @@ Dialog(open={editing()} title="Rename" onClose={() => editing.set(false)})
   - `refused` reads a refusal of the action's handler, as `attempt` does, and its message is toasted in place of `failure`: `ConfirmDelete(... failure="Could not delete" refused={(data: { error: string }) => data.error})`.
   - `trigger="button"` makes the trigger a labelled danger button rather than an icon, and `trigger="link"` a plain underlined text button, for a confirm inside running text. `label` renames the trigger, for "Revoke link" or "Empty trash", and `class` goes on it. `size` and `variant` style the icon trigger only.
   - `title` (`Confirm Deletion`), `confirmLabel` (`Delete`) and `pendingLabel` (`Deleting…`) replace the dialog's words, for a confirm that is not a deletion: `ConfirmDelete(message="Rotating breaks every link already shared." failure="Could not rotate" onConfirm={rotate} trigger="link" label="Rotate link" title="Rotate link" confirmLabel="Rotate" pendingLabel="Rotating…")`.
+  - `ask="inline"` asks in place instead of in a dialog, for a row of a list: a click hides the trigger and shows a danger button saying `confirmLabel` and a cancel button, the focus on the first. `message` names the pair for screen readers and is the danger button's tooltip. Escape or cancel brings the trigger back, focused; a failed delete toasts and stays armed.
 
 ### Table
 
@@ -182,7 +183,7 @@ Table(columns={columns} rows={posts} rowKey="id" filter={['title', 'author']} fi
 - `filter` shows a search box above the rows, `filterLabel` (`Filter`) naming it, and keeps the rows where a value it reads holds the typed text, case and surrounding spaces ignored: the fields it names, or what a function of the row returns, `filter={post => [post.title, post.author.name]}`. `filterParam="q"` keeps the text in the page's URL as `?q=`, which the server reads too, so a reload or a shared link renders filtered. `@noMatch` shows when the filter hides every row, `@empty` when there are none.
 - Narrower than 30rem, its own width and not the screen's, so a table in a sidebar does it too, each row stacks as a card: a line per cell, its column `header` beside it as the label, the labels as wide as the longest up to 40% of the card, an `end`-aligned column such as the row's actions at the end, and only the sortable headers kept, as a row of sort buttons. A column with an empty `header` spans the card's width. `narrow="scroll"` keeps the table whole and scrolls it sideways instead. A stacking table's wrapper is a size container, so it takes its width from its parent and never from its content: in an `auto`-sized grid column it collapses, where `narrow="scroll"` does not.
 
-### Segmented, TabNav, SiteNav, Tabs, Toggle
+### Segmented, ChipGroup, TabNav, SiteNav, Tabs, Toggle, Checkbox
 
 ```kay
 Tabs(tabs={[{ value: 'details', label: 'Details' }, { value: 'reviews', label: 'Reviews' }]} value="details" label="Product")
@@ -207,6 +208,8 @@ Tabs(tabs={[{ value: 'details', label: 'Details' }, { value: 'reviews', label: '
   - It renders inside an island, since its panels come from a block.
 - `Toggle(label="Public" checked={post.public} name="public" onChange={setPublic})`: a checkbox drawn as a switch, with `role="switch"`, that posts like a checkbox. Without `label`, give it `aria-label`.
   - `onChange` may return a promise: the switch is `aria-busy` and flips no further until it settles, and goes back where it was when it resolves to `false`, rejects or throws (logged), unless the parent set `checked` meanwhile. A void answer leaves the switch as clicked. The switch jumping back is all the user sees, so toast the failure too. `attempt` resolves to `undefined` on failure, so turn that into `false`: `onChange={async checked => (await attempt(() => setPublic({ id, public: checked }), 'Could not publish')) ?? false}`.
+- `Checkbox(label="I agree" checked={agreed()} name="terms" onChange={agreed.set})`: a native checkbox and its label, posting like one. `hint` adds a quieter note after the label, and `indeterminate` draws it as neither ticked nor not, for a box over a partly ticked list. Without `label`, give it `aria-label`. `onChange` may return a promise, as Toggle's may. Use Toggle for a setting that applies as it is flipped.
+- `ChipGroup(options={[{ value: 'films', label: 'Films' }, { value: 'games', label: 'Games', icon: 'star' }]} value={decks()} label="Decks" name="decks" onChange={decks.set})`: chips to pick several options from, real checkboxes posting each picked option under `name` (one unique on the page without it). `onChange` gets every picked option in the order of `options`, and may return a promise, as Segmented's may. An option may be `disabled`. A parent passing another `value` moves the picks.
 
 ### Pagination, QrCode
 
@@ -256,7 +259,7 @@ Popover(placement="bottom-end")
 - `open` opens or closes it from the page, and `onToggle(open)` runs however it changed: a page driving `open` sets its own value back there, or it could not open the panel again after a click outside closed it.
 - TooltipHost shows the `data-tooltip` of whichever element the pointer or a tab lands on. `data-tooltip-placement`, a CSS `position-area`, says where it sits, `top` by default: `button(data-tooltip="Copy link" data-tooltip-placement="bottom")`. IconButton sets `data-tooltip` to its label.
 
-### PageSection, CollapsibleSection, Widget, CardRow, SidePanel, SplitLayout
+### PageHeader, PageSection, CollapsibleSection, Widget, CardRow, SidePanel, SplitLayout
 
 ```kay
 PageSection(title="Moons")
@@ -276,6 +279,7 @@ PageSection(title="Moons")
         | {moon.name}
 ```
 
+- `PageHeader(title)`: the head of a page, its one `h1`. `@actions` sits after the title, past a divider, and the children under the title line.
 - `PageSection(title)`: a titled `section` of a page, its `h2` one level under the page's own. `@actions` sits at the end of the head line.
 - `CollapsibleSection(title)`: a native `details`, so it folds without script and a static page can hold it. `open` is whether it starts unfolded, `true` by default. `boxed` draws it as a card whose title is a band over a padded body. `@meta` sits in the band before the chevron, for a count the folded section would hide.
 - `Widget(title icon)`: a dashboard tile, a framed body under a head line of icon, title and `@actions`. `isEmpty` swaps the body for the `@empty` block, keeping the frame; with no `@empty` block, an empty widget renders nothing.

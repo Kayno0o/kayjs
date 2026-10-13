@@ -1,0 +1,8 @@
+---
+import Checkbox from '@kaynooo/kayjs-ui/checkbox.kay'
+
+const agreed = signal(false)
+---
+.flex.flex-col.items-start.gap-2
+  Checkbox(label="I agree to the terms" hint="v2" checked={agreed()} onChange={agreed.set})
+  p You {agreed() ? 'agreed' : 'did not agree yet'}.

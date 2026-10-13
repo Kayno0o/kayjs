@@ -1,0 +1,19 @@
+---
+import Checkbox from '@kaynooo/kayjs-ui/checkbox.kay'
+
+const moons = signal([{ name: 'Io', on: true }, { name: 'Europa', on: false }, { name: 'Ganymede', on: true }])
+const ticked = memo(() => moons().filter(moon => moon.on).length)
+
+function setAll(on: boolean) {
+  moons.set(list => list.map(moon => ({ ...moon, on })))
+}
+
+function set(name: string, on: boolean) {
+  moons.set(list => list.map(moon => moon.name === name ? { ...moon, on } : moon))
+}
+---
+.flex.flex-col.items-start.gap-2
+  Checkbox(label="All moons" checked={ticked() === moons().length} indeterminate={ticked() > 0 && ticked() < moons().length} onChange={setAll})
+  .flex.flex-col.gap-1.pl-6
+    for moon of moons() key={moon.name}
+      Checkbox(label={moon.name} checked={moon.on} onChange={on => set(moon.name, on)})

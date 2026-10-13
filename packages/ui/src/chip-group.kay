@@ -1,0 +1,65 @@
+--- <Value extends string>
+import type { JSX } from 'kay'
+import type { IconProps } from 'kay/icons'
+import type { IconSlot } from './defaults'
+import { effect, signal, uid } from 'kay'
+import { changeAccepted } from './change'
+import Icon from './icon.kay'
+
+const { options, value, label, name, onChange, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
+  // `icon` sits before the label; `disabled` keeps that chip as it is.
+  options: readonly { value: Value, label: string, icon?: IconSlot | IconProps | undefined, disabled?: boolean | undefined }[]
+  // The options picked to start with, in any order; a group whose parent passes others follows them.
+  value: readonly Value[]
+  // Names the group for screen readers.
+  label: string
+  // The checkboxes' name, which the group submits under inside a form, once per picked option; one unique on the page is drawn when none is given.
+  name?: string | undefined
+  // Gets every picked option, in the order of `options`.
+  // A promise holds the group busy until it settles, and puts the previous pick back when it resolves to false, rejects or throws (logged): a refused change never shows as made.
+  // Typed `unknown`, so a callback answering something else, such as `list.push`, still fits.
+  onChange?: ((value: Value[]) => unknown) | undefined
+  class?: string | undefined
+}>()
+
+const group = name ?? uid()
+// Held as strings: a signal cannot take a type parameter that might be a function.
+const picked = signal<readonly string[]>(value)
+const busy = signal(false)
+// How often the parent's `value` reached the group, so a change under way knows whether the parent answered it.
+let synced = 0
+
+effect(() => {
+  picked.set(value)
+  synced++
+})
+
+// Ticks the boxes of `wanted` again, in this group only: the binding may never have seen the box that took the click.
+function check(input: HTMLInputElement, wanted: readonly string[]) {
+  for (const box of input.closest('.kui-chip-group')?.querySelectorAll<HTMLInputElement>('.kui-chip-input') ?? [])
+    box.checked = wanted.includes(box.value)
+}
+
+async function toggle(input: HTMLInputElement, option: Value) {
+  const before = picked()
+  const syncedBefore = synced
+  const next = options.map(one => one.value).filter(one => one === option ? input.checked : before.includes(one))
+
+  picked.set(next)
+
+  // Put back unless the parent set `value` meanwhile, which has the last word.
+  if (!(await changeAccepted('ChipGroup', () => onChange?.(next), busy.set)) && synced === syncedBefore) {
+    picked.set(before)
+    check(input, before)
+  }
+}
+---
+// Real checkboxes drawn as chips, so the group submits like any other field and Space toggles the focused chip. A click while a change is under way ticks nothing.
+.kui-chip-group({...rest} role="group" aria-label={label} aria-busy={busy() ? 'true' : undefined} class={className})
+  for option of options key={option.value}
+    label.kui-chip
+      input.kui-chip-input(type="checkbox" name={group} value={option.value} checked={picked().includes(option.value)} disabled={option.disabled} onClick={event => { if (busy()) event.preventDefault() }} onChange={event => toggle(event.currentTarget, option.value)})
+      span.kui-chip-label
+        if option.icon
+          Icon(icon={option.icon} class="kui-chip-icon")
+        | {option.label}

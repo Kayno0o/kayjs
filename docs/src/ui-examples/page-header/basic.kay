@@ -1,0 +1,4 @@
+---
+import PageHeader from '@kaynooo/kayjs-ui/page-header.kay'
+---
+PageHeader(title="Moons")
