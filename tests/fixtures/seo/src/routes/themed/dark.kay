@@ -2,5 +2,5 @@
 export const page = { sitemap: false }
 ---
 head
-  html(data-theme="dark" data-banner={false} data-CASE="upper" data-case="lower" {...{ LANG: 'x' }})
+  html.wide.dark(data-theme="dark" data-banner={false} data-CASE="upper" data-case="lower" {...{ LANG: 'x' }})
 p Dark

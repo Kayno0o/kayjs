@@ -1,5 +1,6 @@
 import { escape, escapeAttribute } from './escape'
 import { LOCALE_ATTRIBUTES, ROOT_ATTRIBUTES } from './root'
+import { classText } from './values'
 
 // A tag a template's `head` block sets, its text as `children`.
 export interface HeadTag {
@@ -55,6 +56,7 @@ const VIEWPORT = 'meta:name:viewport'
 const OG_IMAGE = 'meta:property:og:image'
 const IMAGE_DETAILS = ['meta:property:og:image:width', 'meta:property:og:image:height', 'meta:property:og:image:alt', 'meta:name:twitter:image:alt']
 const CHARSET = 'charset'
+const SPACES = /\s+/
 
 // Renders are synchronous, so the head of the one in progress can live here; a `head` outside a page render sets nothing.
 let groups: HeadTag[][] | undefined
@@ -88,7 +90,7 @@ function renderHead(collected: HeadTag[][], options: HeadOptions): RenderedHead 
   let resourcesHtml = ''
   let styles = ''
   let titleGroup = -1
-  // An attribute a later group sets on `<html>` replaces an earlier one's, `false` or `null` taking it off.
+  // An attribute a later group sets on `<html>` replaces an earlier one's, `false` or `null` taking it off; `class` gathers every group's tokens instead.
   const root: Record<string, unknown> = {}
 
   for (const [index, group] of collected.entries()) {
@@ -100,8 +102,10 @@ function renderHead(collected: HeadTag[][], options: HeadOptions): RenderedHead 
 
       if (tag.tag === 'html') {
         for (const [name, value] of Object.entries(tag.props)) {
-          if (!LOCALE_ATTRIBUTES.has(name.toLowerCase()))
-            root[name.toLowerCase()] = value
+          const key = name.toLowerCase()
+
+          if (!LOCALE_ATTRIBUTES.has(key))
+            root[key] = key === 'class' ? joinClasses(root.class as string | undefined, classText(value)) : value
         }
 
         continue
@@ -185,6 +189,15 @@ function renderHead(collected: HeadTag[][], options: HeadOptions): RenderedHead 
     metas += tagMarkup({ tag: 'meta', props: { name: ROOT_ATTRIBUTES, content: servedJson(rootAttributes) } })
 
   return { prelude: prelude + viewportTag, styles, html: resourcesHtml + links + metas + others + scripts + title, root: markupOf(rootAttributes), charset: winners.has(CHARSET), viewport: winners.has(VIEWPORT) }
+}
+
+// The tokens of both, each once where first set, or none when there is no token at all.
+function joinClasses(before: string | undefined, added: string): string | undefined {
+  const tokens = new Set([...(before ?? '').split(SPACES), ...added.split(SPACES)])
+
+  tokens.delete('')
+
+  return tokens.size === 0 ? undefined : [...tokens].join(' ')
 }
 
 // Open Graph and Twitter read their own tags only, so the title, description and canonical URL a page sets are repeated there unless it sets those too.

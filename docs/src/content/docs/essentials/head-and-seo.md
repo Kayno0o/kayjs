@@ -20,7 +20,7 @@ h1 {post.title}
 
 ## Attributes on `<html>`
 
-An `html` tag in the `head` block sets attributes on `<html>`, such as a theme, from the server data too. A layout's win over the layouts around it, and the page's over all, one attribute at a time; `false` or `null` takes one off. It attaches no event handler.
+An `html` tag in the `head` block sets attributes on `<html>`, such as a theme, from the server data too. A layout's win over the layouts around it, and the page's over all, one attribute at a time; `false` or `null` takes one off. A `class` is the exception: the tokens of every layout and the page add up, each written once, so a page's `html.wide` under a layout's `html.dark` gives `class="dark wide"`. It attaches no event handler.
 
 ```kay
 --- server
