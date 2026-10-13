@@ -141,7 +141,7 @@ export const authTables = [AuthUsers, AuthIdentities, AuthTokens, AuthRecoveryCo
 
 type UserRow = InferEntity<typeof AuthUsers>
 
-// kayjs-auth's data in the app's Postgres database, through pg-orm: list `authTables` in the database's tables.
+// kayjs-auth's data in the app's Postgres or SQLite database, through pg-orm: list `authTables` in the database's tables.
 export function pgStore(db: Database): AuthStore {
   const users = db.repo(AuthUsers)
   const identities = db.repo(AuthIdentities)

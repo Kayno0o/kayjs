@@ -75,4 +75,11 @@ describe('createUser', () => {
 
     await expect(auth.createUser({ password: PASSWORD })).rejects.toThrow('needs an email or a username')
   })
+
+  test('throws on a role the `roles` option does not declare, as one read from a script\'s arguments may be', async () => {
+    const { auth, store } = setup()
+
+    await expect(auth.createUser({ username: 'ada', roles: ['ghost' as 'admin'] })).rejects.toThrow('\'ghost\', which the `roles` option does not declare')
+    expect((await store.users.list({ offset: 0, limit: 10 })).total).toBe(0)
+  })
 })

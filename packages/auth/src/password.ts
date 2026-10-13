@@ -169,6 +169,11 @@ export async function createUser(core: Core, input: CreateUserInput): Promise<Cr
   if (email === null && username === null)
     throw new Error('kayjs-auth: createUser needs an email or a username to sign in with')
 
+  const undeclared = core.roles && input.roles?.find(role => !core.roles!.has(role))
+
+  if (undeclared)
+    throw new Error(`kayjs-auth: createUser was given the role '${undeclared}', which the \`roles\` option does not declare`)
+
   const errors: RegisterErrors = {
     email: email === null ? undefined : emailProblem(email),
     password: input.password === undefined ? undefined : await newPasswordProblem(core, input.password),

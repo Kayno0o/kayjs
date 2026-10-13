@@ -15,7 +15,7 @@ kayjs-auth is published to the Forgejo registry at git.kaynooo.fr, beside kay. T
 bun add @kaynooo/kayjs-auth
 ```
 
-kay, Elysia and kayjs-ui (for the prebuilt pages) are peers, and `@kaynooo/pg-orm` too for the Postgres store. It is released with kay, at kay's own version, and peers on kay's minor: install the one matching your kay, and move them together. An app on a `^0.x` range moves to kay's version by hand, as a caret on 0.x never reaches it.
+kay, Elysia and kayjs-ui (for the prebuilt pages) are peers, and `@kaynooo/pg-orm` too for the Postgres and SQLite store. It is released with kay, at kay's own version, and peers on kay's minor: install the one matching your kay, and move them together. An app on a `^0.x` range moves to kay's version by hand, as a caret on 0.x never reaches it.
 
 ## Set up
 
@@ -77,6 +77,6 @@ export default auth.guard({ redirect: '/login' })
 
 ## Develop
 
-Tests need Postgres for the pg store: `docker compose up -d`, then `bun run test`. `bun run check` and `bun run lint` check the rest.
+Tests need Postgres for the pg store on Postgres, which runs on an in-memory SQLite database without it: `docker compose up -d`, then `bun run test`. `bun run check` and `bun run lint` check the rest.
 
 The full reference, written for people and coding agents alike, is [llms.txt](llms.txt), with the sign-in action, OAuth providers, mailed links, two-factor and the gate for plain Elysia routes.
