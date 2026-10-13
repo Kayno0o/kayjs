@@ -223,6 +223,12 @@ describe('layout', () => {
     ])
   })
 
+  test('TreeView is opened to the selected node in the server HTML, its row the tab stop', async () => {
+    const rows = [...(await page('tree')).matchAll(/<li ([^>]*)>.*?<span class="kui-tree-view-label">(\w+)<\/span><\/li>/g)].map(([, attributes, label]) => `${label} ${(/aria-expanded="(\w+)"/).exec(attributes!)?.[1] ?? '-'} ${(/tabindex="(-?\d)"/).exec(attributes!)?.[1]}`)
+
+    expect(rows).toEqual(['Mars true -1', 'Phobos - 0', 'Venus - -1'])
+  })
+
   test('PageSection titles its stretch and holds an actions block at the end of the head line', async () => {
     expect(await page('section')).toBe('<article id="section"><section class="kui-page-section"><div class="kui-page-section-head"><h2 class="kui-heading-section kui-page-section-title">Moons</h2><a href="/table">New</a></div><p>Phobos</p></section></article>')
   })

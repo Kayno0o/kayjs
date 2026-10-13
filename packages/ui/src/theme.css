@@ -1650,7 +1650,8 @@
     @apply flex cursor-pointer items-center gap-1 py-1 pr-2 text-sm text-kui-subtext0 transition-colors hover:bg-kui-row-hover hover:text-kui-text;
     padding-left: calc(var(--kui-tree-level, 0) * 1rem + 0.25rem);
 
-    &:where([aria-selected='true']) {
+    /* After the hover, so a hovered selected row keeps its tint. */
+    &[aria-selected='true'] {
       @apply bg-kui-surface1 text-kui-text;
     }
 

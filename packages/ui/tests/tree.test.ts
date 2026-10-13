@@ -44,3 +44,20 @@ describe('treeKey', () => {
     expect([key('work', 'ArrowLeft'), key('notes', 'ArrowLeft'), key('inbox', 'ArrowLeft'), key('notes', 'a')]).toEqual([{ close: 'work' }, { focus: 'work' }, undefined, undefined])
   })
 })
+
+describe('typeahead', () => {
+  const open = new Set(['work'])
+  const rows = treeRows(nodes, open)
+  const key = (focused: string, pressed: string) => treeKey(rows, focused, pressed, open)
+
+  test('goes to the next row shown whose label starts with the letter, coming round after the last', () => {
+    expect([key('work', 'n'), key('inbox', 'W'), key('specs', 's'), key('work', 'x'), key('work', ' ')]).toEqual([{ focus: 'notes' }, { focus: 'work' }, undefined, undefined, undefined])
+  })
+})
+
+test('takes numbers as ids, 0 included', () => {
+  const numbered: TreeNode<number>[] = [{ id: 0, label: 'Root', children: [{ id: 1, label: 'Leaf' }] }]
+  const open = new Set([0])
+
+  expect([treePath(numbered, 1), treeKey(treeRows(numbered, open), 1, 'ArrowLeft', open), treeKey(treeRows(numbered, open), 0, 'ArrowLeft', open)]).toEqual([[0], { focus: 0 }, { close: 0 }])
+})

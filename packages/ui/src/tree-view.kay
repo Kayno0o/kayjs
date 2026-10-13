@@ -18,26 +18,33 @@ const { nodes, label, selected, expanded = [], onSelect, class: className, ...re
   class?: string | undefined
 }>()
 
+const path = (id: TreeId | undefined) => id === undefined ? undefined : treePath(nodes, id)
 // Held as the wider type: a signal cannot take a type parameter.
-const open = signal<ReadonlySet<TreeId>>(new Set<TreeId>(expanded))
+// Opened to the selected node from the start, so the server's HTML shows it too.
+const open = signal<ReadonlySet<TreeId>>(new Set<TreeId>([...expanded, ...path(selected) ?? []]))
 const current = signal<TreeId | undefined>(selected)
 // The row in the page's tab order, as a tree is one stop the arrows move inside.
 const focused = signal<TreeId | undefined>(selected)
 const rows = memo(() => treeRows(nodes, open()))
+// The selected node whose branches were last opened, so new nodes never reopen a branch closed since.
+let reached = path(selected) ? selected : undefined
 let list: HTMLUListElement | undefined
 
-effect(() => {
-  current.set(selected)
+effect(() => current.set(selected))
 
-  if (selected === undefined)
+// Waits for the nodes holding the selected one when they come later.
+effect(() => {
+  const holding = path(selected)
+
+  if (!holding || selected === reached)
     return
 
+  reached = selected
   focused.set(selected)
-  const path = treePath(nodes, selected) ?? []
 
   // Untracked, so closing a branch never brings the prop back over a pick made since.
-  if (path.some(id => !untrack(open).has(id)))
-    open.set(shown => new Set([...shown, ...path]))
+  if (holding.some(id => !untrack(open).has(id)))
+    open.set(shown => new Set([...shown, ...holding]))
 })
 
 // The focused row when shown, which starts as the selected one, else the selected one, else the first.
@@ -57,9 +64,9 @@ function pick(row: TreeRow<Id>) {
   onSelect?.(row.node.id)
 }
 
-// The chevron opens or closes its branch, the rest of the row selects it; the keyboard does both through the row itself.
+// A branch's chevron opens or closes it, the rest of the row selects it; the keyboard does both through the row itself.
 function click(event: MouseEvent, row: TreeRow<Id>) {
-  if ((event.target as Element).closest('.kui-tree-view-toggle'))
+  if (row.node.children && (event.target as Element).closest('.kui-tree-view-toggle'))
     toggle(row.node.id)
   else
     pick(row)
@@ -73,6 +80,10 @@ function focusRow(id: TreeId) {
 }
 
 function keyDown(event: KeyboardEvent) {
+  // A chord, such as Alt+Left going back a page, stays the browser's; Shift only types a capital.
+  if (event.altKey || event.ctrlKey || event.metaKey || (event.shiftKey && (event.key.length > 1 || event.key === ' ')))
+    return
+
   const at = stop()
   const row = rows().find(one => one.node.id === at)
 

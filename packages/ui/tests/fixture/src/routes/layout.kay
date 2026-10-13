@@ -5,6 +5,7 @@ import CollapsibleSection from '@kaynooo/kayjs-ui/collapsible-section.kay'
 import PageHeader from '@kaynooo/kayjs-ui/page-header.kay'
 import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
 import SiteNav from '@kaynooo/kayjs-ui/site-nav.kay'
+import TreeView from '@kaynooo/kayjs-ui/tree-view.kay'
 import Widget from '@kaynooo/kayjs-ui/widget.kay'
 ---
 main
@@ -13,6 +14,8 @@ main
       @actions
         a(href="/table") New
       p Every moon of Mars.
+  article#tree
+    TreeView(nodes={[{ id: 'mars', label: 'Mars', children: [{ id: 'phobos', label: 'Phobos' }] }, { id: 'venus', label: 'Venus' }]} label="Planets" selected="phobos")
   article#bare-header
     PageHeader(title="Rings")
   article#section

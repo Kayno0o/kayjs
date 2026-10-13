@@ -50,6 +50,7 @@ export function treePath<Id extends TreeId>(nodes: readonly TreeNode<Id>[], id: 
 }
 
 // What a key does on the focused row, as the ARIA tree pattern has it: the row to focus, or a branch to open or close.
+// A printable character goes to the next row whose label starts with it, coming round after the last.
 export type TreeMove<Id extends TreeId> = { focus: Id } | { open: Id } | { close: Id } | undefined
 
 export function treeKey<Id extends TreeId>(rows: readonly TreeRow<Id>[], focused: TreeId, key: string, open: ReadonlySet<TreeId>): TreeMove<Id> {
@@ -84,7 +85,14 @@ export function treeKey<Id extends TreeId>(rows: readonly TreeRow<Id>[], focused
         return { close: row.node.id }
 
       return row.parent === undefined ? undefined : { focus: row.parent }
-    default:
-      return undefined
+    default: {
+      if (key.length !== 1 || !key.trim())
+        return undefined
+
+      const typed = key.toLocaleLowerCase()
+      const next = [...rows.slice(index + 1), ...rows.slice(0, index)].find(one => one.node.label.toLocaleLowerCase().startsWith(typed))
+
+      return next && { focus: next.node.id }
+    }
   }
 }

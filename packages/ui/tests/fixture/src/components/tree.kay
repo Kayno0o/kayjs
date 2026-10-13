@@ -3,19 +3,20 @@ import type { TreeNode } from '@kaynooo/kayjs-ui'
 import { signal } from 'kay'
 import TreeView from '@kaynooo/kayjs-ui/tree-view.kay'
 
-// What the test reads back: every node picked, and a button standing for the parent picking one itself.
+// What the test reads back: every node picked, and buttons standing for the parent picking a node itself or sending new nodes.
 const { onSelect } = props<{ onSelect: (id: string) => void }>()
 
 const picked = signal<string | undefined>('notes')
-const nodes: TreeNode[] = [
+const nodes = signal<TreeNode[]>([
   { id: 'work', label: 'Work', children: [{ id: 'specs', label: 'Specs', children: [{ id: 'api', label: 'API' }] }, { id: 'notes', label: 'Notes', icon: 'info' }] },
   { id: 'inbox', label: 'Inbox' },
-]
+])
 
 function select(id: string) {
   picked.set(id)
   onSelect(id)
 }
 ---
-TreeView#tree(nodes={nodes} label="Folders" selected={picked()} onSelect={select})
+TreeView#tree(nodes={nodes()} label="Folders" selected={picked()} onSelect={select})
 button#pick-api(type="button" onClick={() => picked.set('api')}) API
+button#rename(type="button" onClick={() => nodes.set(shown => shown.map(node => node.id === 'inbox' ? { ...node, label: 'Mail' } : node))}) Rename

@@ -97,3 +97,40 @@ test('follows a node its parent selects, opening the branches holding it', async
 
   expect(rows(root)).toEqual(['Work 1 1/2 true false -1', 'Specs 2 1/2 true false -1', 'API 3 1/1  true 0', 'Notes 2 2/2  false -1', 'Inbox 1 2/2  false -1'])
 })
+
+test('a chord stays the browser\'s, Space selects, and a letter goes to the next row starting with it', async () => {
+  const root = await tree()
+  const focused = () => document.activeElement?.querySelector('.kui-tree-view-label')?.textContent
+  const chord = new KeyboardEvent('keydown', { key: 'ArrowLeft', altKey: true, bubbles: true, cancelable: true })
+
+  root.querySelector<HTMLElement>('[tabindex="0"]')!.focus()
+  document.activeElement!.dispatchEvent(chord)
+  await settle()
+
+  expect([focused(), chord.defaultPrevented]).toEqual(['Notes', false])
+
+  press(root, 'i')
+  await settle()
+  press(root, ' ')
+  await settle()
+  press(root, 'W')
+  await settle()
+
+  expect([focused(), picks]).toEqual(['Work', ['inbox']])
+})
+
+test('a click on the blank before a leaf selects it, and new nodes never reopen a branch closed since', async () => {
+  const root = await tree()
+
+  click(root.querySelectorAll('.kui-tree-view-toggle')[3]!)
+  await settle()
+
+  expect(picks).toEqual(['inbox'])
+
+  click(root.querySelector('.kui-tree-view-toggle'))
+  await settle()
+  click(mounted!.root.querySelector('#rename'))
+  await settle()
+
+  expect(rows(root)).toEqual(['Work 1 1/2 false false -1', 'Mail 1 2/2  true 0'])
+})
