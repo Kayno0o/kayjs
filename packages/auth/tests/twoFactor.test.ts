@@ -47,6 +47,48 @@ async function enrolled() {
   return { ...app, ada, setup, secret, code, recoveryCodes: enabled.recoveryCodes as string[] }
 }
 
+describe('changes to the second factor', () => {
+  test('turning it on, new recovery codes and turning it off each end the user\'s other sessions and bearer tokens, this one kept', async () => {
+    const app = testApp({ site: 'Site' })
+    const ada = app.browser()
+
+    await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
+    const { id } = await ada.json('/me') as { id: string }
+    // Another browser and a device token, for the change that follows to end.
+    const otherWaysIn = async () => {
+      const elsewhere = app.browser()
+
+      await elsewhere.fetch(`/sign-in/${id}`, { method: 'POST' })
+      const minted = await ada.call('createToken', { password: PASSWORD }, 'phone')
+
+      expect(await elsewhere.json('/me')).toMatchObject({ id })
+
+      return async () => {
+        expect(await ada.json('/me')).toMatchObject({ id })
+        expect(await elsewhere.json('/me')).toBe('anonymous')
+        expect(await app.browser().json('/me', { headers: { authorization: `Bearer ${minted.token}` } })).toBe('anonymous')
+      }
+    }
+
+    const setup = await ada.call('setUpTwoFactor', { password: PASSWORD })
+    const secret = setup.setup.secret as string
+    let ended = await otherWaysIn()
+
+    expect(await ada.call('enableTwoFactor', await totpCode(secret, totpStep()))).toMatchObject({ ok: true })
+    await ended()
+
+    ended = await otherWaysIn()
+    const regenerated = await ada.call('regenerateRecoveryCodes', { code: await totpCode(secret, totpStep() + 1) })
+
+    expect(regenerated).toMatchObject({ ok: true })
+    await ended()
+
+    ended = await otherWaysIn()
+    expect(await ada.call('disableTwoFactor', { code: regenerated.recoveryCodes[0] })).toEqual({ ok: true })
+    await ended()
+  })
+})
+
 describe('setting up a second factor', () => {
   test('gives a secret, its URI and a QR code, and turns on with a code from it', async () => {
     const { setup, recoveryCodes, ada, store } = await enrolled()

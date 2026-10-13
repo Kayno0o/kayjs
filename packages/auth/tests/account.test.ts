@@ -160,6 +160,21 @@ describe('unlinking a provider', () => {
     expect(await ada.call('unlink', 'discord', { password: 'a first password' })).toEqual({ ok: true })
     expect(await ada.call('identities')).toEqual([])
   })
+
+  test('ends the user\'s other sessions and bearer tokens, this one kept', async () => {
+    const { ada, browser, store } = await registered()
+    const { id } = await ada.json('/me') as User
+    const elsewhere = browser()
+
+    await store.identities.create({ provider: 'discord', providerId: '1', userId: id, accessToken: null, refreshToken: null, tokenExpiresAt: null, createdAt: new Date() })
+    await elsewhere.fetch(`/sign-in/${id}`, POST)
+    const minted = await ada.call('createToken', { password: PASSWORD }, 'phone')
+
+    expect(await ada.call('unlink', 'discord', { password: PASSWORD })).toEqual({ ok: true })
+    expect(await ada.json('/me')).toMatchObject({ id })
+    expect(await elsewhere.json('/me')).toBe('anonymous')
+    expect(await browser().json('/me', { headers: { authorization: `Bearer ${minted.token}` } })).toBe('anonymous')
+  })
 })
 
 describe('deleting the account', () => {

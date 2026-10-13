@@ -10,6 +10,7 @@ import { deriveKeys, digest } from './keys'
 import { spend } from './limits'
 import { notify } from './notify'
 import { provePasskey } from './passkeys'
+import { endOtherSessions } from './sessions'
 import { generateTotpSecret, otpauthUri, verifyTotp } from './totp'
 
 const CHALLENGE_MAX_AGE_MS = 10 * 60 * 1000
@@ -195,12 +196,10 @@ export async function enableTwoFactor(state: RequestState, code: string): Promis
 
   await state.core.store.attempts.reset(`enable-two-factor:${record.id}`)
 
-  const updated = await state.core.store.users.update(record.id, { totpEnabledAt: new Date(), totpLastStep: step })
+  const updated = await endOtherSessions(state, record, { totpEnabledAt: new Date(), totpLastStep: step })
 
-  if (updated) {
-    await state.renew(updated)
+  if (updated)
     await notify(state, updated, 'two-factor-enabled')
-  }
 
   return { ok: true, recoveryCodes: await issueRecoveryCodes(state.core, record.id) }
 }
@@ -211,8 +210,8 @@ export async function disableTwoFactor(state: RequestState, proof: Proof): Promi
   if (!proved.ok)
     return proved
 
-  await state.core.store.users.update(proved.record.id, { totpSecret: null, totpEnabledAt: null })
   await state.core.store.recoveryCodes.replace(proved.record.id, [])
+  await endOtherSessions(state, proved.record, { totpSecret: null, totpEnabledAt: null })
   await notify(state, proved.record, 'two-factor-disabled')
 
   return { ok: true }
@@ -230,6 +229,7 @@ export async function regenerateRecoveryCodes(state: RequestState, proof: Proof)
 
   const recoveryCodes = await issueRecoveryCodes(state.core, proved.record.id)
 
+  await endOtherSessions(state, proved.record)
   await notify(state, proved.record, 'recovery-codes-regenerated')
 
   return { ok: true, recoveryCodes }

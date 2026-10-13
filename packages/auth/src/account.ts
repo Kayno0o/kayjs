@@ -7,9 +7,9 @@ import { hashPassword } from '@kaynooo/utils'
 import { lastAdmin } from './admin'
 import { newPasswordProblem } from './breached'
 import { publicUser } from './core'
-import { revokeBearerTokens } from './email'
 import { notify } from './notify'
 import { normalizeUsername, usernameProblem } from './rules'
+import { endOtherSessions } from './sessions'
 import { reprove } from './twoFactor'
 
 // Sets the signed-in user's password, or a first one, and ends their other sessions.
@@ -24,13 +24,11 @@ export async function changePassword(state: RequestState, proof: Proof, password
   if (!proved.ok)
     return proved
 
-  const updated = await state.core.store.users.update(proved.record.id, { passwordHash: await hashPassword(password), sessionVersion: proved.record.sessionVersion + 1 })
+  const updated = await endOtherSessions(state, proved.record, { passwordHash: await hashPassword(password) })
 
   if (updated) {
     // Links mailed before, a reset among them, no longer outrank the password just set.
     await state.core.store.tokens.deleteForUser(updated.id)
-    await revokeBearerTokens(state.core, updated.id)
-    await state.renew(updated)
     await notify(state, updated, 'password-changed')
   }
 
@@ -84,7 +82,7 @@ export async function changeUsername(state: RequestState, username: string): Pro
   return { ok: true, user: publicUser(updated) }
 }
 
-// Unlinks a provider from the signed-in user, unless it is their last way in.
+// Unlinks a provider from the signed-in user, unless it is their last way in, and ends their other sessions.
 export async function unlink(state: RequestState, provider: string, proof: Proof): Promise<{ ok: true } | { ok: false, error: ProofFailure | 'not-linked' | 'last-way-in' }> {
   const proved = await reprove(state, proof)
 
@@ -104,6 +102,7 @@ export async function unlink(state: RequestState, provider: string, proof: Proof
     return { ok: false, error: 'last-way-in' }
 
   await state.core.store.identities.delete(identity.provider, identity.providerId)
+  await endOtherSessions(state, record)
   await notify(state, record, 'provider-unlinked', provider)
 
   return { ok: true }

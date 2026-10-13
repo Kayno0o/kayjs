@@ -4,9 +4,9 @@ import type { RequestState } from './state'
 import type { UserRecord } from './store'
 import { clamp } from '@kaynooo/utils'
 import { banned, publicUser } from './core'
-import { revokeBearerTokens } from './email'
 import { auditEntries, report } from './events'
 import { notify } from './notify'
+import { revokeBearerTokens } from './sessions'
 import { provedLately } from './twoFactor'
 
 const USER_PAGE_MAX = 200

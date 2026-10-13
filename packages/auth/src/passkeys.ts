@@ -10,6 +10,7 @@ import { report } from './events'
 import { spend } from './limits'
 import { notify } from './notify'
 import { safeRedirect } from './oauth/redirect'
+import { endOtherSessions } from './sessions'
 import { reprove } from './twoFactor'
 import { generateAuthenticationOptions, generateRegistrationOptions, verifyAuthenticationResponse, verifyRegistrationResponse } from './webauthn'
 
@@ -173,6 +174,7 @@ export async function removePasskey(state: RequestState, id: string, proof: Proo
     return { ok: false, error: 'last-way-in' }
 
   await core.store.passkeys.delete(record.id, id)
+  await endOtherSessions(state, record)
   await notify(state, record, 'passkey-removed', passkey.name)
 
   return { ok: true }

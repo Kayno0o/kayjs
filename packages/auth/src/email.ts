@@ -15,6 +15,7 @@ import { writing } from './mail'
 import { notify } from './notify'
 import { safeRedirect } from './oauth/redirect'
 import { emailProblem, normalizeEmail } from './rules'
+import { endOtherSessions, revokeBearerTokens } from './sessions'
 import { reprove } from './twoFactor'
 
 const MINUTE_MS = 60 * 1000
@@ -226,13 +227,12 @@ export async function confirmEmailChange(state: RequestState, token: string): Pr
   if (await store.users.findByEmail(spent.token.email))
     return { ok: false, error: 'invalid' }
 
-  const record = await store.users.update(spent.record.id, { email: spent.token.email, emailVerifiedAt: new Date(), sessionVersion: spent.record.sessionVersion + 1 })
+  const record = await endOtherSessions(state, spent.record, { email: spent.token.email, emailVerifiedAt: new Date() })
 
   if (!record)
     return { ok: false, error: 'invalid' }
 
   await store.tokens.deleteForUser(record.id)
-  await state.renew(record)
   // To the address the account left, which is the one a thief would want silent.
   await notify(state, record, 'email-changed', record.email!, spent.record.emailVerifiedAt === null ? null : spent.record.email)
 
@@ -454,9 +454,4 @@ async function claim(core: Core, record: UserRecord): Promise<Partial<UserRecord
   await core.store.tokens.deleteForUser(record.id)
 
   return { passwordHash: null, totpSecret: null, totpEnabledAt: null, sessionVersion: record.sessionVersion + 1 }
-}
-
-export async function revokeBearerTokens(core: Core, userId: string): Promise<void> {
-  for (const token of await core.store.bearerTokens.listByUser(userId))
-    await core.store.bearerTokens.delete(userId, token.id)
 }

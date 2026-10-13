@@ -352,13 +352,14 @@ describe('magic links', () => {
 })
 
 describe('changing an email', () => {
-  test('mails the new address and moves the account once confirmed, ending the other sessions', async () => {
+  test('mails the new address and moves the account once confirmed, ending the other sessions and bearer tokens', async () => {
     const { browser, mails, tokenOf } = setup()
     const ada = browser()
     const elsewhere = browser()
 
     await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
     await elsewhere.post('/password', { identifier: 'ada@example.com', password: PASSWORD })
+    const minted = await ada.call('createToken', { password: PASSWORD }, 'phone')
 
     expect(await ada.call('changeEmail', { password: PASSWORD }, 'ada@new.test')).toEqual({ ok: true })
     expect(mails.at(-1)).toMatchObject({ to: 'ada@new.test', kind: 'change-email' })
@@ -367,6 +368,7 @@ describe('changing an email', () => {
     expect(await ada.call('confirmEmailChange', tokenOf('change-email'))).toEqual({ ok: true, redirect: '/' })
     expect(await ada.json('/me')).toMatchObject({ email: 'ada@new.test', emailVerified: true })
     expect(await elsewhere.json('/me')).toBe('anonymous')
+    expect(await browser().json('/me', { headers: { authorization: `Bearer ${minted.token}` } })).toBe('anonymous')
   })
 
   test('refuses an address another account has, the same one, or a wrong password', async () => {

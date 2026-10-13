@@ -126,3 +126,20 @@ export async function applyLifetime(state: RequestState, remember: boolean | und
 
   return remember ? core.rememberMaxAge : core.browserSessionMaxAge
 }
+
+// After a change to how the account is signed in to: every session the user holds ends but this browser's, and every bearer token with them, since one minted from a stolen session would outlive it.
+export async function endOtherSessions(state: RequestState, record: UserRecord, patch: Partial<UserRecord> = {}): Promise<UserRecord | undefined> {
+  const updated = await state.core.store.users.update(record.id, { ...patch, sessionVersion: record.sessionVersion + 1 })
+
+  await revokeBearerTokens(state.core, record.id)
+
+  if (updated)
+    await state.renew(updated)
+
+  return updated
+}
+
+export async function revokeBearerTokens(core: Core, userId: string): Promise<void> {
+  for (const token of await core.store.bearerTokens.listByUser(userId))
+    await core.store.bearerTokens.delete(userId, token.id)
+}
