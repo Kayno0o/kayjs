@@ -6,6 +6,10 @@ export interface DevProblem {
   text: string
   // What the dev tool cannot tell from the text: an error nothing caught, or what the policy blocked.
   kind?: 'uncaught' | 'policy'
+  // The error thrown, whose stack the dev tool shows in place of the text.
+  error?: unknown
+  // The island kay caught the error in.
+  island?: string | undefined
 }
 
 // An array until the dev tool loads and takes what it holds, then the dev tool's own `push`.
@@ -30,15 +34,16 @@ export function bootDevTool(win: Window & { $kayProblems?: DevProblems }): void 
   }
 
   win.addEventListener('error', (event) => {
-    const stack: unknown = (event.error as { stack?: unknown } | null)?.stack
+    // Chromium's note that a resize observer's callback ran out of frame, which nothing threw.
+    if (event.message.startsWith('ResizeObserver loop'))
+      return
 
-    win.$kayProblems!.push({ level: 'error', kind: 'uncaught', text: typeof stack === 'string' && stack !== '' ? stack : event.message })
+    win.$kayProblems!.push({ level: 'error', kind: 'uncaught', text: event.message, error: event.error as unknown })
   })
   win.addEventListener('unhandledrejection', (event) => {
     const reason: unknown = event.reason
-    const stack: unknown = (reason as { stack?: unknown } | null)?.stack
 
-    win.$kayProblems!.push({ level: 'error', kind: 'uncaught', text: `Uncaught (in promise) ${typeof stack === 'string' && stack !== '' ? stack : String(reason)}` })
+    win.$kayProblems!.push({ level: 'error', kind: 'uncaught', text: `Uncaught (in promise) ${String(reason)}`, error: reason })
   })
   win.addEventListener('securitypolicyviolation', (event) => {
     const where = event.sourceFile === '' ? '' : ` at ${event.sourceFile}:${event.lineNumber}:${event.columnNumber}`

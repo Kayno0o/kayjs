@@ -2,6 +2,7 @@ import type { DevTool } from '../src/runtime/dev-tool'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test'
 import { startDevTool } from '../src/runtime/dev-tool'
+import { reportError } from '../src/runtime/reactive'
 import { DEV_BOOT, problemsBlock } from '../src/server/dev'
 
 const BOOT = (/<script>([\s\S]*)<\/script>/).exec(DEV_BOOT)![1]!
@@ -126,6 +127,13 @@ describe('the dev tool', () => {
     await Bun.sleep(0)
     expect(problems()).toEqual([['warn', 'warning[missing-alt]: an img needs alt']])
 
+    // Read again, a problem kay check still finds came no second time.
+    document.documentElement.removeAttribute('aria-busy')
+    await Bun.sleep(0)
+    document.documentElement.setAttribute('aria-busy', 'true')
+    await Bun.sleep(0)
+    expect(shadow().querySelector<HTMLElement>('.problem .note')!.hidden).toBe(true)
+
     document.head.innerHTML = problemsBlock(['error[unread-prop]: a prop nothing reads'])
     document.documentElement.removeAttribute('aria-busy')
     await Bun.sleep(0)
@@ -158,6 +166,30 @@ describe('the dev tool', () => {
     expect(groups()).toEqual(['Uncaught errors (1)', 'Blocked by the policy (1)', 'Accessibility (1)'])
   })
 
+  it('lists an error kay caught in an island, heads a stack that lacks them with its name and message, and leaves out a resize observer note', async () => {
+    tool = startDevTool()
+
+    const thrown = Object.assign(new TypeError('no count'), { stack: 'counted@http://localhost/_kay/client/a.js:1:2' })
+    const rejected = new Event('unhandledrejection')
+
+    Object.defineProperty(rejected, 'reason', { value: thrown })
+    // What kay reports, as an island's render that throws does, its client sending it to the server too.
+    const { fetch } = globalThis
+
+    globalThis.fetch = (async () => new Response(null)) as unknown as typeof fetch
+    await import('../src/runtime/client')
+    reportError(thrown, 'src/components/counter.kay')
+    globalThis.fetch = fetch
+    window.dispatchEvent(rejected)
+    window.dispatchEvent(new ErrorEvent('error', { message: 'ResizeObserver loop completed with undelivered notifications.', error: null }))
+    await Bun.sleep(0)
+
+    expect(problems()).toEqual([
+      ['error', 'in island src/components/counter.kay: TypeError: no count\ncounted@http://localhost/_kay/client/a.js:1:2'],
+      ['error', 'Uncaught (in promise) TypeError: no count\ncounted@http://localhost/_kay/client/a.js:1:2'],
+    ])
+  })
+
   it('outlines the elements an accessibility problem names on hover', async () => {
     document.body.innerHTML = '<img class="hero" src="/a.png"><img class="hero" src="/b.png">'
     tool = startDevTool()
@@ -175,16 +207,25 @@ describe('the dev tool', () => {
     document.body.innerHTML = ''
   })
 
+  it('finds the .kay files a problem names by kay\'s route names, with a line alone, and none inside a URL', async () => {
+    tool = startDevTool()
+    console.error('[kay] src/routes/todos/[id].kay:3:4, src/routes/(site)/[[page]].kay:12, src/routes/[...rest].kay and http://localhost:3000/src/x.kay')
+    await Bun.sleep(0)
+
+    expect([...shadow().querySelectorAll('.problem button.position')].map(position => position.textContent)).toEqual(['src/routes/todos/[id].kay:3:4', 'src/routes/(site)/[[page]].kay:12', 'src/routes/[...rest].kay'])
+  })
+
   it('opens each .kay file a problem names once an opener is set, saying why it could not', async () => {
     const opened: string[] = []
 
     tool = startDevTool()
     console.error('[kay] island src/components/card.kay did not match, see src/routes/index.kay:4:3.')
+    console.error('[kay] line alone in src/routes/about.kay:7')
     await Bun.sleep(0)
 
     const positions = () => [...shadow().querySelectorAll<HTMLButtonElement>('.problem button.position')]
 
-    expect(positions().map(position => [position.textContent, position.disabled])).toEqual([['src/components/card.kay', true], ['src/routes/index.kay:4:3', true]])
+    expect(positions().map(position => [position.textContent, position.disabled])).toEqual([['src/components/card.kay', true], ['src/routes/index.kay:4:3', true], ['src/routes/about.kay:7', true]])
 
     tool.setOpener(async (source) => {
       opened.push(source)
@@ -193,11 +234,12 @@ describe('the dev tool', () => {
     })
     expect(positions().every(position => !position.disabled)).toBe(true)
 
-    positions()[0]!.click()
-    positions()[1]!.click()
+    for (const position of positions())
+      position.click()
+
     await Bun.sleep(0)
 
-    expect(opened).toEqual(['src/components/card.kay:1:1', 'src/routes/index.kay:4:3'])
+    expect(opened).toEqual(['src/components/card.kay:1:1', 'src/routes/index.kay:4:3', 'src/routes/about.kay:7:1'])
     expect(problems()[0]![1]).toBe('island src/components/card.kay did not match, see src/routes/index.kay:4:3 (no editor found, set KAY_EDITOR).')
   })
 })

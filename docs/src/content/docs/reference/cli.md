@@ -94,7 +94,7 @@ The `Listening on http://localhost:3000` line an entry scaffolded by an older ka
 Every page a dev server serves carries a bar at the bottom left, `kay` and a count of the page's problems, red when one is an error. A click on it, or Alt+Shift+K, opens its drawer; Escape closes it.
 
 - **Problems** lists, each under its heading:
-  - errors nothing caught and unhandled rejections, with their stack;
+  - errors nothing caught, those kay caught in an island or an effect, and unhandled rejections, with their stack;
   - what kay recovered from in the browser, such as an island that did not match its server markup;
   - what the Content-Security-Policy blocked, naming the directive and the source;
   - what axe-core finds on the rendered page; hovering one outlines the elements it names;

@@ -1,3 +1,4 @@
+import type { DevProblems } from './dev-boot'
 import { withBase } from './base'
 import { dispatch, hydrate, render } from './dom'
 import { ISLAND } from './markers'
@@ -48,6 +49,10 @@ export interface HotSwap {
 
 setErrorReporter((error, island) => {
   console.error(error)
+
+  // The dev tool lists what kay caught too, as the browser fires nothing for it.
+  if (process.env.NODE_ENV !== 'production')
+    (globalThis as { $kayProblems?: DevProblems }).$kayProblems?.push({ level: 'error', kind: 'uncaught', text: String(error), error, island })
 
   if (typeof KAY_STATIC_EXPORT === 'undefined')
     sendError(error, island)

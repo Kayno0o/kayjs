@@ -363,6 +363,26 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay dev in
       await shown.waitUntil(() => document.querySelector('kay-dev')!.shadowRoot!.textContent.includes('thrown later'))
 
       expect((await logged(shown))[0]).toStartWith('Error: thrown later\n    at ')
+
+      // As do a rejection nothing handled and a source the policy blocked.
+      await shown.evaluate(() => {
+        const policy = document.createElement('meta')
+        const image = document.createElement('img')
+
+        policy.httpEquiv = 'Content-Security-Policy'
+        policy.content = 'img-src \'self\''
+        document.head.append(policy)
+        image.src = 'https://blocked.example/x.png'
+        document.body.append(image)
+        void Promise.reject(new Error('rejected later'))
+      })
+      await shown.waitUntil(() => document.querySelector('kay-dev')!.shadowRoot!.querySelectorAll('.problem pre').length >= 3)
+
+      expect(await logged(shown)).toEqual([
+        expect.stringMatching(/^Error: thrown later\n {4}at /),
+        expect.stringMatching(/^Uncaught \(in promise\) Error: rejected later\n {4}at /),
+        expect.stringMatching(/^blocked https:\/\/blocked\.example\/x\.png by img-src/),
+      ])
     }
     finally {
       await dev.close()

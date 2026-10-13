@@ -7,8 +7,11 @@ const STATE_KEY = 'kay-dev'
 const CHECK_PROBLEMS = 'kay-check-problems'
 // The most problem texts a tab remembers as dismissed.
 const MAX_DISMISSED = 200
-// A `.kay` file a problem names, with its line and column when it gives them.
-const KAY_POSITION = /(?:[\w@.-]+\/)*[\w@.-]+\.kay(?::\d+:\d+)?(?!\.?\w)/g
+// A path segment, kay's `(group)`, `[param]`, `[[optional]]` and `[...rest]` names included.
+const SEGMENT = String.raw`(?:\([\w@.+=-]+\)|\[{1,2}(?:\.{3})?[\w-]+\]{1,2}|[\w@.+=-])+`
+// A `.kay` file a problem names, with its line and column when it gives them, not one inside a URL.
+const KAY_POSITION = new RegExp(String.raw`(?<![\w@.+=:/\\)\]-])(?:[A-Za-z]:)?[\\/]?(?:${SEGMENT}[\\/])*${SEGMENT}\.kay(?::\d+(?::\d+)?)?(?!\.?\w)`, 'g')
+const OPENED_POSITION = /^(.+\.kay)(?::(\d+))?(?::(\d+))?$/
 
 type ProblemKind = 'uncaught' | 'kay' | 'policy' | 'a11y' | 'check'
 
@@ -392,14 +395,20 @@ function problemsTab(doc: Document, tool: DevTool, state: DevState, save: () => 
   tab.panel.append(actions, empty, ...[...groups.values()].map(group => group.section))
 
   const update = () => {
-    const errors = [...shown.values()].some(({ problem }) => problem.level === 'error')
+    const counts = new Map<ProblemKind, number>()
+    let errors = false
+
+    for (const { problem, kind } of shown.values()) {
+      counts.set(kind, (counts.get(kind) ?? 0) + 1)
+      errors ||= problem.level === 'error'
+    }
 
     tab.count(shown.size, errors ? 'error' : undefined)
     empty.hidden = shown.size > 0
     actions.hidden = shown.size === 0
 
     for (const [kind, group] of groups) {
-      const count = [...shown.values()].filter(entry => entry.kind === kind).length
+      const count = counts.get(kind) ?? 0
 
       group.section.hidden = count === 0
       group.heading.textContent = `${group.label} (${count})`
@@ -420,8 +429,13 @@ function problemsTab(doc: Document, tool: DevTool, state: DevState, save: () => 
     tool.hideOutline()
     update()
   }
-  const add = (problem: DevProblem, check = false) => {
+  const add = (logged: DevProblem, check = false) => {
+    const problem = { ...logged, text: problemText(logged) }
     const known = shown.get(problem.text)
+
+    // `kay check` is read again after each swap, which is no new occurrence.
+    if (known && check)
+      return
 
     if (known) {
       known.count++
@@ -452,9 +466,10 @@ function problemsTab(doc: Document, tool: DevTool, state: DevState, save: () => 
     if (kind === 'a11y') {
       element.onpointerenter = () => {
         const targets = a11yTargets(doc, problem.text)
+        const colon = problem.text.indexOf(':')
 
         if (targets.length > 0)
-          tool.outline(targets, problem.text.slice(5, problem.text.indexOf(':')))
+          tool.outline(targets, problem.text.slice(5, colon < 0 ? undefined : colon))
       }
       element.onpointerleave = () => tool.hideOutline()
     }
@@ -527,6 +542,16 @@ function problemsTab(doc: Document, tool: DevTool, state: DevState, save: () => 
   }
 }
 
+// An error's stack, headed by its name and message where the browser leaves them out, or the text logged with it; the island kay caught it in first.
+function problemText({ text, error, island }: DevProblem): string {
+  const { name, message, stack } = (typeof error === 'object' && error !== null ? error : {}) as { name?: unknown, message?: unknown, stack?: unknown }
+  const head = `${String(name)}: ${String(message)}`
+  const shown = typeof stack !== 'string' || stack === '' ? text : stack.startsWith(String(name)) ? stack : `${head}\n${stack}`
+  const where = island === undefined ? '' : `in island ${island}: `
+
+  return `${where}${text.startsWith('Uncaught (in promise) ') && shown !== text ? `Uncaught (in promise) ${shown}` : shown}`
+}
+
 // The text with each `.kay` file it names, with or without a position, as a button opening it once the inspector says how.
 function withPositions(text: string, tool: DevTool): Node[] {
   const nodes: Node[] = []
@@ -539,7 +564,8 @@ function withPositions(text: string, tool: DevTool): Node[] {
     position.type = 'button'
     position.disabled = !tool.opens()
     position.onclick = async () => {
-      const failed = await tool.open(source.includes(':') ? source : `${source}:1:1`)
+      const [, file, line = '1', column = '1'] = OPENED_POSITION.exec(source)!
+      const failed = await tool.open(`${file}:${line}:${column}`)
       const note = position.nextElementSibling?.classList.contains('note') === true ? position.nextElementSibling : undefined
 
       note?.remove()
