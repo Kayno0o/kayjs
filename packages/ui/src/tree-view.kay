@@ -1,0 +1,113 @@
+--- <Id extends TreeId>
+import type { JSX } from 'kay'
+import type { TreeId, TreeNode, TreeRow } from './tree'
+import { effect, memo, signal, untrack } from 'kay'
+import Icon from './icon.kay'
+import { treeKey, treePath, treeRows } from './tree'
+
+const { nodes, label, selected, expanded = [], onSelect, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['ul'], 'class' | 'children' | 'role' | 'onKeyDown' | 'onSelect'> & {
+  nodes: readonly TreeNode<Id>[]
+  // Names the tree for screen readers.
+  label: string
+  // The node picked; a tree whose parent passes another follows it, opening the branches holding it.
+  selected?: Id | undefined
+  // The branches open to start with.
+  expanded?: readonly Id[] | undefined
+  // Runs on a click on a row, or Enter or Space on the focused one.
+  onSelect?: ((id: Id) => unknown) | undefined
+  class?: string | undefined
+}>()
+
+// Held as the wider type: a signal cannot take a type parameter.
+const open = signal<ReadonlySet<TreeId>>(new Set<TreeId>(expanded))
+const current = signal<TreeId | undefined>(selected)
+// The row in the page's tab order, as a tree is one stop the arrows move inside.
+const focused = signal<TreeId | undefined>(selected)
+const rows = memo(() => treeRows(nodes, open()))
+let list: HTMLUListElement | undefined
+
+effect(() => {
+  current.set(selected)
+
+  if (selected === undefined)
+    return
+
+  focused.set(selected)
+  const path = treePath(nodes, selected) ?? []
+
+  // Untracked, so closing a branch never brings the prop back over a pick made since.
+  if (path.some(id => !untrack(open).has(id)))
+    open.set(shown => new Set([...shown, ...path]))
+})
+
+// The focused row when shown, which starts as the selected one, else the selected one, else the first.
+const stop = memo(() => {
+  const shown = new Set<TreeId>(rows().map(row => row.node.id))
+
+  return [focused(), current()].find(id => id !== undefined && shown.has(id)) ?? rows()[0]?.node.id
+})
+
+function toggle(id: TreeId) {
+  open.set(shown => shown.has(id) ? new Set([...shown].filter(one => one !== id)) : new Set([...shown, id]))
+}
+
+function pick(row: TreeRow<Id>) {
+  current.set(row.node.id)
+  focused.set(row.node.id)
+  onSelect?.(row.node.id)
+}
+
+// The chevron opens or closes its branch, the rest of the row selects it; the keyboard does both through the row itself.
+function click(event: MouseEvent, row: TreeRow<Id>) {
+  if ((event.target as Element).closest('.kui-tree-view-toggle'))
+    toggle(row.node.id)
+  else
+    pick(row)
+}
+
+function focusRow(id: TreeId) {
+  focused.set(id)
+  const index = rows().findIndex(row => row.node.id === id)
+
+  list?.querySelectorAll<HTMLElement>('.kui-tree-view-item')[index]?.focus()
+}
+
+function keyDown(event: KeyboardEvent) {
+  const at = stop()
+  const row = rows().find(one => one.node.id === at)
+
+  if (at === undefined || !row)
+    return
+
+  if (event.key === 'Enter' || event.key === ' ') {
+    event.preventDefault()
+    pick(row)
+
+    return
+  }
+
+  const move = treeKey(rows(), at, event.key, open())
+
+  if (!move)
+    return
+
+  event.preventDefault()
+
+  if ('focus' in move)
+    focusRow(move.focus)
+  else
+    toggle('open' in move ? move.open : move.close)
+}
+---
+// The rows of every open branch in one list, each saying its depth and place for screen readers, so the arrows walk them in reading order.
+ul.kui-tree-view({...rest} ref={element => list = element} role="tree" aria-label={label} class={className} onKeyDown={keyDown})
+  for row of rows() key={row.node.id}
+    li.kui-tree-view-item(role="treeitem" aria-level={row.level} aria-posinset={row.position} aria-setsize={row.size} aria-expanded={row.node.children ? String(open().has(row.node.id)) : undefined} aria-selected={row.node.id === current() ? 'true' : 'false'} tabindex={row.node.id === stop() ? 0 : -1} style={`--kui-tree-level: ${row.level - 1}`} onFocus={() => focused.set(row.node.id)} onClick={event => click(event, row)})
+      if row.node.children
+        span.kui-tree-view-toggle(aria-hidden="true")
+          Icon(icon="chevron")
+      else
+        span.kui-tree-view-toggle
+      if row.node.icon
+        Icon(icon={row.node.icon} class="kui-tree-view-icon")
+      span.kui-tree-view-label {row.node.label}

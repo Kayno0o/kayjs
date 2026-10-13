@@ -1641,6 +1641,42 @@
     @apply shrink-0 text-kui-overlay1 hover:text-kui-text;
   }
 
+  .kui-tree-view {
+    @apply m-0 flex list-none flex-col p-0;
+  }
+
+  /* Indented by its depth, which the row sets as --kui-tree-level. */
+  .kui-tree-view-item {
+    @apply flex cursor-pointer items-center gap-1 py-1 pr-2 text-sm text-kui-subtext0 transition-colors hover:bg-kui-row-hover hover:text-kui-text;
+    padding-left: calc(var(--kui-tree-level, 0) * 1rem + 0.25rem);
+
+    &:where([aria-selected='true']) {
+      @apply bg-kui-surface1 text-kui-text;
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--color-kui-accent);
+      outline-offset: -2px;
+    }
+  }
+
+  /* The chevron points right while the branch is closed. */
+  .kui-tree-view-toggle {
+    @apply inline-flex size-4 shrink-0 -rotate-90 items-center justify-center transition-transform;
+  }
+
+  :where(.kui-tree-view-item[aria-expanded='true']) > .kui-tree-view-toggle {
+    @apply rotate-0;
+  }
+
+  .kui-tree-view-icon {
+    @apply size-4 shrink-0;
+  }
+
+  .kui-tree-view-label {
+    @apply min-w-0 truncate;
+  }
+
   .kui-toggle {
     @apply relative inline-flex cursor-pointer items-center gap-2;
 

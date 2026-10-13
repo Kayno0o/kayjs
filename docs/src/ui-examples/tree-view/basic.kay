@@ -1,0 +1,14 @@
+---
+import type { TreeNode } from '@kaynooo/kayjs-ui'
+import TreeView from '@kaynooo/kayjs-ui/tree-view.kay'
+
+const folder = signal('ideas')
+const nodes: TreeNode[] = [
+  { id: 'work', label: 'Work', children: [{ id: 'specs', label: 'Specs', children: [{ id: 'api', label: 'API' }] }, { id: 'ideas', label: 'Ideas' }] },
+  { id: 'travel', label: 'Travel', children: [] },
+  { id: 'inbox', label: 'Inbox', icon: 'info' },
+]
+---
+.flex.flex-col.gap-2.max-w-xs
+  TreeView(nodes={nodes} label="Folders" selected={folder()} onSelect={folder.set})
+  p Showing {folder()}.
