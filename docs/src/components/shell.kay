@@ -8,6 +8,7 @@ import { REPOSITORY } from '../forge'
 import CodeCopy from './code-copy.kay'
 import LinkFilter from './link-filter.kay'
 import Search from './search.kay'
+import ThemePicker from './theme-picker.kay'
 
 const { nav, current } = props<{ nav: Navigation, current: string }>()
 ---
@@ -22,6 +23,7 @@ a.skip-link(href="#content") Skip to the content
         a.version(href={`${REPOSITORY}/releases`}) v{nav.version}
         a.repository(href={REPOSITORY} aria-label="kay's repository")
           Icon(icon={BrandGit})
+        ThemePicker(persist)
       Search(persist nav={nav})
       // Shown once the sidebar folds into a popover.
       Button(class="hidden max-[56rem]:inline-flex" label="Menu" icon="menu" popovertarget="sidebar")

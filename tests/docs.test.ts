@@ -4,6 +4,7 @@ import { describe, expect, it } from 'bun:test'
 import { fileTree } from '../docs/src/file-tree'
 import { loadComponents, loadLibraries } from '../docs/src/libraries'
 import { loadReference } from '../docs/src/reference'
+import { ACCENTS, THEME_SCRIPT, themeCss } from '../docs/src/theme'
 import { check } from '../src/check'
 import { renderMarkdown } from '../src/content/markdown'
 
@@ -150,6 +151,29 @@ describe('the documentation site', () => {
     ])
     expect(() => fileTree('\n  \n')).toThrow('FileTree has no file to draw')
     expect(() => fileTree('src/ the sources')).toThrow('FileTree cannot read the line "src/ the sources"')
+  })
+
+  it('puts the theme a visitor picked on the page from the head, and shows the tokens an app sets for it', () => {
+    const paint = (saved: string | null) => {
+      const root = { dataset: {} as Record<string, string>, style: { set: {} as Record<string, string>, setProperty(name: string, value: string) {
+        this.set[name] = value
+      } } }
+
+      // eslint-disable-next-line no-new-func -- the head runs the script as a string, and so does the test.
+      const run = new Function('localStorage', 'document', THEME_SCRIPT) as (storage: { getItem: () => string | null }, page: { documentElement: typeof root }) => void
+
+      run({ getItem: () => saved }, { documentElement: root })
+
+      return { theme: root.dataset.theme, tokens: root.style.set }
+    }
+    const blue = ACCENTS.find(accent => accent.value === 'blue')!.tokens
+
+    expect(paint(JSON.stringify({ scheme: 'dark', accent: 'blue' }))).toEqual({ theme: 'dark', tokens: blue })
+    expect(paint(JSON.stringify({ scheme: 'system', accent: 'yellow' }))).toEqual({ theme: undefined, tokens: {} })
+    expect(paint('{"scheme":"neon","accent":"pink"}')).toEqual({ theme: undefined, tokens: {} })
+    expect(paint('not json')).toEqual({ theme: undefined, tokens: {} })
+    expect(paint(null)).toEqual({ theme: undefined, tokens: {} })
+    expect(themeCss({ scheme: 'light', accent: 'blue' })).toBe(`@theme {\n  --color-kui-accent: ${blue['--color-kui-accent']};\n  --color-kui-accent-hi: ${blue['--color-kui-accent-hi']};\n  --color-kui-on-accent: ${blue['--color-kui-on-accent']};\n}`)
   })
 
   it('passes kay check, and so does the tutorial\'s example app', async () => {

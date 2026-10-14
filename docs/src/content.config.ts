@@ -5,6 +5,7 @@ import Demo from './components/demo.kay'
 import FileTree from './components/file-tree.kay'
 import ReadMore from './components/read-more.kay'
 import RequestFlow from './components/request-flow.kay'
+import ThemeTokens from './components/theme-tokens.kay'
 import { highlight } from './highlight'
 import { loadComponents, loadLibraries } from './libraries'
 import { loadReference } from './reference'
@@ -16,7 +17,7 @@ const sectionIndex = (slug: string) => SECTIONS.findIndex(section => slug.starts
 // Written for people: one folder per section, read in the sidebar's order.
 export const docs = collection('content/docs', {
   schema: s.Object({ title: s.String(), order: s.Number(), description: s.String() }),
-  components: { Callout, FileTree, ReadMore, RequestFlow },
+  components: { Callout, FileTree, ReadMore, RequestFlow, ThemeTokens },
   sort: (a, b) => sectionIndex(a.slug) - sectionIndex(b.slug) || byOrder(a, b),
   highlight,
 })

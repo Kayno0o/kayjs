@@ -1,0 +1,16 @@
+---
+import CopyButton from '@kaynooo/kayjs-ui/copy-button.kay'
+import { memo } from 'kay'
+import { theme, themeCss } from '../theme'
+
+const css = memo(() => themeCss(theme()))
+---
+// The theme picked in the header, as an app's app.css and root layout would set it.
+.code.theme-tokens
+  .code-bar
+    span css
+    CopyButton(text={css()} label="Copy")
+  pre
+    code {css()}
+if theme().scheme !== 'system'
+  p And its root layout's #[code head] block holds #[code html(data-theme="{theme().scheme}")].

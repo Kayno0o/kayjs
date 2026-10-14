@@ -1,8 +1,6 @@
 /* The docs' colours are kayjs-ui's tokens, set in site.css, so one theme restyles the docs and the components on them; light-dark() follows the reader's color scheme with no script, Shiki's code colors included. */
 :root {
   color-scheme: light dark;
-  --navy: #17202e;
-  --yellow: #f5b83d;
   --base: var(--color-kui-canvas);
   --mantle: var(--color-kui-mantle);
   --crust: light-dark(#dbe2eb, #0d131d);
@@ -10,7 +8,8 @@
   --subtext: light-dark(#384356, #c4ccd7);
   --text: var(--color-kui-text);
   --accent: var(--color-kui-accent);
-  --tint: light-dark(#f8e3b5, #23314a);
+  /* The accent the theme picker sets, faint under the page shown and a card hovered. */
+  --tint: color-mix(in srgb, var(--accent) 20%, var(--base));
   --line: color-mix(in srgb, var(--text) 12%, transparent);
   --edge: light-dark(rgb(23 32 46 / 0.2), rgb(0 0 0 / 0.6));
   --sans: var(--font-sans);
@@ -36,7 +35,7 @@ body {
 }
 
 ::selection {
-  background: color-mix(in srgb, var(--yellow) 40%, transparent);
+  background: color-mix(in srgb, var(--accent) 35%, transparent);
 }
 
 a {
@@ -1133,4 +1132,18 @@ pre code {
 .file-tree-note {
   margin-left: 0.75rem;
   color: var(--muted);
+}
+
+.theme-picker-label {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.theme-picker-label + * + .theme-picker-label {
+  margin-top: 0.4rem;
+}
+
+.theme-tokens {
+  margin-block: 1rem 0.75rem;
 }
