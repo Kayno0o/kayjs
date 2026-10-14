@@ -254,7 +254,7 @@ new Elysia().use(welcomeMails).use(await pages()).listen(3000)
 - A run that throws is retried: `backoff` after the first failure, 10 seconds by default, twice as long after each next one, until `attempts` runs in all, 5 by default, each failure retried logged as a one-line warning with its attempt, its wait and the error's message.
 - The last failure keeps the job as failed, logs it with its stack and hands its payload and error to `onFailed`; `failed()` lists the failed jobs.
 - A store that fails, a SQLite file locked past its timeout say, is logged once as the outage starts and once as it ends, its workers asking it again later and later meanwhile, up to a minute apart.
-- A process that dies running a job leaves it held: it runs again once `lostAfter` has passed since it started, 10 minutes by default. A run still going past `lostAfter` counts as a failed attempt, so its worker moves on, and a job whose process died during each of its `attempts` is kept as failed without running again, rather than crash every process that takes it.
+- A process that dies running a job leaves it held: it runs again once `lostAfter` has passed since it started, 10 minutes by default. A run still going as `lostAfter` ends counts as a failed attempt, so its worker moves on, its handler not stopped but left to finish on its own, so a job longer than `lostAfter` needs a longer one, and a job whose process died during each of its `attempts` is kept as failed without running again, rather than crash every process that takes it.
 - `drain()` runs every job whose time has come, here and now, until none is left; in tests `site.runJobs()` from `kay/test` does it for every queue.
 
 ### Behind a proxy

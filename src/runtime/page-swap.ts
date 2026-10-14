@@ -148,7 +148,8 @@ function policyOf(swap: Swap): Policy {
 export async function go(url: URL, swap: Swap): Promise<void> {
   const token = ++navigation.current
 
-  if (swap.intent !== 'refresh')
+  // Another page only: the same one with another query, or a form sending it back to itself, is not left.
+  if (url.pathname !== location.pathname)
     navigation.visits = (navigation.visits ?? 0) + 1
 
   const isCurrent = () => token === navigation.current

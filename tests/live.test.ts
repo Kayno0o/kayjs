@@ -225,9 +225,9 @@ describe('API modules', () => {
     }, true)
 
     reader.start()
-    await Bun.sleep(1200)
+    await until(() => reader.status() === 'done')
 
-    expect([reader.status(), listening]).toEqual(['done', 0])
+    expect(listening).toBe(0)
   })
 
   it('sends the last 100 messages queued while connecting, and none once closed', () => {

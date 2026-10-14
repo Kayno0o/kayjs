@@ -657,11 +657,11 @@ export async function readActionResponse<Output>(response: Response, action: str
 // Whether the page went, or a leave guard kept the visitor on it.
 async function goTo(target: string): Promise<boolean> {
   if (navigation.navigate) {
-    const before = navigation.current
+    const [before, released] = [navigation.current, navigation.released]
 
     await navigation.navigate(target)
 
-    return navigation.current !== before || navigation.released
+    return navigation.current !== before || (!released && navigation.released)
   }
 
   const url = new URL(withBase(target), location.href)

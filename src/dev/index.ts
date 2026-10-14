@@ -462,7 +462,6 @@ function describe(files: string[]): string {
   return files.length === 1 ? first : `${first} and ${files.length - 1} more`
 }
 
-// Keeps editors and `tsgo` in step with the `.kay` sources; type errors themselves are `kay check`'s job.
 // A config that fails to load, halfway through an edit say, leaves the last one in place; the server reports why.
 async function reloadConfig(root: string, last: KayConfig): Promise<KayConfig> {
   try {
@@ -473,6 +472,7 @@ async function reloadConfig(root: string, last: KayConfig): Promise<KayConfig> {
   }
 }
 
+// Keeps editors and `tsgo` in step with the `.kay` sources; type errors themselves are `kay check`'s job.
 async function regenerateTypes(root: string, { entry, config }: DevOptions) {
   try {
     await writeShadowTypes(root, { ...configCheckOptions(config ?? {}), entry })

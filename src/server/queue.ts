@@ -80,6 +80,8 @@ const DEFAULT_BACKOFF = 10
 const DEFAULT_LOST_AFTER = 600
 // How often an idle worker looks for jobs another process enqueued.
 const POLL_MS = 1000
+// The longest a timer waits: past it, setTimeout fires at once.
+const MAX_TIMER_MS = 2 ** 31 - 1
 // The longest a worker waits between looks at a store that keeps failing.
 const MAX_OUTAGE_MS = 60_000
 const DEFAULT_PATH = 'data/jobs.sqlite'
@@ -242,12 +244,13 @@ export function queue<Payload>(name: string, handler: (payload: Payload) => unkn
   }
 
   // A run that outlasts `lostAfter` fails, so its worker takes the next job; the handler itself goes on, as nothing can stop it.
-  const withinLostAfter = async (run: unknown): Promise<void> => {
+  // It ends a moment before the hold does, so no other process takes the job while this one still marks how it went.
+  const withinLostAfter = async (run: unknown, held: number): Promise<void> => {
     let timer: ReturnType<typeof setTimeout> | undefined
 
     try {
       await Promise.race([run, new Promise((_, reject) => {
-        timer = setTimeout(() => reject(new Error(`it ran past lostAfter, ${Math.round(lostAfter / 1000)} s`)), lostAfter)
+        timer = setTimeout(() => reject(new Error(`it ran past lostAfter, ${Math.round(lostAfter / 1000)} s`)), Math.min(Math.max(held - Date.now() - Math.min(1000, lostAfter / 10), 0), MAX_TIMER_MS))
       })])
     }
     finally {
@@ -258,14 +261,15 @@ export function queue<Payload>(name: string, handler: (payload: Payload) => unkn
   // Runs one job it claimed, then marks how it went; false when none was due.
   const runNext = async (): Promise<boolean> => {
     const now = Date.now()
-    const job = await store().claim(name, now, now + lostAfter)
+    const held = now + lostAfter
+    const job = await store().claim(name, now, held)
 
     if (!job)
       return false
 
     // Only runs whose process died never mark how they went: a job that kills its process stops here rather than crash every next one.
     if (job.attempts > attempts) {
-      const message = `its last ${attempts} runs never finished, their process stopping first`
+      const message = `it was taken ${job.attempts - 1} times, as many as its ${attempts} attempts, its last run never finishing`
 
       await store().fail(job.id, message)
       kayLog('error', `a job of queue('${name}') is kept as failed without running: ${message}`)
@@ -275,7 +279,7 @@ export function queue<Payload>(name: string, handler: (payload: Payload) => unkn
     }
 
     try {
-      await withinLostAfter(handler(parse(job.payload) as Payload))
+      await withinLostAfter(handler(parse(job.payload) as Payload), held)
       await store().complete(job.id)
     }
     catch (error) {

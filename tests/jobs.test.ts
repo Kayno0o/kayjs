@@ -453,8 +453,8 @@ describe('queue', () => {
 
       expect(await crashing.drain()).toBe(1)
       expect(runs).toEqual([])
-      expect(gaveUp).toEqual(['huge import: its last 2 runs never finished, their process stopping first'])
-      expect(await crashing.failed()).toEqual([{ id: expect.any(String), payload: 'huge import', attempts: 3, error: 'its last 2 runs never finished, their process stopping first' }])
+      expect(gaveUp).toEqual(['huge import: it was taken 2 times, as many as its 2 attempts, its last run never finishing'])
+      expect(await crashing.failed()).toEqual([{ id: expect.any(String), payload: 'huge import', attempts: 3, error: 'it was taken 2 times, as many as its 2 attempts, its last run never finishing' }])
     }
     finally {
       setSystemTime()
