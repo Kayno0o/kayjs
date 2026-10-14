@@ -910,7 +910,7 @@ pre code {
 /* A demo sits on the ground an app would give it, dotted so it reads apart from the code under it. */
 .example > .ui-stage {
   padding: 1.5rem 1.25rem;
-  background: radial-gradient(var(--line) 1px, transparent 1px) 0 0 / 1rem 1rem, var(--color-kui-canvas);
+  background: radial-gradient(color-mix(in srgb, var(--text) 5%, transparent) 1px, transparent 1px) 0 0 / 1rem 1rem, var(--color-kui-canvas);
   border-bottom: 1px solid var(--line);
 }
 
