@@ -64,8 +64,14 @@ const COUNTED: Record<CaptchaAction, { key: string, limit: keyof Limits }> = {
 
 // A challenge kay's script solves in the browser, with no third party, no widget and no cookie: it costs a bot CPU per request rather than proving a human.
 export function proofOfWork(options: ProofOfWorkOptions = {}): ProofOfWorkCaptcha {
+  const difficulty = options.difficulty ?? 100_000
+
+  // kay takes up to 1,000,000,000, which the difficulty reaches doubled to its most.
+  if (!Number.isInteger(difficulty) || difficulty < 1 || difficulty * 2 ** MOST_DOUBLINGS > 1e9)
+    throw new Error(`kayjs-auth: proofOfWork's difficulty is ${difficulty}; it takes a whole number from 1 to ${1e9 / 2 ** MOST_DOUBLINGS}`)
+
   return {
-    proofOfWork: { difficulty: options.difficulty ?? 100_000, maxAge: options.maxAge ?? '1h', store: options.store },
+    proofOfWork: { difficulty, maxAge: options.maxAge ?? '1h', store: options.store },
     on: { 'register': 'always', 'guest': false, 'reset': 'always', 'magic-link': 'always', 'sign-in': 3, ...options.on },
   }
 }

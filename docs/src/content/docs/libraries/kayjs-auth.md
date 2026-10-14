@@ -122,7 +122,7 @@ form(action={register})
   button Create the account
 ```
 
-A proof of work costs a bot CPU rather than proving a human: a site bots target anyway sets Turnstile or hCaptcha as `captcha` instead, and `captcha: false` turns it off.
+A proof of work costs a bot CPU rather than proving a human: a site bots target anyway sets Turnstile or hCaptcha as `captcha` instead, and `captcha: false` turns it off. It needs kay's script in the browser, so a client without it (a plain Elysia app's own pages, a mobile app, a form with `navigation: false` and no island) sets one of those too.
 
 ## Guarding routes
 

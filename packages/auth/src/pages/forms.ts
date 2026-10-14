@@ -1,4 +1,6 @@
 import type { MinTimeRefusal } from 'kay'
+import type { Auth } from '../auth'
+import type { CaptchaAction } from '../captcha'
 import type { Proof } from '../twoFactor'
 import type { AuthFeatures } from './index'
 import { t } from 'elysia'
@@ -64,6 +66,21 @@ export function captchaOf(input: { 'cf-turnstile-response'?: string | undefined,
   return input['cf-turnstile-response'] ?? input['h-captcha-response'] ?? input['kayjs-captcha']
 }
 
+// An action's failure code, `captchaScript` for a CAPTCHA refused with no token posted, as a browser without JavaScript sends none: `refusal` tells it apart from a stale solution.
+export function refusedFor<Code extends string>(error: Code, input: Parameters<typeof captchaOf>[0]): Code | 'captchaScript' {
+  return error === 'captcha' && !captchaOf(input) ? 'captchaScript' : error
+}
+
+// Whether the page shows its CAPTCHA for `action`, with the proof of work's challenge, reading the client's attempts once.
+export async function captchaFor(auth: Pick<Auth, 'captchaRequired' | 'captchaChallenge'>, captcha: AuthFeatures['captcha'], action: CaptchaAction): Promise<{ shown: boolean, challenge: string | null }> {
+  if (captcha !== 'proof-of-work')
+    return { shown: captcha !== null && await auth.captchaRequired(action), challenge: null }
+
+  const challenge = await auth.captchaChallenge(action)
+
+  return { shown: challenge !== null, challenge }
+}
+
 export function proofOf(input: { password?: string | undefined, code?: string | undefined }): Proof {
   return { ...input.password !== undefined && { password: input.password }, ...input.code !== undefined && { code: input.code } }
 }
@@ -73,7 +90,7 @@ export function failure(error: string): string {
   return message(`auth.errors.${error}` as never)
 }
 
-// What a page open to visitors shows for a refused post: what kay refused it for before the action, or its failure code, the proof of work's saying it needs JavaScript, which a post without sends no solution.
+// What a page open to visitors shows for a refused post: what kay refused it for before the action, or its failure code, a refused proof of work worded by whether the browser ran it.
 export function refusal(failed: { errors: Partial<Record<string, string>>, data?: unknown } | undefined, captcha: AuthFeatures['captcha']): string | undefined {
   const error = (failed?.data as { error?: string } | undefined)?.error
 
@@ -83,7 +100,11 @@ export function refusal(failed: { errors: Partial<Record<string, string>>, data?
     return refused?.startsWith(MIN_TIME) ? failure(refused.slice(MIN_TIME.length)) : refused
   }
 
-  return failure(error === 'captcha' && captcha === 'proof-of-work' ? 'captchaScript' : error)
+  // A proof of work refused with a solution is a stale one, which the page now holds a fresh challenge for; a widget keeps its one message.
+  if (error === 'captcha' || error === 'captchaScript')
+    return failure(captcha !== 'proof-of-work' ? 'captcha' : error === 'captcha' ? 'captchaAgain' : 'captchaScript')
+
+  return failure(error)
 }
 
 // What a page shows under a field refused for `problem`, with the limits the rule holds it to.

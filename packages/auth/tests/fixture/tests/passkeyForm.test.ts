@@ -34,7 +34,8 @@ function passkeyField(page: Awaited<ReturnType<typeof register>>) {
 test('the passkey form labels its proof field with the password', async () => {
   const page = await register('passkey-form@example.com')
 
-  await page.waitFor('form input[name="password"][autocomplete="current-password"]')
+  // The passkey form itself, an island rendering once the browser proves it can make a passkey, rather than the two-factor form beside it.
+  await page.waitFor('form:has(input[name="name"]):not(:has(input[name="id"])) input[name="password"][autocomplete="current-password"]')
 
   const labels = await passkeyField(page)
 

@@ -42,7 +42,7 @@ const STAMP_MARK = 'kay-stamp:'
 export const WORK_MARK = 'kay-work:'
 export const WORK_OPEN = `<script type="application/json" ${WORK_SCRIPT}>`
 
-// A stamp's hole holds its action in the first group, the challenges script its JSON in the second, which holds no `<`, and a `workChallenge` field its mark in the third: a page's own text cannot pass for any.
+// A stamp's hole holds its action in the first group, the challenges script its JSON in the second, which holds no `<`, and a `workChallenge` field its mark in the third.
 export const STAMP_HOLE = new RegExp(`name="${STAMP_FIELD}" value="${STAMP_MARK}([^"]*)"|${WORK_OPEN}([^<]*)</script>|data-kay-work="${WORK_MARK}([^"]*)"`, 'g')
 
 // `use` keeps what one feature signs from passing for another's.

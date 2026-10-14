@@ -49,6 +49,7 @@ Types include `Component`, `Signal`, `Guard`, `Duration`, `PageContext`, `Endpoi
 | `session`, `memoryStore`, `sqliteStore` | Cookie sessions and their stores. See [Sessions and guards](/guides/sessions-and-guards) |
 | `defineEnv` | Reads `process.env` once against a schema, typed |
 | `rateLimit`, `memoryRates`, `sqliteRates`, `clientAddress` | Rate limiting |
+| `workChallenge`, `verifyWork` | Proof of work in a form field your own code checks |
 | `requestId` | The id of a request, on its log lines and its `X-Request-Id` header |
 | `schedule`, `background` | Jobs on a cron or every so long, and background work, in the server's process |
 | `queue`, `memoryJobs`, `sqliteJobs` | Durable jobs with retries |

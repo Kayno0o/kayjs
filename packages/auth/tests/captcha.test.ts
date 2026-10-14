@@ -190,6 +190,13 @@ describe('the proof-of-work CAPTCHA', () => {
     expect(await setup({ captcha: checker({ register: 'always', guest: false }).captcha }).browser().call('signInAsGuest')).toMatchObject({ ok: true })
   })
 
+  test('refuses a difficulty kay could not take once doubled to its most, when configured rather than on the first page', () => {
+    for (const difficulty of [0, 1.5, Number.NaN, 62_500_001])
+      expect(() => proofOfWork({ difficulty })).toThrow('it takes a whole number from 1 to 62500000')
+
+    expect(proofOfWork({ difficulty: 62_500_000 }).proofOfWork.difficulty).toBe(62_500_000)
+  })
+
   test('is reported by features(), as a widget is', async () => {
     expect((await setup({ captcha: undefined }).browser().call('features')).captcha).toBe('proof-of-work')
     expect((await setup({ captcha: { verify: () => true, widget: turnstileWidget('key') } }).browser().call('features')).captcha).toMatchObject({ siteKey: 'key' })

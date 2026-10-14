@@ -1,0 +1,17 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+import { verifyWork, workChallenge } from 'kay/server'
+
+export const page = { prerender: true }
+
+// Rendered once at build, its field still gets a fresh challenge on each visit, which the action checks itself.
+export const join = action(t.Object({ proof: t.String({ maxLength: 512 }) }), async ({ proof }, ctx) => {
+  const refused = await verifyWork(proof, 'pamphlet', { difficulty: 50 })
+
+  return refused === undefined ? 'joined' : ctx.fail(422, { refused })
+})
+---
+form(action={join})
+  input(type="hidden" name="proof" data-kay-work={workChallenge('pamphlet', { difficulty: 50 })})
+  button Join

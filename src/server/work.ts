@@ -39,6 +39,7 @@ export function signChallenge(use: string, bound: string, difficulty: number, ma
   return `${expires}.${salt}.${hash}.${difficulty.toString(36)}.${signText(use, `${bound}\0${expires}\0${salt}\0${hash}`)}`
 }
 
+// The challenge the forms posting to the action at `url` carry.
 export function signWork(url: string, difficulty: number, maxAge: number): string {
   return signChallenge(ACTION_WORK, url, difficulty, maxAge)
 }

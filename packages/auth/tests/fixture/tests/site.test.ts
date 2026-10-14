@@ -146,6 +146,8 @@ describe('the prebuilt pages', () => {
     const noScript = await visitor.submit(register, { ...fields, 'kayjs-captcha': '' }, { from: await visitor.visit('/auth/register') })
 
     expect(text(noScript, '[role="alert"]')).toBe('This form runs a check in your browser, which needs JavaScript: turn it on, then send it again.')
+    // A solution refused with the field filled in is a stale one, not a browser without JavaScript.
+    expect(text(await visitor.submit(register, { ...fields, 'kayjs-captcha': 'stale.solution' }, { from: await visitor.visit('/auth/register') }), '[role="alert"]')).toBe('The check in your browser did not go through: send the form again.')
     expect(text(await visitor.submit(register, { ...fields, 'kayjs-captcha': '' }, { from: await visitor.visit('/fr/auth/register') }), '[role="alert"]')).toBe('Ce formulaire fait une vérification dans votre navigateur, qui demande JavaScript : activez-le, puis renvoyez-le.')
     expect(text(await visitor.submit(register, fields, { from: await visitor.visit('/auth/register'), openedFor: 0 }), '[role="alert"]')).toBe('Wait a moment, then send it again.')
     expect((await visitor.submit(register, { ...fields, website: 'https://spam.example' }, { from: await visitor.visit('/auth/register') })).status).toBe(422)

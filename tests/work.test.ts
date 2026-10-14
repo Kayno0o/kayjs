@@ -10,7 +10,7 @@ import { newServerIslands, withServerIslands } from '../src/runtime/html'
 import { digest, sha256, solveWork } from '../src/runtime/work'
 import { servePages } from '../src/server/app'
 import { memoryRates } from '../src/server/protection'
-import { STAMP_HOLE, useStampSecret } from '../src/server/stamp'
+import { STAMP_HOLE } from '../src/server/stamp'
 import { freshWork, signWork, workRefusal, workScript } from '../src/server/work'
 import { freshFieldWork, verifyWork, workChallenge } from '../src/server/work-scope'
 import { testSite } from '../src/test'
@@ -219,12 +219,15 @@ describe('workChallenge', () => {
       setSystemTime()
     }
 
-    const before = solveWork(workChallenge('contact', { difficulty: 50 }))!
+    // In a process of its own, as the key it switches to would outlive the test.
+    const restart = Bun.spawn([process.execPath, '-e', `import { solveWork } from ${JSON.stringify(`${import.meta.dir}/../src/runtime/work.ts`)}
+import { useStampSecret } from ${JSON.stringify(`${import.meta.dir}/../src/server/stamp.ts`)}
+import { verifyWork, workChallenge } from ${JSON.stringify(`${import.meta.dir}/../src/server/work-scope.ts`)}
+const before = solveWork(workChallenge('contact', { difficulty: 50 }))
+useStampSecret('a session secret of at least thirty-two characters', 'session')
+console.log(JSON.stringify([await verifyWork(before, 'contact'), await verifyWork(solveWork(workChallenge('contact', { difficulty: 50 })), 'contact', { difficulty: 50 }) ?? null]))`], { stdout: 'pipe' })
 
-    useStampSecret('a session secret of at least thirty-two characters', 'session')
-
-    expect(await verifyWork(before, 'contact')).toBe('expired')
-    expect(await verifyWork(solveWork(workChallenge('contact', { difficulty: 50 })), 'contact', { difficulty: 50 })).toBeUndefined()
+    expect(JSON.parse(await new Response(restart.stdout).text())).toEqual(['expired', null])
   })
 
   it('leaves a prerendered page a mark the server fills in with a fresh challenge per visit', async () => {

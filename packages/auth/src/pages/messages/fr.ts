@@ -183,6 +183,7 @@ export default defineMessages({
       'credentials': 'Adresse, nom d’utilisateur ou mot de passe incorrect.',
       'limited': 'Trop de tentatives. Patientez un moment, puis réessayez.',
       'captcha': 'Terminez la vérification anti-robot.',
+      'captchaAgain': 'La vérification dans votre navigateur n\'a pas abouti : renvoyez le formulaire.',
       'captchaScript': 'Ce formulaire fait une vérification dans votre navigateur, qui demande JavaScript : activez-le, puis renvoyez-le.',
       'early': 'Patientez un instant, puis renvoyez-le.',
       'unverified': 'Vérifiez d’abord votre adresse : ouvrez le lien reçu par e-mail.',

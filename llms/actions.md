@@ -406,7 +406,7 @@ button(onClick={save} disabled={add.pending()}) Add
 - A prerendered page holding such a form is still rendered once: the server signs a fresh stamp into it on every visit, as it splices in an inline server island, so the page goes out gzipped rather than in brotli and kept by no cache.
 - `minTime: { after: '3s', maxAge: '1h', pretend: true }` answers a post sent too soon as `honeypot`'s `pretend` does.
 - A form inside an island renders no stamp, so a call from kay's script without one goes through, a stamp it sends still checked.
-- `minTime: { after: '3s', plain: true }` checks only a form the browser posts itself, without kay's script: the page swap's post and an island's call go through, for a form whose script already proves something, such as a `data-kay-work` field below.
+- `minTime: { after: '3s', plain: true }` checks only a form the browser posts itself, without kay's script: the page swap's post and an island's call go through, for a form whose script already proves something, such as a `data-kay-work` field below: the header marking the swap's post proves nothing, so a script sending it skips `minTime`.
 - `site.submit` from a `Visit` sends its form's stamp, and `setSystemTime` from `bun:test` moves the clock past `minTime`.
 
 #### Refusal messages

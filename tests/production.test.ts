@@ -1323,6 +1323,7 @@ describe('a prerendered page posted to', () => {
   const NEWSLETTER = './fixtures/production/src/routes/newsletter.kay'
   const BROCHURE = './fixtures/production/src/routes/brochure.kay'
   const LEAFLET = './fixtures/production/src/routes/leaflet.kay'
+  const PAMPHLET = './fixtures/production/src/routes/pamphlet.kay'
   const root = process.cwd()
   const withEntry = (client: ClientBuild): ClientBuild => ({ ...client, entry: '/_kay/entry.js', navigation: true })
 
@@ -1429,6 +1430,24 @@ describe('a prerendered page posted to', () => {
     expect((await post(solution)).status).toBe(303)
     expect((await post(solution)).status).toBe(422)
     await expect(refusedPrerender({ routes }, withEntry((await readClient(root))!), { exportAll: true })).rejects.toThrow('flyer.kay: a form in it posts to an action with `minTime` or `proofOfWork`')
+  })
+
+  it('signs a fresh `workChallenge` into a prerendered page\'s field on every visit, which the action verifies once', async () => {
+    expect(await Bun.file(join(build.pages, 'pamphlet.html')).text()).toContain('data-kay-work="kay-work:')
+
+    const app = await build.serve({ routes, prebuilt: true, security: false })
+    const { join: joinUp } = await import(PAMPHLET) as { join: Action<{ proof: string }, string> }
+    const challengeOf = async () => (/data-kay-work="([^"]+)"/).exec(await (await app.handle(new Request('http://localhost/pamphlet'))).text())![1]!
+    const post = async (proof: string) => app.handle(new Request(`http://localhost${joinUp.url}`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded', 'referer': 'http://localhost/pamphlet' }, body: new URLSearchParams({ proof }) }))
+    const first = await challengeOf()
+
+    expect(first).not.toStartWith('kay-work:')
+    expect(await challengeOf()).not.toBe(first)
+
+    const solution = solveWork(first)!
+
+    expect((await post(solution)).status).toBe(303)
+    expect((await post(solution)).status).toBe(422)
   })
 })
 
