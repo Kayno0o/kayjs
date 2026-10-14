@@ -30,3 +30,90 @@ On a plain Elysia app mounting `auth.plugin`, a cross-site POST or websocket upg
 Behind a proxy that does not pass the browser's `Host` on, set `url` in `createAuth` to the site's public address. Without it, every form post that touches the session answers a 403.
 
 Only an `Authorization: Bearer` header skips the check. Basic credentials, which a browser sends on its own, are checked like any other request.
+
+## 1.43.0
+
+### Markup reaches `innerHTML` only once vouched for
+
+A spread sets `innerHTML` only from markup kay trusts: `sanitizeHtml`, `trustHtml` or an icon import. Any other value is dropped, with a warning in development. Wrap the value with `sanitizeHtml` when a user wrote it, or `trustHtml` when your app made it. Icons keep drawing.
+
+A string built from vouched markup, by concatenation or `.slice()`, is plain again. Only recent markup stays vouched, so call `trustHtml` where you use the markup rather than once for a long-lived constant. An island receives vouched markup through its props, action results and event streams, never through request input, cookies, `localStorage` or a `fetch`.
+
+A spread on an element now writes attribute names only. Handlers given as text, `srcdoc` and keys that are not attribute names are dropped. Function handlers still attach. `dynamic(name, props)` filters its props the same way, and throws unless `name` is a plain element name.
+
+Head tags drop handlers, neutralise `javascript:` URLs and refuse script text holding `</script>` or `<!--`. A `style` or `script` inside `svg` or `math` now takes static text only.
+
+### Preview links, stamps and the flash cookie are signed
+
+A preview link carrying `secret=` now answers a 403. Make links with `previewUrl` from `kay/server`, or point your CMS at a guarded page calling `enterPreview(ctx)`.
+
+Form stamps, private-file links and the flash cookie are signed with a key derived from the session secret. Those issued before the upgrade stop working once. Rotating the session secret now invalidates them too.
+
+`session()` refuses the placeholder secret that older `kay new` wrote into `.env.example`. Set a real `SESSION_SECRET`:
+
+```sh
+bun -e "console.log(crypto.randomUUID() + crypto.randomUUID())"
+```
+
+### Personal pages are no longer cached publicly
+
+A page rendered per request that reads the session, cookies, a cookie-persisted signal or a form's outcome answers `Cache-Control: private, no-cache` and `Vary: cookie`. Prerendered pages keep public caching. A page that sets its own `cache-control` keeps it.
+
+Behind a CDN that reaches your server from a public address, list its ranges in `proxy.trusted`. Without them, every visitor shares one rate-limit key.
+
+### New defaults
+
+- Compression is on in production. Set `compress: false` behind a proxy or CDN that already compresses.
+- Images load lazily unless they set `loading`, `fetchpriority` or `decoding`. Give an image above the fold `loading="eager"` or `fetchpriority="high"`.
+- Every response carries `Cross-Origin-Resource-Policy: same-site`. If other sites embed your files, set it to `cross-origin` in your headers.
+- `public/` no longer serves dotfiles (except `.well-known/`), `.env` files or backups such as `.bak` and `~` files.
+- `images.remote` refuses a wildcard over a whole top-level domain, such as `*.com`. List the real hosts.
+
+### Navigation
+
+`navigate()` throws on a `javascript:` URL. A link that a redirect takes to another origin loads that page whole. Prefetching skips `/api/` links, downloads and `nofollow` links. A page swap now moves focus to the new page, which can change focus-sensitive tests.
+
+### Stored files
+
+Files under `/_kay/files/` are shown inline only when they are images, video, audio, PDF or plain text. Anything else downloads as an attachment, so stored scripts and stylesheets no longer run from there.
+
+Uploaded JPEG, PNG and WebP images lose their EXIF, XMP and IPTC metadata. Pass `keepMetadata: true` to `files.put` to keep it. `files.delete` also removes the image's variants and social cards.
+
+### Action and API guards
+
+An action's guard now reads `ctx.url` as the page the form was posted from, not `/_kay/action/...`. A guard on `/admin` therefore covers the actions of `/admin` pages. A guard that matched `/_kay/action` needs to match the page instead.
+
+Guards run before validation, so a refused caller gets the guard's answer rather than field errors. At that point `ctx.locals` holds only what `derive` sets: a guard reading a user from `resolve` should read it from `derive`.
+
+### `kay dev` listens on localhost only
+
+Run `kay dev --host` to reach it from another device or from outside a container. A request for a host name it does not know answers 421: list a tunnel's name in `KAY_DEV_HOSTS`. The mail outbox at `/_kay/mail` is served only under `kay dev`.
+
+### Queues
+
+Failed jobs are deleted after 30 days. Set `keepFailed: false` to keep them. A job running longer than `lostAfter`, 10 minutes by default, counts as a failed attempt, so raise it for long jobs. Rate-limit counters stored in SQLite reset once.
+
+### New lints
+
+`missing-label` no longer accepts a `placeholder` as a label. New warnings: `unannounced-click`, `dangling-aria`, `unreachable-tooltip`, `uncontrolled-autoplay`, `meta-refresh` and `ungrouped-radios`. A build that denies warnings fails on them.
+
+### kayjs-mail
+
+Each address holds one mailbox. Pass several recipients as an array, `to: ['a@x.com', 'b@y.com']`, not as one string with commas.
+
+STARTTLS is required on every port but 465. A relay that only speaks clear text, such as a local Mailpit, needs `SMTP_INSECURE=true`. Logs now show only the recipients' count and domains; `logRecipients: true` restores the addresses.
+
+### kayjs-cms
+
+- With `guard` set, every save, publish, delete and upload needs it. Edit mode alone is read-only.
+- Uploads accept PNG, JPEG, WebP, GIF, AVIF and PDF by default. List other types in `uploads`.
+- A save whose body holds scripts, forms, event attributes or `javascript:` links is refused. `rawHtml: ['collection']` opts a collection out.
+- Production refuses to start without `files`. Set `files: forgejo({...})`, or `files: workingTree()` where files persist across deploys.
+- A custom `FileSaver` checks `change.base` and throws `SaveConflict` when the file moved on.
+
+### kayjs-ui
+
+- `CopyButton`, `Toaster` and a filtering `Table` render extra status elements for screen readers. Selectors counting elements may change.
+- `Dialog`'s title is an `h2`. Use `level` to change it.
+- Buttons draw their border with `--color-kui-field-border`, and a few theme colours changed. If you override theme tokens, set `field-border` too.
+- Toasts last 6 seconds, 10 for errors.
