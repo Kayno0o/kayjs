@@ -248,6 +248,7 @@ describe('sending a development mail for real', () => {
   afterEach(() => {
     delete process.env.SMTP_HOST
     delete process.env.SMTP_PORT
+    delete process.env.SMTP_INSECURE
   })
 
   function post(app: { handle: (request: Request) => Promise<Response> }, path: string, to: string, site = 'same-origin'): Promise<Response> {
@@ -266,7 +267,7 @@ describe('sending a development mail for real', () => {
   })
 
   it('sends an outbox mail to the typed address alone, over the environment\'s SMTP', async () => {
-    Object.assign(process.env, { SMTP_HOST: '127.0.0.1', SMTP_PORT: String(server.port) })
+    Object.assign(process.env, { SMTP_HOST: '127.0.0.1', SMTP_PORT: String(server.port), SMTP_INSECURE: 'true' })
     const mail = mailer({ from: 'dev@example.com' })
 
     await mail.send({ to: 'ada@example.com', cc: 'cc@example.com', bcc: 'bcc@example.com', subject: 'For real', text: 'Hello' })
@@ -286,7 +287,7 @@ describe('sending a development mail for real', () => {
   })
 
   it('sends a sample, rendered with its preview props', async () => {
-    Object.assign(process.env, { SMTP_HOST: '127.0.0.1', SMTP_PORT: String(server.port) })
+    Object.assign(process.env, { SMTP_HOST: '127.0.0.1', SMTP_PORT: String(server.port), SMTP_INSECURE: 'true' })
     const mail = mailer({ from: 'dev@example.com' })
     const sent = await post(mail, '/_kay/mail/samples/send?mail=welcome.kay', 'me@example.com')
 
@@ -299,7 +300,7 @@ describe('sending a development mail for real', () => {
     const closed = startSmtp()
 
     closed.stop()
-    Object.assign(process.env, { SMTP_HOST: '127.0.0.1', SMTP_PORT: String(server.port) })
+    Object.assign(process.env, { SMTP_HOST: '127.0.0.1', SMTP_PORT: String(server.port), SMTP_INSECURE: 'true' })
     const mail = mailer({ from: 'dev@example.com' })
     const received = server.received.length
 

@@ -35,7 +35,7 @@ export default defineConfig({
 })
 ```
 
-In production the mailer reads `SMTP_HOST` (required), `SMTP_PORT` (465 by default), `SMTP_USER` and `SMTP_PASS`, and `SMTP_FROM` unless `from` is set. A missing one stops the boot. `MAIL_TO` is where a mail naming no recipient goes, such as a contact form's, and DKIM signing and a rate limit have variables of their own.
+In production the mailer reads `SMTP_HOST` (required), `SMTP_PORT` (465 by default), `SMTP_USER` and `SMTP_PASS`, and `SMTP_FROM` unless `from` is set. A missing one stops the boot. On a port other than 465 a server not offering STARTTLS is refused, unless `SMTP_INSECURE=true`, for a local Mailpit. Each mail sent is logged with its subject and how many recipients it went to at which domains, `mailer({ logRecipients: true })` naming them in full. `MAIL_TO` is where a mail naming no recipient goes, such as a contact form's, and DKIM signing and a rate limit have variables of their own.
 
 ## Writing a mail
 
@@ -90,7 +90,7 @@ export const signUp = action(newUser, async ({ name, email }) => {
 ---
 ```
 
-A message also takes `cc`, `bcc`, `replyTo`, `attachments`, `lang`, `unsubscribe` for one-click unsubscribe, or `html` and `text` in place of `view`. Left without `to`, it goes to `MAIL_TO`.
+A message also takes `cc`, `bcc`, `replyTo`, `attachments`, `lang`, `unsubscribe` for one-click unsubscribe, or `html` and `text` in place of `view`. Left without `to`, it goes to `MAIL_TO`. Each address holds one mailbox: a visitor's `a@x.com,b@y.com` is refused, and several recipients go as a list.
 
 ## Previewing
 

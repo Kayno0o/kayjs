@@ -5,6 +5,7 @@ import process from 'node:process'
 import { Elysia } from 'elysia'
 import { s } from 'kay'
 import { defineEnv, queue, renderToString } from 'kay/server'
+import parseAddresses from 'nodemailer/lib/addressparser'
 import { escapeHtml as escape } from './escape'
 import { log } from './log'
 import { addressOf, outbox } from './outbox'
@@ -25,6 +26,8 @@ export interface MailerOptions {
   lang?: string | undefined
   // The queue `enqueue` hands mails to, `mail` unless named, retried as kay's queues are.
   queue?: QueueOptions<Mail> & { name?: string | undefined } | undefined
+  // Logs each mail's recipients in full rather than their count and domains, such as while setting up a site's mail.
+  logRecipients?: boolean | undefined
   // Lets a server lacking `SMTP_HOST` or `SMTP_FROM` boot anyway, each send then throwing `MailNotConfigured`, for a site whose mail can wait to be set up.
   optional?: boolean | undefined
 }
@@ -68,8 +71,22 @@ function list(addresses: Address | Address[] | undefined): Address[] {
   return addresses === undefined ? [] : Array.isArray(addresses) ? addresses : [addresses]
 }
 
-function recipientsOf(mail: Mail): string {
-  return [...mail.to, ...mail.cc, ...mail.bcc].map(addressOf).join(', ')
+function recipientsOf(mail: Mail): string[] {
+  return [...mail.to, ...mail.cc, ...mail.bcc].map(addressOf)
+}
+
+// Recipients as the log names them: their count and domains, which say where a mail went without naming who.
+function counted(addresses: string[]): string {
+  const domains = [...new Set(addresses.map(address => domainOf(address)?.toLowerCase() ?? 'no domain'))]
+
+  return `${addresses.length} ${addresses.length === 1 ? 'recipient' : 'recipients'} at ${domains.join(', ')}`
+}
+
+// One mailbox as nodemailer reads the string: a comma, a semicolon or a group in an address a visitor typed would add recipients to the envelope.
+function oneAddress(address: Address): boolean {
+  const parsed = parseAddresses(typeof address === 'string' ? address : address.address, { flatten: true })
+
+  return parsed.length === 1 && Boolean(parsed[0]!.address)
 }
 
 // A subject in quotes, its line breaks escaped, so one a visitor wrote cannot add a line of its own to the log.
@@ -128,6 +145,7 @@ function fromEnvironment(from: Address | undefined, fromName: string | undefined
   const env = defineEnv(s.Object({
     SMTP_HOST: optional ? s.Optional(s.String()) : s.String(),
     SMTP_PORT: s.Integer({ minimum: 1, maximum: 65_535, default: 465 }),
+    SMTP_INSECURE: s.Optional(s.Boolean()),
     SMTP_USER: s.Optional(s.String()),
     SMTP_PASS: s.Optional(s.String()),
     SMTP_RATE_LIMIT: s.Optional(s.Integer({ minimum: 1 })),
@@ -159,7 +177,7 @@ function fromEnvironment(from: Address | undefined, fromName: string | undefined
   return {
     transport: {
       send: async (mail) => {
-        transport ??= smtp({ host: env.SMTP_HOST!, port: env.SMTP_PORT, user: env.SMTP_USER, pass: env.SMTP_PASS, rateLimit: env.SMTP_RATE_LIMIT, name: domainOf(sender()), dkim: dkimKey === undefined ? undefined : { domain: env.SMTP_DKIM_DOMAIN ?? domainOf(sender())!, selector: env.SMTP_DKIM_SELECTOR!, privateKey: dkimKey } })
+        transport ??= smtp({ host: env.SMTP_HOST!, port: env.SMTP_PORT, insecure: env.SMTP_INSECURE, user: env.SMTP_USER, pass: env.SMTP_PASS, rateLimit: env.SMTP_RATE_LIMIT, name: domainOf(sender()), dkim: dkimKey === undefined ? undefined : { domain: env.SMTP_DKIM_DOMAIN ?? domainOf(sender())!, selector: env.SMTP_DKIM_SELECTOR!, privateKey: dkimKey } })
 
         return transport.send(mail)
       },
@@ -200,6 +218,7 @@ export function mailExtension(load: () => Promise<Mailer>): KayExtension<Mailer>
 // Sends mails written as `.kay` components, html or text: over SMTP in production, to the outbox in development and tests. Using it in the server runs the queue `enqueue` fills, and in development lists the outbox at `/_kay/mail`.
 export function mailer(options: MailerOptions = {}): Mailer {
   const lang = options.lang ?? 'en'
+  const whom = (addresses: string[]): string => options.logRecipients ? addresses.join(', ') : counted(addresses)
   const configured = options.transport === undefined && delivering() === 'smtp' ? fromEnvironment(options.from, options.fromName, options.optional === true) : undefined
   const transport = options.transport ?? configured?.transport ?? outbox
   const sender = (): Address => configured?.from ?? options.from ?? named(process.env.SMTP_FROM || 'kay@localhost', options.fromName)
@@ -234,10 +253,13 @@ export function mailer(options: MailerOptions = {}): Mailer {
     if (to.length === 0)
       throw new Error(`kayjs-mail: "${message.subject}" has no recipient`)
 
-    // nodemailer neutralises a line break in a name, a subject or a header, but one in an address still adds a recipient to the envelope.
+    // nodemailer neutralises a line break in a name, a subject or a header, but one in an address, or a second address in it, still adds a recipient to the envelope.
     for (const address of [...to, ...list(message.cc), ...list(message.bcc), ...list(message.replyTo), ...list(message.from)]) {
       if (LINE_BREAK.test(addressOf(address)))
         throw new Error(`kayjs-mail: "${message.subject}" has an address holding a line break`)
+
+      if (!oneAddress(address))
+        throw new Error(`kayjs-mail: "${message.subject}" has an address holding no address or several: each takes one, and several recipients go as an array`)
     }
 
     const unsubscribe = message.unsubscribe === undefined ? {} : unsubscribeHeaders(message.unsubscribe, message.subject)
@@ -263,21 +285,21 @@ export function mailer(options: MailerOptions = {}): Mailer {
       const delivery = await outbox.send(mail)
 
       if (process.env.NODE_ENV === 'development')
-        log.info(`${quoted(mail.subject)} to ${recipientsOf(mail)} kept in the outbox, shown at /_kay/mail`)
+        log.info(`${quoted(mail.subject)} to ${recipientsOf(mail).join(', ')} kept in the outbox, shown at /_kay/mail`)
 
       return delivery
     }
 
     const delivery = await transport.send(mail)
     // A transport naming no recipient either way took them all.
-    const accepted = delivery.accepted.length > 0 || delivery.rejected.length > 0 ? delivery.accepted : [recipientsOf(mail)]
+    const accepted = delivery.accepted.length > 0 || delivery.rejected.length > 0 ? delivery.accepted : recipientsOf(mail)
 
     if (accepted.length > 0)
-      log.info(`${quoted(mail.subject)} sent to ${accepted.join(', ')}${delivery.response ? `: ${delivery.response}` : ''}`)
+      log.info(`${quoted(mail.subject)} sent to ${whom(accepted)}${delivery.response ? `: ${delivery.response}` : ''}`)
 
     // Logged rather than thrown: a retry would send the mail again to those who already have it.
     if (delivery.rejected.length > 0)
-      log.warn(`${quoted(mail.subject)} was refused for ${delivery.rejected.join(', ')}, and sent to the others`)
+      log.warn(`${quoted(mail.subject)} was refused for ${whom(delivery.rejected)}, and sent to the others`)
 
     return delivery
   }
@@ -286,7 +308,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
   const jobs = queue<Mail>(name, deliver, {
     ...queueOptions,
     onFailed: async (mail, error) => {
-      log.error(`${quoted(mail.subject)} to ${recipientsOf(mail)} is given up after its last attempt`, error)
+      log.error(`${quoted(mail.subject)} to ${whom(recipientsOf(mail))} is given up after its last attempt`, error)
       await onFailed?.(mail, error)
     },
   })
@@ -306,7 +328,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
         return await deliver(mail)
       }
       catch (error) {
-        log.error(`${quoted(mail.subject)} to ${recipientsOf(mail)} was not sent`, error)
+        log.error(`${quoted(mail.subject)} to ${whom(recipientsOf(mail))} was not sent`, error)
 
         throw error
       }

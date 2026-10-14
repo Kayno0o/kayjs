@@ -144,6 +144,15 @@ describe('rendering', () => {
     await expect(mail.render({ to: 'ada@example.com', replyTo: { name: 'Ada', address: 'ada@example.com\nBcc: spam@example.com' }, subject: 'Spam', text: 'Hi' })).rejects.toThrow('line break')
   })
 
+  it('refuses an address field a visitor filled with several addresses, which would relay the mail to each', async () => {
+    for (const to of ['me@example.com,victim@example.org', 'me@example.com; victim@example.org', 'friends: me@example.com, victim@example.org;', 'Ada'])
+      await expect(mail.render({ to, subject: 'Relay', text: 'Hi' }), to).rejects.toThrow('"Relay" has an address holding no address or several')
+
+    await expect(mail.render({ to: 'ada@example.com', replyTo: 'me@example.com, victim@example.org', subject: 'Relay', text: 'Hi' })).rejects.toThrow('several')
+    await expect(mail.render({ to: { name: 'Ada', address: 'ada@example.com,victim@example.org' }, subject: 'Relay', text: 'Hi' })).rejects.toThrow('several')
+    expect((await mail.render({ to: ['"Doe, Ada" <ada@example.com>', 'bob@example.com'], subject: 'Two', text: 'Hi' })).to).toHaveLength(2)
+  })
+
   it('refuses a mail with no recipient before rendering its component', async () => {
     let rendered = false
     const view = () => {
@@ -221,11 +230,18 @@ describe('the queue', () => {
 })
 
 describe('the log', () => {
-  it('names each mail sent, its recipients and the server\'s answer', async () => {
-    const answering: Transport = { send: async () => ({ accepted: ['ada@example.com', 'bob@example.com'], rejected: [], response: '250 2.0.0 queued as 4F2' }) }
-    const lines = await logged(async () => mailer({ from: 'site@example.com', transport: answering, queue: { name: 'logged-mail' } }).send({ to: 'ada@example.com', bcc: 'bob@example.com', subject: 'Logged', text: 'T' }))
+  it('names each mail sent, how many it went to and where, and the server\'s answer', async () => {
+    const answering: Transport = { send: async () => ({ accepted: ['ada@example.com', 'bob@Example.com', 'cy@other.test'], rejected: [], response: '250 2.0.0 queued as 4F2' }) }
+    const lines = await logged(async () => mailer({ from: 'site@example.com', transport: answering, queue: { name: 'logged-mail' } }).send({ to: 'ada@example.com', bcc: ['bob@Example.com', 'cy@other.test'], subject: 'Logged', text: 'T' }))
 
-    expect(lines).toEqual([['info', 'kayjs-mail: "Logged" sent to ada@example.com, bob@example.com: 250 2.0.0 queued as 4F2']])
+    expect(lines).toEqual([['info', 'kayjs-mail: "Logged" sent to 3 recipients at example.com, other.test: 250 2.0.0 queued as 4F2']])
+  })
+
+  it('names the recipients in full when the app asks', async () => {
+    const answering: Transport = { send: async () => ({ accepted: ['ada@example.com'], rejected: [] }) }
+    const lines = await logged(async () => mailer({ from: 'site@example.com', transport: answering, logRecipients: true, queue: { name: 'logged-in-full' } }).send({ to: 'ada@example.com', subject: 'Logged', text: 'T' }))
+
+    expect(lines).toEqual([['info', 'kayjs-mail: "Logged" sent to ada@example.com']])
   })
 
   it('names a mail the server refuses outright and why, and throws all the same', async () => {
@@ -234,7 +250,7 @@ describe('the log', () => {
     } }
     const lines = await logged(async () => expect(mailer({ from: 'site@example.com', transport: refusing, queue: { name: 'refused-mail' } }).send({ to: { name: 'Ada', address: 'ada@example.com' }, subject: 'Refused', text: 'T' })).rejects.toThrow('550 mailbox unavailable'))
 
-    expect(lines).toEqual([['error', 'kayjs-mail: "Refused" to ada@example.com was not sent: 550 mailbox unavailable']])
+    expect(lines).toEqual([['error', 'kayjs-mail: "Refused" to 1 recipient at example.com was not sent: 550 mailbox unavailable']])
   })
 
   it('names an enqueued mail given up after its last attempt, then hands it to the queue\'s onFailed', async () => {
@@ -250,13 +266,13 @@ describe('the log', () => {
       await queued.drain()
     })
 
-    expect(lines).toContainEqual(['error', 'kayjs-mail: "Given up" to ada@example.com is given up after its last attempt: 550 mailbox unavailable'])
+    expect(lines).toContainEqual(['error', 'kayjs-mail: "Given up" to 1 recipient at example.com is given up after its last attempt: 550 mailbox unavailable'])
     expect(failed).toEqual(['Given up'])
   })
 })
 
 describe('a partly refused mail', () => {
-  it('is logged naming the refused addresses, and sent all the same', async () => {
+  it('is logged counting the refused addresses, and sent all the same', async () => {
     const partial: Transport = { send: async () => ({ accepted: ['ada@example.com'], rejected: ['bob@example.com'] }) }
     let delivery: Awaited<ReturnType<Transport['send']>> | undefined
     const lines = await logged(async () => {
@@ -264,7 +280,7 @@ describe('a partly refused mail', () => {
     })
 
     expect(delivery?.rejected).toEqual(['bob@example.com'])
-    expect(lines).toContainEqual(['warn', 'kayjs-mail: "Partly" was refused for bob@example.com, and sent to the others'])
+    expect(lines).toContainEqual(['warn', 'kayjs-mail: "Partly" was refused for 1 recipient at example.com, and sent to the others'])
   })
 })
 

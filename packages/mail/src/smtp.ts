@@ -15,8 +15,10 @@ export interface DkimSettings {
 
 export interface SmtpSettings {
   host: string
-  // 465 by default, which speaks TLS from the start; any other port upgrades through STARTTLS.
+  // 465 by default, which speaks TLS from the start; any other port upgrades through STARTTLS, and a server not offering it is refused.
   port?: number | undefined
+  // Sends in clear to a server not offering STARTTLS, such as a local Mailpit; a password still never goes in clear.
+  insecure?: boolean | undefined
   user?: string | undefined
   pass?: string | undefined
   // The name the client greets the server with, best the sending domain: a container's hostname is none, and spam filters score a greeting as `[127.0.0.1]` against the mail.
@@ -111,7 +113,7 @@ export function smtp(settings: SmtpSettings): Transport {
   }
 }
 
-function open({ host, port = DEFAULT_PORT, user, pass, name, maxConnections, rateLimit, dkim }: SmtpSettings, wait: number) {
+function open({ host, port = DEFAULT_PORT, insecure = false, user, pass, name, maxConnections, rateLimit, dkim }: SmtpSettings, wait: number) {
   const auth = user === undefined || pass === undefined ? undefined : { user, pass }
 
   return createTransport({
@@ -122,8 +124,8 @@ function open({ host, port = DEFAULT_PORT, user, pass, name, maxConnections, rat
     port,
     name,
     secure: port === 465,
-    // With a password to send, a server whose STARTTLS was stripped on the way is refused rather than sent it in clear.
-    requireTLS: auth !== undefined && port !== 465,
+    // A server whose STARTTLS was stripped on the way is refused rather than sent a reset link or a password in clear.
+    requireTLS: port !== 465 && (!insecure || auth !== undefined),
     auth,
     dkim: dkim && { domainName: dkim.domain, keySelector: dkim.selector, privateKey: dkim.privateKey },
     connectionTimeout: wait,

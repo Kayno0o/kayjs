@@ -13,7 +13,7 @@ afterAll(() => server.stop())
 
 describe('smtp', () => {
   it('sends text and html as one multipart mail, greeting the server with the name given', async () => {
-    const transport = smtp({ host: '127.0.0.1', port: server.port, name: 'fixture.test' })
+    const transport = smtp({ host: '127.0.0.1', port: server.port, insecure: true, name: 'fixture.test' })
     const mail = mailer({ from: { name: 'Fixture', address: 'hello@fixture.test' }, transport })
 
     const delivery = await mail.send({ to: 'ada@example.com', replyTo: { name: 'Visitor', address: 'visitor@example.com' }, subject: 'Welcome', view: Welcome, props: { name: 'Ada', url: 'https://fixture.test/confirm' } })
@@ -30,7 +30,7 @@ describe('smtp', () => {
   })
 
   it('writes no header of a sender\'s own, from a name or a subject holding a line break', async () => {
-    const mail = mailer({ from: 'hello@fixture.test', transport: smtp({ host: '127.0.0.1', port: server.port }) })
+    const mail = mailer({ from: 'hello@fixture.test', transport: smtp({ host: '127.0.0.1', port: server.port, insecure: true }) })
 
     await mail.send({ to: 'ada@example.com', replyTo: { name: 'Ada\r\nBcc: spam@example.com', address: 'ada@example.com' }, subject: 'Hi\r\nBcc: spam@example.com', text: 'Hello\r\nBcc: spam@example.com' })
 
@@ -41,14 +41,22 @@ describe('smtp', () => {
   })
 
   it('logs each mail sent with the server\'s answer, its subject\'s line breaks escaped', async () => {
-    const mail = mailer({ from: 'hello@fixture.test', transport: smtp({ host: '127.0.0.1', port: server.port }) })
+    const mail = mailer({ from: 'hello@fixture.test', transport: smtp({ host: '127.0.0.1', port: server.port, insecure: true }) })
     const lines = await logged(async () => mail.send({ to: 'ada@example.com', cc: 'bob@example.com', subject: 'Hi\nforged line', text: 'Hello' }))
 
-    expect(lines).toEqual([['info', 'kayjs-mail: "Hi\\nforged line" sent to ada@example.com, bob@example.com: 250 queued']])
+    expect(lines).toEqual([['info', 'kayjs-mail: "Hi\\nforged line" sent to 2 recipients at example.com: 250 queued']])
+  })
+
+  it('refuses a server not offering STARTTLS, a reset link going in clear otherwise, unless told it is insecure', async () => {
+    const mail = mailer({ from: 'hello@fixture.test', transport: smtp({ host: '127.0.0.1', port: server.port }) })
+    const before = server.received.length
+
+    await expect(mail.send({ to: 'ada@example.com', subject: 'S', text: 'T' })).rejects.toThrow('STARTTLS')
+    expect(server.received).toHaveLength(before)
   })
 
   it('never sends a password over a connection that did not upgrade to TLS', async () => {
-    const mail = mailer({ from: 'hello@fixture.test', transport: smtp({ host: '127.0.0.1', port: server.port, user: 'site', pass: 'secret' }) })
+    const mail = mailer({ from: 'hello@fixture.test', transport: smtp({ host: '127.0.0.1', port: server.port, insecure: true, user: 'site', pass: 'secret' }) })
     const before = server.received.length
 
     await expect(mail.send({ to: 'ada@example.com', subject: 'S', text: 'T' })).rejects.toThrow('STARTTLS')
@@ -57,7 +65,7 @@ describe('smtp', () => {
 
   it('reuses one connection for mails sent one after another, and closes it once they stop', async () => {
     const own = startSmtp()
-    const mail = mailer({ from: 'hello@fixture.test', transport: smtp({ host: '127.0.0.1', port: own.port }) })
+    const mail = mailer({ from: 'hello@fixture.test', transport: smtp({ host: '127.0.0.1', port: own.port, insecure: true }) })
 
     try {
       for (const subject of ['One', 'Two', 'Three'])
@@ -75,7 +83,7 @@ describe('smtp', () => {
   })
 
   it('holds sends to the rate limit', async () => {
-    const mail = mailer({ from: 'hello@fixture.test', transport: smtp({ host: '127.0.0.1', port: server.port, maxConnections: 1, rateLimit: 1 }) })
+    const mail = mailer({ from: 'hello@fixture.test', transport: smtp({ host: '127.0.0.1', port: server.port, insecure: true, maxConnections: 1, rateLimit: 1 }) })
     const started = performance.now()
 
     await Promise.all([1, 2].map(async n => mail.send({ to: 'ada@example.com', subject: `Limited ${n}`, text: 'Hi' })))
@@ -89,7 +97,7 @@ describe('smtp', () => {
   })
 
   it('signs each mail with DKIM when given a key, and refuses a key that is none where the transport is made', async () => {
-    const mail = mailer({ from: 'hello@fixture.test', transport: smtp({ host: '127.0.0.1', port: server.port, dkim: { domain: 'fixture.test', selector: 'mail', privateKey } }) })
+    const mail = mailer({ from: 'hello@fixture.test', transport: smtp({ host: '127.0.0.1', port: server.port, insecure: true, dkim: { domain: 'fixture.test', selector: 'mail', privateKey } }) })
 
     await mail.send({ to: 'ada@example.com', subject: 'Signed', text: 'Hi' })
 
@@ -111,7 +119,7 @@ describe('smtp', () => {
   it('reads its settings from the environment in production, the greeting named after the sender\'s domain', async () => {
     const saved = { ...process.env }
 
-    Object.assign(process.env, { NODE_ENV: 'production', SMTP_HOST: '127.0.0.1', SMTP_PORT: String(server.port), SMTP_FROM: 'site@env.test' })
+    Object.assign(process.env, { NODE_ENV: 'production', SMTP_HOST: '127.0.0.1', SMTP_PORT: String(server.port), SMTP_INSECURE: 'true', SMTP_FROM: 'site@env.test' })
 
     try {
       await mailer({ fromName: 'Site, Env' }).send({ to: 'bob@example.com', subject: 'From env', text: 'Hello' })
@@ -129,7 +137,7 @@ describe('smtp', () => {
   it('signs with the DKIM key the environment gives, its line breaks written \\n, for the sender\'s domain', async () => {
     const saved = { ...process.env }
 
-    Object.assign(process.env, { NODE_ENV: 'production', SMTP_HOST: '127.0.0.1', SMTP_PORT: String(server.port), SMTP_FROM: 'site@env.test', SMTP_DKIM_SELECTOR: 'mail', SMTP_DKIM_PRIVATE_KEY: privateKey.replaceAll('\n', '\\n') })
+    Object.assign(process.env, { NODE_ENV: 'production', SMTP_HOST: '127.0.0.1', SMTP_PORT: String(server.port), SMTP_INSECURE: 'true', SMTP_FROM: 'site@env.test', SMTP_DKIM_SELECTOR: 'mail', SMTP_DKIM_PRIVATE_KEY: privateKey.replaceAll('\n', '\\n') })
 
     try {
       await mailer({ queue: { name: 'dkim-env' } }).send({ to: 'bob@example.com', subject: 'Signed from env', text: 'Hello' })
