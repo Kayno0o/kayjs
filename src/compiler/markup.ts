@@ -1,7 +1,7 @@
 import type { Attribute, ElementNode, ErrorMessages, FormField, NamedAttribute, Node, SlotNode, Span, TemplateFacts, TextNode } from './ast'
 import type { CodeBuilder } from './mapping'
-import { URL_ATTRIBUTES } from '../runtime/base'
 import { PART_END, PART_START } from '../runtime/markers'
+import { URL_ATTRIBUTES } from '../runtime/url-attributes'
 import { actionOf, describedByOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, formFieldOf } from './ast'
 import { decodeEntities, isFunctionAt } from './expression'
 

@@ -1,5 +1,6 @@
 import type { Elysia } from 'elysia'
-import { joinBase, rebaseSrcset, URL_ATTRIBUTES } from '../runtime/base'
+import { joinBase, rebaseSrcset } from '../runtime/base'
+import { URL_ATTRIBUTES } from '../runtime/url-attributes'
 
 // What may only start a mount point: one slash, then segments; no query, hash or trailing slash.
 const BASE_PATH = /^(?:\/[\w.~-]+)+$/
@@ -30,7 +31,7 @@ export function rebaseHtml(response: Response, base: string): Response {
   const rewriter = new HTMLRewriter()
 
   for (const attribute of URL_ATTRIBUTES) {
-    rewriter.on(`[${attribute}]`, {
+    rewriter.on(`[${attribute.replace(':', '\\:')}]`, {
       element(element) {
         element.setAttribute(attribute, withBase(element.getAttribute(attribute)!))
       },

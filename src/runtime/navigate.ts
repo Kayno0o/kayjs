@@ -1,7 +1,7 @@
 import type { CheckedHref } from './checks'
 import type { HeadElement, HistoryState, NavigationHooks, Swap } from './navigation'
 import { withBase, withoutBase } from './base'
-import { actionUrl, busyForms, dirtyGuard, dropScrollSave, historyState, leave, mayLeave, nativeSubmits, navigation, onScroll, pageKey, prefetched, restoreScroll, saveScroll, submitNatively, swappable, takeFormCheck, takeFormChecks } from './navigation'
+import { busyForms, dirtyGuard, dropScrollSave, historyState, leave, mayLeave, nativeSubmits, navigation, onScroll, pageKey, prefetched, restoreScroll, saveScroll, submitNatively, swappable, swappedActionUrl, takeFormCheck, takeFormChecks } from './navigation'
 
 // Swaps pages in place: a link or a form of the app fetches the next page from the server and puts it in this one, islands marked `persist` kept alive.
 // Everything here runs in the browser only, started by the entry; without JavaScript links and forms load pages as they always did.
@@ -318,7 +318,7 @@ function onSubmit(event: SubmitEvent): void {
   if (event.defaultPrevented)
     return
 
-  const url = actionUrl(form, event.submitter)
+  const url = swappedActionUrl(form, event.submitter)
 
   if (!url)
     return
@@ -355,7 +355,7 @@ function onFormFocus(event: FocusEvent): void {
   const form = event.target instanceof Element ? event.target.closest('form') : null
 
   if (form) {
-    const url = actionUrl(form, null)
+    const url = swappedActionUrl(form, null)
 
     takeFormCheck(form)
     void preloadChecks(url && withoutBase(url.pathname))

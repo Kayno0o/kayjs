@@ -179,7 +179,7 @@ export function swappable(url: URL): boolean {
 }
 
 // Where a form posts when the swap posts it: one of the app's actions, in this tab, with nothing opting it out.
-export function actionUrl(form: HTMLFormElement, submitter: HTMLElement | null): URL | undefined {
+export function swappedActionUrl(form: HTMLFormElement, submitter: HTMLElement | null): URL | undefined {
   const method = (submitter?.getAttribute('formmethod') ?? form.getAttribute('method') ?? 'get').toLowerCase()
   const url = new URL(submitter?.getAttribute('formaction') ?? form.getAttribute('action') ?? '', location.href)
   const target = submitter?.getAttribute('formtarget') ?? form.target
@@ -208,7 +208,7 @@ export function takeFormCheck(form: HTMLFormElement): void {
     return
 
   try {
-    if (!actionUrl(form, null))
+    if (!swappedActionUrl(form, null))
       return
   }
   catch {

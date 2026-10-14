@@ -1,4 +1,5 @@
 import type { CheckedHref } from './checks'
+import { URL_ATTRIBUTES } from './url-attributes'
 
 // Where the site is mounted when it is not at the root of its host, `/docs` for `https://example.com/docs/`, as `base` in kay.config.ts sets it; read off the page in the browser.
 let base: string | undefined
@@ -6,15 +7,11 @@ let base: string | undefined
 // An origin no site has, to tell a path of this one from what a browser would read as another host: `//host`, `/\host`, or either with a tab or line break inside, which browsers drop.
 export const NOWHERE = 'http://nowhere.invalid'
 
-const BASE_META = 'meta[name="kay-base"]'
 // Each URL of a `srcset`, after the start or a comma.
 const SRCSET_URL = /(^|,)(\s*)([^\s,]+)/g
 
-// The attributes holding a URL a page links to or loads, `data` being an `object`'s; `srcset` holds several.
-export const URL_ATTRIBUTES = ['href', 'src', 'action', 'formaction', 'poster', 'data']
-
 function browserBase(): string {
-  return base ??= document.querySelector<HTMLMetaElement>(BASE_META)?.content ?? ''
+  return base ??= document.querySelector<HTMLMetaElement>('meta[name="kay-base"]')?.content ?? ''
 }
 
 // A path of the site under its mount point in the browser: `withBase('/about')` is `/docs/about`, for a link a script builds. On the server it is left as it is, since kay puts what a page renders under the mount point as it goes out.

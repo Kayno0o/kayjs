@@ -1,5 +1,6 @@
 import type { SafeHtml } from './checks'
 import { isVouched, vouch } from './safe-html'
+import { URL_ATTRIBUTES } from './url-attributes'
 
 export interface SanitizeOptions {
   // Tags kept besides the formatted text kept by default, such as `['img', 'table', 'thead', 'tbody', 'tr', 'th', 'td']`.
@@ -16,7 +17,8 @@ const VOID = new Set(['area', 'br', 'col', 'hr', 'img', 'param', 'source', 'trac
 const UNSAFE_TAGS = new Set(['applet', 'base', 'bgsound', 'button', 'embed', 'fencedframe', 'form', 'frame', 'frameset', 'iframe', 'input', 'keygen', 'link', 'math', 'meta', 'noembed', 'noframes', 'noscript', 'object', 'plaintext', 'portal', 'script', 'select', 'style', 'svg', 'template', 'textarea', 'title', 'xmp'])
 // Handlers and styles, which run code or cover the page.
 const UNSAFE_ATTRIBUTE = /^(?:on|style$|srcdoc$|formaction$)/i
-const URL_ATTRIBUTES = new Set(['background', 'cite', 'href', 'longdesc', 'ping', 'poster', 'src'])
+// The URL attributes besides the shared ones, which no page of the app sets but a user's markup may.
+const SANITIZED_ONLY = /^(?:background|cite|longdesc|ping)$/
 const SRCSET_CANDIDATE = /\s*,\s*/
 const DESCRIPTOR = /\s+\S+$/
 const ATTRIBUTE = /([a-z][\w:-]*)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/gi
@@ -42,16 +44,16 @@ function text(markup: string): string {
   return markup.replace(TEXT, char => char === '<' ? '&lt;' : '&amp;')
 }
 
-function safeUrl(value: string): boolean {
+function isSafeUrl(value: string): boolean {
   return SAFE_URL.test(value.replace(AMPERSAND, ''))
 }
 
 // Whether an attribute's value is fine to write back: a URL safe, and every URL of a `srcset`.
 function safeValue(attribute: string, value: string): boolean {
   if (attribute === 'srcset')
-    return value.trim().split(SRCSET_CANDIDATE).every(candidate => safeUrl(candidate.replace(DESCRIPTOR, '')))
+    return value.trim().split(SRCSET_CANDIDATE).every(candidate => isSafeUrl(candidate.replace(DESCRIPTOR, '')))
 
-  return !URL_ATTRIBUTES.has(attribute) || safeUrl(value)
+  return !(URL_ATTRIBUTES.includes(attribute) || SANITIZED_ONLY.test(attribute)) || isSafeUrl(value)
 }
 
 // The opening tag with the attributes kept for it, a URL only when safe, and a link marked as the user's.

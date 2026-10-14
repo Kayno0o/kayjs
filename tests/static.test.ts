@@ -324,6 +324,12 @@ describe('base on a server', () => {
     expect(html).toBe('<img srcset="/repo/a.webp 320w, /repo/b.webp 640w"><style>body { background: url("/repo/bg.png") }</style><object data="/repo/x.svg"></object>')
   })
 
+  it('puts an SVG xlink:href under the mount point as it does an href', async () => {
+    const html = await rebaseHtml(new Response('<svg><use xlink:href="/sprite.svg#a"></use></svg>'), '/repo').text()
+
+    expect(html).toBe('<svg><use xlink:href="/repo/sprite.svg#a"></use></svg>')
+  })
+
   it('puts the links, assets and redirects of every page under the mount point', async () => {
     const app = new Elysia().use(await pages({ routes: 'tests/fixtures/static/src/routes', prebuilt: false, security: false, site: 'https://x.example', base: '/repo/', redirects: { '/old': '/about' } }))
     const visit = async (path: string) => app.handle(new Request(`http://localhost${path}`))
