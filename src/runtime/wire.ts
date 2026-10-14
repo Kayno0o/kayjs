@@ -13,8 +13,8 @@ export function encodeValue(value: unknown): string {
 
 // The revivers for text the server wrote, island props, action results and event streams: the only text whose `SafeHtml` entries vouch for markup. What the browser sends, a cookie and localStorage are read without them, so no caller can vouch for its own text.
 export const serverWritten: Record<string, Reviver> = {
-  // `slice` throws on a payload that is no string.
-  [SAFE_HTML]: (text: string) => vouch(text.slice(1)),
+  // `substring` throws on a payload that is no string, where an array has a `slice`.
+  [SAFE_HTML]: (text: string) => vouch(text.substring(1)),
 }
 
 export function decodeServerValue(text: string): unknown {
