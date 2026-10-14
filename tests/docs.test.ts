@@ -3,17 +3,18 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 import { fileTree, pathTree } from '../docs/src/file-tree'
 import { loadComponents, loadLibraries } from '../docs/src/libraries'
+import { PALETTES, paletteStylesheet, themeCss } from '../docs/src/palettes'
 import { loadReference } from '../docs/src/reference'
 import { partOf } from '../docs/src/sections'
-import { accent, ACCENTS, pickTheme, scheme, THEME_SCRIPT, themeCss } from '../docs/src/theme'
+import { palette, pickTheme, scheme, THEME_SCRIPT, THEMES } from '../docs/src/theme'
 import { check } from '../src/check'
 import { renderMarkdown } from '../src/content/markdown'
 import { sendValue } from '../src/runtime/send'
 
 const root = join(import.meta.dir, '..')
-// A colour token of the docs' theme, and a text colour Shiki writes, each with its light and dark values.
-const TOKEN = /--color-kui-([\w-]+): light-dark\((#[\da-f]{6}), (#[\da-f]{6})\);/gi
-const COLOUR = /(?<![-\w])color:\s*light-dark\((#[\da-f]{6}),\s*(#[\da-f]{6})\)/gi
+// The CSS variable a highlighted token takes its colour from, and one the docs' stylesheet sets.
+const SHIKI_COLOUR = /color:var\((--shiki-[\w-]+)\)/g
+const SHIKI_ALIAS = /^\s*(--shiki-[\w-]+):/gm
 const llms = await Bun.file(join(root, 'llms.txt')).text()
 const docs = (await readdir(join(root, 'llms'))).filter(name => name.endsWith('.md')).sort()
 const LISTED = /^- \[[^\]]+\]\(llms\/([\w-]+\.md)\): \S/gm
@@ -190,55 +191,48 @@ describe('the documentation site', () => {
 
   it('puts the theme a visitor picked on the page from the head, reading what kay kept, and shows the tokens an app sets for it', () => {
     const paint = (kept: Record<string, unknown>) => {
-      const html = { dataset: {} as Record<string, string>, style: { set: {} as Record<string, string>, setProperty(name: string, value: string) {
-        this.set[name] = value
-      } } }
+      const html = { dataset: {} as Record<string, string> }
       const storage = { getItem: (key: string) => key in kept ? sendValue(kept[key]) : null }
       // eslint-disable-next-line no-new-func -- the head runs the script as a string, and so does the test.
       const run = new Function('localStorage', 'document', THEME_SCRIPT) as (storage: { getItem: (key: string) => string | null }, page: { documentElement: typeof html }) => void
 
       run(storage, { documentElement: html })
 
-      return { theme: html.dataset.theme, tokens: html.style.set }
+      return html.dataset
     }
-    const blue = ACCENTS.find(one => one.value === 'blue')!.tokens
 
-    expect(paint({ 'kay-docs-scheme': 'dark', 'kay-docs-accent': 'blue' })).toEqual({ theme: 'dark', tokens: blue })
-    expect(paint({ 'kay-docs-scheme': 'system', 'kay-docs-accent': 'yellow' })).toEqual({ theme: undefined, tokens: {} })
-    expect(paint({ 'kay-docs-scheme': 'neon', 'kay-docs-accent': 'pink' })).toEqual({ theme: undefined, tokens: {} })
-    expect(paint({})).toEqual({ theme: undefined, tokens: {} })
-    expect(themeCss('blue')).toBe(`@theme {\n  --color-kui-accent: ${blue['--color-kui-accent']};\n  --color-kui-accent-hi: ${blue['--color-kui-accent-hi']};\n  --color-kui-on-accent: ${blue['--color-kui-on-accent']};\n}`)
+    expect(paint({ 'kay-docs-scheme': 'dark', 'kay-docs-palette': 'nord' })).toEqual({ theme: 'dark', palette: 'nord' })
+    expect(paint({ 'kay-docs-scheme': 'system', 'kay-docs-palette': 'kay' })).toEqual({})
+    expect(paint({ 'kay-docs-scheme': 'neon', 'kay-docs-palette': 'pink' })).toEqual({})
+    expect(paint({})).toEqual({})
+
+    const nord = PALETTES.find(one => one.value === 'nord')!.colours
+
+    expect(themeCss('nord')).toStartWith(`@theme {\n  --color-kui-mantle: light-dark(${nord.mantle![0]}, ${nord.mantle![1]});\n`)
+    expect(themeCss('nord')).not.toContain('shiki')
   })
 
-  it('switches the theme on the page as the visitor picks it, taking the last accent\'s tokens off, the docs\' own accent being site.css\'s', async () => {
-    const set = new Map<string, string>()
-    const html = { dataset: {} as Record<string, string>, style: { setProperty: (name: string, value: string) => set.set(name, value), removeProperty: (name: string) => set.delete(name) } }
+  it('switches the theme on the page as the visitor picks it, the docs\' own palette being the root\'s', () => {
+    const html = { dataset: {} as Record<string, string> }
     const globals = globalThis as unknown as Record<string, unknown>
     const before = globals.document
 
     globals.document = { documentElement: html }
 
     try {
-      pickTheme({ scheme: 'dark', accent: 'violet' })
-      pickTheme({ accent: 'blue' })
+      pickTheme({ scheme: 'dark', palette: 'gruvbox' })
+      pickTheme({ palette: 'nord' })
 
-      expect(html.dataset.theme).toBe('dark')
-      expect(Object.fromEntries(set)).toEqual(ACCENTS.find(one => one.value === 'blue')!.tokens)
-      expect([scheme(), accent()]).toEqual(['dark', 'blue'])
+      expect(html.dataset).toEqual({ theme: 'dark', palette: 'nord' })
+      expect([scheme(), palette()]).toEqual(['dark', 'nord'])
 
-      pickTheme({ scheme: 'system', accent: 'yellow' })
+      pickTheme({ scheme: 'system', palette: 'kay' })
 
-      expect(html.dataset.theme).toBeUndefined()
-      expect(set.size).toBe(0)
+      expect(html.dataset).toEqual({})
     }
     finally {
       globals.document = before
     }
-
-    const site = await Bun.file(join(root, 'docs/src/site.css')).text()
-
-    for (const [name, value] of Object.entries(ACCENTS[0]!.tokens))
-      expect(site).toContain(`${name}: ${value};`)
   })
 
   it('passes kay check, and so does the tutorial\'s example app', async () => {
@@ -260,22 +254,32 @@ function contrast(a: string, b: string): number {
 }
 
 describe('the documentation\'s colours', () => {
-  const tokens = async () => {
-    const css = await Bun.file(join(root, 'docs/src/site.css')).text()
+  const GROUNDS = ['mantle', 'canvas', 'surface0', 'surface1', 'fill-hover']
+  const TEXT = ['text', 'subtext0', 'overlay1', 'accent', 'error', 'success', 'warning', 'info']
+  const SYNTAX = Object.keys(PALETTES[0]!.colours).filter(name => name.startsWith('syntax-'))
+  // Each pair under its minimum, as `palette: colour on ground (scheme): ratio`.
+  const failing = (pairs: [string, string][], least: number) => PALETTES.flatMap(({ value, colours }) => pairs.flatMap(([fg, ground]) => [0, 1].map(scheme => [`${value}: ${fg} on ${ground} (${scheme === 0 ? 'light' : 'dark'})`, contrast(colours[fg]![scheme]!, colours[ground]![scheme]!)] as const)))
+    .filter(([, ratio]) => ratio < least)
+    .map(([pair, ratio]) => `${pair}: ${ratio.toFixed(2)}`)
 
-    return new Map([...css.matchAll(TOKEN)].map(match => [match[1]!, [match[2]!, match[3]!] as const]))
-  }
+  it('offers each palette in the picker, each setting every colour, as palettes.css holds them', async () => {
+    expect(PALETTES.map(one => one.value)).toEqual(THEMES.map(one => one.value))
 
-  it('reads text at 4.5:1 on every ground, in both schemes', async () => {
-    const colours = await tokens()
-    const failing = ['text', 'subtext0', 'overlay1', 'accent'].flatMap(text => ['mantle', 'canvas', 'surface0', 'surface1'].flatMap(ground => [0, 1].map(scheme => [text, ground, scheme, contrast(colours.get(text)![scheme]!, colours.get(ground)![scheme]!)] as const))).filter(([, , , ratio]) => ratio < 4.5)
+    for (const { colours } of PALETTES)
+      expect(Object.keys(colours)).toEqual(Object.keys(PALETTES[0]!.colours))
 
-    expect(failing).toEqual([])
+    expect(await Bun.file(join(root, 'docs/src/palettes.css')).text()).toBe(paletteStylesheet())
   })
 
-  it('highlights code at 4.5:1 on its ground, in both schemes', async () => {
+  it('reads text at 4.5:1 and field borders at 3:1 on every ground, in both schemes of every palette', () => {
+    expect(failing(TEXT.flatMap(text => GROUNDS.map(ground => [text, ground] as [string, string])), 4.5)).toEqual([])
+    expect(failing(GROUNDS.map(ground => ['field-border', ground]), 3)).toEqual([])
+    expect(failing([['on-accent', 'accent'], ['on-accent', 'accent-hi']], 4.5)).toEqual([])
+  })
+
+  it('highlights code in the palette\'s syntax colours, each at 4.5:1 on the code\'s ground', async () => {
     const { highlight } = await import('../docs/src/highlight')
-    const mantle = (await tokens()).get('mantle')!
+    const styles = await Bun.file(join(root, 'docs/src/styles.css')).text()
     const samples = [
       ['typescript', '// A comment\nimport { s } from \'kay\'\nexport const page = { query: s.Object({ q: s.Optional(s.String()) }) }\nconst n: number = 1 + Number(\'2\') as number\nclass A extends B { #x = /re+/g; get y() { return `t${this.#x}` } }'],
       ['kay', '---\nconst { title } = props<{ title: string }>()\n---\n// A note\nh1.title(data-x="1") {title}\nif title\n  p Hello #[b there]\nfor item of items key={item.id}\n  a(href={item.url}) {item.name}'],
@@ -286,8 +290,10 @@ describe('the documentation\'s colours', () => {
       ['diff', '- removed\n+ added\n@@ -1 +1 @@'],
       ['toml', '# note\n[server]\nport = 3000\nname = "x"'],
     ]
-    const failing = samples.flatMap(([language, code]) => [...highlight(code!, language).matchAll(COLOUR)].flatMap(match => [0, 1].map(scheme => [language, match[scheme + 1]!, contrast(match[scheme + 1]!, mantle[scheme]!)] as const))).filter(([, , ratio]) => ratio < 4.5)
+    const used = new Set(samples.flatMap(([language, code]) => [...highlight(code!, language).matchAll(SHIKI_COLOUR)].map(match => match[1]!)))
+    const set = new Set([...SYNTAX.map(name => `--shiki-token-${name.slice(7)}`), ...[...styles.matchAll(SHIKI_ALIAS)].map(match => match[1]!)])
 
-    expect(failing).toEqual([])
+    expect([...used].filter(name => !set.has(name))).toEqual([])
+    expect(failing(SYNTAX.map(name => [name, 'mantle']), 4.5)).toEqual([])
   })
 })

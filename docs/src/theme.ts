@@ -4,36 +4,27 @@ export type Scheme = 'system' | 'light' | 'dark'
 
 export interface Theme {
   scheme: Scheme
-  accent: string
+  palette: string
 }
 
-interface Accent {
-  value: string
-  label: string
-  // kayjs-ui's accent tokens, each `light-dark(light, dark)`.
-  tokens: Record<string, string>
-}
-
-// The first is the docs' own, which site.css sets: picking it takes the others off.
-export const ACCENTS: Accent[] = [
-  { value: 'yellow', label: 'Yellow', tokens: { '--color-kui-accent': 'light-dark(#8a5700, #f5b83d)', '--color-kui-accent-hi': 'light-dark(#6e4500, #f8ca6b)', '--color-kui-on-accent': 'light-dark(#ffffff, #17202e)' } },
-  { value: 'blue', label: 'Blue', tokens: { '--color-kui-accent': 'light-dark(#2459b8, #7aa8f0)', '--color-kui-accent-hi': 'light-dark(#1b4691, #9cbff5)', '--color-kui-on-accent': 'light-dark(#ffffff, #0f1a2e)' } },
-  { value: 'green', label: 'Green', tokens: { '--color-kui-accent': 'light-dark(#24662f, #7cc98a)', '--color-kui-accent-hi': 'light-dark(#1b5025, #9bd8a6)', '--color-kui-on-accent': 'light-dark(#ffffff, #0f2214)' } },
-  { value: 'red', label: 'Red', tokens: { '--color-kui-accent': 'light-dark(#a63c32, #ec9086)', '--color-kui-accent-hi': 'light-dark(#8f3128, #f4a79d)', '--color-kui-on-accent': 'light-dark(#ffffff, #1a0d0b)' } },
-  { value: 'violet', label: 'Violet', tokens: { '--color-kui-accent': 'light-dark(#6346a0, #b9a3de)', '--color-kui-accent-hi': 'light-dark(#4f3683, #cbb9e8)', '--color-kui-on-accent': 'light-dark(#ffffff, #1a1230)' } },
+// The themes the header offers, each a whole palette in palettes.ts; the first is the docs' own, which palettes.css sets on the root.
+export const THEMES: { value: string, label: string }[] = [
+  { value: 'kay', label: 'kay' },
+  { value: 'catppuccin', label: 'Catppuccin' },
+  { value: 'nord', label: 'Nord' },
+  { value: 'gruvbox', label: 'Gruvbox' },
+  { value: 'solarized', label: 'Solarized' },
+  { value: 'rose-pine', label: 'Rosé Pine' },
+  { value: 'tokyo-night', label: 'Tokyo Night' },
 ]
 
 export const SCHEMES: { value: Scheme, label: string }[] = [{ value: 'system', label: 'System' }, { value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }]
 
-const TOKENS = Object.keys(ACCENTS[0]!.tokens)
-// The tokens each accent sets on `html`; the docs' own sets none, site.css holding it.
-const OVERRIDES: Record<string, Record<string, string>> = Object.fromEntries(ACCENTS.slice(1).map(accent => [accent.value, accent.tokens]))
-
 // Kept in localStorage: the server and the islands as they hydrate render the defaults, and kay applies the visitor's after.
 export const scheme = persisted<Scheme>('kay-docs-scheme', 'system', { storage: 'local' })
-export const accent = persisted<string>('kay-docs-accent', ACCENTS[0]!.value, { storage: 'local' })
+export const palette = persisted<string>('kay-docs-palette', THEMES[0]!.value, { storage: 'local' })
 
-// Shows the theme at once, the scheme as kayjs-ui's `data-theme` and the accent as its tokens on `html`, which kay keeps for the next pages and visits.
+// Shows the theme at once, the scheme as kayjs-ui's `data-theme` and the palette as `data-palette` on `html`, which kay keeps for the next pages and visits.
 export function pickTheme(change: Partial<Theme>) {
   const root = document.documentElement
 
@@ -46,23 +37,15 @@ export function pickTheme(change: Partial<Theme>) {
       root.dataset.theme = change.scheme
   }
 
-  if (change.accent !== undefined) {
-    accent.set(change.accent)
+  if (change.palette !== undefined) {
+    palette.set(change.palette)
 
-    for (const name of TOKENS)
-      root.style.removeProperty(name)
-
-    for (const [name, value] of Object.entries(OVERRIDES[change.accent] ?? {}))
-      root.style.setProperty(name, value)
+    if (change.palette === THEMES[0]!.value)
+      delete root.dataset.palette
+    else
+      root.dataset.palette = change.palette
   }
 }
 
 // What pickTheme does, run in the head before the page paints so a visit never flashes the default theme first, reading each value as kay keeps a persisted string, `["dark"]`.
-export const THEME_SCRIPT = `try{var r=document.documentElement,v=function(k){try{return JSON.parse(localStorage.getItem(k))[0]}catch(e){}},s=v("kay-docs-scheme"),a=${JSON.stringify(OVERRIDES)}[v("kay-docs-accent")];if(s==="light"||s==="dark")r.dataset.theme=s;if(a)for(var k in a)r.style.setProperty(k,a[k])}catch(e){}`
-
-// The `@theme` an app sets for the accent picked.
-export function themeCss(picked: string): string {
-  const tokens = (ACCENTS.find(one => one.value === picked) ?? ACCENTS[0]!).tokens
-
-  return `@theme {\n${Object.entries(tokens).map(([name, value]) => `  ${name}: ${value};`).join('\n')}\n}`
-}
+export const THEME_SCRIPT = `try{var r=document.documentElement,v=function(k){try{return JSON.parse(localStorage.getItem(k))[0]}catch(e){}},s=v("kay-docs-scheme"),p=v("kay-docs-palette");if(s==="light"||s==="dark")r.dataset.theme=s;if(${JSON.stringify(THEMES.slice(1).map(theme => theme.value))}.indexOf(p)>=0)r.dataset.palette=p}catch(e){}`

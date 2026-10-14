@@ -27,7 +27,7 @@ The `@kaynooo` scope must point at the Forgejo registry in your `.npmrc`. kay an
 }
 ```
 
-The palette in this site's header picks a scheme and an accent, and the whole site follows. Your `@theme` sets the ones picked so:
+The palette button in this site's header picks a theme, from Catppuccin to Tokyo Night, and a scheme; the whole site follows, its code included. Your `@theme` sets the theme picked so:
 
 <ThemeTokens />
 

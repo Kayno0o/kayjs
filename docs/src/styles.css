@@ -1,11 +1,11 @@
-/* The docs' colours are kayjs-ui's tokens, set in site.css, so one theme restyles the docs and the components on them; light-dark() follows the reader's color scheme with no script, Shiki's code colors included. */
+/* The docs' colours are kayjs-ui's tokens, set by the palette picked (palettes.css), so one theme restyles the docs, the components on them and the code; light-dark() follows the reader's color scheme with no script. */
 :root {
   color-scheme: light dark;
   --base: var(--color-kui-canvas);
   --mantle: var(--color-kui-mantle);
-  --crust: light-dark(#dbe2eb, #0d131d);
+  --crust: light-dark(color-mix(in srgb, var(--color-kui-mantle) 95%, black), color-mix(in srgb, var(--color-kui-mantle) 72%, black));
   --muted: var(--color-kui-subtext0);
-  --subtext: light-dark(#384356, #c4ccd7);
+  --subtext: color-mix(in srgb, var(--color-kui-text) 50%, var(--color-kui-subtext0));
   --text: var(--color-kui-text);
   --accent: var(--color-kui-accent);
   /* The accent the theme picker sets, faint under the page shown and a card hovered. */
@@ -15,6 +15,14 @@
   --sans: var(--font-sans);
   --mono: ui-monospace, 'JetBrains Mono', 'Cascadia Code', Menlo, Consolas, monospace;
   --radius: 3px;
+  /* Code takes the palette's syntax colours from palettes.css, and these from its tokens. */
+  --shiki-foreground: var(--text);
+  --shiki-background: var(--mantle);
+  --shiki-token-punctuation: var(--subtext);
+  --shiki-token-link: var(--accent);
+  --shiki-token-inserted: var(--color-kui-success);
+  --shiki-token-deleted: var(--color-kui-error);
+  --shiki-token-changed: var(--color-kui-warning);
   --bar: 0px;
   /* The width of a page's text, its demos and code blocks included. */
   --measure: 54rem;

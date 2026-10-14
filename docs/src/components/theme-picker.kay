@@ -3,12 +3,12 @@ import IconButton from '@kaynooo/kayjs-ui/icon-button.kay'
 import Popover from '@kaynooo/kayjs-ui/popover.kay'
 import Segmented from '@kaynooo/kayjs-ui/segmented.kay'
 import Palette from '~icons/tabler/palette'
-import { accent, ACCENTS, pickTheme, scheme, SCHEMES } from '../theme'
+import { palette, pickTheme, scheme, SCHEMES, THEMES } from '../theme'
 ---
 Popover(class="flex flex-col gap-2 p-3" placement="bottom-end")
   @trigger(attributes)
     IconButton({...attributes} icon={Palette} label="Theme" variant="ghost")
+  p.theme-picker-label Theme
+  Segmented(class="grid grid-cols-2" options={THEMES} value={palette()} label="Theme" onChange={picked => pickTheme({ palette: picked })})
   p.theme-picker-label Scheme
   Segmented(options={SCHEMES} value={scheme()} label="Scheme" onChange={picked => pickTheme({ scheme: picked })})
-  p.theme-picker-label Accent
-  Segmented(options={ACCENTS} value={accent()} label="Accent" onChange={picked => pickTheme({ accent: picked })})

@@ -1,0 +1,217 @@
+/* Generated from palettes.ts by `bun docs/scripts/palettes.ts`. */
+:root {
+  --color-kui-mantle: light-dark(#e8edf4, #121a26);
+  --color-kui-canvas: light-dark(#f8fafc, #17202e);
+  --color-kui-surface0: light-dark(#ffffff, #1c2737);
+  --color-kui-surface1: light-dark(#e3e8ef, #23314a);
+  --color-kui-overlay1: light-dark(#5d6879, #929dae);
+  --color-kui-subtext0: light-dark(#566173, #9ba6b5);
+  --color-kui-text: light-dark(#17202e, #eef2f7);
+  --color-kui-accent: light-dark(#8a5700, #f5b83d);
+  --color-kui-accent-hi: light-dark(#6e4500, #f8ca6b);
+  --color-kui-on-accent: light-dark(#ffffff, #17202e);
+  --color-kui-success: light-dark(#2f6b3a, #8fd19e);
+  --color-kui-warning: light-dark(#8a5a12, #e8b46a);
+  --color-kui-info: light-dark(#2459b8, #8fb8f0);
+  --color-kui-error: light-dark(#b03a2e, #f2968c);
+  --color-kui-fill-hover: light-dark(#e3e8ef, #23314a);
+  --color-kui-fill-danger: light-dark(#f1e7e7, #3a333d);
+  --color-kui-field-border: light-dark(#838589, #737a84);
+  --color-kui-chart-3: light-dark(#2459b8, #7aa8f0);
+  --color-kui-chart-4: light-dark(#b0620e, #f0a35e);
+  --color-kui-chart-5: light-dark(#6346a0, #b9a3de);
+  --color-kui-chart-6: light-dark(#24735f, #7fc8b8);
+  --shiki-token-comment: light-dark(#57606a, #8a96a8);
+  --shiki-token-keyword: light-dark(#cf222e, #ffad66);
+  --shiki-token-string: light-dark(#0a3069, #d5ff80);
+  --shiki-token-string-expression: light-dark(#116329, #5ccfe6);
+  --shiki-token-constant: light-dark(#0550ae, #dfbfff);
+  --shiki-token-function: light-dark(#6639ba, #ffd173);
+  --shiki-token-parameter: light-dark(#953800, #f29e74);
+}
+
+[data-palette='catppuccin'] {
+  --color-kui-mantle: light-dark(#e6e9ef, #181825);
+  --color-kui-canvas: light-dark(#eff1f5, #1e1e2e);
+  --color-kui-surface0: light-dark(#f7f8fa, #262637);
+  --color-kui-surface1: light-dark(#dce0e8, #2d2e40);
+  --color-kui-overlay1: light-dark(#62636c, #9399b2);
+  --color-kui-subtext0: light-dark(#5f6278, #a6adc8);
+  --color-kui-text: light-dark(#4c4f69, #cdd6f4);
+  --color-kui-accent: light-dark(#832fe5, #cba6f7);
+  --color-kui-accent-hi: light-dark(#6d00c9, #e5c0ff);
+  --color-kui-on-accent: light-dark(#ffffff, #11111b);
+  --color-kui-success: light-dark(#117200, #a6e3a1);
+  --color-kui-warning: light-dark(#975200, #f9e2af);
+  --color-kui-info: light-dark(#0e56e5, #89b4fa);
+  --color-kui-error: light-dark(#c80034, #f38ba8);
+  --color-kui-fill-hover: light-dark(#dce0e8, #2d2e40);
+  --color-kui-fill-danger: light-dark(#ebd9e2, #402f42);
+  --color-kui-field-border: light-dark(#7e7f85, #737792);
+  --color-kui-chart-3: light-dark(#1e66f5, #89b4fa);
+  --color-kui-chart-4: light-dark(#f25800, #fab387);
+  --color-kui-chart-5: light-dark(#d460b5, #f5c2e7);
+  --color-kui-chart-6: light-dark(#179299, #94e2d5);
+  --shiki-token-comment: light-dark(#656877, #9399b2);
+  --shiki-token-keyword: light-dark(#8737ed, #cba6f7);
+  --shiki-token-string: light-dark(#1a7a00, #a6e3a1);
+  --shiki-token-string-expression: light-dark(#00747c, #94e2d5);
+  --shiki-token-constant: light-dark(#c62c00, #fab387);
+  --shiki-token-function: light-dark(#145ceb, #89b4fa);
+  --shiki-token-parameter: light-dark(#c82744, #eba0ac);
+}
+
+[data-palette='nord'] {
+  --color-kui-mantle: light-dark(#e5e9f0, #272c36);
+  --color-kui-canvas: light-dark(#eceff4, #2e3440);
+  --color-kui-surface0: light-dark(#f5f7fa, #353b49);
+  --color-kui-surface1: light-dark(#d8dee9, #3b4252);
+  --color-kui-overlay1: light-dark(#576278, #a6aebc);
+  --color-kui-subtext0: light-dark(#4c566a, #b5bcc9);
+  --color-kui-text: light-dark(#2e3440, #eceff4);
+  --color-kui-accent: light-dark(#43667d, #88c0d0);
+  --color-kui-accent-hi: light-dark(#2d5066, #a1daea);
+  --color-kui-on-accent: light-dark(#ffffff, #272c36);
+  --color-kui-success: light-dark(#586646, #a3be8c);
+  --color-kui-warning: light-dark(#756000, #ebcb8b);
+  --color-kui-info: light-dark(#43667d, #91b1d1);
+  --color-kui-error: light-dark(#954c55, #f3948a);
+  --color-kui-fill-hover: light-dark(#d8dee9, #3b4252);
+  --color-kui-fill-danger: light-dark(#e3dfe4, #4e434c);
+  --color-kui-field-border: light-dark(#7c7e82, #868d9f);
+  --color-kui-chart-3: light-dark(#5e81ac, #81a1c1);
+  --color-kui-chart-4: light-dark(#be7667, #d08770);
+  --color-kui-chart-5: light-dark(#a07f99, #b48ead);
+  --color-kui-chart-6: light-dark(#6b908f, #8fbcbb);
+  --shiki-token-comment: light-dark(#5c6981, #7e93c2);
+  --shiki-token-keyword: light-dark(#4a6d84, #81a1c1);
+  --shiki-token-string: light-dark(#5f6d4d, #a3be8c);
+  --shiki-token-string-expression: light-dark(#4e6f6f, #8fbcbb);
+  --shiki-token-constant: light-dark(#776375, #b48ead);
+  --shiki-token-function: light-dark(#3e707a, #88c0d0);
+  --shiki-token-parameter: light-dark(#8c5d4e, #d08770);
+}
+
+[data-palette='gruvbox'] {
+  --color-kui-mantle: light-dark(#f2e5bc, #1d2021);
+  --color-kui-canvas: light-dark(#fbf1c7, #282828);
+  --color-kui-surface0: light-dark(#f9f5d7, #302e2e);
+  --color-kui-surface1: light-dark(#ebdbb2, #383533);
+  --color-kui-overlay1: light-dark(#6b5e53, #ac9d87);
+  --color-kui-subtext0: light-dark(#665c54, #bdae93);
+  --color-kui-text: light-dark(#3c3836, #ebdbb2);
+  --color-kui-accent: light-dark(#ad3800, #fe8019);
+  --color-kui-accent-hi: light-dark(#921b00, #ff9a3f);
+  --color-kui-on-accent: light-dark(#fbf1c7, #1d2021);
+  --color-kui-success: light-dark(#686300, #b8bb26);
+  --color-kui-warning: light-dark(#835900, #fabd2f);
+  --color-kui-info: light-dark(#076678, #83a598);
+  --color-kui-error: light-dark(#9d0006, #ff715c);
+  --color-kui-fill-hover: light-dark(#ebdbb2, #383533);
+  --color-kui-fill-danger: light-dark(#f2d9b4, #4a3430);
+  --color-kui-field-border: light-dark(#817d6d, #847e6d);
+  --color-kui-chart-3: light-dark(#076678, #83a598);
+  --color-kui-chart-4: light-dark(#b57614, #fabd2f);
+  --color-kui-chart-5: light-dark(#8f3f71, #d3869b);
+  --color-kui-chart-6: light-dark(#427b58, #8ec07c);
+  --shiki-token-comment: light-dark(#6f6556, #948475);
+  --shiki-token-keyword: light-dark(#9d0006, #fb4934);
+  --shiki-token-string: light-dark(#6e6900, #b8bb26);
+  --shiki-token-string-expression: light-dark(#39724f, #8ec07c);
+  --shiki-token-constant: light-dark(#8f3f71, #d3869b);
+  --shiki-token-function: light-dark(#8b5d00, #fabd2f);
+  --shiki-token-parameter: light-dark(#076678, #83a598);
+}
+
+[data-palette='solarized'] {
+  --color-kui-mantle: light-dark(#eee8d5, #00212b);
+  --color-kui-canvas: light-dark(#fdf6e3, #002b36);
+  --color-kui-surface0: light-dark(#fefaee, #04313c);
+  --color-kui-surface1: light-dark(#e6dfc9, #073642);
+  --color-kui-overlay1: light-dark(#50666e, #889c9e);
+  --color-kui-subtext0: light-dark(#50666d, #889c9e);
+  --color-kui-text: light-dark(#073642, #93a1a1);
+  --color-kui-accent: light-dark(#0065ac, #3a9fe6);
+  --color-kui-accent-hi: light-dark(#004d92, #56b9ff);
+  --color-kui-on-accent: light-dark(#ffffff, #00212b);
+  --color-kui-success: light-dark(#626700, #8aa316);
+  --color-kui-warning: light-dark(#7c5f00, #bf9317);
+  --color-kui-info: light-dark(#006e6f, #32a9a0);
+  --color-kui-error: light-dark(#c41617, #ff665f);
+  --color-kui-fill-hover: light-dark(#e6dfc9, #073642);
+  --color-kui-fill-danger: light-dark(#f7e0cf, #29343d);
+  --color-kui-field-border: light-dark(#78807d, #607f86);
+  --color-kui-chart-3: light-dark(#268bd2, #268bd2);
+  --color-kui-chart-4: light-dark(#cb4b16, #cb4b16);
+  --color-kui-chart-5: light-dark(#d33682, #d33682);
+  --color-kui-chart-6: light-dark(#269d94, #2aa198);
+  --shiki-token-comment: light-dark(#626a6a, #728895);
+  --shiki-token-keyword: light-dark(#686d00, #859900);
+  --shiki-token-string: light-dark(#007576, #2aa198);
+  --shiki-token-string-expression: light-dark(#bb3b00, #dd5d28);
+  --shiki-token-constant: light-dark(#c12479, #e5488d);
+  --shiki-token-function: light-dark(#006bb2, #268bd2);
+  --shiki-token-parameter: light-dark(#816400, #b58900);
+}
+
+[data-palette='rose-pine'] {
+  --color-kui-mantle: light-dark(#f2e9e1, #1d1b2e);
+  --color-kui-canvas: light-dark(#faf4ed, #232136);
+  --color-kui-surface0: light-dark(#fffaf3, #2a273f);
+  --color-kui-surface1: light-dark(#ebe0d6, #393552);
+  --color-kui-overlay1: light-dark(#66636c, #9b9ed2);
+  --color-kui-subtext0: light-dark(#666279, #a29ebc);
+  --color-kui-text: light-dark(#575279, #e0def4);
+  --color-kui-accent: light-dark(#8f545a, #ea9a97);
+  --color-kui-accent-hi: light-dark(#763e44, #ffb3b0);
+  --color-kui-on-accent: light-dark(#ffffff, #1d1b2e);
+  --color-kui-success: light-dark(#1c6f76, #9ccfd8);
+  --color-kui-warning: light-dark(#945500, #f6c177);
+  --color-kui-info: light-dark(#286983, #5aabcc);
+  --color-kui-error: light-dark(#905168, #f77b9e);
+  --color-kui-fill-hover: light-dark(#ebe0d6, #393552);
+  --color-kui-fill-danger: light-dark(#efe4e0, #452f47);
+  --color-kui-field-border: light-dark(#827f85, #817fa1);
+  --color-kui-chart-3: light-dark(#907aa9, #c4a7e7);
+  --color-kui-chart-4: light-dark(#c87b03, #f6c177);
+  --color-kui-chart-5: light-dark(#56949f, #9ccfd8);
+  --color-kui-chart-6: light-dark(#b4637a, #eb6f92);
+  --shiki-token-comment: light-dark(#6b6871, #837fb0);
+  --shiki-token-keyword: light-dark(#286983, #3e8fb0);
+  --shiki-token-string: light-dark(#9c5900, #f6c177);
+  --shiki-token-string-expression: light-dark(#26747b, #9ccfd8);
+  --shiki-token-constant: light-dark(#98556c, #eb6f92);
+  --shiki-token-function: light-dark(#97585e, #ea9a97);
+  --shiki-token-parameter: light-dark(#766380, #c4a7e7);
+}
+
+[data-palette='tokyo-night'] {
+  --color-kui-mantle: light-dark(#d0d5e3, #16161e);
+  --color-kui-canvas: light-dark(#e1e2e7, #1a1b26);
+  --color-kui-surface0: light-dark(#e9e9ed, #212433);
+  --color-kui-surface1: light-dark(#c4c8da, #292e42);
+  --color-kui-overlay1: light-dark(#4f5369, #8595c6);
+  --color-kui-subtext0: light-dark(#435479, #a9b1d6);
+  --color-kui-text: light-dark(#2d4cab, #c0caf5);
+  --color-kui-accent: light-dark(#004db9, #7aa2f7);
+  --color-kui-accent-hi: light-dark(#00339e, #92bcff);
+  --color-kui-on-accent: light-dark(#ffffff, #16161e);
+  --color-kui-success: light-dark(#3f5c20, #9ece6a);
+  --color-kui-warning: light-dark(#6b4f21, #e0af68);
+  --color-kui-info: light-dark(#005c76, #7dcfff);
+  --color-kui-error: light-dark(#a9003f, #f7768e);
+  --color-kui-fill-hover: light-dark(#c4c8da, #292e42);
+  --color-kui-fill-danger: light-dark(#dbcbd6, #3d2a37);
+  --color-kui-field-border: light-dark(#686e83, #717697);
+  --color-kui-chart-3: light-dark(#9854f1, #bb9af7);
+  --color-kui-chart-4: light-dark(#b15c00, #ff9e64);
+  --color-kui-chart-5: light-dark(#118c74, #73daca);
+  --color-kui-chart-6: light-dark(#2e7de9, #2ac3de);
+  --shiki-token-comment: light-dark(#575b71, #727cc1);
+  --shiki-token-keyword: light-dark(#832ac7, #bb9af7);
+  --shiki-token-string: light-dark(#486529, #9ece6a);
+  --shiki-token-string-expression: light-dark(#b90047, #f7768e);
+  --shiki-token-constant: light-dark(#8f4900, #ff9e64);
+  --shiki-token-function: light-dark(#0557c3, #7aa2f7);
+  --shiki-token-parameter: light-dark(#74582a, #e0af68);
+}

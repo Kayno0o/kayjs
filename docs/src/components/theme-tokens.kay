@@ -1,9 +1,10 @@
 ---
 import CopyButton from '@kaynooo/kayjs-ui/copy-button.kay'
 import { memo } from 'kay'
-import { accent, scheme, themeCss } from '../theme'
+import { themeCss } from '../palettes'
+import { palette, scheme } from '../theme'
 
-const css = memo(() => themeCss(accent()))
+const css = memo(() => themeCss(palette()))
 ---
 // The theme picked in the header, as an app's app.css and root layout would set it.
 .code.theme-tokens
