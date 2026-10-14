@@ -19,6 +19,7 @@ import { extensionEditor, routeMounts } from '../server/routes'
 import { ASSET_PREFIX, clientDir, outputDir } from './assets'
 import { findKayFiles, writeIfChanged } from './files'
 import { findKayLibraries, reachableLibraryFiles, reachesAny, sourceWords } from './libraries'
+import { packagesOf } from './licenses'
 import { throughLinks } from './links'
 import { kay } from './plugin'
 import { sizeReport } from './report'
@@ -104,6 +105,9 @@ export async function buildClient(root: string, options: ClientOptions = {}): Pr
   await writeManifest(root, manifest)
 
   const built = fromManifest(root, manifest)
+  const bundled = Object.values(scripts.inputs).flatMap(inputs => Object.entries(inputs).filter(([, input]) => (input.bytesInOutput ?? 0) > 0).map(([input]) => input))
+
+  built.packages = packagesOf([...bundled, ...styles.inputs])
 
   if (options.report !== undefined)
     built.report = await sizeReport(root, clientDir(root), scripts.manifest, sources.islands, options.report === 'modules' ? scripts.inputs : undefined)

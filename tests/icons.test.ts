@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { iconProps, iconTypes, installedIconSets } from '../src/build/icons'
+import { iconSetWarnings, thirdPartyNotices } from '../src/build/licenses'
 import { kay } from '../src/build/plugin'
 import { check } from '../src/check'
 import { iconNames, iconProps as setIconProps } from '../src/runtime/icons'
@@ -113,5 +114,21 @@ describe('icons', () => {
     finally {
       await rm(copy, { recursive: true, force: true })
     }
+  })
+
+  it('warns of a set whose licence asks more than its notice, and credits its author in the notices', async () => {
+    const dir = join(scratch, 'attribution')
+    const set = join(dir, 'node_modules/@iconify-json/drawn')
+    const info = { prefix: 'drawn', name: 'Drawn Icons', author: { name: 'Ada', url: 'https://example.com/drawn' }, license: { title: 'CC BY 4.0', spdx: 'CC-BY-4.0', url: 'https://creativecommons.org/licenses/by/4.0/' } }
+
+    await Bun.write(join(dir, 'package.json'), JSON.stringify({ devDependencies: { '@iconify-json/drawn': '*' } }))
+    await Bun.write(join(set, 'package.json'), JSON.stringify({ name: '@iconify-json/drawn', version: '1.0.0', license: 'CC-BY-4.0' }))
+    await Bun.write(join(set, 'icons.json'), JSON.stringify({ prefix: 'drawn', icons: {}, info }))
+    await Bun.write(join(set, 'info.json'), JSON.stringify(info))
+
+    expect(iconSetWarnings(dir)).toEqual(['kay: Drawn Icons (@iconify-json/drawn) comes under CC BY 4.0, which may ask more than the notice in THIRD-PARTY-LICENSES.txt, such as crediting their author, Ada (https://example.com/drawn) where they show: read https://creativecommons.org/licenses/by/4.0/'])
+    expect(thirdPartyNotices([set])).toContain('@iconify-json/drawn 1.0.0 (CC-BY-4.0)\n  Drawn Icons by Ada, https://example.com/drawn, licence at https://creativecommons.org/licenses/by/4.0/')
+    // Tabler's MIT asks nothing past its notice.
+    expect(iconSetWarnings(FIXTURE)).toEqual([])
   })
 })

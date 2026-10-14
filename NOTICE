@@ -1,0 +1,1 @@
+kay includes code adapted from font-rs, by Raph Levien (https://github.com/raphlinus/font-rs), licensed under the Apache License, Version 2.0 (https://www.apache.org/licenses/LICENSE-2.0): the signed-area coverage accumulation in src/server/raster.ts.

@@ -21,6 +21,7 @@ import { writeCards } from '../server/card'
 import { EXECUTABLE_RECORD, PRERENDERED_DIR } from '../server/client'
 import { compressFiles } from '../server/compress'
 import { FAVICON_DIR, faviconSource, writeFavicons } from '../server/favicon'
+import { fontFiles } from '../server/fonts'
 import { avifQuality, writeImageVariants, writeRemoteVariants } from '../server/image'
 import { hookPrerendered } from '../server/page-hook'
 import { prerenderPages } from '../server/prerender'
@@ -29,6 +30,7 @@ import { slashedPath } from '../server/routes'
 import { linkStoredFiles } from '../server/storage'
 import { buildClient } from './client'
 import { compileServer } from './compile'
+import { iconSetPackages, iconSetWarnings, NOTICES_FILE, packagesOf, thirdPartyNotices } from './licenses'
 import { writeSearchIndex } from './search'
 import { exportStatic, refuseStaticConfig } from './static'
 
@@ -163,7 +165,7 @@ export async function buildProject(root: string, config: KayConfig, options: Bui
     const stage = performance.now()
 
     try {
-      const executable = await compileServer(project, { outfile: resolve(root, options.compile.outfile), entry: options.compile.entry === undefined ? undefined : resolve(root, options.compile.entry) })
+      const executable = await compileServer(project, { outfile: resolve(root, options.compile.outfile), entry: options.compile.entry === undefined ? undefined : resolve(root, options.compile.entry), packages: shippedPackages(project, client) })
 
       await Bun.write(join(output, EXECUTABLE_RECORD), relative(root, executable))
 
@@ -181,6 +183,11 @@ export async function buildProject(root: string, config: KayConfig, options: Bui
   }
 
   return result
+}
+
+// What the browser build bundles, the fonts the pages declare and the icon sets they inline.
+function shippedPackages({ root, config }: Project, client: ClientBuild): string[] {
+  return [...client.packages ?? [], ...packagesOf(fontFiles(root, config.fonts ?? [])), ...iconSetPackages(root)]
 }
 
 // The errors fail a build; warnings are only printed.
@@ -261,6 +268,10 @@ async function outputStage(project: Project, exported: boolean, client: ClientBu
   if (favicon !== undefined)
     await writeFavicons(favicon, join(client.dir, '..', FAVICON_DIR), checking ? () => undefined : undefined)
 
+  for (const warning of iconSetWarnings(root))
+    console.warn(warning)
+
+  await Bun.write(join(client.dir, NOTICES_FILE), thirdPartyNotices(shippedPackages(project, client)))
   await hookPrerendered(root, pageHooks(config.extensions), { clientDir: client.dir, publicDir: paths.public, base: basePath(config.base), aspects: config.images?.aspects })
   await Promise.all([compressFiles(client.dir), compressFiles(join(paths.output, PRERENDERED_DIR))])
 

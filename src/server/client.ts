@@ -61,6 +61,8 @@ export interface ClientBuild extends Omit<ClientManifest, 'styles' | 'pages'> {
   inlineStyles?: Map<string, string> | undefined
   // What the browser loads for islands, when the build was asked to measure it.
   report?: SizeReport | undefined
+  // The directories of the packages its modules and stylesheets come from, for the notices file.
+  packages?: string[] | undefined
 }
 
 // Quoted, spaces included, or bare.

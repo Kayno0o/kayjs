@@ -10,6 +10,7 @@ import { DEFAULT_LANG, extensionMessageFiles, messagesFile } from '../server/i18
 import { matcherFile } from '../server/params'
 import { refuseClashes } from '../server/route-table'
 import { extensionEditor, routeMounts, routeTrees, scanEndpoints, scanRoutes, specialPagesOf } from '../server/routes'
+import { installedDependencies, NOTICES_FILE, thirdPartyNotices } from './licenses'
 import { kay } from './plugin'
 import { runtimeConfig, withoutPlugins } from './runtime-config'
 import { withoutStyles } from './styles'
@@ -18,6 +19,8 @@ export interface CompileOptions {
   // The server entry, `src/server.ts` under the root by default.
   entry?: string | undefined
   outfile: string
+  // The packages the browser build ships, credited with the server's in what `--licenses` prints.
+  packages?: string[] | undefined
 }
 
 // Bun embeds an asset directory under its last path component, beside the executable's entry.
@@ -82,10 +85,19 @@ export async function compileServer(project: Project, options: CompileOptions): 
   const generated = join(paths.compile, 'entry.ts')
   const embedded = (dir: string) => `join(import.meta.dir, ${JSON.stringify(basename(dir))})`
 
+  const notices = join(paths.compile, NOTICES_FILE)
+
+  await Bun.write(notices, thirdPartyNotices([...installedDependencies(root), ...options.packages ?? []]))
   await Bun.write(generated, [
     `import { join } from 'node:path'`,
     `import process from 'node:process'`,
     `import { probeHealth, registerBundle } from 'kay/internal/server'`,
+    `import notices from ${JSON.stringify(notices)} with { type: 'text' }`,
+    '',
+    'if (process.argv.includes(\'--licenses\')) {',
+    '  process.stdout.write(notices)',
+    '  process.exit(0)',
+    '}',
     '',
     // For code reading it off `node:process`, as kay does, which the build's `define` leaves alone.
     'Bun.env.NODE_ENV = \'production\'',

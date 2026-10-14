@@ -60,6 +60,11 @@ export async function prepareFonts(root: string, fonts: (FontConfig | Fontsource
   return assets
 }
 
+// The file of every face, for the notices file to credit the packages they come from.
+export function fontFiles(root: string, fonts: (FontConfig | FontsourceConfig)[]): string[] {
+  return fonts.flatMap(font => 'fontsource' in font ? fontsourceFaces(root, font) : [font]).map(font => fontFile(root, font.src))
+}
+
 // What `kay build` recorded, for a server reading no source.
 export async function builtFonts(dir: string): Promise<FontAssets | undefined> {
   const file = Bun.file(join(dir, FONTS_FILE))

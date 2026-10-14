@@ -2,6 +2,7 @@ import type { Elysia } from 'elysia'
 import type { ClientBuild } from './client'
 import { normalize, relative, resolve, sep } from 'node:path'
 import { ASSET_PREFIX } from '../build/assets'
+import { NOTICES_FILE } from '../build/licenses'
 import { mapBundleToKay } from '../build/sourcemap'
 import { SEARCH_MANIFEST } from '../runtime/search'
 import { encodedCopies, encodedPath, filesUnder, preferredEncoding } from './compress'
@@ -20,6 +21,8 @@ export async function serveBuildFiles(app: Elysia, client: ClientBuild, { dev, s
   const sourceMapHeaders = headerCopies({ 'cache-control': 'no-cache' }, security)
   // The search manifest names the index of the build serving it, so a browser asks for it again each time.
   const searchManifest = resolve(client.dir, SEARCH_MANIFEST.slice(ASSET_PREFIX.length))
+  // The notices file keeps its name from one build to the next, as the search manifest does.
+  const notices = resolve(client.dir, NOTICES_FILE)
   const manifestHeaders = headerCopies({ 'cache-control': 'no-cache' }, security)
   const encodedManifestHeaders = headerCopies({ 'cache-control': 'no-cache', 'vary': 'accept-encoding' }, security)
   // Outside development the build's files never change, so each is looked up once: a lookup costs more than sending the file, in an executable most of all.
@@ -50,7 +53,7 @@ export async function serveBuildFiles(app: Elysia, client: ClientBuild, { dev, s
 
     const copies = assetCopies.get(path)
     const encoding = preferredEncoding(request.headers.get('accept-encoding'), copies)
-    const headers = path === searchManifest ? ownHeaders(set, copies ? encodedManifestHeaders : manifestHeaders) : ownHeaders(set, copies ? encodedFileHeaders : fileHeaders)
+    const headers = path === searchManifest || path === notices ? ownHeaders(set, copies ? encodedManifestHeaders : manifestHeaders) : ownHeaders(set, copies ? encodedFileHeaders : fileHeaders)
 
     if (!encoding)
       return new Response(file, { headers })

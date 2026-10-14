@@ -245,6 +245,7 @@ export default defineConfig({
   - Each page preloads the chunks of the islands it renders. kay's runtime, all any island uses of it included, is the one chunk a page loads first, so a page with islands loads that chunk and one per island, plus one for code several islands import.
   - The build prints what that weighs, gzip then minified: the entry every page with an island loads, then what each island adds beyond it, the heaviest first; `--analyze` also names the five modules weighing most in each, a package's files counted as one, kay's runtime file by file.
   - Every text file it writes, prerendered pages included, gets a brotli and a gzip copy, sent to a browser whose `Accept-Encoding` takes one, with `Vary: Accept-Encoding`; other responses go uncompressed, left to a proxy in front, unless `compress` is on.
+  - It writes `.kay/client/THIRD-PARTY-LICENSES.txt`, served at `/_kay/THIRD-PARTY-LICENSES.txt` and exported with the rest: the licence text of each package whose modules, stylesheets or fonts the browser build ships, and of every `@iconify-json` set the project depends on, with a warning for a set whose licence asks for more than that notice, such as CC BY's credit where the icons show.
 - `kay build [dir] --compile <executable> [--entry src/server.ts]`:
   - The same, then bundles the server entry, every page, layout, special page, guard and API module, `kay.config.ts` and the client build and public files into one executable, which runs from anywhere as the production server would: `PORT=8080 ./server`.
   - It carries its code as bytecode, so it starts without parsing it.
@@ -253,6 +254,7 @@ export default defineConfig({
   - The public directory cannot be named `client`.
   - The executable carries `kay.config.ts` without its `plugins`, nor the imports and top-level declarations only they used, side effects included, so a build plugin such as Tailwind's, whose native addon loads from node_modules, never runs there;
   - Plugins set other than as a property of the object the file exports by default, or beside a spread, stay in, with a warning.
+  - `./server --licenses` prints the licence of every package it carries: the browser build's, and every package the project's `dependencies` install, theirs included.
 - `kay build [dir] --static [--outdir dist]`:
   - The same, then writes the whole site to `--outdir` for a host with no server; see [Static export](routing.md#static-export).
 - `kay start [dir] [--entry <file>] [--port <port>]`:

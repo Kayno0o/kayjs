@@ -1445,3 +1445,44 @@ process.exit(0)
     }
   }, 60_000)
 })
+
+describe('third-party notices', () => {
+  it('writes the licence of every package a build ships beside it, and an executable prints its server\'s with them', async () => {
+    const root = await scratchProject({
+      'package.json': JSON.stringify({ name: 'notices', private: true, dependencies: { elysia: '*' }, devDependencies: { '@iconify-json/tabler': '*' } }),
+      'tsconfig.json': tsconfig,
+      'kay.config.ts': 'export default { favicon: false, fonts: [{ fontsource: \'@fontsource/inter\', weights: [700] }] }\n',
+      'src/encoded.kay': '---\nimport { signal } from \'kay\'\nimport { stringify } from \'devalue\'\n\nconst on = signal(false)\n---\nbutton(onClick={() => on.set(o => !o)}) {on() ? stringify([1]) : \'off\'}\n',
+      'src/routes/index.kay': '---\nimport Encoded from \'../encoded.kay\'\n---\nEncoded\n',
+      'src/server.ts': 'import { Elysia } from \'elysia\'\nimport { pages } from \'kay/server\'\n\nnew Elysia().use(await pages()).listen(0)\n',
+    })
+
+    try {
+      const [report, code] = await printed(Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', root, '--no-check', '--compile', join(root, 'server')], { stdout: 'pipe', stderr: 'pipe' }))
+
+      expect(report).not.toContain('error')
+      expect(code).toBe(0)
+
+      const client = await Bun.file(join(clientDir(root), 'THIRD-PARTY-LICENSES.txt')).text()
+
+      expect(client).toContain('\ndevalue ')
+      expect(client).toContain('@fontsource/inter ')
+      expect(client).toContain('SIL Open Font License')
+      expect(client).toContain('@iconify-json/tabler ')
+      expect(client).toContain('Tabler Icons by Paweł Kuna')
+      // The server's own packages are no business of the browser's.
+      expect(client).not.toContain('\nelysia ')
+
+      const executable = Bun.spawn([join(root, 'server'), '--licenses'], { cwd: root, stdout: 'pipe', stderr: 'pipe' })
+      const [printedNotices, exitCode] = await Promise.all([new Response(executable.stdout).text(), executable.exited])
+
+      expect(exitCode).toBe(0)
+      expect(printedNotices).toContain('\nelysia ')
+      expect(printedNotices).toContain('\ndevalue ')
+      expect(printedNotices).toContain('@fontsource/inter ')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  }, 60_000)
+})

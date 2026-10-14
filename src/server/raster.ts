@@ -1,3 +1,4 @@
+// The coverage accumulation (accumulate() and its row sums) adapts font-rs by Raph Levien, https://github.com/raphlinus/font-rs, under the Apache License 2.0, https://www.apache.org/licenses/LICENSE-2.0; kay's NOTICE file credits it.
 import type { OutlinePoint } from './face'
 
 // An RGB image being drawn on, three bytes a pixel, row after row.
@@ -113,7 +114,7 @@ function curve(from: Point, control: Point, to: Point, line: (from: Point, to: P
   }
 }
 
-// Adds a line's signed area to the cells it crosses, row by row, so that summing a row from the left gives each pixel's coverage (the accumulation font-rs draws with).
+// Adds a line's signed area to the cells it crosses, row by row, so that summing a row from the left gives each pixel's coverage, as font-rs does.
 function accumulate(area: Float32Array, width: number, height: number, from: Point, to: Point): void {
   if (from.y === to.y)
     return

@@ -138,6 +138,7 @@
   },
   "files": [
     "LICENSE",
+    "NOTICE",
     "README.md",
     "dist",
     "editors/vscode/syntaxes/kay.tmLanguage.json",
