@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, setSystemTime, test } from 'bun:test'
-import { testApp } from './helpers/app'
+import { totpCode, totpStep } from '../src/totp'
+import { testApp, userRecord } from './helpers/app'
 
 const PASSWORD = 'correct horse battery'
 const LATER = 11 * 60_000
@@ -91,6 +92,41 @@ describe('exporting a user\'s data', () => {
 
       expect(await ada.call('provedLately')).toBe(true)
       expect((await ada.fetch('/auth/export')).status).toBe(200)
+    })
+
+    test('an account with neither a password nor a second factor can only sign in again', async () => {
+      const { browser, store } = testApp()
+      const ada = browser()
+
+      await store.users.create(userRecord({ id: 'u1', email: 'ada@example.com' }))
+      await ada.fetch('/sign-in/u1', { method: 'POST' })
+
+      expect((await ada.call('exportData')).ok).toBe(true)
+      setSystemTime(new Date(Date.now() + LATER))
+
+      expect(await ada.call('exportData')).toEqual({ ok: false, error: 'stale' })
+      expect(await ada.call('reprove', {})).toEqual({ ok: false, error: 'stale' })
+      expect((await ada.fetch('/auth/export')).status).toBe(403)
+    })
+
+    test('an account with a second factor stays refused after a wrong code, and opens again once proved', async () => {
+      const { browser } = testApp()
+      const ada = browser()
+
+      await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
+
+      const { setup } = await ada.call('setUpTwoFactor', { password: PASSWORD })
+
+      await ada.call('enableTwoFactor', await totpCode(setup.secret, totpStep()))
+      setSystemTime(new Date(Date.now() + LATER))
+
+      expect(await ada.call('exportData')).toEqual({ ok: false, error: 'stale' })
+      expect(await ada.call('reprove', { code: '000000' })).toEqual({ ok: false, error: 'proof' })
+      expect(await ada.call('exportData')).toEqual({ ok: false, error: 'stale' })
+
+      await ada.call('reprove', { password: PASSWORD })
+
+      expect((await ada.call('exportData')).ok).toBe(true)
     })
 
     test('a signed-out visitor still gets signed-out, not stale', async () => {
