@@ -18,7 +18,7 @@ The templates render to HTML, each component's `---` script running as its templ
 
 ## In the browser
 
-The browser shows the HTML as it arrives. A page whose components never react to the user ships no JavaScript bundle at all.
+The browser shows the HTML as it arrives. A page with no island ships no island code: at most the small script that swaps pages in, on a page posting a form.
 
 An [island](/essentials/islands) is a component with an event handler, a `bind:` or a signal. kay rendered it on the server like the rest; in the browser its `---` script runs again with the props the page sent it, and attaches its handlers, on load by default, or once the browser is idle or the island nears the screen.
 

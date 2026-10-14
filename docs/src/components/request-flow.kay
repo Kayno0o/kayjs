@@ -23,7 +23,7 @@ figure.request-flow
     li(data-side="browser")
       span.sr-only In the browser:
       a(href="/essentials/islands") Show
-      p The browser shows the HTML. A page with no island ships no JavaScript bundle.
+      p The browser shows the HTML. A page with no island ships no island code.
     li(data-side="browser")
       span.sr-only In the browser:
       a(href="/essentials/islands#when-to-hydrate") Hydrate
