@@ -188,12 +188,12 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
 
   let closed = false
   let origin = new URL(url).origin
-  // A view runs one `evaluate()` at a time, so the page's calls queue rather than fail when a test runs two at once.
+  // A view runs one `inView()` at a time, so the page's calls queue rather than fail when a test runs two at once.
   let queue = Promise.resolve()
-  // The view's last `evaluate()`, which a wait that timed out leaves running: the next waits for it, up to the page's timeout, rather than fail as already pending.
+  // The view's last `inView()`, which a wait that timed out leaves running: the next waits for it, up to the page's timeout, rather than fail as already pending.
   let evaluating: Promise<unknown> = Promise.resolve()
 
-  const evaluate = async <T>(expression: string): Promise<T> => {
+  const inView = async <T>(expression: string): Promise<T> => {
     const previous = evaluating
     const call = (async () => {
       await within(previous, timeout)
@@ -241,7 +241,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
 
     for (;;) {
       try {
-        trying ??= evaluate(expression)
+        trying ??= inView(expression)
 
         const answer = await within(trying, until - Date.now())
 
@@ -277,7 +277,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
       let failed: string[] | typeof TIMED_OUT = []
 
       try {
-        failed = await within(evaluate<string[]>(FAILED_FILES), FAILED_WAIT_MS)
+        failed = await within(inView<string[]>(FAILED_FILES), FAILED_WAIT_MS)
       }
       catch {}
 
@@ -289,10 +289,10 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
   }
 
   const traverse = async (step: string) => {
-    const entry = await evaluate<string>('navigation.currentEntry.key')
+    const entry = await inView<string>('navigation.currentEntry.key')
 
     // `history`, not the view's own back and forward, which wait for a load a swapped page never fires.
-    await evaluate(`void ${step}`)
+    await inView(`void ${step}`)
     await settle(`navigation.currentEntry.key !== ${JSON.stringify(entry)} && ${SETTLED}`, 'the page to settle')
   }
 
@@ -306,7 +306,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
       await view.navigate(target.href)
       await settle(SETTLED, `${target.pathname} to load and hydrate its islands`)
     }),
-    path: async () => serial(async () => evaluate<string>('location.pathname + location.search')),
+    path: async () => serial(async () => inView<string>('location.pathname + location.search')),
     click: async (selector, wait = {}) => serial(async () => {
       const budget = wait.timeout ?? timeout
       const until = Date.now() + budget
@@ -323,7 +323,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
     }),
     fill: async (selector, text) => serial(async () => {
       await poll(`!!document.querySelector(${JSON.stringify(selector)})`, selector)
-      await evaluate(script((css: string) => {
+      await inView(script((css: string) => {
         const field = document.querySelector<HTMLInputElement>(css)!
 
         field.focus()
@@ -337,10 +337,10 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
     }),
     type: async text => serial(async () => view.type(text)),
     press: async (key, keyOptions) => serial(async () => view.press(key, keyOptions)),
-    text: async selector => serial(async () => evaluate<string | null>(script((css: string) => document.querySelector(css)?.textContent ?? null, [selector]))),
-    value: async selector => serial(async () => evaluate<string | null>(script((css: string) => document.querySelector<HTMLInputElement>(css)?.value ?? null, [selector]))),
-    count: async selector => serial(async () => evaluate<number>(script((css: string) => document.querySelectorAll(css).length, [selector]))),
-    evaluate: async (run, ...args) => serial(async () => evaluate(script(run, args))),
+    text: async selector => serial(async () => inView<string | null>(script((css: string) => document.querySelector(css)?.textContent ?? null, [selector]))),
+    value: async selector => serial(async () => inView<string | null>(script((css: string) => document.querySelector<HTMLInputElement>(css)?.value ?? null, [selector]))),
+    count: async selector => serial(async () => inView<number>(script((css: string) => document.querySelectorAll(css).length, [selector]))),
+    evaluate: async (run, ...args) => serial(async () => inView(script(run, args))),
     waitFor: async (selector, wait = {}) => serial(async () => {
       const found = script((css: string, text?: string) => [...document.querySelectorAll(css)].some(element => text === undefined || element.textContent?.includes(text)), [selector, wait.text])
 
@@ -348,14 +348,14 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
     }),
     a11y: async selector => serial(async () => {
       // Injected again after each navigation, which drops it; through DevTools, which the page's CSP does not hold back.
-      if (!await evaluate<boolean>('!!window.axe')) {
+      if (!await inView<boolean>('!!window.axe')) {
         const { exceptionDetails } = await view.cdp<{ exceptionDetails?: { text: string, exception?: { description?: string } } }>('Runtime.evaluate', { expression: await axeSource() })
 
         if (exceptionDetails)
           throw new Error(`kay: axe-core did not load in the page: ${exceptionDetails.exception?.description ?? exceptionDetails.text}`)
       }
 
-      const violations = await evaluate<A11yViolation[] | null>(script(async (context?: string) => {
+      const violations = await inView<A11yViolation[] | null>(script(async (context?: string) => {
         const { axe } = window as unknown as { axe: Axe }
 
         if (context !== undefined && document.querySelector(context) === null)
