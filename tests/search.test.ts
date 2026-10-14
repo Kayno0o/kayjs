@@ -192,33 +192,18 @@ describe('search', () => {
     }
   }, 60_000)
 
-  it('is written by kay build --static, under the files it exports', async () => {
+  it('is written by kay build --static under the files it exports, and left out of the chunks a page with a searching island loads, for its first query to fetch', async () => {
     const site = await scratchDir('search-static-')
 
     try {
       await Promise.all([
         Bun.write(join(site, 'kay.config.ts'), 'export default { favicon: false, search: true }\n'),
-        Bun.write(join(site, 'src/routes/index.kay'), 'h1 Home\np Staticword\n'),
+        Bun.write(join(site, 'src/components/finder.kay'), '---\nimport { searchResults, signal } from \'kay\'\n\nconst query = signal(\'\')\nconst { hits } = searchResults(query)\n---\ninput(aria-label="Search" bind:value={query})\nfor hit of hits() key={hit.href}\n  a(href={hit.href}) {hit.page}\n'),
+        Bun.write(join(site, 'src/routes/index.kay'), '---\nimport Finder from \'../components/finder.kay\'\n---\nh1 Home\np Staticword\nFinder\n'),
       ])
       await build(site, '--static', '--outdir', join(site, 'dist'))
 
       expect((await search(join(site, 'dist/_kay'), 'staticword')).hits.map(hit => hit.href)).toEqual(['/'])
-    }
-    finally {
-      await rm(site, { recursive: true, force: true })
-    }
-  }, 60_000)
-
-  it('leaves the search out of the chunks a page with a searching island loads, for its first query to fetch', async () => {
-    const site = await scratchDir('search-lazy-')
-
-    try {
-      await Promise.all([
-        Bun.write(join(site, 'kay.config.ts'), 'export default { favicon: false, search: true }\n'),
-        Bun.write(join(site, 'src/components/finder.kay'), '---\nimport { searchResults, signal } from \'kay\'\n\nconst query = signal(\'\')\nconst { hits } = searchResults(query)\n---\ninput(aria-label="Search" bind:value={query})\nfor hit of hits() key={hit.href}\n  a(href={hit.href}) {hit.page}\n'),
-        Bun.write(join(site, 'src/routes/index.kay'), '---\nimport Finder from \'../components/finder.kay\'\n---\nh1 Home\nFinder\n'),
-      ])
-      await build(site, '--static', '--outdir', join(site, 'dist'))
 
       const html = await Bun.file(join(site, 'dist/index.html')).text()
       const loaded = [...html.matchAll(/(?:src|href)="(\/_kay\/[^"]+\.js)"/g)].map(match => match[1]!)

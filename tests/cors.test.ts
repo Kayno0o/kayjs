@@ -1,18 +1,16 @@
-import { mkdir, mkdtemp, rm } from 'node:fs/promises'
-import { join, resolve } from 'node:path'
-import process from 'node:process'
+import { rm } from 'node:fs/promises'
+import { join, relative } from 'node:path'
 import { afterAll, describe, expect, it } from 'bun:test'
+import { check } from '../src/check'
 import { corsRule } from '../src/server/cors'
 import { testSite } from '../src/test'
+import { scratchDir } from './scratch'
 
-const CLI = resolve('src/cli.ts')
 const APP = 'https://app.example.com'
 const site = await testSite({ routes: 'tests/fixtures/cors/src/routes', api: 'tests/fixtures/cors/src/api' })
-const projects: string[] = []
 
 afterAll(async () => {
   await site.close()
-  await Promise.all(projects.map(async dir => rm(dir, { recursive: true, force: true })))
 })
 
 function upgrade(path: string, headers: Record<string, string>): Request {
@@ -139,24 +137,20 @@ describe('an API module opening its routes to other sites', () => {
   })
 
   it('has kay check report cookies for any origin', async () => {
-    const base = join(import.meta.dir, '../node_modules/.cache')
+    const dir = await scratchDir('cors-')
 
-    await mkdir(base, { recursive: true })
+    try {
+      await Promise.all(Object.entries({
+        'package.json': JSON.stringify({ name: 'app' }),
+        'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true }, include: ['src', '.kay/types'] }),
+        'src/routes/index.kay': 'h1 Home\n',
+        'src/api/open.ts': 'import { api } from \'kay/server\'\n\nexport default api({ cors: { origins: \'*\', credentials: true } }).get(\'/\', () => ({ open: true }))\n',
+      }).map(async ([path, content]) => Bun.write(join(dir, path), content)))
 
-    const dir = await mkdtemp(join(base, 'cors-'))
-
-    projects.push(dir)
-    await Promise.all(Object.entries({
-      'package.json': JSON.stringify({ name: 'app' }),
-      'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true }, include: ['src', '.kay/types'] }),
-      'src/routes/index.kay': 'h1 Home\n',
-      'src/api/open.ts': 'import { api } from \'kay/server\'\n\nexport default api({ cors: { origins: \'*\', credentials: true } }).get(\'/\', () => ({ open: true }))\n',
-    }).map(async ([path, content]) => Bun.write(join(dir, path), content)))
-
-    const child = Bun.spawn([process.execPath, CLI, 'check'], { cwd: dir, stdout: 'pipe', stderr: 'pipe' })
-    const [stdout, stderr, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
-
-    expect(`${stdout}${stderr}`).toContain('src/api/open.ts')
-    expect(code).not.toBe(0)
+      expect((await check(dir)).map(({ file, line, message }) => [relative(dir, file), line, message])).toEqual([['src/api/open.ts', 3, 'Type \'true\' is not assignable to type \'false\'.']])
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
   })
 })

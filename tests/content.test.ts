@@ -177,13 +177,13 @@ describe('kay check', () => {
     const page = join(copy, 'src/routes/typo.kay')
 
     try {
-      expect(await check(copy, { site: SITE, lints: { seo: 'allow' } })).toEqual([])
-
       await Bun.write(join(posts, 'broken.md'), '---\ntitle: Broken\ndate: someday\n---\n\n<Missing />\n\n<Counter start="2" />\n\n<Callout kind="warn">\nText\n</Callout>\n')
       await Bun.write(page, '--- server\nimport { posts } from \'../content.config\'\n\nconst first = (await posts.all())[0]!\n---\np {first.data.titel}\n')
 
-      const diagnostics = (await check(copy, { site: SITE })).map(({ file, line, message }) => ({ file: file.slice(file.indexOf(copy)), line, message }))
+      const diagnostics = (await check(copy, { site: SITE, lints: { seo: 'allow' } })).map(({ file, line, message }) => ({ file: file.slice(file.indexOf(copy)), line, message }))
 
+      // The two files alone: the fixture's own pass.
+      expect(new Set(diagnostics.map(diagnostic => diagnostic.file))).toEqual(new Set([`${copy}/src/content/posts/broken.md`, `${copy}/src/routes/typo.kay`]))
       expect(diagnostics).toContainEqual({ file: `${copy}/src/content/posts/broken.md`, line: 3, message: expect.stringContaining('date: ') })
       expect(diagnostics).toContainEqual({ file: `${copy}/src/content/posts/broken.md`, line: 6, message: 'uses <Missing>, which the collection\'s components do not name' })
       expect(diagnostics.some(diagnostic => diagnostic.file === `${copy}/src/routes/typo.kay` && diagnostic.message.includes('titel'))).toBe(true)

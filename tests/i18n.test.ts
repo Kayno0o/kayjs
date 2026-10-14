@@ -350,12 +350,12 @@ describe('localized content', () => {
     const broken = join(copy, 'src/content/news/en/broken.md')
 
     try {
-      expect(await check(copy, { site: SITE, lints: { seo: 'allow' }, i18n: { ...i18n, messages: undefined } })).toEqual([])
       await Bun.write(broken, '---\ntitle: Broken\ndate: someday\n---\n')
 
-      const diagnostics = (await check(copy, { site: SITE, i18n: { ...i18n, messages: undefined } })).map(({ file, line, message }) => ({ file: file.slice(file.indexOf(copy)), line, message }))
+      const diagnostics = (await check(copy, { site: SITE, lints: { seo: 'allow' }, i18n: { ...i18n, messages: undefined } })).map(({ file, line, message }) => ({ file: file.slice(file.indexOf(copy)), line, message }))
 
-      expect(diagnostics).toContainEqual({ file: broken, line: 3, message: expect.stringContaining('date: ') })
+      // The entry alone: the fixture's own entries pass.
+      expect(diagnostics).toEqual([{ file: broken, line: 3, message: expect.stringContaining('date: ') }])
     }
     finally {
       await rm(copy, { recursive: true, force: true })
@@ -474,95 +474,74 @@ describe('kay check', () => {
     await rm(fixture, { recursive: true, force: true })
   })
 
-  it('types t() from the default locale\'s messages and reports a locale that strays from them', async () => {
-    expect(await check(fixture, { site: SITE, lints: { seo: 'allow' }, i18n: { ...i18n, messages: undefined } })).toEqual([])
-    // Unprefixed links stay valid with every locale prefixed: the server sends them on to the visitor's.
-    expect(await check(fixture, { site: SITE, lints: { seo: 'allow' }, i18n: { ...i18n, messages: undefined, prefixDefault: true } })).toEqual([])
-
+  it('types t() and T from the default locale\'s messages, holds every other locale to them, and checks links against each locale\'s paths', async () => {
     const english = join(fixture, 'src/messages/en.ts')
-    const page = join(fixture, 'src/routes/typo.kay')
+    const typo = join(fixture, 'src/routes/typo.kay')
+    const rich = join(fixture, 'src/routes/rich.kay')
+    const links = join(fixture, 'src/routes/links.kay')
     const source = await Bun.file(english).text()
 
     try {
-      await Bun.write(english, source.replace('  greeting: \'Hello {name}\',\n', '').replace('Saved on {date}', 'Saved on {day}').replace('counter: { label: \'Counter\', more: \'More\' }', 'counter: { label: \'Counter\', more: \'More\', less: \'Less\' }'))
-      await Bun.write(page, '--- server\nimport { t } from \'kay/i18n\'\n\nconst a = t(\'nav.hom\')\nconst b = t(\'greeting\')\nconst c = t(\'greeting\', { nom: \'Ada\' })\nconst d = t(\'items\', { count: \'2\' })\n---\np {a} {b} {c} {d}\n')
+      await Promise.all([
+        Bun.write(english, source
+          .replace('  greeting: \'Hello {name}\',\n', '')
+          .replace('Saved on {date}', 'Saved on {day}')
+          .replace('counter: { label: \'Counter\', more: \'More\' }', 'counter: { label: \'Counter\', more: \'More\', less: \'Less\' }')
+          .replace('Read <about>our story</about>, {name}, or <docs>the docs of {name}</docs>.', 'Read <story>our story</story>, {name}, or the docs of {name}.')),
+        Bun.write(typo, '--- server\nimport { t } from \'kay/i18n\'\n\nconst a = t(\'nav.hom\')\nconst b = t(\'greeting\')\nconst c = t(\'greeting\', { nom: \'Ada\' })\nconst d = t(\'items\', { count: \'2\' })\n---\np {a} {b} {c} {d}\n'),
+        Bun.write(rich, [
+          '--- server',
+          'import { T } from \'kay/i18n\'',
+          '---',
+          'T(key="intro" name="Ada")',
+          '  @about(text)',
+          '    strong {text}',
+          '  @docs(text)',
+          '    em {text.toUpperCase()}',
+          'T(key="intro" name="Ada")',
+          '  @about(text)',
+          '    strong {text}',
+          'T(key="intro" nom="Ada")',
+          '  @about(text)',
+          '    strong {text}',
+          '  @docs(text)',
+          '    em {text}',
+          'T(key="intr" name="Ada")',
+          'T(key="greeting" name="Ada")',
+          '  @about(text)',
+          '    strong {text}',
+          '',
+        ].join('\n')),
+        Bun.write(links, 'a(href="/en/about-us") About\na(href="/a-propos") À propos\na(href="/en/about") About\n'),
+      ])
 
-      const diagnostics = (await check(fixture, { site: SITE, lints: { seo: 'allow' }, i18n: { ...i18n, messages: undefined } })).map(({ file, line, message }) => ({ file: file.slice(file.indexOf(fixture)), line, message }))
+      // Every locale prefixed, /about translated, and /streamed given the path of the home page in en.
+      const diagnostics = await check(fixture, { site: SITE, lints: { seo: 'allow' }, i18n: { ...i18n, messages: undefined, prefixDefault: true, paths: { '/about': { en: '/about-us' }, '/streamed': { en: '/' } } } })
+      const found = diagnostics.map(({ file, line, message }) => ({ file: file.slice(file.indexOf(fixture) + fixture.length + 1), line, message }))
+      const lines = Object.fromEntries(Object.entries(Object.groupBy(found, ({ file }) => file)).map(([file, at]) => [file, at!.map(({ line }) => line).toSorted((a, b) => a - b)]))
 
-      expect(diagnostics).toContainEqual({ file: english, line: 1, message: 'lacks greeting, which src/messages/fr.ts has' })
-      expect(diagnostics).toContainEqual({ file: english, line: 7, message: 'gives saved without {date}, which src/messages/fr.ts has' })
-      expect(diagnostics).toContainEqual({ file: english, line: 7, message: 'gives saved a {day}, which src/messages/fr.ts has not, so nothing fills it' })
-      expect(diagnostics).toContainEqual({ file: english, line: 6, message: 'has counter.less, which src/messages/fr.ts lacks, so no `t()` can name it' })
-      expect(diagnostics.filter(diagnostic => diagnostic.file === page).map(diagnostic => diagnostic.line)).toEqual([4, 5, 6, 7])
+      // What the changes break and nothing else: the fixture's own pages pass, their unprefixed links included, as the server sends those on to the visitor's locale.
+      expect(lines).toEqual({
+        'src/messages/en.ts': [1, 6, 7, 7, 8, 8, 8],
+        'src/routes/typo.kay': [4, 5, 6, 7],
+        'src/routes/rich.kay': [9, 12, 17, 19],
+        'src/routes/links.kay': [2, 3],
+        'src/routes': [1],
+      })
+      expect(found.filter(({ file }) => file === 'src/messages/en.ts').map(({ line, message }) => [line, message])).toEqual(expect.arrayContaining([
+        [1, 'lacks greeting, which src/messages/fr.ts has'],
+        [7, 'gives saved without {date}, which src/messages/fr.ts has'],
+        [7, 'gives saved a {day}, which src/messages/fr.ts has not, so nothing fills it'],
+        [6, 'has counter.less, which src/messages/fr.ts lacks, so no `t()` can name it'],
+        [8, 'gives intro without <about>, which src/messages/fr.ts has, so its block renders nothing'],
+        [8, 'gives intro without <docs>, which src/messages/fr.ts has, so its block renders nothing'],
+        [8, 'gives intro a <story>, which src/messages/fr.ts has not, so no block renders it'],
+      ]))
+      expect(found.find(({ file }) => file === 'src/routes')?.message).toContain('are both served at / in en')
     }
     finally {
-      await Bun.write(english, source)
-      await rm(page, { force: true })
+      await Promise.all([Bun.write(english, source), rm(typo, { force: true }), rm(rich, { force: true }), rm(links, { force: true })])
     }
-  })
-
-  it('types T\'s key, placeholders and blocks, and holds every locale to the default one\'s tags', async () => {
-    const english = join(fixture, 'src/messages/en.ts')
-    const page = join(fixture, 'src/routes/rich.kay')
-    const source = await Bun.file(english).text()
-
-    try {
-      await Bun.write(english, source.replace('Read <about>our story</about>, {name}, or <docs>the docs of {name}</docs>.', 'Read <story>our story</story>, {name}, or the docs of {name}.'))
-      await Bun.write(page, [
-        '--- server',
-        'import { T } from \'kay/i18n\'',
-        '---',
-        'T(key="intro" name="Ada")',
-        '  @about(text)',
-        '    strong {text}',
-        '  @docs(text)',
-        '    em {text.toUpperCase()}',
-        'T(key="intro" name="Ada")',
-        '  @about(text)',
-        '    strong {text}',
-        'T(key="intro" nom="Ada")',
-        '  @about(text)',
-        '    strong {text}',
-        '  @docs(text)',
-        '    em {text}',
-        'T(key="intr" name="Ada")',
-        'T(key="greeting" name="Ada")',
-        '  @about(text)',
-        '    strong {text}',
-        '',
-      ].join('\n'))
-
-      const diagnostics = (await check(fixture, { site: SITE, lints: { seo: 'allow' }, i18n: { ...i18n, messages: undefined } })).map(({ file, line, message }) => ({ file: file.slice(file.indexOf(fixture)), line, message }))
-
-      expect(diagnostics).toContainEqual({ file: english, line: 9, message: 'gives intro without <about>, which src/messages/fr.ts has, so its block renders nothing' })
-      expect(diagnostics).toContainEqual({ file: english, line: 9, message: 'gives intro without <docs>, which src/messages/fr.ts has, so its block renders nothing' })
-      expect(diagnostics).toContainEqual({ file: english, line: 9, message: 'gives intro a <story>, which src/messages/fr.ts has not, so no block renders it' })
-      expect(diagnostics.filter(diagnostic => diagnostic.file === page).map(diagnostic => diagnostic.line)).toEqual([9, 12, 17, 19])
-    }
-    finally {
-      await Bun.write(english, source)
-      await rm(page, { force: true })
-    }
-  })
-
-  it('checks a link against the path its locale gives the page, and reports a translation another page takes', async () => {
-    const paths = { '/about': { en: '/about-us' } }
-    const page = join(fixture, 'src/routes/links.kay')
-
-    try {
-      await Bun.write(page, 'a(href="/en/about-us") About\na(href="/a-propos") À propos\na(href="/en/about") About\n')
-
-      const diagnostics = (await check(fixture, { site: SITE, lints: { seo: 'allow' }, i18n: { ...i18n, messages: undefined, paths } })).map(({ file, line, message }) => ({ file: file.slice(file.indexOf(fixture)), line, message }))
-
-      expect(diagnostics.filter(diagnostic => diagnostic.file === page).map(diagnostic => diagnostic.line)).toEqual([2, 3])
-    }
-    finally {
-      await rm(page, { force: true })
-    }
-
-    const clash = await check(fixture, { site: SITE, lints: { seo: 'allow' }, i18n: { ...i18n, messages: undefined, paths: { '/about': { en: '/' } } } })
-
-    expect(clash.map(({ message }) => message)).toContainEqual(expect.stringContaining('are both served at / in en'))
   })
 
   it('reports a locale config no request could be served by, at the config', async () => {

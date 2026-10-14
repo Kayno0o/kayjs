@@ -204,11 +204,10 @@ describe('prerendering', () => {
 
 describe('kay check', () => {
   it('types each param as its matcher returns, optional ones as possibly missing, and reports a redirect to nowhere', async () => {
-    expect(await check(FIXTURE, { redirects: { '/x': '/sitemap.xml' } })).toEqual([])
+    // The sitemap kay serves counts as served; nothing else on the fixture is reported.
+    const diagnostics = await check(FIXTURE, { redirects: { '/x': '/sitemap.xml', '/y': '/nowhere' } })
 
-    const diagnostics = await check(FIXTURE, { redirects: { '/x': '/nowhere' } })
-
-    expect(diagnostics.map(diagnostic => diagnostic.message)).toEqual(['the redirect from /x goes to /nowhere, which nothing on the site serves'])
+    expect(diagnostics.map(diagnostic => diagnostic.message)).toEqual(['the redirect from /y goes to /nowhere, which nothing on the site serves'])
   })
 
   it('reports a matcher nobody provides at the page naming it', async () => {

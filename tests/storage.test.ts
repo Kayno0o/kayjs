@@ -283,19 +283,12 @@ describe('a static export', () => {
     }
   })
 
-  it('fails kay build --static on a page linking a file of the server\'s disk, and links one a CDN serves there', async () => {
-    const build = async (env: Record<string, string>) => {
-      const child = Bun.spawn([process.execPath, 'src/cli.ts', 'build', STATIC_FIXTURE, '--no-check', '--static', '--outdir', join(dir, 'export')], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, ...env } })
-      const [errors, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
+  // Wired to the config's store, which the test above has refuse a static export when on the server's disk.
+  it('has kay build --static link a stored file where a CDN serves it', async () => {
+    const child = Bun.spawn([process.execPath, 'src/cli.ts', 'build', STATIC_FIXTURE, '--no-check', '--static', '--outdir', join(dir, 'export')], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, KAY_TEST_FILES_URL: 'https://cdn.example/files/' } })
+    const [errors, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
 
-      return { code, errors }
-    }
-
-    const refused = await build({})
-
-    expect(refused.code).toBe(1)
-    expect(refused.errors).toContain('a static export links stored file photos/0123456789abcdef0123.4x3.png')
-    expect((await build({ KAY_TEST_FILES_URL: 'https://cdn.example/files/' })).code).toBe(0)
+    expect([code, errors]).toEqual([0, expect.any(String)])
     expect(await Bun.file(join(dir, 'export/index.html')).text()).toContain('<img src="https://cdn.example/files/photos/0123456789abcdef0123.4x3.png" alt="Stored" loading="lazy" decoding="async">')
   }, 30_000)
 })

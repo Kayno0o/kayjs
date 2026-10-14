@@ -1,12 +1,14 @@
+import type { CheckDiagnostic } from '../src/check'
 import type { CodeAction, CompletionItem, CompletionList, Diagnostic, DocumentHighlight, Hover, Location, LocationLink, Range, TextEdit, WorkspaceEdit } from '../src/lsp/protocol'
 import { cp, mkdir, mkdtemp, readdir, rm, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { dirname, join, resolve } from 'node:path'
+import { dirname, join } from 'node:path'
 import process from 'node:process'
 import { pathToFileURL } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
+import { check } from '../src/check'
 import { Connection } from '../src/lsp/rpc'
-import { fixtureCopy, scratchDir } from './scratch'
+import { scratchDir } from './scratch'
 
 const fixtures = join(import.meta.dir, 'fixtures')
 const cli = join(import.meta.dir, '..', 'src', 'cli.ts')
@@ -120,71 +122,78 @@ function brief(diagnostics: Diagnostic[]) {
   return diagnostics.map(diagnostic => ({ ...diagnostic.range, code: diagnostic.code }))
 }
 
-// Copies, as the editor writes its shadow tree into the project while check.test.ts and build.test.ts read the fixtures.
-const brokenCopy = resolve(await fixtureCopy('broken'))
-const siteCopy = resolve(await fixtureCopy('site'))
+// What the editor gets of a diagnostic of kay check: its line from 0, LSP's severity, a TypeScript code as a number, the note and help on lines of their own.
+function asPublished({ line, severity, code, message, note, help }: CheckDiagnostic) {
+  const lines = [message, ...note === undefined ? [] : [`note: ${note}`], ...help === undefined ? [] : [`help: ${help}`]]
+
+  return [line - 1, severity === 'warning' ? 2 : 1, code?.startsWith('TS') === true ? Number(code.slice(2)) : code, lines.join('\n')]
+}
+
+// Copies, as the editor writes its shadow tree into the project while check.test.ts and build.test.ts read the fixtures; side by side in one workspace, each a project of its own, as a monorepo's are.
+const workspace = await scratchDir('lsp-fixtures-')
+
+await Promise.all(['broken', 'site'].map(async name => cp(join(fixtures, name), join(workspace, name), { recursive: true, filter: source => !source.endsWith('/.kay') })))
 
 afterAll(async () => {
-  await Promise.all([rm(brokenCopy, { recursive: true, force: true }), rm(siteCopy, { recursive: true, force: true })])
+  await rm(workspace, { recursive: true, force: true })
 })
 
 describe('kay lsp', () => {
-  const broken = new Editor(brokenCopy)
-  const site = new Editor(siteCopy)
+  const editor = new Editor(workspace)
 
   beforeAll(async () => {
-    await Promise.all([broken.start(), site.start()])
+    await editor.start()
   })
 
   afterAll(async () => {
-    await Promise.all([broken.stop(), site.stop()])
+    await editor.stop()
   })
 
   it('publishes type errors at the .kay source position and follows edits', async () => {
-    const diagnostics = await broken.open('src/routes/[id].kay')
+    const diagnostics = await editor.open('broken/src/routes/[id].kay')
 
     expect(brief(diagnostics)).toEqual([
       { start: { line: 1, character: 29 }, end: { line: 1, character: 33 }, code: 2339 },
       { start: { line: 4, character: 8 }, end: { line: 4, character: 11 }, code: 2551 },
     ])
 
-    const fixed = await broken.change('src/routes/[id].kay', '--- server\nconst id = Number(ctx.params.id)\nconst user = { name: \'Ada\', id }\n---\np {user.name}\n', 2)
+    const fixed = await editor.change('broken/src/routes/[id].kay', '--- server\nconst id = Number(ctx.params.id)\nconst user = { name: \'Ada\', id }\n---\np {user.name}\n', 2)
 
     expect(fixed).toEqual([])
   })
 
   it('survives malformed frames and documents it cannot serve', async () => {
-    broken.write('Content-Length: 5\r\n\r\n{nope')
-    broken.connection.notify('textDocument/didOpen', { textDocument: { uri: 'vscode-vfs://github/x/page.kay', languageId: 'kay', version: 1, text: 'p Hi' } })
+    editor.write('Content-Length: 5\r\n\r\n{nope')
+    editor.connection.notify('textDocument/didOpen', { textDocument: { uri: 'vscode-vfs://github/x/page.kay', languageId: 'kay', version: 1, text: 'p Hi' } })
 
-    expect(await broken.request('textDocument/hover', 'src/routes/[id].kay', 4, 3)).not.toBeNull()
+    expect(await editor.request('textDocument/hover', 'broken/src/routes/[id].kay', 4, 3)).not.toBeNull()
   })
 
   it('reports compile errors from the .kay compiler itself', async () => {
-    const diagnostics = await broken.change('src/routes/[id].kay', 'ul\n  for of [1, 2]\n    li x\n', 3)
+    const diagnostics = await editor.change('broken/src/routes/[id].kay', 'ul\n  for of [1, 2]\n    li x\n', 3)
 
     expect(diagnostics).toEqual([expect.objectContaining({ source: 'kay', range: expect.objectContaining({ start: { line: 1, character: 2 } }) })])
   })
 
   it('shows hover types for template expressions and server data', async () => {
-    await site.open('src/routes/index.kay')
+    await editor.open('site/src/routes/index.kay')
 
-    const hover = await site.request<Hover>('textDocument/hover', 'src/routes/index.kay', 20, 6)
+    const hover = await editor.request<Hover>('textDocument/hover', 'site/src/routes/index.kay', 20, 6)
 
     expect(JSON.stringify(hover.contents)).toContain('open: number')
     expect(hover.range).toEqual({ start: { line: 20, character: 5 }, end: { line: 20, character: 9 } })
   })
 
   it('completes members inside template expressions, without the generated helpers', async () => {
-    const list = await site.request<CompletionList>('textDocument/completion', 'src/routes/index.kay', 23, 46)
+    const list = await editor.request<CompletionList>('textDocument/completion', 'site/src/routes/index.kay', 23, 46)
     const labels = list.items.map(item => item.label)
 
     expect(labels).toContain('title')
     expect(labels).toContain('done')
 
-    await site.open('src/components/quick-add.kay')
+    await editor.open('site/src/components/quick-add.kay')
 
-    const scope = await site.request<CompletionList>('textDocument/completion', 'src/components/quick-add.kay', 16, 22)
+    const scope = await editor.request<CompletionList>('textDocument/completion', 'site/src/components/quick-add.kay', 16, 22)
     const names = scope.items.map(item => item.label)
 
     expect(names).toEqual(expect.arrayContaining(['id', 'saved', 'submit', 'title']))
@@ -193,93 +202,126 @@ describe('kay lsp', () => {
   })
 
   it('completes the keys of a page\'s settings', async () => {
-    const path = 'src/routes/search.kay'
-    const text = await Bun.file(join(siteCopy, path)).text()
+    const path = 'site/src/routes/search.kay'
+    const text = await Bun.file(join(workspace, path)).text()
 
-    await site.open(path)
-    await site.change(path, '--- server\nexport const page = { noindex: true,  }\n---\np x\n', 2)
+    await editor.open(path)
+    await editor.change(path, '--- server\nexport const page = { noindex: true,  }\n---\np x\n', 2)
 
     try {
-      const list = await site.request<CompletionList>('textDocument/completion', path, 1, 37)
+      const list = await editor.request<CompletionList>('textDocument/completion', path, 1, 37)
 
       expect(list.items.map(item => item.label)).toEqual(expect.arrayContaining(['prerender?', 'revalidate?', 'layouts?', 'query?', 'sitemap?']))
     }
     finally {
-      await site.change(path, text, 3)
+      await editor.change(path, text, 3)
     }
   })
 
   it('goes to definitions across .kay files', async () => {
-    const [action] = await site.request<LocationLink[]>('textDocument/definition', 'src/components/quick-add.kay', 9, 19)
+    const [action] = await editor.request<LocationLink[]>('textDocument/definition', 'site/src/components/quick-add.kay', 9, 19)
 
-    expect(action).toMatchObject({ targetUri: site.uri('src/routes/index.kay'), targetSelectionRange: { start: { line: 5, character: 13 }, end: { line: 5, character: 16 } } })
+    expect(action).toMatchObject({ targetUri: editor.uri('site/src/routes/index.kay'), targetSelectionRange: { start: { line: 5, character: 13 }, end: { line: 5, character: 16 } } })
 
-    const [component] = await site.request<LocationLink[]>('textDocument/definition', 'src/routes/index.kay', 31, 2)
+    const [component] = await editor.request<LocationLink[]>('textDocument/definition', 'site/src/routes/index.kay', 31, 2)
 
-    expect(component?.targetUri).toBe(site.uri('src/components/counter.kay'))
+    expect(component?.targetUri).toBe(editor.uri('site/src/components/counter.kay'))
   })
 
   it('goes from a server value in the template to its declaration in the server fence, and to nothing else', async () => {
-    const open = await site.request<LocationLink[]>('textDocument/definition', 'src/routes/index.kay', 20, 6)
+    const open = await editor.request<LocationLink[]>('textDocument/definition', 'site/src/routes/index.kay', 20, 6)
 
-    expect(open.map(link => [link.targetUri, ...spots([link.targetSelectionRange])[0]!])).toEqual([[site.uri('src/routes/index.kay'), 13, 6, 10]])
+    expect(open.map(link => [link.targetUri, ...spots([link.targetSelectionRange])[0]!])).toEqual([[editor.uri('site/src/routes/index.kay'), 13, 6, 10]])
   })
 
   it('finds references across .kay files, a server value\'s reads in the template included', async () => {
-    await site.open('src/components/quick-add.kay')
+    await editor.open('site/src/components/quick-add.kay')
 
-    const add = await site.connection.request<Location[]>('textDocument/references', { textDocument: { uri: site.uri('src/routes/index.kay') }, position: { line: 5, character: 14 }, context: { includeDeclaration: true } })
-    const open = await site.connection.request<Location[]>('textDocument/references', { textDocument: { uri: site.uri('src/routes/index.kay') }, position: { line: 13, character: 7 }, context: { includeDeclaration: true } })
+    const add = await editor.connection.request<Location[]>('textDocument/references', { textDocument: { uri: editor.uri('site/src/routes/index.kay') }, position: { line: 5, character: 14 }, context: { includeDeclaration: true } })
+    const open = await editor.connection.request<Location[]>('textDocument/references', { textDocument: { uri: editor.uri('site/src/routes/index.kay') }, position: { line: 13, character: 7 }, context: { includeDeclaration: true } })
 
-    expect(spots(add.filter(location => location.uri === site.uri('src/routes/index.kay')).map(location => location.range))).toEqual([[5, 13, 16], [14, 27, 30], [24, 19, 22]])
-    expect(spots(add.filter(location => location.uri === site.uri('src/components/quick-add.kay')).map(location => location.range))).toEqual([[2, 9, 12], [9, 18, 21]])
+    expect(spots(add.filter(location => location.uri === editor.uri('site/src/routes/index.kay')).map(location => location.range))).toEqual([[5, 13, 16], [14, 27, 30], [24, 19, 22]])
+    expect(spots(add.filter(location => location.uri === editor.uri('site/src/components/quick-add.kay')).map(location => location.range))).toEqual([[2, 9, 12], [9, 18, 21]])
     expect(spots(open.map(location => location.range))).toEqual([[13, 6, 10], [20, 5, 9], [31, 15, 19]])
-    expect(spots((await site.request<DocumentHighlight[]>('textDocument/documentHighlight', 'src/routes/index.kay', 20, 6)).map(highlight => highlight.range))).toEqual([[13, 6, 10], [20, 5, 9], [31, 15, 19]])
+    expect(spots((await editor.request<DocumentHighlight[]>('textDocument/documentHighlight', 'site/src/routes/index.kay', 20, 6)).map(highlight => highlight.range))).toEqual([[13, 6, 10], [20, 5, 9], [31, 15, 19]])
   })
 
   it('renames a name everywhere the user wrote it, from either end, and nothing generated', async () => {
     const open = [[13, 6, 10], [20, 5, 9], [31, 15, 19]]
 
-    const fromDeclaration = await site.rename('src/routes/index.kay', 13, 7, 'pending')
+    const fromDeclaration = await editor.rename('site/src/routes/index.kay', 13, 7, 'pending')
 
-    expect(Object.keys(fromDeclaration)).toEqual(['src/routes/index.kay'])
-    expect(spots(fromDeclaration['src/routes/index.kay']!)).toEqual(open)
-    expect(spots((await site.rename('src/routes/index.kay', 20, 6, 'pending'))['src/routes/index.kay']!)).toEqual(open)
+    expect(Object.keys(fromDeclaration)).toEqual(['site/src/routes/index.kay'])
+    expect(spots(fromDeclaration['site/src/routes/index.kay']!)).toEqual(open)
+    expect(spots((await editor.rename('site/src/routes/index.kay', 20, 6, 'pending'))['site/src/routes/index.kay']!)).toEqual(open)
     // A loop's item is generated into both its key function and its row.
-    expect(spots((await site.rename('src/routes/index.kay', 22, 9, 'item'))['src/routes/index.kay']!)).toEqual([[22, 8, 12], [22, 27, 31], [23, 28, 32], [23, 41, 45]])
+    expect(spots((await editor.rename('site/src/routes/index.kay', 22, 9, 'item'))['site/src/routes/index.kay']!)).toEqual([[22, 8, 12], [22, 27, 31], [23, 28, 32], [23, 41, 45]])
 
-    await site.open('src/components/card.kay')
+    await editor.open('site/src/components/card.kay')
 
-    const title = await site.rename('src/components/card.kay', 3, 9, 'heading')
+    const title = await editor.rename('site/src/components/card.kay', 3, 9, 'heading')
 
-    expect(spots(title['src/components/card.kay']!)).toEqual([[3, 8, 13], [3, 26, 31], [6, 6, 11]])
-    expect(spots(title['src/routes/index.kay']!)).toEqual([[19, 5, 10]])
-    expect(await site.request('textDocument/prepareRename', 'src/routes/index.kay', 22, 5)).toBeNull()
+    expect(spots(title['site/src/components/card.kay']!)).toEqual([[3, 8, 13], [3, 26, 31], [6, 6, 11]])
+    expect(spots(title['site/src/routes/index.kay']!)).toEqual([[19, 5, 10]])
+    expect(await editor.request('textDocument/prepareRename', 'site/src/routes/index.kay', 22, 5)).toBeNull()
   })
 
   it('renames a generic component\'s type parameter from its fence line and from its uses', async () => {
-    await site.open('src/components/list.kay')
+    await editor.open('site/src/components/list.kay')
 
     const uses = [[0, 5, 6], [1, 39, 40], [1, 57, 58]]
 
-    expect(spots((await site.rename('src/components/list.kay', 0, 5, 'Item'))['src/components/list.kay']!)).toEqual(uses)
-    expect(spots((await site.rename('src/components/list.kay', 1, 57, 'Item'))['src/components/list.kay']!)).toEqual(uses)
-    expect(JSON.stringify((await site.request<Hover>('textDocument/hover', 'src/components/list.kay', 0, 5)).contents)).toContain('T')
+    expect(spots((await editor.rename('site/src/components/list.kay', 0, 5, 'Item'))['site/src/components/list.kay']!)).toEqual(uses)
+    expect(spots((await editor.rename('site/src/components/list.kay', 1, 57, 'Item'))['site/src/components/list.kay']!)).toEqual(uses)
+    expect(JSON.stringify((await editor.request<Hover>('textDocument/hover', 'site/src/components/list.kay', 0, 5)).contents)).toContain('T')
   })
 
   it('shows the signature of the call under the cursor', async () => {
-    const help = await site.request<{ signatures: { label: string }[] }>('textDocument/signatureHelp', 'src/components/quick-add.kay', 9, 28)
+    const help = await editor.request<{ signatures: { label: string }[] }>('textDocument/signatureHelp', 'site/src/components/quick-add.kay', 9, 28)
 
     expect(help.signatures[0]!.label).toBe('add(input: { title: string; }, options?: CallOptions): Promise<number>')
   })
 
   it('formats a .kay document as one whole-document edit', async () => {
-    await site.open('src/routes/about.kay')
-    await site.change('src/routes/about.kay', 'div\n    p( class = \'x\' ) Hi\n', 2)
+    await editor.open('site/src/routes/about.kay')
+    await editor.change('site/src/routes/about.kay', 'div\n    p( class = \'x\' ) Hi\n', 2)
 
-    const edits = await site.connection.request<TextEdit[]>('textDocument/formatting', { textDocument: { uri: site.uri('src/routes/about.kay') }, options: { tabSize: 2, insertSpaces: true } })
+    const edits = await editor.connection.request<TextEdit[]>('textDocument/formatting', { textDocument: { uri: editor.uri('site/src/routes/about.kay') }, options: { tabSize: 2, insertSpaces: true } })
 
     expect(edits).toEqual([{ range: { start: { line: 0, character: 0 }, end: { line: 2, character: 0 } }, newText: 'div\n  p(class="x") Hi\n' }])
+  })
+
+  it('reports what kay check does, at its level and worded as it words it, and nothing a `// kay-allow` comment allows', async () => {
+    const page = 'site/src/routes/lints.kay'
+    const source = [
+      '---',
+      'const { todos } = props<{ todos: { id: number }[] }>()',
+      '// kay-allow unread-name',
+      'const idle = 1',
+      'const posts = signal([{ slug: \'a\' }])',
+      'const open = () => true',
+      '---',
+      'for todo, i of todos key={i}',
+      '  p {i}. {todo.id}',
+      'for todo, i of todos key={i}',
+      '  p {todo.id}',
+      'for post of posts()',
+      '  button(onClick={() => posts.set([])}) {post.slug}',
+      'if open',
+      '  span on',
+      '',
+    ].join('\n')
+
+    await Bun.write(join(workspace, page), source)
+
+    const published = (await editor.open(page)).map(({ range, severity, code, message }) => [range.start.line, severity, code, message])
+    const checked = (await check(join(workspace, 'site'))).filter(diagnostic => diagnostic.file === join(workspace, page)).map(asPublished)
+
+    // The index of a positionally keyed for whose rows do not read it is no unread name.
+    expect(published.map(([line, severity, code]) => [line, severity, code])).toEqual([[7, 2, 'positional-key'], [9, 2, 'positional-key'], [11, 2, 'identity-key'], [13, 1, 2774]])
+    expect(published).toEqual(checked)
+    // That index renames with its key.
+    expect(spots((await editor.rename(page, 9, 10, 'index'))[page]!)).toEqual([[9, 10, 11], [9, 26, 27]])
   })
 })
 
@@ -408,36 +450,6 @@ describe('kay lsp imports', () => {
     expect(diagnostics.map(diagnostic => [diagnostic.code, diagnostic.tags])).toEqual([['unread-name', [1]], ['unread-name', [1]], ['unread-name', [1]]])
   })
 
-  it('reports a lint that warns as a warning, and none a `// kay-allow` comment allows', async () => {
-    const source = '---\nconst { todos } = props<{ todos: { id: number }[] }>()\n// kay-allow unread-name\nconst idle = 1\n---\nfor todo, i of todos key={i}\n  p {i}. {todo.id}\n'
-    const diagnostics = await editor.change(page, source, 8)
-
-    expect(diagnostics.map(diagnostic => [diagnostic.range.start.line, diagnostic.severity, diagnostic.code])).toEqual([[5, 2, 'positional-key']])
-  })
-
-  it('warns of an island\'s for over objects with no id and no key, as kay check does', async () => {
-    const source = '---\nconst posts = signal([{ slug: \'a\' }])\n---\nfor post of posts()\n  button(onClick={() => posts.set([])}) {post.slug}\n'
-    const diagnostics = await editor.change(page, source, 10)
-
-    expect(diagnostics.map(diagnostic => [diagnostic.range.start.line, diagnostic.severity, diagnostic.code])).toEqual([[3, 2, 'identity-key']])
-    // Worded as kay check words it, its note and help on their own lines.
-    expect(diagnostics[0]!.message).toBe('These rows are matched by the objects themselves, which have no `id`\nnote: a list rebuilt with new objects, as a `.map` or a refresh makes, builds every row anew, and their state goes with them\nhelp: name what tells the rows apart, `for post of posts key={post.slug}`')
-  })
-
-  it('tells to call a function read by name where its value goes, as kay check does', async () => {
-    const diagnostics = await editor.change(page, '---\nconst open = () => true\n---\nif open\n  span on\n', 11)
-
-    expect(diagnostics.map(diagnostic => [diagnostic.range.start.line, diagnostic.code, diagnostic.message.split('\n').at(-1)])).toEqual([[3, 2774, 'help: a function is always true here, so its value is read by calling it, `open()`']])
-  })
-
-  it('reports nothing on the index of a positionally keyed for whose rows do not read it, and renames it with its key', async () => {
-    const source = '---\nconst { todos } = props<{ todos: { id: number }[] }>()\n---\nfor todo, i of todos key={i}\n  p {todo.id}\n'
-    const diagnostics = await editor.change(page, source, 9)
-
-    expect(diagnostics.map(diagnostic => [diagnostic.range.start.line, diagnostic.code])).toEqual([[3, 'positional-key']])
-    expect(spots((await editor.rename(page, 3, 10, 'index'))[page]!)).toEqual([[3, 10, 11], [3, 26, 27]])
-  })
-
   // Last, as opening another file publishes the page's diagnostics again, which a later change would take for its own.
   it('leaves the errors of a library component the app never imports to the library, as kay check does', async () => {
     expect(await editor.open('node_modules/kay-lib/src/unused-pill.kay')).toEqual([])
@@ -445,74 +457,13 @@ describe('kay lsp imports', () => {
   })
 })
 
-describe('kay lsp following files on disk', () => {
-  let editor: Editor
-  let dir: string
-  const page = 'src/routes/index.kay'
-  const codes = (diagnostics: Diagnostic[]) => diagnostics.map(diagnostic => diagnostic.code)
-
-  beforeAll(async () => {
-    dir = await mkdtemp(join(tmpdir(), 'kay-disk-'))
-    await Promise.all([
-      Bun.write(join(dir, 'tsconfig.json'), await Bun.file(join(fixtures, 'site/tsconfig.json')).text()),
-      Bun.write(join(dir, 'src/actions.ts'), 'import { action } from \'kay\'\n\nexport const add = action(() => 1)\n'),
-      Bun.write(join(dir, 'src/data.ts'), 'export const n: number = 1\n'),
-      Bun.write(join(dir, page), '---\nimport { n } from \'../data\'\nimport Badge from \'../badge.kay\'\n\nconst s: string = n\n---\nBadge\np {s}\n'),
-    ])
-    await mkdir(join(dir, 'node_modules'))
-    await Promise.all((await readdir(join(import.meta.dir, '../node_modules'))).filter(name => name !== '.bin').map(async name => symlink(join(import.meta.dir, '../node_modules', name), join(dir, 'node_modules', name))))
-    editor = new Editor(dir)
-    await editor.start()
-  })
-
-  afterAll(async () => {
-    await editor.stop()
-    await rm(dir, { recursive: true, force: true })
-  })
-
-  it('sees a component created or deleted on disk, on save or from the file watcher', async () => {
-    expect(codes(await editor.open(page))).toEqual([2307, 2322])
-
-    await Bun.write(join(dir, 'src/badge.kay'), 'span.badge New\n')
-    expect(codes(await editor.save(page))).toEqual([2322])
-
-    await rm(join(dir, 'src/badge.kay'))
-    expect(codes(await editor.filesChanged(page, [{ path: 'src/badge.kay', type: 3 }]))).toEqual([2307, 2322])
-
-    await Bun.write(join(dir, 'src/badge.kay'), 'span.badge New\n')
-    expect(codes(await editor.filesChanged(page, [{ path: 'src/badge.kay', type: 1 }]))).toEqual([2322])
-  })
-
-  it('sees a module a component imports change on disk', async () => {
-    await Bun.write(join(dir, 'src/data.ts'), 'export const n: string = \'1\'\n')
-
-    expect(await editor.filesChanged(page, [{ path: 'src/data.ts', type: 2 }])).toEqual([])
-  })
-
-  it('lets a static component only islands render pass functions to interactive children, until a page renders it too', async () => {
-    const wrapper = 'src/components/wrapper.kay'
-
-    await Promise.all([
-      Bun.write(join(dir, 'src/components/controls.ts'), 'export interface Controls {\n  pick: (value: string) => void\n}\n'),
-      Bun.write(join(dir, 'src/components/panel.kay'), '---\nimport type { Controls } from \'./controls\'\n\nconst { controls } = props<{ controls: Controls }>()\n---\nbutton(type="button" onClick={() => controls.pick("a")}) a\n'),
-      Bun.write(join(dir, wrapper), '---\nimport type { Controls } from \'./controls\'\nimport Panel from \'./panel.kay\'\n\nconst { controls } = props<{ controls: Controls }>()\n---\nPanel(controls={controls})\n'),
-      Bun.write(join(dir, 'src/components/board.kay'), '---\nimport { signal } from \'kay\'\nimport Wrapper from \'./wrapper.kay\'\n\nconst picked = signal(\'none\')\n---\np {picked()}\nWrapper(controls={{ pick: value => picked.set(value) }})\n'),
-      Bun.write(join(dir, 'src/routes/board.kay'), '---\nimport Board from \'../components/board.kay\'\n---\nBoard\n'),
-    ])
-    // Opened before the server hears of the files, it compiles as a static component would, until they reach it.
-    await editor.open(wrapper)
-    expect(await editor.filesChanged(wrapper, [{ path: 'src/components/wrapper.kay', type: 1 }])).toEqual([])
-
-    await Bun.write(join(dir, 'src/routes/plain.kay'), '---\nimport Wrapper from \'../components/wrapper.kay\'\n---\nWrapper(controls={{ pick: () => {} }})\n')
-    expect(codes(await editor.filesChanged(wrapper, [{ path: 'src/routes/plain.kay', type: 1 }]))).toEqual([2345])
-  })
-})
-
-describe('kay lsp reporting what kay check finds across the project', () => {
+describe('kay lsp following the project on disk', () => {
   let editor: Editor
   let dir: string
   let real: string
   const entry = 'src/content/notes/a.md'
+  const page = 'src/routes/home.kay'
+  const codes = (diagnostics: Diagnostic[]) => diagnostics.map(diagnostic => diagnostic.code)
   let first: Record<string, Promise<Diagnostic[]>>
 
   beforeAll(async () => {
@@ -530,6 +481,8 @@ describe('kay lsp reporting what kay check finds across the project', () => {
       Bun.write(join(dir, entry), '---\ndate: today\n---\nText\n'),
       Bun.write(join(dir, 'src/routes/_guard.ts'), 'export default 42\n'),
       Bun.write(join(dir, 'src/routes/index.kay'), 'h1 Home\n'),
+      Bun.write(join(dir, 'src/data.ts'), 'export const n: number = 1\n'),
+      Bun.write(join(dir, page), '---\nimport { n } from \'../data\'\nimport Badge from \'../badge.kay\'\n\nconst s: string = n\n---\nBadge\np {s}\n'),
     ])
     await mkdir(join(dir, 'node_modules'))
     await Promise.all((await readdir(join(import.meta.dir, '../node_modules'))).filter(name => name !== '.bin').map(async name => symlink(join(import.meta.dir, '../node_modules', name), join(dir, 'node_modules', name))))
@@ -572,19 +525,61 @@ describe('kay lsp reporting what kay check finds across the project', () => {
     await Promise.all([Bun.write(join(dir, 'src/routes/sub/_guard.ts'), 'export default 1\n'), Bun.write(join(dir, 'src/routes/sub/index.kay'), 'h1 Sub\n')])
     expect(messages(await editor.filesChanged('src/routes/sub/_guard.ts', [{ path: 'src/routes/sub/_guard.ts', type: 1 }, { path: 'src/routes/sub/index.kay', type: 1 }]))).toEqual([expect.stringMatching(/^It must export a guard by default: /)])
   })
+
+  it('sees a component created or deleted on disk, on save or from the file watcher', async () => {
+    expect(codes(await editor.open(page))).toEqual([2307, 2322])
+
+    await Bun.write(join(dir, 'src/badge.kay'), 'span.badge New\n')
+    expect(codes(await editor.save(page))).toEqual([2322])
+
+    await rm(join(dir, 'src/badge.kay'))
+    expect(codes(await editor.filesChanged(page, [{ path: 'src/badge.kay', type: 3 }]))).toEqual([2307, 2322])
+
+    await Bun.write(join(dir, 'src/badge.kay'), 'span.badge New\n')
+    expect(codes(await editor.filesChanged(page, [{ path: 'src/badge.kay', type: 1 }]))).toEqual([2322])
+  })
+
+  it('sees a module a component imports change on disk', async () => {
+    await Bun.write(join(dir, 'src/data.ts'), 'export const n: string = \'1\'\n')
+
+    expect(await editor.filesChanged(page, [{ path: 'src/data.ts', type: 2 }])).toEqual([])
+  })
+
+  it('lets a static component only islands render pass functions to interactive children, until a page renders it too', async () => {
+    const wrapper = 'src/components/wrapper.kay'
+
+    await Promise.all([
+      Bun.write(join(dir, 'src/components/controls.ts'), 'export interface Controls {\n  pick: (value: string) => void\n}\n'),
+      Bun.write(join(dir, 'src/components/panel.kay'), '---\nimport type { Controls } from \'./controls\'\n\nconst { controls } = props<{ controls: Controls }>()\n---\nbutton(type="button" onClick={() => controls.pick("a")}) a\n'),
+      Bun.write(join(dir, wrapper), '---\nimport type { Controls } from \'./controls\'\nimport Panel from \'./panel.kay\'\n\nconst { controls } = props<{ controls: Controls }>()\n---\nPanel(controls={controls})\n'),
+      Bun.write(join(dir, 'src/components/board.kay'), '---\nimport { signal } from \'kay\'\nimport Wrapper from \'./wrapper.kay\'\n\nconst picked = signal(\'none\')\n---\np {picked()}\nWrapper(controls={{ pick: value => picked.set(value) }})\n'),
+      Bun.write(join(dir, 'src/routes/board.kay'), '---\nimport Board from \'../components/board.kay\'\n---\nBoard\n'),
+    ])
+    // Opened before the server hears of the files, it compiles as a static component would, until they reach it.
+    await editor.open(wrapper)
+    expect(await editor.filesChanged(wrapper, [{ path: 'src/components/wrapper.kay', type: 1 }])).toEqual([])
+
+    await Bun.write(join(dir, 'src/routes/plain.kay'), '---\nimport Wrapper from \'../components/wrapper.kay\'\n---\nWrapper(controls={{ pick: () => {} }})\n')
+    expect(codes(await editor.filesChanged(wrapper, [{ path: 'src/routes/plain.kay', type: 1 }]))).toEqual([2345])
+  })
 })
 
-// An editor opened on a folder holding several projects, each with its own tsconfig.json, as a monorepo is.
-describe('kay lsp in a project nested in the workspace', () => {
+// An app's folder opened in VS Code, which writes its path with more percent-escapes than Node does, while tsgo echoes URIs the VS Code way. It holds another project with its own tsconfig.json, as a monorepo does, and lists an extension by a path beside it, as a library's own fixture app does.
+describe('kay lsp on an app holding a nested project and listing an extension beside it, in a path VS Code percent-encodes', () => {
   let editor: Editor
   let dir: string
-  const page = 'apps/web/src/pages/[id].kay'
+  const page = 'src/routes/a.kay'
+  const nested = 'apps/web/src/pages/[id].kay'
+  const source = '--- server\nconst s = 1\nfunction helper() { return s }\n---\np {s} {helper()}\n'
 
   beforeAll(async () => {
-    dir = await mkdtemp(join(tmpdir(), 'kay-nested-'))
+    dir = join(await scratchDir('lsp-workspace-'), 'app (v1)@x+y')
     await Promise.all([
-      Bun.write(join(dir, 'tsconfig.json'), JSON.stringify({ include: ['src'] })),
-      Bun.write(join(dir, 'src/home.kay'), 'p Home\n'),
+      Bun.write(join(dir, 'tsconfig.json'), await Bun.file(join(fixtures, 'site/tsconfig.json')).text()),
+      Bun.write(join(dir, 'kay.config.ts'), 'export default { i18n: { locales: [\'en\', \'fr\'], defaultLocale: \'en\' }, extensions: [{ name: \'lib\', routes: { dir: \'../lib/routes\', prefix: \'/lib\' } }] }\n'),
+      Bun.write(join(dir, 'src/routes/index.kay'), 'p Home\n'),
+      Bun.write(join(dir, page), source),
+      Bun.write(join(dir, 'src/params/code.ts'), 'export default (value: string): number | undefined => (/^\\d+$/).test(value) ? Number(value) : undefined\n'),
       Bun.write(join(dir, 'shared/data.ts'), 'export const label: string = \'Item \'\n'),
       Bun.write(join(dir, 'apps/web/tsconfig.json'), await Bun.file(join(fixtures, 'site/tsconfig.json')).text()),
       Bun.write(join(dir, 'apps/web/kay.config.ts'), 'export default { routes: \'src/pages\', content: \'site-content.ts\', lints: { \'unread-name\': \'warn\', \'css-import-without-text\': \'allow\' } }\n'),
@@ -593,87 +588,10 @@ describe('kay lsp in a project nested in the workspace', () => {
       Bun.write(join(dir, 'apps/web/src/styled.kay'), '---\nimport theme from \'./theme.css\'\n---\np {theme}\n'),
       Bun.write(join(dir, 'apps/web/src/card.kay'), '---\nconst { title, subtitle } = props<{ title: string, subtitle?: string }>()\n---\np {title}\n'),
       Bun.write(join(dir, 'apps/web/src/counter.kay'), '---\nconst { start } = props<{ start: number }>()\n---\np {start}\n'),
-      Bun.write(join(dir, page), '--- server\nimport { label } from \'../../../../shared/data\'\n\nconst id: string = ctx.params.id\nconst title = label + id\n---\n---\nimport Counter from \'../counter.kay\'\n---\nh1 {title}\nCounter(start={0})\n'),
-    ])
-    await mkdir(join(dir, 'node_modules'))
-    await Promise.all((await readdir(join(import.meta.dir, '../node_modules'))).filter(name => name !== '.bin').map(async name => symlink(join(import.meta.dir, '../node_modules', name), join(dir, 'node_modules', name))))
-    editor = new Editor(dir)
-    await editor.start()
-  })
-
-  afterAll(async () => {
-    await editor.stop()
-    await rm(dir, { recursive: true, force: true })
-  })
-
-  it('checks a .kay file against its own project\'s tsconfig, routes and kay environment', async () => {
-    expect(await editor.open(page)).toEqual([])
-  })
-
-  it('reports a lint at the level its project\'s kay.config.ts gives it', async () => {
-    expect((await editor.open('apps/web/src/card.kay')).map(diagnostic => [diagnostic.code, diagnostic.severity])).toEqual([['unread-name', 2]])
-  })
-
-  it('compiles a file it opens with its project\'s lints, and types it with its project\'s content config', async () => {
-    expect(await editor.open('apps/web/src/styled.kay')).toEqual([])
-    expect(await Bun.file(join(dir, 'apps/web/.kay/types/kay-env.d.ts')).text()).toContain('FeedPathsOf<typeof import("../../site-content")>')
-  })
-
-  it('keeps a nested project\'s shadow files out of the workspace folder\'s', async () => {
-    expect(await Bun.file(join(dir, 'apps/web/.kay/types/src/pages/[id].kay.tsx')).exists()).toBe(true)
-    expect(await Bun.file(join(dir, '.kay/types/src/home.kay.tsx')).exists()).toBe(true)
-    expect(await Bun.file(join(dir, '.kay/types/apps/web/src/pages/[id].kay.tsx')).exists()).toBe(false)
-  })
-})
-
-// A library's own fixture app lists its extension by a path beside it, opened from the app's folder.
-describe('kay lsp on an extension listed from beside the app', () => {
-  let editor: Editor
-  let dir: string
-
-  beforeAll(async () => {
-    dir = await scratchDir('lsp-extension-')
-    await Promise.all([
-      Bun.write(join(dir, 'app/tsconfig.json'), await Bun.file(join(fixtures, 'site/tsconfig.json')).text()),
-      Bun.write(join(dir, 'app/kay.config.ts'), 'export default { i18n: { locales: [\'en\', \'fr\'], defaultLocale: \'en\' }, extensions: [{ name: \'lib\', routes: { dir: \'../lib/routes\', prefix: \'/lib\' } }] }\n'),
-      Bun.write(join(dir, 'app/src/routes/index.kay'), 'p Home\n'),
-      Bun.write(join(dir, 'app/src/params/code.ts'), 'export default (value: string): number | undefined => (/^\\d+$/).test(value) ? Number(value) : undefined\n'),
-      Bun.write(join(dir, 'lib/package.json'), JSON.stringify({ name: 'lib' })),
-      Bun.write(join(dir, 'lib/routes/codes/[id=code]/label.kay'), '--- server\nconst label: string = ctx.params.id\n---\np {label}\n'),
-      Bun.write(join(dir, 'lib/routes/out.kay'), 'a(href="/welcome") Back\na(href="/libx/page") Beside\na(href="/lib/no/such") Nope\na(href="/fr/welcome") Retour\na(href="/fr/lib/no/such") Non\n'),
-    ])
-    editor = new Editor(join(dir, 'app'))
-    await editor.start()
-  })
-
-  afterAll(async () => {
-    await editor.stop()
-    await rm(dir, { recursive: true, force: true })
-  })
-
-  it('types a page\'s params from its path in the extension\'s routes, by the app\'s matchers, as kay check does', async () => {
-    expect((await editor.open('../lib/routes/codes/[id=code]/label.kay')).map(diagnostic => [diagnostic.range.start.line, diagnostic.message])).toEqual([[1, 'Type \'number\' is not assignable to type \'string\'.']])
-  })
-
-  it('checks a path the extension\'s routes name only under its own prefix, a locale\'s before it or not, as kay check does', async () => {
-    expect((await editor.open('../lib/routes/out.kay')).map(diagnostic => [diagnostic.range.start.line, diagnostic.message.match(/serves (\S+?)"/)?.[1]])).toEqual([[2, '/lib/no/such'], [4, '/fr/lib/no/such']])
-  })
-})
-
-// VS Code writes a project's path with more percent-escapes than Node does, and tsgo echoes URIs the VS Code way.
-describe('kay lsp in a path VS Code percent-encodes', () => {
-  let editor: Editor
-  let dir: string
-  const page = 'src/routes/a.kay'
-  const source = '--- server\nconst s = 1\nfunction helper() { return s }\n---\np {s} {helper()}\n'
-
-  beforeAll(async () => {
-    dir = join(await mkdtemp(join(tmpdir(), 'kay-')), 'app (v1)@x+y')
-    await mkdir(join(dir, 'node_modules'), { recursive: true })
-    await Promise.all([
-      Bun.write(join(dir, 'tsconfig.json'), await Bun.file(join(fixtures, 'site/tsconfig.json')).text()),
-      Bun.write(join(dir, page), source),
-      ...(await readdir(join(import.meta.dir, '../node_modules'))).filter(name => name !== '.bin').map(async name => symlink(join(import.meta.dir, '../node_modules', name), join(dir, 'node_modules', name))),
+      Bun.write(join(dir, nested), '--- server\nimport { label } from \'../../../../shared/data\'\n\nconst id: string = ctx.params.id\nconst title = label + id\n---\n---\nimport Counter from \'../counter.kay\'\n---\nh1 {title}\nCounter(start={0})\n'),
+      Bun.write(join(dir, '../lib/package.json'), JSON.stringify({ name: 'lib' })),
+      Bun.write(join(dir, '../lib/routes/codes/[id=code]/label.kay'), '--- server\nconst label: string = ctx.params.id\n---\np {label}\n'),
+      Bun.write(join(dir, '../lib/routes/out.kay'), 'a(href="/welcome") Back\na(href="/libx/page") Beside\na(href="/lib/no/such") Nope\na(href="/fr/welcome") Retour\na(href="/fr/lib/no/such") Non\n'),
     ])
     editor = new Editor(dir, true)
     await editor.start()
@@ -682,7 +600,7 @@ describe('kay lsp in a path VS Code percent-encodes', () => {
 
   afterAll(async () => {
     await editor.stop()
-    await rm(join(dir, '..'), { recursive: true, force: true })
+    await rm(dirname(dir), { recursive: true, force: true })
   })
 
   it('goes to definitions in the .kay file', async () => {
@@ -704,5 +622,32 @@ describe('kay lsp in a path VS Code percent-encodes', () => {
 
   it('renames a name in the .kay file', async () => {
     expect(spots((await editor.rename(page, 4, 3, 'value'))[page]!)).toEqual([[1, 6, 7], [2, 27, 28], [4, 3, 4]])
+  })
+
+  it('checks a nested project\'s .kay file against its own tsconfig, routes and kay environment', async () => {
+    expect(await editor.open(nested)).toEqual([])
+  })
+
+  it('reports a lint at the level the nested project\'s kay.config.ts gives it', async () => {
+    expect((await editor.open('apps/web/src/card.kay')).map(diagnostic => [diagnostic.code, diagnostic.severity])).toEqual([['unread-name', 2]])
+  })
+
+  it('compiles a file of the nested project with its lints, and types it with its content config', async () => {
+    expect(await editor.open('apps/web/src/styled.kay')).toEqual([])
+    expect(await Bun.file(join(dir, 'apps/web/.kay/types/kay-env.d.ts')).text()).toContain('FeedPathsOf<typeof import("../../site-content")>')
+  })
+
+  it('keeps a nested project\'s shadow files out of the app\'s', async () => {
+    expect(await Bun.file(join(dir, 'apps/web/.kay/types/src/pages/[id].kay.tsx')).exists()).toBe(true)
+    expect(await Bun.file(join(dir, `.kay/types/${page}.tsx`)).exists()).toBe(true)
+    expect(await Bun.file(join(dir, `.kay/types/${nested}.tsx`)).exists()).toBe(false)
+  })
+
+  it('types a page\'s params from its path in the extension\'s routes, by the app\'s matchers, as kay check does', async () => {
+    expect((await editor.open('../lib/routes/codes/[id=code]/label.kay')).map(diagnostic => [diagnostic.range.start.line, diagnostic.message])).toEqual([[1, 'Type \'number\' is not assignable to type \'string\'.']])
+  })
+
+  it('checks a path the extension\'s routes name only under its own prefix, a locale\'s before it or not, as kay check does', async () => {
+    expect((await editor.open('../lib/routes/out.kay')).map(diagnostic => [diagnostic.range.start.line, diagnostic.message.match(/serves (\S+?)"/)?.[1]])).toEqual([[2, '/lib/no/such'], [4, '/fr/lib/no/such']])
   })
 })

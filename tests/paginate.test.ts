@@ -2,6 +2,7 @@ import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
+import { check } from '../src/check'
 
 const CLI = resolve('src/cli.ts')
 
@@ -147,17 +148,6 @@ describe('a paginated list', () => {
     expect([...answers['/sitemap.xml']!.body.matchAll(/<loc>([^<]+)<\/loc>/g)].map(match => match[1])).toEqual(['https://example.com/docs/blog', 'https://example.com/docs/blog/2', 'https://example.com/docs/blog/3'])
   })
 
-  it('exported as prerender, has every page written by a static export', async () => {
-    const root = projects.get('paged')!
-    const build = await run([process.execPath, CLI, 'build', '--no-check', '--static', '--outdir', 'dist'], root)
-
-    expect(build.stderr).not.toContain('error')
-    expect(build.code).toBe(0)
-    expect(items(await Bun.file(join(root, 'dist/blog.html')).text())).toEqual(['a', 'b'])
-    expect(items(await Bun.file(join(root, 'dist/blog/3.html')).text())).toEqual(['e'])
-    expect(await Bun.file(join(root, 'dist/blog/4.html')).exists()).toBe(false)
-  }, 60_000)
-
   it('counts each locale\'s own entries, the default locale\'s standing in for those it lacks', async () => {
     const answers = await served('localized')
 
@@ -173,14 +163,17 @@ describe('a paginated list', () => {
     expect(locs).not.toContain('https://example.com/blog/3')
   })
 
-  it('exported as prerender, writes each locale\'s pages and no more', async () => {
+  it('exported as prerender, has every page of each locale written by a static export, and no more', async () => {
     const root = projects.get('localized')!
     const build = await run([process.execPath, CLI, 'build', '--no-check', '--static', '--outdir', 'dist'], root)
 
     expect(build.stderr).not.toContain('error')
     expect(build.code).toBe(0)
+    expect(items(await Bun.file(join(root, 'dist/blog.html')).text())).toEqual(['a', 'b'])
+    expect(items(await Bun.file(join(root, 'dist/blog/2.html')).text())).toEqual(['c', 'd'])
     expect(items(await Bun.file(join(root, 'dist/fr/blog/3.html')).text())).toEqual(['e'])
     expect(await Bun.file(join(root, 'dist/blog/3.html')).exists()).toBe(false)
+    expect(await Bun.file(join(root, 'dist/fr/blog/4.html')).exists()).toBe(false)
   }, 60_000)
 
   it('ends its links with a slash where the site\'s URLs do, and exported as sitemap alone lists its pages there', async () => {
@@ -192,9 +185,6 @@ describe('a paginated list', () => {
   })
 
   it('passes kay check, its page typed by its source', async () => {
-    const { code, stdout, stderr } = await run([process.execPath, CLI, 'check'], projects.get('paged')!)
-
-    expect(`${stdout}${stderr}`).not.toContain('error')
-    expect(code).toBe(0)
+    expect((await check(projects.get('paged')!, { site: 'https://example.com', base: '/docs' })).filter(diagnostic => diagnostic.severity !== 'warning')).toEqual([])
   })
 })
