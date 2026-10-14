@@ -2,9 +2,23 @@
 import type { ScatterPoint } from '@kaynooo/kayjs-ui'
 import LineChart from '@kaynooo/kayjs-ui/line-chart.kay'
 import ScatterChart from '@kaynooo/kayjs-ui/scatter-chart.kay'
+import { signal } from 'kay'
 
 // What the test reads back: the dot pressed, the span dragged.
 const { onSelect, onRange } = props<{ onSelect: (point: ScatterPoint) => void, onRange: (from: number, to: number) => void }>()
+
+const DAYS = ['Mon', 'Tue', 'Wed']
+const VISITS = [null, 3, 5]
+const SALES = [1, 2, 1]
+// The points shown, which a picked span zooms in on as an app would.
+const shown = signal<[number, number]>([0, DAYS.length])
+
+function zoom(from: number, to: number) {
+  const [start] = shown()
+
+  onRange(from, to)
+  shown.set([start + from, start + to + 1])
+}
 ---
-LineChart#line(label="Visits" labels={['Mon', 'Tue', 'Wed']} series={[{ name: 'Visits', values: [null, 3, 5] }, { name: 'Sales', values: [1, 2, 1], color: 'red' }]} formatValue={value => `${value} v`} onRange={onRange})
+LineChart#line(label="Visits" labels={DAYS.slice(...shown())} series={[{ name: 'Visits', values: VISITS.slice(...shown()) }, { name: 'Sales', values: SALES.slice(...shown()), color: 'red' }]} formatValue={value => `${value} v`} onRange={zoom})
 ScatterChart#scatter(label="Games" points={[{ key: 1, label: 'Hades', x: 10, y: 90 }, { key: 2, label: 'Celeste', x: 30, y: 70 }]} onSelect={onSelect})

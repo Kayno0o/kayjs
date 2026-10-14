@@ -57,6 +57,43 @@ describe('LineChart', () => {
     expect(slider.getAttribute('aria-valuetext')).toBe('Tue: Visits 3 v, Sales 2 v')
   })
 
+  test('leaves chords to the browser, Alt with an arrow going back', async () => {
+    const root = await charts()
+    const slider = root.querySelector<HTMLElement>('#line [role="slider"]')!
+
+    for (const chord of [{ altKey: true }, { ctrlKey: true }, { metaKey: true }]) {
+      const event = new KeyboardEvent('keydown', { key: 'ArrowLeft', ...chord, bubbles: true, cancelable: true })
+
+      slider.dispatchEvent(event)
+      await settle()
+      expect(event.defaultPrevented).toBe(false)
+      expect(slider.getAttribute('aria-valuenow')).toBe('2')
+    }
+  })
+
+  test('drops the point it stood on once the app zooms in on a picked span, reading the new points', async () => {
+    const root = await charts()
+    const slider = root.querySelector<HTMLElement>('#line [role="slider"]')!
+    const press = async (key: string, shiftKey = false) => {
+      slider.dispatchEvent(new KeyboardEvent('keydown', { key, shiftKey, bubbles: true, cancelable: true }))
+      await settle()
+    }
+
+    await press('Home')
+    await press('ArrowRight')
+    await press('ArrowRight', true)
+    await press('Enter')
+
+    expect(ranges).toEqual([[1, 2]])
+    expect(slider.getAttribute('aria-valuemax')).toBe('1')
+    expect(slider.getAttribute('aria-valuenow')).toBe('1')
+    expect(slider.getAttribute('aria-valuetext')).toBe('Wed: Visits 5 v, Sales 1 v')
+    expect(root.querySelector('.kui-line-chart-tooltip')).toBeNull()
+
+    await press('Home')
+    expect(slider.getAttribute('aria-valuetext')).toBe('Tue: Visits 3 v, Sales 2 v')
+  })
+
   test('tells screen readers how to pick a span once the chart takes onRange', async () => {
     const root = await charts()
     const slider = root.querySelector('#line [role="slider"]')!

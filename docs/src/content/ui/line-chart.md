@@ -6,7 +6,7 @@ description: A multi-series line chart with a hover tooltip, drawn by chartist.
 
 <Callout type="note">
 
-The chart is drawn by chartist, which the app installs with `bun add chartist`. The server renders its frame and legend, and the drawing happens once the island mounts.
+The chart is drawn by chartist, which the app installs with `bun add chartist`. The server renders its frame, the keyboard slider, the table screen readers read and the legend, and the drawing happens once the island mounts.
 
 </Callout>
 
@@ -24,4 +24,4 @@ A series takes an optional CSS `color`, otherwise the next `--color-kui-chart-*`
 
 ## Keyboard and screen readers
 
-`label` names the chart. Screen readers read every value from a table only they see, one row per label and one column per series. The plot is one stop in the tab order: the arrows walk the points, Home and End reach either end, and each step shows the tooltip and announces the point's label and readings.
+`label` names the chart. Screen readers read every value from a table only they see, one row per label and one column per series, so a series of thousands of points renders as many rows. The plot is one stop in the tab order: the arrows walk the points, Home and End reach either end, chords such as Alt with an arrow stay the browser's, and each step shows the tooltip and announces the point's label and readings.

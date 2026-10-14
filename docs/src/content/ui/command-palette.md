@@ -10,7 +10,7 @@ description: A searchable list of actions and links, opened from the keyboard.
 
 ## Searching
 
-`keywords` are words the search also matches without showing them, so "csv" finds Export report. Once the query is not empty the groups give way to one ranked list.
+`keywords` are words the search also matches without showing them, so "csv" finds Export report. Once the query is not empty the groups give way to one ranked list. The arrows walk it, an accent bar marking the row Enter takes.
 
 <Demo name="command-palette/search" />
 

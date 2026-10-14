@@ -408,10 +408,12 @@
   .kui-command-palette-option {
     @apply flex h-11 w-full cursor-pointer items-center gap-3 px-4 text-left text-sm text-kui-text no-underline outline-none;
 
-    /* The tint alone is too faint to find, so an accent bar marks the option Enter opens. */
+    /* The tint alone is too faint to find, so an accent bar marks the option Enter opens; forced colours drop both and paint the transparent outline instead. */
     &:where([aria-selected='true']) {
       @apply bg-kui-row-hover;
       box-shadow: inset 2px 0 0 var(--color-kui-accent);
+      outline: 2px solid transparent;
+      outline-offset: -2px;
     }
   }
 
@@ -994,9 +996,11 @@
   .kui-menu-item {
     @apply flex w-full cursor-pointer items-center gap-2 px-2 py-1.5 text-left text-sm text-kui-text outline-none hover:bg-kui-row-hover focus:bg-kui-row-hover;
 
-    /* The tint alone is too faint to find, so an accent bar marks the item the keyboard stands on. */
+    /* The tint alone is too faint to find, so an accent bar marks the item the keyboard stands on; forced colours drop both and paint the transparent outline instead. */
     &:focus-visible {
       box-shadow: inset 2px 0 0 var(--color-kui-accent);
+      outline: 2px solid transparent;
+      outline-offset: -2px;
     }
 
     &:where([data-danger]) {

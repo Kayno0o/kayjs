@@ -10,6 +10,6 @@ description: An icon button opening a menu of actions.
 
 ## Row actions
 
-A menu fits at the end of a row. `disabled` greys an entry out, and the arrows, Home and End move between the enabled ones.
+A menu fits at the end of a row. `disabled` greys an entry out, and the arrows, Home and End move between the enabled ones, an accent bar marking the one the keyboard is on.
 
 <Demo name="menu/rows" />

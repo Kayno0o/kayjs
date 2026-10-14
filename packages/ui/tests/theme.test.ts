@@ -96,6 +96,13 @@ describe('theme.css', () => {
     expect(theme).not.toContain('@theme {')
   })
 
+  test('marks the focused menu item and the selected palette option with an accent bar, and an outline forced colours paint', () => {
+    const bar = String.raw`\{\s*(?:\/\*[^*]*\*\/\s*)?(?:@apply [^;]*;\s*)?box-shadow: inset 2px 0 0 var\(--color-kui-accent\);\s*outline: 2px solid transparent;\s*outline-offset: -2px;`
+
+    expect(theme).toMatch(new RegExp(String.raw`\.kui-menu-item \{[^}]*&:focus-visible ${bar}`))
+    expect(theme).toMatch(new RegExp(String.raw`\.kui-command-palette-option \{[^}]*&:where\(\[aria-selected='true'\]\) ${bar}`))
+  })
+
   test('draws no offset shadow nor press-down unless a skin sets their tokens alone', async () => {
     const tailwind = Bun.resolveSync('tailwindcss/theme.css', ROOT)
     const build = async (skin: string) => {

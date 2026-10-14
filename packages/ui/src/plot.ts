@@ -77,8 +77,8 @@ export interface ChartSeries {
   color?: string
 }
 
-// The dash each series of a LineChart draws with, by its place in the list, so lines stay apart without their colours: solid, then patterns in px of a 2px stroke.
-export const SERIES_DASHES = ['', '6 3', '2 3', '10 3 2 3', '1 4', '6 2 1 2'] as const
+// The dash each series of a LineChart draws with, by its place in the list, so lines stay apart without their colours: solid, then patterns in px of a 2px stroke, no dash shorter than the stroke is wide.
+export const SERIES_DASHES = ['', '6 3', '2 3', '10 3 2 3', '2 6', '8 2 2 2'] as const
 
 // A horizontal sample of a dashed line as a CSS background, for the legend to show each series as its line draws.
 export function dashSample(color: string, dash: string): string {

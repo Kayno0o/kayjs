@@ -122,6 +122,18 @@ onMount(() => {
     chart.update(chartData(labels, series.map(item => item.values), times()), settings(), true)
   })
 
+  // New points, such as a span the app zoomed in on, leave nothing picked on the old ones, whose indices may not exist any more.
+  let shown = labels
+
+  effect(() => {
+    if (labels === shown)
+      return
+
+    shown = labels
+    hovered.set(null)
+    dragged.set(null)
+  })
+
   onCleanup(() => chart.detach())
 })
 
@@ -195,6 +207,10 @@ function show(index: number, overlay: HTMLElement) {
 }
 
 function keyDown(event: KeyboardEvent) {
+  // Chords stay the browser's and the system's, Alt with an arrow going back or forward; Shift alone picks a span.
+  if (event.altKey || event.ctrlKey || event.metaKey)
+    return
+
   if (event.key === 'Escape' && dragged()) {
     event.preventDefault()
     dragged.set(null)
@@ -231,6 +247,12 @@ function blurred() {
   hovered.set(null)
   dragged.set(null)
 }
+
+// The pointer leaving takes its point along, unless the keyboard is on the plot and still reading one.
+function pointerLeave(event: PointerEvent) {
+  if (!(event.currentTarget as HTMLElement).matches(':focus-visible'))
+    hovered.set(null)
+}
 ---
 .kui-line-chart({...rest} role="figure" aria-label={label} class={className})
   .kui-line-chart-frame
@@ -242,7 +264,7 @@ function blurred() {
           .kui-line-chart-dot(style={dot(index)})
     if band() !== null
       .kui-line-chart-band(style={band()})
-    .kui-line-chart-overlay(role="slider" tabindex={labels.length > 0 ? '0' : '-1'} aria-label={label} aria-valuemin="0" aria-valuemax={Math.max(0, labels.length - 1)} aria-valuenow={current()} aria-valuetext={announced()} aria-describedby={onRange ? `${id}-hint` : undefined} data-range={onRange ? '' : undefined} onKeyDown={keyDown} onFocus={focused} onBlur={blurred} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={finishSpan} onPointerCancel={() => dragged.set(null)} onPointerLeave={() => hovered.set(null)})
+    .kui-line-chart-overlay(role="slider" tabindex={labels.length > 0 ? '0' : '-1'} aria-label={label} aria-valuemin="0" aria-valuemax={Math.max(0, labels.length - 1)} aria-valuenow={current()} aria-valuetext={announced()} aria-describedby={onRange ? `${id}-hint` : undefined} data-range={onRange ? '' : undefined} onKeyDown={keyDown} onFocus={focused} onBlur={blurred} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={finishSpan} onPointerCancel={() => dragged.set(null)} onPointerLeave={pointerLeave})
   if hovered()
     .kui-line-chart-tooltip(style={`left: ${hovered()!.clientX}px; top: ${hovered()!.clientY}px`} aria-hidden="true")
       .kui-line-chart-tooltip-label {labels[hovered()!.index]}
