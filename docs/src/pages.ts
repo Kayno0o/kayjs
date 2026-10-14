@@ -1,4 +1,6 @@
+import { join } from 'node:path'
 import { components, docs, reference } from './content.config'
+import { FORGE } from './forge'
 import { llmsHref } from './reference'
 import { sectionOf, SECTIONS } from './sections'
 
@@ -6,10 +8,6 @@ export interface PageLink {
   href: string
   title: string
 }
-
-const FORGE_ROOT = 'https://git.kaynooo.fr/kaynooo'
-
-export const FORGE = `${FORGE_ROOT}/kayjs/src/branch/main`
 
 const KAYJS = /^kayjs-/
 
@@ -39,11 +37,13 @@ export interface Navigation {
   groups: NavGroup[]
   components: PageLink[]
   reference: PageLink[]
+  version: string
 }
 
 // The sidebar's links: the docs by section, the kayjs-ui components, then the full reference written for agents.
 export async function navigation(): Promise<Navigation> {
   const pages = await docs.all()
+  const { version } = await Bun.file(join(import.meta.dir, '../../package.json')).json() as { version: string }
 
   return {
     groups: SECTIONS.map(section => ({
@@ -52,5 +52,6 @@ export async function navigation(): Promise<Navigation> {
     })),
     components: (await components.all()).map(component => ({ href: `/ui/${component.slug}`, title: component.data.title })),
     reference: (await reference.all()).map(topic => ({ href: llmsHref(topic.slug), title: topic.data.title })),
+    version,
   }
 }

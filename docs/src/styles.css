@@ -119,6 +119,36 @@ kbd {
   border-radius: var(--radius);
 }
 
+.brand-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.brand-row .version {
+  margin-left: auto;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  text-decoration: none;
+}
+
+.brand-row .repository {
+  display: inline-flex;
+  padding: 0.3rem;
+  color: var(--muted);
+  border-radius: var(--radius);
+}
+
+.brand-row :is(.version, .repository):hover {
+  color: var(--text);
+}
+
+.brand-row .repository svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
 .sidebar[popover] {
   display: block;
   position: static;
@@ -1010,6 +1040,10 @@ pre code {
   .bar .search-trigger {
     flex: 1;
     min-width: 0;
+  }
+
+  .brand-row .version {
+    display: none;
   }
 
   .search-trigger kbd {

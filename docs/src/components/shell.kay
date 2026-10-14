@@ -1,7 +1,10 @@
 ---
 import type { Navigation } from '../pages'
 import Button from '@kaynooo/kayjs-ui/button.kay'
+import Icon from '@kaynooo/kayjs-ui/icon.kay'
 import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
+import BrandGit from '~icons/tabler/brand-git'
+import { REPOSITORY } from '../forge'
 import CodeCopy from './code-copy.kay'
 import LinkFilter from './link-filter.kay'
 import Search from './search.kay'
@@ -12,9 +15,13 @@ a.skip-link(href="#content") Skip to the content
 .shell
   aside.side
     header.bar
-      a.brand(href="/")
-        img(src="/favicon.svg" alt="" width="28" height="28")
-        span kay
+      .brand-row
+        a.brand(href="/")
+          img(src="/favicon.svg" alt="" width="28" height="28")
+          span kay
+        a.version(href={`${REPOSITORY}/releases`}) v{nav.version}
+        a.repository(href={REPOSITORY} aria-label="kay's repository")
+          Icon(icon={BrandGit})
       Search(persist nav={nav})
       // Shown once the sidebar folds into a popover.
       Button(class="hidden max-[56rem]:inline-flex" label="Menu" icon="menu" popovertarget="sidebar")
@@ -36,6 +43,7 @@ a.skip-link(href="#content") Skip to the content
   main#content
     slot
     footer.site-foot
-      p Built with #[a(href="https://git.kaynooo.fr/kaynooo/kayjs") kay]. #[span(data-page-weight)]
+      p Built with #[a(href={REPOSITORY}) kay] {nav.version}, under the #[a(href={`${REPOSITORY}/src/branch/main/LICENSE`}) MIT license]. #[span(data-page-weight)]
+      p See #[a(href={`${REPOSITORY}/releases`}) what changed in each release], or ask a question or report a bug in #[a(href={`${REPOSITORY}/issues`}) the issues].
 CodeCopy(persist)
 Toaster(persist)

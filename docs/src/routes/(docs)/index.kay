@@ -107,7 +107,7 @@ import Card from '@kaynooo/kayjs-ui/card.kay'
 import ModuleCard from '../../components/module-card.kay'
 import Pager from '../../components/pager.kay'
 import UiShowcase from '../../components/ui-showcase.kay'
-import { FORGE } from '../../pages'
+import { FORGE } from '../../forge'
 ---
 head
   title(raw) kay, a Bun web framework

@@ -1,7 +1,8 @@
 --- server
 import { shareCard } from 'kay/image'
 import { docs } from '../../../content.config'
-import { FORGE, neighbours } from '../../../pages'
+import { FORGE } from '../../../forge'
+import { neighbours } from '../../../pages'
 import { sectionOf } from '../../../sections'
 
 export const page = {

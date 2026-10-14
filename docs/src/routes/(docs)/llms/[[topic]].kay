@@ -1,7 +1,8 @@
 --- server
 import { shareCard } from 'kay/image'
 import { reference } from '../../../content.config'
-import { FORGE, libraryRoot, neighbours } from '../../../pages'
+import { FORGE } from '../../../forge'
+import { libraryRoot, neighbours } from '../../../pages'
 import { llmsHref } from '../../../reference'
 
 export const page = {
