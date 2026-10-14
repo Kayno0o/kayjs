@@ -1,5 +1,4 @@
-import { mkdtemp, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
@@ -14,58 +13,76 @@ interface ClientModule {
   mount: (element: HTMLElement) => () => void
 }
 
-let outdir: string
 let client: ClientModule
+const dirs: string[] = []
 
-// Bundles `main.kay` and the files beside it for the browser, and mounts it in a fresh element.
-async function mountKay(files: Record<string, string | Blob>): Promise<{ root: HTMLElement, dispose: () => Promise<void> }> {
-  const dir = await scratchDir('dom-')
+interface Site {
+  files: Record<string, string | Blob>
+  alone: boolean
+  main?: (props: object) => unknown
+  render?: (fn: () => unknown, element: Element) => () => void
+}
 
-  try {
-    await Promise.all(Object.entries({ ...files, 'entry.ts': 'import { render } from \'kay/dom\'\nimport Main from \'./main.kay\'\n\nexport function mount(element: HTMLElement) {\n  return render(() => Main({}), element)\n}\n' }).map(async ([name, text]) => Bun.write(join(dir, name), text)))
+// Each case is a `main.kay` and the files beside it, declared while the file loads so beforeAll bundles all of them in one build. A case reading what the page holds when its bundle loads (a meta tag) is `alone`, bundled when it mounts.
+const sites: Site[] = []
 
-    const build = await Bun.build({ entrypoints: [join(dir, 'entry.ts')], outdir: join(dir, 'out'), target: 'browser', plugins: [kay()] })
+// Declares a case, and hands back what mounts it in a fresh element.
+function site(files: Site['files'], alone = false): () => Promise<{ root: HTMLElement, dispose: () => Promise<void> }> {
+  const declared: Site = { files, alone }
 
-    if (!build.success)
-      throw new AggregateError(build.logs, 'client build failed')
+  sites.push(declared)
 
-    const { mount } = await import(build.outputs[0]!.path) as Pick<ClientModule, 'mount'>
+  return async () => {
+    // Bundled when mounted, so the page holds what it reads as the bundle loads.
+    if (alone)
+      await bundle([declared])
+
     const root = document.createElement('div')
 
     document.body.append(root)
-    const unmount = mount(root)
 
-    return { root, dispose: async () => {
-      unmount()
-      await rm(dir, { recursive: true, force: true })
-    } }
-  }
-  catch (error) {
-    await rm(dir, { recursive: true, force: true })
+    const unmount = declared.render!(() => declared.main!({}), root)
 
-    throw error
+    return { root, dispose: async () => unmount() }
   }
 }
 
-beforeAll(async () => {
-  GlobalRegistrator.register()
-  outdir = await mkdtemp(join(tmpdir(), 'kay-dom-'))
-  const build = await Bun.build({
-    entrypoints: [join(import.meta.dir, 'fixtures/app/src/client.ts')],
-    outdir,
-    target: 'browser',
-    plugins: [kay()],
-  })
+// Bundles the cases for the browser, which `mains` they export in order.
+async function bundle(group: Site[], entrypoints: string[] = []): Promise<string[]> {
+  const folder = await scratchDir('dom-')
+
+  await Bun.write(join(folder, 'entry.ts'), `import { render } from 'kay/dom'\n${group.map((_, index) => `import Main${index} from './${index}/main.kay'`).join('\n')}\n\nexport const mains = [${group.map((_, index) => `Main${index}`).join(', ')}]\nexport { render }\n`)
+  await Promise.all(group.flatMap((declared, index) => Object.entries(declared.files).map(async ([name, text]) => Bun.write(join(folder, String(index), name), text))))
+
+  const build = await Bun.build({ entrypoints: [...entrypoints, join(folder, 'entry.ts')], outdir: join(folder, 'out'), target: 'browser', plugins: [kay()] })
 
   if (!build.success)
     throw new AggregateError(build.logs, 'client build failed')
 
-  client = await import(build.outputs[0]!.path) as ClientModule
+  const [cases, ...others] = build.outputs.filter(output => output.kind === 'entry-point').reverse()
+  const module = await import(cases!.path) as { mains: Site['main'][], render: Site['render'] }
+
+  for (const [index, declared] of group.entries()) {
+    declared.main = module.mains[index]
+    declared.render = module.render
+  }
+
+  dirs.push(folder)
+
+  return others.reverse().map(output => output.path)
+}
+
+beforeAll(async () => {
+  GlobalRegistrator.register()
+
+  const [app] = await bundle(sites.filter(declared => !declared.alone), [join(import.meta.dir, 'fixtures/app/src/client.ts')])
+
+  client = await import(app!) as ClientModule
 })
 
 afterAll(async () => {
   await GlobalRegistrator.unregister()
-  await rm(outdir, { recursive: true, force: true })
+  await Promise.all(dirs.map(async folder => rm(folder, { recursive: true, force: true })))
 })
 
 describe('client bundle', () => {
@@ -120,11 +137,13 @@ describe('a dynamic tag', () => {
 })
 
 describe('a spread onto an element in the browser', () => {
+  const mount1 = site({
+    'main.kay': '---\nimport { sanitizeHtml, trustHtml } from \'kay\'\n\nconst raw = \'<i>raw-dom-1</i>\'\nconst marked = trustHtml(\'<b>marked-dom-1</b>\')\nconst loaded = JSON.parse(JSON.stringify({ innerHTML: marked }))\n---\ndiv.trusted({...{ innerHTML: marked }})\ndiv.sanitized({...{ innerHTML: sanitizeHtml(\'<u>s</u><script>x</script>\') }})\ndiv.raw({...{ innerHTML: raw }})\ndiv.derived({...{ innerHTML: `${marked}<img src=x>` }})\nsvg.drawn({...{ innerHTML: trustHtml(\'<path d="M0 0"/>\') }})\nsvg.rawsvg({...{ innerHTML: \'<path d="raw"/>\' }})\nmath.rawmath({...{ innerHTML: \'<mi>raw</mi>\' }})\ndiv.json({...loaded})\n',
+  })
+
   it('takes innerHTML only as markup something vouched for, and leaves the element empty otherwise', async () => {
     const warn = spyOn(console, 'warn').mockImplementation(() => undefined)
-    const { root, dispose } = await mountKay({
-      'main.kay': '---\nimport { sanitizeHtml, trustHtml } from \'kay\'\n\nconst raw = \'<i>raw-dom-1</i>\'\nconst marked = trustHtml(\'<b>marked-dom-1</b>\')\nconst loaded = JSON.parse(JSON.stringify({ innerHTML: marked }))\n---\ndiv.trusted({...{ innerHTML: marked }})\ndiv.sanitized({...{ innerHTML: sanitizeHtml(\'<u>s</u><script>x</script>\') }})\ndiv.raw({...{ innerHTML: raw }})\ndiv.derived({...{ innerHTML: `${marked}<img src=x>` }})\nsvg.drawn({...{ innerHTML: trustHtml(\'<path d="M0 0"/>\') }})\nsvg.rawsvg({...{ innerHTML: \'<path d="raw"/>\' }})\nmath.rawmath({...{ innerHTML: \'<mi>raw</mi>\' }})\ndiv.json({...loaded})\n',
-    })
+    const { root, dispose } = await mount1()
 
     try {
       expect(root.querySelector('.trusted')!.innerHTML).toBe('<b>marked-dom-1</b>')
@@ -142,14 +161,16 @@ describe('a spread onto an element in the browser', () => {
 })
 
 describe('a spread onto an element in the browser, as it changes', () => {
+  const mount2 = site({
+    'main.kay': '---\nimport { persisted, signal, trustHtml } from \'kay\'\n\nconst safe = trustHtml(\'<b>live-dom-1</b>\')\nconst turn = signal(0)\nconst stored = persisted(\'forged\', \'\')\n---\ndiv.live({...{ get innerHTML() { return turn() === 0 ? safe : \'<i>live-raw-1</i>\' } }})\nbutton(onClick={() => turn.set(1)}) turn\ndiv.cookie({...{ innerHTML: stored() }})\n',
+  })
+
   it('checks a getter on each read, warns when it turns raw, and reads a forged cookie as nothing vouched for', async () => {
     const forged = '[["SafeHtml",1],"!<img src=x onerror=alert(1)>"]'
 
     document.cookie = `forged=${encodeURIComponent(forged)}`
 
-    const { root, dispose } = await mountKay({
-      'main.kay': '---\nimport { persisted, signal, trustHtml } from \'kay\'\n\nconst safe = trustHtml(\'<b>live-dom-1</b>\')\nconst turn = signal(0)\nconst stored = persisted(\'forged\', \'\')\n---\ndiv.live({...{ get innerHTML() { return turn() === 0 ? safe : \'<i>live-raw-1</i>\' } }})\nbutton(onClick={() => turn.set(1)}) turn\ndiv.cookie({...{ innerHTML: stored() }})\n',
-    })
+    const { root, dispose } = await mount2()
     const warn = spyOn(console, 'warn').mockImplementation(() => undefined)
 
     try {
@@ -170,11 +191,13 @@ describe('a spread onto an element in the browser, as it changes', () => {
 })
 
 describe('component class', () => {
+  const mount3 = site({
+    'tagged.kay': '---\nconst { class: className } = props<{ class?: string }>()\n---\np(title={`[${className}]`})\n',
+    'main.kay': '---\nimport { signal } from \'kay\'\nimport Tagged from \'./tagged.kay\'\n\nconst on = signal(false)\nconst sp = { class: \'FROM\' }\n---\nTagged.a({...sp} class={{ on: on() }})\nbutton(onClick={() => on.set(o => !o)}) x\n',
+  })
+
   it('hands a component the merged class as one string, following what it merges', async () => {
-    const { root, dispose } = await mountKay({
-      'tagged.kay': '---\nconst { class: className } = props<{ class?: string }>()\n---\np(title={`[${className}]`})\n',
-      'main.kay': '---\nimport { signal } from \'kay\'\nimport Tagged from \'./tagged.kay\'\n\nconst on = signal(false)\nconst sp = { class: \'FROM\' }\n---\nTagged.a({...sp} class={{ on: on() }})\nbutton(onClick={() => on.set(o => !o)}) x\n',
-    })
+    const { root, dispose } = await mount3()
 
     try {
       expect(root.querySelector('p')!.title).toBe('[a FROM]')
@@ -189,10 +212,12 @@ describe('component class', () => {
 })
 
 describe('ARIA states', () => {
+  const mount4 = site({
+    'main.kay': '---\nimport { signal } from \'kay\'\n\nconst open = signal<boolean | null>(false)\n---\nbutton(aria-expanded={open()} hidden={open() === true} onClick={() => open.set(open() === false ? true : null)}) x\ndiv({...{ \'aria-busy\': open() }})\n',
+  })
+
   it('render a boolean as "true" or "false" as it changes, set or spread, null leaving the attribute out', async () => {
-    const { root, dispose } = await mountKay({
-      'main.kay': '---\nimport { signal } from \'kay\'\n\nconst open = signal<boolean | null>(false)\n---\nbutton(aria-expanded={open()} hidden={open() === true} onClick={() => open.set(open() === false ? true : null)}) x\ndiv({...{ \'aria-busy\': open() }})\n',
-    })
+    const { root, dispose } = await mount4()
 
     try {
       const button = root.querySelector('button')!
@@ -213,10 +238,12 @@ describe('ARIA states', () => {
 })
 
 describe('bound URLs', () => {
+  const mount5 = site({
+    'main.kay': '---\nimport { signal } from \'kay\'\n\nconst url = signal(\'/home\')\n---\na(href={url()}) x\nimg(alt="" {...{ src: url() }})\nbutton(onClick={() => url.set(\' javascript:alert(1)\')}) x\n',
+  })
+
   it('neutralise one that would run script, set or spread, as it changes', async () => {
-    const { root, dispose } = await mountKay({
-      'main.kay': '---\nimport { signal } from \'kay\'\n\nconst url = signal(\'/home\')\n---\na(href={url()}) x\nimg(alt="" {...{ src: url() }})\nbutton(onClick={() => url.set(\' javascript:alert(1)\')}) x\n',
-    })
+    const { root, dispose } = await mount5()
 
     try {
       expect(root.querySelector('a')!.getAttribute('href')).toBe('/home')
@@ -232,15 +259,17 @@ describe('bound URLs', () => {
 })
 
 describe('imported images', () => {
+  const mount6 = site({
+    'main.kay': '---\nimport hero from \'./hero.png\'\n---\nimg(src={hero} alt="")\n',
+    'hero.png': Bun.file(join(import.meta.dir, 'fixtures/images/src/hero.png')),
+  }, true)
+
   it('cap their density as images.maxDensity, which the server wrote on the page, sets it', async () => {
     const meta = Object.assign(document.createElement('meta'), { name: 'kay-max-density', content: '1' })
 
     document.head.append(meta)
 
-    const { root, dispose } = await mountKay({
-      'main.kay': '---\nimport hero from \'./hero.png\'\n---\nimg(src={hero} alt="")\n',
-      'hero.png': Bun.file(join(import.meta.dir, 'fixtures/images/src/hero.png')),
-    })
+    const { root, dispose } = await mount6()
 
     try {
       expect(root.querySelector('img')!.getAttribute('sizes')).toBe(cappedSizes('100vw', 1))
@@ -251,10 +280,12 @@ describe('imported images', () => {
     }
   })
 
+  const mount7 = site({
+    'main.kay': '---\nimport { signal } from \'kay\'\n\nconst src = signal("/a.png")\n---\nimg.lazy(src={src()} alt="")\nimg.hero(src={src()} alt="" loading="eager")\nimg.spread(alt="" {...{ src: src() }})\n',
+  }, true)
+
   it('load lazily in an island as on the server, unless the template says otherwise', async () => {
-    const { root, dispose } = await mountKay({
-      'main.kay': '---\nimport { signal } from \'kay\'\n\nconst src = signal("/a.png")\n---\nimg.lazy(src={src()} alt="")\nimg.hero(src={src()} alt="" loading="eager")\nimg.spread(alt="" {...{ src: src() }})\n',
-    })
+    const { root, dispose } = await mount7()
 
     try {
       expect([...root.querySelectorAll('img')].map(img => [img.className, img.getAttribute('loading'), img.getAttribute('decoding')])).toEqual([['lazy', 'lazy', 'async'], ['hero', 'eager', 'async'], ['spread', 'lazy', 'async']])
@@ -264,11 +295,13 @@ describe('imported images', () => {
     }
   })
 
+  const mount8 = site({
+    'main.kay': '---\nimport { signal } from \'kay\'\nimport hero from \'./hero.png\'\n\nconst src = signal(hero)\n---\nimg.hero(src={src()} sizes="50vw" alt="")\nimg.sized(src={hero} height="10" alt="")\nbutton(onClick={() => src.set(\'/logo.svg\')}) x\n',
+    'hero.png': Bun.file(join(import.meta.dir, 'fixtures/images/src/hero.png')),
+  })
+
   it('load the size they show at in an island too, and a source that changes clears what the last one set', async () => {
-    const { root, dispose } = await mountKay({
-      'main.kay': '---\nimport { signal } from \'kay\'\nimport hero from \'./hero.png\'\n\nconst src = signal(hero)\n---\nimg.hero(src={src()} sizes="50vw" alt="")\nimg.sized(src={hero} height="10" alt="")\nbutton(onClick={() => src.set(\'/logo.svg\')}) x\n',
-      'hero.png': Bun.file(join(import.meta.dir, 'fixtures/images/src/hero.png')),
-    })
+    const { root, dispose } = await mount8()
 
     try {
       const hero = root.querySelector('img.hero')!
@@ -292,11 +325,13 @@ describe('imported images', () => {
 })
 
 describe('event handlers', () => {
+  const mount9 = site({
+    'button.kay': '---\nconst { onPress, label } = props<{ onPress?: () => void, label: string }>()\n---\nbutton(class={label} onClick={onPress}) {label}\n',
+    'main.kay': '---\nimport { signal } from \'kay\'\nimport Button from \'./button.kay\'\n\nconst mode = signal(1)\nconst out = signal(\'\')\nconst rows = signal([{ id: 1, run: () => out.set(\'first\') }])\n---\nbutton.direct(onClick={mode() === 1 ? () => out.set(\'one\') : () => out.set(\'two\')}) Direct\nButton(label="prop" onPress={mode() === 1 ? undefined : () => out.set(\'prop\')})\nfor row of rows() key={row.id}\n  button.row(onClick={row.run}) Row\nbutton.switch(onClick={() => { mode.set(2); rows.set([{ id: 1, run: () => out.set(\'second\') }]) }}) Switch\np {out()}\n',
+  })
+
   it('runs the handler a signal, a prop or a loop item holds when the event fires, not when it attached', async () => {
-    const { root, dispose } = await mountKay({
-      'button.kay': '---\nconst { onPress, label } = props<{ onPress?: () => void, label: string }>()\n---\nbutton(class={label} onClick={onPress}) {label}\n',
-      'main.kay': '---\nimport { signal } from \'kay\'\nimport Button from \'./button.kay\'\n\nconst mode = signal(1)\nconst out = signal(\'\')\nconst rows = signal([{ id: 1, run: () => out.set(\'first\') }])\n---\nbutton.direct(onClick={mode() === 1 ? () => out.set(\'one\') : () => out.set(\'two\')}) Direct\nButton(label="prop" onPress={mode() === 1 ? undefined : () => out.set(\'prop\')})\nfor row of rows() key={row.id}\n  button.row(onClick={row.run}) Row\nbutton.switch(onClick={() => { mode.set(2); rows.set([{ id: 1, run: () => out.set(\'second\') }]) }}) Switch\np {out()}\n',
-    })
+    const { root, dispose } = await mount9()
     const click = async (selector: string) => {
       root.querySelector<HTMLElement>(selector)!.click()
       await settle()
@@ -320,10 +355,12 @@ describe('event handlers', () => {
 })
 
 describe('kay without imports', () => {
+  const mount10 = site({
+    'main.kay': '---\nconst count = signal(1)\nconst double = memo(() => count() * 2)\nconst seen = signal(0)\nconst mounted = signal(false)\n\neffect(() => seen.set(count()))\nonMount(() => mounted.set(true))\nonCleanup(() => { document.body.dataset.cleaned = \'yes\' })\n---\nbutton(onClick={() => count.set(c => c + 1)}) {double()} {seen()} {mounted() ? \'mounted\' : \'not yet\'}\n',
+  })
+
   it('runs signal, memo, effect, onMount and onCleanup a script uses unimported', async () => {
-    const { root, dispose } = await mountKay({
-      'main.kay': '---\nconst count = signal(1)\nconst double = memo(() => count() * 2)\nconst seen = signal(0)\nconst mounted = signal(false)\n\neffect(() => seen.set(count()))\nonMount(() => mounted.set(true))\nonCleanup(() => { document.body.dataset.cleaned = \'yes\' })\n---\nbutton(onClick={() => count.set(c => c + 1)}) {double()} {seen()} {mounted() ? \'mounted\' : \'not yet\'}\n',
-    })
+    const { root, dispose } = await mount10()
 
     try {
       await settle()
@@ -342,10 +379,12 @@ describe('kay without imports', () => {
 })
 
 describe('signals in the template', () => {
+  const mount11 = site({
+    'main.kay': '---\nconst items = signal([\'a\'])\nconst count = memo(() => items().length)\nconst draft = signal(\'b\')\n---\ninput(bind:value={draft})\nbutton(onClick={() => items.set([...items(), draft()])}) {count()} items\nif count() > 1\n  p.many many\nul\n  for item of items()\n    li {item}\n',
+  })
+
   it('read by calling them, in text, conditions, loops and handlers, a bind still writing the signal', async () => {
-    const { root, dispose } = await mountKay({
-      'main.kay': '---\nconst items = signal([\'a\'])\nconst count = memo(() => items().length)\nconst draft = signal(\'b\')\n---\ninput(bind:value={draft})\nbutton(onClick={() => items.set([...items(), draft()])}) {count()} items\nif count() > 1\n  p.many many\nul\n  for item of items()\n    li {item}\n',
-    })
+    const { root, dispose } = await mount11()
     const texts = () => [...root.querySelectorAll('li')].map(item => item.textContent)
 
     try {
@@ -370,12 +409,14 @@ describe('signals in the template', () => {
 })
 
 describe('signal writes', () => {
+  const mount12 = site({
+    'theme.ts': 'import { memo, signal } from \'kay\'\n\nexport const accent = signal(\'red\')\nexport const loud = memo(() => accent().toUpperCase())\n',
+    'toggle.kay': '---\nimport type { Signal } from \'kay\'\n\nconst { open } = props<{ open: Signal<boolean> }>()\n---\nbutton.toggle(onClick={() => open = !open()}) {open() ? \'open\' : \'closed\'}\n',
+    'main.kay': '---\nimport { accent, loud } from \'./theme\'\nimport Toggle from \'./toggle.kay\'\n\nconst count = signal(0)\nconst open = signal(false)\n\nfunction reset() {\n  count = 0\n}\n---\nbutton.more(onClick={() => count++}) {count()}\nbutton.ten(onClick={() => count += 10}) ten\nbutton.reset(onClick={reset}) reset\nbutton.accent(onClick={() => accent = accent() === \'red\' ? \'blue\' : \'red\'}) {accent()} {loud()}\nToggle(open={open})\np.state {open() ? \'yes\' : \'no\'}\n',
+  })
+
   it('assigns a signal by name, its own, a module\'s and one a prop holds, reads them all by calling them, and hands a component the signal itself', async () => {
-    const { root, dispose } = await mountKay({
-      'theme.ts': 'import { memo, signal } from \'kay\'\n\nexport const accent = signal(\'red\')\nexport const loud = memo(() => accent().toUpperCase())\n',
-      'toggle.kay': '---\nimport type { Signal } from \'kay\'\n\nconst { open } = props<{ open: Signal<boolean> }>()\n---\nbutton.toggle(onClick={() => open = !open()}) {open() ? \'open\' : \'closed\'}\n',
-      'main.kay': '---\nimport { accent, loud } from \'./theme\'\nimport Toggle from \'./toggle.kay\'\n\nconst count = signal(0)\nconst open = signal(false)\n\nfunction reset() {\n  count = 0\n}\n---\nbutton.more(onClick={() => count++}) {count()}\nbutton.ten(onClick={() => count += 10}) ten\nbutton.reset(onClick={reset}) reset\nbutton.accent(onClick={() => accent = accent() === \'red\' ? \'blue\' : \'red\'}) {accent()} {loud()}\nToggle(open={open})\np.state {open() ? \'yes\' : \'no\'}\n',
-    })
+    const { root, dispose } = await mount12()
     const text = (selector: string) => root.querySelector(selector)!.textContent
     const click = async (selector: string) => {
       root.querySelector<HTMLElement>(selector)!.click()
@@ -402,12 +443,14 @@ describe('signal writes', () => {
 })
 
 describe('loops', () => {
+  const mount13 = site({
+    'a.kay': '---\nconst { v } = props<{ v: number }>()\n---\np.row A{v}\n',
+    'b.kay': '---\nconst { v } = props<{ v: number }>()\n---\np.row B{v}\n',
+    'main.kay': '---\nimport { signal } from \'kay\'\nimport A from \'./a.kay\'\nimport B from \'./b.kay\'\n\nconst list = signal([A])\n---\nbutton(onClick={() => list.set([B, A])}) Grow\nfor Row, i of list() key={Row}\n  Row(v={i})\n',
+  })
+
   it('keeps rendering components a loop iterates over as the list changes', async () => {
-    const { root, dispose } = await mountKay({
-      'a.kay': '---\nconst { v } = props<{ v: number }>()\n---\np.row A{v}\n',
-      'b.kay': '---\nconst { v } = props<{ v: number }>()\n---\np.row B{v}\n',
-      'main.kay': '---\nimport { signal } from \'kay\'\nimport A from \'./a.kay\'\nimport B from \'./b.kay\'\n\nconst list = signal([A])\n---\nbutton(onClick={() => list.set([B, A])}) Grow\nfor Row, i of list() key={Row}\n  Row(v={i})\n',
-    })
+    const { root, dispose } = await mount13()
 
     try {
       expect([...root.querySelectorAll('.row')].map(row => row.textContent)).toEqual(['A0'])
@@ -420,14 +463,16 @@ describe('loops', () => {
     }
   })
 
-  it.each([
+  const keyed = ([
     ['as the only content of their element', 'ul\n  for n, i of list() key={n}\n    li {n}:{i}\n'],
     ['between other children, several nodes a row', 'ul\n  li.first first\n  for n, i of list() key={n}\n    li {n}:{i}\n    | ,\n  li.last last\n'],
     ['with no key, matched by the value itself', 'ul\n  for n, i of list()\n    li {n}:{i}\n'],
-  ])('move, insert and remove keyed rows %s, keeping the nodes of the rows that stay', async (_name, template) => {
-    const { root, dispose } = await mountKay({
-      'main.kay': `---\nimport { signal } from 'kay'\n\nconst list = signal([1, 2, 3, 4, 5, 6])\n;(globalThis as { setList?: (next: number[]) => void }).setList = next => list.set(next)\n---\n${template}`,
-    })
+  ] as const).map(([name, template]) => [name, template, site({
+    'main.kay': `---\nimport { signal } from 'kay'\n\nconst list = signal([1, 2, 3, 4, 5, 6])\n;(globalThis as { setList?: (next: number[]) => void }).setList = next => list.set(next)\n---\n${template}`,
+  })] as const)
+
+  it.each(keyed)('move, insert and remove keyed rows %s, keeping the nodes of the rows that stay', async (_name, template, mount) => {
+    const { root, dispose } = await mount()
     const setList = (globalThis as unknown as { setList: (next: number[]) => void }).setList
     const items = () => [...root.querySelectorAll('li:not(.first, .last)')]
     const keyOf = (item: Element) => item.textContent.slice(0, item.textContent.indexOf(':'))
@@ -458,10 +503,12 @@ describe('loops', () => {
     }
   })
 
+  const mount14 = site({
+    'main.kay': '---\nimport { signal } from \'kay\'\n\nconst list = signal([{ id: 1, name: \'a\' }, { id: 2, name: \'b\' }])\n;(globalThis as { setItems?: (next: { id: number, name: string }[]) => void }).setItems = next => list.set(next)\n---\nul\n  for item of list()\n    li {item.name}\n',
+  })
+
   it('match rows with no key by their item\'s id, so fresh copies of the same items keep their nodes', async () => {
-    const { root, dispose } = await mountKay({
-      'main.kay': '---\nimport { signal } from \'kay\'\n\nconst list = signal([{ id: 1, name: \'a\' }, { id: 2, name: \'b\' }])\n;(globalThis as { setItems?: (next: { id: number, name: string }[]) => void }).setItems = next => list.set(next)\n---\nul\n  for item of list()\n    li {item.name}\n',
-    })
+    const { root, dispose } = await mount14()
     const setItems = (globalThis as unknown as { setItems: (next: { id: number, name: string }[]) => void }).setItems
     const [a, b] = root.querySelectorAll('li')
 
@@ -480,10 +527,12 @@ describe('loops', () => {
     }
   })
 
+  const mount15 = site({
+    'main.kay': '---\nimport { signal } from \'kay\'\n\nconst list = signal([{ id: 1, label: \'a\' }, { id: 2, label: \'b\' }])\nlet drawn = 0\nconst draw = (id: number) => `#${id}:${++drawn}`\n;(globalThis as { relabel?: () => void }).relabel = () => list.set(list().map(item => ({ ...item, label: `${item.label}!` })))\n---\nul\n  for item of list() key={item.id}\n    li\n      b {item.label}\n      i {draw(item.id)}\n',
+  })
+
   it('leave what reads only a row\'s key alone when its item is replaced by a copy under the same key', async () => {
-    const { root, dispose } = await mountKay({
-      'main.kay': '---\nimport { signal } from \'kay\'\n\nconst list = signal([{ id: 1, label: \'a\' }, { id: 2, label: \'b\' }])\nlet drawn = 0\nconst draw = (id: number) => `#${id}:${++drawn}`\n;(globalThis as { relabel?: () => void }).relabel = () => list.set(list().map(item => ({ ...item, label: `${item.label}!` })))\n---\nul\n  for item of list() key={item.id}\n    li\n      b {item.label}\n      i {draw(item.id)}\n',
-    })
+    const { root, dispose } = await mount15()
     const relabel = (globalThis as unknown as { relabel: () => void }).relabel
 
     try {
@@ -497,11 +546,13 @@ describe('loops', () => {
     }
   })
 
+  const mount16 = site({
+    'rows.kay': '---\nimport type { JSX } from \'kay\'\n\nconst { items, row } = props<{ items: { id: number, label: string }[], row: (label: string) => JSX.Element }>()\n---\nfor item of items key={item.id}\n  | {row(item.label)}\n',
+    'main.kay': '---\nimport { signal } from \'kay\'\nimport Rows from \'./rows.kay\'\n\nconst list = signal([{ id: 1, label: \'a\' }])\n;(globalThis as { relabel?: () => void }).relabel = () => list.set([{ id: 1, label: \'b\' }])\n---\nRows(items={list()})\n  @row(label)\n    input(name={label})\n',
+  })
+
   it('warn when a part drawn again replaces the focused element with a new one of its kind', async () => {
-    const { root, dispose } = await mountKay({
-      'rows.kay': '---\nimport type { JSX } from \'kay\'\n\nconst { items, row } = props<{ items: { id: number, label: string }[], row: (label: string) => JSX.Element }>()\n---\nfor item of items key={item.id}\n  | {row(item.label)}\n',
-      'main.kay': '---\nimport { signal } from \'kay\'\nimport Rows from \'./rows.kay\'\n\nconst list = signal([{ id: 1, label: \'a\' }])\n;(globalThis as { relabel?: () => void }).relabel = () => list.set([{ id: 1, label: \'b\' }])\n---\nRows(items={list()})\n  @row(label)\n    input(name={label})\n',
-    })
+    const { root, dispose } = await mount16()
     const relabel = (globalThis as unknown as { relabel: () => void }).relabel
     const warn = spyOn(console, 'warn').mockImplementation(() => undefined)
 
@@ -519,10 +570,12 @@ describe('loops', () => {
     }
   })
 
+  const mount17 = site({
+    'main.kay': '---\nimport { signal } from \'kay\'\n\nconst list = signal<number[]>([])\n;(globalThis as { setRows?: (next: number[]) => void }).setRows = next => list.set(next)\n---\np\n  b start\n  for n of list() key={n}\n    i {n}\n    | ;\n  b end\n',
+  })
+
   it('keep every node of multi-node rows through random reorders, inserts and removals', async () => {
-    const { root, dispose } = await mountKay({
-      'main.kay': '---\nimport { signal } from \'kay\'\n\nconst list = signal<number[]>([])\n;(globalThis as { setRows?: (next: number[]) => void }).setRows = next => list.set(next)\n---\np\n  b start\n  for n of list() key={n}\n    i {n}\n    | ;\n  b end\n',
-    })
+    const { root, dispose } = await mount17()
     const setRows = (globalThis as unknown as { setRows: (next: number[]) => void }).setRows
     let seed = 7
     const random = () => (seed = (seed * 16807) % 2147483647) / 2147483647
@@ -543,10 +596,12 @@ describe('loops', () => {
 })
 
 describe('blocks', () => {
+  const mount18 = site({
+    'main.kay': '---\nimport { signal } from \'kay\'\n\nconst n = signal(1)\n---\nsvg(viewBox="0 0 2 2")\n  if n() > 0\n    circle(r="1")\np\n  if n() > 0\n    | Tom &amp; Jerry&nbsp;{n()}\n',
+  })
+
   it('decode the entities of their text as the server markup does, and build an SVG child in the SVG namespace', async () => {
-    const { root, dispose } = await mountKay({
-      'main.kay': '---\nimport { signal } from \'kay\'\n\nconst n = signal(1)\n---\nsvg(viewBox="0 0 2 2")\n  if n() > 0\n    circle(r="1")\np\n  if n() > 0\n    | Tom &amp; Jerry&nbsp;{n()}\n',
-    })
+    const { root, dispose } = await mount18()
 
     try {
       expect(root.querySelector('p')!.textContent).toBe('Tom & Jerry\u00A01')
@@ -557,12 +612,14 @@ describe('blocks', () => {
     }
   })
 
+  const mount19 = site({
+    'main.kay': '---\nimport { signal } from \'kay\'\n\nconst shown = signal(true)\nconst value = new Promise<string>(done => (globalThis as { resolveValue?: (value: string) => void }).resolveValue = done)\n---\nbutton(onClick={() => shown.set(false)}) Hide\ndiv\n  if shown()\n    await value\n      p.wait Waiting\n    then text\n      p.text {text}\n',
+  })
+
   it('drop an await block whose branch went away before its value settled', async () => {
     const errors = spyOn(console, 'error').mockImplementation(() => undefined)
     let resolve: (value: string) => void = () => undefined
-    const { root, dispose } = await mountKay({
-      'main.kay': '---\nimport { signal } from \'kay\'\n\nconst shown = signal(true)\nconst value = new Promise<string>(done => (globalThis as { resolveValue?: (value: string) => void }).resolveValue = done)\n---\nbutton(onClick={() => shown.set(false)}) Hide\ndiv\n  if shown()\n    await value\n      p.wait Waiting\n    then text\n      p.text {text}\n',
-    })
+    const { root, dispose } = await mount19()
 
     resolve = (globalThis as unknown as { resolveValue: (value: string) => void }).resolveValue
 
@@ -591,8 +648,10 @@ describe('transitions', () => {
   const STYLE = 'style="transition-duration: 200ms"'
   const toggled = (open: boolean, element: string) => `---\nimport { signal } from 'kay'\n\nconst open = signal(${open})\n---\nbutton(onClick={() => open.set(!open())}) Toggle\nif open()\n  ${element}\n`
 
+  const mount20 = site({ 'main.kay': toggled(true, `p.panel(transition="fade" ${STYLE}) Hi`) })
+
   it('play an if branch out before it goes and in as it shows again, not as the island first renders', async () => {
-    const { root, dispose } = await mountKay({ 'main.kay': toggled(true, `p.panel(transition="fade" ${STYLE}) Hi`) })
+    const { root, dispose } = await mount20()
 
     try {
       const panel = root.querySelector('.panel')!
@@ -622,8 +681,10 @@ describe('transitions', () => {
     }
   })
 
+  const mount21 = site({ 'main.kay': toggled(false, `p.panel(transition:enter="transition-opacity" transition:enter-from="opacity-0" transition:leave-to="opacity-0 scale-95" ${STYLE}) Hi`) })
+
   it('take the classes of each phase from its own attribute, as Tailwind writes them', async () => {
-    const { root, dispose } = await mountKay({ 'main.kay': toggled(false, `p.panel(transition:enter="transition-opacity" transition:enter-from="opacity-0" transition:leave-to="opacity-0 scale-95" ${STYLE}) Hi`) })
+    const { root, dispose } = await mount21()
 
     try {
       root.querySelector('button')!.click()
@@ -645,11 +706,13 @@ describe('transitions', () => {
     }
   })
 
+  const mount22 = site({
+    'presets.ts': 'import type { TransitionClasses } from \'kay\'\n\nexport const fade: TransitionClasses = { enter: \'transition-opacity\', enterFrom: \'opacity-0\', leaveTo: \'opacity-0\' }\n',
+    'main.kay': toggled(false, `p.panel(transition:leave-to="scale-95" transition={fade} ${STYLE}) Hi`).replace('---\n', '---\nimport { fade } from \'./presets\'\n'),
+  })
+
   it('take the classes of each phase from a preset a module shares, the attributes adding to them', async () => {
-    const { root, dispose } = await mountKay({
-      'presets.ts': 'import type { TransitionClasses } from \'kay\'\n\nexport const fade: TransitionClasses = { enter: \'transition-opacity\', enterFrom: \'opacity-0\', leaveTo: \'opacity-0\' }\n',
-      'main.kay': toggled(false, `p.panel(transition:leave-to="scale-95" transition={fade} ${STYLE}) Hi`).replace('---\n', '---\nimport { fade } from \'./presets\'\n'),
-    })
+    const { root, dispose } = await mount22()
 
     try {
       root.querySelector('button')!.click()
@@ -669,10 +732,12 @@ describe('transitions', () => {
     }
   })
 
+  const mount23 = site({
+    'main.kay': `---\nimport { signal } from 'kay'\n\nconst items = signal(['a', 'b', 'c'])\n---\nbutton.drop(onClick={() => items.set(['a', 'c'])}) Drop\nbutton.add(onClick={() => items.set(['a', 'c', 'd'])}) Add\nul\n  for item of items()\n    li(transition="row" ${STYLE}) {item}\n`,
+  })
+
   it('play a for row out as its item goes and the new rows in, the rows left in their order', async () => {
-    const { root, dispose } = await mountKay({
-      'main.kay': `---\nimport { signal } from 'kay'\n\nconst items = signal(['a', 'b', 'c'])\n---\nbutton.drop(onClick={() => items.set(['a', 'c'])}) Drop\nbutton.add(onClick={() => items.set(['a', 'c', 'd'])}) Add\nul\n  for item of items()\n    li(transition="row" ${STYLE}) {item}\n`,
-    })
+    const { root, dispose } = await mount23()
 
     try {
       const texts = () => [...root.querySelectorAll('li')].map(row => row.textContent)
@@ -695,10 +760,12 @@ describe('transitions', () => {
     }
   })
 
+  const mount24 = site({
+    'main.kay': `---\nimport { signal } from 'kay'\n\nconst items = signal(['a'])\n---\nbutton(onClick={() => items.set([])}) Clear\nul\n  for item of items()\n    li(transition="row" ${STYLE}) {item}\n`,
+  })
+
   it('play the last row out of a list its element holds alone, rather than clearing the element', async () => {
-    const { root, dispose } = await mountKay({
-      'main.kay': `---\nimport { signal } from 'kay'\n\nconst items = signal(['a'])\n---\nbutton(onClick={() => items.set([])}) Clear\nul\n  for item of items()\n    li(transition="row" ${STYLE}) {item}\n`,
-    })
+    const { root, dispose } = await mount24()
 
     try {
       root.querySelector('button')!.click()
@@ -712,10 +779,12 @@ describe('transitions', () => {
     }
   })
 
+  const mount25 = site({
+    'main.kay': `---\nimport { signal } from 'kay'\n\nconst items = signal(['a'])\n---\nbutton.clear(onClick={() => items.set([])}) Clear\nbutton.add(onClick={() => items.set(['b'])}) Add\nul\n  for item of items() key={item}\n    li.row {item}\n  else\n    li.empty(transition="fade" ${STYLE}) None\n`,
+  })
+
   it('play a for fallback in once its rows went, and out as rows come back', async () => {
-    const { root, dispose } = await mountKay({
-      'main.kay': `---\nimport { signal } from 'kay'\n\nconst items = signal(['a'])\n---\nbutton.clear(onClick={() => items.set([])}) Clear\nbutton.add(onClick={() => items.set(['b'])}) Add\nul\n  for item of items() key={item}\n    li.row {item}\n  else\n    li.empty(transition="fade" ${STYLE}) None\n`,
-    })
+    const { root, dispose } = await mount25()
 
     try {
       root.querySelector<HTMLElement>('button.clear')!.click()
@@ -735,11 +804,13 @@ describe('transitions', () => {
     }
   })
 
+  const mount26 = site({
+    'main.kay': `---\nimport { signal } from 'kay'\n\nconst items = signal(['a'])\nconst shown = (item: string) => {\n  if (item === 'bad')\n    throw new Error('bad')\n\n  return item\n}\n---\nbutton.bad(onClick={() => items.set(['a', 'b', 'bad'])}) Bad\nbutton.fix(onClick={() => items.set(['a', 'b2', 'c'])}) Fix\nul\n  for item, i of items() key={i}\n    li(transition="row" ${STYLE}) {shown(item)}\n`,
+  })
+
   it('take out the rows a run that threw made, and play in only the rows the next one makes', async () => {
     const errors = spyOn(console, 'error').mockImplementation(() => undefined)
-    const { root, dispose } = await mountKay({
-      'main.kay': `---\nimport { signal } from 'kay'\n\nconst items = signal(['a'])\nconst shown = (item: string) => {\n  if (item === 'bad')\n    throw new Error('bad')\n\n  return item\n}\n---\nbutton.bad(onClick={() => items.set(['a', 'b', 'bad'])}) Bad\nbutton.fix(onClick={() => items.set(['a', 'b2', 'c'])}) Fix\nul\n  for item, i of items() key={i}\n    li(transition="row" ${STYLE}) {shown(item)}\n`,
-    })
+    const { root, dispose } = await mount26()
 
     try {
       const rows = () => [...root.querySelectorAll('li')].map(row => [row.textContent, row.className])
@@ -758,10 +829,12 @@ describe('transitions', () => {
     }
   })
 
+  const mount27 = site({
+    'main.kay': `---\nimport { signal } from 'kay'\n\nconst items = signal(['a', 'b', 'c'])\n---\nbutton.clear(onClick={() => items.set([])}) Clear\nbutton.add(onClick={() => items.set(['z'])}) Add\nul\n  for item of items() key={item}\n    li(transition="row" ${STYLE}) {item}\n`,
+  })
+
   it('keep the rows leaving a list their element holds alone while the next rows enter', async () => {
-    const { root, dispose } = await mountKay({
-      'main.kay': `---\nimport { signal } from 'kay'\n\nconst items = signal(['a', 'b', 'c'])\n---\nbutton.clear(onClick={() => items.set([])}) Clear\nbutton.add(onClick={() => items.set(['z'])}) Add\nul\n  for item of items() key={item}\n    li(transition="row" ${STYLE}) {item}\n`,
-    })
+    const { root, dispose } = await mount27()
 
     try {
       const rows = () => [...root.querySelectorAll('li')].map(row => [row.textContent, row.className])
@@ -780,11 +853,13 @@ describe('transitions', () => {
     }
   })
 
+  const mount28 = site({
+    'main.kay': `---\nimport { signal } from 'kay'\n\nconst broken = signal(false)\nconst read = () => {\n  if (broken())\n    throw new Error('broken')\n\n  return 'fine'\n}\n---\nbutton(onClick={() => broken.set(true)}) Break\ntry\n  p.content {read()}\ncatch error\n  p.caught(transition="fade" ${STYLE}) Oops\n`,
+  })
+
   it('play a try\'s catch block in when what it renders throws after its first render', async () => {
     const errors = spyOn(console, 'error').mockImplementation(() => undefined)
-    const { root, dispose } = await mountKay({
-      'main.kay': `---\nimport { signal } from 'kay'\n\nconst broken = signal(false)\nconst read = () => {\n  if (broken())\n    throw new Error('broken')\n\n  return 'fine'\n}\n---\nbutton(onClick={() => broken.set(true)}) Break\ntry\n  p.content {read()}\ncatch error\n  p.caught(transition="fade" ${STYLE}) Oops\n`,
-    })
+    const { root, dispose } = await mount28()
 
     try {
       expect(root.querySelector('.content')?.textContent).toBe('fine')
@@ -800,9 +875,11 @@ describe('transitions', () => {
     }
   })
 
+  const mount29 = site({ 'main.kay': toggled(true, `p.panel(transition="fade" ${STYLE}) Hi`) })
+
   it('skip both phases when the user asks for reduced motion', async () => {
     const matchMedia = spyOn(window, 'matchMedia').mockImplementation(query => ({ matches: query === '(prefers-reduced-motion: reduce)' }) as MediaQueryList)
-    const { root, dispose } = await mountKay({ 'main.kay': toggled(true, `p.panel(transition="fade" ${STYLE}) Hi`) })
+    const { root, dispose } = await mount29()
 
     try {
       root.querySelector('button')!.click()
@@ -818,9 +895,11 @@ describe('transitions', () => {
     }
   })
 
+  const mount30 = site({ 'main.kay': toggled(true, `p.panel(transition="fade" ${STYLE}) Hi`) })
+
   it('removes a leaving element at once in a hidden tab, which draws no frames to play it in', async () => {
     Object.defineProperty(document, 'hidden', { value: true, configurable: true })
-    const { root, dispose } = await mountKay({ 'main.kay': toggled(true, `p.panel(transition="fade" ${STYLE}) Hi`) })
+    const { root, dispose } = await mount30()
 
     try {
       root.querySelector('button')!.click()
@@ -836,11 +915,13 @@ describe('transitions', () => {
 })
 
 describe('slots with parameters', () => {
+  const mount31 = site({
+    'rows.kay': '--- <T>\nimport type { JSX } from \'kay\'\n\nconst { items, row } = props<{ items: T[], row: (item: T) => JSX.Element }>()\n---\nul\n  for item of items key={item}\n    | {row(item)}\n',
+    'main.kay': '---\nimport { signal } from \'kay\'\nimport Rows from \'./rows.kay\'\n\nconst names = signal([\'a\'])\nconst mark = signal(\'!\')\n---\nbutton(onClick={() => {\n  names.set([\'a\', \'b\'])\n  mark.set(\'?\')\n}}) Grow\nRows(items={names()})\n  @row(name)\n    li.row {name}{mark()}\n',
+  })
+
   it('render a row per item the component passes, following its list and the parent\'s signals', async () => {
-    const { root, dispose } = await mountKay({
-      'rows.kay': '--- <T>\nimport type { JSX } from \'kay\'\n\nconst { items, row } = props<{ items: T[], row: (item: T) => JSX.Element }>()\n---\nul\n  for item of items key={item}\n    | {row(item)}\n',
-      'main.kay': '---\nimport { signal } from \'kay\'\nimport Rows from \'./rows.kay\'\n\nconst names = signal([\'a\'])\nconst mark = signal(\'!\')\n---\nbutton(onClick={() => {\n  names.set([\'a\', \'b\'])\n  mark.set(\'?\')\n}}) Grow\nRows(items={names()})\n  @row(name)\n    li.row {name}{mark()}\n',
-    })
+    const { root, dispose } = await mount31()
 
     try {
       expect([...root.querySelectorAll('.row')].map(row => row.textContent)).toEqual(['a!'])
@@ -855,11 +936,13 @@ describe('slots with parameters', () => {
 })
 
 describe('named slots', () => {
+  const mount32 = site({
+    'card.kay': '---\nimport type { JSX } from \'kay\'\n\nconst { items, actions, row } = props<{ items: string[], actions?: JSX.Element, row?: (item: string, index: number) => JSX.Element }>()\n---\nheader\n  slot actions\n    | No actions\nul\n  for item, i of items key={i}\n    slot row(item, i)\n      li {item}\nslot\n  p Empty\n',
+    'main.kay': '---\nimport { signal } from \'kay\'\nimport Card from \'./card.kay\'\n\nconst names = signal([\'a\'])\n---\nbutton#grow(onClick={() => names.set([\'a\', \'b\'])}) Grow\nCard(items={names()})\n  @row(name, i)\n    li.row {i}: {name}\n',
+  })
+
   it('render the block prop they name as it comes and goes, the lines under them standing in for it', async () => {
-    const { root, dispose } = await mountKay({
-      'card.kay': '---\nimport type { JSX } from \'kay\'\n\nconst { items, actions, row } = props<{ items: string[], actions?: JSX.Element, row?: (item: string, index: number) => JSX.Element }>()\n---\nheader\n  slot actions\n    | No actions\nul\n  for item, i of items key={i}\n    slot row(item, i)\n      li {item}\nslot\n  p Empty\n',
-      'main.kay': '---\nimport { signal } from \'kay\'\nimport Card from \'./card.kay\'\n\nconst names = signal([\'a\'])\n---\nbutton#grow(onClick={() => names.set([\'a\', \'b\'])}) Grow\nCard(items={names()})\n  @row(name, i)\n    li.row {i}: {name}\n',
-    })
+    const { root, dispose } = await mount32()
 
     try {
       expect([root.querySelector('header')!.textContent, root.querySelector('p')!.textContent]).toEqual(['No actions', 'Empty'])
@@ -875,10 +958,12 @@ describe('named slots', () => {
 })
 
 describe('template consts', () => {
+  const mount33 = site({
+    'main.kay': '---\nimport { signal } from \'kay\'\n\nconst n = signal(1)\n---\nconst double = n * 2\nbutton#up(onClick={() => n.set(c => c + 1)}) {double}\ndiv\n  p\n    const label = \'p\' + n\n    b {label}\n    i(title={label}) {double}\n  span\n    const label = \'s\' + double\n    | {label}\nif n > 1\n  const { big } = { big: n * 10 }\n  em {big}\n',
+  })
+
   it('follow what they read as memos, in an element\'s content as in a block, two elements of one template declaring the same name', async () => {
-    const { root, dispose } = await mountKay({
-      'main.kay': '---\nimport { signal } from \'kay\'\n\nconst n = signal(1)\n---\nconst double = n * 2\nbutton#up(onClick={() => n.set(c => c + 1)}) {double}\ndiv\n  p\n    const label = \'p\' + n\n    b {label}\n    i(title={label}) {double}\n  span\n    const label = \'s\' + double\n    | {label}\nif n > 1\n  const { big } = { big: n * 10 }\n  em {big}\n',
-    })
+    const { root, dispose } = await mount33()
 
     try {
       const read = () => [root.querySelector('#up')!.textContent, root.querySelector('b')!.textContent, root.querySelector('i')!.getAttribute('title'), root.querySelector('span')!.textContent, root.querySelector('em')?.textContent]
@@ -897,10 +982,12 @@ describe('template consts', () => {
 })
 
 describe('match blocks', () => {
+  const mount34 = site({
+    'main.kay': '---\nimport { signal } from \'kay\'\n\nconst tab = signal(\'gone\')\nlet reads = 0\nconst read = () => (reads++, tab())\n---\nbutton#next(onClick={() => tab.set(tab() === \'gone\' ? \'draft\' : \'live\')}) next\nmatch read()\n  when \'draft\'\n    p.draft Draft\n  when \'live\', \'scheduled\'\n    p.live Live\n  else\n    p.other Unknown {reads}\n',
+  })
+
   it('render the first when holding the subject, else the else, and follow the subject reading it once', async () => {
-    const { root, dispose } = await mountKay({
-      'main.kay': '---\nimport { signal } from \'kay\'\n\nconst tab = signal(\'gone\')\nlet reads = 0\nconst read = () => (reads++, tab())\n---\nbutton#next(onClick={() => tab.set(tab() === \'gone\' ? \'draft\' : \'live\')}) next\nmatch read()\n  when \'draft\'\n    p.draft Draft\n  when \'live\', \'scheduled\'\n    p.live Live\n  else\n    p.other Unknown {reads}\n',
-    })
+    const { root, dispose } = await mount34()
 
     try {
       expect(root.querySelector('p.other')!.textContent).toBe('Unknown 1')
@@ -919,31 +1006,19 @@ describe('match blocks', () => {
 })
 
 describe('bind:value on a number input', () => {
+  const mountNumber = site({ 'main.kay': '---\nimport { signal } from \'kay\'\nconst n = signal<number>(5)\n---\ninput#num(type="number" bind:value={n})\ninput#range(type="range" min="0" max="10" bind:value={n})\np#out {n()}\n' })
+
   it('keeps the signal\'s last number while the input is empty', async () => {
-    const dir = await scratchDir('dom-')
+    const { root, dispose } = await mountNumber()
+    const input = root.querySelector<HTMLInputElement>('#num')!
+    const output = root.querySelector('#out')!
+    const type = async (value: string) => {
+      input.value = value
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+      await settle()
+    }
 
     try {
-      await Bun.write(join(dir, 'number.kay'), '---\nimport { signal } from \'kay\'\nconst n = signal<number>(5)\n---\ninput#num(type="number" bind:value={n})\ninput#range(type="range" min="0" max="10" bind:value={n})\np#out {n()}\n')
-      await Bun.write(join(dir, 'entry.ts'), 'import { render } from \'kay/dom\'\nimport Number from \'./number.kay\'\n\nexport function mount(element: HTMLElement) {\n  return render(() => Number({}), element)\n}\n')
-
-      const build = await Bun.build({ entrypoints: [join(dir, 'entry.ts')], outdir: join(dir, 'out'), target: 'browser', plugins: [kay()] })
-
-      if (!build.success)
-        throw new AggregateError(build.logs, 'client build failed')
-
-      const { mount } = await import(build.outputs[0]!.path) as Pick<ClientModule, 'mount'>
-      const root = document.createElement('div')
-
-      document.body.append(root)
-      const dispose = mount(root)
-      const input = root.querySelector<HTMLInputElement>('#num')!
-      const output = root.querySelector('#out')!
-      const type = async (value: string) => {
-        input.value = value
-        input.dispatchEvent(new Event('input', { bubbles: true }))
-        await settle()
-      }
-
       expect(input.value).toBe('5')
       await type('7')
       expect(output.textContent).toBe('7')
@@ -951,10 +1026,9 @@ describe('bind:value on a number input', () => {
       expect(output.textContent).toBe('7')
       await type('8.5')
       expect(output.textContent).toBe('8.5')
-      dispose()
     }
     finally {
-      await rm(dir, { recursive: true, force: true })
+      await dispose()
     }
   })
 })
@@ -1075,15 +1149,17 @@ describe('the live reload script', () => {
 })
 
 describe('actions called from the browser', () => {
+  const mount35 = site({
+    'page.kay': '--- server\nimport { t } from \'elysia\'\nimport { action } from \'kay\'\n\nexport const add = action(t.Object({ title: t.String() }), ({ title }) => title)\n---\np Page\n',
+    'main.kay': '---\nimport { add } from \'./page.kay\'\n---\nbutton(disabled={add.pending()} onClick={() => void add({ title: \'x\' })}) Add\n',
+  })
+
   it('read as pending while a call is in flight', async () => {
     let respond: (response: Response) => void = () => undefined
     const fetchStub = spyOn(globalThis, 'fetch').mockImplementation((async () => new Promise<Response>((resolve) => {
       respond = resolve
     })) as unknown as typeof fetch)
-    const { root, dispose } = await mountKay({
-      'page.kay': '--- server\nimport { t } from \'elysia\'\nimport { action } from \'kay\'\n\nexport const add = action(t.Object({ title: t.String() }), ({ title }) => title)\n---\np Page\n',
-      'main.kay': '---\nimport { add } from \'./page.kay\'\n---\nbutton(disabled={add.pending()} onClick={() => void add({ title: \'x\' })}) Add\n',
-    })
+    const { root, dispose } = await mount35()
 
     try {
       const button = root.querySelector('button')!
@@ -1210,6 +1286,10 @@ describe('the dev patch', () => {
 })
 
 describe('a site under a base', () => {
+  const mount36 = site({
+    'main.kay': '---\nimport { signal, withBase } from \'kay\'\n\nconst slug = signal(\'dracula\')\n---\na(href={`/books/${slug()}`}) book\na(href="/about") about\nimg(alt="" srcset="/a.png 1x, /b.png 2x")\na(href={withBase(\'/kept\')}) kept\na(href="https://example.com/x") away\na(href="#top") top\nbutton(onClick={() => slug.set(\'emma\')}) next\n',
+  }, true)
+
   it('puts what an island renders in the browser under it, as the server does, leaving a path already under it and another site\'s URL alone', async () => {
     const meta = document.createElement('meta')
 
@@ -1217,9 +1297,7 @@ describe('a site under a base', () => {
     meta.content = '/shelf'
     document.head.append(meta)
 
-    const { root, dispose } = await mountKay({
-      'main.kay': '---\nimport { signal, withBase } from \'kay\'\n\nconst slug = signal(\'dracula\')\n---\na(href={`/books/${slug()}`}) book\na(href="/about") about\nimg(alt="" srcset="/a.png 1x, /b.png 2x")\na(href={withBase(\'/kept\')}) kept\na(href="https://example.com/x") away\na(href="#top") top\nbutton(onClick={() => slug.set(\'emma\')}) next\n',
-    })
+    const { root, dispose } = await mount36()
 
     try {
       const hrefs = () => [...root.querySelectorAll('a')].map(link => link.getAttribute('href'))
