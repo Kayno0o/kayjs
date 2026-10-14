@@ -32,13 +32,62 @@ const { default: notes } = await import(join(apiDir, 'notes.ts')) as typeof impo
 const { addNote } = await import(resolve(fixture, 'src/lib/notes.ts')) as typeof import('./fixtures/live/src/lib/notes')
 
 // Polls a condition a request or another process makes true, failing past 2 seconds.
-async function until(ready: () => boolean): Promise<void> {
-  for (let waited = 0; !ready(); waited += 5) {
+async function until(ready: () => boolean | Promise<boolean>): Promise<void> {
+  for (let waited = 0; !await ready(); waited += 5) {
     if (waited > 2_000)
       throw new Error('timed out')
 
     await Bun.sleep(5)
   }
+}
+
+const realSetTimeout = setTimeout
+
+// The backoff timers of a reconnect held until the test fires them, so it waits on what they lead to rather than on their delay; the minute-long fallbacks are the test's own.
+function retriesByHand(): { fire: () => void, until: (ready: () => boolean) => Promise<void>, restore: () => void } {
+  const pending = new Map<unknown, () => void>()
+  const timeouts = spyOn(globalThis, 'setTimeout').mockImplementation(((run: () => void, delay?: number) => {
+    const handle = realSetTimeout(() => undefined, 3_600_000)
+
+    handle.unref()
+
+    if (delay !== 60_000)
+      pending.set(handle, run)
+
+    return handle
+  }) as unknown as typeof setTimeout)
+  const clears = spyOn(globalThis, 'clearTimeout').mockImplementation(((handle: Parameters<typeof clearTimeout>[0]) => {
+    pending.delete(handle)
+  }) as typeof clearTimeout)
+  const fire = () => {
+    for (const [handle, run] of pending) {
+      pending.delete(handle)
+      run()
+    }
+  }
+
+  return {
+    fire,
+    until: async (ready) => {
+      for (let tries = 0; !ready(); tries++) {
+        if (tries > 1_000)
+          throw new Error('timed out')
+
+        fire()
+        await new Promise(resolve => setImmediate(resolve))
+      }
+    },
+    restore: () => {
+      timeouts.mockRestore()
+      clears.mockRestore()
+    },
+  }
+}
+
+// Lets what a call queued run, for a test asserting something did not happen.
+async function turns(count = 10): Promise<void> {
+  for (let turn = 0; turn < count; turn++)
+    await new Promise(resolve => setImmediate(resolve))
 }
 
 // The listeners the targets hold, as their add and remove calls leave them.
@@ -188,10 +237,9 @@ describe('API modules', () => {
 
     reader.on(value => received.push(value))
     reader.start()
-    await Bun.sleep(20)
+    await until(() => reader.status() === 'done')
 
     expect(received).toEqual([1])
-    expect(reader.status()).toBe('done')
   })
 
   it('closes a socket with the component that opened it', () => {
@@ -206,16 +254,22 @@ describe('API modules', () => {
   })
 
   it('reconnects a GET stream that dropped before its end', async () => {
+    const retries = retriesByHand()
     const bodies = ['data: [1]\n\n', 'data: [2]\n\nevent: end\ndata:\n\n']
     const reader = readEvents<number>(async () => new Response(bodies.shift()), true)
     const received: number[] = []
 
     reader.on(value => received.push(value))
     reader.start()
-    await Bun.sleep(700)
+
+    try {
+      await retries.until(() => reader.status() === 'done')
+    }
+    finally {
+      retries.restore()
+    }
 
     expect(received).toEqual([1, 2])
-    expect(reader.status()).toBe('done')
   })
 
   it('keeps one abort listener for a stream however many times it reconnects', async () => {
@@ -270,6 +324,8 @@ describe('API modules', () => {
   it('holds the reconnect of a dropped stream while the tab is hidden, and makes it once the tab shows', async () => {
     const tab = Object.assign(new EventTarget(), { hidden: true })
     const globals = globalThis as Record<string, unknown>
+    const listening = listenerCount(globalThis, tab)
+    const retries = retriesByHand()
 
     globals.document = tab
 
@@ -280,18 +336,20 @@ describe('API modules', () => {
 
       reader.on(value => received.push(value))
       reader.start()
-      await Bun.sleep(700)
+      await retries.until(() => listening.count() === 2)
 
       expect(received).toEqual([1])
       expect(reader.status()).toBe('connecting')
 
       tab.hidden = false
       tab.dispatchEvent(new Event('visibilitychange'))
-      await until(() => reader.status() === 'done')
+      await retries.until(() => reader.status() === 'done')
 
       expect(received).toEqual([1, 2])
     }
     finally {
+      retries.restore()
+      listening.restore()
       delete globals.document
     }
   })
@@ -301,6 +359,7 @@ describe('API modules', () => {
     const globals = globalThis as Record<string, unknown>
     const network = (onLine: boolean) => Object.defineProperty(navigator, 'onLine', { value: onLine, configurable: true })
     const listening = listenerCount(globalThis, tab)
+    const retries = retriesByHand()
 
     globals.document = tab
     network(false)
@@ -314,26 +373,26 @@ describe('API modules', () => {
       }, true)
 
       reader.start()
-      await Bun.sleep(700)
+      await retries.until(() => listening.count() === 2)
       expect([calls, listening.count()]).toEqual([1, 2])
 
       network(true)
       globalThis.dispatchEvent(new Event('online'))
-      await until(() => calls === 2)
+      await retries.until(() => calls === 2)
       expect(listening.count()).toBe(0)
 
       network(false)
-      await Bun.sleep(1200)
-      expect(listening.count()).toBe(2)
+      await retries.until(() => listening.count() === 2)
       reader.close()
       expect(listening.count()).toBe(0)
       network(true)
       globalThis.dispatchEvent(new Event('online'))
       tab.dispatchEvent(new Event('visibilitychange'))
-      await Bun.sleep(600)
+      await turns()
       expect(calls).toBe(2)
     }
     finally {
+      retries.restore()
       listening.restore()
       delete globals.document
       delete (navigator as { onLine?: boolean }).onLine
@@ -348,12 +407,14 @@ describe('API modules', () => {
     const fallbacks: (() => void)[] = []
     const timeouts = spyOn(globalThis, 'setTimeout').mockImplementation(((run: () => void, delay?: number) => {
       if (delay !== 60_000)
-        return later(run, delay)
+        return later(run, 0)
 
       fallbacks.push(run)
 
       return later(() => undefined, 3_600_000)
     }) as typeof setTimeout)
+
+    const listening = listenerCount(globalThis, tab)
 
     globals.document = tab
     Object.defineProperty(navigator, 'onLine', { value: false, configurable: true })
@@ -373,7 +434,7 @@ describe('API modules', () => {
       // Hidden, it waits for the tab to show rather than trying, then tries again a minute after.
       tab.hidden = true
       fallbacks.shift()!()
-      await Bun.sleep(1500)
+      await until(() => calls === 2 && listening.count() === 2)
       expect([calls, fallbacks.length]).toEqual([2, 0])
 
       tab.hidden = false
@@ -382,6 +443,7 @@ describe('API modules', () => {
       reader.close()
     }
     finally {
+      listening.restore()
       timeouts.mockRestore()
       delete globals.document
       delete (navigator as { onLine?: boolean }).onLine
@@ -919,11 +981,9 @@ describe('rooms', () => {
     expect(await ada.next()).toEqual({ type: 'said', from: 'bob', text: 'hello' })
 
     ada.send({ type: 'leave', room: 'tea' })
-    await Bun.sleep(30)
-    expect(await members('tea')).toEqual(['bob'])
+    await until(async () => (await members('tea')).join() === 'bob')
     bob.close()
-    await Bun.sleep(30)
-    expect(await members('tea')).toEqual([])
+    await until(async () => (await members('tea')).length === 0)
     expect(bob.received).toEqual([{ type: 'joined', room: 'tea', members: ['ada', 'bob'] }])
     ada.close()
   })
@@ -1049,7 +1109,6 @@ describe('rooms', () => {
 
         second!.publish('hall', { text: 'guests' }, { to: null })
         await until(() => guest.received.length === 1)
-        await Bun.sleep(20)
         expect([anonymous.received, ada.received]).toEqual([[], []])
       }
       finally {
@@ -1066,7 +1125,6 @@ describe('rooms', () => {
         first.join(ada, 'hall', 'ada')
         second.publish('hall', { text: 'after' })
         await until(() => ada.received.length > 0)
-        await Bun.sleep(20)
         expect(ada.received).toEqual(['{"text":"after"}'])
       }
       finally {
@@ -1075,7 +1133,21 @@ describe('rooms', () => {
     })
 
     it('drops the members of a process no longer heard from, and writes them back once a stalled one runs again', async () => {
+      // The heartbeats, run by hand rather than waited for.
+      const beats: (() => void)[] = []
+      const realInterval = setInterval
+      const intervals = spyOn(globalThis, 'setInterval').mockImplementation(((run: () => void, delay?: number) => {
+        if (delay !== 2_000)
+          return realInterval(run, delay)
+
+        beats.push(run)
+
+        return realInterval(() => undefined, 3_600_000)
+      }) as typeof setInterval)
       const { first, second, close } = processes('expiry')
+
+      intervals.mockRestore()
+
       const [ada, bob] = [connection(), connection()]
       const file = new Database(join(dir, 'expiry.sqlite'))
 
@@ -1089,15 +1161,19 @@ describe('rooms', () => {
         file.run('DELETE FROM kay_room_members')
         file.run('DELETE FROM kay_room_processes')
 
-        // The next heartbeat, within 2 seconds, finds each process dropped and writes its members back.
-        await Bun.sleep(2_200)
+        // The next heartbeat finds each process dropped and writes its members back.
+        expect(beats).toHaveLength(2)
+
+        for (const beat of beats)
+          beat()
+
         expect(first.members('hall')).toEqual(['ada', 'bob'])
       }
       finally {
         file.close()
         close()
       }
-    }, 5_000)
+    })
   })
 
   it('calls the handler a message\'s type names, and refuses a type none names', () => {

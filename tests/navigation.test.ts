@@ -42,6 +42,13 @@ async function until(holds: () => boolean | Promise<boolean>): Promise<void> {
     await Bun.sleep(20)
 }
 
+// Whatever the page had queued after its load or its last event has run: two frames and a task later, for a test asserting something did not happen.
+async function settled(on: Page): Promise<void> {
+  await on.evaluate(async () => new Promise<void>((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(resolve)))
+  }))
+}
+
 // A full Chromium, as CI installs, asks for a favicon the fixture has none of.
 function pageError(message: ConsoleMessage): boolean {
   return message.type() === 'error' && !message.location().url.endsWith('/favicon.ico')
@@ -87,8 +94,10 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
       if (new URL(request.url()).pathname === '/second')
         fetched.push(request.method())
     })
+    const hovered = page.waitForRequest(request => new URL(request.url()).pathname === '/second')
+
     await page.hover('a.second')
-    await Bun.sleep(400)
+    await hovered
     await page.click('a.second')
     await page.locator('h1', { hasText: 'Second' }).waitFor()
 
@@ -122,7 +131,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
 
     await fresh.goto(`${origin}/second`)
     await fresh.locator('form').waitFor()
-    await Bun.sleep(200)
+    await settled(fresh)
 
     expect(await checksLoaded()).toBe(false)
 
@@ -142,7 +151,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     const swapLoaded = async (): Promise<boolean> => fresh.evaluate(() => performance.getEntriesByType('resource').some(entry => (/\/page-swap-[^/]*\.js$/).test(entry.name)))
 
     await fresh.goto(origin)
-    await Bun.sleep(200)
+    await settled(fresh)
 
     expect(await swapLoaded()).toBe(false)
 
@@ -369,7 +378,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     expect(await page.evaluate(() => scrollY)).toBe(0)
 
     await page.evaluate(() => scrollTo(0, 700))
-    await Bun.sleep(300)
+    await page.waitForFunction(() => (history.state as { scroll?: number[] } | null)?.scroll?.[1] === 700)
     await page.goBack()
     await page.locator('h1', { hasText: 'Home' }).waitFor()
 
@@ -466,10 +475,10 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
       asked.push(`${dialog.type()} ${dialog.message()}`)
       await (answer ? dialog.accept() : dialog.dismiss())
     }
-    // A refused leave changes nothing, so it is waited for as the question, then a while after it.
+    // A refused leave changes nothing, so it is waited for as the question, then until the page has run what it had queued.
     const refused = async (count: number) => {
       await until(() => asked.length === count)
-      await Bun.sleep(300)
+      await settled(page)
       expect(await page.textContent('h1')).toBe('Guarded')
       expect(await sameDocument()).toBe(true)
     }
@@ -565,26 +574,29 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
   })
 
   it('never fetches a rel=nofollow link ahead, and swaps it in once clicked', async () => {
+    const fresh = await browser.newPage()
     const fetched: string[] = []
-    const fetch = (request: { url: () => string }) => {
+
+    fresh.on('request', (request) => {
       if (new URL(request.url()).pathname === '/state')
         fetched.push(request.url())
-    }
-
-    await page.goto(origin)
-    await page.evaluate(() => {
+    })
+    // The hover delay runs on a faked clock, jumped past rather than waited for.
+    await fresh.clock.install()
+    await fresh.goto(origin)
+    await fresh.evaluate(() => {
       (window as { kayAlive?: boolean }).kayAlive = true
     })
-    page.on('request', fetch)
-    await page.hover('a.nofollow')
-    await Bun.sleep(400)
+    await fresh.hover('a.nofollow')
+    await fresh.clock.runFor(1000)
+    await settled(fresh)
     expect(fetched).toEqual([])
-    await page.click('a.nofollow')
-    await until(() => new URL(page.url()).pathname === '/state')
-    page.off('request', fetch)
+    await fresh.click('a.nofollow')
+    await fresh.waitForURL(`${origin}/state`)
 
     expect(fetched).toHaveLength(1)
-    expect(await sameDocument()).toBe(true)
+    expect(await fresh.evaluate(() => (window as { kayAlive?: boolean }).kayAlive)).toBe(true)
+    await fresh.close()
   })
 
   it('loads a page from a link opting out', async () => {
@@ -653,7 +665,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     await page.locator('p.fallback', { hasText: 'Failed: Fragile broke' }).waitFor()
 
     expect(await page.locator('p.fragile').count()).toBe(0)
-    await Bun.sleep(100)
+    await until(() => reports.length > 0)
     expect(reports.map(body => JSON.parse(body) as Record<string, unknown>)).toEqual([{ name: 'Error', message: 'Fragile broke', stack: expect.any(String), island: 'tests/fixtures/navigation/src/components/fragile.kay', url: `${origin}/fallback` }])
     expect(warnings).toEqual([])
   })
@@ -916,14 +928,22 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     await fresh.goto(`${origin}/plain`)
     const entries = await fresh.evaluate(() => history.length)
 
+    // The earlier navigation's answer is held until the later one has shown its page.
+    const { promise: held, resolve: release } = Promise.withResolvers<void>()
+
     await fresh.route(`${origin}/second`, async (route) => {
-      await Bun.sleep(600)
+      await held
       await route.continue()
     })
     await fresh.click('a.second')
     await fresh.click('a.home')
     await fresh.locator('h1', { hasText: 'Home' }).waitFor()
-    await Bun.sleep(900)
+
+    const answered = fresh.waitForResponse(`${origin}/second`)
+
+    release()
+    await answered
+    await settled(fresh)
 
     expect(await fresh.evaluate(() => [location.pathname, document.querySelector('h1')!.textContent, history.length])).toEqual(['/', 'Home', entries + 1])
     await fresh.close()

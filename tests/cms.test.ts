@@ -789,17 +789,50 @@ describe('preview mode', () => {
   })
 
   it('places the marks of a long listing in one pass', () => {
-    inPreview(() => {
-      const marks = editMarks()!
-      const entry = editableEntry(marks, 'news', { slug: 'a', data: { rows: Array.from({ length: 3000 }, (_, index) => `Row ${index}`) }, Content: () => ({ t: '' }) })
-      const html = withFieldMarks(marks, () => `<title>Rows</title><ul>${loop(entry.data.rows, row => `<li>Row: ${child(row)}</li>`)}</ul>`)
-      const started = performance.now()
-      const marked = placeFieldMarks(html, marks)
+    // The work placing the marks of `count` rows does: the characters it copies out of the page and the scans it starts, which a pass per fence would multiply by the rows.
+    const placed = (count: number) => {
+      let marked = ''
+      let work = 0
 
-      expect(performance.now() - started).toBeLessThan(200)
-      expect(marked).toStartWith('<title>Rows</title><ul data-kay-list="news:a:rows"><li>Row: <!--kay-field news:a:rows.0-->Row 0<!--/kay-field--></li>')
-      expect(marked).toEndWith('<li>Row: <!--kay-field news:a:rows.2999-->Row 2999<!--/kay-field--></li></ul>')
-    }, true)
+      inPreview(() => {
+        const marks = editMarks()!
+        const entry = editableEntry(marks, 'news', { slug: 'a', data: { rows: Array.from({ length: count }, (_, index) => `Row ${index}`) }, Content: () => ({ t: '' }) })
+        const html = withFieldMarks(marks, () => `<title>Rows</title><ul>${loop(entry.data.rows, row => `<li>Row: ${child(row)}</li>`)}</ul>`)
+        // eslint-disable-next-line ts/unbound-method -- called back on its string below
+        const slice = String.prototype.slice
+        // eslint-disable-next-line ts/unbound-method -- called back on its pattern below
+        const exec = RegExp.prototype.exec
+        const slices = spyOn(String.prototype, 'slice').mockImplementation(function (this: string, ...args: [number?, number?]) {
+          const piece = slice.apply(this, args)
+
+          work += piece.length
+
+          return piece
+        })
+        const scans = spyOn(RegExp.prototype, 'exec').mockImplementation(function (this: RegExp, text: string) {
+          work += 1
+
+          return exec.call(this, text)
+        })
+
+        try {
+          marked = placeFieldMarks(html, marks)
+        }
+        finally {
+          slices.mockRestore()
+          scans.mockRestore()
+        }
+      }, true)
+
+      return { marked, work }
+    }
+    const small = placed(1000)
+    const large = placed(3000)
+
+    // Three times the rows, about three times the work, where a pass per fence would make it nine.
+    expect(large.work).toBeLessThan(small.work * 4)
+    expect(large.marked).toStartWith('<title>Rows</title><ul data-kay-list="news:a:rows"><li>Row: <!--kay-field news:a:rows.0-->Row 0<!--/kay-field--></li>')
+    expect(large.marked).toEndWith('<li>Row: <!--kay-field news:a:rows.2999-->Row 2999<!--/kay-field--></li></ul>')
   })
 
   it('decodes the drafted entries alone, leaving those every other request shares as they are', async () => {

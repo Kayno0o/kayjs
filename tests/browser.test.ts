@@ -612,7 +612,10 @@ for (const page of pages)
   page.close()
 
 listed()
-await Bun.sleep(2000)
+// The browser goes once it has been idle a moment, which the temp directory shows.
+for (const limit = Date.now() + 10_000; readdirSync(tmpdir()).some(name => name !== ${JSON.stringify(LOCKED)}) && Date.now() < limit;)
+  await Bun.sleep(20)
+
 listed()
 await open()
 await server.stop()
