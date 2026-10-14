@@ -124,6 +124,21 @@ describe('the audit log', () => {
     expect(await browser().call('auditLog')).toEqual([])
   })
 
+  test('pages by the last entry of a page, also after a JSON hop', async () => {
+    const { browser } = setup({ audit: true })
+    const ada = browser()
+
+    await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
+    await ada.call('changePassword', { password: PASSWORD }, 'a brand new password')
+
+    const [first] = await ada.call('auditLog', { limit: 1 })
+    const next = await ada.call('auditLog', { limit: 1, before: JSON.parse(JSON.stringify(first)) })
+
+    expect(first.event).toBe('password-changed')
+    expect(next.map((entry: { event: string }) => entry.event)).toEqual(['signed-in'])
+    expect(await ada.call('auditLog', { before: JSON.parse(JSON.stringify(next[0])) })).toEqual([])
+  })
+
   test('is not kept without the option', async () => {
     const { browser, store } = setup()
     const ada = browser()

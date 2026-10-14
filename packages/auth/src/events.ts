@@ -74,7 +74,12 @@ export async function auditEntries(core: Core, query: { userId?: string | undefi
 
   const limit = clamp(Math.trunc(query.limit ?? 50), 1, AUDIT_PAGE_MAX)
 
-  return (await audit(core).list({ ...query.userId === undefined ? {} : { userId: query.userId }, ...query.before === undefined ? {} : { before: query.before }, limit })).map(entry => ({ ...entry, event: entry.event as AuthEvent }))
+  return (await audit(core).list({ ...query.userId === undefined ? {} : { userId: query.userId }, ...query.before === undefined ? {} : { before: normalizeCursor(query.before) }, limit })).map(entry => ({ ...entry, event: entry.event as AuthEvent }))
+}
+
+// An entry's `at` is text after a JSON hop, which an app forwarding the last entry of a page may have made.
+function normalizeCursor(before: AuditCursor): AuditCursor {
+  return before instanceof Date ? before : { id: before.id, at: new Date(before.at) }
 }
 
 function audit(core: Core): NonNullable<Core['store']['audit']> {
