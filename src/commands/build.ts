@@ -69,7 +69,8 @@ export const build: Command = {
       return buildToDocument(root, options)
 
     // On a terminal, a line tells what the build is doing until it ends; annotations are for CI, which has none.
-    const progress = format === 'text' ? progressLine() : undefined
+    // Not with stdout piped either, whose lines would reach the terminal after the frame drawn since.
+    const progress = format === 'text' && process.stdout.isTTY ? progressLine() : undefined
     let result: BuildResult
 
     try {

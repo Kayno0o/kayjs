@@ -57,7 +57,7 @@ describe('the progress line', () => {
 
     try {
       line.update({ step: 'prerendering', done: 1, total: 4, unit: 'routes' })
-      line.update({ step: 'prerendering', done: 2, total: 4, unit: 'routes' })
+      line.update({ step: 'compressing the files' })
     }
     finally {
       line.stop()
@@ -74,6 +74,33 @@ describe('the progress line', () => {
     }
 
     expect(written.at(-1)).toBe(CLEAR_LINE)
+  })
+
+  it('draws a new step at once, its clock started again, and a count moving on with the next frame', async () => {
+    const { written, stream } = terminal()
+    const line = progressLine(stream, {})!
+
+    try {
+      line.update({ step: 'bundling' })
+      await Bun.sleep(150)
+
+      const drawn = written.length
+
+      line.update({ step: 'prerendering', done: 0, total: 50, unit: 'routes' })
+
+      for (let done = 1; done <= 50; done++)
+        line.update({ step: 'prerendering', done, total: 50, unit: 'routes' })
+
+      expect(written.slice(drawn)).toHaveLength(1)
+      expect(written.at(-1)).toEndWith(' 0/50 routes 0.0s')
+
+      await Bun.sleep(120)
+
+      expect(written.at(-1)).toContain(' 50/50 routes ')
+    }
+    finally {
+      line.stop()
+    }
   })
 
   it('takes a terminal that says it is 0 columns wide, as a pseudo-terminal may, for 80', () => {
@@ -107,9 +134,15 @@ describe('the progress line', () => {
 
       const drawnAt = written.length
 
+      line.update({ step: 'compressing' })
+      process.stdout.write('')
+
+      const clearedAt = written.length
+
       line.stop()
 
       expect(written[drawnAt - 1]).toBe(CLEAR_LINE)
+      expect(written[clearedAt - 1]).toBe(CLEAR_LINE)
       expect(printed).toEqual([`${drawnAt}:built`])
       expect(Reflect.get(console, 'log') as unknown).toBe(stub)
       expect(Reflect.get(process.stdout, 'write') as unknown).toBe(stdoutWrite)
@@ -117,6 +150,34 @@ describe('the progress line', () => {
     finally {
       Reflect.set(console, 'log', log)
     }
+  })
+
+  it('leaves what the app put in the console meanwhile, and its listeners once stopped', () => {
+    const { stream } = terminal()
+    const warn: unknown = Reflect.get(console, 'warn')
+    const listeners = ['exit', 'SIGINT', 'SIGTERM'].map(event => process.listenerCount(event))
+    const line = progressLine(stream, {})!
+    const replaced = () => undefined
+
+    console.warn = replaced
+    line.stop()
+
+    try {
+      expect(Reflect.get(console, 'warn') as unknown).toBe(replaced)
+      expect(['exit', 'SIGINT', 'SIGTERM'].map(event => process.listenerCount(event))).toEqual(listeners)
+    }
+    finally {
+      Reflect.set(console, 'warn', warn)
+    }
+  })
+
+  it('is cleared when the build is interrupted, which still ends as interrupted', async () => {
+    const script = `import { writeSync } from 'node:fs'\nimport { progressLine } from ${JSON.stringify(join(import.meta.dir, '../src/commands/progress'))}\n\nconst line = progressLine({ isTTY: true, columns: 80, write: text => writeSync(1, \`\${JSON.stringify(text)}\\n\`) }, {})\n\nline.update({ step: 'bundling' })\nprocess.kill(process.pid, 'SIGINT')\nawait Bun.sleep(5000)\n`
+    const child = Bun.spawn([process.execPath, '-e', script], { stdout: 'pipe', stderr: 'pipe' })
+    const [stdout] = await Promise.all([new Response(child.stdout).text(), child.exited])
+
+    expect(child.signalCode).toBe('SIGINT')
+    expect(stdout.trim().split('\n').map(text => JSON.parse(text) as string).at(-1)).toBe(CLEAR_LINE)
   })
 })
 
@@ -131,7 +192,7 @@ describe('kay build\'s progress', () => {
     const images = steps.filter(step => step.unit === 'images')
 
     expect(failed, stderr).toBeUndefined()
-    expect([...new Set(steps.map(step => step.step))]).toEqual(['bundling', 'encoding images', 'prerendering', 'compressing'])
+    expect([...new Set(steps.map(step => step.step))]).toEqual(['bundling', 'encoding images', 'prerendering', 'writing images, cards and favicons', 'compressing'])
     expect(routes.map(step => `${step.done}/${step.total}`)).toEqual(['0/2', '1/2', '2/2'])
     expect(images.at(-1)).toEqual({ step: 'encoding images', done: 1, total: 1, unit: 'images' })
   }, 30_000)

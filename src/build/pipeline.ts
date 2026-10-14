@@ -102,22 +102,32 @@ export async function buildProject(root: string, config: KayConfig, options: Bui
   else
     await rm(previous, { recursive: true, force: true })
 
-  const report: Report = options.onProgress ?? (() => undefined)
+  let step: string | undefined
+  const report: Report = (progress) => {
+    step = progress.step
+    options.onProgress?.(progress)
+  }
   let checkEnded = !checking
+  let bundleEnded = false
+  // Whichever of the check and the bundle ends first says what still runs.
   const checkRun = async () => {
     try {
       return checkWith ? await checkStage(project, checkWith, exported) : []
     }
     finally {
       checkEnded = true
+
+      if (!bundleEnded && step === 'checking and bundling')
+        report({ step: 'bundling' })
     }
   }
-  // The check most often outlasts the bundle, which says so as it ends.
   const bundleRun = async () => {
     try {
       return await bundleStage(project, exported, options.analyze === true, report)
     }
     finally {
+      bundleEnded = true
+
       if (!checkEnded)
         report({ step: 'checking' })
     }
@@ -276,6 +286,10 @@ async function bundleStage(project: Project, exported: boolean, analyze: boolean
 // The rest of what the server serves from `.kay/client`, which runs the app's content config and pages, so only once the check passed: content manifests, prerendered pages, the variants of images only they import, and favicons, compressed.
 async function outputStage(project: Project, exported: boolean, client: ClientBuild, checking: boolean, report: Report): Promise<{ prerendered: number, entries: number, linted: CheckDiagnostic[] }> {
   const { root, config, paths } = project
+
+  // The collections are read for the pages, so their time counts with them.
+  report({ step: 'prerendering' })
+
   // Before prerendering, whose pages read the collections from what it writes.
   const entries = await writeContentManifests(root, paths.output, config.content)
 
@@ -286,13 +300,12 @@ async function outputStage(project: Project, exported: boolean, client: ClientBu
   }
 
   const rendered: RenderedPage[] = []
-
-  report({ step: 'prerendering' })
-
   const prerendered = await prerenderPages(project, client, { exportAll: exported, rendered, onRoute: (done, total) => report({ step: 'prerendering', done, total, unit: 'routes' }) })
 
-  if (config.search === true)
+  if (config.search === true) {
+    report({ step: 'indexing for search' })
     await writeSearchIndex(client.dir, rendered.flatMap(page => page.search === false ? [] : [{ path: slashedPath(page.path, config.trailingSlash), html: page.html, weight: page.search }]))
+  }
 
   // The heads are the check's to read, so a build without checking skips them with it.
   const linted = checking ? pageSeoLints(config, rendered, exported) : []
@@ -301,6 +314,7 @@ async function outputStage(project: Project, exported: boolean, client: ClientBu
   const remote = remoteImages(cacheDir(root, 'remote'), remotePatterns(config.images?.remote))
 
   await writeImageVariants(client.dir, config.images?.quality, cacheDir(root, 'variants'), { avif: exported ? undefined : avifQuality(config.images), onImage: imageProgress(report) })
+  report({ step: 'writing images, cards and favicons' })
   await writeRemoteVariants(client.dir, remote, config.images?.quality)
   await writeCards(client.dir, cacheDir(root, 'cards'), remote)
 
@@ -314,7 +328,13 @@ async function outputStage(project: Project, exported: boolean, client: ClientBu
     console.warn(warning)
 
   await Bun.write(join(client.dir, NOTICES_FILE), thirdPartyNotices(shippedPackages(project, client)))
-  await hookPrerendered(root, pageHooks(config.extensions), { clientDir: client.dir, publicDir: paths.public, base: basePath(config.base), aspects: config.images?.aspects }, paths.output)
+
+  const hooks = pageHooks(config.extensions)
+
+  if (hooks.length > 0)
+    report({ step: 'running page hooks' })
+
+  await hookPrerendered(root, hooks, { clientDir: client.dir, publicDir: paths.public, base: basePath(config.base), aspects: config.images?.aspects }, paths.output)
   report({ step: 'compressing' })
   await Promise.all([compressFiles(client.dir), compressFiles(join(paths.output, PRERENDERED_DIR))])
 

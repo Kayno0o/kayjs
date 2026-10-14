@@ -124,6 +124,11 @@ export function done(verb: string, rest: string, ms?: number): void {
   console.log(`${colors.bold.green(verb)} ${rest}${ms === undefined ? '' : colors.dim(` in ${Math.round(ms)} ms`)}`)
 }
 
+// Whether a redrawn line or a cleared screen may go to `stream`: a terminal, unless `NO_COLOR` or a dumb terminal asks for plain text; `FORCE_COLOR` brings colour to a pipe but never these, which would garble it.
+export function takesControlCodes(stream: { isTTY?: boolean }, env: Record<string, string | undefined> = process.env): boolean {
+  return stream.isTTY === true && env.NO_COLOR === undefined && env.NODE_DISABLE_COLORS === undefined && env.TERM !== 'dumb'
+}
+
 export function isPort(value: string): boolean {
   return PORT.test(value) && Number(value) <= 65_535
 }

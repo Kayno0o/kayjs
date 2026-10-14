@@ -199,7 +199,7 @@ The build runs `kay check` first and keeps the last build when the check or the 
 | `-p <tsconfig>` | Names another tsconfig |
 | `--format <format>` | `text` by default; `github` annotates what the check found as `kay check --format github` does, and a template that does not compile or a failed stage too; `json` prints the whole build as one document once it ends, see [Output for tools](#output-for-tools) |
 
-In a terminal, one line redrawn in place tells what the build is doing and for how long, with a bar and a count where it knows how many routes it prerenders or images it encodes. Piped, in CI or under `NO_COLOR`, it prints only the lines below, as they come.
+In a terminal, one line on stderr redrawn in place tells what the build is doing and since when, with a bar and a count where it knows how many routes it prerenders or images it encodes (a dynamic route counts once, however many pages it renders). With either output piped, in CI, under `NO_COLOR` or with `--format github` or `json`, it prints only the lines below, as they come.
 
 The build prints the JavaScript a page with islands loads, gzip and minified: the entry, then what each island adds.
 
