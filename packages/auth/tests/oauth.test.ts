@@ -67,6 +67,7 @@ describe('safeRedirect', () => {
     `/%${'25'.repeat(9)}09/evil.com`,
     '/%E0%A4%A',
     '/%E0%A4%A?x=1',
+    '/a%3Fb%',
     '/%E0%A4%A#%',
     '/a%?x=1',
     '/%2F/evil.com?x=%',
@@ -88,6 +89,10 @@ describe('safeRedirect', () => {
     const legit = ['/a?x=%25zz#%', '/a?x=%', '/a#%', '/a?x=%zz&y=%E0%A4%A#100%', '/a/b?next=%09//x%']
 
     expect(legit.map(path => safeRedirect(path))).toEqual(legit)
+  })
+
+  test('only a literal question mark or hash ends the strict part', () => {
+    expect(['/%3F%2F/evil.com', '/%253F%252F/evil.com', '/a%23?%'].map(path => safeRedirect(path))).toEqual(['/%3F%2F/evil.com', '/%253F%252F/evil.com', '/a%23?%'])
   })
 
   test('every answer stays on the site, resolved raw and decoded once', () => {

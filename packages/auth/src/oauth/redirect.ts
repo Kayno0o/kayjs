@@ -72,7 +72,7 @@ function resolved(path: string): string {
   return `${url.pathname}${url.search}${url.hash}`
 }
 
-// Undefined for a malformed escape in the path, which no app could decode either; the query and hash may hold a bare `%` and stay as written, as they can't move the path to another host.
+// Undefined for a malformed escape in the path, which no app could decode either; the query and hash can't move the path, so a bare `%` there stays as written.
 function decodedOnce(path: string): string | undefined {
   const end = path.search(/[?#]/)
   const split = end === -1 ? path.length : end
