@@ -25,28 +25,33 @@ function hashOf(text: string): string {
   return nodeCrypto().createHash('sha256').update(text).digest('hex')
 }
 
-function signature(url: string, expires: string, salt: string, hash: string): string {
-  return signText('kay-proof-of-work', `${url}\0${expires}\0${salt}\0${hash}`)
-}
+// An action's challenge is bound to its URL; one `workChallenge` signs is bound to its scope and its difficulty, under another `use`, so neither passes for the other.
+const ACTION_WORK = 'kay-proof-of-work'
 
-// A challenge for the action at `url`, good for `maxAge` ms: the hash of a fresh salt and a number up to `difficulty`, which the browser finds by hashing every number from 0 up.
-export function signWork(url: string, difficulty: number, maxAge: number): string {
+export const SCOPED_WORK = 'kay-proof-of-work-scope'
+
+// A challenge for `bound`, good for `maxAge` ms: the hash of a fresh salt and a number up to `difficulty`, which the browser finds by hashing every number from 0 up.
+export function signChallenge(use: string, bound: string, difficulty: number, maxAge: number): string {
   const expires = (Date.now() + maxAge).toString(36)
   const salt = Buffer.from(crypto.getRandomValues(new Uint8Array(12))).toString('base64url')
   const hash = hashOf(salt + (crypto.getRandomValues(new Uint32Array(1))[0]! % (difficulty + 1)))
 
-  return `${expires}.${salt}.${hash}.${difficulty.toString(36)}.${signature(url, expires, salt, hash)}`
+  return `${expires}.${salt}.${hash}.${difficulty.toString(36)}.${signText(use, `${bound}\0${expires}\0${salt}\0${hash}`)}`
 }
 
-// Why a solution to the action at `url`'s challenge does not pass, or undefined when it does: once, as `store` keeps it until its challenge expires.
-export async function workRefusal(url: string, solution: string | null, store: RateStore): Promise<ProofOfWorkRefusal | undefined> {
-  if (solution === null || solution === '')
+export function signWork(url: string, difficulty: number, maxAge: number): string {
+  return signChallenge(ACTION_WORK, url, difficulty, maxAge)
+}
+
+// Why a solution to `bound`'s challenge does not pass, or undefined when it does: once, as `store` keeps it under `key` until its challenge expires. `boundTo` reads the challenge's difficulty, for a scope binding it too.
+export async function challengeRefusal(use: string, boundTo: (difficulty: string) => string, solution: string | null | undefined, store: RateStore, key: string): Promise<ProofOfWorkRefusal | undefined> {
+  if (solution === null || solution === undefined || solution === '')
     return 'missing'
 
-  const [expires = '', salt = '', hash = '', , signed = '', number = ''] = solution.split('.')
+  const [expires = '', salt = '', hash = '', difficulty = '', signed = '', number = ''] = solution.split('.')
 
   // A challenge signed before a restart changed the key is the most likely one to fail here.
-  if (!signedText('kay-proof-of-work', `${url}\0${expires}\0${salt}\0${hash}`, signed))
+  if (!signedText(use, `${boundTo(difficulty)}\0${expires}\0${salt}\0${hash}`, signed))
     return 'expired'
 
   const left = Number.parseInt(expires, 36) - Date.now()
@@ -57,7 +62,11 @@ export async function workRefusal(url: string, solution: string | null, store: R
   if (!DIGITS.test(number) || hashOf(salt + number) !== hash)
     return 'wrong'
 
-  return (await store.hit(`${url}\n${salt}`, left)).count > 1 ? 'wrong' : undefined
+  return (await store.hit(`${key}\n${salt}`, left)).count > 1 ? 'wrong' : undefined
+}
+
+export async function workRefusal(url: string, solution: string | null, store: RateStore): Promise<ProofOfWorkRefusal | undefined> {
+  return challengeRefusal(ACTION_WORK, () => url, solution, store, url)
 }
 
 // The challenges of the actions with `proofOfWork` a page's forms post to, which kay's script solves; a prerendered page holds a mark the server fills in per visit.

@@ -406,6 +406,7 @@ button(onClick={save} disabled={add.pending()}) Add
 - A prerendered page holding such a form is still rendered once: the server signs a fresh stamp into it on every visit, as it splices in an inline server island, so the page goes out gzipped rather than in brotli and kept by no cache.
 - `minTime: { after: '3s', maxAge: '1h', pretend: true }` answers a post sent too soon as `honeypot`'s `pretend` does.
 - A form inside an island renders no stamp, so a call from kay's script without one goes through, a stamp it sends still checked.
+- `minTime: { after: '3s', plain: true }` checks only a form the browser posts itself, without kay's script: the page swap's post and an island's call go through, for a form whose script already proves something, such as a `data-kay-work` field below.
 - `site.submit` from a `Visit` sends its form's stamp, and `setSystemTime` from `bun:test` moves the clock past `minTime`.
 
 #### Refusal messages
@@ -431,6 +432,13 @@ button(onClick={save} disabled={add.pending()}) Add
 - A form posted with `navigation: false` and no island has no script either, nor does one with `data-reload` or a `target`, which the swap leaves to the browser.
 - A prerendered page gets a fresh challenge on every visit, as a stamp.
 - `site.submit` and `site.call` solve one themselves; a test sending its own `x-kay-work` header, `''` for none, checks the refusal.
+
+#### Proof of work checked in code
+
+- `workChallenge(scope, { difficulty, maxAge })` from `kay/server` signs a challenge bound to `scope` rather than to an action, for code checking it itself, as kayjs-auth's CAPTCHA does: `input(type="hidden" name="proof" data-kay-work={workChallenge('contact')})` posts its solution as the field's value, kay's script solving it from the moment the form takes focus.
+- `await verifyWork(input.proof, 'contact', { difficulty, store })` from `kay/server` answers `undefined` once for each solution, else `missing`, `expired` (past `maxAge`, another scope's, signed before a restart, or easier than `difficulty`) or `wrong`.
+- The difficulty is signed into the challenge, so a scope asking more refuses one handed out before, the page then signing a harder one; `difficulty` is 100,000 by default and `maxAge` a day.
+- A prerendered page gets a fresh challenge in the field on every visit, as a stamp; `site.submit` solves the field unless the test gives its value.
 
 ### Limits outside an action
 

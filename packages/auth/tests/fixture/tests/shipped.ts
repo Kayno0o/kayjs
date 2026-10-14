@@ -13,10 +13,11 @@ const { magicLink } = await import(join(PAGES, 'sign-in.kay'))
 const { register } = await import(join(PAGES, 'register.kay'))
 const { spend } = await import(join(PAGES, 'magic-link.kay'))
 
-const registered = await (await browser()).submit(register, { email: 'shipped@example.com', password: 'correct horse battery', redirect: '/auth/account' }, { from: '/auth/register' })
+const newcomer = await browser()
+const registered = await newcomer.submit(register, { email: 'shipped@example.com', password: 'correct horse battery', redirect: '/auth/account' }, { from: await newcomer.visit('/auth/register') })
 const visitor = await browser()
 
-await visitor.submit(magicLink, { email: 'shipped@example.com', redirect: '/auth/account' }, { from: '/auth/sign-in' })
+await visitor.submit(magicLink, { email: 'shipped@example.com', redirect: '/auth/account' }, { from: await visitor.visit('/auth/sign-in') })
 
 const link = new URL(mails.findLast(mail => mail.kind === 'magic-link')!.url!)
 const opened = await visitor.visit(link.pathname + link.search)

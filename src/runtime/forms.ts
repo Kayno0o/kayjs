@@ -1,6 +1,6 @@
 import { withoutBase } from './base'
 import { busyForms, checkedForms, leave, navigation, prefetched, submitNatively, swappable } from './navigation'
-import { FAILURE_HEADER, NAVIGATE_HEADER, PAGE_HEADER, REDIRECT_HEADER, WORK_HEADER, WORK_SCRIPT } from './swap'
+import { FAILURE_HEADER, NAVIGATE_HEADER, PAGE_HEADER, REDIRECT_HEADER, WORK_FIELD, WORK_HEADER, WORK_SCRIPT } from './swap'
 import { uploaded } from './upload'
 
 // Form posting, which `./navigate` loads once a form posting to an action takes focus or is submitted: checked, then sent, then the page it answers shown through the swap.
@@ -60,11 +60,14 @@ async function loadSwap(): Promise<Swapper> {
   return swapModule ??= import('./page-swap')
 }
 
-// A form posting to the action at `action` took focus; one with `proofOfWork` starts on its challenge as the visitor fills it in, so its post seldom waits for it.
-export async function preloadChecks(action?: string): Promise<void> {
+// A form posting to the action at `action` took focus; one with `proofOfWork`, or holding a `workChallenge` field, starts on its challenge as the visitor fills it in, so its post seldom waits for it.
+export async function preloadChecks(action?: string, form?: HTMLFormElement): Promise<void> {
   try {
     if (action !== undefined && document.querySelector(`script[${WORK_SCRIPT}]`))
       (await import('./work.client')).startWork(action)
+
+    if (form?.querySelector(WORK_FIELD))
+      (await import('./work.client')).startFields(form)
   }
   catch {
     // The post solves it then.
@@ -113,6 +116,9 @@ async function send(form: HTMLFormElement, submitter: HTMLElement | null, url: U
   let response: Answer
 
   try {
+    if (form.querySelector(WORK_FIELD))
+      await (await import('./work.client')).solveFields(form, data)
+
     // The solution to the action's `proofOfWork` challenge, under way since the form took focus.
     const body = multipart ? data : urlEncoded(data)
     const action = withoutBase(url.pathname)

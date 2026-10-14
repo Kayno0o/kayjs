@@ -564,6 +564,16 @@ describe('action protection', () => {
     expect((await site.submit(quick, { message: 'hello' }, { from: page, openedFor: 0 })).html).toContain('<p class="sent">Sent </p>')
   })
 
+  it('checks only a post the browser sends itself with `plain`, not the page swap\'s nor a call, a stamp they send included', async () => {
+    const action = { url: '/_kay/action/plain', protection: { minTime: { after: '3s', plain: true } } } as never
+    const early = { kay_since: signStamp('/_kay/action/plain', Date.now() - 1000) }
+    const refusal = async (headers: Record<string, string>, plain: boolean) => (await refusalOf(action, new Request('http://localhost/', { headers }), early, true, null, plain))?.message
+
+    expect(await refusal({}, true)).toBe('Sent too fast; take a moment, then send it again')
+    expect(await refusal({ 'x-kay-navigate': '1' }, true)).toBeUndefined()
+    expect(await refusal({}, false)).toBeUndefined()
+  })
+
   it('signs the stamps with a key derived from the session\'s secret over the preview one, which replaces only the key of the process', async () => {
     const script = `import { createHmac } from 'node:crypto'
 import { signStamp, signText, stampTime, useStampSecret } from ${JSON.stringify(join(import.meta.dir, '../src/server/stamp.ts'))}

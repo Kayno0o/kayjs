@@ -113,6 +113,16 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay/test i
     expect(costly.errors).toEqual([])
   })
 
+  it('posts the solution of a workChallenge field in its place, for the action to check', async () => {
+    const scoped = await site.open('/scoped')
+
+    await scoped.fill('input[name="message"]', 'hello')
+    await scoped.click('form button')
+    await scoped.waitFor('p.sent', { text: 'Sent 5' })
+
+    expect(scoped.errors).toEqual([])
+  })
+
   it('collects the errors of the page, uncaught ones included', async () => {
     await page.goto('/fallback')
     await page.click('button.break')

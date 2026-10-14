@@ -1,4 +1,4 @@
-import { WORK_SCRIPT } from './swap'
+import { WORK_FIELD, WORK_SCRIPT } from './swap'
 import { solveWork } from './work'
 
 // Each challenge's solution once asked for, so focusing a form and posting it solve it once.
@@ -49,6 +49,25 @@ export async function spendWork(url: string, challenge = challengeOf(url)): Prom
   solutions.delete(challenge)
 
   return solution
+}
+
+// Starts on the challenges of `form`'s `workChallenge` fields while the visitor fills it in.
+export function startFields(form: HTMLFormElement): void {
+  for (const field of form.querySelectorAll<HTMLInputElement>(WORK_FIELD))
+    void solving(field.getAttribute(WORK_SCRIPT)!)
+}
+
+// Puts the solution of each `workChallenge` field of `form` in `data`, in place of the field's value.
+export async function solveFields(form: HTMLFormElement, data: FormData): Promise<void> {
+  for (const field of form.querySelectorAll<HTMLInputElement>(WORK_FIELD)) {
+    const challenge = field.getAttribute(WORK_SCRIPT)!
+    const solution = await solving(challenge)
+
+    solutions.delete(challenge)
+
+    if (solution !== undefined && field.name !== '')
+      data.set(field.name, solution)
+  }
 }
 
 async function inWorker(challenge: string): Promise<string | undefined> {

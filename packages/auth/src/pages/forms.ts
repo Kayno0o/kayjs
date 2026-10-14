@@ -1,8 +1,12 @@
+import type { MinTimeRefusal } from 'kay'
 import type { Proof } from '../twoFactor'
+import type { AuthFeatures } from './index'
 import { t } from 'elysia'
 import { t as message } from 'kay/i18n'
 import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH, USERNAME_MAX_LENGTH, USERNAME_MIN_LENGTH } from '../rules'
 
+// Stands for a `minTime` refusal's reason, which kay words before the request's locale is known: `refusal` puts it in the page's language.
+const MIN_TIME = 'kayjs-auth-min-time:'
 const OAUTH_FAILURES = new Set(['oauth', 'cancelled', 'refused', 'taken', 'unavailable', 'signed-out', 'banned'])
 
 // What the prebuilt pages' actions take. A field longer than kayjs-auth would ever accept is refused here rather than read.
@@ -13,11 +17,19 @@ const token = t.String({ maxLength: 512 })
 const redirect = t.Optional(t.String({ maxLength: 2048 }))
 const remember = t.Optional(t.Boolean())
 
-// The token a CAPTCHA widget posts, under its provider's name.
+// The token a CAPTCHA widget posts, under its provider's name, or the solution to kay's proof of work.
 const captcha = {
   'cf-turnstile-response': t.Optional(t.String({ maxLength: 4096 })),
   'h-captcha-response': t.Optional(t.String({ maxLength: 4096 })),
+  'kayjs-captcha': t.Optional(t.String({ maxLength: 512 })),
 }
+
+// What kay checks of a post from the pages open to visitors without JavaScript, which sends no proof of work: a field bots fill in, and a least time to fill the form in.
+export const guarded = {
+  honeypot: 'website',
+  minTime: { after: '2s', plain: true },
+  messages: { minTime: (reason: MinTimeRefusal) => MIN_TIME + reason },
+} as const
 
 // The current password, or a code for an account without one or a change asking for the second factor.
 const proof = { password: t.Optional(password), code: t.Optional(code) }
@@ -48,8 +60,8 @@ export const schemas = {
   createToken: t.Object({ ...proof, label: t.String({ maxLength: 100 }), scopes: t.Optional(t.Array(t.String({ maxLength: 100 }), { maxItems: 100 })), days: t.Optional(t.Integer({ minimum: 0, maximum: 3650 })) }),
 }
 
-export function captchaOf(input: { 'cf-turnstile-response'?: string | undefined, 'h-captcha-response'?: string | undefined }): string | undefined {
-  return input['cf-turnstile-response'] ?? input['h-captcha-response']
+export function captchaOf(input: { 'cf-turnstile-response'?: string | undefined, 'h-captcha-response'?: string | undefined, 'kayjs-captcha'?: string | undefined }): string | undefined {
+  return input['cf-turnstile-response'] ?? input['h-captcha-response'] ?? input['kayjs-captcha']
 }
 
 export function proofOf(input: { password?: string | undefined, code?: string | undefined }): Proof {
@@ -59,6 +71,19 @@ export function proofOf(input: { password?: string | undefined, code?: string | 
 // What a page shows for a failure code, in the request's language.
 export function failure(error: string): string {
   return message(`auth.errors.${error}` as never)
+}
+
+// What a page open to visitors shows for a refused post: what kay refused it for before the action, or its failure code, the proof of work's saying it needs JavaScript, which a post without sends no solution.
+export function refusal(failed: { errors: Partial<Record<string, string>>, data?: unknown } | undefined, captcha: AuthFeatures['captcha']): string | undefined {
+  const error = (failed?.data as { error?: string } | undefined)?.error
+
+  if (error === undefined) {
+    const refused = failed?.errors['']
+
+    return refused?.startsWith(MIN_TIME) ? failure(refused.slice(MIN_TIME.length)) : refused
+  }
+
+  return failure(error === 'captcha' && captcha === 'proof-of-work' ? 'captchaScript' : error)
 }
 
 // What a page shows under a field refused for `problem`, with the limits the rule holds it to.

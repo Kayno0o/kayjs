@@ -8,7 +8,7 @@ import { honeypotField, minTimeOf, STAMP_FIELD } from '../runtime/action'
 import { durationSeconds } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
 import { openSqlite } from '../runtime/sqlite.server'
-import { WORK_HEADER } from '../runtime/swap'
+import { NAVIGATE_HEADER, WORK_HEADER } from '../runtime/swap'
 import { rewrittenAddress } from './rewrite'
 import { sharedKey, stampTime } from './stamp'
 import { proofOfWork, signWork, workRefusal } from './work'
@@ -203,7 +203,10 @@ export async function protectionRefusal(action: ServerAction<TSchema, unknown>, 
 
   const minTime = action.protection && minTimesOf(action.protection)
 
-  if (minTime && form && (plain || fields[STAMP_FIELD] !== undefined)) {
+  // With `plain`, only a post the browser sends itself: not a call, nor the page swap's.
+  const checked = minTime && (minTime.plain ? plain && request.headers.get(NAVIGATE_HEADER) !== '1' : plain || fields[STAMP_FIELD] !== undefined)
+
+  if (minTime && form && checked) {
     const time = stampTime(action.url, fields[STAMP_FIELD])
     const age = time === undefined ? undefined : Date.now() - time
 

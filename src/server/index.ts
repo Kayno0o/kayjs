@@ -41,6 +41,8 @@ export { diskFiles, files, memoryFiles, s3Files } from './storage'
 export type { RenderToStringOptions } from './string'
 export { renderToString } from './string'
 export { CspViolation } from './violations'
+export type { VerifyWorkOptions, WorkChallengeOptions } from './work-scope'
+export { verifyWork, workChallenge } from './work-scope'
 
 // Serves every `.kay` page under the routes directory, plus the island bundle when a page needs one.
 // In development a project that fails to boot serves its errors instead, and every page reloads when the server restarts.

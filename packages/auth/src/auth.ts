@@ -30,7 +30,7 @@ import { changePassword, changeUsername, deleteAccount, unlink } from './account
 import { actingAdmin, adminAuditLog, banUser, changeRole, deleteUser, getUser, isAdmin, listUsers, unbanUser } from './admin'
 import { bearerUser, createToken, issueToken, listTokens, revokeToken, tokenUser } from './bearer'
 import { pwnedPassword } from './breached'
-import { admit, captchaRequired } from './captcha'
+import { admit, captchaChallenge, captchaRequired, proofOfWork } from './captcha'
 import { banned, newUserRecord, publicUser } from './core'
 import { changeEmail, confirmEmailChange, pendingCode, requestMagicLink, requestPasswordReset, resetPassword, sendVerification, signInWithEmailCode, signInWithMagicLink, verifyEmail, verifyEmailCode } from './email'
 import { auditEntries, report } from './events'
@@ -149,8 +149,8 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   limits?: Partial<Limits> | undefined
   // Passkeys are made for `url`'s host and its origin; `rpId` widens them to a parent domain, `origins` lists every origin the site's pages are served from.
   passkeys?: { rpId?: string, origins?: string[] } | undefined
-  // A CAPTCHA asked of registering, password sign-in, password resets and magic links: `{ verify: turnstile(secret) }`.
-  captcha?: CaptchaOptions | undefined
+  // A CAPTCHA asked of registering, password sign-in, password resets and magic links: kay's proof of work by default, `proofOfWork({ difficulty })` to tune it, `{ verify: turnstile(secret) }` for a third party's, false for none.
+  captcha?: CaptchaOptions | false | undefined
   // Refuses a new password Have I Been Pwned lists, with `true`, or that a check of the app's own finds.
   breachedPasswords?: boolean | ((password: string) => boolean | Promise<boolean>) | undefined
   // The proxies in front, read as kay.config.ts's `proxy` is, for a plain Elysia app that kay's `pages()` does not serve; a kay app sets it in kay.config.ts instead.
@@ -286,7 +286,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
       await this.leave()
   }
 
-  // Signs this browser in as a new guest, a user with no email and no password whom registering or an OAuth sign-in later makes a real account, keeping their id; the guest signed in already answers as is. Counted and CAPTCHA-checked as registering is.
+  // Signs this browser in as a new guest, a user with no email and no password whom registering or an OAuth sign-in later makes a real account, keeping their id; the guest signed in already answers as is. Counted as registering is, and CAPTCHA-checked as `guest`.
   async signInAsGuest(options: { captcha?: string | undefined } = {}): Promise<{ ok: true, user: User } | { ok: false, error: 'limited' | 'captcha' | 'signed-in' | 'closed' }> {
     const current = await this.record()
 
@@ -296,7 +296,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     if (!this.core.signUp)
       return { ok: false, error: 'closed' }
 
-    const refused = await admit(this[STATE], 'register', options.captcha)
+    const refused = await admit(this[STATE], 'guest', options.captcha)
 
     if (refused)
       return { ok: false, error: refused }
@@ -413,6 +413,11 @@ export class Auth<Scope extends string = string, Role extends string = string, O
   // Whether this client's next `action` needs a CAPTCHA token, for the page to show the widget.
   async captchaRequired(action: CaptchaAction): Promise<boolean> {
     return captchaRequired(this[STATE], action)
+  }
+
+  // The proof-of-work challenge for this client's next `action`, for a form field kay's script posts the solution of; null when none is needed.
+  async captchaChallenge(action: CaptchaAction): Promise<string | null> {
+    return captchaChallenge(this[STATE], action)
   }
 
   // Whether this session holds a sign-in waiting for its second factor, for the page that asks for it.
@@ -1110,7 +1115,7 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
     passkeys: url === undefined
       ? undefined
       : { id: options.passkeys?.rpId ?? new URL(url).hostname, name: options.site ?? new URL(url).host, origins: options.passkeys?.origins ?? [new URL(url).origin] },
-    captcha: options.captcha,
+    captcha: options.captcha === false ? undefined : options.captcha ?? proofOfWork(),
     breached: options.breachedPasswords === true ? pwnedPassword : options.breachedPasswords || undefined,
     email: options.email && {
       ...options.email,

@@ -6,6 +6,8 @@ export const join = action(s.Object({
   username: s.String({ pattern: '\\S', maxLength: 32, error: 'Write a name' }),
   email: s.String({ maxLength: 254 }),
   password: s.String({ maxLength: 128 }),
+  // The solution of the proof of work kayjs-auth asks of registering, which kay's script posts.
+  captcha: s.Optional(s.String({ maxLength: 512 })),
 }), async (input, ctx) => {
   const result = await ctx.locals.auth.register(input)
 
@@ -18,6 +20,7 @@ export const join = action(s.Object({
 const refused = ctx.failed(join)?.data
 const errors = refused?.errors ?? {}
 const failure = refused?.error && FAILURE_WORDS[refused.error]
+const challenge = await ctx.locals.auth.captchaChallenge('register')
 --- script
 import Button from '@kaynooo/kayjs-ui/button.kay'
 import FormField from '@kaynooo/kayjs-ui/form-field.kay'
@@ -33,6 +36,8 @@ form.page-form(action={join})
     input(name="email" type="email" autocomplete="email" required)
   FormField(label="Password" hint="10 characters or more" issue={errors.password && PASSWORD_WORDS[errors.password]} required)
     input(name="password" type="password" autocomplete="new-password" required)
+  if challenge
+    input(type="hidden" name="captcha" data-kay-work={challenge})
   if failure
     p.text-kui-error {failure}
   Button(label="Join" variant="accent" type="submit")

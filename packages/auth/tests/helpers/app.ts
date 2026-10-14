@@ -52,7 +52,9 @@ export function serialStore(): AuthStore {
 // An Elysia app on kayjs-auth with routes to drive it, and a browser per call that keeps its own cookies.
 export function testApp<const Scope extends string = never, OrgRole extends string = never>(options: Partial<Omit<AuthOptions<AuthSessionData, 'admin' | 'editor', '/auth', Scope, OrgRole>, 'store'>> & { store?: AuthStore } = {}) {
   const store = options.store ?? memoryStore()
-  const auth = createAuth<AuthSessionData, 'admin' | 'editor', '/auth', Scope, OrgRole>({ sessions: session<AuthSessionData>({ secret: SECRET }), secret: SECRET, roles: { admin: ['editor'], editor: [] }, proxy: { hops: 1 }, ...options, store })
+  // The default proof of work stays off unless a test gives `captcha`, `undefined` included, as a script calling the API sends no solution.
+  const captcha = 'captcha' in options ? options.captcha : false
+  const auth = createAuth<AuthSessionData, 'admin' | 'editor', '/auth', Scope, OrgRole>({ sessions: session<AuthSessionData>({ secret: SECRET }), secret: SECRET, roles: { admin: ['editor'], editor: [] }, proxy: { hops: 1 }, ...options, captcha, store })
   const app = new Elysia()
     .use(auth.plugin)
     .get('/me', async ({ auth }) => (await auth.user()) ?? 'anonymous')

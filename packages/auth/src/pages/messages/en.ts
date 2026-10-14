@@ -183,6 +183,8 @@ export default defineMessages({
       'credentials': 'Wrong email, username or password.',
       'limited': 'Too many attempts. Wait a while, then try again.',
       'captcha': 'Complete the check that you are not a robot.',
+      'captchaScript': 'This form runs a check in your browser, which needs JavaScript: turn it on, then send it again.',
+      'early': 'Wait a moment, then send it again.',
       'unverified': 'Verify your address first: open the link mailed to you.',
       'banned': 'This account is suspended.',
       'closed': 'This site does not take new accounts.',

@@ -123,7 +123,7 @@ Use `s.File()` in the schema and `input(type="file" name="avatar")` in the form,
 
 ## Rate limit, honeypot, minimum time and proof-of-work
 
-The third argument of `action` protects it from scripts. `rateLimit` answers 429 past `max` posts per `window`, `honeypot` names a hidden field that kay renders for you and bots fill in, and `minTime` refuses a form posted sooner than that after its page rendered. For spam that still gets through, `proofOfWork: true` makes each post cost the sender CPU, with no third-party script, and needs JavaScript in the browser.
+The third argument of `action` protects it from scripts. `rateLimit` answers 429 past `max` posts per `window`, `honeypot` names a hidden field that kay renders for you and bots fill in, and `minTime` refuses a form posted sooner than that after its page rendered. For spam that still gets through, `proofOfWork: true` makes each post cost the sender CPU, with no third-party script, and needs JavaScript in the browser. `minTime: { after: '3s', plain: true }` checks only forms posted without JavaScript, and `workChallenge` and `verifyWork` from `kay/server` put proof of work in a form field your own code checks.
 
 ```kay
 export const contact = action(schema, send, {

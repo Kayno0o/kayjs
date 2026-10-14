@@ -28,7 +28,7 @@ export async function mailedToken(site: TestSite, to: string, path: string): Pro
 export async function joinAs(site: TestSite, name: string, options: { confirmed?: boolean } = {}): Promise<string> {
   const email = `${name.toLowerCase()}@example.com`
 
-  expect((await site.submit(join, { username: name, email, password: 'correct horse battery' }, { from: '/register' })).url).toBe('/')
+  expect((await site.submit(join, { username: name, email, password: 'correct horse battery' }, { from: await site.visit('/register') })).url).toBe('/')
 
   if (options.confirmed)
     expect((await site.submit(confirm, { token: await mailedToken(site, email, '/verify') }, { from: '/verify' })).url).toBe('/')

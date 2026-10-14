@@ -9,12 +9,13 @@ import { fixedText, gzipBetween, preferredEncoding } from './compress'
 import { renderServerIslands, servePrerendered } from './render'
 import { freshStamp, STAMP_HOLE } from './stamp'
 import { freshWork } from './work'
+import { freshFieldWork } from './work-scope'
 
 const DEFERRED = '<slot data-kay-server='
 const GZIP: ReadonlySet<'gzip'> = new Set(['gzip'])
 
-// What fills a gap of the page per request: a server island, by its place in the page, a form's stamp, by the action it posts to, or a `proofOfWork` challenge, by its mark.
-type Hole = { island: number } | { action: string } | { work: string }
+// What fills a gap of the page per request: a server island, by its place in the page, a form's stamp, by the action it posts to, or a `proofOfWork` challenge or a `workChallenge` field, by its mark.
+type Hole = { island: number } | { action: string } | { work: string } | { field: string }
 
 // The page cut at its holes, each part deflated once.
 interface Cut {
@@ -55,7 +56,7 @@ async function cutOf(page: ServedPage, all: boolean): Promise<Cut> {
 
 async function cutAt(html: string, all: boolean): Promise<Cut> {
   const islands = [...html.matchAll(SERVER_ISLAND)].filter(match => all || modeOf(match) === 'inline').map(match => ({ match, hole: { island: Number(match[1]) } }))
-  const stamps = [...html.matchAll(STAMP_HOLE)].map(match => ({ match, hole: match[1] === undefined ? { work: match[2]! } : { action: decodeURIComponent(match[1]) } }))
+  const stamps = [...html.matchAll(STAMP_HOLE)].map(match => ({ match, hole: match[1] !== undefined ? { action: decodeURIComponent(match[1]) } : match[2] !== undefined ? { work: match[2] } : { field: match[3]! } }))
   const parts: string[] = []
   const holes: Hole[] = []
   let from = 0
@@ -74,7 +75,7 @@ async function cutAt(html: string, all: boolean): Promise<Cut> {
 // The page with its holes filled for this request, gzipped when the browser takes it.
 async function splice(page: ServedPage, all: boolean, islands: string[], request: Request): Promise<{ body: string | Uint8Array<ArrayBuffer> | ReadableStream<Uint8Array>, gzip: boolean }> {
   const { parts, holes } = await cutOf(page, all)
-  const between = holes.map(hole => 'action' in hole ? freshStamp(hole.action) : 'work' in hole ? freshWork(hole.work) : islands[hole.island] ?? '')
+  const between = holes.map(hole => 'action' in hole ? freshStamp(hole.action) : 'work' in hole ? freshWork(hole.work) : 'field' in hole ? freshFieldWork(hole.field) : islands[hole.island] ?? '')
 
   if (!preferredEncoding(request.headers.get('accept-encoding'), GZIP))
     return { body: parts.map((part, index) => part.bytes.toString() + (between[index] ?? '')).join(''), gzip: false }

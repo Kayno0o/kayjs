@@ -6,6 +6,7 @@ export const signIn = action(s.Object({
   identifier: s.String({ maxLength: 254 }),
   password: s.String({ maxLength: 128 }),
   redirect: s.Optional(s.String({ maxLength: 2000 })),
+  captcha: s.Optional(s.String({ maxLength: 512 })),
 }), async (input, ctx) => {
   const result = await ctx.locals.auth.signInWithPassword(input)
 
@@ -19,11 +20,12 @@ export const signIn = action(s.Object({
 export const mailLink = action(s.Object({
   email: s.String({ maxLength: 254 }),
   redirect: s.Optional(s.String({ maxLength: 2000 })),
-}), async ({ email, redirect }, ctx) => {
-  const result = await ctx.locals.auth.requestMagicLink(email, redirect)
+  captcha: s.Optional(s.String({ maxLength: 512 })),
+}), async ({ email, redirect, captcha }, ctx) => {
+  const result = await ctx.locals.auth.requestMagicLink(email, redirect, { captcha })
 
   if (!result.ok)
-    return ctx.fail(result.error === 'limited' ? 429 : 503, { error: result.error })
+    return ctx.fail(result.error === 'limited' ? 429 : result.error === 'captcha' ? 400 : 503, { error: result.error })
 
   return { sent: true }
 })
@@ -31,6 +33,8 @@ export const mailLink = action(s.Object({
 const redirect = ctx.url.searchParams.get('redirect') ?? '/'
 const signInFailure = ctx.failed(signIn)?.data?.error
 const linkFailure = ctx.failed(mailLink)?.data?.error
+// kayjs-auth asks a proof of work of every magic link, and of a password sign-in once this client failed three times.
+const [signInChallenge, linkChallenge] = await Promise.all([ctx.locals.auth.captchaChallenge('sign-in'), ctx.locals.auth.captchaChallenge('magic-link')])
 --- script
 import Button from '@kaynooo/kayjs-ui/button.kay'
 import FormField from '@kaynooo/kayjs-ui/form-field.kay'
@@ -44,6 +48,8 @@ form.page-form(action={signIn})
     input(name="identifier" autocomplete="username" required)
   FormField(label="Password" required)
     input(name="password" type="password" autocomplete="current-password" required)
+  if signInChallenge
+    input(type="hidden" name="captcha" data-kay-work={signInChallenge})
   if signInFailure
     p.text-kui-error {FAILURE_WORDS[signInFailure]}
   Button(label="Sign in" variant="accent" type="submit")
@@ -52,6 +58,8 @@ form.page-form(action={mailLink})
   input(type="hidden" name="redirect" value={redirect})
   FormField(label="Email" required)
     input(name="email" type="email" autocomplete="email" required)
+  if linkChallenge
+    input(type="hidden" name="captcha" data-kay-work={linkChallenge})
   if mailLink.succeeded()
     p.text-kui-success If a member has this address, a link to sign in is on its way.
   if linkFailure

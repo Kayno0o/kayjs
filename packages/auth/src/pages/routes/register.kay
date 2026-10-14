@@ -7,7 +7,7 @@ import Captcha from '../components/captcha.kay'
 import Message from '../components/message.kay'
 import Panel from '../components/panel.kay'
 import Separator from '../components/separator.kay'
-import { captchaOf, failure, issue, schemas } from '../forms'
+import { captchaOf, guarded, issue, refusal, schemas } from '../forms'
 import Button from '@kaynooo/kayjs-ui/button.kay'
 import FormField from '@kaynooo/kayjs-ui/form-field.kay'
 
@@ -24,7 +24,7 @@ export const register = action(schemas.register, async (input, ctx) => {
     return 'verify'
 
   return ctx.redirect(safeRedirect(input.redirect, localize(ctx.locals.auth.features().pages?.home ?? '/')))
-})
+}, guarded)
 
 const auth = ctx.locals.auth
 const features = auth.features()
@@ -39,10 +39,10 @@ const user = await auth.user()
 if (user && !user.guest)
   ctx.redirect(redirect)
 
-const captcha = await auth.captchaRequired('register')
+const [captcha, challenge] = await Promise.all([auth.captchaRequired('register'), auth.captchaChallenge('register')])
 const refused = ctx.failed(register)?.data
 const fields = refused && 'fields' in refused ? refused.fields : {}
-const error = refused && 'error' in refused ? refused.error : undefined
+const error = refusal(ctx.failed(register), features.captcha)
 const verify = ctx.succeeded(register) !== undefined
 ---
 head
@@ -66,9 +66,9 @@ Panel(title={t('auth.register.title')})
         input(name="remember" type="checkbox")
         span {t('auth.remember')}
       if features.captcha && captcha
-        Captcha(widget={features.captcha})
+        Captcha(widget={features.captcha} challenge={challenge})
       if error
-        Message(text={failure(error)})
+        Message(text={error})
       Button(type="submit" variant="accent" label={t('auth.register.submit')})
   p.text-center
     | {t('auth.register.haveAccount')} #[a(href={localize(`${prefix}/sign-in?redirect=${encodeURIComponent(redirect)}`)}) {t('auth.register.signIn')}]

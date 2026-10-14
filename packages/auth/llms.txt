@@ -1,6 +1,6 @@
 # kayjs-auth
 
-> Auth for kay apps, built on kay's `session()`: OAuth sign-in with any provider, passwords, mailed links (email verification, password reset, magic links, email change), TOTP two-factor with recovery codes, bearer tokens for devices and API clients, security mails, a CAPTCHA hook, a breached-password check, a fail-closed gate for routes, and prebuilt sign-in and account pages. It works in kay pages, actions and guards, and in a plain Elysia app. Its data lives in a store: in memory for tests, in Postgres or SQLite through pg-orm, or in any object keeping the store contract.
+> Auth for kay apps, built on kay's `session()`: OAuth sign-in with any provider, passwords, mailed links (email verification, password reset, magic links, email change), TOTP two-factor with recovery codes, bearer tokens for devices and API clients, security mails, a proof-of-work CAPTCHA or a third party's, a breached-password check, a fail-closed gate for routes, and prebuilt sign-in and account pages. It works in kay pages, actions and guards, and in a plain Elysia app. Its data lives in a store: in memory for tests, in Postgres or SQLite through pg-orm, or in any object keeping the store contract.
 
 ## Rules that are easy to get wrong
 
@@ -79,12 +79,12 @@ export const auth = createAuth({ /* ... */ pages: true })
 - With `pages`, `signInPage`, `twoFactorPage`, `sessionsPage` and every `email.links` default to those pages, and `auth.guard()` without `redirect` sends an anonymous visitor to the sign-in page, `?redirect=` back. Without `pages`, `email.links` names a page for each kind, or `createAuth` throws.
 - An app file at a page's path replaces that page alone: `src/routes/auth/magic-link.kay` is the app's own magic-link page. Its texts live under `auth` in kay's messages: a key in the app's `src/messages/en.ts`, such as `auth: { signIn: { title: 'Welcome back' } }`, replaces that text and keeps the rest.
 - The pages reached before signing in, `sign-in`, `register`, `two-factor`, `reset-password`, `verify-email`, `magic-link` and `confirm-email`, set `guards: false`: none of the app's guards above them runs there, whatever it checks. An app's root `_guard.ts` asking for a session, `export default auth.guard()`, keeps the rest of the site to signed-in users and still lets visitors sign in, the `account` pages keeping it; but a guard for maintenance, an IP allow-list or invite-only access skips those pages too. An app needing such a guard on one of them replaces that page with its own, which the app's guards cover unless it sets `guards: false`; an app page replacing one under a guard asking for a session sets it. kayjs-auth's own routes, OAuth and the rest, are its plugin's, which page guards never reach.
-- `captcha.widget`, `turnstileWidget(siteKey)` or `hcaptchaWidget(siteKey)`, is the widget the pages show where `captchaRequired` asks for one.
+- `captcha.widget`, `turnstileWidget(siteKey)` or `hcaptchaWidget(siteKey)`, is the widget the pages show where `captchaRequired` asks for one; with the proof of work they carry its field instead, and say JavaScript is needed to a browser without it.
 - A provider's button reads its `label`, set on each preset (`GitHub`, `Google`) and overridden by `oauth.<name>.label`.
 - kayjs-ui is a peer of kayjs-auth, so the pages render with the app's own copy; the app keeps `@iconify-json/tabler` and Tailwind, kayjs-ui's peers.
 - kayjs-auth and kayjs-ui are released with kay at its version and peer on kay's minor: the app installs the ones matching its kay and moves them together.
 
-`auth.features()` tells any page, prebuilt or the app's own, what the config enables: `{ providers: [{ name, label }], email, codes, signUp, requireVerified, passkeys, captcha, scopes, prefix, signInPage, pages }`.
+`auth.features()` tells any page, prebuilt or the app's own, what the config enables: `{ providers: [{ name, label }], email, codes, signUp, requireVerified, passkeys, captcha, scopes, prefix, signInPage, pages }`, `captcha` being the widget, `'proof-of-work'` or null.
 
 ## The signed-in user
 
@@ -206,7 +206,7 @@ if failure?.data?.error === 'invalid'
 
 ## Guests
 
-- `signInAsGuest({ captcha? })` signs the browser in as a new user with `guest: true`, no email and no password, so the app keeps their cart or their drafts before they sign up; `onSignUp` runs for them then. It is counted and CAPTCHA-checked as registering is, answers the guest signed in already as is, and `{ ok: false, error: 'signed-in' }` to anyone else.
+- `signInAsGuest({ captcha? })` signs the browser in as a new user with `guest: true`, no email and no password, so the app keeps their cart or their drafts before they sign up; `onSignUp` runs for them then. It is counted as registering is and CAPTCHA-checked as `'guest'`, answers the guest signed in already as is, and `{ ok: false, error: 'signed-in' }` to anyone else.
 - `register(...)` from a guest's browser makes the guest that account, keeping their id and so the app's data; it stays signed in even with `requireVerified`, and `onSignUp` does not run again. A guest registering an address another account holds stays a guest, `{ ok: true, signedIn: false }`, so a guest's browser can tell a held address from a free one, at the 6 registrations an hour `register` allows a client. An OAuth sign-in with a provider account no user has does the same; one a user has already signs in as that user, leaving the guest behind.
 - A guest's way back in is their session: once it ends, the guest is left in the store. `listUsers` shows them, `guest: true`.
 
@@ -378,18 +378,23 @@ createAuth({
 ## Bots and breached passwords
 
 ```ts
-import { createAuth, turnstile } from '@kaynooo/kayjs-auth'
+import { createAuth, turnstile, turnstileWidget } from '@kaynooo/kayjs-auth'
 
 createAuth({
   // ...
-  captcha: { verify: turnstile(process.env.TURNSTILE_SECRET!), on: { 'sign-in': 3, 'reset': 'always' } },
+  captcha: { verify: turnstile(process.env.TURNSTILE_SECRET!), widget: turnstileWidget(process.env.TURNSTILE_SITE_KEY!), on: { 'sign-in': 3, 'reset': 'always' } },
   breachedPasswords: true,
 })
 ```
 
-- `captcha.verify(token, action)` checks the token the page's widget posted, for `action` one of `'register'`, `'sign-in'`, `'reset'` and `'magic-link'`. `turnstile(secret)` and `hcaptcha(secret)` are presets calling the provider's siteverify; their widgets post the token as `cf-turnstile-response` and `h-captcha-response`, which the action passes on.
+- `captcha` is kay's proof of work unless set, `proofOfWork()`: no third party, no widget and no cookie, the browser hashing for some tens of milliseconds before the request goes through. It costs a bot CPU on each request rather than proving a human, so a site bots target anyway, or whose accounts are worth money to a spammer, sets Turnstile or hCaptcha instead. `captcha: false` turns it off.
+- `proofOfWork({ difficulty, maxAge, store, on })`: `difficulty` is 100,000 by default, doubled with each request past the threshold up to 16 times, and `maxAge` an hour; `store` keeps the solutions already used, this process's memory by default, `sqliteRates(path)` from `kay/server` sharing them between processes; `on` asks registering, resets and magic links always, a password sign-in from the third attempt, and a guest sign-in never, which an app often makes with no form.
+- `await auth.captchaChallenge(action)` is the challenge for this client's next request, null when none is needed or the CAPTCHA is a third party's. A form carries it as `input(type="hidden" name="captcha" data-kay-work={challenge})`, kay's script posts its solution as the field's value, and the action passes it on as the token below; the prebuilt pages do, naming the field `kayjs-captcha`.
+- A browser without JavaScript posts the field empty, refused as `'captcha'`; the prebuilt pages then say JavaScript is needed, and set a honeypot and a two-second `minTime` on their forms for the requests a post without JavaScript still reaches.
+- Upgrading from a kayjs-auth without it: the app's own register, reset and magic-link forms carry the field, or the app sets `captcha: false`. A test posts from the page it visited, `site.submit(register, fields, { from: await site.visit('/register') })`, which `site.submit` solves the field of.
+- `captcha.verify(token, action)` checks the token the page's widget posted, for `action` one of `'register'`, `'guest'`, `'sign-in'`, `'reset'` and `'magic-link'`. `turnstile(secret)` and `hcaptcha(secret)` are presets calling the provider's siteverify; their widgets post the token as `cf-turnstile-response` and `h-captcha-response`, which the action passes on.
 - The token goes in as `register({ ..., captcha })`, `signInWithPassword({ ..., captcha })`, `requestPasswordReset(email, { captcha })` and `requestMagicLink(email, redirect, { captcha })`. A missing or refused token answers `{ ok: false, error: 'captcha' }`, and so does a `verify` that throws. The request still counts against the client's limit.
-- `captcha.on` sets each request to `'always'` (every one, by default), `false`, or a number: asked only once this client made that many of it in the limit's window, so people rarely see it. `auth.captchaRequired(action)` says whether the next one needs it, for the page to show the widget. `captcha.widget` names that widget for the prebuilt pages and `features()`.
+- `captcha.on` sets each request to `'always'` (every one, by default for a third party's check, a guest sign-in as registering), `false`, or a number: asked only once this client made that many of it in the limit's window, so people rarely see it. `auth.captchaRequired(action)` says whether the next one needs it, for the page to show the widget. `captcha.widget` names that widget for the prebuilt pages and `features()`.
 - `breachedPasswords: true` refuses a new password Have I Been Pwned lists, on `register`, `resetPassword` and `changePassword`, as `errors.password: 'breached'`. Only the first five characters of the password's SHA-1 leave the server, the answer padded with decoys. A function `(password) => boolean` checks against a list of the app's own instead. A check that fails or takes over three seconds lets the password through, logged: an outage never stops anyone registering. `pwnedPassword(password)` is exported for a check of the app's own.
 
 ## Limits

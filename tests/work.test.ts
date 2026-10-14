@@ -6,16 +6,20 @@ import { stringify } from 'devalue'
 import { clientDir } from '../src/build/assets'
 import { resolveProject } from '../src/project'
 import { action, actionStub } from '../src/runtime/action'
+import { newServerIslands, withServerIslands } from '../src/runtime/html'
 import { digest, sha256, solveWork } from '../src/runtime/work'
 import { servePages } from '../src/server/app'
-import { STAMP_HOLE } from '../src/server/stamp'
-import { freshWork, signWork, workScript } from '../src/server/work'
+import { memoryRates } from '../src/server/protection'
+import { STAMP_HOLE, useStampSecret } from '../src/server/stamp'
+import { freshWork, signWork, workRefusal, workScript } from '../src/server/work'
+import { freshFieldWork, verifyWork, workChallenge } from '../src/server/work-scope'
 import { testSite } from '../src/test'
 
 const routes = 'tests/fixtures/production/src/routes'
 const ROUTE = '/_kay/action/tests/fixtures/production/src/routes/work.kay'
 // Held in a variable so tsc leaves the .kay import to Bun.
 const PAGE = './fixtures/production/src/routes/work.kay'
+const SCOPED_PAGE = './fixtures/navigation/src/routes/scoped.kay'
 const WORK = /<script type="application\/json" data-kay-work>(.*?)<\/script>/
 const client: ClientBuild = { entry: '/_kay/entry.js', entryImports: [], islands: {}, styles: new Map(), pages: new Map(), dir: clientDir(process.cwd()), navigation: true }
 const app = await servePages(resolveProject(process.cwd(), { routes, security: false }), async () => client)
@@ -178,5 +182,67 @@ describe('proof-of-work', () => {
   it('refuses a difficulty it cannot use as the action is declared', () => {
     expect(() => action({} as never, () => 0, { proofOfWork: 0 })).toThrow('proofOfWork\'s difficulty is 0')
     expect(() => action({} as never, () => 0, { proofOfWork: 1.5 })).toThrow('whole number')
+  })
+})
+
+describe('workChallenge', () => {
+  const SCOPED = /data-kay-work="([^"]+)"/
+
+  it('gives a form field a challenge the action checks itself, solved once by kay/test as the browser does', async () => {
+    const site = await testSite({ routes: 'tests/fixtures/navigation/src/routes', security: false })
+    const { contact } = await import(SCOPED_PAGE) as { contact: Action<{ message: string, proof?: string }, number> }
+    const page = await site.visit('/scoped')
+    const challenge = SCOPED.exec(page.html)![1]!
+
+    expect((await site.submit(contact, { message: 'hello' }, { from: page })).html).toContain('<p class="sent">Sent 5</p>')
+    // Without JavaScript the field posts empty; a solution goes through once.
+    expect((await site.submit(contact, { message: 'hello', proof: '' }, { from: page })).html).toContain('<p class="error">missing</p>')
+    expect((await site.submit(contact, { message: 'hello', proof: solveWork(challenge)! }, { from: page })).html).toContain('<p class="error">wrong</p>')
+  })
+
+  it('refuses as expired a challenge of another scope, an action\'s, an easier one, one past its maxAge or signed before the key changed', async () => {
+    const solved = solveWork(workChallenge('contact', { difficulty: 50, maxAge: '1m' }))!
+
+    expect(await verifyWork(solved, 'newsletter')).toBe('expired')
+    expect(await verifyWork(solveWork(signWork('contact', 50, 60_000)), 'contact')).toBe('expired')
+    expect(await workRefusal('contact', solved, memoryRates())).toBe('expired')
+    expect(await verifyWork(solved, 'contact', { difficulty: 51 })).toBe('expired')
+    expect(await verifyWork(`${solved.slice(0, solved.lastIndexOf('.'))}.x`, 'contact')).toBe('wrong')
+    expect(await verifyWork(undefined, 'contact')).toBe('missing')
+
+    setSystemTime(Date.now() + 61_000)
+
+    try {
+      expect(await verifyWork(solved, 'contact')).toBe('expired')
+    }
+    finally {
+      setSystemTime()
+    }
+
+    const before = solveWork(workChallenge('contact', { difficulty: 50 }))!
+
+    useStampSecret('a session secret of at least thirty-two characters', 'session')
+
+    expect(await verifyWork(before, 'contact')).toBe('expired')
+    expect(await verifyWork(solveWork(workChallenge('contact', { difficulty: 50 })), 'contact', { difficulty: 50 })).toBeUndefined()
+  })
+
+  it('leaves a prerendered page a mark the server fills in with a fresh challenge per visit', async () => {
+    const mark = withServerIslands(newServerIslands(true), () => workChallenge('contact', { difficulty: 50, maxAge: '1m' }))
+    const holes = [...`<input type="hidden" name="proof" data-kay-work="${mark}">`.matchAll(STAMP_HOLE)]
+
+    expect(holes).toHaveLength(1)
+
+    const fresh = () => SCOPED.exec(freshFieldWork(holes[0]![3]!))![1]!
+    const first = fresh()
+
+    expect(first).not.toBe(fresh())
+    expect(Number.parseInt(first.slice(0, first.indexOf('.')), 36) - Date.now()).toBeLessThanOrEqual(60_000)
+    expect(await verifyWork(solveWork(first), 'contact', { difficulty: 50 })).toBeUndefined()
+  })
+
+  it('refuses a difficulty it cannot use', () => {
+    expect(() => workChallenge('contact', { difficulty: 0 })).toThrow('difficulty is 0')
+    expect(() => workChallenge('contact', { difficulty: 1.5 })).toThrow('whole number')
   })
 })

@@ -1,0 +1,28 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+import { verifyWork, workChallenge } from 'kay/server'
+
+// A challenge checked by the action's own code rather than by kay before it, as a library checks one: its field posts the solution.
+export const contact = action(t.Object({ message: t.String({ maxLength: 200 }), proof: t.Optional(t.String({ maxLength: 512 })) }), async ({ message, proof }, ctx) => {
+  const refused = await verifyWork(proof, 'contact', { difficulty: 500 })
+
+  if (refused)
+    return ctx.fail(422, { refused })
+
+  return message.length
+})
+
+const failure = ctx.failed(contact)?.data
+const sent = ctx.succeeded(contact)
+---
+head
+  title Scoped
+form(action={contact})
+  input(name="message" aria-label="Message")
+  input(type="hidden" name="proof" data-kay-work={workChallenge('contact', { difficulty: 500, maxAge: '1h' })})
+  button Send
+if failure
+  p.error {failure.refused}
+if sent
+  p.sent Sent {sent.data}

@@ -91,6 +91,39 @@ form(action={signIn})
 
 Changing what protects the account (`changePassword`, `changeEmail`, `deleteAccount`, the second factor, passkeys, linked providers, tokens) takes a `proof`: `{ password }`, `{ code }` from the authenticator or a recovery code, or `{ passkey }`. With two-factor on, `changeEmail`, `disableTwoFactor`, `regenerateRecoveryCodes`, `passkeyRegistrationOptions` and `linkProvider` refuse the password alone and take the code or a passkey.
 
+## Bots
+
+Registering, password resets and magic links ask for a proof of work by default, and a password sign-in from the third attempt: the browser hashes for some tens of milliseconds before the request goes through, with no third party and no cookie. The prebuilt pages carry it; your own form carries `captchaChallenge` in a `data-kay-work` field, whose solution your action passes on as `captcha`:
+
+```kay
+--- server
+import { s } from 'kay'
+
+export const register = action(s.Object({
+  email: s.String({ maxLength: 254 }),
+  password: s.String({ maxLength: 128 }),
+  captcha: s.Optional(s.String({ maxLength: 512 })),
+}), async (input, ctx) => {
+  const result = await ctx.locals.auth.register(input)
+
+  if (!result.ok)
+    return ctx.fail(400, { error: 'error' in result ? result.error : 'invalid' })
+
+  return ctx.redirect('/')
+})
+
+const challenge = await ctx.locals.auth.captchaChallenge('register')
+---
+form(action={register})
+  input(name="email" type="email" autocomplete="email")
+  input(name="password" type="password" autocomplete="new-password")
+  if challenge
+    input(type="hidden" name="captcha" data-kay-work={challenge})
+  button Create the account
+```
+
+A proof of work costs a bot CPU rather than proving a human: a site bots target anyway sets Turnstile or hCaptcha as `captcha` instead, and `captcha: false` turns it off.
+
 ## Guarding routes
 
 A `_guard.ts` default-exports the guard. An anonymous visitor goes to `redirect`, one without the role gets a 403:

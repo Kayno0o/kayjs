@@ -4,11 +4,11 @@ import { FAILURE_WORDS, PASSWORD_WORDS } from '../words'
 
 export const page = { query: s.Object({ token: s.Optional(s.String()) }) }
 
-export const request = action(s.Object({ email: s.String({ maxLength: 254 }) }), async ({ email }, ctx) => {
-  const result = await ctx.locals.auth.requestPasswordReset(email)
+export const request = action(s.Object({ email: s.String({ maxLength: 254 }), captcha: s.Optional(s.String({ maxLength: 512 })) }), async ({ email, captcha }, ctx) => {
+  const result = await ctx.locals.auth.requestPasswordReset(email, { captcha })
 
   if (!result.ok)
-    return ctx.fail(result.error === 'limited' ? 429 : 503, { error: result.error })
+    return ctx.fail(result.error === 'limited' ? 429 : result.error === 'captcha' ? 400 : 503, { error: result.error })
 
   return { sent: true }
 })
@@ -27,6 +27,7 @@ const refused = ctx.failed(choose)?.data
 const passwordIssue = refused?.errors?.password && PASSWORD_WORDS[refused.errors.password]
 const chooseFailure = refused?.error
 const token = ctx.query.token
+const challenge = token ? null : await ctx.locals.auth.captchaChallenge('reset')
 --- script
 import Button from '@kaynooo/kayjs-ui/button.kay'
 import FormField from '@kaynooo/kayjs-ui/form-field.kay'
@@ -48,6 +49,8 @@ else
   form.page-form(action={request})
     FormField(label="Email" required)
       input(name="email" type="email" autocomplete="email" required)
+    if challenge
+      input(type="hidden" name="captcha" data-kay-work={challenge})
     if request.succeeded()
       p.text-kui-success If a member has this address, a link to reset the password is on its way.
     if requestFailure

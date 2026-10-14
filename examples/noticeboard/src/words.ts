@@ -28,4 +28,5 @@ export const FAILURE_WORDS: Record<string, string> = {
   unavailable: 'Mail cannot be sent right now',
   proof: 'Wrong password',
   stale: 'Sign in again first',
+  captcha: 'This form runs a check in your browser, which needs JavaScript: turn it on, then send it again',
 }

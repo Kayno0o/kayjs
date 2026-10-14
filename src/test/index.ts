@@ -17,7 +17,7 @@ import { encodeCall, minTimeOf, readActionResponse, STAMP_FIELD } from '../runti
 import { durationSeconds } from '../runtime/duration'
 import { openSocket, readEvents, routeUrl, streamRequest } from '../runtime/live'
 import { effect, root as reactiveRoot } from '../runtime/reactive'
-import { PAGE_HEADER, WORK_HEADER } from '../runtime/swap'
+import { PAGE_HEADER, WORK_FIELD, WORK_HEADER, WORK_SCRIPT } from '../runtime/swap'
 import { solveWork } from '../runtime/work'
 import { servePages } from '../server/app'
 import { shutdown } from '../server/lifecycle'
@@ -340,6 +340,14 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
 
       if (stamp !== undefined && !(STAMP_FIELD in fields))
         form.set(STAMP_FIELD, stamp)
+
+      // Its `workChallenge` fields post their solution, as kay's script sends them.
+      for (const field of url === undefined ? [] : page?.find(`form[action^="${url.pathname}"] ${WORK_FIELD}`) ?? []) {
+        const { name, [WORK_SCRIPT]: challenge } = field.attributes
+
+        if (name !== undefined && challenge !== undefined && !(name in fields))
+          form.set(name, solveWork(challenge) ?? '')
+      }
 
       for (const [name, value] of Object.entries(fields as Record<string, FormValue | FormValue[] | undefined>)) {
         for (const item of Array.isArray(value) ? value : [value]) {

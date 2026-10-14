@@ -82,6 +82,8 @@ export interface MinTimeOptions {
   maxAge?: Duration | undefined
   // Answers a post sent too soon as if it went through, the handler never running, rather than refusing it.
   pretend?: boolean | undefined
+  // Checks only a form the browser posts itself, without kay's script, leaving a page swap's post and a call to what checks those, such as a proof of work.
+  plain?: boolean | undefined
 }
 
 export interface ProofOfWorkOptions {
@@ -402,7 +404,7 @@ export function workOf(protection: ActionProtection<string>): { difficulty: numb
 }
 
 // `minTime` in milliseconds, read once it is set.
-export function minTimeOf(protection: ActionProtection<string>): { after: number, maxAge: number, pretend: boolean } | undefined {
+export function minTimeOf(protection: ActionProtection<string>): { after: number, maxAge: number, pretend: boolean, plain: boolean } | undefined {
   const { minTime } = protection
 
   if (minTime === undefined)
@@ -410,7 +412,7 @@ export function minTimeOf(protection: ActionProtection<string>): { after: number
 
   const options = typeof minTime === 'object' ? minTime : { after: minTime }
 
-  return { after: durationSeconds(options.after, 'minTime') * 1000, maxAge: durationSeconds(options.maxAge ?? DAY, 'minTime.maxAge') * 1000, pretend: options.pretend === true }
+  return { after: durationSeconds(options.after, 'minTime') * 1000, maxAge: durationSeconds(options.maxAge ?? DAY, 'minTime.maxAge') * 1000, pretend: options.pretend === true, plain: options.plain === true }
 }
 
 export function honeypotField(protection: ActionProtection<string> | undefined): string | undefined {

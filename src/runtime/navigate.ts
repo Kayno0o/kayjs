@@ -358,14 +358,14 @@ function onFormFocus(event: FocusEvent): void {
     const url = swappedActionUrl(form, null)
 
     takeFormCheck(form)
-    void preloadChecks(url && withoutBase(url.pathname))
+    void preloadChecks(url && withoutBase(url.pathname), form)
   }
 }
 
 // A form taking focus is about to be posted: form posting and its checks load then, so a page with no form never fetches them.
-async function preloadChecks(action: string | undefined): Promise<void> {
+async function preloadChecks(action: string | undefined, form: HTMLFormElement): Promise<void> {
   try {
-    await (await loadForms()).preloadChecks(action)
+    await (await loadForms()).preloadChecks(action, form)
   }
   catch {}
 }

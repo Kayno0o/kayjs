@@ -37,7 +37,7 @@ it('joins, signed in at once, and mails a link that confirms the address', async
 })
 
 it('words what kayjs-auth refuses a new member for', async () => {
-  const page = await site.submit(join, { username: 'x', email: 'not an address', password: 'short' }, { from: '/register' })
+  const page = await site.submit(join, { username: 'x', email: 'not an address', password: 'short' }, { from: await site.visit('/register') })
 
   expect(page.status).toBe(400)
   expect(page.html).toContain('Write 2 to 32 characters')
@@ -50,7 +50,7 @@ it('keeps the account section for members, and comes back to it after signing in
 
   try {
     expect((await visitor.visit('/account')).url).toBe('/login?redirect=%2Faccount')
-    expect((await visitor.submit(signIn, { identifier: 'nobody', password: 'wrong password!' }, { from: '/login' })).html).toContain('Wrong name, address or password')
+    expect((await visitor.submit(signIn, { identifier: 'nobody', password: 'wrong password!' }, { from: await visitor.visit('/login') })).html).toContain('Wrong name, address or password')
   }
   finally {
     await visitor.close()
@@ -59,7 +59,7 @@ it('keeps the account section for members, and comes back to it after signing in
   await joinAs(site, 'Grace')
   expect((await site.submit(signOut, {}, { from: '/account' })).url).toBe('/')
   expect((await site.visit('/account')).url).toBe('/login?redirect=%2Faccount')
-  expect((await site.submit(signIn, { identifier: 'grace', password: 'correct horse battery', redirect: '/account' }, { from: '/login?redirect=%2Faccount' })).url).toBe('/account')
+  expect((await site.submit(signIn, { identifier: 'grace', password: 'correct horse battery', redirect: '/account' }, { from: await site.visit('/login?redirect=%2Faccount') })).url).toBe('/account')
 })
 
 it('signs in from a mailed link, which only its button spends', async () => {
@@ -67,7 +67,7 @@ it('signs in from a mailed link, which only its button spends', async () => {
 
   await site.submit(signOut, {}, { from: '/account' })
   outbox.clear()
-  expect((await site.submit(mailLink, { email }, { from: '/login' })).html).toContain('a link to sign in is on its way')
+  expect((await site.submit(mailLink, { email }, { from: await site.visit('/login') })).html).toContain('a link to sign in is on its way')
   const token = await mailedToken(site, email, '/magic')
 
   expect((await site.visit(`/magic?token=${token}`)).find('nav a')[1]?.text).toBe('Sign in')
@@ -80,11 +80,11 @@ it('resets a forgotten password from a mailed link', async () => {
 
   await site.submit(signOut, {}, { from: '/account' })
   outbox.clear()
-  await site.submit(request, { email }, { from: '/reset' })
+  await site.submit(request, { email }, { from: await site.visit('/reset') })
   const token = await mailedToken(site, email, '/reset')
 
   expect((await site.submit(choose, { token, password: 'short' }, { from: `/reset?token=${token}` })).html).toContain('Write at least 10 characters')
   expect((await site.submit(choose, { token, password: 'a brand new passphrase' }, { from: `/reset?token=${token}` })).find('nav a')[1]?.text).toBe('Barbara')
   await site.submit(signOut, {}, { from: '/account' })
-  expect((await site.submit(signIn, { identifier: email, password: 'a brand new passphrase' }, { from: '/login' })).url).toBe('/')
+  expect((await site.submit(signIn, { identifier: email, password: 'a brand new passphrase' }, { from: await site.visit('/login') })).url).toBe('/')
 })

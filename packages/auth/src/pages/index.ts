@@ -30,8 +30,8 @@ export interface AuthFeatures {
   // Whether password sign-in waits for a verified address, the default with mail.
   requireVerified: boolean
   passkeys: boolean
-  // The CAPTCHA widget to show where `captchaRequired` says one is needed; null without one.
-  captcha: CaptchaWidget | null
+  // The CAPTCHA widget to show where `captchaRequired` says one is needed, `'proof-of-work'` for kay's, whose field carries `captchaChallenge`, or null without one.
+  captcha: CaptchaWidget | 'proof-of-work' | null
   // What a bearer token may be limited to; any token may do anything without them.
   scopes: string[]
   // Where kayjs-auth's own routes live: `${prefix}/github` starts a GitHub sign-in.
@@ -52,7 +52,7 @@ export function featuresOf(core: Core): AuthFeatures {
     signUp: core.signUp,
     requireVerified: core.email?.requireVerified ?? false,
     passkeys: core.passkeys !== undefined,
-    captcha: core.captcha?.widget ?? null,
+    captcha: !core.captcha ? null : 'proofOfWork' in core.captcha ? 'proof-of-work' : core.captcha.widget ?? null,
     scopes: [...core.scopes],
     prefix: core.prefix,
     signInPage: core.signInPage,

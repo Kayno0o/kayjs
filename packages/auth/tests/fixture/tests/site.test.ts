@@ -40,7 +40,7 @@ const text = (page: Page, selector: string) => page.find(selector)[0]?.text
 // A visitor who registered from the account's sign-in redirect, landing on their account.
 async function signedUp(email: string) {
   const visitor = await browser()
-  const account = await visitor.submit(register, { email, password: PASSWORD, redirect: '/auth/account' }, { from: '/auth/register?redirect=%2Fauth%2Faccount' })
+  const account = await visitor.submit(register, { email, password: PASSWORD, redirect: '/auth/account' }, { from: await visitor.visit('/auth/register?redirect=%2Fauth%2Faccount') })
 
   expect(account).toMatchObject({ url: '/auth/account', status: 200 })
 
@@ -72,7 +72,7 @@ describe('the prebuilt pages', () => {
 
     expect(await ada.visit('/auth/account')).toMatchObject({ url: '/auth/sign-in?redirect=%2Fauth%2Faccount', status: 200 })
 
-    const account = await ada.submit(register, { email: 'ada@example.com', password: PASSWORD, redirect: '/auth/account' }, { from: '/auth/register?redirect=%2Fauth%2Faccount' })
+    const account = await ada.submit(register, { email: 'ada@example.com', password: PASSWORD, redirect: '/auth/account' }, { from: await ada.visit('/auth/register?redirect=%2Fauth%2Faccount') })
 
     expect(text(account, '#kayjs-auth-email')).toBe('ada@example.com')
     expect(await ada.submit(signOut, {}, { from: '/auth/account' })).toMatchObject({ url: '/' })
@@ -116,7 +116,8 @@ describe('the prebuilt pages', () => {
   test('a refused registration says why, field by field', async () => {
     await signedUp('taken@example.com')
 
-    const refused = await (await browser()).submit(register, { email: 'taken@example.com', password: 'short' }, { from: '/auth/register' })
+    const stranger = await browser()
+    const refused = await stranger.submit(register, { email: 'taken@example.com', password: 'short' }, { from: await stranger.visit('/auth/register') })
 
     expect(refused.status).toBe(400)
     expect(refused.find('.kui-form-field-issue').map(issue => issue.text)).toEqual(['An account already uses this address.', 'Use at least 10 characters.'])
@@ -133,10 +134,31 @@ describe('the prebuilt pages', () => {
     await (await signedUp('grace@example.com')).submit(signOut, {}, { from: '/auth/account' })
 
     const visitor = await browser()
-    const refused = await visitor.submit(password, { identifier: 'grace@example.com', password: 'wrong password', redirect: '/auth/account' }, { from: '/auth/sign-in' })
+    const refused = await visitor.submit(password, { identifier: 'grace@example.com', password: 'wrong password', redirect: '/auth/account' }, { from: await visitor.visit('/auth/sign-in') })
 
     expect(text(refused, '[role="alert"]')).toBe('Wrong email, username or password.')
-    expect(await visitor.submit(password, { identifier: 'grace@example.com', password: PASSWORD, redirect: '/auth/account' }, { from: '/auth/sign-in' })).toMatchObject({ url: '/auth/account' })
+    expect(await visitor.submit(password, { identifier: 'grace@example.com', password: PASSWORD, redirect: '/auth/account' }, { from: await visitor.visit('/auth/sign-in') })).toMatchObject({ url: '/auth/account' })
+  })
+
+  test('a form checks the browser before going through: refused without its script, sent too soon or filling the hidden field, in the page\'s language', async () => {
+    const visitor = await browser()
+    const fields = { email: 'bot@example.com', password: PASSWORD }
+    const noScript = await visitor.submit(register, { ...fields, 'kayjs-captcha': '' }, { from: await visitor.visit('/auth/register') })
+
+    expect(text(noScript, '[role="alert"]')).toBe('This form runs a check in your browser, which needs JavaScript: turn it on, then send it again.')
+    expect(text(await visitor.submit(register, { ...fields, 'kayjs-captcha': '' }, { from: await visitor.visit('/fr/auth/register') }), '[role="alert"]')).toBe('Ce formulaire fait une vérification dans votre navigateur, qui demande JavaScript : activez-le, puis renvoyez-le.')
+    expect(text(await visitor.submit(register, fields, { from: await visitor.visit('/auth/register'), openedFor: 0 }), '[role="alert"]')).toBe('Wait a moment, then send it again.')
+    expect((await visitor.submit(register, { ...fields, website: 'https://spam.example' }, { from: await visitor.visit('/auth/register') })).status).toBe(422)
+    expect(await store.users.findByEmail('bot@example.com')).toBeFalsy()
+  })
+
+  test('the sign-in page asks for the browser\'s check once a client has failed three times', async () => {
+    const visitor = await browser()
+
+    for (let attempt = 0; attempt < 3; attempt++)
+      await visitor.submit(password, { identifier: 'nobody@example.com', password: 'wrong password' }, { from: await visitor.visit('/auth/sign-in') })
+
+    expect((await visitor.visit('/auth/sign-in')).find('form input[name="kayjs-captcha"][data-kay-work]')).toHaveLength(2)
   })
 
   test('two-factor is set up from the security page, and a password sign-in then goes through the code page', async () => {
@@ -159,7 +181,7 @@ describe('the prebuilt pages', () => {
 
     const visitor = await browser()
 
-    expect(await visitor.submit(password, { identifier: 'totp@example.com', password: PASSWORD, redirect: '/auth/account' }, { from: '/auth/sign-in' })).toMatchObject({ url: '/auth/two-factor', status: 200 })
+    expect(await visitor.submit(password, { identifier: 'totp@example.com', password: PASSWORD, redirect: '/auth/account' }, { from: await visitor.visit('/auth/sign-in') })).toMatchObject({ url: '/auth/two-factor', status: 200 })
     expect(text(await visitor.submit(verify, { code: '000000' }, { from: '/auth/two-factor' }), '[role="alert"]')).toBe('Wrong code.')
 
     const account = await visitor.submit(verify, { code: await totpCode(secret, totpStep() + 1) }, { from: '/auth/two-factor' })
@@ -180,7 +202,7 @@ describe('the prebuilt pages', () => {
 
     const visitor = await browser()
 
-    expect(text(await visitor.submit(magicLink, { email: 'magic@example.com', redirect: '/auth/account' }, { from: '/auth/sign-in' }), '[role="status"]')).toBe('If an account has this address, a mail is on its way.')
+    expect(text(await visitor.submit(magicLink, { email: 'magic@example.com', redirect: '/auth/account' }, { from: await visitor.visit('/auth/sign-in') }), '[role="status"]')).toBe('If an account has this address, a mail is on its way.')
 
     const link = lastLink('magic-link')
 
@@ -199,7 +221,7 @@ describe('the prebuilt pages', () => {
 
     const visitor = await browser()
 
-    expect(text(await visitor.submit(request, { email: 'reset@example.com' }, { from: '/auth/reset-password' }), '[role="status"]')).toStartWith('If an account has this address')
+    expect(text(await visitor.submit(request, { email: 'reset@example.com' }, { from: await visitor.visit('/auth/reset-password') }), '[role="status"]')).toStartWith('If an account has this address')
 
     const link = lastLink('reset-password')
     const form = await visitor.visit(link.pathname + link.search)
@@ -233,7 +255,7 @@ describe('the prebuilt pages', () => {
     const ada = await signedUp('sessions@example.com')
     const phone = await browser()
 
-    await phone.submit(password, { identifier: 'sessions@example.com', password: PASSWORD }, { from: '/auth/sign-in' })
+    await phone.submit(password, { identifier: 'sessions@example.com', password: PASSWORD }, { from: await phone.visit('/auth/sign-in') })
 
     const listed = await ada.visit('/auth/account/sessions')
 
