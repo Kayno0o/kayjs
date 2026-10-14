@@ -129,6 +129,6 @@ export default defineConfig({
 })
 ```
 
-Nothing else of the environment reaches the browser.
+Nothing else of the environment reaches the browser. The server warns at boot when `publicEnv` names a variable that looks secret, such as `DATABASE_URL` or one with `SECRET`, `PASSWORD` or `PRIVATE` in its name, as every visitor reads it.
 
 <ReadMore href="/llms/server">Secret rotation, cookie options, sharing a session across subdomains and custom stores are in the full server reference.</ReadMore>

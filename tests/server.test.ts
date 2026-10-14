@@ -22,7 +22,7 @@ import { sourceHash } from '../src/server/csp'
 import { submittedValues } from '../src/server/flash'
 import { historyScript } from '../src/server/history'
 import { prerenderPages } from '../src/server/prerender'
-import { htmlFallbacks } from '../src/server/public'
+import { htmlFallbacks, publicFiles } from '../src/server/public'
 import { renderPage } from '../src/server/render'
 import { refuseClashes } from '../src/server/route-table'
 import { scanRoutes } from '../src/server/routes'
@@ -1169,12 +1169,12 @@ describe('content security policy', () => {
 })
 
 describe('prefetch', () => {
-  it('prefetches the pages links point at on hover, leaving out the urls kay serves itself and opted-out links', async () => {
+  it('prefetches the pages links point at on hover, leaving out the urls kay serves itself, the API, downloads, nofollow and opted-out links', async () => {
     const rules = JSON.parse(SPECULATION.exec((await get('/about')).html)![1]!) as unknown
 
     expect(rules).toEqual({ prefetch: [{
       source: 'document',
-      where: { and: [{ href_matches: '/*' }, { not: { href_matches: '/_kay/*' } }, { not: { selector_matches: '[data-no-prefetch]' } }] },
+      where: { and: [{ href_matches: '/*' }, { not: { href_matches: '/_kay/*' } }, { not: { href_matches: '/api/*' } }, { not: { href_matches: '/api' } }, { not: { selector_matches: '[data-no-prefetch], [download], [rel~=nofollow]' } }] },
       eagerness: 'moderate',
     }] })
     expect(speculationRules('eager')).toContain('"eagerness":"eager"')
@@ -1484,6 +1484,20 @@ describe('public files', () => {
   it('serves nothing outside the directory', async () => {
     expect((await app.handle(new Request('http://localhost/..%2Fsrc%2Fdata.ts'))).status).toBe(404)
     expect((await app.handle(new Request('http://localhost/.well-known/..%2F..%2Fsrc%2Fdata.ts'))).status).toBe(404)
+  })
+
+  it('leaves out the dotfiles, .env files and backups an editor or a deploy leaves behind, but .well-known', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kay-public-'))
+
+    try {
+      for (const name of ['.env', '.env.production', 'prod.env', '.git/config', 'assets/.DS_Store', 'index.html.bak', 'notes.txt~', '.well-known/security.txt', 'env.svg'])
+        await Bun.write(join(dir, name), name)
+
+      expect((await publicFiles(dir)).map(file => file.url)).toEqual(['/.well-known/security.txt', '/env.svg'])
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
   })
 
   it('serves a file at the URL a browser sends for its name', async () => {

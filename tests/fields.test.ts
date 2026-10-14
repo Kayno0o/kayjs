@@ -1,5 +1,6 @@
 import type { FieldSchema } from '../src/runtime/form'
-import { describe, expect, it } from 'bun:test'
+import process from 'node:process'
+import { describe, expect, it, spyOn } from 'bun:test'
 import { Elysia, t } from 'elysia'
 import { formInput, nativeConstraints } from '../src/runtime/form'
 import { readParam } from '../src/runtime/query-param'
@@ -91,6 +92,24 @@ describe('servePublicEnv', () => {
   it('stops the boot naming a public variable missing, and serves only the declared ones', async () => {
     expect(() => servePublicEnv(new Elysia(), new ServedPaths(), t.Object({ KAY_TEST_MISSING: t.String() }))).toThrow('KAY_TEST_MISSING')
     expect(publicEnvModule({ MAP_KEY: 'a</script>', ZOOM: 3 })).toBe('export default {"MAP_KEY":"a\\u003c/script>","ZOOM":3}\n')
+  })
+
+  it('warns when it declares a variable named as a secret or a database address', () => {
+    const logged = spyOn(console, 'warn').mockImplementation(() => undefined)
+
+    Object.assign(process.env, { KAY_TEST_MAP_KEY: 'pk', KAY_TEST_STRIPE_SECRET: 'sk' })
+
+    try {
+      servePublicEnv(new Elysia(), new ServedPaths(), t.Object({ KAY_TEST_MAP_KEY: t.String() }))
+      expect(logged).not.toHaveBeenCalled()
+      servePublicEnv(new Elysia(), new ServedPaths(), t.Object({ KAY_TEST_MAP_KEY: t.String(), KAY_TEST_STRIPE_SECRET: t.String() }))
+      expect(logged).toHaveBeenCalledWith(expect.stringContaining('publicEnv declares KAY_TEST_STRIPE_SECRET, which every visitor reads'))
+    }
+    finally {
+      logged.mockRestore()
+      delete process.env.KAY_TEST_MAP_KEY
+      delete process.env.KAY_TEST_STRIPE_SECRET
+    }
   })
 })
 

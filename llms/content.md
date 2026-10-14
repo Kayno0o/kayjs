@@ -355,15 +355,20 @@ export const news = collection({
 - `store: sqliteCache(path)` keeps them across restarts and has `invalidate()` reach every process sharing it.
 - `prerender`, `sitemap` and a feed take a loaded collection as a folder's: `kay build` loads it to prerender, so it needs the CMS to answer.
 - `kay check` types it from the schema but never calls the loader, and `kay build` writes nothing of it for production, which reads it when the server runs.
-- A CMS's webhook refreshes it through an API route, and refreshes the prerendered pages showing it:
+- A CMS's webhook refreshes it through an API route, and refreshes the prerendered pages showing it; the route refuses a request while the secret is unset, and compares it in constant time:
 
 ```ts
 // src/api/cms.ts
+import { createHash, timingSafeEqual } from 'node:crypto'
 import { api, invalidatePage } from 'kay/server'
 import { news } from '../content.config'
 
+const digest = (text: string) => createHash('sha256').update(text).digest()
+
 export default api().post('/', ({ headers, status }) => {
-  if (headers['x-webhook-secret'] !== process.env.CMS_WEBHOOK_SECRET)
+  const secret = process.env.CMS_WEBHOOK_SECRET
+  const sent = headers['x-webhook-secret']
+  if (!secret || !sent || !timingSafeEqual(digest(sent), digest(secret)))
     return status(401)
 
   news.invalidate()

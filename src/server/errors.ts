@@ -13,6 +13,9 @@ const REPORTS_PER_MINUTE = 20
 const MINUTE_MS = 60_000
 // What the rate limit counts reports under, apart from any action's.
 const REPORTS = 'kay:error-reports'
+// What a report could forge log lines or recolour a terminal with: control characters, a stack keeping only its line breaks.
+const CONTROL_CHARACTERS = /[\p{Cc}\p{Zl}\p{Zp}]+/gu
+const CONTROL_BUT_NEWLINES = /(?:(?!\n)[\p{Cc}\p{Zl}\p{Zp}])+/gu
 
 // An error a browser met on a page of the app, as it reported it: what `onError` gets for errors islands throw.
 export class BrowserError extends Error {
@@ -85,9 +88,13 @@ function readReport(text: string): { name: string, message: string, url: string,
     if (typeof name !== 'string' || typeof message !== 'string' || typeof url !== 'string' || url.length > MAX_URL_LENGTH || (stack !== undefined && typeof stack !== 'string') || (island !== undefined && typeof island !== 'string'))
       return undefined
 
-    return { name, message, url, stack, island }
+    return { name: oneLine(name), message: oneLine(message), url: oneLine(url), stack: stack?.replace(CONTROL_BUT_NEWLINES, ' '), island: island === undefined ? undefined : oneLine(island) }
   }
   catch {
     return undefined
   }
+}
+
+function oneLine(text: string): string {
+  return text.replace(CONTROL_CHARACTERS, ' ')
 }

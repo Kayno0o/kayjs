@@ -95,6 +95,7 @@ describe('security headers', () => {
       expect(response.headers.get('referrer-policy')).toBe('strict-origin-when-cross-origin')
       expect(response.headers.get('x-frame-options')).toBe('SAMEORIGIN')
       expect(response.headers.get('cross-origin-opener-policy')).toBe('same-origin')
+      expect(response.headers.get('cross-origin-resource-policy')).toBe('same-site')
       expect(response.headers.get('permissions-policy')).toBe('camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()')
       expect(response.headers.get('x-permitted-cross-domain-policies')).toBe('none')
       expect(response.headers.has('content-security-policy-report-only')).toBe(false)
@@ -579,6 +580,22 @@ console.log(JSON.stringify(seen))
 `
 
     expect(await isolated(script)).toEqual([1000, null, null, false, null, 1000])
+  })
+
+  it('warns a server started with no NODE_ENV, as Elysia then answers with the schema a request failed', async () => {
+    const warn = spyOn(console, 'warn').mockImplementation(() => undefined)
+    const env = process.env.NODE_ENV ?? 'test'
+
+    delete process.env.NODE_ENV
+
+    try {
+      await pages({ routes: ROUTES, prebuilt: false })
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('NODE_ENV is unset'))
+    }
+    finally {
+      process.env.NODE_ENV = env
+      warn.mockRestore()
+    }
   })
 
   it('warns once, on a production server, when it signs with the key of the process alone', async () => {

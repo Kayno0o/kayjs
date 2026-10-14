@@ -150,6 +150,7 @@ export default defineConfig({
 
 ### Request logs
 
+- A server started with no NODE_ENV warns as it boots, as it then bundles its browser code at boot and Elysia answers a refused API request with the schema it failed: set NODE_ENV=production where the app is deployed.
 - With NODE_ENV=production, a server's first line, once `.listen()` started it, says where it listens and what runs: `kay: listening on http://localhost:3000, kay 1.30.0 in production, 12 pages prerendered`.
 - Then every request kay or the app's routes registered after `.use(await pages())` answer is logged to stdout as one line: `GET /blog/hello 200 12ms AZnLe0vUe9qD0uXq9vLwZw`, the method, the path without its query string, which may carry tokens, the status, the milliseconds until the response was made, a streamed one's headers, and the request's id.
 - kay's own `/_kay/` routes, assets included, and the health route, wherever `health.path` puts it, are left out.
@@ -285,7 +286,7 @@ export default defineConfig({
 
 ### Security headers
 
-- Every response the app sends, its own routes included, carries a Content-Security-Policy, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `X-Frame-Options: SAMEORIGIN` (following `frame-ancestors`, below), `Cross-Origin-Opener-Policy: same-origin`, `X-Permitted-Cross-Domain-Policies: none` and `Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()`.
+- Every response the app sends, its own routes included, carries a Content-Security-Policy, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `X-Frame-Options: SAMEORIGIN` (following `frame-ancestors`, below), `Cross-Origin-Opener-Policy: same-origin`, `Cross-Origin-Resource-Policy: same-site`, `X-Permitted-Cross-Domain-Policies: none` and `Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()`.
 - The policy:
 
 ```text
@@ -338,7 +339,8 @@ export default defineConfig({
 - `reportOnly` merges directives over the enforced policy and sends the result as `Content-Security-Policy-Report-Only`: the browser blocks nothing it allows, but reports what that stricter policy would have blocked, with `disposition: 'report'`, to try it before moving it into `csp`.
 - With `csp: false`, it merges over kay's directives.
 - `headers` merges headers over kay's, one given `false` not sent.
-- HSTS is not sent by default: it binds the domain to https for its `max-age`, so it is the app's call.
+- HSTS is not sent by default: it binds the domain to https for its `max-age`, which no later deploy can take back, so it is the app's call.
+- `Cross-Origin-Resource-Policy: same-site` keeps another site from loading the images, scripts and files the app serves, so an app whose files another site embeds sends `'cross-origin-resource-policy': 'cross-origin'`.
 - `Cross-Origin-Opener-Policy: same-origin` cuts a page off from a window of another site it opened, or that opened it, so a sign-in or payment popup that answers through `window.opener` needs `'cross-origin-opener-policy': 'same-origin-allow-popups'`.
 - A site using a feature `Permissions-Policy` refuses, such as geolocation for a map, sends its own, `'permissions-policy': 'geolocation=(self)'`, which replaces kay's.
 - A header the app sets itself, in an Elysia `onRequest` or a handler, wins over kay's.

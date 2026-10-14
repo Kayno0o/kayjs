@@ -212,6 +212,7 @@ export default defineConfig({ plugins: [tailwind] })
 ### Public files
 
 - Files in `public/` (the `publicDir` option) are served at their path as they are: `public/robots.txt` at `/robots.txt`, `public/logo@2x.png` at `/logo@2x.png`.
+- Dotfiles and dot-directories but `.well-known/`, `.env` files (`.env.local` too) and editor backups (`.bak`, `.old`, `.orig`, `.swp`, `.tmp`, a trailing `~`) are left out, neither served nor copied by `kay build`; `kay build --static` keeps `.htaccess` and `.nojekyll`, which a static host reads.
 - A `:`, `*` or `'` in a name is served percent-encoded only, as `%3A`, `%2A` or `%27`.
 - A file sharing its path with a page, under any locale's path too, an endpoint, a redirect, an API route or a feed stops the server at boot, as do two pages serving one path.
 - kay's own sitemap, `robots.txt`, favicons, manifest and `/sw.js` give way to it.
@@ -301,14 +302,15 @@ img(src={hero} sizes="(min-width: 60rem) 50vw, 100vw" alt="The workshop")
 - With `resolve` set, `image('/media/42', { width, height })` resizes any `src` starting with `/`, a file extension or not; these answers are `Cache-Control: private, no-cache`, revalidated by their ETag, a refusal `private, no-store`, and a static export refuses `resolve`, having no route.
 - The `src` is what any visitor typed: look it up, never join it to a directory, as the path `resolve` returns is read as it is, `../` and symlinks followed.
 - `images.guard` without `resolve` fails the boot.
-- Images on another host, such as a CMS, a CDN or an old WordPress, are resized too from a host `images.remote` lists: `images: { remote: ['https://cms.example.com/uploads/', 'https://*.cdn.example.com'] }`, each entry an `http` or `https` origin, its host starting with `*.` for any subdomain, and maybe a path every URL starts with.
+- Images on another host, such as a CMS, a CDN or an old WordPress, are resized too from a host `images.remote` lists: `images: { remote: ['https://cms.example.com/uploads/', 'https://*.cdn.example.com'] }`, each entry an `http` or `https` origin, its host starting with `*.` for any subdomain of a domain (`*.com` is refused, but no list of public suffixes is read, so `*.co.uk` is not), and maybe a path every URL starts with.
+- An entry may name `http:`, `localhost` or an IP, as a CMS running beside the app in development does, and the address a listed name resolves to is not checked, so list only hosts the app trusts: one whose name came to point at the private network would have the server fetch from there, though only what decodes as an image goes out.
 - Give their size, `image(post.cover.url, { width: post.cover.width, height: post.cover.height })`, for the variants, which the route makes from a copy it downloads into `.kay/cache/images/remote` and keeps for the host's `Cache-Control: max-age`, a minute to a week, an hour without one, then asks again with its ETag or date; a changed image gets new variants under a new ETag.
 - A host that fails leaves the last copy served, and one that never answered is asked again a minute later, the route answering 502 meanwhile.
 - A host not listed is refused with 403, as is a redirect to one, so the route is no open proxy.
 - A path without its final slash covers itself and what is below it, `/uploads/a.jpg` but not `/uploads-private/a.jpg`.
 - On the server, `image()` and `shareImage()` leave an absolute URL no entry covers as it is, as content from a CMS may hold one, warning once per host, and `shareCard()` throws for one.
 - A download is cut off past 25 MB or 10 seconds, and an image over 50 megapixels is refused with 413, as an upload is.
-- Since any URL of a listed host may be asked for, a new query each time, at most 500 originals are kept, the least recently used going first with their variants, and one client starts at most 30 downloads a minute, the route answering 429 past them.
+- Since any URL of a listed host may be asked for, a new query each time, at most 500 originals are kept, up to about 13 GB on disk at 25 MB each plus the variants made of them, the least recently used going first with their variants, and one client starts at most 30 downloads a minute, the route answering 429 past them.
 - The variants are served from the site, so the CSP's `img-src` needs no entry for the host.
 - `images.maxDensity` in `kay.config.ts` sets the most pixels per CSS pixel an image loads at, 2 by default, at least 1; `Infinity` leaves the browser's choice.
 - The browser lays the image out from its `width` and `height`, so only the variant it picks changes; a `sizes` holding `auto` is left as written.

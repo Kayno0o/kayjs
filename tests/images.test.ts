@@ -705,7 +705,7 @@ describe('remote images', () => {
     expect(remoteAllowed('https://media.example.com/files-private/a.jpg', patterns)).toBe(false)
     expect(remoteAllowed('https://café.example.com/a.jpg', patterns)).toBe(true)
 
-    for (const entry of ['cms.example.com', 'ftp://cms.example.com', 'https://cms.*.com', 'https://cms.example.com/a?b'])
+    for (const entry of ['cms.example.com', 'ftp://cms.example.com', 'https://cms.*.com', 'https://cms.example.com/a?b', 'https://*.com', 'https://*.localhost:8080'])
       expect(() => remotePatterns([entry])).toThrow(`images.remote holds ${entry}`)
   })
 

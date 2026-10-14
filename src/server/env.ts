@@ -3,6 +3,7 @@ import type { ServedPaths } from './served-paths'
 import process from 'node:process'
 import { t } from 'elysia'
 import { PUBLIC_ENV } from '../runtime/env'
+import { kayLog } from '../runtime/log'
 import { readFields } from './query'
 
 // A `s.Object` of the variables, each read on its own.
@@ -60,6 +61,9 @@ export function defineEnv<Schema extends EnvSchema>(schema: Schema, source: Reco
   return env
 }
 
+// Names a variable meant for the server alone goes by, which no visitor should read: a map or analytics key is public by design, a secret or a database address never is.
+const SERVER_ONLY = /SECRET|PASSWORD|PASSWD|PRIVATE|^DATABASE_URL$|^REDIS_URL$/i
+
 // The module the island entry imports the public variables from, served from the environment the server runs in, so an executable or a prerendered page reads today's values rather than those of the build.
 export const PUBLIC_ENV_PATH = '/_kay/env.js'
 
@@ -68,6 +72,10 @@ export function servePublicEnv(app: Elysia, served: ServedPaths, schema: EnvSche
   served.claim({ path: PUBLIC_ENV_PATH, owner: '`publicEnv`', kind: 'kay', exported: true })
 
   const values = defineEnv(schema) as Record<string, unknown>
+  const exposed = Object.keys(values).filter(name => SERVER_ONLY.test(name))
+
+  if (exposed.length > 0)
+    kayLog('warn', `publicEnv declares ${exposed.join(', ')}, which every visitor reads from ${PUBLIC_ENV_PATH}; keep a secret in defineEnv, read on the server alone`)
 
   ;(globalThis as { [PUBLIC_ENV]?: unknown })[PUBLIC_ENV] = values
   app.get(PUBLIC_ENV_PATH, () => new Response(publicEnvModule(values), { headers: { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-cache' } }))

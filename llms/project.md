@@ -158,7 +158,7 @@ export default defineConfig({
 - `lang`, the `<html lang>` of every page when `i18n` is not set, defaults to `en`.
 
 - Every page carries speculation rules, which the swap replaces on pages shipping its script (see [Navigation](islands.md#navigation)): Chromium prefetches the page a link points at once it is hovered (`prefetch: 'moderate'`), on press with `'conservative'`, as soon as it can with `'eager'`, never with `false`.
-- A link that changes something on GET, such as a logout, takes `data-no-prefetch`.
+- Links under `/_kay/` or `/api/`, with `download` or with `rel="nofollow"` are never prefetched; any other link that changes something on GET, such as a logout, takes `data-no-prefetch`.
 - A stylesheet holding `@view-transition { navigation: auto; }` animates from page to page where the browser supports it, swaps included; `kay new` writes one inside `@media (prefers-reduced-motion: no-preference)`.
 
 - `pages()` also takes `root`, `dev` (default: `NODE_ENV` is `development`) and `prebuilt` (default: `NODE_ENV` is `production`), which serves what `kay build` wrote instead of bundling at boot.
@@ -304,6 +304,7 @@ export default defineConfig({
   - The language server behind the editor extension in `editors/vscode`: errors, hover, completion with auto-import, signatures, definitions, references, rename, quick fixes and formatting in `.kay` files.
   - An import it adds goes in the fence the name is used from, the server fence for server code and the component script otherwise, made if missing.
   - Renaming a server value renames its reads in the template, and renaming a destructured prop renames it in every parent passing it.
+  - It runs the project's `kay.config.ts`, and the modules it imports, as soon as a `.kay` file is opened, as `bun` would: open only a project you trust, as with its `package.json` scripts.
 
 - Every command prints its usage for `--help` or `-h`, and refuses an option or argument it does not take.
 - `kay fmt` refuses a path that is missing or is neither a directory nor a `.kay` file.

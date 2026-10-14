@@ -61,6 +61,8 @@ const HEADERS: Record<string, string> = {
   'x-frame-options': 'SAMEORIGIN',
   // A page this site opens in another window, or that opens one of its pages, gets no handle on it: no `window.opener` across sites.
   'cross-origin-opener-policy': 'same-origin',
+  // A page of another site may link here, but not load what this one serves into itself, as Spectre-style reads would.
+  'cross-origin-resource-policy': 'same-site',
   // Features a site rarely uses, refused to it and to anything it embeds, so an injected script cannot ask for them.
   'permissions-policy': 'camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()',
   // No Flash or Acrobat cross-domain policy file is honoured.

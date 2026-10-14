@@ -304,6 +304,7 @@ const dispose = mount(Panel, document.querySelector('#panel')!, { title: 'Ticket
 - Without `try`, a render error fails the page as before.
 - In an island, a block that throws while it hydrates, or later as a signal it reads changes, renders `catch` in its place, its effects disposed.
 - The error is logged and sent to the server, where `onError` gets it as a `BrowserError` from `kay/server`, with `kind`, the error's own name such as `TypeError`, `message`, `stack`, the page's `url`, its path without query or hash, and `island`, the island's component path, when known.
+- What a browser reports is anyone's text, so its control characters become spaces before it is logged or reaches `onError`, the stack keeping only its line breaks.
 - A `kay build --static` export has no server to send it to, so there it is logged only.
 - A block the server rendered `catch` for keeps that markup as it came, since the error stayed on the server.
 - `catch` takes the error under a name or none, typed `unknown`.
@@ -414,7 +415,7 @@ const dispose = mount(Panel, document.querySelector('#panel')!, { title: 'Ticket
 
 ### Navigating from code
 
-- `navigate('/todos/1')`, imported from `kay`, goes to a page as a link would, `{ replace: true }` taking the current history entry's place; another site's page loads.
+- `navigate('/todos/1')`, imported from `kay`, goes to a page as a link would, `{ replace: true }` taking the current history entry's place; another site's page loads, so a `?next=` param goes through `localPath()` as a redirect's does, and a URL other than http(s), such as `javascript:`, throws. A link or `navigate()` that a redirect takes to another site loads that page fully rather than swapping it in.
 - `navigate({ query: { sort: 'name', page: null } })` goes to the current page with those params set and a null, undefined or empty one dropped, the others and the path kept and the hash left out, keeping the scroll and the focus as `refresh()` does: a filter or a sort picked in place.
 - `refresh()` from `kay` runs the current page's loads again and shows what they return, keeping the scroll, the focus and every island whose props did not change, as a call to an action does by itself once it went through.
 - An island calls `refresh()` once something else changed what the page shows, or polls with it, `every(3000, refresh, { while: () => issuing })`.

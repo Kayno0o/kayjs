@@ -234,6 +234,7 @@ export default defineConfig({ requireGuards: true })
 - Over https means the request's URL or its `X-Forwarded-Proto`; a request with no `X-Forwarded-Proto` at all counts as https in production (`NODE_ENV=production`) when `site` in kay.config.ts is https.
 - The cookie is read under the name for the request's scheme, so behind a proxy every location passes `X-Forwarded-Proto`, the websocket's included: one that sends `http` where the browser came over https reads no session.
 - A site moving to a kay that names the cookie `__Host-` signs everyone out once, the old cookie read no more.
+- kay's other cookies keep their names over https, as no other host of the site gains anything by setting them: `kay_flash`, a form post's outcome for a minute, is sealed and `kay_preview` signed with the secret, so neither can be read or forged, and `kay-locale` only picks the locale an unprefixed path goes to.
 - It belongs to the visited host alone, unless `domain` names the visited host or a parent of it, which rules `__Host-` out and which the browser otherwise drops the cookie for: `domain: 'example.com'` shares one session between `app.example.com` and `auth.example.com`.
 - Adding `domain` to a running site leaves each browser's host-only cookie beside the new one until it expires, so a site keeping its sessions in the cookie, without a store, changes its `cookie` name with it.
 - Those sibling hosts still count as other sites to each other's actions, API posts and websockets, which only a page of the same host reaches.
@@ -255,6 +256,7 @@ export default defineConfig({ requireGuards: true })
 - They are read from the environment as the server boots, as `defineEnv` reads its own, a missing or refused one stopping it.
 - The browser gets them from `/_kay/env.js`, which the server answers from its environment and the island entry imports before any island hydrates, so an executable, or a page prerendered at build time, carries the values of the environment it runs in; `kay build --static` writes that file with the build's.
 - The markup a prerendered page rendered holds the build's values, though: an island showing a variable that differs at runtime hydrates with a mismatch, so a page showing one renders per request.
+- The server warns as it boots when `publicEnv` declares a name such as `STRIPE_SECRET`, `DB_PASSWORD`, `PRIVATE_KEY` or `DATABASE_URL`, which every visitor would read.
 - Only the declared variables leave the server, and nothing else of the environment reaches an island: a module reading `process.env` or `defineEnv`'s values fails the browser build.
 - Reading `publicEnv` when the config declares none throws; a name it does not declare is a type error.
 

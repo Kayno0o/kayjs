@@ -18,7 +18,7 @@ import { PRERENDERED_DIR } from '../server/client'
 import { compressPaths } from '../server/compress'
 import { localeSettings } from '../server/i18n'
 import { applyPageHooks, assetFiles } from '../server/page-hook'
-import { publicFiles } from '../server/public'
+import { publicFiles, servedPublicly } from '../server/public'
 import { withoutSlash } from '../server/routes'
 import { siteOrigin } from '../server/seo'
 
@@ -79,7 +79,7 @@ export async function exportStatic(project: Project, client: ClientBuild, outdir
   }
 
   if (existsSync(publicDir)) {
-    await cp(publicDir, out, { recursive: true })
+    await cp(publicDir, out, { recursive: true, filter: source => servedPublicly(relative(publicDir, source)) })
     written.push(...(await publicFiles(publicDir)).map(file => join(out, relative(publicDir, file.path))))
   }
 

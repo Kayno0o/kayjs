@@ -98,14 +98,18 @@ async function fetchPage(url: URL): Promise<FetchedPage> {
 
   const full = response.headers.has(RELOAD_HEADER) || (isSecureContext && isolated(response.headers) !== crossOriginIsolated)
 
-  // A file the browser loads itself once the swap gives up on it, so it is not read twice.
-  if (!HTML.test(type)) {
+  // A file the browser loads itself once the swap gives up on it, so it is not read twice, as is a page a redirect took to another site, whose markup the swap never runs.
+  if (!HTML.test(type) || !ownOrigin(response.url)) {
     void response.body?.cancel()
 
     return { url: response.url, type, html: '' }
   }
 
   return { url: response.url, type, html: await response.text(), ...full && { full } }
+}
+
+function ownOrigin(url: string): boolean {
+  return new URL(url, location.href).origin === location.origin
 }
 
 // Whether a page with these headers is cross-origin isolated, as a secure document is with both policies set so.
@@ -202,7 +206,7 @@ export async function show(page: FetchedPage, hash: string, swap: Swap, isCurren
   target.hash = hash
 
   // A page asking for full loads, or isolated otherwise, is still refreshed in place, its query changed included: the document stays the one it loaded.
-  if (!HTML.test(page.type) || (page.full && target.pathname !== location.pathname)) {
+  if (!HTML.test(page.type) || !ownOrigin(page.url) || (page.full && target.pathname !== location.pathname)) {
     leave(target, replaces)
 
     return

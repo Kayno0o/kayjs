@@ -65,7 +65,7 @@ The extension runs the language server of the kay the workspace installed, so it
 | `kay.server.path` | The kay CLI to run, absolute or relative to the workspace, when it is not the workspace's own |
 | `kay.routes` | The pages directory, so route params and links are typed; by default the one `kay.config.ts` names, else `src/routes` |
 
-Any other editor speaking the Language Server Protocol, such as Neovim, Helix or Zed, can run the same server: start `bunx kay lsp --stdio` in the project root for `.kay` files. The TextMate grammar ships as `kay/kay.tmLanguage.json` for an editor or highlighter that takes one.
+Any other editor speaking the Language Server Protocol, such as Neovim, Helix or Zed, can run the same server: start `bunx kay lsp --stdio` in the project root for `.kay` files. The server runs the project's `kay.config.ts` when a `.kay` file opens, so open only a project you trust. The TextMate grammar ships as `kay/kay.tmLanguage.json` for an editor or highlighter that takes one.
 
 ## Troubleshooting
 

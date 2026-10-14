@@ -13,6 +13,8 @@ const SENT_AS_IS = /%(?:40|2B|2C|3B|3D|26|24|5B|5D|7C)/g
 const ROUTER_SYNTAX = /['*]/g
 const WEAK_PREFIX = /^W\//
 const HTML = '.html'
+// What an editor, a deploy or a secret leaves in `public/` rather than what a visitor is meant to fetch: dotfiles and dot-directories but `.well-known/`, `.env` files and backups.
+const LEFT_BEHIND = /(?:^|\/)\.(?!well-known(?:\/|$))|\.env(?:\.[^/]*)?$|(?:\.(?:bak|old|orig|swp|tmp)|~)$/
 const INDEX = '/index.html'
 
 export interface PublicFile {
@@ -32,11 +34,16 @@ export async function publicFiles(dir: string): Promise<PublicFile[]> {
   const entries = await readdir(dir, { recursive: true, withFileTypes: true })
 
   // By URL, as the directory's own order changes from one file system to the next.
-  return entries.filter(entry => entry.isFile()).map((entry) => {
+  return entries.filter(entry => entry.isFile() && servedPublicly(relative(dir, join(entry.parentPath, entry.name)))).map((entry) => {
     const path = join(entry.parentPath, entry.name)
 
     return { path, url: `/${relative(dir, path).split(sep).map(urlSegment).join('/')}` }
   }).toSorted((a, b) => a.url < b.url ? -1 : a.url > b.url ? 1 : 0)
+}
+
+// Whether a file of `public/`, by its path from it, goes out: never one left behind there, which a static export leaves out as well.
+export function servedPublicly(path: string): boolean {
+  return !LEFT_BEHIND.test(path.split(sep).join('/'))
 }
 
 function urlSegment(name: string): string {
