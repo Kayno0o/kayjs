@@ -1,7 +1,7 @@
 import type { CollectionInfo, EntryFilter, EntryRef, SourceEntry } from './kay/contract'
 import { fieldsOf } from './fields'
 
-const UNSAFE_ID = /[^a-z0-9-]/giu
+const UNSAFE_ID = /[^a-z0-9]/giu
 
 export interface EntryRow {
   slug: string
@@ -72,9 +72,10 @@ export function entryPath(prefix: string, { collection, slug, locale }: EntryRef
   return locale === undefined ? path : `${path}?locale=${encodeURIComponent(locale)}`
 }
 
-// The id of the text saying why a collection or an entry cannot be read: a slug or a locale may hold a space or a slash, so each character but a letter, a digit or `-` is spelled by its code, two keys never meeting.
+// The id of the text saying why a collection or an entry cannot be read: a slug or a locale may hold a space or a slash, so each character but a letter or a digit is spelled by its code, two keys never meeting.
 export function problemId(collection: string, key?: string): string {
-  return `kcms-problem-${[collection, key].filter(part => part !== undefined).join('-').replace(UNSAFE_ID, char => `_${char.codePointAt(0)!.toString(16)}_`)}`
+  // `-` is spelled too, so it only ever joins the parts.
+  return `kcms-problem-${[collection, key].filter(part => part !== undefined).map(part => part.replace(UNSAFE_ID, char => `_${char.codePointAt(0)!.toString(16)}_`)).join('-')}`
 }
 
 export function newEntryPath(prefix: string, collection: string): string {

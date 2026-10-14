@@ -86,5 +86,6 @@ describe('paths', () => {
     expect(problemId('posts')).toBe('kcms-problem-posts')
     expect(problemId('docs', 'guides/a b@fr')).toBe('kcms-problem-docs-guides_2f_a_20_b_40_fr')
     expect(problemId('docs', 'a_20_b')).not.toBe(problemId('docs', 'a b'))
+    expect(problemId('a-b', 'c')).not.toBe(problemId('a', 'b-c'))
   })
 })
