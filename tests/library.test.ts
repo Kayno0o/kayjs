@@ -2,6 +2,7 @@ import { readdir, rm, symlink } from 'node:fs/promises'
 import { join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
+import { findKayLibraries } from '../src/build/libraries'
 import { throughLinks } from '../src/build/links'
 import { projectPaths } from '../src/project'
 import { scratchDir } from './scratch'
@@ -71,8 +72,23 @@ afterAll(async () => {
   await Promise.all(projects.map(async dir => rm(dir, { recursive: true, force: true })))
 })
 
-// Named by either published name, the current one or the one up to 0.3.
-describe.each(['@kaynooo/kayjs', '@kaynooo/kay'] as const)('a linked kay library naming kay %s', (kay) => {
+// A library naming kay by any of its published names is found, whichever the manifest says.
+describe('the names a kay library names kay by', () => {
+  it('finds a library whose peer is kay, the name it is published as, or the one it was published as up to 0.3', async () => {
+    const app = await scratchDir('dom-')
+    const names = { 'lib-alias': 'kay', 'lib-current': '@kaynooo/kayjs', 'lib-old': '@kaynooo/kay' } as const
+
+    projects.push(app)
+    await write(app, { 'package.json': JSON.stringify({ name: 'app', private: true, dependencies: Object.fromEntries(Object.keys(names).map(name => [name, '1.0.0'])) }) })
+    await Promise.all(Object.entries(names).map(async ([name, kay]) => write(join(app, 'node_modules', name), { 'package.json': manifest(kay).replace('kay-lib', name), 'src/badge.kay': LIBRARY['src/badge.kay']! })))
+    await write(join(app, 'node_modules/lib-none'), { 'package.json': JSON.stringify({ name: 'lib-none', version: '1.0.0', type: 'module' }), 'src/badge.kay': 'p none\n' })
+
+    expect((await findKayLibraries(app)).map(library => library.name).sort()).toEqual(['lib-alias', 'lib-current', 'lib-old'])
+  })
+})
+
+// Linked from where it is developed, not copied under `node_modules`.
+describe('a linked kay library', () => {
   let linked: string
   let library: string
 
@@ -80,7 +96,7 @@ describe.each(['@kaynooo/kayjs', '@kaynooo/kay'] as const)('a linked kay library
     linked = await scratchDir('dom-')
     library = await scratchDir('dom-')
     await write(linked, { ...PROJECT, 'kay.config.ts': 'export default {}\n' })
-    await write(library, { ...LIBRARY, 'package.json': manifest(kay) })
+    await write(library, LIBRARY)
     await Bun.write(join(linked, 'node_modules/.keep'), '')
     await symlink(library, join(linked, 'node_modules/kay-lib'))
   })
@@ -222,38 +238,19 @@ describe('kay libraries', () => {
     expect(await Bun.file(join(out, 'index.html')).text()).toContain('<h1 style="color: red">Follow it</h1>')
   })
 
-  it('leaves a glob it cannot read to the check or the build reporting it, finding the library\'s components the rest reach', async () => {
-    const project = await newProject()
+  it('renders with the app\'s settings under kay test, whose preload registers the loader, a project nested below the working directory named by KAY_ROOT, and mounts a library component for the browser with its handlers running', async () => {
+    const outer = await scratchDir('dom-')
+    const sources = JSON.stringify(resolve('src/test'))
 
-    await write(project, {
-      'src/globbed.ts': 'const pattern = \'./notes/*.ts\'\n\nexport const notes = import.meta.glob(pattern)\n',
-      'src/routes/notes.kay': '---\nimport Badge from \'kay-lib/badge.kay\'\nimport { notes } from \'../globbed\'\n---\nBadge(label={String(Object.keys(notes).length)})\n',
-    })
-
-    const { code, output } = await run('check', project)
-
-    expect(output).not.toContain('takes its patterns as strings written in the call')
-    expect(code).toBe(0)
-  })
-
-  it('renders with the app\'s settings under kay test, whose preload registers the loader', async () => {
-    const project = await newProject()
-
-    await Bun.write(join(project, 'site.kay-test.ts'), `import { expect, it } from 'bun:test'\nimport { testSite } from ${JSON.stringify(resolve('src/test'))}\n\nit('renders', async () => {\n  expect((await (await testSite()).visit('/')).html).toContain('hi app:hi')\n})\n`)
-
-    const child = Bun.spawn([process.execPath, 'test', '--preload', resolve('src/test/preload.ts'), './site.kay-test.ts'], { cwd: project, stdout: 'pipe', stderr: 'pipe' })
-    const [output, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
-
-    expect(output).toContain('1 pass')
-    expect(code).toBe(0)
-  })
-
-  it('mounts a library component built for the browser with the app\'s settings, its handlers running', async () => {
-    const project = await newProject()
-    const test = [
+    projects.push(outer)
+    await write(join(outer, 'fixture'), PROJECT)
+    await write(join(outer, 'fixture/node_modules/kay-lib'), LIBRARY)
+    // Imported before any `testSite` call, which only the preload makes possible.
+    await Bun.write(join(outer, 'site.kay-test.ts'), `import { expect, it } from 'bun:test'\nimport { testSite } from ${sources}\nimport Badge from './fixture/node_modules/kay-lib/src/badge.kay'\n\nit('renders', async () => {\n  expect(Badge).toBeFunction()\n  expect((await (await testSite()).visit('/')).html).toContain('hi app:hi')\n})\n`)
+    await Bun.write(join(outer, 'mount.kay-test.ts'), [
       'import { GlobalRegistrator } from \'@happy-dom/global-registrator\'',
       'import { expect, it } from \'bun:test\'',
-      `import { mount, settle } from ${JSON.stringify(resolve('src/test'))}`,
+      `import { mount, settle } from ${sources}`,
       '',
       'GlobalRegistrator.register()',
       '',
@@ -265,85 +262,73 @@ describe('kay libraries', () => {
       '  expect(root.textContent).toBe(\'app:count 3\')',
       '})',
       '',
-    ].join('\n')
+    ].join('\n'))
 
-    await Bun.write(join(project, 'mount.kay-test.ts'), test)
-
-    const child = Bun.spawn([process.execPath, 'test', './mount.kay-test.ts'], { cwd: project, stdout: 'pipe', stderr: 'pipe' })
+    const child = Bun.spawn([process.execPath, 'test', '--preload', resolve('src/test/preload.ts'), './site.kay-test.ts', './mount.kay-test.ts'], { cwd: outer, env: { ...process.env, KAY_ROOT: 'fixture' }, stdout: 'pipe', stderr: 'pipe' })
     const [output, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
 
-    expect(output).toContain('1 pass')
-    expect(code).toBe(0)
-  })
-
-  it('renders a project nested below the working directory under kay test, named by KAY_ROOT', async () => {
-    const outer = await scratchDir('dom-')
-
-    projects.push(outer)
-    await write(join(outer, 'fixture'), PROJECT)
-    await write(join(outer, 'fixture/node_modules/kay-lib'), LIBRARY)
-    // Imported before any `testSite` call, which only the preload makes possible.
-    await Bun.write(join(outer, 'site.kay-test.ts'), `import { expect, it } from 'bun:test'\nimport { testSite } from ${JSON.stringify(resolve('src/test'))}\nimport Badge from './fixture/node_modules/kay-lib/src/badge.kay'\n\nit('renders', async () => {\n  expect(Badge).toBeFunction()\n  expect((await (await testSite()).visit('/')).html).toContain('hi app:hi')\n})\n`)
-
-    const child = Bun.spawn([process.execPath, 'test', '--preload', resolve('src/test/preload.ts'), './site.kay-test.ts'], { cwd: outer, env: { ...process.env, KAY_ROOT: 'fixture' }, stdout: 'pipe', stderr: 'pipe' })
-    const [output, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
-
-    expect(output).toContain('1 pass')
+    expect(output).toContain('2 pass')
+    expect(output).toContain('0 fail')
     expect(code).toBe(0)
   })
 
   // A library linked from its own repository may hold the app checking it, as a playground does: the app's files stay its own.
-  it.each(['installed', 'linked', 'linked around the app'] as const)('leaves errors inside a library\'s own modules to it, a missing optional peer included, and reports the app\'s calls into them, the library %s', async (layout) => {
-    const library = layout === 'installed' ? undefined : await scratchDir('dom-')
-    const project = layout === 'linked around the app' ? join(library!, 'playground') : await newProject()
+  it('leaves errors inside a library\'s own modules to it, a missing optional peer included, and reports the app\'s calls into them, the library installed, linked or linked around the app', async () => {
+    await Promise.all((['installed', 'linked', 'linked around the app'] as const).map(async (layout) => {
+      const library = layout === 'installed' ? undefined : await scratchDir('dom-')
+      const project = layout === 'linked around the app' ? join(library!, 'playground') : await newProject()
 
-    if (library !== undefined) {
-      projects.push(library)
-      await write(library, LIBRARY)
-    }
+      if (library !== undefined) {
+        projects.push(library)
+        await write(library, LIBRARY)
+      }
 
-    if (layout === 'linked around the app')
-      await write(project, PROJECT)
+      if (layout === 'linked around the app')
+        await write(project, PROJECT)
 
-    if (library !== undefined) {
-      await rm(join(project, 'node_modules/kay-lib'), { recursive: true, force: true })
-      await Bun.write(join(project, 'node_modules/.keep'), '')
-      await symlink(library, join(project, 'node_modules/kay-lib'))
-    }
+      if (library !== undefined) {
+        await rm(join(project, 'node_modules/kay-lib'), { recursive: true, force: true })
+        await Bun.write(join(project, 'node_modules/.keep'), '')
+        await symlink(library, join(project, 'node_modules/kay-lib'))
+      }
 
-    await write(library ?? join(project, 'node_modules/kay-lib'), {
-      // An optional peer the app has not installed, imported by a component it uses and by one it never imports.
-      'src/media.ts': 'export async function player(): Promise<unknown> {\n  try {\n    const { default: Player } = await import(\'optional-player\')\n\n    return Player\n  }\n  catch {\n    return undefined\n  }\n}\n\nexport function scale(value: number): number {\n  return value * 2\n}\n',
-      'src/axis.ts': 'import { Axis } from \'optional-chart\'\n\nexport const axis = new Axis()\n',
-      'src/video.kay': '---\nimport { onMount } from \'kay\'\nimport { player } from \'./media\'\n\nonMount(() => void player())\n---\nvideo\n',
-      'src/chart.kay': '---\nimport { axis } from \'./axis\'\n---\np {String(axis)}\n',
-      'src/index.ts': `${LIBRARY['src/index.ts']}export { scale } from './media'\n`,
-    })
-    await write(project, {
-      'src/routes/video.kay': '---\nimport Video from \'kay-lib/video.kay\'\n---\nVideo\n',
-      'src/doubled.ts': 'import { scale } from \'kay-lib\'\n\nexport const doubled = scale(\'two\')\n',
-    })
+      await write(library ?? join(project, 'node_modules/kay-lib'), {
+        // An optional peer the app has not installed, imported by a component it uses and by one it never imports.
+        'src/media.ts': 'export async function player(): Promise<unknown> {\n  try {\n    const { default: Player } = await import(\'optional-player\')\n\n    return Player\n  }\n  catch {\n    return undefined\n  }\n}\n\nexport function scale(value: number): number {\n  return value * 2\n}\n',
+        'src/axis.ts': 'import { Axis } from \'optional-chart\'\n\nexport const axis = new Axis()\n',
+        'src/video.kay': '---\nimport { onMount } from \'kay\'\nimport { player } from \'./media\'\n\nonMount(() => void player())\n---\nvideo\n',
+        'src/chart.kay': '---\nimport { axis } from \'./axis\'\n---\np {String(axis)}\n',
+        'src/index.ts': `${LIBRARY['src/index.ts']}export { scale } from './media'\n`,
+      })
+      await write(project, {
+        'src/routes/video.kay': '---\nimport Video from \'kay-lib/video.kay\'\n---\nVideo\n',
+        'src/doubled.ts': 'import { scale } from \'kay-lib\'\n\nexport const doubled = scale(\'two\')\n',
+      })
 
-    const { code, output } = await run('check', project)
+      const { code, output } = await run('check', project)
 
-    expect(reported(output)).toEqual([
-      `${relative(process.cwd(), join(project, 'src/doubled.ts'))}:3:30 error[TS2345]: Argument of type 'string' is not assignable to parameter of type 'number'.`,
-    ])
-    expect(code).toBe(1)
+      expect(reported(output)).toEqual([
+        `${relative(process.cwd(), join(project, 'src/doubled.ts'))}:3:30 error[TS2345]: Argument of type 'string' is not assignable to parameter of type 'number'.`,
+      ])
+      expect(code).toBe(1)
+    }))
   })
 
-  it('types a library\'s components in the app, reporting an error inside one the app uses at its own line, and the app\'s settings against the defaults', async () => {
+  it('types a library\'s components in the app, reporting an error inside one the app uses at its own line, and the app\'s settings against the defaults, leaving a glob it cannot read to the check or the build reporting it', async () => {
     const project = await newProject()
 
     await write(project, {
       'src/routes/typed.kay': '---\nimport Badge from \'kay-lib/badge.kay\'\nimport Typo from \'kay-lib/typo.kay\'\n---\nBadge(label={1})\nTypo(size={2})\n',
       'src/ui-settings.ts': 'const settings = { tone: 1, icon: (name: string) => name }\n\nexport default settings\n',
+      'src/globbed.ts': 'const pattern = \'./notes/*.ts\'\n\nexport const notes = import.meta.glob(pattern)\n',
+      'src/routes/notes.kay': '---\nimport Badge from \'kay-lib/badge.kay\'\nimport { notes } from \'../globbed\'\n---\nBadge(label={String(Object.keys(notes).length)})\n',
     })
     await write(join(project, 'node_modules/kay-lib'), { 'src/typo.kay': '---\nconst { size } = props<{ size: number }>()\n---\np {size.toFixed(1).missing}\n' })
 
     const { code, output } = await run('check', project)
 
     expect(code).toBe(1)
+    expect(output).not.toContain('takes its patterns as strings written in the call')
 
     expect(reported(output)).toEqual([
       `${relative(process.cwd(), join(project, 'src/ui-settings.ts'))}:1:1 error[TS2322]: The settings for kay-lib do not match what it takes: Type '{ tone: number; icon: (name: string) => string; }' is not assignable to type 'Settings'.`,

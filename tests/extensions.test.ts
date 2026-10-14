@@ -1,7 +1,7 @@
 import type { BunPlugin } from 'bun'
 import { mkdir, mkdtemp, rm, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { basename, dirname, join, resolve } from 'node:path'
+import { basename, join, resolve } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { parse } from 'devalue'
@@ -11,7 +11,6 @@ import { readShadowSettings } from '../src/check/shadow'
 import { writeShadowTypes } from '../src/check/shadow-types'
 import { mergeConfig } from '../src/config'
 import { UNSERVED_MESSAGE } from '../src/runtime/checks'
-import { apiStubs } from '../src/server/api'
 import { routeMounts, scanRoutes } from '../src/server/routes'
 import { scratchDir } from './scratch'
 
@@ -19,65 +18,13 @@ const CLI = resolve('src/cli.ts')
 
 const TSCONFIG = JSON.stringify({ compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true }, include: ['src', '.kay/types'] })
 
-const LOGIN = `--- server
-import { t } from 'elysia'
-import { action } from 'kay'
-
-export const signIn = action(t.Object({ name: t.String({ maxLength: 50 }) }), ({ name }) => ({ signedIn: name }))
----
----
-import Counter from '../counter.kay'
----
-form(action={signIn})
-  input(name="name")
-  button Sign in
-Counter
-`
-
-// An app with a library installed under its node_modules, whose pages its config mounts under `/auth`.
-const FILES: Record<string, string> = {
-  'package.json': JSON.stringify({ name: 'app', dependencies: { 'kay-lib': '*' } }),
-  'src/routes/_layout.kay': 'header.app App\nmain\n  slot\n',
-  'src/routes/index.kay': 'p.home home\na(href="/auth/login") in\na(href="/auth/nope") nowhere\n',
-  'tsconfig.json': TSCONFIG,
-  'src/routes/auth/register.kay': 'p.register mine\n',
-  'kay.config.ts': 'import { defineConfig } from \'kay/server\'\nimport { authPages } from \'kay-lib\'\n\nexport default defineConfig({ extensions: [authPages()] })\n',
-  'node_modules/kay-lib/package.json': JSON.stringify({ name: 'kay-lib', type: 'module', exports: { '.': './index.ts' }, peerDependencies: { kay: '*' } }),
-  'node_modules/kay-lib/index.ts': 'import type { KayExtension } from \'kay/server\'\n\nexport const authPages = (): KayExtension => ({ name: \'kay-lib\', routes: { dir: `${import.meta.dir}/routes`, prefix: \'/auth\' } })\n',
-  'node_modules/kay-lib/routes/_layout.kay': '---\nimport \'./lib.css\'\n---\nsection.lib\n  slot\n',
-  'node_modules/kay-lib/routes/lib.css': '.lib { color: teal }\n',
-  'node_modules/kay-lib/routes/register.kay': 'p.register theirs\n',
-  'node_modules/kay-lib/routes/login.kay': LOGIN,
-  'node_modules/kay-lib/routes/terms.kay': '--- server\nexport const page = { prerender: true }\n---\np.terms terms\n',
-  // The library's own check reports this one, not the app's.
-  'node_modules/kay-lib/routes/broken.kay': '---\nconst wrong: number = \'x\'\n---\np {wrong}\n',
-  'node_modules/kay-lib/counter.kay': '---\nimport { signal } from \'kay\'\n\nconst n = signal(0)\n---\nbutton.count(type="button" onClick={() => n.set(n() + 1)}) {n()}\n',
-}
-
-// A process serves one project, so the app is served in its own, reporting what each page answered: run by Bun from the project, or compiled as the executable's entry.
-const SERVE = `import { stringify } from 'devalue'
-import { pages } from 'kay/server'
-
-const app = await pages({ prebuilt: true })
-const visit = async (path: string) => (await app.handle(new Request(\`http://localhost\${path}\`))).text()
-const login = await visit('/auth/login')
-const action = (/<form[^>]*action="([^"]+)"/).exec(login)?.[1] ?? ''
-const posted = await app.handle(new Request(\`http://localhost\${action}\`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-kay-action': '1' }, body: stringify({ name: 'Ada' }) }))
-
-const style = await visit((/rel="stylesheet" href="([^"]+)"/).exec(login)?.[1] ?? '/none.css')
-
-console.log(JSON.stringify({ login, action, posted: await posted.text(), style, register: await visit('/auth/register'), home: await visit('/') }))
-process.exit(0)
-`
-
-// A library whose pages and messages an app in two locales mounts, translating one of the library's texts its own way and adding one key.
-const LOCALIZED: Record<string, string> = {
+// A library whose messages an app in two locales mounts, translating one of the library's texts its own way and adding one key: the base of the apps below writing catalogs of their own, or none.
+const CATALOGS: Record<string, string> = {
   'package.json': JSON.stringify({ name: 'app', dependencies: { 'kay-lib': '*' } }),
   'tsconfig.json': TSCONFIG,
   'kay.config.ts': 'import { defineConfig } from \'kay/server\'\nimport { authPages } from \'kay-lib\'\n\nexport default defineConfig({ i18n: { locales: [\'en\', \'fr\'], defaultLocale: \'en\' }, extensions: [authPages()] })\n',
   'src/messages/en.ts': 'import { defineMessages } from \'kay/i18n\'\n\nexport default defineMessages({ home: \'Home\', auth: { title: \'Log in\' } })\n',
   'src/messages/fr.ts': 'import { defineMessages } from \'kay/i18n\'\n\nexport default defineMessages({ home: \'Accueil\', auth: { title: \'Se connecter\' } })\n',
-  'src/routes/index.kay': '--- server\nimport { t } from \'kay/i18n\'\n\nconst hint = t(\'auth.hint\')\nconst wrong = t(\'auth.nope\')\n---\np {t(\'home\')} {hint} {wrong}\n',
   'node_modules/kay-lib/package.json': JSON.stringify({ name: 'kay-lib', type: 'module', exports: { '.': './index.ts' }, peerDependencies: { kay: '*' } }),
   'node_modules/kay-lib/index.ts': 'import type { KayExtension } from \'kay/server\'\n\nexport const authPages = (): KayExtension => ({ name: \'kay-lib\', routes: { dir: `${import.meta.dir}/routes`, prefix: \'/auth\' }, messages: `${import.meta.dir}/messages` })\n',
   'node_modules/kay-lib/messages/en.ts': 'import { defineMessages } from \'kay/i18n\'\n\nexport default defineMessages({ auth: { title: \'Sign in\', hint: \'Use your email\', extra: \'Only in English\' } })\n',
@@ -85,31 +32,23 @@ const LOCALIZED: Record<string, string> = {
   'node_modules/kay-lib/routes/login.kay': '--- server\nimport { t } from \'kay/i18n\'\n\nconst title = t(\'auth.title\')\nconst hint = t(\'auth.hint\')\n---\nh1 {title}\np {hint}\n',
 }
 
-// The texts the localized app's login page shows in each locale.
-const SERVE_LOCALIZED = `import { pages } from 'kay/server'
-
-const app = await pages({ prebuilt: true })
-const visit = async (path: string) => (await app.handle(new Request(\`http://localhost\${path}\`))).text()
-
-console.log(JSON.stringify({ en: await visit('/auth/login'), fr: await visit('/fr/auth/login') }))
-process.exit(0)
-`
-
 // The same library in an app without `i18n`, written in French: its pages read the French catalogs, the app's own over the library's.
 const IMPLICIT: Record<string, string> = {
-  'package.json': LOCALIZED['package.json']!,
+  'package.json': CATALOGS['package.json']!,
   'tsconfig.json': TSCONFIG,
   'kay.config.ts': 'import { defineConfig } from \'kay/server\'\nimport { authPages } from \'kay-lib\'\n\nexport default defineConfig({ lang: \'fr\', site: \'https://example.com\', lints: { seo: \'allow\' }, extensions: [authPages()] })\n',
   'src/messages/fr.ts': 'import { defineMessages } from \'kay/i18n\'\n\nexport default defineMessages({ auth: { title: \'Se connecter\' } })\n',
   // A component no page renders, so the static export leaves its unknown key to kay check.
   'src/wrong.kay': '---\nimport { t } from \'kay/i18n\'\n---\np {t(\'auth.nope\')}\n',
-  'node_modules/kay-lib/package.json': LOCALIZED['node_modules/kay-lib/package.json']!,
-  'node_modules/kay-lib/index.ts': LOCALIZED['node_modules/kay-lib/index.ts']!,
-  'node_modules/kay-lib/messages/en.ts': LOCALIZED['node_modules/kay-lib/messages/en.ts']!,
-  'node_modules/kay-lib/messages/fr.ts': LOCALIZED['node_modules/kay-lib/messages/fr.ts']!,
+  'node_modules/kay-lib/package.json': CATALOGS['node_modules/kay-lib/package.json']!,
+  'node_modules/kay-lib/index.ts': CATALOGS['node_modules/kay-lib/index.ts']!,
+  'node_modules/kay-lib/messages/en.ts': CATALOGS['node_modules/kay-lib/messages/en.ts']!,
+  'node_modules/kay-lib/messages/fr.ts': CATALOGS['node_modules/kay-lib/messages/fr.ts']!,
   'node_modules/kay-lib/routes/login.kay': '--- server\nimport { locale, localize, t } from \'kay/i18n\'\n\nexport const page = { prerender: true }\n\nconst title = t(\'auth.title\')\nconst hint = t(\'auth.hint\')\nconst register = localize(\'/auth/register\')\nconst lang = locale()\n---\n---\nimport Hint from \'../hint.kay\'\n---\nh1 {title}\np {hint}\na(href={register}) {lang}\nHint\n',
   'node_modules/kay-lib/hint.kay': '---\nimport { signal } from \'kay\'\nimport { t } from \'kay/i18n\'\n\nconst open = signal(false)\n---\nbutton(type="button" onClick={() => open.set(!open())}) {t(\'auth.hint\')}\n',
   'node_modules/kay-lib/routes/register.kay': '--- server\nimport { t } from \'elysia\'\nimport { action } from \'kay\'\nimport { t as text } from \'kay/i18n\'\n\nexport const register = action(t.Object({}), (_, ctx) => ({ locale: ctx.locale, hint: text(\'auth.hint\') }))\n---\nform(action={register})\n  button Register\n',
+  'src/routes/_layout.kay': 'header.app App\nmain\n  slot\n',
+  'node_modules/kay-lib/routes/_layout.kay': 'section.lib\n  slot\n',
   'src/routes/_404.kay': '---\nimport { t } from \'kay/i18n\'\n---\np.missing {t(\'auth.title\')}\n',
 }
 
@@ -129,7 +68,7 @@ process.exit(0)
 
 // The library's catalogs standing in for an app in two locales that writes none of its own.
 const BORROWED: Record<string, string> = {
-  ...LOCALIZED,
+  ...CATALOGS,
   'src/messages/en.ts': undefined!,
   'src/messages/fr.ts': undefined!,
   'src/routes/index.kay': 'p home\n',
@@ -164,93 +103,70 @@ process.exit(0)
   'lib/routes/login.kay': '--- server\nimport { t } from \'elysia\'\nimport { action } from \'kay\'\n\nexport const signIn = action(t.Object({ name: t.String({ maxLength: 50 }) }), ({ name }) => ({ signedIn: name }))\n---\nform(action={signIn})\n  input(name="name")\n  button Sign in\n',
 }
 
-// An app with a library serving API modules under `/api/auth` and laying its config under the app's, which also has a head of its own.
-const SERVED_API: Record<string, string> = {
+// An app in two locales with one library installed under its node_modules, whose extensions the config lists: pages mounted under `/auth` with a layout and an island, messages, API modules under `/api/auth` and `/api/stats`, a config laid under the app's, and two server plugins, one handed as it is and one built from a function only when the app is.
+const EXTENSIONS: Record<string, string> = {
   'package.json': JSON.stringify({ name: 'app', dependencies: { 'kay-lib': '*' } }),
   'tsconfig.json': TSCONFIG,
   'kay.config.ts': `import { defineConfig } from 'kay/server'
-import { authApi, statsApi } from 'kay-lib'
+import { accounts, authPages, greeter, statsApi } from 'kay-lib'
 
-export default defineConfig({ seo: { name: 'App' }, head: [{ tag: 'meta', props: { name: 'app', content: 'mine' } }], openapi: true, extensions: [authApi(), statsApi()] })
+export default defineConfig({ seo: { name: 'App' }, head: [{ tag: 'meta', props: { name: 'app', content: 'mine' } }], openapi: true, i18n: { locales: ['en', 'fr'], defaultLocale: 'en' }, extensions: [authPages(), statsApi(), greeter, accounts()] })
 `,
-  'src/routes/index.kay': '---\nimport Who from \'../components/who.kay\'\n---\np.home home\nWho\n',
+  'src/messages/en.ts': CATALOGS['src/messages/en.ts']!,
+  'src/messages/fr.ts': CATALOGS['src/messages/fr.ts']!,
+  'src/routes/_layout.kay': 'header.app App\nmain\n  slot\n',
+  'src/routes/index.kay': `--- server
+import { t as schema } from 'elysia'
+import { action } from 'kay'
+import { t } from 'kay/i18n'
+
+export const who = action(schema.Object({}), (_, ctx) => ({ account: ctx.locals.account, visitor: ctx.locals.visitor }))
+
+const greeting: string = ctx.locals.greeting
+const account: string = ctx.locals.account
+const hint = t('auth.hint')
+---
+---
+import Who from '../components/who.kay'
+---
+p.home {greeting} {account}
+p.text {t('home')} {hint}
+a(href="/auth/login") in
+a(href="/auth/nope") nowhere
+a(href="/greeter/ping") ping
+form(action={who})
+  button Who
+Who
+`,
+  'src/routes/auth/register.kay': 'p.register mine\n',
+  // A component no page renders, so the app serves without its unknown key, which only kay check reports.
+  'src/unused.kay': '---\nimport { t } from \'kay/i18n\'\n---\np {t(\'auth.nope\')}\n',
+  // Served, though its link and its local's type fail the check.
+  'src/routes/wrong.kay': '--- server\nconst count: number = ctx.locals.greeting\n---\np {count}\na(href="/greeter/nope") nope\n',
   // It reads a module the app replaced and one of a second library directory too.
   'src/components/who.kay': '---\nimport { resource } from \'kay\'\nimport me from \'kay-lib/api/me\'\nimport session from \'kay-lib/api/session\'\nimport count from \'kay-lib/stats-api/count\'\n\nconst who = resource(session, \'/\')\nconst mine = resource(me, \'/\')\nconst total = resource(count, \'/\')\n---\np.who {who.value()?.from} {mine.value()?.from} {total.value()?.count}\n',
-  'src/api/auth/staff/_guard.ts': 'import { guard } from \'kay\'\n\nexport default guard(() => {})\n',
   'src/api/_guard.ts': 'import { guard } from \'kay\'\n\nexport default guard(({ request, deny }) => {\n  if (request.headers.has(\'x-deny\'))\n    deny(403, \'denied\')\n})\n',
+  'src/api/auth/staff/_guard.ts': 'import { guard } from \'kay\'\n\nexport default guard(() => {})\n',
   'src/api/auth/me.ts': 'import { Elysia } from \'elysia\'\n\nexport default new Elysia().get(\'/\', () => ({ from: \'app\' }))\n',
+  'src/api/me.ts': 'import { api } from \'kay/server\'\n\nexport default api().get(\'/\', ({ account, visitor }) => ({ account, visitor }))\n',
   'node_modules/kay-lib/package.json': JSON.stringify({ name: 'kay-lib', type: 'module', exports: { '.': './index.ts', './api/*': './api/*.ts', './stats-api/*': './stats-api/*.ts' }, peerDependencies: { kay: '*' } }),
   'node_modules/kay-lib/index.ts': `import type { KayExtension } from 'kay/server'
+import { Elysia } from 'elysia'
 
-export const authApi = (): KayExtension => ({
+// Not annotated, so its type leaves the app's locals to the plugins below.
+export const authPages = () => ({
   name: 'kay-lib',
+  routes: { dir: \`\${import.meta.dir}/routes\`, prefix: '/auth' },
+  messages: \`\${import.meta.dir}/messages\`,
   api: { dir: \`\${import.meta.dir}/api\`, prefix: 'auth' },
   config: {
     seo: { name: 'Lib', description: 'from the library' },
     head: [{ tag: 'script', props: { children: 'window.lib = 1' } }, { tag: 'style', props: { children: '.lib { color: teal }' } }],
     redirects: { '/old': '/' },
   },
-})
+}) satisfies KayExtension
 
-export const statsApi = (): KayExtension => ({ name: 'kay-lib-stats', api: { dir: \`\${import.meta.dir}/stats-api\`, prefix: 'stats' } })
-`,
-  'node_modules/kay-lib/api/session.ts': 'import { Elysia } from \'elysia\'\n\nexport default new Elysia().get(\'/\', () => ({ from: \'lib\' }))\n',
-  'node_modules/kay-lib/api/me.ts': 'import { Elysia } from \'elysia\'\n\nexport default new Elysia().get(\'/\', () => ({ from: \'lib\' }))\n',
-  'node_modules/kay-lib/api/admin/_guard.ts': 'import { guard } from \'kay\'\n\nexport default guard(({ deny }) => deny(401, \'no admin\'))\n',
-  'node_modules/kay-lib/api/staff/_guard.ts': 'import { guard } from \'kay\'\n\nexport default guard(({ deny }) => deny(401, \'no staff\'))\n',
-  'node_modules/kay-lib/api/staff/list.ts': 'import { Elysia } from \'elysia\'\n\nexport default new Elysia().get(\'/\', () => [\'ada\'])\n',
-  'node_modules/kay-lib/stats-api/count.ts': 'import { Elysia } from \'elysia\'\n\nexport default new Elysia().get(\'/\', () => ({ count: 1 }))\n',
-  'node_modules/kay-lib/api/admin/stats.ts': 'import { Elysia } from \'elysia\'\n\nexport default new Elysia().get(\'/\', () => ({ stats: 1 }))\n',
-}
-
-const SERVE_API = `import { pages } from 'kay/server'
-
-const app = await pages({ prebuilt: true })
-const get = async (path: string, headers: Record<string, string> = {}) => app.handle(new Request(\`http://localhost\${path}\`, { headers }))
-const home = await get('/')
-const old = await get('/old')
-const status = async (path: string, headers?: Record<string, string>) => (await get(path, headers)).status
-
-console.log(JSON.stringify({
-  session: await (await get('/api/auth/session')).json(),
-  me: await (await get('/api/auth/me')).json(),
-  denied: await status('/api/auth/session', { 'x-deny': '1' }),
-  admin: await status('/api/auth/admin/stats'),
-  staff: await status('/api/auth/staff/list'),
-  count: await (await get('/api/stats/count')).json(),
-  openapi: await (await get('/api/openapi.json')).json(),
-  home: await home.text(),
-  csp: home.headers.get('content-security-policy'),
-  old: [old.status, old.headers.get('location')],
-}))
-process.exit(0)
-`
-
-// An app listing two libraries' server plugins and no server entry: one handed as it is, one built from a function only when the app is.
-const SERVED_PLUGINS: Record<string, string> = {
-  'package.json': JSON.stringify({ name: 'app', dependencies: { 'kay-lib': '*' } }),
-  'tsconfig.json': TSCONFIG,
-  'kay.config.ts': 'import { defineConfig } from \'kay/server\'\nimport { accounts, greeter } from \'kay-lib\'\n\nexport default defineConfig({ extensions: [greeter, accounts()] })\n',
-  'src/routes/index.kay': `--- server
-import { t } from 'elysia'
-import { action } from 'kay'
-
-export const who = action(t.Object({}), (_, ctx) => ({ account: ctx.locals.account, visitor: ctx.locals.visitor }))
-
-const greeting: string = ctx.locals.greeting
-const account: string = ctx.locals.account
----
-p.home {greeting} {account}
-a(href="/greeter/ping") ping
-form(action={who})
-  button Who
-`,
-  // Served, though its link and its local's type fail the check.
-  'src/routes/wrong.kay': '--- server\nconst count: number = ctx.locals.greeting\n---\np {count}\na(href="/greeter/nope") nope\n',
-  'src/api/me.ts': 'import { api } from \'kay/server\'\n\nexport default api().get(\'/\', ({ account, visitor }) => ({ account, visitor }))\n',
-  'node_modules/kay-lib/package.json': JSON.stringify({ name: 'kay-lib', type: 'module', exports: { '.': './index.ts' }, peerDependencies: { kay: '*' } }),
-  'node_modules/kay-lib/index.ts': `import type { KayExtension } from 'kay/server'
-import { Elysia } from 'elysia'
+export const statsApi = () => ({ name: 'kay-lib-stats', api: { dir: \`\${import.meta.dir}/stats-api\`, prefix: 'stats' } }) satisfies KayExtension
 
 const greeting = new Elysia({ name: 'kay-lib-greeter' })
   .decorate('greeting', 'hello')
@@ -267,18 +183,81 @@ console.log('accounts built')
 
 export const accounts = new Elysia({ name: 'kay-lib-accounts' }).derive({ as: 'global' }, ({ request }) => ({ account: request.headers.get('x-account') ?? 'nobody' }))
 `,
+  'node_modules/kay-lib/messages/en.ts': CATALOGS['node_modules/kay-lib/messages/en.ts']!,
+  'node_modules/kay-lib/messages/fr.ts': CATALOGS['node_modules/kay-lib/messages/fr.ts']!,
+  'node_modules/kay-lib/api/session.ts': 'import { Elysia } from \'elysia\'\n\nexport default new Elysia().get(\'/\', () => ({ from: \'lib\' }))\n',
+  'node_modules/kay-lib/api/me.ts': 'import { Elysia } from \'elysia\'\n\nexport default new Elysia().get(\'/\', () => ({ from: \'lib\' }))\n',
+  'node_modules/kay-lib/api/admin/_guard.ts': 'import { guard } from \'kay\'\n\nexport default guard(({ deny }) => deny(401, \'no admin\'))\n',
+  'node_modules/kay-lib/api/staff/_guard.ts': 'import { guard } from \'kay\'\n\nexport default guard(({ deny }) => deny(401, \'no staff\'))\n',
+  'node_modules/kay-lib/api/staff/list.ts': 'import { Elysia } from \'elysia\'\n\nexport default new Elysia().get(\'/\', () => [\'ada\'])\n',
+  'node_modules/kay-lib/api/admin/stats.ts': 'import { Elysia } from \'elysia\'\n\nexport default new Elysia().get(\'/\', () => ({ stats: 1 }))\n',
+  'node_modules/kay-lib/stats-api/count.ts': 'import { Elysia } from \'elysia\'\n\nexport default new Elysia().get(\'/\', () => ({ count: 1 }))\n',
+  'node_modules/kay-lib/counter.kay': '---\nimport { signal } from \'kay\'\n\nconst n = signal(0)\n---\nbutton.count(type="button" onClick={() => n.set(n() + 1)}) {n()}\n',
+  'node_modules/kay-lib/routes/_layout.kay': '---\nimport \'./lib.css\'\n---\nsection.lib\n  slot\n',
+  'node_modules/kay-lib/routes/lib.css': '.lib { color: teal }\n',
+  'node_modules/kay-lib/routes/register.kay': 'p.register theirs\n',
+  'node_modules/kay-lib/routes/login.kay': `--- server
+import { t as schema } from 'elysia'
+import { action } from 'kay'
+import { t } from 'kay/i18n'
+
+export const signIn = action(schema.Object({ name: schema.String({ maxLength: 50 }) }), ({ name }) => ({ signedIn: name }))
+
+const title = t('auth.title')
+const hint = t('auth.hint')
+---
+---
+import Counter from '../counter.kay'
+---
+h1 {title}
+p {hint}
+form(action={signIn})
+  input(name="name")
+  button Sign in
+Counter
+`,
+  'node_modules/kay-lib/routes/terms.kay': '--- server\nexport const page = { prerender: true }\n---\np.terms terms\n',
+  // The library's own check reports this one, not the app's.
+  'node_modules/kay-lib/routes/broken.kay': '---\nconst wrong: number = \'x\'\n---\np {wrong}\n',
 }
 
-const SERVE_PLUGINS = `import { parse, stringify } from 'devalue'
+// A process serves one project, so the app is served in its own, reporting what each request answered: run by Bun from the project, or compiled as the executable's entry.
+const SERVE = `import { parse, stringify } from 'devalue'
 import { pages } from 'kay/server'
 
-const app = await pages()
-const get = async (path: string) => app.handle(new Request(\`http://localhost\${path}\`, { headers: { 'x-account': 'ada', 'x-visitor': 'bob' } }))
-const home = await (await get('/')).text()
-const action = (/<form[^>]*action="([^"]+)"/).exec(home)?.[1] ?? ''
-const posted = await app.handle(new Request(\`http://localhost\${action}\`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-kay-action': '1', 'x-account': 'ada', 'x-visitor': 'bob' }, body: stringify({}) }))
+const app = await pages({ prebuilt: true })
+const get = async (path: string, headers: Record<string, string> = {}) => app.handle(new Request(\`http://localhost\${path}\`, { headers: { 'x-account': 'ada', 'x-visitor': 'bob', ...headers } }))
+const visit = async (path: string) => (await get(path)).text()
+const post = async (url: string, body: unknown) => (await app.handle(new Request(\`http://localhost\${url}\`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-kay-action': '1', 'x-account': 'ada', 'x-visitor': 'bob' }, body: stringify(body) }))).text()
+const formOf = (page: string) => (/<form[^>]*action="([^"]+)"/).exec(page)?.[1] ?? ''
+const status = async (path: string, headers?: Record<string, string>) => (await get(path, headers)).status
+const login = await visit('/auth/login')
+const action = formOf(login)
+const home = await get('/')
+const homeText = await home.text()
+const old = await get('/old')
 
-console.log(JSON.stringify({ home, ping: await (await get('/greeter/ping')).text(), me: await (await get('/api/me')).json(), posted: parse(await posted.text()) }))
+console.log(JSON.stringify({
+  login,
+  fr: await visit('/fr/auth/login'),
+  action,
+  posted: parse(await post(action, { name: 'Ada' })),
+  style: await visit((/rel="stylesheet" href="([^"]+)"/).exec(login)?.[1] ?? '/none.css'),
+  register: await visit('/auth/register'),
+  home: homeText,
+  who: parse(await post(formOf(homeText), {})),
+  ping: await visit('/greeter/ping'),
+  account: await (await get('/api/me')).json(),
+  session: await (await get('/api/auth/session')).json(),
+  me: await (await get('/api/auth/me')).json(),
+  denied: await status('/api/auth/session', { 'x-deny': '1' }),
+  admin: await status('/api/auth/admin/stats'),
+  staff: await status('/api/auth/staff/list'),
+  count: await (await get('/api/stats/count')).json(),
+  openapi: await (await get('/api/openapi.json')).json(),
+  csp: home.headers.get('content-security-policy'),
+  old: [old.status, old.headers.get('location')],
+}))
 process.exit(0)
 `
 
@@ -289,7 +268,7 @@ beforeAll(async () => {
 
   await mkdir(base, { recursive: true })
 
-  for (const [name, files] of [['routes', { ...FILES, 'serve.ts': SERVE }], ['messages', { ...LOCALIZED, 'serve.ts': SERVE_LOCALIZED }], ['implicit', { ...IMPLICIT, 'serve.ts': SERVE_IMPLICIT }], ['borrowed', { ...BORROWED, 'serve.ts': SERVE_LOGIN }], ['outside', OUTSIDE], ['api', { ...SERVED_API, 'serve.ts': SERVE_API }], ['plugins', { ...SERVED_PLUGINS, 'serve.ts': SERVE_PLUGINS }]] as const) {
+  for (const [name, files] of [['extensions', { ...EXTENSIONS, 'serve.ts': SERVE }], ['implicit', { ...IMPLICIT, 'serve.ts': SERVE_IMPLICIT }], ['borrowed', { ...BORROWED, 'serve.ts': SERVE_LOGIN }], ['outside', OUTSIDE]] as const) {
     const dir = await mkdtemp(join(base, `extension-${name}-`))
 
     await Promise.all(Object.entries(files).filter(([, content]) => content !== undefined).map(async ([path, content]) => Bun.write(join(dir, path), content)))
@@ -312,35 +291,79 @@ async function run(command: string[], cwd: string): Promise<{ code: number, stdo
 function expectServed({ code, stdout, stderr }: { code: number, stdout: string, stderr: string }) {
   expect(stderr).not.toContain('error')
   expect(code).toBe(0)
-  const { login, action, posted, style, register, home } = JSON.parse(stdout) as { login: string, action: string, posted: string, style: string, register: string, home: string }
+  const served = JSON.parse(stdout.slice(stdout.indexOf('{'))) as { login: string, fr: string, action: string, posted: unknown, style: string, register: string, home: string, who: unknown, ping: string, account: unknown, session: unknown, me: unknown, denied: number, admin: number, staff: number, count: unknown, openapi: { paths: Record<string, { get: { 'x-kay-guards'?: string[] } }> }, csp: string, old: [number, string] }
+  const hash = (text: string) => `'sha256-${new Bun.CryptoHasher('sha256').update(text).digest('base64')}'`
 
-  expect(login).toContain('<header class="app">App</header>')
-  expect(login).toMatch(/<section class="lib">.*<form/s)
+  // The server plugin built from a function is built once.
+  expect(stdout.split('accounts built').length).toBe(2)
+
+  // Pages: under their prefix inside the app's layouts, a library layout filling a level the app has none at, and an app page at the same path replacing the library's.
+  expect(served.login).toContain('<header class="app">App</header>')
+  expect(served.login).toMatch(/<section class="lib">.*<form/s)
   // Its island hydrates, bundled with the app's.
-  expect(login).toContain('data-component="node_modules/kay-lib/counter.kay"')
-  expect(login).toMatch(/rel="modulepreload" href="\/_kay\/counter-/)
+  expect(served.login).toContain('data-component="node_modules/kay-lib/counter.kay"')
+  expect(served.login).toMatch(/rel="modulepreload" href="\/_kay\/counter-/)
   // So does its layout's stylesheet.
-  expect(login).toMatch(/rel="stylesheet" href="\/_kay\/_layout-[^"]+\.css"/)
-  expect(style).toContain('teal')
-  expect(register).toContain('<p class="register">mine</p>')
-  expect(home).toContain('<p class="home">home</p>')
-  expect(action).toBe('/_kay/action/node_modules/kay-lib/routes/login.kay/signIn')
-  expect(parse(posted)).toEqual({ signedIn: 'Ada' })
+  expect(served.login).toMatch(/rel="stylesheet" href="\/_kay\/_layout-[^"]+\.css"/)
+  expect(served.style).toContain('teal')
+  expect(served.register).toContain('<p class="register">mine</p>')
+  expect(served.action).toBe('/_kay/action/node_modules/kay-lib/routes/login.kay/signIn')
+  expect(served.posted).toEqual({ signedIn: 'Ada' })
+
+  // Messages: the library's pages in each locale, under the app's own catalogs key by key.
+  expect(served.login).toContain('<h1>Log in</h1><p>Use your email</p>')
+  expect(served.fr).toContain('<h1>Se connecter</h1><p>Utilisez votre e-mail</p>')
+
+  // Server plugins: used before the pages, actions and API modules, which read what they add as ctx.locals, the first serving its own routes.
+  expect(served.home).toContain('<p class="home">hello ada</p>')
+  expect(served.who).toEqual({ account: 'ada', visitor: 'bob' })
+  expect(served.ping).toBe('pong')
+  expect(served.account).toEqual({ account: 'ada', visitor: 'bob' })
+
+  // API modules: under the prefix behind the app's guards, an app module at the same path replacing one.
+  expect(served.session).toEqual({ from: 'lib' })
+  expect(served.me).toEqual({ from: 'app' })
+  // The app's guard runs before the library's modules, and the library's own before those under it.
+  expect(served.denied).toBe(403)
+  expect(served.admin).toBe(401)
+  // The app's guard at the same level replaces the library's.
+  expect(served.staff).toBe(200)
+  expect(served.count).toEqual({ count: 1 })
+  expect(served.openapi.paths['/api/auth/session']?.get['x-kay-guards']).toEqual(['_guard.ts'])
+  expect(served.openapi.paths['/api/auth/admin/stats']?.get['x-kay-guards']).toEqual(['_guard.ts', 'auth/admin/_guard.ts'])
+
+  // Config: the app's `seo.name` wins, the library's `description` fills in, and both heads are carried.
+  expect(served.home).toContain('<title>App</title>')
+  expect(served.home).toContain('<meta name="description" content="from the library">')
+  expect(served.home).toContain('<script>window.lib = 1</script>')
+  expect(served.home).toContain('<style>.lib { color: teal }</style>')
+  expect(served.home).toContain('<meta name="app" content="mine">')
+  expect(served.csp).toContain(hash('window.lib = 1'))
+  expect(served.old).toEqual([308, '/'])
 }
 
-describe('a library\'s routes', () => {
-  const root = () => projects.get('routes')!
+describe('a library\'s extensions', () => {
+  const root = () => projects.get('extensions')!
 
-  it('serve under their prefix inside the app\'s layouts, a library layout filling a level the app has none at, and an app page at the same path replacing the library\'s', async () => {
+  it('serve its pages, messages, API modules, config and server plugins inside the app\'s layouts, guards and catalogs, the app\'s files replacing the library\'s at the same path', async () => {
     expectServed(await run([process.execPath, 'serve.ts'], root()))
   })
 
-  it('are carried by the executable, which serves them with nothing of the project to read', async () => {
-    // Its link to `/auth/nope` fails the check, which the test below covers.
+  it('are carried by the executable, which serves them with nothing of the project to read, an island reading an API module getting its mount and none of its code', async () => {
+    // Its links to `/auth/nope` and `/greeter/nope` fail the check, which the test below covers.
     const build = await run([process.execPath, CLI, 'build', '--no-check', '--compile', 'server', '--entry', 'serve.ts'], root())
 
     expect(build.stderr).not.toContain('error')
     expect(build.code).toBe(0)
+    const chunks = await Array.fromAsync(new Bun.Glob('.kay/**/who-*.js').scan({ cwd: root(), dot: true }))
+
+    expect(chunks.length).toBeGreaterThan(0)
+    const island = await Bun.file(join(root(), chunks[0]!)).text()
+
+    expect(island).toContain('/api/auth/session')
+    expect(island).toContain('/api/auth/me')
+    expect(island).toContain('/api/stats/count')
+    expect(island).not.toContain('Elysia')
     const elsewhere = join(root(), '..', `${basename(root())}-elsewhere`)
 
     await mkdir(elsewhere, { recursive: true })
@@ -353,34 +376,23 @@ describe('a library\'s routes', () => {
     }
   }, 60_000)
 
-  it('are written by a static export when prerendered, which refuses one taking an action unless the app replaces it', async () => {
-    const export_ = async () => run([process.execPath, CLI, 'build', '--no-check', '--static', '--outdir', 'dist'], root())
-    const refused = await export_()
-
-    expect(refused.code).toBe(1)
-    expect(refused.stderr).toContain('node_modules/kay-lib/routes/login.kay: it exports the action signIn')
-    const override = join(root(), 'src/routes/auth/login.kay')
-
-    await Bun.write(override, 'p.login static\n')
-
-    try {
-      const build = await export_()
-
-      expect(build.stderr).not.toContain('error')
-      expect(build.code).toBe(0)
-      expect(await Bun.file(join(root(), 'dist/auth/terms.html')).text()).toMatch(/<header class="app">App<\/header><main><section class="lib"><p class="terms">terms<\/p>/)
-    }
-    finally {
-      await rm(override)
-    }
-  }, 60_000)
-
-  it('are pages kay check lets a link point at, leaving the errors inside them to the library', async () => {
+  it('are known to kay check, which types ctx.locals and links with no Register of the app\'s, lets a link point at a library page, leaves the errors inside the library\'s pages to it, gives t() the library\'s keys and an island\'s API calls their types', async () => {
     const { code, stdout, stderr } = await run([process.execPath, CLI, 'check'], root())
     const output = `${stdout}${stderr}`
 
     expect(code).toBe(1)
-    expect([...output.matchAll(/serves (\S+?)"/g)].map(match => match[1])).toEqual(['/auth/nope', '/auth/nope'])
+    // A server plugin given as a function is not built by the check.
+    expect(output).not.toContain('accounts built')
+    expect([...output.matchAll(/serves (\S+?)"/g)].map(match => match[1]).sort()).toEqual(['/auth/nope', '/auth/nope', '/greeter/nope', '/greeter/nope'])
+    expect(output).toContain('src/routes/wrong.kay')
+    expect(output).toMatch(/Type 'string' is not assignable to type 'number'/)
+    expect(output).toContain('"auth.nope"')
+    expect(output).not.toContain('"auth.hint"')
+    // A key the library has in one locale alone is the app's to translate.
+    expect(output).toContain('lacks auth.extra, which node_modules/kay-lib/messages/en.ts has')
+    expect(output).not.toContain('who.kay')
+    expect(output).not.toContain('broken.kay')
+    expect([...output.matchAll(/^ *--> (\S+)$/gm)].map(match => match[1])).toEqual(['src/routes/index.kay:18:9', 'src/routes/wrong.kay:2:7', 'src/routes/wrong.kay:5:9', 'src/unused.kay:4:6', 'src/messages/fr.ts:1:1'])
   })
 })
 
@@ -476,127 +488,6 @@ describe('an extension listed from beside the app', () => {
   }, 30_000)
 })
 
-// What `SERVE_API` reports, checked the same whichever way it ran.
-function expectApiServed({ code, stdout, stderr }: { code: number, stdout: string, stderr: string }) {
-  expect(stderr).not.toContain('error')
-  expect(code).toBe(0)
-  const served = JSON.parse(stdout) as { session: unknown, me: unknown, denied: number, admin: number, staff: number, count: unknown, openapi: { paths: Record<string, { get: { 'x-kay-guards'?: string[] } }> }, home: string, csp: string, old: [number, string] }
-  const hash = (text: string) => `'sha256-${new Bun.CryptoHasher('sha256').update(text).digest('base64')}'`
-
-  expect(served.session).toEqual({ from: 'lib' })
-  expect(served.me).toEqual({ from: 'app' })
-  // The app's guard runs before the library's modules, and the library's own before those under it.
-  expect(served.denied).toBe(403)
-  expect(served.admin).toBe(401)
-  // The app's guard at the same level replaces the library's.
-  expect(served.staff).toBe(200)
-  expect(served.count).toEqual({ count: 1 })
-  expect(served.openapi.paths['/api/auth/session']?.get['x-kay-guards']).toEqual(['_guard.ts'])
-  expect(served.openapi.paths['/api/auth/admin/stats']?.get['x-kay-guards']).toEqual(['_guard.ts', 'auth/admin/_guard.ts'])
-  // The app's `seo.name` wins, the library's `description` fills in, and both heads are carried.
-  expect(served.home).toContain('<title>App</title>')
-  expect(served.home).toContain('<meta name="description" content="from the library">')
-  expect(served.home).toContain('<script>window.lib = 1</script>')
-  expect(served.home).toContain('<style>.lib { color: teal }</style>')
-  expect(served.home).toContain('<meta name="app" content="mine">')
-  expect(served.csp).toContain(hash('window.lib = 1'))
-  expect(served.old).toEqual([308, '/'])
-}
-
-describe('a library\'s API modules and config', () => {
-  const root = () => projects.get('api')!
-
-  it('serve under its prefix behind the app\'s guards, an app module at the same path replacing one, its config under the app\'s', async () => {
-    expectApiServed(await run([process.execPath, 'serve.ts'], root()))
-  })
-
-  it('are carried by the executable, an island reading one getting its mount and none of its code', async () => {
-    const build = await run([process.execPath, CLI, 'build', '--no-check', '--compile', 'server', '--entry', 'serve.ts'], root())
-
-    expect(build.stderr).not.toContain('error')
-    expect(build.code).toBe(0)
-    const chunks = await Array.fromAsync(new Bun.Glob('.kay/**/who-*.js').scan({ cwd: root(), dot: true }))
-
-    expect(chunks.length).toBeGreaterThan(0)
-    const island = await Bun.file(join(root(), chunks[0]!)).text()
-
-    expect(island).toContain('/api/auth/session')
-    expect(island).toContain('/api/auth/me')
-    expect(island).toContain('/api/stats/count')
-    expect(island).not.toContain('Elysia')
-    const elsewhere = join(root(), '..', `${basename(root())}-elsewhere`)
-
-    await mkdir(elsewhere, { recursive: true })
-
-    try {
-      expectApiServed(await run([join(root(), 'server')], elsewhere))
-    }
-    finally {
-      await rm(elsewhere, { recursive: true, force: true })
-    }
-  }, 60_000)
-
-  it('type an island\'s calls in kay check', async () => {
-    const { code, stdout, stderr } = await run([process.execPath, CLI, 'check'], root())
-
-    expect(`${stdout}${stderr}`).not.toContain('error')
-    expect(code).toBe(0)
-  })
-
-  it('give an island its mount when the library is linked, whichever side of the link the island imports it from', async () => {
-    const base = await scratchDir('api-link-')
-    const real = join(base, 'lib')
-    const linked = join(base, 'app/node_modules/lib')
-
-    try {
-      await Bun.write(join(real, 'api/who.ts'), 'import { serve } from \'bun\'\n\nexport default { serve }\n')
-      await Bun.write(join(real, 'island.ts'), 'import who from \'./api/who\'\n\nconsole.log(who)\n')
-      await mkdir(dirname(linked), { recursive: true })
-      await symlink(real, linked)
-
-      for (const [dir, entry] of [[join(linked, 'api'), join(real, 'island.ts')], [join(real, 'api'), join(linked, 'island.ts')]] as const) {
-        const built = await Bun.build({ entrypoints: [entry], target: 'browser', plugins: [apiStubs([{ dir, prefix: '/lib' }])] })
-
-        expect(await built.outputs[0]!.text()).toContain('"/api/lib/who"')
-      }
-    }
-    finally {
-      await rm(base, { recursive: true, force: true })
-    }
-  })
-})
-
-describe('a library\'s server plugin', () => {
-  const root = () => projects.get('plugins')!
-
-  it('is used before the pages, actions and API modules, which read what it adds as ctx.locals, and serves its own routes', async () => {
-    const { code, stdout, stderr } = await run([process.execPath, 'serve.ts'], root())
-
-    expect(stderr).not.toContain('error')
-    expect(code).toBe(0)
-    const { home, ping, me, posted } = JSON.parse(stdout.slice(stdout.indexOf('{'))) as { home: string, ping: string, me: unknown, posted: unknown }
-
-    expect(stdout.split('accounts built').length).toBe(2)
-    expect(home).toContain('<p class="home">hello ada</p>')
-    expect(ping).toBe('pong')
-    expect(me).toEqual({ account: 'ada', visitor: 'bob' })
-    expect(posted).toEqual({ account: 'ada', visitor: 'bob' })
-  })
-
-  it('types the app\'s ctx.locals and links in kay check with no Register of the app\'s, building none given as a function', async () => {
-    const { code, stdout, stderr } = await run([process.execPath, CLI, 'check'], root())
-    const output = `${stdout}${stderr}`
-
-    expect(code).toBe(1)
-    expect(output).not.toContain('accounts built')
-    expect(output).not.toContain('index.kay')
-    expect(output).toContain('src/routes/wrong.kay')
-    expect(output).toContain('/greeter/nope')
-    expect(output).toMatch(/Type 'string' is not assignable to type 'number'/)
-    expect(output).toMatch(/2 errors/)
-  })
-})
-
 describe('a library outside the app\'s directory', () => {
   it('takes posts to its actions at a URL no browser resolves away', async () => {
     const { code, stdout, stderr } = await run([process.execPath, 'serve.ts'], join(projects.get('outside')!, 'app'))
@@ -608,52 +499,6 @@ describe('a library outside the app\'s directory', () => {
     expect(action).toBe('/_kay/action/~/lib/routes/login.kay/signIn')
     expect(new URL(action, 'http://localhost').pathname).toBe(action)
     expect(parse(posted)).toEqual({ signedIn: 'Ada' })
-  })
-})
-
-describe('a library\'s messages', () => {
-  const root = () => projects.get('messages')!
-
-  it('translate its pages in each locale, under the app\'s own catalogs key by key', async () => {
-    const { code, stdout, stderr } = await run([process.execPath, 'serve.ts'], root())
-
-    expect(stderr).not.toContain('error')
-    expect(code).toBe(0)
-    const { en, fr } = JSON.parse(stdout) as { en: string, fr: string }
-
-    expect(en).toContain('<h1>Log in</h1><p>Use your email</p>')
-    expect(fr).toContain('<h1>Se connecter</h1><p>Utilisez votre e-mail</p>')
-  })
-
-  it('are carried by the executable', async () => {
-    const build = await run([process.execPath, CLI, 'build', '--no-check', '--compile', 'server', '--entry', 'serve.ts'], root())
-
-    expect(build.stderr).not.toContain('error')
-    expect(build.code).toBe(0)
-    const elsewhere = join(root(), '..', `${basename(root())}-elsewhere`)
-
-    await mkdir(elsewhere, { recursive: true })
-
-    try {
-      const served = await run([join(root(), 'server')], elsewhere)
-
-      expect(served.code).toBe(0)
-      expect((JSON.parse(served.stdout) as { fr: string }).fr).toContain('<h1>Se connecter</h1><p>Utilisez votre e-mail</p>')
-    }
-    finally {
-      await rm(elsewhere, { recursive: true, force: true })
-    }
-  }, 60_000)
-
-  it('give t() their keys in kay check, and a key the library has in one locale alone is the app\'s to translate', async () => {
-    const { code, stdout, stderr } = await run([process.execPath, CLI, 'check'], root())
-    const output = `${stdout}${stderr}`
-
-    expect(code).toBe(1)
-    expect(output).toContain('"auth.nope"')
-    expect(output).not.toContain('"auth.hint"')
-    expect(output).toContain('lacks auth.extra, which node_modules/kay-lib/messages/en.ts has')
-    expect([...output.matchAll(/^ *--> (\S+)$/gm)].map(match => match[1])).toEqual(['src/routes/index.kay:5:17', 'src/messages/fr.ts:1:1'])
   })
 })
 
@@ -678,25 +523,7 @@ describe('a library\'s messages in an app without i18n', () => {
     expect(login).toContain('<script type="application/json" data-kay-i18n>{"locale":"fr","messages":{"auth.hint":"Utilisez votre e-mail"}}</script>')
   })
 
-  it('are carried by the executable and written by a static export', async () => {
-    const build = await run([process.execPath, CLI, 'build', '--no-check', '--compile', 'server', '--entry', 'serve.ts'], root())
-
-    expect(build.stderr).not.toContain('error')
-    expect(build.code).toBe(0)
-    const elsewhere = join(root(), '..', `${basename(root())}-elsewhere`)
-
-    await mkdir(elsewhere, { recursive: true })
-
-    try {
-      const served = await run([join(root(), 'server')], elsewhere)
-
-      expect(served.code).toBe(0)
-      expect((JSON.parse(served.stdout) as { login: string }).login).toContain('<h1>Se connecter</h1><p>Utilisez votre e-mail</p>')
-    }
-    finally {
-      await rm(elsewhere, { recursive: true, force: true })
-    }
-
+  it('are written by a static export, inside the app\'s layouts and the library\'s', async () => {
     // A static export takes no action, so the app replaces the page posting one.
     const override = join(root(), 'src/routes/auth/register.kay')
 
@@ -707,7 +534,7 @@ describe('a library\'s messages in an app without i18n', () => {
 
       expect(exported.stderr).not.toContain('error')
       expect(exported.code).toBe(0)
-      expect(await Bun.file(join(root(), 'dist/auth/login.html')).text()).toContain('<h1>Se connecter</h1><p>Utilisez votre e-mail</p>')
+      expect(await Bun.file(join(root(), 'dist/auth/login.html')).text()).toContain('<header class="app">App</header><main><section class="lib"><h1>Se connecter</h1><p>Utilisez votre e-mail</p>')
     }
     finally {
       await rm(override)

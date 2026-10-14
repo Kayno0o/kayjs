@@ -1354,142 +1354,42 @@ describe('a stylesheet imported as text', () => {
   }, 60_000)
 })
 
-describe('a compiled server with layouts', () => {
-  it('boots with its sources gone, each layout\'s actions behind the guards of its own directory, a library\'s too', async () => {
+describe('a compiled server', () => {
+  it('boots with its sources gone, each layout\'s actions behind the guards of its own directory, a library\'s too, rendering an extension\'s editor with its stylesheet, serving the icons drawn from an SVG favicon without resvg, and printing the notices of what it ships', async () => {
+    const secret = 'a-preview-secret-long-enough-for-kay-0123456789'
     const action = (name: string, settings = '') => `--- server\nimport { t } from 'elysia'\nimport { action } from 'kay'\n\n${settings}export const ${name} = action(t.Object({}), () => '${name}')\n---\nslot\n`
     const root = await scratchProject({
+      'package.json': JSON.stringify({ name: 'notices', private: true, dependencies: { elysia: '*' }, devDependencies: { '@iconify-json/tabler': '*' } }),
       'tsconfig.json': tsconfig,
-      'kay.config.ts': 'export default { favicon: false, requireGuards: true, extensions: [{ name: \'lib\', routes: { dir: \'lib/routes\', prefix: \'/lib\' } }] }\n',
+      'kay.config.ts': `export default { favicon: 'src/favicon.svg', requireGuards: true, preview: { secret: '${secret}' }, fonts: [{ fontsource: '@fontsource/inter', weights: [700] }], extensions: [{ name: 'lib', routes: { dir: 'lib/routes', prefix: '/lib' }, editor: \`\${import.meta.dir}/lib/editor.kay\` }] }\n`,
+      'src/favicon.svg': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#c00"/></svg>',
+      'lib/editor.css': '.edited { outline: 1px dashed teal }\n',
+      'lib/editor.kay': '---\nimport { signal } from \'kay\'\nimport \'./editor.css\'\n\nconst clicks = signal(0)\n---\nbutton.edited(onClick={() => clicks.set(n => n + 1)}) Edit {clicks()}\n',
       'lib/routes/_guard.ts': 'import { guard } from \'kay\'\n\nexport default guard(({ request, deny }) => {\n  if (!request.headers.has(\'x-lib\'))\n    deny(403)\n})\n',
       'lib/routes/_layout.kay': action('track'),
       'lib/routes/index.kay': 'h1 Library\n',
+      'src/encoded.kay': '---\nimport { signal } from \'kay\'\nimport { stringify } from \'devalue\'\n\nconst on = signal(false)\n---\nbutton(onClick={() => on.set(o => !o)}) {on() ? stringify([1]) : \'off\'}\n',
       'src/routes/_layout.kay': action('leave', 'export const page = { guards: false }\n'),
-      'src/routes/index.kay': '--- server\nexport const page = { guards: false }\n---\nh1 Home\n',
+      'src/routes/index.kay': '---\nimport Encoded from \'../encoded.kay\'\n---\n--- server\nexport const page = { guards: false }\n---\nh1 Home\nEncoded\n',
       'src/routes/staff/_guard.ts': 'import { guard } from \'kay\'\n\nexport default guard(({ request, deny }) => {\n  if (!request.headers.has(\'x-admin\'))\n    deny(403, \'Admins only\')\n})\n',
       'src/routes/staff/_layout.kay': action('promote'),
       'src/routes/staff/sign-in.kay': '--- server\nexport const page = { guards: false }\n---\nh1 Staff\n',
-      'src/server.ts': `import process from 'node:process'
-import { Elysia } from 'elysia'
-import { pages } from 'kay/server'
-
-const app = new Elysia().use(await pages({ security: false }))
-const post = async (file: string, name: string, headers: Record<string, string> = {}) => (await app.handle(new Request(\`http://localhost/_kay/action/src/routes/\${file}/\${name}\`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-kay-action': '1', 'referer': 'http://localhost/', ...headers }, body: '[{}]' }))).status
-
-console.log(JSON.stringify({ home: (await app.handle(new Request('http://localhost/'))).status, leave: await post('_layout.kay', 'leave'), promote: await post('staff/_layout.kay', 'promote'), admin: await post('staff/_layout.kay', 'promote', { 'x-admin': '1' }), track: await post('../../lib/routes/_layout.kay', 'track'), tracked: await post('../../lib/routes/_layout.kay', 'track', { 'x-lib': '1' }) }))
-process.exit(0)
-`,
-    })
-
-    try {
-      const [report, code] = await printed(Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', root, '--compile', join(root, 'server')], { stdout: 'pipe', stderr: 'pipe' }))
-
-      expect(report).not.toContain('error')
-      expect(code).toBe(0)
-      // The executable reads nothing from the sources, the layouts' settings included.
-      await rename(join(root, 'src'), join(root, 'moved'))
-      await rename(join(root, 'lib'), join(root, 'moved-lib'))
-      const child = Bun.spawn([join(root, 'server')], { cwd: root, env: { ...process.env, NODE_ENV: 'production' }, stdout: 'pipe', stderr: 'pipe' })
-      const [output, errors, exited] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
-
-      expect({ exited, errors }).toEqual({ exited: 0, errors: expect.any(String) })
-      expect(JSON.parse(output.trim().split('\n').at(-1)!)).toEqual({ home: 200, leave: 200, promote: 403, admin: 200, track: 403, tracked: 200 })
-    }
-    finally {
-      await rm(root, { recursive: true, force: true })
-    }
-  }, 60_000)
-})
-
-describe('a compiled server with an editor', () => {
-  it('renders the editor an extension gives, with its stylesheet, in edit mode with its sources gone', async () => {
-    const secret = 'a-preview-secret-long-enough-for-kay-0123456789'
-    const root = await scratchProject({
-      'tsconfig.json': tsconfig,
-      'kay.config.ts': `export default { favicon: false, preview: { secret: '${secret}' }, extensions: [{ name: 'lib', editor: \`\${import.meta.dir}/lib/editor.kay\` }] }\n`,
-      'lib/editor.css': '.edited { outline: 1px dashed teal }\n',
-      'lib/editor.kay': '---\nimport { signal } from \'kay\'\nimport \'./editor.css\'\n\nconst clicks = signal(0)\n---\nbutton.edited(onClick={() => clicks.set(n => n + 1)}) Edit {clicks()}\n',
-      'src/routes/index.kay': 'h1 Home\n',
       'src/server.ts': `import process from 'node:process'
 import { Elysia } from 'elysia'
 import { pages, previewUrl } from 'kay/server'
 
 const app = new Elysia().use(await pages({ security: false }))
 const get = async (path: string, cookie = '') => app.handle(new Request(\`http://localhost\${path}\`, { headers: { cookie } }))
+const post = async (file: string, name: string, headers: Record<string, string> = {}) => (await app.handle(new Request(\`http://localhost/_kay/action/src/routes/\${file}/\${name}\`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-kay-action': '1', 'referer': 'http://localhost/', ...headers }, body: '[{}]' }))).status
 const cookie = (await get(previewUrl('/', { edit: true }))).headers.getSetCookie()[0]!.split(';')[0]!
 const page = await (await get('/', cookie)).text()
-const sheet = /<link rel="stylesheet" href="([^"]+)">/.exec(page)?.[1]
+const sheets = [...page.matchAll(/<link rel="stylesheet" href="([^"]+)">/g)].map(match => match[1]!)
+const styles = (await Promise.all(sheets.map(async sheet => (await get(sheet)).text()))).join('')
+const icons = await Promise.all(['/favicon.ico', '/icon-512.png', '/favicon.svg'].map(async path => (await get(path)).status))
 
-console.log(JSON.stringify({ editor: page.includes('class="edited"'), sheet: sheet !== undefined && (await (await get(sheet)).text()).includes('dashed teal') }))
+console.log(JSON.stringify({ home: (await get('/')).status, leave: await post('_layout.kay', 'leave'), promote: await post('staff/_layout.kay', 'promote'), admin: await post('staff/_layout.kay', 'promote', { 'x-admin': '1' }), track: await post('../../lib/routes/_layout.kay', 'track'), tracked: await post('../../lib/routes/_layout.kay', 'track', { 'x-lib': '1' }), editor: page.includes('class="edited"'), sheet: styles.includes('dashed teal'), icons }))
 process.exit(0)
 `,
-    })
-
-    try {
-      const [report, code] = await printed(Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', root, '--compile', join(root, 'server')], { stdout: 'pipe', stderr: 'pipe' }))
-
-      expect(report).not.toContain('error')
-      expect(code).toBe(0)
-      await rename(join(root, 'src'), join(root, 'moved'))
-      await rename(join(root, 'lib'), join(root, 'moved-lib'))
-      const child = Bun.spawn([join(root, 'server')], { cwd: root, env: { ...process.env, NODE_ENV: 'production' }, stdout: 'pipe', stderr: 'pipe' })
-      const [output, errors, exited] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
-
-      expect({ exited, errors }).toEqual({ exited: 0, errors: expect.any(String) })
-      expect(JSON.parse(output.trim().split('\n').at(-1)!)).toEqual({ editor: true, sheet: true })
-    }
-    finally {
-      await rm(root, { recursive: true, force: true })
-    }
-  }, 60_000)
-})
-
-describe('a compiled server with an SVG favicon', () => {
-  it('serves the icons kay build drew from it, carrying no resvg', async () => {
-    const root = await scratchProject({
-      'tsconfig.json': tsconfig,
-      'kay.config.ts': 'export default { favicon: \'src/favicon.svg\' }\n',
-      'src/favicon.svg': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#c00"/></svg>',
-      'src/routes/index.kay': 'h1 Home\n',
-      'src/server.ts': `import process from 'node:process'
-import { Elysia } from 'elysia'
-import { pages } from 'kay/server'
-
-const app = new Elysia().use(await pages({ security: false }))
-const statuses = await Promise.all(['/favicon.ico', '/icon-512.png', '/favicon.svg'].map(async path => (await app.handle(new Request(\`http://localhost\${path}\`))).status))
-
-console.log(JSON.stringify(statuses))
-process.exit(0)
-`,
-    })
-
-    try {
-      const [report, code] = await printed(Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', root, '--compile', join(root, 'server')], { stdout: 'pipe', stderr: 'pipe' }))
-
-      expect(report).not.toContain('error')
-      expect(code).toBe(0)
-      await rename(join(root, 'src'), join(root, 'moved'))
-      const child = Bun.spawn([join(root, 'server')], { cwd: root, env: { ...process.env, NODE_ENV: 'production' }, stdout: 'pipe', stderr: 'pipe' })
-      const [output, errors, exited] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
-
-      expect({ exited, errors }).toEqual({ exited: 0, errors: expect.any(String) })
-      expect(JSON.parse(output.trim().split('\n').at(-1)!)).toEqual([200, 200, 200])
-      expect((await Bun.file(join(root, 'server')).text()).includes('resvg-js')).toBe(false)
-    }
-    finally {
-      await rm(root, { recursive: true, force: true })
-    }
-  }, 60_000)
-})
-
-describe('third-party notices', () => {
-  it('writes the licence of every package a build ships beside it, and an executable prints its server\'s with them', async () => {
-    const root = await scratchProject({
-      'package.json': JSON.stringify({ name: 'notices', private: true, dependencies: { elysia: '*' }, devDependencies: { '@iconify-json/tabler': '*' } }),
-      'tsconfig.json': tsconfig,
-      'kay.config.ts': 'export default { favicon: false, fonts: [{ fontsource: \'@fontsource/inter\', weights: [700] }] }\n',
-      'src/encoded.kay': '---\nimport { signal } from \'kay\'\nimport { stringify } from \'devalue\'\n\nconst on = signal(false)\n---\nbutton(onClick={() => on.set(o => !o)}) {on() ? stringify([1]) : \'off\'}\n',
-      'src/routes/index.kay': '---\nimport Encoded from \'../encoded.kay\'\n---\nEncoded\n',
-      'src/server.ts': 'import { Elysia } from \'elysia\'\nimport { pages } from \'kay/server\'\n\nnew Elysia().use(await pages()).listen(0)\n',
     })
 
     try {
@@ -1526,6 +1426,16 @@ describe('third-party notices', () => {
       expect(printedNotices).toContain('\nelysia ')
       expect(printedNotices).toContain('\ndevalue ')
       expect(printedNotices).toContain('@fontsource/inter ')
+
+      // The executable reads nothing from the sources, the layouts' settings and the favicon included.
+      await rename(join(root, 'src'), join(root, 'moved'))
+      await rename(join(root, 'lib'), join(root, 'moved-lib'))
+      const child = Bun.spawn([join(root, 'server')], { cwd: root, env: { ...process.env, NODE_ENV: 'production' }, stdout: 'pipe', stderr: 'pipe' })
+      const [output, errors, exited] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+
+      expect({ exited, errors }).toEqual({ exited: 0, errors: expect.any(String) })
+      expect(JSON.parse(output.trim().split('\n').at(-1)!)).toEqual({ home: 200, leave: 200, promote: 403, admin: 200, track: 403, tracked: 200, editor: true, sheet: true, icons: [200, 200, 200] })
+      expect((await Bun.file(join(root, 'server')).text()).includes('resvg-js')).toBe(false)
     }
     finally {
       await rm(root, { recursive: true, force: true })
