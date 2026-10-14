@@ -422,7 +422,7 @@ button(onClick={save} disabled={add.pending()}) Add
 
 - `proofOfWork: true` makes each post cost the sender CPU, as ALTCHA does, for a site still getting spam past the others, with no third party, no cookie and no new `csp` source.
 - The page carries a challenge for each action its forms post to, the hash of a random salt and a number up to the difficulty, signed as the `minTime` stamp is and bound to the action.
-- Kay's script solves it in a worker, a same-origin file the browser build ships, from the moment one of those forms takes focus, then sends the solution with the post in an `x-kay-work` header.
+- kay's script solves it in a worker, a same-origin file the browser build ships, from the moment one of those forms takes focus, then sends the solution with the post in an `x-kay-work` header.
 - `proofOfWork: 300_000` sets the difficulty, 100,000 by default: the browser hashes half of it on average, some tens of milliseconds on a laptop, more on an old phone.
 - `{ difficulty, maxAge: '1h', pretend: true, store }` sets how long a challenge stays good, a day by default.
 - `pretend` answers a wrong number or a solution sent twice as `honeypot`'s `pretend` does.

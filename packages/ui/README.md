@@ -44,7 +44,7 @@ The root layout renders the toasts and tooltips once. A second Toaster or Toolti
 ---
 import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
 import TooltipHost from '@kaynooo/kayjs-ui/tooltip-host.kay'
-import './app.css'
+import '../app.css'
 ---
 slot
 Toaster

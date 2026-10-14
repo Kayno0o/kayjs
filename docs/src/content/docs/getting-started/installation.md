@@ -6,6 +6,8 @@ description: Point Bun at the registry, scaffold a project with kay new and star
 
 You need [Bun](https://bun.sh) 1.4.3 or later. kay is published as `@kaynooo/kayjs` on its own registry, so tell Bun where the `@kaynooo` scope lives once.
 
+A project depends on it under the name `kay`, `"kay": "npm:@kaynooo/kayjs@~<version>"` in `package.json`, which is why imports read `kay` and `kay/server`. `kay new` writes that line for you.
+
 ## Registry setup
 
 In `~/.bunfig.toml`, or `$XDG_CONFIG_HOME/.bunfig.toml` when that variable is set, as Bun then reads only that one:

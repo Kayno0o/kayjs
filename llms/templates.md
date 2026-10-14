@@ -241,7 +241,7 @@ for product of products
 - The mark is on the string's value at run time, kept by the process for every user, and only the markup most recently vouched for: call `trustHtml` where the markup is used rather than once for a constant kept for hours, as a spread drops what the process forgot, and in production logs that once.
 - A derived string (`safe + '<b>'`, `.slice()`) is unmarked. The mark travels from the server to the browser in island props, action results and event streams, and from nowhere else: a request's input, a cookie, `localStorage` and a `fetch` of your own JSON bring plain strings.
 - Only one written as an attribute is checked at build time: a spread never sets `srcdoc`.
-- Breaking, in the next minor: a spread of a plain string into `innerHTML` rendered before. Upgrading: write `innerHTML={sanitizeHtml(text)}` or `innerHTML={trustHtml(text)}` as an attribute, or wrap the value in the spread the same way.
+- A plain string meant as markup goes through `sanitizeHtml(text)`, for markup a user wrote, or `trustHtml(text)`, for markup the app made, before it reaches `innerHTML`, as an attribute or in a spread.
 - Inside `svg` or `math`, where HTML reads a `style` or `script` as markup rather than text, one holds static text or a string literal only, which the compiler reports otherwise.
 - A line starting with `{expression}` is text, as `| {expression}` is.
 - Inline text follows the tag after one space.

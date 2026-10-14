@@ -110,13 +110,6 @@ export async function archive(scan: File) {
 - `sqliteRooms` from `kay/server` keeps a room's messages 30 seconds, for the processes sharing it to read.
 - The SQLite files `sqliteStore`, `sqliteRates`, `sqliteJobs`, `sqliteRooms` and `sqliteCache` create are readable by the server's user alone.
 
-### Upgrading from before kay kept this
-
-- A SQLite file created before keeps its mode: `chmod 600` it.
-- Variants the image route made before `files.delete` erased them stay in `.kay/cache/images` until it is emptied.
-- The first start purges the failed jobs past `keepFailed`, 30 days by default.
-- Rate-limit counts start over on the first deploy with a session or preview secret, as keys are then hashed with it.
-
 ### Stored files
 
 - `files.put` tells a JPEG, PNG or WebP by its bytes, whatever its name, and stores it with only what draws it: its pixels, colour profile and a JPEG's orientation, every other segment or chunk, EXIF, XMP, IPTC, C2PA, text and comments among them, dropped; any other format, AVIF and HEIC included, and a file it cannot read through, logged, are stored as they came.

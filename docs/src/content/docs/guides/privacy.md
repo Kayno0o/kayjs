@@ -94,15 +94,6 @@ else
 
 `files.put` keeps only what draws a JPEG, PNG or WebP, told by its bytes whatever its name: its pixels, colour profile and orientation. The EXIF, XMP, IPTC and text a camera or phone writes, such as where and when the photo was taken, go, and so does any metadata kay does not know. An AVIF or HEIC is stored as it came, and so is a file kay cannot read through, which it logs. `files.put(file, { keepMetadata: true })` keeps everything, for an archive that needs it. A photo of a person that only some visitors may see is stored with `private: true`, served only through a link the page signed.
 
-## Upgrading
-
-A site that ran an older kay has four things to do or know:
-
-- SQLite files created before keep their mode: `chmod 600` them.
-- Image variants made before `files.delete` erased them stay in `.kay/cache/images` until it is emptied.
-- The first start purges failed jobs past `keepFailed`, 30 days by default.
-- Rate-limit counts start over on the first deploy with a session or preview secret, as keys are then hashed with it.
-
 ## Error trackers
 
 `onError` gets the whole request. Send a tracker its path rather than `request.url`, whose query may hold an address or a token:

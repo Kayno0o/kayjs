@@ -59,7 +59,7 @@ The theme is dark unless the visitor's system asks for light. `data-theme="light
 ---
 import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
 import TooltipHost from '@kaynooo/kayjs-ui/tooltip-host.kay'
-import './app.css'
+import '../app.css'
 ---
 slot
 Toaster
@@ -90,9 +90,7 @@ export default settings
 
 ## Components
 
-Upgrading from 1.42: CopyButton renders a visually hidden status span after its button and Toaster two status regions before its popover, so a selector or a layout counting one element per component sees them; Dialog's title is an `h2` rather than an `h3`, `level` giving another; buttons draw their line with `field-border` rather than `overlay0`.
-
-Each component spreads the other attributes it is given onto its root element, `id`, `aria-*` and `data-*` included. The exceptions: Toggle and Checkbox spread them on their checkbox, Popover on its panel, and ConfirmDelete, FormField, FormDialog, Toaster and TooltipHost take none.
+Each component spreads the other attributes it is given onto its root element, `id`, `aria-*` and `data-*` included. The exceptions: Toggle and Checkbox spread them on their checkbox, Popover on its panel, and CommandPalette, ConfirmDelete, FormField, FormDialog, Menu, Toaster, TooltipHost and WhenVisible take none.
 
 ### Icon, Button, IconButton
 
@@ -137,7 +135,7 @@ Dialog(open={editing()} title="Rename" onClose={() => editing.set(false)})
   @footer
     Button(label="Cancel" onClick={() => editing.set(false)})
     Button(label="Rename" variant="accent" onClick={rename})
-  input.field-input(name="name")
+  input.kui-field-input(name="name")
 ```
 
 - Dialog is a modal `dialog`. It closes when its parent sets `open` to false, on Escape, or on a click outside. `onClose(event)` runs however it closed. Closed by Escape or a click outside, its content is still there to read; closed by the parent, it is already gone. Its title names it for screen readers, an `h2` unless `level` says otherwise.
@@ -175,7 +173,7 @@ Table(columns={columns} rows={posts} rowKey="id" filter={['title', 'author']} fi
     EmptyState(title="No post matches")
 ```
 
-- With a `@cell(row, column)` block, every column shows what it draws, but one with `cell: false`, which shows the row's value at `key` as text, as every column does without the block. A table where any column sets `cell: true` draws only those through the block, as before.
+- With a `@cell(row, column)` block, every column shows what it draws, but one with `cell: false`, which shows the row's value at `key` as text, as every column does without the block. A table where any column sets `cell: true` draws only those through the block.
 - `numeric: true` marks a count or an amount: aligned to the end, its digits in columns, sorted by its own value and largest first, each overridable by `align`, `sortValue` and `defaultDirection`.
 - A column with `sortValue` sorts when its header is clicked. `true` sorts by the row's value at `key`; a function sorts by what it returns.
 - The first click sorts in `defaultDirection`, `desc` unless set, and the next click flips it. `sort` gives the sort to start from.
@@ -462,7 +460,7 @@ Button(label="Rename" onClick={() => editing.set(true)})
 FormDialog(open={editing()} title="Rename" action={rename} submitLabel="Rename" failure="Could not rename" onSaved={saved => title.set(saved.title)} onClose={() => editing.set(false)})
   input(type="hidden" name="id" value={post.id})
   FormField(label="Title" name="title" required)
-    input.field-input(name="title" value={title()})
+    input.kui-field-input(name="title" value={title()})
 ```
 
 - FormDialog calls `action` with `new FormData(form)`, read on the server as a plain form post and answered as a call. An action that redirects takes the browser there instead.

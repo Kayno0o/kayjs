@@ -128,7 +128,7 @@ The vouching travels with the value from the server to the browser in island pro
 
 The server keeps what was vouched for in one registry for every user, and only the markup most recently vouched for. Call `trustHtml` where the markup is used rather than once for a constant kept for hours; a dropped value is logged once in production, and each time in development.
 
-This is a breaking change in the next minor. To upgrade, pass the value through `sanitizeHtml(text)` for markup a user wrote, or `trustHtml(text)` for markup the app made, before it reaches the spread.
+To render a string as markup, pass it through `sanitizeHtml(text)` for markup a user wrote, or `trustHtml(text)` for markup the app made, before it reaches the spread.
 
 ## Comments and slots
 

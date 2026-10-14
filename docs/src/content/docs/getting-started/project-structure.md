@@ -4,7 +4,7 @@ order: 4
 description: Where the files of a kay project live and what the two entry files look like.
 ---
 
-A project made by `kay new` looks like this. Only `src/routes` is required. Each entry leads to its page in the [Structure](/structure/routes) part, which draws the whole tree in its sidebar.
+A kay project grows into this shape. `kay new` writes part of it, depending on the preset and features you pick, and the rest appears as you need it. Only `src/routes` is required. Each entry leads to its page in the [Structure](/structure/routes) part, which draws the whole tree in its sidebar.
 
 <FileTree tree="
 my-app/

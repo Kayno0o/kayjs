@@ -215,7 +215,7 @@ export default (value: string) =>
 
 - A page's settings are the keys of one object its server fence exports, `export const page = { prerender: true, revalidate: '1h' }`.
 - `kay` exports the type `PageSettings`, which `kay check` types the object by (`satisfies PageSettings`): the editor completes the keys and an unknown one is a type error.
-- Kay reads the object as written, a literal with no spread, computed key or method.
+- kay reads the object as written, a literal with no spread, computed key or method.
 - A layout takes `layouts`, `security` and `reload`, the last two applying to every page under it, and `guards: false`, which opens its own actions alone, the pages under it keeping their guards.
 - `query` on a layout or a special page is reported.
 - A setting exported under its own name, `export const prerender = true` or `export async function prerender()`, is a compile error.

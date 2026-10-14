@@ -440,7 +440,7 @@ const dispose = mount(Panel, document.querySelector('#panel')!, { title: 'Ticket
 - So do a link with `target` or `download`, one to another site, `/api` and `/_kay` paths, and modified clicks.
 - A page in another locale, or one built against another client build, loads fully too, as does a page setting `reload: true` in its `page` or its layout's, and one whose cross-origin isolation differs from the current page's, which a document cannot change in place.
 - Such a page still swaps itself in place: a link to it with another query, `navigate({ query })` and `refresh()` on it.
-- The swap prefetches as the speculation rules would, `prefetch` setting when (see [Project setup](project.md#project-setup)), and replaces them, so each page is fetched once: a hovered link's page is kept for 30 seconds and taken as the link is followed.
+- The swap prefetches as the speculation rules would, on the timing the `prefetch` setting gives (see [Project setup](project.md#project-setup)), and replaces them, so each page is fetched once: a hovered link's page is kept for 30 seconds and taken as the link is followed.
 - `data-no-prefetch` still opts a link out.
 - A stylesheet holding `@view-transition { navigation: auto; }` animates the swap where the browser has view transitions, as it animates full loads, the rule standing at the top level or inside an `@media` or `@supports` that holds.
 - A visitor asking for reduced motion (`prefers-reduced-motion: reduce`) gets no animation from the swap whatever the stylesheet says; a full load animates for them unless the rule sits in `@media (prefers-reduced-motion: no-preference)`, as the one `kay new` writes does.

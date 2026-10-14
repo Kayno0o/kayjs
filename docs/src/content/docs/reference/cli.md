@@ -3,11 +3,14 @@ title: CLI
 order: 1
 description: The kay commands to scaffold, run, check, build and format a project.
 ---
-`kay dev`, `kay build` and `kay check` take an optional project directory (the current one by default), and every command prints its usage for `--help`.
+`kay dev`, `kay build`, `kay check`, `kay start` and `kay routes` take an optional project directory (the current one by default), and every command prints its usage for `--help`.
+
+Once Bun knows the registry ([Installation](/getting-started/installation#registry-setup)):
 
 ```sh
 bunx -p @kaynooo/kayjs kay new my-app
 cd my-app
+bun install
 bun run dev
 ```
 
@@ -16,6 +19,7 @@ bun run dev
 | `kay new <dir>` | Scaffold a project that checks, builds and runs |
 | `kay dev [dir]` | Run the server, restarting on change, with errors shown in the browser |
 | `kay build [dir]` | Check the project and bundle the browser code for production |
+| `kay start [dir]` | Serve the last build as production does |
 | `kay check [dir]` | Type-check the project, `.kay` files included |
 | `kay routes [dir]` | List every route the project serves, and the file serving it |
 | `kay explain [lint\|group]` | List the lints, or a group's, or explain one |
@@ -90,7 +94,7 @@ kay dev: http://localhost:3000 (ready in 412 ms)
 14:03:05 the server exited with code 1, waiting for a change
 ```
 
-The `Listening on http://localhost:3000` line an entry scaffolded by an older kay prints is left out; kay's own start line only shows in production.
+An entry's own `Listening on http://localhost:3000` line is left out; kay's own start line only shows in production.
 
 ### Dev tool
 

@@ -1,6 +1,6 @@
-# Kay
+# kay
 
-> Kay is a Bun web framework. A `.kay` file is one component: TypeScript fences, then a pug-like indented template. Pages render to plain HTML strings on the server, islands run on kay's own signals and DOM runtime, and an Elysia plugin serves it all with automatic islands. Everything is typed, templates included, and `kay check` reports errors at the `.kay` line and column.
+> kay is a Bun web framework. A `.kay` file is one component: TypeScript fences, then a pug-like indented template. Pages render to plain HTML strings on the server, islands run on kay's own signals and DOM runtime, and an Elysia plugin serves it all with automatic islands. Everything is typed, templates included, and `kay check` reports errors at the `.kay` line and column.
 
 ## Rules that are easy to get wrong
 

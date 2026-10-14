@@ -10,6 +10,6 @@ Give a column a `sortValue` to make its header sortable: `true` sorts by the row
 
 ## Empty
 
-Columns marked `cell: true` are drawn by the `@cell(row, column)` block. The `@empty` block is shown in place of the rows when there are none.
+With a `@cell(row, column)` block, every column is drawn by it, except one marked `cell: false`, which shows its value as text. Once any column sets `cell: true`, the block draws only those columns. The `@empty` block is shown in place of the rows when there are none.
 
 <Demo name="table/empty" />

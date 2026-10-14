@@ -38,13 +38,15 @@ In production the server serves what `kay build` wrote and bundles nothing at bo
 | Command | Does |
 | --- | --- |
 | `kay new <dir> [--template blank\|server\|site\|app] [--with <features>] [--without <features>] [-y] [--kay <dependency>]` | scaffold a project that checks, builds and runs: one bare page, a server run as one executable, a static site, or an app with sessions and members in Postgres through pg-orm; in a terminal with none of these options it asks for a preset, then for each feature; `--with` and `--without` change the preset's features, `-y` takes the server preset without asking, `--kay` sets its `kay` dependency |
-| `kay dev [dir] [--entry <file>] [--port <port>] [--inspect] [--open]` | run the server, restarting on change, errors shown in the browser |
-| `kay build [dir] [--no-check]` | bundle the browser code for production while checking the project as `kay check` does, keeping the last build when either fails; `--no-check` skips the check |
+| `kay dev [dir] [--entry <file>] [--port <port>] [--host[=<address>]] [--inspect[=<address>]] [--open]` | run the server, restarting on change, errors shown in the browser |
+| `kay build [dir] [-p tsconfig.json] [--no-check] [--analyze]` | bundle the browser code for production while checking the project as `kay check` does, keeping the last build when either fails; `--no-check` skips the check |
 | `kay build [dir] --compile <file> [--entry <file>]` | the same, plus the server and everything it serves in one executable, `--entry` naming the server entry |
 | `kay build [dir] --static [--outdir dist]` | the same, then the whole site as static files for a host with no server |
-| `kay check [dir] [-p tsconfig.json] [--entry <file>] [--deny-warnings] [--fix]` | type-check the project, `.kay` files included, `-p` naming another tsconfig and `--entry` the server entry whose `app` types `ctx.locals`; warnings fail it only with `--deny-warnings`, and `--fix` applies the fixes that change nothing else first |
-| `kay explain [lint]` | list the lints, or explain one with an example it reports and the same written right |
-| `kay fmt [paths] [--check]` | format `.kay` files |
+| `kay check [dir] [paths...] [-p tsconfig.json] [--entry <file>] [--deny-warnings] [--fix] [--only <group>] [--format text\|github\|json] [--watch]` | type-check the project, `.kay` files included, `-p` naming another tsconfig and `--entry` the server entry whose `app` types `ctx.locals`; warnings fail it only with `--deny-warnings`, and `--fix` applies the fixes that change nothing else first |
+| `kay start [dir] [--entry <file>] [--port <port>]` | serve the last build as production does |
+| `kay routes [dir]` | list every route the project serves, and the file serving it |
+| `kay explain [lint\|group]` | list the lints, or a group's, or explain one with an example it reports and the same written right |
+| `kay fmt [paths...] [--check]` | format `.kay` files |
 | `kay migrate astro [dir] [--out <dir>]` | translate an Astro project into `.kay` files, listing what is left by hand |
 | `kay lsp --stdio` | language server for the editor extension in `editors/vscode` |
 
