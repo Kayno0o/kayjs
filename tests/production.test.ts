@@ -35,7 +35,7 @@ import { signStamp } from '../src/server/stamp'
 import { CspViolation } from '../src/server/violations'
 import { testSite } from '../src/test'
 import { parsingRoutes, routePaths } from './elysia'
-import { prerendered } from './prerendered'
+import { prerendered, refusedPrerender } from './prerendered'
 import { fixtureCopy, scratchDir } from './scratch'
 
 const ROUTES = 'tests/fixtures/seo/src/routes'
@@ -1223,8 +1223,7 @@ describe('revalidation', () => {
       expect(await (await app.handle(new Request('http://localhost/origin'))).text()).toContain('<p class="origin">https://example.com</p>')
       // Built for no site and served for one, as one build for several hosts is, it goes quietly.
       expect(warned).not.toHaveBeenCalled()
-      // The pages before the refused one are written again.
-      await build.keeping(async () => expect(prerenderPages(resolveProject(root, { routes }), (await readClient(root))!, { exportAll: true })).rejects.toThrow('origin.kay: it reads the site, through siteUrl() or siteOrigin()'))
+      await expect(refusedPrerender({ routes }, (await readClient(root))!, { exportAll: true })).rejects.toThrow('origin.kay: it reads the site, through siteUrl() or siteOrigin()')
     }
     finally {
       warned.mockRestore()
@@ -1302,8 +1301,7 @@ describe('revalidation', () => {
     try {
       await Bun.write(join(copy, 'src/routes/broken.kay'), '--- server\nexport const page = { prerender: true, revalidate: \'hourly\' }\n---\np Broken\n')
 
-      // The pages before the refused one are written over the describe's.
-      await build.keeping(async () => expect(prerenderPages(resolveProject(root, { routes: `${copy}/src/routes` }), (await readClient(root))!)).rejects.toThrow('broken.kay\'s revalidate is \'hourly\'; it takes a positive duration'))
+      await expect(refusedPrerender({ routes: `${copy}/src/routes` }, (await readClient(root))!)).rejects.toThrow('broken.kay\'s revalidate is \'hourly\'; it takes a positive duration')
     }
     finally {
       await rm(copy, { recursive: true, force: true })
@@ -1319,7 +1317,8 @@ describe('a prerendered page posted to', () => {
   const LEAFLET = './fixtures/production/src/routes/leaflet.kay'
   const root = process.cwd()
   const withEntry = (client: ClientBuild): ClientBuild => ({ ...client, entry: '/_kay/entry.js', navigation: true })
-  const build = prerendered({ routes }, withEntry)
+
+  prerendered({ routes }, withEntry)
 
   it('renders for the post a form sent, and for the request carrying how it went, kept by no cache, the built file served before and after', async () => {
     const app = await pages({ routes, prebuilt: true, security: false })
@@ -1421,8 +1420,7 @@ describe('a prerendered page posted to', () => {
 
     expect((await post(solution)).status).toBe(303)
     expect((await post(solution)).status).toBe(422)
-    // The pages before the refused one are written again.
-    await build.keeping(async () => expect(prerenderPages(resolveProject(root, { routes }), withEntry((await readClient(root))!), { exportAll: true })).rejects.toThrow('flyer.kay: a form in it posts to an action with `minTime` or `proofOfWork`'))
+    await expect(refusedPrerender({ routes }, withEntry((await readClient(root))!), { exportAll: true })).rejects.toThrow('flyer.kay: a form in it posts to an action with `minTime` or `proofOfWork`')
   })
 })
 

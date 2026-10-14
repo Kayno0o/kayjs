@@ -33,7 +33,7 @@ import { setTracer } from '../src/server/trace'
 import { parsingRoutes, routePaths } from './elysia'
 import { auth } from './fixtures/site/src/auth'
 import { resetTodos } from './fixtures/site/src/data'
-import { prerendered } from './prerendered'
+import { prerendered, refusedPrerender } from './prerendered'
 import { scratchDir } from './scratch'
 
 const app = await pages({ routes: 'tests/fixtures/site/src/routes', publicDir: 'tests/fixtures/site/public' })
@@ -1076,7 +1076,8 @@ describe('prerendering', () => {
         dirs.push(dir)
         await Promise.all(Object.entries(files).map(async ([file, source]) => Bun.write(join(dir, file), source)))
 
-        const rendering = build.keeping(async () => prerenderPages(resolveProject(root, { routes: dir, ...config }), (await readClient(root))!))
+        // The one render that goes through writes the manifest, so it is put back after; a refused one throws before.
+        const rendering = typeof outcome === 'number' ? build.keeping(async () => prerenderPages(resolveProject(root, { routes: dir, ...config }), (await readClient(root))!)) : refusedPrerender({ routes: dir, ...config }, (await readClient(root))!)
 
         if (typeof outcome === 'number')
           expect(await rendering).toBe(outcome)
