@@ -1,7 +1,8 @@
+import type { BunPlugin } from 'bun'
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
-import { mergeSupports } from '../src/build/supports'
+import { mergeSupports, mergingSupports } from '../src/build/supports'
 import { scratchDir } from './scratch'
 
 let dir: string
@@ -29,6 +30,7 @@ describe('mergeSupports', () => {
   it('keeps every override Tailwind nests in a rule for a color-mix(), through Bun, minified or not', async () => {
     const css = `:root {\n  --a: var(--x);\n  ${TAILWIND} {\n    & {\n      --a: color-mix(in srgb, var(--x) 14%, var(--y));\n    }\n  }\n  --b: var(--z);\n  ${TAILWIND} {\n    & {\n      --b: color-mix(in srgb, var(--z) 12%, transparent);\n    }\n  }\n}\n`
 
+    // Bun 1.4.3 drops it: once this fails, Bun fixed it and the merge can go.
     expect(await bundled(css)).not.toContain('--b: color-mix')
 
     for (const minify of [false, true]) {
@@ -44,6 +46,7 @@ describe('mergeSupports', () => {
   it('keeps a rule nested in a rule holding only custom properties, followed by one with the same selector', async () => {
     const css = `:root {\n  & { --a: 2; }\n  --c: 1;\n  & { --b: 2; }\n  .p { --d: 2; }\n  .p { --e: 2; }\n}\n`
 
+    // Bun 1.4.3 drops it: once this fails, Bun fixed it and the merge can go.
     expect(await bundled(css)).not.toContain('--a: 2')
 
     for (const minify of [false, true]) {
@@ -83,6 +86,37 @@ describe('mergeSupports', () => {
 
     expect(mergeSupports(css)).toBe(css)
     expect(mergeSupports(css.replace('.b {', `${TAILWIND} { .c { --y: 2 } }\n.b {`))).toContain('--y: 2')
+  })
+
+  it('keeps what follows a `}` closing nothing, for Bun to report it', () => {
+    const css = `.a { color: red }\n}\n.b { color: blue }\n${TAILWIND} { .c { --x: 2 } }\n${TAILWIND} { .d { --y: 2 } }\n`
+
+    expect(mergeSupports(css)).toBe(`.a { color: red }\n}\n.b { color: blue }\n${TAILWIND} { .c { --x: 2 }  .d { --y: 2 } }\n`)
+  })
+
+  it('leaves alone custom properties whose value is a block, and the case of a condition', () => {
+    const css = `.a { --x: { a: b }; --x: { c: d } }\n@supports (--Foo: x) { .a { --y: 1 } }\n@supports (--foo: x) { .a { --y: 2 } }\n`
+
+    expect(mergeSupports(css)).toBe(css)
+  })
+
+  it('merges what a plugin loads as CSS, and the stylesheets no plugin loads', async () => {
+    const twice = (a: string, b: string) => `${TAILWIND} { .${a} { --x: 2 } }\n${TAILWIND} { .${b} { --y: 2 } }\n`
+    const file = join(dir, 'loaded.css')
+
+    await Bun.write(file, '')
+    await Bun.write(join(dir, 'plain.css'), twice('a', 'b'))
+
+    for (const loader of ['css', undefined] as const) {
+      const plugin: BunPlugin = { name: 'loads', setup: (build) => {
+        build.onLoad({ filter: /loaded\.css$/ }, () => ({ contents: `@import './plain.css';\n${twice('c', 'd')}`, ...loader && { loader } }))
+      } }
+      const build = await Bun.build({ entrypoints: [file], plugins: mergingSupports([plugin]) })
+      const out = await build.outputs[0]!.text()
+
+      for (const name of ['--x', '--y'])
+        expect(out.split(`${name}: 2`)).toHaveLength(3)
+    }
   })
 
   it('returns a stylesheet testing nothing as it is', () => {

@@ -13,7 +13,8 @@ import { importsOf, libraryOf } from './libraries'
 
 const KAY_FILE = /\.kay$/
 const SCRIPT_FILE = /\.[cm]?[jt]sx?$/
-const CSS_FILE = /\.css$/
+
+export const CSS_FILE = /\.css$/
 const ABSOLUTE_URL = /^\//
 // `import css from './x.css' with { type: 'text' }` and its dynamic form: the file's text, read by the module, which no stylesheet build follows.
 const TEXT_IMPORT = /\bfrom\s*(['"])([^'"\n]+)\1\s*(?:with|assert)\s*\{[^}]*\btype\s*:\s*(['"])text\3[^}]*\}|\bimport\(\s*(['"])([^'"\n]+)\4\s*,\s*\{\s*with\s*:\s*\{[^}]*\btype\s*:\s*(['"])text\6[^}]*\}\s*(?:,\s*)?\}\s*\)/g

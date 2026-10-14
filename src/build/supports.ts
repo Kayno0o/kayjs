@@ -1,10 +1,9 @@
 import type { BunPlugin, PluginBuilder } from 'bun'
+import { CSS_FILE } from './styles'
 
-const CSS_FILE = /\.css$/
 const SUPPORTS_PRELUDE = /^@supports\b/i
 const SPACES = /\s+/g
 const COMMENTS = /\/\*[\s\S]*?\*\//g
-const LAST_MEANINGFUL = /\S\s*$/
 // An unquoted `url(`, whose contents may hold any brace or semicolon.
 const URL_OPEN = /^url\([^'"\s]/i
 
@@ -13,7 +12,7 @@ type Node = { text: string } | { prelude: string, body: Node[] }
 // The stylesheet as text runs and blocks, each block its prelude (what leads to its `{`, the whitespace and comments before included) and what it holds; strings, comments and `url()` are read past whole, so a brace in one is not one.
 function parse(css: string): Node[] {
   let at = 0
-  const read = (): Node[] => {
+  const read = (depth: number): Node[] => {
     const nodes: Node[] = []
     let start = at
     // Where the prelude of a block opening next starts: after the last `;` of this run.
@@ -55,13 +54,14 @@ function parse(css: string): Node[] {
 
         at++
 
-        const body = read()
+        const body = read(depth + 1)
 
         nodes.push({ prelude, body })
         start = at
         statement = at
       }
-      else if (char === '}') {
+      // A `}` closing nothing is text, which Bun reports as it would without the merge.
+      else if (char === '}' && depth > 0) {
         if (at > start)
           nodes.push({ text: css.slice(start, at) })
 
@@ -80,14 +80,14 @@ function parse(css: string): Node[] {
     return nodes
   }
 
-  return read()
+  return read(0)
 }
 
 function print(nodes: Node[]): string {
   return nodes.map(node => 'text' in node ? node.text : `${node.prelude}{${print(node.body)}}`).join('')
 }
 
-// What a block merges by, written one way: the condition of an `@supports` block, or inside a rule the selector of a nested rule; undefined for any other block.
+// What a block merges by, written one way: the condition of an `@supports` block, or inside a rule the selector of a nested rule; undefined for any other block, a custom property whose value is a block among them.
 function mergeKey(node: Node, inRule: boolean): string | undefined {
   if ('text' in node)
     return undefined
@@ -95,27 +95,27 @@ function mergeKey(node: Node, inRule: boolean): string | undefined {
   const prelude = node.prelude.replace(COMMENTS, '').trim().replace(SPACES, ' ')
 
   if (SUPPORTS_PRELUDE.test(prelude))
-    return prelude.toLowerCase()
+    return prelude.replace(SUPPORTS_PRELUDE, '@supports')
 
-  return inRule && !prelude.startsWith('@') ? prelude : undefined
+  return inRule && !prelude.startsWith('@') && !prelude.endsWith(':') ? prelude : undefined
 }
 
 // Puts what `from` holds at the end of `into`, a `;` between when `into` ends on a declaration that has none.
 function append(into: Node[], from: Node[]): void {
-  const last = LAST_MEANINGFUL.exec(print(into).replace(COMMENTS, ''))?.[0].trim()
+  const last = into.findLast(node => !('text' in node) || node.text.replace(COMMENTS, '').trim() !== '')
 
-  if (last !== undefined && last !== ';' && last !== '}' && last !== '{')
+  if (last !== undefined && 'text' in last && !last.text.replace(COMMENTS, '').trim().endsWith(';'))
     into.push({ text: ';' })
 
   into.push(...from)
 }
 
 // Bun keeps the first of two `@supports` blocks testing the same condition one right after the other and drops the second, and lowering nesting puts the blocks a rule holds one after the other, its declarations hoisted out from between; there too, of two rules with the same selector, it drops the first when it holds only custom properties, as Tailwind's `& { }` does.
-// So each such block merges into the one before it, with only whitespace and comments between, or declarations too inside a rule.
+// So each such block merges into the one before it, with only whitespace and comments between, or declarations too inside a rule, which stay where they are.
 function merge(nodes: Node[], inRule: boolean): Node[] {
   const out: Node[] = []
-  // The block a next one testing its condition merges into, and the length of `out` right after it.
-  let previous: { block: { prelude: string, body: Node[] }, at: number } | undefined
+  // The block a next one with its key merges into.
+  let previous: { prelude: string, body: Node[] } | undefined
 
   for (const node of nodes) {
     if ('text' in node) {
@@ -129,17 +129,14 @@ function merge(nodes: Node[], inRule: boolean): Node[] {
 
     const key = mergeKey(node, inRule)
 
-    if (key !== undefined && previous !== undefined && mergeKey(previous.block, inRule) === key) {
-      append(previous.block.body, node.body)
-      // What came between is whitespace and comments, which go with it, or declarations, which stay.
-      out.splice(previous.at, Infinity, ...out.slice(previous.at).filter(between => inRule && 'text' in between))
-      previous.at = out.length
+    if (key !== undefined && previous !== undefined && mergeKey(previous, inRule) === key) {
+      append(previous.body, node.body)
 
       continue
     }
 
     out.push(node)
-    previous = key === undefined ? undefined : { block: node, at: out.length }
+    previous = key === undefined ? undefined : node
   }
 
   return out.map(node => 'text' in node ? node : { prelude: node.prelude, body: merge(node.body, inRule || !atRule(node)) })
