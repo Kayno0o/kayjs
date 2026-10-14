@@ -8,7 +8,7 @@ Styles and assets are imported where they are used, and Bun bundles them.
 
 ## Component styles
 
-A component script imports its stylesheet. Each page links one stylesheet per layout, then its own, holding the CSS of every component it renders, those its server fence imports included.
+A component script imports its stylesheet. A page links the stylesheets of its layouts, then its own, holding the CSS of every component it renders.
 
 ```kay
 ---
@@ -20,7 +20,7 @@ article.card
 
 `@import`, nesting and relative `url()` assets work in the stylesheet.
 
-Imported `with { type: 'text' }`, a stylesheet is its text instead, a string in server code and in the executable `kay build --compile` writes, for a mail or a generated page to inline; it joins no page stylesheet. The text is the file as written, a Tailwind entry's `@import` lines included, not the CSS built from it, and an island importing it carries it in its script. A stylesheet imported under a name without the attribute is refused by `kay check` (`css-import-without-text`).
+Imported `with { type: 'text' }`, a stylesheet is its text as a string instead, for a mail or a generated page to inline. It joins no page stylesheet.
 
 ```ts
 import theme from './theme.css' with { type: 'text' }
@@ -37,17 +37,17 @@ import { defineConfig } from 'kay/server'
 export default defineConfig({ plugins: [tailwind] })
 ```
 
-Import `src/app.css` from the root `_layout.kay`. It needs only `@import 'tailwindcss';`, and classes written with the `.class` shorthand are picked up too.
+Import `src/app.css` from the root `_layout.kay`. It needs only `@import 'tailwindcss';`, and classes written with the `.class` shorthand work too.
 
 ## Public files
 
-A file in `public/` is served at its path as it is: `public/robots.txt` is `/robots.txt`. Use it for anything that needs a fixed URL. One at a path a page serves, in any locale, or an endpoint, a redirect, an API route or a feed, stops the server at boot; kay's own sitemap, `robots.txt`, favicons and `/sw.js` give way to it.
+A file in `public/` is served at its path as it is: `public/robots.txt` is `/robots.txt`. Use it for anything that needs a fixed URL.
 
-An HTML file is also served without its `.html`, and an `index.html` at its directory, as a static host does: `public/shelf/books.html` at `/shelf/books`, `public/shelf/index.html` at `/shelf`. A site exported into `public/` keeps its links that way. Anything else served at that exact path, a file, a page or a redirect, wins.
+An HTML file is also served without its `.html`, as a static host does: `public/shelf/books.html` at `/shelf/books`, and `public/shelf/index.html` at `/shelf`.
 
 ## Imported images
 
-Import an image for its URL, a content-named path served with a year of immutable caching:
+Import an image for its URL, a content-named path served with long-lived caching:
 
 ```kay
 ---
@@ -73,19 +73,17 @@ onMount(async () => {
 p Ready
 ```
 
-Server code importing one `with { type: 'file' }` keeps Bun's meaning, the file's own path, embedded in an executable.
+A worker is a file named with `new URL`, and kay bundles it on its own, imports included:
 
-An island, and any package it imports, names a file shipped beside a module with `new URL('./file', import.meta.url)`. kay writes that file with the assets and bundles a script on its own as a worker, its imports included, so `new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })` works in development, in a build and in a compiled executable. The URL is relative to the island's chunk, so it holds under a `base`.
+```ts
+const worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })
+```
 
-- A package starting itself as its threads' worker, as an emscripten build does, gets a bundle of its own, and one building its worker from a blob, as qr-scanner does, works as it is.
-- Only a relative path written as a string, naming a file, is shipped: a directory, a template with a part, an absolute path or a call inside a comment is left as written.
-- A worker bundles as an island does, its stylesheets dropped and its API imports as stubs, but without the config's `plugins`. One that fails to build fails the build, each error at its `file:line:column`.
-- When an island or its worker compiles wasm, kay's content security policy adds `'wasm-unsafe-eval'` to `script-src`, and `worker-src 'self' blob:` when one starts a worker from a blob. They join a `csp` setting its own `script-src` or `worker-src` too, unless it sets that directive to `false` or `'none'`.
-- Threads sharing memory need a page isolated from other origins: set `security: { headers: { 'cross-origin-embedder-policy': 'credentialless' } }`; kay already sends `cross-origin-opener-policy: same-origin`. Set it in kay.config.ts for the whole site, or in a page's `page` for that page alone, which links then load fully.
+This works in development, in a build and in a compiled executable. When an island or its worker compiles wasm, kay's content security policy allows it. Threads sharing memory need extra headers, which the reference lists.
 
 ## Responsive images
 
-An imported PNG, JPEG, WebP, GIF or AVIF used as an `img` `src` gets a `srcset` of WebP variants, with AVIF for browsers that take it, and its `width` and `height`. Write `sizes` to say how large it shows:
+An imported PNG, JPEG, WebP, GIF or AVIF used as an `img` `src` gets a `srcset` of WebP variants, with AVIF for browsers that take it, and its `width` and `height`. Write `sizes` to say how large it shows, and the browser loads the smallest variant that fits:
 
 ```kay
 ---
@@ -93,8 +91,6 @@ import hero from '../hero.jpg'
 ---
 img(src={hero} sizes="(min-width: 60rem) 50vw, 100vw" alt="The workshop")
 ```
-
-An image always drawn at one width in pixels, such as a logo with `sizes="95px"`, gets one variant per screen density instead, from 1x to `images.maxDensity`, 3x when it is `Infinity`, each rounded up to a width the image route makes, a multiple of 16 below 320: `96w` and `192w` for that logo, never wider than the image itself.
 
 `image(hero, { aspect: '16/9' })` from `kay/image` cuts the variants to a shape instead of relying on `object-fit`. Spread its result on the element:
 
@@ -105,8 +101,6 @@ import hero from '../hero.jpg'
 ---
 img({...image(hero, { aspect: '16/9', sizes: '100vw' })} alt="The workshop")
 ```
-
-An animated GIF keeps its frames: it gets no variants and is served as it is.
 
 ### Private images
 
@@ -128,7 +122,7 @@ export default defineConfig({
 })
 ```
 
-`image('/media/42', { width, height })` then resizes that `src`. The answers are private to the browser, revalidated by their ETag, and `resolve` gets the guard's `ctx` too. There `ctx.locals` holds what the app's plugins add, such as the session, but not Elysia's `cookie`, `query`, `headers` or `body`: read `ctx.cookies`, `ctx.url` and `ctx.request` instead. The `src` is whatever a visitor asks for: look it up, never join it to a directory, since the path `resolve` returns is read as it is. A static export has no image route, so it refuses `resolve`.
+`image('/media/42', { width, height })` then resizes that `src`. The `src` is whatever a visitor asks for: look it up, never join it to a directory.
 
 ## Fonts
 
@@ -143,19 +137,17 @@ export default defineConfig({
 })
 ```
 
-`subset: ['latin', 'latin-ext']` on a Fontsource entry declares each subset with its `unicode-range`, so a page downloads only the files its text needs.
-
 Then use the family as usual: `font-family: Inter, system-ui, sans-serif`, or with Tailwind `@theme { --font-sans: Inter, system-ui, sans-serif; }`.
 
 <Callout type="note">
 
-`preload: true` on a face fetches it with the page, but on a slow phone it can hold back the first paint. Leave it off unless text painting in that font first matters more.
+Faces load once the page uses them. `preload: true` fetches one with the page, but can hold back the first paint on a slow phone.
 
 </Callout>
 
 ## Icons
 
-Any Iconify set installed as `@iconify-json/<prefix>` is imported one icon at a time, as `~icons/<prefix>/<name>`. Imported under a capitalised name, it is a tag:
+Any Iconify set installed as `@iconify-json/<prefix>` is imported one icon at a time, as `~icons/<prefix>/<name>`. Imported under a capitalised name, it is a tag that takes classes:
 
 ```kay
 ---
@@ -168,4 +160,4 @@ a(href="/")
 
 The icon sizes to the surrounding text and takes its colour from `currentColor`. An icon without text beside it needs `role="img"` and an `aria-label`.
 
-<ReadMore href="/llms/styles-and-assets">Inlined styles, remote and uploaded images, share cards, AVIF settings and runtime icon lookup are in the full styles and assets reference.</ReadMore>
+<ReadMore href="/llms/styles-and-assets">Inlined styles, worker and wasm details, fixed-width and cropped images, private, remote and uploaded images, share cards, AVIF settings, public file conflicts and runtime icon lookup are in the full styles and assets reference.</ReadMore>
