@@ -2,6 +2,9 @@ import { join } from 'node:path'
 import { describe, expect, test } from 'bun:test'
 import { testSite } from 'kay/test'
 
+// An id kay draws for a page, which differs per render.
+const DRAWN_ID = /\b(id|data-kui-field)="k\w+-\d+"/g
+
 // The fixture is an app installing the library, linked back to this repository by scripts/link-fixture.ts.
 const ROOT = join(import.meta.dir, '..')
 // kay check prints this line on success since kay 1.18, nothing before.
@@ -76,7 +79,7 @@ test('IconButton names its action for screen readers and as its tooltip', async 
 })
 
 test('Toaster is an island rendering an empty manual popover, filled in the browser only', async () => {
-  expect(await element('/buttons', 'toasts')).toMatch(/^<div id="toasts"><slot data-component="[^"]*\/toaster\.kay"[^>]*><!--\[--><div class="kui-toaster" popover="manual"><\/div>/)
+  expect(await element('/buttons', 'toasts')).toMatch(/^<div id="toasts"><slot data-component="[^"]*\/toaster\.kay"[^>]*><!--\[--><div class="kui-toaster-live" role="status"><\/div><div class="kui-toaster-live" role="alert"><\/div><div class="kui-toaster" popover="manual"><\/div>/)
 })
 
 test('Table renders sorted on the server from a static page, its sortable headers buttons and the rest text', async () => {
@@ -132,11 +135,12 @@ describe('controls', () => {
 describe('content', () => {
   const page = async (id: string) => (await element('/content', id)).replaceAll(/<!--[^>]*-->/g, '')
 
-  test('Card titles its frame, holds a head block at the far end, and insets its body unless bare', async () => {
+  test('Card titles its frame at the level given, holds a head block at the far end, and insets its body unless bare', async () => {
     const card = await page('card')
 
     expect(card).toMatch(/^<section id="card" class="kui-card"><div class="kui-card-head"><h3 class="kui-card-title">Moons<\/h3><span data-tone="success" class="kui-badge"><svg[^>]*class="kui-icon kui-badge-icon">.*<\/svg>3<\/span><\/div><div class="kui-card-body"><p>Phobos and Deimos<\/p><\/div><\/section>$/)
     expect(await page('bare')).toBe('<section id="bare" class="kui-card"><p>Edge to edge</p></section>')
+    expect(await page('outlined')).toContain('<h2 class="kui-card-title">Orbits</h2>')
   })
 
   test('Notice is a status, or an alert for an error, drawn as a box or as a bare line', async () => {
@@ -184,9 +188,10 @@ describe('content', () => {
 
 describe('FormField', () => {
   test('labels its control with what it takes, and shows the message a plain form post was refused with', async () => {
-    const field = (await element('/form', 'field')).replaceAll(/<!--[^>]*-->/g, '')
+    const field = (await element('/form', 'field')).replaceAll(/<!--[^>]*-->/g, '').replaceAll(DRAWN_ID, '$1="id"')
 
-    expect(field).toBe('<section id="field"><div class="kui-form-field"><label class="kui-form-field-label"><span class="kui-form-field-head"><span class="kui-label-text">Name<span class="kui-form-field-required" aria-hidden="true">*</span></span></span><input name="name"></label><span class="kui-form-field-hint">As it shows on the site</span><span class="kui-form-field-issues" aria-live="polite"></span></div></section>')
+    // Static on a page of its own: the ids are drawn for a FormField inside an island to tie its control to them.
+    expect(field).toBe('<section id="field"><div class="kui-form-field" data-kui-field="id"><label class="kui-form-field-label"><span class="kui-form-field-head"><span class="kui-label-text">Name<span class="kui-form-field-required" aria-hidden="true">*</span></span></span><input name="name"></label><span class="kui-form-field-hint" id="id">As it shows on the site</span><span class="kui-form-field-issues" id="id" aria-live="polite"></span></div></section>')
 
     const { rename } = await import('../src/routes/form.kay')
     const refused = await site.submit(rename, { name: 'A' }, { from: '/form' })
@@ -195,7 +200,7 @@ describe('FormField', () => {
   })
 
   test('sizes itself by its control when compact, holding no message region without a name or an issue', async () => {
-    expect((await element('/form', 'compact')).replaceAll(/<!--[^>]*-->/g, '')).toBe('<section id="compact"><div class="kui-form-field" data-compact=""><label class="kui-form-field-label"><span class="kui-form-field-head"><span class="kui-label-text">Period</span></span><select name="period"></select></label></div></section>')
+    expect((await element('/form', 'compact')).replaceAll(/<!--[^>]*-->/g, '').replaceAll(DRAWN_ID, '$1="id"')).toBe('<section id="compact"><div class="kui-form-field" data-kui-field="id" data-compact=""><label class="kui-form-field-label"><span class="kui-form-field-head"><span class="kui-label-text">Period</span></span><select name="period"></select></label></div></section>')
   })
 })
 
@@ -283,9 +288,9 @@ describe('data', () => {
     expect(await page('rating-none')).toBe(`<article id="rating-none"><span role="img" aria-label="3 out of 0" class="kui-rating">${stars(0)}<span class="kui-rating-fill" style="width: 0%">${stars(0)}</span></span></article>`)
   })
 
-  test('CopyButton is a plain button saying what it copies, taking Button\'s variants', async () => {
-    expect(await page('copy')).toBe('<article id="copy"><button type="button" class="kui-btn kui-copy-btn">Copy link</button></article>')
-    expect(await page('copy-accent')).toBe('<article id="copy-accent"><button type="button" class="kui-btn kui-copy-btn kui-btn-accent">Copy link</button></article>')
+  test('CopyButton is a plain button saying what it copies, beside a status saying it copied, taking Button\'s variants', async () => {
+    expect(await page('copy')).toBe('<article id="copy"><button type="button" class="kui-btn kui-copy-btn">Copy link</button><span class="kui-copy-btn-live" role="status"></span></article>')
+    expect(await page('copy-accent')).toBe('<article id="copy-accent"><button type="button" class="kui-btn kui-copy-btn kui-btn-accent">Copy link</button><span class="kui-copy-btn-live" role="status"></span></article>')
   })
 })
 
@@ -349,17 +354,17 @@ describe('charts', () => {
     expect(await page('no-scatter')).toBe('<article id="no-scatter"><p class="kui-scatter-chart-empty">No games</p></article>')
   })
 
-  test('ContributionGraph shades each day by how full it was, marks today, and names the months over their weeks', async () => {
+  test('ContributionGraph shades each day by how full it was, says so in its name, marks today, and names the months over their weeks', async () => {
     const graph = await page('graph')
     const cells = [...graph.matchAll(/<span class="kui-contribution-cell" role="img" aria-label="([^"]+)"[^>]*?( data-today)? style="([^"]+)"/g)].map(match => [match[1], Boolean(match[2]), match[3]])
 
     expect(cells.slice(0, 3)).toEqual([
       ['3 commits · 2026-08-31', false, 'grid-row: 2; grid-column: 1'],
-      ['2026-09-01', false, 'background-color: color-mix(in srgb, var(--color-kui-accent) 63%, transparent); grid-row: 3; grid-column: 1'],
-      ['2026-09-02', true, 'background-color: color-mix(in srgb, var(--color-kui-accent) 100%, transparent); grid-row: 4; grid-column: 1'],
+      ['50% · 2026-09-01', false, 'background-color: color-mix(in srgb, var(--color-kui-accent) 63%, transparent); grid-row: 3; grid-column: 1'],
+      ['100% · 2026-09-02', true, 'background-color: color-mix(in srgb, var(--color-kui-accent) 100%, transparent); grid-row: 4; grid-column: 1'],
     ])
     expect(cells.at(-1)?.[2]).toContain('grid-row: 8; grid-column: 3')
-    expect(graph).toMatch(/^<article id="graph"><div class="kui-contribution-graph kui-contribution-graph-months"><span class="kui-contribution-month" aria-hidden="true" style="grid-column: 1">Sep\w*<\/span><span class="kui-contribution-cell"/)
+    expect(graph).toMatch(/^<article id="graph"><div role="group" aria-label="Contributions" class="kui-contribution-graph kui-contribution-graph-months"><span class="kui-contribution-month" aria-hidden="true" style="grid-column: 1">Sep\w*<\/span><span class="kui-contribution-cell"/)
   })
 })
 

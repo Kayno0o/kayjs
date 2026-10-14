@@ -18,6 +18,10 @@ Typing inside marks the dialog as edited, so a click outside or Escape no longer
 
 Set `dirty` for other work the dialog must not drop, such as a request in flight.
 
+## Heading level
+
+The title is an `h2`, as the dialog opens over the page's own `h1`; `level` sets another.
+
 <Demo name="dialog/dirty" />
 
 <ReadMore href="/ui/form-dialog">FormDialog wraps a Dialog around a form that calls a page's action.</ReadMore>

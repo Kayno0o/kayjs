@@ -1,6 +1,6 @@
 ---
 import type { JSX } from 'kay'
-import { formIssues } from './forms'
+import { fieldLinks, formIssues } from './forms'
 
 const { label, name, issue, hint, required = false, group = false, compact = false, action, class: className } = props<{
   label: string
@@ -23,11 +23,12 @@ const { label, name, issue, hint, required = false, group = false, compact = fal
 const refused = formIssues.use()
 const reports = () => !compact || name !== undefined || issue !== undefined
 const messages = () => [name === undefined ? undefined : refused?.()[name], issue].filter(message => message !== undefined)
+const links = fieldLinks(group, hint !== undefined && hint !== '', messages)
 ---
 // The control, as children, takes the `kui-field-input` look with no class of its own.
 // The hint and the messages sit outside the label, so the control is named by its label alone; the action too, since a button inside a label would take the label from the control.
 if group
-  fieldset.kui-form-field.kui-form-field-group(data-compact={compact ? '' : undefined} class={className})
+  fieldset.kui-form-field.kui-form-field-group(aria-describedby={links.described().join(' ') || undefined} data-compact={compact ? '' : undefined} class={className})
     legend.kui-form-field-head
       span.kui-label-text
         | {label}
@@ -38,13 +39,13 @@ if group
       span.kui-form-field-action
         | {action}
     if hint
-      span.kui-form-field-hint {hint}
+      span.kui-form-field-hint(id={links.hint}) {hint}
     if reports()
-      span.kui-form-field-issues(aria-live="polite" data-field={name})
+      span.kui-form-field-issues(id={links.issues} aria-live="polite" data-field={name})
         for message, index of messages() key={index}
           span.kui-form-field-issue {message}
 else
-  .kui-form-field(data-compact={compact ? '' : undefined} class={className})
+  .kui-form-field(data-kui-field={links.frame} data-compact={compact ? '' : undefined} class={className})
     label.kui-form-field-label
       span.kui-form-field-head
         span.kui-label-text
@@ -56,8 +57,8 @@ else
       span.kui-form-field-action
         | {action}
     if hint
-      span.kui-form-field-hint {hint}
+      span.kui-form-field-hint(id={links.hint}) {hint}
     if reports()
-      span.kui-form-field-issues(aria-live="polite" data-field={name})
+      span.kui-form-field-issues(id={links.issues} aria-live="polite" data-field={name})
         for message, index of messages() key={index}
           span.kui-form-field-issue {message}

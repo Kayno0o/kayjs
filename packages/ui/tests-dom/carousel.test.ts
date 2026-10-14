@@ -97,6 +97,35 @@ test('turns on its own, held while the pointer or the focus is on it, and stops 
   expect(turns).toEqual([])
 })
 
+test('stops for good from its pause button, which a carousel without autoplay leaves out', async () => {
+  const view = await carousel(AUTOPLAY_MS)
+  const pause = view.section.querySelector<HTMLButtonElement>('.kui-carousel-pause')!
+
+  expect(pause.getAttribute('aria-label')).toBe('Pause')
+
+  click(pause)
+  await settle()
+  view.outside.focus()
+  await settle()
+  turns.length = 0
+  await Bun.sleep(TWO_TURNS_MS)
+
+  expect([turns, pause.getAttribute('aria-label')]).toEqual([[], 'Play'])
+
+  click(pause)
+  await settle()
+  view.outside.focus()
+  await settle()
+  await Bun.sleep(TWO_TURNS_MS)
+
+  expect(turns.length).toBeGreaterThan(0)
+
+  mounted!.unmount()
+  mounted = undefined
+
+  expect((await carousel()).section.querySelector('.kui-carousel-pause')).toBeNull()
+})
+
 test('never turns on its own for a visitor asking for reduced motion', async () => {
   const media = window.matchMedia
 

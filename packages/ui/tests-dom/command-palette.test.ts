@@ -95,7 +95,7 @@ describe('CommandPalette', () => {
     expect(labels().slice(0, 3)).toEqual(['# Recent', 'Content', '# Actions'])
   })
 
-  test('ranks the matches of a query in one list, walked with the arrows, wrapping', async () => {
+  test('ranks the matches of a query in one list, walked with the arrows, wrapping, and says how many it found', async () => {
     const { input, labels, active } = await palette()
 
     press(window, 'k', { ctrlKey: true })
@@ -107,6 +107,7 @@ describe('CommandPalette', () => {
     await search(input()!, 'e')
 
     expect(labels()).toEqual(['New moon', 'Content', 'Table'])
+    expect(document.querySelector('.kui-command-palette [role="status"]')?.textContent).toBe('3 results')
     expect(active()).toBe('New moon')
 
     press(input()!, 'ArrowUp')

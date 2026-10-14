@@ -2,10 +2,12 @@
 import type { JSX } from 'kay'
 import { effect, signal } from 'kay'
 
-const { open, title, dirty = false, onClose, footer, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'onClose' | 'onInput' | 'closedby' | 'closedBy'> & {
+const { open, title, level = 2, dirty = false, onClose, footer, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'onClose' | 'onInput' | 'closedby' | 'closedBy'> & {
   // Shows the dialog as a modal; the parent sets it back to false in `onClose`.
   open: boolean
   title: string
+  // The title's heading level: a modal opens over the page's own `h1`.
+  level?: 2 | 3 | 4 | 5 | 6 | undefined
   // Work the dialog must not drop, such as a request in flight: a click outside or Escape leaves it open. Typing inside the dialog counts on its own.
   dirty?: boolean | undefined
   // Called however the dialog closes, a click outside and Escape included. Closed by Escape or a click outside, its content is still there to read; closed by the parent setting `open` to false, it is already gone.
@@ -38,7 +40,16 @@ function closed(event: Event) {
 // Named by its title for screen readers, which announce the dialog as it opens.
 dialog.kui-dialog(aria-label={title} {...rest} ref={element => dialog = element} closedby={dirty || edited() ? 'none' : 'any'} onInput={() => edited.set(true)} onClose={closed} class={className})
   if open
-    h3.kui-dialog-title {title}
+    if level === 2
+      h2.kui-dialog-title {title}
+    else if level === 3
+      h3.kui-dialog-title {title}
+    else if level === 4
+      h4.kui-dialog-title {title}
+    else if level === 5
+      h5.kui-dialog-title {title}
+    else
+      h6.kui-dialog-title {title}
     .kui-dialog-body
       slot
     if footer

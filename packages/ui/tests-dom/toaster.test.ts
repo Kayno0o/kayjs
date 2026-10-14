@@ -9,7 +9,7 @@ afterEach(() => {
   mounted?.unmount()
 })
 
-test('a toast shows in the toaster, an error as an alert, and leaves once dismissed', async () => {
+test('a toast shows in the toaster and is read from a region kept in the page, an error as an alert, and leaves once dismissed', async () => {
   mounted = await mount('src/components/toasts.kay')
   click(mounted.root.querySelector('#saved'))
   click(mounted.root.querySelector('#refused'))
@@ -17,7 +17,8 @@ test('a toast shows in the toaster, an error as an alert, and leaves once dismis
 
   const toasts = [...mounted.root.querySelectorAll('.kui-toast')]
 
-  expect(toasts.map(item => [item.getAttribute('role'), item.getAttribute('data-type'), item.querySelector('.kui-toast-message')?.textContent])).toEqual([['status', 'success', 'Saved'], ['alert', 'error', 'Refused']])
+  expect(toasts.map(item => [item.getAttribute('data-type'), item.querySelector('.kui-toast-message')?.textContent])).toEqual([['success', 'Saved'], ['error', 'Refused']])
+  expect([...mounted.root.querySelectorAll('.kui-toaster-live')].map(region => [region.getAttribute('role'), region.textContent])).toEqual([['status', 'Saved'], ['alert', 'Refused']])
   expect(mounted.root.querySelector('.kui-toaster')?.matches(':popover-open')).toBe(true)
 
   click(toasts[0]!.querySelector('.kui-toast-dismiss'))
@@ -55,7 +56,7 @@ test('the toasts hold while the pointer rests on them, and run out once it leave
     expect(messages()).toEqual(['Saved'])
 
     toaster.dispatchEvent(new PointerEvent('pointerleave'))
-    await elapse(4000)
+    await elapse(6000)
 
     expect(messages()).toEqual([])
   }

@@ -76,6 +76,37 @@ describe('TooltipHost', () => {
   })
 })
 
+test('keeps a tooltip while the pointer crosses onto it, and Escape closes it until the pointer moves to another element', async () => {
+  const root = await popovers()
+  const button = root.querySelector<HTMLElement>('#delete')!
+  const tooltip = root.querySelector<HTMLElement>('.kui-tooltip')!
+  const over = async (target: Element, wait = 100) => {
+    target.dispatchEvent(new Event('pointerover', { bubbles: true }))
+    await Bun.sleep(wait)
+    await settle()
+  }
+
+  await over(button)
+  await over(document.body, 0)
+  await over(tooltip)
+
+  expect(tooltip.matches(':popover-open')).toBe(true)
+
+  await over(document.body, 200)
+
+  expect(tooltip.matches(':popover-open')).toBe(false)
+
+  await over(button)
+  document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+  await settle()
+
+  expect(tooltip.matches(':popover-open')).toBe(false)
+
+  await over(button.querySelector('svg')!)
+
+  expect(tooltip.matches(':popover-open')).toBe(false)
+})
+
 test('a second TooltipHost renders nothing while the first is mounted, and takes over once it unmounts', async () => {
   mounted = await mount('src/components/hosts.kay')
   const { root } = mounted

@@ -5,7 +5,7 @@ import Dialog from './dialog.kay'
 import IconButton from './icon-button.kay'
 import { attempt } from './toast'
 
-const { message, onConfirm, failure, refused, trigger = 'icon', ask = 'dialog', label = 'Delete', title = 'Confirm Deletion', confirmLabel = 'Delete', pendingLabel = 'Deleting…', size, variant, class: className } = props<{
+const { message, onConfirm, failure, refused, trigger = 'icon', ask = 'dialog', label = 'Delete', title = 'Confirm Deletion', confirmLabel = 'Delete', pendingLabel = 'Deleting…', cancelLabel = 'Cancel', size, variant, class: className } = props<{
   // The dialog's question; asked inline, the armed pair's name for screen readers and the confirm button's tooltip.
   message: string
   // Deletes. The dialog stays open, its buttons disabled, until a returned promise settles, and closes once it resolves.
@@ -25,6 +25,7 @@ const { message, onConfirm, failure, refused, trigger = 'icon', ask = 'dialog', 
   // The confirm button's text, and the one it shows while `onConfirm` is pending.
   confirmLabel?: string | undefined
   pendingLabel?: string | undefined
+  cancelLabel?: string | undefined
   // The icon trigger's size and look, `size` sizing the cancel button too when asking inline; the button trigger is always a danger button.
   size?: 'xs' | 'sm' | 'md' | 'lg' | undefined
   variant?: 'solid' | 'ghost' | 'inline' | 'danger' | undefined
@@ -81,10 +82,10 @@ if ask === 'inline'
     // Armed by a click, so the focus moves onto the button that deletes.
     span.kui-confirm-delete-armed(ref={element => { armed = element; queueMicrotask(() => element.querySelector('button')?.focus()) }} role="group" aria-label={message} onKeyDown={keyDown})
       Button(label={pending() ? pendingLabel : confirmLabel} variant="danger" busy={pending()} disabled={pending()} data-tooltip={message} onClick={confirm})
-      IconButton(icon="close" label="Cancel" size={size} variant="ghost" disabled={pending()} onClick={close})
+      IconButton(icon="close" label={cancelLabel} size={size} variant="ghost" disabled={pending()} onClick={close})
 else
   Dialog(open={open()} title={title} dirty={pending()} onClose={() => open.set(false)})
     @footer
-      Button(label="Cancel" disabled={pending()} onClick={() => open.set(false)})
+      Button(label={cancelLabel} disabled={pending()} onClick={() => open.set(false)})
       Button(label={pending() ? pendingLabel : confirmLabel} variant="danger" busy={pending()} disabled={pending()} onClick={confirm})
     p.kui-confirm-delete-message {message}

@@ -35,3 +35,5 @@ async function press() {
 }
 ---
 button.kui-btn.kui-copy-btn({...rest} type="button" class={[{ 'kui-btn-accent': variant === 'accent', 'kui-btn-danger': variant === 'danger' }, className]} onClick={press}) {copied() ? copiedLabel : label}
+// A button's new text is not read out, so the copy is said here too.
+span.kui-copy-btn-live(role="status") {copied() ? copiedLabel : ''}

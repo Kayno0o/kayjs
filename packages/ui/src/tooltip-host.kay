@@ -7,6 +7,8 @@ const CARRIER = '[data-tooltip]'
 // The anchor name theme.css's `.kui-tooltip` positions against.
 const ANCHOR = '--kui-tooltip-anchor'
 const SHOW_DELAY_MS = 80
+// Long enough for the pointer to cross the gap onto the tooltip, which stays while hovered.
+const HIDE_DELAY_MS = 150
 
 const aimed = signal<{ element: HTMLElement, text: string } | null>(null)
 let at: HTMLElement | null = null
@@ -36,7 +38,7 @@ function onto(next: HTMLElement | null) {
   const text = next?.dataset.tooltip
 
   if (!next || !text) {
-    aimed.set(null)
+    timer = setTimeout(() => aimed.set(null), HIDE_DELAY_MS)
 
     return
   }
@@ -58,7 +60,26 @@ function blurred(event: FocusEvent) {
 }
 
 function over(event: PointerEvent) {
+  const shown = panel()
+
+  // On the tooltip itself, it stays, as it does while the pointer crosses over to it.
+  if (shown && aimed() && event.target instanceof Node && shown.contains(event.target)) {
+    clearTimeout(timer)
+    at = shown
+
+    return
+  }
+
   onto(found(event))
+}
+
+// Escape closes the tooltip and leaves the key to whatever else it does; it stays closed until the pointer or the focus moves to another element.
+function keyDown(event: KeyboardEvent) {
+  if (event.key !== 'Escape' || !aimed())
+    return
+
+  clearTimeout(timer)
+  aimed.set(null)
 }
 
 // One set of listeners for every element carrying a tooltip, rather than a set each.
@@ -70,6 +91,7 @@ effect(() => {
   document.addEventListener('focusin', focused)
   document.addEventListener('focusout', blurred)
   document.addEventListener('pointerdown', hide)
+  document.addEventListener('keydown', keyDown)
   window.addEventListener('blur', hide)
 
   onCleanup(() => {
@@ -78,6 +100,7 @@ effect(() => {
     document.removeEventListener('focusin', focused)
     document.removeEventListener('focusout', blurred)
     document.removeEventListener('pointerdown', hide)
+    document.removeEventListener('keydown', keyDown)
     window.removeEventListener('blur', hide)
   })
 })

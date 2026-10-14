@@ -14,4 +14,8 @@ description: The frame a page's content is written on, with an optional title an
 
 `bare` drops the padded body, for content that runs to the card's edge such as a chart or a table.
 
+## Heading level
+
+The title is an `h3`; `level` sets another, from 2 to 6, to fit the page's outline.
+
 <Demo name="card/bare" />

@@ -1,19 +1,22 @@
 --- <Output>
 import type { Action, Failure, FailureData, JSX } from 'kay'
-import { ActionError, effect, signal, uid } from 'kay'
+import { ActionError, effect, focusInvalid, signal, uid } from 'kay'
 import Button from './button.kay'
 import Dialog from './dialog.kay'
 import { formIssues } from './forms'
 import { toast } from './toast'
 
 
-const { open, title, action, submitLabel, failure, refused, onSaved, onClose, extra, id, class: className } = props<{
+const { open, title, action, submitLabel, savingLabel = 'Saving…', cancelLabel = 'Cancel', failure, refused, onSaved, onClose, extra, id, class: className } = props<{
   // Shows the dialog; the parent sets it back to false in `onClose`.
   open: boolean
   title: string
   // The page's action the form calls with its fields, imported from the page: the server reads them as a plain form post, coercing numbers, booleans and lists.
   action: Action<never, Output>
   submitLabel: string
+  // What the submit button says while the action runs, and the cancel button.
+  savingLabel?: string | undefined
+  cancelLabel?: string | undefined
   // Toasted when the call fails other than on a field; a refused field shows its message on its FormField.
   failure: string
   // What a refusal of the action's handler says, from the data it passed to `ctx.fail`: a message per field, each shown on its FormField, or one message, toasted. Without it, or when it answers undefined or an empty message, `failure` is toasted.
@@ -69,6 +72,9 @@ async function submit(event: SubmitEvent) {
     for (const message of messages.length === 0 ? [failure] : messages.filter(([name]) => !shown(name)).map(([, message]) => message))
       toast.error(message)
 
+    // Each FormField marks its control invalid as its message renders; the first one takes the focus, so the message is read with it.
+    await focusInvalid(form)
+
     return
   }
 
@@ -92,7 +98,7 @@ Dialog(open={open} title={title} dirty={action.pending()} class={className} onCl
     .kui-form-dialog-footer
       | {extra}
       .kui-form-dialog-actions
-        Button(label="Cancel" disabled={action.pending()} onClick={() => onClose()})
-        Button(label={action.pending() ? 'Saving…' : submitLabel} type="submit" form={formId} variant="accent" busy={action.pending()} disabled={action.pending()})
+        Button(label={cancelLabel} disabled={action.pending()} onClick={() => onClose()})
+        Button(label={action.pending() ? savingLabel : submitLabel} type="submit" form={formId} variant="accent" busy={action.pending()} disabled={action.pending()})
   form.kui-form-grid(id={formId} ref={element => form = element} onSubmit={submit} onKeyDown={submitOnCtrlEnter})
     slot

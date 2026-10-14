@@ -99,7 +99,7 @@ describe('Table with a filter', () => {
     expect(names(mounted.root).map(name => name?.replaceAll(/<!--[^>]*-->/g, ''))).toEqual(['Io', 'Phobos', 'Deimos'])
   })
 
-  test('keeps the rows whose named fields hold the typed text, whatever its case, and says when none does', async () => {
+  test('keeps the rows whose named fields hold the typed text, whatever its case, says how many to screen readers, and when none does', async () => {
     mounted = await mount('src/components/filtered-table.kay', { rows: MOONS })
 
     expect(mounted.root.querySelector('.kui-table-filter')?.textContent).toBe('Filter moons')
@@ -108,6 +108,7 @@ describe('Table with a filter', () => {
     await settle()
 
     expect(names(mounted.root)).toEqual(['Phobos', 'Deimos'])
+    expect(mounted.root.querySelector('.kui-table-wrap > [role="status"]')?.textContent).toBe('2 rows')
 
     filter(mounted.root, 'titan')
     await settle()
@@ -118,6 +119,7 @@ describe('Table with a filter', () => {
     await settle()
 
     expect(names(mounted.root)).toHaveLength(3)
+    expect(mounted.root.querySelector('.kui-table-wrap > [role="status"]')?.textContent).toBe('')
   })
 
   test('keeps the typed text in the URL under filterParam, and starts from it', async () => {

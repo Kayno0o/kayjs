@@ -4,7 +4,7 @@ import type { RangeValue } from './range'
 import { effect } from 'kay'
 import { rangeFrom } from './range'
 
-const { value = [null, null], min, max, step, label, unit, onChange, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
+const { value = [null, null], min, max, step, label, fromLabel, toLabel, unit, onChange, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
   // The bounds to start with; a pair whose parent passes another follows it.
   value?: RangeValue | undefined
   // The lowest and highest values allowed, shown as the empty boxes' placeholders.
@@ -13,6 +13,9 @@ const { value = [null, null], min, max, step, label, unit, onChange, class: clas
   step?: number | undefined
   // Names the pair for screen readers, each box adding "from" or "to".
   label: string
+  // Each box's whole name in place of the label and "from" or "to", for another language.
+  fromLabel?: string | undefined
+  toLabel?: string | undefined
   // Written after the boxes, such as `h` or `%`.
   unit?: string | undefined
   // Runs once a box is committed, on blur or Enter, rather than on every keystroke, and only when the range changed.
@@ -46,8 +49,8 @@ function commit() {
 }
 ---
 .kui-range-input({...rest} role="group" aria-label={label} class={className})
-  input.kui-field-input.kui-range-input-box(ref={element => low = element} type="number" inputmode="decimal" aria-label={`${label} from`} placeholder={min?.toString()} min={min} max={max} step={step} value={value[0] ?? ''} onChange={commit})
+  input.kui-field-input.kui-range-input-box(ref={element => low = element} type="number" inputmode="decimal" aria-label={fromLabel ?? `${label} from`} placeholder={min?.toString()} min={min} max={max} step={step} value={value[0] ?? ''} onChange={commit})
   span.kui-range-input-separator(aria-hidden="true") -
-  input.kui-field-input.kui-range-input-box(ref={element => high = element} type="number" inputmode="decimal" aria-label={`${label} to`} placeholder={max?.toString()} min={min} max={max} step={step} value={value[1] ?? ''} onChange={commit})
+  input.kui-field-input.kui-range-input-box(ref={element => high = element} type="number" inputmode="decimal" aria-label={toLabel ?? `${label} to`} placeholder={max?.toString()} min={min} max={max} step={step} value={value[1] ?? ''} onChange={commit})
   if unit
     span.kui-range-input-unit {unit}

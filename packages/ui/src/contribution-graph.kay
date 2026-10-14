@@ -4,19 +4,22 @@ import type { ContributionDay } from './contribution'
 import { monthStarts } from './contribution'
 import { shade } from './shade'
 
-const { days, color, today, months = false, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
+const { days, color, today, label = 'Contributions', months = false, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
   // Ascending days starting on a Monday, as `gridDays` from `@kaynooo/utils` lists them, each with how full its cell is.
   days: readonly ContributionDay[]
   // The CSS colour the filled cells shade towards.
   color: string
   // The ISO date of today, whose cell is marked.
   today: string
+  // Names the grid for screen readers.
+  label?: string | undefined
   // Names each month above the week it starts in, placing every cell by hand.
   months?: boolean | undefined
   class?: string | undefined
 }>()
 
-const describe = (day: ContributionDay) => day.description ? `${day.description} · ${day.day}` : day.day
+// A day without a description is read as how full it is, which its colour alone shows.
+const describe = (day: ContributionDay) => `${day.description ?? `${Math.round(day.intensity * 100)}%`} · ${day.day}`
 
 const style = (day: ContributionDay, index: number) => {
   const fill = shade(color, day.intensity)
@@ -26,7 +29,7 @@ const style = (day: ContributionDay, index: number) => {
 }
 ---
 // A year of days as a grid of weeks, each cell shaded by how full its day was.
-.kui-contribution-graph({...rest} class={[{ 'kui-contribution-graph-months': months }, className]})
+.kui-contribution-graph({...rest} role="group" aria-label={label} class={[{ 'kui-contribution-graph-months': months }, className]})
   if months
     for start of monthStarts(days.map(day => day.day)) key={start.column}
       span.kui-contribution-month(aria-hidden="true" style={`grid-column: ${start.column + 1}`}) {start.label}

@@ -6,7 +6,7 @@ description: Two number boxes for a range, each bound open when left empty.
 
 ## Open bounds
 
-`value` is a `[from, to]` pair where `null` leaves a bound open. `min`, `max` and `step` bound the numbers and show as the empty boxes' placeholders, `unit` is written after them.
+`value` is a `[from, to]` pair where `null` leaves a bound open. `min`, `max` and `step` bound the numbers and show as the empty boxes' placeholders, `unit` is written after them. Each box is named `{label} from` and `{label} to`, or `fromLabel` and `toLabel`.
 
 ## Filtering
 

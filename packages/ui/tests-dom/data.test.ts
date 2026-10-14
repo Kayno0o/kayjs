@@ -86,7 +86,7 @@ describe('CopyButton', () => {
     return written
   }
 
-  test('copies its text with its html alongside, and says so on itself', async () => {
+  test('copies its text with its html alongside, and says so on itself and to screen readers', async () => {
     const written = clipboardWith()
     const root = await data()
 
@@ -95,6 +95,7 @@ describe('CopyButton', () => {
 
     expect(written).toEqual([{ 'text/plain': 'https://kaynooo.fr', 'text/html': '<b>kaynooo.fr</b>' }])
     expect(root.querySelector('#copy')?.textContent).toBe('Copied!')
+    expect(root.querySelector('#copy + [role="status"]')?.textContent).toBe('Copied!')
   })
 
   test('toasts a copy the browser refused, and keeps its label', async () => {

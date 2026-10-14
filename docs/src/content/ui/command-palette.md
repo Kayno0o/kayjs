@@ -6,7 +6,7 @@ description: A searchable list of actions and links, opened from the keyboard.
 
 ## Entries
 
-`entries` mixes two kinds: an action with an `onSelect`, and a link with an `href`. Both take a `label`, a `group` and an `icon`. `groups` sets the order the groups are listed in.
+`entries` mixes two kinds: an action with an `onSelect`, and a link with an `href`. Both take a `label`, a `group` and an `icon`. `groups` sets the order the groups are listed in. Screen readers hear how many rows a query lists, worded by `resultsLabel(count)`.
 
 ## Searching
 

@@ -64,6 +64,21 @@ describe('MarkdownEditor', () => {
     expect(press(state.area, 'Tab').defaultPrevented).toBe(false)
   })
 
+  test('indents a list item on Tab, and leaves the field on Escape then Tab, as it tells screen readers', async () => {
+    const state = await editor('- milk')
+
+    state.area.setSelectionRange(6, 6)
+
+    expect(press(state.area, 'Tab').defaultPrevented).toBe(true)
+    expect(state.value).toBe('  - milk')
+
+    press(state.area, 'Escape')
+
+    expect(press(state.area, 'Tab').defaultPrevented).toBe(false)
+    expect(press(state.area, 'Tab').defaultPrevented).toBe(true)
+    expect(state.area.getAttribute('aria-description')).toContain('Escape then Tab')
+  })
+
   test('turns a pasted page into markdown', async () => {
     const state = await editor('')
 

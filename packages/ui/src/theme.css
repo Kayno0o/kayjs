@@ -11,19 +11,19 @@
   --color-kui-surface1: light-dark(#ece8e1, #1b1b1b);
   --color-kui-surface2: light-dark(rgb(0 0 0 / 0.1), rgb(255 255 255 / 0.11));
   --color-kui-overlay0: light-dark(rgb(0 0 0 / 0.22), rgb(255 255 255 / 0.22));
-  --color-kui-overlay1: light-dark(#8f897f, #6e6a63);
+  --color-kui-overlay1: light-dark(#6d685f, #8a857d);
   --color-kui-subtext0: light-dark(#625d55, #9c978e);
   --color-kui-muted: var(--color-kui-subtext0);
   --color-kui-text: light-dark(#1f1c18, #e0dcd4);
 
   /* The one accent, the two statuses, and the fills state is drawn with. */
-  --color-kui-accent: light-dark(#b8483d, #ec9086);
+  --color-kui-accent: light-dark(#ab433a, #ec9086);
   --color-kui-accent-hi: light-dark(#a03a30, #f4a79d);
   --color-kui-on-accent: light-dark(#ffffff, #1a0d0b);
   --color-kui-success: light-dark(#4f6b2e, #b4c79b);
   --color-kui-warning: light-dark(#8a5a12, #d8b27a);
   --color-kui-info: light-dark(#2f6496, #8fb8de);
-  --color-kui-error: light-dark(#b8483d, #ec9086);
+  --color-kui-error: light-dark(#ab433a, #ec9086);
   --color-kui-fill-hover: light-dark(#ece8e1, #1c1c1c);
   --color-kui-fill-danger: light-dark(#f8e4e1, #241615);
   --color-kui-row-hover: light-dark(rgb(0 0 0 / 0.04), rgb(255 255 255 / 0.05));
@@ -67,9 +67,10 @@
   --color-kui-stamp-fill-hover: var(--color-kui-fill-hover);
   --kui-border-stamp: 1px;
 
-  /* A text field's inset, and its look while focused. */
+  /* A text field's inset, its border, and its look while focused. */
   --spacing-kui-field-x: 0.5625rem;
   --spacing-kui-field-y: 0.25rem;
+  --color-kui-field-border: light-dark(#8a8379, #6e6a63);
   --color-kui-field-focus: var(--color-kui-accent);
   --kui-field-focus-shadow: none;
 
@@ -148,7 +149,8 @@
   :where(button, a, [role='button'], summary).kui-shell:focus-visible,
   .kui-btn:focus-visible {
     --kui-shell-line: var(--color-kui-accent);
-    outline: none;
+    outline: 2px solid var(--color-kui-accent);
+    outline-offset: 2px;
   }
 
   .kui-shell-danger:hover {
@@ -212,14 +214,16 @@
       textarea
     ) {
     @apply rounded-kui-card bg-kui-surface0 px-kui-field-x py-kui-field-y text-sm text-kui-text outline-none;
-    border: var(--kui-border-input) solid var(--color-kui-overlay0);
+    border: var(--kui-border-input) solid var(--color-kui-field-border);
 
     &::placeholder {
       @apply text-kui-overlay1;
     }
 
+    /* The outline doubles the accent border, so focus reads by more than a colour change. */
     &:focus {
       @apply border-kui-field-focus;
+      outline: 1px solid var(--color-kui-field-focus);
       box-shadow: var(--kui-field-focus-shadow);
     }
 
@@ -450,6 +454,10 @@
     @apply px-4 py-6 text-center text-sm text-kui-subtext0;
   }
 
+  .kui-command-palette-count {
+    @apply sr-only;
+  }
+
   .kui-checkbox {
     @apply inline-flex cursor-pointer items-center gap-2;
 
@@ -553,6 +561,10 @@
 
   .kui-copy-btn {
     @apply px-1.5 py-0.5;
+  }
+
+  .kui-copy-btn-live {
+    @apply sr-only;
   }
 
   .kui-dialog {
@@ -741,6 +753,11 @@
     &:where([data-side='next']) {
       @apply -rotate-90;
     }
+  }
+
+  /* Apart from the slides' own controls, as it stops the carousel rather than moving it. */
+  .kui-carousel-pause {
+    @apply ms-2;
   }
 
   /* The dot is drawn small, and pressed through a margin around it wide enough for a finger. */
@@ -1092,6 +1109,11 @@
 
   .kui-multi-select-empty {
     @apply px-2 py-3 text-center text-xs text-kui-subtext0;
+
+    /* Kept in the page while empty, so a screen reader hears it fill. */
+    &:empty {
+      @apply p-0;
+    }
   }
 
   .kui-meter {
@@ -1533,6 +1555,11 @@
   .kui-tabs-panel {
     @apply pt-4 outline-none;
 
+    &:focus-visible {
+      outline: 2px solid var(--color-kui-accent);
+      outline-offset: 2px;
+    }
+
     &:where([hidden]) {
       @apply p-0;
     }
@@ -1553,6 +1580,10 @@
 
   .kui-table-filter-input {
     @apply w-56 max-w-full;
+  }
+
+  .kui-table-count {
+    @apply sr-only;
   }
 
   .kui-table {
@@ -1674,6 +1705,10 @@
     }
   }
 
+  .kui-toaster-live {
+    @apply sr-only;
+  }
+
   .kui-toaster {
     @apply pointer-events-none fixed inset-auto right-4 bottom-4 z-100 m-0 flex w-[calc(100%-2rem)] max-w-sm flex-col gap-2 overflow-visible border-0 bg-transparent p-0;
   }
@@ -1786,7 +1821,7 @@
 
   /* Anchored to whichever element TooltipHost names --kui-tooltip-anchor. */
   .kui-tooltip {
-    @apply pointer-events-none inset-auto m-1.5 max-w-xs overflow-visible border border-kui-overlay0 bg-kui-surface1 px-2 py-1 text-kui-2xs text-kui-text;
+    @apply inset-auto m-1.5 max-w-xs overflow-visible border border-kui-overlay0 bg-kui-surface1 px-2 py-1 text-kui-2xs text-kui-text;
     position-anchor: --kui-tooltip-anchor;
     position-try-fallbacks: flip-block, flip-inline;
   }

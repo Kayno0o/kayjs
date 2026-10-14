@@ -78,6 +78,8 @@ describe('MultiSelect', () => {
     await settle()
 
     expect(root.querySelector('.kui-multi-select-empty')?.textContent).toBe('No match')
+    expect(root.querySelector('.kui-multi-select-empty')?.getAttribute('role')).toBe('status')
+    expect(root.querySelector('#planets')?.getAttribute('role')).toBe('group')
   })
 
   test('keeps what is picked in the options\' order, sums it up on the trigger, and posts each value', async () => {
@@ -98,6 +100,7 @@ describe('MultiSelect', () => {
 
     expect(seen.planets).toEqual([['mars'], ['venus', 'mars']])
     expect(summary()).toBe('2 selected')
+    expect(root.querySelector('.kui-multi-select-trigger')?.getAttribute('aria-label')).toEndWith(': 2 selected')
     expect(posted()).toEqual(['venus', 'mars'])
 
     click(root.querySelectorAll('.kui-multi-select-action')[1]!)

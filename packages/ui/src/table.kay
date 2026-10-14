@@ -5,7 +5,7 @@ import { effect, memo, persisted, signal } from 'kay'
 import Icon from './icon.kay'
 import { cellText, drawnByBlock, nextSort, resolvedColumn, rowKeyOf, rowsMatching, sortedRows } from './table'
 
-const { columns: given, rows, rowKey, sort, serverSort = false, onSort, cell, empty, filter, filterLabel = 'Filter', filterPlaceholder, filterParam, noMatch, narrow = "stack", class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
+const { columns: given, rows, rowKey, sort, serverSort = false, onSort, cell, empty, filter, filterLabel = 'Filter', filterPlaceholder, filterParam, countLabel, noMatch, narrow = "stack", class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
   columns: Column<Row>[]
   rows: Row[]
   rowKey: RowKey<Row>
@@ -26,6 +26,8 @@ const { columns: given, rows, rowKey, sort, serverSort = false, onSort, cell, em
   filterPlaceholder?: string | undefined
   // The query parameter keeping the typed text in the page's URL, so a reload or a shared link filters the same; without it the text stays on the page.
   filterParam?: string | undefined
+  // How many rows the filter keeps, as screen readers hear it.
+  countLabel?: ((count: number) => string) | undefined
   // Shown in place of the rows when the filter hides every one; `empty` otherwise.
   noMatch?: JSX.Element
   // Below 30rem of width, rows stack as cards labelled by their headers, or the table scrolls sideways.
@@ -41,6 +43,7 @@ effect(() => current.set(sort))
 
 // The rows the filter keeps, all of them without one.
 const kept = memo(() => filter === undefined ? rows : rowsMatching(rows, filter, typed()))
+const counted = countLabel ?? ((count: number) => count === 1 ? '1 row' : `${count} rows`)
 const shown = memo(() => serverSort ? kept() : sortedRows(kept(), columns(), current()))
 const sorting = (column: Column<Row>) => column.sortValue !== undefined && current()?.key === column.key
 
@@ -63,6 +66,7 @@ function ariaSort(column: Column<Row>): 'ascending' | 'descending' | undefined {
     label.kui-table-filter
       span.kui-label-text {filterLabel}
       input.kui-field-input.kui-table-filter-input(type="search" value={typed()} placeholder={filterPlaceholder} autocomplete="off" onInput={event => typed.set(event.currentTarget.value)})
+    p.kui-table-count(role="status") {typed() ? counted(kept().length) : ''}
   table.kui-table
     thead
       tr

@@ -13,3 +13,7 @@ The control goes inside as the child. `label` names it, `hint` explains it below
 <Demo name="form-field/issue" />
 
 <ReadMore href="/ui/form-dialog">FormDialog shows each refused field's message on its FormField.</ReadMore>
+
+## Screen readers
+
+Inside an island, as in a FormDialog, the control is described by the hint and, while one shows, by its messages, beside the ids its own `aria-describedby` held, and marked `aria-invalid` while a message shows. A FormDialog refusing a field focuses the first one marked so, which reads its message with it. On a static page, kay marks the fields of a refused plain form post `aria-invalid` itself.

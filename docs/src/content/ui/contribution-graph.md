@@ -10,7 +10,7 @@ description: A calendar grid of days shaded by how full each one is, like a comm
 
 ## Tooltips
 
-A day can carry a `description`, shown with its date as the cell's tooltip. Hover a cell below.
+A day can carry a `description`, shown with its date as the cell's tooltip and read out by screen readers, which hear how full the day was without one. `label` names the grid. Hover a cell below.
 
 <Demo name="contribution-graph/description" />
 

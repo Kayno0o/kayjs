@@ -4,14 +4,14 @@ export interface MultiSelectOption {
 }
 
 // The trigger's text: the placeholder, the one label picked, or a count.
-export function selectionSummary(options: readonly MultiSelectOption[], value: readonly string[], placeholder: string): string {
+export function selectionSummary(options: readonly MultiSelectOption[], value: readonly string[], placeholder: string, counted: (count: number) => string = count => `${count} selected`): string {
   if (value.length === 0)
     return placeholder
 
   if (value.length === 1)
     return options.find(option => option.value === value[0])?.label ?? value[0]!
 
-  return `${value.length} selected`
+  return counted(value.length)
 }
 
 // `value` with every option in `shown` picked, or none of them, the rest left as they were and kept in the options' order.

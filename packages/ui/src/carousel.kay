@@ -4,12 +4,12 @@ import { effect, onCleanup, signal } from 'kay'
 import IconButton from './icon-button.kay'
 import { stepIndex } from './cycle'
 
-const { slides, index = 0, onIndexChange, autoplay, ratio = '16 / 9', label = 'Carousel', previousLabel = 'Previous slide', nextLabel = 'Next slide', slideLabel = 'Slide {n} of {count}', dotLabel = 'Go to slide {n}', class: className, ...rest } = props<Omit<JSX.IntrinsicElements['section'], 'class' | 'children'> & {
+const { slides, index = 0, onIndexChange, autoplay, ratio = '16 / 9', label = 'Carousel', previousLabel = 'Previous slide', nextLabel = 'Next slide', pauseLabel = 'Pause', playLabel = 'Play', slideLabel = 'Slide {n} of {count}', dotLabel = 'Go to slide {n}', class: className, ...rest } = props<Omit<JSX.IntrinsicElements['section'], 'class' | 'children'> & {
   slides: readonly { src: string, alt: string }[]
   // The slide shown first; a carousel whose parent passes another follows it.
   index?: number | undefined
   onIndexChange?: ((index: number) => void) | undefined
-  // Moves to the next slide every this many milliseconds, held while the pointer or the focus is on the carousel, and never for a visitor asking for reduced motion.
+  // Moves to the next slide every this many milliseconds, held while the pointer or the focus is on the carousel, stopped by its pause button, and never for a visitor asking for reduced motion.
   autoplay?: number | undefined
   // The slides' aspect ratio, as CSS writes it.
   ratio?: string | undefined
@@ -17,6 +17,9 @@ const { slides, index = 0, onIndexChange, autoplay, ratio = '16 / 9', label = 'C
   label?: string | undefined
   previousLabel?: string | undefined
   nextLabel?: string | undefined
+  // The autoplay's button, while it runs and once paused.
+  pauseLabel?: string | undefined
+  playLabel?: string | undefined
   // `{n}` stands for the slide's number and `{count}` for how many there are.
   slideLabel?: string | undefined
   dotLabel?: string | undefined
@@ -27,11 +30,13 @@ const shown = signal(index)
 // Whether the pointer or the focus is on the carousel, which holds the autoplay.
 const pointed = signal(false)
 const focused = signal(false)
+// The visitor's own pause, which nothing but the button lifts.
+const paused = signal(false)
 
 effect(() => shown.set(index))
 
 effect(() => {
-  if (!autoplay || pointed() || focused() || matchMedia('(prefers-reduced-motion: reduce)').matches)
+  if (!autoplay || paused() || pointed() || focused() || matchMedia('(prefers-reduced-motion: reduce)').matches)
     return
 
   const timer = setInterval(() => step(1), autoplay)
@@ -65,3 +70,5 @@ section.kui-carousel({...rest} aria-roledescription="carousel" aria-label={label
       for slide, position of slides key={slide.src}
         button.kui-carousel-dot(type="button" aria-label={numbered(dotLabel, position)} aria-current={position === active() ? 'true' : undefined} onClick={() => go(position)})
       IconButton(icon="chevron" label={nextLabel} variant="ghost" class="kui-carousel-step" data-side="next" onClick={() => step(1)})
+      if autoplay
+        IconButton(icon={paused() ? 'play' : 'pause'} label={paused() ? playLabel : pauseLabel} variant="ghost" class="kui-carousel-pause" onClick={() => paused.set(!paused())})

@@ -9,7 +9,7 @@ import { nameOf } from './icon-picker'
 const PAGE_SIZE = 50
 const DEBOUNCE_MS = 200
 
-const { search, value = '', name, onChange, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onChange'> & {
+const { search, value = '', name, onChange, searchLabel = 'Search icons', placeholder = 'Search icons…', gridLabel = 'Icons', searchingLabel = 'Searching…', emptyLabel = 'No icons found.', clearLabel = 'Clear icon selection', moreLabel = 'Show more', class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onChange'> & {
   // The icons matching `query`, at most `limit` of them: typically an action, since a whole icon set is too large to ship. A rejection goes unhandled and leaves the last grid on screen.
   search: (query: string, limit: number) => Promise<IconChoice[]>
   // The chosen icon's name, or an empty string for none; a picker whose parent passes another follows it.
@@ -18,6 +18,14 @@ const { search, value = '', name, onChange, class: className, ...rest } = props<
   name?: string | undefined
   // Hands over a pick, or an empty string for a cleared one.
   onChange?: ((name: string) => void) | undefined
+  // What the picker says: the search box's name and placeholder, the grid's name, its states, and its two buttons.
+  searchLabel?: string | undefined
+  placeholder?: string | undefined
+  gridLabel?: string | undefined
+  searchingLabel?: string | undefined
+  emptyLabel?: string | undefined
+  clearLabel?: string | undefined
+  moreLabel?: string | undefined
   class?: string | undefined
 }>()
 
@@ -93,20 +101,20 @@ function keepEnter(event: KeyboardEvent) {
 .kui-icon-picker({...rest} class={className})
   if name
     input(type="hidden" name={name} value={picked()} ref={element => hidden = element})
-  input.kui-field-input(type="search" placeholder="Search icons…" aria-label="Search icons" value={typed()} onInput={event => typed.set(event.currentTarget.value)} onKeyDown={keepEnter})
-  ul.kui-icon-grid(aria-label="Icons" aria-busy={pending() ? 'true' : undefined})
+  input.kui-field-input(type="search" placeholder={placeholder} aria-label={searchLabel} value={typed()} onInput={event => typed.set(event.currentTarget.value)} onKeyDown={keepEnter})
+  ul.kui-icon-grid(aria-label={gridLabel} aria-busy={pending() ? 'true' : undefined})
     for choice of icons() key={choice.name}
       li
         button.kui-icon-grid-option(type="button" aria-label={nameOf(choice.name)} data-tooltip={nameOf(choice.name)} aria-pressed={picked() === choice.name ? 'true' : 'false'} onClick={() => choose(choice)})
           Icon(icon={choice.icon})
     if icons().length === 0
-      li.kui-icon-grid-empty {pending() ? 'Searching…' : 'No icons found.'}
+      li.kui-icon-grid-empty {pending() ? searchingLabel : emptyLabel}
   .kui-icon-grid-bar
     if picked()
       span.kui-icon-grid-selection(aria-live="polite")
         if chosen() as icon
           Icon(icon={icon})
         | {nameOf(picked())}
-        IconButton(icon="close" label="Clear icon selection" size="xs" variant="inline" class="kui-icon-grid-clear" onClick={() => pick('')})
+        IconButton(icon="close" label={clearLabel} size="xs" variant="inline" class="kui-icon-grid-clear" onClick={() => pick('')})
     if icons().length >= limit()
-      button.kui-icon-grid-more(type="button" onClick={() => limit.set(limit() + PAGE_SIZE)}) Show more
+      button.kui-icon-grid-more(type="button" onClick={() => limit.set(limit() + PAGE_SIZE)}) {moreLabel}

@@ -6,7 +6,7 @@ description: A markdown textarea that writes like an editor, with shortcuts and 
 
 ## Shortcuts
 
-Ctrl or Cmd with B, I or K wraps the selection in bold, italics or a link, Enter continues a list and Tab indents a list item. A page pasted as HTML turns into markdown. `onInput` reports the text after every change.
+Ctrl or Cmd with B, I or K wraps the selection in bold, italics or a link, Enter continues a list and Tab indents a list item. Escape then Tab leaves the field from a list item too, which `keysHint` tells screen readers. A page pasted as HTML turns into markdown. `onInput` reports the text after every change.
 
 ## Image uploads
 

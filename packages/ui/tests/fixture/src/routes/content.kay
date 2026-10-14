@@ -14,6 +14,8 @@ main
     p Phobos and Deimos
   Card#bare(bare)
     p Edge to edge
+  Card#outlined(title="Orbits" level={2})
+    p Elliptic
   Badge#badge Draft
   a.group#stamped(href="/data")
     Badge(stamp label="Winner")

@@ -18,7 +18,7 @@ async function dialogs(onDelete: () => Promise<void> = async () => Promise.resol
 }
 
 describe('Dialog', () => {
-  test('opens as a modal holding its title and content, which it drops once closed', async () => {
+  test('opens as a modal holding its title as an h2 and its content, which it drops once closed', async () => {
     const root = await dialogs()
     const dialog = root.querySelector<HTMLDialogElement>('#dialog')!
 
@@ -29,7 +29,7 @@ describe('Dialog', () => {
     await settle()
 
     expect(dialog.open).toBe(true)
-    expect(dialog.querySelector('.kui-dialog-title')?.textContent).toBe('Rename')
+    expect(dialog.querySelector('h2.kui-dialog-title')?.textContent).toBe('Rename')
     expect(dialog.getAttribute('aria-label')).toBe('Rename')
     expect(dialog.querySelector('.kui-dialog-footer #cancel')).not.toBeNull()
 

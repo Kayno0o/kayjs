@@ -8,7 +8,9 @@ export interface Toast {
   type: ToastType
 }
 
-const DURATION_MS = 4000
+// Long enough to read a sentence, an error longer as the reader has something to do about it.
+const DURATION_MS = 6000
+const ERROR_DURATION_MS = 10_000
 
 // What keeps the toasts on screen past their time: the pointer resting on them, or focus inside them.
 export type ToastHold = 'pointer' | 'focus'
@@ -67,7 +69,7 @@ export function holdToasts(hold: ToastHold, on: boolean): void {
 // Untracked: an effect toasting a settled task would otherwise read the list, and toast again on every toast it adds.
 function push(message: string, type: ToastType): void {
   const id = nextId++
-  const timer: Timer = { remaining: DURATION_MS, started: Date.now() }
+  const timer: Timer = { remaining: type === 'error' ? ERROR_DURATION_MS : DURATION_MS, started: Date.now() }
 
   untrack(() => toasts.set(list => [...list, { id, message, type }]))
   timers.set(id, timer)

@@ -54,6 +54,14 @@ describe('FormDialog', () => {
     submit(root)
     await settle()
 
+    const input = root.querySelector<HTMLInputElement>('#name')!
+    const hint = root.querySelector('.kui-form-field-hint')!.id
+    const issues = root.querySelector('.kui-form-field-issues')!.id
+
+    expect(input.getAttribute('aria-invalid')).toBe('true')
+    expect(input.getAttribute('aria-describedby')).toBe(`name-note ${hint} ${issues}`)
+    expect(document.activeElement).toBe(input)
+
     expect(root.querySelector('.kui-form-field-issue')?.textContent).toBe('Taken')
     expect(root.querySelector<HTMLDialogElement>('dialog')?.open).toBe(true)
     expect(root.querySelector('.kui-toast')).toBeNull()
@@ -69,6 +77,8 @@ describe('FormDialog', () => {
 
     expect(root.querySelector('.kui-form-field')).not.toBeNull()
     expect(root.querySelector('.kui-form-field-issue')).toBeNull()
+    expect(root.querySelector('#name')?.getAttribute('aria-invalid')).toBeNull()
+    expect(root.querySelector('#name')?.getAttribute('aria-describedby')).toBe(`name-note ${root.querySelector('.kui-form-field-hint')!.id}`)
   })
 
   test('toasts a message no FormField shows, the whole form\'s included, and clears every message however it closed', async () => {

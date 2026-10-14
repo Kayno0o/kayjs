@@ -42,13 +42,18 @@ describe('a toast\'s time', () => {
     jest.useRealTimers()
   })
 
-  test('runs out after four seconds', () => {
+  test('runs out after six seconds, an error after ten', () => {
     toast.info('Copied')
-    jest.advanceTimersByTime(3999)
+    toast.error('Refused')
+    jest.advanceTimersByTime(5999)
 
-    expect(shown()).toEqual([{ message: 'Copied', type: 'info' }])
+    expect(shown().map(item => item.message)).toEqual(['Copied', 'Refused'])
 
     jest.advanceTimersByTime(1)
+
+    expect(shown().map(item => item.message)).toEqual(['Refused'])
+
+    jest.advanceTimersByTime(4000)
 
     expect(shown()).toEqual([])
   })
@@ -66,7 +71,7 @@ describe('a toast\'s time', () => {
     expect(shown().map(item => item.message)).toEqual(['Copied', 'Saved'])
 
     holdToasts('focus', false)
-    jest.advanceTimersByTime(2999)
+    jest.advanceTimersByTime(4999)
 
     expect(shown().map(item => item.message)).toEqual(['Copied', 'Saved'])
 
@@ -84,7 +89,7 @@ describe('a toast\'s time', () => {
     holdToasts('pointer', true)
     dismissToast(toasts()[0]!.id)
     toast.info('Saved')
-    jest.advanceTimersByTime(4000)
+    jest.advanceTimersByTime(6000)
 
     expect(shown()).toEqual([])
   })

@@ -6,7 +6,7 @@ import { stepIndex } from './cycle'
 import Icon from './icon.kay'
 import { isPaletteLink, paletteHits, paletteMatches, paletteSections, withRecent } from './palette'
 
-const { open = false, onOpenChange, entries, groups = [], recent = [], onRecentChange, hotkey = 'k', siteSearch = false, siteSearchLabel = 'In the pages', siteSearchError = 'The pages could not be searched', label = 'Search', placeholder = 'Search', emptyLabel = 'No results', class: className } = props<{
+const { open = false, onOpenChange, entries, groups = [], recent = [], onRecentChange, hotkey = 'k', siteSearch = false, siteSearchLabel = 'In the pages', siteSearchError = 'The pages could not be searched', label = 'Search', placeholder = 'Search', emptyLabel = 'No results', resultsLabel, class: className } = props<{
   // Shows the palette; the hotkey opens and closes it too, and `onOpenChange` reports every change for a parent driving it.
   open?: boolean | undefined
   onOpenChange?: ((open: boolean) => void) | undefined
@@ -26,6 +26,8 @@ const { open = false, onOpenChange, entries, groups = [], recent = [], onRecentC
   label?: string | undefined
   placeholder?: string | undefined
   emptyLabel?: string | undefined
+  // How many rows a query lists, as screen readers hear it.
+  resultsLabel?: ((count: number) => string) | undefined
   class?: string | undefined
 }>()
 
@@ -37,6 +39,7 @@ interface Row {
 }
 
 const id = uid()
+const counted = resultsLabel ?? ((count: number) => count === 1 ? '1 result' : `${count} results`)
 const shown = signal(open)
 const followedRecently = signal<string[]>(recent)
 const query = signal('')
@@ -209,3 +212,4 @@ dialog.kui-command-palette(ref={element => dialog = element} closedby="any" aria
         p.kui-command-palette-empty {siteSearchError}
       else if rows().length === 0 && !site?.loading()
         p.kui-command-palette-empty {emptyLabel}
+    p.kui-command-palette-count(role="status") {query().trim() && !site?.loading() ? counted(rows().length) : ''}

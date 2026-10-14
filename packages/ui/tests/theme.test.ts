@@ -5,7 +5,7 @@ import { compile } from 'tailwindcss'
 const ROOT = new URL('..', import.meta.url).pathname
 
 // These list today's families of token names, every one under `kui-` so no app's own token meets them: a class reaching for a new family needs it added here too.
-const COLOR = /\b(?:bg|text|border|ring|ring-offset|fill|stroke|outline|caret|accent)-(kui-(?:text|muted|mantle|canvas|surface\d|overlay\d|subtext\d|accent(?:-hi)?|on-accent|error|success|warning|info|row-hover|fill-hover|fill-danger|chart-\d|stamp(?:-fill(?:-hover)?)?|field-focus|avatar-ring))\b/g
+const COLOR = /\b(?:bg|text|border|ring|ring-offset|fill|stroke|outline|caret|accent)-(kui-(?:text|muted|mantle|canvas|surface\d|overlay\d|subtext\d|accent(?:-hi)?|on-accent|error|success|warning|info|row-hover|fill-hover|fill-danger|chart-\d|stamp(?:-fill(?:-hover)?)?|field-border|field-focus|avatar-ring))\b/g
 const SCALE = /\b(gap|p|px|py|pt|pb|pl|pr|m|mx|my|mt|mb|ml|mr|text|font|tracking|rounded)-(kui-(?:section|inline|micro|2xs|heading|label|action|card|badge-[xy]|badge|field-[xy]|notice|avatar))\b/g
 const DEFINED_TOKEN = /(--[\w-]+):/g
 const DEFINED_CLASS = /\.([a-z][\w-]*)/g
@@ -26,6 +26,15 @@ const QUOTED = /'([a-z][\w-]*)'/g
 const THIRD_PARTY = /^(?:ct-|group$)/
 // The tokens of a skin's offset shadows and press-down, with their value.
 const PRESS_TOKEN = /(--kui-(?:shadow-raised|shadow-press|press-travel)): ([^;]+);/g
+
+const HEX = /^#[\da-f]{6}$/i
+const RGB_ALPHA = /^rgb\((\d+) (\d+) (\d+) \/ ([\d.]+)\)$/
+const LIGHT_DARK = /^light-dark\(([^,]+), (.+)\)$/
+const VAR = /^var\((--color-kui-[\w-]+)\)$/
+// The grounds text and controls sit on, and what must read on them: text at 4.5:1, a field's border and the focus colour at 3:1 (RGAA 3.2, 3.3).
+const GROUNDS = ['mantle', 'canvas', 'surface0', 'surface1', 'fill-hover']
+const TEXT = ['text', 'subtext0', 'overlay1', 'accent', 'error', 'success', 'warning', 'info']
+const LINES = ['field-border', 'field-focus']
 
 // The theme namespace a scale utility reads, by its prefix.
 const NAMESPACE: Record<string, string> = { text: 'text', font: 'font-weight', tracking: 'tracking', rounded: 'radius' }
@@ -50,7 +59,64 @@ function writtenClasses(path: string, source: string): string[] {
   return [...compileKay(source, path).classes, ...plain, ...expressions].filter(Boolean)
 }
 
+const colourTokens = new Map([...theme.matchAll(COLOUR_TOKEN)].map(([, token = '', value = '']) => [token, value.trim()]))
+
+// A token's colour in one scheme, as [r, g, b] over the given ground when it is translucent.
+function colour(name: string, scheme: 0 | 1, ground?: number[]): number[] {
+  const value = colourTokens.get(`--color-kui-${name}`)!
+  const named = VAR.exec(value)
+
+  if (named)
+    return colour(named[1]!.slice('--color-kui-'.length), scheme, ground)
+
+  const side = LIGHT_DARK.exec(value)![scheme + 1]!.trim()
+
+  if (HEX.test(side))
+    return [1, 3, 5].map(at => Number.parseInt(side.slice(at, at + 2), 16))
+
+  const [, r, g, b, alpha] = RGB_ALPHA.exec(side)!.map(Number) as number[]
+
+  return [r!, g!, b!].map((channel, index) => channel * alpha! + ground![index]! * (1 - alpha!))
+}
+
+function luminance(rgb: number[]): number {
+  const [r, g, b] = rgb.map((channel) => {
+    const c = channel / 255
+
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
+  })
+
+  return 0.2126 * r! + 0.7152 * g! + 0.0722 * b!
+}
+
+function contrast(a: number[], b: number[]): number {
+  const [high, low] = [luminance(a), luminance(b)].sort((x, y) => y - x)
+
+  return (high! + 0.05) / (low! + 0.05)
+}
+
+// Each pair under its minimum, as `fg on ground (scheme): ratio`.
+function failing(names: string[], least: number): string[] {
+  return ([0, 1] as const).flatMap(scheme => GROUNDS.flatMap((ground) => {
+    const under = colour(ground, scheme)
+
+    return names.map(name => [name, contrast(colour(name, scheme, under), under)] as const)
+      .filter(([, ratio]) => ratio < least)
+      .map(([name, ratio]) => `${name} on ${ground} (${scheme === 0 ? 'light' : 'dark'}): ${ratio.toFixed(2)}`)
+  }))
+}
+
 describe('theme.css', () => {
+  test('reads at 4.5:1 for text and 3:1 for field borders and focus, on every ground in both schemes', () => {
+    expect(failing(TEXT, 4.5)).toEqual([])
+    expect(failing(LINES, 3)).toEqual([])
+
+    for (const scheme of [0, 1] as const) {
+      for (const fill of ['accent', 'accent-hi'])
+        expect(contrast(colour('on-accent', scheme), colour(fill, scheme))).toBeGreaterThanOrEqual(4.5)
+    }
+  })
+
   test('defines every colour its classes paint with', () => {
     const used = new Set([...theme.matchAll(COLOR)].map(([, name]) => `--color-${name}`))
 

@@ -8,7 +8,7 @@ import { attempt } from './toast'
 
 const SHORTCUT_MARKERS: Partial<Record<string, string>> = { b: '**', i: '*' }
 
-const { value = '', onInput, onImage, uploadFailure = 'Could not upload the image', placeholder = 'Write markdown…', class: className, ...rest } = props<Omit<JSX.IntrinsicElements['textarea'], 'value' | 'class' | 'children' | 'onInput' | 'onKeyDown' | 'onPaste' | 'onDrop'> & {
+const { value = '', onInput, onImage, uploadFailure = 'Could not upload the image', placeholder = 'Write markdown…', keysHint = 'Tab indents a list item; Escape then Tab leaves the field.', class: className, ...rest } = props<Omit<JSX.IntrinsicElements['textarea'], 'value' | 'class' | 'children' | 'onInput' | 'onKeyDown' | 'onPaste' | 'onDrop'> & {
   // The text to start with; an editor whose parent passes other text follows it.
   value?: string | undefined
   // The text after every change, typed or applied by a shortcut, a paste or an upload.
@@ -17,11 +17,15 @@ const { value = '', onInput, onImage, uploadFailure = 'Could not upload the imag
   onImage?: ((file: File) => Promise<string>) | undefined
   // Toasted when an upload throws.
   uploadFailure?: string | undefined
+  // Tells screen readers how to leave the field, since Tab on a list item indents it.
+  keysHint?: string | undefined
   class?: string | undefined
 }>()
 
 const uploading = signal(0)
 let area: HTMLTextAreaElement | undefined
+// Set by Escape, so the Tab after it moves on rather than indenting.
+let leaving = false
 
 function isImage(file: File): boolean {
   return file.type.startsWith('image/')
@@ -67,6 +71,13 @@ function keyDown(event: KeyboardEvent) {
   const field = event.currentTarget as HTMLTextAreaElement
 
   if (event.defaultPrevented || event.isComposing)
+    return
+
+  const left = leaving
+
+  leaving = event.key === 'Escape'
+
+  if (left && event.key === 'Tab')
     return
 
   const { selectionStart: start, selectionEnd: end } = field
@@ -171,5 +182,5 @@ function drop(event: DragEvent) {
   void upload(images)
 }
 ---
-// A markdown field that writes like an editor: Ctrl+B, Ctrl+I and Ctrl+K wrap the selection, Enter continues a list and Tab indents one, a pasted page turns into markdown, and pasted or dropped images upload behind a placeholder.
-textarea.kui-field-input.kui-markdown-editor({...rest} ref={element => area = element} value={untrack(() => value)} placeholder={placeholder} aria-busy={uploading() > 0 ? 'true' : 'false'} class={className} onInput={event => onInput?.(event.currentTarget.value)} onKeyDown={keyDown} onPaste={paste} onDrop={drop})
+// A markdown field that writes like an editor: Ctrl+B, Ctrl+I and Ctrl+K wrap the selection, Enter continues a list and Tab indents one, Escape then Tab leaving the field, a pasted page turns into markdown, and pasted or dropped images upload behind a placeholder.
+textarea.kui-field-input.kui-markdown-editor({...rest} ref={element => area = element} value={untrack(() => value)} placeholder={placeholder} aria-description={keysHint} aria-busy={uploading() > 0 ? 'true' : 'false'} class={className} onInput={event => onInput?.(event.currentTarget.value)} onKeyDown={keyDown} onPaste={paste} onDrop={drop})
