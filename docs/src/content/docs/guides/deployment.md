@@ -38,10 +38,10 @@ Every page is rendered, with `about.html` and `about/index.html` for `/about`, p
 
 ## Docker
 
-`kay new` writes this `Dockerfile`: it builds the executable in one stage with `bun run compile` (`kay build --compile server`), and copies it into a small image:
+`kay new` writes this `Dockerfile`, on the Bun version it ran under: it builds the executable in one stage with `bun run compile` (`kay build --compile server`), and copies it into a small image:
 
 ```dockerfile
-FROM oven/bun:1 AS build
+FROM oven/bun:1.4.3 AS build
 WORKDIR /app
 COPY package.json bun.lock* .npmrc ./
 RUN bun install --frozen-lockfile
@@ -61,7 +61,7 @@ HEALTHCHECK --interval=30s --timeout=6s CMD ["./server", "--health"]
 CMD ["./server"]
 ```
 
-The image has no curl, so `./server --health` checks the health route and exits with 0 or 1. If you keep SQLite files, mount a volume the `nobody` user can write.
+Its `compose.prod.yaml` publishes the app on `127.0.0.1:3000` alone, for the reverse proxy serving it over HTTPS. The image has no curl, so `./server --health` checks the health route and exits with 0 or 1. If you keep SQLite files, mount a volume the `nobody` user can write.
 
 ## Health check and shutdown
 

@@ -31,7 +31,7 @@ The app is at `http://localhost:3000` and reloads on every change, and Alt+click
 | `blank` | One layout and one bare page, built as a static site |
 | `server` | An Elysia server, a layout, a header, Tailwind and a counter island (the default) |
 | `site` | A static site: `bun run build` writes plain files for any host |
-| `app` | The server plus sessions, a sign-in action, members in Postgres and a websocket island |
+| `app` | The server plus sessions, a demo sign-in action (refused in production unless `DEMO_SIGN_IN=true`), members in Postgres and a websocket island |
 
 `--with` and `--without` change a preset's features, for example `--without tailwind,accents`, as the accent picker needs Tailwind.
 

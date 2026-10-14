@@ -1,5 +1,6 @@
 import type { Action } from '../src/runtime'
 import type { SessionStore } from '../src/server'
+import process from 'node:process'
 import { afterEach, describe, expect, it, setSystemTime } from 'bun:test'
 import { stringify } from 'devalue'
 import { Elysia } from 'elysia'
@@ -63,6 +64,35 @@ function counter(options: Partial<Parameters<typeof session>[0]> = {}) {
 }
 
 describe('sessions', () => {
+  it('warns once in production that a sign-in on a session without a store cannot be revoked, and not with one', async () => {
+    const SINK = Symbol.for('kay.log')
+    const global = globalThis as { [SINK]?: unknown }
+    const sink = global[SINK]
+    const warnings: unknown[] = []
+    const environment = process.env.NODE_ENV
+
+    global[SINK] = (level: string, message: string) => level === 'warn' && warnings.push(message)
+    process.env.NODE_ENV = 'production'
+
+    try {
+      const sealed = counter({})
+      const stored = counter({ store: memoryStore() })
+
+      for (const app of [sealed, sealed, stored])
+        await app.handle(new Request('http://localhost/rotate'))
+    }
+    finally {
+      global[SINK] = sink
+
+      if (environment === undefined)
+        delete process.env.NODE_ENV
+      else
+        process.env.NODE_ENV = environment
+    }
+
+    expect(warnings).toEqual([expect.stringContaining('a sign-in regenerated a session kept in its session cookie alone, with no store')])
+  })
+
   for (const [name, store] of [['in the cookie', undefined], ['in memory', memoryStore()], ['in sqlite', sqliteStore(':memory:')]] as const) {
     it(`keeps data across requests ${name}, writing the cookie only when it changed`, async () => {
       const visit = browser(counter({ store }))

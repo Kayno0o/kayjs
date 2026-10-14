@@ -112,16 +112,13 @@ jobs:
         env:
           KAYJS_AUTH_REQUIRE_DATABASE: '1'
 
-      - name: Configure npm authentication
-        run: |
-          echo "@kaynooo:registry=https://git.kaynooo.fr/api/packages/kaynooo/npm/" > ~/.npmrc
-          echo "//git.kaynooo.fr/api/packages/kaynooo/npm/:_authToken=${PACKAGE_TOKEN}" >> ~/.npmrc
-        env:
-          PACKAGE_TOKEN: ${{ secrets.PACKAGE_TOKEN }}
-
       # prepack writes what the exports point at: the declarations under types/ and the Node build of kay/eslint under dist/. Each library publishes at kay's version, its `workspace:` ranges written as that version; one marked private is not released yet.
+      # The token lives in ~/.npmrc for this step alone, so no later step, nor what it downloads, can publish with it.
       - name: Publish to Forgejo npm registry
         run: |
+          trap 'rm -f ~/.npmrc' EXIT
+          echo "@kaynooo:registry=https://git.kaynooo.fr/api/packages/kaynooo/npm/" > ~/.npmrc
+          echo "//git.kaynooo.fr/api/packages/kaynooo/npm/:_authToken=${PACKAGE_TOKEN}" >> ~/.npmrc
           # A package already on the registry at this version is skipped, so a rerun after a partial failure publishes the rest.
           publish() {
             package="$(jq -r '.name + "@" + .version' package.json)"
@@ -139,6 +136,6 @@ jobs:
           PACKAGE_TOKEN: ${{ secrets.PACKAGE_TOKEN }}
 
       - name: Generate changelog
-        run: bun x @kaynooo/changelogitea@latest
+        run: bun x @kaynooo/changelogitea@1.6.5
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}

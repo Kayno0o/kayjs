@@ -11,6 +11,10 @@ major: (release "major") # vX.0.0
 release level:
 	#!/usr/bin/env bash
 	set -euo pipefail
+	# A release is cut from main as origin has it, so the tag names what CI tested and nothing local rides along.
+	[ "$(git branch --show-current)" = main ] || { echo "release runs on main, not $(git branch --show-current)" >&2; exit 1; }
+	git fetch -q origin main
+	[ "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" ] || { echo "main differs from origin/main: pull or land first" >&2; exit 1; }
 	bun scripts/version.ts {{level}}
 	tag=$(git tag --points-at HEAD)
 	before=$(tea actions runs ls -o json --limit 1 | jq -r '.[0].id // 0')

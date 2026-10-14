@@ -290,7 +290,7 @@ const WORKFLOW_SETUP = `      - name: Install unzip and git
       - name: Setup Bun
         uses: oven-sh/setup-bun@v1
         with:
-          bun-version: latest
+          bun-version: ${Bun.version}
 
       - name: Install dependencies
         run: bun install --frozen-lockfile`
@@ -408,12 +408,15 @@ const APP_COMPOSE = `services:
   app:
     build: .
     restart: unless-stopped
+    # This machine alone: the reverse proxy in front serves the site over HTTPS.
     ports:
-      - 3000:3000
+      - 127.0.0.1:3000:3000
     environment:
       # At least 32 characters, kept out of the repository.
       SESSION_SECRET: \${SESSION_SECRET:?set SESSION_SECRET}
       DATABASE_URL: postgres://app:\${POSTGRES_PASSWORD}@db:5432/app
+      # \`true\` keeps the demo sign-in, which lets anyone in under any name, for a site that is only a demo.
+      DEMO_SIGN_IN: \${DEMO_SIGN_IN:-}
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -425,7 +428,7 @@ volumes:
 // The binary `kay build --compile` makes carries the pages, their assets and the browser build, so the image holds it alone.
 function serverContainerFiles({ has }: Setup): Record<string, string> {
   return {
-    'Dockerfile': `FROM oven/bun:1 AS build
+    'Dockerfile': `FROM oven/bun:${Bun.version} AS build
 WORKDIR /app
 COPY package.json bun.lock* .npmrc ./
 RUN bun install --frozen-lockfile
@@ -442,15 +445,16 @@ USER nobody
 HEALTHCHECK --interval=30s --timeout=6s CMD ["./server", "--health"]
 CMD ["./server"]
 `,
-    '.dockerignore': 'node_modules\n.kay\nserver\n.env\n',
+    '.dockerignore': 'node_modules\n.kay\nserver\n.git\n.env\n.env.*\n',
     'compose.prod.yaml': has('auth')
       ? APP_COMPOSE
       : `services:
   app:
     build: .
     restart: unless-stopped
+    # This machine alone: the reverse proxy in front serves the site over HTTPS.
     ports:
-      - 3000:3000
+      - 127.0.0.1:3000:3000
 `,
   }
 }
@@ -458,7 +462,7 @@ CMD ["./server"]
 // The static site's container: the same files, served by nginx with the compressed copies the build wrote, and the starter's 404 page for a path it lacks.
 function staticContainerFiles({ has }: Setup): Record<string, string> {
   return {
-    'Dockerfile': `FROM oven/bun:1 AS build
+    'Dockerfile': `FROM oven/bun:${Bun.version} AS build
 WORKDIR /app
 COPY . .
 RUN bun install --frozen-lockfile && bun run build
@@ -482,7 +486,7 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
   }${has('starter') ? '\n\n  error_page 404 /404.html;' : ''}
 }
 `,
-    '.dockerignore': 'node_modules\n.kay\ndist\n',
+    '.dockerignore': 'node_modules\n.kay\ndist\n.git\n.env\n.env.*\n',
   }
 }
 
@@ -491,7 +495,8 @@ function authFiles({ tw }: Setup): Record<string, string> {
   return {
     // What production sets, for compose.prod.yaml; development's own settings are in the .env `kay new` wrote.
     '.env.example': `# Each one generated and kept out of the repository: \`bun -e "console.log((crypto.randomUUID() + crypto.randomUUID()).replaceAll('-', ''))"\`.\nSESSION_SECRET=\nPOSTGRES_PASSWORD=\n`,
-    'src/env.ts': `import { s } from 'kay'
+    'src/env.ts': `import process from 'node:process'
+import { s } from 'kay'
 import { defineEnv } from 'kay/server'
 
 // Read once as the server boots; \`kay new\` wrote a secret and the development database to .env, and production sets its own.
@@ -499,7 +504,11 @@ export const env = defineEnv(s.Object({
   SESSION_SECRET: s.String({ minLength: 32 }),
   DATABASE_URL: s.String(),
   PORT: s.Integer({ default: 3000 }),
+  DEMO_SIGN_IN: s.Optional(s.Boolean()),
 }))
+
+// The demo sign-in lets anyone in under any name, so production refuses it unless DEMO_SIGN_IN=true says the site is a demo.
+export const demoSignIn = process.env.NODE_ENV !== 'production' || env.DEMO_SIGN_IN === true
 `,
     'src/db/member.ts': `import type { InferEntity } from '@kaynooo/pg-orm'
 import { defineTable } from '@kaynooo/pg-orm'
@@ -584,9 +593,13 @@ export const app = new Elysia().use(sessions).use(await pages()).listen(env.PORT
 import { s } from 'kay'
 import { db } from '../db'
 import { Member } from '../db/member'
+import { demoSignIn } from '../env'
 
 // Anyone may sign in under any name, which makes them a member the first time: swap in real credentials, such as @kaynooo/kayjs-auth's.
 export const signIn = action(s.Object({ name: s.String({ pattern: '\\\\S', maxLength: 40, error: 'Write a name' }) }), async ({ name }, ctx) => {
+  if (!demoSignIn)
+    return ctx.fail(403, 'This demo sign-in is off in production: swap in real credentials, or set DEMO_SIGN_IN=true for a demo site')
+
   await db.repo(Member).write.findOrCreate({ name: name.trim() }, ['name'])
   await ctx.locals.session.regenerate()
   await ctx.locals.session.set('name', name.trim())
@@ -601,6 +614,8 @@ form${tw('.mt-4.flex.flex-col.items-start.gap-2')}(action={signIn})
   label(for="name") Name
   input#name(name="name" autocomplete="username")
   if signIn.error('name') as error
+    p${tw('.text-error')} {error}
+  if signIn.error() as error
     p${tw('.text-error')} {error}
   button(type="submit") Sign in
 `,
@@ -775,7 +790,7 @@ export function templateFiles(features: ReadonlySet<Feature>, settings: ConfigSe
   return {
     // kay itself is published there, as are @kaynooo/eslint and @kaynooo/pg-orm.
     '.npmrc': `@kaynooo:registry=${REGISTRY}\n`,
-    '.gitignore': lines('node_modules', '.kay', has('eslint') && '.eslintcache', server ? '/server' : 'dist', has('auth') && '.env'),
+    '.gitignore': lines('node_modules', '.kay', has('eslint') && '.eslintcache', server ? '/server' : 'dist', '.env', '.env.*', '!.env.example', '!.env.test'),
     'kay.config.ts': config(setup),
     'src/routes/_layout.kay': layout(setup),
     'src/routes/index.kay': home(setup),

@@ -10,6 +10,9 @@ on:
       - '**.md'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 # Pinned so the cache step and bun agree on one folder, whatever HOME the runner image sets.
 env:
   BUN_INSTALL_CACHE_DIR: /tmp/bun-cache
@@ -121,9 +124,3 @@ jobs:
 
       - name: Check that kay's bench pages leave hydration markers to islands
         run: bun test ./bench -t 'leave hydration markers'
-
-      # Last, as it moves the lockfile: kay's own libraries are this checkout's packages/, pg-orm's newest release goes through the example here.
-      - name: Test the example app on the latest pg-orm release
-        run: |
-          bun update --latest @kaynooo/pg-orm
-          bun test ./tests/examples.test.ts

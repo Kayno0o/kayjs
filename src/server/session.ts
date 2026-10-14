@@ -1,7 +1,9 @@
 import type { Duration } from '../runtime/duration'
+import process from 'node:process'
 import { parse, stringify } from 'devalue'
 import { Elysia } from 'elysia'
 import { durationSeconds } from '../runtime/duration'
+import { kayLog } from '../runtime/log'
 import { openSqlite } from '../runtime/sqlite.server'
 import { overHttps } from './actions'
 import { nodeCrypto } from './builtins'
@@ -127,6 +129,8 @@ interface SessionConfig {
   domain?: string | undefined
   store?: SessionStore | undefined
   keys: Buffer[]
+  // Whether production was told, once, that a sign-in rests on cookies sign-out cannot revoke.
+  warned?: boolean
 }
 
 class RequestSession<Data extends object> implements Session<Data> {
@@ -178,6 +182,11 @@ class RequestSession<Data extends object> implements Session<Data> {
   }
 
   async regenerate(): Promise<void> {
+    if (!this.config.store && !this.config.warned && process.env.NODE_ENV === 'production') {
+      this.config.warned = true
+      kayLog('warn', `a sign-in regenerated a session kept in its ${this.config.name} cookie alone, with no store, so signing out only clears the browser's cookie: a copy taken before stays valid until it expires; give session() a store, such as sqliteStore('data/sessions.sqlite'), to end sessions on the server`)
+    }
+
     await this.load()
     this.retired = this.id
     this.id = undefined

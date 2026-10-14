@@ -1,7 +1,7 @@
 import type { ConfigSettings, Feature } from './templates'
 import { randomBytes } from 'node:crypto'
 import { existsSync, statSync } from 'node:fs'
-import { chmod, readdir } from 'node:fs/promises'
+import { mkdir, readdir, writeFile } from 'node:fs/promises'
 import { basename, join, resolve } from 'node:path'
 import process from 'node:process'
 import { checklist, select } from './prompt'
@@ -115,11 +115,9 @@ export async function createProject(target: string, options: NewOptions = {}): P
 
   const files = await projectFiles(dir, features, options.kay)
 
-  await Promise.all(Object.entries(files).map(async ([path, content]) => Bun.write(join(dir, path), content)))
-
-  // The session secret is for its owner's eyes only.
-  if (features.has('auth'))
-    await chmod(join(dir, '.env'), 0o600)
+  // The session secret in .env is for its owner's eyes only from the moment it is written, which Bun.write cannot do as it ignores a mode.
+  await mkdir(dir, { recursive: true })
+  await Promise.all(Object.entries(files).map(async ([path, content]) => path === '.env' ? writeFile(join(dir, path), content, { mode: 0o600 }) : Bun.write(join(dir, path), content)))
 
   return Object.keys(files).sort()
 }
