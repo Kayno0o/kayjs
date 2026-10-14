@@ -439,7 +439,7 @@
   }
 
   .kui-command-palette-snippet {
-    @apply truncate text-xs text-kui-subtext0;
+    @apply line-clamp-2 text-xs text-kui-subtext0;
   }
 
   .kui-command-palette-snippet :where(mark) {

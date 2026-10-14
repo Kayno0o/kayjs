@@ -28,6 +28,7 @@ export function highlight(code: string, language: string | undefined): string {
             properties: { class: 'code-bar' },
             children: [
               { type: 'element', tagName: 'span', properties: {}, children: [{ type: 'text', value: lang === 'text' ? '' : lang }] },
+              // The classes copy-button.kay draws CopyButton with; components/code-copy.kay answers the click.
               { type: 'element', tagName: 'button', properties: { 'type': 'button', 'class': 'kui-btn kui-copy-btn', 'data-copy': '' }, children: [{ type: 'text', value: 'Copy' }] },
             ],
           },

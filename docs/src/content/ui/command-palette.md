@@ -16,7 +16,7 @@ description: A searchable list of actions and links, opened from the keyboard.
 
 ## Searching the pages
 
-With `search: true` in `kay.config.ts`, `siteSearch` searches the text of your pages too: a query lists the sections it finds after the entries it matches, under `siteSearchLabel` (`In the pages`), each with the line it was found in. `siteSearch={{ limit: 40 }}` lists more of them than the 20 it lists by default, and a section an entry already links to is left out. This site's search, behind Ctrl K, is one.
+With `search: true` in `kay.config.ts`, `siteSearch` searches the text of your pages too: a query lists the sections it finds after the entries it matches, under `siteSearchLabel` (`In the pages`), each with the line it was found in. `siteSearch={{ limit: 40 }}` lists more of them than the 20 it lists by default, and a section an entry already links to is left out. If the index fails to load, as under `kay dev`, which writes none, the palette says so with `siteSearchError`. This site's search, behind Ctrl K, is one.
 
 ## Opening it
 

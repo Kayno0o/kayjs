@@ -1,5 +1,4 @@
 ---
-import Notice from '@kaynooo/kayjs-ui/notice.kay'
 import AlertTriangle from '~icons/tabler/alert-triangle'
 import Bulb from '~icons/tabler/bulb'
 import InfoCircle from '~icons/tabler/info-circle'
@@ -8,8 +7,8 @@ const TONES = { note: 'info', tip: 'success', warning: 'warning' } as const
 
 const { type = 'note' } = props<{ type?: 'note' | 'tip' | 'warning' }>()
 ---
-// The tone marks the border and the icon; the prose inside keeps the text colour, as a callout runs longer than a form's outcome.
-Notice.callout.text-kui-text(tone={TONES[type]})
+// Notice's look without its status role, as a callout is prose the page holds rather than an outcome to read out; the tone marks the border and the icon, the prose keeps the text colour.
+aside.kui-notice.callout(class="text-kui-text text-[length:inherit] leading-[inherit]" data-tone={TONES[type]})
   if type === 'tip'
     Bulb
   else if type === 'warning'

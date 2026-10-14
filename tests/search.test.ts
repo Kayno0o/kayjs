@@ -6,7 +6,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { clientDir } from '../src/build/assets'
 import { writeSearchIndex } from '../src/build/search'
 import { flush, root as reactiveRoot, signal } from '../src/runtime'
-import { SEARCH_MANIFEST, searchResults, searchShard, searchSite, searchWords } from '../src/runtime/search'
+import { SEARCH_MANIFEST, searchShard, searchSite, searchWords } from '../src/runtime/search'
+import { searchResults } from '../src/runtime/search-results'
 import { scratchDir } from './scratch'
 
 const CLI = join(import.meta.dir, '../src/cli.ts')
@@ -202,6 +203,31 @@ describe('search', () => {
       await build(site, '--static', '--outdir', join(site, 'dist'))
 
       expect((await search(join(site, 'dist/_kay'), 'staticword')).hits.map(hit => hit.href)).toEqual(['/'])
+    }
+    finally {
+      await rm(site, { recursive: true, force: true })
+    }
+  }, 60_000)
+
+  it('leaves the search out of the chunks a page with a searching island loads, for its first query to fetch', async () => {
+    const site = await scratchDir('search-lazy-')
+
+    try {
+      await Promise.all([
+        Bun.write(join(site, 'kay.config.ts'), 'export default { favicon: false, search: true }\n'),
+        Bun.write(join(site, 'src/components/finder.kay'), '---\nimport { searchResults, signal } from \'kay\'\n\nconst query = signal(\'\')\nconst { hits } = searchResults(query)\n---\ninput(aria-label="Search" bind:value={query})\nfor hit of hits() key={hit.href}\n  a(href={hit.href}) {hit.page}\n'),
+        Bun.write(join(site, 'src/routes/index.kay'), '---\nimport Finder from \'../components/finder.kay\'\n---\nh1 Home\nFinder\n'),
+      ])
+      await build(site, '--static', '--outdir', join(site, 'dist'))
+
+      const html = await Bun.file(join(site, 'dist/index.html')).text()
+      const loaded = [...html.matchAll(/(?:src|href)="(\/_kay\/[^"]+\.js)"/g)].map(match => match[1]!)
+      const chunks = await readdir(join(site, 'dist/_kay'))
+      const holdsSearch = async (path: string) => (await Bun.file(join(site, 'dist', path)).text()).includes(SEARCH_MANIFEST)
+
+      expect(loaded.length).toBeGreaterThan(0)
+      expect(await Promise.all(loaded.map(holdsSearch))).not.toContain(true)
+      expect(await Promise.all(chunks.filter(chunk => chunk.endsWith('.js')).map(async chunk => holdsSearch(`/_kay/${chunk}`)))).toContain(true)
     }
     finally {
       await rm(site, { recursive: true, force: true })

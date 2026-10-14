@@ -6,7 +6,7 @@ import { stepIndex } from './cycle'
 import Icon from './icon.kay'
 import { isPaletteLink, paletteHits, paletteMatches, paletteSections, withRecent } from './palette'
 
-const { open = false, onOpenChange, entries, groups = [], recent = [], onRecentChange, hotkey = 'k', siteSearch = false, siteSearchLabel = 'In the pages', label = 'Search', placeholder = 'Search', emptyLabel = 'No results', class: className } = props<{
+const { open = false, onOpenChange, entries, groups = [], recent = [], onRecentChange, hotkey = 'k', siteSearch = false, siteSearchLabel = 'In the pages', siteSearchError = 'The pages could not be searched', label = 'Search', placeholder = 'Search', emptyLabel = 'No results', class: className } = props<{
   // Shows the palette; the hotkey opens and closes it too, and `onOpenChange` reports every change for a parent driving it.
   open?: boolean | undefined
   onOpenChange?: ((open: boolean) => void) | undefined
@@ -18,9 +18,11 @@ const { open = false, onOpenChange, entries, groups = [], recent = [], onRecentC
   onRecentChange?: ((recent: string[]) => void) | undefined
   // Ctrl or Cmd and this key opens and closes it from anywhere, unless something handled the key first; `null` leaves opening to the app.
   hotkey?: string | null | undefined
-  // Searches the text of the site's pages too, as kay indexes them under `search: true`: a query lists the sections it finds, `limit` of them, after the entries it matches, under `siteSearchLabel`.
+  // Searches the text of the site's pages too, as kay indexes them under `search: true`: a query lists the sections it finds, `limit` of them, after the entries it matches, under `siteSearchLabel`. Read once, as the palette is set up.
   siteSearch?: boolean | { limit?: number | undefined } | undefined
   siteSearchLabel?: string | undefined
+  // Shown under the entries when the index could not load.
+  siteSearchError?: string | undefined
   label?: string | undefined
   placeholder?: string | undefined
   emptyLabel?: string | undefined
@@ -62,6 +64,8 @@ const sections = memo(() => {
 })
 
 const rows = memo(() => sections().flatMap(section => section.rows))
+// The highlighted row, kept within the list as hits arriving shorten it.
+const active = memo(() => Math.min(selected(), Math.max(rows().length - 1, 0)))
 
 const optionId = (index: number) => `${id}-option-${index}`
 
@@ -70,7 +74,7 @@ const linkOf = (entry: PaletteEntry) => isPaletteLink(entry) ? entry : undefined
 const actionOf = (entry: PaletteEntry) => isPaletteLink(entry) ? undefined : entry
 
 effect(() => {
-  const current = selected()
+  const current = active()
 
   if (shown())
     document.getElementById(optionId(current))?.scrollIntoView?.({ block: 'nearest' })
@@ -119,11 +123,15 @@ onMount(() => {
   onCleanup(() => window.removeEventListener('keydown', toggle))
 })
 
-function followed(link: PaletteLink) {
-  const next = withRecent(followedRecently(), link.href)
+// A section the site search found is not kept as recent: the list only shows the entries' own links.
+function followed(link: PaletteLink, found: boolean) {
+  if (!found) {
+    const next = withRecent(followedRecently(), link.href)
 
-  followedRecently.set(next)
-  onRecentChange?.(next)
+    followedRecently.set(next)
+    onRecentChange?.(next)
+  }
+
   dialog?.close()
 }
 
@@ -138,12 +146,13 @@ function keyDown(event: KeyboardEvent) {
 
   if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
     event.preventDefault()
-    selected.set(stepIndex(selected(), event.key === 'ArrowDown' ? 1 : -1, count))
+    selected.set(stepIndex(active(), event.key === 'ArrowDown' ? 1 : -1, count))
 
     return
   }
 
-  const entry = rows()[selected()]?.entry
+  const row = rows()[active()]
+  const entry = row?.entry
 
   if (event.key !== 'Enter' || !entry)
     return
@@ -152,20 +161,20 @@ function keyDown(event: KeyboardEvent) {
 
   if (isPaletteLink(entry) && (event.ctrlKey || event.metaKey)) {
     window.open(entry.href, '_blank', 'noopener')
-    followed(entry)
+    followed(entry, row.snippet !== undefined)
 
     return
   }
 
   // A real click on the link, so kay's navigation takes it as it takes any other.
-  document.getElementById(optionId(selected()))?.click()
+  document.getElementById(optionId(active()))?.click()
 }
 ---
 dialog.kui-command-palette(ref={element => dialog = element} closedby="any" aria-label={label} onClose={closed} class={className})
   if shown()
     .kui-command-palette-search
       Icon(icon="search")
-      input.kui-command-palette-input(value={query()} onInput={event => { query.set(event.currentTarget.value); selected.set(0) }} onKeyDown={keyDown} role="combobox" aria-label={label} aria-expanded="true" aria-controls={`${id}-list`} aria-autocomplete="list" aria-activedescendant={rows()[selected()] ? optionId(selected()) : undefined} autocomplete="off" spellcheck="false" placeholder={placeholder})
+      input.kui-command-palette-input(value={query()} onInput={event => { query.set(event.currentTarget.value); selected.set(0) }} onKeyDown={keyDown} role="combobox" aria-label={label} aria-expanded="true" aria-controls={`${id}-list`} aria-autocomplete="list" aria-activedescendant={rows()[active()] ? optionId(active()) : undefined} autocomplete="off" spellcheck="false" placeholder={placeholder})
     .kui-command-palette-list(id={`${id}-list`} role="listbox" aria-label={label})
       for section, sectionIndex of sections() key={section.group ?? ''}
         div(role="group" aria-labelledby={section.group === null ? undefined : `${id}-group-${sectionIndex}`})
@@ -173,7 +182,7 @@ dialog.kui-command-palette(ref={element => dialog = element} closedby="any" aria
             .kui-heading-section.kui-command-palette-heading(id={`${id}-group-${sectionIndex}`}) {section.group}
           for row of section.rows key={row.index}
             if linkOf(row.entry) as link
-              a.kui-command-palette-option(href={link.href} target={link.external ? '_blank' : undefined} rel={link.external ? 'noopener noreferrer' : undefined} id={optionId(row.index)} role="option" aria-selected={row.index === selected() ? 'true' : 'false'} tabindex="-1" onPointerMove={() => selected.set(row.index)} onClick={() => followed(link)})
+              a.kui-command-palette-option(href={link.href} target={link.external ? '_blank' : undefined} rel={link.external ? 'noopener noreferrer' : undefined} id={optionId(row.index)} role="option" aria-selected={row.index === active() ? 'true' : 'false'} tabindex="-1" onPointerMove={() => selected.set(row.index)} onClick={() => followed(link, row.snippet !== undefined)})
                 if link.icon as icon
                   Icon(icon={icon})
                 if row.snippet as snippet
@@ -187,14 +196,16 @@ dialog.kui-command-palette(ref={element => dialog = element} closedby="any" aria
                           | {part.text}
                 else
                   span.kui-command-palette-label {row.entry.label}
-                if query().trim()
+                if query().trim() && row.entry.group
                   span.kui-command-palette-group {row.entry.group}
             else if actionOf(row.entry) as action
-              button.kui-command-palette-option(type="button" id={optionId(row.index)} role="option" aria-selected={row.index === selected() ? 'true' : 'false'} tabindex="-1" onPointerMove={() => selected.set(row.index)} onClick={() => act(action)})
+              button.kui-command-palette-option(type="button" id={optionId(row.index)} role="option" aria-selected={row.index === active() ? 'true' : 'false'} tabindex="-1" onPointerMove={() => selected.set(row.index)} onClick={() => act(action)})
                 if action.icon as icon
                   Icon(icon={icon})
                 span.kui-command-palette-label {row.entry.label}
-                if query().trim()
+                if query().trim() && row.entry.group
                   span.kui-command-palette-group {row.entry.group}
-      if rows().length === 0
+      if site?.error() && query().trim()
+        p.kui-command-palette-empty {siteSearchError}
+      else if rows().length === 0 && !site?.loading()
         p.kui-command-palette-empty {emptyLabel}

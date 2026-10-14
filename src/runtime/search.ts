@@ -1,5 +1,4 @@
 import { withBase } from './base'
-import { effect, ownSignal } from './reactive'
 
 // What `kay build` writes with `search` on: the manifest naming the index of the build and each language's, served revalidated, and the index under a directory named by its hash, served for good.
 export const SEARCH_MANIFEST = '/_kay/search.json'
@@ -128,42 +127,6 @@ export async function searchSite(query: string, options: SearchOptions = {}): Pr
 
     return { page, ...heading !== undefined && { heading }, href, snippet: snippet(text, terms), score }
   })
-}
-
-// In an island, the hits of `searchSite` for `query` as it changes: only the latest query's are shown, whichever answers first.
-export function searchResults(query: () => string, options?: SearchOptions): SearchResults {
-  const [hits, setHits] = ownSignal<SearchHit[]>([])
-  const [loading, setLoading] = ownSignal(false)
-  const [error, setError] = ownSignal<Error | undefined>(undefined)
-  let asked = 0
-
-  const ask = async (text: string, turn: number) => {
-    try {
-      const found = await searchSite(text, options)
-
-      if (turn === asked) {
-        setHits(found)
-        setError(undefined)
-      }
-    }
-    catch (caught) {
-      if (turn === asked)
-        setError(caught instanceof Error ? caught : new Error(String(caught)))
-    }
-    finally {
-      if (turn === asked)
-        setLoading(false)
-    }
-  }
-
-  effect(() => {
-    const text = query()
-
-    setLoading(true)
-    void ask(text, ++asked)
-  })
-
-  return { hits, loading, error }
 }
 
 // Each section holding a word the term starts, scored by the best such word.

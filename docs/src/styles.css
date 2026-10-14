@@ -13,7 +13,7 @@
   --tint: light-dark(#f8e3b5, #23314a);
   --line: color-mix(in srgb, var(--text) 12%, transparent);
   --edge: light-dark(rgb(23 32 46 / 0.2), rgb(0 0 0 / 0.6));
-  --sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --sans: var(--font-sans);
   --mono: ui-monospace, 'JetBrains Mono', 'Cascadia Code', Menlo, Consolas, monospace;
   --radius: 3px;
   --bar: 0px;

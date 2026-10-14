@@ -34,6 +34,7 @@ export interface PaletteSection {
 export const RECENT_GROUP = 'Recent'
 
 const COLLATOR = new Intl.Collator()
+const TRAILING_SLASH = /\/(?=[?#]|$)/
 
 export function isPaletteLink(entry: PaletteEntry): entry is PaletteLink {
   return 'href' in entry
@@ -107,16 +108,20 @@ export interface PaletteHit {
   snippet: SearchHit['snippet']
 }
 
-// The site search's hits as links, but for those leading where one of `matches` already does.
+// The site search's hits as links, but for those leading where one of `matches` already does, with or without a trailing slash; a section under a heading is listed under its page.
 export function paletteHits(hits: SearchHit[], matches: PaletteEntry[]): PaletteHit[] {
-  const linked = new Set(matches.filter(isPaletteLink).map(link => link.href))
+  const linked = new Set(matches.filter(isPaletteLink).map(link => withoutSlash(link.href)))
 
-  return hits.filter(hit => !linked.has(hit.href)).map(hit => ({ link: { label: hit.heading ?? hit.page, group: hit.page, href: hit.href }, snippet: hit.snippet }))
+  return hits.filter(hit => !linked.has(withoutSlash(hit.href))).map(hit => ({ link: { label: hit.heading ?? hit.page, group: hit.heading === undefined ? '' : hit.page, href: hit.href }, snippet: hit.snippet }))
 }
 
 // `recent` with `href` moved to the front, at most `limit` long.
 export function withRecent(recent: string[], href: string, limit = 8): string[] {
   return [href, ...recent.filter(entry => entry !== href)].slice(0, limit)
+}
+
+function withoutSlash(href: string): string {
+  return href.replace(TRAILING_SLASH, '')
 }
 
 function groupRank(groups: string[]): (group: string) => number {

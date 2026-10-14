@@ -23,7 +23,7 @@ afterEach(() => {
   seen.actions = []
 })
 
-async function palette(props: { recent?: string[], hotkey?: string | null } = {}) {
+async function palette(props: { recent?: string[], hotkey?: string | null, siteSearch?: boolean } = {}) {
   mounted = await mount('src/components/palette.kay', {
     onOpenChange: (open: boolean) => seen.open.push(open),
     onRecentChange: (recent: string[]) => seen.recent.push(recent),
@@ -143,5 +143,91 @@ describe('CommandPalette', () => {
 
     expect(seen.recent).toEqual([['/table']])
     expect(dialog.open).toBe(false)
+  })
+})
+
+describe('CommandPalette with siteSearch', () => {
+  const realFetch = globalThis.fetch
+  const asked: string[] = []
+  let failing = false
+  // The file of the index holding the words starting as `word` does, by its first two letters.
+  const shard = (word: string) => [...word].slice(0, 2).map(char => char.codePointAt(0)!.toString(36)).join('-')
+  const files: Record<string, unknown> = {
+    '/_kay/search.json': { dir: 'build', langs: { en: 0 } },
+    '/_kay/search/build/0/index.json': { shards: [shard('table')], sections: 2 },
+    [`/_kay/search/build/0/w-${shard('table')}.json`]: { table: [0, 2, 1, 1] },
+    '/_kay/search/build/0/t-0.json': [
+      { page: 'Table', href: '/table', text: 'The table page' },
+      { page: 'Table', heading: 'Sorting', href: '/table#sorting', text: 'Sort the table by a column' },
+    ],
+  }
+
+  beforeEach(() => {
+    globalThis.fetch = (async (url: string) => {
+      asked.push(url)
+
+      return !failing && url in files ? Response.json(files[url]) : new Response('', { status: 404 })
+    }) as typeof fetch
+  })
+
+  afterEach(() => {
+    globalThis.fetch = realFetch
+    asked.length = 0
+    failing = false
+  })
+
+  async function until(ready: () => boolean) {
+    for (let tries = 0; tries < 100 && !ready(); tries++) {
+      await Bun.sleep(5)
+      await settle()
+    }
+  }
+
+  // First, as a failed load clears what the index had loaded for the next test to fetch afresh.
+  test('says the pages could not be searched when the index fails to load, still listing the entries', async () => {
+    failing = true
+    const { root, input, labels } = await palette({ siteSearch: true })
+
+    press(window, 'k', { ctrlKey: true })
+    await settle()
+    await search(input()!, 'table')
+    await until(() => root.querySelector('.kui-command-palette-empty') !== null)
+
+    expect(labels()).toEqual(['Table'])
+    expect(root.querySelector('.kui-command-palette-empty')?.textContent).toBe('The pages could not be searched')
+  })
+
+  test('lists the sections found after the entries, leaving out one an entry links, and follows one without keeping it as recent', async () => {
+    const { root, dialog, input, labels, active } = await palette({ siteSearch: true })
+
+    press(window, 'k', { ctrlKey: true })
+    await settle()
+    await search(input()!, 'table')
+    await until(() => labels().includes('Sorting'))
+
+    expect(labels()).toEqual(['Table', '# In the pages', 'Sorting'])
+    expect(root.querySelector('.kui-command-palette-snippet mark')?.textContent).toBe('table')
+
+    press(input()!, 'ArrowDown')
+    await settle()
+
+    expect(active()).toBe('Sorting')
+
+    press(input()!, 'Enter')
+    await settle()
+
+    expect(dialog.open).toBe(false)
+    expect(seen.recent).toEqual([])
+  })
+
+  test('loads nothing without siteSearch', async () => {
+    const { input } = await palette()
+
+    press(window, 'k', { ctrlKey: true })
+    await settle()
+    await search(input()!, 'table')
+    await Bun.sleep(20)
+
+    expect(asked).toEqual([])
   })
 })

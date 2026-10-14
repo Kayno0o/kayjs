@@ -1,8 +1,11 @@
 ---
 import { attempt } from '@kaynooo/kayjs-ui'
-import { onCleanup, onMount } from 'kay'
+import { onCleanup, onMount, signal } from 'kay'
 
 const COPIED_MS = 2000
+
+// Read out by a screen reader, which does not announce a button changing its label.
+const said = signal('')
 
 // The highlighter writes each code block's button as HTML, CopyButton's look without its island, so one listener on the document answers them all, pages swapped in later included, as CopyButton would: the label says it went through, a toast says it did not.
 async function copy(event: MouseEvent) {
@@ -16,7 +19,11 @@ async function copy(event: MouseEvent) {
     return
 
   button.textContent = 'Copied!'
-  setTimeout(() => button.textContent = 'Copy', COPIED_MS)
+  said.set('Copied to the clipboard')
+  setTimeout(() => {
+    button.textContent = 'Copy'
+    said.set('')
+  }, COPIED_MS)
 }
 
 const onClick = (event: MouseEvent) => void copy(event)
@@ -25,3 +32,4 @@ onMount(() => document.addEventListener('click', onClick))
 
 onCleanup(() => document.removeEventListener('click', onClick))
 ---
+p.sr-only(aria-live="polite") {said()}
