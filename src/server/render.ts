@@ -152,8 +152,10 @@ interface Rendering {
   base: string
   // Rendering at build time or on revalidation, for every visitor at once.
   prerendering: boolean
-  // The form post the browser came back from, if any.
+  // The form post the browser came back from, if any, as the page asks for it.
   outcome: () => Outcome | null
+  // The same, for kay to hand to islands, which asking for does not tie the page to the visitor unless they carry one.
+  carried: () => Outcome | null
   // Development only, for the dev tool: the route the request matched, and its loads as they were timed.
   matched?: string | undefined
   loads?: Pick<LoadedRoute, 'files' | 'modules' | 'timings'> | undefined
@@ -442,11 +444,12 @@ function createRendering(context: RequestContext, params: Record<string, unknown
 
     return jar.cookies
   }
-  // Asking how a form post went reads the visitor's cookie, carried or not, so the page is theirs either way.
-  const readOnce = () => {
+  const readOnce = () => flash ??= handedOverFlash(request) ?? (hasFlash(request) ? readFlash(personalCookies()) ?? null : null)
+  // A page asking how a form post went depends on the visitor's cookie, carried or not, so it is theirs either way.
+  const asked = () => {
     readPersonally(request)
 
-    return flash ??= handedOverFlash(request) ?? (hasFlash(request) ? readFlash(jar.cookies) ?? null : null)
+    return readOnce()
   }
   const headers = new Headers({ 'content-type': 'text/html; charset=utf-8' })
   const url = new URL(request.url)
@@ -458,7 +461,8 @@ function createRendering(context: RequestContext, params: Record<string, unknown
     base,
     prerendering,
     // How a form post went is for the one page the browser went back to.
-    outcome: readOnce,
+    outcome: asked,
+    carried: readOnce,
     writeCookies: () => {
       if (hasFlash(request))
         jar.cookies.delete(FLASH_COOKIE)
@@ -496,12 +500,12 @@ function createRendering(context: RequestContext, params: Record<string, unknown
         throw new Denied(code, message)
       },
       failed: (action) => {
-        const read = readOnce()
+        const read = asked()
 
         return read?.action === action.url && !('succeeded' in read) ? { status: read.status, values: read.values, errors: read.errors, data: read.data } as FailureOf<typeof action> : undefined
       },
       succeeded: (action) => {
-        const read = readOnce()
+        const read = asked()
 
         return read?.action === action.url && 'succeeded' in read ? { data: read.data } as SuccessOf<typeof action> : undefined
       },
@@ -679,7 +683,7 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
   const shipsEntry = hasIslands || posts || (client.entry !== undefined && scan?.modes.includes('defer') === true)
   const scripts = shipsEntry ? islandScripts(client, islands.eager, streamed, hasIslands) + (posts ? formsScript(forms) : '') + workScript(forms, options.prerendering === true) : ''
   const lang = localeState()?.locale ?? options.lang ?? DEFAULT_LANG
-  const islandData = hasIslands ? messagesScript(islands.messages, true) + outcomeScript(rendering.outcome()) + queryScript(rules) : ''
+  const islandData = hasIslands ? messagesScript(islands.messages, true) + outcomeScript(rendering.carried()) + queryScript(rules) : ''
   const written = `${htmlOpen(lang, head.root)}<head>${headStart(head)}${stylesheets(client, styled)}${head.html}${scripts}${islandData}${kayMetas(options, hasIslands)}${speculationRules(options.prefetch, options.base)}${client.navigation === true && !shipsEntry ? historyScript : ''}${options.offline ? registerScript(options.base ?? '') : ''}${options.dev ? devScripts(client) + (options.prerendering ? '' : requestBlock(files, rendering)) : ''}</head><body>${body}`
   const start = marks === undefined ? written : placeFieldMarks(written, marks)
 
