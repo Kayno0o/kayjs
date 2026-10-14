@@ -622,10 +622,11 @@ export async function readActionResponse<Output>(response: Response, action: str
     if (!HTTP_PROTOCOLS.has(new URL(target, window.location.href).protocol))
       throw new TypeError(`kay: the action redirected to ${JSON.stringify(target)}, which is no page`)
 
-    // The page goes away, so whatever awaited the call never resumes.
-    void goTo(target)
+    // The page goes away, so whatever awaited the call never resumes; a leave guard keeping the visitor here settles it instead.
+    if (await goTo(target))
+      return new Promise<never>(() => undefined)
 
-    return new Promise<never>(() => undefined)
+    throw new ActionRedirect(response.status, target)
   }
 
   const body = await response.text()
@@ -644,15 +645,22 @@ export async function readActionResponse<Output>(response: Response, action: str
 }
 
 // Through the swap once it took over the app's links; a site with `navigation: false` loads the page, asking the leave guards first as `navigate()` would.
-async function goTo(target: string): Promise<void> {
+// Whether the page went, or a leave guard kept the visitor on it.
+async function goTo(target: string): Promise<boolean> {
   if (navigation.navigate) {
+    const before = navigation.current
+
     await navigation.navigate(target)
 
-    return
+    return navigation.current !== before || navigation.released
   }
 
   const url = new URL(withBase(target), location.href)
 
-  if (await mayLeave(url))
-    leave(url)
+  if (!await mayLeave(url))
+    return false
+
+  leave(url)
+
+  return true
 }

@@ -322,6 +322,8 @@ function onSubmit(event: SubmitEvent): void {
 
 // The form is busy from its submit on, so a second submit while form posting or its checks load posts nothing.
 async function submit(form: HTMLFormElement, submitter: HTMLElement | null, url: URL): Promise<void> {
+  const navigated = navigation.current
+
   busyForms.add(form)
 
   let forms: typeof import('./forms')
@@ -336,7 +338,7 @@ async function submit(form: HTMLFormElement, submitter: HTMLElement | null, url:
     return
   }
 
-  await forms.submit(form, submitter, url)
+  await forms.submit(form, submitter, url, navigated)
 }
 
 // An island may render a form after the page loaded, taken once it gets focus.

@@ -271,6 +271,19 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
     expect(page.errors).toEqual([])
   })
 
+  it('keeps the page the visitor went to while a form was posting, the answer dropped', async () => {
+    const page = await browser.open('/')
+
+    await page.click('form.slow button')
+    await page.waitFor('form.slow[aria-busy]')
+    await page.click('a.other')
+    await page.waitFor('h1', { text: 'Other' })
+    await page.evaluate(async () => new Promise(resolve => setTimeout(resolve, 1000)))
+
+    expect(await page.path()).toBe('/other')
+    expect(page.errors).toEqual([])
+  })
+
   it('leaves what a call was refused for on the page that made it', async () => {
     const page = await browser.open('/')
 
@@ -288,7 +301,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
   it('takes the forms posting to an action from the browser\'s own check, so the schema\'s messages show', async () => {
     const page = await browser.open('/')
 
-    expect(await page.evaluate(() => [...document.forms].map(form => form.noValidate))).toEqual([true, true, true, true, true])
+    expect(await page.evaluate(() => [...document.forms].map(form => form.noValidate))).toEqual([true, true, true, true, true, true])
 
     await page.fill('form.enrol input[name="title"]', 'ab')
     await page.fill('form.enrol input[name="email"]', 'a@b.co')

@@ -7,7 +7,7 @@ import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { Elysia } from 'elysia'
 import { ActionError } from '../src/runtime'
-import { readActionResponse } from '../src/runtime/action'
+import { ActionRedirect, readActionResponse } from '../src/runtime/action'
 import { leaveGuards } from '../src/runtime/navigation'
 import { session } from '../src/server/session'
 import { testSite } from '../src/test'
@@ -324,7 +324,7 @@ describe('kay/test', () => {
     expect(site.cookies.has('kay_flash')).toBe(false)
   })
 
-  it('sends the browser where a called action redirects, once the leave guards let it go', async () => {
+  it('sends the browser where a called action redirects once the leave guards let it go, and settles the call when they keep it', async () => {
     GlobalRegistrator.register({ url: 'http://localhost/admin' })
 
     const asked: string[] = []
@@ -341,8 +341,8 @@ describe('kay/test', () => {
     leaveGuards.add(guard)
 
     try {
-      void readActionResponse(new Response(null, { status: 303, headers: { 'x-kay-redirect': '/about' } }), '/_kay/action/test/go')
-      await until(() => asked.length > 0)
+      // Kept on the page, the call settles, so its `pending` clears.
+      await expect(readActionResponse(new Response(null, { status: 303, headers: { 'x-kay-redirect': '/about' } }), '/_kay/action/test/go')).rejects.toBeInstanceOf(ActionRedirect)
       expect([asked, window.location.href]).toEqual([['/about'], 'http://localhost/admin'])
 
       leaving = true

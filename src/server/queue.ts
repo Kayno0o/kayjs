@@ -49,7 +49,7 @@ export interface QueueOptions<Payload> {
   backoff?: Duration | undefined
   // Jobs of this queue one process runs at once. 1 by default.
   concurrency?: number | undefined
-  // How long a run may take before another process takes the job as lost and runs it again. 10 minutes by default.
+  // How long a run may take: past it, the run counts as failed and frees its worker, and another process takes a job its dead process held as lost. 10 minutes by default.
   lostAfter?: Duration | undefined
   // Gets a job that failed its last attempt, once it is kept as failed.
   onFailed?: ((payload: Payload, error: unknown) => unknown) | undefined
@@ -241,6 +241,20 @@ export function queue<Payload>(name: string, handler: (payload: Payload) => unkn
     }
   }
 
+  // A run that outlasts `lostAfter` fails, so its worker takes the next job; the handler itself goes on, as nothing can stop it.
+  const withinLostAfter = async (run: unknown): Promise<void> => {
+    let timer: ReturnType<typeof setTimeout> | undefined
+
+    try {
+      await Promise.race([run, new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`it ran past lostAfter, ${Math.round(lostAfter / 1000)} s`)), lostAfter)
+      })])
+    }
+    finally {
+      clearTimeout(timer)
+    }
+  }
+
   // Runs one job it claimed, then marks how it went; false when none was due.
   const runNext = async (): Promise<boolean> => {
     const now = Date.now()
@@ -249,8 +263,19 @@ export function queue<Payload>(name: string, handler: (payload: Payload) => unkn
     if (!job)
       return false
 
+    // Only runs whose process died never mark how they went: a job that kills its process stops here rather than crash every next one.
+    if (job.attempts > attempts) {
+      const message = `its last ${attempts} runs never finished, their process stopping first`
+
+      await store().fail(job.id, message)
+      kayLog('error', `a job of queue('${name}') is kept as failed without running: ${message}`)
+      await reportFailed(job, new Error(message))
+
+      return true
+    }
+
     try {
-      await handler(parse(job.payload) as Payload)
+      await withinLostAfter(handler(parse(job.payload) as Payload))
       await store().complete(job.id)
     }
     catch (error) {

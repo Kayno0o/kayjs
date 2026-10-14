@@ -238,6 +238,7 @@ form(action={add})
 - Once kay's script runs it sets `novalidate` on every form posting to an action and checks the form against the schema itself, so the schema's `error` messages show rather than the browser's, then the constraints the template wrote itself.
 - An island renders its fields without the constraints, kay's check covering them.
 - After the post the browser goes back to the page, or wherever the handler's `ctx.redirect` points.
+- A visitor following a link to another page while the post is under way stays where it led, what the post answers dropped.
 - A line break a form posts, CRLF per the standard, is read as `\n`, the one character the `textarea` the visitor typed in counts, so a `maxLength` matches what the browser let them write.
 
 ### Form values
@@ -328,6 +329,7 @@ form(action={add})
 - `data` is undefined for a call refused before the handler ran, by the schema or a limit.
 - Its input, its result and that `data` cross as island props do, Dates, Maps, Sets and bigints included; a result holding a function or a class instance answers 500, logging where it sits.
 - When the handler or a guard redirects, the browser goes there, swapping the page in as a link would, and the call never resolves.
+- A leave guard keeping the visitor on the page settles the call instead, throwing `ActionRedirect`, so `pending()` clears; a call made on a page the visitor has left since throws it too, taking them nowhere.
 - Outside a browser, as in a test, a redirect throws `ActionRedirect` from `kay` with `location`.
 
 ```kay

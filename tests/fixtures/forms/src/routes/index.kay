@@ -17,6 +17,10 @@ export const ping = action(t.Object({}), () => 'Saved')
 
 export const join = action(t.Object({ email: t.String({ format: 'email', maxLength: 200, error: 'Not an email' }) }), () => undefined)
 
+export const slow = action(t.Object({}), async () => {
+  await Bun.sleep(600)
+})
+
 export const bump = action(t.Object({}), () => ++tally.count)
 
 export const busy = action(t.Object({
@@ -81,5 +85,7 @@ form.enrol(action={enrol})
   input(field="agree" type="checkbox")
   button Enrol
 Signup
+form.slow(action={slow})
+  button Slow
 p.tally {tally.count}
 a.other(href="/other") Other

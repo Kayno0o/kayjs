@@ -435,6 +435,55 @@ describe('queue', () => {
     }
   })
 
+  it('keeps as failed, without running it, a job whose process died during each of its attempts', async () => {
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+    const store = memoryJobs()
+    const runs: string[] = []
+    const gaveUp: string[] = []
+    const crashing = queue('crashing', (name: string) => void runs.push(name), { store, attempts: 2, lostAfter: '1m', onFailed: (name, error) => void gaveUp.push(`${name}: ${(error as Error).message}`) })
+
+    try {
+      await crashing.enqueue('huge import')
+
+      // Two processes take it in turn, each dying before marking how it went.
+      for (let crash = 0; crash < 2; crash++) {
+        expect(await store.claim('crashing', Date.now(), Date.now() + 60_000)).toBeDefined()
+        setSystemTime(Date.now() + 61_000)
+      }
+
+      expect(await crashing.drain()).toBe(1)
+      expect(runs).toEqual([])
+      expect(gaveUp).toEqual(['huge import: its last 2 runs never finished, their process stopping first'])
+      expect(await crashing.failed()).toEqual([{ id: expect.any(String), payload: 'huge import', attempts: 3, error: 'its last 2 runs never finished, their process stopping first' }])
+    }
+    finally {
+      setSystemTime()
+      logged.mockRestore()
+    }
+  })
+
+  it('fails a run that outlasts lostAfter, freeing its worker for the next job', async () => {
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+    const runs: string[] = []
+    const slow = queue('slow', async (name: string) => {
+      runs.push(name)
+
+      if (name === 'stuck')
+        await new Promise(() => undefined)
+    }, { store: memoryJobs(), lostAfter: '1s', attempts: 1 })
+
+    try {
+      await slow.enqueue('stuck')
+      await slow.enqueue('next')
+      expect(await slow.drain()).toBe(2)
+      expect(runs).toEqual(['stuck', 'next'])
+      expect(await slow.failed()).toEqual([{ id: expect.any(String), payload: 'stuck', attempts: 1, error: 'it ran past lostAfter, 1 s' }])
+    }
+    finally {
+      logged.mockRestore()
+    }
+  })
+
   it('runs later a job enqueued with a delay, and in memory under bun test when no store is named', async () => {
     const runs: string[] = []
     const later = queue('later', (name: string) => void runs.push(name))

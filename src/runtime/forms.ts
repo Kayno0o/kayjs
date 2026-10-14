@@ -25,7 +25,8 @@ let checks: Promise<typeof import('./validate')> | undefined
 let swapModule: Promise<Swapper> | undefined
 
 // Checks the form, already marked busy, then posts it; without the swap to show what it answers, the browser posts it.
-export async function submit(form: HTMLFormElement, submitter: HTMLElement | null, url: URL): Promise<void> {
+// `navigated` is the navigation the form was submitted on: once another started, the visitor went elsewhere and what the form answers is dropped.
+export async function submit(form: HTMLFormElement, submitter: HTMLElement | null, url: URL, navigated: number): Promise<void> {
   let swapper: Swapper
 
   try {
@@ -42,7 +43,7 @@ export async function submit(form: HTMLFormElement, submitter: HTMLElement | nul
 
   // Past the schema, the constraints the template writes itself, which the browser no longer checks once kay took the form.
   if ((form.noValidate && !ours) || submitter?.hasAttribute('formnovalidate') || (await passes(form, withoutBase(url.pathname)) && (!ours || form.reportValidity()))) {
-    await send(form, submitter, url, swapper)
+    await send(form, submitter, url, swapper, navigated)
 
     return
   }
@@ -91,11 +92,18 @@ async function passes(form: HTMLFormElement, action: string): Promise<boolean> {
 }
 
 // Posts the form as the browser would, multipart unless it says otherwise, then shows the page the action sends the browser back to.
-async function send(form: HTMLFormElement, submitter: HTMLElement | null, url: URL, { go, HTML, show }: Swapper): Promise<void> {
+async function send(form: HTMLFormElement, submitter: HTMLElement | null, url: URL, { go, HTML, show }: Swapper, navigated: number): Promise<void> {
   const data = new FormData(form, submitter)
   const multipart = (submitter?.getAttribute('formenctype') ?? form.enctype) === 'multipart/form-data'
   const focused = document.activeElement
   const refused = { form: [...document.forms].indexOf(form), control: [...form.elements].indexOf(focused as Element) }
+
+  // Gone before its checks loaded, the form posts nothing.
+  if (navigation.current !== navigated) {
+    busyForms.delete(form)
+
+    return
+  }
 
   busyForms.add(form)
   form.setAttribute('aria-busy', 'true')
@@ -126,6 +134,10 @@ async function send(form: HTMLFormElement, submitter: HTMLElement | null, url: U
     form.removeAttribute('aria-busy')
     form.style.removeProperty('--kay-progress')
   }
+
+  // The visitor went to another page meanwhile: the answer is the one they left's, and the action has run.
+  if (navigation.current !== navigated)
+    return
 
   // Sent once: from here on a failure loads the page rather than posting again.
   if (response.redirect !== null) {

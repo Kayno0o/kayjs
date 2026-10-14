@@ -58,6 +58,6 @@ export const welcomeMails = queue(
 )
 ```
 
-The server runs it with `.use(welcomeMails)`, and an action calls `await welcomeMails.enqueue({ to: email })`, or `enqueue(payload, { delay: '1h' })` to run it later. A job that throws is retried after a growing wait, and one that runs out of attempts is kept as failed and passed to `onFailed`. Jobs wait in a SQLite file shared by the server processes on one machine, kept in memory under `bun test`, where `site.runJobs()` from `kay/test` runs them.
+The server runs it with `.use(welcomeMails)`, and an action calls `await welcomeMails.enqueue({ to: email })`, or `enqueue(payload, { delay: '1h' })` to run it later. A job that throws is retried after a growing wait, and one that runs out of attempts is kept as failed and passed to `onFailed`, as is a run outlasting `lostAfter`, 10 minutes by default, or one whose process died each time. Jobs wait in a SQLite file shared by the server processes on one machine, kept in memory under `bun test`, where `site.runJobs()` from `kay/test` runs them.
 
 <ReadMore href="/llms/production#background-jobs">Job stores, concurrency, lost jobs and how shutdown waits for runs in progress are in the full production reference.</ReadMore>
