@@ -1,5 +1,6 @@
 import type { SafeHtml } from './checks'
 import type { SanitizeOptions } from './sanitize'
+import { vouch } from './safe-html'
 import { sanitizeHtml } from './sanitize'
 
 // What a user's Markdown keeps besides formatted text: tables, images and the task lists' checkboxes, which `sanitizeHtml` would drop as inputs.
@@ -16,5 +17,5 @@ export const MARKDOWN_OPTIONS = { autolinks: true }
 export function sanitizedMarkdown(html: string): SafeHtml {
   const held = html.replace(MARKS, mark => `&#${mark.codePointAt(0)};`).replace(TASK, (_, checked: string | undefined) => checked !== undefined ? '<li>\uE001' : '<li>\uE000')
 
-  return sanitizeHtml(held, KEPT).replace(ODD_ALIGN, '').replace(MARKED_TASK, (_, mark: string) => `<li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" disabled${mark === '\uE001' ? ' checked' : ''}>`) as SafeHtml
+  return vouch(sanitizeHtml(held, KEPT).replace(ODD_ALIGN, '').replace(MARKED_TASK, (_, mark: string) => `<li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" disabled${mark === '\uE001' ? ' checked' : ''}>`))
 }

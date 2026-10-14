@@ -30,7 +30,7 @@ import { collection } from 'kay/content'
 | `resource`, `call`, `socket`, `stream`, `dispatch` | Typed reads and calls of API routes, websockets and event streams from islands; `call` throws `ApiError`. See [API routes](/guides/api-routes) |
 | `publicEnv` | The variables `publicEnv` in the config exposed to islands |
 | `localPath`, `withBase` | A path with the locale prefix or the `base` applied |
-| `sanitizeHtml`, `trustHtml` | Clean untrusted HTML, its options typed `SanitizeOptions`, or mark HTML as safe to render |
+| `sanitizeHtml`, `trustHtml` | Clean untrusted HTML, its options typed `SanitizeOptions`, or mark HTML as safe to render, which a spread's `innerHTML` requires |
 | `uid` | A unique id that matches between server and browser |
 | `describeField` | Adds ids to the `aria-describedby` of the first field a component renders on the server, its slot included, for a form field linking the control its parent writes to its hint |
 | `previewing` | Whether the visitor is in preview mode |

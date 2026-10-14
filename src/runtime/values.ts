@@ -1,5 +1,7 @@
 // How both renderers read the values a template gives, kay/html into markup and kay/dom into nodes, so a page hydrates into what the server wrote.
 
+import { isVouched } from './safe-html'
+
 const ARIA = /^aria-/i
 // A name HTML reads as one attribute: a key holding a space, a quote, `=`, `/` or `>` would open others.
 const ATTRIBUTE_NAME = /^[^\0-\x20"'>/=\x7F]+$/
@@ -7,7 +9,7 @@ const ATTRIBUTE_NAME = /^[^\0-\x20"'>/=\x7F]+$/
 const HANDLER = /^on/i
 // A tag name HTML reads as one, which a dynamic tag given as text must be.
 const ELEMENT_NAME = /^[a-z][^\0-\x20"'>/=\x7F]*$/i
-// A whole document in a frame, which no spread sets; `innerHTML` stays, as an icon's props bring their markup by it.
+// A whole document in a frame, which no spread sets.
 const DOCUMENT = /^srcdoc$/i
 
 export function attributeName(name: string): boolean {
@@ -26,7 +28,7 @@ export function handlerName(name: string): boolean {
   return HANDLER.test(name)
 }
 
-// What a spread onto an element may set, as it often carries data, such as a record's fields: attribute names only, handlers only as functions an island attaches, and no `srcdoc`; getters are kept, so a prop stays live.
+// What a spread onto an element may set, as it often carries data, such as a record's fields: attribute names only, handlers only as functions an island attaches, no `srcdoc`, and `innerHTML` only as markup `trustHtml`, `sanitizeHtml` or an icon import vouched for; getters are kept, so a prop stays live.
 export function spreadAttributes<T>(source: T): T {
   if (source == null || typeof source !== 'object')
     return source
@@ -40,10 +42,21 @@ export function spreadAttributes<T>(source: T): T {
     if (HANDLER.test(name) && typeof (descriptor.get ? (source as Record<string, unknown>)[name] : descriptor.value) !== 'function')
       continue
 
-    Object.defineProperty(kept, name, descriptor)
+    Object.defineProperty(kept, name, name === 'innerHTML' ? { get: () => vouchedMarkup(descriptor.get ? (source as Record<string, unknown>)[name] : descriptor.value), enumerable: true } : descriptor)
   }
 
   return kept as T
+}
+
+// The markup of an `innerHTML` a spread brings, or nothing when none vouched for it, with a warning in development.
+function vouchedMarkup(value: unknown): unknown {
+  if (value == null || isVouched(value))
+    return value
+
+  if (process.env.NODE_ENV !== 'production')
+    console.warn('[kay] a spread brought an `innerHTML` that nothing vouched for and it was dropped: pass sanitizeHtml(value) for markup a user wrote, or trustHtml(value) for markup the app made. Markup that went through JSON elsewhere than an island prop has to be vouched for again.')
+
+  return undefined
 }
 
 // Props from several objects, later ones winning, each keeping its getters, so a prop stays live and a spread `children` renders only when read.

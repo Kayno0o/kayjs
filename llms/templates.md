@@ -219,7 +219,8 @@ for product of products
 - `{...obj}` spreads.
 - On an element, a spread sets attributes only, as it often carries data such as a record's fields: a key that is no attribute name, a handler given as text in any case (`ONCLICK: '...'`) and `srcdoc` are left out, on the server and in an island alike.
 - A name the browser refuses to set, such as `@click`, is written by the server only.
-- A handler given as a function still attaches, and `innerHTML` still renders, as an icon's props draw it, so spread only data whose `innerHTML` the app made.
+- A handler given as a function still attaches.
+- A spread sets `innerHTML` only when its value is a `SafeHtml`, which `sanitizeHtml`, `trustHtml` and an icon import return, and drops any other value, with a warning in development: `svg({...icon})` draws, `div({...record})` ignores a `record.innerHTML` that is a plain string.
 - A tag held in a value renders only when it is an element name, `img src=x onerror=...` throwing, and takes its props as a spread does.
 - Events are camelCase handlers: `onClick={save}`, `onInput={e => name.set(e.currentTarget.value)}`.
 - A lowercase `onclick` or `on:click` attaches nothing, and kay reports it.
@@ -237,7 +238,9 @@ for product of products
 - The options are read once per object, so declare them once outside the function, typed as `SanitizeOptions` from `kay`.
 - `trustHtml` vouches for markup the app made, such as its own Markdown renderer's, and changes nothing.
 - An icon's markup is already a `SafeHtml`.
-- Only one written as an attribute is checked: a spread never sets `srcdoc`, but its `innerHTML` renders unchecked.
+- The mark is on the string's value at run time, so a derived string (`safe + '<b>'`, `.slice()`) is unmarked, and it travels with the value from the server to the browser in island props, action results and event streams, and from nowhere else: a request's input, a `fetch` of your own JSON and `localStorage` bring plain strings.
+- Only one written as an attribute is checked at build time: a spread never sets `srcdoc`.
+- Breaking, in the next minor: a spread of a plain string into `innerHTML` rendered before. Upgrading: write `innerHTML={sanitizeHtml(text)}` or `innerHTML={trustHtml(text)}` as an attribute, or wrap the value in the spread the same way.
 - Inside `svg` or `math`, where HTML reads a `style` or `script` as markup rather than text, one holds static text or a string literal only, which the compiler reports otherwise.
 - A line starting with `{expression}` is text, as `| {expression}` is.
 - Inline text follows the tag after one space.

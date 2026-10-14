@@ -1,6 +1,7 @@
 import type { IconProps, IconSet } from '../runtime/icons'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import * as iconSet from '../runtime/icons'
 
 // `import home from '~icons/tabler/home'`: an icon of a set the project installs as `@iconify-json/<prefix>`.
@@ -54,6 +55,9 @@ export function iconProps(file: string, name: string): IconProps | undefined {
   return set && iconSet.iconProps(set, name)
 }
 
+// Where the runtime keeps the mark an icon's markup carries, which the module marks it with.
+const VOUCH_MODULE = fileURLToPath(new URL('../runtime/safe-html.ts', import.meta.url))
+
 // The module an icon import loads, or one throwing on use with what went wrong.
 export function iconModule(sets: Map<string, string>, specifier: string): string {
   const [, prefix, name] = ICON_IMPORT.exec(specifier) ?? []
@@ -67,7 +71,7 @@ export function iconModule(sets: Map<string, string>, specifier: string): string
   if (!props)
     throw new Error(`kay: ${ICONIFY_PACKAGE}${prefix} has no icon named ${name}`)
 
-  return `export default ${JSON.stringify(props)}`
+  return `import { vouch } from ${JSON.stringify(VOUCH_MODULE)}\nconst icon = ${JSON.stringify(props)}\nicon.innerHTML = vouch(icon.innerHTML, true)\nexport default icon\n`
 }
 
 // One module declaration per icon of the installed sets, so a misspelt name fails to type-check as a missing module.

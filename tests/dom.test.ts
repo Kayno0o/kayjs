@@ -119,6 +119,28 @@ describe('a dynamic tag', () => {
   })
 })
 
+describe('a spread onto an element in the browser', () => {
+  it('takes innerHTML only as markup something vouched for, and leaves the element empty otherwise', async () => {
+    const warn = spyOn(console, 'warn').mockImplementation(() => undefined)
+    const { root, dispose } = await mountKay({
+      'main.kay': '---\nimport { sanitizeHtml, trustHtml } from \'kay\'\n\nconst raw = \'<i>raw-dom-1</i>\'\nconst marked = trustHtml(\'<b>marked-dom-1</b>\')\nconst loaded = JSON.parse(JSON.stringify({ innerHTML: marked }))\n---\ndiv.trusted({...{ innerHTML: marked }})\ndiv.sanitized({...{ innerHTML: sanitizeHtml(\'<u>s</u><script>x</script>\') }})\ndiv.raw({...{ innerHTML: raw }})\ndiv.derived({...{ innerHTML: `${marked}<img src=x>` }})\nsvg.drawn({...{ innerHTML: trustHtml(\'<path d="M0 0"/>\') }})\nsvg.rawsvg({...{ innerHTML: \'<path d="raw"/>\' }})\nmath.rawmath({...{ innerHTML: \'<mi>raw</mi>\' }})\ndiv.json({...loaded})\n',
+    })
+
+    try {
+      expect(root.querySelector('.trusted')!.innerHTML).toBe('<b>marked-dom-1</b>')
+      expect(root.querySelector('.sanitized')!.innerHTML).toBe('<u>s</u>')
+      expect(root.querySelector('.drawn')!.innerHTML).toBe('<path d="M0 0"></path>')
+      expect([...root.querySelectorAll('.raw, .derived, .rawsvg, .rawmath')].map(element => element.innerHTML)).toEqual(['', '', '', ''])
+      // Vouched in this page, so the same markup survives a JSON round trip by value.
+      expect(root.querySelector('.json')!.innerHTML).toBe('<b>marked-dom-1</b>')
+    }
+    finally {
+      warn.mockRestore()
+      await dispose()
+    }
+  })
+})
+
 describe('component class', () => {
   it('hands a component the merged class as one string, following what it merges', async () => {
     const { root, dispose } = await mountKay({

@@ -2,6 +2,7 @@ import type { RendererObject, Token, TokenizerObject, Tokens } from 'marked'
 import type { SafeHtml } from './checks'
 import { Marked, Tokenizer } from 'marked'
 import { sanitizedMarkdown } from './markdown'
+import { vouch } from './safe-html'
 
 const ESCAPED = /[&<>"]/g
 const TEXT_ESCAPED = /&(?![a-z][a-z\d]{1,31};)|[<>"]/gi
@@ -146,7 +147,7 @@ const tokenizer: TokenizerObject = {
 
 const marked = new Marked({ gfm: true, async: false, renderer, tokenizer })
 
-const asWritten = (markdown: string) => `<p>${escape(markdown)}</p>\n` as SafeHtml
+const asWritten = (markdown: string) => vouch(`<p>${escape(markdown)}</p>\n`)
 
 // Markdown rendered as `renderMarkdown` renders it, headings without anchors, then sanitized for `innerHTML`: formatted text, tables, images and task lists, sync so it renders again on each chunk of a stream.
 export function markdownHtml(markdown: string): SafeHtml {

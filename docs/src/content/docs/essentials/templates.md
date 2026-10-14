@@ -120,6 +120,14 @@ button(onClick={() => name.set('')}) Clear
 
 `bind:value` and `bind:checked` read and write a signal both ways.
 
+## Markup in a spread
+
+A spread sets `innerHTML` only from markup that `sanitizeHtml`, `trustHtml` or an icon import vouched for, and drops any other value, with a warning in development. An icon keeps drawing, `svg({...Home})`, and a record's plain-string `innerHTML` no longer renders as markup.
+
+The vouching travels with the value from the server to the browser in island props, action results and event streams. A string derived from a vouched one, such as `markup + '<b>'`, is plain again.
+
+This is a breaking change in the next minor. To upgrade, pass the value through `sanitizeHtml(text)` for markup a user wrote, or `trustHtml(text)` for markup the app made, before it reaches the spread.
+
 ## Comments and slots
 
 `// note` is a comment. `slot` is where a layout or wrapper component renders its children:

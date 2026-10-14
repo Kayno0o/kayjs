@@ -2,6 +2,7 @@
 import type { SafeHtml } from '../runtime/checks'
 import { escape, escapeAttribute } from '../runtime/escape'
 import { MARKDOWN_OPTIONS } from '../runtime/markdown'
+import { vouch } from '../runtime/safe-html'
 
 export interface Heading {
   depth: number
@@ -123,9 +124,9 @@ export async function renderMarkdown(markdown: string, options: { highlight?: Hi
 // A code block as Markdown renders one, through `highlight` when given, for a page's `innerHTML`.
 export async function highlightCode(code: string, language?: string, options: { highlight?: Highlighter | undefined } = {}): Promise<SafeHtml> {
   if (options.highlight)
-    return await options.highlight(code, language) as SafeHtml
+    return vouch(await options.highlight(code, language))
 
-  return `<pre><code${language === undefined ? '' : ` class="language-${escapeAttribute(language)}"`}>${escape(code)}</code></pre>` as SafeHtml
+  return vouch(`<pre><code${language === undefined ? '' : ` class="language-${escapeAttribute(language)}"`}>${escape(code)}</code></pre>`)
 }
 
 async function highlighted(html: string, highlight: Highlighter): Promise<string> {

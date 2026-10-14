@@ -2,7 +2,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 import { collectHead } from '../src/runtime/head'
 import { attribute, child, dynamic, element, head, loop, merge, omit, selectOptions, spreadAttributes } from '../src/runtime/html'
-import { sanitizeHtml } from '../src/runtime/sanitize'
+import { sanitizeHtml, trustHtml } from '../src/runtime/sanitize'
 
 describe('child values', () => {
   it('escape text, keep numbers and rendered markup, and drop null, undefined and booleans', () => {
@@ -41,7 +41,7 @@ describe('element', () => {
   it('takes from a spread only attributes, handlers as functions, and no srcdoc, getters kept', () => {
     const handler = () => undefined
     let reads = 0
-    const kept = spreadAttributes({ 'title': 't', 'onClick': handler, 'ONCLICK': 'alert(1)', 'onmouseover': 'alert(1)', 'innerHTML': '<b>icon</b>', 'SrcDoc': '<script>', 'x" y': 1, 'open': true, get 'live'() {
+    const kept = spreadAttributes({ 'title': 't', 'onClick': handler, 'ONCLICK': 'alert(1)', 'onmouseover': 'alert(1)', 'innerHTML': trustHtml('<b>icon</b>'), 'SrcDoc': '<script>', 'x" y': 1, 'open': true, get 'live'() {
       return ++reads
     } })
 
