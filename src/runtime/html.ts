@@ -16,12 +16,12 @@ import { currentServerScope, scope } from './reactive'
 import { ISLAND_PARAM } from './server-islands'
 import { failedIds, idMark } from './uid'
 import { safeUrl } from './url'
-import { attributeValue, classText, eachChild, styleText } from './values'
+import { attributeName, attributeValue, classText, eachChild, elementName, handlerName, styleText } from './values'
 
 export { escape, escapeAttribute } from './escape'
 export { head } from './head'
 export { memo, untrack } from './reactive'
-export { componentClass, merge, omit } from './values'
+export { componentClass, merge, omit, spreadAttributes } from './values'
 
 export interface Html {
   t: string
@@ -32,8 +32,6 @@ export const FAILED_MARKER = `<!--${FAILED}-->`
 const VOID_ELEMENTS = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'keygen', 'link', 'menuitem', 'meta', 'param', 'source', 'track', 'wbr'])
 // Properties that set an element's content rather than an attribute.
 const CONTENT_PROPERTIES = new Set(['innerHTML', 'textContent', 'innerText', 'children'])
-// Handlers and refs, which only an island attaches; `open` is the one attribute starting with `on` that is none.
-const BEHAVIOUR = /^(?:on(?!en$)|ref$)/
 // What ends a `script` or `style` early, or opens a comment that keeps a script running past its end tag.
 const RAW_TEXT_BREAK = /<\/(?=script|style)|<!--/gi
 const OPTION = /<option(?=[\s>])([^>]*)>([\s\S]*?)(?=<\/option>|<option[\s>]|<\/select>|$)/g
@@ -169,7 +167,8 @@ export function element(tag: string, sources: readonly object[], content?: () =>
         continue
       }
 
-      if (value == null || BEHAVIOUR.test(name))
+      // Handlers and refs only an island attaches, and a name that is no attribute's.
+      if (value == null || name === 'ref' || handlerName(name) || !attributeName(name))
         continue
 
       if (name === 'value')
@@ -180,11 +179,11 @@ export function element(tag: string, sources: readonly object[], content?: () =>
       else if (name === 'style')
         markup += ` style="${style(value)}"`
       else if (value === '')
-        markup += ` ${escape(name)}`
+        markup += ` ${name}`
       else if (tag === 'a' && name === 'href' && !sources.some(later => later != null && Object.hasOwn(later, 'hreflang')))
         markup += attribute(name, localHref(value))
       else
-        markup += attribute(escape(name), value)
+        markup += attribute(name, value)
     }
   }
 
@@ -200,7 +199,7 @@ export function element(tag: string, sources: readonly object[], content?: () =>
 // A component tag read off a prop or through a call: a string names an element, a function is the component.
 export function dynamic(tag: unknown, props: object): unknown {
   if (typeof tag === 'string')
-    return element(tag, [props])
+    return element(elementName(tag), [props])
 
   return typeof tag === 'function' ? component(tag as (props: object) => unknown, props) : undefined
 }

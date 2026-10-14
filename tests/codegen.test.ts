@@ -363,6 +363,13 @@ describe('head', () => {
     expect(checked).not.toContain('KayUseHead')
   })
 
+  it('rejects a computed style or script inside svg or math, where HTML reads it as markup', () => {
+    expect(errors('---\nconst css = "a{}"\n---\nsvg\n  style {css}')).toEqual(['A `style` inside `svg` or `math` takes static text only'])
+    expect(errors('---\nconst c = "red"\n---\nsvg\n  style {`.a{fill:${c}}`}')).toHaveLength(1)
+    expect(errors('---\nconst css = "a{}"\n---\nmath\n  g\n    script(textContent={css})')).toEqual(['A `script` inside `svg` or `math` takes static text only'])
+    expect(errors('---\nconst css = "a{}"\n---\nsvg\n  style @import \'a.css\';\nsvg\n  style {\'.a{fill:red}\'}\n  style {`.b{fill:blue}`}\nstyle {css}\nsvg\n  foreignObject\n    style {css}')).toEqual([])
+  })
+
   it('rejects head blocks an island, a nested element or a second block holds, and content the head cannot', () => {
     expect(errors('---\nimport { signal } from "kay"\n---\nhead\n  title x\np')).toEqual(['An island cannot set the document head'])
     expect(reports('head\n  title a\nhead\n  title b')).toEqual([{ message: 'A template has one `head` block', at: 'head', related: [['head', 'the first one']] }])

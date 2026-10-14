@@ -16,6 +16,12 @@ const COMPOUND_EVENT = /^(dbl|key|mouse|pointer|touch|drag|focus|context|before|
 const HEAD_TAGS = new Set(['title', 'meta', 'link', 'style', 'script', 'base', 'html'])
 const HEAD_CONTENT = 'A `head` block holds `title`, `meta`, `link`, `style`, `script`, `base` and `html` elements only'
 const QUERY: PageSettingName = 'query'
+// Inside `svg` and `math`, HTML reads a `style` or `script` as markup, not text, back to HTML in a `foreignObject`.
+const FOREIGN = new Set(['svg', 'math'])
+const RAW_TEXT = new Set(['style', 'script'])
+const CONTENT_ATTRIBUTES = new Set(['innerHTML', 'textContent', 'innerText', 'children'])
+// One string literal, the way CSS with braces is written in a template's text.
+const STRING_LITERAL = /^\s*(?:'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|`(?:[^`\\$]|\\.|\$(?!\{))*`)\s*$/
 // What only a static parent passes an island.
 const ISLAND_OPTIONS = new Set(['hydrate', 'persist'])
 // Elements a keyboard reaches and a screen reader announces as controls; a click handler on any other one needs a `role`.
@@ -86,6 +92,7 @@ class Validator {
   private readonly rootTags = new Set<Node>()
   private readonly src: string
   private readonly forms: Map<Node, Span>
+  private foreign = false
 
   constructor(private readonly file: KayFile, private readonly options: ValidateOptions) {
     this.src = file.source
@@ -214,8 +221,25 @@ class Validator {
   }
 
   private element(element: ElementNode): void {
+    const outer = this.foreign
+
+    if (!element.component)
+      this.foreign = FOREIGN.has(element.name) || (this.foreign && element.name !== 'foreignObject')
+
+    try {
+      this.elementIn(element, outer)
+    }
+    finally {
+      this.foreign = outer
+    }
+  }
+
+  private elementIn(element: ElementNode, foreign: boolean): void {
     if (this.options.check && !element.component)
       this.accessibility(element)
+
+    if (foreign && !element.component && RAW_TEXT.has(element.name) && this.dynamicContent(element))
+      this.error(element.tag, `A \`${element.name}\` inside \`svg\` or \`math\` takes static text only`, { note: `HTML reads its content as markup there, so a value could add elements`, help: `write its text as it is, or move the \`${element.name}\` out of the \`svg\`` })
 
     if (isHead(element))
       this.error(element, 'A `head` block sits at the top level of a template')
@@ -262,6 +286,14 @@ class Validator {
     }
 
     this.nodes(children)
+  }
+
+  // Whether what an element holds is computed: a value in its text other than a string literal, any other child, a spread or a content attribute.
+  private dynamicContent(element: ElementNode): boolean {
+    if (element.attributes.some(attribute => attribute.kind === 'spread' || (attribute.kind === 'expression' && CONTENT_ATTRIBUTES.has(this.text(attribute.name)))))
+      return true
+
+    return element.children.some(child => child.kind !== 'text' || child.parts.some(part => part.kind === 'element' || (part.kind === 'expression' && !STRING_LITERAL.test(this.text(part.expression)))))
   }
 
   private attributes(element: ElementNode): void {

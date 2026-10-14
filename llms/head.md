@@ -16,7 +16,7 @@ h1 {todo.title}
 
 - One `head` block per template, at its top level, in a page, a layout or a static component; an island has none.
 - The page wins over its layouts: one `title`, and one `meta` per `name`, `property` or `http-equiv`. A `link` is one per `rel` and `href`.
-- Head elements hold text only. The default charset and viewport tags can be replaced the same way.
+- Head elements hold text only. Their attributes take no handlers, a `javascript:` URL goes out as `unsafe:javascript:...`, and a script's text cannot end it or open a comment, whatever the server data in it. The default charset and viewport tags can be replaced the same way.
 - A `link(rel="canonical")` is one per page, the page's replacing its layouts'.
 - `html(data-theme="light")` sets attributes on `<html>`, static or from server data, from the `head` block only: one per name, a layout's over the layouts around it and the page's over all, `false` or `null` taking one off, except `class`, whose tokens add up across the layouts and the page, each once (`html.dark` in a layout and `html.wide` in its page give `class="dark wide"`, and a page cannot take off a layout's class); no event handler is attached. `lang` and `dir` are kay's, from `lang` in kay.config.ts or the locale. A page swap changes only what the server sets differently for the next page, and only where a script left it as the server set it, so a theme a toggle changed stays; a `class` changes token by token, a token the server set being the server's.
 - The head opens with the charset and viewport, then the stylesheets and `style` elements of `head` blocks and of `fonts`, then the stylesheets of the components, which win a tie with them, then everything else, so the first paint waits on no other tag.

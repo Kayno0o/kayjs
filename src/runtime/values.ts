@@ -1,6 +1,50 @@
 // How both renderers read the values a template gives, kay/html into markup and kay/dom into nodes, so a page hydrates into what the server wrote.
 
 const ARIA = /^aria-/i
+// A name HTML reads as one attribute: a key holding a space, a quote, `=`, `/` or `>` would open others.
+const ATTRIBUTE_NAME = /^[^\0-\x20"'>/=\x7F]+$/
+// An event handler in any case, as HTML reads attribute names; `open` is the one attribute starting with `on` that is none.
+const HANDLER = /^on(?!en$)/i
+// A tag name HTML reads as one, which a dynamic tag given as text must be.
+const ELEMENT_NAME = /^[a-z][^\0-\x20"'>/=\x7F]*$/i
+// A whole document in a frame, which no spread sets; `innerHTML` stays, as an icon's props bring their markup by it.
+const DOCUMENT = /^srcdoc$/i
+
+export function attributeName(name: string): boolean {
+  return ATTRIBUTE_NAME.test(name)
+}
+
+// The tag a dynamic tag names, refused when HTML would read it as something else, such as `img src=x onerror=...`.
+export function elementName(tag: string): string {
+  if (!ELEMENT_NAME.test(tag))
+    throw new Error(`kay: ${JSON.stringify(tag)} is not an element name`)
+
+  return tag
+}
+
+export function handlerName(name: string): boolean {
+  return HANDLER.test(name)
+}
+
+// What a spread onto an element may set, as it often carries data, such as a record's fields: attribute names only, handlers only as functions an island attaches, and no `srcdoc`; getters are kept, so a prop stays live.
+export function spreadAttributes<T>(source: T): T {
+  if (source == null || typeof source !== 'object')
+    return source
+
+  const kept = {}
+
+  for (const [name, descriptor] of Object.entries(Object.getOwnPropertyDescriptors(source))) {
+    if (!ATTRIBUTE_NAME.test(name) || DOCUMENT.test(name))
+      continue
+
+    if (HANDLER.test(name) && typeof (descriptor.get ? (source as Record<string, unknown>)[name] : descriptor.value) !== 'function')
+      continue
+
+    Object.defineProperty(kept, name, descriptor)
+  }
+
+  return kept as T
+}
 
 // Props from several objects, later ones winning, each keeping its getters, so a prop stays live and a spread `children` renders only when read.
 export function merge(...sources: readonly object[]): Record<string, unknown> {

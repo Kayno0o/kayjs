@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import { collectHead } from '../src/runtime/head'
-import { attribute, child, element, head, loop, merge, omit, selectOptions } from '../src/runtime/html'
+import { attribute, child, dynamic, element, head, loop, merge, omit, selectOptions, spreadAttributes } from '../src/runtime/html'
 import { sanitizeHtml } from '../src/runtime/sanitize'
 
 describe('child values', () => {
@@ -24,6 +24,29 @@ describe('element', () => {
   it('leaves out handlers, refs and empty values', () => {
     expect(element('button', [{ onClick: Number, ref: String, disabled: true, hidden: false, title: null, value: '' }]).t).toBe('<button disabled value></button>')
     expect(element('details', [{ open: true, ontoggle: 'x()' }]).t).toBe('<details open></details>')
+  })
+
+  it('leaves out a handler in any case, and a name HTML would read as several attributes', () => {
+    expect(element('div', [{ 'ONCLICK': 'alert(1)', 'OnMouseOver': 'alert(1)', 'x" onfocus="alert(1)': 1, 'a b': 1, 'a=b': 1, 'a>': 1, 'data-ok': 1, 'xlink:href': '/a' }]).t).toBe('<div data-ok="1" xlink:href="/a"></div>')
+  })
+
+  it('refuses a dynamic tag HTML would read as more than a name', () => {
+    expect((dynamic('my-tag', { title: 'a' }) as { t: string }).t).toBe('<my-tag title="a"></my-tag>')
+    expect(() => dynamic('img src=x onerror=alert(1)', {})).toThrow('is not an element name')
+    expect(() => dynamic('a>', {})).toThrow('is not an element name')
+  })
+
+  it('takes from a spread only attributes, handlers as functions, and no srcdoc, getters kept', () => {
+    const handler = () => undefined
+    let reads = 0
+    const kept = spreadAttributes({ 'title': 't', 'onClick': handler, 'ONCLICK': 'alert(1)', 'onmouseover': 'alert(1)', 'innerHTML': '<b>icon</b>', 'SrcDoc': '<script>', 'x" y': 1, 'open': true, get 'live'() {
+      return ++reads
+    } })
+
+    expect(Object.keys(kept)).toEqual(['title', 'onClick', 'innerHTML', 'open', 'live'])
+    expect(kept.onClick).toBe(handler)
+    expect([kept.live, kept.live]).toEqual([1, 2])
+    expect(spreadAttributes(null)).toBeNull()
   })
 
   it('writes a boolean ARIA state as "true" or "false", leaving it out only for null and undefined', () => {
@@ -100,6 +123,12 @@ describe('head', () => {
     const { head: rendered } = collectHead(() => head([{ tag: 'meta', props: { name: 'viewport', content: 'width=1' } }, { tag: 'meta', props: { charset: 'utf-8' } }]))
 
     expect(rendered).toEqual({ prelude: '<meta charset="utf-8"><meta name="viewport" content="width=1">', styles: '', html: '', root: '', charset: true, viewport: true })
+  })
+
+  it('neutralises a script URL and a handler in any case, and keeps script text from ending or opening a comment', () => {
+    const { head: rendered } = collectHead(() => head([{ tag: 'link', props: { 'rel': 'canonical', 'HREF': ' javascript:alert(1)', 'ONLOAD': 'alert(1)', 'x" y': 1 } }, { tag: 'script', props: { children: 'var a = "<!--<script>"; var b = "</SCRIPT>"' } }]))
+
+    expect(rendered.html).toBe('<link rel="canonical" href="unsafe: javascript:alert(1)"><script>var a = "<\\!--<script>"; var b = "<\\/SCRIPT>"</script>')
   })
 
   it('sets nothing outside a render', () => {

@@ -41,6 +41,9 @@ const FIXTURES: Record<string, Record<string, string>> = {
     'main.kay': '---\nimport Box from \'./box.kay\'\n\nconst count = signal(0)\nconst rest = { id: \'spread\', title: \'from spread\' }\nconst extra = signal(\'wide\')\n---\ndiv(onClick={() => count.set(count() + 1)} {...rest}) clicks {count()}\nform(action={\'/save\'} {...rest})\n  input(name="q")\nform(action={\'/save\'} method="get" {...rest})\n  input(name="q")\nBox.tag(class={extra()} {...rest})\n',
     'box.kay': '---\nconst { class: className } = props<{ class?: string }>()\n---\ndiv(class={className}) box\n',
   },
+  'untrusted spread': {
+    'main.kay': '---\nconst count = signal(0)\nconst data = { title: \'ok\', ONCLICK: \'alert(1)\', onmouseover: \'alert(1)\', \'x" onfocus="alert(1)\': 1, srcdoc: \'<script>alert(1)</script>\' }\n---\np {count()}\ndiv({...data})\niframe(title="frame" {...data})\n',
+  },
   'consts': {
     'main.kay': '---\nconst cents = signal(1250)\n---\nconst price = cents() / 100\np Price {price}\nconst { a, b } = { a: 1, b: 2 }\np {a} and {b}\n',
   },
@@ -128,6 +131,13 @@ afterAll(async () => {
 })
 
 describe('server and browser markup', () => {
+  it('drops from a spread what would run or load a document, on both sides', () => {
+    const expected = '<p>0</p><div title="ok"></div><iframe title="ok"></iframe>'
+
+    expect(normalized(server.get('untrusted spread')!)).toBe(expected)
+    expect(browser.get('untrusted spread')).toBe(expected)
+  })
+
   for (const name of Object.keys(FIXTURES)) {
     it(`renders ${name} alike`, () => {
       expect(browser.get(name)).toBe(normalized(server.get(name)!))

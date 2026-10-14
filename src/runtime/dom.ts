@@ -7,11 +7,11 @@ import { FAILED, ISLAND, PART_END, PART_START } from './markers'
 import { catchError, createSignal, getOwner, hydrationEnded, hydrationStarted, memo, onCleanup, renderEffect, reportError, root, runWithOwner, scope, unrecorded, untrack } from './reactive'
 import { freshPrefix, withIds } from './uid'
 import { safeUrl } from './url'
-import { attributeValue, classText, eachChild, merge, styleText } from './values'
+import { attributeName, attributeValue, classText, eachChild, elementName, handlerName, merge, styleText } from './values'
 
 export { renderEffect as effect, memo, untrack } from './reactive'
 export { transition } from './transition'
-export { componentClass, merge, omit } from './values'
+export { componentClass, merge, omit, spreadAttributes } from './values'
 
 // Several sibling nodes rendered as one: a block or a component returning more than one node. Its first and last nodes stay in place while what sits between changes.
 export class Range {
@@ -1064,7 +1064,7 @@ export function dynamic(tag: unknown, props: Record<string, unknown>): unknown {
   if (typeof tag !== 'string')
     return null
 
-  const element = claim ? claimNode() as Element : createElement(tag)
+  const element = claim ? claimNode() as Element : createElement(elementName(tag))
 
   spread(element, () => [props], 'children' in props)
 
@@ -1210,7 +1210,7 @@ export function spread(element: Element, sources: () => readonly object[], conte
     const seen = new Set<string>()
 
     for (const name of Object.keys(props)) {
-      if (name === 'children')
+      if (name === 'children' || !attributeName(name))
         continue
 
       const value = props[name]
@@ -1226,8 +1226,11 @@ export function spread(element: Element, sources: () => readonly object[], conte
 
       if (name === 'ref')
         ref(element, value)
-      else if (name.startsWith('on') && name !== 'open' && typeof value === 'function')
+      else if (handlerName(name) && typeof value === 'function')
         listen(element, name, value as (event: Event) => void, previous as ((event: Event) => void) | undefined)
+      // A handler given as text runs as script, which the server never writes either.
+      else if (handlerName(name))
+        continue
       else if (name === 'class')
         setClass(element, value)
       else if (name === 'style')
@@ -1242,9 +1245,9 @@ export function spread(element: Element, sources: () => readonly object[], conte
 
       set.delete(name)
 
-      if (name.startsWith('on') && name !== 'open' && typeof previous === 'function')
+      if (handlerName(name) && typeof previous === 'function')
         unlisten(element, name, previous as (event: Event) => void)
-      else if (name !== 'ref')
+      else if (name !== 'ref' && !handlerName(name))
         property(element, name, undefined)
     }
   })

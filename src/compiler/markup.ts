@@ -283,7 +283,8 @@ export abstract class TemplateWriter {
     for (const attribute of element.attributes) {
       if (attribute.kind === 'spread') {
         closeObject()
-        b.add(objects++ > 0 ? ', (' : '(').addSource(attribute.expression).add(')')
+        // On an element, a spread brings attributes only: see `spreadAttributes`.
+        b.add(objects++ > 0 ? ', ' : '').add(element.component ? '(' : `${helperName('spreadAttributes')}(`).addSource(attribute.expression).add(')')
 
         continue
       }

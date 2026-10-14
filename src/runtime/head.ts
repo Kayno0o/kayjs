@@ -1,6 +1,7 @@
 import { escape, escapeAttribute } from './escape'
 import { LOCALE_ATTRIBUTES, ROOT_ATTRIBUTES } from './root'
-import { classText } from './values'
+import { safeUrl } from './url'
+import { attributeName, classText, handlerName } from './values'
 
 // A tag a template's `head` block sets, its text as `children`.
 export interface HeadTag {
@@ -42,11 +43,11 @@ export interface RenderedHead {
 }
 
 const HEAD_TAGS = new Set(['title', 'meta', 'link', 'style', 'script', 'base', 'html'])
-const ATTRIBUTE_NAME = /^[a-z_][\w:.-]*$/i
 const RESOURCE_RELS = new Set(['preload', 'modulepreload', 'prefetch', 'preconnect', 'dns-prefetch', 'stylesheet'])
 const VOID_TAGS = new Set(['meta', 'link', 'base'])
 const META_KEYS = ['name', 'property', 'http-equiv']
-const SCRIPT_END = /<\/(script)/gi
+// What ends a script early, or opens a comment that keeps it running past its end tag; `\/` and `\!` read as `/` and `!` in its strings.
+const SCRIPT_BREAK = /<(\/(?=script)|!(?=--))/gi
 // JSON holds `<` only inside strings, where `\u003c` reads the same, so no `<!--` or `</script` survives in it.
 const JSON_LT = /</g
 const JSON_TYPE = /json/i
@@ -312,10 +313,10 @@ function attributesOf(props: Record<string, unknown>): Map<string, string | true
   const attributes = new Map<string, string | true>()
 
   for (const [name, value] of Object.entries(props)) {
-    if (name === 'children' || name === 'ref' || name.startsWith('on') || !ATTRIBUTE_NAME.test(name) || value == null || value === false)
+    if (name === 'children' || name === 'ref' || handlerName(name) || !attributeName(name) || value == null || value === false)
       continue
 
-    attributes.set(name.toLowerCase(), value === true ? true : String(value))
+    attributes.set(name.toLowerCase(), value === true ? true : safeUrl(name, String(value)))
   }
 
   return attributes
@@ -338,7 +339,7 @@ function markupOf(attributes: Map<string, string | true>): string {
 // A JSON script, such as JSON-LD, takes its data as an object or as text.
 function scriptText(tag: HeadTag): string {
   if (!JSON_TYPE.test(String(tag.props.type ?? '')))
-    return text(tag).replace(SCRIPT_END, '<\\/$1')
+    return text(tag).replace(SCRIPT_BREAK, '<\\$1')
 
   const { children } = tag.props
   const json = typeof children === 'string' ? children : JSON.stringify(children ?? null)
