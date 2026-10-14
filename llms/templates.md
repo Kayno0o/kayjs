@@ -1,5 +1,142 @@
 # Template lines
 
+## Common tasks
+
+### Show a block only when a condition holds
+
+`if`, `else if` and `else` render the first block whose condition is true:
+
+```kay
+---
+const { stock } = props<{ stock: number }>()
+---
+if stock === 0
+  p Sold out
+else if stock < 5
+  p Only {stock} left
+else
+  p In stock
+```
+
+### Render a list
+
+`for item of list` renders its block once per item, and its `else` renders when the list is empty:
+
+```kay
+---
+const { names } = props<{ names: string[] }>()
+---
+ul
+  for name of names
+    li {name}
+  else
+    li Nobody yet
+```
+
+### Pick a block by a value
+
+`match` renders the block of the first `when` listing a value equal to it, else the `else` block:
+
+```kay
+---
+const { status } = props<{ status: 'draft' | 'live' | 'archived' }>()
+---
+match status
+  when 'draft'
+    p Not published
+  when 'live', 'archived'
+    p Published
+```
+
+### Set classes from a condition
+
+A `.class` shorthand and a `class={...}` object merge into one `class`:
+
+```kay
+---
+const { done } = props<{ done: boolean }>()
+---
+li.todo(class={{ done }}) Buy milk
+```
+
+### Bind an input to a signal
+
+`bind:value` reads and writes a signal both ways:
+
+```kay
+---
+const name = signal('')
+---
+input(type="text" bind:value={name} placeholder="Your name")
+p Hello {name()}
+```
+
+### Name a value used several times
+
+`const` in a template names a value for the lines after it, computed once per render of its block:
+
+```kay
+---
+const { products } = props<{ products: { id: number, cents: number }[] }>()
+---
+for product of products
+  const price = (product.cents / 100).toFixed(2)
+  li(title={price}) {price}
+```
+
+### Put an element inside text
+
+`#[tag inline]` writes an element in the middle of a sentence, and `tag: child` nests one on the same line:
+
+```kay
+p Read #[a(href="/terms") the terms] first
+li: a(href="/") Home
+```
+
+### Let a parent fill a part of a component
+
+A `slot name` renders the `name` block the parent passes with `@name`, and a plain `slot` its other children:
+
+```kay
+---
+import type { JSX } from 'kay'
+
+const { title, actions } = props<{ title: string, actions?: JSX.Element }>()
+---
+article.card
+  header
+    h2 {title}
+    slot actions
+  slot
+```
+
+```kay
+---
+import Card from './card.kay'
+---
+Card(title="Todos")
+  @actions
+    a(href="/new") New
+  p Body text
+```
+
+### Render markup a user wrote
+
+`sanitizeHtml` keeps basic formatting and links and drops the rest, so `innerHTML` accepts its result:
+
+```kay
+---
+import { sanitizeHtml } from 'kay'
+
+const { comment } = props<{ comment: string }>()
+---
+div(innerHTML={sanitizeHtml(comment)})
+```
+
+## Reference
+
+### Template lines
+
 Each line is one of the following; deeper indentation nests children under the line above.
 
 | Line | Meaning |
@@ -67,21 +204,48 @@ for product of products
       span.badge {product.stock}
 ```
 
-## Elements
+### Elements
 
-- Classes: `.class` takes Tailwind names, `:`, `/`, `@` and `!` included: `div.md:flex.w-1/2.hover:underline`. A class holding `.` or `[` goes in `class="..."`.
-- `class={...}` takes a string, an array or a `{ name: boolean }` object, and merges with the `.class` shorthand and with the `class` of a `{...spread}`. A component gets what merges as one string, so its `class?: string` prop holds; an expression alone reaches it as written. An element has one `class` attribute and one id.
-- Attributes are separated by spaces, inside one pair of parentheses that may span lines: `a(href="/x" target="_blank")`. A value is a quoted string or `{expression}`. A name alone is a boolean attribute. A boolean bound to an attribute, `disabled={busy}`, writes it or leaves it out, but an `aria-*` one renders `"true"` or `"false"`, as ARIA states read: `aria-expanded={open}`; `null` and `undefined` leave any attribute out. `{...obj}` spreads. On an element, a spread sets attributes only, as it often carries data such as a record's fields: a key that is no attribute name, a handler given as text in any case (`ONCLICK: '...'`) and `srcdoc` are left out, on the server and in an island alike, and a name the browser refuses to set, such as `@click`, is written by the server only; a handler given as a function still attaches, and `innerHTML` still renders, as an icon's props draw it, so spread only data whose `innerHTML` the app made. A tag held in a value renders only when it is an element name, `img src=x onerror=...` throwing, and takes its props as a spread does.
-- Events are camelCase handlers: `onClick={save}`, `onInput={e => name.set(e.currentTarget.value)}`. A lowercase `onclick` or `on:click` attaches nothing, and kay reports it. A handler is read when the event fires, so one a prop, a signal or a loop item holds stays current: `button(onClick={onPress})`.
-- `bind:value={signal}` on `input`, `textarea` and `select`, and `bind:checked={signal}` on a checkbox, read and write a signal both ways. On `type="number"` and `type="range"` the signal holds a `number`, and keeps its last one while the input is empty.
+- Classes: `.class` takes Tailwind names, `:`, `/`, `@` and `!` included: `div.md:flex.w-1/2.hover:underline`.
+- A class holding `.` or `[` goes in `class="..."`.
+- `class={...}` takes a string, an array or a `{ name: boolean }` object, and merges with the `.class` shorthand and with the `class` of a `{...spread}`.
+- A component gets what merges as one string, so its `class?: string` prop holds; an expression alone reaches it as written.
+- An element has one `class` attribute and one id.
+- Attributes are separated by spaces, inside one pair of parentheses that may span lines: `a(href="/x" target="_blank")`.
+- A value is a quoted string or `{expression}`.
+- A name alone is a boolean attribute.
+- A boolean bound to an attribute, `disabled={busy}`, writes it or leaves it out, but an `aria-*` one renders `"true"` or `"false"`, as ARIA states read: `aria-expanded={open}`.
+- `null` and `undefined` leave any attribute out.
+- `{...obj}` spreads.
+- On an element, a spread sets attributes only, as it often carries data such as a record's fields: a key that is no attribute name, a handler given as text in any case (`ONCLICK: '...'`) and `srcdoc` are left out, on the server and in an island alike.
+- A name the browser refuses to set, such as `@click`, is written by the server only.
+- A handler given as a function still attaches, and `innerHTML` still renders, as an icon's props draw it, so spread only data whose `innerHTML` the app made.
+- A tag held in a value renders only when it is an element name, `img src=x onerror=...` throwing, and takes its props as a spread does.
+- Events are camelCase handlers: `onClick={save}`, `onInput={e => name.set(e.currentTarget.value)}`.
+- A lowercase `onclick` or `on:click` attaches nothing, and kay reports it.
+- A handler is read when the event fires, so one a prop, a signal or a loop item holds stays current: `button(onClick={onPress})`.
+- `bind:value={signal}` on `input`, `textarea` and `select`, and `bind:checked={signal}` on a checkbox, read and write a signal both ways.
+- On `type="number"` and `type="range"` the signal holds a `number`, and keeps its last one while the input is empty.
 - `ref={el => ...}` receives the DOM element.
-- `innerHTML` renders its value as markup, unescaped, and so does an `iframe`'s `srcdoc`. Written out, `innerHTML="<b>hi</b>"` or `innerHTML={'<b>hi</b>'}`, it is the app's own; bound to a computed string, a template literal with values in it included, `kay check` and the editor report it unless the value is a `SafeHtml`, which `sanitizeHtml(markup)` and `trustHtml(markup)` from `kay` return. `sanitizeHtml` is for markup a user wrote: it keeps `p`, `br`, `hr`, `b`, `strong`, `i`, `em`, `u`, `s`, `del`, `ins`, `small`, `sub`, `sup`, `code`, `pre`, `blockquote`, `h1` to `h6`, `ul`, `ol`, `li` and `a`, balanced and without attributes, a link's `href` kept when it is an http(s), `mailto:` or site URL and given `rel="nofollow ugc"`; it drops other tags, keeping their text, and `script`, `style`, `iframe`, `svg` and comments whole, and gives the same result on the server and in an island. A second argument keeps more: `sanitizeHtml(html, { tags: ['img', 'table', 'thead', 'tbody', 'tr', 'th', 'td'], attributes: { img: ['src', 'alt', 'title'] } })` keeps images and tables, a URL, such as an `href`, a `src`, a `poster` or each one of a `srcset`, only when it is an http(s), `mailto:` or site URL; a tag that runs code, loads another document or takes input, such as `script`, `iframe` or `form`, an `on*`, `style` or `srcdoc` attribute, and attributes for a tag `tags` does not name are refused with an error. The options are read once per object, so declare them once outside the function, typed as `SanitizeOptions` from `kay`. `trustHtml` vouches for markup the app made, such as its own Markdown renderer's, and changes nothing. An icon's markup is already a `SafeHtml`. Only one written as an attribute is checked: a spread never sets `srcdoc`, but its `innerHTML` renders unchecked. Inside `svg` or `math`, where HTML reads a `style` or `script` as markup rather than text, one holds static text or a string literal only, which the compiler reports otherwise.
+- `innerHTML` renders its value as markup, unescaped, and so does an `iframe`'s `srcdoc`.
+- Written out, `innerHTML="<b>hi</b>"` or `innerHTML={'<b>hi</b>'}`, it is the app's own.
+- Bound to a computed string, a template literal with values in it included, `kay check` and the editor report it unless the value is a `SafeHtml`, which `sanitizeHtml(markup)` and `trustHtml(markup)` from `kay` return.
+- `sanitizeHtml` is for markup a user wrote: it keeps `p`, `br`, `hr`, `b`, `strong`, `i`, `em`, `u`, `s`, `del`, `ins`, `small`, `sub`, `sup`, `code`, `pre`, `blockquote`, `h1` to `h6`, `ul`, `ol`, `li` and `a`, balanced and without attributes, a link's `href` kept when it is an http(s), `mailto:` or site URL and given `rel="nofollow ugc"`.
+- It drops other tags, keeping their text, and `script`, `style`, `iframe`, `svg` and comments whole, and gives the same result on the server and in an island.
+- A second argument keeps more: `sanitizeHtml(html, { tags: ['img', 'table', 'thead', 'tbody', 'tr', 'th', 'td'], attributes: { img: ['src', 'alt', 'title'] } })` keeps images and tables, a URL, such as an `href`, a `src`, a `poster` or each one of a `srcset`, only when it is an http(s), `mailto:` or site URL.
+- A tag that runs code, loads another document or takes input, such as `script`, `iframe` or `form`, an `on*`, `style` or `srcdoc` attribute, and attributes for a tag `tags` does not name are refused with an error.
+- The options are read once per object, so declare them once outside the function, typed as `SanitizeOptions` from `kay`.
+- `trustHtml` vouches for markup the app made, such as its own Markdown renderer's, and changes nothing.
+- An icon's markup is already a `SafeHtml`.
+- Only one written as an attribute is checked: a spread never sets `srcdoc`, but its `innerHTML` renders unchecked.
+- Inside `svg` or `math`, where HTML reads a `style` or `script` as markup rather than text, one holds static text or a string literal only, which the compiler reports otherwise.
 - A line starting with `{expression}` is text, as `| {expression}` is.
-- Inline text follows the tag after one space. `\{` and `\#` are a literal brace and hash.
+- Inline text follows the tag after one space.
+- `\{` and `\#` are a literal brace and hash.
 - `#[tag inline]` puts an element inside text: `p Read #[a(href="/terms") the terms] first`.
 - `tag: child` nests one element on the same line: `li: a(href="/") Home`.
 
-## Slots
+### Slots
 
 ```kay
 ---
@@ -97,7 +261,11 @@ article.card
     p Nothing here yet
 ```
 
-A parent fills it like this: the `@actions` block becomes the `actions` prop, which `slot actions` renders, and the other children go to `slot`. The lines under a `slot` render when it gets nothing to show. `kay check` reports a `slot name` naming no prop, as a call with the wrong arguments.
+A parent fills it like this: the `@actions` block becomes the `actions` prop, which `slot actions` renders, and the other children go to `slot`.
+
+The lines under a `slot` render when it gets nothing to show.
+
+`kay check` reports a `slot name` naming no prop, as a call with the wrong arguments.
 
 ```kay
 ---
@@ -109,7 +277,11 @@ Card(title="Todos")
   p Body text
 ```
 
-A block taking parameters is passed as a function the component calls, once per row for instance, and its parameters take their types from the prop. No function reaches the browser, so a static component passing one to an island renders as an island itself, and a layout or a page with a `--- server` fence cannot pass one. A static component that only islands render is part of them, so it can.
+A block taking parameters is passed as a function the component calls, once per row for instance, and its parameters take their types from the prop.
+
+No function reaches the browser, so a static component passing one to an island renders as an island itself, and a layout or a page with a `--- server` fence cannot pass one.
+
+A static component that only islands render is part of them, so it can.
 
 ```kay
 --- <T extends { id: number }>
