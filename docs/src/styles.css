@@ -16,6 +16,11 @@
   --mono: ui-monospace, 'JetBrains Mono', 'Cascadia Code', Menlo, Consolas, monospace;
   --radius: 3px;
   --bar: 0px;
+  /* The width a paragraph keeps, and the one a demo or code block may grow to beyond it. */
+  --measure: 48rem;
+  --wide: 72rem;
+  /* The whole page scales from 1920px up to 125% at 3200px, so a 2k or 4k screen does not shrink it. */
+  font-size: clamp(100%, 62.5% + 0.3125vw, 125%);
   font-family: var(--sans);
   line-height: 1.6;
   scrollbar-color: var(--crust) transparent;
@@ -158,6 +163,8 @@ kbd {
   margin: 0;
   padding: 0.5rem 0.9rem 2rem;
   overflow-y: auto;
+  /* Room for the scrollbar whether a part's links overflow or not, so switching parts does not shift them. */
+  scrollbar-gutter: stable;
   color: inherit;
   background: none;
   border: none;
@@ -248,7 +255,7 @@ kbd {
   background: var(--mantle);
 }
 
-/* Page: the text from the left edge of the content area, its sections in a sticky column beside it on wide screens and a block above it otherwise. */
+/* Page: one centered column with its sections in a block above the text, until wide screens give them a column of their own. */
 main {
   min-width: 0;
   padding: 2.75rem clamp(1rem, 4vw, 3.5rem) 5rem;
@@ -258,11 +265,12 @@ main {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   max-width: 54rem;
+  margin-inline: auto;
 }
 
 /* The home page has no table of contents, so its content takes the width the docs pages split with theirs. */
 .page.home {
-  max-width: 72rem;
+  max-width: var(--wide);
 }
 
 .page-head {
@@ -351,35 +359,47 @@ main {
   display: none;
 }
 
+/* Wide screens: the table of contents at the right edge, the text centered in the room left of it, and demos, code and the props table breaking out of the text on both sides. */
 @media (min-width: 84rem) {
-  .page {
-    grid-template-areas: 'head toc' 'body toc' 'foot toc';
-    grid-template-columns: minmax(0, 1fr) 14rem;
-    column-gap: 3.5rem;
-    max-width: 72rem;
+  .page:not(.home) {
+    grid-template-columns: [wide-start] minmax(0, 1fr) [text-start] minmax(0, var(--measure)) [text-end] minmax(0, 1fr) [wide-end] 3.5rem [toc-start] 14rem [toc-end];
+    max-width: none;
   }
 
-  .page.home {
-    grid-template-areas: 'head' 'body' 'foot';
-    grid-template-columns: minmax(0, 1fr);
+  .page:not(.home) > .page-head {
+    grid-row: 1;
+    grid-column: text;
   }
 
-  .page-head {
-    grid-area: head;
-  }
-
-  .page > :is(.prose, .home-body) {
-    grid-area: body;
+  .page:not(.home) > .prose {
+    display: grid;
+    grid-row: 2;
+    grid-column: wide;
+    grid-template-columns: subgrid;
   }
 
   .page-foot {
-    grid-area: foot;
+    grid-row: 3;
+    grid-column: text;
+  }
+
+  .prose > * {
+    grid-column: text;
+  }
+
+  .prose > :is(.code, .example, .file-tree, .request-flow, .props) {
+    grid-column: wide;
+    justify-self: center;
+    box-sizing: border-box;
+    width: 100%;
+    max-width: var(--wide);
   }
 
   .toc {
     position: sticky;
     top: 2.75rem;
-    grid-area: toc;
+    grid-row: 1 / span 3;
+    grid-column: toc;
     align-self: start;
     max-height: calc(100vh - 5.5rem);
     margin: 0;
@@ -993,7 +1013,6 @@ pre code {
 }
 
 .site-foot {
-  max-width: 72rem;
   margin-top: 3rem;
   padding-top: 1rem;
   color: var(--muted);
