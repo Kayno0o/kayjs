@@ -4,7 +4,7 @@ order: 8
 description: Set each page's head, give the whole site its defaults, and let kay serve the sitemap, robots.txt and favicons.
 ---
 
-A `head` block in a page, a layout or a static component sets tags in the document head. The page wins over its layouts: one `title`, one `meta` per `name` or `property`.
+A `head` block in a page, a layout or a static component sets tags in the document head. The page wins over its layouts: its `title` and its `meta` tags replace theirs.
 
 ```kay
 --- server
@@ -20,7 +20,7 @@ h1 {post.title}
 
 ## Attributes on `<html>`
 
-An `html` tag in the `head` block sets attributes on `<html>`, such as a theme, from the server data too. A layout's win over the layouts around it, and the page's over all, one attribute at a time; `false` or `null` takes one off. A `class` is the exception: the tokens of every layout and the page add up, each written once, so a page's `html.wide` under a layout's `html.dark` gives `class="dark wide"`, and a page cannot take off a layout's class. It attaches no event handler.
+An `html` tag in the `head` block sets attributes on `<html>`, such as a theme, from static values or server data. The page's attributes win over its layouts', and `false` or `null` removes one. A `class` adds up instead: a page's `html.wide` under a layout's `html.dark` gives `class="dark wide"`.
 
 ```kay
 --- server
@@ -31,7 +31,7 @@ head
 slot
 ```
 
-`lang` and `dir` stay kay's, set from `lang` in kay.config.ts or from the page's locale. When a link swaps the page in, `<html>` changes only where the server sets something else for the next page, and only where a script left it as the server set it, so a theme a toggle changed stays. A `class` changes token by token: a token the server set is the server's, even when a script added it too.
+`lang` and `dir` are set by kay, from `lang` in kay.config.ts or the page's locale. When a link swaps the page in, a theme your script changed, such as a dark mode toggle, stays.
 
 ## Site defaults
 
@@ -53,15 +53,15 @@ export default defineConfig({
 })
 ```
 
-With `site` set, every page gets a canonical link, `og:title`, `og:description` and `og:url` repeating its own, and `twitter:card`. A home page can put the name first with `title(raw) Example, the shop for kay`, which skips the template.
+With `site` set, every page gets a canonical link, `og:title`, `og:description`, `og:url` and `twitter:card`. A home page can put the name first with `title(raw) Example, the shop for kay`, which skips the template.
 
 <Callout type="tip">
 
-Without `site` in the config, kay reads it from `SITE_URL`, so one build serves each host it is deployed to. A server with `seo` set and no `SITE_URL` warns once at boot, as `kay build` cannot tell.
+Without `site` in the config, kay reads it from `SITE_URL`, so one build serves each host it is deployed to.
 
 </Callout>
 
-Any other tag every page carries, such as an analytics script, goes in `head`, written as a `head` block compiles it. The content security policy lets an inline one through:
+Any other tag every page carries, such as an analytics script, goes in `head`:
 
 ```ts
 export default defineConfig({
@@ -71,7 +71,7 @@ export default defineConfig({
 
 ## Social card
 
-`seo.image` is the default `og:image`. A page can set its own, cut to the 1200x630 card with `shareImage()` or drawn from its title with `shareCard()`, both from `kay/image`:
+`seo.image` is the default `og:image`. A page can set its own, drawn from its title with `shareCard()` from `kay/image`:
 
 ```kay
 ---
@@ -97,11 +97,11 @@ export const page = {
 ---
 ```
 
-`noindex: true` in a page's `page` object keeps a page out of search engines and the sitemap. A file with the same name in `public/` replaces either generated one.
+`noindex: true` in a page's `page` object keeps a page out of search engines and the sitemap. A file of the same name in `public/` replaces either generated one.
 
 ## Favicon
 
-`favicon` names a square image of 512 pixels or more, or a square SVG, `favicon: 'src/favicon.svg'`, from which kay draws every icon. The SVG's `svg` tag needs a `viewBox`, or a `width` and `height` that are not percentages, and its text draws as nothing, since kay draws without fonts, so turn it into paths; `kay build` and `kay check` name an SVG they cannot draw, and warn of one with text. kay serves the sizes browsers ask for, a web manifest, and links them from every page. The manifest also takes the installed app's `startUrl`, `scope`, `orientation` and `shortcuts`, and a `maskable` image, its subject inside the middle 80%, which kay serves as the icons a launcher crops to its own shape. Its paths are paths of the site, put under `base`; one that is not, or a start page or shortcut outside `scope`, stops the server as it boots.
+`favicon` names a square image of 512 pixels or more, or a square SVG (`favicon: 'src/favicon.svg'`), from which kay draws every icon. Turn any text in an SVG into paths. kay serves the sizes browsers ask for and a web manifest, and links them from every page. The manifest also takes the installed app's `startUrl`, `scope`, `orientation`, `shortcuts` and a `maskable` image for launchers that crop icons.
 
 ```ts
 export default defineConfig({
@@ -118,7 +118,7 @@ export default defineConfig({
 
 ## Offline
 
-`offline: true` turns on a service worker. It keeps the build's scripts, stylesheets and fonts, the pages listed in `pages` and the prerendered pages no guard covers, so an installed site still opens without a connection and its islands hydrate:
+`offline: true` turns on a service worker. It keeps the build's scripts, stylesheets and fonts, the pages listed in `pages` and the prerendered pages no guard covers, so an installed site still opens without a connection:
 
 ```ts
 export default defineConfig({
@@ -126,7 +126,7 @@ export default defineConfig({
 })
 ```
 
-Pages are fetched from the network first, and a kept copy answers only when the network fails, then the `fallback` page. Actions and API routes always go to the network. Each deploy names a new cache, so visitors never need to clear anything, and `kay dev` registers no worker.
+Pages are fetched from the network first, and a kept copy answers only when the network fails, then the `fallback` page. Actions and API routes always go to the network. `kay dev` registers no worker.
 
 ## JSON-LD
 
