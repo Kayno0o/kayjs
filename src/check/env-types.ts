@@ -98,7 +98,7 @@ function environment(patterns: string[], files: string[], api: { mount: string, 
   ]
 
   return [
-    'import type { Action, ApiRoutesOf, CheckedHref, CheckedHtml, ExtensionServersOf, FieldName, FunctionProp, IdentityKeyed, IslandProp, LocalsOf, PublicEnvOf } from \'kay\'',
+    'import type { Action, ApiRoutesOf, CheckedHref, CheckedHtml, ExtensionServersOf, FieldName, FunctionProp, IdentityKeyed, IslandProp, LocalsOf, PublicEnvOf, Signal } from \'kay\'',
     ...content === undefined ? [] : ['import type { FeedPathsOf } from \'kay/content\''],
     ...(i18n?.messages.length ?? 0) > 1 ? ['import type { MergeMessages } from \'kay/i18n\''] : [],
     '',
@@ -115,6 +115,7 @@ function environment(patterns: string[], files: string[], api: { mount: string, 
     '  function KayProp<Component>(component: Component): <Value>(value: Value & IslandProp<Component, Value>) => Value',
     '  function KayFunctionProp<Component>(component: Component): (attribute: FunctionProp<Component>) => Record<never, never>',
     '  function KayIdentityKey<Each>(each: Each & IdentityKeyed<Each>): Each',
+    '  function KayWritable<Written extends Signal<any>>(signal: Written): Written',
     '}',
     '',
   ].join('\n')

@@ -92,7 +92,7 @@ export const theme = persisted('theme', 'light')
 
 <Callout type="note">
 
-Outside a component, a signal is written with `cart.set(...)`. A component also writes one it imports, or a `Signal<T>` prop, by assigning it, `cart = []`. Both read it by calling it, `{cart().length}`.
+Outside a component, a signal is written with `cart.set(...)`. A component writes any signal it holds in a `const`, an import or a `Signal<T>` prop by assigning it, `cart = []`, wherever the signal was made. Both read it by calling it, `{cart().length}`.
 
 </Callout>
 

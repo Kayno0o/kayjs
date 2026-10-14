@@ -719,17 +719,38 @@ describe('signal writes', () => {
     expect(imported.tsx).toContain('<button onClick={() => tone.set((KayCurrent) => KayCurrent + (\'!\'))}>{(void tone, __values.tone)}</button>')
   })
 
-  it('reject a write to a memo, a signal written by destructuring and a name kay cannot tell is a signal', () => {
-    const source = '---\nimport { other, loud } from \'./theme\'\nconst count = signal(0)\nconst double = memo(() => count() * 2)\nconst plain = 1\nlet free = 0\nfunction f() {\n  double = 3\n  loud++\n  other = 2\n  plain += 1\n  free++\n  ;[count] = [signal(1)]\n}\n---\np x'
+  it('reject a write to a memo, a signal written by destructuring and a constant plainly holding no signal', () => {
+    const source = '---\nimport { loud } from \'./theme\'\nconst count = signal(0)\nconst double = memo(() => count() * 2)\nconst plain = 1\nconst params = new URLSearchParams() as URLSearchParams\nconst list = [1]\nconst sum = count() + 1\nlet free = 0\nfunction f() {\n  double = 3\n  loud++\n  plain += 1\n  params = new URLSearchParams()\n  list = []\n  sum ??= 2\n  free++\n  ;[count] = [signal(1)]\n}\n---\np x'
     const found = compileKay(source, 'test.kay', { importedSignals: { './theme': { loud: 'memo' } } }).diagnostics.map(d => [source.slice(d.start, d.end), d.message])
 
     expect(found).toEqual([
       ['double', '`double` is a memo, which cannot be written'],
       ['loud', '`loud` is a memo, which cannot be written'],
-      ['other', '`other` is not a signal kay can tell, so it cannot be assigned'],
-      ['plain', '`plain` is not a signal kay can tell, so it cannot be assigned'],
+      ['plain', '`plain` holds no signal, so it cannot be assigned'],
+      ['params', '`params` holds no signal, so it cannot be assigned'],
+      ['list', '`list` holds no signal, so it cannot be assigned'],
+      ['sum', '`sum` holds no signal, so it cannot be assigned'],
       ['count', '`count` is a signal, written by assigning its name'],
     ])
+  })
+
+  it('write through .set any other constant or import assigned, which type checking asserts holds a signal', () => {
+    const source = '---\nimport accent, { theme, makeSignal, useDialog } from \'./theme\'\nconst sel = makeSignal()\nconst { open } = useDialog()\nfunction f() {\n  accent = \'red\'\n  theme ??= \'dark\'\n  sel += 1\n  sel++\n  for (const each of [sel]) each = 0\n  let shadow = 1\n  shadow = 2\n}\n---\nbutton(onClick={() => open = !open()}) {sel()}'
+    const runs = compileKay(source, 'test.kay', { output: 'dom' })
+    const served = compileKay(source, 'test.kay', { output: 'html' })
+    const checked = compileKay(source, 'test.kay', { check: true })
+
+    for (const result of [runs, served, checked])
+      expect(result.diagnostics.map(d => d.message)).toEqual([])
+
+    for (const { tsx: code } of [runs, served]) {
+      expect(code).toContain('accent.set(\'red\')\n  theme.set((KayCurrent) => KayCurrent ?? (\'dark\'))\n  sel.set((KayCurrent) => KayCurrent + (1))\n  sel.set((KayCurrent) => KayCurrent + 1)\n  for (const each of [sel]) each.set(0)\n  let shadow = 1\n  shadow = 2')
+      expect(code).not.toContain('KayWritable')
+    }
+
+    expect(runs.tsx).toContain('open.set(!open())')
+    expect(checked.tsx).toContain('KayWritable(accent).set(\'red\')\n  KayWritable(theme).set((KayCurrent) => KayCurrent ?? (\'dark\'))\n  KayWritable(sel).set((KayCurrent) => KayCurrent + (1))\n  KayWritable(sel).set((KayCurrent) => KayCurrent + 1)\n  for (const each of [sel]) KayWritable(each).set(0)\n  let shadow = 1\n  shadow = 2')
+    expect(checked.tsx).toContain('KayWritable(open).set(!open())')
   })
 })
 

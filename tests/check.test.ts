@@ -232,6 +232,25 @@ describe.concurrent('kay check, edge cases', () => {
     }
   })
 
+  it('reports an assignment to a constant of unknown origin holding no signal at its name, and a value the signal cannot hold', async () => {
+    const theme = 'import { memo, signal } from \'kay\'\n\nexport function makeCounter() {\n  return signal(0)\n}\nexport function makeMemo() {\n  return memo(() => 1)\n}\nexport function makeCount() {\n  return 1\n}\nexport function makeParams() {\n  return new URLSearchParams()\n}\n'
+    const page = '---\nimport { makeCounter, makeCount, makeMemo, makeParams } from \'../theme\'\n\nconst counter = makeCounter()\nconst doubled = makeMemo()\nconst n = makeCount()\nconst params = makeParams()\n---\nbutton(onClick={() => { counter += 1; counter = \'x\'; doubled = 2; n = 3; params = makeParams() }}) {counter()} {doubled()}\n'
+    const root = await scratchProject({ 'src/theme.ts': theme, 'src/routes/index.kay': page })
+    const line = page.split('\n')[8]!
+
+    try {
+      expect((await check(root)).map(d => [d.line, line.slice(d.column - 1, d.column - 1 + 8), d.code])).toEqual([
+        [9, '\'x\'; dou', 'TS2345'],
+        [9, 'doubled ', 'TS2741'],
+        [9, 'n = 3; p', 'TS2345'],
+        [9, 'params =', 'TS2345'],
+      ])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('narrows a signal the template reads twice in one expression, but not in a function it writes, which runs later', async () => {
     const meter = [
       '---',

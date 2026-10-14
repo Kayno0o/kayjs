@@ -58,6 +58,8 @@ export interface RewriteInput {
   imported?: ReadonlyMap<string, SignalKind> | undefined
   // The name the file gives the component, which a template `const` would hide from the tags after it.
   component?: string | undefined
+  // Type checking a project: a write to a name kay sees no signal made in asserts it holds one, through `KayWritable`.
+  check?: boolean | undefined
 }
 
 // What the final pass applies.
@@ -143,8 +145,8 @@ class RewriteFinder {
   private readonly globalReads = new Set<string>()
   // The names whose writes are handled: written as signals, or reported as read-only.
   private readonly known = new Set<Binding>()
-  // Writes to a constant or an import, reported once every name kay knows is found.
-  private readonly assigned: { binding: Binding, identifier: t.Identifier }[] = []
+  // Writes to a constant or an import, handled once every name kay knows is found.
+  private readonly assigned: { binding: Binding, path: NodePath<t.AssignmentExpression | t.UpdateExpression> }[] = []
   private translates = false
   private readonly values = new Map<string, string>()
   // The names nothing in the module declares, of which `globalReads` keeps those read as values.
@@ -169,7 +171,7 @@ class RewriteFinder {
       FunctionDeclaration: path => this.loadReads(path),
     })
 
-    this.unassignable()
+    this.constantWrites()
 
     return {
       plan: { rewrites: this.rewrites, translates: this.translates, values: this.values },
@@ -532,7 +534,7 @@ class RewriteFinder {
     const binding = target.type === 'Identifier' ? path.scope.getBinding(target.name) : undefined
 
     if (target.type === 'Identifier' && (binding?.kind === 'const' || binding?.kind === 'module') && this.input.map.isExact(target.start!))
-      this.assigned.push({ binding, identifier: target })
+      this.assigned.push({ binding, path })
   }
 
   // `load` ends handing the fence's names to the template; any other read of one is the fence's own.
@@ -549,15 +551,36 @@ class RewriteFinder {
     }
   }
 
-  // Writes to a name kay sees no signal in.
-  private unassignable() {
-    for (const { binding, identifier } of this.assigned) {
-      const start = this.input.map.toSource(identifier.start!)
+  // A write to a constant or an import kay sees no signal made in, which only a signal makes valid: one plainly holding none is reported, any other is written through `.set`, which type checking asserts holds a signal.
+  private constantWrites() {
+    for (const { binding, path } of this.assigned) {
+      const { name } = binding.identifier
+      const identifier = assignedIdentifier(path.node, name)
+      const start = identifier && this.input.map.toSource(identifier.start!)
 
-      if (!this.known.has(binding) && start !== undefined)
-        this.diagnostics.push({ start, end: start + identifier.name.length, message: `\`${identifier.name}\` is not a signal kay can tell, so it cannot be assigned`, note: 'kay writes a name through `.set` when it sees the signal made: by `signal`, `persisted`, `linked` or `queryParam` in this script, as a module\'s `export const`, or as a prop typed `Signal<T>`', help: `write \`${identifier.name}.set(...)\` if it holds a signal` })
+      if (this.known.has(binding) || start === undefined)
+        continue
+
+      if (holdsNoSignal(binding))
+        this.diagnostics.push({ start, end: start + name.length, message: `\`${name}\` holds no signal, so it cannot be assigned`, help: 'declare it with `let`, or make it a `signal`' })
+      else
+        this.signalWrite(path, name, 'signal', this.input.check === true ? { before: 'KayWritable(', after: ')' } : {})
     }
   }
+}
+
+// What a constant is set to that is never a signal: a literal, an object, an array, a function, a class, an instance or an operation.
+const HOLDS_NO_SIGNAL = new Set(['StringLiteral', 'NumericLiteral', 'BooleanLiteral', 'NullLiteral', 'BigIntLiteral', 'RegExpLiteral', 'TemplateLiteral', 'ObjectExpression', 'ArrayExpression', 'ArrowFunctionExpression', 'FunctionExpression', 'ClassExpression', 'NewExpression', 'BinaryExpression', 'UnaryExpression'])
+
+// Whether a constant plainly holds no signal, `as` and the like seen through.
+function holdsNoSignal(binding: Binding): boolean {
+  const declarator = binding.path.node
+  let init = declarator.type === 'VariableDeclarator' && declarator.id.type === 'Identifier' ? declarator.init : undefined
+
+  while (init?.type === 'TSAsExpression' || init?.type === 'TSSatisfiesExpression' || init?.type === 'TSNonNullExpression' || init?.type === 'TSTypeAssertion' || init?.type === 'ParenthesizedExpression')
+    init = init.expression
+
+  return init != null && HOLDS_NO_SIGNAL.has(init.type)
 }
 
 // Where a node of the generated code was written, when all of it was.

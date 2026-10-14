@@ -394,6 +394,36 @@ describe('signals in the template', () => {
 })
 
 describe('signal writes', () => {
+  const unseen = site({
+    'theme.ts': 'import { signal } from \'kay\'\n\nconst accent = signal(\'red\')\n\nexport { accent }\nexport function makeCounter() {\n  return signal(0)\n}\nexport function useDialog() {\n  return { open: signal(false) }\n}\n',
+    'colors.ts': 'export { accent } from \'./theme\'\n',
+    'main.kay': '---\nimport { accent } from \'./colors\'\nimport { makeCounter, useDialog } from \'./theme\'\n\nconst counter = makeCounter()\nconst { open } = useDialog()\n\nfunction reset() {\n  counter = 0\n}\n---\nbutton.more(onClick={() => counter += 2}) {counter()}\nbutton.reset(onClick={reset}) reset\nbutton.accent(onClick={() => accent = \'blue\'}) {accent()}\nbutton.open(onClick={() => open = !open()}) {open() ? \'open\' : \'closed\'}\n',
+  })
+
+  it('assigns a signal kay cannot see made: a re-export, one a function returns and one destructured off what it returns', async () => {
+    const { root, dispose } = await unseen()
+    const text = (selector: string) => root.querySelector(selector)!.textContent
+    const click = async (selector: string) => {
+      root.querySelector<HTMLElement>(selector)!.click()
+      await settle()
+    }
+
+    try {
+      await click('.more')
+      await click('.more')
+      expect(text('.more')).toBe('4')
+      await click('.reset')
+      expect(text('.more')).toBe('0')
+      await click('.accent')
+      expect(text('.accent')).toBe('blue')
+      await click('.open')
+      expect(text('.open')).toBe('open')
+    }
+    finally {
+      await dispose()
+    }
+  })
+
   const mount12 = site({
     'theme.ts': 'import { memo, signal } from \'kay\'\n\nexport const accent = signal(\'red\')\nexport const loud = memo(() => accent().toUpperCase())\n',
     'toggle.kay': '---\nimport type { Signal } from \'kay\'\n\nconst { open } = props<{ open: Signal<boolean> }>()\n---\nbutton.toggle(onClick={() => open = !open()}) {open() ? \'open\' : \'closed\'}\n',
