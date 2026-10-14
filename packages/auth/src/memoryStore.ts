@@ -220,10 +220,8 @@ export function memoryStore(): AuthStore {
         audit.push({ ...entry })
       },
       list: ({ userId, before, limit }) => audit
-        .filter(entry => (userId === undefined || entry.userId === userId) && (before === undefined || entry.at < before))
-        // Reversed first, so entries of one millisecond read back newest added first too.
-        .reverse()
-        .sort((a, b) => b.at.getTime() - a.at.getTime())
+        .filter(entry => (userId === undefined || entry.userId === userId) && (before === undefined || (before instanceof Date ? entry.at < before : entry.at < before.at || (entry.at.getTime() === before.at.getTime() && entry.id < before.id))))
+        .sort((a, b) => b.at.getTime() - a.at.getTime() || (a.id < b.id ? 1 : -1))
         .slice(0, limit)
         .map(entry => ({ ...entry })),
       prune(before) {

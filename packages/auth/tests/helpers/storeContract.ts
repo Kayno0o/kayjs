@@ -210,6 +210,41 @@ export function storeContract(name: string, fresh: () => Promise<AuthStore>) {
       expect((await store.audit!.list({ limit: 10 })).map(found => found.id)).toEqual(['a3', 'a2'])
     })
 
+    test('the audit log orders entries of one millisecond by id, newest first, and pages across them without a skip or a repeat', async () => {
+      const entry = (id: string, userId: string, at: string) => ({ id, userId, event: 'signed-in', detail: null, ip: '10.0.0.1', userAgent: 'Firefox', actorId: null, at: new Date(at) })
+      const same = '2026-02-01T00:00:00.000Z'
+
+      await store.audit!.add(entry('b2', 'u1', same))
+      await store.audit!.add(entry('b3', 'u2', same))
+      await store.audit!.add(entry('b1', 'u1', same))
+      await store.audit!.add(entry('b0', 'u1', '2026-01-31T00:00:00.000Z'))
+      await store.audit!.add(entry('b4', 'u1', '2026-02-02T00:00:00.000Z'))
+
+      expect((await store.audit!.list({ limit: 10 })).map(found => found.id)).toEqual(['b4', 'b3', 'b2', 'b1', 'b0'])
+
+      for (const limit of [1, 2, 3]) {
+        const seen: string[] = []
+        let before: { at: Date, id: string } | undefined
+
+        for (;;) {
+          const page = await store.audit!.list({ ...before ? { before } : {}, limit })
+
+          if (page.length === 0)
+            break
+
+          seen.push(...page.map(found => found.id))
+          before = page.at(-1)
+        }
+
+        expect(seen).toEqual(['b4', 'b3', 'b2', 'b1', 'b0'])
+      }
+
+      expect((await store.audit!.list({ userId: 'u1', before: { at: new Date(same), id: 'b2' }, limit: 10 })).map(found => found.id)).toEqual(['b1', 'b0'])
+      expect((await store.audit!.list({ before: { at: new Date(same), id: 'b1' }, limit: 10 })).map(found => found.id)).toEqual(['b0'])
+      // A bare instant still excludes the whole millisecond.
+      expect((await store.audit!.list({ before: new Date(same), limit: 10 })).map(found => found.id)).toEqual(['b0'])
+    })
+
     test('the audit log forgets a user, in their entries and in those they acted in', async () => {
       const entry = (id: string, userId: string, actorId: string | null) => ({ id, userId, event: 'role-granted', detail: 'editor', ip: '10.0.0.1', userAgent: 'Firefox', actorId, at: new Date('2026-01-01T00:00:00Z') })
 

@@ -1,7 +1,7 @@
 import type { Core, User } from './core'
 import type { SecurityEvent } from './mail'
 import type { RequestState } from './state'
-import type { UserRecord } from './store'
+import type { AuditCursor, UserRecord } from './store'
 import { clamp } from '@kaynooo/utils'
 import { publicUser } from './core'
 import { log } from './log'
@@ -68,7 +68,7 @@ export async function report(state: RequestState, record: UserRecord, event: Aut
 }
 
 // The audit log, newest first, for one user or everyone, a page of `limit` before `before`.
-export async function auditEntries(core: Core, query: { userId?: string | undefined, before?: Date | undefined, limit?: number | undefined }): Promise<AuditEntry[]> {
+export async function auditEntries(core: Core, query: { userId?: string | undefined, before?: AuditCursor | undefined, limit?: number | undefined }): Promise<AuditEntry[]> {
   if (!core.audit)
     return []
 

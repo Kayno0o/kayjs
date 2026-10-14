@@ -21,7 +21,7 @@ import type { RoleHierarchy } from './roles'
 import type { PasswordProblem } from './rules'
 import type { UserSession } from './sessions'
 import type { RequestState } from './state'
-import type { AuthStore, LinkType, UserRecord } from './store'
+import type { AuditCursor, AuthStore, LinkType, UserRecord } from './store'
 import type { Proof, ProofFailure, TwoFactorResult, TwoFactorSetup } from './twoFactor'
 import type { Level, PolicyContext, Predicate, Requirement } from './types'
 import { Elysia } from 'elysia'
@@ -568,8 +568,8 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     return passkeyProofOptions(this[STATE])
   }
 
-  // The signed-in user's own audit log, newest first, a page of `limit` (50 by default) before `before`; empty without the `audit` option.
-  async auditLog(options: { before?: Date, limit?: number } = {}): Promise<AuditEntry[]> {
+  // The signed-in user's own audit log, newest first, a page of `limit` (50 by default) before `before`, an instant or the last entry of the page (which tells entries of one millisecond apart); empty without the `audit` option.
+  async auditLog(options: { before?: AuditCursor, limit?: number } = {}): Promise<AuditEntry[]> {
     const record = await this.record()
 
     return record ? auditEntries(this.core, { ...options, userId: record.id }) : []
@@ -609,7 +609,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
   }
 
   // Everyone's audit log, or `userId`'s, newest first.
-  async adminAuditLog(query: { userId?: string, before?: Date, limit?: number } = {}): Promise<{ ok: true, entries: AuditEntry[] } | { ok: false, error: 'forbidden' }> {
+  async adminAuditLog(query: { userId?: string, before?: AuditCursor, limit?: number } = {}): Promise<{ ok: true, entries: AuditEntry[] } | { ok: false, error: 'forbidden' }> {
     return adminAuditLog(this[STATE], query)
   }
 

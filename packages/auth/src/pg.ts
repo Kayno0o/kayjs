@@ -235,7 +235,7 @@ export function pgStore(db: Database): AuthStore {
       async add(entry) {
         await audit.write.insertOne({ id: entry.id, user_id: entry.userId, event: entry.event, detail: entry.detail, ip: entry.ip, user_agent: entry.userAgent, actor_id: entry.actorId, at: entry.at })
       },
-      list: async ({ userId, before, limit }) => (await audit.read.findMany(q => q.andWhere(userId !== undefined && { user_id: userId }).andWhere(before !== undefined && { at: { lt: before } }).orderBy('at', 'desc').limit(limit))).map(row => toAudit(row)),
+      list: async ({ userId, before, limit }) => (await audit.read.findMany(q => q.andWhere(userId !== undefined && { user_id: userId }).andWhere(before !== undefined && (e => before instanceof Date ? e.lt('at', before) : e.or(e.lt('at', before.at), e.and(e.eq('at', before.at), e.lt('id', before.id))))).orderBy('at', 'desc').orderBy('id', 'desc').limit(limit))).map(row => toAudit(row)),
       async prune(before) {
         await audit.write.deleteMany({ at: { lt: before } })
       },

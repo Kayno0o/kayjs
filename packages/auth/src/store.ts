@@ -70,6 +70,9 @@ export interface SessionRecord {
   maxAge: number | null
 }
 
+// Where a page of the audit log ends: an instant, or the last entry of the page, which tells the entries of its millisecond apart.
+export type AuditCursor = Date | Pick<AuditRecord, 'at' | 'id'>
+
 // A line of the audit log, kept past its user's deletion so the log still tells what happened, under a name that no longer leads to them.
 export interface AuditRecord {
   id: string
@@ -208,8 +211,8 @@ export interface AuthStore {
   // Needed only with the `audit` option.
   audit?: {
     add: (entry: AuditRecord) => MaybePromise<void>
-    // Newest first; `before` excludes that instant.
-    list: (query: { userId?: string, before?: Date, limit: number }) => MaybePromise<AuditRecord[]>
+    // Newest first, entries of one millisecond by id descending; `before` excludes that instant, or when it names an entry's `at` and `id`, that entry and every one after it in this order.
+    list: (query: { userId?: string, before?: AuditCursor, limit: number }) => MaybePromise<AuditRecord[]>
     // Deletes the entries older than `before`.
     prune: (before: Date) => MaybePromise<void>
     // Strips a deleted user from the log: `userId` becomes `pseudonym` in their entries, which lose their address, browser and detail, and in the entries they acted in, which lose their address and browser.

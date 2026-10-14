@@ -1,7 +1,7 @@
 import type { User } from './core'
 import type { AuditEntry } from './events'
 import type { RequestState } from './state'
-import type { UserRecord } from './store'
+import type { AuditCursor, UserRecord } from './store'
 import { clamp } from '@kaynooo/utils'
 import { banned, publicUser } from './core'
 import { erase } from './erase'
@@ -222,7 +222,7 @@ export async function deleteUser(state: RequestState, userId: string): Promise<D
 }
 
 // Everyone's audit log, or one user's, newest first.
-export async function adminAuditLog(state: RequestState, query: { userId?: string | undefined, before?: Date | undefined, limit?: number | undefined }): Promise<{ ok: true, entries: AuditEntry[] } | { ok: false, error: 'forbidden' }> {
+export async function adminAuditLog(state: RequestState, query: { userId?: string | undefined, before?: AuditCursor | undefined, limit?: number | undefined }): Promise<{ ok: true, entries: AuditEntry[] } | { ok: false, error: 'forbidden' }> {
   if (!(await actingAdmin(state)))
     return { ok: false, error: 'forbidden' }
 
