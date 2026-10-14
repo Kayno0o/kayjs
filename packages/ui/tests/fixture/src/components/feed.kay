@@ -1,0 +1,19 @@
+---
+import WhenVisible from '@kaynooo/kayjs-ui/when-visible.kay'
+
+// `load` stands in for a source: what it resolves to is how many rows it brought.
+const { load } = props<{ load: () => Promise<number> }>()
+
+const rows = signal(10)
+
+async function more() {
+  const count = await load()
+
+  rows.set(current => current + count)
+}
+---
+// A scroll box of fixed height, as an infinite list usually sits in: rows added to it leave its size alone.
+#feed(style="height: 12rem; overflow-y: auto")
+  for row of Array.from({ length: rows() }, (_, index) => index + 1) key={row}
+    p.row Row {row}
+  WhenVisible(onVisible={more})

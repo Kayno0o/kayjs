@@ -26,10 +26,18 @@ onMount(() => {
   const el = sentinel!
   let visible = false
   let running = false
+  // Set when the sentinel was reported in view while a call ran, so the call settling asks again rather than leaving a list that grew under it stalled.
+  let missed = false
 
   async function run(): Promise<void> {
-    if (running || !visible)
+    if (!visible)
       return
+
+    if (running) {
+      missed = true
+
+      return
+    }
 
     running = true
 
@@ -38,6 +46,11 @@ onMount(() => {
     }
     finally {
       running = false
+
+      if (missed) {
+        missed = false
+        void run()
+      }
     }
   }
 
@@ -47,19 +60,26 @@ onMount(() => {
   }, { root: scrollBoxOf(el), rootMargin: `${margin}px` })
 
   // A list that grew under a sentinel still in view fires no new intersection, so observing it afresh reports where it stands now.
-  const growth = new ResizeObserver(() => {
+  function recheck() {
     intersection.unobserve(el)
     intersection.observe(el)
-  })
+  }
+
+  // Rows added inside a scroll box of fixed height leave its size alone, so new children count as growth as much as a parent growing does.
+  const growth = new ResizeObserver(recheck)
+  const added = new MutationObserver(recheck)
 
   intersection.observe(el)
 
-  if (el.parentElement)
+  if (el.parentElement) {
     growth.observe(el.parentElement)
+    added.observe(el.parentElement, { childList: true, subtree: true })
+  }
 
   onCleanup(() => {
     intersection.disconnect()
     growth.disconnect()
+    added.disconnect()
   })
 })
 ---

@@ -329,3 +329,57 @@ describe('Masonry and WhenVisible', () => {
     expect(seen.more).toBe(1)
   })
 })
+
+describe('WhenVisible loading from a source', () => {
+  const loads: ((count: number) => void)[] = []
+
+  async function feed() {
+    loads.length = 0
+    mounted = await mount('src/components/feed.kay', { load: () => new Promise<number>(resolve => loads.push(resolve)) })
+
+    const sentinel = mounted.root.querySelector('.kui-when-visible')!
+
+    return { root: mounted.root, sentinel, observer: Observer.made.find(made => made.observed.includes(sentinel))! }
+  }
+
+  test('rows added inside a scroll box of fixed height ask again where the sentinel stands', async () => {
+    const { root, sentinel, observer } = await feed()
+    const observe = spyOn(observer, 'observe')
+
+    observer.callback([{ isIntersecting: true }])
+    loads[0]!(10)
+    await settle()
+
+    expect(root.querySelectorAll('.row')).toHaveLength(20)
+    expect(observe).toHaveBeenCalledWith(sentinel)
+
+    observer.callback([{ isIntersecting: true }])
+
+    expect(loads).toHaveLength(2)
+  })
+
+  test('never calls again before the promise settles, and answers a report made meanwhile once it does', async () => {
+    const { observer } = await feed()
+
+    observer.callback([{ isIntersecting: true }])
+    observer.callback([{ isIntersecting: true }])
+
+    expect(loads).toHaveLength(1)
+
+    loads[0]!(10)
+    await settle()
+
+    expect(loads).toHaveLength(2)
+  })
+
+  test('a report out of view meanwhile leaves it alone once the promise settles', async () => {
+    const { observer } = await feed()
+
+    observer.callback([{ isIntersecting: true }])
+    observer.callback([{ isIntersecting: false }])
+    loads[0]!(10)
+    await settle()
+
+    expect(loads).toHaveLength(1)
+  })
+})
