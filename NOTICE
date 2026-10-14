@@ -1,1 +1,3 @@
 kay includes code adapted from font-rs, by Raph Levien (https://github.com/raphlinus/font-rs), licensed under the Apache License, Version 2.0, whose text is in LICENSES/Apache-2.0.txt: the signed-area coverage accumulation in src/server/raster.ts.
+
+kay's server carries, through @jsquash/avif 2.1.1's wasm, libavif 1.0.1 (https://github.com/AOMediaCodec/libavif), libaom 3.7.0 (https://aomedia.googlesource.com/aom) with the AOMedia Patent License 1.0, and libsharpyuv from libwebp (https://chromium.googlesource.com/webm/libwebp), whose texts are in LICENSES/libavif.txt, LICENSES/libaom.txt, LICENSES/libaom-PATENTS.txt, LICENSES/libwebp.txt and LICENSES/libwebp-PATENTS.txt and in the third-party licences file of a build.

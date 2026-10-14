@@ -12,6 +12,19 @@ const NOTICE_ENOUGH = new Set(['MIT', 'ISC', 'Apache-2.0', 'BSD-2-Clause', 'BSD-
 const LICENSES_DIR = 'LICENSES'
 const RULE = '='.repeat(80)
 
+// What a package's wasm compiles in, whose licences its own files do not carry: keyed by package and exact version, as a bump may change the codecs, and a test fails when the installed version leaves the map.
+// @jsquash/avif 2.1.1: packages/avif/codec/Makefile of github.com/jamsinclair/jSquash builds libavif v1.0.1 with libaom v3.7.0 (encoder and decoder) and, in the encoder, libsharpyuv from the libwebp commit e2c85878f6a33f29948b43d3492d9cdaf801aa54; the wasm files hold the string "AOMedia Project AV1 Encoder v3.7.0" and "Decoder v3.7.0".
+// The texts are those of each repository at that tag or commit. The Emscripten runtime and libc in the wasm are not covered.
+const BUNDLED_LICENCES: Record<string, Record<string, { codec: string, files: string[] }[]>> = {
+  '@jsquash/avif': {
+    '2.1.1': [
+      { codec: 'libavif 1.0.1 (BSD-2-Clause), https://github.com/AOMediaCodec/libavif/blob/v1.0.1/LICENSE', files: ['libavif.txt'] },
+      { codec: 'libaom 3.7.0 (BSD-2-Clause and the AOMedia Patent License 1.0), https://aomedia.googlesource.com/aom/+/refs/tags/v3.7.0', files: ['libaom.txt', 'libaom-PATENTS.txt'] },
+      { codec: 'libsharpyuv from libwebp e2c85878f6a33f29948b43d3492d9cdaf801aa54 (BSD-3-Clause), https://chromium.googlesource.com/webm/libwebp/+/e2c85878f6a33f29948b43d3492d9cdaf801aa54', files: ['libwebp.txt', 'libwebp-PATENTS.txt'] },
+    ],
+  },
+}
+
 interface PackageJson {
   name?: string
   version?: string
@@ -142,6 +155,21 @@ function licenceTexts(dir: string): string {
   }).join('\n\n')
 }
 
+const BUNDLED_DIR = join(import.meta.dir, '..', '..', LICENSES_DIR)
+
+// The packages among `dirs` that kay knows codecs for, installed at a version it holds no texts for.
+export function unknownCodecVersions(dirs: Iterable<string>): string[] {
+  return [...dirs].flatMap((dir) => {
+    const { name, version } = readJson<PackageJson>(join(dir, 'package.json')) ?? {}
+
+    return name !== undefined && name in BUNDLED_LICENCES && (version === undefined || BUNDLED_LICENCES[name]![version] === undefined) ? [`${name}@${version}`] : []
+  })
+}
+
+function bundledTexts(name: string, version: string | undefined): string[] {
+  return (version === undefined ? undefined : BUNDLED_LICENCES[name]?.[version])?.map(({ codec, files }) => [`Compiled into it: ${codec}`, ...files.map(file => readFileSync(join(BUNDLED_DIR, file), 'utf8').trim())].join('\n\n')) ?? []
+}
+
 // The text of a notices file: each package by name and version with its licence, packages sharing one licence text listed together above it.
 export function thirdPartyNotices(packages: Iterable<string>): string {
   const groups = new Map<string, string[]>()
@@ -161,7 +189,7 @@ export function thirdPartyNotices(packages: Iterable<string>): string {
       continue
 
     const license = typeof manifest.license === 'string' ? manifest.license : manifest.license?.type ?? 'no licence named'
-    const text = licenceTexts(real)
+    const text = [licenceTexts(real), ...bundledTexts(manifest.name, manifest.version)].filter(part => part !== '').join('\n\n')
     const icons = manifest.name.startsWith('@iconify-json/') ? iconSetInfo(real) : undefined
     const lines = [`${[manifest.name, manifest.version].filter(Boolean).join(' ')} (${license})`]
 

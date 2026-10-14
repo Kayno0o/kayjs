@@ -14,6 +14,7 @@ import { ASSET_FILE, clientDir, outputDir, writeAsset } from '../src/build/asset
 import { buildClient } from '../src/build/client'
 import { writeIfChanged } from '../src/build/files'
 import { reachesAny } from '../src/build/libraries'
+import { thirdPartyNotices, unknownCodecVersions } from '../src/build/licenses'
 import { formatSizeReport } from '../src/build/report'
 import { anchorModule } from '../src/build/runtime-chunk'
 import { runtimeConfig, withoutPlugins } from '../src/build/runtime-config'
@@ -1499,4 +1500,37 @@ describe('third-party notices', () => {
       await rm(root, { recursive: true, force: true })
     }
   }, 60_000)
+})
+
+describe('codec licences', () => {
+  const avif = join(import.meta.dir, '../node_modules/@jsquash/avif')
+
+  it('adds the licences of the codecs the AVIF wasm compiles in to the package\'s own', () => {
+    const notices = thirdPartyNotices([avif])
+
+    expect(notices).toContain('@jsquash/avif 2.1.1 (Apache-2.0)')
+    expect(notices).toContain('Copyright 2019 Joe Drago')
+    expect(notices).toContain('Copyright (c) 2016, Alliance for Open Media')
+    expect(notices).toContain('Alliance for Open Media Patent License 1.0')
+    expect(notices).toContain('Copyright (c) 2010, Google Inc.')
+    expect(notices).toContain('Additional IP Rights Grant (Patents)')
+  })
+
+  it('knows the installed version of every package it holds codec licences for', () => {
+    expect(unknownCodecVersions([avif])).toEqual([])
+  })
+
+  it('reports a version the map does not hold, and adds nothing for it', async () => {
+    const dir = await scratchDir('avif-')
+
+    try {
+      await Bun.write(join(dir, 'package.json'), JSON.stringify({ name: '@jsquash/avif', version: '2.1.2', license: 'Apache-2.0' }))
+
+      expect(unknownCodecVersions([dir])).toEqual(['@jsquash/avif@2.1.2'])
+      expect(thirdPartyNotices([dir])).not.toContain('Alliance for Open Media')
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
 })

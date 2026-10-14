@@ -165,7 +165,7 @@ The build runs `kay check` first and keeps the last build when the check or the 
 
 The build prints the JavaScript a page with islands loads, gzip and minified: the entry, then what each island adds.
 
-Every build writes `/_kay/THIRD-PARTY-LICENSES.txt`, served beside the rest and copied by `--static`: each package whose code, stylesheets or fonts the browser gets, and every `@iconify-json` set the project depends on, with its licence text. A set whose licence asks for more than that notice, such as CC BY's credit where the icons show, gets a warning. An executable prints the same notices, its server's packages added, for `./server --licenses`.
+Every build writes `/_kay/THIRD-PARTY-LICENSES.txt`, served beside the rest and copied by `--static`: each package whose code, stylesheets or fonts the browser gets, and every `@iconify-json` set the project depends on, with its licence text. A set whose licence asks for more than that notice, such as CC BY's credit where the icons show, gets a warning. An executable prints the same notices, its server's packages added, for `./server --licenses`, with the licences of the codecs the AVIF encoder compiles in (libavif, libaom, libsharpyuv), which `@jsquash/avif` does not ship.
 
 ## kay start
 
