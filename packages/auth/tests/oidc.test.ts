@@ -150,7 +150,7 @@ describe('any OpenID Connect provider', () => {
     }
   })
 
-  test('an ID token signed with none, a shared secret or an algorithm outside the app's list signs nobody in', async () => {
+  test('an ID token signed with none, a shared secret or an algorithm outside the list signs nobody in', async () => {
     const rs384 = await generateKeyPair('RS384')
     const rs384Jwk = { ...await exportJWK(rs384.publicKey), kid: 'k1', use: 'sig' }
     const now = Math.floor(Date.now() / 1000)
