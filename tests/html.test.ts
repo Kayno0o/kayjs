@@ -1,3 +1,4 @@
+import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 import { collectHead } from '../src/runtime/head'
 import { attribute, child, dynamic, element, head, loop, merge, omit, selectOptions, spreadAttributes } from '../src/runtime/html'
@@ -175,5 +176,16 @@ describe('sanitizeHtml', () => {
     const once = sanitizeHtml('<p>a <a href="/x">b</a> &amp; <i>c</p>')
 
     expect(String(sanitizeHtml(once))).toBe(once)
+  })
+})
+
+describe('trustHtml', () => {
+  it('bundles none of sanitizeHtml\'s defaults into an island reaching it alone', async () => {
+    const entry = `import { trustHtml } from ${JSON.stringify(join(import.meta.dir, '../src/runtime/sanitize'))}\nconsole.log(trustHtml('<b>x</b>'))\n`
+    const build = await Bun.build({ entrypoints: ['entry.ts'], files: { 'entry.ts': entry }, target: 'browser', minify: true })
+    const code = await build.outputs[0]!.text()
+
+    expect(code).toContain('<b>x</b>')
+    expect(code).not.toContain('blockquote')
   })
 })

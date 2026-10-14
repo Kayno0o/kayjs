@@ -141,3 +141,30 @@ test('never turns on its own for a visitor asking for reduced motion', async () 
     window.matchMedia = media
   }
 })
+
+test('starts paused in a tab mounted hidden, and turns once it shows', async () => {
+  const hidden = Object.getOwnPropertyDescriptor(Document.prototype, 'hidden') ?? Object.getOwnPropertyDescriptor(document, 'hidden')
+  let isHidden = true
+
+  Object.defineProperty(document, 'hidden', { configurable: true, get: () => isHidden })
+
+  try {
+    await carousel(AUTOPLAY_MS)
+    await Bun.sleep(TWO_TURNS_MS)
+
+    expect(turns).toEqual([])
+
+    isHidden = false
+    document.dispatchEvent(new Event('visibilitychange'))
+    await settle()
+    await Bun.sleep(TWO_TURNS_MS)
+
+    expect(turns.length).toBeGreaterThan(0)
+  }
+  finally {
+    if (hidden)
+      Object.defineProperty(document, 'hidden', hidden)
+    else
+      delete (document as { hidden?: boolean }).hidden
+  }
+})

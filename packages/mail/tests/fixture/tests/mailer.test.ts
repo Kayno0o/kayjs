@@ -95,6 +95,7 @@ describe('rendering', () => {
     const { html, text } = await mail.render({ to: 'ada@example.com', subject: 'Kit', view: Kit })
 
     expect(html).toContain('<img src="https://fixture.test/logo.png" alt="Fixture" width="120" height="40"')
+    expect(html).not.toMatch(/loading=|decoding=/)
     expect(html).toContain('font-family:ui-monospace')
     expect(html).toContain('letter-spacing:6px')
     expect(html).toContain('border-top:1px solid #e5e5e0')

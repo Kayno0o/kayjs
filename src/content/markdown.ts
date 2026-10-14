@@ -55,10 +55,15 @@ const TAGS = /<[^>]*>/g
 const SPACE = /\s/
 const ENTITY = /&(?:amp|lt|gt|quot|#39|#x27);/g
 const DECODED: Record<string, string> = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': '\'', '&#x27;': '\'' }
-// An image, and the attributes that keep it from loading lazily and decoding off the main thread, as a template's does.
-const IMAGE_TAG = /<img\b(?:[^>"']|"[^"]*"|'[^']*')*>/gi
-const EAGER = /\s(?:loading|fetchpriority)\s*=/i
-const DECODING = /\sdecoding\s*=/i
+// The attributes that keep an image from loading lazily and decoding off the main thread, as a template's do.
+const EAGER = new Set(['loading', 'fetchpriority'])
+const TAG_NAME = /[a-z][\w-]*/iy
+const ATTRIBUTE = /[^\s"'>/=]+/y
+const UNQUOTED = /[^\s>]*/y
+const SPACES = /[\s/]*/y
+const WHITESPACE = /\s*/y
+// Elements whose text is no markup, where an `<img` is text.
+const RAW_TEXT = new Set(['script', 'style', 'textarea', 'title'])
 // Line breaks in the text before an offset, for the line a problem sits on.
 const LINE_BREAK = /\n/g
 
@@ -106,7 +111,7 @@ export interface RenderedMarkdown {
 // The HTML is the writer's, raw tags included: a user's goes through `sanitizeHtml` before `innerHTML`, and the headings may be ones a user typed as raw tags.
 // The highlighter gets the fence's language as written, so for a user's text it falls back on one it does not know rather than throw.
 export async function renderMarkdown(markdown: string, options: { highlight?: Highlighter | undefined } = {}): Promise<RenderedMarkdown> {
-  const html = Bun.markdown.html(markdown, { ...MARKDOWN_OPTIONS, headings: { ids: true, autolink: true } }).replace(IMAGE_TAG, imageDefaults)
+  const html = withImageDefaults(Bun.markdown.html(markdown, { ...MARKDOWN_OPTIONS, headings: { ids: true, autolink: true } }))
   const headings: Heading[] = []
 
   for (const { open: [, depth, id], inner } of elements(html, HEADING_OPEN, ([, depth]) => `</a></h${depth}>`))
@@ -356,8 +361,116 @@ function holdsMarkup(value: unknown): boolean {
   return Object.values(value).some(holdsMarkup)
 }
 
-function imageDefaults(tag: string): string {
-  return `<img${EAGER.test(tag) ? '' : ' loading="lazy"'}${DECODING.test(tag) ? '' : ' decoding="async"'}${tag.slice(4)}`
+// Gives each `<img>` tag of the HTML the loading and decoding defaults its attributes leave out, reading the tags in one pass as a browser does, so text in another tag's attribute or a script is left alone.
+// A tag left open ends the pass, everything after it kept as it is.
+function withImageDefaults(html: string): string {
+  const lower = html.toLowerCase()
+  let out = ''
+  let copied = 0
+  let at = html.indexOf('<')
+
+  while (at !== -1) {
+    if (html.startsWith('<!--', at)) {
+      const end = html.indexOf('-->', at + 4)
+
+      if (end === -1)
+        break
+
+      at = html.indexOf('<', end + 3)
+
+      continue
+    }
+
+    TAG_NAME.lastIndex = at + 1
+
+    const name = TAG_NAME.exec(html)?.[0].toLowerCase()
+
+    if (name === undefined) {
+      at = html.indexOf('<', at + 1)
+
+      continue
+    }
+
+    const tag = readTag(html, at + 1 + name.length)
+
+    if (!tag)
+      break
+
+    if (name === 'img') {
+      out += `${html.slice(copied, at)}<img${[...EAGER].some(eager => tag.names.has(eager)) ? '' : ' loading="lazy"'}${tag.names.has('decoding') ? '' : ' decoding="async"'}`
+      copied = at + 4
+    }
+
+    const close = RAW_TEXT.has(name) ? lower.indexOf(`</${name}`, tag.end) : tag.end
+
+    if (close === -1)
+      break
+
+    at = html.indexOf('<', close)
+  }
+
+  return out + html.slice(copied)
+}
+
+// Where a sticky pattern matching from `at` ends.
+function skip(html: string, pattern: RegExp, at: number): number {
+  pattern.lastIndex = at
+  pattern.exec(html)
+
+  return pattern.lastIndex
+}
+
+// The attribute names of a tag whose name ends at `from`, and where it ends, or undefined when it never closes.
+function readTag(html: string, from: number): { names: Set<string>, end: number } | undefined {
+  const names = new Set<string>()
+  let at = from
+
+  for (;;) {
+    at = skip(html, SPACES, at)
+
+    if (at >= html.length)
+      return undefined
+
+    if (html[at] === '>')
+      return { names, end: at + 1 }
+
+    ATTRIBUTE.lastIndex = at
+
+    const name = ATTRIBUTE.exec(html)?.[0]
+
+    // A stray quote or = reads as part of no attribute, as a browser skips it.
+    if (name === undefined) {
+      at++
+
+      continue
+    }
+
+    names.add(name.toLowerCase())
+    at += name.length
+
+    at = skip(html, WHITESPACE, at)
+
+    if (html[at] !== '=')
+      continue
+
+    at++
+
+    at = skip(html, WHITESPACE, at)
+
+    const quote = html[at]
+
+    if (quote === '"' || quote === '\'') {
+      const end = html.indexOf(quote, at + 1)
+
+      if (end === -1)
+        return undefined
+
+      at = end + 1
+    }
+    else {
+      at = skip(html, UNQUOTED, at)
+    }
+  }
 }
 
 // `name="text"`, `name='text'`, `name={json}` or a bare `name`, which is `true`.

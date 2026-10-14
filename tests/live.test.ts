@@ -41,6 +41,21 @@ async function until(ready: () => boolean): Promise<void> {
   }
 }
 
+// The listeners the targets hold, as their add and remove calls leave them.
+function listenerCount(...targets: EventTarget[]): { count: () => number, restore: () => void } {
+  const spies = targets.map(target => [spyOn(target, 'addEventListener'), spyOn(target, 'removeEventListener')] as const)
+
+  return {
+    count: () => spies.reduce((sum, [added, removed]) => sum + added.mock.calls.length - removed.mock.calls.length, 0),
+    restore: () => {
+      for (const [added, removed] of spies) {
+        added.mockRestore()
+        removed.mockRestore()
+      }
+    },
+  }
+}
+
 function upgrade(path: string, headers: Record<string, string> = {}): Request {
   return new Request(`http://localhost${path}`, { headers: { 'upgrade': 'websocket', 'connection': 'Upgrade', 'sec-websocket-key': 'dGhlIHNhbXBsZSBub25jZQ==', 'sec-websocket-version': '13', ...headers } })
 }
@@ -272,20 +287,20 @@ describe('API modules', () => {
 
       tab.hidden = false
       tab.dispatchEvent(new Event('visibilitychange'))
-      await Bun.sleep(50)
+      await until(() => reader.status() === 'done')
 
       expect(received).toEqual([1, 2])
-      expect(reader.status()).toBe('done')
     }
     finally {
       delete globals.document
     }
   })
 
-  it('holds the reconnect while offline until the browser is online, and drops it once closed', async () => {
+  it('holds the reconnect while offline until the browser is online, and drops it and its listeners once closed', async () => {
     const tab = Object.assign(new EventTarget(), { hidden: false })
     const globals = globalThis as Record<string, unknown>
     const network = (onLine: boolean) => Object.defineProperty(navigator, 'onLine', { value: onLine, configurable: true })
+    const listening = listenerCount(globalThis, tab)
 
     globals.document = tab
     network(false)
@@ -300,23 +315,74 @@ describe('API modules', () => {
 
       reader.start()
       await Bun.sleep(700)
-      expect(calls).toBe(1)
+      expect([calls, listening.count()]).toEqual([1, 2])
 
       network(true)
       globalThis.dispatchEvent(new Event('online'))
-      await Bun.sleep(50)
-      expect(calls).toBe(2)
+      await until(() => calls === 2)
+      expect(listening.count()).toBe(0)
 
       network(false)
-      await Bun.sleep(700)
+      await Bun.sleep(1200)
+      expect(listening.count()).toBe(2)
       reader.close()
+      expect(listening.count()).toBe(0)
       network(true)
       globalThis.dispatchEvent(new Event('online'))
       tab.dispatchEvent(new Event('visibilitychange'))
-      await Bun.sleep(50)
+      await Bun.sleep(600)
       expect(calls).toBe(2)
     }
     finally {
+      listening.restore()
+      delete globals.document
+      delete (navigator as { onLine?: boolean }).onLine
+    }
+  })
+
+  it('tries now and then while the browser says it is offline, as long as the tab shows', async () => {
+    const tab = Object.assign(new EventTarget(), { hidden: false })
+    const globals = globalThis as Record<string, unknown>
+    const later = setTimeout
+    // The minute-long fallbacks, run by hand rather than waited for.
+    const fallbacks: (() => void)[] = []
+    const timeouts = spyOn(globalThis, 'setTimeout').mockImplementation(((run: () => void, delay?: number) => {
+      if (delay !== 60_000)
+        return later(run, delay)
+
+      fallbacks.push(run)
+
+      return later(() => undefined, 3_600_000)
+    }) as typeof setTimeout)
+
+    globals.document = tab
+    Object.defineProperty(navigator, 'onLine', { value: false, configurable: true })
+
+    try {
+      let calls = 0
+      const reader = readEvents<number>(async () => {
+        calls++
+
+        return new Response('data: [1]\n\n')
+      }, true)
+
+      reader.start()
+      await until(() => fallbacks.length === 1)
+      expect(calls).toBe(1)
+
+      // Hidden, it waits for the tab to show rather than trying, then tries again a minute after.
+      tab.hidden = true
+      fallbacks.shift()!()
+      await Bun.sleep(1500)
+      expect([calls, fallbacks.length]).toEqual([2, 0])
+
+      tab.hidden = false
+      tab.dispatchEvent(new Event('visibilitychange'))
+      expect([calls, fallbacks.length]).toEqual([2, 1])
+      reader.close()
+    }
+    finally {
+      timeouts.mockRestore()
       delete globals.document
       delete (navigator as { onLine?: boolean }).onLine
     }

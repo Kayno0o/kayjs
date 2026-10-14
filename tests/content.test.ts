@@ -316,6 +316,23 @@ describe('Markdown outside collections', () => {
     expect(() => sanitizeHtml('', { tags: ['img'], attributes: { imgg: ['src'] } })).toThrow('attributes of <imgg>, a tag it does not keep')
   })
 
+  it('gives the defaults to img tags alone, by their attribute names, and never inside another tag', async () => {
+    const html = async (markdown: string) => (await renderMarkdown(markdown)).html
+
+    expect(await html('<img-x src="/a.png"></img-x>\n')).toBe('<p><img-x src="/a.png"></img-x></p>\n')
+    expect(await html('<img alt="loading=eager decoding=sync" src="/a.png">\n')).toBe('<img loading="lazy" decoding="async" alt="loading=eager decoding=sync" src="/a.png">\n')
+    expect(await html('<p><a title="<img src=x>" href="/">x</a></p>\n')).toBe('<p><a title="<img src=x>" href="/">x</a></p>\n')
+    expect(await html('<IMG SRC="/a.png" Loading="eager">\n')).toBe('<img decoding="async" SRC="/a.png" Loading="eager">\n')
+  })
+
+  it('reads a page of unclosed img tags in linear time', async () => {
+    const start = performance.now()
+    const { html } = await renderMarkdown(`<div>\n${'<img '.repeat(20_000)}`)
+
+    expect(performance.now() - start).toBeLessThan(250)
+    expect(html).not.toContain('loading=')
+  })
+
   it('checks every URL an opted-in attribute holds, and writes back only the attributes it read', () => {
     const options = { tags: ['img', 'video', 'source', 'blockquote'], attributes: { img: ['src', 'srcset', 'alt'], video: ['poster'], source: ['src'], blockquote: ['cite'], a: ['href', 'rel'] } }
     const kept = (markup: string) => String(sanitizeHtml(markup, options))

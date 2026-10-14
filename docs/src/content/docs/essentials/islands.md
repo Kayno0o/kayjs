@@ -115,7 +115,7 @@ A link with `data-reload` loads its page fully. So does every link to a page set
 
 ## Browser-only code
 
-kay's browser code runs on Chrome and Edge 98, Firefox 104 and Safari 16.4 or later, and kayjs-ui's popovers on Chrome and Edge 114, Firefox 125 and Safari 17. A browser without CSS anchor positioning opens kayjs-ui's popovers and tooltips away from their trigger. The build ships an island's code as written, so code meant for those browsers stays off newer APIs such as `Map.groupBy`.
+kay's browser code runs on Chrome and Edge 98, Firefox 104 and Safari 16.4 or later, and kayjs-ui's popovers on Chrome and Edge 114, Firefox 125 and Safari 17. kayjs-ui places its popovers, tooltips and site nav lists beside their trigger through CSS anchor positioning, in Chrome and Edge 129, Firefox 147 and Safari 26: an older browser opens them away from their trigger. Its colours use `light-dark()` and its carousel `inert`, which every browser with anchor positioning has. The build ships an island's code as written, so code meant for those browsers stays off newer APIs such as `Map.groupBy`.
 
 `window`, `document` and `localStorage` do not exist on the server. Read them in `onMount` or `effect`, which run in the browser only:
 

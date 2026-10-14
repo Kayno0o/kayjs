@@ -137,7 +137,7 @@ p {answer.last()}
 
 ## Websockets
 
-A `.ws()` route is opened with `socket()`. `send` takes the route's `body`, `last()` reads the last message reactively and `status()` is `connecting`, `open` or `closed`. A dropped connection reconnects by itself.
+A `.ws()` route is opened with `socket()`. `send` takes the route's `body`, `last()` reads the last message reactively and `status()` is `connecting`, `open` or `closed`. A dropped connection reconnects by itself, waiting while the tab is hidden or offline, though a visible tab still tries each minute in case the browser is wrong about being offline.
 
 ```ts
 export default api().ws('/:room', {

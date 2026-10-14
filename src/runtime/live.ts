@@ -17,6 +17,8 @@ export const ERROR_EVENT = 'error'
 
 const RECONNECT_MS = 500
 const MAX_RECONNECT_MS = 30_000
+// How often a visible tab the browser says is offline tries anyway, as `navigator.onLine` can be wrong, behind some VPNs for one.
+const OFFLINE_RETRY_MS = 60_000
 // The close code of a connection either side ended on purpose, which is not reconnected.
 const NORMAL_CLOSURE = 1000
 // What a socket keeps to send while it connects, the oldest dropped past it.
@@ -182,8 +184,12 @@ function scheduleRetry(attempt: number, reconnect: () => void): () => void {
   // Read only once asleep, which a browser alone can be.
   const wakers = () => [[globalThis, 'online'], [document, 'visibilitychange']] as const
   let waiting = false
+  let timer: ReturnType<typeof setTimeout> | undefined
+  let fallback: ReturnType<typeof setTimeout> | undefined
 
   function stopWaiting() {
+    clearTimeout(fallback)
+
     if (!waiting)
       return
 
@@ -193,15 +199,30 @@ function scheduleRetry(attempt: number, reconnect: () => void): () => void {
       target.removeEventListener(type, wake)
   }
 
-  function wake() {
-    if (asleep())
-      return
+  function rest() {
+    clearTimeout(fallback)
 
-    stopWaiting()
-    reconnect()
+    if (!document.hidden) {
+      fallback = setTimeout(() => {
+        stopWaiting()
+        reconnect()
+      }, OFFLINE_RETRY_MS)
+    }
   }
 
-  const timer = setTimeout(() => {
+  function wake() {
+    if (asleep()) {
+      rest()
+
+      return
+    }
+
+    stopWaiting()
+    // The clients a network coming back wakes together come back apart too.
+    timer = setTimeout(reconnect, Math.random() * RECONNECT_MS)
+  }
+
+  timer = setTimeout(() => {
     if (!asleep()) {
       reconnect()
 
@@ -212,6 +233,8 @@ function scheduleRetry(attempt: number, reconnect: () => void): () => void {
 
     for (const [target, type] of wakers())
       target.addEventListener(type, wake)
+
+    rest()
   }, delay - Math.random() * delay / 2)
 
   return () => {

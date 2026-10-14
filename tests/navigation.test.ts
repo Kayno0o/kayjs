@@ -418,6 +418,34 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     expect(await page.evaluate(() => document.querySelector('#drawer')!.matches(':popover-open'))).toBe(false)
   })
 
+  it('swaps on a browser without popovers, which throws on the :popover-open selector', async () => {
+    const fresh = await browser.newPage()
+    const errors: string[] = []
+
+    fresh.on('pageerror', error => errors.push(error.message))
+    await fresh.addInitScript(() => {
+      Reflect.deleteProperty(HTMLElement.prototype, 'popover')
+      Element.prototype.querySelectorAll = new Proxy<Element['querySelectorAll']>(Reflect.get(Element.prototype, 'querySelectorAll'), {
+        apply: (select, element: Element, selectors: [string]) => {
+          if (selectors[0].includes(':popover-open'))
+            throw new SyntaxError(`'${selectors[0]}' is not a valid selector`)
+
+          return Reflect.apply(select, element, selectors) as NodeListOf<Element>
+        },
+      })
+    })
+    await fresh.goto(origin)
+    await fresh.evaluate(() => {
+      (window as { kayAlive?: boolean }).kayAlive = true
+    })
+    await fresh.click('a.second')
+    await fresh.locator('h1', { hasText: 'Second' }).waitFor()
+
+    expect(await fresh.evaluate(() => (window as { kayAlive?: boolean }).kayAlive)).toBe(true)
+    expect(errors).toEqual([])
+    await fresh.close()
+  })
+
   it('goes back to a jump within the page by scrolling, the page left as it is', async () => {
     await page.goto(origin)
     await page.evaluate(() => {

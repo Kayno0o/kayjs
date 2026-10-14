@@ -668,6 +668,7 @@ describe('in the browser', () => {
       document.body.innerHTML = '<script type="application/json" data-kay-i18n>{"locale":"en","messages":{},"now":1000000}</script>'
 
       const texts: string[] = []
+      const timers: number[] = []
       const dispose = root((dispose) => {
         const ago = relativeTime(() => 970_000)
 
@@ -684,13 +685,26 @@ describe('in the browser', () => {
         texts.push(ago())
         jest.advanceTimersByTime(1000)
         texts.push(ago())
+        // A hidden tab holds no timer and the time rests, then catches up at once when it shows again.
+        Object.defineProperty(document, 'hidden', { configurable: true, get: () => true })
+        document.dispatchEvent(new Event('visibilitychange'))
+        flush()
+        timers.push(jest.getTimerCount())
+        jest.advanceTimersByTime(3_600_000)
+        texts.push(ago())
+        Reflect.deleteProperty(document, 'hidden')
+        document.dispatchEvent(new Event('visibilitychange'))
+        flush()
+        timers.push(jest.getTimerCount())
+        texts.push(ago())
 
         return dispose
       })
 
       dispose()
       jest.advanceTimersByTime(3_600_000)
-      expect([texts, jest.getTimerCount()]).toEqual([['30 seconds ago', '40 seconds ago', '41 seconds ago', '1 minute ago', '1 minute ago', '2 minutes ago'], 0])
+      timers.push(jest.getTimerCount())
+      expect([texts, timers]).toEqual([['30 seconds ago', '40 seconds ago', '41 seconds ago', '1 minute ago', '1 minute ago', '2 minutes ago', '2 minutes ago', '1 hour ago'], [0, 1, 0]])
     }
     finally {
       // A fake queueMicrotask holds the flush the last tick queued, which every later effect of the process would wait on.
