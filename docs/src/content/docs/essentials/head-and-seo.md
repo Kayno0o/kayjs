@@ -31,7 +31,7 @@ head
 slot
 ```
 
-`lang` and `dir` are set by kay, from `lang` in kay.config.ts or the page's locale. When a link swaps the page in, a theme your script changed, such as a dark mode toggle, stays.
+`lang` and `dir` are set by kay, from `lang` in kay.config.ts or the page's locale. When a link swaps the page in, a theme your script changed, such as a dark mode toggle, stays, in place of the next page's own `theme-color`.
 
 ## Site defaults
 

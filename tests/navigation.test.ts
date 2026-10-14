@@ -339,6 +339,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
   it('keeps through a swap what a script changed or added in the head and on <body>, and drops what the server alone served', async () => {
     const state = async () => page.evaluate(() => ({
       themes: [...document.querySelectorAll('meta[name="theme-color"]')].map(meta => meta.getAttribute('content')),
+      images: [...document.querySelectorAll('meta[property="og:image"]')].map(meta => meta.getAttribute('content')),
       added: document.querySelectorAll('meta[name="script-added"]').length,
       secondOnly: document.querySelectorAll('meta[name="second-only"]').length,
       mode: document.body.dataset.mode,
@@ -356,6 +357,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     // A dark mode toggle recolouring the browser's bar, a loader adding a tag, a script marking the body, all before the swap loads.
     await page.evaluate(() => {
       document.querySelector('meta[name="theme-color"]')!.setAttribute('content', '#123456')
+      document.querySelector('meta[property="og:image"]')!.setAttribute('content', '/x.png')
       const meta = document.createElement('meta')
 
       meta.name = 'script-added'
@@ -363,14 +365,14 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
       document.body.dataset.mode = 'dark'
     })
     await go('second', 'Second')
-    expect(await state()).toEqual({ themes: ['#123456'], added: 1, secondOnly: 1, mode: 'dark' })
+    expect(await state()).toEqual({ themes: ['#123456'], images: ['/x.png', '/b.png'], added: 1, secondOnly: 1, mode: 'dark' })
     await go('home', 'Home')
-    expect(await state()).toEqual({ themes: ['#123456'], added: 1, secondOnly: 0, mode: 'dark' })
-    // A page serving another colour leaves the script's in place of its own.
+    expect(await state()).toEqual({ themes: ['#123456'], images: ['/x.png', '/b.png'], added: 1, secondOnly: 0, mode: 'dark' })
+    // A page serving other values leaves the script's metas in place of its own, one for one, the served one beside them kept.
     await go('later', 'Later')
-    expect(await state()).toEqual({ themes: ['#123456'], added: 1, secondOnly: 0, mode: 'dark' })
+    expect(await state()).toEqual({ themes: ['#123456'], images: ['/x.png', '/b.png'], added: 1, secondOnly: 0, mode: 'dark' })
     await go('home', 'Home')
-    expect(await state()).toEqual({ themes: ['#123456'], added: 1, secondOnly: 0, mode: 'dark' })
+    expect(await state()).toEqual({ themes: ['#123456'], images: ['/x.png', '/b.png'], added: 1, secondOnly: 0, mode: 'dark' })
   })
 
   it('restores where the page was scrolled to when going back, focusing its heading without scrolling and announcing its title', async () => {

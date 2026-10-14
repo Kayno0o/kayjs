@@ -10,6 +10,8 @@ const bare = page === '/later'
 ---
 head
   meta(name="theme-color" content={bare ? '#000000' : '#ffffff'})
+  meta(property="og:image" content={bare ? '/b.png' : '/a.png'})
+  meta(property="og:image" content={bare ? '/c.png' : '/b.png'})
   html(class={bare ? undefined : 'served'} data-theme={bare ? undefined : 'light'} data-label={bare ? undefined : 'say "hi" & <b>\r\nbye'})
 nav
   a.home(href="/") Home

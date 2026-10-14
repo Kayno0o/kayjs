@@ -386,6 +386,8 @@ function mergeHead(next: Document): { loaded: Promise<unknown>, commit: () => vo
     return at !== -1
   }
   const stale: HeadElement[] = []
+  // Taken once every element served as it stands found its copy, so a script's meta never takes the copy of a served one of the same name.
+  const named: Element[] = []
 
   for (const element of document.head.children as HTMLCollectionOf<HeadElement>) {
     // A stylesheet `kay dev` swapped in for an edited one is the server's as it stands.
@@ -398,12 +400,15 @@ function mergeHead(next: Document): { loaded: Promise<unknown>, commit: () => vo
       const same = take(element.outerHTML)
 
       if (!take(key) && !same)
-        take(metaName(element), metaName)
+        named.push(element)
     }
     else if (!take(key) && element.tagName !== 'TITLE' && !ranAlready(element)) {
       stale.push(element)
     }
   }
+
+  for (const element of named)
+    take(metaName(element), metaName)
 
   const loading: Promise<unknown>[] = []
 
@@ -438,7 +443,7 @@ function metaName(element: Element): string | undefined {
 
   const by = META_NAMES.find(name => element.hasAttribute(name))
 
-  return by === undefined ? undefined : `${by}=${element.getAttribute(by)} ${element.getAttribute('media') ?? ''}`
+  return by === undefined ? undefined : `${by}=${element.getAttribute(by)!.toLowerCase()} ${element.getAttribute('media') ?? ''}`
 }
 
 // A script that ran stays, since taking it out undoes nothing; one holding data, such as the schemas of the page's forms, goes with its page.
