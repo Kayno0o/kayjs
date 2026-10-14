@@ -2,7 +2,7 @@
   "name": "@kaynooo/kayjs",
   "type": "module",
   "version": "1.43.1",
-  "description": "Pug-like, fully typed web framework on Bun, Elysia and pg-orm, with its own island runtime",
+  "description": "A Bun web framework: one .kay file per component, pages rendered to plain HTML on the server, interactive islands in the browser",
   "author": "Kaynooo <https://github.com/Kayno0o>",
   "license": "MIT",
   "homepage": "https://kayjs.kaynooo.fr",

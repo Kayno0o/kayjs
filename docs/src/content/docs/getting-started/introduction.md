@@ -4,7 +4,9 @@ order: 1
 description: kay is a Bun web framework where a page is plain HTML and only the interactive parts ship JavaScript.
 ---
 
-kay is a web framework for Bun. A `.kay` file is one component: TypeScript in fences, then an indented template. Pages render to HTML on the server, and an Elysia plugin serves them.
+kay is a web framework for Bun. Pages render to plain HTML on the server, and only the parts that react to the visitor ship JavaScript. Everything is typed, templates included, so `kay check` catches a mistake at its line before it reaches the browser.
+
+A `.kay` file is one component: TypeScript in fences, then an indented template. An [Elysia](https://elysiajs.com) plugin serves the pages.
 
 ## A first look
 

@@ -128,6 +128,20 @@ expect(outbox.to('ada@example.com')[0]?.subject).toBe('Welcome, Ada')
 
 `outbox.waitFor(address)` waits for a mail to arrive, and `outbox.links(mail)` gives the links it carries, such as a confirmation link to visit next.
 
-[kayjs-auth](/libraries/kayjs-auth) takes the mailer's `enqueue` as its `email.mailer.send`.
+## With kayjs-auth
+
+`authMailer` sends [kayjs-auth](/libraries/kayjs-auth)'s mails (verification, reset, magic links, security notices) through your mailer, themed by your mail settings. It needs `mailExtension` in `kay.config.ts`, as above.
+
+```ts
+// src/auth.ts
+import { createAuth } from '@kaynooo/kayjs-auth'
+import { authMailer } from '@kaynooo/kayjs-mail'
+import { mail } from './mail'
+
+export const auth = createAuth({
+  // ...
+  email: { mailer: authMailer(mail.enqueue) },
+})
+```
 
 <ReadMore href="/llms/kayjs-mail">Optional mail setup, other transports, attachments, the queue's retry options and the settings are in the full kayjs-mail reference.</ReadMore>

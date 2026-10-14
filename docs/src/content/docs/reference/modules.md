@@ -23,9 +23,12 @@ import { collection } from 'kay/content'
 | `persisted`, `queryParam`, `linked`, `selection`, `context` | Signal helpers: stored, one query param of the page read by its schema, derived from a source, one selected key, shared down a tree |
 | `s` | The schema builder for actions, config and content (`s.Object`, `s.String`, ...) |
 | `action` | A form post or island call checked by a schema. See [Forms and actions](/essentials/forms-and-actions) |
+| `ActionError`, `ActionRedirect` | What an action called from an island throws: its schema's messages, or the redirect it answered |
+| `focusInvalid`, `flush` | Focus the first invalid field once pending writes rendered; run pending effects now |
 | `guard` | A route guard. See [Sessions and guards](/guides/sessions-and-guards) |
 | `defer` | Makes a promise an `await` block can stream |
 | `navigate`, `refresh` | Go to a page, or re-render the current one, without a reload |
+| `searchResults`, `searchSite` | The site search from an island: following a signal holding the query, or as a promise |
 | `guardLeave` | Warns before leaving a page with unsaved changes |
 | `resource`, `call`, `socket`, `stream`, `dispatch` | Typed reads and calls of API routes, websockets and event streams from islands; `call` throws `ApiError`. See [API routes](/guides/api-routes) |
 | `publicEnv` | The variables `publicEnv` in the config exposed to islands |
@@ -48,7 +51,7 @@ Types include `Component`, `Signal`, `Guard`, `Duration`, `PageContext`, `Endpoi
 | `api`, `eventStream` | An API module under `src/api`, and server-sent events |
 | `session`, `memoryStore`, `sqliteStore` | Cookie sessions and their stores. See [Sessions and guards](/guides/sessions-and-guards) |
 | `defineEnv` | Reads `process.env` once against a schema, typed |
-| `rateLimit`, `memoryRates`, `sqliteRates`, `clientAddress` | Rate limiting |
+| `rateLimit`, `memoryRates`, `sqliteRates`, `clientAddress`, `rateKey` | Rate limiting, and the key a limit counts an address under |
 | `workChallenge`, `verifyWork` | Proof of work in a form field your own code checks |
 | `requestId` | The id of a request, on its log lines and its `X-Request-Id` header |
 | `schedule`, `background` | Jobs on a cron or every so long, and background work, in the server's process |
@@ -61,6 +64,9 @@ Types include `Component`, `Signal`, `Guard`, `Duration`, `PageContext`, `Endpoi
 | `processImage`, `imageSize` | Resize or measure an image |
 | `files`, `diskFiles`, `s3Files`, `memoryFiles` | Stored uploads and their stores. See [File storage](/guides/file-storage) |
 | `shutdown` | Stops the server gracefully |
+| `inlineScriptHashes` | The CSP hashes of kay's inline scripts, for a policy written elsewhere |
+
+Types include `BrowserError` and `CspViolation`, the browser errors and CSP violations `onError` receives.
 
 ## Other entry points
 
@@ -75,7 +81,8 @@ Types include `Component`, `Signal`, `Guard`, `Duration`, `PageContext`, `Endpoi
 | `kay/cache` | `cached`, `invalidate`, `sqliteCache`. See [Caching and streaming](/guides/caching-and-streaming) |
 | `kay/image` | `image`, `shareImage`, `shareCard` |
 | `kay/icons` | `iconProps`, `iconNames`, for icons known only at runtime |
-| `kay/test` | `testSite`, `mount`, `browse`. See [Testing](/guides/testing) |
+| `kay/test` | `testSite`, `mount`, `browse`, `browserPath`, `settle`, `readPersisted`, `writePersisted`. See [Testing](/guides/testing) |
+| `kay/test/preload` | The preload a project's `bunfig.toml` lists for `bun test`, before any other registering a DOM |
 | `kay/bun` | `kay`, the Bun plugin compiling `.kay` files for a page kay does not serve. See [Islands](/essentials/islands#a-page-kay-does-not-serve) |
 | `kay/mount` | `mount`, which renders a component into an element on a page kay does not serve. See [Islands](/essentials/islands#a-page-kay-does-not-serve) |
 | `kay/eslint` | The ESLint processor for `.kay` files. See [Checks](/reference/checks) |
