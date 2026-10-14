@@ -1,0 +1,8 @@
+head
+  title Unreadable
+main
+  p.same(style="color: #fff; background: #fff") Same
+  p.shown Shown
+  span.hidden(style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; color: #fff; background: #fff") Hidden
+  div.image(style="background: url('data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7')")
+    p.over Over an image

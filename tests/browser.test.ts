@@ -247,7 +247,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay/test i
     const contrast = (await page.a11y()).find(violation => violation.id === 'color-contrast')
 
     expect(contrast?.impact).toBe('serious')
-    expect(contrast?.nodes).toEqual([{ target: '.faint', html: '<button class="faint" style="color: #ccc; background: #fff">Faint</button>' }])
+    expect(contrast?.nodes).toEqual([{ target: '.faint', html: '<button class="faint" style="color: #ccc; background: #fff">Faint</button>' }, { target: 'p', html: '<p class="same" style="color: #fff; background: #fff">Same</p>' }])
     expect(await page.a11y('button.plain')).toEqual([])
 
     await page.goto('/plain')
@@ -255,6 +255,16 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay/test i
 
     expect((await page.a11y('main')).map(violation => violation.id)).toEqual(['color-contrast'])
     await expect(page.a11y('.nowhere')).rejects.toThrow('kay: nothing matches .nowhere to check')
+  })
+
+  it('reports text the colour of its background as low contrast, but text clipped out of sight or over an image', async () => {
+    await page.goto('/unreadable')
+
+    expect((await page.a11y('main')).map(violation => [violation.id, violation.impact, violation.nodes.map(node => node.target)])).toEqual([['color-contrast', 'serious', ['.same']]])
+    expect((await page.a11y('p.same')).map(violation => violation.id)).toEqual(['color-contrast'])
+    expect(await page.a11y('p.shown')).toEqual([])
+    expect(await page.a11y('span.hidden')).toEqual([])
+    expect(await page.a11y('div.image')).toEqual([])
   })
 })
 
@@ -421,7 +431,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay dev in
 
     await shown.waitUntil(() => document.querySelector('kay-dev')?.shadowRoot!.textContent.includes('a11y color-contrast'))
 
-    expect(await shown.evaluate(() => [...document.querySelector('kay-dev')!.shadowRoot!.querySelectorAll('.problem pre')].map(pre => pre.textContent))).toContain('a11y color-contrast: Elements must meet minimum color contrast ratio thresholds\n  .faint\nhttps://dequeuniversity.com/rules/axe/4.14/color-contrast?application=axeAPI')
+    expect(await shown.evaluate(() => [...document.querySelector('kay-dev')!.shadowRoot!.querySelectorAll('.problem pre')].map(pre => pre.textContent))).toContain('a11y color-contrast: Elements must meet minimum color contrast ratio thresholds\n  .faint\n  p\nhttps://dequeuniversity.com/rules/axe/4.14/color-contrast?application=axeAPI')
     // The dev tool is kay's, no part of the page a test checks.
     expect((await shown.a11y()).flatMap(violation => violation.nodes.map(node => node.target))).not.toContainEqual(expect.stringContaining('kay-dev'))
     expect(shown.errors).toEqual([])

@@ -260,6 +260,7 @@ it('shows why a todo was refused', async () => {
 - Only the source of that function crosses, so it sees no variable or helper of the test, only its arguments, and `waitUntil` runs its function the same way.
 - `a11y(selector)` checks the page as it stands, or only the elements `selector` matches, with axe-core, as `kay dev` does (see [Checks and lints](checks.md#checks-and-lints)).
 - `a11y` resolves with the rules it breaks, none when it passes, each with its `id` (such as `color-contrast`), `impact`, `help`, `helpUrl` and `nodes`, the elements breaking it as `{ target, html }`, `target` their CSS selector.
+- Text the colour of its background is reported under `color-contrast`, as `kay dev` reports it.
 - `goto`, `back`, `forward` and `reload` resolve once the page settled, a swapped page included, and fail naming the files the page could not load (an island's chunk answering 404, say) when it does not settle in time.
 - `path()` reads where the page is.
 - `errors` holds the page's console errors and uncaught exceptions.

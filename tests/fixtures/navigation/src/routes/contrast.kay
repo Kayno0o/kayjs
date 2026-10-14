@@ -3,3 +3,4 @@ head
 main
   button.faint(style="color: #ccc; background: #fff") Faint
   button.plain Plain
+  p.same(style="color: #fff; background: #fff") Same

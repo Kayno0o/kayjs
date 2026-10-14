@@ -1,9 +1,11 @@
+import type { AxeResults } from '../runtime/dev-a11y'
 import { existsSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, realpathSync, rmdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { afterAll } from 'bun:test'
+import { withUnreadable } from '../runtime/dev-a11y'
 import { ISLAND } from '../runtime/markers'
 
 export interface BrowserOptions {
@@ -355,7 +357,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
           throw new Error(`kay: axe-core did not load in the page: ${exceptionDetails.exception?.description ?? exceptionDetails.text}`)
       }
 
-      const violations = await inView<A11yViolation[] | null>(script(async (context?: string) => {
+      const violations = await inView<A11yViolation[] | null>(script(async (unreadable: typeof withUnreadable, context?: string) => {
         const { axe } = window as unknown as { axe: Axe }
 
         if (context !== undefined && document.querySelector(context) === null)
@@ -366,10 +368,10 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
           await new Promise(resolve => setTimeout(resolve, 25))
 
         // Leaving out a dev server's dev tool.
-        const { violations } = await axe.run({ include: context === undefined ? document : [[context]], exclude: [['kay-dev']] }, { resultTypes: ['violations'] })
+        const results = await axe.run({ include: context === undefined ? document : [[context]], exclude: [['kay-dev']] }, { resultTypes: ['violations', 'incomplete'] })
 
-        return violations.map(({ id, impact, help, helpUrl, nodes }) => ({ id, impact, help, helpUrl, nodes: nodes.map(node => ({ target: node.target.map(part => Array.isArray(part) ? part.join(' >>> ') : part).join(' '), html: node.html })) }))
-      }, [selector]))
+        return unreadable(results).map(({ id, impact, help, helpUrl, nodes }) => ({ id, impact, help, helpUrl, nodes: nodes.map(node => ({ target: node.target.map(part => Array.isArray(part) ? part.join(' >>> ') : part).join(' '), html: node.html })) }))
+      }, [withUnreadable, selector]))
 
       if (violations === null)
         throw new Error(`kay: nothing matches ${selector} to check`)
@@ -631,7 +633,7 @@ function attempt<T>(run: () => T): T | undefined {
 
 interface Axe {
   _running?: boolean
-  run: (context: unknown, options: unknown) => Promise<{ violations: (Omit<A11yViolation, 'nodes'> & { nodes: { target: (string | string[])[], html: string }[] })[] }>
+  run: (context: unknown, options: unknown) => Promise<AxeResults<Omit<A11yViolation, 'nodes'> & { nodes: { target: (string | string[])[], html: string }[] }>>
 }
 
 let axe: string | undefined
@@ -644,8 +646,9 @@ async function axeSource(): Promise<string> {
 }
 
 // A call of `run` in the page, an undefined argument kept as such rather than sent as JSON's null.
+// A function argument crosses as its source, so it must read nothing from its module.
 function script(run: (...args: never[]) => unknown, args: unknown[]): string {
-  return `(${run.toString()})(${args.map(arg => arg === undefined ? 'undefined' : JSON.stringify(arg)).join(', ')})`
+  return `(${run.toString()})(${args.map(arg => arg === undefined ? 'undefined' : typeof arg === 'function' ? arg.toString() : JSON.stringify(arg)).join(', ')})`
 }
 
 // Resolves once `promise` settles, either way.

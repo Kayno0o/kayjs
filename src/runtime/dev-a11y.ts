@@ -13,9 +13,35 @@ export interface AxeViolation {
   nodes: { target: unknown[] }[]
 }
 
+// The rules a page breaks, and those axe-core leaves for a person to review.
+export interface AxeResults<Rule extends AxeViolation = AxeViolation> {
+  violations: Rule[]
+  incomplete: Rule[]
+}
+
+// Each element axe-core reports carries the checks it ran on it.
+interface AxeChecked {
+  any: { data?: { messageKey?: string } | null }[]
+}
+
 interface Axe {
   _running?: boolean
-  run: (context: unknown, options: unknown) => Promise<{ violations: AxeViolation[] }>
+  run: (context: unknown, options: unknown) => Promise<AxeResults>
+}
+
+// axe-core leaves text the colour of its background for a person to review, as it may be hidden on purpose; text hidden on purpose is clipped, which axe-core already skips, so it is reported under `color-contrast` with the elements failing the ratio.
+// Self-contained, as `page.a11y()` runs its source in the page.
+export function withUnreadable<Rule extends AxeViolation>({ violations, incomplete }: AxeResults<Rule>): Rule[] {
+  const review = incomplete.find(rule => rule.id === 'color-contrast')
+  const nodes = review?.nodes.filter(node => (node as Rule['nodes'][number] & AxeChecked).any.some(check => check.data?.messageKey === 'equalRatio')) ?? []
+
+  if (review === undefined || nodes.length === 0)
+    return violations
+
+  if (!violations.some(rule => rule.id === 'color-contrast'))
+    return [...violations, { ...review, nodes }]
+
+  return violations.map(rule => rule.id === 'color-contrast' ? { ...rule, nodes: [...rule.nodes, ...nodes] } : rule)
 }
 
 // The warning a violation logs: the rule and what it asks, then the elements breaking it, a few at most, and where it explains the fix.
@@ -62,9 +88,9 @@ export function startA11y(doc: Document = document): () => void {
         while (loaded._running)
           await new Promise(resolve => win.setTimeout(resolve, WAIT_MS))
 
-        const { violations } = await loaded.run({ exclude: KAY_DEV.map(selector => [selector]) }, { resultTypes: ['violations'] })
+        const results = await loaded.run({ exclude: KAY_DEV.map(selector => [selector]) }, { resultTypes: ['violations', 'incomplete'] })
 
-        for (const violation of violations)
+        for (const violation of withUnreadable(results))
           console.warn(a11yProblem(violation))
       } while (again)
     }

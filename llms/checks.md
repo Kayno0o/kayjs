@@ -155,6 +155,7 @@ kay check && keslint --cache
 - What the markup alone cannot tell, such as text too faint on its background, content outside any landmark or an id two islands both render, is checked on the rendered page.
 - Every page the dev server serves, `kay dev`'s or `pages({ dev: true })`'s, runs [axe-core](https://github.com/dequelabs/axe-core) once it settled, and again after each page swap.
 - It lists each rule it breaks in the dev tool's problems as `a11y color-contrast: Elements must meet minimum color contrast ratio thresholds`, then a few of the elements breaking it and the page explaining the fix.
+- Text the colour of its background counts under `color-contrast`, which axe-core alone leaves for a person to review; text hidden on purpose is clipped (`sr-only`), which the check skips.
 - Production pages never load it.
 - A test checks a page the same way with `page.a11y()` (see [Testing](testing.md#testing)).
 - `kay check` keeps TypeScript's incremental state, and what its last clean type check read, in `.kay/cache/check`, and its compiles of `.kay` files in `.kay/cache`.

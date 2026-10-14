@@ -72,16 +72,6 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the docs a
           if (violation.id === 'color-contrast')
             found.push(...violation.nodes.map(node => `${at} ${node.target}`))
         }
-
-        // axe-core leaves text the colour of its background for a person to review, as it may be hidden on purpose, which none of the docs' is.
-        const unreadable = await page.evaluate(async () => {
-          const { axe } = window as unknown as { axe: { run: (context: Document, options: object) => Promise<{ incomplete: { nodes: { target: string[], any: { data?: { messageKey?: string } }[] }[] }[] }> } }
-          const { incomplete } = await axe.run(document, { runOnly: ['color-contrast'] })
-
-          return incomplete.flatMap(rule => rule.nodes.filter(node => node.any.some(check => check.data?.messageKey === 'equalRatio')).map(node => node.target.join(' ')))
-        })
-
-        found.push(...unreadable.map(target => `${at} ${target} (1:1)`))
       }
 
       expect(found).toEqual([])

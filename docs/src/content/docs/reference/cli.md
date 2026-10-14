@@ -100,7 +100,7 @@ Every page a dev server serves carries a bar at the bottom left, `kay` and a cou
   - errors nothing caught, those kay caught in an island or an effect, and unhandled rejections, with their stack;
   - what kay recovered from in the browser, such as an island that did not match its server markup;
   - what the Content-Security-Policy blocked, naming the directive and the source;
-  - what axe-core finds on the rendered page; hovering one outlines the elements it names;
+  - what axe-core finds on the rendered page, text the colour of its background counted as low contrast; hovering one outlines the elements it names;
   - what `kay check` reports of the project without type checking.
 
   A problem logged again shows once with how many times it came. Under `kay dev`, a `.kay` file a problem names opens in the editor on a click. Dismiss, or Dismiss all, hides a problem for the rest of the browser tab, until its text changes; those the page logged go when it is left.
