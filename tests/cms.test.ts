@@ -789,7 +789,7 @@ describe('preview mode', () => {
   })
 
   it('places the marks of a long listing in one pass', () => {
-    // The work placing the marks of `count` rows does: the characters it copies out of the page and the scans it starts, which a pass per fence would multiply by the rows.
+    // The work placing the marks of `count` rows does, as the characters it copies out of the page and the regex scans it starts: a pass or a copy of the page per fence would multiply it by the rows.
     const placed = (count: number) => {
       let marked = ''
       let work = 0

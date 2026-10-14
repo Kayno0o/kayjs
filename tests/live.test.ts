@@ -1144,9 +1144,16 @@ describe('rooms', () => {
 
         return realInterval(() => undefined, 3_600_000)
       }) as typeof setInterval)
-      const { first, second, close } = processes('expiry')
+      let opened: ReturnType<typeof processes>
 
-      intervals.mockRestore()
+      try {
+        opened = processes('expiry')
+      }
+      finally {
+        intervals.mockRestore()
+      }
+
+      const { first, second, close } = opened
 
       const [ada, bob] = [connection(), connection()]
       const file = new Database(join(dir, 'expiry.sqlite'))

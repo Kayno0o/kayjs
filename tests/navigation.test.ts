@@ -45,6 +45,8 @@ async function until(holds: () => boolean | Promise<boolean>): Promise<void> {
 // Whatever the page had queued after its load or its last event has run: two frames and a task later, for a test asserting something did not happen.
 async function settled(on: Page): Promise<void> {
   await on.evaluate(async () => new Promise<void>((resolve) => {
+    // A page in the background gets no frames, so a timer ends the wait too.
+    setTimeout(resolve, 100)
     requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(resolve)))
   }))
 }
