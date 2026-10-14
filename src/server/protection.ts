@@ -3,6 +3,7 @@ import type { Elysia, TSchema } from 'elysia'
 import type { ProxyConfig } from '../config'
 import type { ActionRateLimit, RateLimit, RateStore, RateWindow, ServerAction } from '../runtime/action'
 import type { Duration } from '../runtime/duration'
+import { BlockList, isIP } from 'node:net'
 import { honeypotField, minTimeOf, STAMP_FIELD } from '../runtime/action'
 import { durationSeconds } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
@@ -51,6 +52,11 @@ const limitLists = new WeakMap<object, ActionLimit[]>()
 // One memory store per limit, so clients flooding one never push another's windows out, such as a login form's.
 const memories = new Map<string, ReturnType<typeof memoryRates>>()
 let warnedUnconfigured = false
+// The proxy settings already warned about a forwarded header from a public peer, once each.
+const warnedUntrusted = new WeakSet<ProxyConfig>()
+// Each setting's `trusted` ranges, read once.
+const trustedRanges = new WeakMap<ProxyConfig, BlockList>()
+const RANGE = /^([^/]+)\/(\d{1,3})$/
 const requestIds = new WeakMap<Request, string>()
 
 // The header a request's id comes in from a trusted proxy and goes out on, every context holding it.
@@ -332,6 +338,8 @@ export function trustProxy(app: Elysia, proxy: ProxyConfig | undefined): void {
 
     if (header !== undefined && header.trim() === '')
       throw new Error('kay: proxy.header names the header a proxy sets to the client\'s address, such as cf-connecting-ip')
+
+    rangesOf(proxy)
   }
 
   app.onRequest(({ request, server }) => {
@@ -348,7 +356,7 @@ export function clientAddress(request: Request, server: Server<unknown> | null |
   const address = rewrittenAddress(request) ?? (server ?? servers.get(request))?.requestIP(request)?.address
   const trusted = proxy ?? proxies.get(request)
   // Under `app.handle()`, as in a test, there is no socket: the request came from whatever the test says.
-  const fromProxy = address === undefined || LOOPBACK_OR_PRIVATE.test(address)
+  const fromProxy = address === undefined || fromTrusted(address, trusted)
 
   if (trusted && fromProxy) {
     const forwarded = forwardedAddress(request, trusted)
@@ -359,6 +367,9 @@ export function clientAddress(request: Request, server: Server<unknown> | null |
 
   if (!trusted && address !== undefined && fromProxy && request.headers.has('x-forwarded-for'))
     warnUnconfigured()
+
+  if (trusted && !fromProxy && request.headers.has(trusted.header ?? 'x-forwarded-for'))
+    warnUntrusted(trusted, address)
 
   return address ?? 'unknown'
 }
@@ -401,7 +412,54 @@ function passedId(request: Request): string | undefined {
 
   const address = rewrittenAddress(request) ?? servers.get(request)?.requestIP(request)?.address
 
-  return address === undefined || LOOPBACK_OR_PRIVATE.test(address) ? id : undefined
+  return address === undefined || fromTrusted(address, proxies.get(request) ?? undefined) ? id : undefined
+}
+
+// This machine, a private network, or a range the setting trusts.
+function fromTrusted(address: string, proxy: ProxyConfig | null | undefined): boolean {
+  if (LOOPBACK_OR_PRIVATE.test(address))
+    return true
+
+  const ranges = proxy ? rangesOf(proxy) : undefined
+  const family = isIP(address)
+
+  return ranges !== undefined && family !== 0 && ranges.check(address, family === 4 ? 'ipv4' : 'ipv6')
+}
+
+function rangesOf(proxy: ProxyConfig): BlockList | undefined {
+  if (!proxy.trusted)
+    return undefined
+
+  let ranges = trustedRanges.get(proxy)
+
+  if (!ranges) {
+    ranges = new BlockList()
+
+    for (const range of proxy.trusted) {
+      const [, address = range, bits] = RANGE.exec(range.trim()) ?? []
+      const family = isIP(address)
+      const prefix = bits === undefined ? (family === 4 ? 32 : 128) : Number(bits)
+
+      if (family === 0 || prefix > (family === 4 ? 32 : 128))
+        throw new Error(`kay: proxy.trusted takes address ranges such as 173.245.48.0/20 or 2400:cb00::/32; got ${JSON.stringify(range)}`)
+
+      ranges.addSubnet(address, prefix, family === 4 ? 'ipv4' : 'ipv6')
+    }
+
+    trustedRanges.set(proxy, ranges)
+  }
+
+  return ranges
+}
+
+function warnUntrusted(proxy: ProxyConfig, address: string): void {
+  if (warnedUntrusted.has(proxy))
+    return
+
+  warnedUntrusted.add(proxy)
+  const header = proxy.header ?? 'X-Forwarded-For'
+
+  kayLog('warn', `a request from ${address} carries ${header}, but that address is public and not in proxy.trusted, so kay counts it as the client and ignores the header; a CDN reaching the server from public addresses has its ranges listed in proxy.trusted`)
 }
 
 function warnUnconfigured(): void {

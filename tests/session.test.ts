@@ -1,7 +1,7 @@
 import type { Action } from '../src/runtime'
 import type { SessionStore } from '../src/server'
 import process from 'node:process'
-import { afterEach, describe, expect, it, setSystemTime } from 'bun:test'
+import { afterEach, describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { stringify } from 'devalue'
 import { Elysia } from 'elysia'
 import { configuredSite, setSite } from '../src/runtime/site'
@@ -276,6 +276,32 @@ describe('sessions', () => {
     expect(await count({})).toMatch(/^session=(?!.*Secure)/i)
   })
 
+  it('in production with no site, warns once that cookies lose Secure when a request does not say its scheme, not for a server tried locally', async () => {
+    const env = process.env.NODE_ENV ?? 'test'
+    const before = configuredSite()
+    const app = counter()
+    const warn = spyOn(console, 'warn').mockImplementation(() => undefined)
+    const count = async (url: string, headers: Record<string, string> = {}) => (await app.handle(new Request(url, { headers }))).headers.getSetCookie()[0]!
+
+    setSite(undefined)
+    process.env.NODE_ENV = 'production'
+
+    try {
+      expect(await count('http://localhost/count')).toMatch(/^session=(?!.*Secure)/i)
+      expect(await count('http://example.com/count', { 'x-forwarded-proto': 'https' })).toMatch(/^__Host-session=.*; Secure/i)
+      expect(warn).not.toHaveBeenCalled()
+      expect(await count('http://example.com/count')).toMatch(/^session=(?!.*Secure)/i)
+      expect(await count('http://example.com/count')).toMatch(/^session=(?!.*Secure)/i)
+      expect(warn).toHaveBeenCalledTimes(1)
+      expect(String(warn.mock.calls[0]![0])).toContain('X-Forwarded-Proto')
+    }
+    finally {
+      warn.mockRestore()
+      process.env.NODE_ENV = env
+      setSite(before?.origin, before?.slashed ? 'always' : undefined)
+    }
+  })
+
   it('reads a cookie from before kay counted a session\'s start, counting it from when it was written', async () => {
     const key = new Bun.CryptoHasher('sha256').update(SECRET).digest()
     const now = Math.floor(Date.now() / 1000)
@@ -446,5 +472,26 @@ describe('a refused form post on a running server', () => {
     finally {
       await app.stop()
     }
+  })
+})
+
+describe('a page read by who sent it', () => {
+  it('keeps out of shared caches once its render read the session, and leaves other pages and an app\'s own caching alone', async () => {
+    const app = new Elysia()
+      .use(session({ secret: SECRET }))
+      .derive({ as: 'global' }, () => ({ greeting: 'Hello' }))
+      .use(await pages({ routes: 'tests/fixtures/session/src/routes', prebuilt: false, security: false }))
+    const plain = new Elysia().use(await pages({ routes: 'tests/fixtures/production/src/routes', prebuilt: false, security: false }))
+    const personal = await app.handle(new Request('http://localhost/'))
+    const shared = await plain.handle(new Request('http://localhost/feed'))
+    // Asking whether a form post failed reads no cookie when the request carries none for it.
+    const unposted = await plain.handle(new Request('http://localhost/notes'))
+
+    expect(personal.status).toBe(200)
+    expect(personal.headers.get('cache-control')).toBe('private, no-cache')
+    expect(personal.headers.get('vary')).toContain('cookie')
+    expect(shared.status).toBe(200)
+    expect(shared.headers.get('cache-control')).toBeNull()
+    expect(unposted.headers.get('cache-control')).toBeNull()
   })
 })

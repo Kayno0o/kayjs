@@ -100,6 +100,8 @@ export default defineConfig({
 })
 ```
 
-Use `hops: 2` for Cloudflare then nginx, or `proxy: { header: 'cf-connecting-ip' }` to read a header the proxy sets.
+Use `hops: 2` for Cloudflare then nginx, or `proxy: { header: 'cf-connecting-ip' }` to read a header the proxy sets. kay reads either only from this machine, a private network or the address ranges `trusted` lists, such as a CDN's published ranges when it reaches the server directly: `proxy: { header: 'cf-connecting-ip', trusted: ['173.245.48.0/20'] }`.
+
+The proxy passes `X-Forwarded-Proto`, or `site` in kay.config.ts is the https address, so kay's cookies stay `Secure`; production warns once when it cannot tell.
 
 <ReadMore href="/llms/production">Log entries for your own sink, span attributes, security headers and compression are in the full production reference.</ReadMore>

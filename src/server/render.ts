@@ -49,7 +49,7 @@ import { pageSetting } from './page-settings'
 import { matchesEtag } from './public'
 import { queryRules, queryScript, readQuery } from './query'
 import { reportServerError } from './report'
-import { inServerScope, withOutcome } from './scope'
+import { inServerScope, readPersonally, wasReadPersonally, withOutcome } from './scope'
 import { Denied, NotFound, Redirect } from './signals'
 import { speculationRules } from './speculation'
 import { renderStatic, settle, streamDocument } from './stream'
@@ -165,6 +165,7 @@ const stylesheetsOf = perOwner<ClientBuild['styles']>()
 const TEXT = { 'content-type': 'text/plain; charset=utf-8' }
 // Header values are bytes, so a file name outside ASCII is escaped.
 const NOT_ASCII = /[^\x20-\x7E]/g
+const VARY_COOKIE = /(?:^|,)\s*cookie\s*(?:,|$)/i
 
 // The params come resolved, each matcher's value in place of its text.
 export async function renderPage(route: ServedRoute, context: RequestContext, params: Record<string, unknown>, client: ClientBuild, options: RenderOptions = {}): Promise<Response> {
@@ -434,7 +435,12 @@ function createRendering(context: RequestContext, params: Record<string, unknown
   const { request } = context
   const jar = cookieJar(request)
   let flash: Flash | SuccessFlash | null | undefined
-  const readOnce = () => flash ??= handedOverFlash(request) ?? (hasFlash(request) ? readFlash(jar.cookies) ?? null : null)
+  const personalCookies = () => {
+    readPersonally(request)
+
+    return jar.cookies
+  }
+  const readOnce = () => flash ??= handedOverFlash(request) ?? (hasFlash(request) ? readFlash(personalCookies()) ?? null : null)
   const headers = new Headers({ 'content-type': 'text/html; charset=utf-8' })
   const url = new URL(request.url)
   // The search params as text until the page's schema reads them; most pages never look.
@@ -464,7 +470,7 @@ function createRendering(context: RequestContext, params: Record<string, unknown
         query = value
       },
       get cookies() {
-        return jar.cookies
+        return personalCookies()
       },
       // The app's derive and resolve hooks ran before this handler, so the context carries what `Register` declares.
       locals: context as unknown as Locals,
@@ -522,12 +528,24 @@ export function hasFlash(request: Request): boolean {
 // A page under a mount point has its paths put under it as it goes out, unless they are already.
 function respond(rendering: Rendering, output: Body | Rebased): Response {
   rendering.writeCookies()
+  keepPersonal(rendering)
 
   const body = output instanceof Rebased ? output.body : output
   const init = { status: rendering.status, headers: rendering.headers }
   const response = body instanceof ReadableStream || body instanceof Blob ? new Response(body, init) : wholeResponse(body, init)
 
   return !(output instanceof Rebased) && rendering.base !== '' && (typeof body === 'string' || body instanceof ReadableStream) ? rebaseHtml(response, rendering.base) : response
+}
+
+// A page whose render read the session or a cookie is for that visitor alone: no CDN may keep it, unless the page set its own caching.
+function keepPersonal({ headers, ctx }: Rendering): void {
+  if (headers.has('cache-control') || !wasReadPersonally(ctx.request))
+    return
+
+  headers.set('cache-control', 'private, no-cache')
+
+  if (!VARY_COOKIE.test(headers.get('vary') ?? ''))
+    headers.append('vary', 'cookie')
 }
 
 // A redirect goes out as is; anything else renders the nearest special page, falling back to plain text.

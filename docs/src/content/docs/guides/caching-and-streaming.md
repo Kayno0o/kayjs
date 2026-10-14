@@ -56,6 +56,8 @@ The cache lives in the process, and the value is shared by every caller, so neve
 
 A page that is the same for everyone is rendered once with `prerender: true` in its `page` object, and rebuilt in the background with `revalidate: '1h'`. See [Routing](/essentials/routing#prerendering). After a change, `invalidatePage(path => path.startsWith('/news'))` from `kay/server` refreshes the prerendered pages.
 
+A page rendered per request that read the session or a cookie goes out as `Cache-Control: private, no-cache` with `Vary: cookie`, so a CDN caching HTML never hands one visitor's page to another. A `cache-control` the page sets through `ctx.headers` wins.
+
 ## Streaming
 
 A load waits for every `await` in its server fence before the page renders. Leave a slow value unawaited and render it with an `await` block: the page goes out at once, and the `then` block streams in when the value resolves.

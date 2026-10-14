@@ -7,6 +7,7 @@ import { kayLog } from '../runtime/log'
 import { openSqlite } from '../runtime/sqlite.server'
 import { overHttps } from './actions'
 import { nodeCrypto } from './builtins'
+import { readPersonally } from './scope'
 import { useStampSecret } from './stamp'
 
 export type SessionData = Record<string, unknown>
@@ -253,6 +254,7 @@ class RequestSession<Data extends object> implements Session<Data> {
   }
 
   private async read(): Promise<void> {
+    readPersonally(this.request)
     const value = new Bun.CookieMap(this.request.headers.get('cookie') ?? '').get(this.name)
     const opening = value !== null && value !== '' ? opened(value, this.config.keys, this.name) : undefined
     const sealed = opening?.sealed

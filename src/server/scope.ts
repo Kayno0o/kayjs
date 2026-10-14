@@ -6,6 +6,9 @@ import { setRequestOutcome } from '../runtime/action'
 import { readParam } from '../runtime/query-param'
 import { setServerScope } from '../runtime/reactive'
 
+// Requests whose page read who sent them, through their session or a cookie, so no shared cache may keep the answer.
+const personal = new WeakSet<Request>()
+
 const store = new AsyncLocalStorage<ServerScope>()
 
 setServerScope(() => store.getStore())
@@ -18,6 +21,7 @@ export function inServerScope<T>(request: Request, report: (error: unknown) => v
   const cookie = (name: string) => {
     if (!cookies) {
       cookies = new Bun.CookieMap(request.headers.get('cookie') ?? '')
+      personal.add(request)
       cookieRead?.()
     }
 
@@ -36,4 +40,12 @@ setRequestOutcome(() => outcomes.getStore()?.())
 // Answers a request whose form post, if any, `read` gives: an action's `failed()` and `succeeded()` read it in its loads and templates alike.
 export function withOutcome<T>(read: () => Outcome | null, run: () => T): T {
   return outcomes.run(read, run)
+}
+
+export function readPersonally(request: Request): void {
+  personal.add(request)
+}
+
+export function wasReadPersonally(request: Request): boolean {
+  return personal.has(request)
 }

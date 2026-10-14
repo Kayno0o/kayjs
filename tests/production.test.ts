@@ -687,6 +687,29 @@ describe('action protection', () => {
     expect(clientAddress(behind, socket('198.51.100.9'), { hops: 2 })).toBe('198.51.100.9')
   })
 
+  it('trusts a CDN reaching the server from the public ranges proxy.trusted lists, warning once when a header arrives from a public peer outside them', () => {
+    const warn = spyOn(console, 'warn').mockImplementation(() => undefined)
+    const proxy = { header: 'cf-connecting-ip', trusted: ['173.245.48.0/20', '2400:cb00::/32', '198.51.100.1'] }
+    const behind = new Request('http://localhost/', { headers: { 'cf-connecting-ip': '203.0.113.7' } })
+
+    try {
+      expect(clientAddress(behind, socket('173.245.50.1'), proxy)).toBe('203.0.113.7')
+      expect(clientAddress(behind, socket('::ffff:173.245.50.1'), proxy)).toBe('203.0.113.7')
+      expect(clientAddress(behind, socket('2400:cb00:2049::1'), proxy)).toBe('203.0.113.7')
+      expect(clientAddress(behind, socket('198.51.100.1'), proxy)).toBe('203.0.113.7')
+      expect(clientAddress(behind, socket('10.0.0.2'), proxy)).toBe('203.0.113.7')
+      expect(warn).not.toHaveBeenCalled()
+      expect(clientAddress(behind, socket('198.51.100.9'), proxy)).toBe('198.51.100.9')
+      expect(clientAddress(behind, socket('198.51.100.10'), proxy)).toBe('198.51.100.10')
+      expect(clientAddress(new Request('http://localhost/'), socket('198.51.100.11'), proxy)).toBe('198.51.100.11')
+      expect(warn).toHaveBeenCalledTimes(1)
+      expect(String(warn.mock.calls[0]![0])).toContain('proxy.trusted')
+    }
+    finally {
+      warn.mockRestore()
+    }
+  })
+
   it('counts the socket as the client without a proxy setting, warning once when requests come through one', () => {
     const warn = spyOn(console, 'warn').mockImplementation(() => undefined)
     const forged = new Request('http://localhost/', { headers: { 'x-forwarded-for': '203.0.113.7' } })
@@ -716,7 +739,7 @@ describe('action protection', () => {
   })
 
   it('refuses a proxy setting it cannot read, as the server boots', async () => {
-    for (const proxy of [{}, { hops: 1, header: 'x-real-ip' }, { hops: 0 }, { hops: 1.5 }, { header: ' ' }])
+    for (const proxy of [{}, { hops: 1, header: 'x-real-ip' }, { hops: 0 }, { hops: 1.5 }, { header: ' ' }, { hops: 1, trusted: ['a CDN'] }, { hops: 1, trusted: ['10.0.0.0/33'] }, { hops: 1, trusted: ['::/129'] }])
       await expect(pages({ routes: `${FIXTURE}/src/routes`, prebuilt: false, proxy })).rejects.toThrow('kay: proxy')
   })
 

@@ -151,6 +151,8 @@ export interface ProxyConfig {
   hops?: number | undefined
   // The header a proxy sets to the client's address, such as `cf-connecting-ip` or `x-real-ip`, read instead of `X-Forwarded-For`.
   header?: string | undefined
+  // The public address ranges the proxy reaches the server from, such as a CDN's published ones, `173.245.48.0/20`: trusted besides this machine and private networks.
+  trusted?: string[] | undefined
 }
 
 export interface FontConfig {
