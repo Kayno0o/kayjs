@@ -30,4 +30,4 @@ export default api({ bodyLimit: UPLOAD_LIMIT })
     const result = await deleteUnusedUploads(body.keys)
 
     return 'blocked' in result ? status(409, `Nothing was deleted: ${result.blocked.join('; ')}`) : result
-  }, { body: s.Object({ keys: s.Array(s.String(), { maxItems: 100 }) }) })
+  }, { body: s.Object({ keys: s.Array(s.String({ maxLength: 300 }), { maxItems: 100 }) }) })

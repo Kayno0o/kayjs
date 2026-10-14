@@ -102,7 +102,7 @@ export async function deleteSaved(ref: EntryRef, version?: string | undefined): 
   return settled(outcome, 'Deleted', 'Not deleted')
 }
 
-// Deletes an unused upload and its variants, and says how it went; true once deleted.
+// Deletes an unused upload and its variants, and says how it went; true once the row is stale, deleted or not.
 export async function deleteUnusedUpload(key: string): Promise<boolean> {
   const result = await attempt(() => call(filesApi, '/unused/delete', { method: 'post', body: { keys: [key] } }), 'Could not delete')
 
@@ -110,9 +110,9 @@ export async function deleteUnusedUpload(key: string): Promise<boolean> {
     return false
 
   if (result.deleted.length === 0) {
-    toast.error('Not deleted: an entry references this file now')
+    toast.info('No longer unused, or already deleted')
 
-    return false
+    return true
   }
 
   toast.success('Deleted')

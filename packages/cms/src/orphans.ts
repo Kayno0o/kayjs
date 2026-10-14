@@ -14,22 +14,29 @@ export interface UnusedUpload {
 // Either the uploads no entry references, or why they cannot be told: an unreadable collection or entry may reference any of them.
 export type UploadScan = { unused: UnusedUpload[] } | { blocked: string[] }
 
+// An upload younger than this is never listed: an entry saved to a forge the site has not rebuilt from, an open form, or another replica's save may reference it before this server reads it.
+const GRACE = 24 * 60 * 60 * 1000
+// A collection named so has no folder `files.list` takes.
+const PRIVATE_FOLDER = /^private$/i
+
 // The 20 hex digits of a key's random id, which a reference to the file holds whatever the URL around it: `/_kay/files/`, the site's base, an origin or a CDN.
 const KEY_ID = /([\da-f]{20})(?:\.\d+x\d+)?\.[a-z\d]{1,10}$/
 // Every window of 20 hex digits, so an id inside a longer run of them is found too.
 const IDS = /(?=([\da-f]{20}))/g
 
 // The uploads of the CMS's folders that no entry of any collection, locale or draft mentions.
+// An upload modified less than a day ago, or that the store dates not at all, is held back.
 // A URL hardcoded in a page, a file of the repository outside the collections or an older revision a revert brings back is not seen: the editor confirms before anything goes.
 export async function unusedUploads(): Promise<UploadScan> {
   const blocked: string[] = []
   const listed = await collections()
-  const folders = [...new Set(listed.map(collection => uploadFolder(collection.name)))]
+  const folders = [...new Set(listed.map(collection => uploadFolder(collection.name)))].filter(folder => !PRIVATE_FOLDER.test(folder))
   const stored: string[] = []
+  const now = Date.now()
 
   try {
     for (const folder of folders)
-      stored.push(...await files.list({ folder }))
+      stored.push(...(await files.list({ folder })).filter(file => file.modified !== undefined && now - file.modified.getTime() >= GRACE).map(file => file.key))
   }
   catch (error) {
     log.error('listing the uploads failed', error)
@@ -55,7 +62,7 @@ export async function unusedUploads(): Promise<UploadScan> {
         }
 
         for (const text of [JSON.stringify(entry.data, (_, value: unknown) => typeof value === 'bigint' ? String(value) : value), entry.body ?? '']) {
-          for (const match of text.matchAll(IDS))
+          for (const match of text.toLowerCase().matchAll(IDS))
             referenced.add(match[1]!)
         }
       }
@@ -69,14 +76,13 @@ export async function unusedUploads(): Promise<UploadScan> {
   if (blocked.length > 0)
     return { blocked }
 
-  const unused: UnusedUpload[] = []
-
-  for (const key of stored.toSorted()) {
+  const orphans = stored.toSorted().filter((key) => {
     const id = KEY_ID.exec(key)?.[1]
 
-    if (id !== undefined && !referenced.has(id))
-      unused.push({ key, url: files.url(key), variants: await files.variants(key) })
-  }
+    return id !== undefined && !referenced.has(id)
+  })
+  const variants = await files.variants(orphans)
+  const unused = orphans.map(key => ({ key, url: files.url(key), variants: variants.get(key) ?? [] }))
 
   return { unused }
 }

@@ -18,5 +18,5 @@ PageSection(title="Unused uploads" level={1})
   if 'blocked' in scan
     EmptyState(title="Uploads cannot be checked" description={`${scan.blocked.join('; ')}. Nothing is listed while an entry or a collection cannot be read, since it may use any upload.`})
   else
-    Notice(tone="warning" label="These uploads are mentioned in no entry of any collection, locale or draft. A URL written by hand in a page, a file of the repository outside the collections, or an older revision a revert brings back is not seen, so check each before you delete it: deleting is permanent, variants included.")
+    Notice(tone="warning" label="These uploads are mentioned in no entry of any collection, locale or draft the server can read, and are over a day old. Recent uploads are held back, since a save the site has not rebuilt from, another server's save or an unsaved form may use them. A URL written by hand in a page and an older revision a revert brings back are not seen either, so check each before you delete it: deleting is permanent, variants included.")
     UnusedUploads(uploads={scan.unused})

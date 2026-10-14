@@ -1,6 +1,6 @@
 import type { Elysia } from 'elysia'
 import type { Duration } from '../runtime/duration'
-import { readdir, rename, rm } from 'node:fs/promises'
+import { readdir, rename, rm, stat } from 'node:fs/promises'
 import { basename, join, relative, resolve, sep } from 'node:path'
 import { durationSeconds } from '../runtime/duration'
 import { FILES_ROUTE } from '../runtime/image'
@@ -15,12 +15,18 @@ export interface FileStore {
   // The file, or undefined when none is stored under the key.
   read: (key: string) => Promise<Blob | undefined>
   delete: (key: string) => Promise<void>
-  // Every key stored under the prefix, all of them without one, in no order; `files.list()` needs it, so a store of the app's own gives it for anything listing the files.
-  list?: ((prefix?: string) => Promise<string[]>) | undefined
+  // Every file stored under the prefix, all of them without one, in no order, with when it was last written when the store knows; `files.list()` needs it, so a store of the app's own gives it for anything listing the files.
+  list?: ((prefix?: string) => Promise<StoredFile[]>) | undefined
   // Where a store on this machine's disk keeps a file, which the image route reads in place rather than copying.
   path?: ((key: string) => string) | undefined
   // Where the files are reachable over HTTP without kay, such as a public bucket or a CDN in front of it, which a static export links.
   publicUrl?: string | undefined
+}
+
+export interface StoredFile {
+  key: string
+  // When the file was last written; absent when the store cannot say.
+  modified?: Date | undefined
 }
 
 export interface PutOptions {
@@ -83,11 +89,15 @@ export function diskFiles(dir: string = DEFAULT_DIR): FileStore {
       await rm(path(key), { force: true })
     },
     async list(prefix = '') {
-      try {
-        const root = resolve(dir)
-        const found = await readdir(root, { recursive: true, withFileTypes: true })
+      const root = resolve(dir)
+      // Only the folder the prefix names is walked.
+      const base = prefix.slice(0, prefix.lastIndexOf('/') + 1)
 
-        return found.filter(entry => entry.isFile()).map(entry => relative(root, join(entry.parentPath, entry.name)).split(sep).join('/')).filter(key => key.startsWith(prefix))
+      try {
+        const found = await readdir(join(root, base), { recursive: true, withFileTypes: true })
+        const keys = found.filter(entry => entry.isFile()).map(entry => relative(root, join(entry.parentPath, entry.name)).split(sep).join('/')).filter(key => key.startsWith(prefix))
+
+        return await Promise.all(keys.map(async key => ({ key, modified: (await stat(path(key))).mtime })))
       }
       catch (error) {
         if ((error as NodeJS.ErrnoException).code === 'ENOENT')
@@ -116,17 +126,17 @@ export function s3Files(options: Bun.S3Options & { publicUrl?: string | undefine
       await bucket.delete(key)
     },
     async list(prefix = '') {
-      const keys: string[] = []
+      const found: StoredFile[] = []
       let token: string | undefined
 
       do {
         const page = await bucket.list(token === undefined ? { prefix } : { prefix, continuationToken: token })
 
-        keys.push(...(page.contents ?? []).map(object => object.key))
+        found.push(...(page.contents ?? []).map(object => ({ key: object.key, modified: object.lastModified === undefined ? undefined : new Date(object.lastModified) })))
         token = page.isTruncated ? page.nextContinuationToken : undefined
       } while (token !== undefined)
 
-      return keys
+      return found
     },
     publicUrl,
   }
@@ -135,19 +145,22 @@ export function s3Files(options: Bun.S3Options & { publicUrl?: string | undefine
 // Files kept in this process, gone when it stops: what `bun test` uses unless told otherwise.
 export function memoryFiles(): FileStore {
   const stored = new Map<string, Blob>()
+  const written = new Map<string, Date>()
 
   return {
     async write(key, data) {
       stored.set(key, new Blob([await data.arrayBuffer()], { type: data.type }))
+      written.set(key, new Date())
     },
     async read(key) {
       return stored.get(key)
     },
     async delete(key) {
       stored.delete(key)
+      written.delete(key)
     },
     async list(prefix = '') {
-      return [...stored.keys()].filter(key => key.startsWith(prefix))
+      return [...stored.keys()].filter(key => key.startsWith(prefix)).map(key => ({ key, modified: written.get(key) }))
     },
   }
 }
@@ -214,7 +227,7 @@ export const files = {
       await rm(join(current.cacheDir, key), { force: true })
 
     try {
-      await Promise.all((await files.variants(key)).map(async name => rm(join(current.variantsDir!, name), { force: true })))
+      await Promise.all(((await files.variants([key])).get(key) ?? []).map(async name => rm(join(current.variantsDir!, name), { force: true })))
     }
     catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT')
@@ -222,36 +235,40 @@ export const files = {
     }
   },
 
-  // The keys of the stored files, those in a folder alone when one is given, in no order; the store must be able to list, as the built-in ones do.
-  async list(options: { folder?: string | undefined } = {}): Promise<string[]> {
+  // The stored files, those directly in a folder alone when one is given, in no order; the store must be able to list, as the built-in ones do.
+  async list(options: { folder?: string | undefined } = {}): Promise<StoredFile[]> {
+    const { folder } = options
+
+    if (folder !== undefined && (!FOLDER.test(folder) || PRIVATE_SEGMENT.test(folder)))
+      throw new Error(`kay: files.list() was given the folder ${JSON.stringify(folder)}: a folder is letters, digits, - and _ in segments split by /, and starts with no \`private\` segment`)
+
     const store = await activeStore()
 
     if (!store.list)
       throw new Error('kay: files.list() needs a store with a list method; the one `storage` names has none')
 
-    const prefix = options.folder === undefined ? undefined : `${options.folder.replace(TRAILING_SLASH, '')}/`
+    const prefix = folder === undefined ? undefined : `${folder}/`
 
-    return (await store.list(prefix)).filter(key => KEY.test(key))
+    return (await store.list(prefix)).filter(file => KEY.test(file.key) && (prefix === undefined || !file.key.slice(prefix.length).includes('/')))
   },
 
-  // The file names the image route made of a stored file, resized variants and social cards, which `files.delete` removes with it.
-  async variants(key: string): Promise<string[]> {
+  // The file names the image route made of each stored file, resized variants and social cards, which `files.delete` removes with it; the directory is read once.
+  async variants(keys: string[]): Promise<Map<string, string[]>> {
     const { variantsDir } = current
+    const made = new Map(keys.map(key => [storedVariants(checkedKey(key, 'files.variants()')), { key, names: [] as string[] }]))
 
-    if (variantsDir === undefined)
-      return []
-
-    const prefix = storedVariants(checkedKey(key, 'files.variants()'))
-
-    try {
-      return (await readdir(variantsDir)).filter(name => name.startsWith(prefix)).toSorted()
+    if (variantsDir !== undefined) {
+      try {
+        for (const name of (await readdir(variantsDir)).toSorted())
+          made.get(`${name.split('-').slice(0, 2).join('-')}-`)?.names.push(name)
+      }
+      catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT')
+          throw error
+      }
     }
-    catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT')
-        return []
 
-      throw error
-    }
+    return new Map([...made.values()].map(({ key, names }) => [key, names]))
   },
 
   // Where a page links the file, a path of the site as a template's `href` is: `/_kay/files/<key>`, signed and expiring for a private one.

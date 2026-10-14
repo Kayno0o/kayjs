@@ -1,7 +1,7 @@
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
-import { beforeAll, expect, test } from 'bun:test'
+import { beforeAll, expect, setSystemTime, test } from 'bun:test'
 import { testSite } from 'kay/test'
 import { fileVersion } from '../../../src/files'
 import { BODY, parseMarker } from '../../../src/markers'
@@ -325,6 +325,8 @@ test('the unused-uploads screen lists an upload no entry mentions, and deleting 
   const keyOf = (path: string) => path.slice('/_kay/files/'.length)
   const remove = async (keys: string[]) => site.fetch('/api/cms/files/unused/delete', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ keys }) })
 
+  // The scan holds back what is under a day old.
+  setSystemTime(new Date(Date.now() + 2 * 24 * 60 * 60 * 1000))
   products.push({ slug: 'cup', data: { name: 'Cup', photo: used } as { name: string } })
 
   try {
@@ -343,6 +345,7 @@ test('the unused-uploads screen lists an upload no entry mentions, and deleting 
     expect((await site.visit('/admin/uploads')).text('main')).toContain('Uploads cannot be checked')
   }
   finally {
+    setSystemTime()
     outage.message = undefined
     products.splice(products.findIndex(product => product.slug === 'cup'), 1)
   }
