@@ -148,6 +148,7 @@ describe('the documentation site', () => {
       ] },
       { name: 'kay.config.ts', href: undefined, note: undefined, children: [] },
     ])
+    expect(() => fileTree('\n  \n')).toThrow('FileTree has no file to draw')
     expect(() => fileTree('src/ the sources')).toThrow('FileTree cannot read the line "src/ the sources"')
   })
 

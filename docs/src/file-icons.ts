@@ -1,7 +1,6 @@
 import type { IconProps } from 'kay/icons'
 import BrandDocker from '~icons/tabler/brand-docker'
 import BrandTypescript from '~icons/tabler/brand-typescript'
-import Database from '~icons/tabler/database'
 import File from '~icons/tabler/file'
 import FileText from '~icons/tabler/file-text'
 import FileTypeCss from '~icons/tabler/file-type-css'
@@ -21,7 +20,6 @@ const CONFIG = /(?:^|\.)config\.\w+$|^tsconfig|^\./
 const BY_NAME: Record<string, IconProps> = { 'Dockerfile': BrandDocker, 'bun.lock': Lock, 'package.json': Json }
 const BY_EXTENSION: Record<string, IconProps> = {
   css: FileTypeCss,
-  db: Database,
   html: FileTypeHtml,
   ico: Photo,
   jpg: Photo,
@@ -29,7 +27,6 @@ const BY_EXTENSION: Record<string, IconProps> = {
   json: Json,
   md: Markdown,
   png: Photo,
-  sql: Database,
   svg: Photo,
   ts: BrandTypescript,
   txt: FileText,
