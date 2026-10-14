@@ -315,6 +315,55 @@ describe('GitLab', () => {
   })
 })
 
+describe('the algorithms option of the Google, Microsoft and GitLab presets', () => {
+  const GITLAB = 'https://git.example.test'
+  const presets: [string, (algorithms?: string[]) => OAuthProvider<any, any>, string, Endpoints, Record<string, unknown>][] = [
+    ['google', algorithms => googleProvider({ ...algorithms && { algorithms } }), 'https://accounts.google.com', { token: 'https://oauth2.googleapis.com/token', jwks: 'https://www.googleapis.com/oauth2/v3/certs' }, { email: 'ada@gmail.com', email_verified: true }],
+    ['microsoft', algorithms => microsoftProvider({ ...algorithms && { algorithms } }), 'unused', { token: 'https://login.microsoftonline.com/common/oauth2/v2.0/token', jwks: 'https://login.microsoftonline.com/common/discovery/v2.0/keys' }, { tid: WORK_TENANT, iss: `https://login.microsoftonline.com/${WORK_TENANT}/v2.0` }],
+    ['gitlab', algorithms => gitlabProvider({ url: GITLAB, ...algorithms && { algorithms } }), GITLAB, { token: `${GITLAB}/oauth/token`, jwks: `${GITLAB}/oauth/discovery/keys`, user: `${GITLAB}/oauth/userinfo` }, { preferred_username: 'ada' }],
+  ]
+
+  test('each preset refuses a token signed outside its list, and takes one inside it', async () => {
+    const rs384 = await generateKeyPair('RS384')
+    const rs384Jwk = { ...await exportJWK(rs384.publicKey), kid: 'k1', use: 'sig' }
+
+    for (const [name, make, issuer, endpoints, account] of presets) {
+      // An RS384 token is taken by default and when listed, refused once the app names RS256 or ES256 only.
+      for (const [algorithms, landed] of [[undefined, '/'], [['RS384'], '/'], [['RS256'], '/login?error=oauth'], [['ES256', 'PS256'], '/login?error=oauth']] as const) {
+        const mock = provider(issuer, endpoints, { ada: account })
+        const { signIn } = setup(name, make(algorithms && [...algorithms]))
+
+        mock.alg = 'RS384'
+        mock.key = rs384.privateKey
+        mock.jwks = [rs384Jwk]
+
+        expect([name, algorithms, (await signIn(mock, 'ada')).landed]).toEqual([name, algorithms, landed])
+      }
+
+      // An RS256 token is refused by a list without RS256.
+      const mock = provider(issuer, endpoints, { ada: account })
+      const { signIn } = setup(name, make(['ES256']))
+
+      expect([name, (await signIn(mock, 'ada')).landed]).toEqual([name, '/login?error=oauth'])
+    }
+  })
+
+  test('a GitLab on http is refused in production, where the app is created and so at every sign-in', () => {
+    const realEnv = process.env.NODE_ENV ?? 'test'
+
+    process.env.NODE_ENV = 'production'
+
+    try {
+      expect(() => setup('gitlab', gitlabProvider({ url: 'http://git.example.test' }))).toThrow('https')
+      expect(() => setup('gitlab', gitlabProvider({ url: 'HTTP://git.example.test' }))).toThrow('https')
+      expect(() => setup('gitlab', gitlabProvider({ url: GITLAB }))).not.toThrow()
+    }
+    finally {
+      process.env.NODE_ENV = realEnv
+    }
+  })
+})
+
 describe('Apple', () => {
   const ENDPOINTS = { token: 'https://appleid.apple.com/auth/token', jwks: 'https://appleid.apple.com/auth/keys' }
 
