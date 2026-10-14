@@ -32,7 +32,9 @@ export interface Inferred {}
 
 // The server plugins a config's extensions hand `pages()`, each awaited out of the function giving it.
 export type ExtensionServersOf<Config> = Config extends { extensions?: readonly (infer Extension)[] | undefined } ? ServersOf<Extension> : never
-type ServersOf<Extension> = Extension extends { server?: infer Server } ? Server extends (...args: never[]) => infer Built ? Awaited<Built> : Server extends AnyElysia ? Server : never : never
+type ServersOf<Extension> = Extension extends { server?: infer Server } ? Typed<Server extends (...args: never[]) => infer Built ? Awaited<Built> : Server> : never
+// An extension annotated `KayExtension` with no type argument holds `AnyElysia`, which knows no locals or routes and would turn every local and link `any`, so it is left out.
+type Typed<Server> = Server extends AnyElysia ? 0 extends 1 & Server['~Singleton'] ? never : Server : never
 type ExtensionServers = Inferred extends { extensions: infer Servers } ? Servers : never
 type Intersected<Union> = (Union extends unknown ? (value: Union) => void : never) extends (value: infer Each) => void ? Each : never
 type ServerLocals<Server> = Server extends Pick<Elysia, '~Singleton' | '~Ephemeral' | '~Volatile'> ? LocalsOf<Server> : never

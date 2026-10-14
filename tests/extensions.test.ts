@@ -154,8 +154,8 @@ Who
   'node_modules/kay-lib/index.ts': `import type { KayExtension } from 'kay/server'
 import { Elysia } from 'elysia'
 
-// Not annotated, so its type leaves the app's locals to the plugins below.
-export const authPages = () => ({
+// Annotated with no server of its own, so it adds nothing to the app's locals and leaves them to the plugins below.
+export const authPages = (): KayExtension => ({
   name: 'kay-lib',
   routes: { dir: \`\${import.meta.dir}/routes\`, prefix: '/auth' },
   messages: \`\${import.meta.dir}/messages\`,
@@ -165,9 +165,9 @@ export const authPages = () => ({
     head: [{ tag: 'script', props: { children: 'window.lib = 1' } }, { tag: 'style', props: { children: '.lib { color: teal }' } }],
     redirects: { '/old': '/' },
   },
-}) satisfies KayExtension
+})
 
-export const statsApi = () => ({ name: 'kay-lib-stats', api: { dir: \`\${import.meta.dir}/stats-api\`, prefix: 'stats' } }) satisfies KayExtension
+export const statsApi = (): KayExtension => ({ name: 'kay-lib-stats', api: { dir: \`\${import.meta.dir}/stats-api\`, prefix: 'stats' } })
 
 const greeting = new Elysia({ name: 'kay-lib-greeter' })
   .decorate('greeting', 'hello')
