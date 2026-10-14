@@ -1,5 +1,8 @@
 const URL_STRIPPED = /[\t\n\r]/g
 const LEADING_SPACE = /^\s+/
+// A `%XX` of the ASCII range, which a lenient decoder turns into its character even beside a malformed escape.
+const ASCII_ESCAPE = /%([0-7][\da-f])/gi
+const MAX_LAYERS = 8
 // Resolved against, so dot segments collapse as a browser or `new URL` would; the reserved `.invalid` names no real host.
 const BASE = new URL('http://kayjs-auth.invalid')
 // A path whose first segment is empty, or decodes to empty, reads as a host once something decodes or resolves it again: `//evil.com`, `/%2F/evil.com`.
@@ -23,7 +26,7 @@ export function safeRedirect(path: string | undefined | null, fallback = '/'): s
     return fallback
 
   // Browsers strip tab/newline anywhere in a URL; mirror that before validating.
-  const cleaned = path.replace(URL_STRIPPED, '').replace(LEADING_SPACE, '')
+  const cleaned = stripped(path)
 
   if (!cleaned.startsWith('/') || cleaned.startsWith('//') || cleaned.includes('\\') || hasControlChar(cleaned))
     return fallback
@@ -37,16 +40,29 @@ export function safeRedirect(path: string | undefined | null, fallback = '/'): s
 }
 
 // What an app that decoded the path sees: the tab and newline a browser strips only after decoding (`/%09/evil.com`) can leave a second slash or a backslash up front, and resolving alone would hide it behind the other host's pathname.
+// Each further layer of encoding (`/%2509/evil.com`) is checked too, decoded leniently as `unescape` would, until decoding changes nothing; a path still decoding past `MAX_LAYERS` is no real redirect.
 function leavesSite(decoded: string): boolean {
-  const cleaned = decoded.replace(URL_STRIPPED, '').replace(LEADING_SPACE, '')
+  let current = decoded
 
-  if (!cleaned.startsWith('/') || SECOND_SLASH.test(cleaned) || new URL(cleaned, BASE).origin !== BASE.origin || SECOND_SLASH.test(resolved(cleaned)))
-    return true
+  for (let layer = 0; layer <= MAX_LAYERS; layer++) {
+    const cleaned = stripped(current)
 
-  // A double encoding (`/%2509/evil.com`) is checked the same way, down to where decoding changes nothing.
-  const again = decodedOnce(cleaned)
+    if (!cleaned.startsWith('/') || SECOND_SLASH.test(cleaned) || new URL(cleaned, BASE).origin !== BASE.origin || SECOND_SLASH.test(resolved(cleaned)))
+      return true
 
-  return again !== undefined && (again !== cleaned && leavesSite(again))
+    const next = cleaned.replace(ASCII_ESCAPE, (_, hex: string) => String.fromCharCode(Number.parseInt(hex, 16)))
+
+    if (next === cleaned)
+      return false
+
+    current = next
+  }
+
+  return true
+}
+
+function stripped(s: string): string {
+  return s.replace(URL_STRIPPED, '').replace(LEADING_SPACE, '')
 }
 
 // Starting with a single slash and holding no backslash, the path stays on `BASE`'s origin.
