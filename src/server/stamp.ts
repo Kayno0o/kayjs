@@ -7,7 +7,7 @@ import { nodeCrypto } from './builtins'
 const KEY_BYTES = 32
 
 // What signs the stamps `minTime` reads and the links to private stored files, and seals the flash cookie: a key derived from the session's secret, else the preview one, which a CMS may also hold, else one of this process, which a restart changes, refusing what was signed before it.
-// Derived, so what leaks of one never signs for the other: a preview link's signature is no stamp's.
+// Derived, so it is neither the key of preview links nor that of the session cookie: what one signs never passes for the other's.
 let secret: { key: Uint8Array, from: 'process' | 'session' | 'preview' } = { key: crypto.getRandomValues(new Uint8Array(KEY_BYTES)), from: 'process' }
 let warnOnProcessKey = false
 
@@ -17,14 +17,14 @@ export function useStampSecret(value: string, from: 'session' | 'preview'): void
 }
 
 // A production server says so the first time it signs with the process's own key, which no restart and no other replica shares.
-export function warnOnStampKey(): void {
-  warnOnProcessKey = true
+export function warnOnStampKey(production: boolean): void {
+  warnOnProcessKey = production
 }
 
 function stampKey(): Uint8Array {
   if (warnOnProcessKey && secret.from === 'process') {
     warnOnProcessKey = false
-    kayLog('warn', 'links to private files, form stamps and the flash cookie are signed with a key of this process, as neither session() nor preview sets a secret: a restart refuses what was signed before it, and other replicas refuse it too')
+    kayLog('warn', 'links to private files, form stamps and the flash cookie are signed with a key of this process, as neither session() nor preview sets a secret: a restart refuses what was signed before it, and other replicas refuse it too; give session() or preview a secret')
   }
 
   return secret.key

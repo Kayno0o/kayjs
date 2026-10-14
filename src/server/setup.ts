@@ -81,9 +81,7 @@ export async function setupPages(project: Project, loadClient: () => Promise<Cli
     setupPreview(config.preview, base)
     setTracer(config.tracer)
     setupStorage(config.storage, join(imageCache, 'stored'))
-
-    if (!mode.dev)
-      warnOnStampKey()
+    warnOnStampKey(!mode.dev)
   }
 
   if (config.inlineStyles === true && !mode.dev)

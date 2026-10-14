@@ -42,6 +42,16 @@ function socket(address: string): Server<unknown> {
 }
 
 // What a post was refused with, a honeypot pretending aside.
+// What a script prints, run in a process of its own, as a test file run before may have given this one a stamp secret already.
+async function isolated(script: string): Promise<unknown> {
+  const run = Bun.spawn([process.execPath, '-e', script], { stdout: 'pipe', stderr: 'pipe' })
+  const [out, err] = await Promise.all([new Response(run.stdout).text(), new Response(run.stderr).text()])
+
+  expect({ code: await run.exited, err }).toEqual({ code: 0, err: '' })
+
+  return JSON.parse(out)
+}
+
 async function refusalOf(...args: Parameters<typeof protectionRefusal>): Promise<ProtectionRefusal | undefined> {
   return await protectionRefusal(...args) as ProtectionRefusal | undefined
 }
@@ -551,14 +561,14 @@ describe('action protection', () => {
   })
 
   it('signs the stamps with a key derived from the session\'s secret over the preview one, which replaces only the key of the process', async () => {
-    // A process of its own, as a test file run before may have given this one a secret already.
-    const script = `import { signStamp, stampTime, useStampSecret } from ${JSON.stringify(join(import.meta.dir, '../src/server/stamp.ts'))}
+    const script = `import { createHmac } from 'node:crypto'
+import { signStamp, signText, stampTime, useStampSecret } from ${JSON.stringify(join(import.meta.dir, '../src/server/stamp.ts'))}
 const seen = []
 const stamp = signStamp('/_kay/action/a', 1000)
 seen.push(stampTime('/_kay/action/a', stamp), stampTime('/_kay/action/b', stamp) ?? null)
 useStampSecret('the preview secret, long enough', 'preview')
 const preview = signStamp('/_kay/action/a', 1000)
-seen.push(stampTime('/_kay/action/a', stamp) ?? null)
+seen.push(stampTime('/_kay/action/a', stamp) ?? null, signText('link', '/news') === createHmac('sha256', 'the preview secret, long enough').update('link\\0/news').digest('base64url'))
 useStampSecret('a session secret, long enough too', 'session')
 const session = signStamp('/_kay/action/a', 1000)
 seen.push(stampTime('/_kay/action/a', preview) ?? null)
@@ -566,9 +576,8 @@ useStampSecret('the preview secret, long enough', 'preview')
 seen.push(stampTime('/_kay/action/a', session))
 console.log(JSON.stringify(seen))
 `
-    const run = Bun.spawn([process.execPath, '-e', script], { stdout: 'pipe' })
 
-    expect(JSON.parse(await new Response(run.stdout).text())).toEqual([1000, null, null, null, 1000])
+    expect(await isolated(script)).toEqual([1000, null, null, false, null, 1000])
   })
 
   it('warns once, on a production server, when it signs with the key of the process alone', async () => {
@@ -577,15 +586,14 @@ console.log(JSON.stringify(seen))
 import { signStamp, useStampSecret, warnOnStampKey } from ${JSON.stringify(join(import.meta.dir, '../src/server/stamp.ts'))}
 const warnings = []
 setLogSink((level, message) => warnings.push(level + ' ' + message))
-warnOnStampKey()
+warnOnStampKey(true)
 ${secret}
 signStamp('/_kay/action/a', 1000)
 signStamp('/_kay/action/a', 2000)
 console.log(JSON.stringify(warnings))
 `
-      const run = Bun.spawn([process.execPath, '-e', script], { stdout: 'pipe' })
 
-      return JSON.parse(await new Response(run.stdout).text()) as string[]
+      return await isolated(script) as string[]
     }
 
     const alone = await warned('')
