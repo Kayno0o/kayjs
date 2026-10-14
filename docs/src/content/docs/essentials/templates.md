@@ -55,7 +55,7 @@ p Hello {user.name}, you have {messages.length} messages
 `#[tag text]` puts an element inside text, and `\{` is a literal brace:
 
 ```kay
-p Read #[a(href="/docs") the docs] first
+p Read #[a(href="/terms") the terms] first
 ```
 
 ## Conditions and lists

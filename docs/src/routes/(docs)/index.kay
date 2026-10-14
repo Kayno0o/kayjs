@@ -3,8 +3,18 @@ import { highlightCode } from 'kay/content'
 import { shareCard } from 'kay/image'
 import { components } from '../../content.config'
 import { highlight } from '../../highlight'
+import { navigation } from '../../pages'
 
 export const page = { prerender: true }
+
+// Installation's own steps, which tests/docs.test.ts holds them to.
+const REGISTRY = `[install.scopes]
+"@kaynooo" = "https://git.kaynooo.fr/api/packages/kaynooo/npm/"`
+
+const CREATE = `bunx -p @kaynooo/kayjs kay new my-app
+cd my-app
+bun install
+bun run dev`
 
 const SAMPLE = `--- server
 import { s } from 'kay'
@@ -58,10 +68,13 @@ Layout(preheader="Your account is ready")
   Paragraph Welcome, {name}. Confirm your address to start.
   Button(href={url}) Confirm my address`
 
+const registry = await highlightCode(REGISTRY, 'toml', { highlight })
+const create = await highlightCode(CREATE, 'bash', { highlight })
 const sample = await highlightCode(SAMPLE, 'kay', { highlight })
 const auth = await highlightCode(AUTH, 'kay', { highlight })
 const mail = await highlightCode(MAIL, 'kay', { highlight })
 const componentCount = (await components.all()).length
+const { groups } = await navigation()
 const features = [
   { title: 'One file per component', text: 'TypeScript fences, then an indented template. No JSX, no closing tags.', href: '/essentials/templates' },
   { title: 'HTML first', text: 'Pages render to plain HTML on the server. Only interactive components ship JavaScript.', href: '/essentials/islands' },
@@ -99,6 +112,7 @@ head
   title(raw) kay, a Bun web framework
   meta(property="og:image" content={shareCard({ title: 'kay, a Bun web framework' })})
   meta(property="og:image:alt" content="kay, a Bun web framework")
+  link(rel="alternate" type="text/plain" href="/llms.txt" title="kay's documentation for agents")
 .page.home
   header.page-head.hero
     h1 kay
@@ -106,6 +120,13 @@ head
     .hero-actions
       a.button.primary(href="/getting-started/introduction") Get started
       a.button(href="/guides/tutorial") Follow the tutorial
+    ol.install
+      li
+        p Once, point Bun at kay's registry in #[code ~/.bunfig.toml]:
+        div(innerHTML={registry})
+      li
+        p Then scaffold a project and start it:
+        div(innerHTML={create})
   .home-body
     .hero-code(innerHTML={sample})
     ul.features
@@ -116,7 +137,7 @@ head
             span {feature.text}
     section.home-section(aria-labelledby="built-in")
       h2#built-in Built in
-      p.section-lede What a site needs ships with kay, typed and checked like the pages using it.
+      p.section-lede Translations, SEO, images, content, uploads, sessions, API routes, caching, jobs and offline pages come with kay, no plugin to add.
       ul.modules
         ModuleCard(title="i18n" use="kay/i18n" href="/guides/i18n")
           @icon
@@ -176,7 +197,7 @@ head
           | Any Iconify set, imported one icon at a time as a tag that sizes to the text and takes its colour.
     section.home-section(aria-labelledby="tooling")
       h2#tooling Tooling
-      p.section-lede From the first scaffold to the server in production, every step knows .kay files.
+      p.section-lede A language server, a scaffolder, an inspector, test helpers, one-command builds and request logs, each made for .kay files.
       ul.modules
         ModuleCard(title="Editor" use="kay lsp" href="/getting-started/installation#editor")
           @icon
@@ -204,7 +225,7 @@ head
           | One line per request carrying its id, JSON logs for a collector, and OpenTelemetry spans for each load and render.
     section.home-section(aria-labelledby="libraries")
       h2#libraries Libraries
-      p.section-lede Packages built on kay, installed when a site needs them.
+      p.section-lede UI components, sign-in, mail and a CMS, each a package of its own for the sites that need it.
       .libraries
         article.library
           header.library-head
@@ -229,4 +250,15 @@ head
             h3
               a(href="/libraries/kayjs-cms") kayjs-cms
             p Content edited on the page it renders, and screens listing, adding and publishing each collection's entries, saved as Forgejo commits.
+    section.home-section(aria-labelledby="docs")
+      h2#docs The documentation
+      p.section-lede Pages written for people, by section. Agents read #[a(href="/llms.txt") llms.txt], the index of the full reference.
+      ul.doc-map
+        for group of groups key={group.title}
+          li
+            h3 {group.title}
+            ul
+              for link of group.links key={link.href}
+                li
+                  a(href={link.href}) {link.title}
   Pager(next={{ href: '/getting-started/introduction', title: 'Introduction' }} source={`${FORGE}/docs/src/routes/(docs)/index.kay`})

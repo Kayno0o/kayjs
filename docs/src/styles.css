@@ -13,6 +13,7 @@
   --accent: light-dark(#8a5700, var(--yellow));
   --tint: light-dark(#f8e3b5, #23314a);
   --line: color-mix(in srgb, var(--text) 12%, transparent);
+  --edge: light-dark(rgb(23 32 46 / 0.2), rgb(0 0 0 / 0.6));
   --sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --mono: ui-monospace, 'JetBrains Mono', 'Cascadia Code', Menlo, Consolas, monospace;
   --radius: 3px;
@@ -374,6 +375,11 @@ main {
   max-width: 54rem;
 }
 
+/* The home page has no table of contents, so its content takes the width the docs pages split with theirs. */
+.page.home {
+  max-width: 72rem;
+}
+
 .page-head {
   margin-bottom: 2rem;
 }
@@ -488,6 +494,11 @@ main {
     grid-template-columns: minmax(0, 1fr) 14rem;
     column-gap: 3.5rem;
     max-width: 72rem;
+  }
+
+  .page.home {
+    grid-template-areas: 'head' 'body' 'foot';
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .page-head {
@@ -663,11 +674,17 @@ a > code {
   background: var(--mantle);
 }
 
+/* A shadow shows at an edge the code runs past, as phones hide the scrollbar: the mantle-coloured covers scroll with the code and hide it at either end. */
 .code pre {
   margin: 0;
   padding: 0.9rem 1rem;
   overflow-x: auto;
   font-size: 0.85rem;
+  background:
+    linear-gradient(to right, var(--mantle) 40%, transparent) left / 2rem 100% no-repeat local,
+    linear-gradient(to left, var(--mantle) 40%, transparent) right / 2rem 100% no-repeat local,
+    linear-gradient(to right, var(--edge), transparent) left / 0.75rem 100% no-repeat scroll,
+    linear-gradient(to left, var(--edge), transparent) right / 0.75rem 100% no-repeat scroll;
   /* Shiki writes its theme's background inline; the block sits on the mantle instead. */
   background-color: var(--mantle) !important;
 }
@@ -747,7 +764,7 @@ pre code {
 .features {
   display: grid;
   /* min() keeps a column within a phone screen whose text size the reader raised. */
-  grid-template-columns: repeat(auto-fit, minmax(min(18rem, 100%), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(14rem, 100%), 1fr));
   gap: 0.75rem;
   margin: 2rem 0 0;
   padding: 0;
@@ -789,9 +806,72 @@ pre code {
   color: var(--subtext);
 }
 
+/* The two steps from nothing to a running project, side by side when there is room. */
+.install {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(26rem, 100%), 1fr));
+  gap: 1rem 1.25rem;
+  margin: 1.75rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* A subgrid lines both code blocks up under captions of different lengths. */
+.install li {
+  display: grid;
+  grid-row: span 2;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: subgrid;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.install .code {
+  height: 100%;
+}
+
+.install p {
+  margin: 0;
+  color: var(--subtext);
+  font-size: 0.925rem;
+}
+
+/* Every page of the docs from the home page, for a reader or an agent that never opens the sidebar. */
+.doc-map {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(11rem, 100%), 1fr));
+  gap: 1.5rem 1.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.doc-map h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+}
+
+.doc-map ul {
+  display: grid;
+  gap: 0.3rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.doc-map a {
+  color: var(--subtext);
+  font-size: 0.925rem;
+  text-decoration: none;
+}
+
+.doc-map a:hover {
+  color: var(--accent);
+}
+
 .modules {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(16rem, 100%), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(17rem, 100%), 1fr));
   gap: 0.75rem;
   margin: 0;
   padding: 0;
@@ -816,11 +896,12 @@ pre code {
   background: var(--tint);
 }
 
+/* The title wraps in its own column, so the badge keeps to the line of the icon however long the title runs. */
 .module-head {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 0.25rem 0.6rem;
+  gap: 0.6rem;
 }
 
 .module-head strong {
@@ -829,9 +910,9 @@ pre code {
 }
 
 .module-head code {
-  margin-left: auto;
   color: var(--muted);
   font-size: 0.75rem;
+  white-space: nowrap;
 }
 
 .module-icon {

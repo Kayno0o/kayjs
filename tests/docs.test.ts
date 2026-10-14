@@ -114,6 +114,17 @@ describe('the documentation site', () => {
     expect(broken).toEqual([])
   })
 
+  it('shows on the home page the steps Installation gives', async () => {
+    const home = await Bun.file(join(root, 'docs/src/routes/(docs)/index.kay')).text()
+    const installation = await Bun.file(join(root, 'docs/src/content/docs/getting-started/installation.md')).text()
+    const steps = ['REGISTRY', 'CREATE'].map(name => home.match(new RegExp(`const ${name} = \`([^\`]+)\``))?.[1])
+
+    expect(steps).toEqual([expect.any(String), expect.any(String)])
+
+    for (const step of steps)
+      expect(installation).toContain(`\n${step}\n\`\`\``)
+  })
+
   it('passes kay check, and so does the tutorial\'s example app', async () => {
     expect(await check(join(root, 'docs'))).toEqual([])
     expect(await check(join(root, 'examples/reading-list'))).toEqual([])

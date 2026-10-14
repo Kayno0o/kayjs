@@ -22,5 +22,6 @@ export default defineConfig({
   search: true,
   // kay's own docs wear kay's mark.
   lints: { 'default-favicon': 'allow' },
-  redirects: Object.fromEntries(moved.map(topic => [`/reference/${topic}`, `/llms/${topic}`])),
+  // /docs is where a visitor, or an agent, guesses the docs are.
+  redirects: { '/docs': '/getting-started/introduction', ...Object.fromEntries(moved.map(topic => [`/reference/${topic}`, `/llms/${topic}`])) },
 })
