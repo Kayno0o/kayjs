@@ -285,7 +285,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
 
     spareEntry = entryToRun()
 
-    const server = Bun.spawn([process.execPath, '--preload', SPARE, spareEntry], { cwd: root, env: { ...env, NODE_ENV: 'development', ...options.port === undefined ? {} : { PORT: String(options.port) }, ...options.host === undefined ? {} : { KAY_DEV_HOST: options.host }, ...socket === undefined ? {} : { BUN_INSPECT: `ws+unix://${socket}` } }, stdin: 'pipe', stdout: 'inherit', stderr: 'inherit', ipc: (message, server) => received(server, message) })
+    const server = Bun.spawn([process.execPath, '--preload', SPARE, spareEntry], { cwd: root, env: { ...env, NODE_ENV: 'development', ...options.port === undefined ? {} : { PORT: String(options.port) }, KAY_DEV_HOST: options.host ?? 'localhost', ...socket === undefined ? {} : { BUN_INSPECT: `ws+unix://${socket}` } }, stdin: 'pipe', stdout: 'inherit', stderr: 'inherit', ipc: (message, server) => received(server, message) })
 
     if (socket !== undefined) {
       sockets.set(server, socket)

@@ -9,6 +9,7 @@ import type { MountedApi } from './openapi'
 import type { Endpoint } from './routes'
 import { readFileSync, statSync } from 'node:fs'
 import { isIP } from 'node:net'
+import { hostname } from 'node:os'
 import { basename, isAbsolute, join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
@@ -41,6 +42,7 @@ const POSITION = /^(.+\.(?:kay|[cm]?[jt]sx?)):(\d+):(\d+)$/
 const BACKSLASH = /\\/g
 const BRACKETS = /^\[|\]$/g
 const LOCAL_NAME = /(?:^|\.)localhost$/
+const TRAILING_DOT = /\.$/
 const SOURCE_FILE = /\.(?:kay|[cm]?[jt]sx?|json|css)$/
 // A path a request fills in, which the Routes tab cannot link to.
 const PATH_PARAM = /[:*]/
@@ -348,20 +350,24 @@ function broadcast(event: string): void {
 }
 
 // Under `kay dev`, a request naming a host other than localhost, an IP address or the site is refused, as a page of another site renaming itself to this machine's address (DNS rebinding) would send it.
-// `KAY_DEV_HOSTS` lists other names the server answers to, comma-separated, such as a tunnel's.
+// `KAY_DEV_HOSTS` lists other names the server answers to, comma-separated, such as a tunnel's; `kay dev --host` adds this machine's own names, as a phone on the network reaches it by.
 export function refuseForeignHosts(app: Elysia, site: string | undefined): void {
   if (!underKayDev())
     return
 
   const allowed = new Set((process.env.KAY_DEV_HOSTS ?? '').split(',').map(name => name.trim().toLowerCase()).filter(Boolean))
   const siteName = site === undefined ? undefined : URL.parse(site)?.hostname
+  const listening = process.env.KAY_DEV_HOST ?? 'localhost'
 
   if (siteName !== undefined)
     allowed.add(siteName)
 
+  if (listening !== 'localhost')
+    allowed.add(listening.toLowerCase()).add(hostname().toLowerCase()).add(`${hostname().toLowerCase()}.local`)
+
   app.onRequest(({ request }) => {
     const host = request.headers.get('host')
-    const name = host === null ? undefined : URL.parse(`http://${host}`)?.hostname
+    const name = host === null ? undefined : URL.parse(`http://${host}`)?.hostname.replace(TRAILING_DOT, '')
 
     if (host === null || (name !== undefined && (LOCAL_NAME.test(name) || isIP(name.replace(BRACKETS, '')) !== 0 || allowed.has(name))))
       return

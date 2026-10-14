@@ -215,7 +215,7 @@ export function mailExtension(load: () => Promise<Mailer>): KayExtension<Mailer>
   return { name: '@kaynooo/kayjs-mail', server: load, messages: `${import.meta.dir}/messages` }
 }
 
-// Sends mails written as `.kay` components, html or text: over SMTP in production, to the outbox in development and tests. Using it in the server runs the queue `enqueue` fills, and in development lists the outbox at `/_kay/mail`.
+// Sends mails written as `.kay` components, html or text: over SMTP in production, to the outbox in development and tests. Using it in the server runs the queue `enqueue` fills, and under `kay dev` lists the outbox at `/_kay/mail`.
 export function mailer(options: MailerOptions = {}): Mailer {
   const lang = options.lang ?? 'en'
   const whom = (addresses: string[]): string => options.logRecipients ? addresses.join(', ') : counted(addresses)

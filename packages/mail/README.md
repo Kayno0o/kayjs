@@ -1,6 +1,6 @@
 # kayjs-mail
 
-Mail for kay apps: SMTP configured from typed environment variables, mails written as `.kay` components rendered to html and text, an outbox shown at `/_kay/mail` in development and read by tests instead of a real server, and sending through kay's queue with retries. It works from kay pages, actions and jobs, and from a plain Elysia app.
+Mail for kay apps: SMTP configured from typed environment variables, mails written as `.kay` components rendered to html and text, an outbox shown at `/_kay/mail` under `kay dev` and read by tests instead of a real server, and sending through kay's queue with retries. It works from kay pages, actions and jobs, and from a plain Elysia app.
 
 ## Install
 
@@ -27,7 +27,7 @@ export const mail = mailer({ from: 'Site <contact@example.com>', lang: 'fr' })
 ```
 
 ```ts
-// kay.config.ts: the server runs the queue, and lists the outbox at /_kay/mail in development
+// kay.config.ts: the server runs the queue, and lists the outbox at /_kay/mail under kay dev
 import { mailExtension } from '@kaynooo/kayjs-mail'
 
 export default defineConfig({ extensions: [mailExtension(async () => (await import('./src/mail')).mail)] })

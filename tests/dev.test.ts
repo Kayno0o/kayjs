@@ -1,7 +1,7 @@
 import type { Subprocess } from 'bun'
 import { chmodSync, existsSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { mkdir, mkdtemp, rename, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { hostname, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it, spyOn } from 'bun:test'
@@ -926,7 +926,7 @@ describe('kay dev', () => {
       // A page of another site that renamed itself to this machine's address sends its own name as the Host.
       expect((await fetch(url, { headers: { host: 'rebound.example' } })).status).toBe(421)
       expect((await fetch(url, { headers: { host: 'app.localhost' } })).status).toBe(200)
-      expect((await fetch(url.replace('localhost', '127.0.0.1'))).status).toBe(200)
+      expect((await fetch(url, { headers: { host: '127.0.0.1' } })).status).toBe(200)
     }
     finally {
       await stop()
@@ -1198,19 +1198,26 @@ describe('kay dev', () => {
   })
 
   it('answers under kay dev only to localhost, an IP address, the site and the names KAY_DEV_HOSTS lists', async () => {
-    const saved = { KAY_DEV_CODE: process.env.KAY_DEV_CODE, KAY_DEV_HOSTS: process.env.KAY_DEV_HOSTS, SITE_URL: process.env.SITE_URL }
+    const saved = { KAY_DEV_CODE: process.env.KAY_DEV_CODE, KAY_DEV_HOST: process.env.KAY_DEV_HOST, KAY_DEV_HOSTS: process.env.KAY_DEV_HOSTS, SITE_URL: process.env.SITE_URL }
 
-    Object.assign(process.env, { KAY_DEV_CODE: '0', KAY_DEV_HOSTS: 'tunnel.example, Dev.Example', SITE_URL: 'https://shop.example' })
+    Object.assign(process.env, { KAY_DEV_CODE: '0', KAY_DEV_HOST: 'localhost', KAY_DEV_HOSTS: 'tunnel.example, Dev.Example', SITE_URL: 'https://shop.example' })
 
     try {
       const app = bootFailure(new Error('down'), process.cwd())
-      const status = async (host: string) => (await app.handle(new Request('http://localhost/', { headers: { host } }))).status
+      const status = async (host: string, served = app) => (await served.handle(new Request('http://localhost/', { headers: { host } }))).status
 
-      for (const host of ['localhost:3000', 'app.localhost', '127.0.0.1:3000', '[::1]:3000', '192.168.1.20:3000', 'shop.example', 'tunnel.example', 'dev.example:8080'])
+      for (const host of ['localhost.:3000', 'localhost:3000', 'app.localhost', '127.0.0.1:3000', '[::1]:3000', '192.168.1.20:3000', 'shop.example', 'tunnel.example', 'dev.example:8080'])
         expect(await status(host)).toBe(500)
 
-      for (const host of ['rebound.example', 'localhost.rebound.example', 'shop.example.rebound.example'])
+      for (const host of ['rebound.example', 'localhost.rebound.example', 'shop.example.rebound.example', `${hostname()}.local`])
         expect(await status(host)).toBe(421)
+
+      // Opened to the network, it answers to this machine's own names as well.
+      process.env.KAY_DEV_HOST = '0.0.0.0'
+      const opened = bootFailure(new Error('down'), process.cwd())
+
+      expect(await status(`${hostname()}.local:3000`, opened)).toBe(500)
+      expect(await status(hostname(), opened)).toBe(500)
     }
     finally {
       for (const [name, value] of Object.entries(saved)) {

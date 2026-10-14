@@ -230,5 +230,5 @@ function originAllowed(origin: string | null, pagePort: number | undefined): boo
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:')
     return true
 
-  return parsed.origin === 'https://debug.bun.sh' || (isLoopback(parsed.hostname) && pagePort !== undefined && Number(parsed.port || 80) === pagePort)
+  return parsed.origin === 'https://debug.bun.sh' || (isLoopback(parsed.hostname) && pagePort !== undefined && Number(parsed.port || (parsed.protocol === 'https:' ? 443 : 80)) === pagePort)
 }

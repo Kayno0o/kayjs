@@ -110,5 +110,5 @@ function createOutbox(): Outbox {
   }
 }
 
-// Where mails go in development and under `bun test` instead of leaving the machine: the development server lists them at `/_kay/mail`, and a test reads them here.
+// Where mails go in development and under `bun test` instead of leaving the machine: `kay dev` lists them at `/_kay/mail`, and a test reads them here.
 export const outbox: Outbox = ((globalThis as { [OUTBOX]?: Outbox })[OUTBOX] ??= createOutbox())
