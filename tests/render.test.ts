@@ -7,8 +7,9 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { kay } from '../src/build/plugin'
 import { mapStack } from '../src/build/sourcemap'
 import { transformKay } from '../src/build/transform'
+import { UNCHECKED_TYPES } from '../src/compiler/ast'
 import { collectHead } from '../src/runtime/head'
-import { child } from '../src/runtime/html'
+import { child, UNDESCRIBED_TYPES } from '../src/runtime/html'
 import { renderToString } from '../src/server/string'
 import { scratchDir } from './scratch'
 
@@ -84,6 +85,11 @@ describe('describeField', () => {
   beforeAll(async () => {
     await Bun.write(join(scratch, 'describe-field.ts'), 'import { describeField } from \'kay\'\n\nexport const describe = (ids: string) => describeField(ids)\n')
     await Bun.write(join(scratch, 'described.kay'), '---\nimport { describe } from \'./describe-field\'\n\nconst { ids } = props<{ ids: string }>()\n\ndescribe(ids)\n---\nlabel\n  slot\n')
+  })
+
+  // The compiler decides a written type, the runtime one an expression or a spread gives.
+  it('skips the same input types on the compiled path as at render time', () => {
+    expect([...UNDESCRIBED_TYPES]).toEqual([...UNCHECKED_TYPES])
   })
 
   it('hands the first described field its component renders the ids, beside its own, whether written out or spread', async () => {

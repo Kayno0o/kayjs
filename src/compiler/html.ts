@@ -383,7 +383,7 @@ export class HtmlTemplate extends TemplateWriter {
     const filled = field?.fill === 'value' || field?.fill === 'checked' ? field.fill : undefined
     let ownFill: (() => void) | undefined
     let checkboxValue: (() => void) | undefined
-    // A field takes the ids a component around it hands it, beside its own, unless its type shows no text to describe; a type an expression gives is decided as it renders.
+    // A field takes the ids a component around it hands it, beside its own, unless its type shows no text to describe; a type an expression gives is decided as it renders, the expression read a second time for it.
     const type = plan.attributes.find(attribute => 'name' in attribute && attribute.name === 'type')
     const describable = FIELD_ELEMENTS.has(name) && !(type?.kind === 'text' && UNCHECKED_TYPES.has(type.text.toLowerCase()))
     let ownDescribed: (() => void) | undefined
@@ -433,7 +433,7 @@ export class HtmlTemplate extends TemplateWriter {
       const written = attribute.kind === 'image' ? 'src' : attribute.kind === 'selected' ? 'value' : attribute.name
 
       if (describable && written === 'aria-describedby') {
-        // A bare `aria-describedby` is kept as the empty one it renders elsewhere.
+        // A bare `aria-describedby` is kept, written as an empty value.
         ownDescribed = attribute.kind === 'value' ? read(attribute.expression, false) : () => void b.add(JSON.stringify('text' in attribute ? attribute.text : ''))
 
         continue

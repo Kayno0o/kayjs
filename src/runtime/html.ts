@@ -137,7 +137,8 @@ export function nonEmptyAttribute(name: string, text: string): string {
 
 // The fields a component's `describeField` reaches, but those showing no text of their own to describe.
 const DESCRIBED_FIELDS = new Set(['input', 'select', 'textarea'])
-const UNDESCRIBED_TYPES = new Set(['hidden', 'submit', 'button', 'reset', 'image'])
+
+export const UNDESCRIBED_TYPES = new Set(['hidden', 'submit', 'button', 'reset', 'image'])
 
 function lastValue(sources: readonly object[], name: string): unknown {
   const source = sources.findLast(source => source != null && Object.hasOwn(source, name)) as Record<string, unknown> | undefined
