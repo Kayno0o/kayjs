@@ -63,7 +63,15 @@ afterAll(async () => {
 
 interface Built { mount: typeof import('../src/runtime/mount').mount, Label: (props: { text: string }) => unknown, Switch: () => unknown }
 
+let builtOnce: Promise<Built> | undefined
+
 async function built(): Promise<Built> {
+  builtOnce ??= buildEntry()
+
+  return builtOnce
+}
+
+async function buildEntry(): Promise<Built> {
   const build = await Bun.build({ entrypoints: [join(dir, 'entry.ts')], outdir: join(dir, 'out-built'), target: 'browser', plugins: [kay({ root: dir })] })
 
   if (!build.success)
@@ -133,7 +141,7 @@ describe('a page kay does not serve', () => {
     element.remove()
   })
 
-  it('disposes of a mount whose element the app already emptied or moved out of', async () => {
+  it('disposes of a mount whose element the app already emptied', async () => {
     const { mount, Switch } = await built()
     const element = document.createElement('div')
     const dispose = mount(Switch, element)

@@ -1277,7 +1277,7 @@ export function render(fn: () => unknown, container: Element): () => void {
   })
 }
 
-// Renders `render`'s result at the end of `container`, between two markers of its own; returns what removes those nodes again and leaves the rest of `container` as it was.
+// Renders what `fn` returns at the end of `container`, between two markers of its own; returns what removes those nodes again and leaves the rest of `container` as it was.
 export function renderAppended(fn: () => unknown, container: Element): () => void {
   const start = document.createComment('')
   const end = document.createComment('')
@@ -1296,8 +1296,8 @@ export function renderAppended(fn: () => unknown, container: Element): () => voi
       if (!parent)
         return
 
-      while (end.parentNode === parent && start.nextSibling && start.nextSibling !== end)
-        parent.removeChild(start.nextSibling)
+      if (end.parentNode === parent)
+        new Region(null, start, end).clear()
 
       start.remove()
       end.remove()
