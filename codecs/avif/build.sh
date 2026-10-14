@@ -16,7 +16,7 @@ tar xzf /src/libwebp.tar.gz --strip-components 1 -C $WEBP
 # libaom's SSE2 to SSE4.1 intrinsics compile to wasm SIMD through Emscripten's SSE headers, once its x86 target is accepted: inline asm stubbed, the NASM files left empty, and the functions they alone define dropped from the dispatch tables, so those fall back to C.
 perl -0pi /kit/x86-emscripten.pl $B/libaom/aom_ports/x86.h
 perl -0pi /kit/rtcd-skip.pl $B/libaom/cmake/rtcd.pl
-# A patch whose pattern a new libaom no longer matches changes nothing, silently.
+# A patch that no longer matches a new libaom changes nothing: the rtcd one would only fail at the link, so both are checked here, and an x86 inline asm left unpatched stops the compile on its own.
 grep -q __EMSCRIPTEN__ $B/libaom/aom_ports/x86.h || { echo "x86-emscripten.pl did not apply" >&2; exit 1; }
 grep -q AOM_RTCD_SKIP $B/libaom/cmake/rtcd.pl || { echo "rtcd-skip.pl did not apply" >&2; exit 1; }
 export PATH=/kit/nasm:$PATH AOM_RTCD_SKIP=/kit/asm-only.txt

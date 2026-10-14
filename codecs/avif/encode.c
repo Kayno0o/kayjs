@@ -1,4 +1,4 @@
-// kay's entry into libavif: an 8-bit RGBA image to an AVIF, with the settings jSquash's binding applied to kay's options (4:2:0, BT.601, sharpness and denoise 0, tune=ssim from quality 50), so the bytes stay those of @jsquash/avif's encoder.
+// kay's entry into libavif: an 8-bit RGBA image to an AVIF, with the settings @jsquash/avif 2.1.1 encoded kay's variants with (4:2:0, BT.601, sharpness and denoise 0, tune=ssim), so a newer libaom writes within about 1% of its bytes.
 #include <stdint.h>
 #include <emscripten/emscripten.h>
 #include "avif/avif.h"
@@ -34,8 +34,8 @@ EMSCRIPTEN_KEEPALIVE size_t kay_avif_encode(const uint8_t *rgba, int width, int 
   if ((status = avifEncoderSetCodecSpecificOption(encoder, "sharpness", "0")) != AVIF_RESULT_OK)
     goto done;
 
-  // Left unset, libavif 1.4 picks libaom's tune IQ, which writes other bytes.
-  if (quality >= 50 && (status = avifEncoderSetCodecSpecificOption(encoder, "tune", "ssim")) != AVIF_RESULT_OK)
+  // libavif 1.0 tuned for SSIM whenever left unset, at every quality and for alpha too; 1.4 picks tune IQ for colour instead, which writes other bytes.
+  if ((status = avifEncoderSetCodecSpecificOption(encoder, "tune", "ssim")) != AVIF_RESULT_OK)
     goto done;
 
   if ((status = avifEncoderSetCodecSpecificOption(encoder, "color:denoise-noise-level", "0")) != AVIF_RESULT_OK)

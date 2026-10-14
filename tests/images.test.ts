@@ -9,10 +9,10 @@ import { Elysia } from 'elysia'
 import { testWorker } from '../src/build/assets'
 import { cappedSizes, DEFAULT_ASPECTS, image, imageUrl, recordVariants, registerImage, setAspects, setMaxDensity, setRemoteImages, shareCard, shareImage } from '../src/runtime/image'
 import { imageSize, pages, processImage } from '../src/server'
-import { AVIF_ENCODER, AVIF_SPEED } from '../src/server/avif'
+import { AVIF_ENCODER, AVIF_SPEED, encodeAvif } from '../src/server/avif'
 import { coverImage } from '../src/server/crop'
 import { avifQuality, drawing, serveImages, variantName, writeImageVariants } from '../src/server/image'
-import { decodePng } from '../src/server/png'
+import { decodePng, encodePng } from '../src/server/png'
 import { remoteAllowed, remoteImages, remotePatterns } from '../src/server/remote'
 import { scratchDir } from './scratch'
 
@@ -424,6 +424,17 @@ describe('build variants', () => {
 })
 
 describe('AVIF', () => {
+  it('encodes with the build its cache key names, at the settings of @jsquash/avif whatever the quality', async () => {
+    const wasm = await Bun.file(join(import.meta.dir, '../src/server/codec/avif-enc.wasm')).bytes()
+    const [, version, hash] = (/^aom([\d.]+)-([\da-f]{8})$/).exec(AVIF_ENCODER)!
+    const png = encodePng(new Uint8Array(96 * 64 * 4).map((_, at) => at % 4 === 3 ? 255 - (at % 64) : (at * 37) % 251), 96, 64)
+
+    expect(new Bun.CryptoHasher('sha256').update(wasm).digest('hex').slice(0, 8)).toBe(hash!)
+    expect(Buffer.from(wasm).includes(`AOMedia Project AV1 Encoder v${version}`)).toBe(true)
+    // This build's sizes, within 1% of @jsquash/avif 2.1.1's 1441 and 3706 B; libavif 1.4 left to pick tune IQ writes 822 B at quality 30.
+    expect([(await encodeAvif(new Bun.Image(png), 30)).length, (await encodeAvif(new Bun.Image(png), 50)).length]).toEqual([1434, 3702])
+  })
+
   it('writes an AVIF beside each WebP variant given its quality, cached under it and the encoder speed', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'kay-avif-'))
     const client = join(dir, 'client')

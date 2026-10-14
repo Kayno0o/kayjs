@@ -6,7 +6,7 @@ import { join } from 'node:path'
 const EMSDK = '6.0.12'
 const SOURCES = {
   libavif: { url: 'https://github.com/AOMediaCodec/libavif/archive/refs/tags/v1.4.2.tar.gz', sha256: '2b645287340ba5a631d268b551dc2d72bd73ac33335962dd36dcdb6d8366921d' },
-  libaom: { url: 'https://storage.googleapis.com/aom-releases/libaom-3.15.2.tar.gz', sha256: '67bb54b245f33ed98600e08269e6139986e48114e14042474ddd8885801dfddc' },
+  libaom: { version: '3.15.2', url: 'https://storage.googleapis.com/aom-releases/libaom-3.15.2.tar.gz', sha256: '67bb54b245f33ed98600e08269e6139986e48114e14042474ddd8885801dfddc' },
   libwebp: { url: 'https://github.com/webmproject/libwebp/archive/refs/tags/v1.6.0.tar.gz', sha256: '93a852c2b3efafee3723efd4636de855b46f9fe1efddd607e1f42f60fc8f2136' },
 }
 
@@ -42,5 +42,12 @@ mkdirSync(TARGET, { recursive: true })
 
 for (const name of ['avif-enc.js', 'avif-enc.wasm'])
   await Bun.write(join(TARGET, name), Bun.file(join(OUT, name)))
+
+// Any change to the kit writes other bytes, so the variant cache key names the wasm itself.
+const hash = new Bun.CryptoHasher('sha256').update(await Bun.file(join(TARGET, 'avif-enc.wasm')).bytes()).digest('hex').slice(0, 8)
+
+await Bun.write(join(TARGET, 'avif-enc-build.ts'), `// Written by codecs/avif/build.ts: the encoder's libaom and the start of its wasm's sha256, part of the AVIF variant cache key.
+export const AVIF_ENCODER = 'aom${SOURCES.libaom.version}-${hash}'
+`)
 
 console.log(`src/server/codec: avif-enc.wasm ${(Bun.file(join(TARGET, 'avif-enc.wasm')).size / 2 ** 20).toFixed(2)} MB`)

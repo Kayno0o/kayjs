@@ -4,8 +4,7 @@ import { fileURLToPath } from 'node:url'
 export const DEFAULT_AVIF_QUALITY = 50
 // libavif's speed, 0 to 10: 7 encodes about twice as fast as its default of 6 and writes 3 to 5% fewer bytes, at a luma SSIM about 0.005 lower; 9 is 4 times faster again but writes 30 to 40% more on flat images such as logos, and 8 doubles some photos.
 export const AVIF_SPEED = 7
-// The libaom codecs/avif/build.ts compiles, in the variant cache key: another version writes other bytes.
-export const AVIF_ENCODER = 'aom3.15.2'
+export { AVIF_ENCODER } from './codec/avif-enc-build'
 
 // The worker's source, which `kay build --compile` adds as an entry of the executable, named after its file.
 export const AVIF_WORKER_SOURCE = fileURLToPath(new URL('./avif-worker.ts', import.meta.url))
