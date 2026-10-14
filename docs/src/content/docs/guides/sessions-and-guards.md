@@ -100,7 +100,7 @@ A guard reads the params of the page asked for in `ctx.params`, as `src/routes/o
 A page under a guard that anyone may reach, such as the sign-in page under a root guard asking for a session, sets `guards: false` in its `page`, and runs none of the guards above it, nor do its actions. An endpoint sets it in its own `export const page`, and an API module in its `api()` options:
 
 ```kay
----
+--- server
 export const page = { guards: false }
 ---
 h1 Sign in

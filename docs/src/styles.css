@@ -169,7 +169,7 @@ kbd {
   padding: 0;
 }
 
-.sidebar li a {
+.sidebar li > a {
   display: block;
   padding: 0.25rem 0.6rem;
   color: var(--subtext);
@@ -178,12 +178,12 @@ kbd {
   border-radius: var(--radius);
 }
 
-.sidebar li a:hover {
+.sidebar li > a:hover {
   color: var(--text);
   background: var(--crust);
 }
 
-.sidebar li a[aria-current='page'] {
+.sidebar li > a[aria-current='page'] {
   color: var(--accent);
   font-weight: 600;
   background: var(--tint);
@@ -891,11 +891,6 @@ pre code {
   color: var(--subtext);
 }
 
-/* The full reference sits folded at the bottom of the sidebar. */
-.full-reference summary {
-  cursor: pointer;
-}
-
 /* A kayjs-ui component's page: its example rendered over its source, then its props. */
 .import {
   margin: 0.75rem 0 0;
@@ -1093,20 +1088,20 @@ pre code {
   border-radius: var(--radius);
 }
 
-.file-tree .file-tree-list {
+:is(.file-tree, .sidebar-tree) .file-tree-list {
   display: block;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.file-tree .file-tree-list .file-tree-list {
+:is(.file-tree, .sidebar-tree) .file-tree-list .file-tree-list {
   margin-left: 0.5rem;
   padding-left: 0.9rem;
   border-left: 1px solid var(--line);
 }
 
-.file-tree li {
+:is(.file-tree, .sidebar-tree) li {
   margin: 0;
 }
 
@@ -1127,6 +1122,46 @@ pre code {
 
 .file-tree-entry img {
   border-radius: 2px;
+}
+
+/* The Structure part's sidebar: a row a link spans, lit as the page on screen. */
+.sidebar-tree {
+  margin-bottom: 1.4rem;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+}
+
+.sidebar-tree .file-tree-entry {
+  position: relative;
+  padding: 0.2rem 0.5rem;
+  color: var(--subtext);
+  border-radius: var(--radius);
+}
+
+.sidebar-tree .file-tree-entry a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.sidebar-tree .file-tree-entry a::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+
+.sidebar-tree .file-tree-entry:has(a):hover {
+  color: var(--text);
+  background: var(--crust);
+}
+
+.sidebar-tree .file-tree-entry:has(a[aria-current='page']) {
+  color: var(--accent);
+  font-weight: 600;
+  background: var(--tint);
+}
+
+.sidebar-tree .file-tree-entry:has(a[aria-current='page']) svg {
+  color: inherit;
 }
 
 .file-tree-note {

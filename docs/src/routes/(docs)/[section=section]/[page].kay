@@ -17,9 +17,11 @@ export const page = {
 
 const entry = await docs.get(`${ctx.params.section}/${ctx.params.page}`) ?? ctx.notFound()
 const { Content } = entry
-const { title, description } = entry.data
+const { title, description, path } = entry.data
 const sections = entry.headings.filter(heading => heading.depth === 2 || heading.depth === 3)
-const { previous, next } = neighbours(await docs.all(), entry.slug, slug => `/${slug}`)
+// The pager stays in the page's part: the Structure pages lead to each other, the other sections to theirs.
+const structure = (slug: string) => sectionOf(slug)?.slug === 'structure'
+const { previous, next } = neighbours((await docs.all()).filter(one => structure(one.slug) === structure(entry.slug)), entry.slug, slug => `/${slug}`)
 --- script
 import Pager from '../../../components/pager.kay'
 import Toc from '../../../components/toc.kay'
@@ -31,7 +33,10 @@ head
   meta(property="og:image:alt" content={title})
 .page
   header.page-head
-    p.eyebrow {sectionOf(entry.slug)?.title}
+    if path as file
+      p.eyebrow: code {file}
+    else
+      p.eyebrow {sectionOf(entry.slug)?.title}
     h1 {title}
     p.lede {description}
   if sections.length > 0

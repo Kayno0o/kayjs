@@ -4,21 +4,21 @@ order: 4
 description: Where the files of a kay project live and what the two entry files look like.
 ---
 
-A project made by `kay new` looks like this. Only `src/routes` is required.
+A project made by `kay new` looks like this. Only `src/routes` is required. Each entry leads to its page in the [Structure](/structure/routes) part, which draws the whole tree in its sidebar.
 
 <FileTree tree="
 my-app/
   src/
-    [routes/](/essentials/routing)  pages and layouts, a file is a URL
-    [components/](/essentials/components)  components shared by pages
-    [api/](/guides/api-routes)  Elysia modules, served under /api
-    [content/](/guides/content)  Markdown, JSON and YAML read by collections
-    [content.config.ts](/guides/content)  the collections
-    [server.ts](#the-server-entry)  the server entry
-  [public/](/essentials/styling-and-assets#public-files)  files served as they are, at their path
-  [kay.config.ts](#kayconfigts)  project settings
-  tsconfig.json  extends kay's
-  .kay/  generated types and build output, git ignored
+    [routes/](/structure/routes)  pages and layouts, a file is a URL
+    [components/](/structure/components)  components shared by pages
+    [api/](/structure/api)  Elysia modules, served under /api
+    [content/](/structure/content)  Markdown, JSON and YAML read by collections
+    [content.config.ts](/structure/content-config)  the collections
+    [server.ts](/structure/server)  the server entry
+  [public/](/structure/public)  files served as they are, at their path
+  [kay.config.ts](/structure/kay-config)  project settings
+  [tsconfig.json](/structure/tsconfig)  extends kay's
+  [.kay/](/structure/dot-kay)  generated types and build output, git ignored
 " />
 
 `.kay/` holds the generated types, the client build and the compile cache. Add it to `.gitignore`.

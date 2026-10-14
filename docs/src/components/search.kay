@@ -10,6 +10,7 @@ const { nav } = props<{ nav: Navigation }>()
 // Every page by its title, so an empty query lists the docs as the sidebar does, and the site search finds the sections inside them.
 const entries: PaletteEntry[] = [
   ...nav.groups.flatMap(group => group.links.map(link => ({ label: link.title, group: group.title, href: link.href }))),
+  ...nav.structure.map(link => ({ label: link.title, group: 'Structure', href: link.href })),
   ...nav.components.map(link => ({ label: link.title, group: 'UI components', href: link.href })),
 ]
 

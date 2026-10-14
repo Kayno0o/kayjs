@@ -5,8 +5,26 @@ export const SECTIONS = [
   { slug: 'guides', title: 'Guides' },
   { slug: 'reference', title: 'Reference' },
   { slug: 'libraries', title: 'Libraries' },
+  // A part of its own, its sidebar the project's tree drawn from each page's `path`.
+  { slug: 'structure', title: 'Structure' },
 ] as const
 
 export type Section = typeof SECTIONS[number]['slug']
 
 export const sectionOf = (slug: string) => SECTIONS.find(section => slug.startsWith(`${section.slug}/`))
+
+// The docs are read one part at a time, the sidebar listing only the current part's pages.
+export type Part = 'docs' | 'structure' | 'ui' | 'agents'
+
+export function partOf(path: string): Part {
+  if (path.startsWith('/structure/'))
+    return 'structure'
+
+  if (path.startsWith('/ui/'))
+    return 'ui'
+
+  if (path === '/llms' || path.startsWith('/llms/'))
+    return 'agents'
+
+  return 'docs'
+}

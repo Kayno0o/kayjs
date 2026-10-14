@@ -1,5 +1,8 @@
+import type { FileEntry } from './file-tree'
+import type { Part } from './sections'
 import { join } from 'node:path'
 import { components, docs, reference } from './content.config'
+import { pathTree } from './file-tree'
 import { FORGE } from './forge'
 import { llmsHref } from './reference'
 import { sectionOf, SECTIONS } from './sections'
@@ -34,24 +37,46 @@ export interface NavGroup {
 }
 
 export interface Navigation {
+  // The tabs over the sidebar, each leading to its part's first page.
+  parts: { part: Part, href: string, label: string }[]
   groups: NavGroup[]
+  structure: PageLink[]
+  tree: FileEntry[]
   components: PageLink[]
   reference: PageLink[]
   version: string
 }
 
-// The sidebar's links: the docs by section, the kayjs-ui components, then the full reference written for agents.
+// The sidebar's links, one part at a time: the docs by section, the project's tree, the kayjs-ui components, then the full reference written for agents.
 export async function navigation(): Promise<Navigation> {
   const pages = await docs.all()
   const { version } = await Bun.file(join(import.meta.dir, '../../package.json')).json() as { version: string }
+  const inSection = (slug: string) => pages.filter(page => sectionOf(page.slug)?.slug === slug)
+  const structure = inSection('structure')
+  const groups = SECTIONS.filter(section => section.slug !== 'structure').map(section => ({
+    title: section.title,
+    links: inSection(section.slug).map(page => ({ href: `/${page.slug}`, title: page.data.title })),
+  }))
+  const componentLinks = (await components.all()).map(component => ({ href: `/ui/${component.slug}`, title: component.data.title }))
+  const referenceLinks = (await reference.all()).map(topic => ({ href: llmsHref(topic.slug), title: topic.data.title }))
 
   return {
-    groups: SECTIONS.map(section => ({
-      title: section.title,
-      links: pages.filter(page => sectionOf(page.slug)?.slug === section.slug).map(page => ({ href: `/${page.slug}`, title: page.data.title })),
+    parts: [
+      { part: 'docs', href: groups[0]!.links[0]!.href, label: 'Docs' },
+      { part: 'structure', href: `/${structure[0]!.slug}`, label: 'Structure' },
+      { part: 'ui', href: componentLinks[0]!.href, label: 'UI' },
+      { part: 'agents', href: referenceLinks[0]!.href, label: 'Agents' },
+    ],
+    groups,
+    structure: structure.map(page => ({ href: `/${page.slug}`, title: page.data.title })),
+    tree: pathTree(structure.map((page) => {
+      if (page.data.path === undefined)
+        throw new Error(`${page.slug} is a Structure page with no path in its frontmatter`)
+
+      return { path: page.data.path, href: `/${page.slug}` }
     })),
-    components: (await components.all()).map(component => ({ href: `/ui/${component.slug}`, title: component.data.title })),
-    reference: (await reference.all()).map(topic => ({ href: llmsHref(topic.slug), title: topic.data.title })),
+    components: componentLinks,
+    reference: referenceLinks,
     version,
   }
 }

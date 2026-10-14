@@ -2,15 +2,19 @@
 import type { Navigation } from '../pages'
 import Button from '@kaynooo/kayjs-ui/button.kay'
 import Icon from '@kaynooo/kayjs-ui/icon.kay'
+import TabNav from '@kaynooo/kayjs-ui/tab-nav.kay'
 import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
 import BrandGit from '~icons/tabler/brand-git'
 import { REPOSITORY } from '../forge'
+import { partOf } from '../sections'
 import CodeCopy from './code-copy.kay'
+import FileTreeEntries from './file-tree-entries.kay'
 import LinkFilter from './link-filter.kay'
 import Search from './search.kay'
 import ThemePicker from './theme-picker.kay'
 
 const { nav, current } = props<{ nav: Navigation, current: string }>()
+const part = partOf(current)
 ---
 a.skip-link(href="#content") Skip to the content
 .shell
@@ -28,20 +32,27 @@ a.skip-link(href="#content") Skip to the content
       // Shown once the sidebar folds into a popover.
       Button(class="hidden max-[56rem]:inline-flex" label="Menu" icon="menu" popovertarget="sidebar")
     nav#sidebar.sidebar(popover aria-label="Documentation")
-      for group of nav.groups key={group.title}
-        p.group {group.title}
-        ul
-          for link of group.links key={link.href}
-            li
-              a(href={link.href}) {link.title}
-      p.group UI components
-      LinkFilter(links={nav.components} current={current} label="Filter the components")
-      details.full-reference(open={current.startsWith('/llms')})
-        summary.group Full reference
+      TabNav(class="mb-4 [&>a]:flex-1 [&>a]:px-1 [&>a]:text-center" links={nav.parts} current={nav.parts.find(one => one.part === part)!.href} label="Parts of the documentation")
+      if part === 'structure'
+        p.group A kay project
+        .sidebar-tree
+          FileTreeEntries(entries={nav.tree})
+      else if part === 'ui'
+        p.group kayjs-ui components
+        LinkFilter(links={nav.components} current={current} label="Filter the components")
+      else if part === 'agents'
+        p.group Full reference
         ul
           for link of nav.reference key={link.href}
             li
               a(href={link.href}) {link.title}
+      else
+        for group of nav.groups key={group.title}
+          p.group {group.title}
+          ul
+            for link of group.links key={link.href}
+              li
+                a(href={link.href}) {link.title}
   main#content
     slot
     footer.site-foot

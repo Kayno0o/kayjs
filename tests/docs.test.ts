@@ -1,9 +1,10 @@
 import { readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
-import { fileTree } from '../docs/src/file-tree'
+import { fileTree, pathTree } from '../docs/src/file-tree'
 import { loadComponents, loadLibraries } from '../docs/src/libraries'
 import { loadReference } from '../docs/src/reference'
+import { partOf } from '../docs/src/sections'
 import { accent, ACCENTS, pickTheme, scheme, THEME_SCRIPT, themeCss } from '../docs/src/theme'
 import { check } from '../src/check'
 import { renderMarkdown } from '../src/content/markdown'
@@ -152,6 +153,27 @@ describe('the documentation site', () => {
     ])
     expect(() => fileTree('\n  \n')).toThrow('FileTree has no file to draw')
     expect(() => fileTree('src/ the sources')).toThrow('FileTree cannot read the line "src/ the sources"')
+  })
+
+  it('draws the Structure part\'s tree from its pages\' paths, each folder above them once, in the order first met', () => {
+    expect(pathTree([
+      { path: 'src/routes/', href: '/structure/routes' },
+      { path: 'src/routes/_layout.kay', href: '/structure/layout' },
+      { path: 'src/server.ts', href: '/structure/server' },
+      { path: 'kay.config.ts', href: '/structure/kay-config' },
+    ])).toEqual([
+      { name: 'src/', children: [
+        { name: 'routes/', href: '/structure/routes', children: [{ name: '_layout.kay', href: '/structure/layout', children: [] }] },
+        { name: 'server.ts', href: '/structure/server', children: [] },
+      ] },
+      { name: 'kay.config.ts', href: '/structure/kay-config', children: [] },
+    ])
+    expect(() => pathTree([{ path: 'src/', href: '/a' }, { path: 'src/', href: '/b' }])).toThrow('Two pages are about src/')
+  })
+
+  it('reads each page in its part, the sidebar listing only that part\'s pages', () => {
+    expect(['/', '/getting-started/introduction', '/libraries/kayjs-ui', '/structure/routes', '/ui/button', '/llms', '/llms/routing', '/llmsx'].map(partOf))
+      .toEqual(['docs', 'docs', 'docs', 'structure', 'ui', 'agents', 'agents', 'docs'])
   })
 
   it('puts the theme a visitor picked on the page from the head, reading what kay kept, and shows the tokens an app sets for it', () => {
