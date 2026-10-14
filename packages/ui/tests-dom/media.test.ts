@@ -190,6 +190,20 @@ describe('ZoomPane', () => {
     expect(scale()).toBeCloseTo(1)
   })
 
+  test('steps by the buttons alone however fast they are clicked, never as a double click', async () => {
+    const root = await media()
+    const pane = root.querySelector('#zoom')!
+    const scale = () => Number(pane.querySelector<HTMLElement>('.kui-zoom-plate')!.style.getPropertyValue('--kui-zoom-scale'))
+    const zoomIn = pane.querySelector<HTMLElement>('[aria-label="Zoom in"]')!
+
+    sized(pane, 200, 100)
+    click(zoomIn)
+    zoomIn.dispatchEvent(new MouseEvent('dblclick', { clientX: 10, clientY: 10, bubbles: true }))
+    await settle()
+
+    expect(scale()).toBeCloseTo(1.15 ** 2)
+  })
+
   test('takes the picture in on a double click and a pinch, and moves it by a drag once it has wandered', async () => {
     const root = await media()
     const pane = root.querySelector('#zoom')!
