@@ -170,6 +170,51 @@ function backoff(attempt: number): number {
   return Math.min(RECONNECT_MS * 2 ** attempt, MAX_RECONNECT_MS)
 }
 
+function asleep(): boolean {
+  return typeof document !== 'undefined' && (document.hidden || navigator.onLine === false)
+}
+
+// Runs `reconnect` after the attempt's backoff, shortened by up to half at random so the clients a restart dropped together come back apart, and not before the tab is visible and online again; gives what cancels it.
+function scheduleRetry(attempt: number, reconnect: () => void): () => void {
+  const delay = backoff(attempt)
+  let waking = false
+  const listen = (on: boolean) => {
+    waking = on
+
+    for (const [target, type] of [[globalThis, 'online'], [document, 'visibilitychange']] as const) {
+      if (on)
+        target.addEventListener(type, wake)
+      else
+        target.removeEventListener(type, wake)
+    }
+  }
+
+  function wake() {
+    if (asleep())
+      return
+
+    listen(false)
+    reconnect()
+  }
+
+  const timer = setTimeout(() => {
+    if (!asleep()) {
+      reconnect()
+
+      return
+    }
+
+    listen(true)
+  }, delay - Math.random() * delay / 2)
+
+  return () => {
+    clearTimeout(timer)
+
+    if (waking)
+      listen(false)
+  }
+}
+
 // A websocket that reconnects after a drop, waiting longer each time, until `close()`; `connect` gives none where there is nothing to connect from.
 export function openSocket<Send, Receive>(connect: () => WebSocket | undefined): Socket<Send, Receive> & { start: () => void } {
   const [status, setStatus] = ownSignal<SocketStatus>('connecting')
@@ -179,7 +224,7 @@ export function openSocket<Send, Receive>(connect: () => WebSocket | undefined):
   let current: WebSocket | undefined
   let closed = false
   let attempt = 0
-  let retry: ReturnType<typeof setTimeout> | undefined
+  let cancelRetry: (() => void) | undefined
 
   const start = () => {
     if (closed || current)
@@ -211,7 +256,7 @@ export function openSocket<Send, Receive>(connect: () => WebSocket | undefined):
       }
 
       setStatus('connecting')
-      retry = setTimeout(start, backoff(attempt++))
+      cancelRetry = scheduleRetry(attempt++, start)
     })
   }
 
@@ -231,7 +276,7 @@ export function openSocket<Send, Receive>(connect: () => WebSocket | undefined):
     onOpen: listener => opened.on(listener),
     close: () => {
       closed = true
-      clearTimeout(retry)
+      cancelRetry?.()
       setStatus('closed')
       current?.close(NORMAL_CLOSURE)
     },
@@ -246,7 +291,7 @@ export function readEvents<T>(request: (signal: AbortSignal) => Promise<Response
   let run: AbortController | undefined
   let started = false
   let attempt = 0
-  let retry: ReturnType<typeof setTimeout> | undefined
+  let cancelRetry: (() => void) | undefined
 
   const settle = (final: StreamStatus) => {
     if (status() !== 'closed')
@@ -317,7 +362,7 @@ export function readEvents<T>(request: (signal: AbortSignal) => Promise<Response
     }
 
     setStatus('connecting')
-    retry = setTimeout(() => void read(controller), backoff(attempt++))
+    cancelRetry = scheduleRetry(attempt++, () => void read(controller))
   }
 
   return {
@@ -331,7 +376,7 @@ export function readEvents<T>(request: (signal: AbortSignal) => Promise<Response
         values.forget()
 
       started = true
-      clearTimeout(retry)
+      cancelRetry?.()
       run?.abort()
       run = new AbortController()
       attempt = 0
@@ -342,7 +387,7 @@ export function readEvents<T>(request: (signal: AbortSignal) => Promise<Response
     status,
     on: values.on,
     close: () => {
-      clearTimeout(retry)
+      cancelRetry?.()
       setStatus('closed')
       run?.abort()
     },

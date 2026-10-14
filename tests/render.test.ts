@@ -72,6 +72,14 @@ async function renderKay(source: string, props: Record<string, unknown> = {}, di
   return child(module.default(data))
 }
 
+describe('images', () => {
+  it('load lazily and decode off the main thread unless the template says otherwise, a spread carrying its own', async () => {
+    const html = await renderKay('---\nconst own = { loading: "eager" }\n---\nimg(src="/a.png" alt="")\nimg(src="/b.png" alt="" fetchpriority="high")\nimg(src="/c.png" alt="" loading="eager" decoding="sync")\nimg(src="/d.png" alt="" {...own})')
+
+    expect(html).toBe('<img src="/a.png" alt loading="lazy" decoding="async"><img src="/b.png" alt fetchpriority="high" decoding="async"><img src="/c.png" alt loading="eager" decoding="sync"><img decoding="async" src="/d.png" alt loading="eager">')
+  })
+})
+
 describe('server fence declarations', () => {
   it('render when a declaration carries a type annotation', async () => {
     expect(await renderKay('--- server\nconst title: string = \'T\'\nlet count: number = 3\n---\nh1 {title} {count}')).toBe('<h1>T 3</h1>')

@@ -3,7 +3,8 @@ import { withBase, withoutBase } from './base'
 import { fragment, insert, localizeLinks, markers } from './dom'
 import { formatDate as formatDateIn, formatList as formatListIn, formatNumber as formatNumberIn, formatRelativeTime as formatRelativeTimeIn, localePath, localizedLink, richMessage, splitLocale, textDirection, translate, untranslatedPath } from './i18n'
 import { pageData } from './page-data'
-import { createSignal, effect, memo, onCleanup, onMount } from './reactive'
+import { createSignal, effect, memo, onCleanup } from './reactive'
+import { tabVisible } from './visibility'
 
 export type { Direction, Locale, LocaleSettings, MergeMessages, Message, MessageKey, MessageTree, MessageValue, Plural, PluralCategory, RelativeTimeOptions, RichText } from './i18n'
 export { defineMessages } from './i18n'
@@ -118,7 +119,7 @@ export function formatRelativeTime(value: Date | number, unitOrOptions?: Intl.Re
   return formatRelativeTimeIn(translations().locale, value, unitOrOptions, options)
 }
 
-// A date relative to now, formatted as `formatRelativeTime` does, that goes on ticking while the island lives: every second under a minute away, every minute under an hour, every hour past that.
+// A date relative to now, formatted as `formatRelativeTime` does, that goes on ticking while the island lives and the tab shows: every second under a minute away, every minute under an hour, every hour past that.
 // It renders first as relative to the page's render time, as the server did, so hydrating changes nothing.
 export function relativeTime(value: () => Date | number, options?: Intl.RelativeTimeFormatOptions): () => string {
   load()
@@ -126,8 +127,15 @@ export function relativeTime(value: () => Date | number, options?: Intl.Relative
   const [now, setNow] = createSignal(renderedAt ?? Date.now())
   const pace = memo(() => tickPace(Math.abs(Number(value()) - now()) / 1000))
 
-  onMount(() => setNow(Date.now()))
+  // Once mounted, and each time the tab shows again, it catches up at once rather than at its next tick.
   effect(() => {
+    if (tabVisible())
+      setNow(Date.now())
+  })
+  effect(() => {
+    if (!tabVisible())
+      return
+
     const timer = setInterval(() => setNow(Date.now()), pace())
 
     onCleanup(() => clearInterval(timer))

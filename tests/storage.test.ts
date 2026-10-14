@@ -250,7 +250,7 @@ describe('a static export', () => {
     expect(refused.code).toBe(1)
     expect(refused.errors).toContain('a static export links stored file photos/0123456789abcdef0123.4x3.png')
     expect((await build({ KAY_TEST_FILES_URL: 'https://cdn.example/files/' })).code).toBe(0)
-    expect(await Bun.file(join(dir, 'export/index.html')).text()).toContain('<img src="https://cdn.example/files/photos/0123456789abcdef0123.4x3.png" alt="Stored">')
+    expect(await Bun.file(join(dir, 'export/index.html')).text()).toContain('<img src="https://cdn.example/files/photos/0123456789abcdef0123.4x3.png" alt="Stored" loading="lazy" decoding="async">')
   }, 30_000)
 })
 

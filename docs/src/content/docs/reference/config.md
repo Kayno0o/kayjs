@@ -22,7 +22,7 @@ export default defineConfig({
   i18n: { locales: ['fr', 'en'], defaultLocale: 'fr' },
   security: { csp: { 'img-src': ["'self'", 'data:'] } },
   proxy: { hops: 1 },
-  compress: true,
+  compress: false,
   lints: { 'positional-key': 'deny' },
 })
 ```
@@ -85,7 +85,7 @@ Every option is optional. The ones below are the common ones, the rest are in th
 | --- | --- |
 | `security` | The CSP and security headers every response carries, or `false` for none; `X-Frame-Options` follows the policy's `frame-ancestors`. See [Deployment](/guides/deployment) |
 | `proxy` | The proxies in front of the server and the public ranges they reach it from (`trusted`), for the client address rate limits count |
-| `compress` | Brotli and gzip for pages rendered per request, when no proxy does it |
+| `compress` | Brotli and gzip for pages rendered per request, on in production; `false` when a proxy does it |
 | `health` | The route a load balancer polls, `/_kay/health` by default |
 | `log` | One line per request, and kay's own messages: as text, `'json'`, a function receiving each `LogEntry`, or `false` for no request lines |
 | `bodyLimit` | The most bytes an action or API request may send, 1 MB by default |

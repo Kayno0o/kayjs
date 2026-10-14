@@ -1477,6 +1477,30 @@ describe('compression', () => {
     expect(await ok.text()).toBe('ok')
   })
 
+  it('compresses in production unless told not to, and nowhere else unless told to', async () => {
+    const encodingOf = async (options: { compress?: boolean }) => {
+      const app = new Elysia().use(await pages({ routes, prebuilt: false, ...options }))
+      const page = await app.handle(new Request('http://localhost/contact', { headers: { 'accept-encoding': 'br' } }))
+
+      return page.headers.get('content-encoding')
+    }
+    const before = process.env.NODE_ENV
+
+    try {
+      process.env.NODE_ENV = 'production'
+      expect(await encodingOf({})).toBe('br')
+      expect(await encodingOf({ compress: false })).toBeNull()
+      process.env.NODE_ENV = 'development'
+      expect(await encodingOf({})).toBeNull()
+    }
+    finally {
+      if (before === undefined)
+        delete process.env.NODE_ENV
+      else
+        process.env.NODE_ENV = before
+    }
+  })
+
   it('splices fixed texts into the gzip of a page, wherever they sit and however much lies around them, and compresses anything else as before', async () => {
     const { compressResponse, fixedTexts, wholeResponse } = await import('../src/server/compress')
     const a = `<style>.a{color:red}${'.x{margin:0}'.repeat(40)}</style>`

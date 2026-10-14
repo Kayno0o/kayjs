@@ -653,6 +653,7 @@ export class HtmlTemplate extends TemplateWriter {
     const children = element.children.filter(child => child.kind !== 'slot')
 
     b.add(`${helperName('element')}(${JSON.stringify(element.name)}, [`)
+    this.leadingImageDefaults(element)
     this.sources(element, false)
     this.formDefaults(element)
 

@@ -622,6 +622,7 @@ export class DomTemplate extends TemplateWriter {
     const { b } = this
 
     b.add(`KaySpread(${variable}, () => [`)
+    this.leadingImageDefaults(element)
     this.sources(element, false)
     this.formDefaults(element)
 

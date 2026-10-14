@@ -1,6 +1,6 @@
 ---
 import type { JSX } from 'kay'
-import { effect, onCleanup, signal } from 'kay'
+import { effect, listen, onCleanup, signal } from 'kay'
 import IconButton from './icon-button.kay'
 import { stepIndex } from './cycle'
 
@@ -27,16 +27,19 @@ const { slides, index = 0, onIndexChange, autoplay, ratio = '16 / 9', label = 'C
 }>()
 
 const shown = signal(index)
-// Whether the pointer or the focus is on the carousel, which holds the autoplay.
+// Whether the pointer or the focus is on the carousel, or the tab is hidden, which holds the autoplay.
 const pointed = signal(false)
 const focused = signal(false)
 // The visitor's own pause, which nothing but the button lifts.
 const paused = signal(false)
+const hidden = signal(false)
+
+listen(document, 'visibilitychange', () => hidden.set(document.hidden))
 
 effect(() => shown.set(index))
 
 effect(() => {
-  if (!autoplay || paused() || pointed() || focused() || matchMedia('(prefers-reduced-motion: reduce)').matches)
+  if (!autoplay || paused() || pointed() || focused() || hidden() || matchMedia('(prefers-reduced-motion: reduce)').matches)
     return
 
   const timer = setInterval(() => step(1), autoplay)

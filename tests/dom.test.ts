@@ -201,6 +201,19 @@ describe('imported images', () => {
     }
   })
 
+  it('load lazily in an island as on the server, unless the template says otherwise', async () => {
+    const { root, dispose } = await mountKay({
+      'main.kay': '---\nimport { signal } from \'kay\'\n\nconst src = signal("/a.png")\n---\nimg.lazy(src={src()} alt="")\nimg.hero(src={src()} alt="" loading="eager")\nimg.spread(alt="" {...{ src: src() }})\n',
+    })
+
+    try {
+      expect([...root.querySelectorAll('img')].map(img => [img.className, img.getAttribute('loading'), img.getAttribute('decoding')])).toEqual([['lazy', 'lazy', 'async'], ['hero', 'eager', 'async'], ['spread', 'lazy', 'async']])
+    }
+    finally {
+      await dispose()
+    }
+  })
+
   it('load the size they show at in an island too, and a source that changes clears what the last one set', async () => {
     const { root, dispose } = await mountKay({
       'main.kay': '---\nimport { signal } from \'kay\'\nimport hero from \'./hero.png\'\n\nconst src = signal(hero)\n---\nimg.hero(src={src()} sizes="50vw" alt="")\nimg.sized(src={hero} height="10" alt="")\nbutton(onClick={() => src.set(\'/logo.svg\')}) x\n',

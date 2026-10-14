@@ -185,7 +185,34 @@ export abstract class TemplateWriter {
       }
     }
 
+    for (const [attributeName, text] of this.imageDefaults(element))
+      plan.attributes.push({ kind: 'text', name: attributeName, text, bare: false })
+
     return plan
+  }
+
+  // An image loads lazily and decodes off the main thread unless the template says otherwise: a hero above the fold sets `loading="eager"` or `fetchpriority="high"`.
+  protected imageDefaults(element: ElementNode): [string, string][] {
+    if (element.name !== 'img')
+      return []
+
+    const defaults: [string, string][] = []
+
+    if (!this.named(element, 'loading') && !this.named(element, 'fetchpriority'))
+      defaults.push(['loading', 'lazy'])
+
+    if (!this.named(element, 'decoding'))
+      defaults.push(['decoding', 'async'])
+
+    return defaults
+  }
+
+  // The image defaults as a props object leading an element's sources, so a spread carrying its own wins.
+  protected leadingImageDefaults(element: ElementNode): void {
+    const defaults = this.imageDefaults(element)
+
+    if (defaults.length > 0)
+      this.b.add(`{ ${defaults.map(([name, value]) => `${JSON.stringify(name)}: ${JSON.stringify(value)}`).join(', ')} }, `)
   }
 
   // A component's props: its attributes, then its slots and children, each read through a getter or a function so it renders where the component puts it.

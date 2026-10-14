@@ -203,6 +203,36 @@ describe('API modules', () => {
     expect(reader.status()).toBe('done')
   })
 
+  it('holds the reconnect of a dropped stream while the tab is hidden, and makes it once the tab shows', async () => {
+    const tab = Object.assign(new EventTarget(), { hidden: true })
+    const globals = globalThis as Record<string, unknown>
+
+    globals.document = tab
+
+    try {
+      const bodies = ['data: [1]\n\n', 'data: [2]\n\nevent: end\ndata:\n\n']
+      const reader = readEvents<number>(async () => new Response(bodies.shift()), true)
+      const received: number[] = []
+
+      reader.on(value => received.push(value))
+      reader.start()
+      await Bun.sleep(700)
+
+      expect(received).toEqual([1])
+      expect(reader.status()).toBe('connecting')
+
+      tab.hidden = false
+      tab.dispatchEvent(new Event('visibilitychange'))
+      await Bun.sleep(50)
+
+      expect(received).toEqual([1, 2])
+      expect(reader.status()).toBe('done')
+    }
+    finally {
+      delete globals.document
+    }
+  })
+
   it('gives an island a module\'s mount in the browser build, none of its server code', async () => {
     const outdir = await mkdtemp(join(tmpdir(), 'kay-live-'))
 

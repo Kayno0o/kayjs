@@ -106,7 +106,7 @@ describe('kay build --static', () => {
     const home = (await get('/')).text
     const entry = (/<script type="module" src="\/repo(\/_kay\/entry-[\w-]+\.js)">/).exec(home)![1]!
     const stylesheet = (/<link rel="stylesheet" href="\/repo(\/_kay\/[\w-]+\.css)">/).exec(home)![1]!
-    const image = (/<img src="\/repo(\/_kay\/images\/[\w-]+\.webp)"/).exec(home)![1]!
+    const image = (/<img[^>]*? src="\/repo(\/_kay\/images\/[\w-]+\.webp)"/).exec(home)![1]!
 
     const script = await get(entry)
 
@@ -118,13 +118,13 @@ describe('kay build --static', () => {
     expect((await get(image)).status).toBe(200)
 
     // The cut variants and the share card the page asks for are written too.
-    const square = (/<img src="\/repo(\/_kay\/images\/[\w-]+-1x1\.webp)"/).exec(home)![1]!
+    const square = (/<img[^>]*? src="\/repo(\/_kay\/images\/[\w-]+-1x1\.webp)"/).exec(home)![1]!
     const card = (/<meta property="og:image" content="https:\/\/x\.example\/repo(\/_kay\/images\/[\w-]+-card\.jpg)">/).exec(home)![1]!
 
     expect((await get(square)).status).toBe(200)
 
     // A remote image's variants are downloaded and written as files, named after its URL.
-    const remote = (/<img src="\/repo(\/_kay\/images\/remote-\w+-1000\.webp)" srcset="([^"]+)"/).exec(home)!
+    const remote = (/<img[^>]*? src="\/repo(\/_kay\/images\/remote-\w+-1000\.webp)" srcset="([^"]+)"/).exec(home)!
     const variant = await fetch(new URL(`${BASE}${remote[1]}`, server.url))
 
     expect(remote[2]).toContain('-320.webp 320w')
@@ -142,7 +142,7 @@ describe('kay build --static', () => {
 
     expect(linked).toContain(named(/<link rel="stylesheet" href="\/repo\/_kay\/([\w-]+\.css)">/))
     expect(linked).toContain(named(/<script type="module" src="\/repo\/_kay\/(entry-[\w-]+\.js)">/))
-    expect(linked).toContain(named(/<img src="\/repo\/_kay\/images\/([\w-]+-1x1\.webp)"/))
+    expect(linked).toContain(named(/<img[^>]*? src="\/repo\/_kay\/images\/([\w-]+-1x1\.webp)"/))
     expect(linked).toContain('favicon.svg')
     expect(new TextDecoder().decode(Bun.gunzipSync(await Bun.file(join(out, 'index.html.gz')).bytes()))).toContain('<!--linked from /: ')
     expect((await get('/about')).text).toContain('<!--linked from /about: ')

@@ -54,7 +54,7 @@ export interface KayConfig {
   requireGuards?: boolean | undefined
   // Serves an OpenAPI 3.1 document of the API modules' routes at `/api/openapi.json`, read from their schemas, behind the API directory's own `_guard.ts`; `{ reference: true }` adds a page listing them at `/api/reference`, `{ dev: true }` keeps both to `kay dev`.
   openapi?: boolean | OpenApiConfig | undefined
-  // Compresses the pages rendered per request, action results, and any Response the app's routes registered after `pages()` return, with brotli or gzip: for a server with no proxy in front doing it. Off by default.
+  // Compresses the pages rendered per request, action results, and any Response the app's routes registered after `pages()` return, with brotli or gzip. On by default when NODE_ENV is production; `false` behind a proxy or CDN that compresses already.
   compress?: boolean | undefined
   // The route a load balancer or a container polls, `/_kay/health` unless `path` names another, or `false` for none.
   health?: HealthConfig | false | undefined

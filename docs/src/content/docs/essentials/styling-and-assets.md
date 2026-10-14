@@ -92,6 +92,8 @@ import hero from '../hero.jpg'
 img(src={hero} sizes="(min-width: 60rem) 50vw, 100vw" alt="The workshop")
 ```
 
+Every image loads lazily and decodes off the main thread unless it says otherwise. Give the hero image above the fold `loading="eager"` or `fetchpriority="high"`, so it does not show late.
+
 `image(hero, { aspect: '16/9' })` from `kay/image` cuts the variants to a shape instead of relying on `object-fit`. Spread its result on the element:
 
 ```kay

@@ -193,7 +193,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   if (security)
     sendSecurityHeaders(app, security, filePaths)
 
-  if (options.compress)
+  if (options.compress ?? process.env.NODE_ENV === 'production')
     compress(app, client, base)
 
   // kay's own messages go out whether requests are logged or not.

@@ -673,7 +673,7 @@ describe('preview mode', () => {
     expect(html).toContain('<h1 data-kay-field="news:launch:title">Launch day</h1>')
     expect(html).toContain('<h2 class="headline" data-kay-field="news:launch:title">Launch day</h2>')
     expect(html).toContain('<p>Posted as <!--kay-field news:launch:title-->Launch day<!--/kay-field--></p>')
-    expect(html).toContain('<img src="/cover.png" alt="Launch day" data-kay-field-alt="news:launch:title">')
+    expect(html).toContain('<img src="/cover.png" alt="Launch day" data-kay-field-alt="news:launch:title" loading="lazy" decoding="async">')
     expect(html).toContain('<ul data-kay-list="news:launch:tags"><li data-kay-field="news:launch:tags.0">launch</li></ul>')
     expect(html).toContain('<textarea>Draft: Launch day</textarea>')
     expect(html).toContain('<article data-kay-body="news:launch"><h2 id="what-ships">')

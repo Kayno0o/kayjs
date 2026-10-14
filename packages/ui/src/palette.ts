@@ -95,7 +95,19 @@ export function paletteSections(entries: PaletteEntry[], recent: string[] = [], 
   const byHref = new Map(entries.filter(isPaletteLink).map(entry => [entry.href, entry]))
   const recents = recent.flatMap(href => byHref.get(href) ?? [])
   const rank = groupRank(groups)
-  const sections = [...Map.groupBy(entries, entry => entry.group)]
+  const grouped = new Map<string, PaletteEntry[]>()
+
+  // Not `Map.groupBy`, which Safari before 17.4 lacks.
+  for (const entry of entries) {
+    const members = grouped.get(entry.group)
+
+    if (members)
+      members.push(entry)
+    else
+      grouped.set(entry.group, [entry])
+  }
+
+  const sections = [...grouped]
     .map(([group, members]) => ({ group, entries: members }))
     .sort((a, b) => rank(a.group) - rank(b.group))
 

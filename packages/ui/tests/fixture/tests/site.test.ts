@@ -149,7 +149,7 @@ describe('content', () => {
   })
 
   test('Avatar shows its picture as decoration, or the initial on a seeded colour, named when given a label', async () => {
-    expect((await page('avatar')).replaceAll(/<\/?slot[^>]*>/g, '')).toBe('<article id="avatar"><span data-size="sm" class="kui-avatar"><img class="kui-avatar-image" src="/ada.png" alt></span></article>')
+    expect((await page('avatar')).replaceAll(/<\/?slot[^>]*>/g, '')).toBe('<article id="avatar"><span data-size="sm" class="kui-avatar"><img class="kui-avatar-image" src="/ada.png" alt loading="lazy" decoding="async"></span></article>')
     expect((await page('avatar-initial')).replaceAll(/<\/?slot[^>]*>/g, '')).toMatch(/^<article id="avatar-initial"><span data-size="md" role="img" aria-label="Grace" class="kui-avatar"><span class="kui-avatar-initial" aria-hidden="true" style="background-color: #[\dA-F]{6}; color: #(?:000|fff)">g<\/span><\/span><\/article>$/)
   })
 
@@ -274,7 +274,7 @@ describe('data', () => {
   })
 
   test('SiteFavicon shows the site\'s icon, or the globe in a colour of the site\'s own', async () => {
-    expect(await page('favicon')).toBe('<article id="favicon"><span class="kui-site-favicon"><img class="kui-site-favicon-img" src="/favicon.png" alt></span></article>')
+    expect(await page('favicon')).toBe('<article id="favicon"><span class="kui-site-favicon"><img class="kui-site-favicon-img" src="/favicon.png" alt loading="lazy" decoding="async"></span></article>')
     expect(await element('/data', 'no-favicon')).toMatch(/<svg[^>]*style="color: #[0-9A-F]{6}"[^>]*class="kui-icon kui-site-favicon-icon"/)
   })
 

@@ -115,6 +115,8 @@ A link with `data-reload` loads its page fully. So does every link to a page set
 
 ## Browser-only code
 
+kay's browser code runs on Chrome and Edge 98, Firefox 104 and Safari 16.4 or later, and kayjs-ui's popovers on Chrome and Edge 114, Firefox 125 and Safari 17. The build ships an island's code as written, so code meant for those browsers stays off newer APIs such as `Map.groupBy`.
+
 `window`, `document` and `localStorage` do not exist on the server. Read them in `onMount` or `effect`, which run in the browser only:
 
 ```kay

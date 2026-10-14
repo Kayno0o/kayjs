@@ -304,6 +304,8 @@ describe('Markdown outside collections', () => {
     const kept = String(sanitizeHtml(html, options))
 
     expect(kept).toContain('<img src="/cat.png" alt="Cat" title="A cat">')
+    expect(html).toContain('<img loading="lazy" decoding="async" src="/cat.png" alt="Cat" title="A cat" />')
+    expect((await renderMarkdown('<img src="/hero.png" alt="" fetchpriority="high">\n')).html).toBe('<img decoding="async" src="/hero.png" alt="" fetchpriority="high">\n')
     expect(kept).toContain('<table>\n<thead>\n<tr><th>a</th><th>b</th></tr>\n</thead>\n<tbody>\n<tr><td>1</td><td>2</td></tr>\n</tbody>\n</table>')
     expect(kept).toContain('<img>')
     expect(kept).not.toContain('onerror')

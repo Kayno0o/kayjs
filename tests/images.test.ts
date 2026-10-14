@@ -77,10 +77,10 @@ describe('image()', () => {
     const imgs = new Map([...html.matchAll(/<img class="(\w+)" ([^>]*)>/g)].map(match => [match[1]!, match[2]!]))
     const variant = imageUrl(`/_kay/assets/${heroUrl}`, 1000).replaceAll('&', '&amp;')
 
-    expect(imgs.get('plain')).toBe(`src="${variant}" srcset="${(/srcset="([^"]+)"/).exec(html)![1]}" sizes="${cappedSizes('50vw', 2)}" width="1000" height="600" alt="Plain"`)
-    expect(imgs.get('sized')).toMatch(/^src="[^"]+&amp;w=1000" srcset="[^"]+ 1000w" sizes="[^"]+, 100vw" width="500" alt="Sized"$/)
-    expect(imgs.get('own')).toBe(`src="/_kay/assets/${heroUrl}" srcset="/a.png 1x" alt="Own"`)
-    expect(imgs.get('other')).toBe('src="/logo.svg" alt="Other"')
+    expect(imgs.get('plain')).toBe(`src="${variant}" srcset="${(/srcset="([^"]+)"/).exec(html)![1]}" sizes="${cappedSizes('50vw', 2)}" width="1000" height="600" alt="Plain" loading="lazy" decoding="async"`)
+    expect(imgs.get('sized')).toMatch(/^src="[^"]+&amp;w=1000" srcset="[^"]+ 1000w" sizes="[^"]+, 100vw" width="500" alt="Sized" loading="lazy" decoding="async"$/)
+    expect(imgs.get('own')).toBe(`src="/_kay/assets/${heroUrl}" srcset="/a.png 1x" alt="Own" loading="lazy" decoding="async"`)
+    expect(imgs.get('other')).toBe('src="/logo.svg" alt="Other" loading="lazy" decoding="async"')
   })
 
   it('resizes an image it was given the size of, and leaves one it cannot resize as it is', () => {

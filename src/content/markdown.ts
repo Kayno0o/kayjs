@@ -56,6 +56,10 @@ const SPACE = /\s/
 const ENTITY = /&(?:amp|lt|gt|quot|#39|#x27);/g
 const DECODED: Record<string, string> = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': '\'', '&#x27;': '\'' }
 // Line breaks in the text before an offset, for the line a problem sits on.
+// An image, and the attributes that keep it from loading lazily and decoding off the main thread, as a template's does.
+const IMAGE_TAG = /<img\b[^>]*>/gi
+const EAGER = /\s(?:loading|fetchpriority)\s*=/i
+const DECODING = /\sdecoding\s*=/i
 const LINE_BREAK = /\n/g
 
 export class MarkdownError extends Error {
@@ -102,7 +106,7 @@ export interface RenderedMarkdown {
 // The HTML is the writer's, raw tags included: a user's goes through `sanitizeHtml` before `innerHTML`, and the headings may be ones a user typed as raw tags.
 // The highlighter gets the fence's language as written, so for a user's text it falls back on one it does not know rather than throw.
 export async function renderMarkdown(markdown: string, options: { highlight?: Highlighter | undefined } = {}): Promise<RenderedMarkdown> {
-  const html = Bun.markdown.html(markdown, { ...MARKDOWN_OPTIONS, headings: { ids: true, autolink: true } })
+  const html = Bun.markdown.html(markdown, { ...MARKDOWN_OPTIONS, headings: { ids: true, autolink: true } }).replace(IMAGE_TAG, imageDefaults)
   const headings: Heading[] = []
 
   for (const { open: [, depth, id], inner } of elements(html, HEADING_OPEN, ([, depth]) => `</a></h${depth}>`))
@@ -350,6 +354,10 @@ function holdsMarkup(value: unknown): boolean {
     return true
 
   return Object.values(value).some(holdsMarkup)
+}
+
+function imageDefaults(tag: string): string {
+  return `<img${EAGER.test(tag) ? '' : ' loading="lazy"'}${DECODING.test(tag) ? '' : ' decoding="async"'}${tag.slice(4)}`
 }
 
 // `name="text"`, `name='text'`, `name={json}` or a bare `name`, which is `true`.
