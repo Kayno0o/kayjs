@@ -99,21 +99,6 @@ describe('props', () => {
     expect(code).toContain('{(__props.size !== undefined ? __props.size : __default_0())} {__props.label}')
   })
 
-  it('leaves shadowing names alone', () => {
-    const code = tsx('---\nconst { item } = props<{ item: string }>()\nconst upper = (item: string) => item.toUpperCase()\n---\np {upper(item)}')
-
-    expect(code).toContain('const upper = (item: string) => item.toUpperCase()')
-    expect(code).toContain('{upper(__props.item)}')
-  })
-
-  it('spells out shorthand properties', () => {
-    expect(tsx('---\nconst { id } = props<{ id: number }>()\nconst payload = { id }\n---\np x')).toContain('const payload = { id: __props.id }')
-  })
-
-  it('keeps a named props object as is', () => {
-    expect(tsx('---\nconst p = props<{ a: number }>()\n---\np {p.a}')).toContain('const p = __props;')
-  })
-
   it('rejects writes to props and misplaced props() calls', () => {
     expect(errors('---\nconst { a } = props<{ a: number }>()\na = 2\n---\np x')).toEqual([expect.stringContaining('props are read-only')])
     expect(errors('---\nconst f = () => props<{ a: number }>()\n---\np x')).toEqual([expect.stringContaining('only valid as')])
@@ -156,10 +141,6 @@ describe('control flow', () => {
     expect(compileKay(page, 'src/routes/index.kay', { includeServer: false }).tsx).not.toContain('export const page')
   })
 
-  it('renders a for fallback', () => {
-    expect(jsx('for t of list key={t}\n  p {t}\nelse\n  p none')).toContain('fallback={<p>none</p>}')
-  })
-
   it('chains if branches as conditionals', () => {
     expect(jsx('if a\n  p a\nelse if b\n  p b\nelse\n  p c')).toBe('<>{(a) ? <p>a</p> : (b) ? <p>b</p> : <p>c</p>}</>')
   })
@@ -199,10 +180,6 @@ describe('elements', () => {
     expect(jsx('p.a(class="b")')).toBe('<p class="a b" />')
     expect(jsx('p.a(class={{ on: on() }})')).toBe('<p class={["a", ({ on: on() })]} />')
     expect(errors('p(class="a" class="b")')).toEqual([expect.stringContaining('one `class`')])
-  })
-
-  it('writes the id shorthand', () => {
-    expect(jsx('#main.x')).toBe('<div id="main" class="x" />')
   })
 
   it('binds inputs both ways, with the right event and value type', () => {
@@ -624,23 +601,6 @@ describe('server values the fence reads', () => {
   })
 })
 
-describe('prop defaults', () => {
-  it('reads a default only for an undefined prop and runs it only then', () => {
-    const code = tsx('---\nconst { opts = {}, fmt = (v: number) => String(v) } = props<{ opts?: { a?: number }, fmt?: (v: number) => string }>()\n---\np {opts.a} {fmt(1)}')
-
-    expect(code).toContain('const __default_0 = (): Exclude<(typeof __props)["opts"], undefined> => (__default_0_made ??= { value: ({}) }).value;')
-    expect(code).toContain('(__props.opts !== undefined ? __props.opts : __default_0()).a')
-    expect(code).not.toContain('?? __default')
-  })
-
-  it('applies a default to a renamed and a quoted key too', () => {
-    const code = tsx('---\nconst { label: text = \'x\', \'aria-label\': aria = \'y\' } = props<{ label?: string, \'aria-label\'?: string }>()\n---\np {text} {aria}')
-
-    expect(code).toContain('(__props.label !== undefined ? __props.label : __default_0())')
-    expect(code).toContain('(__props["aria-label"] !== undefined ? __props["aria-label"] : __default_1())')
-  })
-})
-
 describe('generic components', () => {
   it('declares the type parameters of the script fence on the component function', () => {
     const code = tsx('--- <T extends { id: number }, const K extends keyof T = keyof T>\nconst { items } = props<{ items: T[], key?: K }>()\n---\np {items.length}')
@@ -740,15 +700,6 @@ describe('invalid code', () => {
   })
 })
 
-describe('read-only diagnostics', () => {
-  it('point at the name a statement writes, not at the start of the statement', () => {
-    const source = '---\nconst { a, b, c, d } = props<{ a: number, b: number, c: number[], d: number }>()\nfunction f() {\n  a = 1\n  ++b\n  ;[d] = [2]\n  for (c of [[1]]) {}\n  ;({ x: a } = { x: 1 })\n}\n---\np x'
-    const found = compileKay(source, 'test.kay').diagnostics.map(d => source.slice(d.start, d.end))
-
-    expect(found).toEqual(['a', 'b', 'd', 'c', 'a'])
-  })
-})
-
 describe('signal writes', () => {
   it('assign a signal through .set, a compound one or ++ through an updater', () => {
     const code = tsx('---\nconst count = signal(0)\nconst open = signal(false)\nfunction f() {\n  count=count() + 1\n  count *= 2\n  --count\n}\n---\nbutton(onClick={() => { count++; open = !open() }}) {count()}')
@@ -786,115 +737,5 @@ describe('module signals', () => {
   it('finds the signals and memos a module exports as export const, made by kay\'s functions', () => {
     expect(moduleSignals('import { signal as s, memo, persisted } from \'kay\'\nimport { linked } from \'other\'\n\nexport const a = s(1), b = memo(() => a())\nexport const c = persisted(\'c\', 0)\nexport const d = linked(() => 1)\nconst e = s(2)\nexport let f = s(3)\nexport { e }\n')).toEqual({ a: 'signal', b: 'memo', c: 'signal' })
     expect(moduleSignals('export const a = signal(1)\n')).toEqual({})
-  })
-})
-
-describe('class shorthand', () => {
-  it('merges with the class attribute and the class of every spread', () => {
-    expect(jsx('p.a({...sp})')).toBe('<p {...sp} class={["a", ((sp) as unknown as { class?: string }).class]} />')
-    expect(jsx('p.a({...sp} class="z")')).toBe('<p {...sp} class={["a", ((sp) as unknown as { class?: string }).class, "z"]} />')
-    expect(jsx('p.a(class={c} {...sp})')).toBe('<p {...sp} class={["a", (c), ((sp) as unknown as { class?: string }).class]} />')
-    expect(jsx('p.a(title="t" {...sp} id="i")')).toBe('<p title="t" {...sp} id="i" class={["a", ((sp) as unknown as { class?: string }).class]} />')
-  })
-
-  it('stays where it is without a spread', () => {
-    expect(jsx('p.a(title="t" class="b")')).toBe('<p class="a b" title="t" />')
-  })
-})
-
-describe('text lines', () => {
-  it('separates consecutive lines with a line break, and nothing else', () => {
-    expect(jsx('p\n  | one\n  | two {x}\n  | three')).toBe('<p>one{"\\n"}two {x}{"\\n"}three</p>')
-    expect(jsx('p one\n  | two')).toBe('<p>one{"\\n"}two</p>')
-    expect(jsx('p\n  | one\n  b two\n  | three')).toBe('<p>one<b>two</b>three</p>')
-  })
-})
-
-describe('lowercase events', () => {
-  it('suggests the camelCase name', () => {
-    expect(reports('button(onclick={go}) x')).toEqual([{ message: '`onclick` does not attach a handler', at: 'onclick', note: 'events are written in camelCase', help: '`onClick`' }])
-    expect(errors('button(on:click={go}) x')).toEqual(['`on:click` does not attach a handler'])
-    expect(compileKay('input(onkeydown={go} ondblclick={go})', 'test.kay').diagnostics.map(d => d.help)).toEqual(['`onKeyDown`', '`onDblClick`'])
-    expect(compileKay('button(on:click={go}) x', 'test.kay').diagnostics[0]?.fixes).toEqual([{ title: 'Write `onClick`', edits: [{ start: 7, end: 15, text: 'onClick' }], safe: true }])
-  })
-
-  it('leaves components, strings and the camelCase form alone', () => {
-    expect(errors('Card(onclick={go})')).toEqual([])
-    expect(errors('button(onclick="go()") x')).toEqual([])
-    expect(errors('button(onClick={go}) x')).toEqual([])
-  })
-})
-
-describe('accessibility checks', () => {
-  const checked = (source: string) => compileKay(source, 'test.kay', { check: true }).diagnostics.map(d => d.message)
-
-  it('ask an img for alt and an iframe for a title, alt="" marking decoration', () => {
-    expect(checked('img(src="/a.png")\niframe(src="/map")')).toEqual([
-      'An `img` needs `alt`',
-      'An `iframe` needs a `title`',
-    ])
-    expect(checked('img(src="/a.png" alt="")\niframe(src="/map" title="Map")')).toEqual([])
-    expect(checked('input(type="image" src="/go.png")\ninput(type="image" src="/go.png" alt="Search")')).toEqual(['An image button needs `alt`'])
-  })
-
-  it('report a click handler on an element the keyboard never reaches, unless it has a role', () => {
-    const click = 'onClick={() => undefined}'
-
-    expect(checked(`.card(${click})\nli(${click}) x\nbutton(${click}) ok\na(href="/" ${click}) ok`)).toEqual([
-      'This `div` reacts to `onClick` but is out of reach of the keyboard and screen readers',
-      'This `li` reacts to `onClick` but is out of reach of the keyboard and screen readers',
-    ])
-    expect(checked(`li(role="option" ${click}) x`)).toEqual([])
-  })
-
-  it('ask a field for a label, one around it, pointing at its id or written as an attribute, a placeholder being none', () => {
-    expect(checked('input(name="email")\nselect(name="size")\ntextarea#bio\ninput(id="age")\ninput(placeholder="Search")')).toEqual([
-      'This `input` has no label',
-      'This `select` has no label',
-      'This `textarea` has no label',
-      'This `input` has no label',
-      'This `input` has no label',
-    ])
-    expect(checked([
-      'label Email\n  input(name="email")',
-      'label(for="bio") Bio\ntextarea#bio',
-      'input(id="age")\nlabel(for="age") Age',
-      'input(aria-label="Search")\ninput(title="Search")\ninput(aria-labelledby="heading")\nh2#heading Search',
-      'input(type="hidden" name="id")\ninput(type="submit" value="Send")\ninput(type="button" value="Go")',
-      'input(name="website" aria-hidden="true" tabindex="-1")\n.trap(hidden)\n  input(name="phone")',
-    ].join('\n'))).toEqual([])
-  })
-
-  it('leave a field whose label may be elsewhere: one with an id written as an expression, or among a component\'s children', () => {
-    expect(checked('---\nimport Field from \'./field.kay\'\n\nconst { name } = props<{ name: string }>()\n---\ninput(id={name})\nField(label="Email")\n  input(name="email")')).toEqual([])
-  })
-
-  it('ask a button or a link for something to announce, an icon alone not being one', () => {
-    expect(checked('button\n  svg\na(href="/")\n  img(src="/logo.png" alt="")\nbutton(type="submit")')).toEqual([
-      'This `button` has nothing for a screen reader to announce',
-      'This `a` has nothing for a screen reader to announce',
-      'This `button` has nothing for a screen reader to announce',
-    ])
-    expect(checked([
-      'button Save',
-      'button(aria-label="Close")\n  svg',
-      'a(href="/")\n  img(src="/logo.png" alt="Home")',
-      'a(name="top")',
-    ].join('\n'))).toEqual([])
-    expect(checked('---\nconst { count } = props<{ count: number }>()\n---\nbutton {count}')).toEqual([])
-  })
-
-  it('report a heading skipping a level, each branch of an if following the heading before it', () => {
-    expect(checked('h1 Shop\nh3 Shoes\nh4 Boots\nh2 Hats\nh4 Caps')).toEqual([
-      'This `h3` follows an `h1`, skipping a level',
-      'This `h4` follows an `h2`, skipping a level',
-    ])
-    expect(checked('---\nconst { open } = props<{ open: boolean }>()\n---\nh1 Shop\nif open\n  h2 Open\nelse\n  h2 Closed\nh3 Hours')).toEqual([])
-  })
-
-  it('leave an element with a spread alone, and never stop a page from running', () => {
-    expect(checked('---\nconst { attrs } = props<{ attrs: Record<string, string> }>()\n---\nimg({...attrs})')).toEqual([])
-    expect(checked('---\nconst { attrs } = props<{ attrs: Record<string, string> }>()\n---\ninput({...attrs})\nbutton({...attrs})')).toEqual([])
-    expect(errors('img(src="/a.png")\n.card(onClick={() => undefined})')).toEqual([])
   })
 })

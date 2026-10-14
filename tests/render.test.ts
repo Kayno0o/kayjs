@@ -182,6 +182,25 @@ describe('prop defaults', () => {
   })
 })
 
+describe('props read off the props object', () => {
+  it('apply a default to a renamed and a quoted key, and hand the rest on', async () => {
+    const source = '---\nconst { size = \'md\', label: text = \'x\', \'aria-label\': aria = \'y\', ...rest } = props<{ size?: string, label?: string, \'aria-label\'?: string, id?: string }>()\n---\np(aria-label={aria} {...rest}) {size} {text}'
+
+    expect(await renderKay(source, {})).toBe('<p aria-label="y">md x</p>')
+    expect(await renderKay(source, { 'size': 'lg', 'label': 'L', 'aria-label': 'A', 'id': 'i' })).toBe('<p aria-label="A" id="i">lg L</p>')
+  })
+
+  it('leave a name that shadows a prop alone, spell out a shorthand property and keep a named props object', async () => {
+    expect(await renderKay('---\nconst { item } = props<{ item: string }>()\nconst upper = (item: string) => item.toUpperCase()\n---\np {upper(item)} {item}', { item: 'a' })).toBe('<p>A a</p>')
+    expect(await renderKay('---\nconst { id } = props<{ id: number }>()\nconst payload = { id }\n---\np {payload.id}', { id: 4 })).toBe('<p>4</p>')
+    expect(await renderKay('---\nconst p = props<{ a: number }>()\n---\np {p.a}', { a: 5 })).toBe('<p>5</p>')
+  })
+
+  it('write the id shorthand beside classes', async () => {
+    expect(await renderKay('#main.x')).toBe('<div id="main" class="x"></div>')
+  })
+})
+
 describe('named slots', () => {
   it('read a line made of an expression as text', async () => {
     expect(await renderKay('---\nconst { name } = props<{ name: string }>()\n---\np\n  {name} <b>\n  | !', { name: 'kay' })).toBe('<p>kay &lt;b>\n!</p>')
@@ -260,6 +279,7 @@ describe('text lines', () => {
   it('keep their line breaks', async () => {
     expect(await renderKay('pre\n  | a\n  | b\n  | c')).toBe('<pre>a\nb\nc</pre>')
     expect(await renderKay('pre\n  | a\n  |   b {"x"}  c\n  |    d')).toBe('<pre>a\n  b x  c\n   d</pre>')
+    expect(await renderKay('p\n  | one\n  b two\n  | three')).toBe('<p>one<b>two</b>three</p>')
     expect(await renderKay('textarea a   b')).toBe('<textarea>a   b</textarea>')
     expect(await renderKay('---\nconst { n } = props<{ n: string }>()\n---\np\n  | line one\n  | line two {n}', { n: 'N' })).toBe('<p>line one\nline two N</p>')
   })

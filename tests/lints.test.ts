@@ -56,14 +56,6 @@ describe('lint levels', () => {
   it('reports nothing outside type checking, so no lint ever stops a page from running', () => {
     expect(compileKay(`${ROWS}img(src="/a.png")\nfor todo, i of todos key={i}\n  p {todo.id}\n`, 'list.kay', { output: 'html' }).diagnostics).toEqual([])
   })
-
-  it('documents every lint with an example it reports, and the same example written right', () => {
-    // One the types find, or one found in kay.config.ts or the rendered pages, is proved by `kay check`'s and `kay build`'s own tests.
-    for (const [code, lint] of Object.entries(LINTS).filter(([, lint]) => !('typed' in lint) && !('site' in lint))) {
-      expect(lints(lint.wrong).map(d => d.code)).toContain(code)
-      expect(lints(lint.right).map(d => d.code)).not.toContain(code)
-    }
-  })
 })
 
 describe('unread names in a file that did not compile', () => {
@@ -81,19 +73,23 @@ describe('kay explain', () => {
     return { code: await child.exited, stdout: await new Response(child.stdout).text(), stderr: await new Response(child.stderr).text() }
   }
 
-  it('lists every lint with its group, its default level and the first sentence of what it reports', () => {
+  it('lists every lint with its group, its default level and the first sentence of what it reports, a group\'s under what it covers', () => {
     expect(lintList().split('\n').map(line => line.split(/\s{2,}/).slice(0, 3))).toEqual(Object.entries(LINTS).map(([name, lint]) => [name, lint.group, lint.level]))
     expect(lintList()).toMatch(/^unread-name +code +deny {2}A prop or server value nothing reads\.$/m)
-  })
 
-  it('lists a group\'s lints under what the group covers', () => {
     const [heading, blank, ...rows] = lintList('islands').split('\n')
 
     expect([heading, blank]).toEqual([`islands: ${LINT_GROUPS.islands}`, ''])
     expect(rows.map(row => row.split(/\s{2,}/)[0])).toEqual(['positional-key', 'identity-key', 'uncalled-signal', 'constant-signal'])
   })
 
-  it('explains a lint with an example it reports and the same written right, indented as code', () => {
+  it('explains a lint with an example it reports and the same written right, indented as code, and every lint\'s examples hold', () => {
+    // One the types find, or one found in kay.config.ts or the rendered pages, is proved by `kay check`'s and `kay build`'s own tests.
+    for (const [code, lint] of Object.entries(LINTS).filter(([, lint]) => !('typed' in lint) && !('site' in lint))) {
+      expect(lints(lint.wrong).map(d => d.code)).toContain(code)
+      expect(lints(lint.right).map(d => d.code)).not.toContain(code)
+    }
+
     expect(explainLint('constant-signal')).toBe([
       'constant-signal: warn by default, in islands',
       LINTS['constant-signal'].summary,
@@ -431,5 +427,44 @@ describe('a11y lints', () => {
 
     expect(a11y(valid.map(value => `input(name="f" aria-label="F" autocomplete="${value}")`).join('\n'))).toEqual([])
     expect(a11y('input(name="a" aria-label="A" autocomplete="nope")\ninput(name="b" aria-label="B" autocomplete="home name")\nform(autocomplete="email")\n  p x\nform(autocomplete="off")\n  p y\n')).toEqual(['invalid-autocomplete autocomplete', 'invalid-autocomplete autocomplete', 'invalid-autocomplete autocomplete'])
+  })
+})
+
+describe('what a template gets reported for', () => {
+  const click = 'onClick={() => undefined}'
+  const props = (types: string, names: string) => `---\nconst { ${names} } = props<{ ${types} }>()\n---\n`
+  // The code of each report (its message when it has none) and the text it points at.
+  const found = (source: string) => compileKay(source, 'list.kay', { check: true }).diagnostics.map(d => `${d.code ?? d.message} ${source.slice(d.start, d.end)}`)
+  const rows: [string, string, string[]][] = [
+    ['img and iframe', 'img(src="/a.png")\niframe(src="/map")', ['missing-alt img', 'missing-title iframe']],
+    ['alt="" marking decoration', 'img(src="/a.png" alt="")\niframe(src="/map" title="Map")', []],
+    ['image button', 'input(type="image" src="/go.png")\ninput(type="image" src="/go.png" alt="Search")', ['missing-alt input']],
+    ['click out of keyboard reach', `.card(${click})\nli(${click}) x\nbutton(${click}) ok\na(href="/" ${click}) ok`, [`unreachable-click .card(${click})`, 'unreachable-click li']],
+    ['click with a role', `li(role="option" ${click}) x`, []],
+    ['fields with no label', 'input(name="email")\nselect(name="size")\ntextarea#bio\ninput(id="age")\ninput(placeholder="Search")', ['missing-label input', 'missing-label select', 'missing-label textarea', 'missing-label input', 'missing-label input']],
+    ['fields labelled', ['label Email\n  input(name="email")', 'label(for="bio") Bio\ntextarea#bio', 'input(id="age")\nlabel(for="age") Age', 'input(aria-label="Search")\ninput(title="Search")\ninput(aria-labelledby="heading")\nh2#heading Search', 'input(type="hidden" name="id")\ninput(type="submit" value="Send")\ninput(type="button" value="Go")', 'input(name="website" aria-hidden="true" tabindex="-1")\n.trap(hidden)\n  input(name="phone")'].join('\n'), []],
+    ['a label that may be elsewhere', `${props('name: string', 'name')}input(id={name})\nField(label="Email")\n  input(name="email")`, []],
+    ['buttons and links with nothing to announce', 'button\n  svg\na(href="/")\n  img(src="/logo.png" alt="")\nbutton(type="submit")', ['empty-control button', 'empty-control a', 'empty-control button']],
+    ['buttons and links announcing', ['button Save', 'button(aria-label="Close")\n  svg', 'a(href="/")\n  img(src="/logo.png" alt="Home")', 'a(name="top")'].join('\n'), []],
+    ['a button whose text is an expression', `${props('count: number', 'count')}button {count}`, []],
+    ['headings skipping a level', 'h1 Shop\nh3 Shoes\nh4 Boots\nh2 Hats\nh4 Caps', ['skipped-heading h3', 'skipped-heading h4']],
+    ['headings in each branch of an if', `${props('open: boolean', 'open')}h1 Shop\nif open\n  h2 Open\nelse\n  h2 Closed\nh3 Hours`, []],
+    ['a spread', `${props('attrs: Record<string, string>', 'attrs')}img({...attrs})\ninput({...attrs})\nbutton({...attrs})`, []],
+    ['a lowercase event', 'button(onclick={go}) x', ['`onclick` does not attach a handler onclick']],
+    ['a namespaced event', 'button(on:click={go}) x', ['`on:click` does not attach a handler on:click']],
+    ['lowercase events on a component, a string and camelCase', 'Card(onclick={go})\nbutton(onclick="go()") x\nbutton(onClick={go}) x', []],
+    ['writes to props, at the name written', '---\nconst { a, b, c, d } = props<{ a: number, b: number, c: number[], d: number }>()\nfunction f() {\n  a = 1\n  ++b\n  ;[d] = [2]\n  for (c of [[1]]) {}\n  ;({ x: a } = { x: 1 })\n}\n---\np x', ['`a` is a prop, and props are read-only a', '`b` is a prop, and props are read-only b', '`d` is a prop, and props are read-only d', '`c` is a prop, and props are read-only c', '`a` is a prop, and props are read-only a']],
+  ]
+
+  it.each(rows)('%s', (_name, source, expected) => {
+    expect(found(source)).toEqual(expected)
+  })
+
+  it('offers the camelCase name as a fix and a help', () => {
+    const [first] = compileKay('button(onclick={go}) x', 'list.kay').diagnostics
+
+    expect([first!.note, first!.help]).toEqual(['events are written in camelCase', '`onClick`'])
+    expect(compileKay('input(onkeydown={go} ondblclick={go})', 'list.kay').diagnostics.map(d => d.help)).toEqual(['`onKeyDown`', '`onDblClick`'])
+    expect(compileKay('button(on:click={go}) x', 'list.kay').diagnostics[0]?.fixes).toEqual([{ title: 'Write `onClick`', edits: [{ start: 7, end: 15, text: 'onClick' }], safe: true }])
   })
 })
