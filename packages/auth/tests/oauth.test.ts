@@ -29,6 +29,64 @@ describe('safeRedirect', () => {
     expect(['/../x', '/a?', '/é?q=é', '/a b'].map(path => safeRedirect(path))).toEqual(['/x', '/a', '/%C3%A9?q=%C3%A9', '/a%20b'])
     expect(safeRedirect(safeRedirect('/a/./é'))).toBe(safeRedirect('/a/./é'))
   })
+
+  // Hostile values that must fall back, and the invariant for every answer: on the site's origin both resolved raw and decoded once.
+  const hostile = [
+    '/%09/evil.com',
+    '/%0a/evil.com',
+    '/%0d/evil.com',
+    '/%0A/evil.com',
+    '/%0D/evil.com',
+    '/%09%0a%0d/evil.com',
+    '/%0a%09/evil.com',
+    '/%09%09/evil.com',
+    '/%5cevil.com',
+    '/%5Cevil.com',
+    '/%09%5cevil.com',
+    '/%0a%5cevil.com',
+    '/\\evil.com',
+    '/\t\\evil.com',
+    '//evil.com',
+    '/\t/evil.com',
+    '/\n/evil.com',
+    '/\r/evil.com',
+    '\t//evil.com',
+    ' //evil.com',
+    '/%2f/evil.com',
+    '/%2F/evil.com',
+    '/%09/%2fevil.com',
+    '/%2509/evil.com',
+    '/%250a/evil.com',
+    '/%252F/evil.com',
+    '/%255cevil.com',
+    '/%E0%A4%A',
+    '/%09/%E0%A4%A',
+    'https://evil.com',
+    'http:evil.com',
+    'javascript:alert(1)',
+    'evil.com',
+  ]
+
+  test('rejects tab, newline and backslash hidden behind an escape', () => {
+    for (const path of hostile)
+      expect([path, safeRedirect(path)]).toEqual([path, '/'])
+  })
+
+  test('every answer stays on the site, resolved raw and decoded once', () => {
+    const legit = ['/dashboard', '/a/b?x=1#top', '/a/%2F', '/a/%09b', '/a?next=%09//x', '/a?q=%0a', '/é?q=é', '/a b', '/a/%5Cb', '/%7Euser', '/a/..%2fb', '/.%09/evil.com', '/a/..%09/evil.com', '/ /evil.com', '/%2e%09/evil.com', '/a?q=100%25']
+
+    for (const path of [...hostile, ...legit]) {
+      const answer = safeRedirect(path)
+
+      for (const form of [answer, decodeURIComponent(answer)]) {
+        const url = new URL(form, 'http://site.test')
+
+        expect([path, url.origin]).toEqual([path, 'http://site.test'])
+      }
+    }
+
+    expect(['/a/%09b', '/a?next=%09//x', '/a?q=%0a', '/a/%5Cb', '/a?q=100%25'].map(path => safeRedirect(path))).toEqual(['/a/%09b', '/a?next=%09//x', '/a?q=%0a', '/a/%5Cb', '/a?q=100%25'])
+  })
 })
 
 describe('pkce', () => {

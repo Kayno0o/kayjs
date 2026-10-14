@@ -33,7 +33,20 @@ export function safeRedirect(path: string | undefined | null, fallback = '/'): s
   // Checked decoded once too, for an app that decodes before it resolves: `/.%2f/evil.com` is `//evil.com` to it.
   const decoded = decodedOnce(normalized)
 
-  return SECOND_SLASH.test(normalized) || decoded === undefined || SECOND_SLASH.test(resolved(decoded)) ? fallback : normalized
+  return SECOND_SLASH.test(normalized) || decoded === undefined || leavesSite(decoded) ? fallback : normalized
+}
+
+// What an app that decoded the path sees: the tab and newline a browser strips only after decoding (`/%09/evil.com`) can leave a second slash or a backslash up front, and resolving alone would hide it behind the other host's pathname.
+function leavesSite(decoded: string): boolean {
+  const cleaned = decoded.replace(URL_STRIPPED, '').replace(LEADING_SPACE, '')
+
+  if (!cleaned.startsWith('/') || SECOND_SLASH.test(cleaned) || new URL(cleaned, BASE).origin !== BASE.origin || SECOND_SLASH.test(resolved(cleaned)))
+    return true
+
+  // A double encoding (`/%2509/evil.com`) is checked the same way, down to where decoding changes nothing.
+  const again = decodedOnce(cleaned)
+
+  return again !== undefined && (again !== cleaned && leavesSite(again))
 }
 
 // Starting with a single slash and holding no backslash, the path stays on `BASE`'s origin.
