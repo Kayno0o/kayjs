@@ -1,14 +1,16 @@
 ---
 import type { JSX } from 'kay'
+import Card from '@kaynooo/kayjs-ui/card.kay'
 
 const { title, use, href, icon } = props<{ title: string, use: string, href: string, icon: JSX.Element }>()
 ---
 li
-  a.module(href={href})
-    span.module-head
-      span.module-icon(aria-hidden="true")
-        | {icon}
-      strong {title}
-      code {use}
-    span.module-text
-      slot
+  Card.link-card(bare)
+    a.module(href={href})
+      span.module-head
+        span.module-icon(aria-hidden="true")
+          | {icon}
+        strong {title}
+        code {use}
+      span.module-text
+        slot

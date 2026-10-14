@@ -1,11 +1,12 @@
 ---
+import type { SearchHit } from 'kay'
 import type { PaletteAction, PaletteEntry, PaletteLink } from './palette'
-import { effect, memo, onCleanup, onMount, signal, uid } from 'kay'
+import { effect, memo, onCleanup, onMount, searchResults, signal, uid } from 'kay'
 import { stepIndex } from './cycle'
 import Icon from './icon.kay'
-import { isPaletteLink, paletteMatches, paletteSections, withRecent } from './palette'
+import { isPaletteLink, paletteHits, paletteMatches, paletteSections, withRecent } from './palette'
 
-const { open = false, onOpenChange, entries, groups = [], recent = [], onRecentChange, hotkey = 'k', label = 'Search', placeholder = 'Search', emptyLabel = 'No results', class: className } = props<{
+const { open = false, onOpenChange, entries, groups = [], recent = [], onRecentChange, hotkey = 'k', siteSearch = false, siteSearchLabel = 'In the pages', label = 'Search', placeholder = 'Search', emptyLabel = 'No results', class: className } = props<{
   // Shows the palette; the hotkey opens and closes it too, and `onOpenChange` reports every change for a parent driving it.
   open?: boolean | undefined
   onOpenChange?: ((open: boolean) => void) | undefined
@@ -17,16 +18,20 @@ const { open = false, onOpenChange, entries, groups = [], recent = [], onRecentC
   onRecentChange?: ((recent: string[]) => void) | undefined
   // Ctrl or Cmd and this key opens and closes it from anywhere, unless something handled the key first; `null` leaves opening to the app.
   hotkey?: string | null | undefined
+  // Searches the text of the site's pages too, as kay indexes them under `search: true`: a query lists the sections it finds, `limit` of them, after the entries it matches, under `siteSearchLabel`.
+  siteSearch?: boolean | { limit?: number | undefined } | undefined
+  siteSearchLabel?: string | undefined
   label?: string | undefined
   placeholder?: string | undefined
   emptyLabel?: string | undefined
   class?: string | undefined
 }>()
 
-// A row of the list, numbered the way the arrow keys walk it.
+// A row of the list, numbered the way the arrow keys walk it; a section the site search found carries the line of text it was found in.
 interface Row {
   entry: PaletteEntry
   index: number
+  snippet?: SearchHit['snippet'] | undefined
 }
 
 const id = uid()
@@ -35,18 +40,25 @@ const followedRecently = signal<string[]>(recent)
 const query = signal('')
 const selected = signal(0)
 let dialog: HTMLDialogElement | undefined
+const searching = siteSearch
+const site = searching ? searchResults(query, searching === true ? {} : searching) : undefined
 
 effect(() => shown.set(open))
 effect(() => followedRecently.set(recent))
 
-// Headed groups while the query is empty, one flat ranked list once it is not.
+// Headed groups while the query is empty, one flat ranked list once it is not, then the sections the site search found that no entry links already.
 const sections = memo(() => {
   let index = 0
   const numbered = (members: PaletteEntry[]): Row[] => members.map(entry => ({ entry, index: index++ }))
 
-  return query().trim()
-    ? [{ group: null, rows: numbered(paletteMatches(entries, query(), groups)) }]
-    : paletteSections(entries, followedRecently(), groups).map(section => ({ group: section.group as string | null, rows: numbered(section.entries) }))
+  if (!query().trim())
+    return paletteSections(entries, followedRecently(), groups).map(section => ({ group: section.group as string | null, rows: numbered(section.entries) }))
+
+  const matches = paletteMatches(entries, query(), groups)
+  const found = numbered(matches)
+  const hits = paletteHits(site?.hits() ?? [], matches).map(hit => ({ entry: hit.link, index: index++, snippet: hit.snippet }))
+
+  return hits.length > 0 ? [{ group: null, rows: found }, { group: siteSearchLabel, rows: hits }] : [{ group: null, rows: found }]
 })
 
 const rows = memo(() => sections().flatMap(section => section.rows))
@@ -164,7 +176,17 @@ dialog.kui-command-palette(ref={element => dialog = element} closedby="any" aria
               a.kui-command-palette-option(href={link.href} target={link.external ? '_blank' : undefined} rel={link.external ? 'noopener noreferrer' : undefined} id={optionId(row.index)} role="option" aria-selected={row.index === selected() ? 'true' : 'false'} tabindex="-1" onPointerMove={() => selected.set(row.index)} onClick={() => followed(link)})
                 if link.icon as icon
                   Icon(icon={icon})
-                span.kui-command-palette-label {row.entry.label}
+                if row.snippet as snippet
+                  span.kui-command-palette-text
+                    span.kui-command-palette-label {row.entry.label}
+                    span.kui-command-palette-snippet
+                      for part, partIndex of snippet key={partIndex}
+                        if part.hit
+                          mark {part.text}
+                        else
+                          | {part.text}
+                else
+                  span.kui-command-palette-label {row.entry.label}
                 if query().trim()
                   span.kui-command-palette-group {row.entry.group}
             else if actionOf(row.entry) as action

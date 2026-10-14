@@ -19,7 +19,6 @@ import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
 import TooltipHost from '@kaynooo/kayjs-ui/tooltip-host.kay'
 import Pager from '../../../components/pager.kay'
 import Toc from '../../../components/toc.kay'
-import '../../../ui.css'
 ---
 head
   title {title} · kayjs-ui

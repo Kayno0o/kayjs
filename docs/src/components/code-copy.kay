@@ -1,9 +1,10 @@
 ---
-import { onCleanup, onMount, signal } from 'kay'
+import { attempt } from '@kaynooo/kayjs-ui'
+import { onCleanup, onMount } from 'kay'
 
-const said = signal('')
+const COPIED_MS = 2000
 
-// The copy buttons come with the highlighted code blocks; one listener on the document answers them all, pages swapped in later included.
+// The highlighter writes each code block's button as HTML, CopyButton's look without its island, so one listener on the document answers them all, pages swapped in later included, as CopyButton would: the label says it went through, a toast says it did not.
 async function copy(event: MouseEvent) {
   const button = event.target instanceof Element ? event.target.closest<HTMLButtonElement>('[data-copy]') : null
   const code = button?.closest('.code')?.querySelector('code')
@@ -11,20 +12,11 @@ async function copy(event: MouseEvent) {
   if (!button || !code)
     return
 
-  try {
-    await navigator.clipboard.writeText(code.textContent ?? '')
-    button.textContent = 'Copied'
-    said.set('Code copied')
-  }
-  catch {
-    button.textContent = 'Failed'
-    said.set('The code could not be copied')
-  }
+  if (!await attempt(async () => navigator.clipboard.writeText(code.textContent ?? ''), 'Could not copy to the clipboard'))
+    return
 
-  setTimeout(() => {
-    button.textContent = 'Copy'
-    said.set('')
-  }, 1500)
+  button.textContent = 'Copied!'
+  setTimeout(() => button.textContent = 'Copy', COPIED_MS)
 }
 
 const onClick = (event: MouseEvent) => void copy(event)
@@ -33,4 +25,3 @@ onMount(() => document.addEventListener('click', onClick))
 
 onCleanup(() => document.removeEventListener('click', onClick))
 ---
-p.sr-only(aria-live="polite") {said()}

@@ -1,6 +1,6 @@
 import type { PaletteEntry } from '../src/palette'
 import { describe, expect, test } from 'bun:test'
-import { paletteMatches, paletteScore, paletteSections, RECENT_GROUP, withRecent } from '../src/palette'
+import { paletteHits, paletteMatches, paletteScore, paletteSections, RECENT_GROUP, withRecent } from '../src/palette'
 
 const link = (label: string, group: string, keywords?: string): PaletteEntry => ({ label, group, keywords, href: `/${group}/${label}`.toLowerCase().replaceAll(' ', '-') })
 
@@ -50,6 +50,22 @@ describe('paletteSections', () => {
 
   test('has no recent section when nothing recent is left', () => {
     expect(paletteSections([link('Steam', 'Pages')], ['/gone']).map(section => section.group)).toEqual(['Pages'])
+  })
+})
+
+describe('paletteHits', () => {
+  test('turns each hit into a link under its page, its heading the label, and drops one an entry already leads to', () => {
+    const snippet = [{ text: 'a ', hit: false }, { text: 'signal', hit: true }]
+    const hits = [
+      { page: 'Islands', heading: 'Signals', href: '/islands#signals', snippet, score: 2 },
+      { page: 'Islands', href: '/islands', snippet, score: 1 },
+      { page: 'Forms', href: '/forms', snippet, score: 1 },
+    ]
+
+    expect(paletteHits(hits, [{ label: 'Islands', group: 'Guides', href: '/islands' }])).toEqual([
+      { link: { label: 'Signals', group: 'Islands', href: '/islands#signals' }, snippet },
+      { link: { label: 'Forms', group: 'Forms', href: '/forms' }, snippet },
+    ])
   })
 })
 

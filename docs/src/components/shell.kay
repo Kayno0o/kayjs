@@ -1,6 +1,7 @@
 ---
 import type { Navigation } from '../pages'
-import Menu from '~icons/tabler/menu-2'
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
 import CodeCopy from './code-copy.kay'
 import LinkFilter from './link-filter.kay'
 import Search from './search.kay'
@@ -14,10 +15,9 @@ a.skip-link(href="#content") Skip to the content
       a.brand(href="/")
         img(src="/favicon.svg" alt="" width="28" height="28")
         span kay
-      Search(persist)
-      button.menu(type="button" popovertarget="sidebar")
-        Menu
-        | Menu
+      Search(persist nav={nav})
+      // Shown once the sidebar folds into a popover.
+      Button(class="hidden max-[56rem]:inline-flex" label="Menu" icon="menu" popovertarget="sidebar")
     nav#sidebar.sidebar(popover aria-label="Documentation")
       for group of nav.groups key={group.title}
         p.group {group.title}
@@ -38,3 +38,4 @@ a.skip-link(href="#content") Skip to the content
     footer.site-foot
       p Built with #[a(href="https://git.kaynooo.fr/kaynooo/kayjs") kay]. #[span(data-page-weight)]
 CodeCopy(persist)
+Toaster(persist)

@@ -44,6 +44,8 @@ ul
             | {part.text}
 ```
 
+[kayjs-ui](/libraries/kayjs-ui)'s [CommandPalette](/ui/command-palette#searching-the-pages) takes `siteSearch` for a search box ready made, behind Ctrl K, as on this site.
+
 Each hit links a section of a page: the text above its first `h2`, `h3` or `h4`, or a heading and the text under it, through the heading's `id`. `snippet` is a line of that text around the first word found, its parts marking each word searched for.
 
 A query needs all its words, each found as a word or the start of one, with case and accents ignored. A word is a run of letters and digits, so in Chinese or Japanese, written without spaces, a query finds a run only by its start. A word in the page's title counts most, then one in a heading, then the text. The browser loads only the part of the index holding the words typed, then the texts of the best hits.

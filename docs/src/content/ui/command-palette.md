@@ -14,6 +14,10 @@ description: A searchable list of actions and links, opened from the keyboard.
 
 <Demo name="command-palette/search" />
 
+## Searching the pages
+
+With `search: true` in `kay.config.ts`, `siteSearch` searches the text of your pages too: a query lists the sections it finds after the entries it matches, under `siteSearchLabel` (`In the pages`), each with the line it was found in. `siteSearch={{ limit: 40 }}` lists more of them than the 20 it lists by default, and a section an entry already links to is left out. This site's search, behind Ctrl K, is one.
+
 ## Opening it
 
 Ctrl or Cmd with `hotkey` (`k` by default) opens and closes the palette from anywhere. Pass `open` and `onOpenChange` to drive it from a button as above, or `hotkey={null}` to leave opening to your app.

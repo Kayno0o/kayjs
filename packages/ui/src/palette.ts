@@ -1,3 +1,4 @@
+import type { SearchHit } from 'kay'
 import type { IconProps } from 'kay/icons'
 import type { IconSlot } from './defaults'
 
@@ -98,6 +99,19 @@ export function paletteSections(entries: PaletteEntry[], recent: string[] = [], 
     .sort((a, b) => rank(a.group) - rank(b.group))
 
   return recents.length > 0 ? [{ group: RECENT_GROUP, entries: recents }, ...sections] : sections
+}
+
+// A section the site search found, as a link under its page, with the line of text it was found in.
+export interface PaletteHit {
+  link: PaletteLink
+  snippet: SearchHit['snippet']
+}
+
+// The site search's hits as links, but for those leading where one of `matches` already does.
+export function paletteHits(hits: SearchHit[], matches: PaletteEntry[]): PaletteHit[] {
+  const linked = new Set(matches.filter(isPaletteLink).map(link => link.href))
+
+  return hits.filter(hit => !linked.has(hit.href)).map(hit => ({ link: { label: hit.heading ?? hit.page, group: hit.page, href: hit.href }, snippet: hit.snippet }))
 }
 
 // `recent` with `href` moved to the front, at most `limit` long.

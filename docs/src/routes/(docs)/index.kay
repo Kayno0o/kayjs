@@ -102,11 +102,12 @@ import ShieldLock from '~icons/tabler/shield-lock'
 import Terminal2 from '~icons/tabler/terminal-2'
 import TestPipe from '~icons/tabler/test-pipe'
 import WifiOff from '~icons/tabler/wifi-off'
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import Card from '@kaynooo/kayjs-ui/card.kay'
 import ModuleCard from '../../components/module-card.kay'
 import Pager from '../../components/pager.kay'
 import UiShowcase from '../../components/ui-showcase.kay'
 import { FORGE } from '../../pages'
-import '../../ui.css'
 ---
 head
   title(raw) kay, a Bun web framework
@@ -118,8 +119,8 @@ head
     h1 kay
     p.lede A Bun web framework. One #[code .kay] file per component, pages rendered to plain HTML on the server, interactive islands in the browser, and types down to the template line.
     .hero-actions
-      a.button.primary(href="/getting-started/introduction") Get started
-      a.button(href="/guides/tutorial") Follow the tutorial
+      Button(class="px-4 py-2 text-sm" variant="accent" href="/getting-started/introduction" label="Get started")
+      Button(class="px-4 py-2 text-sm" href="/guides/tutorial" label="Follow the tutorial")
     ol.install
       li
         p Once, point Bun at kay's registry in #[code ~/.bunfig.toml]:
@@ -132,9 +133,10 @@ head
     ul.features
       for feature of features key={feature.href}
         li
-          a(href={feature.href})
-            strong {feature.title}
-            span {feature.text}
+          Card.link-card(bare)
+            a(href={feature.href})
+              strong {feature.title}
+              span {feature.text}
     section.home-section(aria-labelledby="built-in")
       h2#built-in Built in
       p.section-lede Translations, accessibility checks, SEO, images, content, uploads, sessions, API routes, page swaps, server islands, caching, jobs, offline pages and icons come with kay, no plugin to add.
@@ -227,29 +229,33 @@ head
       h2#libraries Libraries
       p.section-lede UI components, sign-in, mail and a CMS, each a package of its own for the sites that need it.
       .libraries
-        article.library
-          header.library-head
-            h3
-              a(href="/libraries/kayjs-ui") kayjs-ui
-            p {componentCount} components your app compiles as its own: dialogs, tables, forms, charts, a command palette and more, restyled from one stylesheet. Try them:
-          UiShowcase
-        article.library
-          header.library-head
-            h3
-              a(href="/libraries/kayjs-auth") kayjs-auth
-            p Passwords, OAuth, magic links, TOTP two-factor and bearer tokens on kay's sessions. It ships no UI: your pages call it.
-          div(innerHTML={auth})
-        article.library
-          header.library-head
-            h3
-              a(href="/libraries/kayjs-mail") kayjs-mail
-            p Mails written as .kay components, rendered to HTML and text, sent over SMTP or queued with retries. Tests read an outbox.
-          div(innerHTML={mail})
-        article.library
-          header.library-head
-            h3
-              a(href="/libraries/kayjs-cms") kayjs-cms
-            p Content edited on the page it renders, and screens listing, adding and publishing each collection's entries, saved as Forgejo commits.
+        Card.library(bare)
+          .library-body
+            header.library-head
+              h3
+                a(href="/libraries/kayjs-ui") kayjs-ui
+              p {componentCount} components your app compiles as its own: dialogs, tables, forms, charts, a command palette and more, restyled from one stylesheet. Try them:
+            UiShowcase
+        Card.library(bare)
+          .library-body
+            header.library-head
+              h3
+                a(href="/libraries/kayjs-auth") kayjs-auth
+              p Passwords, OAuth, magic links, TOTP two-factor and bearer tokens on kay's sessions. It ships no UI: your pages call it.
+            div(innerHTML={auth})
+        Card.library(bare)
+          .library-body
+            header.library-head
+              h3
+                a(href="/libraries/kayjs-mail") kayjs-mail
+              p Mails written as .kay components, rendered to HTML and text, sent over SMTP or queued with retries. Tests read an outbox.
+            div(innerHTML={mail})
+        Card.library(bare)
+          .library-body
+            header.library-head
+              h3
+                a(href="/libraries/kayjs-cms") kayjs-cms
+              p Content edited on the page it renders, and screens listing, adding and publishing each collection's entries, saved as Forgejo commits.
     section.home-section(aria-labelledby="docs")
       h2#docs The documentation
       p.section-lede Pages written for people, by section. Agents read #[a(href="/llms.txt") llms.txt], the index of the full reference.

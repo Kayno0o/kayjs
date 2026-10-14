@@ -1,16 +1,15 @@
-/* The favicon's navy, white and yellow: light-dark() follows the reader's color scheme with no script, Shiki's code colors included. */
+/* The docs' colours are kayjs-ui's tokens, set in site.css, so one theme restyles the docs and the components on them; light-dark() follows the reader's color scheme with no script, Shiki's code colors included. */
 :root {
   color-scheme: light dark;
   --navy: #17202e;
   --yellow: #f5b83d;
-  --base: light-dark(#eef2f7, var(--navy));
-  --mantle: light-dark(#e3e8ef, #121a26);
+  --base: var(--color-kui-canvas);
+  --mantle: var(--color-kui-mantle);
   --crust: light-dark(#d6dde7, #0d131d);
-  --muted: light-dark(#566173, #9ba6b5);
+  --muted: var(--color-kui-subtext0);
   --subtext: light-dark(#384356, #c4ccd7);
-  --text: light-dark(var(--navy), #eef2f7);
-  /* Yellow text on the white ground is unreadable, so text in the accent darkens it there; fills keep the favicon's yellow. */
-  --accent: light-dark(#8a5700, var(--yellow));
+  --text: var(--color-kui-text);
+  --accent: var(--color-kui-accent);
   --tint: light-dark(#f8e3b5, #23314a);
   --line: color-mix(in srgb, var(--text) 12%, transparent);
   --edge: light-dark(rgb(23 32 46 / 0.2), rgb(0 0 0 / 0.6));
@@ -69,15 +68,6 @@ kbd {
   border-radius: var(--radius);
 }
 
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-}
-
 .skip-link {
   position: absolute;
   z-index: 20;
@@ -127,10 +117,6 @@ kbd {
 
 .brand img {
   border-radius: var(--radius);
-}
-
-.menu {
-  display: none;
 }
 
 .sidebar[popover] {
@@ -233,136 +219,6 @@ kbd {
   background: var(--mantle);
 }
 
-.palette {
-  box-sizing: border-box;
-  width: min(44rem, calc(100vw - 2rem));
-  max-height: min(36rem, calc(100vh - 4rem));
-  margin: 12vh auto auto;
-  padding: 0;
-  overflow: hidden;
-  color: var(--text);
-  background: var(--mantle);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-}
-
-.palette[open] {
-  display: flex;
-}
-
-.palette::backdrop {
-  background: rgb(13 19 29 / 0.6);
-}
-
-.palette-box {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  min-height: 0;
-  min-width: 0;
-}
-
-.palette-field {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  padding: 0 1.1rem;
-  color: var(--muted);
-  background: var(--crust);
-}
-
-.palette-input {
-  flex: 1;
-  min-width: 0;
-  padding: 0.9rem 0;
-  color: var(--text);
-  font: inherit;
-  font-size: 1rem;
-  background: none;
-  border: none;
-  outline: none;
-}
-
-.palette-results {
-  flex: 1;
-  list-style: none;
-  margin: 0;
-  padding: 0.4rem;
-  overflow-y: auto;
-}
-
-.palette-results [role='option'] {
-  display: flex;
-  flex-direction: column;
-  gap: 0.1rem;
-  padding: 0.5rem 0.75rem;
-  border-radius: var(--radius);
-  cursor: pointer;
-}
-
-.palette-results [aria-selected='true'] {
-  background: var(--tint);
-}
-
-.palette-where {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.3rem;
-  font-weight: 600;
-}
-
-.palette-where svg {
-  color: var(--muted);
-}
-
-.palette-heading {
-  color: var(--accent);
-}
-
-.palette-snippet {
-  display: -webkit-box;
-  overflow: hidden;
-  color: var(--subtext);
-  font-size: 0.85rem;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-}
-
-.palette mark {
-  color: var(--navy);
-  background: var(--yellow);
-  border-radius: 2px;
-}
-
-.palette-empty {
-  margin: 0;
-  padding: 1.5rem;
-  color: var(--muted);
-  text-align: center;
-}
-
-.palette-help {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.35rem;
-  margin: 0;
-  padding: 0.5rem 1.1rem;
-  color: var(--muted);
-  font-family: var(--mono);
-  font-size: 0.75rem;
-  background: var(--crust);
-}
-
-.palette-help kbd {
-  background: var(--mantle);
-}
-
-.palette-help kbd + kbd {
-  margin-left: -0.15rem;
-}
-
 /* Page: the text from the left edge of the content area, its sections in a sticky column beside it on wide screens and a block above it otherwise. */
 main {
   min-width: 0;
@@ -421,28 +277,6 @@ main {
   display: flex;
   flex-wrap: wrap;
   gap: 0.6rem;
-}
-
-.button {
-  padding: 0.5rem 1rem;
-  color: var(--text);
-  font-weight: 600;
-  text-decoration: none;
-  background: var(--crust);
-  border-radius: var(--radius);
-}
-
-.button:hover {
-  background: var(--tint);
-}
-
-.button.primary {
-  color: var(--navy);
-  background: var(--yellow);
-}
-
-.button.primary:hover {
-  background: color-mix(in srgb, var(--yellow) 85%, white);
 }
 
 .toc {
@@ -659,21 +493,6 @@ a > code {
   background: var(--crust);
 }
 
-.copy {
-  padding: 0.15rem 0.55rem;
-  color: inherit;
-  font: inherit;
-  background: none;
-  border: none;
-  border-radius: var(--radius);
-  cursor: pointer;
-}
-
-.copy:hover {
-  color: var(--text);
-  background: var(--mantle);
-}
-
 /* A shadow shows at an edge the code runs past, as phones hide the scrollbar: the mantle-coloured covers scroll with the code and hide it at either end. */
 .code pre {
   margin: 0;
@@ -697,24 +516,20 @@ pre code {
 .callout {
   display: flex;
   gap: 0.75rem;
-  padding: 0.85rem 1rem;
-  background: var(--mantle);
-  border-left: 3px solid var(--callout, var(--muted));
-  border-radius: var(--radius);
 }
 
 .callout > svg {
   flex: none;
-  margin-top: 0.3rem;
-  color: var(--callout, var(--muted));
+  margin-top: 0.1rem;
+  font-size: 1.15rem;
 }
 
-.callout-tip {
-  --callout: light-dark(#2f7a4f, #7fcf9a);
+.callout:where([data-tone='success']) > svg {
+  color: var(--color-kui-success);
 }
 
-.callout-warning {
-  --callout: var(--accent);
+.callout:where([data-tone='warning']) > svg {
+  color: var(--color-kui-warning);
 }
 
 /* min-width: 0 lets a code block inside scroll instead of widening the callout. */
@@ -771,17 +586,22 @@ pre code {
   list-style: none;
 }
 
+/* A card that is a link from edge to edge, as tall as the tallest of its row. */
+.link-card {
+  height: 100%;
+}
+
+.link-card > a {
+  flex: 1;
+}
+
 .features a {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
-  height: 100%;
-  box-sizing: border-box;
   padding: 1rem;
   color: var(--subtext);
   text-decoration: none;
-  background: var(--mantle);
-  border-radius: var(--radius);
 }
 
 .features a:hover {
@@ -882,14 +702,10 @@ pre code {
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
-  height: 100%;
-  box-sizing: border-box;
   padding: 1rem;
   color: var(--subtext);
   font-size: 0.925rem;
   text-decoration: none;
-  background: var(--mantle);
-  border-radius: var(--radius);
 }
 
 .module:hover {
@@ -932,13 +748,14 @@ pre code {
 }
 
 .library {
+  min-width: 0;
+}
+
+.library-body {
   display: flex;
   flex-direction: column;
   gap: 1rem;
-  min-width: 0;
   padding: 1.25rem;
-  background: var(--mantle);
-  border-radius: var(--radius);
 }
 
 .library-head h3 {
@@ -1114,20 +931,6 @@ pre code {
 
   .search-trigger kbd {
     display: none;
-  }
-
-  .menu {
-    display: flex;
-    align-items: center;
-    gap: 0.35rem;
-    padding: 0.4rem 0.7rem;
-    color: var(--text);
-    font: inherit;
-    font-size: 0.875rem;
-    background: var(--crust);
-    border: none;
-    border-radius: var(--radius);
-    cursor: pointer;
   }
 
   .sidebar[popover] {

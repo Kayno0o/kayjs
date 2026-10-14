@@ -1,118 +1,41 @@
 ---
-import type { SearchHit } from 'kay'
-import { effect, navigate, onCleanup, onMount, searchResults, signal } from 'kay'
-import ArrowDown from '~icons/tabler/arrow-down'
-import ArrowUp from '~icons/tabler/arrow-up'
-import ChevronRight from '~icons/tabler/chevron-right'
-import CornerDownLeft from '~icons/tabler/corner-down-left'
+import type { PaletteEntry } from '@kaynooo/kayjs-ui'
+import type { Navigation } from '../pages'
+import CommandPalette from '@kaynooo/kayjs-ui/command-palette.kay'
+import { onCleanup, onMount, signal } from 'kay'
 import SearchIcon from '~icons/tabler/search'
 
-const query = signal('')
-const { hits, error } = searchResults(query, { limit: 40 })
-const active = signal(0)
+const { nav } = props<{ nav: Navigation }>()
+
+// Every page by its title, so an empty query lists the docs as the sidebar does, and the site search finds the sections inside them.
+const entries: PaletteEntry[] = [
+  ...nav.groups.flatMap(group => group.links.map(link => ({ label: link.title, group: group.title, href: link.href }))),
+  ...nav.components.map(link => ({ label: link.title, group: 'UI components', href: link.href })),
+]
+
+const open = signal(false)
 const shortcut = signal('Ctrl K')
-let dialog: HTMLDialogElement | undefined
-let input: HTMLInputElement | undefined
-
-function open() {
-  dialog?.showModal()
-  input?.select()
-}
-
-function close() {
-  dialog?.close()
-}
-
-function go(hit: SearchHit | undefined) {
-  if (hit === undefined)
-    return
-
-  close()
-  void navigate(hit.href)
-}
-
-function move(by: number) {
-  const count = hits().length
-
-  if (count === 0)
-    return
-
-  active.set((active() + by + count) % count)
-  document.getElementById(`search-${active()}`)?.scrollIntoView({ block: 'nearest' })
-}
-
-function onKeyDown(event: KeyboardEvent) {
-  if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-    event.preventDefault()
-    move(event.key === 'ArrowDown' ? 1 : -1)
-  }
-  else if (event.key === 'Enter') {
-    event.preventDefault()
-    go(hits()[active()])
-  }
-}
-
-const activeId = () => hits().length > 0 ? `search-${active()}` : undefined
 
 const typing = (target: EventTarget | null) => target instanceof HTMLElement && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
 
-function onShortcut(event: KeyboardEvent) {
-  if ((event.key === 'k' && (event.ctrlKey || event.metaKey)) || (event.key === '/' && !typing(event.target))) {
+// The palette opens on Ctrl or Cmd K itself; / opens it too, as on most docs sites.
+function onSlash(event: KeyboardEvent) {
+  if (event.key === '/' && !typing(event.target)) {
     event.preventDefault()
-    open()
+    open.set(true)
   }
 }
-
-// A new query starts again from its best hit.
-effect(() => {
-  query()
-  active.set(0)
-})
 
 onMount(() => {
   if (navigator.platform.startsWith('Mac'))
     shortcut.set('Cmd K')
-  window.addEventListener('keydown', onShortcut)
+  window.addEventListener('keydown', onSlash)
 })
 
-onCleanup(() => window.removeEventListener('keydown', onShortcut))
+onCleanup(() => window.removeEventListener('keydown', onSlash))
 ---
-button.search-trigger(type="button" aria-haspopup="dialog" onClick={open})
+button.search-trigger(type="button" aria-haspopup="dialog" onClick={() => open.set(true)})
   SearchIcon
   span Search
   kbd {shortcut()}
-dialog.palette(aria-label="Search the documentation" closedby="any" ref={el => dialog = el})
-  .palette-box
-    .palette-field
-      SearchIcon
-      input.palette-input(type="search" placeholder="Search the docs" aria-controls="search-results" aria-activedescendant={activeId()} ref={el => input = el} bind:value={query} onKeyDown={onKeyDown})
-    if error() !== undefined
-      p.palette-empty The search index could not load.
-    else if query().trim() === ''
-      p.palette-empty Type a word to search
-    else
-      ul#search-results.palette-results(role="listbox")
-        for hit, i of hits() key={i}
-          li(id={`search-${i}`} role="option" aria-selected={i === active()} onMouseMove={() => active.set(i)} onClick={() => go(hit)})
-            span.palette-where
-              span {hit.page}
-              if hit.heading as heading
-                ChevronRight
-                span.palette-heading {heading}
-            if hit.snippet.length > 0
-              span.palette-snippet
-                for part, j of hit.snippet key={j}
-                  if part.hit
-                    mark {part.text}
-                  else
-                    | {part.text}
-        else
-          li.palette-empty Nothing matches “{query()}”
-    p.palette-help
-      kbd: ArrowUp
-      kbd: ArrowDown
-      | to move,
-      kbd: CornerDownLeft
-      | to open,
-      kbd esc
-      | to close
+CommandPalette(entries={entries} open={open()} onOpenChange={open.set} siteSearch={{ limit: 40 }} label="Search the documentation" placeholder="Search the docs")

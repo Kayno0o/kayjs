@@ -28,7 +28,7 @@ export function highlight(code: string, language: string | undefined): string {
             properties: { class: 'code-bar' },
             children: [
               { type: 'element', tagName: 'span', properties: {}, children: [{ type: 'text', value: lang === 'text' ? '' : lang }] },
-              { type: 'element', tagName: 'button', properties: { 'type': 'button', 'class': 'copy', 'data-copy': '' }, children: [{ type: 'text', value: 'Copy' }] },
+              { type: 'element', tagName: 'button', properties: { 'type': 'button', 'class': 'kui-btn kui-copy-btn', 'data-copy': '' }, children: [{ type: 'text', value: 'Copy' }] },
             ],
           },
           ...node.children.filter(child => child.type === 'element'),

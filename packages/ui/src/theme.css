@@ -426,7 +426,24 @@
   }
 
   .kui-command-palette-group {
-    @apply shrink-0 text-xs text-kui-subtext0;
+    @apply max-w-[40%] shrink-0 truncate text-xs text-kui-subtext0;
+  }
+
+  /* A section the site search found: its heading over the line it was found in, the words searched for in the text colour. */
+  .kui-command-palette-option:has(.kui-command-palette-text) {
+    @apply h-auto py-2;
+  }
+
+  .kui-command-palette-text {
+    @apply flex min-w-0 flex-1 flex-col;
+  }
+
+  .kui-command-palette-snippet {
+    @apply truncate text-xs text-kui-subtext0;
+  }
+
+  .kui-command-palette-snippet :where(mark) {
+    @apply bg-transparent font-semibold text-kui-text;
   }
 
   .kui-command-palette-empty {
