@@ -85,3 +85,19 @@ test('closes once a link is followed, or once another page is on screen', async 
   expect(view.open()).toEqual([false, 'false'])
   expect([view.link('Home').getAttribute('aria-current'), view.link('Data').getAttribute('aria-current')]).toEqual([null, 'page'])
 })
+
+test('a press outside closes the open menu, a press inside leaves it open', async () => {
+  const view = await nav()
+
+  click(view.toggle)
+  await settle()
+  view.link('Data').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+  await settle()
+
+  expect(view.open()).toEqual([true, 'true'])
+
+  view.root.querySelector('#next')!.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+  await settle()
+
+  expect(view.open()).toEqual([false, 'false'])
+})

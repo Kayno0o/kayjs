@@ -12,4 +12,4 @@ description: The links of a site's header, folded into a menu button on a narrow
 
 ## Narrow screens
 
-`label` names the navigation for screen readers, and `menuLabel` the button shown on a narrow screen, which opens the links and closes on Escape or a click on a link. The fold depends on the screen width, so it cannot be shown in a demo on a wide frame: narrow the window to see it.
+`label` names the navigation for screen readers, and `menuLabel` the button shown on a narrow screen, which opens the links and closes on Escape, a click on a link or a click outside. The fold depends on the screen width, so it cannot be shown in a demo on a wide frame: narrow the window to see it.

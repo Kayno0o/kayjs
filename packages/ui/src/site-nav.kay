@@ -1,6 +1,6 @@
 ---
 import type { JSX } from 'kay'
-import { effect, signal, uid } from 'kay'
+import { effect, listen, signal, uid } from 'kay'
 import IconButton from './icon-button.kay'
 
 const TRAILING_SLASHES = /\/+$/
@@ -21,6 +21,7 @@ const { id, links, current, label, menuLabel = 'Menu', class: className, ...rest
 const listId = id ?? uid()
 const anchor = `--kui-site-nav-${listId}`
 const open = signal(false)
+let nav: HTMLElement | undefined
 let toggle: HTMLElement | undefined
 
 // A page the parent says is now on screen, as for an island kept from page to page, closes the menu.
@@ -43,6 +44,12 @@ function marked(href: string) {
   return own !== '/' && here.startsWith(`${own}/`) ? 'true' : undefined
 }
 
+// A press anywhere outside closes the open menu, as the browser's own popovers do, and leaves the focus where the press put it.
+listen(document, 'pointerdown', (event) => {
+  if (open() && !nav?.contains(event.target as Node))
+    open.set(false)
+})
+
 function escape(event: KeyboardEvent) {
   if (event.key !== 'Escape' || !open())
     return
@@ -51,7 +58,7 @@ function escape(event: KeyboardEvent) {
   toggle?.focus()
 }
 ---
-nav.kui-site-nav({...rest} aria-label={label} data-open={open() || undefined} class={className} onKeyDown={escape})
+nav.kui-site-nav({...rest} ref={element => nav = element} aria-label={label} data-open={open() || undefined} class={className} onKeyDown={escape})
   IconButton(icon={open() ? 'close' : 'menu'} label={menuLabel} variant="ghost" class="kui-site-nav-toggle" aria-expanded={String(open())} aria-controls={listId} style={`anchor-name: ${anchor}`} ref={element => toggle = element} onClick={() => open.set(!open())})
   ul.kui-site-nav-list(id={listId} style={`position-anchor: ${anchor}`})
     for link of links key={link.href}
