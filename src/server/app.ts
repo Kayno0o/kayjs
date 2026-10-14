@@ -26,7 +26,7 @@ import { DEFAULT_BODY_LIMIT, limitBodies } from './body'
 import { serveBuildFiles } from './build-files'
 import { serveCards } from './card'
 import { compressResponse, fixedTexts } from './compress'
-import { DEV_A11Y, DEV_AXE, DEV_EVENTS, DEV_INSPECTOR, DEV_OPEN, DEV_PATCH, DEV_ROUTES, DEV_TOOL, devA11y, devAxe, devEvents, devInspector, devPatch, devRoutes, devTool, followBuilds, hotSwap, openInEditor } from './dev'
+import { DEV_A11Y, DEV_AXE, DEV_EVENTS, DEV_INSPECTOR, DEV_OPEN, DEV_PATCH, DEV_ROUTES, DEV_TOOL, devA11y, devAxe, devEvents, devInspector, devPatch, devRoutes, devTool, followBuilds, hotSwap, openInEditor, refuseForeignHosts } from './dev'
 import { claimEndpoints, serveEndpoints } from './endpoints'
 import { entryUrls } from './entry-urls'
 import { servePublicEnv } from './env'
@@ -189,6 +189,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   const lifecycle = { draining: false }
 
   trustProxy(app, options.proxy)
+  refuseForeignHosts(app, site)
 
   if (security)
     sendSecurityHeaders(app, security, filePaths)

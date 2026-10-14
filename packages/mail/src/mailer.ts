@@ -284,7 +284,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
     if (transport === outbox) {
       const delivery = await outbox.send(mail)
 
-      if (process.env.NODE_ENV === 'development')
+      if (underKayDev())
         log.info(`${quoted(mail.subject)} to ${recipientsOf(mail).join(', ')} kept in the outbox, shown at /_kay/mail`)
 
       return delivery
@@ -314,7 +314,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
   })
   const plugin = new Elysia().use(jobs)
 
-  if (transport === outbox && process.env.NODE_ENV === 'development')
+  if (transport === outbox && underKayDev())
     plugin.use(preview(render as (message: Message) => Promise<Mail>, relay(options)))
 
   const sending = Object.assign(plugin, {
@@ -344,4 +344,9 @@ export function mailer(options: MailerOptions = {}): Mailer {
 
   // A getter, since `kay build` leaves a missing variable to throw where it is read.
   return Object.defineProperty(sending, 'configured', { get: () => (configured?.missing() ?? []).length === 0 }) as Mailer
+}
+
+// The outbox page, which shows every mail with its links live, is served by `kay dev` alone, never by a server merely started with NODE_ENV=development.
+function underKayDev(): boolean {
+  return process.env.KAY_DEV_CODE !== undefined
 }

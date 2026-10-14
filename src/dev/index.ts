@@ -19,6 +19,8 @@ export interface DevOptions {
   entry?: string | undefined
   // The `PORT` the server gets, over the shell's and the `.env`'s.
   port?: number | undefined
+  // The address a server listens on when the app names none, `localhost` by default, so nothing past this machine reaches it; `0.0.0.0` opens it to the network.
+  host?: string | undefined
   // The address of the debugger every server opens, such as `ws://localhost:6499/kay`.
   inspect?: string | undefined
   // Opens the address in the browser once the first server listens.
@@ -64,6 +66,8 @@ const MAX_CHANGED_FILES = 200
 const ROOT_PATH = /(?<=\/\/[^/]+)\/$/
 const STOP_SIGNALS = new Set(['SIGINT', 'SIGTERM', 'SIGHUP'])
 const WS_SCHEME = /^ws:\/\//
+// A server listening on every address is reached on this machine as localhost.
+const ANY_ADDRESS = /(?<=\/\/)(?:0\.0\.0\.0|\[::\])(?=:)/
 const ANY_FILE = /^/
 
 // Runs the server entry in development and restarts it on every change; a fresh process is the only way to drop modules Bun has loaded.
@@ -114,7 +118,9 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   const log = options.log ?? console.log
   // The inspector socket of each server process.
   const sockets = new Map<Subprocess, string>()
-  const inspector = options.inspect === undefined ? undefined : inspectorProxy(options.inspect, () => child && sockets.get(child))
+  // The port the running server's pages are on, the one origin besides debug.bun.sh a page may reach the debugger from.
+  let pagePort: number | undefined
+  const inspector = options.inspect === undefined ? undefined : inspectorProxy(options.inspect, () => child && sockets.get(child), () => pagePort)
   // Bun leaves its socket behind as it exits.
   const forgetSocket = async (server: Subprocess, socket: string) => {
     await server.exited
@@ -132,12 +138,13 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     if (server !== child || typeof message !== 'object' || message === null || !('listening' in message) || typeof message.listening !== 'string')
       return
 
-    const url = message.listening.replace(ROOT_PATH, '')
+    const url = message.listening.replace(ROOT_PATH, '').replace(ANY_ADDRESS, 'localhost')
     const ms = Math.round(performance.now() - restartedAt)
     const took = `${ms} ms`
     const { asked, port } = message as Partial<Record<'asked' | 'port', number>>
 
     moved = asked !== undefined && port !== undefined && asked !== port ? `${asked}:${port}` : undefined
+    pagePort = port
 
     if (address === undefined) {
       log(`kay dev: ${url} (ready in ${took}${moved === undefined ? '' : `, ${asked} was in use`})`)
@@ -278,7 +285,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
 
     spareEntry = entryToRun()
 
-    const server = Bun.spawn([process.execPath, '--preload', SPARE, spareEntry], { cwd: root, env: { ...env, NODE_ENV: 'development', ...options.port === undefined ? {} : { PORT: String(options.port) }, ...socket === undefined ? {} : { BUN_INSPECT: `ws+unix://${socket}` } }, stdin: 'pipe', stdout: 'inherit', stderr: 'inherit', ipc: (message, server) => received(server, message) })
+    const server = Bun.spawn([process.execPath, '--preload', SPARE, spareEntry], { cwd: root, env: { ...env, NODE_ENV: 'development', ...options.port === undefined ? {} : { PORT: String(options.port) }, ...options.host === undefined ? {} : { KAY_DEV_HOST: options.host }, ...socket === undefined ? {} : { BUN_INSPECT: `ws+unix://${socket}` } }, stdin: 'pipe', stdout: 'inherit', stderr: 'inherit', ipc: (message, server) => received(server, message) })
 
     if (socket !== undefined) {
       sockets.set(server, socket)

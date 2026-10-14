@@ -71,10 +71,13 @@ kay: accents needs tailwind: add --with tailwind, or drop it with --without acce
 | --- | --- |
 | `--entry <file>` | The server entry, when it is not `src/server.ts` |
 | `--port <port>` | Sets `PORT` for the server, over the shell's and the `.env`'s |
-| `--inspect[=<address>]` | Opens Bun's debugger in the server, at `ws://localhost:6499/kay` or the port, host and port, or address given, port 0 taking a free one, the same address after every restart: `kay dev` listens there and passes each connection on to the server running, and a debugger's connection closes when the server restarts, for it to connect again; an address another process holds, at `localhost` on either loopback address, stops `kay dev` |
+| `--host[=<address>]` | Listens past this machine: `0.0.0.0` alone, or the address given. Without it, a server naming no `hostname` listens on `localhost` only |
+| `--inspect[=<address>]` | Opens Bun's debugger in the server, at `ws://localhost:6499/kay` or the port, host and port, or address given, port 0 taking a free one, the same address after every restart: `kay dev` listens there and passes each connection on to the server running, and a debugger's connection closes when the server restarts, for it to connect again; an address another process holds, at `localhost` on either loopback address, stops `kay dev`, and one past this machine needs `--host` too, as whoever reaches the debugger runs code on the machine. A page reaches it only from the dev server's own `localhost` address or `debug.bun.sh` |
 | `--open` | Opens the address in the browser (the command `BROWSER` names, else the system's) once the server is ready |
 
 When another process holds the port, the server moves to the next free one, and the ready line names the port it found in use: `kay dev: http://localhost:3001 (ready in 412 ms, 3000 was in use)`. It works however the server picks its port, and restarts keep the port it moved to, so open pages stay connected.
+
+The dev server answers 421 to a request whose `Host` is not `localhost`, a `*.localhost` name, an IP address or the site's host, so a page of another site that renames itself to this machine (DNS rebinding) cannot read it. A tunnel or a LAN name the server is reached by goes in `KAY_DEV_HOSTS`, comma-separated: `KAY_DEV_HOSTS=dev.example.com bunx kay dev --host`.
 
 A project with no server entry, such as a static site, gets a server of kay's own on `PORT` (3000 by default).
 

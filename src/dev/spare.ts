@@ -2,6 +2,7 @@ import type { Server } from 'bun'
 import process from 'node:process'
 import { loadTraverse } from '../compiler/rewrite'
 import { registerEarlyLoader } from '../server/loader'
+import { loopbackTaken } from './loopback'
 import '../server'
 // The `.kay` loader's plugin loads now too: only registering it waits for the start line, as registering reads the app's config.
 import '../build/plugin'
@@ -18,6 +19,8 @@ const LISTENING_LINE = /^Listening on https?:\/\/[^/\s]+:(\d+)\/?$/
 
 // How many ports past a busy one a server tries before giving up.
 const PORTS_TRIED = 100
+// Where a server listens when the app names no hostname: this machine alone, unless `kay dev --host` opens it to the network.
+const HOST = process.env.KAY_DEV_HOST ?? 'localhost'
 
 // The first server the entry starts is the one `kay dev` reports.
 let port: number | undefined
@@ -26,8 +29,10 @@ let serving = false
 let moved: [asked: number, to: number] | undefined
 const serve = Bun.serve.bind(Bun)
 
-Bun.serve = ((options: Parameters<typeof Bun.serve>[0]) => {
+Bun.serve = ((given: Parameters<typeof Bun.serve>[0]) => {
+  const options = hosted(given)
   const asked = askedPort(options)
+  const local = 'hostname' in options && options.hostname === 'localhost'
   const first = moved !== undefined && moved[0] === asked ? moved[1] : asked
   let server: Server<unknown> | undefined
 
@@ -36,6 +41,9 @@ Bun.serve = ((options: Parameters<typeof Bun.serve>[0]) => {
     const next = asked === undefined || tried === 0 ? first : asked + tried
 
     try {
+      if (local && next !== undefined && loopbackTaken(next))
+        throw Object.assign(new Error(`port ${next} is taken on a loopback address`), { code: 'EADDRINUSE' })
+
       server = serve(next === asked ? options : { ...options, port: next } as typeof options)
     }
     catch (error) {
@@ -95,6 +103,14 @@ if (startedAt !== undefined && changed !== undefined) {
 }
 
 reader.releaseLock()
+
+// The options with the hostname kay dev listens on, when they name none and no Unix socket.
+function hosted(options: Parameters<typeof Bun.serve>[0]): Parameters<typeof Bun.serve>[0] {
+  if (('unix' in options && options.unix !== undefined) || ('hostname' in options && options.hostname !== undefined))
+    return options
+
+  return { ...options, hostname: HOST } as typeof options
+}
 
 // The TCP port a server asks for, as Bun picks it when the options name none; none for a Unix socket or a port the system picks.
 function askedPort(options: Parameters<typeof Bun.serve>[0]): number | undefined {

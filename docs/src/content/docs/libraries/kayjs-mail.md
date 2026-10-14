@@ -23,7 +23,7 @@ import { mailer } from '@kaynooo/kayjs-mail'
 export const mail = mailer({ from: 'Site <contact@example.com>', lang: 'en' })
 ```
 
-Listed in `kay.config.ts`, the server uses it to run the queue and, in development, serve the outbox at `/_kay/mail`:
+Listed in `kay.config.ts`, the server uses it to run the queue and, under `kay dev`, serve the outbox at `/_kay/mail`:
 
 ```ts
 import { mailExtension } from '@kaynooo/kayjs-mail'
@@ -94,7 +94,7 @@ A message also takes `cc`, `bcc`, `replyTo`, `attachments`, `lang`, `unsubscribe
 
 ## Previewing
 
-In development, `/_kay/mail` lists the mails sent, each with its html at desktop or phone width, its text and its size. `/_kay/mail/samples` renders every mail under `src/mails` without sending it, with the props a `.preview.ts` beside it default-exports:
+Under `kay dev`, `/_kay/mail` lists the mails sent, each with its html at desktop or phone width, its text and its size. `/_kay/mail/samples` renders every mail under `src/mails` without sending it, with the props a `.preview.ts` beside it default-exports:
 
 ```ts
 // src/mails/welcome.preview.ts

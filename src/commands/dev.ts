@@ -5,6 +5,7 @@ import process from 'node:process'
 import { loadConfig } from '../config'
 import { dev as startDev } from '../dev'
 import { InspectorAddressInUse } from '../dev/inspector'
+import { isLoopback } from '../dev/loopback'
 import { isPort, warnOtherKay } from './command'
 
 const WS_SCHEME = /^ws:\/\//
@@ -12,11 +13,11 @@ const PORT_FIRST = /^\d+(?:\/|$)/
 
 // Restarts the server on every change until interrupted.
 export const dev: Command = {
-  usage: 'dev [dir] [--entry <file>] [--port <port>] [--inspect[=<address>]] [--open]',
-  options: { entry: { type: 'string' }, port: { type: 'string' }, inspect: { type: 'string' }, open: { type: 'boolean' } },
+  usage: 'dev [dir] [--entry <file>] [--port <port>] [--host[=<address>]] [--inspect[=<address>]] [--open]',
+  options: { entry: { type: 'string' }, port: { type: 'string' }, host: { type: 'string' }, inspect: { type: 'string' }, open: { type: 'boolean' } },
   positionals: 1,
-  // A bare `--inspect` takes the default address, as Bun's does, rather than the next argument.
-  normalize: args => args.map(arg => arg === '--inspect' ? '--inspect=' : arg),
+  // A bare `--inspect` or `--host` takes the default address, as Bun's does, rather than the next argument.
+  normalize: args => args.map(arg => arg === '--inspect' || arg === '--host' ? `${arg}=` : arg),
   run: async ({ values, positionals: [path] }, refuse) => {
     const option = values.entry
     // A directory is the project, as `build` and `check` take it; anything else is the server entry in the current one.
@@ -32,9 +33,15 @@ export const dev: Command = {
       return refuse(`${path} is not a directory, and --entry names the server entry already`)
 
     const { port, inspect, open } = values
+    // A bare `--host` opens the server to the network.
+    const host = typeof values.host === 'string' ? values.host || '0.0.0.0' : undefined
+    const debuggerAt = typeof inspect === 'string' ? inspectorAddress(inspect) : undefined
 
     if (typeof port === 'string' && !isPort(port))
       return refuse(`--port takes a port number, not ${port}`)
+
+    if (debuggerAt !== undefined && host === undefined && !isLoopback(new URL(debuggerAt).hostname))
+      return refuse(`--inspect=${inspect} opens the debugger past this machine, and whoever reaches it runs code on it; add --host to mean it`)
 
     const root = resolve(inDir ? path : '.')
 
@@ -44,7 +51,7 @@ export const dev: Command = {
     let stop: () => Promise<void>
 
     try {
-      stop = await startDev(root, { entry, port: typeof port === 'string' ? Number(port) : undefined, inspect: typeof inspect === 'string' ? inspectorAddress(inspect) : undefined, open: open === true, config })
+      stop = await startDev(root, { entry, port: typeof port === 'string' ? Number(port) : undefined, host, inspect: debuggerAt, open: open === true, config })
     }
     catch (error) {
       if (!(error instanceof InspectorAddressInUse))

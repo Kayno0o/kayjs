@@ -8,6 +8,7 @@ import type { ServedRoute } from './guards'
 import type { MountedApi } from './openapi'
 import type { Endpoint } from './routes'
 import { readFileSync, statSync } from 'node:fs'
+import { isIP } from 'node:net'
 import { basename, isAbsolute, join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
@@ -38,6 +39,8 @@ const A11Y_SOURCE = resolve(import.meta.dir, '../runtime/dev-a11y.ts')
 const OPEN_HEADER = 'x-kay-dev'
 const POSITION = /^(.+\.(?:kay|[cm]?[jt]sx?)):(\d+):(\d+)$/
 const BACKSLASH = /\\/g
+const BRACKETS = /^\[|\]$/g
+const LOCAL_NAME = /(?:^|\.)localhost$/
 const SOURCE_FILE = /\.(?:kay|[cm]?[jt]sx?|json|css)$/
 // A path a request fills in, which the Routes tab cannot link to.
 const PATH_PARAM = /[:*]/
@@ -344,6 +347,29 @@ function broadcast(event: string): void {
   }
 }
 
+// Under `kay dev`, a request naming a host other than localhost, an IP address or the site is refused, as a page of another site renaming itself to this machine's address (DNS rebinding) would send it.
+// `KAY_DEV_HOSTS` lists other names the server answers to, comma-separated, such as a tunnel's.
+export function refuseForeignHosts(app: Elysia, site: string | undefined): void {
+  if (!underKayDev())
+    return
+
+  const allowed = new Set((process.env.KAY_DEV_HOSTS ?? '').split(',').map(name => name.trim().toLowerCase()).filter(Boolean))
+  const siteName = site === undefined ? undefined : URL.parse(site)?.hostname
+
+  if (siteName !== undefined)
+    allowed.add(siteName)
+
+  app.onRequest(({ request }) => {
+    const host = request.headers.get('host')
+    const name = host === null ? undefined : URL.parse(`http://${host}`)?.hostname
+
+    if (host === null || (name !== undefined && (LOCAL_NAME.test(name) || isIP(name.replace(BRACKETS, '')) !== 0 || allowed.has(name))))
+      return
+
+    return new Response(`kay dev answers to localhost, an IP address or the site, and ${host} is none of them; list it in KAY_DEV_HOSTS to reach the server by that name\n`, { status: 421, headers: { 'content-type': 'text/plain; charset=utf-8' } })
+  })
+}
+
 // What a dev server serves when the project failed to boot: the errors on every page, until a fix restarts it.
 export function bootFailure(error: unknown, root: string): Elysia {
   // Told by its name: the class's module loads the compiler, which a production server never needs.
@@ -351,6 +377,7 @@ export function bootFailure(error: unknown, root: string): Elysia {
 
   const app = new Elysia({ name: 'kay/pages', seed: root })
 
+  refuseForeignHosts(app, process.env.SITE_URL)
   app.get(DEV_EVENTS, () => devEvents(true))
   app.get(DEV_TOOL, () => devTool())
 

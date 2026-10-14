@@ -369,6 +369,11 @@ describe('kay dev', () => {
       expect(await notPort.exited).toBe(1)
       expect(await new Response(notPort.stderr).text()).toContain('--port takes a port number, not 70000')
 
+      const exposed = Bun.spawn(['bun', cli, 'dev', root, '--inspect=0.0.0.0:0'], { stdout: 'ignore', stderr: 'pipe' })
+
+      expect(await exposed.exited).toBe(1)
+      expect(await new Response(exposed.stderr).text()).toContain('--inspect=0.0.0.0:0 opens the debugger past this machine')
+
       const missing = Bun.spawn(['bun', cli, 'dev', join(root, 'typo')], { stdout: 'ignore', stderr: 'pipe' })
 
       expect(await missing.exited).toBe(1)
@@ -622,6 +627,54 @@ describe('kay dev', () => {
     }
   })
 
+  it('listens on localhost alone unless --host opens it, keeping a hostname the app names', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
+    const lines: string[] = []
+
+    // The first server, the one kay dev reports, answers with its own hostname and the second's, which names one.
+    await Bun.write(join(root, 'src/server.ts'), 'const server = Bun.serve({ port: 0, fetch: () => new Response(`${server.hostname} ${named.hostname}`) })\nconst named = Bun.serve({ port: 0, hostname: \'127.0.0.1\', fetch: () => new Response() })\n')
+
+    try {
+      for (const [host, expected] of [[undefined, 'localhost 127.0.0.1'], ['0.0.0.0', '0.0.0.0 127.0.0.1']] as const) {
+        lines.length = 0
+        const stop = await dev(root, { host, log: line => lines.push(line) })
+
+        try {
+          await until(() => lines.length === 1)
+          const [, port] = (/^kay dev: http:\/\/localhost:(\d+) \(ready in \d+ ms\)$/).exec(lines[0]!) ?? []
+
+          expect(await (await fetch(`http://localhost:${port}`)).text()).toBe(expected)
+        }
+        finally {
+          await stop()
+        }
+      }
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it.each(['127.0.0.1', '::1'].filter(binds))('moves off a port %s alone holds, where Bun would take the other loopback address', async (hostname) => {
+    const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
+    const lines: string[] = []
+    const holder = Bun.listen({ hostname, port: 0, socket: { data: () => undefined } })
+    const busy = holder.port
+
+    await Bun.write(join(root, 'src/server.ts'), `Bun.serve({ port: ${busy}, fetch: () => new Response('ok') })\n`)
+    const stop = await dev(root, { log: line => lines.push(line) })
+
+    try {
+      await until(() => lines.length === 1)
+      expect(lines[0]).toMatch(new RegExp(`^kay dev: http://localhost:\\d+ \\(ready in \\d+ ms, ${busy} was in use\\)$`))
+    }
+    finally {
+      holder.stop(true)
+      await stop()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('opens the address in the BROWSER command once, not on a restart', async () => {
     const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
     const lines: string[] = []
@@ -747,7 +800,7 @@ describe('kay dev', () => {
   })
 
   it('lets no page of another site reach the debugger, as Bun\'s inspector does', async () => {
-    const proxy = inspectorProxy('ws://localhost:0/kay', () => undefined)
+    const proxy = inspectorProxy('ws://localhost:0/kay', () => undefined, () => 3000)
     const status = async (headers: Record<string, string>) => (await fetch(proxy.url.replace('ws:', 'http:'), { headers })).status
 
     try {
@@ -755,6 +808,9 @@ describe('kay dev', () => {
       expect(await status({})).toBe(426)
       expect(await status({ host: '127.0.0.1', origin: 'https://debug.bun.sh' })).toBe(426)
       expect(await status({ origin: 'http://localhost:3000' })).toBe(426)
+      expect(await status({ origin: 'http://127.0.0.1:3000' })).toBe(426)
+      // Another app on this machine is no more trusted than another site.
+      expect(await status({ origin: 'http://localhost:5173' })).toBe(403)
       expect(await status({ host: 'evil.example' })).toBe(400)
       expect(await status({ origin: 'https://evil.example' })).toBe(403)
       expect(await status({ origin: 'http://localhost.evil.example' })).toBe(403)
@@ -821,7 +877,7 @@ describe('kay dev', () => {
     }
   })
 
-  it('marks its pages for the inspector, serves it, and opens the file it names in KAY_EDITOR, telling when that fails', async () => {
+  it('marks its pages for the inspector, serves it, opens the file it names in KAY_EDITOR, telling when that fails, and answers 421 to a host not its own', async () => {
     // Inside the repository, where the browser build resolves `kay`.
     const scratch = join(import.meta.dir, '../node_modules/.cache')
 
@@ -867,6 +923,10 @@ describe('kay dev', () => {
       // A script's position too, as an error page names, the recording editor failing this time.
       expect((await open('../outside.ts:1:1')).status).toBe(404)
       expect(await (await open('record.ts:2:1')).json()).toEqual({ opened: false, failed: true })
+      // A page of another site that renamed itself to this machine's address sends its own name as the Host.
+      expect((await fetch(url, { headers: { host: 'rebound.example' } })).status).toBe(421)
+      expect((await fetch(url, { headers: { host: 'app.localhost' } })).status).toBe(200)
+      expect((await fetch(url.replace('localhost', '127.0.0.1'))).status).toBe(200)
     }
     finally {
       await stop()
@@ -1135,6 +1195,31 @@ describe('kay dev', () => {
     expect(events.headers.get('content-type')).toBe('text/event-stream')
     // Its code is its own id, so pages on either side of it always reload.
     expect(await firstEvent(events)).toMatch(/^event: boot\ndata: ([\w-]+) \1\n\n$/)
+  })
+
+  it('answers under kay dev only to localhost, an IP address, the site and the names KAY_DEV_HOSTS lists', async () => {
+    const saved = { KAY_DEV_CODE: process.env.KAY_DEV_CODE, KAY_DEV_HOSTS: process.env.KAY_DEV_HOSTS, SITE_URL: process.env.SITE_URL }
+
+    Object.assign(process.env, { KAY_DEV_CODE: '0', KAY_DEV_HOSTS: 'tunnel.example, Dev.Example', SITE_URL: 'https://shop.example' })
+
+    try {
+      const app = bootFailure(new Error('down'), process.cwd())
+      const status = async (host: string) => (await app.handle(new Request('http://localhost/', { headers: { host } }))).status
+
+      for (const host of ['localhost:3000', 'app.localhost', '127.0.0.1:3000', '[::1]:3000', '192.168.1.20:3000', 'shop.example', 'tunnel.example', 'dev.example:8080'])
+        expect(await status(host)).toBe(500)
+
+      for (const host of ['rebound.example', 'localhost.rebound.example', 'shop.example.rebound.example'])
+        expect(await status(host)).toBe(421)
+    }
+    finally {
+      for (const [name, value] of Object.entries(saved)) {
+        if (value === undefined)
+          delete process.env[name]
+        else
+          process.env[name] = value
+      }
+    }
   })
 })
 

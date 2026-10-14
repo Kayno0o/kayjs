@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
+import { isLoopback, loopbackTaken } from './loopback'
 
 // `kay dev --inspect` listens at the debugger's address itself and passes each connection on to the running server's own inspector, which listens on a Unix socket of that process's, so the address stays the same across restarts and two server processes never want the same port.
 
@@ -17,12 +18,10 @@ const RELEASE = JSON.stringify({ id: RELEASE_ID, method: 'Runtime.evaluate', par
 // The paths Bun's inspector answers over plain HTTP, which some debuggers ask before connecting.
 const JSON_PATHS = new Set(['/json', '/json/list', '/json/version'])
 const IPV4 = /^\d{1,3}(?:\.\d{1,3}){3}$/
-const LOOPBACK_V4 = /^127(?:\.\d{1,3}){3}$/
 // The longest path a Unix socket takes on macOS, Linux taking 107.
 const SOCKET_PATH_MAX = 103
 // As Bun's inspector takes them: a heap snapshot comes back in one message.
 const MAX_PAYLOAD = 2 ** 31 - 1
-const LOOPBACKS = ['127.0.0.1', '::1']
 
 // A second `kay dev` asking for the address the first listens on.
 export class InspectorAddressInUse extends Error {}
@@ -42,8 +41,8 @@ export interface InspectorProxy {
   stop: () => Promise<void>
 }
 
-// `current` names the socket of the server running now, which a new connection goes to.
-export function inspectorProxy(address: string, current: () => string | undefined): InspectorProxy {
+// `current` names the socket of the server running now, which a new connection goes to; `pagePort` the port its pages are on, whose origin alone, beside debug.bun.sh, may connect from a page.
+export function inspectorProxy(address: string, current: () => string | undefined, pagePort: () => number | undefined = () => undefined): InspectorProxy {
   const url = new URL(address)
   let count = 0
   const inUse = `kay dev: the debugger address ${url.host} is in use`
@@ -53,7 +52,7 @@ export function inspectorProxy(address: string, current: () => string | undefine
     throw new InspectorAddressInUse(inUse)
 
   try {
-    server = serve(url, current)
+    server = serve(url, current, pagePort)
   }
   catch (error) {
     if ((error as { code?: unknown }).code === 'EADDRINUSE')
@@ -83,7 +82,7 @@ export function inspectorProxy(address: string, current: () => string | undefine
   }
 }
 
-function serve(url: URL, current: () => string | undefined): Server<Link> {
+function serve(url: URL, current: () => string | undefined, pagePort: () => number | undefined): Server<Link> {
   return Bun.serve<Link>({
     hostname: url.hostname,
     port: Number(url.port),
@@ -93,7 +92,7 @@ function serve(url: URL, current: () => string | undefined): Server<Link> {
       if (!hostAllowed(request.headers.get('host'), url.hostname))
         return new Response(null, { status: 400 })
 
-      if (!originAllowed(request.headers.get('origin')))
+      if (!originAllowed(request.headers.get('origin'), pagePort()))
         return new Response(null, { status: 403 })
 
       const socket = current()
@@ -129,24 +128,6 @@ function serve(url: URL, current: () => string | undefined): Server<Link> {
       },
     },
   })
-}
-
-// `localhost` names both loopback addresses, and Bun binds the other one when the first is taken: a debugger would then reach either `kay dev`.
-function loopbackTaken(port: number): boolean {
-  if (port === 0)
-    return false
-
-  for (const hostname of LOOPBACKS) {
-    try {
-      Bun.listen({ hostname, port, socket: { data: () => undefined } }).stop(true)
-    }
-    catch (error) {
-      if ((error as { code?: unknown }).code === 'EADDRINUSE')
-        return true
-    }
-  }
-
-  return false
 }
 
 // Joins a client to the inspector of the server running; a server still starting has no socket yet, and is tried again.
@@ -233,7 +214,7 @@ function hostAllowed(host: string | null, expected: string): boolean {
   return hostname === expected || hostname === 'localhost' || hostname === 'localhost6' || (hostname.startsWith('[') && hostname.endsWith(']')) || IPV4.test(hostname)
 }
 
-function originAllowed(origin: string | null): boolean {
+function originAllowed(origin: string | null, pagePort: number | undefined): boolean {
   if (origin === null)
     return true
 
@@ -249,5 +230,5 @@ function originAllowed(origin: string | null): boolean {
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:')
     return true
 
-  return parsed.origin === 'https://debug.bun.sh' || parsed.hostname === 'localhost' || parsed.hostname === '[::1]' || LOOPBACK_V4.test(parsed.hostname)
+  return parsed.origin === 'https://debug.bun.sh' || (isLoopback(parsed.hostname) && pagePort !== undefined && Number(parsed.port || 80) === pagePort)
 }

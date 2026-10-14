@@ -10,11 +10,15 @@ import { startSmtp } from './helpers/smtp'
 
 const saved = process.env.NODE_ENV
 
+// As `kay dev` runs the server, the one serving the outbox page.
 beforeAll(() => {
   process.env.NODE_ENV = 'development'
+  process.env.KAY_DEV_CODE = '0'
 })
 
 afterAll(() => {
+  delete process.env.KAY_DEV_CODE
+
   if (saved === undefined)
     delete process.env.NODE_ENV
   else
@@ -158,15 +162,19 @@ describe('the development outbox page', () => {
     expect((await get(mail, '/_kay/mail/gone/html')).status).toBe(404)
   })
 
-  it('is left out of a server that delivers, or under bun test', async () => {
-    process.env.NODE_ENV = 'test'
+  it('is left out of any server kay dev does not run, one started with NODE_ENV=development included', async () => {
+    delete process.env.KAY_DEV_CODE
 
     try {
-      expect((await get(mailer({ from: 'dev@example.com' }), '/_kay/mail')).status).toBe(404)
-      expect((await get(mailer({ from: 'dev@example.com' }), '/_kay/mail.json')).status).toBe(404)
+      for (const env of ['development', 'test']) {
+        process.env.NODE_ENV = env
+        expect((await get(mailer({ from: 'dev@example.com' }), '/_kay/mail')).status).toBe(404)
+        expect((await get(mailer({ from: 'dev@example.com' }), '/_kay/mail.json')).status).toBe(404)
+      }
     }
     finally {
       process.env.NODE_ENV = 'development'
+      process.env.KAY_DEV_CODE = '0'
     }
   })
 })
