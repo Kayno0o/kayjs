@@ -23,7 +23,7 @@ class Editor {
   private readonly waiting = new Map<string, { resolve: (diagnostics: Diagnostic[]) => void, version: number | undefined }>()
 
   // Every publish, in the order they came.
-  readonly publishes: { uri: string, version: number | undefined, diagnostics: Diagnostic[], at: number }[] = []
+  readonly publishes: { uri: string, version: number | undefined, diagnostics: Diagnostic[] }[] = []
 
   constructor(readonly root: string, private readonly vscode = false, private readonly capabilities: object = {}) {
     this.connection = new Connection(this.process.stdout, (data) => {
@@ -33,7 +33,7 @@ class Editor {
     this.connection.onNotification<{ uri: string, version?: number, diagnostics: Diagnostic[] }>('textDocument/publishDiagnostics', ({ uri, version, diagnostics }) => {
       const waiting = this.waiting.get(uri)
 
-      this.publishes.push({ uri, version, diagnostics, at: performance.now() })
+      this.publishes.push({ uri, version, diagnostics })
 
       if (waiting && (waiting.version === undefined || waiting.version === version))
         waiting.resolve(diagnostics)
@@ -194,27 +194,6 @@ describe('kay lsp', () => {
     const diagnostics = await editor.change('broken/src/routes/[id].kay', 'ul\n  for of [1, 2]\n    li x\n', 3)
 
     expect(diagnostics).toEqual([expect.objectContaining({ source: 'kay', range: expect.objectContaining({ start: { line: 1, character: 2 } }) })])
-  })
-
-  it('publishes a change after a quiet spell before the delay, and a burst once more after its last change without the version between', async () => {
-    const path = 'broken/src/routes/[id].kay'
-    const uri = editor.uri(path)
-
-    await Bun.sleep(DIAGNOSTICS_DELAY * 2)
-
-    const started = performance.now()
-    const quiet = await editor.change(path, 'p {missing}\n', 4)
-
-    expect(quiet.length).toBeGreaterThan(0)
-    expect(editor.publishes.find(entry => entry.uri === uri && entry.version === 4)!.at - started).toBeLessThan(DIAGNOSTICS_DELAY)
-
-    await Bun.sleep(DIAGNOSTICS_DELAY * 2)
-    void editor.change(path, 'p {alsoMissing}\n', 5)
-    void editor.change(path, 'p {stillMissing}\n', 6)
-
-    expect(await editor.change(path, 'p fixed\n', 7)).toEqual([])
-    await Bun.sleep(DIAGNOSTICS_DELAY * 2)
-    expect(editor.publishes.filter(entry => entry.uri === uri && entry.version === 6)).toEqual([])
   })
 
   it('shows hover types for template expressions and server data', async () => {
@@ -668,6 +647,101 @@ describe('kay lsp for a client that supports diagnostic refreshes', () => {
       await editor.change(page, `--- server\nconst n: string = ${version}\n---\np {n}\n`, version)
       await settled(editor)
       expect(editor.publishes.filter(entry => entry.uri === uri && entry.version === version)).toHaveLength(1)
+    }
+  })
+})
+
+// In process, holding the debounce's timer, so the test ends each quiet spell itself and no publish has a clock to beat.
+describe('kay lsp debouncing its diagnostics', () => {
+  it('publishes the first change after a quiet spell at once, and a burst once its spell ends, without the versions between', async () => {
+    const dir = await scratchDir('lsp-debounce-')
+    const page = 'src/routes/a.kay'
+    const encoder = new TextEncoder()
+    const toServer = new TransformStream<Uint8Array>()
+    const toClient = new TransformStream<Uint8Array>()
+    const writeToServer = toServer.writable.getWriter()
+    const writeToClient = toClient.writable.getWriter()
+    const client = new Connection(toClient.readable, (data) => {
+      void writeToServer.write(encoder.encode(data))
+    })
+    const server = new KayLanguageServer(new Connection(toServer.readable, (data) => {
+      void writeToClient.write(encoder.encode(data))
+    }))
+    const realSetTimeout = globalThis.setTimeout
+    // The timer of each change, the last one the spell running; a change in it only moves it.
+    const spells: (() => void)[] = []
+    let held: { count: number, resolve: () => void } | undefined
+    const changesHeld = async (count: number) => new Promise<void>((resolve) => {
+      held = { count, resolve }
+
+      if (spells.length >= count)
+        resolve()
+    })
+    const endSpell = () => spells.at(-1)!()
+    const published: (number | undefined)[] = []
+    const waiting = new Map<number, () => void>()
+    const publishOf = async (version: number) => new Promise<void>((resolve) => {
+      waiting.set(version, resolve)
+    })
+
+    await Promise.all([Bun.write(join(dir, 'tsconfig.json'), await Bun.file(join(fixtures, 'site/tsconfig.json')).text()), Bun.write(join(dir, page), 'p x\n')])
+
+    const timers = spyOn(globalThis, 'setTimeout').mockImplementation(((callback: () => void, delay?: number, ...rest: unknown[]) => {
+      if (delay !== DIAGNOSTICS_DELAY)
+        return realSetTimeout(callback, delay, ...rest)
+
+      spells.push(callback)
+
+      if (held && spells.length >= held.count)
+        held.resolve()
+
+      return realSetTimeout(() => undefined, 0)
+    }) as typeof setTimeout)
+
+    try {
+      const uri = pathToFileURL(join(dir, page)).href
+      const change = (version: number) => client.notify('textDocument/didChange', { textDocument: { uri, version }, contentChanges: [{ text: `p {missing${version}}\n` }] })
+
+      client.onNotification<{ version?: number }>('textDocument/publishDiagnostics', ({ version }) => {
+        published.push(version)
+
+        if (version !== undefined)
+          waiting.get(version)?.()
+      })
+      await client.request('initialize', { processId: process.pid, rootUri: pathToFileURL(dir).href, capabilities: {} })
+      client.notify('initialized', {})
+
+      const opened = publishOf(1)
+
+      client.notify('textDocument/didOpen', { textDocument: { uri, languageId: 'kay', version: 1, text: 'p x\n' } })
+      await opened
+      endSpell()
+
+      // Its spell never ends, so only skipping the wait publishes it.
+      const quiet = publishOf(2)
+
+      change(2)
+      await quiet
+
+      const burst = publishOf(4)
+
+      change(3)
+      change(4)
+      await changesHeld(4)
+      // However long it waits, a held spell publishes nothing.
+      await Bun.sleep(DIAGNOSTICS_DELAY * 2)
+      expect(published).toEqual([1, 2])
+      endSpell()
+      await burst
+      expect(published).toEqual([1, 2, 4])
+    }
+    finally {
+      timers.mockRestore()
+      // `exit` would end the test run too.
+      const { tsgo } = server as unknown as { tsgo?: { process: { kill: () => void } } }
+
+      tsgo?.process.kill()
+      await rm(dir, { recursive: true, force: true })
     }
   })
 })
