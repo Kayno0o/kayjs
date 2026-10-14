@@ -37,12 +37,14 @@ const DEFAULT_DIR = 'data/files'
 const PRIVATE = 'private/'
 const KEY = /^(?:[\w-]+\/)*[\w-]+(?:\.\d{1,5}x\d{1,5})?\.[a-z\d]{1,10}$/
 const FOLDER = /^[\w-]+(?:\/[\w-]+)*$/
-const PRIVATE_FOLDER = /^private(?:\/|$)/
+const PRIVATE_FOLDER = /^private(?:\/|$)/i
+// A key under `Private/` is private too, as a store matching keys whatever their case reads `private/` for it.
+const PRIVATE_KEY = /^private\//i
 const TYPE_PARAMETERS = /;.*$/
 const NAME_EXTENSION = /\.([a-z\d]{1,10})$/i
 // What Bun.Image reads the size of, which the key then holds.
 const SIZED = /^(?:png|jpe?g|webp|gif|avif)$/
-// Types a browser shows without running anything; any other file is downloaded, so an uploaded page or SVG never runs as the site.
+// Types a browser shows without running anything; any other file is downloaded as bytes of no type, so an uploaded page, SVG, script or stylesheet never runs as the site, nor loads into one of its pages.
 const INLINE = /^(?:image\/(?:png|jpeg|webp|gif|avif)|video\/|audio\/|application\/pdf|text\/plain)/
 const RANGE = /^bytes=(\d*)-(\d*)$/
 const TRAILING_SLASH = /\/+$/
@@ -176,7 +178,7 @@ export const files = {
     checkedKey(key, 'files.url()')
 
     if (current.exported) {
-      if (key.startsWith(PRIVATE))
+      if (PRIVATE_KEY.test(key))
         throw new Error(`kay: a static export links private file ${key}, which only a server can serve once it checked the link`)
 
       if (current.store?.publicUrl === undefined)
@@ -185,7 +187,7 @@ export const files = {
       return `${current.store.publicUrl.replace(TRAILING_SLASH, '')}/${key}`
     }
 
-    if (!key.startsWith(PRIVATE))
+    if (!PRIVATE_KEY.test(key))
       return `${FILES_ROUTE}${key}`
 
     const seconds = durationSeconds(options.expires ?? DEFAULT_EXPIRES, 'files.url()\'s expires')
@@ -209,7 +211,7 @@ export function serveFiles(app: Elysia): void {
     if (!KEY.test(key))
       return new Response('Not found', { status: 404, headers: TEXT })
 
-    if (!key.startsWith(PRIVATE))
+    if (!PRIVATE_KEY.test(key))
       return fileResponse(key, request, IMMUTABLE)
 
     const query = new URL(request.url).searchParams
@@ -230,7 +232,7 @@ export async function storedImage(src: string): Promise<{ path: string, immutabl
   if (!url?.pathname.startsWith(FILES_ROUTE) || !KEY.test(key))
     return undefined
 
-  const locked = key.startsWith(PRIVATE)
+  const locked = PRIVATE_KEY.test(key)
 
   if (locked && !linkSigned(key, url.searchParams))
     return { status: 403, message: 'Not a valid link to this file' }
@@ -271,12 +273,18 @@ async function fileResponse(key: string, request: Request | undefined, cacheCont
     return new Response('Not found', { status: 404, headers: TEXT })
 
   const type = Bun.file(key).type
+  const inline = INLINE.test(type)
   const headers: Record<string, string> = {
-    'content-type': type,
+    'content-type': inline ? type : 'application/octet-stream',
     'x-content-type-options': 'nosniff',
-    'content-disposition': INLINE.test(type) ? 'inline' : `attachment; filename="${basename(key)}"`,
+    'content-disposition': inline ? 'inline' : `attachment; filename="${basename(key)}"`,
     'cache-control': cacheControl,
   }
+
+  // A browser that opened a downloaded file in place anyway gives it no origin to act as.
+  if (!inline)
+    headers['content-security-policy'] = 'sandbox'
+
   // An S3 object's size is only known by asking for it, so its file goes whole, streamed: Bun answers an S3 file given as the body with nothing.
   const size = Number.isFinite(data.size) ? data.size : undefined
 

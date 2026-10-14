@@ -27,7 +27,7 @@ for key of photos key={key}
 
 A key looks like `photos/1f3a9c0b2d4e6f8a0b1c.1600x1200.jpg`: an image's key holds its size, so `img` gives a stored image the same responsive variants as an imported one without opening the file. Keys are never reused, so a new avatar is a new file: `files.put(file, { replace: user.avatar })` deletes the old one once the new one is stored.
 
-`/_kay/files/<key>` serves each file with its type, cached for good. A file a browser could run as the site, an HTML page or an SVG, is sent as a download.
+`/_kay/files/<key>` serves each file with its type, cached for good. Only images, video, audio, PDFs and plain text are shown in place: any other file, an HTML page, an SVG, a script or a stylesheet, is sent as a download with no type, so it can neither run as the site nor load into one of its pages.
 
 ## Private files
 

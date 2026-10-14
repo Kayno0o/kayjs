@@ -46,7 +46,7 @@ describe('files', () => {
   })
 
   it('refuses a folder that is not plain segments or would pass for private', async () => {
-    for (const folder of ['../up', 'a//b', 'private', 'private/x', 'with space'])
+    for (const folder of ['../up', 'a//b', 'private', 'private/x', 'Private', 'with space'])
       await expect(files.put(new Blob(['x']), { folder })).rejects.toThrow('files.put() was given the folder')
   })
 
@@ -74,7 +74,7 @@ describe('files', () => {
 })
 
 describe('the file route', () => {
-  it('serves a public file for good, with its type, and downloads one a browser would run', async () => {
+  it('serves a public file for good, with its type, and downloads one a browser would run or load as bytes of no type', async () => {
     const get = await serve(memoryFiles())
     const key = await files.put(await hero())
     const response = await get(files.url(key))
@@ -87,10 +87,12 @@ describe('the file route', () => {
     expect(response.headers.get('content-disposition')).toBe('inline')
     expect((await response.arrayBuffer()).byteLength).toBe(Bun.file(HERO).size)
 
-    for (const name of ['page.html', 'drawing.svg']) {
+    for (const name of ['page.html', 'drawing.svg', 'app.js', 'theme.css', 'module.mjs']) {
       const ran = await get(files.url(await files.put(new File(['<script>alert(1)</script>'], name))))
 
+      expect(ran.headers.get('content-type')).toBe('application/octet-stream')
       expect(ran.headers.get('content-disposition')).toStartWith('attachment; filename=')
+      expect(ran.headers.get('content-security-policy')).toBe('sandbox')
     }
   })
 
@@ -116,6 +118,7 @@ describe('the file route', () => {
 
     expect(key).toStartWith('private/')
     expect((await get(`/_kay/files/${key}`)).status).toBe(403)
+    expect((await get(`/_kay/files/${key.replace('private/', 'Private/')}`)).status).toBe(403)
 
     setSystemTime(new Date('2026-06-01T12:01:00Z'))
 
