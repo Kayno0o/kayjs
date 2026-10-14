@@ -175,6 +175,7 @@ export default defineMessages({
         delete: 'Supprimer votre compte',
         deleteIntro: 'Votre compte et tout ce qui s’y rattache sont supprimés définitivement. C’est irréversible.',
         confirmDelete: 'Supprimer mon compte',
+        confirmExport: 'Confirmer pour télécharger mes données',
       },
     },
     errors: {

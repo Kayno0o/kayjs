@@ -1,7 +1,12 @@
-import { describe, expect, test } from 'bun:test'
+import { afterEach, describe, expect, setSystemTime, test } from 'bun:test'
 import { testApp } from './helpers/app'
 
 const PASSWORD = 'correct horse battery'
+const LATER = 11 * 60_000
+
+afterEach(() => {
+  setSystemTime()
+})
 
 describe('exporting a user\'s data', () => {
   test('gives what kayjs-auth keeps about the user, no secret among it, with the app\'s own', async () => {
@@ -49,5 +54,51 @@ describe('exporting a user\'s data', () => {
     expect((await ada.fetch('/auth/export')).status).toBe(200)
     expect(await ada.call('exportData')).toEqual({ ok: false, error: 'limited' })
     expect((await ada.fetch('/auth/export')).status).toBe(429)
+  })
+
+  describe('needs a sign-in or a proof under ten minutes old, so a stolen session downloads nothing', () => {
+    test('a stale session is refused by the method and the route, neither counting against the limit', async () => {
+      const { browser } = testApp({ limits: { export: { max: 1, window: 3600 } } })
+      const ada = browser()
+
+      await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
+      setSystemTime(new Date(Date.now() + LATER))
+
+      expect(await ada.call('exportData')).toEqual({ ok: false, error: 'stale' })
+
+      const response = await ada.fetch('/auth/export')
+
+      expect(response.status).toBe(403)
+      expect(response.headers.get('content-disposition')).toBeNull()
+
+      await ada.call('reprove', { password: PASSWORD })
+
+      expect((await ada.call('exportData')).ok).toBe(true)
+    })
+
+    test('a wrong proof leaves it refused, a right one opens the route again', async () => {
+      const { browser } = testApp()
+      const ada = browser()
+
+      await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
+      setSystemTime(new Date(Date.now() + LATER))
+
+      expect(await ada.call('reprove', { password: 'wrong password' })).toEqual({ ok: false, error: 'proof' })
+      expect((await ada.fetch('/auth/export')).status).toBe(403)
+      expect(await ada.call('provedLately')).toBe(false)
+
+      await ada.call('reprove', { password: PASSWORD })
+
+      expect(await ada.call('provedLately')).toBe(true)
+      expect((await ada.fetch('/auth/export')).status).toBe(200)
+    })
+
+    test('a signed-out visitor still gets signed-out, not stale', async () => {
+      const { browser } = testApp()
+
+      setSystemTime(new Date(Date.now() + LATER))
+
+      expect(await browser().call('exportData')).toEqual({ ok: false, error: 'signed-out' })
+    })
   })
 })

@@ -12,6 +12,7 @@ import { spend } from './limits'
 import { listMemberships } from './organizations'
 import { listPasskeys } from './passkeys'
 import { listSessions } from './sessions'
+import { provedLately } from './twoFactor'
 
 // More than a person's year of sign-ins, so only a bot's account is cut short.
 const AUDIT_EXPORT_MAX = 100_000
@@ -33,7 +34,8 @@ export interface DataExport {
 }
 
 // Not for an admin acting as the user: they see what the user sees, not a copy of everything kept about them.
-export async function exportData(state: RequestState): Promise<{ ok: true, data: DataExport } | { ok: false, error: 'signed-out' | 'limited' | 'impersonating' }> {
+// Only within ten minutes of signing in or re-proving, so a session left open or stolen does not download everything the account holds.
+export async function exportData(state: RequestState): Promise<{ ok: true, data: DataExport } | { ok: false, error: 'signed-out' | 'limited' | 'impersonating' | 'stale' }> {
   const { core } = state
   const record = await state.current()
 
@@ -42,6 +44,9 @@ export async function exportData(state: RequestState): Promise<{ ok: true, data:
 
   if (await impersonatorOf(state) !== undefined)
     return { ok: false, error: 'impersonating' }
+
+  if (!await provedLately(state))
+    return { ok: false, error: 'stale' }
 
   if (await spend(core.store, `export:${record.id}`, core.limits.export))
     return { ok: false, error: 'limited' }

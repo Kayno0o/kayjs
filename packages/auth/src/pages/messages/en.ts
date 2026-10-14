@@ -175,6 +175,7 @@ export default defineMessages({
         delete: 'Delete your account',
         deleteIntro: 'Your account and everything tied to it are deleted for good. This cannot be undone.',
         confirmDelete: 'Delete my account',
+        confirmExport: 'Confirm to download my data',
       },
     },
     errors: {

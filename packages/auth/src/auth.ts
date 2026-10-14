@@ -51,7 +51,7 @@ import { listPasskeys, passkeyProofOptions, passkeyRegistrationOptions, passkeyS
 import { createUser, register, signInWithPassword } from './password'
 import { createRoleHierarchy } from './roles'
 import { applyLifetime, chooseRemember, listSessions, liveSession, openSession, revokeBearerTokens } from './sessions'
-import { challenged, completeSignIn, disableTwoFactor, enableTwoFactor, regenerateRecoveryCodes, reprove, setUpTwoFactor, verifyTwoFactor } from './twoFactor'
+import { challenged, completeSignIn, disableTwoFactor, enableTwoFactor, provedLately, regenerateRecoveryCodes, reprove, setUpTwoFactor, verifyTwoFactor } from './twoFactor'
 
 export type { AuthSessionData, OAuthApp, Profile, User } from './core'
 
@@ -423,6 +423,11 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     return verifyTwoFactor(this[STATE], code, (record, method) => this.establish(record, method))
   }
 
+  // Whether this session signed in or re-proved its user in the last ten minutes, as `exportData()` and the admin methods ask, for a page to show a form for `reprove` first.
+  async provedLately(): Promise<boolean> {
+    return provedLately(this[STATE])
+  }
+
   // Re-proves the signed-in user, as before an app's own sensitive change: a proof counts for ten minutes, as a sign-in does.
   async reprove(proof: Proof): Promise<{ ok: true } | { ok: false, error: ProofFailure }> {
     const proved = await reprove(this[STATE], proof)
@@ -685,7 +690,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
   }
 
   // Everything kayjs-auth keeps about the signed-in user, secrets left out, with the app's own from `onExport`: for a download of their data.
-  async exportData(): Promise<{ ok: true, data: DataExport } | { ok: false, error: 'signed-out' | 'limited' | 'impersonating' }> {
+  async exportData(): Promise<{ ok: true, data: DataExport } | { ok: false, error: 'signed-out' | 'limited' | 'impersonating' | 'stale' }> {
     return exportData(this[STATE])
   }
 
@@ -888,7 +893,7 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
       const exported = await auth.exportData()
 
       if (!exported.ok)
-        return exported.error === 'limited' ? status(429, 'Too many exports; try again later') : exported.error === 'impersonating' ? status(403, 'Not while acting as the user') : status(401, 'Sign in to continue')
+        return exported.error === 'limited' ? status(429, 'Too many exports; try again later') : exported.error === 'impersonating' ? status(403, 'Not while acting as the user') : exported.error === 'stale' ? status(403, 'Sign in again to continue') : status(401, 'Sign in to continue')
 
       set.headers['content-disposition'] = `attachment; filename="${core.site.replaceAll(/[^\w.-]/g, '-')}-data.json"`
       set.headers['cache-control'] = 'no-store'

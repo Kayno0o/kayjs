@@ -7,6 +7,14 @@ import { failure, proofOf, schemas } from '../../forms'
 import Button from '@kaynooo/kayjs-ui/button.kay'
 import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
 
+// Re-proves the user, so the export link below shows for the next ten minutes.
+export const prove = action(schemas.proof, async (input, ctx) => {
+  const result = await ctx.locals.auth.reprove(proofOf(input))
+
+  if (!result.ok)
+    return ctx.fail(400, { error: result.error })
+})
+
 export const remove = action(schemas.proof, async (input, ctx) => {
   const result = await ctx.locals.auth.deleteAccount(proofOf(input))
 
@@ -20,11 +28,20 @@ const auth = ctx.locals.auth
 const user = (await auth.user())!
 const features = auth.features()
 const refused = ctx.failed(remove)?.data?.error
+const notProved = ctx.failed(prove)?.data?.error
+const proved = await auth.provedLately()
 ---
 PageSection(title={t('auth.account.data.export')})
   .flex.flex-col.items-start.gap-3
     p {t('auth.account.data.exportIntro')}
-    Button(href={`${features.prefix}/export`} label={t('auth.account.data.export')} download data-no-prefetch)
+    if proved
+      Button(href={`${features.prefix}/export`} label={t('auth.account.data.export')} download data-no-prefetch)
+    else
+      form.flex.flex-col.gap-3(action={prove})
+        Proof(user={user})
+        if notProved
+          Message(text={failure(notProved)})
+        Button(type="submit" label={t('auth.account.data.confirmExport')})
 PageSection(title={t('auth.account.data.delete')})
   form.flex.flex-col.gap-3(action={remove})
     p {t('auth.account.data.deleteIntro')}

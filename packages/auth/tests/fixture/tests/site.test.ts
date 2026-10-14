@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import { afterEach, describe, expect, test } from 'bun:test'
+import { afterEach, describe, expect, setSystemTime, test } from 'bun:test'
 import { testSite } from 'kay/test'
 import { totpCode, totpStep } from '../../../src/totp'
 import { mails, store } from '../src/auth'
@@ -23,7 +23,7 @@ const { connect } = await import(join(PAGES, 'account', 'connections.kay'))
 const { disable, enable, setUp } = await import(join(PAGES, 'account', 'security.kay'))
 const { end, endOthers } = await import(join(PAGES, 'account', 'sessions.kay'))
 const { create, revoke } = await import(join(PAGES, 'account', 'tokens.kay'))
-const { remove } = await import(join(PAGES, 'account', 'data.kay'))
+const { prove, remove } = await import(join(PAGES, 'account', 'data.kay'))
 const { confirm } = await import(join(PAGES, 'confirm-email.kay'))
 const { magicLink, password } = await import(join(PAGES, 'sign-in.kay'))
 const { register } = await import(join(PAGES, 'register.kay'))
@@ -259,6 +259,27 @@ describe('the prebuilt pages', () => {
     expect((await ada.visit('/auth/account/tokens')).find('#kayjs-auth-token')).toHaveLength(0)
     await ada.submit(revoke, { id: token!.attributes['data-token']! }, { from: '/auth/account/tokens' })
     expect((await ada.visit('/auth/account/tokens')).find('[data-token]')).toHaveLength(0)
+  })
+
+  test('the data page asks for a proof before offering the download once the sign-in is old', async () => {
+    const ada = await signedUp('stale@example.com')
+
+    expect((await ada.visit('/auth/account/data')).find('a[download]')).toHaveLength(1)
+
+    setSystemTime(new Date(Date.now() + 11 * 60_000))
+
+    try {
+      const page = await ada.visit('/auth/account/data')
+
+      expect(page.find('a[download]')).toHaveLength(0)
+      expect((await ada.fetch('/auth/export')).status).toBe(403)
+      expect(text(await ada.submit(prove, { password: 'wrong password' }, { from: '/auth/account/data' }), '[role="alert"]')).toBe('Wrong password or code.')
+      expect((await ada.submit(prove, { password: PASSWORD }, { from: '/auth/account/data' })).find('a[download]')).toHaveLength(1)
+      expect((await ada.fetch('/auth/export')).status).toBe(200)
+    }
+    finally {
+      setSystemTime()
+    }
   })
 
   test('the data page downloads the user\'s data and deletes the account once proved', async () => {
