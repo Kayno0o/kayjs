@@ -20,7 +20,7 @@ import { handedOverFlash } from './flash'
 import { cookieLocale, hostLocale, localeCookie, preferredLocale, prerenderKey, stateFor } from './i18n'
 import { answeringRequest } from './log'
 import { hookedResponse } from './page-hook'
-import { matchedParams, positionalParams } from './params'
+import { matchedParams, positionalParams, slashSpelling } from './params'
 import { inPreview, previewRequested, requestDrafts } from './preview'
 import { requestId } from './protection'
 import { hasFlash, renderPage, renderUnmatched, servePrerendered, sharedContext, withEditor } from './render'
@@ -31,7 +31,6 @@ import { serveServerIslands } from './server-islands'
 import { answered, SERVER_SPAN, traced } from './trace'
 
 // Every slash at either end of a path.
-const EDGE_SLASHES = /^\/+|\/+$/g
 
 // The params come resolved, each matcher's value in place of its text.
 export type PageResponder = (route: ServedRoute, params: Record<string, unknown>, context: RequestContext, url: URL) => Promise<Response>
@@ -125,15 +124,9 @@ export function pageResponder({ client, renderOptions, prerendered, settings, tr
   }
 }
 
-// The redirect giving a page one URL, so its relative links resolve one way: `/about/` to `/about`, or the other way with `always`; leading slashes collapse too, so `//host/` never becomes a redirect off the site.
-// A catch-all's own directory keeps one slash: `/docs//` goes to `/docs/`, since `/docs` is not one of its paths.
+// The redirect giving a page one URL, so its relative links resolve one way.
 function slashRedirect(url: URL, shape: RouterShape, trailingSlash: TrailingSlash): Response | undefined {
-  if (trailingSlash === 'ignore' || url.pathname === '/')
-    return undefined
-
-  const path = `/${url.pathname.replace(EDGE_SLASHES, '')}`
-  const directory = shape.path.endsWith('/*') && path.split('/').length === shape.path.split('/').length - 1
-  const wanted = trailingSlash === 'always' || directory ? `${path}/` : path
+  const wanted = slashSpelling(url.pathname, shape, trailingSlash)
 
   return wanted === url.pathname ? undefined : new Response(null, { status: 308, headers: { location: `${wanted}${url.search}` } })
 }

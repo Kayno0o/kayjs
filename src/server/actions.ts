@@ -246,15 +246,26 @@ function readPage(request: Request, page: ActionPage, match: RouteMatch, { base 
 function guardedPage(request: Request, page: ActionPage, match: RouteMatch, { base = '' }: ActionOptions): URL {
   const from = postedPage(request, page, match, base)
 
-  if (from?.path !== undefined)
-    return new URL(`${from.path}${from.search}`, request.url)
+  // Set on the request's own URL, so a path starting `//` never names another host.
+  const url = new URL(request.url)
+
+  url.search = ''
+
+  if (from?.path !== undefined) {
+    url.pathname = from.path
+    url.search = from.search
+
+    return url
+  }
 
   if (page.params.length > 0)
     throw notFromPage()
 
-  const plain = page.routes.filter(route => route.params.length === 0).sort((a, b) => a.pattern.length - b.pattern.length || (a.pattern < b.pattern ? -1 : 1))
+  const shortest = page.routes.filter(route => route.params.length === 0).reduce<ServedRoute | undefined>((best, route) => best === undefined || route.pattern.length < best.pattern.length ? route : best, undefined)
 
-  return new URL(match.served(plain[0] ?? page.routes[0]!), request.url)
+  url.pathname = match.served(shortest ?? page.routes[0]!)
+
+  return url
 }
 
 // Records the params of the page the post came from, giving its path as the router serves it and its query.

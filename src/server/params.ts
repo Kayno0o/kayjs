@@ -1,9 +1,12 @@
+import type { TrailingSlash } from '../config'
 import type { Route } from './routes'
 import { join } from 'node:path'
 import * as builtIn from '../runtime/params'
 import { importModule } from './bundle'
 import { decodePath, patternShapes, withoutSlash } from './routes'
 import { projectSource } from './source'
+
+const EDGE_SLASHES = /^\/+|\/+$/g
 
 // Gives the param's value, or undefined to refuse the URL, which then falls through to the next page serving its path.
 export type Matcher = (value: string) => unknown
@@ -118,17 +121,14 @@ export function matchedParams(route: Route, params: Record<string, string>, matc
   return matched
 }
 
-// The path `shapeParams` read as the router serves it to a visit: each static segment as the shape names it, a param's as sent, no trailing slash or empty catch-all.
-export function servedPath(shape: RouterShape, path: string): string {
-  const segments = withoutSlash(path).split('/')
+// A path `shapeParams` accepted, spelled as a visit to it reaches the guards: each static segment as the shape names it, a param's as sent, its slashes as the redirects leave them.
+export function servedPath(shape: RouterShape, path: string, trailingSlash: TrailingSlash): string {
+  const segments = path.split('/')
   const served: string[] = []
 
   for (const [index, segment] of shape.path.split('/').entries()) {
     if (segment === '*') {
-      const rest = segments.slice(index).join('/')
-
-      if (rest !== '')
-        served.push(rest)
+      served.push(segments.slice(index).join('/'))
 
       break
     }
@@ -136,7 +136,18 @@ export function servedPath(shape: RouterShape, path: string): string {
     served.push(segment.startsWith(':') ? segments[index]! : segment)
   }
 
-  return served.join('/') || '/'
+  return slashSpelling(served.join('/') || '/', shape, trailingSlash)
+}
+
+// The spelling of a path a visit is redirected to: `/about/` to `/about`, or the other way with `always`, leading slashes collapsed, so `//host/` never leaves the site; a catch-all's own directory keeps one slash, as `/docs` is not one of its paths.
+export function slashSpelling(pathname: string, shape: RouterShape, trailingSlash: TrailingSlash): string {
+  if (trailingSlash === 'ignore' || pathname === '/')
+    return pathname
+
+  const path = `/${pathname.replace(EDGE_SLASHES, '')}`
+  const directory = shape.path.endsWith('/*') && path.split('/').length === shape.path.split('/').length - 1
+
+  return trailingSlash === 'always' || directory ? `${path}/` : path
 }
 
 // The params `path` gives the route through `shape`, decoded and matched as a request's are: undefined when the shape cannot serve the path or a matcher refuses it. Looser than the router, a catch-all taking an empty rest and a static segment its decoded text, which reads no params a valid page would not give.

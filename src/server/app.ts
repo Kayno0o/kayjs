@@ -233,7 +233,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
     filePaths.add(path)
 
   const actionOptions = { dev: mode.dev, onError: options.onError, i18n: locales, base, requireGuards: options.requireGuards }
-  const [actionLimits, apiModules, files] = await Promise.all([registerActionRoutes(app, routes, routeMatch(table, matchers), actionOptions), source.api(root, options), publicFiles(paths.public)])
+  const [actionLimits, apiModules, files] = await Promise.all([registerActionRoutes(app, routes, routeMatch(table, matchers, options.trailingSlash), actionOptions), source.api(root, options), publicFiles(paths.public)])
   const publicServed = claimPublic(served, files)
   const api = await serveApi(app, apiModules, actionOptions)
   const endpoints = await source.endpoints(paths.routes, mounts)

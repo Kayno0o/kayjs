@@ -1,3 +1,4 @@
+import type { TrailingSlash } from '../config'
 import type { LocaleSettings } from '../runtime/i18n'
 import type { RouteMatch } from './actions'
 import type { ServedRoute } from './guards'
@@ -5,7 +6,7 @@ import type { Matcher, RouterShape } from './params'
 import type { Route } from './routes'
 import type { Claim } from './served-paths'
 import { localePattern, localePrefixes } from './i18n'
-import { isPlain, routerShapes, servedPath, shapeParams } from './params'
+import { isPlain, routerShapes, servedPath, shapeParams, slashSpelling } from './params'
 import { refuseRouteNames } from './routes'
 import { ServedPaths } from './served-paths'
 
@@ -126,14 +127,14 @@ export function refuseClashes(routesDir: string, routes: Route[], served = new S
 }
 
 // Reads a path as the router would for one route, under every locale's pattern, to give an action the params of the page it was posted from.
-export function routeMatch(table: RouteTable, matchers: Map<string, Matcher>): RouteMatch {
+export function routeMatch(table: RouteTable, matchers: Map<string, Matcher>, trailingSlash: TrailingSlash = 'never'): RouteMatch {
   return {
     posted: (route, path) => {
       for (const shape of table.shapes.get(route) ?? []) {
         const params = shapeParams(shape, route, path, matchers)
 
         if (params)
-          return { params, path: table.sentOn.has(shape) ? undefined : servedPath(shape, path) }
+          return { params, path: table.sentOn.has(shape) ? undefined : servedPath(shape, path, trailingSlash) }
       }
 
       return undefined
@@ -141,7 +142,7 @@ export function routeMatch(table: RouteTable, matchers: Map<string, Matcher>): R
     served: (route) => {
       const shape = table.shapes.get(route)?.find(shape => !table.sentOn.has(shape))
 
-      return shape === undefined ? route.pattern : namedPath(shape)
+      return shape === undefined ? route.pattern : slashSpelling(namedPath(shape), shape, trailingSlash)
     },
   }
 }

@@ -724,6 +724,7 @@ describe('the url an action\'s guards see', () => {
   let dir = ''
   let served: Awaited<ReturnType<typeof pages>>
   let shop: Awaited<ReturnType<typeof pages>>
+  let slashed: Awaited<ReturnType<typeof pages>>
 
   const post = async (headers: Record<string, string> = {}, file = 'admin/index.kay', app = served) => {
     const response = await app.handle(new NativeRequest(`http://localhost/_kay/action/${dir.slice(root.length + 1)}/routes/${file}/ping`, {
@@ -743,8 +744,11 @@ describe('the url an action\'s guards see', () => {
     await Bun.write(join(dir, 'routes/admin/users.kay'), 'p Users\n')
     await Bun.write(join(dir, 'routes/admin/_layout.kay'), `${ACTION}main\n  slot\n`)
     await Bun.write(join(dir, 'routes/blog/[slug].kay'), `${ACTION}p Post\n`)
+    await Bun.write(join(dir, 'routes/[...path].kay'), `${ACTION}p Page\n`)
+    await Bun.write(join(dir, 'routes/docs/[...rest].kay'), `${ACTION}p Doc\n`)
     served = await pages({ routes: join(dir, 'routes'), prebuilt: true })
     shop = await pages({ routes: join(dir, 'routes'), prebuilt: true, base: '/shop' })
+    slashed = await pages({ routes: join(dir, 'routes'), prebuilt: true, trailingSlash: 'always' })
   })
 
   afterAll(async () => rm(dir, { recursive: true, force: true }))
@@ -761,6 +765,10 @@ describe('the url an action\'s guards see', () => {
     expect(await post({ referer: 'http://localhost/blog/x/' }, 'blog/_slug_.kay')).toEqual({ status: 200, url: '/blog/x' })
     expect(await post({ referer: 'http://localhost/shop/admin?tab=1' }, 'admin/index.kay', shop)).toEqual({ status: 403, url: '/admin?tab=1' })
     expect(await post({}, 'admin/index.kay', shop)).toEqual({ status: 403, url: '/admin' })
+    expect(await post({ referer: 'http://localhost//admin/x' }, '_...path_.kay')).toEqual({ status: 403, url: '/admin/x' })
+    expect(await post({ referer: 'http://localhost/docs' }, 'docs/_...rest_.kay')).toEqual({ status: 200, url: '/docs/' })
+    expect(await post({ referer: 'http://localhost/admin' }, 'admin/index.kay', slashed)).toEqual({ status: 403, url: '/admin/' })
+    expect(await post({}, 'admin/index.kay', slashed)).toEqual({ status: 403, url: '/admin/' })
   })
 
   it('is the action\'s page when the post names none of its own, as a script\'s or another page\'s would, a layout\'s shortest', async () => {
