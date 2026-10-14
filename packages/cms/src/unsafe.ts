@@ -1,7 +1,10 @@
-import { renderMarkdown } from './kay/content'
+import { bodyHtml, MarkdownError } from './kay/content'
 
-// Tags that run code, load another document, take input, or style or cover the page, whatever their attributes; `sanitizeHtml` drops the same.
-const UNSAFE_TAGS = new Set(['applet', 'base', 'button', 'embed', 'fencedframe', 'form', 'frame', 'frameset', 'iframe', 'input', 'link', 'math', 'meta', 'noscript', 'object', 'portal', 'script', 'select', 'style', 'svg', 'template', 'textarea'])
+// Tags that run code, load another document, take input, style or cover the page, or swallow the rest of it, whatever their attributes; `sanitizeHtml` drops the same.
+const UNSAFE_TAGS = new Set(['applet', 'base', 'button', 'embed', 'fencedframe', 'form', 'frame', 'frameset', 'iframe', 'input', 'link', 'math', 'meta', 'noembed', 'noscript', 'object', 'plaintext', 'portal', 'script', 'select', 'style', 'svg', 'template', 'textarea', 'title', 'xmp'])
+// What Markdown's own task list gives a checkbox.
+const TASK_ATTRIBUTES = new Set(['type', 'class', 'disabled', 'checked'])
+const UNCLOSED_COMMENT = /<!--(?![\s\S]*-->)/
 const URL_ATTRIBUTES = new Set(['action', 'background', 'data', 'formaction', 'href', 'poster', 'src', 'xlink:href'])
 const UNSAFE_ATTRIBUTE = /^(?:on|style$|srcdoc$)/i
 const HEX_ENTITY = /&#x([\da-f]+);?/gi
@@ -11,11 +14,32 @@ const NAMED: Record<string, string> = { colon: ':', tab: '\t', newline: '\n' }
 const IGNORED = /[\0-\x20]/g
 // A browser runs these as script when followed or loaded; an inline image stays allowed.
 const SCRIPT_URL = /^(?:javascript|vbscript|data):(?!image\/(?:png|jpe?g|gif|webp|avif)[;,])/i
-const REGEX_SPECIAL = /[.*+?^${}()|[\]\\]/g
 
-// What of a Markdown body would run as the site once rendered, such as `<script>` or an `onclick` attribute, or undefined when nothing does; the collection's own components, which kay renders, are left out.
-export async function scriptInBody(body: string, components: string[]): Promise<string | undefined> {
-  return scriptIn((await renderMarkdown(withoutComponents(body, components))).html)
+// What of a Markdown body would run as the site once kay renders it, such as `<script>` or an `onclick` attribute, or undefined when nothing does: read off the HTML kay puts on the page, so components drop out exactly as kay takes them.
+export async function scriptInBody(body: string): Promise<string | undefined> {
+  let parts: string[]
+
+  try {
+    parts = await bodyHtml(body)
+  }
+  catch (error) {
+    if (error instanceof MarkdownError)
+      return `components that do not nest (line ${error.line}: ${error.message})`
+
+    throw error
+  }
+
+  for (const part of parts) {
+    if (UNCLOSED_COMMENT.test(part))
+      return 'a comment left open'
+
+    const found = await scriptIn(part)
+
+    if (found !== undefined)
+      return found
+  }
+
+  return undefined
 }
 
 // Read with Bun's HTML tokenizer, as a browser reads it: a hand-written pattern reads `<img src="x>" onerror=...>` or `<script/x>` otherwise.
@@ -34,11 +58,10 @@ export async function scriptIn(html: string): Promise<string | undefined> {
 function unsafeElement(tag: string, attributes: [string, string][]): string | undefined {
   const name = tag.toLowerCase()
 
-  // Markdown's own task list renders as disabled checkboxes, which take no input.
-  if (name === 'input' && attributes.some(([key, value]) => key === 'type' && value === 'checkbox') && attributes.some(([key]) => key === 'disabled'))
-    return undefined
+  // Markdown's own task list renders as disabled checkboxes, which take no input; any other attribute on one is checked as on any tag.
+  const task = name === 'input' && attributes.some(([key, value]) => key === 'type' && value === 'checkbox') && attributes.some(([key]) => key === 'disabled') && attributes.every(([key]) => TASK_ATTRIBUTES.has(key.toLowerCase()))
 
-  if (UNSAFE_TAGS.has(name))
+  if (UNSAFE_TAGS.has(name) && !task)
     return `a <${name}> tag`
 
   for (const [attribute, value] of attributes) {
@@ -52,15 +75,6 @@ function unsafeElement(tag: string, attributes: [string, string][]): string | un
   }
 
   return undefined
-}
-
-function withoutComponents(body: string, components: string[]): string {
-  if (components.length === 0)
-    return body
-
-  const names = components.map(name => name.replace(REGEX_SPECIAL, '\\$&')).join('|')
-
-  return body.replace(new RegExp(`</?(?:${names})(?![\\w.-])(?:"[^"]*"|'[^']*'|[^'">])*>`, 'g'), '')
 }
 
 // The value as the browser reads it: entities decoded, then the whitespace and control characters it skips in a URL dropped.

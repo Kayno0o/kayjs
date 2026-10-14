@@ -7,7 +7,7 @@ import { describe, expect, it } from 'bun:test'
 import { Elysia, t } from 'elysia'
 import { outputDir } from '../src/build/assets'
 import { check } from '../src/check'
-import { collection, highlightCode, renderMarkdown } from '../src/content'
+import { bodyHtml, collection, highlightCode, renderMarkdown } from '../src/content'
 import { feedXml } from '../src/content/feed'
 import { contentMode, manifestFile, setContentMode, setContentPlace } from '../src/content/load'
 import { compileMarkdown, MarkdownError } from '../src/content/markdown'
@@ -277,6 +277,12 @@ describe('Markdown outside collections', () => {
     expect(note.html).toContain('<a href="https://example.com">https://example.com</a>')
     expect(note.html).toContain('<pre class="shout">ts:CONST A = 1\n</pre>')
     expect((await renderMarkdown('```ts\na < b\n```\n')).html).toBe('<pre><code class="language-ts">a &lt; b\n</code></pre>\n')
+  })
+
+  it('gives the HTML a body puts on the page outside its components, with their markup as kay takes it', async () => {
+    expect(await bodyHtml('Hi <b>there</b>\n\n<Callout title="a}">In <i>it</i></Callout>\n\nBye')).toEqual(['<p>Hi <b>there</b></p>\n<p>', 'In <i>it</i>', '</p>\n<p>Bye</p>\n'])
+    expect(await bodyHtml('<Callout onclick=alert(1)//}>hi')).toEqual(['<p><Callout onclick=alert(1)//}>hi</p>\n'])
+    await expect(bodyHtml('<Callout>open')).rejects.toBeInstanceOf(MarkdownError)
   })
 
   it('highlights a code string as a Markdown code block renders, plain without a highlighter', async () => {

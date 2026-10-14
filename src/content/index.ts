@@ -22,7 +22,7 @@ export type { CollectionInfo, DataValue, EntryFile, EntryFilter, EntryPath, Fiel
 export { collectionInfo, collections, entries, entryFile, entrySource, fileField, imageField, markdownField, reference, removeEntry, repositoryRoot, saveEntry } from './edit'
 export type { FeedItem, FeedOptions } from './feed'
 export type { Heading, Highlighter, RenderedMarkdown } from './markdown'
-export { highlightCode, renderMarkdown } from './markdown'
+export { bodyHtml, highlightCode, MarkdownError, renderMarkdown } from './markdown'
 export type { Page, Paginated } from './paginate'
 export { isPaginated, paginate } from './paginate'
 

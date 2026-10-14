@@ -36,7 +36,7 @@ export async function saveEntry(entry: DraftEntry, { create = false, verb, autho
   const collection = await collectionNamed(entry.collection)
 
   if (entry.body !== undefined && !bodyKept && !settings().rawHtml.has(collection.name)) {
-    const script = await scriptInBody(entry.body, collection.components)
+    const script = await scriptInBody(entry.body)
 
     if (script !== undefined)
       return refused(entry, `The text holds ${script}, which would run as the site: write it as Markdown, or list ${collection.name} in cms({ rawHtml })`, 'body')

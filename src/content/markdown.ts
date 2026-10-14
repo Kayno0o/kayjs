@@ -83,6 +83,23 @@ export async function compileMarkdown(body: string, bodyLine: number, highlight?
   return { segments: componentSegments(html, components), headings }
 }
 
+// The HTML an entry's Markdown body puts on the page outside its components' own markup, one part per run of text, so a CMS can check what an editor wrote before saving it; throws a MarkdownError for components that do not nest.
+export async function bodyHtml(body: string): Promise<string[]> {
+  const parts: string[] = []
+  const collect = (segments: Segment[]): void => {
+    for (const segment of segments) {
+      if (typeof segment === 'string')
+        parts.push(segment)
+      else
+        collect(segment.children)
+    }
+  }
+
+  collect((await compileMarkdown(body, 1)).segments)
+
+  return parts
+}
+
 export interface RenderedMarkdown {
   html: string
   headings: Heading[]

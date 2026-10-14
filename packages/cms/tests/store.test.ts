@@ -2,7 +2,7 @@ import type { FileChange } from '../src/files'
 import type * as Content from '../src/kay/content'
 import type { CollectionInfo, SourceEntry } from '../src/kay/contract'
 import { beforeEach, describe, expect, mock, test } from 'bun:test'
-import { renderMarkdown } from 'kay/content'
+import { bodyHtml, MarkdownError } from 'kay/content'
 import { configure } from '../src/settings'
 
 const posts: CollectionInfo = { name: 'posts', kind: 'folder', dir: 'content/posts', schema: { type: 'object', properties: { title: { type: 'string' }, draft: { type: 'boolean' } } }, components: [], localized: false, draftField: 'draft' }
@@ -19,7 +19,8 @@ let stored: Record<string, SourceEntry[]>
 
 // kay's content API, answering from `stored` and recording what a loader was handed.
 const content: typeof Content = {
-  renderMarkdown,
+  bodyHtml,
+  MarkdownError,
   collections: async () => [posts, products, outside],
   collectionInfo: async name => [posts, products, outside].find(collection => collection.name === name),
   entries: async (collection, filter) => (stored[collection] ?? []).filter(entry => (filter?.slug === undefined || entry.slug === filter.slug) && (filter?.locale === undefined || entry.locale === filter.locale)),
