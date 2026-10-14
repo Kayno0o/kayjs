@@ -48,15 +48,6 @@ In production it sends over SMTP from `SMTP_HOST`, `SMTP_PORT` (465 by default),
 
 The full reference, for people and for LLMs, is [llms.txt](./llms.txt).
 
-## Develop
+## Contributing
 
-```sh
-bun install
-bun test
-bun run check
-bun run lint
-```
-
-The tests run the fixture app under `tests/fixture`, which installs this library as an app does, linked back to the repository by `scripts/link-fixture.ts`.
-
-kay ships breaking changes as minors, so this library, released with kay from kay's repository, peers on kay's minor as a tilde range, `~<major>.<minor>.0`, which `scripts/version.ts` there moves with each release.
+This library is developed in [kay's repository](https://github.com/Kayno0o/kayjs), whose [CONTRIBUTING.md](https://github.com/Kayno0o/kayjs/blob/main/CONTRIBUTING.md) says how to work on it.

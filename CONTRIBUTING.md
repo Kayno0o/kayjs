@@ -42,7 +42,10 @@ bun run check                    # types, templates included
 bun test tests/<file>.test.ts    # the tests of what you changed
 ```
 
-A change under `packages/<name>` also runs `bun run check` and `bun run test` in that folder.
+A change under `packages/<name>` also runs `bun run check` and `bun run test` in that folder. A library's tests run against the app in its `tests/fixture`, which installs the library as an app does, linked back to the checkout. Two of them need more:
+
+- kayjs-auth tests its Postgres store against the database in its `docker-compose.yml`: run `docker compose up -d` in `packages/auth` first, or set `KAYJS_AUTH_TEST_DATABASE_URL`.
+- kayjs-ui and kayjs-cms also run DOM tests on happy-dom, from `tests-dom`.
 
 `bun run test` runs the whole suite in parallel. It is slow, and CI runs it on every push, so the tests of what you changed are usually enough. Some tests need more than Bun:
 
@@ -69,6 +72,10 @@ Commit titles follow [Conventional Commits](https://www.conventionalcommits.org)
 ```
 fix(session): a running server reopens its sqlite session file once deleted or replaced
 ```
+
+## Releases
+
+kay and its libraries are released together, at one version, by a maintainer. Each library peers on kay's minor as a tilde range, `~<major>.<minor>.0`, since a minor may break. `scripts/version.ts` moves every version and peer range for each release.
 
 ## Code of conduct
 

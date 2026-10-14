@@ -75,8 +75,10 @@ export default auth.guard({ redirect: '/login' })
 
 `authPages()` in kay.config.ts serves them. With `pages: true` in `createAuth`, kayjs-auth sends users to `/auth/sign-in`, `/auth/account` and the rest. A file of the app's at one of those paths replaces that page, and a key under `auth` in its messages replaces that text.
 
-## Develop
-
-Tests need Postgres for the pg store on Postgres, which runs on an in-memory SQLite database without it: `docker compose up -d`, then `bun run test`. `bun run check` and `bun run lint` check the rest.
+## Reference
 
 The full reference, written for people and coding agents alike, is [llms.txt](llms.txt), with the sign-in action, OAuth providers, mailed links, two-factor and the gate for plain Elysia routes.
+
+## Contributing
+
+This library is developed in [kay's repository](https://github.com/Kayno0o/kayjs), whose [CONTRIBUTING.md](https://github.com/Kayno0o/kayjs/blob/main/CONTRIBUTING.md) says how to work on it.

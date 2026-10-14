@@ -61,8 +61,10 @@ import { toast } from '@kaynooo/kayjs-ui'
 Button(label="Save" variant="accent" icon="plus" onClick={() => toast.success('Saved')})
 ```
 
-## Develop
-
-`bun run test` runs the server tests, then the DOM tests on happy-dom, against the fixture app in `tests/fixture`. `bun run check` and `bun run lint` check the rest.
+## Reference
 
 The full reference, written for people and coding agents alike, is [llms.txt](llms.txt).
+
+## Contributing
+
+This library is developed in [kay's repository](https://github.com/Kayno0o/kayjs), whose [CONTRIBUTING.md](https://github.com/Kayno0o/kayjs/blob/main/CONTRIBUTING.md) says how to work on it.

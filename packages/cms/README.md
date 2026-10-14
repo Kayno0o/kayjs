@@ -49,13 +49,10 @@ Replacing or removing a file leaves the old upload stored: the unused-uploads sc
 
 An app replaces a screen by writing a page at its path, `src/routes/admin/new/[collection].kay` say, and can render the screens' own `@kaynooo/kayjs-cms/entry-editor.kay` and `@kaynooo/kayjs-cms/entry-table.kay` in it.
 
-## Develop
+## Reference
 
-```sh
-bun install
-bun run lint
-bun run check
-bun run test
-```
+The full reference, written for people and coding agents alike, is [llms.txt](llms.txt).
 
-`tests/fixture` is an app installing the package through a link, which `kay check` and `testSite` run against. See `llms.txt` for the API.
+## Contributing
+
+This library is developed in [kay's repository](https://github.com/Kayno0o/kayjs), whose [CONTRIBUTING.md](https://github.com/Kayno0o/kayjs/blob/main/CONTRIBUTING.md) says how to work on it.
