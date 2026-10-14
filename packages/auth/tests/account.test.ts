@@ -4,6 +4,7 @@ import { afterEach, describe, expect, setSystemTime, test } from 'bun:test'
 import { githubProvider } from '../src/oauth/providers'
 import { totpCode, totpStep } from '../src/totp'
 import { testApp, userRecord } from './helpers/app'
+import { authenticator } from './helpers/authenticator'
 import { mailbox } from './helpers/mail'
 
 const PASSWORD = 'correct horse battery'
@@ -47,10 +48,10 @@ describe('changing the password', () => {
 describe('the actions that re-prove the user', () => {
   type Browser = ReturnType<ReturnType<typeof testApp>['browser']>
 
-  // `codeOnly` is whether an account with a second factor refuses the password alone, as what adds a way in does; changing the password or the email is asked of whoever knows the password.
+  // `codeOnly` is whether an account with a second factor refuses the password alone, as what adds a way in or moves where its reset links go does; changing the password is asked of whoever knows the password.
   const actions: [string, boolean, (ada: Browser, proof: Proof) => Promise<any>][] = [
     ['changing the password', false, (ada, proof) => ada.call('changePassword', proof, 'a first password')],
-    ['changing the email', false, (ada, proof) => ada.call('changeEmail', proof, 'ada@new.test')],
+    ['changing the email', true, (ada, proof) => ada.call('changeEmail', proof, 'ada@new.test')],
     ['adding a passkey', true, (ada, proof) => ada.call('passkeyRegistrationOptions', proof)],
     ['linking a provider', true, (ada, proof) => ada.call('linkProvider', 'github', proof)],
   ]
@@ -122,6 +123,74 @@ describe('the actions that re-prove the user', () => {
         expect(await act(ada, { password: PASSWORD })).not.toHaveProperty('error')
       }
     })
+  })
+})
+
+describe('changing the email on an account with a second factor', () => {
+  // Ada with two-factor on, and the secret her authenticator holds; `password: false` makes the account a passwordless one.
+  async function twoFactor({ password = true } = {}) {
+    const app = testApp({
+      url: 'https://site.test',
+      site: 'Site',
+      admin: 'admin',
+      email: { mailer: mailbox().mailer, links: { 'verify-email': '/v', 'reset-password': '/r', 'magic-link': '/m', 'change-email': '/c' }, requireVerified: false },
+    })
+    const ada = app.browser()
+
+    if (password) {
+      await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
+    }
+    else {
+      await app.store.users.create(userRecord({ id: 'u1', email: 'ada@example.com' }))
+      await ada.fetch('/sign-in/u1', POST)
+    }
+
+    const { setup } = await ada.call('setUpTwoFactor', password ? { password: PASSWORD } : {})
+
+    await ada.call('enableTwoFactor', await totpCode(setup.secret, totpStep()))
+
+    return { ...app, ada, secret: setup.secret as string }
+  }
+
+  test('refuses the password alone, takes an authenticator code once, and refuses it spent', async () => {
+    const { ada, secret } = await twoFactor()
+    const code = await totpCode(secret, totpStep() + 1)
+
+    expect(await ada.call('changeEmail', { password: PASSWORD }, 'ada@new.test')).toEqual({ ok: false, error: 'proof' })
+    expect(await ada.call('changeEmail', { code }, 'ada@new.test')).not.toHaveProperty('error')
+    expect(await ada.call('changeEmail', { code }, 'ada@new.test')).toEqual({ ok: false, error: 'proof' })
+  })
+
+  test('takes a passkey', async () => {
+    const { ada, secret } = await twoFactor()
+    const device = authenticator()
+    const { options } = await ada.call('passkeyRegistrationOptions', { code: await totpCode(secret, totpStep() + 1) })
+
+    await ada.call('registerPasskey', await device.create(options))
+
+    const proof = await ada.call('passkeyProofOptions')
+
+    expect(await ada.call('changeEmail', { passkey: await device.get(proof.options) }, 'ada@new.test')).not.toHaveProperty('error')
+  })
+
+  test('asks a passwordless account for the code', async () => {
+    const { ada, secret } = await twoFactor({ password: false })
+
+    expect(await ada.call('changeEmail', {}, 'ada@new.test')).toEqual({ ok: false, error: 'proof' })
+    expect(await ada.call('changeEmail', { code: await totpCode(secret, totpStep() + 1) }, 'ada@new.test')).not.toHaveProperty('error')
+  })
+
+  test('refuses an admin acting as the user, code or not', async () => {
+    const { ada, browser, store, secret } = await twoFactor()
+    const root = browser()
+    const { user } = await root.call('register', { email: 'root@example.com', password: PASSWORD })
+    const adaId = (await store.users.findByEmail('ada@example.com'))!.id
+
+    await store.users.update(user.id, { roles: ['admin'] })
+
+    expect(await root.call('impersonate', adaId)).toEqual({ ok: true })
+    expect(await root.call('changeEmail', { code: await totpCode(secret, totpStep() + 1) }, 'ada@new.test')).toEqual({ ok: false, error: 'impersonating' })
+    expect(await ada.json('/me')).toMatchObject({ email: 'ada@example.com' })
   })
 })
 

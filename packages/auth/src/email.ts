@@ -214,7 +214,7 @@ export async function signInWithMagicLink(state: RequestState, token: string): P
 
 // Mails the new address a link confirming it; the account keeps the old one until then.
 export async function changeEmail(state: RequestState, proof: Proof, email: string): Promise<ChangeEmailResult> {
-  const proved = await reprove(state, proof)
+  const proved = await reprove(state, proof, { secondFactor: true })
 
   if (!proved.ok)
     return proved

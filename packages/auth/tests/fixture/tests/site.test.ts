@@ -165,6 +165,9 @@ describe('the prebuilt pages', () => {
     const account = await visitor.submit(verify, { code: await totpCode(secret, totpStep() + 1) }, { from: '/auth/two-factor' })
 
     expect(text(account, '#kayjs-auth-email')).toBe('totp@example.com')
+    // Moving the address, and with it the reset links, asks for the code rather than the password.
+    expect(account.find('input[name="code"]')).toHaveLength(1)
+    expect(account.find('input[name="password"]')).toHaveLength(0)
 
     // Both codes of the authenticator were spent, so a recovery code proves the second factor.
     const off = await visitor.submit(disable, { code: recoveryCodes[0]! }, { from: '/auth/account/security' })

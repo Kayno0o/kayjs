@@ -87,6 +87,10 @@ form(action={signIn})
 
 `register({ email, password, username })` creates an account the same way, answering `errors` by field. With a mailer, it signs no one in until the address is verified, and answers a held address as a free one, mailing its holder instead; `email: { requireVerified: false }` signs in at once and answers `'taken'` for a held address, telling anyone which addresses have an account.
 
+## Account changes
+
+Changing what protects the account (`changePassword`, `changeEmail`, `deleteAccount`, the second factor, passkeys, linked providers, tokens) takes a `proof`: `{ password }`, `{ code }` from the authenticator or a recovery code, or `{ passkey }`. With two-factor on, `changeEmail`, `disableTwoFactor`, `regenerateRecoveryCodes`, `passkeyRegistrationOptions` and `linkProvider` refuse the password alone and take the code or a passkey.
+
 ## Guarding routes
 
 A `_guard.ts` default-exports the guard. An anonymous visitor goes to `redirect`, one without the role gets a 403:

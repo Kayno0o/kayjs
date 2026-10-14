@@ -74,7 +74,7 @@ if features.email
     form.flex.flex-col.gap-3(action={changeEmail})
       FormField(label={t('auth.account.profile.newEmail')} issue={emailRefused && 'email' in emailRefused ? issue('email', emailRefused.email) : undefined} required)
         input(name="email" type="email" autocomplete="email" required)
-      Proof(user={user})
+      Proof(user={user} secondFactor)
       if emailSent
         Message(tone="success" text={t('auth.account.profile.changeSent', { email: emailSent })})
       if emailRefused && 'error' in emailRefused
