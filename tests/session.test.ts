@@ -1,6 +1,6 @@
 import type { Action } from '../src/runtime'
 import type { SessionStore } from '../src/server'
-import { rm } from 'node:fs/promises'
+import { rename, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { Database } from 'bun:sqlite'
@@ -487,21 +487,49 @@ describe('sessions', () => {
     }
   })
 
-  it('opens a sqlite store afresh once its file was deleted and recreated at the same path', async () => {
+  it('opens a sqlite file afresh once deleted and recreated at the same path, when the config is read again', async () => {
     const file = join(await scratchDir('sessions-'), 'sessions.sqlite')
-    const first = sqliteStore(file)
+    const store = sqliteStore(file)
 
-    await first.set('a', { userId: 1 }, 60)
-    await rm(file)
-    await rm(`${file}-wal`, { force: true })
-    await rm(`${file}-shm`, { force: true })
+    await store.set('a', { userId: 1 }, 60)
+    await deleteSqlite(file)
 
-    const second = sqliteStore(file)
+    expect(sqliteStore(file)).toBe(store)
+    expect(await store.get('a')).toBeUndefined()
+    await store.set('b', { userId: 2 }, 60)
+    expect(readSessionIds(file)).toEqual(['b'])
+  })
 
-    expect(second).not.toBe(first)
-    expect(await second.get('a')).toBeUndefined()
-    await second.set('b', { userId: 2 }, 60)
-    expect(sqliteStore(file)).toBe(second)
+  it('opens a sqlite file afresh under a running server once deleted or replaced, looking at most every few seconds', async () => {
+    const dir = await scratchDir('sessions-')
+    const file = join(dir, 'sessions.sqlite')
+    const store = sqliteStore(file)
+
+    try {
+      setSystemTime(new Date())
+      await store.set('a', { userId: 1 }, 60)
+      await deleteSqlite(file)
+      // Within the few seconds, the deleted file's handle still answers.
+      expect(await store.get('a')).toEqual({ userId: 1 })
+
+      setSystemTime(new Date(Date.now() + 10_000))
+      await store.set('b', { userId: 2 }, 60)
+      expect(readSessionIds(file)).toEqual(['b'])
+
+      const replacement = new Database(join(dir, 'replacement.sqlite'))
+
+      replacement.run('CREATE TABLE kay_sessions (id TEXT PRIMARY KEY, data TEXT NOT NULL, expires INTEGER NOT NULL)')
+      replacement.run('INSERT INTO kay_sessions (id, data, expires) VALUES (?, ?, ?)', ['c', stringify({ userId: 3 }), Date.now() + 60_000])
+      replacement.close()
+      // Its write-ahead log goes too, which SQLite would otherwise replay over the file taking its place.
+      await deleteSqlite(file)
+      await rename(join(dir, 'replacement.sqlite'), file)
+      setSystemTime(new Date(Date.now() + 10_000))
+      expect(await store.get('c')).toEqual({ userId: 3 })
+    }
+    finally {
+      setSystemTime()
+    }
   })
 
   it('takes a store of the app\'s own, and refuses a short or published secret or a cookie too big to keep', async () => {
@@ -627,3 +655,18 @@ describe('a page read by who sent it', () => {
     expect(prerendered.headers.get('cache-control')).toBeNull()
   })
 })
+
+async function deleteSqlite(file: string) {
+  await Promise.all(['', '-wal', '-shm'].map(async suffix => rm(`${file}${suffix}`, { force: true })))
+}
+
+function readSessionIds(file: string): string[] {
+  const db = new Database(file)
+
+  try {
+    return db.query<{ id: string }, []>('SELECT id FROM kay_sessions ORDER BY id').all().map(row => row.id)
+  }
+  finally {
+    db.close()
+  }
+}

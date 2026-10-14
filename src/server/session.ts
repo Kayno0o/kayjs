@@ -83,9 +83,11 @@ const TAG_BYTES = 16
 const SWEEP_EVERY = 1000
 // How often a SQLite store drops expired sessions on its own, so a quiet site does not keep them.
 const SWEEP_MS = 60 * 60 * 1000
+// How often a SQLite store looks whether its file was deleted or replaced, at most.
+const FILE_CHECK_MS = 5000
 
 type SqliteSessionStore = SessionStore & { deleteWhere: NonNullable<SessionStore['deleteWhere']> }
-const sqliteStores = new Map<string, { store: SqliteSessionStore, ino: string | undefined, close: () => void }>()
+const sqliteStores = new Map<string, { store: SqliteSessionStore, reopen: () => void }>()
 
 // Sessions for kay pages and plain Elysia routes alike, as `session` in the context: `ctx.locals.session` in a page, an action or a guard.
 // The cookie is read on first use and written only when the session changed or is due an extension; it is HttpOnly, SameSite=Lax, and over https Secure and named `__Host-` unless shared under a domain.
@@ -386,30 +388,67 @@ export function memoryStore(): SessionStore & { deleteWhere: NonNullable<Session
 }
 
 // Sessions in a SQLite file, surviving restarts and shared by the processes on one machine.
-// One store per file, so a config read again, as in development, opens no second database and sweep timer; a file deleted and recreated at the same path is opened afresh.
+// One store per file, so a config read again, as in development, opens no second database and sweep timer; a file deleted or replaced at the same path is opened afresh, by a running server too.
 export function sqliteStore(path: string): SqliteSessionStore {
-  const file = path === ':memory:' || path === '' ? undefined : resolve(path)
-  const opened = file === undefined ? undefined : sqliteStores.get(file)
+  if (path === ':memory:' || path === '')
+    return openSqliteStore(path).store
 
-  if (opened && fileId(file!) === opened.ino)
+  const file = resolve(path)
+  const opened = sqliteStores.get(file)
+
+  if (opened) {
+    opened.reopen()
+
     return opened.store
+  }
 
-  opened?.close()
+  const created = fileStore(file)
 
-  const created = openSqliteStore(path)
-
-  if (file !== undefined)
-    sqliteStores.set(file, { ...created, ino: fileId(file) })
+  sqliteStores.set(file, created)
 
   return created.store
 }
 
+// A store that keeps its object while the database under it changes, so a request holding it never meets a closed one; each call is synchronous, so none runs across a reopen.
+function fileStore(file: string): { store: SqliteSessionStore, reopen: () => void } {
+  let opened = openSqliteStore(file)
+  let id = fileId(file)
+  let checked = Date.now()
+  const reopen = () => {
+    checked = Date.now()
+
+    if (fileId(file) === id)
+      return
+
+    opened.close()
+    opened = openSqliteStore(file)
+    id = fileId(file)
+  }
+  const current = () => {
+    if (Date.now() - checked >= FILE_CHECK_MS)
+      reopen()
+
+    return opened.store
+  }
+
+  return {
+    reopen,
+    store: {
+      get: async id => current().get(id),
+      set: async (id, data, maxAge) => current().set(id, data, maxAge),
+      delete: async id => current().delete(id),
+      deleteWhere: async match => current().deleteWhere(match),
+    },
+  }
+}
+
 // The file's device, inode and creation time, which a file recreated at the same path does not keep whole; undefined once it is gone.
+// The creation time needs a filesystem reporting a real one: some network or overlay mounts report 0, or the change time, which every write moves, so a creation time equal to it is left out.
 function fileId(file: string): string | undefined {
   try {
     const stat = statSync(file, { throwIfNoEntry: false })
 
-    return stat && `${stat.dev}:${stat.ino}:${stat.birthtimeMs}`
+    return stat && `${stat.dev}:${stat.ino}:${stat.birthtimeMs === stat.ctimeMs ? '' : stat.birthtimeMs}`
   }
   catch {
     return undefined
