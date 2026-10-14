@@ -124,7 +124,9 @@ button(onClick={() => name.set('')}) Clear
 
 A spread sets `innerHTML` only from markup that `sanitizeHtml`, `trustHtml` or an icon import vouched for, and drops any other value, with a warning in development. An icon keeps drawing, `svg({...Home})`, and a record's plain-string `innerHTML` no longer renders as markup.
 
-The vouching travels with the value from the server to the browser in island props, action results and event streams. A string derived from a vouched one, such as `markup + '<b>'`, is plain again.
+The vouching travels with the value from the server to the browser in island props, action results and event streams, and from nowhere else: a request's input, a cookie and `localStorage` bring plain strings. A string derived from a vouched one, such as `markup + '<b>'`, is plain again.
+
+The server keeps what was vouched for in one registry for every user, and only the markup most recently vouched for. Call `trustHtml` where the markup is used rather than once for a constant kept for hours; a dropped value is logged once in production, and each time in development.
 
 This is a breaking change in the next minor. To upgrade, pass the value through `sanitizeHtml(text)` for markup a user wrote, or `trustHtml(text)` for markup the app made, before it reaches the spread.
 

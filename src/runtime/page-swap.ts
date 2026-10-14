@@ -4,7 +4,7 @@ import { ISLAND } from './markers'
 import { historyState, leave, navigation, pageKey, prefetched, restoreScroll, saveScroll, takeFormChecks } from './navigation'
 import { ROOT_ATTRIBUTES } from './root'
 import { NAVIGATE_HEADER, RELOAD_HEADER } from './swap'
-import { decodeValue } from './wire'
+import { decodeServerValue } from './wire'
 
 // The page swap itself, which `./navigate` loads once a visitor is about to follow a link, and `./forms` once a form is posted.
 // The body's content becomes the next page's, morphed so what renders again stays the same element, islands kept only by `persist` or a refresh.
@@ -476,7 +476,7 @@ function swapBody(next: Document, policy: Policy): void {
         else
           live.dataset.props = props
 
-        live._$p?.(props === undefined ? {} : decodeValue(props) as object)
+        live._$p?.(props === undefined ? {} : decodeServerValue(props) as object)
       }
     }
   }

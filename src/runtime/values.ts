@@ -1,6 +1,10 @@
 // How both renderers read the values a template gives, kay/html into markup and kay/dom into nodes, so a page hydrates into what the server wrote.
 
+import { kayLog } from './log'
 import { isVouched } from './safe-html'
+
+// Whether production has warned of a dropped `innerHTML` yet.
+let dropped = false
 
 const ARIA = /^aria-/i
 // A name HTML reads as one attribute: a key holding a space, a quote, `=`, `/` or `>` would open others.
@@ -48,13 +52,17 @@ export function spreadAttributes<T>(source: T): T {
   return kept as T
 }
 
-// The markup of an `innerHTML` a spread brings, or nothing when none vouched for it, with a warning in development.
+// The markup of an `innerHTML` a spread brings, or nothing when none vouched for it: warned of in development each time, in production once per process.
 function vouchedMarkup(value: unknown): unknown {
   if (value == null || isVouched(value))
     return value
 
-  if (process.env.NODE_ENV !== 'production')
-    console.warn('[kay] a spread brought an `innerHTML` that nothing vouched for and it was dropped: pass sanitizeHtml(value) for markup a user wrote, or trustHtml(value) for markup the app made. Markup that went through JSON elsewhere than an island prop has to be vouched for again.')
+  const production = process.env.NODE_ENV === 'production'
+
+  if (!production || !dropped) {
+    dropped = production
+    kayLog('warn', 'a spread brought an `innerHTML` that nothing vouched for, so it was dropped: pass sanitizeHtml(value) for markup a user wrote, or trustHtml(value) for markup the app made, called where it is used, as the process keeps only the markup most recently vouched for, for every user. Markup read from a request, a cookie or localStorage has to be vouched for again.')
+  }
 
   return undefined
 }

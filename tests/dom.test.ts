@@ -141,6 +141,34 @@ describe('a spread onto an element in the browser', () => {
   })
 })
 
+describe('a spread onto an element in the browser, as it changes', () => {
+  it('checks a getter on each read, warns when it turns raw, and reads a forged cookie as nothing vouched for', async () => {
+    const forged = '[["SafeHtml",1],"!<img src=x onerror=alert(1)>"]'
+
+    document.cookie = `forged=${encodeURIComponent(forged)}`
+
+    const { root, dispose } = await mountKay({
+      'main.kay': '---\nimport { persisted, signal, trustHtml } from \'kay\'\n\nconst safe = trustHtml(\'<b>live-dom-1</b>\')\nconst turn = signal(0)\nconst stored = persisted(\'forged\', \'\')\n---\ndiv.live({...{ get innerHTML() { return turn() === 0 ? safe : \'<i>live-raw-1</i>\' } }})\nbutton(onClick={() => turn.set(1)}) turn\ndiv.cookie({...{ innerHTML: stored() }})\n',
+    })
+    const warn = spyOn(console, 'warn').mockImplementation(() => undefined)
+
+    try {
+      expect(root.querySelector('.live')!.innerHTML).toBe('<b>live-dom-1</b>')
+      expect(root.querySelector('.cookie')!.innerHTML).toBe('')
+      expect(warn).not.toHaveBeenCalled()
+      root.querySelector('button')!.click()
+      await settle()
+      expect(root.querySelector('.live')!.innerHTML).toBe('')
+      expect(String(warn.mock.calls[0]![0])).toContain('nothing vouched for')
+    }
+    finally {
+      warn.mockRestore()
+      document.cookie = 'forged=; max-age=0'
+      await dispose()
+    }
+  })
+})
+
 describe('component class', () => {
   it('hands a component the merged class as one string, following what it merges', async () => {
     const { root, dispose } = await mountKay({

@@ -1,6 +1,6 @@
 import { withBase } from './base'
 import { effect, onCleanup, onMount, ownSignal } from './reactive'
-import { decodeValue } from './wire'
+import { decodeServerValue } from './wire'
 
 // Set by the server on every module it mounts under `/api`, and by the browser build on the stub standing in for one: where the module's routes are served.
 export const API_MOUNT = Symbol.for('kay.api')
@@ -358,7 +358,7 @@ export function readEvents<T>(request: (signal: AbortSignal) => Promise<Response
         let value: T
 
         try {
-          value = decodeValue(data) as T
+          value = decodeServerValue(data) as T
         }
         catch (error) {
           console.error('kay: an event stream sent a value that does not decode', error)

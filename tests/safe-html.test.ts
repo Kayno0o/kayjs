@@ -8,7 +8,7 @@ import { island } from '../src/runtime/island.server'
 import { isVouched, vouch } from '../src/runtime/safe-html'
 import { sanitizeHtml, trustHtml } from '../src/runtime/sanitize'
 import { sendValue } from '../src/runtime/send'
-import { decodeValue, encodeValue } from '../src/runtime/wire'
+import { decodeServerValue, decodeValue, encodeValue } from '../src/runtime/wire'
 import { scratchDir } from './scratch'
 
 const render = (tag: string, source: object) => element(tag, [spreadAttributes(source)]).t
@@ -29,20 +29,38 @@ describe('vouched markup', () => {
     expect(isVouched('')).toBe(true)
   })
 
-  it('is bounded: the oldest recent markup goes first, a use keeps it, and an icon stays', () => {
-    const big = (mark: string) => mark + 'x'.repeat(6_000_000)
-    const kept = vouch(big('a'), false)
+  it('is bounded: markup nothing used for a whole generation is forgotten, a use keeps it, and an icon stays', () => {
+    const big = (mark: string) => mark + 'x'.repeat(5_000_000)
     const icon = vouch('<path d="icon-forever"/>', true)
 
-    vouch(big('b'))
-    expect(isVouched(kept)).toBe(true)
-    vouch(big('c'))
+    for (const mark of 'abcd')
+      vouch(big(mark))
+
+    expect(isVouched(big('a'))).toBe(false)
     expect(isVouched(big('b'))).toBe(false)
-    expect(isVouched(kept)).toBe(true)
-    vouch(big('d'))
-    vouch(big('e'))
-    expect(isVouched(kept)).toBe(false)
+    // Used, so it moves to the newer generation and outlasts the next one.
+    expect(isVouched(big('c'))).toBe(true)
+
+    for (const mark of 'ef')
+      vouch(big(mark))
+
+    expect(isVouched(big('c'))).toBe(true)
+    expect(isVouched(big('d'))).toBe(false)
+
+    for (const mark of 'ghij')
+      vouch(big(mark))
+
+    expect(isVouched(big('c'))).toBe(false)
     expect(isVouched(icon)).toBe(true)
+  })
+
+  it('leaves what is no string alone, so the registry is not spoilt', () => {
+    const kept = trustHtml('<b>before-null-1</b>')
+
+    expect(trustHtml(null as unknown as string)).toBeNull()
+    expect(trustHtml(5 as unknown as string) as unknown).toBe(5)
+    expect(isVouched(kept)).toBe(true)
+    expect(isVouched(5)).toBe(false)
   })
 })
 
@@ -71,16 +89,19 @@ describe('a spread onto an element', () => {
     }
   })
 
-  it('drops it without a warning in production, and leaves null and undefined alone', () => {
+  it('warns of a dropped innerHTML once per process in production, and leaves null and undefined alone', () => {
     const warn = spyOn(console, 'warn').mockImplementation(() => undefined)
 
     try {
-      process.env.NODE_ENV = 'production'
-      expect(render('div', { innerHTML: '<b>raw</b>' })).toBe('<div></div>')
       process.env.NODE_ENV = 'development'
       expect(render('div', { innerHTML: null })).toBe('<div></div>')
       expect(render('div', { innerHTML: undefined })).toBe('<div></div>')
       expect(warn).not.toHaveBeenCalled()
+      process.env.NODE_ENV = 'production'
+      expect(render('div', { innerHTML: '<b>raw-prod-1</b>' })).toBe('<div></div>')
+      expect(render('div', { innerHTML: '<b>raw-prod-2</b>' })).toBe('<div></div>')
+      expect(warn).toHaveBeenCalledTimes(1)
+      expect(String(warn.mock.calls[0]![0])).toContain('most recently vouched for')
     }
     finally {
       warn.mockRestore()
@@ -118,32 +139,53 @@ describe('a spread onto an element', () => {
 })
 
 describe('markup across JSON', () => {
-  it('is vouched for again where it arrives from the server: island props, action results and event streams', () => {
-    const markup = trustHtml('<b>island-prop-1</b>')
-    const text = encodeValue({ html: markup, plain: '<b>plain-prop-1</b>', nested: [markup] })
+  const encoded = (value: unknown) => decodeServerValue(encodeValue(value))
 
+  it('survives an encode and a decode as the same markup, an icon prop, a sanitized prop and a nested one included', () => {
+    const file = installedIconSets(join(import.meta.dir, 'fixtures/icons')).get('tabler')!
+    const icon = fileIconProps(file, 'home')!
+    const sanitized = sanitizeHtml('<b>sanitized-prop-1</b><script>x</script>')
+    const text = encodeValue({ icon, sanitized, nested: [{ deep: [sanitized] }], map: new Map([['k', icon.innerHTML]]), plain: 'text' })
+    const back = decodeServerValue(text) as { icon: typeof icon, sanitized: string, nested: [{ deep: string[] }], map: Map<string, string>, plain: string }
+
+    expect(back).toEqual({ icon, sanitized, nested: [{ deep: [sanitized] }], map: new Map([['k', icon.innerHTML]]), plain: 'text' })
     expect(text).toContain('"SafeHtml"')
-    expect(text.match(/SafeHtml/g)).toHaveLength(1)
-    expect(text).not.toContain('["SafeHtml",3]')
-
-    // A browser has no mark of its own: the text names the markup the server vouched for.
-    const props = decodeValue('[{"html":1},["SafeHtml",2],"<b>other-realm-1</b>"]') as { html: string }
-
-    expect(props.html).toBe('<b>other-realm-1</b>')
-    expect(isVouched(props.html)).toBe(true)
+    expect(isVouched(back.icon.innerHTML) && isVouched(back.sanitized) && isVouched(back.nested[0].deep[0]!)).toBe(true)
   })
 
-  it('arrives plain when nothing vouched for it on the server, and from the browser', () => {
+  it('writes the markup behind a mark, so the entry never points at itself', () => {
+    const text = encodeValue({ html: trustHtml('<b>entry-1</b>') })
+
+    expect(text).toBe(String.raw`[{"html":1},["SafeHtml",2],"!\u003Cb>entry-1\u003C/b>"]`)
+    expect(decodeServerValue(text)).toEqual({ html: '<b>entry-1</b>' })
+  })
+
+  it('reads a plain string equal to a vouched one as that string, and vouches again what only the server vouched for', () => {
+    const markup = trustHtml('<b>twin-1</b>')
+
+    expect(encoded({ vouched: markup, plain: '<b>twin-1</b>' })).toEqual({ vouched: markup, plain: markup })
+
+    // A browser that never vouched for it: the text alone names it.
+    const fresh = decodeServerValue('[{"html":1},["SafeHtml",2],"!<b>only-the-server-1</b>"]') as { html: string }
+
+    expect(isVouched(fresh.html)).toBe(true)
+  })
+
+  it('arrives plain when nothing vouched for it, and from the browser', () => {
     const text = encodeValue({ html: '<b>unvouched-1</b>' })
 
     expect(text).not.toContain('SafeHtml')
-    expect(isVouched((decodeValue(text) as { html: string }).html)).toBe(false)
+    expect(isVouched((decodeServerValue(text) as { html: string }).html)).toBe(false)
     expect(sendValue({ html: trustHtml('<b>sent-1</b>') })).not.toContain('SafeHtml')
   })
 
-  it('is no type a request\'s input can use to vouch for its own text', () => {
-    expect(() => decodeCall('[{"html":1},["SafeHtml",2],"<b>forged-1</b>"]')).toThrow('malformed')
-    expect(isVouched('<b>forged-1</b>')).toBe(false)
+  it('is no type text the browser or a request holds can use to vouch for its own markup', () => {
+    const forged = '[{"html":1},["SafeHtml",2],"!<img src=x onerror=alert(1)>"]'
+
+    expect(() => decodeValue(forged)).toThrow('malformed')
+    expect(() => decodeCall(forged)).toThrow('malformed')
+    expect(isVouched('<img src=x onerror=alert(1)>')).toBe(false)
+    expect(() => decodeServerValue('[{"html":1},["SafeHtml",2],5]')).toThrow()
   })
 
   it('goes into an island\'s data-props as the SafeHtml type only for markup vouched for', () => {

@@ -56,7 +56,7 @@ export function iconProps(file: string, name: string): IconProps | undefined {
 }
 
 // Where the runtime keeps the mark an icon's markup carries, which the module marks it with.
-const VOUCH_MODULE = fileURLToPath(new URL('../runtime/safe-html.ts', import.meta.url))
+export const VOUCH_MODULE = fileURLToPath(new URL('../runtime/safe-html.ts', import.meta.url))
 
 // The module an icon import loads, or one throwing on use with what went wrong.
 export function iconModule(sets: Map<string, string>, specifier: string): string {

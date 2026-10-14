@@ -1,0 +1,6 @@
+---
+import { trustHtml } from 'kay'
+import Vouched from './vouched.kay'
+---
+main
+  Vouched(markup={trustHtml('<b>island-vouched-1</b>')} raw="<i>island-raw-1</i>")

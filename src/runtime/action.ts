@@ -11,7 +11,7 @@ import { pageData } from './page-data'
 import { ownSignal, undoable, untrack } from './reactive'
 import { sendValue } from './send'
 import { FAILURE_HEADER, PAGE_HEADER, REDIRECT_HEADER, WORK_HEADER, WORK_SCRIPT } from './swap'
-import { decodeValue, unflattenValue } from './wire'
+import { decodeServerValue, decodeValue, unflattenValue } from './wire'
 
 const ACTION = Symbol.for('kay.action')
 const DAY = 86_400
@@ -445,7 +445,7 @@ export function formError(target: unknown, field: string): string | undefined {
 const refusedAt = new WeakMap<ActionError, string>()
 
 function pageOutcome(): Outcome | undefined {
-  return typeof document === 'undefined' ? undefined : pageData<Outcome>(`script[${OUTCOME_SCRIPT}]`, decodeValue)[0]
+  return typeof document === 'undefined' ? undefined : pageData<Outcome>(`script[${OUTCOME_SCRIPT}]`, decodeServerValue)[0]
 }
 
 // Posts a call, counting the ones in flight; a call that redirects never settles, so the action stays pending while the page goes, unless the visitor stays or already went elsewhere.
@@ -641,7 +641,7 @@ export async function readActionResponse<Output>(response: Response, action: str
   const body = await response.text()
 
   if (!response.ok) {
-    const failed = response.headers.get(FAILURE_HEADER) === null ? {} : decodeValue(body) as { errors?: Record<string, string>, data?: unknown }
+    const failed = response.headers.get(FAILURE_HEADER) === null ? {} : decodeServerValue(body) as { errors?: Record<string, string>, data?: unknown }
 
     const error = new ActionError(response.status, body, failed.errors, failed.data)
 
@@ -650,7 +650,7 @@ export async function readActionResponse<Output>(response: Response, action: str
     throw error
   }
 
-  return (body === '' ? undefined : decodeValue(body)) as Output
+  return (body === '' ? undefined : decodeServerValue(body)) as Output
 }
 
 // Through the swap once it took over the app's links; a site with `navigation: false` loads the page, asking the leave guards first as `navigate()` would.

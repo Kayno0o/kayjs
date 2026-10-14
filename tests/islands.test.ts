@@ -312,4 +312,27 @@ describe('islands', () => {
     expect(rows()).toEqual([['product low', '5.00', 'Tea: 5.001 left'], ['product', '18.00', 'Mug: 18.00']])
     expect(issues).toEqual([])
   })
+
+  it('hydrates an island whose prop the server vouched for, keeping its markup in a spread and dropping a plain string\'s', async () => {
+    const { default: Fixture } = await import(join(fixtures, 'vouchedpage.kay')) as { default: () => unknown }
+    const html = child(Fixture())
+    const warn = spyOn(console, 'warn').mockImplementation(() => undefined)
+
+    document.body.innerHTML = html
+    expect(document.querySelector('.good')!.innerHTML).toBe('<b>island-vouched-1</b>')
+    expect(document.querySelector('.bad')!.innerHTML).toBe('')
+    expect(document.querySelector('slot')!.getAttribute('data-props')).toContain('SafeHtml')
+
+    const { hydrateAgain } = await import(join(outdir, 'client.js')) as { hydrateAgain: () => Promise<void> }
+    const good = document.querySelector('.good')!
+
+    await hydrateAgain()
+    document.querySelector('button.bump')!.dispatchEvent(new Event('click', { bubbles: true }))
+    await new Promise(resolve => setTimeout(resolve, 30))
+    warn.mockRestore()
+    expect(document.querySelector('.good')).toBe(good)
+    expect(good.innerHTML).toBe('<b>island-vouched-1</b>')
+    expect(document.querySelector('.bad')!.innerHTML).toBe('')
+    expect(document.querySelector('button.bump')!.textContent).toBe('Bumped 1')
+  })
 })

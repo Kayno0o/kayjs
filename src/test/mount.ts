@@ -1,5 +1,6 @@
 import { mkdir, mkdtemp, rm, stat } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
+import { VOUCH_MODULE } from '../build/icons'
 import { kay } from '../build/plugin'
 import { loadConfig } from '../config'
 import { projectPaths } from '../project'
@@ -84,6 +85,14 @@ export async function mount(file: string, props: Record<string, unknown> = {}): 
   } }
 }
 
+// The bundle shares what the test process vouched for, such as an icon the test builds, as an island shares it with the page; its own copy would vouch for nothing.
+const sharedMarks: Bun.BunPlugin = {
+  name: 'kay-shared-marks',
+  setup(build) {
+    build.onResolve({ filter: /(?:^|[/\\])safe-html(?:\.ts)?$/ }, () => ({ path: VOUCH_MODULE, external: true }))
+  },
+}
+
 // Bundled from under the project's `.kay`, where `kay/dom` resolves to the kay it installed, with its libraries' settings applied.
 async function bundle(root: string, file: string): Promise<string> {
   const work = await mkdtemp(join(await testDir(root), 'mount-'))
@@ -95,7 +104,7 @@ async function bundle(root: string, file: string): Promise<string> {
     let output: Bun.BuildArtifact
 
     try {
-      output = (await Bun.build({ entrypoints: [join(work, 'entry.ts')], outdir: join(work, 'out'), target: 'browser', plugins: [kay({ root, settings })] })).outputs[0]!
+      output = (await Bun.build({ entrypoints: [join(work, 'entry.ts')], outdir: join(work, 'out'), target: 'browser', plugins: [kay({ root, settings }), sharedMarks] })).outputs[0]!
     }
     catch (error) {
       // Bun throws on a failed build, its messages in `errors`.

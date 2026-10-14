@@ -3,12 +3,22 @@ import { isVouched, vouch } from './safe-html'
 
 // Island props, action calls and the flash cookie go as devalue text: JSON that also carries Dates, Maps, Sets, bigints, URLs, RegExps, undefined and shared references.
 // The server writes it with devalue's stringify, whose errors name the path of what it cannot send; the browser writes it with `sendValue` (send.ts) and kay reads it back itself, so no client chunk ships devalue.
-// Markup the server vouched for stays vouched for where it arrives, in island props, action results and event streams. What the browser sends has no such type, and a request's input is read with revivers of its own, so no caller can mark its own text.
+// Markup the server vouched for stays vouched for where it arrives, as a `SafeHtml` entry holding the markup after a mark: devalue stores a string once by value, so a payload equal to the string itself would point at its own entry.
 const SAFE_HTML = 'SafeHtml'
-const READ: Record<string, Reviver> = { [SAFE_HTML]: (markup: string) => vouch(markup) }
+const MARK = '!'
 
 export function encodeValue(value: unknown): string {
-  return stringify(value, { [SAFE_HTML]: markup => typeof markup === 'string' && isVouched(markup) && markup })
+  return stringify(value, { [SAFE_HTML]: markup => typeof markup === 'string' && isVouched(markup, false) && MARK + markup })
+}
+
+// The revivers for text the server wrote, island props, action results and event streams: the only text whose `SafeHtml` entries vouch for markup. What the browser sends, a cookie and localStorage are read without them, so no caller can vouch for its own text.
+export const serverWritten: Record<string, Reviver> = {
+  // `slice` throws on a payload that is no string.
+  [SAFE_HTML]: (text: string) => vouch(text.slice(1)),
+}
+
+export function decodeServerValue(text: string): unknown {
+  return decodeValue(text, serverWritten)
 }
 
 // Reads back a custom type, from what the stringify reducer of the same name returned.
@@ -29,12 +39,12 @@ const FROM_TEXT: Record<string, (text: string, flags?: string) => unknown> = {
   URLSearchParams: text => new URLSearchParams(text),
 }
 
-export function decodeValue(text: string, revivers: Record<string, Reviver> = READ): unknown {
+export function decodeValue(text: string, revivers: Record<string, Reviver> = {}): unknown {
   return unflattenValue(JSON.parse(text), revivers)
 }
 
 // The value devalue's stringify wrote, from its text as JSON.parse returns it; throws on anything stringify cannot have written.
-export function unflattenValue(flat: unknown, revivers: Record<string, Reviver> = READ): unknown {
+export function unflattenValue(flat: unknown, revivers: Record<string, Reviver> = {}): unknown {
   const values = Array.isArray(flat) ? flat as unknown[] : []
   const decoded = new Map<unknown, unknown>()
   // The custom types being revived, whose payload may not lead back to them.

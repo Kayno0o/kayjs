@@ -1,0 +1,10 @@
+---
+import { signal } from 'kay'
+
+const { markup, raw } = props<{ markup: string, raw: string }>()
+const count = signal(0)
+---
+section.vouched
+  div.good({...{ innerHTML: markup }})
+  div.bad({...{ innerHTML: raw }})
+  button.bump(onClick={() => count.set(count() + 1)}) Bumped {count()}

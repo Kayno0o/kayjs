@@ -4,7 +4,7 @@ import { dispatch, hydrate, render } from './dom'
 import { ISLAND } from './markers'
 import { batch, flush, ownSignal, recordSignals, reportError, root, setErrorReporter } from './reactive'
 import { freshPrefix, withIds } from './uid'
-import { decodeValue } from './wire'
+import { decodeServerValue } from './wire'
 
 export { startNavigation } from './navigate'
 
@@ -151,7 +151,7 @@ async function hydrateIsland(registry: IslandRegistry, element: HTMLElement): Pr
     return
   }
 
-  const [props, update] = liveProps(element.dataset.props === undefined ? {} : decodeValue(element.dataset.props) as Record<string, unknown>)
+  const [props, update] = liveProps(element.dataset.props === undefined ? {} : decodeServerValue(element.dataset.props) as Record<string, unknown>)
 
   for (const [key, slot] of Object.entries(slots))
     Object.defineProperty(props, key, { value: slot, enumerable: true, configurable: true })
@@ -291,7 +291,7 @@ async function hotSwap(registry: IslandRegistry, swap: HotSwap): Promise<boolean
       }
 
       const values = signalsOf.get(element)?.()
-      const props = { ...element.dataset.props === undefined ? {} : decodeValue(element.dataset.props) as object, ...await staticSlots(registry, element) }
+      const props = { ...element.dataset.props === undefined ? {} : decodeServerValue(element.dataset.props) as object, ...await staticSlots(registry, element) }
 
       dispose()
       element.textContent = ''
