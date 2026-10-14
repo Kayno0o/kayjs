@@ -217,13 +217,19 @@ test('a loaded slug starting with / opens at its escaped path', async () => {
   }
 })
 
-test('a file that does not parse lists as broken, and is written over or deleted', async () => {
+test('a file that does not parse lists as broken, why said on its link too, and is written over or deleted', async () => {
   const file = join(ROOT, 'src/content/posts/broken.json')
 
   await Bun.write(file, '{ "title": ')
 
   try {
-    expect((await site.visit('/admin/collections/posts')).find('.kcms-entries .kui-badge').map(badge => badge.text)).toContain('Broken')
+    const listed = await site.visit('/admin/collections/posts')
+    const link = listed.find('.kcms-entries a[aria-describedby]')
+
+    expect(listed.find('.kcms-entries .kui-badge').map(badge => badge.text)).toContain('Broken')
+    expect(link.map(found => found.text)).toEqual(['broken'])
+    expect(listed.text(`#${link[0]!.attributes['aria-describedby']}`)).toBe(link[0]!.attributes['data-tooltip'])
+    expect(listed.find('h1').map(heading => heading.text)).toEqual(['Posts'])
 
     const page = await site.visit('/admin/collections/posts/broken')
 
@@ -249,12 +255,15 @@ test('a collection whose loader throws says so on its screens, its error kept to
 
     expect(index.find('.kui-badge').map(badge => [badge.text, badge.attributes['data-tooltip']])).toEqual([['Cannot be read', expect.stringContaining('failed to read')]])
     expect(index.html).not.toContain('db.internal')
+    expect(index.find('h1').map(heading => heading.text)).toEqual(['Content'])
+    expect(index.text(`#${index.find('main a[aria-describedby]')[0]!.attributes['aria-describedby']}`)).toContain('failed to read')
     expect(index.text('main')).toContain('2 entries')
 
     for (const path of ['/admin/collections/products', '/admin/collections/products/mug', '/admin/new/products']) {
       const page = await site.visit(path)
 
       expect(page.text('main')).toContain('failed to read')
+      expect(page.find('h1')).toHaveLength(1)
       expect(page.html).not.toContain('db.internal')
     }
   }

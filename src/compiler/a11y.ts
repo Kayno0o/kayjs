@@ -19,6 +19,15 @@ const INTERACTIVE = new Set(['button', 'select', 'textarea', 'details', 'iframe'
 const REDUNDANT_ALT = /\b(?:image|picture|photo)\s+of\b/i
 const FILENAME_ALT = /^[\w-]+\.(?:png|jpe?g|gif|webp|avif|svg)$/i
 const WHITESPACE = /\s+/
+// What a screen reader reads a tooltip's text from on an element the keyboard never reaches.
+const DESCRIBING = ['aria-label', 'aria-labelledby', 'aria-describedby']
+// Attributes pointing at other elements by their ids.
+const REFERENCES = ['aria-labelledby', 'aria-describedby']
+// Roles named by a label, as a field is, besides the native fields.
+const NAMED_ROLES = new Set(['slider', 'meter'])
+// Roles grouping radios under a name, as a `fieldset` does.
+const GROUP_ROLES = new Set(['group', 'radiogroup'])
+const REFRESH_DELAY = /^\s*(\d+)/
 
 interface Context {
   // Inside a `label`, which names the control it holds.
@@ -33,6 +42,8 @@ interface Context {
   ariaHidden: boolean
   // Inside a `dialog`, where `autofocus` is how the spec says to pick what gets focus on opening.
   dialog: boolean
+  // Inside a `fieldset` or a group, whose name the radios it holds are read under.
+  grouped: boolean
   // The link or button holding the element, which may not hold another control.
   control?: ElementNode | undefined
   // Which alternative of each block the element renders in, `if` branches and `await` blocks being one page each.
@@ -58,6 +69,8 @@ export function accessibilityLints(file: KayFile): Diagnostic[] {
   const labelled = new Set<string>()
   const labels: { element: ElementNode, target: string }[] = []
   const controls: ElementNode[] = []
+  const references: { attribute: NamedAttribute, id: string }[] = []
+  const radios = new Map<string, ElementNode[]>()
   const ids: IdUse[] = []
   // A spread or an id written as an expression may hold any id, so no label pointing at one is reported.
   let dynamicIds = false
@@ -234,9 +247,37 @@ export function accessibilityLints(file: KayFile): Diagnostic[] {
 
     const type = staticValue(element, 'type')?.toLowerCase()
 
-    // A placeholder names a field too when nothing else does, as browsers and axe take it, though it is gone once the field holds text.
-    if (LABELLED.has(element.name) && !(element.name === 'input' && type !== undefined && UNLABELLED_TYPES.has(type)) && !context.label && !context.component && ![...NAMING, 'placeholder'].some(name => has(element, name)))
+    const roles = staticValue(element, 'role')?.trim().toLowerCase().split(WHITESPACE) ?? []
+    // A placeholder is no label: it is gone once the field holds text, and RGAA does not take it as one.
+    const field = (LABELLED.has(element.name) && !(element.name === 'input' && type !== undefined && UNLABELLED_TYPES.has(type))) || element.name === 'meter' || roles.some(role => NAMED_ROLES.has(role))
+
+    if (field && !context.label && !context.component && !NAMING.some(name => has(element, name)))
       controls.push(element)
+
+    const radioName = element.name === 'input' && type === 'radio' && !context.grouped && !context.component ? staticValue(element, 'name') : undefined
+
+    if (radioName !== undefined)
+      radios.set(radioName, [...radios.get(radioName) ?? [], element])
+
+    for (const name of REFERENCES) {
+      const reference = attribute(element, name)
+
+      if (reference?.kind === 'static') {
+        for (const id of reference.text.trim().split(WHITESPACE).filter(Boolean))
+          references.push({ attribute: reference, id })
+      }
+    }
+
+    if (has(element, 'data-tooltip') && !focusable(element) && !DESCRIBING.some(name => has(element, name)))
+      lint(attribute(element, 'data-tooltip')!.name, 'unreachable-tooltip', `This \`${element.name}\`'s tooltip shows only under the pointer`, { note: 'a tooltip shows as the pointer or the focus lands on its element, and the keyboard never lands on this one', help: 'put it on a `button` or a link, give the element `tabindex="0"`, or say the same in `aria-label` or visible text' })
+
+    if ((element.name === 'video' || element.name === 'audio') && has(element, 'autoplay') && !has(element, 'controls'))
+      lint(attribute(element, 'autoplay')!.name, 'uncontrolled-autoplay', `This \`${element.name}\` plays by itself with no controls`, { note: 'a visitor who did not start it has no way to pause or stop it', help: 'add `controls`, or a pause button of its own beside it' })
+
+    const delay = element.name === 'meta' && staticValue(element, 'http-equiv')?.trim().toLowerCase() === 'refresh' ? REFRESH_DELAY.exec(staticValue(element, 'content') ?? '') : null
+
+    if (delay && Number(delay[1]) > 0)
+      lint(element, 'meta-refresh', 'This `meta` reloads or leaves the page after a delay', { note: 'the page changes under a visitor still reading it, with no way to stop it', help: 'redirect on the server, or let the visitor follow a link' })
 
     if ((element.name === 'button' || (element.name === 'a' && has(element, 'href'))) && !elementHasContent(element))
       lint(element, 'empty-control', `This \`${element.name}\` has nothing for a screen reader to announce`, { note: 'an icon alone is hidden from screen readers, so the control reads as nameless', help: 'give it text, or name it with `aria-label`' })
@@ -283,6 +324,7 @@ export function accessibilityLints(file: KayFile): Diagnostic[] {
     removed: context.removed || has(element, 'hidden') || has(element, 'inert'),
     ariaHidden: (context.ariaHidden || staticValue(element, 'aria-hidden') === 'true') && !context.removed && !has(element, 'hidden') && !has(element, 'inert'),
     dialog: context.dialog || element.name === 'dialog',
+    grouped: context.grouped || element.name === 'fieldset' || (staticValue(element, 'role')?.trim().toLowerCase().split(WHITESPACE).some(role => GROUP_ROLES.has(role)) ?? false),
     control: context.control ?? (!element.component && (element.name === 'button' || (element.name === 'a' && has(element, 'href'))) ? element : undefined),
     branches: context.branches,
     repeated: context.repeated,
@@ -321,7 +363,7 @@ export function accessibilityLints(file: KayFile): Diagnostic[] {
     }
   }
 
-  visit(file.template, { label: false, component: false, hidden: false, removed: false, ariaHidden: false, dialog: false, branches: new Map(), repeated: false })
+  visit(file.template, { label: false, component: false, hidden: false, removed: false, ariaHidden: false, dialog: false, grouped: false, branches: new Map(), repeated: false })
 
   for (const control of controls) {
     const id = control.id ? text(control.id) : staticValue(control, 'id')
@@ -339,6 +381,16 @@ export function accessibilityLints(file: KayFile): Diagnostic[] {
   for (const { element, target } of dynamicIds ? [] : labels) {
     if (!known.has(target))
       lint(attribute(element, 'for')!.name, 'dangling-label', `This \`label\` points at \`#${target}\`, which nothing here has`, { note: 'a label names the field whose id it gives, so this one names none', help: `give the field \`id="${target}"\`, or wrap the field in the label` })
+  }
+
+  for (const { attribute: reference, id } of dynamicIds ? [] : references) {
+    if (!known.has(id))
+      lint(reference.name, 'dangling-aria', `\`${text(reference.name)}\` points at \`#${id}\`, which nothing here has`, { note: 'a screen reader reads the elements whose ids it lists, so this one reads nothing', help: `give the element \`id="${id}"\`, or drop the id from the list` })
+  }
+
+  for (const [name, group] of radios) {
+    if (group.length > 1)
+      lint(group[0]!, 'ungrouped-radios', `The radios named \`${name}\` sit in no \`fieldset\``, { note: 'a screen reader reads each radio by its own label, never the question they answer', help: 'wrap them in a `fieldset` whose `legend` asks it, or an element with `role="radiogroup"` and `aria-label`' })
   }
 
   checkIds(ids)

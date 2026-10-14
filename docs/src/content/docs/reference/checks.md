@@ -55,6 +55,11 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `autofocus` | warn | a11y | `autofocus` outside a `dialog` |
 | `dangling-label` | warn | a11y | A `label(for)` pointing at no id |
 | `missing-captions` | warn | a11y | A `video` with no captions |
+| `dangling-aria` | warn | a11y | An `aria-labelledby` or `aria-describedby` pointing at no id |
+| `unreachable-tooltip` | warn | a11y | A `data-tooltip` the keyboard never reaches |
+| `uncontrolled-autoplay` | warn | a11y | Media playing by itself with no `controls` |
+| `meta-refresh` | warn | a11y | A `meta` refresh with a delay |
+| `ungrouped-radios` | warn | a11y | Radios sharing a name outside a `fieldset` |
 | `redundant-alt` | warn | a11y | Alt text that says it is an image |
 | `uncalled-signal` | deny | islands | A signal read by name where its value goes, not called |
 | `constant-signal` | warn | islands | A signal that is only ever read |

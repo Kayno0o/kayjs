@@ -11,7 +11,7 @@ const selected = selection<number>()
 ---
 section.todo-list
   h1 {title}
-  input(type="search" bind:value={filter} placeholder="Filter")
+  input(type="search" bind:value={filter} placeholder="Filter" aria-label="Filter")
   ul
     for todo, i of shown() key={todo.id}
       TodoItem(todo={todo} index={i} selected={selected.is(todo.id)} onToggle={id => selected.set(id)})

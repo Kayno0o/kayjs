@@ -11,6 +11,9 @@ import { renderMarkdown } from '../src/content/markdown'
 import { sendValue } from '../src/runtime/send'
 
 const root = join(import.meta.dir, '..')
+// A colour token of the docs' theme, and a text colour Shiki writes, each with its light and dark values.
+const TOKEN = /--color-kui-([\w-]+): light-dark\((#[\da-f]{6}), (#[\da-f]{6})\);/gi
+const COLOUR = /(?<![-\w])color:\s*light-dark\((#[\da-f]{6}),\s*(#[\da-f]{6})\)/gi
 const llms = await Bun.file(join(root, 'llms.txt')).text()
 const docs = (await readdir(join(root, 'llms'))).filter(name => name.endsWith('.md')).sort()
 const LISTED = /^- \[[^\]]+\]\(llms\/([\w-]+\.md)\): \S/gm
@@ -242,4 +245,49 @@ describe('the documentation site', () => {
     expect(await check(join(root, 'docs'))).toEqual([])
     expect(await check(join(root, 'examples/reading-list'))).toEqual([])
   }, 60_000)
+})
+
+// WCAG's contrast ratio between two `#rrggbb` colours.
+function contrast(a: string, b: string): number {
+  const luminance = (hex: string) => {
+    const [r, g, b] = [1, 3, 5].map(at => Number.parseInt(hex.slice(at, at + 2), 16) / 255).map(value => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4) as [number, number, number]
+
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+  }
+  const [light, dark] = [luminance(a), luminance(b)].sort((x, y) => y - x) as [number, number]
+
+  return (light + 0.05) / (dark + 0.05)
+}
+
+describe('the documentation\'s colours', () => {
+  const tokens = async () => {
+    const css = await Bun.file(join(root, 'docs/src/site.css')).text()
+
+    return new Map([...css.matchAll(TOKEN)].map(match => [match[1]!, [match[2]!, match[3]!] as const]))
+  }
+
+  it('reads text at 4.5:1 on every ground, in both schemes', async () => {
+    const colours = await tokens()
+    const failing = ['text', 'subtext0', 'overlay1', 'accent'].flatMap(text => ['mantle', 'canvas', 'surface0', 'surface1'].flatMap(ground => [0, 1].map(scheme => [text, ground, scheme, contrast(colours.get(text)![scheme]!, colours.get(ground)![scheme]!)] as const))).filter(([, , , ratio]) => ratio < 4.5)
+
+    expect(failing).toEqual([])
+  })
+
+  it('highlights code at 4.5:1 on its ground, in both schemes', async () => {
+    const { highlight } = await import('../docs/src/highlight')
+    const mantle = (await tokens()).get('mantle')!
+    const samples = [
+      ['typescript', '// A comment\nimport { s } from \'kay\'\nexport const page = { query: s.Object({ q: s.Optional(s.String()) }) }\nconst n: number = 1 + Number(\'2\') as number\nclass A extends B { #x = /re+/g; get y() { return `t${this.#x}` } }'],
+      ['kay', '---\nconst { title } = props<{ title: string }>()\n---\n// A note\nh1.title(data-x="1") {title}\nif title\n  p Hello #[b there]\nfor item of items key={item.id}\n  a(href={item.url}) {item.name}'],
+      ['bash', '# install\nbun add kay && echo "done" $HOME --flag'],
+      ['json', '{ "name": "app", "version": 1, "private": true, "list": [null] }'],
+      ['css', '/* note */\n.a:hover > b { color: #fff !important; margin: 1rem calc(2px + 1em); }\n@media (width > 30rem) { :root { --x: 1 } }'],
+      ['html', '<!-- note -->\n<a href="/x" class="y">Link &amp; more</a>'],
+      ['diff', '- removed\n+ added\n@@ -1 +1 @@'],
+      ['toml', '# note\n[server]\nport = 3000\nname = "x"'],
+    ]
+    const failing = samples.flatMap(([language, code]) => [...highlight(code!, language).matchAll(COLOUR)].flatMap(match => [0, 1].map(scheme => [language, match[scheme + 1]!, contrast(match[scheme + 1]!, mantle[scheme]!)] as const))).filter(([, , ratio]) => ratio < 4.5)
+
+    expect(failing).toEqual([])
+  })
 })

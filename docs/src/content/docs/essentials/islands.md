@@ -98,7 +98,7 @@ Outside a component, a signal is written with `cart.set(...)`. A component also 
 
 ## Page navigation
 
-A page with an island or a form swaps the next page in without a reload. An island marked `persist` lives on from page to page, so `Player(persist)` in a layout keeps a song playing. What the next page renders again stays as it is, so a sidebar keeps its scroll.
+A page with an island or a form swaps the next page in without a reload. An island marked `persist` lives on from page to page, so `Player(persist)` in a layout keeps a song playing. What the next page renders again stays as it is, so a sidebar keeps its scroll. Each swap, going back included, focuses the new page's `autofocus` field, else its `h1`, else its `main`, and announces its title to screen readers.
 
 Go to a page from code with `navigate`:
 

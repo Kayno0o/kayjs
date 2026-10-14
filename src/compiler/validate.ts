@@ -4,6 +4,7 @@ import type { LintName } from './lints'
 import type { PageSettingName } from './page-settings'
 import type { ImportBinding, ScriptAnalysis, ServerAnalysis } from './script'
 import { LOCALE_ATTRIBUTES } from '../runtime/root'
+import { WIDGET_ROLES } from './aria'
 import { childBlocks, FIELD_ATTRIBUTE, FIELD_ELEMENTS, isHead, isSlot, serverIslandOf, templateFacts } from './ast'
 
 type ValidateOptions = Pick<GenerateOptions, 'island' | 'insideIsland' | 'check' | 'special' | 'includeServer'>
@@ -12,6 +13,7 @@ const BINDABLE = new Set(['input', 'textarea', 'select'])
 const TRANSITION_PART = 'transition:'
 const TRANSITION_PARTS = new Set(['enter', 'enter-from', 'enter-to', 'leave', 'leave-from', 'leave-to'])
 const LOWERCASE_EVENT = /^on:?([a-z]+)$/
+const WHITESPACE = /\s+/
 const COMPOUND_EVENT = /^(dbl|key|mouse|pointer|touch|drag|focus|context|before|after)(click|down|up|press|move|enter|leave|over|out|start|end|cancel|in|menu|input)$/
 const HEAD_TAGS = new Set(['title', 'meta', 'link', 'style', 'script', 'base', 'html'])
 const HEAD_CONTENT = 'A `head` block holds `title`, `meta`, `link`, `style`, `script`, `base` and `html` elements only'
@@ -24,7 +26,7 @@ const CONTENT_ATTRIBUTES = new Set(['innerHTML', 'textContent', 'innerText', 'ch
 const STRING_LITERAL = /^\s*(?:'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|`(?:[^`\\$]|\\.|\$(?!\{))*`)\s*$/
 // What only a static parent passes an island.
 const ISLAND_OPTIONS = new Set(['hydrate', 'persist'])
-// Elements a keyboard reaches and a screen reader announces as controls; a click handler on any other one needs a `role`.
+// Elements a keyboard reaches and a screen reader announces as controls; a click handler on any other one needs a control's `role`.
 const INTERACTIVE_TAGS = new Set(['a', 'audio', 'button', 'details', 'embed', 'iframe', 'input', 'label', 'object', 'option', 'select', 'summary', 'textarea', 'video'])
 // An attribute an element needs to be understood without seeing it, and what to write.
 const REQUIRED_TEXT = new Map<string, [attribute: string, message: string, help: string]>([
@@ -415,6 +417,9 @@ class Validator {
     const at = element.tag.end > element.tag.start ? element.tag : element
     const required = REQUIRED_TEXT.get(element.name)
     const type = element.attributes.find(attribute => attribute.kind === 'static' && this.text(attribute.name) === 'type')
+    const role = element.attributes.find(attribute => this.text((attribute as NamedAttribute).name) === 'role')
+    // A role written as an expression may be any; a written one counts when it names a control.
+    const controlRole = role !== undefined && (role.kind !== 'static' || role.text.trim().toLowerCase().split(WHITESPACE).some(token => WIDGET_ROLES.has(token)))
 
     if (required && !names.has(required[0]))
       this.lint(at, required[0] === 'alt' ? 'missing-alt' : 'missing-title', required[1], { help: required[2] })
@@ -422,8 +427,8 @@ class Validator {
     if (element.name === 'input' && type?.kind === 'static' && type.text === 'image' && !names.has('alt'))
       this.lint(at, 'missing-alt', 'An image button needs `alt`', { help: 'name what it does' })
 
-    if (names.has('onClick') && !names.has('role') && !INTERACTIVE_TAGS.has(element.name))
-      this.lint(at, 'unreachable-click', `This \`${element.name}\` reacts to \`onClick\` but is out of reach of the keyboard and screen readers`, { help: 'use a `button`, or give it a `role` along with a `tabindex` and a key handler' })
+    if (names.has('onClick') && !controlRole && !INTERACTIVE_TAGS.has(element.name))
+      this.lint(at, 'unreachable-click', `This \`${element.name}\` reacts to \`onClick\` but is out of reach of the keyboard and screen readers`, { help: 'use a `button`, or give it a control\'s `role`, such as `button` or `option`, along with a `tabindex` and a key handler' })
   }
 
   private text(span: Span): string {

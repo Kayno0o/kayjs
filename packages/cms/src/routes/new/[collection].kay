@@ -16,7 +16,7 @@ const locale = ctx.query.locale
 ---
 head
   title New entry - {humanize(collection.name)}
-PageSection(title="New entry")
+PageSection(title="New entry" level={1})
   @actions
     a(href={collectionPath(prefix, collection.name)}) {humanize(collection.name)}
   if collection.problem as problem

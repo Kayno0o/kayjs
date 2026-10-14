@@ -17,7 +17,7 @@ const name = ctx.query.locale === undefined ? ctx.params.slug : `${ctx.params.sl
 ---
 head
   title {name} - {humanize(collection.name)}
-PageSection(title={name})
+PageSection(title={name} level={1})
   @actions
     a(href={collectionPath(prefix, collection.name)}) {humanize(collection.name)}
   if entry

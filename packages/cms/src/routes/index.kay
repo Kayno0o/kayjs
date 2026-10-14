@@ -13,14 +13,15 @@ const listed = await collections()
 ---
 head
   title Content
-PageSection(title="Content")
+PageSection(title="Content" level={1})
   for collection of listed key={collection.name}
     CardRow
       @right
         if collection.problem as problem
           Badge(tone="danger" label="Cannot be read" data-tooltip={problem})
+          span.kcms-sr-only(id={`kcms-problem-${collection.name}`}) {problem}
         else
           span {collection.count === 1 ? '1 entry' : `${collection.count ?? 0} entries`}
-      a(href={collectionPath(prefix, collection.name)}) {humanize(collection.name)}
+      a(href={collectionPath(prefix, collection.name)} data-tooltip={collection.problem} aria-describedby={collection.problem === undefined ? undefined : `kcms-problem-${collection.name}`}) {humanize(collection.name)}
   else
     EmptyState(title="No collections" description="This site declares no content collection in its content config.")

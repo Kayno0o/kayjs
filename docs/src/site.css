@@ -12,7 +12,7 @@
   --color-kui-canvas: light-dark(#f8fafc, #17202e);
   --color-kui-surface0: light-dark(#ffffff, #1c2737);
   --color-kui-surface1: light-dark(#e3e8ef, #23314a);
-  --color-kui-overlay1: light-dark(#7c8798, #6f7b8d);
+  --color-kui-overlay1: light-dark(#5d6879, #929dae);
   --color-kui-subtext0: light-dark(#566173, #9ba6b5);
   --color-kui-text: light-dark(#17202e, #eef2f7);
   /* Yellow text on the white ground is unreadable, so text in the accent darkens it there; fills keep the favicon's yellow. */

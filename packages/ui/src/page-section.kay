@@ -1,16 +1,29 @@
 ---
 import type { JSX } from 'kay'
 
-const { title, actions, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['section'], 'class' | 'title'> & {
+const { title, level = 2, actions, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['section'], 'class' | 'title'> & {
   title: string
+  // The title's heading level, `1` for a section holding a whole page.
+  level?: 1 | 2 | 3 | 4 | 5 | 6 | undefined
   // The end of the head line: a `+` IconButton, a link, a row of controls.
   actions?: JSX.Element
   class?: string | undefined
 }>()
 ---
-// A titled stretch of a page, its title one level under the page's own.
+// A titled stretch of a page, its title one level under the page's own unless `level` says otherwise.
 section.kui-page-section({...rest} class={className})
   .kui-page-section-head
-    h2.kui-heading-section.kui-page-section-title {title}
+    if level === 1
+      h1.kui-heading-section.kui-page-section-title {title}
+    else if level === 2
+      h2.kui-heading-section.kui-page-section-title {title}
+    else if level === 3
+      h3.kui-heading-section.kui-page-section-title {title}
+    else if level === 4
+      h4.kui-heading-section.kui-page-section-title {title}
+    else if level === 5
+      h5.kui-heading-section.kui-page-section-title {title}
+    else
+      h6.kui-heading-section.kui-page-section-title {title}
     | {actions}
   slot

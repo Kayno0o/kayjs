@@ -21,7 +21,7 @@ const url = ctx.url
 ---
 head
   title {humanize(collection.name)}
-PageSection(title={humanize(collection.name)})
+PageSection(title={humanize(collection.name)} level={1})
   @actions
     if collection.problem === undefined
       Button(href={newEntryPath(prefix, collection.name)} label="New entry" icon="plus" variant="accent")

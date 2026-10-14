@@ -668,7 +668,7 @@ function later(from: ChildNode | null, node: Node): ChildNode | undefined {
   return undefined
 }
 
-// The element focused before, found again on a refreshed page; on a new page its autofocus field or its heading, so a screen reader starts there, the title announced.
+// The element focused before, found again on a refreshed page; on a new page, Back and Forward included, its autofocus field, its heading or its main, so a screen reader starts there, the title announced.
 async function moveFocus(swap: Swap, policy: Policy): Promise<void> {
   if (policy.focus === 'refused' && swap.refused && await showRefusal(document.forms[swap.refused.form], swap.refused.control))
     return
@@ -687,11 +687,8 @@ async function moveFocus(swap: Swap, policy: Policy): Promise<void> {
     return
   }
 
-  // Going back to a position the entry saved leaves the reader where they were.
-  if (policy.scroll === 'saved')
-    return
-
-  const target = document.querySelector<HTMLElement>('[autofocus]') ?? document.querySelector<HTMLElement>('h1')
+  // Going back to a position the entry saved leaves the window there, the focus moving without scrolling.
+  const target = document.querySelector<HTMLElement>('[autofocus]') ?? document.querySelector<HTMLElement>('h1') ?? document.querySelector<HTMLElement>('main')
 
   if (target) {
     if (!target.matches('[autofocus]') && !target.hasAttribute('tabindex'))

@@ -123,9 +123,9 @@ kay check && keslint --cache
 - What a page needs to be usable without seeing it:
   - An `img` has `alt` (`alt=""` for decoration) and so has an `input(type="image")` (`missing-alt`).
   - An `iframe` has a `title` (`missing-title`).
-  - An element with `onClick` is one a keyboard reaches, such as a `button` or an `a`, or has a `role` (`unreachable-click`).
+  - An element with `onClick` is one a keyboard reaches, such as a `button` or an `a`, or has a control's `role`, such as `button`, `option` or `tab` (`unreachable-click`).
   - A `button` or a link has text, a value or an `aria-label` to announce, an icon alone not counting (`empty-control`).
-  - An `input`, `select` or `textarea` has a `label` around it or pointing at its id, or an `aria-label`, `aria-labelledby`, `title` or `placeholder` (`missing-label`).
+  - An `input`, `select`, `textarea`, `meter`, `role="slider"` or `role="meter"` has a `label` around it or pointing at its id, or an `aria-label`, `aria-labelledby` or `title`, a `placeholder` being no label (`missing-label`).
   - A heading follows the one before it by at most a level, each branch of an `if` following the heading before the block (`skipped-heading`).
 - An element with a `{...spread}` is not checked, nor one hidden with `aria-hidden="true"` or `hidden`, such as a honeypot field.
 - A field among a component's children or with an id written as an expression is left alone, its label maybe elsewhere.
@@ -141,7 +141,12 @@ kay check && keslint --cache
   - No control inside a link or a button (`nested-control`).
   - No id two elements of a template share, elements in different branches of an `if` or a `match` or blocks of an `await` excepted, nor one written out inside a `for` (`duplicate-id`).
   - A `label(for="...")` pointing at an id of the template, unless a spread or an expression may set one (`dangling-label`).
+  - An `aria-labelledby` or `aria-describedby` listing ids of the template, on the same terms (`dangling-aria`).
+  - A `data-tooltip` on an element the keyboard reaches, or whose `aria-label`, `aria-labelledby` or `aria-describedby` says it (`unreachable-tooltip`).
   - A captions `track` in a `video` that is not `muted` (`missing-captions`).
+  - `controls` on a `video` or `audio` playing by itself (`uncontrolled-autoplay`).
+  - No `meta(http-equiv="refresh")` with a delay (`meta-refresh`).
+  - Radios sharing a `name` inside a `fieldset` or a `role="radiogroup"` or `role="group"` (`ungrouped-radios`).
   - Alt text that is not a filename nor says it is an image (`redundant-alt`).
   - An `autocomplete` value HTML's autofill defines (`invalid-autocomplete`).
 - Only what the markup says for sure is reported: a value written as an expression, a spread or a component is left alone.
@@ -174,7 +179,7 @@ kay check && keslint --cache
 | `unread-name` | deny | code | A prop, server value, import or declaration nothing reads (see [What `kay check` verifies](#what-kay-check-verifies)). |
 | `missing-alt` | deny | a11y | An `img` or `input(type="image")` with no `alt`. |
 | `missing-title` | deny | a11y | An `iframe` with no `title`. |
-| `unreachable-click` | deny | a11y | An `onClick` on an element no keyboard reaches and no `role` names. |
+| `unreachable-click` | deny | a11y | An `onClick` on an element no keyboard reaches and no control's `role` names. |
 | `empty-control` | deny | a11y | A `button`, or an `a` with an `href`, with nothing for a screen reader to announce: no text, no value, no `aria-label`, an icon alone. |
 | `unknown-aria` | deny | a11y | An `aria-*` attribute ARIA does not define, such as `aria-labeledby`. The quick fix writes the closest one. |
 | `unknown-role` | deny | a11y | A `role` ARIA does not define, or an abstract one such as `widget`. |
@@ -188,11 +193,16 @@ kay check && keslint --cache
 | `unbounded-string` | deny | forms | A string field of an action's schema with no `maxLength`. |
 | `positional-key` | warn | islands | `for todo, i of todos key={i}` whose rows read `todo.id`: keyed by position, a row added before others hands their markup and state to the wrong rows. The quick fix drops the key, so they are matched by `todo.id`. |
 | `identity-key` | warn | islands | A `for` in an island over objects with no `id` and no `key`, matched by the objects themselves: a list rebuilt with new objects builds every row anew. Found by the type check, so by `kay check` and the editor. |
-| `missing-label` | warn | a11y | An `input`, `select` or `textarea` with no `label`, `aria-label`, `aria-labelledby`, `title` or `placeholder`. |
+| `missing-label` | warn | a11y | An `input`, `select`, `textarea`, `meter`, `role="slider"` or `role="meter"` with no `label`, `aria-label`, `aria-labelledby` or `title`; a `placeholder` is no label. |
 | `skipped-heading` | warn | a11y | A heading skipping a level after the one before it, an `h3` after an `h1`. |
 | `autofocus` | warn | a11y | `autofocus` outside a `dialog`, on an element without `tabindex="-1"`. |
 | `dangling-label` | warn | a11y | A `label(for="...")` pointing at an id nothing in the template has. |
 | `missing-captions` | warn | a11y | A `video` that is not `muted` with no captions `track`. |
+| `dangling-aria` | warn | a11y | An `aria-labelledby` or `aria-describedby` listing an id nothing in the template has. |
+| `unreachable-tooltip` | warn | a11y | A `data-tooltip` on an element the keyboard never reaches and no `aria-label`, `aria-labelledby` or `aria-describedby` speaks for. |
+| `uncontrolled-autoplay` | warn | a11y | A `video` or `audio` with `autoplay` and no `controls`. |
+| `meta-refresh` | warn | a11y | A `meta(http-equiv="refresh")` reloading or leaving the page after a delay. |
+| `ungrouped-radios` | warn | a11y | Radios sharing a `name` outside a `fieldset` or a `role="radiogroup"`. |
 | `redundant-alt` | warn | a11y | Alt text that is a filename or says it is an image. |
 | `uncalled-signal` | deny | islands | A signal or memo the template names without calling it where its value goes, `{count}` or `if count > 1`: a signal is read by calling it, in the template as in the script, `{count()}`. Handed on whole, as a component prop or a function argument, it passes the signal itself; `--fix` calls it. |
 | `constant-signal` | warn | islands | A signal the component script declares and only ever reads: it never changes, so a plain `const` renders the same without the reactivity. |

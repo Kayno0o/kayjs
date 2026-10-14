@@ -5,11 +5,13 @@ import { createHighlighter } from 'shiki'
 const kay: LanguageRegistration = { ...kayGrammar, name: 'kay', embeddedLangs: ['typescript'] }
 
 const highlighter = await createHighlighter({
-  themes: ['ayu-light', 'ayu-mirage'],
+  themes: ['github-light-default', 'ayu-mirage'],
   langs: [kay, 'typescript', 'javascript', 'json', 'bash', 'css', 'html', 'toml', 'diff'],
 })
 
 const languages = new Set(highlighter.getLoadedLanguages())
+// The colours under 4.5:1 on the code's ground, each darkened or lightened until it reads: comments and keywords in the light theme, comments in the dark one.
+const READABLE = { 'github-light-default': { '#6e7781': '#57606a', '#8250df': '#6639ba' }, 'ayu-mirage': { '#6e7c8f': '#8a96a8' } }
 
 // Runs at build time only; light-dark() lets the page's color-scheme pick the theme with no script, and code-copy.kay answers the copy button.
 export function highlight(code: string, language: string | undefined): string {
@@ -38,5 +40,5 @@ export function highlight(code: string, language: string | undefined): string {
     },
   }
 
-  return highlighter.codeToHtml(code, { lang, themes: { light: 'ayu-light', dark: 'ayu-mirage' }, defaultColor: 'light-dark()', transformers: [framed] })
+  return highlighter.codeToHtml(code, { lang, themes: { light: 'github-light-default', dark: 'ayu-mirage' }, colorReplacements: READABLE, defaultColor: 'light-dark()', transformers: [framed] })
 }

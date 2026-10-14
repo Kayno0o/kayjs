@@ -343,8 +343,10 @@ describe('literal-tag', () => {
 })
 
 describe('a11y lints', () => {
-  const A11Y = new Set(['unknown-aria', 'unknown-role', 'missing-state', 'hidden-focusable', 'positive-tabindex', 'autofocus', 'link-as-button', 'nested-control', 'duplicate-id', 'dangling-label', 'missing-captions', 'redundant-alt', 'invalid-autocomplete'])
+  const A11Y = new Set(['unknown-aria', 'unknown-role', 'missing-state', 'hidden-focusable', 'positive-tabindex', 'autofocus', 'link-as-button', 'nested-control', 'duplicate-id', 'dangling-label', 'missing-captions', 'redundant-alt', 'invalid-autocomplete', 'dangling-aria', 'unreachable-tooltip', 'meta-refresh', 'ungrouped-radios'])
   const a11y = (source: string) => lints(source).filter(d => A11Y.has(d.code ?? '')).map(d => `${d.code} ${d.at}`)
+  // One lint alone, for those the other examples here would trip.
+  const only = (code: string, source: string) => lints(source).filter(d => d.code === code).map(d => `${d.code} ${d.at}`)
 
   it('reports an aria attribute ARIA does not define, fixing it to the closest one, whatever the value', () => {
     expect(a11y('div(aria-labeledby="t" aria-live={mode} aria-label="Menu") Menu\np(aria-zzzz="1") x\n')).toEqual(['unknown-aria aria-labeledby', 'unknown-aria aria-zzzz'])
@@ -387,6 +389,32 @@ describe('a11y lints', () => {
 
   it('reports a video with no captions, unless muted or its tracks come from a block', () => {
     expect(a11y('video(src="/a.mp4")\nvideo(src="/b.mp4" muted autoplay)\nvideo(src="/c.mp4")\n  track(kind="captions" src="/c.vtt")\nvideo(src="/d.mp4")\n  for track of tracks\n    track(kind="captions" src={track})\nvideo(src="/e.mp4")\n  track(kind="chapters" src="/e.vtt")\n')).toEqual(['missing-captions video', 'missing-captions video'])
+  })
+
+  it('takes no placeholder as a label, and asks one of a meter and a slider', () => {
+    expect(only('missing-label', 'input(name="q" placeholder="Search")\ninput(name="r" aria-label="R" placeholder="Search")\nmeter(value="3" max="5")\nmeter(value="3" max="5" aria-label="Storage")\ndiv(role="slider" aria-valuenow="2")\nlabel\n  | Rating\n  meter(value="2")\n')).toEqual(['missing-label input', 'missing-label meter', 'missing-label div'])
+  })
+
+  it('takes only a control\'s role as making a click reachable', () => {
+    expect(only('unreachable-click', 'div(onClick={go}) a\ndiv(role="presentation" onClick={go}) b\nli(role="option" onClick={go}) c\ndiv(role={kind} onClick={go}) d\nspan(role="button" tabindex="0" onClick={go}) e\n')).toEqual(['unreachable-click div', 'unreachable-click div'])
+  })
+
+  it('reports an aria-labelledby or aria-describedby id nothing has, unless an id may come from an expression', () => {
+    expect(a11y('input(name="a" aria-label="A" aria-describedby="a-hint a-error")\np#a-hint Hint\nh2#title Title\nsection(aria-labelledby="title") x\n')).toEqual(['dangling-aria aria-describedby'])
+    expect(a11y('input(name="a" aria-label="A" aria-describedby="a-hint")\np(id={hint}) Hint\n')).toEqual([])
+  })
+
+  it('reports a tooltip the keyboard never reaches, unless a screen reader gets it some other way', () => {
+    expect(a11y('span(data-tooltip="Tip") a\nbutton(data-tooltip="Tip") b\nspan(tabindex="0" data-tooltip="Tip") c\nspan(role="img" aria-label="3 commits" data-tooltip="3 commits") d\na(href="/x" data-tooltip="Tip") e\n')).toEqual(['unreachable-tooltip data-tooltip'])
+  })
+
+  it('reports media playing by itself with no controls, and a meta refresh with a delay', () => {
+    expect(only('uncontrolled-autoplay', 'video(src="/a.mp4" autoplay muted)\nvideo(src="/b.mp4" autoplay muted controls)\naudio(src="/c.mp3" autoplay)\n')).toEqual(['uncontrolled-autoplay autoplay', 'uncontrolled-autoplay autoplay'])
+    expect(a11y('head\n  meta(http-equiv="refresh" content="5; url=/next")\n  meta(http-equiv="Refresh" content="0; url=/next")\n')).toEqual(['meta-refresh meta'])
+  })
+
+  it('reports radios sharing a name outside a fieldset or a radiogroup, once per name', () => {
+    expect(a11y('input(type="radio" name="plan" value="a" aria-label="A")\ninput(type="radio" name="plan" value="b" aria-label="B")\ninput(type="radio" name="solo" aria-label="Solo")\nfieldset\n  legend Size\n  input(type="radio" name="size" value="s" aria-label="S")\n  input(type="radio" name="size" value="m" aria-label="M")\ndiv(role="radiogroup" aria-label="Tone")\n  input(type="radio" name="tone" value="a" aria-label="A")\n  input(type="radio" name="tone" value="b" aria-label="B")\n')).toEqual(['ungrouped-radios input'])
   })
 
   it('reports alt text naming the image as one, or a filename, as whole words only', () => {

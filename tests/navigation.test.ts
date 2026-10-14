@@ -365,7 +365,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     expect(await state()).toEqual({ themes: ['#123456'], added: 1, secondOnly: 0, mode: 'dark' })
   })
 
-  it('restores where the page was scrolled to when going back', async () => {
+  it('restores where the page was scrolled to when going back, focusing its heading without scrolling and announcing its title', async () => {
     await page.goto(origin)
     await page.evaluate(() => {
       (window as { kayAlive?: boolean }).kayAlive = true
@@ -382,6 +382,8 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     await page.locator('h1', { hasText: 'Home' }).waitFor()
 
     expect(await page.evaluate(() => scrollY)).toBe(1500)
+    expect(await page.evaluate(() => document.activeElement?.tagName)).toBe('H1')
+    await page.waitForFunction(() => [...document.querySelectorAll('body > [aria-live="polite"]')].at(-1)?.textContent === document.title)
 
     await page.goForward()
     await page.locator('h1', { hasText: 'Second' }).waitFor()
@@ -876,6 +878,19 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
 
     expect(await fresh.evaluate(() => [location.pathname, document.querySelector('h1')!.textContent, history.length])).toEqual(['/', 'Home', entries + 1])
     await fresh.close()
+  })
+
+  it('focuses the main of a page without a heading', async () => {
+    await page.goto(origin)
+    await page.evaluate(() => {
+      const link = Object.assign(document.createElement('a'), { href: '/contrast', className: 'contrast' })
+
+      document.body.append(link)
+      link.click()
+    })
+    await page.locator('button.faint').waitFor()
+
+    expect(await page.evaluate(() => [document.activeElement?.tagName, document.activeElement?.getAttribute('tabindex')])).toEqual(['MAIN', '-1'])
   })
 
   it('announces the swapped page without making it any taller, so one filling the screen gets no scrollbar', async () => {

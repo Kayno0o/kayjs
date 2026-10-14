@@ -6,7 +6,7 @@ description: A titled section of a page, with room for actions at the end of its
 
 ## Title
 
-The `title` is an `h2`, one level under the page's own. Stack several sections to split a page, each keeping the same head.
+The `title` is an `h2`, one level under the page's own, or the heading `level` given, `1` for a section holding a whole page. Stack several sections to split a page, each keeping the same head.
 
 <Demo name="page-section/sections" />
 

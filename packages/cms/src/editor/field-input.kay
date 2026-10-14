@@ -53,7 +53,7 @@ function setJson(next: string): void {
         for item, i of items() key={i}
           .kcms-list-item
             FieldInput(drafts={drafts} entry={entry} field={itemAt(current, i)} path={joinPath(path, i)})
-            IconButton(icon="delete" label="Remove" variant="ghost" size="sm" onClick={() => set(items().filter((_, at) => at !== i))})
+            IconButton(icon="delete" label={`Remove item ${i + 1}`} variant="ghost" size="sm" onClick={() => set(items().filter((_, at) => at !== i))})
         Button(label="Add" icon="plus" onClick={() => set([...items(), emptyValue(current.item)])})
     when 'group'
       FormField(label={current.label} hint={current.hint} issue={issue()} required={current.required} group)
