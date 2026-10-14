@@ -1176,6 +1176,43 @@ describe.concurrent('kay dev', () => {
     }
   }, 60_000)
 
+  it.serial('keeps one process building the client for builds riding one that died, and none once stopped meanwhile', async () => {
+    const scratch = join(import.meta.dir, '../node_modules/.cache')
+
+    await mkdir(scratch, { recursive: true })
+    const root = await mkdtemp(join(scratch, 'dev-builder-respawn-'))
+    const real = realpathSync(root)
+    const running = () => childrenRunning(real, 'builder.ts').filter(pid => existsSync(`/proc/${pid}`) && !readFileSync(`/proc/${pid}/stat`, 'utf8').includes(') Z'))
+
+    await Bun.write(join(root, 'kay.config.ts'), 'export default {}\n')
+    await Bun.write(join(root, 'src/routes/index.kay'), 'h1 Home\n')
+    const builder = startClientBuilder(root, process.env)
+
+    try {
+      expect(await builder.build(null)).toBeDefined()
+      process.kill(Number(running()[0]), 'SIGKILL')
+
+      const outcomes = await Promise.all([builder.build(null), builder.build(null)])
+
+      expect(outcomes.every(outcome => outcome !== undefined)).toBe(true)
+      expect(running()).toHaveLength(1)
+      expect(builder.gone()).toBe(false)
+
+      // Stopped while the next one replaces a dead one.
+      process.kill(Number(running()[0]), 'SIGKILL')
+      const build = builder.build(null)
+
+      await builder.stop()
+      await build
+      await Bun.sleep(300)
+      expect(running()).toEqual([])
+    }
+    finally {
+      await builder.stop()
+      await rm(root, { recursive: true, force: true })
+    }
+  }, 60_000)
+
   it('starts no process building the client once stopping, for a server asking for it as it stops', async () => {
     const scratch = join(import.meta.dir, '../node_modules/.cache')
 

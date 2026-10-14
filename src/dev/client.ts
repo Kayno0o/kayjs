@@ -1,3 +1,4 @@
+import type { Subprocess } from 'bun'
 import type { BuildOutcome, BuildRequest } from './builder'
 import { realpathSync } from 'node:fs'
 import { join } from 'node:path'
@@ -14,6 +15,14 @@ export interface ClientBuilder {
   stop: () => Promise<void>
 }
 
+interface Builder {
+  gone: boolean
+  answered: boolean
+  replacing: Promise<Builder | undefined> | undefined
+  waiting: ((outcome: BuildOutcome | undefined) => void)[]
+  child: Subprocess
+}
+
 const BUILDER = join(import.meta.dir, 'builder.ts')
 
 // The process building the client for the servers `kay dev` starts, kept from one build to the next: its modules stay loaded and what it last built tells what an edit reaches.
@@ -21,13 +30,16 @@ export function startClientBuilder(root: string, env: Record<string, string | un
   const realRoot = realpathSync(root)
   let modules = new Set<string>()
   let current = spawn()
+  let stopped = false
 
   function spawn() {
-    const state = {
+    const state: Builder = {
       gone: false,
       // Whether it answered a build: one that never did failed as it started, as when the config failed to load.
       answered: false,
-      waiting: [] as ((outcome: BuildOutcome | undefined) => void)[],
+      // The process taking its place once it died after answering, shared by the builds riding it.
+      replacing: undefined as Promise<Builder | undefined> | undefined,
+      waiting: [],
       // Under `kay dev`, so it writes where its servers read.
       child: Bun.spawn([process.execPath, BUILDER], {
         cwd: root,
@@ -56,7 +68,7 @@ export function startClientBuilder(root: string, env: Record<string, string | un
     return state
   }
 
-  const ask = async (state: typeof current, changed: string[] | null) => {
+  const ask = async (state: Builder, changed: string[] | null) => {
     if (state.gone)
       return Promise.resolve(undefined)
 
@@ -77,14 +89,25 @@ export function startClientBuilder(root: string, env: Record<string, string | un
       if (outcome !== undefined || !dying.answered || current !== dying)
         return outcome
 
-      await dying.child.exited
-      current = spawn()
+      dying.replacing ??= (async () => {
+        await dying.child.exited
 
-      return ask(current, null)
+        if (stopped)
+          return undefined
+
+        current = spawn()
+
+        return current
+      })()
+
+      const next = await dying.replacing
+
+      return next && ask(next, null)
     },
-    gone: () => current.gone,
+    gone: () => current.gone && current.replacing === undefined,
     loaded: file => file === CONFIG_FILE || modules.has(join(realRoot, file)),
     stop: async () => {
+      stopped = true
       current.child.kill()
       await current.child.exited
     },
