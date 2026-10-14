@@ -162,7 +162,7 @@ export default defineConfig({
 - A stylesheet holding `@view-transition { navigation: auto; }` animates from page to page where the browser supports it, swaps included; `kay new` writes one inside `@media (prefers-reduced-motion: no-preference)`.
 
 - `pages()` also takes `root`, `dev` (default: `NODE_ENV` is `development`) and `prebuilt` (default: `NODE_ENV` is `production`), which serves what `kay build` wrote instead of bundling at boot.
-- A `.ts` file imports a component as `import Card from './card.kay'`, typed through the generated `.kay/types` tree.
+- A `.ts` file imports a component as `import Card from './card.kay'`, typed through the generated `.kay/types` tree, which `kay dev` writes again on every restart, from `kay.config.ts` as it is once it changed, the modules it imports as they were.
 - `.kay/` also holds the client build and the compile cache.
 - List it in `.gitignore`.
 - `tsconfig.json` extends kay's, which merges that tree with the sources and is as strict as kay itself:

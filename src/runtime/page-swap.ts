@@ -147,6 +147,10 @@ function policyOf(swap: Swap): Policy {
 
 export async function go(url: URL, swap: Swap): Promise<void> {
   const token = ++navigation.current
+
+  if (swap.intent !== 'refresh')
+    navigation.visits = (navigation.visits ?? 0) + 1
+
   const isCurrent = () => token === navigation.current
   const { history: change } = policyOf(swap)
 

@@ -145,6 +145,31 @@ describe('islands', () => {
     expect((globalThis as { _$K?: Event[] })._$K).toEqual([])
   })
 
+  it('drops the clicks made on an island that will never hydrate', async () => {
+    const error = spyOn(console, 'error').mockImplementation(() => undefined)
+
+    try {
+      // eslint-disable-next-line no-new-func -- runs the inline hydration script, which happy-dom does not execute from markup
+      (new Function(HYDRATION_SCRIPT) as () => void)()
+      document.body.innerHTML = '<slot data-component="gone.kay"><button>Gone</button></slot><section><slot data-component="tests/fixtures/islands/counter.kay" data-hydrate="idle"><button>Later</button></slot></section>'
+
+      for (const button of document.querySelectorAll('button'))
+        button.dispatchEvent(new Event('click', { bubbles: true }))
+
+      const queue = (globalThis as { _$K?: Event[] })._$K!
+      const { hydrateAgain } = await import(join(outdir, 'client.js')) as { hydrateAgain: () => Promise<void> }
+
+      // As a page swap takes an island away before it hydrated.
+      document.querySelector('section')!.remove()
+
+      await hydrateAgain()
+      expect(queue).toEqual([])
+    }
+    finally {
+      error.mockRestore()
+    }
+  })
+
   it('replays a click made before its island hydrated once its effects ran, as on an island already hydrated', async () => {
     const { default: Mounted } = await import(join(fixtures, 'mounted.kay')) as { default: (props: object) => unknown }
 

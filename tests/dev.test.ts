@@ -9,6 +9,7 @@ import { testWorker } from '../src/build/assets'
 import { buildClient } from '../src/build/client'
 import { KayCompileError } from '../src/build/transform'
 import { readShadowSettings } from '../src/check/shadow'
+import { loadConfig } from '../src/config'
 import { dev, watchProject } from '../src/dev'
 import { InspectorAddressInUse, inspectorProxy } from '../src/dev/inspector'
 import { bootFailure, hotSwap } from '../src/server/dev'
@@ -275,6 +276,27 @@ describe('kay dev', () => {
       await rm(root, { recursive: true, force: true })
     }
     expect(children.at(-1)!.killed).toBe(true)
+  })
+
+  it('writes the types from kay.config.ts as it is once it changed, without a restart of kay dev', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
+    const config = join(root, 'kay.config.ts')
+
+    await Bun.write(join(root, 'src/server.ts'), 'setInterval(() => undefined, 1000)\n')
+    await Bun.write(join(root, 'src/routes/index.kay'), 'p Home\n')
+    await Bun.write(config, 'export default { lints: { \'unread-name\': \'allow\' } }\n')
+    const stop = await dev(root, { config: await loadConfig(root) })
+
+    try {
+      expect(readShadowSettings(root).lints).toEqual({ 'unread-name': 'allow' })
+
+      await Bun.write(config, 'export default { lints: { \'unread-name\': \'deny\' } }\n')
+      await until(() => readShadowSettings(root).lints?.['unread-name'] === 'deny')
+    }
+    finally {
+      await stop()
+      await rm(root, { recursive: true, force: true })
+    }
   })
 
   it('readies the next server once one on a Unix socket is up, as one on a port', async () => {

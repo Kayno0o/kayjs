@@ -119,7 +119,6 @@ export async function exportStatic(project: Project, client: ClientBuild, outdir
   written.push(...await writeLocaleRedirects(app, out, config, built.map(([path]) => path), base, origin))
 
   await compressPaths(written)
-  await Bun.write(join(out, MARKER), '')
 
   return { pages: built.length, files: written.length }
 }
@@ -186,6 +185,8 @@ async function clear(root: string, out: string): Promise<void> {
 
   await rm(out, { recursive: true, force: true })
   await mkdir(out, { recursive: true })
+  // Marked first, so an export failing halfway leaves a directory the next one may clear.
+  await Bun.write(join(out, MARKER), '')
 }
 
 // The files a page path is written to: `/` as `index.html`, any other both ways.

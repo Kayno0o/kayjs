@@ -358,8 +358,15 @@ export function hydrationEnded(): void {
 
   afterHydration = []
 
-  for (const fn of waiting)
-    fn()
+  // Each on its own, so one that throws leaves the rest to run.
+  for (const fn of waiting) {
+    try {
+      fn()
+    }
+    catch (error) {
+      reportError(error)
+    }
+  }
 }
 
 // A derived value, computed when read and cached until what it read changes.

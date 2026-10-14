@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -257,6 +258,32 @@ describe('kay build --static', () => {
       expect(code).toBe(1)
       expect(errors).toContain('src/routes/index.kay: requireGuards is on and no guard covers it; set `guards: false` in its `page` to export it')
       expect(errors).not.toContain('src/routes/about.kay:')
+    }
+    finally {
+      await rm(fixture, { recursive: true, force: true })
+      await rm(elsewhere, { recursive: true, force: true })
+    }
+  })
+
+  it('runs again into the directory an export failing halfway left', async () => {
+    const fixture = await fixtureCopy('static')
+    const elsewhere = await mkdtemp(join(tmpdir(), 'kay-static-'))
+    const endpoint = join(fixture, 'src/routes/llms.txt.ts')
+    const served = await Bun.file(endpoint).text()
+
+    try {
+      await Bun.write(endpoint, 'export function GET() {\n  throw new Error("down")\n}\n')
+
+      const failed = await exportSite(elsewhere, fixture)
+
+      expect([failed.code, existsSync(join(elsewhere, 'index.html'))]).toEqual([1, true])
+
+      await Bun.write(endpoint, served)
+
+      const { code, errors } = await exportSite(elsewhere, fixture)
+
+      expect(errors).not.toContain('holds files a static export did not write')
+      expect([code, await Bun.file(join(elsewhere, 'llms.txt')).text()]).toEqual([0, '# Static site\n'])
     }
     finally {
       await rm(fixture, { recursive: true, force: true })

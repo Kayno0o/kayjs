@@ -134,7 +134,9 @@ async function hydrateIsland(registry: IslandRegistry, element: HTMLElement): Pr
   const id = element.dataset.component ?? ''
   const load = registry[id]
 
+  // What was clicked on it is dropped, as it never hydrates.
   if (!load) {
+    takeEvents(element)
     console.error(`[kay] no client chunk for island ${id}`)
 
     return
@@ -369,11 +371,17 @@ export function disposeIslands(root: ParentNode): void {
 // The clicks, inputs and changes the inline hydration script queued on the island while it waited for its chunk.
 function takeEvents(element: HTMLElement): Event[] {
   const queue = (globalThis as { _$K?: Event[] })._$K ?? []
-  // Not those of an island in one of its static slots, which takes its own.
-  const taken = queue.filter(event => (event.target as Element).closest?.(ISLAND) === element)
+  const taken: Event[] = []
 
-  for (const event of taken)
-    queue.splice(queue.indexOf(event), 1)
+  // Not those of an island in one of its static slots, which takes its own; those of an island a page swap took away go, as it never hydrates.
+  for (const event of queue.splice(0)) {
+    const target = event.target as Element
+
+    if (target.closest?.(ISLAND) === element)
+      taken.push(event)
+    else if (target.isConnected)
+      queue.push(event)
+  }
 
   return taken
 }

@@ -305,18 +305,19 @@ export function defineConfig<Config extends KayConfig>(config: Config): Config {
   return config
 }
 
-export async function loadConfig(root: string): Promise<KayConfig> {
-  return withSiteUrl(withExtensions(await importConfig(root)))
+// `fresh` reads the file again as it is now, as `kay dev` does once it changed, rather than the module this process imported first.
+export async function loadConfig(root: string, fresh = false): Promise<KayConfig> {
+  return withSiteUrl(withExtensions(await importConfig(root, fresh)))
 }
 
 // The config as `kay.config.ts` writes it, its extensions' config not laid under it yet.
-async function importConfig(root: string): Promise<KayConfig> {
+async function importConfig(root: string, fresh = false): Promise<KayConfig> {
   const file = join(root, CONFIG_FILE)
 
   if (!existsSync(file))
     return {}
 
-  const { default: config } = await import(file) as { default?: KayConfig }
+  const { default: config } = await import(fresh ? `${file}?${Date.now()}` : file) as { default?: KayConfig }
 
   if (typeof config !== 'object' || config === null)
     throw new Error(`kay: ${CONFIG_FILE} must export its config by default: export default defineConfig({ ... })`)

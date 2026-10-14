@@ -344,6 +344,9 @@ describe('kay/test', () => {
       // Kept on the page, the call settles, so its `pending` clears.
       await expect(readActionResponse(new Response(null, { status: 303, headers: { 'x-kay-redirect': '/about' } }), '/_kay/action/test/go')).rejects.toBeInstanceOf(ActionRedirect)
       expect([asked, window.location.href]).toEqual([['/about'], 'http://localhost/admin'])
+      // Made on a page the visitor has left since, it takes them nowhere.
+      await expect(readActionResponse(new Response(null, { status: 303, headers: { 'x-kay-redirect': '/about' } }), '/_kay/action/test/go', () => true)).rejects.toBeInstanceOf(ActionRedirect)
+      expect(asked).toEqual(['/about'])
 
       leaving = true
       void readActionResponse(new Response(null, { status: 303, headers: { 'x-kay-redirect': '/about' } }), '/_kay/action/test/go')

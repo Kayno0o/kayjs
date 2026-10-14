@@ -19,6 +19,8 @@ const RECONNECT_MS = 500
 const MAX_RECONNECT_MS = 30_000
 // The close code of a connection either side ended on purpose, which is not reconnected.
 const NORMAL_CLOSURE = 1000
+// What a socket keeps to send while it connects, the oldest dropped past it.
+const MAX_QUEUED = 100
 // What Elysia's websocket parser reads as JSON, by first character: `"`, `[`, `{`.
 const JSON_START = /^["[{]/
 const NUMERIC = /^-?\d+(?:\.\d+)?(?:e[+-]?\d+)?$/i
@@ -270,8 +272,8 @@ export function openSocket<Send, Receive>(connect: () => WebSocket | undefined):
 
       if (current?.readyState === WebSocket.OPEN)
         current.send(text)
-      else
-        queued.push(text)
+      else if (!closed && queued.push(text) > MAX_QUEUED)
+        queued.shift()
     },
     last: messages.last,
     status,
@@ -279,6 +281,7 @@ export function openSocket<Send, Receive>(connect: () => WebSocket | undefined):
     onOpen: listener => opened.on(listener),
     close: () => {
       closed = true
+      queued.length = 0
       cancelRetry?.()
       setStatus('closed')
       current?.close(NORMAL_CLOSURE)
@@ -408,56 +411,64 @@ async function parseEvents(body: ReadableStream<Uint8Array>, signal: AbortSignal
     catch {}
   }
 
-  signal.addEventListener('abort', () => void cancel(), { once: true })
+  const onAbort = () => void cancel()
+
+  // One listener per run, removed as it ends, as every reconnect of a stream reads under the same signal.
+  signal.addEventListener('abort', onAbort, { once: true })
   const decoder = new TextDecoder()
   let buffer = ''
   let event = ''
   let data: string[] = []
 
-  for (;;) {
-    const { done, value } = await reader.read()
+  try {
+    for (;;) {
+      const { done, value } = await reader.read()
 
-    if (done)
-      return undefined
-
-    buffer += decoder.decode(value, { stream: true })
-
-    const lines = buffer.split(LINE_BREAK)
-
-    buffer = lines.pop() ?? ''
-
-    for (const line of lines) {
-      // A listener starting another run aborts this one, whose chunk holds events of its own still.
-      if (signal.aborted)
+      if (done)
         return undefined
 
-      if (line === '') {
-        const ended = data.length > 0 || event !== '' ? onEvent(event, data.join('\n')) : undefined
+      buffer += decoder.decode(value, { stream: true })
 
-        event = ''
-        data = []
+      const lines = buffer.split(LINE_BREAK)
 
-        if (ended) {
-          await reader.cancel()
+      buffer = lines.pop() ?? ''
 
-          return ended
+      for (const line of lines) {
+        // A listener starting another run aborts this one, whose chunk holds events of its own still.
+        if (signal.aborted)
+          return undefined
+
+        if (line === '') {
+          const ended = data.length > 0 || event !== '' ? onEvent(event, data.join('\n')) : undefined
+
+          event = ''
+          data = []
+
+          if (ended) {
+            await reader.cancel()
+
+            return ended
+          }
+
+          continue
         }
 
-        continue
+        if (line.startsWith(':'))
+          continue
+
+        const colon = line.indexOf(':')
+        const field = colon === -1 ? line : line.slice(0, colon)
+        const text = colon === -1 ? '' : line.slice(colon + 1).replace(LEADING_SPACE, '')
+
+        if (field === 'event')
+          event = text
+        else if (field === 'data')
+          data.push(text)
       }
-
-      if (line.startsWith(':'))
-        continue
-
-      const colon = line.indexOf(':')
-      const field = colon === -1 ? line : line.slice(0, colon)
-      const text = colon === -1 ? '' : line.slice(colon + 1).replace(LEADING_SPACE, '')
-
-      if (field === 'event')
-        event = text
-      else if (field === 'data')
-        data.push(text)
     }
+  }
+  finally {
+    signal.removeEventListener('abort', onAbort)
   }
 }
 

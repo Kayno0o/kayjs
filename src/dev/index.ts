@@ -9,7 +9,7 @@ import { join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { findProjectFiles, IGNORED_DIRS } from '../build/files'
 import { configCheckOptions, writeShadowTypes } from '../check'
-import { CONFIG_FILE } from '../config'
+import { CONFIG_FILE, loadConfig } from '../config'
 import { projectPaths } from '../project'
 import { startClientBuilder } from './client'
 import { inspectorProxy } from './inspector'
@@ -93,6 +93,8 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   let changedFiles = new Set<string>()
   // Every file changed since the last restart began, stylesheets included.
   let touched = new Set<string>()
+  // The config the types are written from, read again once kay.config.ts changes.
+  let typesConfig = options.config
   // What the last restart came from and when it began, for its report.
   let restartedFor: string[] = []
   let restartedAt = performance.now()
@@ -342,7 +344,11 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     previous?.kill()
     await previous?.exited
     start()
-    await regenerateTypes(root, options)
+
+    if (typesConfig !== undefined && files.includes(CONFIG_FILE))
+      typesConfig = await reloadConfig(root, typesConfig)
+
+    await regenerateTypes(root, { ...options, config: typesConfig })
   }
   // Changes landing during a restart trigger one more, never two restarts at once.
   const drain = async () => {
@@ -457,6 +463,16 @@ function describe(files: string[]): string {
 }
 
 // Keeps editors and `tsgo` in step with the `.kay` sources; type errors themselves are `kay check`'s job.
+// A config that fails to load, halfway through an edit say, leaves the last one in place; the server reports why.
+async function reloadConfig(root: string, last: KayConfig): Promise<KayConfig> {
+  try {
+    return await loadConfig(root, true)
+  }
+  catch {
+    return last
+  }
+}
+
 async function regenerateTypes(root: string, { entry, config }: DevOptions) {
   try {
     await writeShadowTypes(root, { ...configCheckOptions(config ?? {}), entry })

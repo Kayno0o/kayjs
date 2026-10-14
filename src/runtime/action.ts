@@ -448,14 +448,14 @@ function pageOutcome(): Outcome | undefined {
   return typeof document === 'undefined' ? undefined : pageData<Outcome>(`script[${OUTCOME_SCRIPT}]`, decodeValue)[0]
 }
 
-// Posts a call, counting the ones in flight; a call that redirects never settles, so the action stays pending while the page goes.
+// Posts a call, counting the ones in flight; a call that redirects never settles, so the action stays pending while the page goes, unless the visitor stays or already went elsewhere.
 // How a post went is the request's on the server; in the browser the last call's once the page shown made one, else the post the page answers.
 function callable(url: () => string): { call: (input: never, options?: CallOptions) => Promise<unknown>, reads: PropertyDescriptorMap } {
   const [inFlight, setInFlight] = ownSignal(0)
   const [last, setLast] = ownSignal<{ page: number, outcome: Outcome | null } | undefined>(undefined)
   const [progress, setProgress] = ownSignal<number | undefined>(undefined)
   const shift = (by: number) => setInFlight(untrack(inFlight) + by)
-  const called = (outcome: Outcome | null) => setLast({ page: navigation.page, outcome })
+  const called = (page: number, outcome: Outcome | null) => setLast({ page, outcome })
   const outcome = () => {
     const posted = requestOutcome?.()
     const own = last()
@@ -472,15 +472,20 @@ function callable(url: () => string): { call: (input: never, options?: CallOptio
 
   return {
     call: async (input: unknown, options?: CallOptions) => {
+      // The page the call was made on, whose outcome it is even once the visitor went elsewhere.
+      const page = navigation.page
+      const visits = navigation.visits
+      const left = () => navigation.visits !== visits
+
       shift(1)
-      called(null)
+      called(page, null)
 
       let undo: (() => void) | undefined
       let posted = false
       let sent = false
       // Started before the caller goes on, so a navigation it starts next supersedes the refresh rather than the other way round; a site with `navigation: false` shows a call's effects itself.
       const refreshPage = () => {
-        if (options?.refresh !== false)
+        if (options?.refresh !== false && !left())
           void navigation.refresh?.()
       }
 
@@ -489,11 +494,11 @@ function callable(url: () => string): { call: (input: never, options?: CallOptio
 
         const data = await post(url(), input, setProgress, options?.signal, () => {
           sent = true
-        })
+        }, left)
 
         posted = true
 
-        called({ action: url(), succeeded: true, data })
+        called(page, { action: url(), succeeded: true, data })
         refreshPage()
 
         return data
@@ -508,7 +513,7 @@ function callable(url: () => string): { call: (input: never, options?: CallOptio
           refreshPage()
 
         if (error instanceof ActionError && !(error instanceof ActionRedirect))
-          called({ action: url(), status: error.status, values: {}, errors: error.errors, data: error.data })
+          called(page, { action: url(), status: error.status, values: {}, errors: error.errors, data: error.data })
 
         throw error
       }
@@ -532,7 +537,7 @@ function callable(url: () => string): { call: (input: never, options?: CallOptio
   }
 }
 
-async function post<Output>(url: string, input: unknown, onProgress: (sent: number) => void, signal?: AbortSignal, onSent?: () => void): Promise<Output> {
+async function post<Output>(url: string, input: unknown, onProgress: (sent: number) => void, signal: AbortSignal | undefined, onSent: () => void, left: () => boolean): Promise<Output> {
   const { headers, body } = encodeCall(input)
   const sent: Record<string, string> = { ...headers }
 
@@ -550,7 +555,7 @@ async function post<Output>(url: string, input: unknown, onProgress: (sent: numb
 
     // A signal aborted already sends nothing.
     if (signal?.aborted !== true)
-      onSent?.()
+      onSent()
 
     return files && upload ? upload.uploaded('POST', withBase(url), headers, files, onProgress, signal) : fetch(withBase(url), { method: 'POST', headers, body, ...signal && { signal } })
   }
@@ -565,7 +570,7 @@ async function post<Output>(url: string, input: unknown, onProgress: (sent: numb
 
   prefetched.clear()
 
-  return readActionResponse(response, url)
+  return readActionResponse(response, url, left)
 }
 
 // The encoding keeps numbers, booleans and Dates typed, which form fields would turn into strings; only a call carrying files needs multipart, whose boundary fetch writes.
@@ -611,7 +616,8 @@ export function decodeCall(body: unknown): unknown {
 }
 
 // What a call to `action` got back: the handler's result, or an `ActionError` with the refused fields and the failure data.
-export async function readActionResponse<Output>(response: Response, action: string): Promise<Output> {
+// `left` tells whether the visitor went to another page since the call was made, which a redirect then no longer takes them from.
+export async function readActionResponse<Output>(response: Response, action: string, left?: () => boolean): Promise<Output> {
   const target = response.headers.get(REDIRECT_HEADER)
 
   if (target !== null) {
@@ -621,6 +627,9 @@ export async function readActionResponse<Output>(response: Response, action: str
     // Only a page goes there: a `javascript:` target would run in this one.
     if (!HTTP_PROTOCOLS.has(new URL(target, window.location.href).protocol))
       throw new TypeError(`kay: the action redirected to ${JSON.stringify(target)}, which is no page`)
+
+    if (left?.() === true)
+      throw new ActionRedirect(response.status, target)
 
     // The page goes away, so whatever awaited the call never resumes; a leave guard keeping the visitor here settles it instead.
     if (await goTo(target))

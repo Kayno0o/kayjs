@@ -4,7 +4,7 @@ import { stringify } from 'devalue'
 import { batch, effect, every, flush, linked, listen, memo, onCleanup, onMount, root, selection, signal, untrack } from '../src/runtime'
 import { ActionError, actionStub } from '../src/runtime/action'
 import { navigation } from '../src/runtime/navigation'
-import { createSignal, ownSignal, recordSignals, renderEffect, renderOnServer, undoable, unrecorded } from '../src/runtime/reactive'
+import { createSignal, hydrationEnded, hydrationStarted, ownSignal, recordSignals, renderEffect, renderOnServer, undoable, unrecorded, whenHydrated } from '../src/runtime/reactive'
 import { inServerScope } from '../src/server/scope'
 
 describe('signals', () => {
@@ -233,6 +233,29 @@ describe('effects', () => {
     })
     await Promise.resolve()
     expect(mounted).toBe(false)
+  })
+})
+
+describe('whenHydrated', () => {
+  it('runs every function deferred until the islands hydrated, one throwing included', () => {
+    const error = spyOn(console, 'error').mockImplementation(() => undefined)
+    const ran: number[] = []
+
+    try {
+      hydrationStarted()
+      whenHydrated(() => ran.push(1))
+      whenHydrated(() => {
+        throw new Error('broken')
+      })
+      whenHydrated(() => ran.push(3))
+      hydrationEnded()
+
+      expect(ran).toEqual([1, 3])
+      expect(error).toHaveBeenCalledTimes(1)
+    }
+    finally {
+      error.mockRestore()
+    }
   })
 })
 

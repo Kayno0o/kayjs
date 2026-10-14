@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { kay } from '../src/build/plugin'
 import { check } from '../src/check'
 import { flush, root, signal } from '../src/runtime'
-import { ApiError, call, dispatch, readEvents, resource, socket, stream } from '../src/runtime/live'
+import { ApiError, call, dispatch, openSocket, readEvents, resource, socket, stream } from '../src/runtime/live'
 import { encodeValue } from '../src/runtime/wire'
 import { apiStubs, scanApi } from '../src/server/api'
 import { rooms, sqliteRooms } from '../src/server/rooms'
@@ -201,6 +201,55 @@ describe('API modules', () => {
 
     expect(received).toEqual([1, 2])
     expect(reader.status()).toBe('done')
+  })
+
+  it('keeps one abort listener for a stream however many times it reconnects', async () => {
+    const bodies = ['data: [1]\n\n', 'data: [2]\n\n', 'data: [3]\n\nevent: end\ndata:\n\n']
+    let listening = 0
+    const reader = readEvents<number>(async (signal) => {
+      if (listening === 0) {
+        const add = signal.addEventListener.bind(signal)
+        const remove = signal.removeEventListener.bind(signal)
+
+        signal.addEventListener = ((...args: Parameters<typeof add>) => {
+          listening++
+          add(...args)
+        }) as typeof add
+        signal.removeEventListener = ((...args: Parameters<typeof remove>) => {
+          listening--
+          remove(...args)
+        }) as typeof remove
+      }
+
+      return new Response(bodies.shift())
+    }, true)
+
+    reader.start()
+    await Bun.sleep(1200)
+
+    expect([reader.status(), listening]).toEqual(['done', 0])
+  })
+
+  it('sends the last 100 messages queued while connecting, and none once closed', () => {
+    const sent: string[] = []
+    const ws = Object.assign(new EventTarget(), { readyState: 0, send: (text: string) => sent.push(text), close: () => undefined }) as unknown as WebSocket
+    const room = openSocket<number, never>(() => ws)
+
+    room.start()
+
+    for (let n = 0; n < 150; n++)
+      room.send(n)
+
+    ws.dispatchEvent(new Event('open'))
+
+    expect([sent.length, sent[0], sent.at(-1)]).toEqual([100, '50', '149'])
+
+    sent.length = 0
+    room.close()
+    room.send(1)
+    ws.dispatchEvent(new Event('open'))
+
+    expect(sent).toEqual([])
   })
 
   it('holds the reconnect of a dropped stream while the tab is hidden, and makes it once the tab shows', async () => {
