@@ -10,6 +10,34 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 - An app's own register, reset or magic-link form carries the field, `input(type="hidden" name="captcha" data-kay-work={challenge})` with `const challenge = await ctx.locals.auth.captchaChallenge('register')` (`'reset'`, `'magic-link'`, `'sign-in'`) in its server fence, and its action passes `captcha` on, else the request answers `{ ok: false, error: 'captcha' }`. The full form is in kayjs-auth's llms.txt under "Bots and breached passwords".
 - A test posting such a form submits from the page it visited, `site.submit(register, fields, { from: await site.visit('/register') })`, which solves the field.
 - `signInAsGuest` is CAPTCHA-checked as `'guest'`, with its own `captcha.on.guest`, where it was `'register'` before: a custom `captcha.verify(token, action)` matching on `action` handles it.
+- `auth.features().captcha` is `'proof-of-work'` by default, besides a `CaptchaWidget` or `null`: an app's own page reading `.script`, `.class` or `.siteKey` off it checks `captcha === 'proof-of-work'` first and renders the field above. `CaptchaOptions` is a union of `CaptchaCheck` and `ProofOfWorkCaptcha`, so code reading its `verify` or `widget` narrows it first.
+- The prebuilt pages' actions also refuse a post sent without kay's script or under 2 seconds (`honeypot`, `minTime`): a test posting to one goes through `site.submit(..., { from })` as above.
+
+### kayjs-auth asks for a recent proof before sensitive reads and changes
+
+- `exportData()` answers `{ ok: false, error: 'stale' }` unless the session signed in or `reprove()`d within ten minutes, and `GET <prefix>/export` a 403. An app's own data page calls `auth.reprove(proof)` before linking the download, `auth.provedLately()` telling whether it must; an exhaustive `switch` over `exportData`'s errors handles `'stale'`.
+- `changeEmail` on an account with two-factor on takes its code or a passkey, `{ code }`, no longer the password alone, else `{ ok: false, error: 'proof' }`: an app's own change-email form asks for the code when `user.twoFactorEnabledAt` is set.
+
+### kayjs-auth checks OpenID Connect providers harder
+
+- ID tokens are verified against asymmetric algorithms only (RS, PS, ES and EdDSA): an identity provider signing them with an `HS*` secret switches to a key pair. `oidcProvider`, `googleProvider`, `microsoftProvider` and `gitlabProvider` take `algorithms` to narrow the list further.
+- In production, an `http:` issuer or GitLab `url` throws at startup, and an `http:` endpoint in the discovery document on the first sign-in: use the `https:` address. `http:` still works in development and tests.
+- Discovery no longer follows a redirect: point `issuer` at the address whose `/.well-known/openid-configuration` answers directly.
+
+### kayjs-auth stores
+
+- A custom `AuthStore`'s `audit.list` takes `before` as a `Date` or an `{ at, id }` cursor, orders by `at` then `id`, both descending, and with a cursor returns only the entries before it in that order (`at < before.at`, or the same `at` and `id < before.id`).
+- Expired links, codes, invitations, attempt windows and old sessions are deleted by the store's optional `prune(limits)`, run hourly, no longer as a side effect of reading them: a custom store implements `prune` or deletes them otherwise. `memoryStore` and `pgStore` implement it.
+- `pgStore`'s `auth_attempts` table gains an index on `reset_at`: `db.sync()` creates it, an app writing its own migrations adds it.
+- The rate-limit counters keyed by a typed email reset once.
+
+### Rendering and tests
+
+- `xlink:href` is rebased under `base` and URL-checked like `href`: drop a `base` prefix written into it by hand.
+- `mount()` from `kay/mount` leaves two empty comments around what it renders, and disposing it removes only those nodes rather than emptying the element: an app relying on the element being emptied empties it, and `innerHTML` snapshots change.
+- `page.a11y()` and the dev tool report text the colour of its background under `color-contrast`, where axe-core left it unreported: fix the colours, or clip text meant for screen readers only.
+- An extension typed as a bare `KayExtension` no longer turns `ctx.locals` into `any`: type it `KayExtension<typeof plugin>`, or fix what only compiled through the `any`.
+- kayjs-cms problem ids spell a `-` in a collection or key as `_2d_`.
 
 ### kayjs-auth refuses cross-site requests on a plain Elysia app
 

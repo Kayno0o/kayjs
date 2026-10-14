@@ -23,6 +23,38 @@ await site.submit(register, fields, { from: await site.visit('/register') })
 
 A guest sign-in is now checked as `'guest'` rather than `'register'`, with its own `captcha.on.guest`. A custom `captcha.verify` that looks at the action needs to handle it.
 
+`auth.features().captcha` is now `'proof-of-work'` by default. If your own page reads a widget's script or site key from it, check for `'proof-of-work'` first and render the field instead.
+
+The prebuilt pages also refuse a post sent without kay's script or within 2 seconds. Tests posting to them go through `site.submit` with `from`, as above.
+
+### kayjs-auth asks for a recent proof
+
+Downloading a user's data now needs a sign-in or a `reprove()` from the last ten minutes. `exportData()` otherwise answers `'stale'`, and the export route a 403. Your own data page calls `auth.reprove(proof)` before linking the download; `auth.provedLately()` tells you whether it needs to.
+
+Changing the email of an account with two-factor on now takes its code or a passkey, not the password alone. Your own change-email form asks for the code when the user has two-factor on.
+
+### kayjs-auth checks OpenID Connect providers harder
+
+ID tokens are only accepted when signed with a key pair (RS, PS, ES or EdDSA). An identity provider signing them with a shared `HS*` secret needs a key pair instead. The provider presets take `algorithms` to narrow the list further.
+
+In production, an issuer or discovered endpoint on `http:` is refused. Use the `https:` address. Discovery no longer follows redirects, so point `issuer` at the address that answers directly.
+
+### kayjs-auth stores
+
+If you wrote your own `AuthStore`:
+
+- `audit.list` takes `before` as a `Date` or an `{ at, id }` cursor. It orders by `at`, then `id`, both newest first, and returns only the entries before the cursor.
+- Expired links, codes, invitations and old sessions are now deleted by the store's `prune` method, run hourly. Implement it, or delete them another way. The built-in stores already do.
+
+`pgStore` adds an index on `auth_attempts.reset_at`. `db.sync()` creates it. If you write your own migrations, add it there.
+
+### Rendering and tests
+
+- `xlink:href` is now rebased under `base`, like `href`. Drop any prefix you added by hand.
+- `mount()` from `kay/mount` leaves two empty comments around what it renders. Disposing it removes only what it rendered, no longer emptying the element. `innerHTML` snapshots change.
+- `page.a11y()` now reports text the same colour as its background. Fix the colours, or clip text meant only for screen readers.
+- An extension typed as a bare `KayExtension` no longer makes `ctx.locals` untyped. Type it `KayExtension<typeof plugin>`.
+
 ### kayjs-auth refuses cross-site requests on a plain Elysia app
 
 On a plain Elysia app mounting `auth.plugin`, a cross-site POST or websocket upgrade from a browser now reads the session as signed out, and a sign-in, a sign-out or any other session write answers a 403. kay's own actions and API already refused these, and an `api({ cors })` module still lets in the origins it names.
