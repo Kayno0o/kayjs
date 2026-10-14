@@ -4,7 +4,8 @@ import type { PageSettings } from '../runtime'
 import type { ClientBuild, PrerenderedPage } from './client'
 import type { Route } from './routes'
 import { mkdir } from 'node:fs/promises'
-import { dirname, join, relative } from 'node:path'
+import { join, relative } from 'node:path'
+import { resolveFrom } from '../build/files'
 import { elementsIn, serverIslandOf } from '../compiler/ast'
 import { parseKay } from '../compiler/parser'
 import { analyzeServer } from '../compiler/script'
@@ -218,14 +219,10 @@ export async function reachesServerIsland(file: string, seen = new Set<string>()
     return true
 
   for (const [, specifier] of source.matchAll(KAY_IMPORT)) {
-    let imported: string
+    const imported = resolveFrom(specifier!, file)
 
-    try {
-      imported = Bun.resolveSync(specifier!, dirname(file))
-    }
-    catch {
+    if (imported === undefined)
       continue
-    }
 
     if (await reachesServerIsland(imported, seen))
       return true

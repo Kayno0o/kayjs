@@ -344,7 +344,7 @@ describe('Markdown outside collections', () => {
   })
 
   it('checks every URL an opted-in attribute holds, and writes back only the attributes it read', () => {
-    const options = { tags: ['img', 'video', 'source', 'blockquote'], attributes: { img: ['src', 'srcset', 'alt'], video: ['poster'], source: ['src'], blockquote: ['cite'], a: ['href', 'rel'] } }
+    const options = { tags: ['img', 'video', 'source', 'blockquote', 'span'], attributes: { img: ['src', 'srcset', 'alt'], video: ['poster'], source: ['src'], blockquote: ['cite'], a: ['href', 'rel', 'xlink:href', 'action'], span: ['data'] } }
     const kept = (markup: string) => String(sanitizeHtml(markup, options))
 
     expect(kept('<img src="javascript:x" srcset="/a.png 1x, javascript:y 2x" alt="a">')).toBe('<img alt="a">')
@@ -353,6 +353,9 @@ describe('Markdown outside collections', () => {
     expect(kept('<blockquote cite="data:text/html,x">q</blockquote>')).toBe('<blockquote>q</blockquote>')
     expect(kept('<img src="/a.png" src="javascript:x" alt=\'say "hi"\'>')).toBe('<img src="/a.png" alt="say &quot;hi&quot;">')
     expect(kept('<img alt="a > b" src="javascript:x">')).toBe('<img> b" src="javascript:x">')
+    expect(kept('<a xlink:href="javascript:x" action="javascript:x">x</a>')).toBe('<a>x</a>')
+    expect(kept('<a xlink:href="/x" action="/x">x</a>')).toBe('<a xlink:href="/x" action="/x">x</a>')
+    expect(kept('<span data="hello">x</span>')).toBe('<span data="hello">x</span>')
     expect(kept('<a href="/x" rel="opener">x</a>')).toBe('<a href="/x" rel="nofollow ugc">x</a>')
   })
 

@@ -7,7 +7,7 @@ import type { Endpoint, Route } from '../server/routes'
 import type { ContentChecks } from './project'
 import type { ShadowTypes } from './shadow-types'
 import { join, relative, resolve } from 'node:path'
-import { settingsReplacements } from '../build/libraries'
+import { SCRIPT_FILE, settingsReplacements } from '../build/libraries'
 import { CONFIG_FILE } from '../config'
 import { projectPaths } from '../project'
 import { matcherSource } from './shadow'
@@ -15,7 +15,6 @@ import { matcherSource } from './shadow'
 export const SETTINGS_CHECK = 'kay-settings.ts'
 export const EXPORTS_CHECK = 'kay-exports.ts'
 export const CONTENT_CHECK = 'kay-content.ts'
-const SCRIPT_EXTENSION = /\.[cm]?[jt]sx?$/
 // A prop name TypeScript reads unquoted, so its errors name it as written.
 const IDENTIFIER = /^[a-z_$][\w$]*$/i
 
@@ -44,7 +43,7 @@ function assertions<About>(lines: AssertionLine<About>[]): Assertions<About> {
 }
 
 function modulePath(root: string, file: string): string {
-  return JSON.stringify(relative(projectPaths(root).types, file).replace(SCRIPT_EXTENSION, ''))
+  return JSON.stringify(relative(projectPaths(root).types, file).replace(SCRIPT_FILE, ''))
 }
 
 // One line per library whose settings the app replaces, assigning the app's module to the type of the defaults it stands in for.

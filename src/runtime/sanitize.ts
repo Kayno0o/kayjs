@@ -48,12 +48,12 @@ function isSafeUrl(value: string): boolean {
   return SAFE_URL.test(value.replace(AMPERSAND, ''))
 }
 
-// Whether an attribute's value is fine to write back: a URL safe, and every URL of a `srcset`.
+// Whether an attribute's value is fine to write back: a URL safe, and every URL of a `srcset`. `data` is a URL on an `object` only, a tag never kept, so on any other it is a plain value.
 function safeValue(attribute: string, value: string): boolean {
   if (attribute === 'srcset')
     return value.trim().split(SRCSET_CANDIDATE).every(candidate => isSafeUrl(candidate.replace(DESCRIPTOR, '')))
 
-  return !(URL_ATTRIBUTES.includes(attribute) || SANITIZED_ONLY.test(attribute)) || isSafeUrl(value)
+  return !((attribute !== 'data' && URL_ATTRIBUTES.includes(attribute)) || SANITIZED_ONLY.test(attribute)) || isSafeUrl(value)
 }
 
 // The opening tag with the attributes kept for it, a URL only when safe, and a link marked as the user's.
