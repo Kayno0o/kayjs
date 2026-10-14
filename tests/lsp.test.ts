@@ -18,7 +18,7 @@ class Editor {
   readonly connection: Connection
   private readonly process = Bun.spawn([process.execPath, cli, 'lsp', '--stdio'], { stdin: 'pipe', stdout: 'pipe', stderr: 'ignore' })
   // Who waits for the next diagnostics of a file, of a version of it when they changed it.
-  private readonly waiting = new Map<string, { resolve: (diagnostics: Diagnostic[]) => void, version?: number }>()
+  private readonly waiting = new Map<string, { resolve: (diagnostics: Diagnostic[]) => void, version: number | undefined }>()
 
   constructor(readonly root: string, private readonly vscode = false) {
     this.connection = new Connection(this.process.stdout, (data) => {
