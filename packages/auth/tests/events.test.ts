@@ -129,6 +129,7 @@ describe('the audit log', () => {
     const ada = browser()
 
     await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
+    setSystemTime(new Date(Date.now() + 1000))
     await ada.call('changePassword', { password: PASSWORD }, 'a brand new password')
 
     const [first] = await ada.call('auditLog', { limit: 1 })
@@ -137,6 +138,28 @@ describe('the audit log', () => {
     expect(first.event).toBe('password-changed')
     expect(next.map((entry: { event: string }) => entry.event)).toEqual(['signed-in'])
     expect(await ada.call('auditLog', { before: JSON.parse(JSON.stringify(next[0])) })).toEqual([])
+  })
+
+  test('reads entries of one millisecond newest written first', async () => {
+    const { browser, store } = setup({ audit: true })
+    const ada = browser()
+
+    setSystemTime(new Date())
+    await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
+    let current = PASSWORD
+
+    for (let index = 0; index < 20; index++) {
+      const next = `a brand new password ${index}`
+
+      await ada.call('changePassword', { password: current }, next)
+      current = next
+    }
+    const entries = await store.audit!.list({ limit: 100 })
+
+    expect(new Set(entries.map(entry => entry.at.getTime())).size).toBe(1)
+    expect(entries.filter(entry => entry.event === 'password-changed')).toHaveLength(20)
+    expect(entries.map(entry => entry.id)).toEqual(entries.map(entry => entry.id).toSorted().toReversed())
+    expect(entries.at(-1)!.event).toBe('signed-in')
   })
 
   test('is not kept without the option', async () => {

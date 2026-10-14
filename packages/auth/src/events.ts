@@ -59,7 +59,7 @@ export async function report(state: RequestState, record: UserRecord, event: Aut
     return
 
   try {
-    await audit(core).add({ id: crypto.randomUUID(), userId: record.id, event, detail: detail ?? null, ip: state.address, userAgent: state.userAgent, actorId: actor?.id ?? null, at: new Date() })
+    await audit(core).add({ id: Bun.randomUUIDv7(), userId: record.id, event, detail: detail ?? null, ip: state.address, userAgent: state.userAgent, actorId: actor?.id ?? null, at: new Date() })
     await prune(core)
   }
   catch (error) {

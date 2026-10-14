@@ -211,7 +211,7 @@ export interface AuthStore {
   // Needed only with the `audit` option.
   audit?: {
     add: (entry: AuditRecord) => MaybePromise<void>
-    // Newest first, entries of one millisecond by id descending; `before` excludes that instant, or when it names an entry's `at` and `id`, that entry and every one after it in this order.
+    // Newest first, entries of one millisecond by id descending (the library writes time-ordered ids, so that is newest written first); `before` excludes that instant, or when it names an entry's `at` and `id`, that entry and every one after it in this order.
     list: (query: { userId?: string, before?: AuditCursor, limit: number }) => MaybePromise<AuditRecord[]>
     // Deletes the entries older than `before`.
     prune: (before: Date) => MaybePromise<void>
