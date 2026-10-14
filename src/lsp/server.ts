@@ -108,6 +108,9 @@ export class KayLanguageServer {
   // The quiet spell since the last change, and whether another came during it, which publishes again once it ends.
   private diagnosticsTimer: Timer | undefined
   private diagnosticsDue = false
+  // Whether every open file is being published, and whether another publish was asked for during it, which runs once it ends.
+  private publishing = false
+  private publishAgain = false
   private projectChecksTimer?: Timer
   // The run of the project-wide checks in flight, and whether a save came during it.
   private projectChecks: Promise<void> | undefined
@@ -257,7 +260,7 @@ export class KayLanguageServer {
   }
 
   // Rewrites the shadow tree on disk, so closed .kay files and the editor's own TypeScript server see the saved code; tsgo hears which shadow files came and went, so imports of them resolve again.
-  // `modulesChanged` when a module but a .kay file changed on disk, whose signals the open components may take on or lose.
+  // `modulesChanged` is true when a file other than a .kay file changed on disk, whose signals the open components may take on or lose.
   private async saved(modulesChanged = false) {
     const options = new Map([...this.projects].map(([root, project]) => [root, project.options]))
 
@@ -465,9 +468,27 @@ export class KayLanguageServer {
     return found.flat()
   }
 
-  // Every open file is checked again on any change, since editing one component can break the files using it.
+  // Every open file is checked again on any change, since editing one component can break the files using it. A slow tsgo runs one publish at a time, those asked for meanwhile making one more, which sees the latest text.
   private async publishAllDiagnostics() {
-    await Promise.all([...this.documents.values()].map(async document => this.publishDiagnostics(document)))
+    if (this.publishing) {
+      this.publishAgain = true
+
+      return
+    }
+
+    this.publishing = true
+
+    try {
+      await Promise.all([...this.documents.values()].map(async document => this.publishDiagnostics(document)))
+    }
+    finally {
+      this.publishing = false
+
+      if (this.publishAgain) {
+        this.publishAgain = false
+        void guard(this.publishAllDiagnostics())
+      }
+    }
   }
 
   private async publishDiagnostics(document: Document) {

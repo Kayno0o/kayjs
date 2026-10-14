@@ -5,13 +5,16 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import process from 'node:process'
 import { pathToFileURL } from 'node:url'
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
+import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { check } from '../src/check'
 import { Connection } from '../src/lsp/rpc'
+import { KayLanguageServer } from '../src/lsp/server'
 import { scratchDir } from './scratch'
 
 const fixtures = join(import.meta.dir, 'fixtures')
 const cli = join(import.meta.dir, '..', 'src', 'cli.ts')
+const DIAGNOSTICS_DELAY = 150
+const SLOW = 300
 
 // Drives `kay lsp` over stdio the way an editor does.
 class Editor {
@@ -20,7 +23,10 @@ class Editor {
   // Who waits for the next diagnostics of a file, of a version of it when they changed it.
   private readonly waiting = new Map<string, { resolve: (diagnostics: Diagnostic[]) => void, version: number | undefined }>()
 
-  constructor(readonly root: string, private readonly vscode = false) {
+  // Every publish, in the order they came.
+  readonly publishes: { uri: string, version: number | undefined, diagnostics: Diagnostic[], at: number }[] = []
+
+  constructor(readonly root: string, private readonly vscode = false, private readonly capabilities: object = {}) {
     this.connection = new Connection(this.process.stdout, (data) => {
       void this.process.stdin.write(data)
       void this.process.stdin.flush()
@@ -28,13 +34,15 @@ class Editor {
     this.connection.onNotification<{ uri: string, version?: number, diagnostics: Diagnostic[] }>('textDocument/publishDiagnostics', ({ uri, version, diagnostics }) => {
       const waiting = this.waiting.get(uri)
 
+      this.publishes.push({ uri, version, diagnostics, at: performance.now() })
+
       if (waiting && (waiting.version === undefined || waiting.version === version))
         waiting.resolve(diagnostics)
     })
   }
 
   async start() {
-    await this.connection.request('initialize', { processId: process.pid, rootUri: this.fileUri(this.root), capabilities: {} })
+    await this.connection.request('initialize', { processId: process.pid, rootUri: this.fileUri(this.root), capabilities: this.capabilities })
     this.connection.notify('initialized', {})
   }
 
@@ -181,10 +189,25 @@ describe('kay lsp', () => {
     expect(diagnostics).toEqual([expect.objectContaining({ source: 'kay', range: expect.objectContaining({ start: { line: 1, character: 2 } }) })])
   })
 
-  it('publishes a burst of changes once more after the last, with its diagnostics', async () => {
-    void editor.change('broken/src/routes/[id].kay', 'p {missing}\n', 4)
+  it('publishes a change after a quiet spell before the delay, and a burst once more after its last change without the versions between', async () => {
+    const path = 'broken/src/routes/[id].kay'
+    const uri = editor.uri(path)
 
-    expect(await editor.change('broken/src/routes/[id].kay', 'p fixed\n', 5)).toEqual([])
+    await Bun.sleep(DIAGNOSTICS_DELAY * 2)
+
+    const started = performance.now()
+    const quiet = await editor.change(path, 'p {missing}\n', 4)
+
+    expect(quiet.length).toBeGreaterThan(0)
+    expect(editor.publishes.findLast(entry => entry.uri === uri && entry.version === 4)!.at - started).toBeLessThan(DIAGNOSTICS_DELAY)
+
+    await Bun.sleep(DIAGNOSTICS_DELAY * 2)
+    void editor.change(path, 'p {alsoMissing}\n', 5)
+    void editor.change(path, 'p {stillMissing}\n', 6)
+
+    expect(await editor.change(path, 'p fixed\n', 7)).toEqual([])
+    await Bun.sleep(DIAGNOSTICS_DELAY * 2)
+    expect(editor.publishes.filter(entry => entry.uri === uri && (entry.version === 5 || entry.version === 6))).toEqual([])
   })
 
   it('shows hover types for template expressions and server data', async () => {
@@ -603,6 +626,109 @@ describe('kay lsp following the project on disk', () => {
 
     await Bun.write(join(dir, 'src/cart.ts'), 'import { signal } from \'kay\'\n\nexport const cart = signal([1])\n')
     expect(codes(await editor.filesChanged(component, [{ path: 'src/cart.ts', type: 2 }]))).toEqual(['uncalled-signal'])
+  })
+})
+
+describe('kay lsp for a client that supports diagnostic refreshes', () => {
+  let editor: Editor
+  let dir: string
+  const page = 'src/routes/a.kay'
+
+  beforeAll(async () => {
+    dir = await scratchDir('lsp-refresh-')
+    await Promise.all([
+      Bun.write(join(dir, 'tsconfig.json'), await Bun.file(join(fixtures, 'site/tsconfig.json')).text()),
+      Bun.write(join(dir, page), 'p x\n'),
+    ])
+    editor = new Editor(dir, false, { workspace: { diagnostics: { refreshSupport: true } } })
+    await editor.start()
+    await editor.open(page)
+  })
+
+  afterAll(async () => {
+    await editor.stop()
+    await rm(dir, { recursive: true, force: true })
+  })
+
+  it('publishes each edit once, with no second publish from tsgo', async () => {
+    const uri = editor.uri(page)
+
+    // A save or a file changing on disk makes tsgo ask for a refresh, which edits do not.
+    editor.connection.notify('textDocument/didSave', { textDocument: { uri } })
+    await Bun.sleep(DIAGNOSTICS_DELAY * 4)
+    for (const version of [2, 3]) {
+      await Bun.sleep(DIAGNOSTICS_DELAY * 2)
+      await editor.change(page, `--- server\nconst n: string = ${version}\n---\np {n}\n`, version)
+      await Bun.sleep(DIAGNOSTICS_DELAY * 3)
+      expect(editor.publishes.filter(entry => entry.uri === uri && entry.version === version)).toHaveLength(1)
+    }
+  })
+})
+
+describe('kay lsp with a slow tsgo', () => {
+  it('keeps one publish running at a time, and one more once it ends, however many changes come meanwhile', async () => {
+    const dir = await scratchDir('lsp-slow-')
+    const page = 'src/routes/a.kay'
+    const encoder = new TextEncoder()
+    const toServer = new TransformStream<Uint8Array>()
+    const toClient = new TransformStream<Uint8Array>()
+    const writeToServer = toServer.writable.getWriter()
+    const writeToClient = toClient.writable.getWriter()
+    const client = new Connection(toClient.readable, (data) => {
+      void writeToServer.write(encoder.encode(data))
+    })
+    const server = new KayLanguageServer(new Connection(toServer.readable, (data) => {
+      void writeToClient.write(encoder.encode(data))
+    }))
+    // eslint-disable-next-line ts/unbound-method -- called back with the connection it was taken from
+    const request = Connection.prototype.request as (this: Connection, method: string, params?: unknown) => Promise<unknown>
+    let running = 0
+    let started = 0
+    let most = 0
+
+    await Promise.all([Bun.write(join(dir, 'tsconfig.json'), await Bun.file(join(fixtures, 'site/tsconfig.json')).text()), Bun.write(join(dir, page), 'p x\n')])
+
+    const slow = spyOn(Connection.prototype, 'request').mockImplementation((async function (this: Connection, method: string, params?: unknown) {
+      // The project checks ask for other files.
+      if (method !== 'textDocument/diagnostic' || !(params as { textDocument: { uri: string } }).textDocument.uri.endsWith(`${page}.tsx`))
+        return request.call(this, method, params)
+
+      started++
+      most = Math.max(most, ++running)
+      await Bun.sleep(SLOW * 2)
+      running--
+
+      return request.call(this, method, params)
+    }) as Connection['request'])
+
+    try {
+      const uri = pathToFileURL(join(dir, page)).href
+      let last = 0
+
+      client.onNotification('textDocument/publishDiagnostics', () => {
+        last = performance.now()
+      })
+      await client.request('initialize', { processId: process.pid, rootUri: pathToFileURL(dir).href, capabilities: {} })
+      client.notify('initialized', {})
+      client.notify('textDocument/didOpen', { textDocument: { uri, languageId: 'kay', version: 1, text: 'p x\n' } })
+
+      for (let version = 2; version <= 5; version++) {
+        await Bun.sleep(DIAGNOSTICS_DELAY + 50)
+        client.notify('textDocument/didChange', { textDocument: { uri, version }, contentChanges: [{ text: `p {${version}}\n` }] })
+      }
+      await Bun.sleep(SLOW * 8)
+      expect(last).toBeGreaterThan(0)
+      expect(most).toBe(1)
+      expect(started).toBeLessThanOrEqual(3)
+    }
+    finally {
+      slow.mockRestore()
+      // `exit` would end the test run too.
+      const { tsgo } = server as unknown as { tsgo?: { process: { kill: () => void } } }
+
+      tsgo?.process.kill()
+      await rm(dir, { recursive: true, force: true })
+    }
   })
 })
 
