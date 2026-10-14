@@ -1,10 +1,10 @@
 import type { CaptchaOptions } from '../src/captcha'
-import type { Mail } from '../src/mail'
 import { createHash } from 'node:crypto'
 import { afterEach, describe, expect, test } from 'bun:test'
 import { pwnedPassword } from '../src/breached'
 import { hcaptcha, turnstile } from '../src/captcha'
 import { testApp, userRecord } from './helpers/app'
+import { mailbox } from './helpers/mail'
 
 const PASSWORD = 'correct horse battery'
 const LINKS = { 'verify-email': '/verify', 'reset-password': '/reset', 'magic-link': '/magic', 'change-email': '/confirm-email' }
@@ -15,22 +15,18 @@ afterEach(() => {
 })
 
 function setup(options: Parameters<typeof testApp>[0] = {}) {
-  const mails: Mail[] = []
+  const { mails, mailer, take } = mailbox()
   const app = testApp({
     url: 'https://site.test',
     email: {
-      mailer: {
-        send: (mail) => {
-          mails.push(mail)
-        },
-      },
+      mailer,
       links: LINKS,
       requireVerified: false,
     },
     ...options,
   })
 
-  return { ...app, mails }
+  return { ...app, mails, take }
 }
 
 // A check passing only the token `human`, recording what it was asked.
@@ -122,7 +118,7 @@ describe('breached passwords', () => {
   const breached = (password: string) => password === 'password1234'
 
   test('are refused on registering, resetting and changing a password', async () => {
-    const { browser, mails } = setup({ breachedPasswords: breached })
+    const { browser, take } = setup({ breachedPasswords: breached })
     const ada = browser()
 
     expect(await ada.post('/register', { email: 'ada@example.com', password: 'password1234' })).toEqual({ ok: false, errors: { password: 'breached' } })
@@ -130,8 +126,8 @@ describe('breached passwords', () => {
     expect(await ada.call('changePassword', { password: PASSWORD }, 'password1234')).toEqual({ ok: false, errors: { password: 'breached' } })
 
     await ada.call('requestPasswordReset', 'ada@example.com')
-    await Bun.sleep(10)
-    const token = new URL(mails.findLast(mail => mail.kind === 'reset-password')!.url!).searchParams.get('token')!
+    const [reset] = await take({ kind: 'reset-password' })
+    const token = new URL(reset!.url!).searchParams.get('token')!
 
     expect(await ada.call('resetPassword', token, 'password1234')).toEqual({ ok: false, errors: { password: 'breached' } })
     // The refused password left the link usable.

@@ -1,6 +1,7 @@
 import type { User } from '../src/auth'
 import { describe, expect, test } from 'bun:test'
 import { serialStore, testApp, userRecord } from './helpers/app'
+import { productionHash } from './helpers/cheapHash'
 
 const PASSWORD = 'correct horse battery'
 
@@ -27,7 +28,7 @@ describe('register', () => {
     expect([await ada.json('/me'), signUps.at(-1)?.id]).toEqual([expect.objectContaining({ id: '2', email: 'ada@example.com' }), '2'])
   })
 
-  test('creates a user with a hashed password and signs them in', async () => {
+  test('creates a user with a password hashed at the production cost and signs them in', productionHash(async () => {
     const { browser, signUps, store } = setup()
     const ada = browser()
     const result = await ada.post('/register', { email: ' Ada@Example.com ', password: PASSWORD, username: 'Ada' })
@@ -35,8 +36,8 @@ describe('register', () => {
     expect(result).toMatchObject({ ok: true, user: { email: 'ada@example.com', username: 'Ada', hasPassword: true, emailVerified: false } })
     expect(await ada.json('/me')).toMatchObject({ email: 'ada@example.com' })
     expect(signUps).toHaveLength(1)
-    expect((await store.users.findByEmail('ada@example.com'))?.passwordHash).toStartWith('$argon2id$')
-  })
+    expect((await store.users.findByEmail('ada@example.com'))?.passwordHash).toStartWith('$argon2id$v=19$m=65536,t=2,')
+  }))
 
   test('answers each refused field with a code', async () => {
     const { browser, signUps } = setup()
@@ -148,14 +149,14 @@ describe('signInWithPassword', () => {
     expect(await browser().json('/password', from('10.0.0.2'))).toMatchObject({ ok: true })
   })
 
-  test('rehashes a bcrypt password with argon2id on sign-in', async () => {
+  test('rehashes a bcrypt password with argon2id on sign-in', productionHash(async () => {
     const { browser, store } = setup()
 
     await store.users.create(userRecord({ id: 'u1', email: 'ada@example.com', passwordHash: await Bun.password.hash(PASSWORD, { algorithm: 'bcrypt', cost: 4 }) }))
 
     expect(await browser().post('/password', { identifier: 'ada@example.com', password: PASSWORD })).toMatchObject({ ok: true })
-    expect((await store.users.get('u1'))?.passwordHash).toStartWith('$argon2id$')
-  })
+    expect((await store.users.get('u1'))?.passwordHash).toStartWith('$argon2id$v=19$m=65536,t=2,')
+  }))
 
   test('refuses a password past the longest allowed', async () => {
     const { browser } = await registered()
