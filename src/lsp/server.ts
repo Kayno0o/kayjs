@@ -105,7 +105,7 @@ export class KayLanguageServer {
   private readonly projects = new Map<string, Project>()
   private tsgo?: { connection: Connection, process: Subprocess<'pipe', 'pipe', 'ignore'> }
   private readonly documents = new Map<string, Document>()
-  // The quiet spell after a publish, and whether a change came during it, which publishes again once it ends.
+  // The quiet spell since the last change, and whether another came during it, which publishes again once it ends.
   private diagnosticsTimer: Timer | undefined
   private diagnosticsDue = false
   private projectChecksTimer?: Timer
@@ -219,13 +219,7 @@ export class KayLanguageServer {
         project.configured = false
     }
 
-    await this.saved()
-
-    // An open component takes as signals those a changed module now exports, or stops.
-    for (const previous of others.length > 0 ? this.documents.values() : []) {
-      if (JSON.stringify(importedSignals(fileURLToPath(previous.uri), previous.source)) !== previous.signals)
-        this.refresh(previous)
-    }
+    await this.saved(others.length > 0)
   }
 
   private open(item: TextDocumentItem) {
@@ -263,16 +257,17 @@ export class KayLanguageServer {
   }
 
   // Rewrites the shadow tree on disk, so closed .kay files and the editor's own TypeScript server see the saved code; tsgo hears which shadow files came and went, so imports of them resolve again.
-  private async saved() {
+  // `modulesChanged` when a module but a .kay file changed on disk, whose signals the open components may take on or lose.
+  private async saved(modulesChanged = false) {
     const options = new Map([...this.projects].map(([root, project]) => [root, project.options]))
 
     this.server.notify('workspace/didChangeWatchedFiles', { changes: await this.writeShadows() })
-    // An open component that came to be rendered only by islands, or stopped being, or whose project read its config again, compiles again.
+    // An open component that came to be rendered only by islands, or stopped being, whose project read its config again, or that takes as signals those a changed module now exports, or stops, compiles again before the files are checked.
     for (const previous of this.documents.values()) {
       const file = fileURLToPath(previous.uri)
       const project = this.projects.get(projectRootOf(file, this.root))
 
-      if ((project?.islandOnly.has(file) ?? false) !== previous.insideIsland || (project !== undefined && project.options !== options.get(project.root)))
+      if ((project?.islandOnly.has(file) ?? false) !== previous.insideIsland || (project !== undefined && project.options !== options.get(project.root)) || (modulesChanged && JSON.stringify(importedSignals(file, previous.source)) !== previous.signals))
         this.refresh(previous)
     }
     this.scheduleDiagnostics()

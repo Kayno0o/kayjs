@@ -574,6 +574,17 @@ describe('kay lsp following the project on disk', () => {
     await Bun.write(join(dir, 'src/routes/plain.kay'), '---\nimport Wrapper from \'../components/wrapper.kay\'\n---\nWrapper(controls={{ pick: () => {} }})\n')
     expect(codes(await editor.filesChanged(wrapper, [{ path: 'src/routes/plain.kay', type: 1 }]))).toEqual([2345])
   })
+
+  // Last, as a module changing publishes the open files again once tsgo asks, which a later wait would take for its own.
+  it('compiles an open component again once a module it imports exports a signal, and publishes it', async () => {
+    const component = 'src/components/cart-count.kay'
+
+    await Promise.all([Bun.write(join(dir, 'src/cart.ts'), 'export const cart = [1]\n'), Bun.write(join(dir, component), '---\nimport { cart } from \'../cart\'\n---\np {cart.length}\n')])
+    expect(await editor.open(component)).toEqual([])
+
+    await Bun.write(join(dir, 'src/cart.ts'), 'import { signal } from \'kay\'\n\nexport const cart = signal([1])\n')
+    expect(codes(await editor.filesChanged(component, [{ path: 'src/cart.ts', type: 2 }]))).toEqual(['uncalled-signal'])
+  })
 })
 
 // An app's folder opened in VS Code, which writes its path with more percent-escapes than Node does, while tsgo echoes URIs the VS Code way. It holds another project with its own tsconfig.json, as a monorepo does, and lists an extension by a path beside it, as a library's own fixture app does.
