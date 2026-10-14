@@ -121,6 +121,8 @@ createAuth({
 a(href="/auth/discord?redirect=/account" data-no-prefetch) Sign in with Discord
 ```
 
+An OpenID Connect provider (`oidcProvider({ issuer })`, `googleProvider()`, `microsoftProvider()`...) has its ID token checked before anything is read off it, and only an `RS256`, `PS256`, `ES256` or `EdDSA` signature passes: `none` and the shared-secret `HS*` algorithms never do. A provider signing otherwise names its own with `algorithms: ['RS384']`. In production an `http://` issuer or discovered endpoint is refused.
+
 <Callout type="warning">
 
 A mailed link opens a page of yours that shows a button posting the token to an action. Never spend a token when the page loads, mail scanners open links.

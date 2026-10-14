@@ -96,14 +96,26 @@ export interface OpenIdClaims {
 /** Options every OpenID Connect preset takes: other scopes than its own, and extra authorize URL parameters, such as Google's `{ access_type: 'offline', prompt: 'consent' }` for a refresh token. */
 export interface OpenIdOptions {
   scopes?: string[]
+  /** The `alg` values the provider signs ID tokens with, when not `RS256`, `PS256`, `ES256` or `EdDSA`, as `['RS384']`. */
+  algorithms?: string[]
   params?: Record<string, string>
 }
 
 const OPENID_SCOPES = ['openid', 'email', 'profile']
 
+// Anything but https is refused in production, where a plain-http endpoint lets whoever sits on the path read the codes and tokens or answer in the provider's place.
+function requireHttps(url: string, what: string): void {
+  if (process.env.NODE_ENV === 'production' && new URL(url).protocol !== 'https:')
+    throw new Error(`${what} ${url} is not https, which production refuses`)
+}
+
+const idTokenAlgorithms = (opts: OpenIdOptions) => opts.algorithms === undefined ? {} : { algorithms: opts.algorithms }
+
 /** Any OpenID Connect provider by its issuer URL, its endpoints read off its discovery document on first use: Keycloak, Authentik, Auth0, Okta, Zitadel... */
 export function oidcProvider(opts: OpenIdOptions & { issuer: string, name?: string }): OAuthProvider<OpenIdClaims> {
   const issuer = opts.issuer.replace(TRAILING_SLASHES, '')
+
+  requireHttps(issuer, 'the OpenID Connect issuer')
 
   return {
     name: opts.name ?? new URL(issuer).host,
@@ -126,11 +138,16 @@ export function oidcProvider(opts: OpenIdOptions & { issuer: string, name?: stri
           throw new Error(`discovery document has no ${field}`)
       }
 
+      for (const field of ['authorization_endpoint', 'token_endpoint', 'userinfo_endpoint', 'jwks_uri']) {
+        if (typeof doc[field] === 'string')
+          requireHttps(doc[field], `the discovery document's ${field}`)
+      }
+
       return {
         authorizeUrl: doc.authorization_endpoint as string,
         tokenUrl: doc.token_endpoint as string,
         userUrl: typeof doc.userinfo_endpoint === 'string' ? doc.userinfo_endpoint : undefined,
-        openId: { issuer: doc.issuer, jwksUrl: doc.jwks_uri as string },
+        openId: { issuer: doc.issuer, jwksUrl: doc.jwks_uri as string, ...idTokenAlgorithms(opts) },
       }
     },
     parseTokens: parseStandardTokens,
@@ -145,7 +162,7 @@ export function googleProvider(opts: OpenIdOptions = {}): OAuthProvider<OpenIdCl
     label: 'Google',
     authorizeUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
     tokenUrl: 'https://oauth2.googleapis.com/token',
-    openId: { issuer: ['https://accounts.google.com', 'accounts.google.com'], jwksUrl: 'https://www.googleapis.com/oauth2/v3/certs' },
+    openId: { issuer: ['https://accounts.google.com', 'accounts.google.com'], jwksUrl: 'https://www.googleapis.com/oauth2/v3/certs', ...idTokenAlgorithms(opts) },
     scopes: opts.scopes ?? OPENID_SCOPES,
     ...opts.params === undefined ? {} : { authorizeParams: opts.params },
     parseTokens: parseStandardTokens,
@@ -165,7 +182,7 @@ export function microsoftProvider(opts: OpenIdOptions & { tenant?: string } = {}
     authorizeUrl: `${base}/oauth2/v2.0/authorize`,
     tokenUrl: `${base}/oauth2/v2.0/token`,
     // The issuer names the account's own tenant, so a multi-tenant app checks it against the token's `tid`.
-    openId: { issuer: claims => microsoftIssued(tenant, claims), jwksUrl: `${base}/discovery/v2.0/keys` },
+    openId: { issuer: claims => microsoftIssued(tenant, claims), jwksUrl: `${base}/discovery/v2.0/keys`, ...idTokenAlgorithms(opts) },
     scopes: opts.scopes ?? OPENID_SCOPES,
     ...opts.params === undefined ? {} : { authorizeParams: opts.params },
     parseTokens: parseStandardTokens,
@@ -201,13 +218,15 @@ function microsoftIssued(tenant: string, claims: Record<string, unknown>): boole
 export function gitlabProvider(opts: OpenIdOptions & { url?: string } = {}): OAuthProvider<OpenIdClaims> {
   const base = (opts.url ?? 'https://gitlab.com').replace(TRAILING_SLASHES, '')
 
+  requireHttps(base, 'the GitLab url')
+
   return {
     name: 'gitlab',
     label: 'GitLab',
     authorizeUrl: `${base}/oauth/authorize`,
     tokenUrl: `${base}/oauth/token`,
     userUrl: `${base}/oauth/userinfo`,
-    openId: { issuer: base, jwksUrl: `${base}/oauth/discovery/keys` },
+    openId: { issuer: base, jwksUrl: `${base}/oauth/discovery/keys`, ...idTokenAlgorithms(opts) },
     scopes: opts.scopes ?? OPENID_SCOPES,
     ...opts.params === undefined ? {} : { authorizeParams: opts.params },
     parseTokens: parseStandardTokens,

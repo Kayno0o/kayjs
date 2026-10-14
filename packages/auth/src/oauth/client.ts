@@ -6,6 +6,9 @@ import { PROVIDER_TIMEOUT_MS } from './timeout'
 // How far apart the provider's clock and this one may be when an ID token's times are read.
 const CLOCK_TOLERANCE_S = 60
 
+// What an ID token may be signed with when the provider names no list: asymmetric algorithms only, so neither `none` nor a shared-secret one passes.
+const ID_TOKEN_ALGORITHMS = ['RS256', 'PS256', 'ES256', 'EdDSA']
+
 interface AuthorizeUrlOptions {
   state?: string
   /** PKCE code challenge (S256); pair with `codeVerifier` on `exchangeCode`. */
@@ -101,7 +104,7 @@ export function createOAuthClient<Raw = any, User = unknown>(provider: OAuthProv
     let claims: Record<string, unknown>
 
     try {
-      ({ payload: claims } = await jwtVerify(idToken, keys, { ...typeof check.issuer === 'function' ? {} : { issuer: check.issuer }, audience: config.clientId, clockTolerance: CLOCK_TOLERANCE_S, requiredClaims: ['sub', 'iat', 'exp'] }))
+      ({ payload: claims } = await jwtVerify(idToken, keys, { ...typeof check.issuer === 'function' ? {} : { issuer: check.issuer }, audience: config.clientId, algorithms: check.algorithms ?? ID_TOKEN_ALGORITHMS, clockTolerance: CLOCK_TOLERANCE_S, requiredClaims: ['sub', 'iat', 'exp'] }))
     }
     catch (error) {
       // A key set out of reach is the provider down; any other failure, a token not to trust.

@@ -27,7 +27,12 @@ function provider(issuer: string, endpoints: Endpoints, accounts: Record<string,
     // Claims set over every ID token's, to forge one.
     token: {} as Record<string, unknown>,
     userinfo: {} as Record<string, unknown>,
-    key: signing.privateKey as CryptoKey,
+    key: signing.privateKey as CryptoKey | Uint8Array,
+    // The header's `alg`, and the keys the JWKS serves.
+    alg: 'RS256',
+    jwks: [JWK] as Record<string, unknown>[],
+    // Sent as the whole ID token when set, to hand over one the mock did not sign.
+    rawToken: undefined as string | undefined,
     discoveryDown: false,
     calls: [] as { url: string, body: URLSearchParams }[],
   }
@@ -42,13 +47,13 @@ function provider(issuer: string, endpoints: Endpoints, accounts: Record<string,
       return mock.discoveryDown ? new Response('down', { status: 503 }) : Response.json(endpoints.discovery.doc)
 
     if (url === endpoints.jwks)
-      return Response.json({ keys: [JWK] })
+      return Response.json({ keys: mock.jwks })
 
     if (url === endpoints.token) {
       const sub = body.get('code')!.slice('code-'.length)
       const now = Math.floor(Date.now() / 1000)
       const claims = { iss: issuer, aud: body.get('client_id')!, sub, iat: now, exp: now + 300, ...mock.nonce === undefined ? {} : { nonce: mock.nonce }, ...accounts[sub], ...mock.token }
-      const idToken = await new SignJWT(claims).setProtectedHeader({ alg: 'RS256', kid: 'k1' }).sign(mock.key)
+      const idToken = mock.rawToken ?? await new SignJWT(claims).setProtectedHeader({ alg: mock.alg, kid: 'k1' }).sign(mock.key)
 
       return Response.json({ access_token: `token-${sub}`, id_token: idToken, expires_in: 3600 })
     }
@@ -143,6 +148,63 @@ describe('any OpenID Connect provider', () => {
       expect([forgery, (await signIn(mock, 'ada')).landed]).toEqual([forgery, '/login?error=oauth'])
       expect(await store.users.findByEmail('ada@example.com')).toBeUndefined()
     }
+  })
+
+  test('an ID token signed with an algorithm outside the allow-list, or none, signs nobody in', async () => {
+    const rs384 = await generateKeyPair('RS384')
+    const rs384Jwk = { ...await exportJWK(rs384.publicKey), kid: 'k1', use: 'sig' }
+    const now = Math.floor(Date.now() / 1000)
+    const claims = { iss: ISSUER, aud: 'client-id', sub: 'ada', iat: now, exp: now + 300 }
+    const base64url = (value: object) => Buffer.from(JSON.stringify(value)).toString('base64url')
+    const hmac = new TextEncoder().encode(JSON.stringify(JWK))
+    const cases: [string, (mock: ReturnType<typeof provider>) => void][] = [
+      ['alg none', (mock) => {
+        mock.rawToken = `${base64url({ alg: 'none', kid: 'k1' })}.${base64url(claims)}.`
+      }],
+      ['alg none with a stripped signature', (mock) => {
+        mock.rawToken = `${base64url({ alg: 'none' })}.${base64url(claims)}`
+      }],
+      ['HS256 keyed with the public key', (mock) => {
+        mock.alg = 'HS256'
+        mock.key = hmac
+      }],
+      ['HS256 keyed with the public key, the JWKS entry a symmetric one', (mock) => {
+        mock.alg = 'HS256'
+        mock.key = hmac
+        mock.jwks = [{ kty: 'oct', k: Buffer.from(hmac).toString('base64url'), kid: 'k1', alg: 'HS256' }]
+      }],
+      ['an RSA algorithm the list leaves out', (mock) => {
+        mock.alg = 'RS384'
+        mock.key = rs384.privateKey
+        mock.jwks = [rs384Jwk]
+      }],
+    ]
+
+    for (const [name, forge] of cases) {
+      const mock = provider(ISSUER, ENDPOINTS, ACCOUNTS)
+      const { signIn, store } = setup('keycloak', oidcProvider({ issuer: ISSUER }))
+
+      forge(mock)
+
+      expect([name, (await signIn(mock, 'ada')).landed]).toEqual([name, '/login?error=oauth'])
+      expect(await store.users.findByEmail('ada@example.com')).toBeUndefined()
+    }
+
+    // The same RS384 token is taken once the app lists the algorithm.
+    const mock = provider(ISSUER, ENDPOINTS, ACCOUNTS)
+    const { signIn } = setup('keycloak', oidcProvider({ issuer: ISSUER, algorithms: ['RS384'] }))
+
+    mock.alg = 'RS384'
+    mock.key = rs384.privateKey
+    mock.jwks = [rs384Jwk]
+
+    expect((await signIn(mock, 'ada')).landed).toBe('/')
+
+    // And a list without RS256 refuses an RS256 token.
+    const strict = provider(ISSUER, ENDPOINTS, ACCOUNTS)
+    const { signIn: strictSignIn } = setup('keycloak', oidcProvider({ issuer: ISSUER, algorithms: ['ES256'] }))
+
+    expect((await strictSignIn(strict, 'ada')).landed).toBe('/login?error=oauth')
   })
 
   test('the user endpoint answering for another account than the token\'s signs nobody in', async () => {
@@ -294,5 +356,50 @@ describe('Apple', () => {
     const { browser } = setup('apple', appleProvider(APPLE), undefined)
 
     expect((await browser().fetch('/auth/nope/callback', { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: 'code=x' })).status).toBe(404)
+  })
+})
+
+describe('https issuers in production', () => {
+  const realEnv = process.env.NODE_ENV ?? 'test'
+
+  afterEach(() => {
+    process.env.NODE_ENV = realEnv
+  })
+
+  test('an http issuer, or a GitLab on http, is refused where the app is created, and taken outside production', () => {
+    process.env.NODE_ENV = 'production'
+
+    expect(() => oidcProvider({ issuer: 'http://idp.test' })).toThrow('https')
+    expect(() => oidcProvider({ issuer: 'HTTP://idp.test' })).toThrow('https')
+    expect(() => oidcProvider({ issuer: 'ftp://idp.test' })).toThrow('https')
+    expect(() => gitlabProvider({ url: 'http://git.test' })).toThrow('https')
+    expect(() => oidcProvider({ issuer: 'https://idp.test' })).not.toThrow()
+
+    process.env.NODE_ENV = 'development'
+
+    expect(() => oidcProvider({ issuer: 'http://localhost:8080/realms/main' })).not.toThrow()
+    expect(() => gitlabProvider({ url: 'http://git.test' })).not.toThrow()
+
+    process.env.NODE_ENV = 'test'
+
+    expect(() => oidcProvider({ issuer: 'http://idp.test' })).not.toThrow()
+  })
+
+  test('a discovery document naming an http endpoint is a provider unavailable in production, and fine in development', async () => {
+    const issuer = 'https://id.example.test'
+
+    for (const field of ['authorization_endpoint', 'token_endpoint', 'userinfo_endpoint', 'jwks_uri']) {
+      const doc = { issuer, authorization_endpoint: `${issuer}/auth`, token_endpoint: `${issuer}/token`, userinfo_endpoint: `${issuer}/userinfo`, jwks_uri: `${issuer}/certs`, [field]: `http://evil.test/${field}` }
+
+      for (const [env, expected] of [['development', false], ['production', true]] as const) {
+        process.env.NODE_ENV = env
+        provider(issuer, { token: `${issuer}/token`, jwks: `${issuer}/certs`, discovery: { url: `${issuer}/.well-known/openid-configuration`, doc } }, {})
+
+        const { browser } = setup('idp', oidcProvider({ issuer }))
+        const location = (await browser().fetch('/auth/idp')).headers.get('location')
+
+        expect([field, env, location === '/login?error=unavailable']).toEqual([field, env, expected])
+      }
+    }
   })
 })
