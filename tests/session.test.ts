@@ -1,5 +1,6 @@
 import type { Action } from '../src/runtime'
 import type { SessionStore } from '../src/server'
+import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { Database } from 'bun:sqlite'
@@ -484,6 +485,23 @@ describe('sessions', () => {
     finally {
       intervals.mockRestore()
     }
+  })
+
+  it('opens a sqlite store afresh once its file was deleted and recreated at the same path', async () => {
+    const file = join(await scratchDir('sessions-'), 'sessions.sqlite')
+    const first = sqliteStore(file)
+
+    await first.set('a', { userId: 1 }, 60)
+    await rm(file)
+    await rm(`${file}-wal`, { force: true })
+    await rm(`${file}-shm`, { force: true })
+
+    const second = sqliteStore(file)
+
+    expect(second).not.toBe(first)
+    expect(await second.get('a')).toBeUndefined()
+    await second.set('b', { userId: 2 }, 60)
+    expect(sqliteStore(file)).toBe(second)
   })
 
   it('takes a store of the app\'s own, and refuses a short or published secret or a cookie too big to keep', async () => {

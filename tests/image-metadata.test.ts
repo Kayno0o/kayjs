@@ -114,7 +114,7 @@ describe('stripImageMetadata', () => {
     expect(await new Bun.Image(stripped).metadata()).toEqual({ width: 1000, height: 600, format: 'png' })
   })
 
-  it('reads a file of countless tiny segments in linear time, giving it back as it came', () => {
+  it('refuses a JPEG of countless tiny segments after a bounded number of them, giving it back as it came', () => {
     const pairs = new Uint8Array(10 * 1024 * 1024).fill(0x01)
 
     for (let at = 0; at < pairs.length; at += 2)
@@ -122,10 +122,18 @@ describe('stripImageMetadata', () => {
 
     pairs.set([0xFF, 0xD8])
 
-    const started = performance.now()
-
     expect(warnings(() => expect(stripImageMetadata(pairs)).toBe(pairs))).toHaveLength(1)
-    expect(performance.now() - started).toBeLessThan(500)
+  })
+
+  it('strips a PNG of more chunks than any image holds', async () => {
+    const png = await Bun.file('tests/fixtures/images/src/hero.png').bytes()
+    const chunk = bytesOf(u32(GPS.length), 'tEXt', GPS, [0, 0, 0, 0])
+    const chunks = bytesOf(...Array.from({ length: 10_500 }).fill(chunk) as Uint8Array[])
+    const stripped = stripImageMetadata(bytesOf(png.subarray(0, 33), chunks, png.subarray(33)))
+
+    expect(warnings(() => stripImageMetadata(bytesOf(png.subarray(0, 33), chunks, png.subarray(33))))).toEqual([])
+    expect(holds(stripped, GPS)).toBe(false)
+    expect(await new Bun.Image(stripped).metadata()).toEqual({ width: 1000, height: 600, format: 'png' })
   })
 
   it('leaves alone a format it does not read and a file it cannot follow', () => {

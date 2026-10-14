@@ -115,6 +115,7 @@ export async function archive(scan: File) {
 - A SQLite file created before keeps its mode: `chmod 600` it.
 - Variants the image route made before `files.delete` erased them stay in `.kay/cache/images` until it is emptied.
 - The first start purges the failed jobs past `keepFailed`, 30 days by default.
+- Rate-limit counts start over on the first deploy with a session or preview secret, as keys are then hashed with it.
 
 ### Stored files
 

@@ -1,4 +1,5 @@
 import type { Duration } from '../runtime/duration'
+import { statSync } from 'node:fs'
 import { resolve } from 'node:path'
 import process from 'node:process'
 import { parse, stringify } from 'devalue'
@@ -82,7 +83,9 @@ const TAG_BYTES = 16
 const SWEEP_EVERY = 1000
 // How often a SQLite store drops expired sessions on its own, so a quiet site does not keep them.
 const SWEEP_MS = 60 * 60 * 1000
-const sqliteStores = new Map<string, SessionStore & { deleteWhere: NonNullable<SessionStore['deleteWhere']> }>()
+
+type SqliteSessionStore = SessionStore & { deleteWhere: NonNullable<SessionStore['deleteWhere']> }
+const sqliteStores = new Map<string, { store: SqliteSessionStore, ino: number | undefined, close: () => void }>()
 
 // Sessions for kay pages and plain Elysia routes alike, as `session` in the context: `ctx.locals.session` in a page, an action or a guard.
 // The cookie is read on first use and written only when the session changed or is due an extension; it is HttpOnly, SameSite=Lax, and over https Secure and named `__Host-` unless shared under a domain.
@@ -383,23 +386,35 @@ export function memoryStore(): SessionStore & { deleteWhere: NonNullable<Session
 }
 
 // Sessions in a SQLite file, surviving restarts and shared by the processes on one machine.
-// One store per file, so a config read again, as in development, opens no second database and sweep timer.
-export function sqliteStore(path: string): SessionStore & { deleteWhere: NonNullable<SessionStore['deleteWhere']> } {
+// One store per file, so a config read again, as in development, opens no second database and sweep timer; a file deleted and recreated at the same path is opened afresh.
+export function sqliteStore(path: string): SqliteSessionStore {
   const file = path === ':memory:' || path === '' ? undefined : resolve(path)
   const opened = file === undefined ? undefined : sqliteStores.get(file)
 
-  if (opened)
-    return opened
+  if (opened && fileId(file!) === opened.ino)
+    return opened.store
 
-  const store = openSqliteStore(path)
+  opened?.close()
+
+  const created = openSqliteStore(path)
 
   if (file !== undefined)
-    sqliteStores.set(file, store)
+    sqliteStores.set(file, { ...created, ino: fileId(file) })
 
-  return store
+  return created.store
 }
 
-function openSqliteStore(path: string): SessionStore & { deleteWhere: NonNullable<SessionStore['deleteWhere']> } {
+// The file's inode, or undefined once it is gone.
+function fileId(file: string): number | undefined {
+  try {
+    return statSync(file, { throwIfNoEntry: false })?.ino
+  }
+  catch {
+    return undefined
+  }
+}
+
+function openSqliteStore(path: string): { store: SqliteSessionStore, close: () => void } {
   const db = openSqlite(path)
 
   db.run('CREATE TABLE IF NOT EXISTS kay_sessions (id TEXT PRIMARY KEY, data TEXT NOT NULL, expires INTEGER NOT NULL)')
@@ -412,16 +427,19 @@ function openSqliteStore(path: string): SessionStore & { deleteWhere: NonNullabl
   let writes = 0
 
   sweep.run(Date.now())
-  setInterval(() => {
+
+  const timer = setInterval(() => {
     try {
       sweep.run(Date.now())
     }
     catch (error) {
       kayLog('error', 'dropping the expired sessions failed; trying again in an hour', error)
     }
-  }, SWEEP_MS).unref()
+  }, SWEEP_MS)
 
-  return {
+  timer.unref()
+
+  const store: SqliteSessionStore = {
     get(id) {
       const row = select.get(id, Date.now())
 
@@ -447,6 +465,11 @@ function openSqliteStore(path: string): SessionStore & { deleteWhere: NonNullabl
       return ids.length
     },
   }
+
+  return { store, close: () => {
+    clearInterval(timer)
+    db.close()
+  } }
 }
 
 // Whether stored session data matches, a row that does not parse logged and skipped so the rest are still erased.

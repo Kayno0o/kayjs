@@ -241,8 +241,7 @@ function stripPng(bytes: Uint8Array): Uint8Array<ArrayBuffer> {
     if (end > bytes.length)
       throw new Error('cut short')
 
-    kept.segment()
-
+    // Not counted: a PNG of countless chunks is still read in one pass, so it is stripped like any other.
     if (PNG_KEPT.has(type))
       kept.range(at, end)
 

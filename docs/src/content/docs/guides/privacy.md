@@ -96,11 +96,12 @@ else
 
 ## Upgrading
 
-A site that ran an older kay has three things to do or know:
+A site that ran an older kay has four things to do or know:
 
 - SQLite files created before keep their mode: `chmod 600` them.
 - Image variants made before `files.delete` erased them stay in `.kay/cache/images` until it is emptied.
 - The first start purges failed jobs past `keepFailed`, 30 days by default.
+- Rate-limit counts start over on the first deploy with a session or preview secret, as keys are then hashed with it.
 
 ## Error trackers
 
