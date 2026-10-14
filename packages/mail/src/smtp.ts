@@ -99,6 +99,13 @@ export function smtp(settings: SmtpSettings): Transport {
 
         return { messageId: info.messageId, accepted: info.accepted, rejected: info.rejected, response: info.response }
       }
+      catch (error) {
+        // nodemailer says only that STARTTLS failed, not that kay required it nor how a relay taking mail in clear is allowed.
+        if ((error as { code?: unknown }).code === 'ETLS')
+          throw new Error(`kayjs-mail: ${settings.host}:${settings.port ?? DEFAULT_PORT} did not upgrade to TLS with STARTTLS, which kayjs-mail requires on every port but 465, so nothing was sent; a relay taking mail in clear, as on a private network, needs SMTP_INSECURE=true (smtp({ insecure: true })), which is ignored while SMTP_PASS is set, as a password never goes in clear`, { cause: error })
+
+        throw error
+      }
       finally {
         if (--sending === 0) {
           idle = setTimeout(() => {

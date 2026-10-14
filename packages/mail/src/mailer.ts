@@ -71,6 +71,11 @@ function list(addresses: Address | Address[] | undefined): Address[] {
   return addresses === undefined ? [] : Array.isArray(addresses) ? addresses : [addresses]
 }
 
+// An optional field left empty, as a form's blank reply-to gives it, names no one rather than a broken address.
+function given(addresses: Address | Address[] | undefined): Address[] {
+  return list(addresses).filter(address => addressOf(address).trim() !== '')
+}
+
 function recipientsOf(mail: Mail): string[] {
   return [...mail.to, ...mail.cc, ...mail.bcc].map(addressOf)
 }
@@ -253,8 +258,10 @@ export function mailer(options: MailerOptions = {}): Mailer {
     if (to.length === 0)
       throw new Error(`kayjs-mail: "${message.subject}" has no recipient`)
 
+    const [cc, bcc, [replyTo], [from]] = [given(message.cc), given(message.bcc), given(message.replyTo), given(message.from)]
+
     // nodemailer neutralises a line break in a name, a subject or a header, but one in an address, or a second address in it, still adds a recipient to the envelope.
-    for (const address of [...to, ...list(message.cc), ...list(message.bcc), ...list(message.replyTo), ...list(message.from)]) {
+    for (const address of [...to, ...cc, ...bcc, ...replyTo === undefined ? [] : [replyTo], ...from === undefined ? [] : [from]]) {
       if (LINE_BREAK.test(addressOf(address)))
         throw new Error(`kayjs-mail: "${message.subject}" has an address holding a line break`)
 
@@ -267,11 +274,11 @@ export function mailer(options: MailerOptions = {}): Mailer {
     const html = markup === undefined ? undefined : asDocument(markup, message.subject, message.lang ?? lang)
 
     return {
-      from: message.from ?? sender(),
+      from: from ?? sender(),
       to,
-      cc: list(message.cc),
-      bcc: list(message.bcc),
-      replyTo: message.replyTo,
+      cc,
+      bcc,
+      replyTo,
       subject: message.subject,
       html,
       text: message.text ?? htmlToText(html!),

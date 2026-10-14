@@ -51,7 +51,7 @@ describe('smtp', () => {
     const mail = mailer({ from: 'hello@fixture.test', transport: smtp({ host: '127.0.0.1', port: server.port }) })
     const before = server.received.length
 
-    await expect(mail.send({ to: 'ada@example.com', subject: 'S', text: 'T' })).rejects.toThrow('STARTTLS')
+    await expect(mail.send({ to: 'ada@example.com', subject: 'S', text: 'T' })).rejects.toThrow(`kayjs-mail: 127.0.0.1:${server.port} did not upgrade to TLS with STARTTLS, which kayjs-mail requires on every port but 465, so nothing was sent; a relay taking mail in clear, as on a private network, needs SMTP_INSECURE=true`)
     expect(server.received).toHaveLength(before)
   })
 
@@ -59,7 +59,7 @@ describe('smtp', () => {
     const mail = mailer({ from: 'hello@fixture.test', transport: smtp({ host: '127.0.0.1', port: server.port, insecure: true, user: 'site', pass: 'secret' }) })
     const before = server.received.length
 
-    await expect(mail.send({ to: 'ada@example.com', subject: 'S', text: 'T' })).rejects.toThrow('STARTTLS')
+    await expect(mail.send({ to: 'ada@example.com', subject: 'S', text: 'T' })).rejects.toThrow('which is ignored while SMTP_PASS is set')
     expect(server.received).toHaveLength(before)
   })
 

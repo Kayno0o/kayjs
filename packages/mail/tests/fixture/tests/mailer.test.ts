@@ -153,6 +153,13 @@ describe('rendering', () => {
     expect((await mail.render({ to: ['"Doe, Ada" <ada@example.com>', 'bob@example.com'], subject: 'Two', text: 'Hi' })).to).toHaveLength(2)
   })
 
+  it('leaves out an optional address field left empty, as a form\'s blank reply-to, but not an empty recipient', async () => {
+    const rendered = await mail.render({ to: 'ada@example.com', replyTo: '', cc: ['', 'bob@example.com'], bcc: ' ', from: '', subject: 'Blank', text: 'Hi' })
+
+    expect({ replyTo: rendered.replyTo, cc: rendered.cc, bcc: rendered.bcc, from: rendered.from }).toEqual({ replyTo: undefined, cc: ['bob@example.com'], bcc: [], from: (await mail.render({ to: 'ada@example.com', subject: 'Blank', text: 'Hi' })).from })
+    await expect(mail.render({ to: '', subject: 'Nobody', text: 'Hi' })).rejects.toThrow('"Nobody" has an address holding no address or several')
+  })
+
   it('refuses a mail with no recipient before rendering its component', async () => {
     let rendered = false
     const view = () => {
