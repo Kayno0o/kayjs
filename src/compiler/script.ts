@@ -138,8 +138,12 @@ type FenceAnalysis = Pick<ScriptAnalysis, 'hoisted' | 'imports' | 'specifiers' |
 function splitFence(source: string, fence: Span, globals: string[], names: string[], analysis: FenceAnalysis): (ParsedFence & { statements: FenceStatement[], tail: Span | undefined }) | undefined {
   const parsed = parseFence(source, fence, analysis.diagnostics)
 
-  if (!parsed)
+  // A fence Babel cannot recover from, as one being typed with a quote not closed yet, still reaches the editor whole at module level, where TypeScript's own recovery parses it.
+  if (!parsed) {
+    analysis.hoisted.push(fence)
+
     return undefined
+  }
 
   const { ast, shift } = parsed
   const local = bodyTypes(ast.program.body, names, shift, analysis.diagnostics)

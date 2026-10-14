@@ -354,7 +354,7 @@ describe('kay lsp imports', () => {
     dir = await mkdtemp(join(tmpdir(), 'kay-imports-'))
     await Promise.all([
       Bun.write(join(dir, 'tsconfig.json'), await Bun.file(join(fixtures, 'site/tsconfig.json')).text()),
-      Bun.write(join(dir, 'package.json'), JSON.stringify({ name: 'imports', type: 'module', dependencies: { 'kay': '*', 'kay-lib': '*' } })),
+      Bun.write(join(dir, 'package.json'), JSON.stringify({ name: 'imports', type: 'module', dependencies: { 'kay': '*', 'kay-lib': '*', '@iconify-json/tabler': '*' } })),
       // A kay library, its components given specifiers by its exports map.
       Bun.write(join(dir, 'node_modules/kay-lib/package.json'), JSON.stringify({ name: 'kay-lib', version: '1.0.0', type: 'module', peerDependencies: { kay: '*' }, exports: { './*.kay': './src/*.kay' } })),
       Bun.write(join(dir, 'node_modules/kay-lib/src/tag-pill.kay'), '---\nconst { label } = props<{ label: string }>()\n---\nspan.pill {label}\n'),
@@ -405,6 +405,16 @@ describe('kay lsp imports', () => {
     const item = await editor.connection.request<CompletionItem>('completionItem/resolve', list.items.find(entry => entry.label === 'signal'))
 
     expect(applyEdits(source, item.additionalTextEdits ?? [])).toBe('---\nimport { add } from \'../actions\'\nimport { signal } from \'kay\'\nconst count = signa\n---\nform(action={add})\n  button Add\n')
+  })
+
+  it('completes an import specifier while its quote is still open, an icon\'s included', async () => {
+    const source = '---\nimport BrandGithub from \'~icons/tabler/brand\n---\np x\n'
+
+    await editor.change(page, source, 9)
+
+    const list = await editor.request<CompletionList>('textDocument/completion', page, 1, 44)
+
+    expect(list.items.map(item => item.label)).toContain('brand-github')
   })
 
   it('types a library component, goes to its .kay source and imports it as a quick fix', async () => {

@@ -324,6 +324,31 @@ describe('fences', () => {
     expect(errors('---\nconst x = 1 +\n---\np x')).toEqual(['Unexpected token'])
   })
 
+  it('keep one that fails to parse in the shadow whole, for the editor to complete in while its quote is still open', () => {
+    // Each component with how many of its fences fail to parse.
+    const components: [string, number][] = [
+      ['---\nimport BrandGithub from \'~icons/tabler/brand\n---\np x\n', 1],
+      ['---\nimport { signal } from "kay/\nconst count = signal(1)\n---\np {count()}\n', 1],
+      ['---\nconst a = \'one\nconst b = "two\n---\np {a}\n', 1],
+      ['--- server\nimport { listTodos } from \'../da\nexport const page = {}\n---\n---\nconst label = "x\n---\np x\n', 2],
+      ['---\nconst count = 1\nconst label = \'x\n---\np {count}\n', 1],
+    ]
+
+    for (const [source, broken] of components) {
+      const { tsx, map, diagnostics } = compileKay(source, 'test.kay', { check: true })
+      const lines = source.split('\n')
+      const fenceLines = lines.slice(0, lines.findLastIndex(line => line.startsWith('---'))).filter(line => !line.startsWith('---'))
+
+      expect(diagnostics.map(d => d.message)).toEqual(Array.from<string>({ length: broken }).fill('Unterminated string constant.'))
+
+      for (const line of fenceLines) {
+        const at = map.toGenerated(source.indexOf(`${line}\n`))!
+
+        expect(tsx.slice(at, at + line.length)).toBe(line)
+      }
+    }
+  })
+
   it('parse each fence and each handler once a compile, however many passes and checks read it', () => {
     const script = 'const a = signal(true)\nconst f = () => 1\nconst g = () => 2\n'
     const server = 'import { t } from \'kay\'\n\nexport const page = { query: t.Object({}) }\n'
