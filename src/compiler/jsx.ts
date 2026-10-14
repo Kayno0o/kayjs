@@ -5,7 +5,7 @@ import { actionOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, isSlot, keyedByPosition, ser
 import { isFunctionAt, sentParts } from './expression'
 import { slotValue } from './items'
 import { DYNAMIC_TAG } from './mapping'
-import { helperName } from './markup'
+import { addBindWrite, bindRead, helperName } from './markup'
 import { bindEvent, bindProblem } from './validate'
 
 export interface JsxOptions {
@@ -21,7 +21,6 @@ export interface JsxOptions {
 
 // JSX collapses a run of spaces in text, which `pre` and `textarea` would show, so a run goes out as a string.
 const JSX_TEXT_ESCAPES = /[{}<>]|[ \t]{2,}/g
-const NUMERIC_INPUTS = new Set(['number', 'range'])
 const FORM_FIELDS = new Set(['input', 'select', 'textarea', 'button'])
 const LINK_ELEMENTS = new Set(['a', 'area'])
 // Attributes rendered as markup rather than text.
@@ -763,16 +762,11 @@ export class JsxTemplate {
 
     const inputType = this.staticAttribute(element, 'type') ?? 'text'
     const event = bindEvent(element, property)
-    const read = property === 'checked' ? 'checked' : NUMERIC_INPUTS.has(inputType) ? 'valueAsNumber' : 'value'
 
     b.wrap(attribute.name, () => b.add(property))
     b.add('={(').addSource(attribute.expression).add(`)()} ${event}={(kayEvent) => `)
-
-    // An emptied number input has no number: the signal keeps its last one rather than take a NaN, or an undefined its type does not allow.
-    if (read === 'valueAsNumber')
-      b.add('{ const kayValue = kayEvent.currentTarget.valueAsNumber; if (!Number.isNaN(kayValue)) (').addSource(attribute.expression).add(').set(kayValue) }}')
-    else
-      b.add('(').addSource(attribute.expression).add(`).set(kayEvent.currentTarget.${read})}`)
+    addBindWrite(b, attribute.expression, bindRead(property, inputType))
+    b.add('}')
   }
 
   private emitText(node: TextNode) {

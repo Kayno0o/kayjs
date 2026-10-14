@@ -38,6 +38,22 @@ export function escapeText(text: string): string {
   return text.replace(LESS_THAN, '&lt;')
 }
 
+const NUMERIC_INPUTS = new Set(['number', 'range'])
+
+// What a `bind:` reads from the input on its event: a checkbox's `checked`, a number or range input's number, else its text.
+export function bindRead(property: string, inputType: string): 'checked' | 'valueAsNumber' | 'value' {
+  return property === 'checked' ? 'checked' : NUMERIC_INPUTS.has(inputType) ? 'valueAsNumber' : 'value'
+}
+
+// The body of a `bind:` event handler, `(kayEvent) => ` before it: it writes what the input holds back to the signal, which the caller closes.
+export function addBindWrite(b: CodeBuilder, expression: Span, read: string): void {
+  // An emptied number input has no number: the signal keeps its last one rather than take a NaN, or an undefined its type does not allow.
+  if (read === 'valueAsNumber')
+    b.add('{ const kayValue = kayEvent.currentTarget.valueAsNumber; if (!Number.isNaN(kayValue)) (').addSource(expression).add(').set(kayValue) }')
+  else
+    b.add('(').addSource(expression).add(`).set(kayEvent.currentTarget.${read})`)
+}
+
 // A quoted attribute as JSX reads it, an entity standing for its character, then escaped for markup.
 export function escapeStaticAttribute(text: string): string {
   return text.replace(STATIC_ATTRIBUTE, char => ATTRIBUTE_ENTITY[char] ?? '&amp;')

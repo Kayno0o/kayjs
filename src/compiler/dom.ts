@@ -5,12 +5,12 @@ import type { PlannedAttribute } from './markup'
 import { keyedByPosition, marksServerIsland } from './ast'
 import { decodeEntities, isFunctionAt } from './expression'
 import { childItems, constDeclaration, errorParagraphArguments, slotValue, soleDynamic } from './items'
-import { describedValue, END_MARKER, escapeStaticAttribute, escapeText, helperName, RAW_ELEMENTS, START_MARKER, TemplateWriter, VOID_ELEMENTS } from './markup'
+import { addBindWrite, bindRead, describedValue, END_MARKER, escapeStaticAttribute, escapeText, helperName, RAW_ELEMENTS, START_MARKER, TemplateWriter, VOID_ELEMENTS } from './markup'
 import { SUBJECT } from './names'
+import { bindEvent } from './validate'
 
 // The `kay/dom` helpers browser output calls, each imported under a `Kay` name.
 const DOM_HELPERS = ['append', 'attempt', 'attribute', 'awaited', 'branches', 'close', 'component', 'componentClass', 'dynamic', 'effect', 'errorParagraph', 'fragment', 'image', 'insert', 'listen', 'loop', 'markers', 'memo', 'merge', 'omit', 'property', 'ref', 'rowKey', 'setClass', 'setStyle', 'spread', 'spreadAttributes', 'template', 'text', 'transition', 'untrack']
-const NUMERIC_INPUTS = new Set(['number', 'range'])
 const TRANSITION_PART = 'transition:'
 
 export function domHelperImport(): string {
@@ -605,17 +605,12 @@ export class DomTemplate extends TemplateWriter {
   private bind(element: ElementNode, expression: Span, property: string, variable: string): void {
     const { b } = this
     const inputType = this.staticAttribute(element, 'type') ?? 'text'
-    const event = property === 'checked' || element.name === 'select' ? 'onChange' : 'onInput'
-    const read = property === 'checked' ? 'checked' : NUMERIC_INPUTS.has(inputType) ? 'valueAsNumber' : 'value'
+    const event = bindEvent(element, property)
 
     b.add(`KayEffect(() => KayProperty(${variable}, ${JSON.stringify(property)}, (`).addSource(expression).add(')())); ')
     b.add(`KayListen(${variable}, ${JSON.stringify(event)}, (kayEvent) => `)
-
-    // An emptied number input has no number: the signal keeps its last one rather than take a NaN.
-    if (read === 'valueAsNumber')
-      b.add('{ const kayValue = kayEvent.currentTarget.valueAsNumber; if (!Number.isNaN(kayValue)) (').addSource(expression).add(').set(kayValue) });')
-    else
-      b.add('(').addSource(expression).add(`).set(kayEvent.currentTarget.${read}));`)
+    addBindWrite(b, expression, bindRead(property, inputType))
+    b.add(');')
   }
 
   private spreadBinding(element: ElementNode, variable: string, content: boolean): void {
