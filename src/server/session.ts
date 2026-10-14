@@ -85,7 +85,7 @@ const SWEEP_EVERY = 1000
 const SWEEP_MS = 60 * 60 * 1000
 
 type SqliteSessionStore = SessionStore & { deleteWhere: NonNullable<SessionStore['deleteWhere']> }
-const sqliteStores = new Map<string, { store: SqliteSessionStore, ino: number | undefined, close: () => void }>()
+const sqliteStores = new Map<string, { store: SqliteSessionStore, ino: string | undefined, close: () => void }>()
 
 // Sessions for kay pages and plain Elysia routes alike, as `session` in the context: `ctx.locals.session` in a page, an action or a guard.
 // The cookie is read on first use and written only when the session changed or is due an extension; it is HttpOnly, SameSite=Lax, and over https Secure and named `__Host-` unless shared under a domain.
@@ -404,10 +404,12 @@ export function sqliteStore(path: string): SqliteSessionStore {
   return created.store
 }
 
-// The file's inode, or undefined once it is gone.
+// The file's device, inode and creation time, which a file recreated at the same path does not keep whole; undefined once it is gone.
 function fileId(file: string): number | undefined {
   try {
-    return statSync(file, { throwIfNoEntry: false })?.ino
+    const stat = statSync(file, { throwIfNoEntry: false })
+
+    return stat && `${stat.dev}:${stat.ino}:${stat.birthtimeMs}`
   }
   catch {
     return undefined

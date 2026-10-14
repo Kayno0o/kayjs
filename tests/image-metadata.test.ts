@@ -129,9 +129,9 @@ describe('stripImageMetadata', () => {
     const png = await Bun.file('tests/fixtures/images/src/hero.png').bytes()
     const chunk = bytesOf(u32(GPS.length), 'tEXt', GPS, [0, 0, 0, 0])
     const chunks = bytesOf(...Array.from({ length: 10_500 }).fill(chunk) as Uint8Array[])
-    const stripped = stripImageMetadata(bytesOf(png.subarray(0, 33), chunks, png.subarray(33)))
+    let stripped = new Uint8Array(0)
 
-    expect(warnings(() => stripImageMetadata(bytesOf(png.subarray(0, 33), chunks, png.subarray(33))))).toEqual([])
+    expect(warnings(() => void (stripped = stripImageMetadata(bytesOf(png.subarray(0, 33), chunks, png.subarray(33)))))).toEqual([])
     expect(holds(stripped, GPS)).toBe(false)
     expect(await new Bun.Image(stripped).metadata()).toEqual({ width: 1000, height: 600, format: 'png' })
   })
