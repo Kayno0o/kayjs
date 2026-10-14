@@ -413,7 +413,7 @@ function contextLocale(): Locale {
 
 // The guards of the action's page, answering for it when one stops the request.
 async function admit(guards: LoadedGuard[], context: { request: Request }, params: RouteParams, url: URL | undefined, options: ActionOptions): Promise<Response | undefined> {
-  const passed = await passGuards(guards, context, params, options, url)
+  const passed = await passGuards(guards, context, params, options, { url })
 
   if (passed instanceof Response)
     return passed
@@ -426,13 +426,13 @@ async function admit(guards: LoadedGuard[], context: { request: Request }, param
 // The guards of a route whose input the schema refused, run before its field errors go out, so a caller they refuse learns nothing of the input, nor sees its values echoed.
 // Only `derive` values are there, `resolve` running after the schema: a guard throwing for want of one leaves the field errors.
 export async function guardsFirst(guards: LoadedGuard[], context: { request: Request }, params: RouteParams, url: URL | undefined, options: ActionOptions): Promise<Response | undefined> {
-  const passed = await passGuards(guards, context, params, options, url, false)
+  const passed = await passGuards(guards, context, params, options, { url, answerThrown: false })
 
   return passed instanceof Response ? passed : undefined
 }
 
-// Runs the guards of an action or an API route: the response when one stops the request, else the cookies and headers they set; a guard throwing anything but a redirect or a denial answers 500, or lets the request on without `answerThrown`.
-export async function passGuards(guards: LoadedGuard[], context: { request: Request }, params: RouteParams, options: ActionOptions, url = guardUrl(context.request.url), answerThrown = true): Promise<Response | GuardedRequest> {
+// Runs the guards of an action or an API route: the response when one stops the request, else the cookies and headers they set; a guard throwing anything but a redirect or a denial answers 500, or lets the request on with `answerThrown: false`.
+export async function passGuards(guards: LoadedGuard[], context: { request: Request }, params: RouteParams, options: ActionOptions, { url = guardUrl(context.request.url), answerThrown = true }: { url?: URL | undefined, answerThrown?: boolean } = {}): Promise<Response | GuardedRequest> {
   const { request } = context
   const state: GuardedRequest = { jar: cookieJar(request), headers: new Headers() }
   const ctx: GuardContext = {

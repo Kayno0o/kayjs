@@ -95,7 +95,7 @@ A guard reads the params of the page asked for in `ctx.params`, as `src/routes/o
 
 A guard reads `ctx.url` spelled one way, each segment decoded then encoded and leading slashes collapsed, so `/%61dmin/x` and `//admin/x` both read as `/admin/x` and a path check holds however the URL was written.
 
-Input an action or an API route refuses meets its guards first: a caller they refuse gets their redirect or denial, never the field errors or the values sent back. Only what the app derives is in `ctx.locals` there, as `resolve` runs after the schema, so a user kept with `derive`, as `session()` does, is the one a guard sees.
+Input an action or an API route refuses meets its guards first: a caller they refuse gets their redirect or denial, never the field errors or the values sent back. Only what the app derives is in `ctx.locals` there, as `resolve` runs after the schema, so a guard reads the user from what the app derives, such as the session `session()` derives.
 
 </Callout>
 

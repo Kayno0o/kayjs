@@ -273,7 +273,7 @@ export default defineConfig({ requireGuards: true })
 - Checks on one record still belong in the load and the action.
 - An action's guards run once its input is valid, when the app's `resolve` values are there.
 - Input the schema refuses meets the guards first, so a caller they refuse gets their redirect or denial, never the field errors or the values sent back; a caller they let through gets the field errors, without reaching the handler.
-- On that path only what the app derives is in `ctx.locals`, `resolve` running after the schema: a guard reading a user the app resolves refuses a signed-in caller there, so keep the user in `derive`, as `session()` does. A guard throwing there leaves the field errors.
+- On that path only what the app derives is in `ctx.locals`, `resolve` running after the schema: a guard reading a user the app resolves refuses a signed-in caller there, so read the user from what the app derives, such as the session `session()` derives. A guard throwing there leaves the field errors.
 - A refused form post gets the redirect, or the denial as plain text.
 - A denied page renders the nearest `_error.kay` outside the guard's directory, inside the layouts outside it, so nothing the guard protects renders.
 - A layout's `ctx.redirect` is no guard: actions never run layout loads.

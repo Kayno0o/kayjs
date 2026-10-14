@@ -69,6 +69,9 @@ const BODY_LIMIT = Symbol.for('kay.bodyLimit')
 // Where `api({ cors })` keeps the origins it lets in.
 const CORS = Symbol.for('kay.cors')
 
+// The requests the guards of their module let through, whose later errors are no refused input.
+const admitted = new WeakSet<Request>()
+
 // Where a failing event stream reports its error: logged, and handed to `onError` once the route answering with it is known.
 const streamReporters = new WeakMap<Response, { report: (error: unknown) => void }>()
 
@@ -219,7 +222,8 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
         })
         // Before the module's own `onError`, so no custom answer to refused input reaches a caller the guards refuse.
         .onError(async (context) => {
-          if (context.code !== 'VALIDATION' || guards.length === 0)
+          // Past the guards, a failing response schema or a handler's own throw is no input to keep from a refused caller.
+          if ((context.code !== 'VALIDATION' && context.code !== 'INVALID_FILE_TYPE') || guards.length === 0 || admitted.has(context.request))
             return undefined
 
           const refusal = await answeringRequest(context.request, async () => inLocale(context.request, options, async () => guardsFirst(guards, sharedContext(context.request, () => ({ ...context })), (context as { params?: Record<string, unknown> }).params ?? {}, undefined, options)))
@@ -335,6 +339,9 @@ async function admit(guards: LoadedGuard[], context: { request: Request, params?
 
   if (passed instanceof Response)
     return passed
+
+  if (passed)
+    admitted.add(context.request)
 
   // A browser lets any page open a websocket or post a form to any host, the user's cookies attached; a request with neither header, such as a webhook, is no browser's.
   if ((!SAFE_METHODS.has(context.request.method) || context.request.headers.get('upgrade')?.toLowerCase() === 'websocket') && isCrossSite(context.request) && !(cors && corsAdmits(cors, context.request)))

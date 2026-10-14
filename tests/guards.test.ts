@@ -148,6 +148,10 @@ describe('input a guarded route\'s schema refuses', () => {
       Bun.write(join(dir, 'routes/admin/index.kay'), NAMED),
       Bun.write(join(dir, 'routes/broken/_guard.ts'), BROKEN),
       Bun.write(join(dir, 'routes/broken/index.kay'), NAMED),
+      Bun.write(join(dir, 'api/owned/_guard.ts'), ADMINS),
+      Bun.write(join(dir, 'api/owned/index.ts'), 'import { t } from \'elysia\'\nimport { api } from \'kay/server\'\n\nexport default api().onError(({ code }) => code === \'VALIDATION\' ? new Response(\'own\', { status: 400 }) : undefined).post(\'/\', ({ body }) => body.name, { body: t.Object({ name: t.String({ maxLength: 3 }) }) })\n'),
+      Bun.write(join(dir, 'api/counted/_guard.ts'), 'import { guard } from \'kay\'\n\nexport default guard(({ headers }) => {\n  const runs = (globalThis as { guardRuns?: number }).guardRuns = ((globalThis as { guardRuns?: number }).guardRuns ?? 0) + 1\n\n  headers.set(\'x-runs\', String(runs))\n})\n'),
+      Bun.write(join(dir, 'api/counted/index.ts'), 'import { t } from \'elysia\'\nimport { api } from \'kay/server\'\n\nexport default api().get(\'/\', () => \'text\' as unknown as number, { response: t.Number() })\n'),
       Bun.write(join(dir, 'api/admin/_guard.ts'), ADMINS),
       Bun.write(join(dir, 'api/admin/index.ts'), 'import { t } from \'elysia\'\nimport { api } from \'kay/server\'\n\nexport default api().post(\'/\', ({ body }) => body.name, { body: t.Object({ name: t.String({ maxLength: 3 }) }) })\n'),
     ])
@@ -169,6 +173,19 @@ describe('input a guarded route\'s schema refuses', () => {
   it('answers an API route\'s caller the guards refuse with their refusal, never the validation error', async () => {
     expect(await call()).toEqual({ status: 403, body: 'Admins only' })
     expect((await call({ 'x-admin': '1' })).status).toBe(422)
+  })
+
+  it('answers before the module\'s own onError, and leaves a response its schema refuses to it once the guards let the caller through', async () => {
+    const owned = async (headers: Record<string, string> = {}) => app.handle(new Request('http://localhost/api/owned', { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify({ name: 'secret-value' }) }))
+
+    expect((await owned()).status).toBe(403)
+    expect(await (await owned({ 'x-admin': '1' })).text()).toBe('own')
+
+    const before = (globalThis as { guardRuns?: number }).guardRuns ?? 0
+    const counted = await app.handle(new Request('http://localhost/api/counted'))
+
+    expect(counted.status).not.toBe(200)
+    expect((globalThis as { guardRuns?: number }).guardRuns).toBe(before + 1)
   })
 
   it('gives the field errors when a guard throws for want of a value set up after the schema', async () => {
