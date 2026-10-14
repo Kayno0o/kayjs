@@ -274,7 +274,7 @@ const dispose = mount(Panel, document.querySelector('#panel')!, { title: 'Ticket
 - A value the rules refuse reads as the default rather than throwing.
 - A `queryParam` write takes the current history entry's place, a list as the param repeated, the default, `undefined` or blank text leaving the param out.
 - The type argument is the island's to give, defaulting to `string | undefined`; on a page whose schema names no such param, the value is its text.
-- `persisted('draft', '', { storage: 'local' })` keeps it in localStorage instead, which the server never sees: the page renders the default and the kept value applies once the islands reading it have hydrated, so it suits what the first paint does not show.
+- `persisted('draft', '', { storage: 'local' })` keeps it in localStorage instead, which the server never sees: the page renders the default, and each island reading it hydrates on the default too, then shows the kept value: one hydrating later, once visible or on the next page, included. It suits what the first paint does not show.
 - A persisted value crosses as island props do, Dates, Maps and Sets included.
 - A cookie value over about 3.8 KB encoded is not kept, with a warning; one written by another version of the app, or by hand, that does not decode leaves the default.
 - A value that decodes is not checked against the signal's type, so one whose shape the code relies on is checked before use.

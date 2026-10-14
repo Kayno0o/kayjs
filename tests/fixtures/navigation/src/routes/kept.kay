@@ -1,0 +1,11 @@
+---
+import NoteShown from '../components/note-shown.kay'
+import Total from '../components/total.kay'
+---
+head
+  title Kept
+h1 Kept
+Total
+NoteShown
+div(style="height: 3000px")
+NoteShown(hydrate="visible")

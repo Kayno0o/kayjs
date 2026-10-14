@@ -1,0 +1,6 @@
+---
+import { note } from '../shared'
+---
+if note()
+  p.note-shown Kept {note()}
+button.forget(onClick={() => note.set('')}) Forget

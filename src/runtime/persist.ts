@@ -1,7 +1,7 @@
 import type { ServerScope } from './reactive'
 import { withBase } from './base'
 import { kayLog } from './log'
-import { currentServerScope, whenHydrated } from './reactive'
+import { createSignal, currentServerScope, isHydrating, untrack, whenHydrated } from './reactive'
 import { sendValue } from './send'
 import { decodeValue } from './wire'
 
@@ -62,18 +62,43 @@ export function keep<T>(store: Store<T>, read: () => T, write: (value: T) => voi
   }
 
   let loaded = false
+  // What the server rendered with, which never sees this store: an island claiming its markup reads it, whichever island hydrated first, then reads the kept value once it has hydrated.
+  const rendered = untrack(read)
+  const [hydrated, bump] = createSignal(0)
+  let bumping = false
+  // A render writing the signal writes it on the server too, so its markup holds that value.
+  let written = false
 
   return {
-    // After hydration when an island reads it while claiming markup the server rendered without it.
     read: () => {
       if (!loaded) {
         loaded = true
         whenHydrated(load)
       }
 
-      return read()
+      if (!isHydrating() || written)
+        return read()
+
+      hydrated()
+
+      if (!bumping) {
+        bumping = true
+        whenHydrated(() => {
+          bumping = false
+          bump(untrack(hydrated) + 1)
+        })
+      }
+
+      return rendered
     },
-    save: store.save,
+    save: (value) => {
+      if (isHydrating() && !written) {
+        written = true
+        whenHydrated(() => written = false)
+      }
+
+      store.save(value)
+    },
   }
 }
 

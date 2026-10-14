@@ -136,6 +136,25 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay/test i
     expect(lenient.errors).toEqual([expect.stringContaining('did not match its server markup')])
   }, 30_000)
 
+  it('hydrates every island reading a value kept in localStorage on the markup the server rendered, then shows the value', async () => {
+    const kept = await site.open('/kept')
+
+    await kept.click('button.note')
+    await kept.waitFor('p.note-shown', { text: 'Kept kept' })
+    await kept.reload()
+
+    await kept.waitFor('button.note', { text: 'Note kept' })
+    expect(await kept.count('p.note-shown')).toBe(1)
+    // One hydrating once visible, long after the value applied, claims the markup the server rendered too, then shows the value.
+    await kept.evaluate(() => scrollTo(0, document.body.scrollHeight))
+    await kept.waitFor('slot[data-hydrate] p.note-shown', { text: 'Kept kept' })
+    await kept.click('slot[data-hydrate] button.forget')
+    await kept.waitFor('button.note', { text: 'Note none' })
+    expect(await kept.count('p.note-shown')).toBe(0)
+    expect(kept.errors).toEqual([])
+    kept.close()
+  }, 30_000)
+
   it('opens each page as a new visitor, no cookie or storage of the last one kept', async () => {
     await page.goto('/state')
     await page.click('button.theme')

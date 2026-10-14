@@ -345,6 +345,11 @@ export function whenHydrated(fn: () => void): void {
     fn()
 }
 
+// Whether an island is claiming its server markup, which a value the server never saw must not change.
+export function isHydrating(): boolean {
+  return hydrating > 0
+}
+
 // Brackets an island claiming its server markup.
 export function hydrationStarted(): void {
   hydrating++

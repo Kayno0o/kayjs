@@ -12,5 +12,5 @@ const css = memo(() => themeCss(accent()))
     CopyButton(text={css()} label="Copy")
   pre
     code {css()}
-// Hidden rather than left out on the system scheme: a stored scheme can apply while this island still hydrates (#451), and a branch on it would not match the server markup.
-p(hidden={scheme() === 'system'}) And its root layout's #[code head] block holds #[code html(data-theme="{scheme()}")].
+if scheme() !== 'system'
+  p And its root layout's #[code head] block holds #[code html(data-theme="{scheme()}")].
