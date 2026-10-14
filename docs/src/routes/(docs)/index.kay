@@ -137,7 +137,7 @@ head
             span {feature.text}
     section.home-section(aria-labelledby="built-in")
       h2#built-in Built in
-      p.section-lede Translations, SEO, images, content, uploads, sessions, API routes, caching, jobs and offline pages come with kay, no plugin to add.
+      p.section-lede Translations, accessibility checks, SEO, images, content, uploads, sessions, API routes, page swaps, server islands, caching, jobs, offline pages and icons come with kay, no plugin to add.
       ul.modules
         ModuleCard(title="i18n" use="kay/i18n" href="/guides/i18n")
           @icon

@@ -114,6 +114,15 @@ describe('the documentation site', () => {
     expect(broken).toEqual([])
   })
 
+  it('leads an agent reading the home page, or guessing /docs, to the docs', async () => {
+    const home = await Bun.file(join(root, 'docs/src/routes/(docs)/index.kay')).text()
+    const { default: config } = await import('../docs/kay.config')
+
+    expect(config.redirects?.['/docs']).toBe('/getting-started/introduction')
+    expect(home).toContain('link(rel="alternate" type="text/plain" href="/llms.txt"')
+    expect(home).toContain('for group of groups')
+  })
+
   it('shows on the home page the steps Installation gives', async () => {
     const home = await Bun.file(join(root, 'docs/src/routes/(docs)/index.kay')).text()
     const installation = await Bun.file(join(root, 'docs/src/content/docs/getting-started/installation.md')).text()
