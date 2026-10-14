@@ -87,4 +87,31 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the docs a
       expect(found).toEqual([])
     }, 60_000)
   }
+
+  // At 1440px the table of contents has its column: the home page, which has none, stays one column, and a docs page's footer stays under its text.
+  it('lays the home page out as one column and a docs page beside its table of contents', async () => {
+    await page.goto('/')
+    const home = await page.evaluate(() => {
+      const box = (selector: string) => document.querySelector(selector)!.getBoundingClientRect()
+
+      return {
+        columns: getComputedStyle(document.querySelector('.page.home')!).gridTemplateColumns.split(' ').length,
+        stacked: box('.hero').bottom <= box('.home-body').top && box('.home-body').bottom <= box('.page-foot').top,
+      }
+    })
+
+    expect(home).toEqual({ columns: 1, stacked: true })
+
+    await page.goto('/guides/api-routes')
+    const docs = await page.evaluate(() => {
+      const box = (selector: string) => document.querySelector(selector)!.getBoundingClientRect()
+
+      return {
+        foot: box('.page-foot').left === box('.page-head').left && box('.page-foot').top >= box('.prose').bottom,
+        toc: box('.toc').left >= box('.page-head').right,
+      }
+    })
+
+    expect(docs).toEqual({ foot: true, toc: true })
+  }, 60_000)
 })

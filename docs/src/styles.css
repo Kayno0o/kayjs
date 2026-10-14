@@ -383,7 +383,7 @@ main {
     grid-column: text;
   }
 
-  .page-foot {
+  .page:not(.home) > .page-foot {
     grid-row: 3;
     grid-column: text;
   }
