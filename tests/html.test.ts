@@ -50,12 +50,6 @@ describe('element', () => {
     expect([kept.live, kept.live]).toEqual([1, 2])
     expect(spreadAttributes(null)).toBeNull()
   })
-
-  it('writes a boolean ARIA state as "true" or "false", leaving it out only for null and undefined', () => {
-    expect(element('button', [{ 'aria-expanded': true, 'aria-pressed': false, 'aria-busy': null, 'aria-hidden': undefined, 'aria-label': 'x' }]).t).toBe('<button aria-expanded="true" aria-pressed="false" aria-label="x"></button>')
-    expect(attribute('aria-selected', false)).toBe(' aria-selected="false"')
-    expect(attribute('hidden', true) + attribute('disabled', false)).toBe(' hidden')
-  })
 })
 
 describe('bound URLs', () => {

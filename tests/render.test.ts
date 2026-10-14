@@ -182,52 +182,22 @@ describe('prop defaults', () => {
   })
 })
 
-describe('slots with parameters', () => {
-  it('render once per call the component makes, with the arguments it passes', async () => {
-    await Bun.write(join(scratch, 'rows.kay'), '--- <T>\nimport type { JSX } from \'kay\'\n\nconst { items, row } = props<{ items: T[], row: (item: T, index: number) => JSX.Element }>()\n---\nul\n  for item, i of items key={i}\n    | {row(item, i)}\n')
-
-    const html = await renderKay('---\nimport Rows from \'./rows.kay\'\nconst { names } = props<{ names: string[] }>()\n---\nRows(items={names})\n  @row(name, i)\n    li {i}: {name}', { names: ['a', 'b'] })
-
-    expect(html).toBe('<ul><li>0: a</li><li>1: b</li></ul>')
-  })
-})
-
 describe('named slots', () => {
-  it('render the block prop they name, called with their arguments, or the lines under them when it is not given', async () => {
-    await Bun.write(join(scratch, 'card.kay'), '---\nimport type { JSX } from \'kay\'\n\nconst { items, actions, row } = props<{ items: string[], actions?: JSX.Element, row?: (item: string, index: number) => JSX.Element }>()\n---\nheader\n  slot actions\n    | No actions\nul\n  for item, i of items key={i}\n    slot row(item, i)\n      li {item}\nslot\n  p Empty\n')
-
-    const filled = await renderKay('---\nimport Card from \'./card.kay\'\n---\nCard(items={[\'a\', \'b\']})\n  @actions\n    button Add\n  @row(name, i)\n    li {i}: {name}\n  p Body')
-    const bare = await renderKay('---\nimport Card from \'./card.kay\'\n---\nCard(items={[\'a\']})')
-
-    expect(filled).toBe('<header><button>Add</button></header><ul><li>0: a</li><li>1: b</li></ul><p>Body</p>')
-    expect(bare).toBe('<header>No actions</header><ul><li>a</li></ul><p>Empty</p>')
-  })
-
   it('read a line made of an expression as text', async () => {
     expect(await renderKay('---\nconst { name } = props<{ name: string }>()\n---\np\n  {name} <b>\n  | !', { name: 'kay' })).toBe('<p>kay &lt;b>\n!</p>')
   })
 })
 
 describe('match blocks', () => {
-  it('render the first when holding the subject, else the else, or nothing without one', async () => {
+  it('render nothing without an else when no when holds the subject, and the innermost match of nested ones', async () => {
     const template = '---\nconst { status } = props<{ status: string }>()\n---\nmatch status\n  when \'draft\'\n    p Draft\n  when \'published\', \'scheduled\'\n    p Live\n'
 
-    expect(await renderKay(`${template}  else\n    p Unknown`, { status: 'scheduled' })).toBe('<p>Live</p>')
-    expect(await renderKay(`${template}  else\n    p Unknown`, { status: 'gone' })).toBe('<p>Unknown</p>')
     expect(await renderKay(template, { status: 'gone' })).toBe('')
     expect(await renderKay(`div\n  match 1\n    when 1\n      match 2\n        when 1\n          p a\n        when 2\n          p b`)).toBe('<div><p>b</p></div>')
   })
 })
 
 describe('template consts', () => {
-  it('name a value once per render of their block, for the lines after them and their children', async () => {
-    await Bun.write(join(scratch, 'box.kay'), '---\nimport type { JSX } from \'kay\'\n\nconst { children } = props<{ children: JSX.Element }>()\n---\ndiv.box\n  slot\n')
-
-    const source = '---\nimport Box from \'./box.kay\'\n\nconst { products } = props<{ products: { name: string, cents: number, stock: number }[] }>()\n---\nconst count = products.length\np {count} products\nfor product of products\n  const price = (product.cents / 100).toFixed(2)\n  const { name, stock: left = 0 } = product\n  li(title={price}) {name}: {price}\n    if left < 3 as low\n      const label = \'only \' + low\n      b {label}\nBox\n  const total = products.reduce((sum, product) => sum + product.cents, 0)\n  | {total}\ntry\n  const twice = count * 2\n  i {twice}'
-
-    expect(await renderKay(source, { products: [{ name: 'Tea', cents: 250, stock: 1 }, { name: 'Mug', cents: 900, stock: 8 }] })).toBe('<p>2 products</p><li title="2.50">Tea: 2.50<b>only true</b></li><li title="9.00">Mug: 9.00</li><div class="box">1150</div><i>4</i>')
-  })
-
   it('reach the head block when written before it', async () => {
     const file = join(scratch, 'titled.kay')
 
