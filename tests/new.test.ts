@@ -403,6 +403,7 @@ describe('kay new', () => {
       expect(await Bun.file(join(dir, '.env')).text()).toMatch(/^SESSION_SECRET=[0-9a-f]{64}\nDATABASE_URL=postgres:\/\/app:app@127\.0\.0\.1:5433\/app\nCOMPOSE_FILE=compose\.dev\.yaml\n$/)
       expect(await Bun.file(join(dir, '.gitignore')).text()).toContain('.env')
       expect(await Bun.file(join(dir, 'compose.prod.yaml')).text()).toContain('SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET}')
+      expect(await Bun.file(join(dir, '.env.example')).text()).toMatch(/\nSESSION_SECRET=\nPOSTGRES_PASSWORD=\n$/)
 
       await installKay(dir)
       expect(await checked(dir)).toEqual([])

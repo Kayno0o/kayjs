@@ -24,7 +24,7 @@ A page then reads `ctx.locals.user`, typed. `kay check` and the editor read `exp
 
 ## Sessions
 
-`session()` from `kay/server` is a plugin adding `ctx.locals.session`. Give it a secret of at least 32 characters and a store:
+`session()` from `kay/server` is a plugin adding `ctx.locals.session`. Give it a secret of at least 32 characters, generated and kept out of the repository (the placeholder an older `kay new` wrote to `.env.example` is refused), and a store:
 
 ```ts
 import { session, sqliteStore } from 'kay/server'

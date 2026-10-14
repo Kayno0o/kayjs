@@ -490,7 +490,7 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 function authFiles({ tw }: Setup): Record<string, string> {
   return {
     // What production sets, for compose.prod.yaml; development's own settings are in the .env `kay new` wrote.
-    '.env.example': 'SESSION_SECRET=at-least-32-characters-kept-out-of-the-repository\nPOSTGRES_PASSWORD=letters-and-digits-only-as-it-goes-into-a-url\n',
+    '.env.example': `# Each one generated and kept out of the repository: \`bun -e "console.log((crypto.randomUUID() + crypto.randomUUID()).replaceAll('-', ''))"\`.\nSESSION_SECRET=\nPOSTGRES_PASSWORD=\n`,
     'src/env.ts': `import { s } from 'kay'
 import { defineEnv } from 'kay/server'
 

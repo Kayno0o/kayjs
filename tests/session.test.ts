@@ -345,7 +345,7 @@ describe('sessions', () => {
     expect(await (await counter({ store }).handle(new Request('http://localhost/peek', { headers: { cookie: planted } }))).text()).toBe('none')
   })
 
-  it('takes a store of the app\'s own, and refuses a short secret or a cookie too big to keep', async () => {
+  it('takes a store of the app\'s own, and refuses a short or published secret or a cookie too big to keep', async () => {
     const saved = new Map<string, unknown>()
     const store: SessionStore = {
       get: async id => saved.get(id) as Record<string, unknown> | undefined,
@@ -357,6 +357,7 @@ describe('sessions', () => {
     await visit('/count')
     expect([...saved.values()]).toEqual([{ count: 1 }])
     expect(() => session({ secret: 'short' })).toThrow('at least 32 characters')
+    expect(() => session({ secret: 'at-least-32-characters-kept-out-of-the-repository' })).toThrow('which anyone can read')
 
     const big = new Elysia().use(session<{ text: string }>({ secret: SECRET })).get('/', async ({ session }) => {
       await session.set('text', 'x'.repeat(4000))

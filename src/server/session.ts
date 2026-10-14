@@ -63,6 +63,8 @@ const DEFAULT_MAX_AGE = 60 * 60 * 24 * 30
 const DEFAULT_ABSOLUTE_MAX_AGE = 60 * 60 * 24 * 90
 const DEFAULT_BROWSER_MAX_AGE = 60 * 60 * 24
 const MIN_SECRET_LENGTH = 32
+// Secrets published in kay's own templates, which anyone can read: an app copying one would let anyone forge its sessions.
+const PUBLISHED_SECRETS = new Set(['at-least-32-characters-kept-out-of-the-repository'])
 // A host name, the form a cookie's Domain takes once trimmed, lowercased and its leading dot dropped.
 const COOKIE_DOMAIN = /^[a-z\d-]+(?:\.[a-z\d-]+)*$/
 const LEADING_DOT = /^\./
@@ -80,6 +82,9 @@ export function session<Data extends object = SessionData>(options: SessionOptio
 
   if (secrets.length === 0 || secrets.some(secret => secret.length < MIN_SECRET_LENGTH))
     throw new Error(`kay: a session secret is at least ${MIN_SECRET_LENGTH} characters; generate one with \`bun -e "console.log(crypto.randomUUID() + crypto.randomUUID())"\``)
+
+  if (secrets.some(secret => PUBLISHED_SECRETS.has(secret)))
+    throw new Error('kay: the session secret is the placeholder an older `kay new` wrote to .env.example, which anyone can read; generate one with `bun -e "console.log(crypto.randomUUID() + crypto.randomUUID())"`')
 
   const keys = secrets.map(secret => nodeCrypto().createHash('sha256').update(secret).digest())
 
