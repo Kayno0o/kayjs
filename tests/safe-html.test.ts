@@ -209,8 +209,8 @@ describe('markup across JSON', () => {
       expect(() => decodeServerValue(text), payload).toThrow(TypeError)
     }
 
-    // A missing payload reads as undefined.
-    expect(() => decodeServerValue('[{"html":1},["SafeHtml"]]')).toThrow(TypeError)
+    // A missing payload is no index, which `read` refuses before the reviver.
+    expect(() => decodeServerValue('[{"html":1},["SafeHtml"]]')).toThrow('malformed')
   })
 
   it('goes into an island\'s data-props as the SafeHtml type only for markup vouched for', () => {
