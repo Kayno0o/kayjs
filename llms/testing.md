@@ -1,5 +1,161 @@
 # Testing
 
+## Common tasks
+
+### Test a page
+
+`testSite()` from `kay/test` serves the project in the test process, `site.visit(path)` GETs a page, and `page.text(selector)` reads what a visitor reads:
+
+```ts
+import { expect, it } from 'bun:test'
+import { testSite } from 'kay/test'
+
+const site = await testSite()
+
+it('greets the visitor', async () => {
+  const page = await site.visit('/')
+
+  expect(page.text('h1')).toBe('Welcome')
+})
+```
+
+### Test a refused form
+
+`site.submit(action, fields, { from })` posts a form without JavaScript and reads the page a refused post renders:
+
+```ts
+import { expect, it } from 'bun:test'
+import { testSite } from 'kay/test'
+import { add } from '../src/routes/index.kay'
+
+const site = await testSite()
+
+it('shows why a todo was refused', async () => {
+  const page = await site.submit(add, { title: '' }, { from: '/' })
+
+  expect(page.text()).toContain('Write a title')
+})
+```
+
+### Test an action as an island calls it
+
+`site.call(action, input)` resolves with the result, and `site.refusal(action, input)` expects the call refused:
+
+```ts
+const refused = await site.refusal(add, { title: '' })
+
+expect(refused.status).toBe(422)
+expect(refused.errors).toEqual({ title: 'Write a title' })
+```
+
+### Test as a signed-in user
+
+`locals` stands in for the app's `derive`, and `use` takes the plugins the server entry uses before the pages:
+
+```ts
+const site = await testSite({
+  locals: () => ({ user: { id: 1, admin: true } }),
+})
+```
+
+### Check a page's metadata
+
+A visit reads the title, meta tags, canonical link, JSON-LD and links without a regex:
+
+```ts
+const page = await site.visit('/pricing')
+
+expect(page.title()).toBe('Pricing | Example')
+expect(page.meta('description')).toBe('What it costs')
+expect(page.canonical()).toBe('https://example.com/pricing')
+expect(page.find('a[aria-current="page"]')[0]?.attributes.href).toBe('/pricing')
+```
+
+### Test an API route
+
+`site.fetch(path, init)` sends any request with the cookies so far and resolves with the response as it is:
+
+```ts
+const response = await site.fetch('/api/health')
+
+expect(response.status).toBe(200)
+```
+
+### Run the jobs an action enqueued
+
+`site.runJobs()` runs every job whose time has come and resolves with how many ran:
+
+```ts
+await site.submit(signUp, { name: 'Ada', email: 'ada@example.com' }, { from: '/' })
+
+expect(await site.runJobs()).toBe(1)
+```
+
+### Test a websocket route
+
+`site.socket(module, path, options)` opens the route as an island does, and `next()` resolves with the oldest message not read yet:
+
+```ts
+import chat from '../src/api/chat'
+
+const room = site.socket(chat, '/:room', { params: { room: 'general' } })
+
+room.send({ text: 'hello' })
+
+expect(await room.next()).toEqual({ room: 'general', from: 'anonymous', text: 'hello' })
+room.close()
+```
+
+### Test a component's handlers
+
+`mount(file, props)` renders one component built for the browser into `document`, and `settle()` lets effects land before the DOM is read:
+
+```ts
+import { GlobalRegistrator } from '@happy-dom/global-registrator'
+import { beforeAll, expect, it } from 'bun:test'
+import { mount, settle } from 'kay/test'
+
+beforeAll(() => {
+  GlobalRegistrator.register()
+})
+
+it('opens its panel on a click', async () => {
+  const { root, unmount } = await mount('src/components/toggle.kay', { label: 'Menu' })
+
+  root.querySelector('button')!.click()
+  await settle()
+
+  expect(root.querySelector('.panel')?.textContent).toBe('Open')
+  unmount()
+})
+```
+
+### Test an island in a real browser
+
+`testSite({ browser: true })` builds the islands, and `site.open(path)` loads a page in a headless Chrome:
+
+```ts
+import { afterAll, expect, it } from 'bun:test'
+import { testSite } from 'kay/test'
+
+const site = await testSite({ browser: true })
+
+afterAll(async () => site.close())
+
+it('counts the clicks', async () => {
+  const page = await site.open('/')
+
+  await page.click('button.counter')
+  await page.waitFor('button.counter', { text: 'Clicked 1' })
+  expect(page.errors).toEqual([])
+  expect(await page.a11y('main')).toEqual([])
+})
+```
+
+## Reference
+
+### Test site
+
 `kay/test` serves the project's pages and actions inside the test process, with no server and, unless asked for, no browser build:
 
 ```ts
@@ -18,19 +174,109 @@ it('shows why a todo was refused', async () => {
 })
 ```
 
-- `site.visit(path)` GETs a page and follows redirects, stopping at one to another site. A project setting no `site`, nor `SITE_URL`, is served as `http://localhost`, so a page reading `siteUrl()` or `siteOrigin()` renders as it does in production. `site.submit(action, fields, { from })` posts a form without JavaScript, as multipart with any `File` among its fields, and follows it back to its page, or reads the page a refused post renders. `from` may be a page `visit` or `submit` resolved with instead of a path: the post goes where its form posts, from the URL the browser shows it at, so `site.submit(add, fields, { from: refused })` posts again from the page a refused post answered, as a visitor fixing the form does. A post to an action with `minTime` goes through as if its form had been open long enough, with a page or without, so a test of something else needs no waiting; a page older than `maxAge` is still refused as expired. A post or a call to an action with `proofOfWork` carries a solved challenge, unless `headers` gives its own `x-kay-work`, `''` for none. A test of the minimum itself says how long the form was open, `site.submit(contact, fields, { from: '/', openedFor: 0 })` posting as soon as the page loaded and `openedFor: '2d'` two days after, and a `kay_since` among the fields, such as a forged one, wins over all of it, the clock left alone. `openedFor` signs a stamp of its own, so a test checking that the refused page keeps the stamp its form rendered with posts that stamp as `kay_since`, read off the visit with `page.find('input[name="kay_since"]')`. Both resolve with `{ url, status, headers, html }`, which also reads the page as a crawler does (see below). `site.call(action, input)` calls an action as an island does, `input` its typed input or a `FormData`, `{ from: '/orgs/acme' }` naming the page it is made on for an action reading its params, resolving with its result, throwing `ActionError` when it fails and `ActionRedirect` with `location` when it redirects. `site.refusal(action, input)` makes the same call expecting it refused: it resolves with the `ActionError`, `data` typed from the handler, `await site.refusal(add, { title: '' })` reading `{ status: 422, errors: { title: 'Write a title' } }`, and fails the test when the call went through.
-- A visit reads its page without a regex: `page.title()`, `page.meta(key)` the `content` of the `meta` whose `name` or `property` is `key`, such as `description` or `og:image`, `page.canonical()`, `page.jsonLd()` each thing the JSON-LD scripts describe, parsed, the items of a `@graph` one by one, `page.links()` every `a`'s `href` in page order, and `page.find(selector)` every element a CSS selector matches, as `{ tag, attributes, text }`: `expect(page.find('a[aria-current="page"]')[0]?.attributes.href).toBe('/pricing')`, and `page.text(selector)` the text a visitor reads in the first element a selector matches, or in the whole body without one, scripts, styles and templates left out, or `undefined` when nothing matches. Assert on text through `text` or `find`, never on `page.html`: an island's markup holds hydration markers between the parts of an interpolated text, so `p Thanks, {name}!` renders `Thanks, <!--[-->Ada<!--]-->!`, and `expect(page.text('.success')).toBe('Thanks, Ada!')` is what passes. Text and attributes come decoded, `&amp;` read as `&`, text with each run of whitespace one space and trimmed, and what the page lacks reads `undefined`. `site.sitemap()` resolves with the URLs `/sitemap.xml` lists, or the sitemap at another path, failing when it does not answer 200.
+- `site.visit(path)` GETs a page and follows redirects, stopping at one to another site.
+- A project setting no `site`, nor `SITE_URL`, is served as `http://localhost`, so a page reading `siteUrl()` or `siteOrigin()` renders as it does in production.
+- `site.submit(action, fields, { from })` posts a form without JavaScript, as multipart with any `File` among its fields, and follows it back to its page, or reads the page a refused post renders.
+- `from` may be a page `visit` or `submit` resolved with instead of a path: the post goes where its form posts, from the URL the browser shows it at.
+- So `site.submit(add, fields, { from: refused })` posts again from the page a refused post answered, as a visitor fixing the form does.
+- A post to an action with `minTime` goes through as if its form had been open long enough, with a page or without, so a test of something else needs no waiting.
+- A page older than `maxAge` is still refused as expired.
+- A post or a call to an action with `proofOfWork` carries a solved challenge, unless `headers` gives its own `x-kay-work`, `''` for none.
+- A test of the minimum itself says how long the form was open: `site.submit(contact, fields, { from: '/', openedFor: 0 })` posts as soon as the page loaded and `openedFor: '2d'` two days after.
+- A `kay_since` among the fields, such as a forged one, wins over all of it, the clock left alone.
+- `openedFor` signs a stamp of its own, so a test checking that the refused page keeps the stamp its form rendered with posts that stamp as `kay_since`, read off the visit with `page.find('input[name="kay_since"]')`.
+- Both `visit` and `submit` resolve with `{ url, status, headers, html }`, which also reads the page as a crawler does (see below).
+- `site.call(action, input)` calls an action as an island does, `input` its typed input or a `FormData`.
+- `{ from: '/orgs/acme' }` names the page a call is made on, for an action reading its params.
+- `site.call` resolves with the action's result, throws `ActionError` when it fails and `ActionRedirect` with `location` when it redirects.
+- `site.refusal(action, input)` makes the same call expecting it refused: it resolves with the `ActionError`, `data` typed from the handler, and fails the test when the call went through.
+- `await site.refusal(add, { title: '' })` reads `{ status: 422, errors: { title: 'Write a title' } }`.
+
+### Reading a page
+
+- A visit reads its page without a regex: `page.title()`, `page.meta(key)`, `page.canonical()`, `page.jsonLd()`, `page.links()`, `page.find(selector)` and `page.text(selector)`.
+- `page.meta(key)` is the `content` of the `meta` whose `name` or `property` is `key`, such as `description` or `og:image`.
+- `page.jsonLd()` is each thing the JSON-LD scripts describe, parsed, the items of a `@graph` one by one.
+- `page.links()` is every `a`'s `href` in page order.
+- `page.find(selector)` is every element a CSS selector matches, as `{ tag, attributes, text }`: `expect(page.find('a[aria-current="page"]')[0]?.attributes.href).toBe('/pricing')`.
+- `page.text(selector)` is the text a visitor reads in the first element a selector matches, or in the whole body without one, scripts, styles and templates left out, or `undefined` when nothing matches.
+- Assert on text through `text` or `find`, never on `page.html`: an island's markup holds hydration markers between the parts of an interpolated text, so `p Thanks, {name}!` renders `Thanks, <!--[-->Ada<!--]-->!`, and `expect(page.text('.success')).toBe('Thanks, Ada!')` is what passes.
+- Text and attributes come decoded, `&amp;` read as `&`, text with each run of whitespace one space and trimmed, and what the page lacks reads `undefined`.
+- `site.sitemap()` resolves with the URLs `/sitemap.xml` lists, or the sitemap at another path, failing when it does not answer 200.
+
+### Requests, jobs, sockets and sessions
+
 - `site.fetch(path, init)` sends any request, an API route's included, with the cookies so far, and resolves with the response as it is, redirects not followed.
-- `site.runJobs()` runs every job the app's queues hold whose time has come, those the jobs enqueue included, and resolves with how many ran: an action enqueues, the test runs the jobs, then checks what they did. Queues keep their jobs in memory under `bun test` unless one names a store, and `files` its files, each `testSite` in a store of its own unless its options name one.
-- `site.socket(module, path, options)` opens a websocket route and `site.stream(module, path, options)` reads an event stream as an island does, the options taking `headers` too. Both keep every message in `received` and resolve `next()` with the oldest one not read yet, waiting for one if need be; a stream's `finished()` resolves with all its values once it ended. `site.socket` starts the site on a free port the first time, which `site.close()` stops.
-- Cookies a response sets go with the next request and read as `site.cookies`. `use` takes the plugins the server entry uses before the pages, in order, so an app on `session()` signs in through `site.submit` and stays signed in: `testSite({ use: [sessions] })`. `locals` stands in for the app's Elysia `derive`, called with each request, after those plugins.
-- A site made at the top of a test file, as `const site = await testSite()` is, sends each test's requests as a client of its own, so a rate limit counts the posts of one test only: a test posting until it is refused needs no other to run first, and none after it is refused. One made inside a test or a `beforeAll` is one client throughout. A request carrying the header the app's `proxy` setting names still comes from the address it gives.
-- `mount(file, props)` from `kay/test` renders one component built for the browser, as an island renders, into `document`, and resolves with `{ root, unmount }` once its effects ran: for what handlers and effects do, such as a dialog opening on a click. `file` is the `.kay` file relative to the project, since importing it through the preload gives its server build; props may be functions, and the component runs on a kay of its own, so a signal of the test reaches it through a callback rather than as a prop; a library's settings apply as `kay.config.ts` sets them. Each mount runs the component's modules afresh, as a page load does, so module state, a persisted signal read from storage included, does not carry over from an earlier mount: set localStorage, then mount. The test registers the DOM itself, such as `GlobalRegistrator.register()` from `@happy-dom/global-registrator`; one left registered for the rest of the run does not reach `testSite`, whose app runs on Bun's own `Request`, `Response` and the rest, so a file mounting components and one visiting pages share one `bun test` run, as long as `kay/test/preload` comes before any preload registering a DOM; a function the test stubbed, such as `fetch`, stays its stub there, and a streamed page under a DOM is read through `visit`, `site.fetch` handing back a body read later. A `persisted(key, initial, { storage: 'local' })` signal keeps its value encoded as island props are, not as JSON: `writePersisted(key, value)` and `readPersisted(key)` from `kay/test` set one before a mount and read one back, `undefined` when none was kept. After an interaction, `await settle()` lets effects land before the DOM is read.
-- kay holds no database code: an app keeps its data with `@kaynooo/pg-orm`, as `kay new --template app` does, and its tests get a database each from pg-orm's `testDatabase()`. A preload listed after `kay/test/preload` copies, for each test file, a database migrated from `migrations/` and seeded once, points `DATABASE_URL` at the copy before the app's modules read it, and drops it in `afterAll`; `bun test --isolate` runs each file in modules of its own, so each reads its own copy, and files never see each other's rows; the app's `bun run test` passes it, while a plain `bun test` runs the preload once and every file shares one copy. The test database in `.env.test` need not exist, its server's user only needs `CREATEDB`.
-- Without `browser`, pages render their islands' markup without scripts. Test files import `.kay` files directly, `import { add } from '../src/routes/index.kay'`, through `[test] preload = ["kay/test/preload"]` in `bunfig.toml`, which `kay new` writes along with a first test; they are typed through `.kay/types` as any `.ts` file's imports are, so `kay check` passes them, and a bare `tsgo` resolves them only once `kay check` has written that tree, which a check script runs first.
-- `bun test` loads the project's `.env` as well as `.env.test` and `.env.test.local`, whatever `NODE_ENV` says. The preload drops every variable only `.env` sets, so a test never reaches the mail server or database a developer's `.env` names: tests see the shell's and the CI's variables and the test files', and `.env.test` need not blank what `.env` holds. The preload serves the project in the working directory, or the one `KAY_ROOT` names when it is nested, such as a library's fixture app run as `KAY_ROOT=tests/fixture bun test`, which `testSite()` then serves too.
-- `testSite({ browser: true })` also builds the islands for the browser, into `.kay/client` as `kay build` does (`.kay/client-<n>` in each worker of `bun test --parallel`, the processes its tests start included, so files running at once keep their builds apart, and a worker's `pages({ prebuilt: true })` reads its own, not what a `kay build` before the tests left), and `site.open(path)` loads a page in a headless Chrome over a server the site starts on a free port, resolving with a page once it loaded and its islands hydrating on load are done; `browse(url, options)` from `kay/test` is the same for a server already running, such as one the test started itself, rather than one `testSite` serves. The page clicks as a user does, `click(selector)` scrolling the element to the middle of the view, then waiting for it to be visible, still and not covered (a click on an island not hydrated yet is replayed once it is), and `fill(selector, text)` replaces a field's text as typing does; `type(text)` and `press(key)` go to the focused element. `text`, `value` and `count` read the page at once, `text` and `value` null when nothing matches; `waitFor(selector, { text, gone })` and `waitUntil(fn)` poll until they hold, 5 seconds at most unless `timeout` gives other milliseconds, and fail naming what they waited for. `evaluate(fn, ...args)` runs a function in the page, its arguments and result crossing as JSON; only its source crosses, so it sees no variable or helper of the test, only its arguments, and `waitUntil` runs its function the same way. `a11y(selector)` checks the page as it stands, or only the elements `selector` matches, with axe-core, as `kay dev` does (see [Checks and lints](checks.md#checks-and-lints)), and resolves with the rules it breaks, none when it passes, each with its `id` (such as `color-contrast`), `impact`, `help`, `helpUrl` and `nodes`, the elements breaking it as `{ target, html }`, `target` their CSS selector. A wait whose function keeps throwing names the last error when it times out. `goto`, `back`, `forward` and `reload` resolve once the page settled, a swapped page included, and fail naming the files the page could not load (an island's chunk answering 404, say) when it does not settle in time; `path()` reads where it is. `errors` holds the page's console errors and uncaught exceptions; once it logs a problem kay recovers from in production, such as an island that did not match its server markup or had no client chunk, or a message no locale has, the page's next call fails naming it, unless `strict: false` was given to `open` or `browse`, which leaves it in `errors`. `view` is the `Bun.WebView` behind it, for a `screenshot()` or a raw `cdp()` call. Each page opened starts with no cookie or storage for the site, and pages opened at once share them, the browser's own rather than `site.cookies`. `site.close()` closes the pages it opened.
-- The browser is `Bun.WebView` on its Chrome backend, young in Bun and marked experimental, so kay keeps to the part of it these helpers use. It runs the executable given as `path`, to `testSite({ browser: { path } })` or `open`, else `BUN_CHROME_PATH`, else the first Chrome or Chromium on the `PATH` or where it usually installs; with none, `open` fails saying so, and `describe.skipIf(!browserPath())` skips a suite instead. In an Alpine CI image, `apk add chromium` and `BUN_CHROME_PATH=$(command -v chromium)`; as root, as in a container, Chrome runs without its sandbox. Chrome runs on a profile kay makes in the temp directory and removes, with what Bun and Chrome leave beside it, when the browser closes: a second after the last page closed, so the next test reuses it, and once the tests ran, as bun test runs no exit handler (after the run, or each file of a parallel one, with `kay/test/preload`; else after the file that loaded `kay/test` first), or at exit outside bun test. The first page of a later run removes what a killed run left. Closing the browser closes every `Bun.WebView` of the process, one the test made itself included, and kills every process Chrome started, which Alpine's Chromium leaves running otherwise.
+- `site.runJobs()` runs every job the app's queues hold whose time has come, those the jobs enqueue included, and resolves with how many ran: an action enqueues, the test runs the jobs, then checks what they did.
+- Queues keep their jobs in memory under `bun test` unless one names a store, and `files` its files, each `testSite` in a store of its own unless its options name one.
+- `site.socket(module, path, options)` opens a websocket route and `site.stream(module, path, options)` reads an event stream as an island does, the options taking `headers` too.
+- Both keep every message in `received` and resolve `next()` with the oldest one not read yet, waiting for one if need be; a stream's `finished()` resolves with all its values once it ended.
+- `site.socket` starts the site on a free port the first time, which `site.close()` stops.
+- Cookies a response sets go with the next request and read as `site.cookies`.
+- `use` takes the plugins the server entry uses before the pages, in order, so an app on `session()` signs in through `site.submit` and stays signed in: `testSite({ use: [sessions] })`.
+- `locals` stands in for the app's Elysia `derive`, called with each request, after those plugins.
+- A site made at the top of a test file, as `const site = await testSite()` is, sends each test's requests as a client of its own, so a rate limit counts the posts of one test only: a test posting until it is refused needs no other to run first, and none after it is refused.
+- One made inside a test or a `beforeAll` is one client throughout.
+- A request carrying the header the app's `proxy` setting names still comes from the address it gives.
+
+### Mounting a component
+
+- `mount(file, props)` from `kay/test` renders one component built for the browser, as an island renders, into `document`, and resolves with `{ root, unmount }` once its effects ran: for what handlers and effects do, such as a dialog opening on a click.
+- `file` is the `.kay` file relative to the project, since importing it through the preload gives its server build.
+- Props may be functions, and the component runs on a kay of its own, so a signal of the test reaches it through a callback rather than as a prop.
+- A library's settings apply as `kay.config.ts` sets them.
+- Each mount runs the component's modules afresh, as a page load does, so module state, a persisted signal read from storage included, does not carry over from an earlier mount: set localStorage, then mount.
+- The test registers the DOM itself, such as `GlobalRegistrator.register()` from `@happy-dom/global-registrator`.
+- A DOM left registered for the rest of the run does not reach `testSite`, whose app runs on Bun's own `Request`, `Response` and the rest, so a file mounting components and one visiting pages share one `bun test` run, as long as `kay/test/preload` comes before any preload registering a DOM.
+- A function the test stubbed, such as `fetch`, stays its stub there, and a streamed page under a DOM is read through `visit`, `site.fetch` handing back a body read later.
+- A `persisted(key, initial, { storage: 'local' })` signal keeps its value encoded as island props are, not as JSON: `writePersisted(key, value)` and `readPersisted(key)` from `kay/test` set one before a mount and read one back, `undefined` when none was kept.
+- After an interaction, `await settle()` lets effects land before the DOM is read.
+
+### Databases and setup
+
+- kay holds no database code: an app keeps its data with `@kaynooo/pg-orm`, as `kay new --template app` does, and its tests get a database each from pg-orm's `testDatabase()`.
+- A preload listed after `kay/test/preload` copies, for each test file, a database migrated from `migrations/` and seeded once, points `DATABASE_URL` at the copy before the app's modules read it, and drops it in `afterAll`.
+- `bun test --isolate` runs each file in modules of its own, so each reads its own copy, and files never see each other's rows; the app's `bun run test` passes it, while a plain `bun test` runs the preload once and every file shares one copy.
+- The test database in `.env.test` need not exist, its server's user only needs `CREATEDB`.
+- Without `browser`, pages render their islands' markup without scripts.
+- Test files import `.kay` files directly, `import { add } from '../src/routes/index.kay'`, through `[test] preload = ["kay/test/preload"]` in `bunfig.toml`, which `kay new` writes along with a first test.
+- They are typed through `.kay/types` as any `.ts` file's imports are, so `kay check` passes them, and a bare `tsgo` resolves them only once `kay check` has written that tree, which a check script runs first.
+- `bun test` loads the project's `.env` as well as `.env.test` and `.env.test.local`, whatever `NODE_ENV` says.
+- The preload drops every variable only `.env` sets, so a test never reaches the mail server or database a developer's `.env` names: tests see the shell's and the CI's variables and the test files', and `.env.test` need not blank what `.env` holds.
+- The preload serves the project in the working directory, or the one `KAY_ROOT` names when it is nested, such as a library's fixture app run as `KAY_ROOT=tests/fixture bun test`, which `testSite()` then serves too.
+
+### Browser tests
+
+- `testSite({ browser: true })` also builds the islands for the browser, into `.kay/client` as `kay build` does.
+- In each worker of `bun test --parallel`, the processes its tests start included, the build goes into `.kay/client-<n>`, so files running at once keep their builds apart, and a worker's `pages({ prebuilt: true })` reads its own, not what a `kay build` before the tests left.
+- `site.open(path)` loads a page in a headless Chrome over a server the site starts on a free port, resolving with a page once it loaded and its islands hydrating on load are done.
+- `browse(url, options)` from `kay/test` is the same for a server already running, such as one the test started itself, rather than one `testSite` serves.
+- The page clicks as a user does: `click(selector)` scrolls the element to the middle of the view, then waits for it to be visible, still and not covered (a click on an island not hydrated yet is replayed once it is).
+- `fill(selector, text)` replaces a field's text as typing does; `type(text)` and `press(key)` go to the focused element.
+- `text`, `value` and `count` read the page at once, `text` and `value` null when nothing matches.
+- `waitFor(selector, { text, gone })` and `waitUntil(fn)` poll until they hold, 5 seconds at most unless `timeout` gives other milliseconds, and fail naming what they waited for.
+- A wait whose function keeps throwing names the last error when it times out.
+- `evaluate(fn, ...args)` runs a function in the page, its arguments and result crossing as JSON.
+- Only the source of that function crosses, so it sees no variable or helper of the test, only its arguments, and `waitUntil` runs its function the same way.
+- `a11y(selector)` checks the page as it stands, or only the elements `selector` matches, with axe-core, as `kay dev` does (see [Checks and lints](checks.md#checks-and-lints)).
+- `a11y` resolves with the rules it breaks, none when it passes, each with its `id` (such as `color-contrast`), `impact`, `help`, `helpUrl` and `nodes`, the elements breaking it as `{ target, html }`, `target` their CSS selector.
+- `goto`, `back`, `forward` and `reload` resolve once the page settled, a swapped page included, and fail naming the files the page could not load (an island's chunk answering 404, say) when it does not settle in time.
+- `path()` reads where the page is.
+- `errors` holds the page's console errors and uncaught exceptions.
+- Once `errors` logs a problem kay recovers from in production, such as an island that did not match its server markup or had no client chunk, or a message no locale has, the page's next call fails naming it, unless `strict: false` was given to `open` or `browse`, which leaves it in `errors`.
+- `view` is the `Bun.WebView` behind it, for a `screenshot()` or a raw `cdp()` call.
+- Each page opened starts with no cookie or storage for the site, and pages opened at once share them, the browser's own rather than `site.cookies`.
+- `site.close()` closes the pages it opened.
+
+### The browser itself
+
+- The browser is `Bun.WebView` on its Chrome backend, young in Bun and marked experimental, so kay keeps to the part of it these helpers use.
+- It runs the executable given as `path`, to `testSite({ browser: { path } })` or `open`, else `BUN_CHROME_PATH`, else the first Chrome or Chromium on the `PATH` or where it usually installs; with none, `open` fails saying so, and `describe.skipIf(!browserPath())` skips a suite instead.
+- In an Alpine CI image, `apk add chromium` and `BUN_CHROME_PATH=$(command -v chromium)`; as root, as in a container, Chrome runs without its sandbox.
+- Chrome runs on a profile kay makes in the temp directory and removes, with what Bun and Chrome leave beside it, when the browser closes.
+- The browser closes a second after the last page closed, so the next test reuses it, and once the tests ran, as bun test runs no exit handler (after the run, or each file of a parallel one, with `kay/test/preload`; else after the file that loaded `kay/test` first), or at exit outside bun test.
+- The first page of a later run removes what a killed run left.
+- Closing the browser closes every `Bun.WebView` of the process, one the test made itself included, and kills every process Chrome started, which Alpine's Chromium leaves running otherwise.
 
 ```ts
 import { afterAll, expect, it } from 'bun:test'
