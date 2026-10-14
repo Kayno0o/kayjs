@@ -116,14 +116,6 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     expect(errors).toEqual([])
   })
 
-  it('checks a form against its action\'s schema before posting, with the server\'s message', async () => {
-    await page.fill('input[name="title"]', 'ab')
-    await page.click('form button')
-    await page.waitForFunction(() => document.querySelector('input')!.validationMessage === 'Too short')
-
-    expect(await page.locator('p.error, p.done').count()).toBe(0)
-  })
-
   it('loads the form checks once a form is used, and checks a form submitted before they loaded', async () => {
     const fresh = await browser.newPage()
     const checksLoaded = async (): Promise<boolean> => fresh.evaluate(() => performance.getEntriesByType('resource').some(entry => (/\/validate-[^/]*\.js$/).test(entry.name)))
@@ -1001,4 +993,49 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
 
     expect(overflow).toBe(0)
   })
+
+  it('serves the pages it keeps and their islands offline after a first visit, the fallback for any other, and never kay\'s routes', async () => {
+    const context = await browser.newContext()
+    const page = await context.newPage()
+
+    await page.goto(origin)
+    await page.waitForFunction(async () => (await navigator.serviceWorker.ready).active?.state === 'activated' && navigator.serviceWorker.controller !== null, undefined, { timeout: 10_000 })
+    await page.goto(`${origin}/second`)
+    await context.setOffline(true)
+
+    try {
+      await page.goto(origin)
+      expect(await page.textContent('h1')).toBe('Home')
+
+      // The page swap fetches the next page through the worker too.
+      await page.evaluate(() => {
+        (window as { kayAlive?: boolean }).kayAlive = true
+      })
+      await page.click('a.second')
+      await page.locator('h1', { hasText: 'Second' }).waitFor()
+      expect(await page.evaluate(() => (window as { kayAlive?: boolean }).kayAlive)).toBe(true)
+
+      // Islands hydrate from the chunks it keeps.
+      await page.click('button.player')
+      await page.locator('button.player', { hasText: 'Played 1' }).waitFor()
+
+      const fallback = await page.goto(`${origin}/plain`)
+
+      expect(fallback?.status()).toBe(503)
+      expect(await page.textContent('h1')).toBe('Offline')
+      expect(await page.evaluate(async () => {
+        try {
+          await fetch('/_kay/health')
+
+          return 'answered'
+        }
+        catch {
+          return 'failed'
+        }
+      })).toBe('failed')
+    }
+    finally {
+      await context.close()
+    }
+  }, 30_000)
 })

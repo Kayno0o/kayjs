@@ -170,7 +170,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay/test i
     expect(await page.text('button.note')).toBe('Note none')
   })
 
-  it('waits for an element to show up or go away, and runs a function with its arguments, undefined ones included', async () => {
+  it('waits for an element to show up or go away, runs a function with its arguments, undefined ones included, and times out naming what it waited for', async () => {
     await page.goto('/')
     await page.evaluate(() => void setTimeout(() => document.body.append(Object.assign(document.createElement('p'), { className: 'late' })), 200))
     await page.waitFor('p.late')
@@ -179,14 +179,12 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay/test i
 
     expect(await page.count('p.late')).toBe(0)
     expect(await page.evaluate((first: string, second?: string) => [first, second === undefined], 'a', undefined)).toEqual(['a', true])
-  })
 
-  it('times out naming what it waited for', async () => {
+    // A wait that times out names what it waited for.
     await expect(page.waitFor('p.nothing', { timeout: 100 })).rejects.toThrow('kay: timed out after 100ms waiting for p.nothing')
     await expect(page.waitFor('h1', { text: 'Nope', timeout: 100 })).rejects.toThrow('waiting for h1 with text "Nope"')
-  })
 
-  it('names why a condition that keeps throwing never held, as one calling a helper of the test does', async () => {
+    // A condition that keeps throwing is named as never held, as one calling a helper of the test does.
     await expect(page.waitUntil(() => elsewhere(), { timeout: 100 })).rejects.toThrow(/waiting for the condition to hold, last throwing .*elsewhere is not defined/)
     await expect(page.waitUntil(() => false, { timeout: 100 })).rejects.toThrow(/to hold$/)
     // Thrown once, as by a page swap in flight, then only false: the error is over.
@@ -266,181 +264,167 @@ async function logged(shown: TestPage): Promise<string[]> {
 }
 
 describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('history after a reload', () => {
+  let history: TestSite
+
+  beforeAll(async () => {
+    history = await testSite({ routes: 'tests/fixtures/history/src/routes', browser: { path } })
+  }, 60_000)
+
+  afterAll(async () => history?.close())
+
   it('goes back to the page a swap left, from a page without islands loaded afresh, as from one with them, an anchor on it staying put', async () => {
-    const history = await testSite({ routes: 'tests/fixtures/history/src/routes', browser: { path } })
+    const view = await history.open('/')
 
-    try {
-      const view = await history.open('/')
+    await view.click('button.count')
+    await view.click('a.still')
+    await view.waitFor('h1', { text: 'Still' })
+    // Nothing of kay's runs on it once loaded afresh: only a few bytes.
+    await view.reload()
 
-      await view.click('button.count')
-      await view.click('a.still')
-      await view.waitFor('h1', { text: 'Still' })
-      // Nothing of kay's runs on it once loaded afresh: only a few bytes.
-      await view.reload()
+    expect(await view.count('script[src]')).toBe(0)
 
-      expect(await view.count('script[src]')).toBe(0)
+    await view.click('a.anchor')
+    await view.back()
 
-      await view.click('a.anchor')
-      await view.back()
+    expect(await view.path()).toBe('/still')
+    expect(await view.text('h1')).toBe('Still')
 
-      expect(await view.path()).toBe('/still')
-      expect(await view.text('h1')).toBe('Still')
+    await view.back()
+    await view.waitFor('h1', { text: 'Home' })
 
-      await view.back()
-      await view.waitFor('h1', { text: 'Home' })
+    expect(await view.path()).toBe('/')
 
-      expect(await view.path()).toBe('/')
+    await view.forward()
+    await view.waitFor('h1', { text: 'Still' })
+    await view.click('a.home')
+    await view.waitFor('h1', { text: 'Home' })
+    await view.reload()
+    await view.back()
+    await view.waitFor('h1', { text: 'Still' })
 
-      await view.forward()
-      await view.waitFor('h1', { text: 'Still' })
-      await view.click('a.home')
-      await view.waitFor('h1', { text: 'Home' })
-      await view.reload()
-      await view.back()
-      await view.waitFor('h1', { text: 'Still' })
-
-      expect(view.errors).toEqual([])
-    }
-    finally {
-      await history.close()
-    }
+    expect(view.errors).toEqual([])
   }, 60_000)
 
   it('leaves Back and Forward to kay\'s script across a swap to a page without islands, and an entry the app pushed to the app', async () => {
-    const history = await testSite({ routes: 'tests/fixtures/history/src/routes', browser: { path } })
     const kept = () => (window as unknown as { kept?: boolean }).kept === true
+    const view = await history.open('/')
 
-    try {
-      const view = await history.open('/')
+    await view.evaluate(() => {
+      (window as unknown as { kept: boolean }).kept = true
+    })
+    await view.click('a.still')
+    await view.waitFor('h1', { text: 'Still' })
+    await view.back()
+    await view.waitFor('h1', { text: 'Home' })
+    await view.forward()
+    await view.waitFor('h1', { text: 'Still' })
+    // A reload would come once the traversal is over.
+    await Bun.sleep(300)
 
-      await view.evaluate(() => {
-        (window as unknown as { kept: boolean }).kept = true
-      })
-      await view.click('a.still')
-      await view.waitFor('h1', { text: 'Still' })
-      await view.back()
-      await view.waitFor('h1', { text: 'Home' })
-      await view.forward()
-      await view.waitFor('h1', { text: 'Still' })
-      // A reload would come once the traversal is over.
-      await Bun.sleep(300)
+    expect(await view.evaluate(kept)).toBe(true)
 
-      expect(await view.evaluate(kept)).toBe(true)
+    await view.reload()
+    await view.evaluate(() => {
+      (window as unknown as { kept: boolean }).kept = true
+      window.history.pushState(null, '', '/elsewhere')
+    })
+    await view.back()
+    await view.forward()
+    await Bun.sleep(300)
 
-      await view.reload()
-      await view.evaluate(() => {
-        (window as unknown as { kept: boolean }).kept = true
-        window.history.pushState(null, '', '/elsewhere')
-      })
-      await view.back()
-      await view.forward()
-      await Bun.sleep(300)
-
-      expect(await view.path()).toBe('/elsewhere')
-      expect(await view.evaluate(kept)).toBe(true)
-      expect(view.errors).toEqual([])
-    }
-    finally {
-      await history.close()
-    }
+    expect(await view.path()).toBe('/elsewhere')
+    expect(await view.evaluate(kept)).toBe(true)
+    expect(view.errors).toEqual([])
   }, 60_000)
 })
 
 describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay dev in a browser', () => {
-  it('shows each problem kay recovers from on the page, a page swap leaving them behind', async () => {
-    const dev = await testSite({ routes: 'tests/fixtures/navigation/src/routes', browser: { path }, dev: true, onError: () => undefined })
+  let dev: TestSite
 
-    try {
-      const shown = await dev.open('/mismatch', { strict: false })
-
-      // The accessibility check lists its own problems once the page settles.
-      await shown.waitUntil(() => [...document.querySelector('kay-dev')?.shadowRoot!.querySelectorAll('.problem pre') ?? []].some(pre => pre.textContent.startsWith('a11y ')))
-
-      expect(await logged(shown)).toEqual([expect.stringMatching(/^island tests\/fixtures\/navigation\/src\/components\/mismatch\.kay did not match its server markup, rendering it again: /)])
-      expect(shown.errors).toHaveLength(1)
-
-      // A problem logged again is listed once, a warning counts, anything not kay's is left to the console.
-      await shown.evaluate(() => {
-        console.warn('[kay] the persisted signal note could not be kept')
-        console.warn('[kay] the persisted signal note could not be kept')
-        console.error('not kay')
-      })
-      await shown.waitUntil(() => document.querySelector('kay-dev')!.shadowRoot!.textContent.includes('the persisted signal'))
-
-      expect((await logged(shown)).map(problem => problem.slice(0, 20))).toEqual(['island tests/fixture', 'the persisted signal'])
-
-      // Dismissed, they stay so for the browser tab, a new one showing.
-      await shown.evaluate(() => document.querySelector('kay-dev')!.shadowRoot!.querySelector<HTMLButtonElement>('.actions button')!.click())
-
-      expect(await shown.evaluate(() => document.querySelector('kay-dev')!.shadowRoot!.querySelectorAll('.problem pre').length)).toBe(0)
-
-      await shown.evaluate(() => console.error('[kay] no locale has the message "late"'))
-      await shown.waitUntil(() => document.querySelector('kay-dev')!.shadowRoot!.querySelector('.problem pre') !== null)
-
-      expect(await shown.evaluate(() => [...document.querySelector('kay-dev')!.shadowRoot!.querySelectorAll('.problem pre')].map(problem => problem.textContent))).toEqual(['no locale has the message "late"'])
-      expect(await shown.evaluate(() => [...document.querySelector('kay-dev')!.shadowRoot!.querySelectorAll('.bar > button:not([hidden])')].map(button => button.textContent))).toEqual(['kay', '1 problem'])
-
-      await shown.click('a.home')
-      await shown.waitFor('h1', { text: 'Home' })
-
-      expect(await logged(shown)).toEqual([])
-
-      // An error nothing caught shows too, with its stack.
-      await shown.evaluate(() => {
-        setTimeout(() => {
-          throw new Error('thrown later')
-        })
-      })
-      await shown.waitUntil(() => document.querySelector('kay-dev')!.shadowRoot!.textContent.includes('thrown later'))
-
-      expect((await logged(shown))[0]).toStartWith('Error: thrown later\n    at ')
-
-      // As do a rejection nothing handled and a source the policy blocked.
-      await shown.evaluate(() => {
-        const policy = document.createElement('meta')
-        const image = document.createElement('img')
-
-        policy.httpEquiv = 'Content-Security-Policy'
-        policy.content = 'img-src \'self\''
-        document.head.append(policy)
-        image.src = 'https://blocked.example/x.png'
-        document.body.append(image)
-        void Promise.reject(new Error('rejected later'))
-      })
-      await shown.waitUntil(() => document.querySelector('kay-dev')!.shadowRoot!.querySelectorAll('.problem pre').length >= 3)
-
-      expect(await logged(shown)).toEqual([
-        expect.stringMatching(/^Error: thrown later\n {4}at /),
-        expect.stringMatching(/^Uncaught \(in promise\) Error: rejected later\n {4}at /),
-        expect.stringMatching(/^blocked https:\/\/blocked\.example\/x\.png by img-src/),
-      ])
-    }
-    finally {
-      await dev.close()
-    }
+  beforeAll(async () => {
+    dev = await testSite({ routes: 'tests/fixtures/navigation/src/routes', browser: { path }, dev: true, onError: () => undefined })
   }, 60_000)
-})
 
-describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay dev checking accessibility', () => {
+  afterAll(async () => dev?.close())
+
+  it('shows each problem kay recovers from on the page, a page swap leaving them behind', async () => {
+    const shown = await dev.open('/mismatch', { strict: false })
+
+    // The accessibility check lists its own problems once the page settles.
+    await shown.waitUntil(() => [...document.querySelector('kay-dev')?.shadowRoot!.querySelectorAll('.problem pre') ?? []].some(pre => pre.textContent.startsWith('a11y ')))
+
+    expect(await logged(shown)).toEqual([expect.stringMatching(/^island tests\/fixtures\/navigation\/src\/components\/mismatch\.kay did not match its server markup, rendering it again: /)])
+    expect(shown.errors).toHaveLength(1)
+
+    // A problem logged again is listed once, a warning counts, anything not kay's is left to the console.
+    await shown.evaluate(() => {
+      console.warn('[kay] the persisted signal note could not be kept')
+      console.warn('[kay] the persisted signal note could not be kept')
+      console.error('not kay')
+    })
+    await shown.waitUntil(() => document.querySelector('kay-dev')!.shadowRoot!.textContent.includes('the persisted signal'))
+
+    expect((await logged(shown)).map(problem => problem.slice(0, 20))).toEqual(['island tests/fixture', 'the persisted signal'])
+
+    // Dismissed, they stay so for the browser tab, a new one showing.
+    await shown.evaluate(() => document.querySelector('kay-dev')!.shadowRoot!.querySelector<HTMLButtonElement>('.actions button')!.click())
+
+    expect(await shown.evaluate(() => document.querySelector('kay-dev')!.shadowRoot!.querySelectorAll('.problem pre').length)).toBe(0)
+
+    await shown.evaluate(() => console.error('[kay] no locale has the message "late"'))
+    await shown.waitUntil(() => document.querySelector('kay-dev')!.shadowRoot!.querySelector('.problem pre') !== null)
+
+    expect(await shown.evaluate(() => [...document.querySelector('kay-dev')!.shadowRoot!.querySelectorAll('.problem pre')].map(problem => problem.textContent))).toEqual(['no locale has the message "late"'])
+    expect(await shown.evaluate(() => [...document.querySelector('kay-dev')!.shadowRoot!.querySelectorAll('.bar > button:not([hidden])')].map(button => button.textContent))).toEqual(['kay', '1 problem'])
+
+    await shown.click('a.home')
+    await shown.waitFor('h1', { text: 'Home' })
+
+    expect(await logged(shown)).toEqual([])
+
+    // An error nothing caught shows too, with its stack.
+    await shown.evaluate(() => {
+      setTimeout(() => {
+        throw new Error('thrown later')
+      })
+    })
+    await shown.waitUntil(() => document.querySelector('kay-dev')!.shadowRoot!.textContent.includes('thrown later'))
+
+    expect((await logged(shown))[0]).toStartWith('Error: thrown later\n    at ')
+
+    // As do a rejection nothing handled and a source the policy blocked.
+    await shown.evaluate(() => {
+      const policy = document.createElement('meta')
+      const image = document.createElement('img')
+
+      policy.httpEquiv = 'Content-Security-Policy'
+      policy.content = 'img-src \'self\''
+      document.head.append(policy)
+      image.src = 'https://blocked.example/x.png'
+      document.body.append(image)
+      void Promise.reject(new Error('rejected later'))
+    })
+    await shown.waitUntil(() => document.querySelector('kay-dev')!.shadowRoot!.querySelectorAll('.problem pre').length >= 3)
+
+    expect(await logged(shown)).toEqual([
+      expect.stringMatching(/^Error: thrown later\n {4}at /),
+      expect.stringMatching(/^Uncaught \(in promise\) Error: rejected later\n {4}at /),
+      expect.stringMatching(/^blocked https:\/\/blocked\.example\/x\.png by img-src/),
+    ])
+  }, 60_000)
+
   it('shows what axe-core finds on the rendered page in the problem panel', async () => {
-    const dev = await testSite({ routes: 'tests/fixtures/navigation/src/routes', browser: { path }, dev: true, onError: () => undefined })
+    const shown = await dev.open('/contrast', { strict: false })
 
-    try {
-      const shown = await dev.open('/contrast', { strict: false })
+    // At once, as the dev server's own check starts: the two take turns.
+    expect((await shown.a11y()).map(violation => violation.id)).toContain('color-contrast')
 
-      // At once, as the dev server's own check starts: the two take turns.
-      expect((await shown.a11y()).map(violation => violation.id)).toContain('color-contrast')
+    await shown.waitUntil(() => document.querySelector('kay-dev')?.shadowRoot!.textContent.includes('a11y color-contrast'))
 
-      await shown.waitUntil(() => document.querySelector('kay-dev')?.shadowRoot!.textContent.includes('a11y color-contrast'))
-
-      expect(await shown.evaluate(() => [...document.querySelector('kay-dev')!.shadowRoot!.querySelectorAll('.problem pre')].map(pre => pre.textContent))).toContain('a11y color-contrast: Elements must meet minimum color contrast ratio thresholds\n  .faint\nhttps://dequeuniversity.com/rules/axe/4.14/color-contrast?application=axeAPI')
-      // The dev tool is kay's, no part of the page a test checks.
-      expect((await shown.a11y()).flatMap(violation => violation.nodes.map(node => node.target))).not.toContainEqual(expect.stringContaining('kay-dev'))
-      expect(shown.errors).toEqual([])
-    }
-    finally {
-      await dev.close()
-    }
+    expect(await shown.evaluate(() => [...document.querySelector('kay-dev')!.shadowRoot!.querySelectorAll('.problem pre')].map(pre => pre.textContent))).toContain('a11y color-contrast: Elements must meet minimum color contrast ratio thresholds\n  .faint\nhttps://dequeuniversity.com/rules/axe/4.14/color-contrast?application=axeAPI')
+    // The dev tool is kay's, no part of the page a test checks.
+    expect((await shown.a11y()).flatMap(violation => violation.nodes.map(node => node.target))).not.toContainEqual(expect.stringContaining('kay-dev'))
+    expect(shown.errors).toEqual([])
   }, 60_000)
 })
 

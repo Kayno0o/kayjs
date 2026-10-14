@@ -1,22 +1,15 @@
-import type { Browser, BrowserContext, Page } from 'playwright-core'
 import type { ClientBuild } from '../src/server/client'
-import { existsSync } from 'node:fs'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import process from 'node:process'
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
+import { describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
-import { chromium } from 'playwright-core'
 import { inlineScriptHashes, pages } from '../src/server'
 import { registerScript, serveServiceWorker } from '../src/server/offline'
 import { ServedPaths } from '../src/server/served-paths'
 
 const ROUTES = 'tests/fixtures/static/src/routes'
-const LISTENING = /port (\d+)/
 const SETTINGS = /^const KAY = (.+)$/m
-const executablePath = process.env.BUN_CHROME_PATH !== undefined && process.env.BUN_CHROME_PATH !== '' ? process.env.BUN_CHROME_PATH : chromium.executablePath()
-const browserInstalled = existsSync(executablePath)
 
 interface WorkerSettings {
   cache: string
@@ -106,82 +99,4 @@ describe('service worker', () => {
       await rm(dir, { recursive: true, force: true })
     }
   })
-})
-
-describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('offline in Chromium', () => {
-  let server: Bun.Subprocess<'ignore', 'pipe', 'pipe'>
-  let browser: Browser
-  let context: BrowserContext
-  let page: Page
-  let origin: string
-
-  beforeAll(async () => {
-    server = Bun.spawn(['bun', 'tests/fixtures/navigation/offline.ts'], { env: { ...process.env, NODE_ENV: 'production' }, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' })
-
-    const reader = server.stdout.getReader()
-    let output = ''
-
-    while (!LISTENING.test(output)) {
-      const { value, done } = await reader.read()
-
-      if (done)
-        throw new Error(`the offline fixture exited without listening: ${await new Response(server.stderr).text()}`)
-
-      output += new TextDecoder().decode(value)
-    }
-
-    reader.releaseLock()
-    origin = `http://localhost:${LISTENING.exec(output)![1]}`
-    browser = await chromium.launch({ headless: true, executablePath })
-    context = await browser.newContext()
-    page = await context.newPage()
-  }, 60_000)
-
-  afterAll(async () => {
-    await browser?.close()
-    server?.kill()
-    await server?.exited
-  })
-
-  it('serves the pages it keeps and their islands offline after a first visit, the fallback for any other, and never kay\'s routes', async () => {
-    await page.goto(origin)
-    await page.waitForFunction(async () => (await navigator.serviceWorker.ready).active?.state === 'activated' && navigator.serviceWorker.controller !== null, undefined, { timeout: 10_000 })
-    await page.goto(`${origin}/second`)
-    await context.setOffline(true)
-
-    try {
-      await page.goto(origin)
-      expect(await page.textContent('h1')).toBe('Home')
-
-      // The page swap fetches the next page through the worker too.
-      await page.evaluate(() => {
-        (window as { kayAlive?: boolean }).kayAlive = true
-      })
-      await page.click('a.second')
-      await page.locator('h1', { hasText: 'Second' }).waitFor()
-      expect(await page.evaluate(() => (window as { kayAlive?: boolean }).kayAlive)).toBe(true)
-
-      // Islands hydrate from the chunks it keeps.
-      await page.click('button.player')
-      await page.locator('button.player', { hasText: 'Played 1' }).waitFor()
-
-      const fallback = await page.goto(`${origin}/plain`)
-
-      expect(fallback?.status()).toBe(503)
-      expect(await page.textContent('h1')).toBe('Offline')
-      expect(await page.evaluate(async () => {
-        try {
-          await fetch('/_kay/health')
-
-          return 'answered'
-        }
-        catch {
-          return 'failed'
-        }
-      })).toBe('failed')
-    }
-    finally {
-      await context.setOffline(false)
-    }
-  }, 30_000)
 })
