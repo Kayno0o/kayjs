@@ -30,10 +30,18 @@ describe('routeTable', () => {
 
     const match = routeMatch(table, new Map())
 
-    expect(match(org, '/orgs/acme')).toEqual({ org: 'acme' })
-    expect(match(org, '/fr/organisations/acme')).toEqual({ org: 'acme' })
-    expect(match(org, '/fr/orgs/acme')).toEqual({ org: 'acme' })
-    expect(match(about, '/orgs/acme')).toBeUndefined()
+    expect(match.posted(org, '/orgs/acme')).toEqual({ params: { org: 'acme' }, path: '/orgs/acme' })
+    expect(match.posted(org, '/fr/organisations/acme/')).toEqual({ params: { org: 'acme' }, path: '/fr/organisations/acme' })
+    expect(match.posted(org, '/fr/orgs/acme')).toEqual({ params: { org: 'acme' }, path: undefined })
+    expect(match.posted(about, '/%61bout')).toEqual({ params: {}, path: '/about' })
+    expect(match.posted(about, '/orgs/acme')).toBeUndefined()
+    expect(match.served(org)).toBe('/orgs/:org')
+
+    const prefixed = routeMatch(routeTable([about], localeSettings({ locales: ['en', 'fr'], defaultLocale: 'en', prefixDefault: true })), new Map())
+
+    expect(prefixed.posted(about, '/about')).toEqual({ params: {}, path: undefined })
+    expect(prefixed.posted(about, '/en/about')).toEqual({ params: {}, path: '/en/about' })
+    expect(prefixed.served(about)).toBe('/en/about')
   })
 
   it('tries the pages a matcher checks before the one without, then by file path in UTF-16 code unit order, upper case first', () => {

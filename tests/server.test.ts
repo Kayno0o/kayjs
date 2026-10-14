@@ -719,12 +719,14 @@ describe('route params in guards and actions', () => {
 
 describe('the url an action\'s guards see', () => {
   const GUARD = 'import { guard } from \'kay\'\n\nexport default guard(({ url, request, headers, deny }) => {\n  headers.set(\'x-url\', url.pathname + url.search)\n\n  if (url.pathname.startsWith(\'/admin\') && !request.headers.has(\'x-admin\'))\n    deny(403, \'Admins only\')\n})\n'
+  const ACTION = '--- server\nimport { t } from \'elysia\'\nimport { action } from \'kay\'\n\nexport const ping = action(t.Object({}), () => \'pong\')\n---\n'
   const root = process.cwd()
   let dir = ''
   let served: Awaited<ReturnType<typeof pages>>
+  let shop: Awaited<ReturnType<typeof pages>>
 
-  const post = async (headers: Record<string, string> = {}) => {
-    const response = await served.handle(new NativeRequest(`http://localhost/_kay/action/${dir.slice(root.length + 1)}/routes/admin/index.kay/ping`, {
+  const post = async (headers: Record<string, string> = {}, file = 'admin/index.kay', app = served) => {
+    const response = await app.handle(new NativeRequest(`http://localhost/_kay/action/${dir.slice(root.length + 1)}/routes/${file}/ping`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-kay-action': '1', ...headers },
       body: stringify({}),
@@ -737,8 +739,12 @@ describe('the url an action\'s guards see', () => {
     dir = await mkdtemp(join(root, '.kay/routes-'))
     await Bun.write(join(dir, 'routes/_guard.ts'), GUARD)
     await Bun.write(join(dir, 'routes/index.kay'), 'p Home\n')
-    await Bun.write(join(dir, 'routes/admin/index.kay'), '--- server\nimport { t } from \'elysia\'\nimport { action } from \'kay\'\n\nexport const ping = action(t.Object({}), () => \'pong\')\n---\np Admin\n')
+    await Bun.write(join(dir, 'routes/admin/index.kay'), `${ACTION}p Admin\n`)
+    await Bun.write(join(dir, 'routes/admin/users.kay'), 'p Users\n')
+    await Bun.write(join(dir, 'routes/admin/_layout.kay'), `${ACTION}main\n  slot\n`)
+    await Bun.write(join(dir, 'routes/blog/[slug].kay'), `${ACTION}p Post\n`)
     served = await pages({ routes: join(dir, 'routes'), prebuilt: true })
+    shop = await pages({ routes: join(dir, 'routes'), prebuilt: true, base: '/shop' })
   })
 
   afterAll(async () => rm(dir, { recursive: true, force: true }))
@@ -746,12 +752,24 @@ describe('the url an action\'s guards see', () => {
   it('is the page the post came from, never the action\'s own, so a guard checking the path covers its actions', async () => {
     expect(await post({ referer: 'http://localhost/admin?tab=1' })).toEqual({ status: 403, url: '/admin?tab=1' })
     expect(await post({ 'x-admin': '1', 'referer': 'http://localhost/admin' })).toEqual({ status: 200, url: '/admin' })
+    expect(await post({ referer: 'http://localhost/blog/a%20b' }, 'blog/_slug_.kay')).toEqual({ status: 200, url: '/blog/a%20b' })
   })
 
-  it('is the action\'s page when the post names none of its own, as a script\'s or another page\'s would', async () => {
+  it('is the page as a visit reaches the guards, under `base` or not, whatever spelling of it the post names', async () => {
+    expect(await post({ referer: 'http://localhost/%61dmin' })).toEqual({ status: 403, url: '/admin' })
+    expect(await post({ 'x-kay-page': '/admin/' })).toEqual({ status: 403, url: '/admin' })
+    expect(await post({ referer: 'http://localhost/blog/x/' }, 'blog/_slug_.kay')).toEqual({ status: 200, url: '/blog/x' })
+    expect(await post({ referer: 'http://localhost/shop/admin?tab=1' }, 'admin/index.kay', shop)).toEqual({ status: 403, url: '/admin?tab=1' })
+    expect(await post({}, 'admin/index.kay', shop)).toEqual({ status: 403, url: '/admin' })
+  })
+
+  it('is the action\'s page when the post names none of its own, as a script\'s or another page\'s would, a layout\'s shortest', async () => {
     expect(await post()).toEqual({ status: 403, url: '/admin' })
     expect(await post({ referer: 'http://localhost/' })).toEqual({ status: 403, url: '/admin' })
     expect(await post({ 'referer': 'https://evil.example/', 'sec-fetch-site': 'same-origin' })).toEqual({ status: 403, url: '/admin' })
+    expect(await post({}, 'admin/_layout.kay')).toEqual({ status: 403, url: '/admin' })
+    expect(await post({ referer: 'http://localhost/admin/users' }, 'admin/_layout.kay')).toEqual({ status: 403, url: '/admin/users' })
+    expect((await post({}, 'blog/_slug_.kay')).status).toBe(400)
   })
 })
 

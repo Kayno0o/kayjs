@@ -5,7 +5,7 @@ import type { Matcher, RouterShape } from './params'
 import type { Route } from './routes'
 import type { Claim } from './served-paths'
 import { localePattern, localePrefixes } from './i18n'
-import { isPlain, routerShapes, shapeParams } from './params'
+import { isPlain, routerShapes, servedPath, shapeParams } from './params'
 import { refuseRouteNames } from './routes'
 import { ServedPaths } from './served-paths'
 
@@ -27,6 +27,8 @@ export interface RouteTable {
   paths: Map<string, Map<string | undefined, LocaleServed>>
   // Every shape each route is served under, in any locale, translated or not.
   shapes: Map<ServedRoute, RouterShape[]>
+  // The shapes of paths a visit is sent on from rather than served at: untranslated ones, and every bare one when each locale is prefixed.
+  sentOn: Set<RouterShape>
 }
 
 // Where a router path is served for each locale: under its prefix, bare for an unprefixed default or on its own host, and bare with no locale for every path that redirects to the visitor's.
@@ -55,6 +57,7 @@ function namedPath({ path, positions }: RouterShape): string {
 export function routeTable(routes: ServedRoute[], settings: LocaleSettings | undefined, served = new ServedPaths()): RouteTable {
   const paths = new Map<string, Map<string | undefined, LocaleServed>>()
   const shapes = new Map<ServedRoute, RouterShape[]>(routes.map(route => [route, []]))
+  const sentOn = new Set<RouterShape>()
   const serve = (path: string, locale: string | undefined, entry: LocaleServed) => {
     const locales = paths.get(path) ?? new Map<string | undefined, LocaleServed>()
 
@@ -81,6 +84,9 @@ export function routeTable(routes: ServedRoute[], settings: LocaleSettings | und
             : `kay: ${taken.owner} and ${route.file} both serve ${namedPath(shape)}; give one a matcher, [id=integer], for the other to take what it refuses`)
         serve(shape.path, locale, { prefix, candidates: [] }).candidates.push({ route, shape })
         shapes.get(route)!.push(shape)
+
+        if (settings && locale === undefined)
+          sentOn.add(shape)
       }
     }
   }
@@ -100,6 +106,7 @@ export function routeTable(routes: ServedRoute[], settings: LocaleSettings | und
         }
 
         shapes.get(route)!.push(shape)
+        sentOn.add(shape)
       }
     }
   }
@@ -109,7 +116,7 @@ export function routeTable(routes: ServedRoute[], settings: LocaleSettings | und
       candidates.sort((a, b) => Number(isPlain(a)) - Number(isPlain(b)) || (a.route.file < b.route.file ? -1 : Number(a.route.file > b.route.file)))
   }
 
-  return { paths, shapes }
+  return { paths, shapes, sentOn }
 }
 
 // Two pages serving one path stop the server, as does a name the router misreads.
@@ -120,14 +127,21 @@ export function refuseClashes(routesDir: string, routes: Route[], served = new S
 
 // Reads a path as the router would for one route, under every locale's pattern, to give an action the params of the page it was posted from.
 export function routeMatch(table: RouteTable, matchers: Map<string, Matcher>): RouteMatch {
-  return (route, path) => {
-    for (const shape of table.shapes.get(route) ?? []) {
-      const params = shapeParams(shape, route, path, matchers)
+  return {
+    posted: (route, path) => {
+      for (const shape of table.shapes.get(route) ?? []) {
+        const params = shapeParams(shape, route, path, matchers)
 
-      if (params)
-        return params
-    }
+        if (params)
+          return { params, path: table.sentOn.has(shape) ? undefined : servedPath(shape, path) }
+      }
 
-    return undefined
+      return undefined
+    },
+    served: (route) => {
+      const shape = table.shapes.get(route)?.find(shape => !table.sentOn.has(shape))
+
+      return shape === undefined ? route.pattern : namedPath(shape)
+    },
   }
 }

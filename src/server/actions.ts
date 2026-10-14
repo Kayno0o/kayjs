@@ -85,8 +85,12 @@ export interface ActionOptions {
   requireGuards?: boolean | undefined
 }
 
-// The params `path` gives the route, under any locale's pattern; undefined when the route does not serve it.
-export type RouteMatch = (route: ServedRoute, path: string) => Record<string, unknown> | undefined
+export interface RouteMatch {
+  // The params `path` gives the route under any locale's pattern, with the path as the router serves the page there, none for one it sends on, such as an untranslated path; undefined when the route does not serve it.
+  posted: (route: ServedRoute, path: string) => { params: Record<string, unknown>, path: string | undefined } | undefined
+  // The first path the router serves the route at, each param named, `/orgs/:org`.
+  served: (route: ServedRoute) => string
+}
 
 // Renders the page a refused plain form post came from, with how it failed, through the app the post reached.
 type Back = (request: Request, headers: Headers, flash: Flash, server: Server | null) => Promise<Response>
@@ -237,22 +241,24 @@ function readPage(request: Request, page: ActionPage, match: RouteMatch, { base 
     throw notFromPage()
 }
 
-// The page of the file a guarded post came from, its params kept: the guards see its URL rather than the action's. A post naming none, such as from a script, stands for the file's one page without params, and is refused when the file has none.
+// The page of the file a guarded post came from, as a visit to it reaches the guards, so a path they check covers its actions: its static segments as the router names them, without `base` or a trailing slash.
+// A post naming none, such as a script's, stands for the file's shortest page without params, else its first, and is refused when the file reads params.
 function guardedPage(request: Request, page: ActionPage, match: RouteMatch, { base = '' }: ActionOptions): URL {
   const from = postedPage(request, page, match, base)
 
-  if (from !== undefined)
-    return from
+  if (from?.path !== undefined)
+    return new URL(`${from.path}${from.search}`, request.url)
 
-  const plain = page.params.length === 0 ? page.routes.find(route => route.params.length === 0) : undefined
-
-  if (plain === undefined)
+  if (page.params.length > 0)
     throw notFromPage()
 
-  return new URL(`${base}${plain.pattern}`, request.url)
+  const plain = page.routes.filter(route => route.params.length === 0).sort((a, b) => a.pattern.length - b.pattern.length || (a.pattern < b.pattern ? -1 : 1))
+
+  return new URL(match.served(plain[0] ?? page.routes[0]!), request.url)
 }
 
-function postedPage(request: Request, page: ActionPage, match: RouteMatch, base: string): URL | undefined {
+// Records the params of the page the post came from, giving its path as the router serves it and its query.
+function postedPage(request: Request, page: ActionPage, match: RouteMatch, base: string): { path: string | undefined, search: string } | undefined {
   const from = postedFrom(request)
 
   if (from === undefined)
@@ -262,12 +268,12 @@ function postedPage(request: Request, page: ActionPage, match: RouteMatch, base:
   const path = routerPath(url.pathname, base)
 
   for (const route of page.routes) {
-    const params = match(route, path)
+    const posted = match.posted(route, path)
 
-    if (params) {
-      pageParams.set(request, Object.fromEntries(Object.entries(params).filter(([name]) => page.params.includes(name))))
+    if (posted) {
+      pageParams.set(request, Object.fromEntries(Object.entries(posted.params).filter(([name]) => page.params.includes(name))))
 
-      return url
+      return { path: posted.path, search: url.search }
     }
   }
 

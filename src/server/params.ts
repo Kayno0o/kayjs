@@ -118,6 +118,27 @@ export function matchedParams(route: Route, params: Record<string, string>, matc
   return matched
 }
 
+// The path `shapeParams` read as the router serves it to a visit: each static segment as the shape names it, a param's as sent, no trailing slash or empty catch-all.
+export function servedPath(shape: RouterShape, path: string): string {
+  const segments = withoutSlash(path).split('/')
+  const served: string[] = []
+
+  for (const [index, segment] of shape.path.split('/').entries()) {
+    if (segment === '*') {
+      const rest = segments.slice(index).join('/')
+
+      if (rest !== '')
+        served.push(rest)
+
+      break
+    }
+
+    served.push(segment.startsWith(':') ? segments[index]! : segment)
+  }
+
+  return served.join('/') || '/'
+}
+
 // The params `path` gives the route through `shape`, decoded and matched as a request's are: undefined when the shape cannot serve the path or a matcher refuses it. Looser than the router, a catch-all taking an empty rest and a static segment its decoded text, which reads no params a valid page would not give.
 export function shapeParams(shape: RouterShape, route: Route, path: string, matchers: Map<string, Matcher>): Record<string, unknown> | undefined {
   const pattern = shape.path.split('/')
