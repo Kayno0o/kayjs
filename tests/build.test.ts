@@ -1,6 +1,7 @@
 import type { BunPlugin } from 'bun'
 import type { BuildOptions, BuildResult } from '../src/build/pipeline'
 import type { KayConfig } from '../src/config'
+import type { ClientBuild } from '../src/server/client'
 import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp, readdir, rename, rm, stat, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -8,6 +9,7 @@ import { basename, dirname, join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import tailwind from 'bun-plugin-tailwind'
 import { describe, expect, it } from 'bun:test'
+import { Elysia } from 'elysia'
 import { ASSET_FILE, clientDir, outputDir, writeAsset } from '../src/build/assets'
 import { buildClient } from '../src/build/client'
 import { writeIfChanged } from '../src/build/files'
@@ -20,6 +22,7 @@ import { analyzeKayCached, compilerModules, keepAnalyses, transformKayCached } f
 import { loadConfig, withConfig } from '../src/config'
 import { devBuilder } from '../src/dev/builder'
 import { projectPaths } from '../src/project'
+import { serveBuildFiles } from '../src/server/build-files'
 import { compileErrorPage } from '../src/server/overlay'
 import { fixtureCopy, scratchDir } from './scratch'
 
@@ -1472,6 +1475,17 @@ describe('third-party notices', () => {
       expect(client).toContain('Tabler Icons by Paweł Kuna')
       // The server's own packages are no business of the browser's.
       expect(client).not.toContain('\nelysia ')
+
+      const served = new Elysia()
+
+      await serveBuildFiles(served, { dir: clientDir(root) } as ClientBuild, { dev: false, security: undefined })
+
+      const response = await served.handle(new Request('http://localhost/_kay/THIRD-PARTY-LICENSES.txt'))
+
+      expect(response.status).toBe(200)
+      // Named the same from one build to the next, so it is asked for again each time.
+      expect(response.headers.get('cache-control')).toBe('no-cache')
+      expect(await response.text()).toBe(client)
 
       const executable = Bun.spawn([join(root, 'server'), '--licenses'], { cwd: root, stdout: 'pipe', stderr: 'pipe' })
       const [printedNotices, exitCode] = await Promise.all([new Response(executable.stdout).text(), executable.exited])

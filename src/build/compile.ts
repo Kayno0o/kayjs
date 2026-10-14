@@ -92,10 +92,11 @@ export async function compileServer(project: Project, options: CompileOptions): 
     `import { join } from 'node:path'`,
     `import process from 'node:process'`,
     `import { probeHealth, registerBundle } from 'kay/internal/server'`,
-    `import notices from ${JSON.stringify(notices)} with { type: 'text' }`,
+    // An embedded file, read only for `--licenses`, so the server keeps none of it in memory.
+    `import notices from ${JSON.stringify(notices)} with { type: 'file' }`,
     '',
     'if (process.argv.includes(\'--licenses\')) {',
-    '  process.stdout.write(notices)',
+    '  process.stdout.write(await Bun.file(notices).text())',
     '  process.exit(0)',
     '}',
     '',

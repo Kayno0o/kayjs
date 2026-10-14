@@ -138,6 +138,7 @@
   },
   "files": [
     "LICENSE",
+    "LICENSES",
     "NOTICE",
     "README.md",
     "dist",

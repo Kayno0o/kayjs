@@ -1,5 +1,5 @@
 import type { IconSet } from '../src/runtime/icons'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
@@ -125,9 +125,13 @@ describe('icons', () => {
     await Bun.write(join(set, 'package.json'), JSON.stringify({ name: '@iconify-json/drawn', version: '1.0.0', license: 'CC-BY-4.0' }))
     await Bun.write(join(set, 'icons.json'), JSON.stringify({ prefix: 'drawn', icons: {}, info }))
     await Bun.write(join(set, 'info.json'), JSON.stringify(info))
+    // A directory under a licence file's name is no licence file.
+    await mkdir(join(set, 'LICENSE'), { recursive: true })
+    await Bun.write(join(set, 'LICENSES/CC-BY-4.0.txt'), 'Attribution 4.0 International')
 
     expect(iconSetWarnings(dir)).toEqual(['kay: Drawn Icons (@iconify-json/drawn) comes under CC BY 4.0, which may ask more than the notice in THIRD-PARTY-LICENSES.txt, such as crediting their author, Ada (https://example.com/drawn) where they show: read https://creativecommons.org/licenses/by/4.0/'])
     expect(thirdPartyNotices([set])).toContain('@iconify-json/drawn 1.0.0 (CC-BY-4.0)\n  Drawn Icons by Ada, https://example.com/drawn, licence at https://creativecommons.org/licenses/by/4.0/')
+    expect(thirdPartyNotices([set])).toContain('\n\nAttribution 4.0 International')
     // Tabler's MIT asks nothing past its notice.
     expect(iconSetWarnings(FIXTURE)).toEqual([])
   })

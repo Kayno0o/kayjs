@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync, realpathSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from 'node:fs'
 import { dirname, join, resolve, sep } from 'node:path'
 import { installedIconSets } from './icons'
 
@@ -9,6 +9,7 @@ const NODE_MODULES = `${sep}node_modules${sep}`
 const LICENSE_FILE = /^(?:licen[cs]e|copying|notice)(?:[.-][\w.-]*)?$/i
 // What asks nothing more than its notice kept with the copy, which the notices file is; an icon set under anything else is warned about.
 const NOTICE_ENOUGH = new Set(['MIT', 'ISC', 'Apache-2.0', 'BSD-2-Clause', 'BSD-3-Clause', '0BSD', 'CC0-1.0', 'Unlicense', 'OFL-1.1', 'MPL-2.0'])
+const LICENSES_DIR = 'LICENSES'
 const RULE = '='.repeat(80)
 
 interface PackageJson {
@@ -127,6 +128,20 @@ export function iconSetWarnings(root: string): string[] {
   })
 }
 
+// The package's licence files, those under a REUSE-style `LICENSES/` included; a directory or an unreadable file under such a name is skipped.
+function licenceTexts(dir: string): string {
+  const files = [...readdirSync(dir).filter(file => LICENSE_FILE.test(file)).sort(), ...existsSync(join(dir, LICENSES_DIR)) ? readdirSync(join(dir, LICENSES_DIR)).sort().map(file => join(LICENSES_DIR, file)) : []]
+
+  return files.flatMap((file) => {
+    try {
+      return statSync(join(dir, file), { throwIfNoEntry: false })?.isFile() === true ? [readFileSync(join(dir, file), 'utf8').trim()] : []
+    }
+    catch {
+      return []
+    }
+  }).join('\n\n')
+}
+
 // The text of a notices file: each package by name and version with its licence, packages sharing one licence text listed together above it.
 export function thirdPartyNotices(packages: Iterable<string>): string {
   const groups = new Map<string, string[]>()
@@ -146,8 +161,7 @@ export function thirdPartyNotices(packages: Iterable<string>): string {
       continue
 
     const license = typeof manifest.license === 'string' ? manifest.license : manifest.license?.type ?? 'no licence named'
-    const files = readdirSync(real).filter(file => LICENSE_FILE.test(file)).sort()
-    const text = files.map(file => readFileSync(join(real, file), 'utf8').trim()).join('\n\n')
+    const text = licenceTexts(real)
     const icons = manifest.name.startsWith('@iconify-json/') ? iconSetInfo(real) : undefined
     const lines = [`${[manifest.name, manifest.version].filter(Boolean).join(' ')} (${license})`]
 

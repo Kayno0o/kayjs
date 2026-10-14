@@ -5,6 +5,7 @@ import type { ServedPaths } from './served-paths'
 import { readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { ASSET_PREFIX } from '../build/assets'
+import { NOTICES_FILE } from '../build/licenses'
 import { escapeAttribute } from '../runtime/escape'
 import { textDirection } from '../runtime/i18n'
 import { kayLog } from '../runtime/log'
@@ -180,7 +181,8 @@ async function workerScript(options: ServiceWorkerOptions, offline: true | Offli
   const { base, client } = options
   const config = offline === true ? {} : offline
   const files = (await readdir(client.dir, { recursive: true, withFileTypes: true }))
-    .filter(entry => entry.isFile() && !SKIPPED.test(entry.name))
+    // The notices file is read once in a while, online, and never worth a copy on every visitor's device.
+    .filter(entry => entry.isFile() && !SKIPPED.test(entry.name) && entry.name !== NOTICES_FILE)
     .map(entry => `${base}${ASSET_PREFIX}${join(entry.parentPath, entry.name).slice(client.dir.length + 1).replace(BACKSLASH, '/')}`)
     .sort()
   const pages = (config.pages ?? options.publicPages).map(path => `${base}${path}`).sort()
