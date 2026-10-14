@@ -195,12 +195,12 @@ async function scratchProject(files: Record<string, string>): Promise<string> {
   return root
 }
 
-// Moves the start of the project's last clean check a clock slack past `written`, as though the files written by then had settled: kay counts one written within a second before a check as changed since. `Date.now()` rounds down, the file times do not.
-async function settledBefore(root: string, written: number): Promise<void> {
+// Moves the start of the project's last clean check a second later, as a wait would: kay counts a file written within a second before a check as changed since.
+async function startedLater(root: string): Promise<void> {
   const file = join(root, '.kay/cache/check/clean.json')
   const entry = await Bun.file(file).json() as { value: { started: number } }
 
-  entry.value.started = written + 1001
+  entry.value.started += 1000
   await Bun.write(file, JSON.stringify(entry))
 }
 
@@ -447,12 +447,11 @@ describe.concurrent('kay check, edge cases', () => {
 
   it('skips tsgo while nothing its last clean run read has changed, and runs it for a file added since', async () => {
     const root = await scratchProject({ 'src/a.ts': 'export const a: number = 1\n', 'src/routes/index.kay': 'p hi\n' })
-    const written = Date.now()
     const buildInfo = join(root, '.kay/cache/check/tsbuildinfo')
 
     try {
       expect(await check(root)).toEqual([])
-      await settledBefore(root, written)
+      await startedLater(root)
       await rm(buildInfo)
       expect(await check(root)).toEqual([])
       expect(await Bun.file(buildInfo).exists()).toBe(false)
@@ -471,12 +470,11 @@ describe.concurrent('kay check, edge cases', () => {
       'node_modules/dep/index.d.ts': 'export declare const value: number\n',
       'src/a.ts': 'import { value } from \'dep\'\n\nexport const a: number = value\n',
     })
-    const written = Date.now()
     const types = join(root, 'node_modules/dep/index.d.ts')
 
     try {
       expect(await check(root)).toEqual([])
-      await settledBefore(root, written)
+      await startedLater(root)
       await rm(types)
       await Bun.write(types, 'export declare const value: string\n')
       await utimes(types, new Date('2020-01-01'), new Date('2020-01-01'))
