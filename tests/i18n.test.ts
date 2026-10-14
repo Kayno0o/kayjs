@@ -33,6 +33,13 @@ const SITE = 'https://x.example'
 const chrome = browserPath() ?? (existsSync(chromium.executablePath()) ? chromium.executablePath() : undefined)
 const app = new Elysia().use(await pages({ routes, prebuilt: false, security: false, site: 'https://x.example', i18n }))
 
+// Built by the first test reading it, then shared by the others, as building the fixture's pages again for each would only cost time.
+function once<T>(build: () => Promise<T>): () => Promise<T> {
+  let built: Promise<T> | undefined
+
+  return async () => built ??= build()
+}
+
 async function get(path: string, served: { handle: (request: Request) => Promise<Response> } = app, headers: Record<string, string> = {}): Promise<{ status: number, html: string, location: string | null, cookie: string | null, vary: string | null, etag: string | null }> {
   const response = await served.handle(new Request(path.startsWith('http') ? path : `http://localhost${path}`, { headers }))
 
@@ -154,8 +161,10 @@ describe('locale prefixes', () => {
 })
 
 describe('the default locale prefixed', () => {
+  const prefixedSite = once(async () => new Elysia().use(await pages({ routes, prebuilt: false, security: false, i18n: { ...i18n, prefixDefault: true } })))
+
   it('sends an unprefixed path to the visitor\'s locale: their cookie, then their browser\'s languages', async () => {
-    const prefixed = new Elysia().use(await pages({ routes, prebuilt: false, security: false, i18n: { ...i18n, prefixDefault: true } }))
+    const prefixed = await prefixedSite()
 
     expect(await get('/about?x=1', prefixed, { 'accept-language': 'en-US,en;q=0.9,fr;q=0.5' })).toMatchObject({ status: 307, location: '/en/about?x=1' })
     expect(await get('/about', prefixed, { 'accept-language': 'en', 'cookie': 'kay-locale=fr' })).toMatchObject({ status: 307, location: '/fr/about' })
@@ -170,7 +179,7 @@ describe('the default locale prefixed', () => {
   })
 
   it('answers a path no page serves in the visitor\'s locale, varying on what chose it', async () => {
-    const prefixed = new Elysia().use(await pages({ routes, prebuilt: false, security: false, i18n: { ...i18n, prefixDefault: true } }))
+    const prefixed = await prefixedSite()
     const missing = await get('/nope', prefixed, { 'accept-language': 'en' })
 
     expect(missing).toMatchObject({ status: 404, vary: 'cookie, accept-language' })
@@ -180,8 +189,10 @@ describe('the default locale prefixed', () => {
 })
 
 describe('locales by domain', () => {
+  const domainsSite = once(async () => new Elysia().use(await pages({ routes, prebuilt: false, security: false, site: 'https://x.fr', i18n: { ...i18n, domains: { fr: 'x.fr', en: 'x.com' } } })))
+
   it('serve each host its locale, linking to another locale on its own host', async () => {
-    const domains = new Elysia().use(await pages({ routes, prebuilt: false, security: false, i18n: { ...i18n, domains: { fr: 'x.fr', en: 'x.com' } } }))
+    const domains = await domainsSite()
     const english = await get('http://x.com/about', domains)
 
     expect(english.html).toContain('<h1>About</h1>')
@@ -192,7 +203,7 @@ describe('locales by domain', () => {
   })
 
   it('give each host a sitemap of its own pages, each linking its copies on the other hosts', async () => {
-    const domains = new Elysia().use(await pages({ routes, prebuilt: false, security: false, site: 'https://x.fr', i18n: { ...i18n, domains: { fr: 'x.fr', en: 'x.com' } } }))
+    const domains = await domainsSite()
     const english = (await get('http://x.com/sitemap.xml', domains)).html
 
     expect(english).toContain('<url><loc>https://x.com/about</loc><xhtml:link rel="alternate" hreflang="fr" href="https://x.fr/about"/><xhtml:link rel="alternate" hreflang="en" href="https://x.com/about"/><xhtml:link rel="alternate" hreflang="x-default" href="https://x.fr/about"/></url>')
@@ -205,9 +216,10 @@ describe('locales by domain', () => {
 describe('translated paths', () => {
   const paths = { '/about': { fr: '/a-propos', en: '/about-us' }, '/blog/:slug': { en: '/articles/:slug' } }
   const translated = { ...i18n, paths }
+  const translatedSite = once(async () => new Elysia().use(await pages({ routes, prebuilt: false, security: false, i18n: translated })))
 
   it('serve a page at its path in each locale, links and the locale switcher following', async () => {
-    const served = new Elysia().use(await pages({ routes, prebuilt: false, security: false, i18n: translated }))
+    const served = await translatedSite()
     const english = await get('/en/about-us', served)
 
     expect(english.html).toContain('<h1>About</h1>')
@@ -230,7 +242,7 @@ describe('translated paths', () => {
   })
 
   it('send a locale\'s untranslated path to its translation', async () => {
-    const served = new Elysia().use(await pages({ routes, prebuilt: false, security: false, i18n: translated }))
+    const served = await translatedSite()
 
     expect(await get('/en/about?x=1', served)).toMatchObject({ status: 308, location: '/en/about-us?x=1' })
     expect(await get('/about', served)).toMatchObject({ status: 308, location: '/a-propos' })
@@ -287,9 +299,10 @@ describe('localized content', () => {
   const site = 'tests/fixtures/i18n-content'
   const content = `${site}/src/content.config.ts`
   const config = { routes: `${site}/src/routes`, content, prebuilt: false, security: false as const, site: SITE, i18n: { ...i18n, messages: `${site}/src/messages` } }
+  const contentSite = once(async () => new Elysia().use(await pages(config)))
 
   it('reads the request\'s locale\'s entry, the default locale\'s standing in for one it lacks', async () => {
-    const served = new Elysia().use(await pages(config))
+    const served = await contentSite()
     const english = (await get('/en/news/hello', served)).html
     const fallback = (await get('/en/news/launch', served)).html
 
@@ -305,7 +318,7 @@ describe('localized content', () => {
   })
 
   it('serve a feed per locale of the entries written in it, and list every locale\'s copy in the sitemap', async () => {
-    const served = new Elysia().use(await pages(config))
+    const served = await contentSite()
     const english = (await get('/en/news/rss.xml', served)).html
     const french = (await get('/news/rss.xml', served)).html
     const sitemap = (await get('/sitemap.xml', served)).html
