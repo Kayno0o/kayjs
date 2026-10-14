@@ -18,6 +18,7 @@ import { collection } from 'kay/content'
 | Export | Is |
 | --- | --- |
 | `signal`, `memo`, `effect`, `batch`, `untrack`, `onMount`, `onCleanup` | Reactivity |
+| `watch`, `debounced` | Code running on a change only, handed the value before, and a value once it stops changing |
 | `every` | A timer running while an island lives, and while a condition holds |
 | `listen` | An event listener on `window`, `document` or another target while an island lives |
 | `persisted`, `queryParam`, `linked`, `selection`, `context` | Signal helpers: stored, one query param of the page read by its schema, derived from a source, one selected key, shared down a tree |

@@ -76,6 +76,27 @@ effect(() => {
 input(bind:value={query} aria-label="Search")
 ```
 
+### React to a change, or to typing once it pauses
+
+`watch` from `kay` runs on each change of what it watches, not on its first read, handed the value before; `debounced` gives a value once it has stopped changing for a while:
+
+```kay
+---
+import { debounced, watch } from 'kay'
+
+const typed = signal('')
+const found = signal<string[]>([])
+
+watch(debounced(typed, 300), async (query) => {
+  found = query === '' ? [] : await (await fetch(`/api/people?q=${encodeURIComponent(query)}`)).json()
+})
+---
+input(bind:value={typed} aria-label="Search people")
+ul
+  for name of found()
+    li {name}
+```
+
 ### Run code on a timer or a window event
 
 `every` and `listen` from `kay` run while the island lives, never on the server:
@@ -227,6 +248,12 @@ export default defineConfig({ extensions: [authPages()] })
 - `every` skips a tick while the promise the last run returned is pending.
 - `every(ms, run, { immediate: true })` runs it as the timer starts too, rather than one interval later.
 - `every(3000, refresh, { while: () => issuing })` polls the page, `every(1000, () => now = Date.now())` ticks a clock.
+- `watch(source, (next, previous) => ...)` from `kay` runs on each change of `source`, a signal or a function reading some, not on its first read: no hand-kept previous value to compare against.
+- `watch` tracks only `source`, never what its callback reads; a read giving the same value runs nothing, and what the callback registers with `onCleanup` stays until its next run.
+- `watch(source, run, { immediate: true })` runs on the first read too, `previous` being `undefined` then.
+- `debounced(source, ms)` from `kay` is a memo giving `source`'s value once it has stopped changing for `ms` milliseconds, starting with its value now: `watch(debounced(typed, 300), lookUp)` looks up as the user pauses, with no `setTimeout` kept by hand.
+- `debounced` drops a pending value when its source comes back to the settled one, and its timer with the island; on the server it keeps its first value.
+- `watch` and `debounced` run nothing while the server renders, as `effect` does.
 - `listen(window, 'keydown', event => ...)` from `kay` listens to an event of `window`, `document` or any other target while the island lives, the handler typed by the target's events and the fourth argument passed to `addEventListener`.
 - `listen` never runs on the server, where the compiler keeps `window` unread, so a `.ts` module writes `listen(() => window, ...)`.
 - A `listen` target read from a signal or a ref, `listen(() => panel, 'scroll', ...)`, listens to its new value as it changes, none while it is undefined.

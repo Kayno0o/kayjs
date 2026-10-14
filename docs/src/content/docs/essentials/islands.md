@@ -143,6 +143,8 @@ onMount(() => drawMap(center))
 .map
 ```
 
+`watch(source, (next, previous) => ...)` from `kay` runs whenever `source` changes, but not on its first read, so you need no variable of your own holding the old value. `debounced(source, ms)` gives `source`'s value once it has stopped changing for `ms` milliseconds: `watch(debounced(typed, 300), lookUp)` looks a name up when the user pauses typing.
+
 `every(ms, run)` from `kay` runs `run` on a timer while the island lives: `every(1000, () => now = Date.now())` ticks a clock. `listen(window, 'keydown', event => ...)` listens to an event of `window` or `document` and removes the listener when the island ends.
 
 <Callout type="warning">

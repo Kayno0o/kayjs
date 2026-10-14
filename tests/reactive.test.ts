@@ -1,7 +1,7 @@
 import type { Action } from '../src/runtime'
 import { describe, expect, it, jest, spyOn } from 'bun:test'
 import { stringify } from 'devalue'
-import { batch, effect, every, flush, linked, listen, memo, onCleanup, onMount, root, selection, signal, untrack } from '../src/runtime'
+import { batch, debounced, effect, every, flush, linked, listen, memo, onCleanup, onMount, root, selection, signal, untrack, watch } from '../src/runtime'
 import { ActionError, actionStub } from '../src/runtime/action'
 import { navigation } from '../src/runtime/navigation'
 import { createSignal, hydrationEnded, hydrationStarted, ownSignal, recordSignals, renderEffect, renderOnServer, undoable, unrecorded, whenHydrated } from '../src/runtime/reactive'
@@ -950,6 +950,165 @@ describe('every', () => {
       flush()
       expect([started, count()]).toEqual([2, 2])
       dispose()
+    }
+    finally {
+      jest.useRealTimers()
+    }
+  })
+})
+
+describe('watch', () => {
+  it('runs on each change, not the first read, handed the value before, until its root goes', () => {
+    const turn = signal(1)
+    const seen: [number, number][] = []
+    const dispose = root((dispose) => {
+      watch(turn, (next, previous) => {
+        seen.push([next, previous])
+      })
+
+      return dispose
+    })
+
+    flush()
+    expect(seen).toEqual([])
+
+    turn.set(2)
+    flush()
+    turn.set(3)
+    flush()
+    expect(seen).toEqual([[2, 1], [3, 2]])
+
+    dispose()
+    turn.set(4)
+    flush()
+    expect(seen).toEqual([[2, 1], [3, 2]])
+  })
+
+  it('runs on the first read too with `immediate`, handed no value before', () => {
+    const turn = signal(1)
+    const seen: [number, number | undefined][] = []
+    const dispose = root((dispose) => {
+      watch(turn, (next, previous) => {
+        seen.push([next, previous])
+      }, { immediate: true })
+
+      return dispose
+    })
+
+    flush()
+    turn.set(2)
+    flush()
+    expect(seen).toEqual([[1, undefined], [2, 1]])
+    dispose()
+  })
+
+  it('tracks only its source, runs nothing for an equal value, and keeps what the last run registered until the next', () => {
+    const board = signal({ id: 1, name: 'a' })
+    const other = signal(0)
+    const runs: number[] = []
+    const cleaned: number[] = []
+    const dispose = root((dispose) => {
+      watch(() => board().id, (id) => {
+        runs.push(id + other())
+        onCleanup(() => cleaned.push(id))
+      })
+
+      return dispose
+    })
+
+    flush()
+    board.set({ id: 2, name: 'a' })
+    flush()
+    board.set({ id: 2, name: 'b' })
+    other.set(10)
+    flush()
+    expect([runs, cleaned]).toEqual([[2], []])
+
+    board.set({ id: 3, name: 'b' })
+    flush()
+    expect([runs, cleaned]).toEqual([[2, 13], [2]])
+
+    dispose()
+    expect(cleaned).toEqual([2, 3])
+  })
+
+  it('runs nothing while the server renders', () => {
+    const turn = signal(1)
+    let runs = 0
+
+    renderOnServer(() => watch(turn, () => runs++, { immediate: true }))
+    turn.set(2)
+    flush()
+    expect(runs).toBe(0)
+  })
+})
+
+describe('debounced', () => {
+  it('takes the value of its source once it stops changing for the delay, starting with its value now', () => {
+    jest.useFakeTimers()
+
+    try {
+      const typed = signal('a')
+      const { settled, dispose } = root(dispose => ({ settled: debounced(typed, 300), dispose }))
+
+      expect(settled()).toBe('a')
+
+      typed.set('ad')
+      flush()
+      jest.advanceTimersByTime(200)
+      typed.set('ada')
+      flush()
+      jest.advanceTimersByTime(200)
+      expect(settled()).toBe('a')
+
+      jest.advanceTimersByTime(100)
+      expect(settled()).toBe('ada')
+      dispose()
+    }
+    finally {
+      jest.useRealTimers()
+    }
+  })
+
+  it('drops a pending value when its source comes back to the settled one, and its timer with its root', () => {
+    jest.useFakeTimers()
+
+    try {
+      const typed = signal('a')
+      const { settled, dispose } = root(dispose => ({ settled: debounced(typed, 300), dispose }))
+      const seen: string[] = []
+
+      root(() => watch(settled, next => seen.push(next)))
+      flush()
+
+      typed.set('b')
+      flush()
+      typed.set('a')
+      flush()
+      jest.advanceTimersByTime(400)
+      flush()
+      expect([settled(), seen, jest.getTimerCount()]).toEqual(['a', [], 0])
+
+      typed.set('c')
+      flush()
+      dispose()
+      expect(jest.getTimerCount()).toBe(0)
+    }
+    finally {
+      jest.useRealTimers()
+    }
+  })
+
+  it('starts no timer while the server renders', () => {
+    jest.useFakeTimers()
+
+    try {
+      const typed = signal('a')
+      const settled = renderOnServer(() => debounced(typed, 300))
+
+      typed.set('b')
+      flush()
+      expect([settled(), jest.getTimerCount()]).toEqual(['a', 0])
     }
     finally {
       jest.useRealTimers()
