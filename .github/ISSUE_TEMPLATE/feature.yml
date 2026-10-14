@@ -1,0 +1,21 @@
+name: Feature request
+description: Something kay or one of its libraries could do.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What you are trying to do
+      description: The task, and what makes it hard with kay today.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would help
+      description: How you would like to write it in your app.
+  - type: textarea
+    id: today
+    attributes:
+      label: How you do it today
+      description: The workaround you use, if any.

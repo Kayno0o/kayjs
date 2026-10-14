@@ -23,7 +23,7 @@ kay is for sites and apps on Bun whose pages are mostly content and forms, with 
 - **A young ecosystem.** Few integrations exist beyond kay's own libraries, [kayjs-ui](/libraries/kayjs-ui), [kayjs-auth](/libraries/kayjs-auth), [kayjs-mail](/libraries/kayjs-mail) and [kayjs-cms](/libraries/kayjs-cms), and answers to a question are in these docs rather than across the web. Coding agents learn kay from [llms.txt](/llms.txt), not from their training.
 - **No JSX components to reuse.** `.kay` is its own template language, so React, Vue or Svelte components do not run in it, and their component libraries have no kay version. A plain browser library, such as a map or a chart, runs inside an island.
 - **Its own file format.** Editors read `.kay` through `kay lsp`, for VS Code or any LSP editor; tools that only know HTML, JSX or Svelte files do not.
-- **It moves fast.** A minor version can carry a breaking change; a major is kept for a rewrite.
+- **It moves fast.** A minor version can carry a breaking change, listed in [Upgrading](/guides/upgrading) with what to change; a major is kept for a rewrite.
 
 ## When to pick something else
 

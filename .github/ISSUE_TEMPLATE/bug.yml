@@ -1,0 +1,39 @@
+name: Bug report
+description: Something in kay or one of its libraries does not work as documented.
+labels: [bug]
+body:
+  - type: dropdown
+    id: package
+    attributes:
+      label: Package
+      options:
+        - kay
+        - kayjs-auth
+        - kayjs-ui
+        - kayjs-mail
+        - kayjs-cms
+        - editor extension
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Versions
+      description: kay's version, and Bun's (`bun --version`).
+      placeholder: kay 1.43.1, Bun 1.4.3
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happens
+      description: The exact error or output, and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: How to reproduce
+      description: The smallest `.kay` file, config or command that shows it, and where it happens (`kay dev`, a production build, an island, the server).
+    validations:
+      required: true

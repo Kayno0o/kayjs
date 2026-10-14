@@ -48,6 +48,14 @@ In production the server serves what `kay build` wrote and bundles nothing at bo
 | `kay migrate astro [dir] [--out <dir>]` | translate an Astro project into `.kay` files, listing what is left by hand |
 | `kay lsp --stdio` | language server for the editor extension in `editors/vscode` |
 
-## Working on kay
+## Upgrading
 
-`bun run lint:fix` and the tests of what changed before a commit, then `just land`, which checks the branch and lands it on main; CI runs the whole suite on every push.
+A minor release may break an app. [Upgrading](llms/upgrading.md) lists what each one breaks and what to change.
+
+## Contributing
+
+[CONTRIBUTING.md](CONTRIBUTING.md) covers setup, checks and what a pull request needs. Report a vulnerability privately, as [SECURITY.md](SECURITY.md) says, and follow the [code of conduct](CODE_OF_CONDUCT.md).
+
+## License
+
+[MIT](LICENSE). [NOTICE](NOTICE) lists the third-party code kay carries and its licenses.

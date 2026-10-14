@@ -37,4 +37,5 @@ To build a site, read [Build a site](llms/site.md) first: one page walking throu
 - [Checks and lints](llms/checks.md): what `kay check` reports, every lint at its default level and how to change it, ESLint on `.kay` files
 - [Project setup and commands](llms/project.md): `kay.config.ts`, tsconfig, editor setup, and every `kay` CLI command and template
 - [Running in production](llms/production.md): request logs, tracing and Server-Timing, health checks and graceful shutdown, cron and background jobs, running behind a proxy, security headers and CSP, compression
+- [Upgrading](llms/upgrading.md): what each minor release of kay and its libraries breaks, and what an app changes to move to it
 - [Privacy and personal data](llms/privacy.md): the cookies and data kay keeps and for how long, erasing a person, consent-gated analytics, photo metadata
