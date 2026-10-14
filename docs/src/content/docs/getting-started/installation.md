@@ -4,7 +4,7 @@ order: 2
 description: Point Bun at the registry, scaffold a project with kay new and start the dev server.
 ---
 
-You need [Bun](https://bun.sh) 1.4.3 or later: the CLI and `pages()` refuse an older one and say how to update it, `bun update bun` when a dependency installed the npm `bun` package, which package scripts run ahead of the system Bun. kay is published as `@kaynooo/kayjs` on its own registry, so tell Bun where the `@kaynooo` scope lives once.
+You need [Bun](https://bun.sh) 1.4.3 or later. kay is published as `@kaynooo/kayjs` on its own registry, so tell Bun where the `@kaynooo` scope lives once.
 
 ## Registry setup
 
@@ -66,5 +66,9 @@ The extension runs the language server of the kay the workspace installed, so it
 | `kay.routes` | The pages directory, so route params and links are typed; by default the one `kay.config.ts` names, else `src/routes` |
 
 Any other editor speaking the Language Server Protocol, such as Neovim, Helix or Zed, can run the same server: start `bunx kay lsp --stdio` in the project root for `.kay` files. The TextMate grammar ships as `kay/kay.tmLanguage.json` for an editor or highlighter that takes one.
+
+## Troubleshooting
+
+kay refuses a Bun older than 1.4.3 and says how to update it. When that Bun is the npm `bun` package a dependency installed, which package scripts run ahead of the system Bun, `bun update bun` in the project updates it.
 
 <ReadMore href="/llms/project">Every `kay` command, the `kay new` features and the tsconfig details are in the project reference.</ReadMore>
