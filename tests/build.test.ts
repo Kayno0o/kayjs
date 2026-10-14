@@ -477,7 +477,7 @@ describe('kay build', () => {
       const entry = await Bun.file(entryFile).text()
 
       expect(code).toBe(0)
-      expect(report).toStartWith('built 11 islands, 0 stylesheets and 0 prerendered pages in ')
+      expect(report).toStartWith('built 13 islands, 0 stylesheets and 0 prerendered pages in ')
       expect(Object.keys(manifest.islands).sort()).toEqual(['counter.kay', 'greeting.kay', 'joined.kay', 'mounted.kay', 'picker.kay', 'plain.kay', 'priced.kay', 'rich.kay', 'slow.kay', 'tally.kay', 'typed.kay'])
       // Minified: no line of the bundle is indented.
       expect(entry).not.toContain('\n  ')
