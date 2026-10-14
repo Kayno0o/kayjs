@@ -23,6 +23,10 @@ jobs:
         with:
           fetch-depth: 0
 
+      # actions/cache archives with GNU tar's --posix, which the image's BusyBox tar refuses, so the cache was never saved.
+      - name: Install GNU tar
+        run: apk info -e tar >/dev/null || apk add --no-cache tar
+
       # A lockfile change still restores the closest older cache, so bun only fetches the packages that moved.
       - name: Cache bun packages
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
