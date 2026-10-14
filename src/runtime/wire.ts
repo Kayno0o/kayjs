@@ -39,14 +39,15 @@ const FROM_TEXT: Record<string, (text: string, flags?: string) => unknown> = {
   URLSearchParams: text => new URLSearchParams(text),
 }
 
-export function decodeValue(text: string, revivers: Record<string, Reviver> = {}): unknown {
+export function decodeValue(text: string, revivers?: Record<string, Reviver>): unknown {
   return unflattenValue(JSON.parse(text), revivers)
 }
 
 // The value devalue's stringify wrote, from its text as JSON.parse returns it; throws on anything stringify cannot have written.
 export function unflattenValue(flat: unknown, revivers: Record<string, Reviver> = {}): unknown {
   const values = Array.isArray(flat) ? flat as unknown[] : []
-  const decoded = new Map<unknown, unknown>()
+  // Seeded with the constants, which no index of the text can overwrite.
+  const decoded = new Map<unknown, unknown>(CONSTANTS)
   // The custom types being revived, whose payload may not lead back to them.
   const reviving = new Set<number>()
 
@@ -57,9 +58,6 @@ export function unflattenValue(flat: unknown, revivers: Record<string, Reviver> 
   }
 
   const read = (index: unknown): unknown => {
-    if (CONSTANTS.has(index))
-      return CONSTANTS.get(index)
-
     if (decoded.has(index))
       return decoded.get(index)
 
