@@ -272,7 +272,7 @@ async function outputStage(project: Project, exported: boolean, client: ClientBu
     console.warn(warning)
 
   await Bun.write(join(client.dir, NOTICES_FILE), thirdPartyNotices(shippedPackages(project, client)))
-  await hookPrerendered(root, pageHooks(config.extensions), { clientDir: client.dir, publicDir: paths.public, base: basePath(config.base), aspects: config.images?.aspects })
+  await hookPrerendered(root, pageHooks(config.extensions), { clientDir: client.dir, publicDir: paths.public, base: basePath(config.base), aspects: config.images?.aspects }, paths.output)
   await Promise.all([compressFiles(client.dir), compressFiles(join(paths.output, PRERENDERED_DIR))])
 
   return { prerendered, entries, linted }

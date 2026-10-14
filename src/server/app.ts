@@ -144,7 +144,7 @@ function imageRouteOf({ root, config: options, mode }: Project<PagesOptions>, { 
 }
 
 // Tracked for `invalidatePage` while the app runs, each page the build rendered for another site, or that read the site, waiting for a fresh render first.
-function trackWhileRunning(app: App, prerendered: Map<string, Map<string, ServedPage>>, client: ClientBuild, site: string | undefined, mode: Mode) {
+function trackWhileRunning(app: App, prerendered: Map<string, Map<string, ServedPage>>, client: ClientBuild, site: string | undefined, mode: Mode, output: string) {
   // Their canonical links, social URLs and anything built with `siteUrl()` name the site the build ran for.
   const moved = client.pages.size > 0 && client.site !== site
 
@@ -162,7 +162,7 @@ function trackWhileRunning(app: App, prerendered: Map<string, Map<string, Served
     for (const { release } of tracked)
       release()
 
-    clearContentMode(mode)
+    clearContentMode(mode, output)
   })
 }
 
@@ -303,7 +303,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   const guarded = new Set(routes.filter(route => route.guards.length > 0).map(route => route.pattern))
 
   await serveServiceWorker(app, served, { client, offline: offlineOf(options, mode) ? options.offline : undefined, base, lang: options.lang, publicPages: [...client.pages].filter(([, page]) => !guarded.has(page.pattern) && page.islands === undefined && page.stamps === undefined).map(([path]) => path) })
-  trackWhileRunning(app, prerendered, client, site, mode)
+  trackWhileRunning(app, prerendered, client, site, mode, paths.output)
 
   // `kay dev` prints its own.
   if (log !== false && !mode.dev)

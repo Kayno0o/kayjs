@@ -52,8 +52,8 @@ export function setContentMode(value: ContentMode, built?: string): void {
 }
 
 // Called as the server that set it stops, so a script running after it takes `NODE_ENV`'s again; another server's since is left alone.
-export function clearContentMode(value: ContentMode): void {
-  if (mode === value) {
+export function clearContentMode(value: ContentMode, built?: string): void {
+  if (mode === value && output === built) {
     mode = undefined
     output = undefined
   }

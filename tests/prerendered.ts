@@ -36,13 +36,20 @@ export async function scratchBuild(): Promise<ScratchBuild> {
   const dir = await scratchDir('build-')
   const pages = join(dir, PRERENDERED_DIR)
 
-  await cp(outputDir(root), dir, { recursive: true, filter: source => source !== join(outputDir(root), PRERENDERED_DIR) })
+  try {
+    await cp(outputDir(root), dir, { recursive: true, filter: source => source !== join(outputDir(root), PRERENDERED_DIR) })
 
-  const manifest = (await readManifest(root, dir))!
+    const manifest = (await readManifest(root, dir))!
 
-  delete manifest.pages
-  delete manifest.site
-  await writeManifest(root, manifest, dir)
+    delete manifest.pages
+    delete manifest.site
+    await writeManifest(root, manifest, dir)
+  }
+  catch (error) {
+    await rm(dir, { recursive: true, force: true })
+
+    throw error
+  }
 
   const client = async () => (await readClient(root, dir))!
   const project = (config: KayConfig) => {
