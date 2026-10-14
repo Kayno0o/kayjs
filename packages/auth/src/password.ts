@@ -10,7 +10,7 @@ import { warnHolder, welcome } from './email'
 import { erase } from './erase'
 import { report } from './events'
 import { randomToken } from './keys'
-import { spend } from './limits'
+import { spend, typedKey } from './limits'
 import { validLocale } from './locale'
 import { safeRedirect } from './oauth/redirect'
 import { emailProblem, normalizeEmail, normalizeUsername, PASSWORD_MAX_LENGTH, usernameProblem } from './rules'
@@ -246,7 +246,7 @@ export async function signInWithPassword(state: RequestState, input: PasswordSig
     ? undefined
     : byEmail ? await store.users.findByEmail(identifier) : await store.users.findByUsername(identifier)
   // Counted against the account, so its email and every spelling of its name share one count, or against what was typed when none matches, so a guess at a missing account runs out the same way.
-  const accountKey = `sign-in-account:${record?.id ?? identifier.toLowerCase()}`
+  const accountKey = record ? `sign-in-account:${record.id}` : typedKey(state.core, 'sign-in-account', identifier.toLowerCase())
 
   // Spent before the password is checked, so a burst of parallel guesses cannot all pass a count that only a failure would raise.
   if (await spend(store, accountKey, limits.signInAccount))

@@ -1,4 +1,4 @@
-import type { Core, SignedIn } from './core'
+import type { Core } from './core'
 import type { Device } from './device'
 import type { RequestState } from './state'
 import type { SessionRecord, UserRecord } from './store'
@@ -33,8 +33,7 @@ export async function openSession(core: Core, record: UserRecord, ip: string, us
 }
 
 // Whether `signedIn` still names a live session of `record`: not ended, not signed out everywhere since, seen within the session's lifetime and signed in within `sessionAbsoluteMaxAge`. A visit is recorded on the way.
-export async function liveSession(core: Core, signedIn: SignedIn & { session: string }, record: UserRecord, ip: string): Promise<boolean> {
-  const found = await core.store.sessions.get(signedIn.session)
+export async function liveSession(core: Core, found: SessionRecord | undefined, record: UserRecord, ip: string): Promise<boolean> {
   const now = Date.now()
 
   if (!found || found.userId !== record.id || !live(core, found, record, now))
@@ -139,6 +138,21 @@ export async function endOtherSessions(state: RequestState, record: UserRecord, 
 }
 
 export async function revokeBearerTokens(core: Core, userId: string): Promise<void> {
-  for (const token of await core.store.bearerTokens.listByUser(userId))
-    await core.store.bearerTokens.delete(userId, token.id)
+  const { bearerTokens } = core.store
+
+  if (bearerTokens.deleteForUser)
+    return bearerTokens.deleteForUser(userId)
+
+  for (const token of await bearerTokens.listByUser(userId))
+    await bearerTokens.delete(userId, token.id)
+}
+
+export async function removeIdentities(core: Core, userId: string): Promise<void> {
+  const { identities } = core.store
+
+  if (identities.deleteForUser)
+    return identities.deleteForUser(userId)
+
+  for (const identity of await identities.listByUser(userId))
+    await identities.delete(identity.provider, identity.providerId)
 }

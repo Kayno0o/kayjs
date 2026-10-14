@@ -1,3 +1,4 @@
+import type { Core } from './core'
 import type { AuthStore } from './store'
 
 const MINUTE = 60
@@ -51,4 +52,9 @@ export async function exhausted(store: AuthStore, key: string, limit: Limit): Pr
 // Counts one attempt and answers whether it was over the limit.
 export async function spend(store: AuthStore, key: string, limit: Limit): Promise<boolean> {
   return await store.attempts.hit(key, limit.window) > limit.max
+}
+
+// The key counting attempts against what a visitor typed, such as an address: kept as a keyed digest, so the table holds no email.
+export function typedKey(core: Core, scope: string, typed: string): string {
+  return `${scope}:${core.keys.fingerprint(typed)}`
 }

@@ -70,8 +70,9 @@ export async function lastAdmin(state: RequestState, record: UserRecord): Promis
   if (!(await isAdmin(state, record)))
     return false
 
+  // Read a page at a time and stopped at the first other admin; the total is never read, so the store need not count.
   for (let offset = 0; ; offset += USER_PAGE_MAX) {
-    const { users } = await state.core.store.users.list({ offset, limit: USER_PAGE_MAX })
+    const { users } = await state.core.store.users.list({ offset, limit: USER_PAGE_MAX, total: false })
 
     for (const user of users) {
       if (user.id !== record.id && await isAdmin(state, user))

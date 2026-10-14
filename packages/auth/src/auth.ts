@@ -21,7 +21,7 @@ import type { RoleHierarchy } from './roles'
 import type { PasswordProblem } from './rules'
 import type { UserSession } from './sessions'
 import type { RequestState } from './state'
-import type { AuditCursor, AuthStore, LinkType, UserRecord } from './store'
+import type { AuditCursor, AuthStore, LinkType, SessionRecord, UserRecord } from './store'
 import type { Proof, ProofFailure, TwoFactorResult, TwoFactorSetup } from './twoFactor'
 import type { Level, PolicyContext, Predicate, Requirement } from './types'
 import { Elysia } from 'elysia'
@@ -50,6 +50,7 @@ import { featuresOf, pagePaths, pagesOf } from './pages'
 import { listPasskeys, passkeyProofOptions, passkeyRegistrationOptions, passkeySignInOptions, registerPasskey, removePasskey, renamePasskey, signInWithPasskey, twoFactorPasskeyOptions, verifyTwoFactorPasskey } from './passkeys'
 import { createUser, register, signInWithPassword } from './password'
 import { meetsRequirement } from './requirement'
+import { pruneWhenDue } from './prune'
 import { createRoleHierarchy } from './roles'
 import { applyLifetime, chooseRemember, listSessions, liveSession, openSession, revokeBearerTokens } from './sessions'
 import { challenged, completeSignIn, disableTwoFactor, enableTwoFactor, provedLately, regenerateRecoveryCodes, reprove, setUpTwoFactor, verifyTwoFactor } from './twoFactor'
@@ -813,9 +814,9 @@ export class Auth<Scope extends string = string, Role extends string = string, O
   }
 
   // Whether the sign-in's session is still on the user's list; one from before kayjs-auth kept them is put on it.
-  private async live(signedIn: SignedIn, record: UserRecord): Promise<boolean> {
+  private async live(signedIn: SignedIn, record: UserRecord, stored: SessionRecord | undefined): Promise<boolean> {
     if (signedIn.session !== undefined)
-      return liveSession(this.core, { ...signedIn, session: signedIn.session }, record, this[STATE].address)
+      return liveSession(this.core, stored, record, this[STATE].address)
 
     const session = await openSession(this.core, record, this[STATE].address, this[STATE].userAgent)
 
@@ -833,9 +834,12 @@ export class Auth<Scope extends string = string, Role extends string = string, O
 
   private async resolve(): Promise<UserRecord | null> {
     const signedIn = await this.session.get('auth')
-    const record = signedIn && await this.core.store.users.get(signedIn.user)
+    // The user and their session do not depend on each other, so they are read together.
+    const [record, stored] = signedIn
+      ? await Promise.all([this.core.store.users.get(signedIn.user), signedIn.session === undefined ? undefined : this.core.store.sessions.get(signedIn.session)])
+      : []
 
-    if (record && record.sessionVersion === signedIn!.version && !banned(record) && await this.genuine(signedIn!) && await this.live(signedIn!, record)) {
+    if (record && record.sessionVersion === signedIn!.version && !banned(record) && await this.genuine(signedIn!) && await this.live(signedIn!, record, stored)) {
       this.source = 'session'
 
       return record
@@ -884,6 +888,8 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
         throw new Error('kayjs-auth: no session reaches this route. Use the session plugin on the app itself, or leave it to auth.plugin, rather than in a plugin of the app\'s own before auth.plugin')
 
       const address = clientAddress(ctx.request, ctx.server, options.proxy)
+
+      pruneWhenDue(core)
 
       return { auth: new Auth<Scope, Role, OrgRole>(session, core, ctx.request, rateKey(address), address) }
     })
@@ -1126,6 +1132,7 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
     onExport: options.onExport,
     onEvent: options.onEvent,
     organizations: options.organizations && organizationsCore(options.organizations),
+    pruned: { at: 0, running: Promise.resolve() },
     audit: options.audit ? { maxAge: (options.audit === true ? undefined : options.audit.maxAge) ?? DEFAULT_AUDIT_MAX_AGE, prunedAt: 0 } : undefined,
   }
 

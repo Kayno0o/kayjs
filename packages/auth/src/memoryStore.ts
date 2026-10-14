@@ -1,4 +1,4 @@
-import type { AuditRecord, AuthStore, BearerTokenRecord, IdentityRecord, InvitationRecord, MemberRecord, OrganizationRecord, PasskeyRecord, SessionRecord, TokenRecord, UserRecord } from './store'
+import type { AuditRecord, AuthStore, BearerTokenRecord, IdentityRecord, InvitationRecord, MemberRecord, OrganizationRecord, PasskeyRecord, PruneLimits, SessionRecord, TokenRecord, UserRecord } from './store'
 
 const SWEEP_EVERY = 1000
 
@@ -53,6 +53,7 @@ export function memoryStore(): AuthStore {
   return {
     users: {
       get: id => copy(users.get(id)),
+      getMany: ids => ids.flatMap(id => copy(users.get(id)) ?? []),
       findByEmail: email => copy(holder('email', email)),
       findByUsername: username => copy(holder('username', username)),
       create(user) {
@@ -151,6 +152,12 @@ export function memoryStore(): AuthStore {
       },
       delete(provider, providerId) {
         identities.delete(identityKey(provider, providerId))
+      },
+      deleteForUser(userId) {
+        for (const [key, identity] of identities) {
+          if (identity.userId === userId)
+            identities.delete(key)
+        }
       },
     },
     tokens: {
@@ -254,6 +261,12 @@ export function memoryStore(): AuthStore {
 
         return bearerTokens.delete(id)
       },
+      deleteForUser(userId) {
+        for (const [key, token] of bearerTokens) {
+          if (token.userId === userId)
+            bearerTokens.delete(key)
+        }
+      },
     },
     recoveryCodes: {
       replace(userId, digests) {
@@ -268,6 +281,7 @@ export function memoryStore(): AuthStore {
         organizations.set(organization.id, { ...organization })
       },
       get: id => clone(organizations.get(id)),
+      getMany: ids => ids.flatMap(id => clone(organizations.get(id)) ?? []),
       findBySlug: slug => clone([...organizations.values()].find(organization => organization.slug === slug)),
       update(id, patch) {
         const organization = organizations.get(id)
@@ -356,6 +370,34 @@ export function memoryStore(): AuthStore {
       reset(key) {
         attempts.delete(key)
       },
+    },
+    prune({ now, bearerExpiredBefore, sessionMaxAge, sessionAbsoluteMaxAge }: PruneLimits) {
+      const at = now.getTime()
+
+      for (const [key, token] of tokens) {
+        if (token.expiresAt.getTime() <= at)
+          tokens.delete(key)
+      }
+
+      for (const [key, invitation] of invitations) {
+        if (invitation.expiresAt.getTime() <= at)
+          invitations.delete(key)
+      }
+
+      for (const [key, token] of bearerTokens) {
+        if (token.expiresAt && token.expiresAt < bearerExpiredBefore)
+          bearerTokens.delete(key)
+      }
+
+      for (const [key, open] of attempts) {
+        if (open.resetAt <= at)
+          attempts.delete(key)
+      }
+
+      for (const [key, session] of sessions) {
+        if (session.lastSeenAt.getTime() < at - sessionMaxAge * 1000 || session.createdAt.getTime() < at - sessionAbsoluteMaxAge * 1000)
+          sessions.delete(key)
+      }
     },
   }
 }

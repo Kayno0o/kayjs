@@ -46,6 +46,9 @@ export function createTokenRefresher<K, S>(deps: TokenRefresherDeps<K, S>) {
       if (cached && cached.expiresAt > now + margin)
         return cached.accessToken
 
+      if (cached && cached.expiresAt <= now)
+        cache.delete(key)
+
       if (stored.expiresAt > now + margin)
         return stored.accessToken
 
@@ -65,6 +68,12 @@ export function createTokenRefresher<K, S>(deps: TokenRefresherDeps<K, S>) {
             cache.delete(key)
 
             return null
+          }
+
+          // Entries past their expiry are never read again, so they go as a new one comes.
+          for (const [other, entry] of cache) {
+            if (entry.expiresAt <= Date.now())
+              cache.delete(other)
           }
 
           if (result.expiresAt !== undefined)

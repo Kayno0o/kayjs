@@ -322,6 +322,65 @@ export function storeContract(name: string, fresh: () => Promise<AuthStore>) {
       expect(await store.invitations!.listByOrganization('o1')).toEqual([])
     })
 
+    test('getMany answers the records found in one call, deleteForUser empties a user\'s identities and bearer tokens, and list may skip the total', async () => {
+      await store.users.create(userRecord({ id: 'u1', email: 'ada@example.com' }))
+      await store.users.create(userRecord({ id: 'u2', email: 'bob@example.com' }))
+      await store.organizations!.create({ id: 'o1', name: 'Acme', slug: null, createdAt: new Date() })
+
+      expect((await store.users.getMany!(['u1', 'missing', 'u2'])).map(user => user.id).sort()).toEqual(['u1', 'u2'])
+      expect(await store.users.getMany!(['missing'])).toEqual([])
+      expect((await store.organizations!.getMany!(['o1', 'missing'])).map(organization => organization.id)).toEqual(['o1'])
+      expect((await store.users.list({ offset: 0, limit: 1, total: false })).users).toHaveLength(1)
+
+      for (const [userId, provider] of [['u1', 'github'], ['u1', 'discord'], ['u2', 'github-2']] as const) {
+        await store.identities.create(identity(provider, provider, userId))
+        await store.bearerTokens.create({ id: provider, userId, label: provider, digest: provider, scopes: null, createdAt: new Date(), lastUsedAt: null, expiresAt: null })
+      }
+
+      await store.identities.deleteForUser!('u1')
+      await store.bearerTokens.deleteForUser!('u1')
+
+      expect(await store.identities.listByUser('u1')).toEqual([])
+      expect(await store.bearerTokens.listByUser('u1')).toEqual([])
+      expect(await store.identities.listByUser('u2')).toHaveLength(1)
+      expect(await store.bearerTokens.listByUser('u2')).toHaveLength(1)
+    })
+
+    test('prune deletes expired links, invitations, sessions and attempt windows, bearer tokens long expired, and nothing alive', async () => {
+      const now = new Date('2026-06-01T00:00:00Z')
+      const at = (days: number) => new Date(now.getTime() + days * 24 * 3600 * 1000)
+
+      setSystemTime(now)
+      await store.users.create(userRecord({ id: 'u1', email: 'ada@example.com' }))
+      await store.organizations!.create({ id: 'o1', name: 'Acme', slug: null, createdAt: now })
+
+      for (const [digest, expiresAt] of [['old-link', at(-1)], ['live-link', at(1)]] as const)
+        await store.tokens.create({ digest, type: 'verify-email', userId: 'u1', email: 'ada@example.com', redirect: null, expiresAt })
+
+      for (const [id, expiresAt] of [['old-invite', at(-1)], ['live-invite', at(1)]] as const)
+        await store.invitations!.create({ id, organizationId: 'o1', email: 'bob@example.com', roles: [], invitedBy: null, createdAt: now, expiresAt })
+
+      for (const [id, expiresAt] of [['long-expired', at(-40)], ['just-expired', at(-1)], ['live', at(1)], ['never', null]] as const)
+        await store.bearerTokens.create({ id, userId: 'u1', label: id, digest: id, scopes: null, createdAt: at(-60), lastUsedAt: null, expiresAt })
+
+      for (const [id, lastSeenAt, createdAt] of [['idle', at(-31), at(-31)], ['aged', at(0), at(-400)], ['live', at(-1), at(-2)]] as const)
+        await store.sessions.create({ id, userId: 'u1', version: 0, userAgent: 'ua', ip: '127.0.0.1', createdAt, lastSeenAt, maxAge: null })
+
+      await store.attempts.hit('short', 60)
+      await store.attempts.hit('long', 7 * 24 * 3600)
+
+      setSystemTime(at(0))
+      await store.prune!({ now: at(0), bearerExpiredBefore: at(-30), sessionMaxAge: 30 * 24 * 3600, sessionAbsoluteMaxAge: 365 * 24 * 3600 })
+
+      expect(await store.tokens.consume('old-link', 'verify-email')).toBeUndefined()
+      expect(await store.tokens.consume('live-link', 'verify-email')).toBeDefined()
+      expect(await store.invitations!.get('old-invite')).toBeUndefined()
+      expect(await store.invitations!.get('live-invite')).toBeDefined()
+      expect((await store.bearerTokens.listByUser('u1')).map(token => token.id).sort()).toEqual(['just-expired', 'live', 'never'])
+      expect((await store.sessions.listByUser('u1')).map(session => session.id)).toEqual(['live'])
+      expect(await store.attempts.count('long')).toBe(1)
+    })
+
     test('attempts count within their window, start over after it, and reset', async () => {
       expect(await store.attempts.count('k')).toBe(0)
       expect(await store.attempts.hit('k', 60)).toBe(1)

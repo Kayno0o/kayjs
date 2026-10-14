@@ -65,12 +65,18 @@ export function totpStep(now = Date.now()): number {
 }
 
 export async function totpCode(secret: string, step: number): Promise<string> {
+  const cryptoKey = await importKey(secret)
+
+  return cryptoKey ? codeAt(cryptoKey, step) : ''
+}
+
+async function importKey(secret: string): Promise<CryptoKey | undefined> {
   const key = base32Decode(secret)
 
-  if (key.length === 0)
-    return ''
+  return key.length === 0 ? undefined : crypto.subtle.importKey('raw', key, { name: 'HMAC', hash: 'SHA-1' }, false, ['sign'])
+}
 
-  const cryptoKey = await crypto.subtle.importKey('raw', key, { name: 'HMAC', hash: 'SHA-1' }, false, ['sign'])
+async function codeAt(cryptoKey: CryptoKey, step: number): Promise<string> {
   const counter = new Uint8Array(8)
 
   new DataView(counter.buffer).setBigUint64(0, BigInt(step))
@@ -90,10 +96,15 @@ export async function verifyTotp(secret: string, code: string, now = Date.now())
   if (digits.length !== TOTP_DIGITS)
     return undefined
 
+  const cryptoKey = await importKey(secret)
+
+  if (!cryptoKey)
+    return undefined
+
   const current = totpStep(now)
 
   for (let offset = -TOTP_WINDOW; offset <= TOTP_WINDOW; offset++) {
-    if (sameText(await totpCode(secret, current + offset), digits))
+    if (sameText(await codeAt(cryptoKey, current + offset), digits))
       return current + offset
   }
 

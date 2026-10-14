@@ -9,13 +9,13 @@ import { newPasswordProblem } from './breached'
 import { admit } from './captcha'
 import { banned } from './core'
 import { digest, randomToken } from './keys'
-import { spend } from './limits'
+import { spend, typedKey } from './limits'
 import { log } from './log'
 import { writing } from './mail'
 import { notify } from './notify'
 import { safeRedirect } from './oauth/redirect'
 import { emailProblem, normalizeEmail } from './rules'
-import { endOtherSessions, revokeBearerTokens } from './sessions'
+import { endOtherSessions, removeIdentities, revokeBearerTokens } from './sessions'
 import { reprove } from './twoFactor'
 
 const MINUTE_MS = 60 * 1000
@@ -349,7 +349,7 @@ async function spendCode(state: RequestState, type: CodeType, code: string) {
   if (!pending || pending.type !== type || pending.expires < Date.now())
     return { ok: false, error: 'expired' } as const
 
-  if (await spend(core.store, `email-code:${state.client}`, core.limits.emailCode) || await spend(core.store, `email-code:${pending.email}`, core.limits.emailCodeAccount))
+  if (await spend(core.store, `email-code:${state.client}`, core.limits.emailCode) || await spend(core.store, typedKey(core, 'email-code', pending.email), core.limits.emailCodeAccount))
     return { ok: false, error: 'limited' } as const
 
   const spent = await core.store.tokens.consume(codeDigest(state.core, pending.nonce, code.replace(NOT_DIGITS, '')), type)
@@ -395,7 +395,7 @@ async function mailByAddress(state: RequestState, email: string, type: 'reset-pa
   if (refused)
     return { ok: false, error: refused }
 
-  if (await spend(core.store, `${limit}:${address}`, core.limits[`${limit}Account`]))
+  if (await spend(core.store, typedKey(core, limit, address), core.limits[`${limit}Account`]))
     return { ok: false, error: 'limited' }
 
   // Parked whether or not an account has the address, so this session looks the same either way.
@@ -498,8 +498,7 @@ async function claim(core: Core, record: UserRecord): Promise<Partial<UserRecord
   if (record.emailVerifiedAt !== null)
     return {}
 
-  for (const identity of await core.store.identities.listByUser(record.id))
-    await core.store.identities.delete(identity.provider, identity.providerId)
+  await removeIdentities(core, record.id)
 
   for (const passkey of await core.store.passkeys.listByUser(record.id))
     await core.store.passkeys.delete(record.id, passkey.id)

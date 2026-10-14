@@ -1,9 +1,6 @@
 import type { Database, InferEntity } from '@kaynooo/pg-orm'
-import type { AuditRecord, AuthStore, BearerTokenRecord, IdentityRecord, InvitationRecord, MemberRecord, OrganizationRecord, PasskeyRecord, SessionRecord, TokenRecord, TokenType, UserRecord } from './store'
+import type { AuditRecord, AuthStore, BearerTokenRecord, IdentityRecord, InvitationRecord, MemberRecord, OrganizationRecord, PasskeyRecord, PruneLimits, SessionRecord, TokenRecord, TokenType, UserRecord } from './store'
 import { defineTable } from '@kaynooo/pg-orm'
-
-// Expired attempt windows are deleted once every so many hits.
-const SWEEP_EVERY = 1000
 
 export const AuthUsers = defineTable('auth_user', t => ({
   id: t.text().primaryKey(),
@@ -134,7 +131,7 @@ export const AuthAttempts = defineTable('auth_attempt', t => ({
   key: t.text().primaryKey(),
   count: t.int4().notNull(),
   reset_at: t.timestamptz().notNull(),
-}))
+})).withIndexes([{ columns: ['reset_at'] }])
 
 // The tables to list in the app's `new Database({ tables })`, so `db.sync()` creates them.
 export const authTables = [AuthUsers, AuthIdentities, AuthTokens, AuthRecoveryCodes, AuthBearerTokens, AuthSessions, AuthPasskeys, AuthAudit, AuthOrganizations, AuthMembers, AuthInvitations, AuthAttempts] as const
@@ -155,11 +152,11 @@ export function pgStore(db: Database): AuthStore {
   const members = db.repo(AuthMembers)
   const invitations = db.repo(AuthInvitations)
   const attempts = db.repo(AuthAttempts)
-  let hits = 0
 
   return {
     users: {
       get: async id => toUser(await users.read.findById(id)),
+      getMany: async ids => (await users.read.findMany({ id: { in: ids } })).map(row => toUser(row)!),
       findByEmail: async email => toUser(await users.read.findOne({ email })),
       findByUsername: async username => toUser(await users.read.findOne({ username_key: username.toLowerCase() })),
       async create(user) {
@@ -171,10 +168,10 @@ export function pgStore(db: Database): AuthStore {
       async delete(id) {
         await users.write.deleteById(id)
       },
-      async list({ search, offset, limit }) {
+      async list({ search, offset, limit, total: counted = true }) {
         const [rows, total] = await Promise.all([
           users.read.findMany(q => q.andWhere(search !== undefined && (e => e.or(e.eq('id', search), e.iContains('email', search), e.iContains('username', search)))).orderBy('created_at', 'desc').orderBy('id', 'desc').offset(offset).limit(limit)),
-          users.read.count(search !== undefined && (e => e.or(e.eq('id', search), e.iContains('email', search), e.iContains('username', search)))),
+          counted ? users.read.count(search !== undefined && (e => e.or(e.eq('id', search), e.iContains('email', search), e.iContains('username', search)))) : 0,
         ])
 
         return { users: rows.map(row => toUser(row)!), total }
@@ -193,6 +190,9 @@ export function pgStore(db: Database): AuthStore {
       },
       async delete(provider, providerId) {
         await identities.write.deleteMany({ provider, provider_id: providerId })
+      },
+      async deleteForUser(userId) {
+        await identities.write.deleteMany({ user_id: userId })
       },
     },
     tokens: {
@@ -249,6 +249,7 @@ export function pgStore(db: Database): AuthStore {
         await organizations.write.insertOne({ id: organization.id, name: organization.name, slug: organization.slug, created_at: organization.createdAt })
       },
       get: async id => toOrganization(await organizations.read.findById(id)),
+      getMany: async ids => (await organizations.read.findMany({ id: { in: ids } })).map(row => toOrganization(row)!),
       findBySlug: async slug => toOrganization(await organizations.read.findOne({ slug })),
       update: async (id, patch) => toOrganization(await organizations.write.updateById(id, withoutUndefined({ name: patch.name, slug: patch.slug }))),
       delete: async id => await organizations.write.deleteById(id) !== null,
@@ -282,6 +283,9 @@ export function pgStore(db: Database): AuthStore {
         await bearerTokens.write.updateById(id, { last_used_at: at })
       },
       delete: async (userId, id) => await bearerTokens.write.deleteOne({ id, user_id: userId }) !== null,
+      async deleteForUser(userId) {
+        await bearerTokens.write.deleteMany({ user_id: userId })
+      },
     },
     recoveryCodes: {
       async replace(userId, digests) {
@@ -306,9 +310,6 @@ export function pgStore(db: Database): AuthStore {
       async hit(key, window) {
         const now = new Date()
 
-        if (++hits % SWEEP_EVERY === 0)
-          await attempts.write.deleteMany({ reset_at: { lte: now } })
-
         // One statement, so two attempts at once both count: a window still open is raised, an ended one starts over.
         const [row] = await db.raw<{ count: number }>`
           INSERT INTO "auth_attempt" ("key", "count", "reset_at") VALUES (${key}, 1, ${new Date(now.getTime() + window * 1000)})
@@ -322,6 +323,16 @@ export function pgStore(db: Database): AuthStore {
       async reset(key) {
         await attempts.write.deleteMany({ key })
       },
+    },
+    async prune({ now, bearerExpiredBefore, sessionMaxAge, sessionAbsoluteMaxAge }: PruneLimits) {
+      await Promise.all([
+        tokens.write.deleteMany({ expires_at: { lte: now } }),
+        invitations.write.deleteMany({ expires_at: { lte: now } }),
+        bearerTokens.write.deleteMany({ expires_at: { lt: bearerExpiredBefore } }),
+        attempts.write.deleteMany({ reset_at: { lte: now } }),
+        sessions.write.deleteMany({ last_seen_at: { lt: new Date(now.getTime() - sessionMaxAge * 1000) } }),
+        sessions.write.deleteMany({ created_at: { lt: new Date(now.getTime() - sessionAbsoluteMaxAge * 1000) } }),
+      ])
     },
   }
 }

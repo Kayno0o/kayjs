@@ -160,6 +160,8 @@ export interface TokenRecord {
 export interface AuthStore {
   users: {
     get: (id: string) => MaybePromise<UserRecord | undefined>
+    // The users with those ids in one query, the missing ones left out; without it kayjs-auth calls `get` for each.
+    getMany?: (ids: string[]) => MaybePromise<UserRecord[]>
     // Given an address already normalised, as every caller does: a store may match it exactly.
     findByEmail: (email: string) => MaybePromise<UserRecord | undefined>
     findByUsername: (username: string) => MaybePromise<UserRecord | undefined>
@@ -170,7 +172,8 @@ export interface AuthStore {
     // Deletes the user with everything kayjs-auth keeps for them: identities, links, sessions, passkeys, bearer tokens, recovery codes and memberships; invitations they sent lose their `invitedBy`.
     delete: (id: string) => MaybePromise<void>
     // Newest first; `search` matches part of the email or the username, whatever its case, or the whole id.
-    list: (query: { search?: string, offset: number, limit: number }) => MaybePromise<{ users: UserRecord[], total: number }>
+    // With `total: false` the caller does not read `total`, so a store may skip counting.
+    list: (query: { search?: string, offset: number, limit: number, total?: boolean }) => MaybePromise<{ users: UserRecord[], total: number }>
     // Records `step` as the last one a code was accepted for, only when it is later than the one recorded: false when it is not, even when two requests try it together.
     advanceTotpStep: (id: string, step: number) => MaybePromise<boolean>
   }
@@ -181,6 +184,8 @@ export interface AuthStore {
     create: (identity: IdentityRecord) => MaybePromise<void>
     update: (provider: string, providerId: string, patch: Partial<Pick<IdentityRecord, 'accessToken' | 'refreshToken' | 'tokenExpiresAt'>>) => MaybePromise<void>
     delete: (provider: string, providerId: string) => MaybePromise<void>
+    // Deletes every identity of the user in one query; without it kayjs-auth deletes them one by one.
+    deleteForUser?: (userId: string) => MaybePromise<void>
   }
   tokens: {
     create: (token: TokenRecord) => MaybePromise<void>
@@ -223,6 +228,8 @@ export interface AuthStore {
     // Throws when the slug is taken.
     create: (organization: OrganizationRecord) => MaybePromise<void>
     get: (id: string) => MaybePromise<OrganizationRecord | undefined>
+    // The organizations with those ids in one query, the missing ones left out; without it kayjs-auth calls `get` for each.
+    getMany?: (ids: string[]) => MaybePromise<OrganizationRecord[]>
     findBySlug: (slug: string) => MaybePromise<OrganizationRecord | undefined>
     // The organization once changed, or undefined when there is none; throws when the change takes a slug another has.
     update: (id: string, patch: Partial<Pick<OrganizationRecord, 'name' | 'slug'>>) => MaybePromise<OrganizationRecord | undefined>
@@ -259,6 +266,8 @@ export interface AuthStore {
     touch: (id: string, at: Date) => MaybePromise<void>
     // Deletes the user's token with that id; false when they have none.
     delete: (userId: string, id: string) => MaybePromise<boolean>
+    // Deletes every token of the user in one query; without it kayjs-auth deletes them one by one.
+    deleteForUser?: (userId: string) => MaybePromise<void>
   }
   // Digests of the codes that sign in in place of a second factor.
   recoveryCodes: {
@@ -275,6 +284,18 @@ export interface AuthStore {
     hit: (key: string, window: number) => MaybePromise<number>
     reset: (key: string) => MaybePromise<void>
   }
+  // Deletes what outlived its use: expired links and codes and invitations, bearer tokens expired long ago, sessions past `sessionMaxAge` unseen or `sessionAbsoluteMaxAge` old, and attempt windows that ended. kayjs-auth calls it at most once an hour; a store without it keeps those rows until the app deletes them.
+  prune?: (limits: PruneLimits) => MaybePromise<void>
+}
+
+export interface PruneLimits {
+  now: Date
+  // Bearer tokens expired before this go: the list shows an expired one for a while, so its owner sees why a device stopped working.
+  bearerExpiredBefore: Date
+  // Seconds a session may go unseen: the longest lifetime any session was given.
+  sessionMaxAge: number
+  // Seconds since a session's sign-in, whatever its use.
+  sessionAbsoluteMaxAge: number
 }
 
 export type MaybePromise<T> = T | Promise<T>

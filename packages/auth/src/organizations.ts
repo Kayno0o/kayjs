@@ -4,11 +4,12 @@ import type { AuthStore, InvitationRecord, MemberRecord, OrganizationRecord, Use
 import type { Requirement } from './types'
 import { publicUser } from './core'
 import { impersonatorOf, report } from './events'
-import { spend } from './limits'
+import { spend, typedKey } from './limits'
 import { log } from './log'
 import { writing } from './mail'
 import { createRoleHierarchy } from './roles'
 import { emailProblem, normalizeEmail } from './rules'
+import { organizationsById, usersById } from './storeHelpers'
 
 const DEFAULT_INVITATION_MAX_AGE = 7 * 24 * 60 * 60
 const NAME_MAX_LENGTH = 100
@@ -195,9 +196,11 @@ export async function listMemberships(state: RequestState): Promise<Membership[]
     return []
 
   const memberships: Membership[] = []
+  const held = await store.members.listByUser(record.id)
+  const organizations = await organizationsById(store.organizations, held.map(member => member.organizationId))
 
-  for (const member of await store.members.listByUser(record.id)) {
-    const organization = await store.organizations.get(member.organizationId)
+  for (const member of held) {
+    const organization = organizations.get(member.organizationId)
 
     if (organization)
       memberships.push(membership(organization, member))
@@ -271,8 +274,11 @@ export async function listMembers(state: RequestState, ref: string): Promise<{ o
 
   const members: Member[] = []
 
-  for (const member of await store.members.listByOrganization(found.organization.id)) {
-    const user = await state.core.store.users.get(member.userId)
+  const held = await store.members.listByOrganization(found.organization.id)
+  const users = await usersById(state.core.store, held.map(member => member.userId))
+
+  for (const member of held) {
+    const user = users.get(member.userId)
 
     if (user)
       members.push({ user: { id: user.id, email: user.email, username: user.username }, roles: [...member.roles], joinedAt: member.createdAt })
@@ -375,7 +381,7 @@ export async function invite(state: RequestState, ref: string, email: string, ro
     return { ok: false, error: 'member' }
 
   // Each mail goes to an inbox someone else owns, so neither a manager nor many managers together may flood it.
-  if (await spend(core.store, `invite:${found.record.id}`, core.limits.invite) || await spend(core.store, `invite-address:${address}`, core.limits.inviteAddress))
+  if (await spend(core.store, `invite:${found.record.id}`, core.limits.invite) || await spend(core.store, typedKey(core, 'invite-address', address), core.limits.inviteAddress))
     return { ok: false, error: 'limited' }
 
   for (const earlier of await store.invitations.listByOrganization(found.organization.id)) {
@@ -405,7 +411,7 @@ export async function invite(state: RequestState, ref: string, email: string, ro
   return { ok: true, invitation: publicInvitation(invitation, found.organization) }
 }
 
-// The organization's invitations still open, oldest first, for its managers; expired ones are dropped on the way.
+// The organization's invitations still open, oldest first, for its managers; expired ones are left out.
 export async function listInvitations(state: RequestState, ref: string): Promise<{ ok: true, invitations: Invitation[] } | { ok: false, error: OrganizationFailure }> {
   const { config, store } = organizationsOf(state.core)
   const found = await asMember(state, ref, config.manage)
@@ -413,7 +419,7 @@ export async function listInvitations(state: RequestState, ref: string): Promise
   if (!found.ok)
     return found
 
-  return { ok: true, invitations: (await open(store, await store.invitations.listByOrganization(found.organization.id))).map(invitation => publicInvitation(invitation, found.organization)) }
+  return { ok: true, invitations: open(await store.invitations.listByOrganization(found.organization.id)).map(invitation => publicInvitation(invitation, found.organization)) }
 }
 
 export async function revokeInvitation(state: RequestState, ref: string, invitationId: string): Promise<{ ok: true } | { ok: false, error: OrganizationFailure }> {
@@ -442,9 +448,11 @@ export async function myInvitations(state: RequestState): Promise<Invitation[]> 
     return []
 
   const invitations: Invitation[] = []
+  const pending = open(await store.invitations.listByEmail(record.email))
+  const organizations = await organizationsById(store.organizations, pending.map(invitation => invitation.organizationId))
 
-  for (const invitation of await open(store, await store.invitations.listByEmail(record.email))) {
-    const organization = await store.organizations.get(invitation.organizationId)
+  for (const invitation of pending) {
+    const organization = organizations.get(invitation.organizationId)
 
     if (organization)
       invitations.push(publicInvitation(invitation, organization))
@@ -544,19 +552,11 @@ async function live(store: Stores, invitationId: string): Promise<InvitationReco
   return invitation && invitation.expiresAt.getTime() > Date.now() ? invitation : undefined
 }
 
-// The invitations not yet expired; the others are deleted.
-async function open(store: Stores, invitations: InvitationRecord[]): Promise<InvitationRecord[]> {
+// The invitations not yet expired; the store's pruning deletes the others.
+function open(invitations: InvitationRecord[]): InvitationRecord[] {
   const now = Date.now()
-  const kept: InvitationRecord[] = []
 
-  for (const invitation of invitations) {
-    if (invitation.expiresAt.getTime() > now)
-      kept.push(invitation)
-    else
-      await store.invitations.delete(invitation.id)
-  }
-
-  return kept
+  return invitations.filter(invitation => invitation.expiresAt.getTime() > now)
 }
 
 async function reportOn(state: RequestState, userId: string, event: 'member-roles-changed' | 'member-removed', detail: string, actor: UserRecord): Promise<void> {
