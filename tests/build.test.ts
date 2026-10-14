@@ -347,6 +347,34 @@ describe('kay build', () => {
     }
   })
 
+  it('keeps every color-mix() of a rule through Tailwind and in plain CSS, built for production and in kay dev, where Bun alone keeps the first', async () => {
+    const project = await scratchDir('supports-')
+    const mixes = ':root {\n  --tint: color-mix(in srgb, var(--accent) 14%, var(--base));\n  --line: color-mix(in srgb, var(--text) 12%, transparent);\n}\n'
+    const files = {
+      'src/app.css': `@import 'tailwindcss';\n${mixes}`,
+      'src/plain.css': '.plain {\n  --x: 1;\n  @supports (display: grid) {\n    --x: 2;\n  }\n  --y: 1;\n  @supports (display: grid) {\n    --y: 2;\n  }\n}\n',
+      'src/routes/index.kay': '---\nimport \'../app.css\'\nimport \'../plain.css\'\n---\np Hello\n',
+    }
+
+    await Promise.all(Object.entries(files).map(async ([file, content]) => Bun.write(join(project, file), content)))
+
+    const stylesheet = async (url: string) => (await Bun.file(join(clientDir(project), url.slice('/_kay/'.length))).text()).replace(/\s/g, '')
+    const expectAll = (css: string) => {
+      expect(css).toContain('--tint:color-mix(insrgb,var(--accent)14%,var(--base))')
+      expect(css).toContain('--line:color-mix(insrgb,var(--text)12%,transparent)')
+      expect(css).toContain('--x:2')
+      expect(css).toContain('--y:2')
+    }
+
+    try {
+      expectAll(await stylesheet((await buildClient(project, { plugins: [tailwind], minify: true })).styles.get(join(project, 'src/routes/index.kay'))!))
+      expectAll(await stylesheet((await devBuilder(project, { plugins: [tailwind] })(null)).styles!['src/routes/index.kay']!))
+    }
+    finally {
+      await rm(project, { recursive: true, force: true })
+    }
+  })
+
   it('writes the files pages import, through a server fence\'s modules too, for a production server that never writes', async () => {
     const site = join(import.meta.dir, 'fixtures/site')
 

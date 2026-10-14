@@ -27,6 +27,7 @@ import { ANCHOR, runtimeAnchor, runtimeChunk } from './runtime-chunk'
 import { builtinChains, refusedBuiltins, refuseServerOnlyReads } from './server-only'
 import { forgetBundleMaps } from './sourcemap'
 import { styleImports, withoutStyles } from './styles'
+import { mergingSupports } from './supports'
 import { analyzeKayCached, KayCompileError, keepAnalyses } from './transform'
 
 export interface ClientOptions {
@@ -387,7 +388,7 @@ export async function bundleStyles(root: string, { pages, libraries }: Pick<Clie
     minify: options.minify ?? false,
     metafile: true,
     naming: { entry: '[name]-[hash].[ext]', chunk: '[name]-[hash].[ext]', asset: '[name]-[hash].[ext]' },
-    plugins: [styleImports(root, libraries), ...options.plugins ?? []],
+    plugins: [styleImports(root, libraries), ...mergingSupports(options.plugins ?? [])],
   })
 
   if (!build.success)

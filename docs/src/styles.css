@@ -3,9 +3,14 @@
   color-scheme: light dark;
   --base: var(--color-kui-canvas);
   --mantle: var(--color-kui-mantle);
+  --crust: light-dark(color-mix(in srgb, var(--color-kui-mantle) 95%, black), color-mix(in srgb, var(--color-kui-mantle) 72%, black));
   --muted: var(--color-kui-subtext0);
+  --subtext: color-mix(in srgb, var(--color-kui-text) 50%, var(--color-kui-subtext0));
   --text: var(--color-kui-text);
   --accent: var(--color-kui-accent);
+  /* The accent the theme picker sets, faint under the page shown and a card hovered. */
+  --tint: color-mix(in srgb, var(--accent) 14%, var(--base));
+  --line: color-mix(in srgb, var(--text) 12%, transparent);
   --edge: light-dark(rgb(23 32 46 / 0.2), rgb(0 0 0 / 0.6));
   --sans: var(--font-sans);
   --mono: ui-monospace, 'JetBrains Mono', 'Cascadia Code', Menlo, Consolas, monospace;
@@ -26,24 +31,6 @@
   font-family: var(--sans);
   line-height: 1.6;
   scrollbar-color: var(--crust) transparent;
-}
-
-/* One color-mix() per rule: Bun keeps only the first of the @supports overrides Tailwind nests in a rule for each, the others staying on their fallback. */
-:root {
-  --crust: light-dark(color-mix(in srgb, var(--color-kui-mantle) 95%, black), color-mix(in srgb, var(--color-kui-mantle) 72%, black));
-}
-
-:root {
-  --subtext: color-mix(in srgb, var(--color-kui-text) 50%, var(--color-kui-subtext0));
-}
-
-:root {
-  /* The accent the theme picker sets, faint under the page shown and a card hovered. */
-  --tint: color-mix(in srgb, var(--accent) 14%, var(--base));
-}
-
-:root {
-  --line: color-mix(in srgb, var(--text) 12%, transparent);
 }
 
 @media (prefers-reduced-motion: no-preference) {
