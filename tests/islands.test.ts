@@ -8,6 +8,7 @@ import { kay } from '../src/build/plugin'
 import { collectHead, head } from '../src/runtime/head'
 import { child } from '../src/runtime/html'
 import { island, IslandPropsError } from '../src/runtime/island.server'
+import { trustHtml } from '../src/runtime/sanitize'
 import { HYDRATION_SCRIPT } from '../src/server/hydration'
 
 await plugin(kay())
@@ -314,8 +315,8 @@ describe('islands', () => {
   })
 
   it('hydrates an island whose prop the server vouched for, keeping its markup in a spread and dropping a plain string\'s', async () => {
-    const { default: Fixture } = await import(join(fixtures, 'vouchedpage.kay')) as { default: () => unknown }
-    const html = child(Fixture())
+    const { default: Fixture } = await import(join(fixtures, 'vouchedpage.kay')) as { default: (props: { markup: string }) => unknown }
+    const html = child(Fixture({ markup: trustHtml('<b>island-vouched-1</b>') }))
     const warn = spyOn(console, 'warn').mockImplementation(() => undefined)
 
     document.body.innerHTML = html

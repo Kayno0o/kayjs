@@ -1,6 +1,7 @@
 ---
-import { trustHtml } from 'kay'
 import Vouched from './vouched.kay'
+
+const { markup } = props<{ markup: string }>()
 ---
 main
-  Vouched(markup={trustHtml('<b>island-vouched-1</b>')} raw="<i>island-raw-1</i>")
+  Vouched(markup={markup} raw="<i>island-raw-1</i>")
