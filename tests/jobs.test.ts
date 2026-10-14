@@ -382,6 +382,60 @@ describe('queue', () => {
     }
   })
 
+  it('drops a failed job once keepFailed has passed since its last attempt, and keeps it for good on false', async () => {
+    const failing = (keepFailed?: false) => queue('failing', () => {
+      throw new Error('no such mailbox')
+    }, { store: memoryJobs(), attempts: 1, keepFailed, onFailed: () => undefined })
+    const kept = failing()
+    const forever = failing(false)
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+
+    try {
+      await kept.enqueue('ada@example.com')
+      await forever.enqueue('ada@example.com')
+      await kept.drain()
+      await forever.drain()
+      setSystemTime(Date.now() + 29 * 24 * 3_600_000)
+      await kept.drain()
+      expect(await kept.failed()).toHaveLength(1)
+      setSystemTime(Date.now() + 2 * 24 * 3_600_000)
+      await kept.drain()
+      await forever.drain()
+      expect(await kept.failed()).toEqual([])
+      expect(await forever.failed()).toHaveLength(1)
+    }
+    finally {
+      setSystemTime()
+      logged.mockRestore()
+    }
+  })
+
+  it.each(['memory', 'sqlite'])('removes a job by id, or every waiting and failed job whose payload matches, from a %s store', async (kind) => {
+    const mail = queue('erase', (to: string) => {
+      if (to === 'bounce@example.com')
+        throw new Error('no such mailbox')
+    }, { store: kind === 'memory' ? memoryJobs() : sqliteJobs(await jobsPath()), attempts: 1, onFailed: () => undefined })
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+
+    try {
+      await mail.enqueue('bounce@example.com')
+      await mail.drain()
+      await mail.enqueue('ada@example.com', { delay: '1h' })
+      await mail.enqueue('ada@example.com', { delay: '2h' })
+      const grace = await mail.enqueue('grace@example.com', { delay: '1h' })
+
+      expect(await mail.remove(to => to === 'ada@example.com' || to === 'bounce@example.com')).toBe(3)
+      expect(await mail.failed()).toEqual([])
+      expect(await mail.remove(grace)).toBe(1)
+      setSystemTime(Date.now() + 3 * 3_600_000)
+      expect(await mail.drain()).toBe(0)
+    }
+    finally {
+      setSystemTime()
+      logged.mockRestore()
+    }
+  })
+
   it('logs a store that fails once as its outage starts and once as it ends, whatever the concurrency', async () => {
     const store = memoryJobs()
     const claim = store.claim.bind(store)

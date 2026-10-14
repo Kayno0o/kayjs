@@ -1,10 +1,11 @@
 import type { Elysia } from 'elysia'
 import type { Duration } from '../runtime/duration'
-import { rename, rm } from 'node:fs/promises'
+import { readdir, rename, rm } from 'node:fs/promises'
 import { basename, join, resolve } from 'node:path'
 import { durationSeconds } from '../runtime/duration'
 import { FILES_ROUTE } from '../runtime/image'
 import { imageHeader } from './image-format'
+import { stripImageMetadata } from './image-metadata'
 import { signedText, signText } from './stamp'
 
 // Where files are kept: `diskFiles`, `s3Files` and `memoryFiles` make one, an app may write its own. Keys are never written twice, so a store needs no locking.
@@ -26,6 +27,8 @@ export interface PutOptions {
   folder?: string | undefined
   // The key of a file this one replaces, deleted once the new one is stored.
   replace?: string | undefined
+  // A JPEG, PNG or WebP is stored without the metadata a camera or phone writes in it, such as where the photo was taken; `true` stores it byte for byte.
+  keepMetadata?: boolean | undefined
 }
 
 export interface UrlOptions {
@@ -43,6 +46,7 @@ const TYPE_PARAMETERS = /;.*$/
 const NAME_EXTENSION = /\.([a-z\d]{1,10})$/i
 // What Bun.Image reads the size of, which the key then holds.
 const SIZED = /^(?:png|jpe?g|webp|gif|avif)$/
+const STRIPPED = /^(?:png|jpe?g|webp)$/
 // Types a browser shows without running anything; any other file is downloaded, sandboxed, so an uploaded page or SVG never runs as the site.
 const INLINE = /^(?:image\/(?:png|jpeg|webp|gif|avif)|video\/|audio\/|application\/pdf|text\/plain)/
 // An image keeps its type, so an SVG still shows in an `img`; any other downloaded file goes as bytes of no type, so a script or stylesheet never loads into one of the site's pages.
@@ -57,7 +61,7 @@ const SIGNING_USE = 'kay-file'
 const EXTENSIONS: Record<string, string> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/gif': 'gif', 'image/avif': 'avif', 'image/svg+xml': 'svg', 'application/pdf': 'pdf', 'text/plain': 'txt', 'application/json': 'json', 'video/mp4': 'mp4', 'video/webm': 'webm', 'audio/mpeg': 'mp3' }
 const TEXT = { 'content-type': 'text/plain; charset=utf-8' }
 
-let current: { store: FileStore | undefined, cacheDir: string | undefined, exported: boolean } = { store: undefined, cacheDir: undefined, exported: false }
+let current: { store: FileStore | undefined, cacheDir: string | undefined, variantsDir?: string | undefined, exported: boolean } = { store: undefined, cacheDir: undefined, exported: false }
 let defaultStore: FileStore | undefined
 
 // Files in a directory of this machine, `data/files` by default, relative to where the server runs.
@@ -121,8 +125,8 @@ export function defaultFileStore(): FileStore {
 }
 
 // `storage` from kay.config.ts, which the server's `files` reads, and the directory where the image route copies a file from a store not on this disk.
-export function setupStorage(store: FileStore | undefined, cacheDir: string): void {
-  current = { store: store ?? defaultFileStore(), cacheDir, exported: false }
+export function setupStorage(store: FileStore | undefined, cacheDir: string, variantsDir?: string): void {
+  current = { store: store ?? defaultFileStore(), cacheDir, variantsDir, exported: false }
 }
 
 // A static export has no server, so its pages link files where the store serves them itself, or fail to build.
@@ -148,12 +152,14 @@ export const files = {
       throw new Error(`kay: files.put() was given the folder ${JSON.stringify(options.folder)}: a folder is letters, digits, - and _ in segments split by /, and starts with no \`private\` segment`)
 
     const extension = fileExtension(data)
-    const size = SIZED.test(extension) ? await imageSize(data) : undefined
+
+    const stored = options.keepMetadata !== true && STRIPPED.test(extension) ? new Blob([stripImageMetadata(await data.bytes())], { type: data.type }) : data
+    const size = SIZED.test(extension) ? await imageSize(stored) : undefined
     const id = Buffer.from(crypto.getRandomValues(new Uint8Array(10))).toString('hex')
     const key = `${options.private === true ? PRIVATE : ''}${options.folder === undefined ? '' : `${options.folder}/`}${id}${size ? `.${size.width}x${size.height}` : ''}.${extension}`
     const store = await activeStore()
 
-    await store.write(key, data)
+    await store.write(key, stored)
 
     if (options.replace !== undefined)
       await files.delete(options.replace)
@@ -166,12 +172,24 @@ export const files = {
     return (await activeStore()).read(checkedKey(key, 'files.get()'))
   },
 
-  // Deletes the file, its copy kept for the image route included; a key with no file is no error.
+  // Deletes the file, with its copy and the variants the image route made of it; a key with no file is no error.
   async delete(key: string): Promise<void> {
     await (await activeStore()).delete(checkedKey(key, 'files.delete()'))
 
     if (current.cacheDir !== undefined)
       await rm(join(current.cacheDir, key), { force: true })
+
+    const { variantsDir } = current
+
+    if (variantsDir === undefined)
+      return
+
+    try {
+      const prefix = storedVariants(key)
+
+      await Promise.all((await readdir(variantsDir)).filter(name => name.startsWith(prefix)).map(async name => rm(join(variantsDir, name), { force: true })))
+    }
+    catch {}
   },
 
   // Where a page links the file, a path of the site as a template's `href` is: `/_kay/files/<key>`, signed and expiring for a private one.
@@ -226,7 +244,7 @@ export function serveFiles(app: Elysia): void {
 }
 
 // The file a stored image's URL names, as the image route reads it: in place on this disk, else copied once into the cache, since a key never changes.
-export async function storedImage(src: string): Promise<{ path: string, immutable: false, private: boolean } | { status: number, message: string } | undefined> {
+export async function storedImage(src: string): Promise<{ path: string, immutable: false, prefix: string, private: boolean } | { status: number, message: string } | undefined> {
   const url = URL.parse(src, 'http://kay')
   const key = url?.pathname.slice(FILES_ROUTE.length) ?? ''
 
@@ -242,7 +260,7 @@ export async function storedImage(src: string): Promise<{ path: string, immutabl
   const own = store.path?.(key)
 
   if (own !== undefined)
-    return await Bun.file(own).exists() ? { path: own, immutable: false, private: locked } : undefined
+    return await Bun.file(own).exists() ? { path: own, immutable: false, prefix: storedVariants(key), private: locked } : undefined
 
   const copy = join(current.cacheDir!, key)
 
@@ -258,7 +276,12 @@ export async function storedImage(src: string): Promise<{ path: string, immutabl
     await rename(partial, copy)
   }
 
-  return { path: copy, immutable: false, private: locked }
+  return { path: copy, immutable: false, prefix: storedVariants(key), private: locked }
+}
+
+// How the image route's variants of a stored file start, so deleting the file finds them.
+function storedVariants(key: string): string {
+  return `stored-${Bun.hash(key).toString(36)}-`
 }
 
 function linkSigned(key: string, query: URLSearchParams): boolean {

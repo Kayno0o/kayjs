@@ -215,7 +215,7 @@ export default defineConfig({
 })
 ```
 
-- `head` adds tags to every page's head, written as a `head` block compiles them, a tag's text as `children`: `head: [{ tag: 'script', props: { src: '/stats.js', defer: true } }, { tag: 'meta', props: { name: 'color-scheme', content: 'light dark' } }]`.
+- `head` adds tags to every page's head, written as a `head` block compiles them, a tag's text as `children`: `head: [{ tag: 'script', props: { src: '/stats.js', defer: true } }, { tag: 'meta', props: { name: 'color-scheme', content: 'light dark' } }]`. An analytics script that needs the visitor's consent loads from an island once they agreed (see [Privacy](privacy.md)).
 - A layout or the page setting a tag of the same identity replaces one of those.
 - An inline script or style among them is let through by the content security policy, its hash added.
 - `site` is an origin, nothing after the host.

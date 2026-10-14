@@ -406,6 +406,17 @@ describe('sessions', () => {
     expect(await (await counter({ store }).handle(new Request('http://localhost/peek', { headers: { cookie: planted } }))).text()).toBe('none')
   })
 
+  for (const [name, store] of [['in memory', memoryStore()], ['in sqlite', sqliteStore(':memory:')]] as const) {
+    it(`erases the sessions ${name} whose data matches, and only those`, async () => {
+      await store.set('a', { userId: 1 }, 60)
+      await store.set('b', { userId: 2 }, 60)
+      await store.set('c', { userId: 1, cart: [3] }, 60)
+
+      expect(await store.deleteWhere(data => data.userId === 1)).toBe(2)
+      expect([await store.get('a'), await store.get('b'), await store.get('c')]).toEqual([undefined, { userId: 2 }, undefined])
+    })
+  }
+
   it('takes a store of the app\'s own, and refuses a short or published secret or a cookie too big to keep', async () => {
     const saved = new Map<string, unknown>()
     const store: SessionStore = {

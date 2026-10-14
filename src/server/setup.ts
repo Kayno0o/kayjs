@@ -80,7 +80,7 @@ export async function setupPages(project: Project, loadClient: () => Promise<Cli
   if (!prerendering) {
     setupPreview(config.preview, base)
     setTracer(config.tracer)
-    setupStorage(config.storage, join(imageCache, 'stored'))
+    setupStorage(config.storage, join(imageCache, 'stored'), imageCache)
     warnOnStampKey(!mode.dev)
   }
 

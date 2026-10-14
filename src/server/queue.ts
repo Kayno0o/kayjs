@@ -34,6 +34,8 @@ export interface JobStore {
   // Keeps it as failed, out of the queue.
   fail: (id: string, error: string) => Maybe<void>
   failed: (queue: string) => Maybe<StoredJob[]>
+  // Every job of the queue, waiting or failed, which `remove` looks through for a payload; a store without it removes jobs by id alone.
+  jobs?: ((queue: string) => Maybe<StoredJob[]>) | undefined
   // When the queue's next job may run, so a worker sleeps until then.
   nextRunAt: (queue: string) => Maybe<number | undefined>
   // True for the first caller naming this lock and slot, in any process: a schedule's run happens once.
@@ -51,6 +53,8 @@ export interface QueueOptions<Payload> {
   concurrency?: number | undefined
   // How long a run may take: past it, the run counts as failed and frees its worker, and another process takes a job its dead process held as lost. 10 minutes by default.
   lostAfter?: Duration | undefined
+  // How long a failed job is kept, its payload included, from its last attempt: 30 days by default, `false` until removed.
+  keepFailed?: Duration | false | undefined
   // Gets a job that failed its last attempt, once it is kept as failed.
   onFailed?: ((payload: Payload, error: unknown) => unknown) | undefined
 }
@@ -73,11 +77,16 @@ export type Queue<Payload> = Elysia & {
   // Runs every job whose time has come, here and now, until none is left: for a test, or a script with no server.
   drain: () => Promise<number>
   failed: () => Promise<FailedJob<Payload>[]>
+  // Removes the job of that id, or every job, waiting or failed, whose payload `match` returns true for, such as a person's mails once they asked to be erased; resolves with how many went.
+  remove: (match: string | ((payload: Payload) => boolean)) => Promise<number>
 }
 
 const DEFAULT_ATTEMPTS = 5
 const DEFAULT_BACKOFF = 10
 const DEFAULT_LOST_AFTER = 600
+const DEFAULT_KEEP_FAILED = 30 * 24 * 60 * 60
+// How often a process's workers drop the failed jobs past `keepFailed`.
+const PURGE_MS = 60 * 60 * 1000
 // How often an idle worker looks for jobs another process enqueued.
 const POLL_MS = 1000
 // The longest a timer waits: past it, setTimeout fires at once.
@@ -118,6 +127,9 @@ export function sqliteJobs(path: string): JobStore {
     failed(queue) {
       return open(false)?.failed.all(queue).map(toJob) ?? []
     },
+    jobs(queue) {
+      return open(false)?.all.all(queue).map(toJob) ?? []
+    },
     nextRunAt(queue) {
       return open(false)?.next.get(queue)?.at ?? undefined
     },
@@ -150,12 +162,13 @@ function prepareJobs(db: Database) {
   const retry = db.query('UPDATE kay_jobs SET run_at = ?, held_until = NULL, error = ? WHERE id = ?')
   const fail = db.query('UPDATE kay_jobs SET failed = 1, held_until = NULL, error = ? WHERE id = ?')
   const failed = db.query<JobRow, [string]>('SELECT id, queue, payload, attempts, run_at, error FROM kay_jobs WHERE queue = ? AND failed = 1 ORDER BY run_at')
+  const all = db.query<JobRow, [string]>('SELECT id, queue, payload, attempts, run_at, error FROM kay_jobs WHERE queue = ? ORDER BY run_at')
   // A held job counts from when its hold ends, as it runs again then if its process died.
   const next = db.query<{ at: number | null }, [string]>('SELECT min(max(run_at, coalesce(held_until, 0))) AS at FROM kay_jobs WHERE queue = ? AND failed = 0')
   const lock = db.query('INSERT OR IGNORE INTO kay_locks (name, slot) VALUES (?, ?)')
   const pruneLocks = db.query('DELETE FROM kay_locks WHERE name = ? AND slot < ?')
 
-  return { insert, claim, remove, retry, fail, failed, next, lock, pruneLocks }
+  return { insert, claim, remove, retry, fail, failed, all, next, lock, pruneLocks }
 }
 
 // Jobs kept in this process's memory, gone with it: what tests run on.
@@ -191,6 +204,9 @@ export function memoryJobs(): JobStore {
     failed(queue) {
       return [...jobs.values()].filter(job => job.queue === queue && job.failed).map(({ heldUntil: _, failed: __, ...job }) => job)
     },
+    jobs(queue) {
+      return [...jobs.values()].filter(job => job.queue === queue).map(({ heldUntil: _, failed: __, ...job }) => job)
+    },
     nextRunAt(queue) {
       const times = waiting(queue).map(job => Math.max(job.runAt, job.heldUntil ?? 0))
 
@@ -221,6 +237,7 @@ export function queue<Payload>(name: string, handler: (payload: Payload) => unkn
   const backoff = durationSeconds(options.backoff ?? DEFAULT_BACKOFF, `queue('${name}')'s backoff`) * 1000
   const lostAfter = durationSeconds(options.lostAfter ?? DEFAULT_LOST_AFTER, `queue('${name}')'s lostAfter`) * 1000
   const concurrency = options.concurrency ?? 1
+  const keepFailed = options.keepFailed === false ? undefined : durationSeconds(options.keepFailed ?? DEFAULT_KEEP_FAILED, `queue('${name}')'s keepFailed`) * 1000
 
   if (!Number.isInteger(attempts) || attempts < 1)
     throw new Error(`kay: queue('${name}')'s attempts is ${attempts}; it takes a whole number of at least 1`)
@@ -302,6 +319,23 @@ export function queue<Payload>(name: string, handler: (payload: Payload) => unkn
     return true
   }
 
+  let purged = 0
+
+  // Drops the failed jobs whose last attempt is older than `keepFailed`, once an hour at most, whichever worker or drain gets there first.
+  const purgeFailed = async () => {
+    const now = Date.now()
+
+    if (keepFailed === undefined || now - purged < PURGE_MS)
+      return
+
+    purged = now
+
+    for (const job of await store().failed(name)) {
+      if (job.runAt < now - keepFailed)
+        await store().complete(job.id)
+    }
+  }
+
   // Whether the store failed at the last look, so an outage is logged once as it starts and once as it ends, whatever the concurrency.
   let storeDown = false
 
@@ -310,6 +344,8 @@ export function queue<Payload>(name: string, handler: (payload: Payload) => unkn
 
     while (!signal.aborted) {
       try {
+        await purgeFailed()
+
         const ran = await runNext()
 
         if (storeDown) {
@@ -375,12 +411,27 @@ export function queue<Payload>(name: string, handler: (payload: Payload) => unkn
     drain: async () => {
       let ran = 0
 
+      await purgeFailed()
+
       while (await runNext())
         ran++
 
       return ran
     },
     failed: async () => (await store().failed(name)).map(job => ({ id: job.id, payload: parse(job.payload) as Payload, attempts: job.attempts, error: job.error ?? '' })),
+    remove: async (match: string | ((payload: Payload) => boolean)) => {
+      const listed = typeof match === 'string' ? undefined : store().jobs?.(name)
+
+      if (typeof match !== 'string' && !listed)
+        throw new Error(`kay: queue('${name}')'s store lists no jobs, so remove() takes a job's id rather than a function`)
+
+      const ids = typeof match === 'string' ? [match] : (await listed ?? []).filter(job => match(parse(job.payload) as Payload)).map(job => job.id)
+
+      for (const id of ids)
+        await store().complete(id)
+
+      return ids.length
+    },
   }) as Queue<Payload>
 
   drains.add(queued.drain)

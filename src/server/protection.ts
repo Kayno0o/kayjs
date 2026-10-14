@@ -118,10 +118,16 @@ export function memoryRates(): { hit: (key: string, windowMs: number) => RateWin
 }
 
 // Windows kept in a SQLite file, so every process of the machine opening it counts the same attempts.
+// A key is stored hashed with a salt the file keeps, so the file holds no visitor's address.
 export function sqliteRates(path: string): RateStore {
   const db = openSqlite(path)
 
   db.run('CREATE TABLE IF NOT EXISTS kay_rates (key TEXT PRIMARY KEY, count INTEGER NOT NULL, reset_at INTEGER NOT NULL)')
+  db.run('CREATE TABLE IF NOT EXISTS kay_rates_salt (id INTEGER PRIMARY KEY CHECK (id = 1), salt TEXT NOT NULL)')
+  db.query('INSERT OR IGNORE INTO kay_rates_salt (id, salt) VALUES (1, ?)').run(crypto.randomUUID())
+
+  const salt = db.query<{ salt: string }, []>('SELECT salt FROM kay_rates_salt').get()!.salt
+  const hashed = (key: string) => new Bun.CryptoHasher('sha256').update(salt).update(key).digest('base64url')
 
   // The row's old values are what both cases read: a closed window opens afresh, an open one counts one more.
   const hit = db.query<{ count: number, reset_at: number }, [string, number, number]>('INSERT INTO kay_rates (key, count, reset_at) VALUES (?1, 1, ?2 + ?3) ON CONFLICT (key) DO UPDATE SET count = CASE WHEN reset_at <= ?2 THEN 1 ELSE count + 1 END, reset_at = CASE WHEN reset_at <= ?2 THEN ?2 + ?3 ELSE reset_at END RETURNING count, reset_at')
@@ -138,12 +144,12 @@ export function sqliteRates(path: string): RateStore {
         sweep.run(now)
       }
 
-      const row = hit.get(key, now, windowMs)!
+      const row = hit.get(hashed(key), now, windowMs)!
 
       return { count: row.count, resetAt: row.reset_at }
     },
     peek(key) {
-      const row = peek.get(key, Date.now())
+      const row = peek.get(hashed(key), Date.now())
 
       return row ? { count: row.count, resetAt: row.reset_at } : undefined
     },

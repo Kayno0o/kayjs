@@ -76,8 +76,13 @@ export function remoteAllowed(src: string | URL, patterns: readonly RemotePatter
   return patterns.some(pattern => url.protocol === pattern.protocol && (pattern.wildcard ? host.endsWith(`.${pattern.host}`) : host === pattern.host) && (url.pathname === pattern.path || url.pathname.startsWith(pattern.path.endsWith('/') ? pattern.path : `${pattern.path}/`)))
 }
 
+// How the image route's variants of a remote original start, so evicting it finds them.
+export function remoteVariants(key: string): string {
+  return `remote-${key}-`
+}
+
 // Downloads an image another host serves, or keeps the copy `dir` holds while it is fresh, asking the host whether it changed once it is not. A host that fails leaves the last copy served, and is asked again a minute later.
-// `variantsDir` holds what the image route made of the originals, `remote-<key>-...`, removed with the original they came from.
+// `variantsDir` holds what the image route made of the originals, named after `remoteVariants`, removed with the original they came from.
 export function remoteImages(dir: string, patterns: readonly RemotePattern[], variantsDir?: string, maxOriginals = MAX_ORIGINALS): RemoteImages {
   const stored = new Map<string, Stored>()
   const failedUntil = new Map<string, number>()
@@ -146,7 +151,7 @@ export function remoteImages(dir: string, patterns: readonly RemotePattern[], va
       return
 
     try {
-      const prefix = `remote-${key}-`
+      const prefix = remoteVariants(key)
 
       await Promise.all((await readdir(variantsDir)).filter(name => name.startsWith(prefix)).map(async name => rm(join(variantsDir, name), { force: true })))
     }

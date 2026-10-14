@@ -17,7 +17,7 @@ import { decodable, imageHeader } from './image-format'
 import { limiter } from './limit'
 import { clientAddress } from './protection'
 import { revalidated } from './public'
-import { remoteAllowed, remotePatterns } from './remote'
+import { remoteAllowed, remotePatterns, remoteVariants } from './remote'
 import { decodePath } from './routes'
 import { headerCopies, ownHeaders } from './security'
 import { storedImage } from './storage'
@@ -293,8 +293,8 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
     const negotiated = options.avif !== undefined && variant !== 'card'
     const format = negotiated && acceptsAvif(request.headers.get('accept')) ? 'avif' : 'webp'
     const headers = negotiated ? negotiatedImmutable : immutable
-    // An imported image is named after its content; a runtime one may change in place, so its size and time, read above since its size is never kept, go in the name, after its key for a remote one, whose variants go when its original does.
-    const name = source.immutable ? variantName(path, variant, format) : inFormat(`${source.key === undefined ? '' : `remote-${source.key}-`}${Bun.hash(`${path}\n${stats!.size}\n${stats!.mtimeMs}`).toString(36)}${variantSuffix(variant)}`, format)
+    // An imported image is named after its content; a runtime one may change in place, so its size and time, read above since its size is never kept, go in the name, after the prefix of a remote or stored one, whose variants go when its original does.
+    const name = source.immutable ? variantName(path, variant, format) : inFormat(`${source.prefix ?? ''}${Bun.hash(`${path}\n${stats!.size}\n${stats!.mtimeMs}`).toString(36)}${variantSuffix(variant)}`, format)
     const found = source.immutable ? importedVariants.get(name) : undefined
 
     if (found)
@@ -435,7 +435,7 @@ async function resolvedSource(src: string, context: { request: Request }, { find
 }
 
 // The file a `src` names, a remote image's downloaded copy or a stored one included, or why the remote or private one is refused.
-export async function findSource(src: string, options: ImageRouteOptions, client?: string): Promise<{ path: string, immutable: boolean, key?: string, private?: boolean } | { status: number, message: string } | undefined> {
+export async function findSource(src: string, options: ImageRouteOptions, client?: string): Promise<{ path: string, immutable: boolean, prefix?: string, private?: boolean } | { status: number, message: string } | undefined> {
   if (src.startsWith(FILES_ROUTE))
     return RESIZABLE.test(src) ? storedImage(src) : undefined
 
@@ -446,7 +446,7 @@ export async function findSource(src: string, options: ImageRouteOptions, client
 
   const original = await options.remote(src, client)
 
-  return 'path' in original ? { path: original.path, immutable: false, key: original.key } : original
+  return 'path' in original ? { path: original.path, immutable: false, prefix: remoteVariants(original.key) } : original
 }
 
 // The file a `src` names, never one outside the built assets or the directories of runtime images.

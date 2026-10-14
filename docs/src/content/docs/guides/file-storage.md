@@ -25,7 +25,9 @@ for key of photos key={key}
   img(src={files.url(key)} alt="")
 ```
 
-A key looks like `photos/1f3a9c0b2d4e6f8a0b1c.1600x1200.jpg`: an image's key holds its size, so `img` gives a stored image the same responsive variants as an imported one without opening the file. Keys are never reused, so a new avatar is a new file: `files.put(file, { replace: user.avatar })` deletes the old one once the new one is stored.
+A key looks like `photos/1f3a9c0b2d4e6f8a0b1c.1600x1200.jpg`: an image's key holds its size, so `img` gives a stored image the same responsive variants as an imported one without opening the file. Keys are never reused, so a new avatar is a new file: `files.put(file, { replace: user.avatar })` deletes the old one once the new one is stored, and `files.delete(key)` deletes a file with every resized variant of it.
+
+A JPEG, PNG or WebP is stored without the metadata a camera or phone writes in it, such as where and when the photo was taken, keeping its colour profile and orientation. `files.put(file, { keepMetadata: true })` stores it byte for byte.
 
 `/_kay/files/<key>` serves each file with its type, cached for good. Only PNG, JPEG, WebP, GIF and AVIF images, video, audio, PDFs and plain text are shown in place: any other file is sent as a sandboxed download, so an HTML page or an SVG never runs as the site, and every one but an image goes with no type, so a script or a stylesheet never loads into one of its pages. An SVG keeps its type, so it still shows in an `img`.
 

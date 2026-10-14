@@ -61,7 +61,7 @@ Without `site` in the config, kay reads it from `SITE_URL`, so one build serves 
 
 </Callout>
 
-Any other tag every page carries, such as an analytics script, goes in `head`:
+Any other tag every page carries, such as a script of the site's own, goes in `head`. An analytics script that needs the visitor's consent goes in an island instead, loaded once they agreed, as [Privacy](/guides/privacy) shows:
 
 ```ts
 export default defineConfig({

@@ -2,11 +2,12 @@ import type { Server } from 'bun'
 import type { Action } from '../src/runtime'
 import type { LogEntry } from '../src/server/log'
 import type { ProtectionRefusal } from '../src/server/protection'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
 import { brotliDecompressSync, constants } from 'node:zlib'
+import { Database } from 'bun:sqlite'
 import { describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { parse, stringify } from 'devalue'
 import { Elysia, t } from 'elysia'
@@ -692,6 +693,14 @@ console.log(JSON.stringify(warnings))
       // A window that closed opens afresh.
       setSystemTime(Date.now() + 61_000)
       expect(await rateLimit('login', { max: 1, window: '1m', store: second }).hit(request())).toBeUndefined()
+
+      // The file keeps no key as given, and only the server's user reads it.
+      await rateLimit('reset', { max: 1, window: '1m', store: first }).hit('ada@example.com')
+      const db = new Database(path, { readonly: true })
+
+      expect(db.query<{ key: string }, []>('SELECT key FROM kay_rates').all().filter(row => row.key.includes('ada') || row.key.includes('reset'))).toEqual([])
+      expect((await stat(path)).mode & 0o777).toBe(0o600)
+      db.close()
     }
     finally {
       setSystemTime()

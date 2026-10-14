@@ -1,11 +1,13 @@
 import type { FileStore } from '../src/server'
 import { existsSync } from 'node:fs'
-import { mkdtemp, readdir, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, readdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, it, setSystemTime } from 'bun:test'
 import { chromium } from 'playwright-core'
+import { testWorker } from '../src/build/assets'
+import { cacheDir } from '../src/project'
 import { image } from '../src/runtime/image'
 import { diskFiles, files, memoryFiles, pages, s3Files } from '../src/server'
 import { linkStoredFiles, setupStorage } from '../src/server/storage'
@@ -201,9 +203,17 @@ describe('stored images', () => {
     const get = await serve(memoryFiles())
     const key = await files.put(await hero())
     const url = `/_kay/image?src=${encodeURIComponent(files.url(key))}&w=640`
+    const variants = cacheDir(process.cwd(), `images${testWorker()}`)
+    const made = async () => new Set(await readdir(variants))
+
+    await mkdir(variants, { recursive: true })
+
+    const before = await made()
 
     expect((await get(url)).status).toBe(200)
+    expect([...await made()].filter(name => !before.has(name))).toEqual([expect.stringMatching(/^stored-\w+-\w+-640\.webp$/)])
     await files.delete(key)
+    expect(await made()).toEqual(before)
     expect((await get(url)).status).toBe(404)
   })
 

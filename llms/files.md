@@ -113,7 +113,8 @@ if upload.progress() !== undefined
 - A key under `private/` is private whatever its case.
 - `img(src={files.url(key)})` and `image(files.url(key), { sizes })` give a stored PNG, JPEG, WebP, GIF or AVIF the same variants as an imported image, with its size; an animated GIF is answered as it is.
 - `shareImage` and `shareCard` take one too.
-- `files.get(key)` resolves with the file as a `Blob`, or `undefined`; `files.delete(key)` deletes it, a key with no file being no error.
+- `files.get(key)` resolves with the file as a `Blob`, or `undefined`; `files.delete(key)` deletes it with every variant the image route made of it, a key with no file being no error.
+- A JPEG, PNG or WebP is stored without the EXIF, XMP, IPTC, text chunks and comments a camera or phone writes in it, such as where the photo was taken, keeping its colour profile and a JPEG's orientation; `files.put(file, { keepMetadata: true })` stores it byte for byte (see [Privacy](privacy.md)).
 - Each throws on a key `files.put` never gives, `../` say.
 
 ### Private files

@@ -228,6 +228,7 @@ export default defineConfig({ requireGuards: true })
 - `memoryStore()` from `kay/server` keeps sessions in the process, gone on restart.
 - `sqliteStore(path)` keeps them in a SQLite file shared by the processes on one machine, creating its directory, as `sqliteRates`, `sqliteCache` and `sqliteJobs` do.
 - Any object with `get(id)`, `set(id, data, maxAge)` and `delete(id)`, each sync or async, is a store too, such as one over Redis.
+- `deleteWhere(match)` on `memoryStore()` and `sqliteStore(path)` deletes every session whose data `match` returns true for, a person's once they asked to be erased or changed their password say, resolving with how many went; `sqliteStore` also drops expired sessions every hour.
 - Values cross as island props do, Dates, Maps, Sets and bigints included.
 - The cookie, `session` unless `cookie` names another, is `HttpOnly`, `SameSite=Lax`, `Path=/`, and over https `Secure` and named `__Host-session`, so no other host of the site can set it; code reading kay's session cookie by hand looks for that name over https.
 - Over https means the request's URL or its `X-Forwarded-Proto`; a request with no `X-Forwarded-Proto` at all counts as https in production (`NODE_ENV=production`) when `site` in kay.config.ts is https.

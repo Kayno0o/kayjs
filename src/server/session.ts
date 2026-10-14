@@ -18,6 +18,8 @@ export interface SessionStore {
   // `maxAge` in seconds: past it the store may forget the session.
   set: (id: string, data: SessionData, maxAge: number) => void | Promise<void>
   delete: (id: string) => void | Promise<void>
+  // Deletes every session whose data `match` returns true for, such as a person's once they asked to be erased or their password changed, resolving with how many went.
+  deleteWhere?: ((match: (data: SessionData) => boolean) => number | Promise<number>) | undefined
 }
 
 export interface SessionOptions {
@@ -77,6 +79,8 @@ const IV_BYTES = 12
 const TAG_BYTES = 16
 // A store drops expired sessions once every so many writes.
 const SWEEP_EVERY = 1000
+// How often a SQLite store drops expired sessions on its own, so a quiet site does not keep them.
+const SWEEP_MS = 60 * 60 * 1000
 
 // Sessions for kay pages and plain Elysia routes alike, as `session` in the context: `ctx.locals.session` in a page, an action or a guard.
 // The cookie is read on first use and written only when the session changed or is due an extension; it is HttpOnly, SameSite=Lax, and over https Secure and named `__Host-` unless shared under a domain.
@@ -328,7 +332,7 @@ function opened(value: string, keys: Buffer[], name: string): { sealed: Sealed, 
 }
 
 // Sessions in this process's memory: gone on restart, and each process keeps its own. Fine for development and one-process sites that can sign everyone out on deploy.
-export function memoryStore(): SessionStore {
+export function memoryStore(): SessionStore & { deleteWhere: NonNullable<SessionStore['deleteWhere']> } {
   const sessions = new Map<string, { text: string, expires: number }>()
   let writes = 0
 
@@ -360,11 +364,23 @@ export function memoryStore(): SessionStore {
     delete(id) {
       sessions.delete(id)
     },
+    deleteWhere(match) {
+      let deleted = 0
+
+      for (const [id, entry] of sessions) {
+        if (match(parse(entry.text) as SessionData)) {
+          sessions.delete(id)
+          deleted++
+        }
+      }
+
+      return deleted
+    },
   }
 }
 
 // Sessions in a SQLite file, surviving restarts and shared by the processes on one machine.
-export function sqliteStore(path: string): SessionStore {
+export function sqliteStore(path: string): SessionStore & { deleteWhere: NonNullable<SessionStore['deleteWhere']> } {
   const db = openSqlite(path)
 
   db.run('CREATE TABLE IF NOT EXISTS kay_sessions (id TEXT PRIMARY KEY, data TEXT NOT NULL, expires INTEGER NOT NULL)')
@@ -373,9 +389,11 @@ export function sqliteStore(path: string): SessionStore {
   const upsert = db.query('INSERT INTO kay_sessions (id, data, expires) VALUES (?, ?, ?) ON CONFLICT (id) DO UPDATE SET data = excluded.data, expires = excluded.expires')
   const remove = db.query('DELETE FROM kay_sessions WHERE id = ?')
   const sweep = db.query('DELETE FROM kay_sessions WHERE expires < ?')
+  const all = db.query<{ id: string, data: string }, []>('SELECT id, data FROM kay_sessions')
   let writes = 0
 
   sweep.run(Date.now())
+  setInterval(() => sweep.run(Date.now()), SWEEP_MS).unref()
 
   return {
     get(id) {
@@ -391,6 +409,16 @@ export function sqliteStore(path: string): SessionStore {
     },
     delete(id) {
       remove.run(id)
+    },
+    deleteWhere(match) {
+      const ids = all.all().filter(row => match(parse(row.data) as SessionData)).map(row => row.id)
+
+      db.transaction(() => {
+        for (const id of ids)
+          remove.run(id)
+      })()
+
+      return ids.length
     },
   }
 }
