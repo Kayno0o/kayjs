@@ -16,6 +16,7 @@
     "tests/server.test.ts": 14870,
     "tests/hot.test.ts": 13635,
     "tests/start.test.ts": 13063,
+    "tests/docs-contrast.test.ts": 13000,
     "tests/storage.test.ts": 12848,
     "tests/dom.test.ts": 10954,
     "tests/content.test.ts": 8209,
