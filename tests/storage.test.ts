@@ -232,6 +232,27 @@ describe('stored images', () => {
     expect((await get(url)).status).toBe(404)
   })
 
+  it('drop the social card drawn on a stored image once it is deleted', async () => {
+    const store = memoryFiles()
+    const app = await pages({ site: 'https://storage.example', routes: 'tests/fixtures/storage/src/card-routes', fonts: [{ family: 'Archivo Black', src: 'tests/fixtures/cards/src/fonts/archivo-black-latin-400-normal.woff2' }], prebuilt: false, security: false, storage: store })
+    const key = await files.put(await hero())
+    const html = await (await app.handle(new Request(`http://localhost/?key=${encodeURIComponent(key)}`))).text()
+    const card = (/<meta property="og:image" content="https:\/\/storage\.example([^"]+)">/).exec(html)![1]!.replaceAll('&amp;', '&')
+    const variants = cacheDir(process.cwd(), `images${testWorker()}`)
+    const made = async () => new Set((await readdir(variants)).filter(name => name.endsWith('.jpg')))
+
+    await mkdir(variants, { recursive: true })
+
+    const before = await made()
+    const drawn = await app.handle(new Request(`http://localhost${card}`))
+
+    expect(drawn.status).toBe(200)
+    expect([...await made()].filter(name => !before.has(name))).toEqual([expect.stringMatching(/^stored-\w+-card-\w+\.jpg$/)])
+    await files.delete(key)
+    expect(await made()).toEqual(before)
+    expect((await app.handle(new Request(`http://localhost${card}`))).status).toBe(404)
+  })
+
   it('are read in place from a store on this disk', async () => {
     const store = join(dir, 'in-place')
     const get = await serve(diskFiles(store))

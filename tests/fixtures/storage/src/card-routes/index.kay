@@ -1,0 +1,10 @@
+--- server
+import { shareCard } from 'kay/image'
+import { files } from 'kay/server'
+
+const card = shareCard({ title: 'A stored photo', image: files.url(ctx.url.searchParams.get('key') ?? '') })
+---
+head
+  title Card
+  meta(property="og:image" content={card})
+h1 Card

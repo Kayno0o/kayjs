@@ -119,5 +119,5 @@ export async function archive(scan: File) {
 ### Stored files
 
 - `files.put` tells a JPEG, PNG or WebP by its bytes, whatever its name, and stores it with only what draws it: its pixels, colour profile and a JPEG's orientation, every other segment or chunk, EXIF, XMP, IPTC, C2PA, text and comments among them, dropped; any other format, AVIF and HEIC included, and a file it cannot read through, logged, are stored as they came.
-- `files.delete(key)` deletes the file, its cached copy and every variant the image route made of it; a social card `shareImage()` or `shareCard()` drew from it stays in the build's cache until the next build drops it.
+- `files.delete(key)` deletes the file, its cached copy and every variant and social card the image route made of it.
 - A photo of a person that only some visitors may see is stored with `private: true`, which only a link the page signed reaches.

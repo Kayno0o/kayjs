@@ -279,7 +279,8 @@ export function serveCards(app: Elysia, cards: Cards, options: ImageRouteOptions
       }
     }
 
-    const name = cardFile(cards, spec, version)
+    // A stored or remote image's card starts with the prefix its variants do, so deleting the original drops the card.
+    const name = `${source?.prefix ?? ''}${cardFile(cards, spec, version)}`
     const built = join(options.clientDir, VARIANTS_DIR, name)
     const file = await Bun.file(built).exists() ? built : join(options.cacheDir, name)
 

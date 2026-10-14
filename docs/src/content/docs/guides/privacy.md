@@ -52,7 +52,7 @@ export async function erase(userId: string) {
 }
 ```
 
-`files.delete` also deletes every resized variant of the file; a social card drawn from it stays in the build's cache until the next build. Sessions kept in the cookie alone, without a store, cannot be listed: they end when they expire, or for everyone when the secret is replaced.
+`files.delete` also deletes every resized variant of the file and every social card drawn on it. Sessions kept in the cookie alone, without a store, cannot be listed: they end when they expire, or for everyone when the secret is replaced.
 
 ## Analytics behind consent
 
