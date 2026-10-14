@@ -1,5 +1,5 @@
 import type { SafeHtml } from './checks'
-import { vouch } from './safe-html'
+import { isVouched, vouch } from './safe-html'
 
 export interface SanitizeOptions {
   // Tags kept besides the formatted text kept by default, such as `['img', 'table', 'thead', 'tbody', 'tr', 'th', 'td']`.
@@ -199,11 +199,11 @@ export function sanitizeHtml(markup: string, options?: SanitizeOptions): SafeHtm
   for (const inner of open.reverse())
     result += `</${inner}>`
 
-  return vouch(result)
+  return isVouched(result) ? result : vouch(result)
 }
 
 // Marks markup the app made, such as its own Markdown renderer's or a trusted CMS's, as fit for `innerHTML` as it is.
 export function trustHtml(markup: string): SafeHtml {
   // Anything but a string is left as it is, so nothing but a string is ever vouched for.
-  return typeof (markup as unknown) === 'string' ? vouch(markup) : markup as SafeHtml
+  return typeof (markup as unknown) === 'string' ? isVouched(markup) ? markup : vouch(markup) : markup as SafeHtml
 }

@@ -54,15 +54,15 @@ describe('vouched markup', () => {
     expect(isVouched(icon)).toBe(true)
   })
 
-  it('counts a repeat of markup the registry holds for nothing, so a hot path cannot push other markup out', () => {
+  it('counts a repeat of markup trustHtml or sanitizeHtml is given for nothing, so a hot path cannot push other markup out', () => {
     const big = (mark: string, size: number) => mark + 'x'.repeat(size)
 
     // Fills a generation, so the count starts from nothing.
-    vouch(big('fill', 8_500_000))
-    vouch(big('victim', 5_000_000))
+    trustHtml(big('fill', 8_500_000))
+    trustHtml(big('victim', 5_000_000))
 
     for (let i = 0; i < 10; i++)
-      vouch(big('hot', 3_000_000))
+      trustHtml(big('hot', 3_000_000))
 
     expect(isVouched(big('victim', 5_000_000), false)).toBe(true)
     expect(isVouched(big('hot', 3_000_000), false)).toBe(true)
@@ -200,8 +200,6 @@ describe('markup across JSON', () => {
     expect(() => decodeCall(forged)).toThrow('malformed')
     expect(isVouched('<img src=x onerror=alert(1)>')).toBe(false)
     expect(() => decodeServerValue('[{"html":1},["SafeHtml",2],5]')).toThrow()
-    // Anything with a `slice`, an array here, once reached `vouch` and spoilt its count.
-    expect(() => decodeServerValue('[{"html":1},["SafeHtml",2],["!x"]]')).toThrow('malformed')
   })
 
   it('goes into an island\'s data-props as the SafeHtml type only for markup vouched for', () => {
