@@ -104,9 +104,9 @@ import TestPipe from '~icons/tabler/test-pipe'
 import WifiOff from '~icons/tabler/wifi-off'
 import Button from '@kaynooo/kayjs-ui/button.kay'
 import Card from '@kaynooo/kayjs-ui/card.kay'
+import Demo from '../../components/demo.kay'
 import ModuleCard from '../../components/module-card.kay'
 import Pager from '../../components/pager.kay'
-import UiShowcase from '../../components/ui-showcase.kay'
 import { FORGE } from '../../forge'
 ---
 head
@@ -236,7 +236,7 @@ head
               h3
                 a(href="/libraries/kayjs-ui") kayjs-ui
               p {componentCount} components your app compiles as its own: dialogs, tables, forms, charts, a command palette and more, restyled from one stylesheet. Try them:
-            UiShowcase
+            Demo(name="showcase/dashboard")
         Card.library(bare)
           .library-body
             header.library-head

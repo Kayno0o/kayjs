@@ -892,12 +892,6 @@ pre code {
   color: var(--subtext);
 }
 
-.showcase-stage {
-  padding: 1rem;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-}
-
 /* The full reference sits folded at the bottom of the sidebar. */
 .full-reference summary {
   cursor: pointer;
@@ -919,14 +913,11 @@ pre code {
   border-radius: var(--radius);
 }
 
+/* A demo sits on the ground an app would give it, dotted so it reads apart from the code under it. */
 .example > .ui-stage {
   padding: 1.5rem 1.25rem;
-  border-bottom: 1px solid var(--line);
-}
-
-/* A demo sits on the ground an app would give it, dotted so it reads apart from the code under it. */
-:is(.example > .ui-stage, .showcase-stage) {
   background: radial-gradient(var(--line) 1px, transparent 1px) 0 0 / 1rem 1rem, var(--color-kui-canvas);
+  border-bottom: 1px solid var(--line);
 }
 
 .example .code {
