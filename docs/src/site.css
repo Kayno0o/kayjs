@@ -8,9 +8,9 @@
 /* The docs' colours, from kay's favicon: navy, white and yellow. */
 @theme {
   --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  --color-kui-mantle: light-dark(#e3e8ef, #121a26);
-  --color-kui-canvas: light-dark(#eef2f7, #17202e);
-  --color-kui-surface0: light-dark(#f6f8fb, #1c2737);
+  --color-kui-mantle: light-dark(#e8edf4, #121a26);
+  --color-kui-canvas: light-dark(#f8fafc, #17202e);
+  --color-kui-surface0: light-dark(#ffffff, #1c2737);
   --color-kui-surface1: light-dark(#e3e8ef, #23314a);
   --color-kui-overlay1: light-dark(#7c8798, #6f7b8d);
   --color-kui-subtext0: light-dark(#566173, #9ba6b5);

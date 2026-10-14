@@ -5,7 +5,7 @@
   --yellow: #f5b83d;
   --base: var(--color-kui-canvas);
   --mantle: var(--color-kui-mantle);
-  --crust: light-dark(#d6dde7, #0d131d);
+  --crust: light-dark(#dbe2eb, #0d131d);
   --muted: var(--color-kui-subtext0);
   --subtext: light-dark(#384356, #c4ccd7);
   --text: var(--color-kui-text);
@@ -509,6 +509,7 @@ a > code {
   overflow: hidden;
   line-height: 1.6;
   background: var(--mantle);
+  border: 1px solid var(--line);
   border-radius: var(--radius);
 }
 
@@ -893,7 +894,7 @@ pre code {
 
 .showcase-stage {
   padding: 1rem;
-  background: var(--base);
+  border: 1px solid var(--line);
   border-radius: var(--radius);
 }
 
@@ -914,15 +915,22 @@ pre code {
 
 .example {
   overflow: hidden;
+  border: 1px solid var(--line);
   border-radius: var(--radius);
 }
 
 .example > .ui-stage {
   padding: 1.5rem 1.25rem;
-  background: var(--mantle);
+  border-bottom: 1px solid var(--line);
+}
+
+/* A demo sits on the ground an app would give it, dotted so it reads apart from the code under it. */
+:is(.example > .ui-stage, .showcase-stage) {
+  background: radial-gradient(var(--line) 1px, transparent 1px) 0 0 / 1rem 1rem, var(--color-kui-canvas);
 }
 
 .example .code {
+  border: 0;
   border-radius: 0;
 }
 
