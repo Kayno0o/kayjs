@@ -757,6 +757,104 @@ describe('kay build checks the project first', () => {
     }
   }, 60_000)
 
+  describe('--format json and github', () => {
+    const documented = async (root: string, ...args: string[]) => {
+      const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', root, ...args], { stdout: 'pipe', stderr: 'pipe' })
+      const [stdout, stderr, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+
+      expect(stdout.trimEnd().split('\n'), stderr).toHaveLength(1)
+
+      return { document: JSON.parse(stdout) as { errors: number, warnings: number, failed?: { stage: string }, built?: unknown, problems: { file?: string, severity: string, code: string | null, message: string }[] }, stdout, stderr, code }
+    }
+
+    it('gives what the check found in its shape, and the check as the stage that stopped the build', async () => {
+      const root = await scratchProject({
+        'tsconfig.json': tsconfig,
+        'kay.config.ts': 'export default { favicon: false }\n',
+        'src/routes/index.kay': '--- server\nconst n: number = \'one\'\n---\np {n}\n',
+      })
+
+      try {
+        const { document, code } = await documented(root, '--format', 'json')
+
+        expect(code).toBe(1)
+        expect(document.failed).toEqual({ stage: 'check' })
+        expect(document.built).toBeUndefined()
+        expect(document.errors).toBeGreaterThan(0)
+        expect(document.problems[0]).toMatchObject({ file: relative(process.cwd(), join(root, 'src/routes/index.kay')), severity: 'error' })
+      }
+      finally {
+        await rm(root, { recursive: true, force: true })
+      }
+    }, 60_000)
+
+    it('gives the lints of the prerendered pages, the output as the stage they stopped', async () => {
+      const root = await scratchProject({
+        'tsconfig.json': tsconfig,
+        'kay.config.ts': 'export default { site: \'https://example.com\', favicon: false, seo: { image: \'/og.png\' }, lints: { seo: \'allow\', \'duplicate-title\': \'deny\' } }\n',
+        'src/routes/index.kay': '--- server\nexport const page = { prerender: true }\n---\nhead\n  title Home\n  meta(name="description" content="Home")\np Home\n',
+        'src/routes/about.kay': '--- server\nexport const page = { prerender: true }\n---\nhead\n  title Home\n  meta(name="description" content="Who we are")\np About\n',
+      })
+
+      try {
+        const { document, code } = await documented(root, '--format', 'json')
+
+        expect(code).toBe(1)
+        expect(document.failed).toEqual({ stage: 'output' })
+        expect(document.problems.map(problem => problem.code)).toEqual(['duplicate-title'])
+      }
+      finally {
+        await rm(root, { recursive: true, force: true })
+      }
+    }, 60_000)
+
+    it('gives the problems found so far once a prerendered page ends the process', async () => {
+      const root = await scratchProject({
+        'tsconfig.json': tsconfig,
+        'src/routes/index.kay': '--- server\nimport process from \'node:process\'\n\nexport const page = { prerender: true }\nconsole.log(\'prerendering\')\nprocess.exit(3)\n---\nh1 Home\nh3 Skipped\n',
+      })
+
+      try {
+        const { document, stderr, code } = await documented(root, '--format', 'json')
+
+        expect(code).toBe(3)
+        expect(stderr).toContain('prerendering')
+        expect(document.failed).toEqual({ stage: 'output' })
+        expect(document.problems.map(problem => problem.code ?? problem.message)).toEqual(['skipped-heading', 'the build ended with exit code 3 before it was done'])
+        expect([document.errors, document.warnings]).toEqual([1, 1])
+      }
+      finally {
+        await rm(root, { recursive: true, force: true })
+      }
+    }, 60_000)
+
+    it('answers options that do not go together with an error document', async () => {
+      const { document, stderr, code } = await documented('.', '--no-check', '-p', 'tsconfig.json', '--format', 'json')
+
+      expect(code).toBe(1)
+      expect(stderr).toBe('kay build: -p names the tsconfig the build checks with, so it does not go with --no-check\n')
+      expect(document).toEqual({ errors: 1, warnings: 0, problems: [{ severity: 'error', code: null, message: '-p names the tsconfig the build checks with, so it does not go with --no-check' }] })
+    })
+
+    it('annotates a template that does not compile under --format github, at its place', async () => {
+      const root = await scratchProject({
+        'kay.config.ts': 'export default { favicon: false }\n',
+        'src/routes/index.kay': 'p Home\neach x in y\n  p {x}\n',
+      })
+
+      try {
+        const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', root, '--no-check', '--format', 'github'], { stdout: 'pipe', stderr: 'pipe' })
+        const [stdout, code] = await Promise.all([new Response(child.stdout).text(), child.exited])
+
+        expect(code).toBe(1)
+        expect(stdout).toBe(`::error file=${relative(process.cwd(), join(root, 'src/routes/index.kay'))},line=2,col=1,endLine=2,endColumn=5,title=kay build::\`each\` is pug syntax kay does not have%0Ahelp: kay loops with \`for item of list\`\n`)
+      }
+      finally {
+        await rm(root, { recursive: true, force: true })
+      }
+    }, 30_000)
+  })
+
   it('builds nothing from a project kay check refuses, and builds it with --no-check', async () => {
     const root = await scratchProject({ 'tsconfig.json': tsconfig, 'src/routes/index.kay': 'a(href="/nowhere") Lost\n' })
 

@@ -328,13 +328,13 @@ export default defineConfig({
   - It runs the project's `kay.config.ts`, and the modules it imports, as soon as a `.kay` file is opened, as `bun` would: open only a project you trust, as with its `package.json` scripts.
 
 - Every command prints its usage for `--help` or `-h`, and refuses an option or argument it does not take.
-- `kay build`, `kay routes`, `kay explain`, `kay fmt` and `kay migrate` take `--format json`, as `kay check` does: stdout holds one JSON document on one line, what the app's own code prints going to stderr, and the exit code is the text output's.
-  - `kay build`: `{ errors, warnings, problems }` as `kay check` prints them, a template that does not compile at its place and any other failure as one problem with `code: null`, then `failed: { stage }` when a stage stopped it, `built: { islands, stylesheets, prerendered, entries, ms, sizes }` (`sizes` the entry's and each island's `raw` and `gzip` bytes, `modules` under `--analyze`), `exported: { pages, files, dir, ms }` and `compiled: { executable, ms }`; `--format github` prints the check's problems as `kay check` does.
-  - `kay routes`: `{ routes, unlisted }`, each route's `methods`, `path`, `kind`, `by`, and `file`, `notes`, `layouts`, `guards` when it has them.
+- `kay build`, `kay routes`, `kay explain`, `kay fmt` and `kay migrate` take `--format json`, as `kay check` does: stdout holds one JSON document on one line, what the app's own code prints through the console or `process.stdout` going to stderr (a write straight to file descriptor 1 is not caught), and the exit code is the text output's.
+  - `kay build`: `{ errors, warnings, problems }` as `kay check` prints them, a template that does not compile at its place and any other failure as one problem with `code: null`, then `failed: { stage }` when a stage stopped it, `built: { islands, stylesheets, prerendered, entries, ms, sizes }` (`sizes` the entry's and each island's `raw` and `gzip` bytes, `modules` under `--analyze`), `exported: { pages, files, dir, ms }` and `compiled: { executable, ms }`; code that ends the process mid-build leaves the problems so far, one saying it ended and the stage; `--format github` annotates the check's problems as `kay check` does, and a template that does not compile or a failed stage too.
+  - `kay routes`: `{ routes, unlisted }`, each route's `methods`, `path`, `kind`, `by`, and `file`, `notes`, `layouts`, `guards` when it has them, every locale's copy with its chains.
   - `kay explain`: `{ groups, lints }` with each lint's `name`, `group`, `level` and whole `summary`, or one lint's fields, its `wrong` and `right` examples included.
   - `kay fmt`: `{ errors, warnings, problems, written, changed }`, what does not parse as problems.
   - `kay migrate`: `{ written, kept, copied, notes }`, each note's `file`, `line`, `target` and `message`.
-  - A command that cannot run prints `{ errors: 1, warnings: 0, problems: [{ severity, code: null, message }] }`.
+  - A command that cannot run, options that do not go together included, prints `{ errors: 1, warnings: 0, problems: [{ severity, code: null, message }] }`.
 - `kay fmt` refuses a path that is missing or is neither a directory nor a `.kay` file.
 
 - The TextMate grammar the extension highlights `.kay` files with ships as `kay/kay.tmLanguage.json`, for a highlighter such as Shiki: register it as `{ ...grammar, name: 'kay', embeddedLangs: ['typescript'] }`.

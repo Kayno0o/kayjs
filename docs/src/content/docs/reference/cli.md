@@ -197,7 +197,7 @@ The build runs `kay check` first and keeps the last build when the check or the 
 | `--no-check` | Skips the check |
 | `--analyze` | Lists the modules weighing most in the entry and each island |
 | `-p <tsconfig>` | Names another tsconfig |
-| `--format <format>` | `text` by default; `github` prints the check's problems as `kay check --format github` does; `json` prints the whole build as one document once it ends, see [Output for tools](#output-for-tools) |
+| `--format <format>` | `text` by default; `github` annotates what the check found as `kay check --format github` does, and a template that does not compile or a failed stage too; `json` prints the whole build as one document once it ends, see [Output for tools](#output-for-tools) |
 
 The build prints the JavaScript a page with islands loads, gzip and minified: the entry, then what each island adds.
 
@@ -280,7 +280,7 @@ GET   /old                        redirect  308 to /
 GET   /_kay/health                kay       health check
 ```
 
-It lists the routes the project serves in production, without starting the server or running a page or a guard: each page with its layouts and guards, outermost first, once per locale's path, `/about` and `/fr/a-propos`, with its matchers shown as its file names them, `/items/:id=integer`; each action of a page or a layout; each endpoint; each route of an API module, with its method, `WS` and `OPTIONS` included; the routes of an extension's `server` given as an Elysia instance; each redirect and collection feed; and the routes kay serves itself as the config turns them on, such as `/_kay/health`, the favicons and the sitemap. A page is marked `prerendered` with `prerender: true` or a server island, and `prerendered as its prerender setting lists` with a list or a function. A route that sets `guards: false` is marked `open`, one that `requireGuards` refuses with a 403 says so, and a library's API module shows the guards of its own directory.
+It lists the routes the project serves in production, without starting the server or running a page or a guard: each page with its layouts and guards, outermost first, once per locale's path, `/about` and `/fr/a-propos`, with its matchers shown as its file names them, `/items/:id=integer`; each action of a page or a layout; each endpoint; each route of an API module, with its method, `WS` and `OPTIONS` included; the routes of an extension's `server` given as an Elysia instance; each redirect and collection feed; and the routes kay serves itself as the config turns them on, such as `/_kay/health`, the favicons and the sitemap. A page is marked `prerendered` with `prerender: true` or a server island, and `prerendered as its prerender setting lists` with a list or a function. `--format json` gives the routes as one document, every locale's copy with its layouts and guards ([Output for tools](#output-for-tools)). A route that sets `guards: false` is marked `open`, one that `requireGuards` refuses with a 403 says so, and a library's API module shows the guards of its own directory.
 
 API modules are the one thing it runs, as their routes are only known once their Elysia instance is built, so their top-level code runs: what it writes to stdout, through the console or `process.stdout`, goes to stderr, off the listing, and one that fails to load, as without the server's environment, or calls `process.exit()`, is listed by its mount with why. What the server entry adds itself, such as kayjs-auth's `.use(auth.plugin)`, and an extension's `server` given as a function are only built as the server starts: a last line names them as not listed.
 
@@ -297,6 +297,8 @@ Translates an Astro project's `.astro` files into `.kay` ones, its pages into `s
 | `[dir]` | The Astro project, the current directory by default |
 | `--out <dir>` | Writes there instead of next to the `.astro` files. A directory with no `package.json` gets a whole kay project: `package.json`, `kay.config.ts`, `tsconfig.json`, a server entry when the site renders on demand, and the project's other files under `src` and `public` |
 
+`--format json` gives what it wrote and left to do as one document ([Output for tools](#output-for-tools)).
+
 The [Astro guide](/guides/migrating-from-astro) shows what it translates and how to finish what it lists.
 
 ## Other commands
@@ -305,11 +307,14 @@ The [Astro guide](/guides/migrating-from-astro) shows what it translates and how
 kay explain positional-key   # one lint, with an example and the fix
 kay fmt src                  # format a folder
 kay fmt --check              # list unformatted files and fail
+kay explain --format json    # every lint, for a tool to read
 ```
+
+`kay explain` and `kay fmt` take `--format json` too ([Output for tools](#output-for-tools)).
 
 ## Output for tools
 
-`kay build`, `kay routes`, `kay explain`, `kay fmt` and `kay migrate` take `--format json`, as `kay check` does, for a script or an agent to read: stdout then holds one JSON document on one line and nothing else, what the app's own code prints, such as `kay.config.ts` or an API module, going to stderr. The exit code is the one the text output gives.
+`kay build`, `kay routes`, `kay explain`, `kay fmt` and `kay migrate` take `--format json`, as `kay check` does, for a script or an agent to read: stdout then holds one JSON document on one line, what the app's own code prints through the console or `process.stdout`, such as `kay.config.ts`, an API module or a prerendered page, going to stderr; a write straight to the file descriptor, as `Bun.write(Bun.stdout, ...)`, still lands on stdout. The exit code is the one the text output gives.
 
 | Command | Document |
 | --- | --- |
@@ -319,6 +324,6 @@ kay fmt --check              # list unformatted files and fail
 | `kay fmt` | `{ errors, warnings, problems, written, changed }`: what does not parse as problems, and the files it formatted, or under `--check` would, `written` false |
 | `kay migrate` | `{ written, kept, copied, notes }`: the files written and those kept as they exist, how many other files it copied, and each item left to do by hand with its `file`, `line`, `target` and `message` |
 
-A command that cannot run, on a directory that does not exist, a `kay.config.ts` that does not load or a lint that is none, prints `{ errors: 1, warnings: 0, problems: [{ severity, code: null, message }] }`. Paths are relative to the current directory.
+Code a build runs that ends the process, such as a prerendered page calling `process.exit()`, leaves the problems found so far and one saying it ended, with the stage it ended in. A command that cannot run, on a directory that does not exist, options that do not go together, a `kay.config.ts` that does not load or a lint that is none, prints `{ errors: 1, warnings: 0, problems: [{ severity, code: null, message }] }`. Paths are relative to the current directory.
 
 <ReadMore href="/llms/project">Every `kay new` feature, what `kay dev` restarts on, the compiled executable's limits and what `kay migrate` translates are in the full project reference.</ReadMore>

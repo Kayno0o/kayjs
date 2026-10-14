@@ -218,7 +218,7 @@ export function printFailure(command: string, failure: unknown, format: ProblemF
   if (format === 'json')
     printDocument({ errors: 1, warnings: 0, problems: [failureProblem(failure, format)] })
   else if (format === 'github')
-    console.log(workflowCommand(failureProblem(failure, format)))
+    console.log(workflowCommand(failureProblem(failure, format), command))
 }
 
 // What stopped a command as a problem with no code, placed where Bun's error for a module that does not parse tells.
@@ -280,8 +280,8 @@ function printedProblem(diagnostic: CheckDiagnostic, source: string | undefined,
 }
 
 // `::error file=src/a.kay,line=4,col=3,title=missing-alt::An img needs alt`, which an Actions runner shows on the diff; the note and the help go on lines of their own.
-function workflowCommand(problem: FailureProblem): string {
-  const properties = [['file', problem.file], ['line', problem.line], ['col', problem.column], ['endLine', problem.endLine], ['endColumn', problem.endColumn], ['title', problem.code ?? 'kay check']] as const
+export function workflowCommand(problem: FailureProblem, command = 'check'): string {
+  const properties = [['file', problem.file], ['line', problem.line], ['col', problem.column], ['endLine', problem.endLine], ['endColumn', problem.endColumn], ['title', problem.code ?? `kay ${command}`]] as const
   const text = [problem.message, ...problem.note === undefined ? [] : [`note: ${problem.note}`], ...problem.help === undefined ? [] : [`help: ${problem.help}`]].join('\n')
 
   return `::${problem.severity} ${properties.filter(([, value]) => value !== undefined).map(([name, value]) => `${name}=${escapeCommand(String(value), COMMAND_PROPERTY)}`).join(',')}::${escapeCommand(text, COMMAND_DATA)}`

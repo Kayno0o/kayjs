@@ -1,5 +1,6 @@
 import type { BuildOptions, BuildResult, BuildStage } from '../build/pipeline'
 import type { Command, FailureProblem, ProblemFormat } from './command'
+import { writeSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { buildProject } from '../build/pipeline'
@@ -10,14 +11,14 @@ import { loadConfig } from '../config'
 import { ContentError } from '../content/validate'
 import { buildingWithoutEnv } from '../server/env'
 import { ExportError } from '../server/prerender'
-import { count, done, failureProblem, formatOption, printDocument, printedProblems, printFailure, printProblems, PROBLEM_FORMATS, problemCounts, projectRoot, withStdoutOnStderr } from './command'
+import { count, done, failureProblem, formatOption, printDocument, printedProblems, printFailure, printProblems, PROBLEM_FORMATS, problemCounts, projectRoot, withStdoutOnStderr, workflowCommand } from './command'
 
 // With `--compile`, also bundles the server and all of it into one executable; with `--static`, writes the whole site to `--outdir`, `dist` by default, for a host with no server. `--no-check` builds without checking.
 export const build: Command = {
   usage: 'build [dir] [--compile <executable>] [--entry <file>] [--static] [--outdir <dir>] [--no-check] [--analyze] [-p tsconfig.json] [--format text|github|json]',
   options: { 'compile': { type: 'string' }, 'entry': { type: 'string' }, 'static': { type: 'boolean' }, 'outdir': { type: 'string' }, 'no-check': { type: 'boolean' }, 'analyze': { type: 'boolean' }, 'project': { type: 'string', short: 'p' }, 'format': { type: 'string' } },
   positionals: 1,
-  run: async ({ values, positionals }, refuse) => {
+  run: async ({ values, positionals }, refuseUsage) => {
     const { compile, outdir, project: tsconfig } = values
     const entry = typeof values.entry === 'string' ? resolve(values.entry) : undefined
     const exported = values.static === true
@@ -26,6 +27,16 @@ export const build: Command = {
 
     if (format === undefined)
       return 1
+
+    // The text output prints the usage after why; the others say why in their format.
+    const refuse = (reason: string) => {
+      if (format === 'text')
+        return refuseUsage(reason)
+
+      printFailure('build', reason, format)
+
+      return 1
+    }
 
     if (!checking && typeof tsconfig === 'string')
       return refuse('-p names the tsconfig the build checks with, so it does not go with --no-check')
@@ -74,6 +85,11 @@ export const build: Command = {
     if (failed) {
       console.error(buildError(failed.error))
 
+      if (format === 'github') {
+        for (const problem of await failureProblems(failed.error, format))
+          console.log(workflowCommand(problem, 'build'))
+      }
+
       return 1
     }
 
@@ -107,24 +123,41 @@ async function printStage(stage: BuildStage, result: BuildResult, format: Proble
 }
 
 // The whole build as one document once it ends, `kay check`'s problems and counts first, then what each stage made and the stage that stopped it; what the app prints meanwhile goes to stderr.
+// Code the build runs that ends the process leaves the problems found so far, and the stage it ended in, written at once as the process goes.
 async function buildToDocument(root: string, options: BuildOptions): Promise<number> {
   let result: BuildResult
+  let found: FailureProblem[] = []
+  let running: BuildStage = 'check'
+  const ended = (code: number) => {
+    const problems = [...found, failureProblem(`the build ended with exit code ${code} before it was done`, 'json')]
+
+    writeSync(1, `${JSON.stringify({ ...problemCounts(problems), problems, failed: { stage: running } })}\n`)
+  }
+  const onStage = async (stage: BuildStage, sofar: BuildResult) => {
+    found = await printedProblems([...sofar.checked, ...sofar.linted])
+    running = stage === 'check' ? 'output' : stage === 'output' && options.exportTo !== undefined ? 'export' : 'compile'
+  }
+
+  process.on('exit', ended)
 
   try {
-    result = await withStdoutOnStderr(async () => buildProject(root, await loadConfig(root), options))
+    result = await withStdoutOnStderr(async () => buildProject(root, await loadConfig(root), { ...options, onStage }))
   }
   catch (error) {
+    process.off('exit', ended)
     printFailure('build', error, 'json')
 
     return 1
   }
+
+  process.off('exit', ended)
 
   const { failed, built, exported, compiled } = result
 
   if (failed?.error !== undefined)
     console.error(buildError(failed.error))
 
-  const problems: FailureProblem[] = [...await printedProblems([...result.checked, ...result.linted]), ...failed?.error === undefined ? [] : await failureProblems(failed.error)]
+  const problems: FailureProblem[] = [...await printedProblems([...result.checked, ...result.linted]), ...failed?.error === undefined ? [] : await failureProblems(failed.error, 'json')]
 
   printDocument({
     ...problemCounts(problems),
@@ -139,11 +172,11 @@ async function buildToDocument(root: string, options: BuildOptions): Promise<num
 }
 
 // A template that does not compile, at its place in the file, as `kay check` gives it; anything else as one problem.
-async function failureProblems(error: unknown): Promise<FailureProblem[]> {
+async function failureProblems(error: unknown, format: ProblemFormat): Promise<FailureProblem[]> {
   if (error instanceof KayCompileError)
-    return printedProblems(error.diagnostics.map(diagnostic => fromCompile(diagnostic.file, diagnostic.source, diagnostic)))
+    return printedProblems(error.diagnostics.map(diagnostic => fromCompile(diagnostic.file, diagnostic.source, diagnostic)), format)
 
-  return [failureProblem(buildError(error), 'json')]
+  return [failureProblem(buildError(error), format)]
 }
 
 function buildError(error: unknown): unknown {

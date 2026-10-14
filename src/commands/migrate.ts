@@ -31,7 +31,18 @@ export const migrate: Command = {
     }
 
     const out = typeof values.out === 'string' ? resolve(values.out) : resolve(dir)
-    const { written, copied, skipped, notes } = await migrateAstroProject(resolve(dir), out)
+    let migrated: Awaited<ReturnType<typeof migrateAstroProject>>
+
+    try {
+      migrated = await migrateAstroProject(resolve(dir), out)
+    }
+    catch (error) {
+      printFailure('migrate', error, format)
+
+      return 1
+    }
+
+    const { written, copied, skipped, notes } = migrated
     const shown = (file: string) => relative(process.cwd(), join(out, file)) || '.'
     const noted = notes.map(each => ({ file: relative(process.cwd(), join(dir, each.file)), line: each.line, ...each.target !== undefined && { target: shown(each.target) }, message: each.message }))
 

@@ -141,26 +141,33 @@ describe('kay build --format json', () => {
 })
 
 describe('kay routes --format json', () => {
-  it('gives each route with its kind, file, layouts and guards, the config\'s own stdout sent to stderr', async () => {
+  it('gives each route with its kind, file, layouts and guards, every locale\'s copy included, what the app prints sent to stderr', async () => {
     const root = await project({
-      'kay.config.ts': noisyConfig,
+      'kay.config.ts': noisyConfig.replace('export default { favicon: false }', 'export default { favicon: false, i18n: { locales: [\'en\', \'fr\'], defaultLocale: \'en\' } }'),
       'src/routes/_layout.kay': 'main\n  slot\n',
       'src/routes/index.kay': 'p Home\n',
       'src/routes/admin/_guard.ts': 'import { guard } from \'kay\'\n\nexport default guard(() => {})\n',
       'src/routes/admin/report.kay': '--- server\nimport { action } from \'kay/server\'\n\nexport const save = action(() => {})\n---\np Report\n',
+      'src/api/items.ts': 'import process from \'node:process\'\nimport { Elysia } from \'elysia\'\n\nconsole.log(\'connecting\')\nprocess.stdout.write(\'items written\\n\')\n\nexport default new Elysia().get(\'/\', () => [])\n',
+      'src/api/exits.ts': 'import process from \'node:process\'\n\nprocess.exit(7)\n',
     })
     const { stdout, stderr, code } = await kay(['routes', '--format', 'json'], root)
     const listed = document<{ routes: { methods: string, path: string, kind: string, by: string, file?: string, notes?: string[], layouts?: string[], guards?: string[] }[], unlisted: string[] }>(stdout)
     const own = listed.routes.filter(route => route.kind !== 'kay')
 
     expect(code, stderr).toBe(0)
-    expect(stderr).toBe('loading the config\nwritten\n')
-    expect(own.map(({ methods, kind, file, layouts, guards }) => ({ methods, kind, file, layouts, guards }))).toEqual([
-      { methods: 'GET', kind: 'page', file: 'src/routes/admin/report.kay', layouts: ['src/routes/_layout.kay'], guards: ['src/routes/admin/_guard.ts'] },
-      { methods: 'POST', kind: 'action', file: 'src/routes/admin/report.kay', layouts: undefined, guards: undefined },
-      { methods: 'GET', kind: 'page', file: 'src/routes/index.kay', layouts: ['src/routes/_layout.kay'], guards: [] },
+    expect(stderr).toBe('loading the config\nwritten\nconnecting\nitems written\n')
+    expect(own.map(({ methods, path, kind, file, layouts, guards }) => ({ methods, path, kind, file, layouts, guards }))).toEqual([
+      { methods: 'GET', path: '/admin/report', kind: 'page', file: 'src/routes/admin/report.kay', layouts: ['src/routes/_layout.kay'], guards: ['src/routes/admin/_guard.ts'] },
+      { methods: 'GET', path: '/fr/admin/report', kind: 'page', file: 'src/routes/admin/report.kay', layouts: ['src/routes/_layout.kay'], guards: ['src/routes/admin/_guard.ts'] },
+      { methods: 'POST', path: '/_kay/action/src/routes/admin/report.kay/save', kind: 'action', file: 'src/routes/admin/report.kay', layouts: undefined, guards: undefined },
+      { methods: 'GET', path: '/', kind: 'page', file: 'src/routes/index.kay', layouts: ['src/routes/_layout.kay'], guards: [] },
+      { methods: 'GET', path: '/fr', kind: 'page', file: 'src/routes/index.kay', layouts: ['src/routes/_layout.kay'], guards: [] },
+      { methods: '?', path: '/api/exits/*', kind: 'api', file: 'src/api/exits.ts', layouts: undefined, guards: [] },
+      { methods: 'GET', path: '/api/items', kind: 'api', file: 'src/api/items.ts', layouts: undefined, guards: [] },
     ])
-    expect(own[0]!.path).toBe('/admin/report')
+    expect(own.find(route => route.file === 'src/api/exits.ts')!.notes![0]).toBe('not loaded: it calls process.exit(7)')
+    expect(own.some(route => 'copy' in route)).toBe(false)
     expect(listed.routes.some(route => route.kind === 'kay' && route.path === '/_kay/*')).toBe(true)
     expect(listed.unlisted).toEqual([])
   })

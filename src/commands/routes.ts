@@ -43,6 +43,8 @@ interface Listed {
   notes?: string[] | undefined
   layouts?: string[] | undefined
   guards?: string[] | undefined
+  // A locale's copy after the first, whose chains the listing leaves to that one.
+  copy?: boolean | undefined
 }
 
 const PARAM = /:([^/?]+)/g
@@ -70,7 +72,9 @@ export const routes: Command = {
 
     if (format === 'json') {
       try {
-        printDocument(await withStdoutOnStderr(async () => listRoutes(root)))
+        const { routes, unlisted } = await withStdoutOnStderr(async () => listRoutes(root))
+
+        printDocument({ routes: routes.map(({ copy: _copy, ...route }) => route), unlisted })
       }
       catch (error) {
         printFailure('routes', error, format)
@@ -110,7 +114,7 @@ async function appRoutes(root: string, config: KayConfig): Promise<Listed[]> {
 
     // Each locale's copy, the layouts and guards under the first alone, as every copy shares them.
     for (const [index, copy] of localeCopies(settings, route.pattern).entries())
-      listed.push({ methods: 'GET', path: withMatchers(copy.path, route), kind: 'page', by: shown(route.file), file: shown(route.file), notes: [...localeNotes(copy, settings), ...prerendered, ...guards], ...index === 0 && { layouts: route.layouts.map(shown), guards: route.guards.map(guard => shown(guard.file)) } })
+      listed.push({ methods: 'GET', path: withMatchers(copy.path, route), kind: 'page', by: shown(route.file), file: shown(route.file), notes: [...localeNotes(copy, settings), ...prerendered, ...guards], layouts: route.layouts.map(shown), guards: route.guards.map(guard => shown(guard.file)), ...index > 0 && { copy: true } })
 
     // A layout's actions once, though every page under it renders it.
     for (const file of [...route.layouts, route.file].filter(file => !actionFiles.has(file))) {
@@ -280,7 +284,7 @@ function formatListing(listed: Listed[]): string {
 
   return listed.flatMap(entry => [
     `${entry.methods.padEnd(methods)}  ${entry.path.padEnd(path)}  ${entry.kind.padEnd(kind)}  ${[entry.by, ...entry.notes ?? []].join(', ')}`,
-    ...(entry.layouts?.length ?? 0) > 0 ? [`${indent}layouts ${entry.layouts!.join(' > ')}`] : [],
-    ...(entry.guards?.length ?? 0) > 0 ? [`${indent}guards  ${entry.guards!.join(' > ')}`] : [],
+    ...!entry.copy && (entry.layouts?.length ?? 0) > 0 ? [`${indent}layouts ${entry.layouts!.join(' > ')}`] : [],
+    ...!entry.copy && (entry.guards?.length ?? 0) > 0 ? [`${indent}guards  ${entry.guards!.join(' > ')}`] : [],
   ]).join('\n')
 }
