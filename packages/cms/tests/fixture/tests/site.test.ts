@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { beforeAll, expect, test } from 'bun:test'
 import { testSite } from 'kay/test'
+import { fileVersion } from '../../../src/files'
 import { BODY, parseMarker } from '../../../src/markers'
 import { outage, products } from '../src/products'
 import { saved } from '../src/saved'
@@ -150,7 +151,12 @@ async function send(method: string, path: string, body?: object): Promise<{ stat
 test('saving a file entry hands the file kay wrote to the saver, as a commit by the editor the app names', async () => {
   saved.length = 0
 
-  expect(await send('POST', 'posts/hello', { data: { title: 'Hello again', tags: ['kay'] }, body: 'New body.\n' })).toEqual({ status: 200, answer: { saved: true, commit: { sha: 'c0ffee' } } })
+  const { answer: opened } = await send('GET', 'posts/hello') as { answer: { entry: { version: string } } }
+  const file = Bun.file(`${import.meta.dir}/../src/content/posts/hello.md`)
+
+  expect(opened.entry.version).toBe(fileVersion(await file.bytes()))
+  expect(await send('POST', 'posts/hello', { data: { title: 'Hello again', tags: ['kay'] }, body: 'New body.\n', version: opened.entry.version })).toEqual({ status: 200, answer: { saved: true, commit: { sha: 'c0ffee' }, version: fileVersion(saved[0]!.text!) } })
+  expect(saved[0]?.base).toBe(opened.entry.version)
   expect(saved.map(({ repoPath, message }) => [repoPath, message])).toEqual([['packages/cms/tests/fixture/src/content/posts/hello.md', 'content(posts): update hello']])
   expect(saved[0]?.text).toContain('title: Hello again')
   expect(saved[0]?.text).toContain('New body.')

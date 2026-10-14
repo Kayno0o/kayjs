@@ -4,7 +4,7 @@ import { attempt, toast } from '@kaynooo/kayjs-ui'
 import { call } from 'kay'
 import entriesApi from '../api/entries'
 
-type Outcome = { issues: Issue[] } | { saved: true, commit?: unknown }
+type Outcome = { issues: Issue[] } | { saved: true, commit?: unknown, version?: string | undefined }
 
 // Saves an entry's draft, under the slug and locale a new entry was given, and says how it went; true once saved.
 export async function saveDraft(drafts: Drafts, ref: EntryRef, { slug = ref.slug, locale = ref.locale, create = false }: { slug?: string, locale?: string | undefined, create?: boolean } = {}): Promise<boolean> {
@@ -16,7 +16,7 @@ export async function saveDraft(drafts: Drafts, ref: EntryRef, { slug = ref.slug
   const outcome = await attempt(() => call(entriesApi, '/:collection/:slug', {
     method: 'post',
     params: { collection: ref.collection, slug },
-    body: { data: entry.data, create, ...localeOf({ ...ref, locale }), ...(entry.body === undefined ? {} : { body: entry.body }) },
+    body: { data: entry.data, create, ...localeOf({ ...ref, locale }), ...(entry.body === undefined ? {} : { body: entry.body }), ...versionOf(drafts.version(ref)) },
   }), 'Could not save')
 
   if (outcome && 'issues' in outcome) {
@@ -27,10 +27,10 @@ export async function saveDraft(drafts: Drafts, ref: EntryRef, { slug = ref.slug
     return false
   }
 
-  if (!settled(outcome, 'Saved', 'Not saved'))
+  if (!outcome || !settled(outcome, 'Saved', 'Not saved'))
     return false
 
-  drafts.markSaved(ref)
+  drafts.markSaved(ref, entry, 'version' in outcome ? outcome.version : undefined)
   drafts.report([])
 
   return true
@@ -60,6 +60,10 @@ export async function publishSaved(ref: EntryRef): Promise<boolean> {
 
 function localeOf({ locale }: EntryRef): { locale?: string } {
   return locale === undefined ? {} : { locale }
+}
+
+function versionOf(version: string | undefined): { version?: string } {
+  return version === undefined ? {} : { version }
 }
 
 // Toasts how a change the server answered went; `attempt` already toasted a failed call.

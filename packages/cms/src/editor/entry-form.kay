@@ -24,7 +24,7 @@ effect(() => {
 
   // A file that does not parse opens empty, and saving writes the form over it.
   if (answer)
-    drafts.open({ ...entry, data: answer.entry.data ?? {}, body: answer.entry.body })
+    drafts.open({ ...entry, data: answer.entry.data ?? {}, body: answer.entry.body }, answer.entry.version)
 })
 
 // A click on the page brings its field into view and puts the caret in it, once the form has loaded.

@@ -141,11 +141,27 @@ describe('saving', () => {
     const { drafts } = setup()
 
     drafts.set(post, 'title', 'Saved title')
-    drafts.markSaved(post)
+    drafts.markSaved(post, drafts.entry(post)!, 'v2')
 
     expect(drafts.changed(post)).toBe(false)
+    expect(drafts.version(post)).toBe('v2')
     drafts.reset(post)
     expect(drafts.value(post, 'title')).toBe('Saved title')
+  })
+
+  it('keeps an edit typed while the save was on its way unsaved, to go with the next', () => {
+    const { drafts } = setup()
+
+    drafts.set(post, 'title', 'Sent')
+    const sent = drafts.entry(post)!
+
+    drafts.set(post, 'title', 'Sent, then more')
+    drafts.markSaved(post, sent)
+
+    expect(drafts.changed(post)).toBe(true)
+    expect(drafts.value(post, 'title')).toBe('Sent, then more')
+    drafts.reset(post)
+    expect(drafts.value(post, 'title')).toBe('Sent')
   })
 
   it('shows the issues a save was refused with', () => {

@@ -26,7 +26,7 @@ export default defineConfig({
   extensions: [cms({
     // Who may use the screens and save; edit mode alone only reads.
     guard: auth.guard({ require: 'editor' }),
-    // Left out, a file entry is written in the working tree, for `kay dev`.
+    // Left out, a file entry is written in the working tree, for `kay dev`: a production server refuses to boot so.
     files: process.env.FORGEJO_TOKEN ? forgejo({ url: 'https://git.example.com', repo: 'me/site', token: process.env.FORGEJO_TOKEN }) : undefined,
   })],
   // Edit mode is kay's preview mode: it needs the secret signing its cookie.
@@ -38,7 +38,7 @@ The screens live at `/admin` (`prefix` moves them) and stay closed without a `gu
 
 A file field takes PNG, JPEG, WebP, GIF, AVIF and PDF files unless `uploads` lists others (`['image/*', 'application/pdf']`). A body whose Markdown renders HTML that would run as the site or cover it, a `<script>`, an `onclick`, a `style`, a `javascript:` link, or a tag left open for the page around it to close, is refused on save unless `rawHtml` lists the collection; the collection's own components and HTML shown in a code block are fine.
 
-A commit shows on the site once it has rebuilt from it. The Forgejo token needs write access to the repository's contents, and the commit is the token's user's. An image or file field (`imageField()`, `fileField()` from `kay/content`) takes a file dropped or picked, stored through kay's [file storage](/guides/file-storage), and keeps the path that serves it.
+A commit shows on the site once it has rebuilt from it. A save made over another editor's is refused until the editor reloads the entry, which with Forgejo waits for the site to rebuild from that save; a forge that does not answer within 15 seconds (`timeout`) fails the save with the reason. The Forgejo token needs write access to the repository's contents, and the commit is the token's user's. An image or file field (`imageField()`, `fileField()` from `kay/content`) takes a file dropped or picked, stored through kay's [file storage](/guides/file-storage), and keeps the path that serves it.
 
 An app replaces a screen by writing a page at its path, `src/routes/admin/new/[collection].kay` say, and can render the screens' own `@kaynooo/kayjs-cms/entry-editor.kay` and `@kaynooo/kayjs-cms/entry-table.kay` in it.
 

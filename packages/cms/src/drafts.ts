@@ -16,6 +16,8 @@ export type Drafts = ReturnType<typeof createDrafts>
 // The unsaved edits of the entries a page renders, rendering the page with them shortly after each change.
 export function createDrafts({ show, delay = 150 }: DraftsOptions) {
   const saved = new Map<string, DraftEntry>()
+  // The version of each entry's file its saved state was read from, which the next save names.
+  const versions = new Map<string, string | undefined>()
   const current = signal<ReadonlyMap<string, DraftEntry>>(new Map())
   const issues = signal<readonly Issue[]>([])
   const failure = signal<string>()
@@ -74,17 +76,21 @@ export function createDrafts({ show, delay = 150 }: DraftsOptions) {
 
   return {
     // Starts from the saved entry, unless it already has a draft.
-    open(entry: DraftEntry): void {
+    open(entry: DraftEntry, version?: string | undefined): void {
       const key = entryKey(entry)
 
       if (saved.has(key))
         return
 
       saved.set(key, entry)
+      versions.set(key, version)
       current.set(new Map(current()).set(key, entry))
     },
     entry(ref: EntryRef): DraftEntry | undefined {
       return current().get(entryKey(ref))
+    },
+    version(ref: EntryRef): string | undefined {
+      return versions.get(entryKey(ref))
     },
     value(ref: EntryRef, path: FieldPath): unknown {
       const entry = current().get(entryKey(ref))
@@ -103,14 +109,12 @@ export function createDrafts({ show, delay = 150 }: DraftsOptions) {
     reset(ref: EntryRef): void {
       update(ref, () => undefined)
     },
-    // Takes the entry as it stands for its saved state, once a save went through.
-    markSaved(ref: EntryRef): void {
+    // Takes the entry as it was sent for its saved state, once a save went through: an edit made while it was on its way stays unsaved.
+    markSaved(ref: EntryRef, sent: DraftEntry, version?: string | undefined): void {
       const key = entryKey(ref)
-      const entry = current().get(key)
 
-      if (entry)
-        saved.set(key, entry)
-
+      saved.set(key, sent)
+      versions.set(key, version)
       current.set(new Map(current()))
     },
     // Shows the issues a save was refused with, as a render's are shown.

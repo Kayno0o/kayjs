@@ -13,12 +13,13 @@ export default api()
 
     return entry ? { collection, entry } : status(404, `No entry ${params.slug} in ${params.collection}`)
   }, { query: locale })
-  .post('/:collection/:slug', async ({ params, body, request }) => saveEntry({ collection: params.collection, slug: params.slug, locale: body.locale, data: body.data, body: body.body }, { create: body.create, author: authors.get(request) }), {
+  .post('/:collection/:slug', async ({ params, body, request }) => saveEntry({ collection: params.collection, slug: params.slug, locale: body.locale, data: body.data, body: body.body }, { create: body.create, version: body.version, author: authors.get(request) }), {
     body: s.Object({
       locale: s.Optional(s.String()),
       data: s.Record(s.String(), s.Unknown()),
       body: s.Optional(s.String()),
       create: s.Optional(s.Boolean()),
+      version: s.Optional(s.String()),
     }),
   })
   .post('/:collection/:slug/publish', async ({ params, query, request }) => publishEntry({ collection: params.collection, slug: params.slug, locale: query.locale }, authors.get(request)), { query: locale })

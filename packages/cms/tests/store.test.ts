@@ -1,8 +1,12 @@
 import type { FileChange } from '../src/files'
 import type * as Content from '../src/kay/content'
 import type { CollectionInfo, SourceEntry } from '../src/kay/contract'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { beforeEach, describe, expect, mock, test } from 'bun:test'
 import { bodyHtml, MarkdownError } from 'kay/content'
+import { fileVersion, ForgeError, SaveConflict } from '../src/files'
 import { configure } from '../src/settings'
 
 const posts: CollectionInfo = { name: 'posts', kind: 'folder', dir: 'content/posts', schema: { type: 'object', properties: { title: { type: 'string' }, draft: { type: 'boolean' } } }, components: [], localized: false, draftField: 'draft' }
@@ -40,7 +44,7 @@ const content: typeof Content = {
   entryFile: async (collection, slug) => {
     const path = stored[collection]?.find(entry => entry.slug === slug)?.path
 
-    return path === undefined ? { issues: [{ collection, slug, path: '', key: 'slug', message: MISSING }] } : { file: { path, absolute: `/site/${path}`, repoPath: path } }
+    return path === undefined ? { issues: [{ collection, slug, path: '', key: 'slug', message: MISSING }] } : { file: { path, absolute: path.startsWith('/') ? path : `/site/${path}`, repoPath: path } }
   },
   removeEntry: async (collection, slug) => {
     if (!stored[collection]?.some(entry => entry.slug === slug))
@@ -71,7 +75,7 @@ beforeEach(() => {
 
 describe('saveEntry', () => {
   test('commits a folder entry\'s file, named by what kay wrote', async () => {
-    expect(await saveEntry({ collection: 'posts', slug: 'hello', data: { title: 'Hi there' }, body: 'Body' })).toEqual({ saved: true, commit: { sha: 'abc' } })
+    expect(await saveEntry({ collection: 'posts', slug: 'hello', data: { title: 'Hi there' }, body: 'Body' })).toEqual({ saved: true, commit: { sha: 'abc' }, version: fileVersion('{"title":"Hi there"}\nBody') })
     expect(saved).toEqual([{ repoPath: 'content/posts/hello.md', absolute: '/site/content/posts/hello.md', text: '{"title":"Hi there"}\nBody', message: 'content(posts): update hello' }])
   })
 
@@ -105,6 +109,24 @@ describe('saveEntry', () => {
     expect(await saveEntry({ collection: 'products', slug: 'mug', data: { name: 'Mug' } }, { create: true })).toHaveProperty('issues.0.key', 'slug')
     expect(await saveEntry({ collection: 'posts', slug: 'notes/new', data: { title: 'New' } }, { create: true })).toHaveProperty('saved', true)
     expect(saved.map(change => change.message)).toEqual(['content(posts): add notes/new'])
+  })
+
+  test('names the version the editor opened, a new entry\'s as none', async () => {
+    await saveEntry({ collection: 'posts', slug: 'hello', data: { title: 'Hi' } }, { version: 'b10b' })
+    await saveEntry({ collection: 'posts', slug: 'fresh', data: { title: 'Fresh' } }, { create: true, version: 'ignored' })
+    expect(saved.map(change => change.base)).toEqual(['b10b', null])
+  })
+
+  test('refuses a save over someone else\'s, and one the forge failed, as an issue the editor shows', async () => {
+    configure({ files: { save: async () => {
+      throw new SaveConflict()
+    } } })
+    expect(await saveEntry({ collection: 'posts', slug: 'hello', data: { title: 'Hi' } }, { version: 'old' })).toHaveProperty('issues.0.message', new SaveConflict().message)
+
+    configure({ files: { save: async () => {
+      throw new ForgeError(504, 'Forgejo did not answer within 15 s')
+    } } })
+    expect(await deleteEntry({ collection: 'posts', slug: 'hello' })).toHaveProperty('issues.0.message', 'Not saved: Forgejo did not answer within 15 s')
   })
 
   test('hands a loaded entry to its collection\'s loader', async () => {
@@ -155,6 +177,23 @@ describe('entryOf', () => {
 
     expect((await entryOf({ collection: 'posts', slug: 'hello', locale: 'fr' }))?.data).toEqual({ title: 'Bonjour' })
     expect(await entryOf({ collection: 'posts', slug: 'gone' })).toBeUndefined()
+  })
+
+  test('gives a folder entry\'s file version, which publishing names', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kayjs-cms-store-'))
+    const path = join(dir, 'hello.md')
+
+    try {
+      await Bun.write(path, 'as on disk')
+      stored.posts = [{ slug: 'hello', path, data: { title: 'Hello', draft: true }, draft: true }]
+
+      expect(await entryOf({ collection: 'posts', slug: 'hello' })).toHaveProperty('version', fileVersion('as on disk'))
+      await publishEntry({ collection: 'posts', slug: 'hello' })
+      expect(saved.map(change => change.base)).toEqual([fileVersion('as on disk')])
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
   })
 })
 

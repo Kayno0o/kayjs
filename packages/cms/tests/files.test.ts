@@ -2,7 +2,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, test } from 'bun:test'
-import { ForgeError, forgejo, workingTree } from '../src/files'
+import { fileVersion, ForgeError, forgejo, SaveConflict, workingTree } from '../src/files'
 
 interface Sent {
   url: string
@@ -79,6 +79,28 @@ describe('forgejo', () => {
     await expect(failure).rejects.toThrow('Forgejo answered 403: branch is protected')
   })
 
+  test('refuses a change made from a version the branch no longer holds, and a new file the branch already holds', async () => {
+    const { sent, saver } = forge({ 'content/posts/hello.md': 'b10b' })
+
+    await expect(saver.save({ ...change, repoPath: 'content/posts/hello.md', text: 'mine', base: 'a11ce' })).rejects.toBeInstanceOf(SaveConflict)
+    await expect(saver.save({ ...change, repoPath: 'content/posts/hello.md', text: 'mine', base: null })).rejects.toBeInstanceOf(SaveConflict)
+    expect(sent.map(({ method }) => method)).toEqual(['GET', 'GET'])
+
+    await saver.save({ ...change, repoPath: 'content/posts/hello.md', text: 'mine', base: 'b10b' })
+    expect(sent.at(-1)?.method).toBe('POST')
+  })
+
+  test('fails a save the forge does not answer within the timeout', async () => {
+    const hanging = async (_input: string | URL | Request, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => reject(init.signal?.reason))
+    })
+    const saver = forgejo({ url: 'https://git.example.com', repo: 'me/site', token: 't0k', timeout: 50, fetch: hanging as typeof fetch })
+    const failure = saver.save({ ...change, repoPath: 'a.md', text: 'a' })
+
+    await expect(failure).rejects.toBeInstanceOf(ForgeError)
+    await expect(failure).rejects.toThrow('Forgejo did not answer within 0.05 s')
+  })
+
   test('throws a proxy\'s plain-text refusal as it came', async () => {
     const { saver } = forge({}, new Response('Bad gateway', { status: 502 }))
 
@@ -101,5 +123,23 @@ describe('workingTree', () => {
     await saver.save({ ...change, repoPath: 'content/posts/hello.md', absolute, text: undefined })
 
     expect(await Bun.file(absolute).exists()).toBe(false)
+  })
+
+  test('refuses a change made from a version the file no longer has', async () => {
+    const absolute = join(dir, 'content', 'posts', 'race.md')
+    const saver = workingTree()
+
+    await saver.save({ ...change, repoPath: 'content/posts/race.md', absolute, text: 'first', base: null })
+    await expect(saver.save({ ...change, repoPath: 'content/posts/race.md', absolute, text: 'again', base: null })).rejects.toBeInstanceOf(SaveConflict)
+    await expect(saver.save({ ...change, repoPath: 'content/posts/race.md', absolute, text: 'stale', base: fileVersion('older') })).rejects.toBeInstanceOf(SaveConflict)
+    await saver.save({ ...change, repoPath: 'content/posts/race.md', absolute, text: 'second', base: fileVersion('first') })
+
+    expect(await Bun.file(absolute).text()).toBe('second')
+  })
+})
+
+describe('fileVersion', () => {
+  test('is the git blob sha Forgejo names a file by', () => {
+    expect(fileVersion('hello\n')).toBe('ce013625030ba8dba906f756967f9e9ca394464a')
   })
 })
