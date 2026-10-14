@@ -1,18 +1,16 @@
-import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { gunzipSync } from 'node:zlib'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
-import { outputDir } from '../src/build/assets'
 import { compileKay } from '../src/compiler'
-import { resolveProject } from '../src/project'
 import { hydrateIslands } from '../src/runtime/client'
 import { ISLAND_HEADER } from '../src/runtime/server-islands'
 import { pages } from '../src/server'
-import { readClient, readManifest, writeManifest } from '../src/server/client'
-import { ExportError, prerenderPages } from '../src/server/prerender'
+import { readManifest } from '../src/server/client'
+import { ExportError } from '../src/server/prerender'
 import { renders } from './fixtures/server-islands/src/renders'
+import { scratchBuild } from './prerendered'
 
 const routes = 'tests/fixtures/server-islands/src/routes'
 const STAMP = /<p class="stamp">(stamp-\d+)<\/p>/g
@@ -33,20 +31,19 @@ describe('server islands', () => {
   }, 60_000)
 
   it('prerenders a page reaching one, and renders each per request: spliced in, or fetched by the browser', async () => {
-    const root = process.cwd()
-    const manifest = (await readManifest(root))!
+    const build = await scratchBuild()
 
     try {
-      await prerenderPages(resolveProject(root, { routes }), (await readClient(root))!)
+      await build.prerender({ routes })
 
-      const written = (await readManifest(root))!.pages!
+      const written = (await readManifest(process.cwd(), build.dir))!.pages!
 
       // No page exports `prerender`: reaching a server island is enough, and a page reaching none renders per request.
       expect(written['/']!.islands).toEqual(['inline', 'defer'])
       expect(written['/deferred']!.islands).toEqual(['defer'])
       expect(written['/plain']).toBeUndefined()
 
-      const built = await Bun.file(join(outputDir(root), 'pages/index.html')).text()
+      const built = await Bun.file(join(build.pages, 'index.html')).text()
       const placeholder = DEFERRED.exec(built)![0]
 
       expect(built).toContain(INLINE)
@@ -57,9 +54,9 @@ describe('server islands', () => {
       // Opted in with `noscript`, a link leads a browser without JavaScript to the page with the island in place.
       expect(placeholder).toEndWith('</slot><noscript><a href="?kay_island" rel="nofollow">Show the form</a></noscript><!--/kay-server:1-->')
 
-      const app = await pages({ routes, prebuilt: true, security: false })
+      const app = await build.serve({ routes, security: false })
       // Its loads run per request, so they are timed as a page rendered afresh is.
-      const timed = await pages({ routes, prebuilt: true, security: false, serverTiming: true })
+      const timed = await build.serve({ routes, security: false, serverTiming: true })
 
       expect((await timed.handle(new Request('http://localhost/'))).headers.get('server-timing')).toMatch(/render;dur=/)
       const visit = async (path: string, headers: Record<string, string> = {}) => app.handle(new Request(`http://localhost${path}`, { headers }))
@@ -121,14 +118,14 @@ describe('server islands', () => {
 
       expect(deferred.headers.get('cache-control')).toBe('public, max-age=0, must-revalidate')
       expect(deferred.headers.get('etag')).toBeTruthy()
-      expect(await deferred.text()).toBe(await Bun.file(join(outputDir(root), 'pages/deferred.html')).text())
+      expect(await deferred.text()).toBe(await Bun.file(join(build.pages, 'deferred.html')).text())
 
       // One whose deferred island holds the form of a `minTime` action too: the island's fetch signs the stamp.
       const asking = await visit('/ask')
 
       expect(written['/ask']!.stamps).toBeUndefined()
       expect(asking.headers.get('etag')).toBeTruthy()
-      expect(await asking.text()).toBe(await Bun.file(join(outputDir(root), 'pages/ask.html')).text())
+      expect(await asking.text()).toBe(await Bun.file(join(build.pages, 'ask.html')).text())
       expect(await (await visit('/ask?kay_island=0', { [ISLAND_HEADER]: '1' })).text()).toMatch(/<input type="hidden" name="kay_since" value="[\da-z]+\.[\w-]+">/)
 
       // An island reads the query as the page's schema reads it, and a query the schema refuses fails its request as it fails the page's.
@@ -140,24 +137,21 @@ describe('server islands', () => {
       expect((await visit('/typed?kay_island=1&n=abc', { [ISLAND_HEADER]: '1' })).status).toBe(400)
     }
     finally {
-      await rm(join(outputDir(root), 'pages'), { recursive: true, force: true })
-      await writeManifest(root, manifest)
+      await build.remove()
     }
   })
 
   it('keeps a page holding one out of a static export, naming it', async () => {
-    const root = process.cwd()
-    const manifest = (await readManifest(root))!
+    const build = await scratchBuild()
 
     try {
-      const exporting = prerenderPages(resolveProject(root, { routes }), (await readClient(root))!, { exportAll: true })
+      const exporting = build.prerender({ routes }, { exportAll: true })
 
       await expect(exporting).rejects.toThrow(ExportError)
       await expect(exporting).rejects.toThrow('deferred.kay: it holds a server island, which only a server renders per request')
     }
     finally {
-      await rm(join(outputDir(root), 'pages'), { recursive: true, force: true })
-      await writeManifest(root, manifest)
+      await build.remove()
     }
   })
 

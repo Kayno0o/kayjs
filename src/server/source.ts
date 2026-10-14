@@ -40,7 +40,7 @@ export interface ProjectSource {
   runtimeRoot: (root: string) => string
   imageCache: (root: string) => string
   // The client build the content manifests were written into, if any is read.
-  contentBuild: (root: string, prebuilt: boolean) => string | undefined
+  contentBuild: (root: string, prebuilt: boolean, output?: string) => string | undefined
 }
 
 const DISK: ProjectSource = {
@@ -48,9 +48,9 @@ const DISK: ProjectSource = {
   mode: options => modeOf(options),
   root: fallback => resolve(fallback),
   config: async (root, options) => withConfig(root, options),
-  client: async ({ root, config, mode }) => {
+  client: async ({ root, config, mode, paths }) => {
     if (mode.prebuilt) {
-      const built = await readClient(root)
+      const built = await readClient(root, paths.output)
 
       if (built)
         return built
@@ -85,7 +85,7 @@ const DISK: ProjectSource = {
   editor: (root, config) => extensionEditor(root, config.extensions),
   runtimeRoot: root => root,
   imageCache: root => cacheDir(root, `images${testWorker()}`),
-  contentBuild: (root, prebuilt) => prebuilt ? outputDir(root) : undefined,
+  contentBuild: (root, prebuilt, output) => prebuilt ? output ?? outputDir(root) : undefined,
 }
 
 function embeddedSource(bundle: Bundle): ProjectSource {

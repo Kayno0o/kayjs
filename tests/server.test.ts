@@ -14,15 +14,14 @@ import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { parse, stringify } from 'devalue'
 import { Elysia } from 'elysia'
 import { outputDir } from '../src/build/assets'
-import { projectPaths, resolveProject } from '../src/project'
+import { projectPaths } from '../src/project'
 import { ActionError } from '../src/runtime'
 import { inlineScriptHashes, pages } from '../src/server'
-import { readClient, readInlineStyles, readManifest, writeManifest } from '../src/server/client'
+import { readClient, readInlineStyles, readManifest } from '../src/server/client'
 import { compressFiles, preferredEncoding } from '../src/server/compress'
 import { sourceHash } from '../src/server/csp'
 import { submittedValues } from '../src/server/flash'
 import { historyScript } from '../src/server/history'
-import { prerenderPages } from '../src/server/prerender'
 import { htmlFallbacks, publicFiles, servedPublicly } from '../src/server/public'
 import { renderPage } from '../src/server/render'
 import { refuseClashes } from '../src/server/route-table'
@@ -33,7 +32,7 @@ import { setTracer } from '../src/server/trace'
 import { parsingRoutes, routePaths } from './elysia'
 import { auth } from './fixtures/site/src/auth'
 import { resetTodos } from './fixtures/site/src/data'
-import { prerendered, refusedPrerender } from './prerendered'
+import { prerendered, refusedPrerender, scratchBuild } from './prerendered'
 import { scratchDir } from './scratch'
 
 const app = await pages({ routes: 'tests/fixtures/site/src/routes', publicDir: 'tests/fixtures/site/public' })
@@ -622,12 +621,12 @@ describe('route params in guards and actions', () => {
   })
 
   it('gives a prerendered page\'s guards its params', async () => {
-    const manifest = (await readManifest(root))!
+    const build = await scratchBuild()
 
     try {
-      await prerenderPages(resolveProject(root, { routes: dir }), (await readClient(root))!)
-      const file = await Bun.file(join(outputDir(root), 'pages/orgs/acme/report.html')).text()
-      const prerendered = await pages({ routes: dir, prebuilt: true })
+      await build.prerender({ routes: dir })
+      const file = await Bun.file(join(build.pages, 'orgs/acme/report.html')).text()
+      const prerendered = await build.serve({ routes: dir })
       const acme = await prerendered.handle(new NativeRequest('http://localhost/orgs/acme/report'))
       const other = await prerendered.handle(new NativeRequest('http://localhost/orgs/other/report'))
 
@@ -637,8 +636,7 @@ describe('route params in guards and actions', () => {
       expect(other.headers.get('x-guarded')).toBe('{"org":"other"}')
     }
     finally {
-      await rm(join(outputDir(root), 'pages'), { recursive: true, force: true })
-      await writeManifest(root, manifest)
+      await build.remove()
     }
   })
 
@@ -931,8 +929,8 @@ describe('prerendering', () => {
   it('renders the pages marked prerender once at build time and serves them behind their guards', async () => {
     expect(build.count()).toBe(4)
 
-    const file = await Bun.file(join(outputDir(root), 'pages/admin/report.html')).text()
-    const signedIn = new Elysia().use(auth).use(await pages({ routes, publicDir: 'tests/fixtures/site/public', prebuilt: true }))
+    const file = await Bun.file(join(build.pages, 'admin/report.html')).text()
+    const signedIn = new Elysia().use(auth).use(await build.serve({ routes, publicDir: 'tests/fixtures/site/public' }))
     const visit = async (user: string, headers: Record<string, string> = {}) => signedIn.handle(new NativeRequest('http://localhost/admin/report', { headers: { 'x-user': user, ...headers } }))
     const served = await visit('ada')
     const etag = served.headers.get('etag')!
@@ -948,8 +946,8 @@ describe('prerendering', () => {
 
   it('writes the stylesheets into the pages it prerenders with inlineStyles', async () => {
     await build.keeping(async () => {
-      await prerenderPages(resolveProject(root, { routes, inlineStyles: true }), (await readClient(root))!)
-      const file = await Bun.file(join(outputDir(root), 'pages/admin/report.html')).text()
+      await build.prerender({ routes, inlineStyles: true })
+      const file = await Bun.file(join(build.pages, 'admin/report.html')).text()
 
       expect(file).toContain('<style>')
       expect(file).toContain('background: url("/paper.png")')
@@ -958,15 +956,15 @@ describe('prerendering', () => {
   })
 
   it('renders a dynamic route for each params its prerender export lists, and the others per request', async () => {
-    const served = new Elysia().use(await pages({ routes, publicDir: 'tests/fixtures/site/public', prebuilt: true }))
+    const served = new Elysia().use(await build.serve({ routes, publicDir: 'tests/fixtures/site/public' }))
     const visit = async (path: string) => {
       const response = await served.handle(new NativeRequest(`http://localhost${path}`))
 
       return { html: (await response.text()), etag: response.headers.get('etag') }
     }
 
-    expect(await Bun.file(join(outputDir(root), 'pages/docs/guide/intro.html')).text()).toBe((await get('/docs/guide/intro')).html)
-    expect(await Bun.file(join(outputDir(root), 'pages/docs/a%20b.html')).exists()).toBe(true)
+    expect(await Bun.file(join(build.pages, 'docs/guide/intro.html')).text()).toBe((await get('/docs/guide/intro')).html)
+    expect(await Bun.file(join(build.pages, 'docs/a%20b.html')).exists()).toBe(true)
     expect(await visit('/docs/guide/intro')).toMatchObject({ html: expect.stringContaining('<p class="path">Docs at guide/intro</p>'), etag: expect.any(String) })
     expect(await visit('/docs/a%20b')).toMatchObject({ html: expect.stringContaining('<p class="path">Docs at a b</p>'), etag: expect.any(String) })
     expect(await visit('/docs/other')).toMatchObject({ html: expect.stringContaining('<p class="path">Docs at other</p>'), etag: null })
@@ -977,13 +975,13 @@ describe('prerendering', () => {
   })
 
   it('serves the compressed copies kay build writes to a browser accepting them, each encoding with its own tag', async () => {
-    const manifest = (await readManifest(root))!
-    const client = (await readClient(root))!
-    const prerenderedDir = join(outputDir(root), 'pages')
+    const manifest = (await readManifest(root, build.dir))!
+    const client = await build.client()
+    const prerenderedDir = build.pages
 
     try {
       await Promise.all([compressFiles(client.dir), compressFiles(prerenderedDir)])
-      const served = new Elysia().use(await pages({ routes, publicDir: 'tests/fixtures/site/public', prebuilt: true }))
+      const served = new Elysia().use(await build.serve({ routes, publicDir: 'tests/fixtures/site/public' }))
       const fetch = async (path: string, headers: Record<string, string> = {}) => served.handle(new NativeRequest(`http://localhost${path}`, { headers }))
       const plain = await fetch(manifest.entry!)
       const brotli = await fetch(manifest.entry!, { 'accept-encoding': 'gzip, deflate, br, zstd' })
@@ -1014,7 +1012,7 @@ describe('prerendering', () => {
         lookup.mockRestore()
       }
 
-      const file = await Bun.file(join(outputDir(root), 'pages/docs/guide/intro.html')).text()
+      const file = await Bun.file(join(build.pages, 'docs/guide/intro.html')).text()
       const page = await fetch('/docs/guide/intro', { 'accept-encoding': 'br' })
       const etag = page.headers.get('etag')!
 
@@ -1027,7 +1025,7 @@ describe('prerendering', () => {
       expect(await (await fetch('/docs/guide/intro')).text()).toBe(file)
       expect(new TextDecoder().decode(Bun.gunzipSync(await (await fetch('/docs/guide/intro', { 'accept-encoding': 'gzip' })).bytes()))).toBe(file)
 
-      const signedIn = new Elysia().use(auth).use(await pages({ routes, publicDir: 'tests/fixtures/site/public', prebuilt: true }))
+      const signedIn = new Elysia().use(auth).use(await build.serve({ routes, publicDir: 'tests/fixtures/site/public' }))
       const report = await signedIn.handle(new NativeRequest('http://localhost/admin/report', { headers: { 'x-user': 'ada', 'accept-encoding': 'br' } }))
 
       expect(report.headers.get('content-encoding')).toBe('br')
@@ -1077,7 +1075,7 @@ describe('prerendering', () => {
         await Promise.all(Object.entries(files).map(async ([file, source]) => Bun.write(join(dir, file), source)))
 
         // The one render that goes through writes the manifest, so it is put back after; a refused one throws before.
-        const rendering = typeof outcome === 'number' ? build.keeping(async () => prerenderPages(resolveProject(root, { routes: dir, ...config }), (await readClient(root))!)) : refusedPrerender({ routes: dir, ...config }, (await readClient(root))!)
+        const rendering = typeof outcome === 'number' ? build.keeping(async () => build.prerender({ routes: dir, ...config })) : refusedPrerender({ routes: dir, ...config }, (await readClient(root))!)
 
         if (typeof outcome === 'number')
           expect(await rendering).toBe(outcome)

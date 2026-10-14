@@ -88,8 +88,9 @@ function isPlugin(value: unknown): value is { name: string } {
   return typeof value === 'object' && value !== null && 'setup' in value && typeof value.setup === 'function' && 'name' in value && typeof value.name === 'string'
 }
 
-export async function writeManifest(root: string, manifest: ClientManifest): Promise<void> {
-  await Bun.write(join(outputDir(root), MANIFEST), JSON.stringify(manifest))
+// `base` is where the build is written, `.kay/client` unless a project's `paths.output` names another.
+export async function writeManifest(root: string, manifest: ClientManifest, base = outputDir(root)): Promise<void> {
+  await Bun.write(join(base, MANIFEST), JSON.stringify(manifest))
 }
 
 // `base` is where `kay build` wrote the client build, `.kay/client` unless an executable embeds it elsewhere.

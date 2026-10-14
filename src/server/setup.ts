@@ -74,7 +74,7 @@ export async function setupPages(project: Project, loadClient: () => Promise<Cli
   const imageCache = source.imageCache(root)
 
   setSite(site, config.trailingSlash, prerendering)
-  setContentMode(mode)
+  setContentMode(mode, paths.output)
 
   // A build may run without the server's secrets, the preview one included.
   if (!prerendering) {

@@ -1,74 +1,125 @@
 import type { KayConfig } from '../src/config'
+import type { PagesOptions } from '../src/server/app'
 import type { ClientBuild } from '../src/server/client'
 import type { PrerenderOptions } from '../src/server/prerender'
-import { rm } from 'node:fs/promises'
+import { cp, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll } from 'bun:test'
 import { outputDir } from '../src/build/assets'
-import { resolveProject } from '../src/project'
+import { withConfig } from '../src/config'
+import { modeOf, resolveProject } from '../src/project'
+import { servePages } from '../src/server/app'
 import { PRERENDERED_DIR, readClient, readManifest, writeManifest } from '../src/server/client'
 import { prerenderPages } from '../src/server/prerender'
 import { scratchDir } from './scratch'
 
-export interface Prerendered {
-  count: () => number
-  // Runs what changes the prerendered build, a page hook or another render, then puts the describe's render back for the tests after it.
+// A copy of the checkout's client build in a scratch directory, without the pages it prerendered: what a test prerenders into and serves from, so the checkout's own `.kay/client` is never written.
+// The `.kay` loader stays on the checkout's root, as the project's `paths.output` is the only thing that moves.
+export interface ScratchBuild {
+  dir: string
+  // The pages directory under it.
+  pages: string
+  // The client build it holds, which `prerender` and `serve` read.
+  client: () => Promise<ClientBuild>
+  // Prerenders the routes `config` names into it, `client` standing in for its build when given.
+  prerender: (config: KayConfig, options?: PrerenderOptions, client?: ClientBuild) => Promise<number>
+  // What `pages()` serves, read from it.
+  serve: (options?: PagesOptions) => ReturnType<typeof servePages>
+  // The pages it holds, as a prerender writes them, and the manifest, back to what they were when `keeping` returns.
   keeping: <T>(change: () => Promise<T>) => Promise<T>
+  remove: () => Promise<void>
 }
 
-// The routes prerendered once for a describe's tests, which read that one render, the build put back as it was once they ran.
-// It goes into the checkout's build, as the .kay loader serves one root a process and every test file serves its fixtures from the checkout. Under `bun test --parallel` that build is the worker's own (`outputDir` adds BUN_TEST_WORKER_ID), whose files run one after another, and `tests/one-run.ts` keeps two runs apart, so no other file reads or writes it meanwhile.
-export function prerendered(config: KayConfig, client: (built: ClientBuild) => ClientBuild = built => built): Prerendered {
+export async function scratchBuild(): Promise<ScratchBuild> {
   const root = process.cwd()
-  const dir = join(outputDir(root), PRERENDERED_DIR)
-  let count = 0
-  let restore: (() => Promise<void>) | undefined
+  const dir = await scratchDir('build-')
+  const pages = join(dir, PRERENDERED_DIR)
 
-  beforeAll(async () => {
-    // Without the pages a run killed mid-describe left behind, which the client build never holds.
-    const manifest = (await readManifest(root))!
+  await cp(outputDir(root), dir, { recursive: true, filter: source => source !== join(outputDir(root), PRERENDERED_DIR) })
 
-    delete manifest.pages
-    delete manifest.site
+  const manifest = (await readManifest(root, dir))!
 
-    restore = async () => {
-      await rm(dir, { recursive: true, force: true })
-      await writeManifest(root, manifest)
-    }
-    await restore()
-    count = await prerenderPages(resolveProject(root, config), client((await readClient(root))!))
-  })
+  delete manifest.pages
+  delete manifest.site
+  await writeManifest(root, manifest, dir)
 
-  afterAll(async () => restore?.())
+  const client = async () => (await readClient(root, dir))!
+  const project = (config: KayConfig) => {
+    const resolved = resolveProject(root, config)
+
+    return { ...resolved, paths: { ...resolved.paths, output: dir } }
+  }
 
   return {
-    count: () => count,
+    dir,
+    pages,
+    client,
+    prerender: async (config, options, built) => prerenderPages(project(config), built ?? await client(), options),
+    serve: async (options = {}) => {
+      const mode = modeOf({ prebuilt: true, ...options })
+      const resolved = resolveProject(root, { ...await withConfig(root, options), dev: mode.dev, prebuilt: mode.prebuilt }, mode)
+
+      return servePages({ ...resolved, paths: { ...resolved.paths, output: dir } }, client)
+    },
     keeping: async (change) => {
-      const manifest = (await readManifest(root))!
-      const files = await Promise.all([...new Bun.Glob('**/*').scanSync(dir)].map(async (file): Promise<[string, Uint8Array]> => [file, await Bun.file(join(dir, file)).bytes()]))
+      const manifest = await readManifest(root, dir)
+      const files = await Promise.all([...new Bun.Glob('**/*').scanSync(pages)].map(async (file): Promise<[string, Uint8Array]> => [file, await Bun.file(join(pages, file)).bytes()]))
 
       try {
         return await change()
       }
       finally {
-        await rm(dir, { recursive: true, force: true })
-        await Promise.all(files.map(async ([file, bytes]) => Bun.write(join(dir, file), bytes)))
-        await writeManifest(root, manifest)
+        await rm(pages, { recursive: true, force: true })
+        await Promise.all(files.map(async ([file, bytes]) => Bun.write(join(pages, file), bytes)))
+        await writeManifest(root, manifest!, dir)
       }
     },
+    remove: async () => rm(dir, { recursive: true, force: true }),
   }
 }
 
-// A prerender a test expects refused, which throws before it writes the manifest: the pages it renders first go to a scratch directory, not over the checkout's build.
+export interface Prerendered extends ScratchBuild {
+  count: () => number
+}
+
+// The routes prerendered once for a describe's tests, which read that one render through `serve` and the files under `pages`; a test changing the render goes through `keeping`.
+export function prerendered(config: KayConfig, client: (built: ClientBuild) => ClientBuild = built => built): Prerendered {
+  let count = 0
+  let build: ScratchBuild | undefined
+
+  beforeAll(async () => {
+    build = await scratchBuild()
+    count = await build.prerender(config, undefined, client(await build.client()))
+  })
+
+  afterAll(async () => build?.remove())
+
+  // The tests run after beforeAll, so these only look through to the build it made.
+  return {
+    get dir() {
+      return build!.dir
+    },
+    get pages() {
+      return build!.pages
+    },
+    client: async () => build!.client(),
+    prerender: async (...args) => build!.prerender(...args),
+    serve: async options => build!.serve(options),
+    keeping: async change => build!.keeping(change),
+    remove: async () => build!.remove(),
+    count: () => count,
+  }
+}
+
+// A prerender a test expects refused, which throws before it writes the manifest.
 export async function refusedPrerender(config: KayConfig, client: ClientBuild, options?: PrerenderOptions): Promise<number> {
-  const project = resolveProject(process.cwd(), config)
-  const output = await scratchDir('refused-')
+  const build = await scratchBuild()
 
   try {
-    return await prerenderPages({ ...project, paths: { ...project.paths, output } }, client, options)
+    return await build.prerender(config, options, client)
   }
   finally {
-    await rm(output, { recursive: true, force: true })
+    await build.remove()
   }
 }

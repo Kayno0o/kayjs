@@ -45,10 +45,10 @@ export interface PrerenderOptions {
   rendered?: RenderedPage[] | undefined
 }
 
-// Renders every page whose server fence exports `prerender = true` into `.kay/client/pages`, listing them in the manifest the server boots from.
+// Renders every page whose server fence exports `prerender = true` into `pages` under the project's `paths.output` (`.kay/client`), listing them in the manifest the server boots from.
 export async function prerenderPages(project: Project, client: ClientBuild, options: PrerenderOptions = {}): Promise<number> {
   const { root, config, paths: { routes: routesDir, output } } = project
-  const manifest = await readManifest(root)
+  const manifest = await readManifest(root, output)
 
   if (!manifest)
     throw new Error('kay: no client build to add prerendered pages to; run buildClient first')
@@ -168,7 +168,7 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
   if (problems.length > 0 || apiProblems.length > 0 || endpointProblems.length > 0)
     throw new ExportError(`kay: ${PARTS.format([count(problems.length, 'page'), count(endpointProblems.length, 'endpoint'), count(apiProblems.length, 'API module')].filter(part => part !== ''))} cannot be exported to static files, which no server answers for:\n${[...problems, ...endpointProblems, ...apiProblems].map(problem => `  ${problem}`).join('\n')}`)
 
-  await writeManifest(root, { ...manifest, pages, site })
+  await writeManifest(root, { ...manifest, pages, site }, output)
   client.pages = new Map(Object.entries(pages))
 
   return Object.keys(pages).length

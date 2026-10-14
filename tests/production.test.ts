@@ -13,7 +13,6 @@ import { describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { parse, stringify } from 'devalue'
 import { Elysia, t } from 'elysia'
 import { version } from '../package.json'
-import { outputDir } from '../src/build/assets'
 import { check } from '../src/check'
 import { compileKay } from '../src/compiler'
 import { resolveProject } from '../src/project'
@@ -28,7 +27,6 @@ import { compressTextStrongest } from '../src/server/compress'
 import { probeHealth } from '../src/server/lifecycle'
 import { answeringRequest, useLogger } from '../src/server/log'
 import { hookPrerendered } from '../src/server/page-hook'
-import { prerenderPages } from '../src/server/prerender'
 import { clientAddress, countSucceeded, memoryRates, protectionRefusal, rateKey, rateLimit, sqliteRates } from '../src/server/protection'
 import { securityHeaders } from '../src/server/security'
 import { signStamp } from '../src/server/stamp'
@@ -1035,8 +1033,8 @@ describe('revalidation', () => {
     const { news } = await import('./fixtures/production/src/news')
 
     try {
-      const stopped = await pages({ routes, prebuilt: true, security: false, log: false })
-      const running = await pages({ routes, prebuilt: true, security: false, log: false })
+      const stopped = await build.serve({ routes, prebuilt: true, security: false, log: false })
+      const running = await build.serve({ routes, prebuilt: true, security: false, log: false })
       const edition = async (app: typeof running) => (await (await app.handle(new Request('http://localhost/news'))).text()).match(/<h1>(Edition \d)<\/h1>/)?.[1]
 
       stopped.listen(0)
@@ -1076,7 +1074,7 @@ describe('revalidation', () => {
 
     const before = reached()
     const dropped = await (async () => {
-      const app = await pages({ routes, prebuilt: true, security: false, log: false })
+      const app = await build.serve({ routes, prebuilt: true, security: false, log: false })
 
       await app.handle(new Request('http://localhost/news'))
 
@@ -1099,7 +1097,7 @@ describe('revalidation', () => {
     const { news } = await import('./fixtures/production/src/news')
 
     try {
-      const app = await pages({ routes, prebuilt: true, security: false })
+      const app = await build.serve({ routes, prebuilt: true, security: false })
       const visit = async (headers: Record<string, string> = {}) => app.handle(new Request('http://localhost/news', { headers }))
       const built = await visit()
       const etag = built.headers.get('etag')!
@@ -1133,7 +1131,7 @@ describe('revalidation', () => {
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
 
     try {
-      const app = await pages({ routes, prebuilt: true, security: false })
+      const app = await build.serve({ routes, prebuilt: true, security: false })
       const visit = async () => (await app.handle(new Request('http://localhost/news'))).text()
 
       news.failing = true
@@ -1167,17 +1165,17 @@ describe('revalidation', () => {
 
     try {
       await build.keeping(async () => {
-        await prerenderPages(resolveProject(root, { routes, site: 'https://example.com' }), (await readClient(root))!)
+        await build.prerender({ routes, site: 'https://example.com' })
 
-        expect(await canonical(await pages({ routes, prebuilt: true, security: false, site: 'https://example.com' }))).toBe('https://example.com/news')
+        expect(await canonical(await build.serve({ routes, prebuilt: true, security: false, site: 'https://example.com' }))).toBe('https://example.com/news')
         expect(warned).not.toHaveBeenCalled()
 
         // Built where the variable naming the host is unset, run where it is.
-        expect(await canonical(await pages({ routes, prebuilt: true, security: false, site: 'http://127.0.0.1:4173' }))).toBe('http://127.0.0.1:4173/news')
+        expect(await canonical(await build.serve({ routes, prebuilt: true, security: false, site: 'http://127.0.0.1:4173' }))).toBe('http://127.0.0.1:4173/news')
         expect(warned).toHaveBeenCalledWith('kay: kay build rendered its pages for https://example.com and this server runs for http://127.0.0.1:4173: each renders again on its first request')
 
         // Once rendered again, it goes out as small as the build would have written it.
-        const moved = await pages({ routes, prebuilt: true, security: false, site: 'http://127.0.0.1:4173' })
+        const moved = await build.serve({ routes, prebuilt: true, security: false, site: 'http://127.0.0.1:4173' })
         const html = await (await moved.handle(new Request('http://localhost/news'))).text()
 
         const strongest = (await compressTextStrongest(html)).br!
@@ -1197,13 +1195,13 @@ describe('revalidation', () => {
     const missing = 'kay: `seo` is set, but not the origin the site is public at, in kay.config.ts or SITE_URL: pages get no canonical link or og:url, and the site no sitemap or robots.txt'
 
     try {
-      await pages({ routes, prebuilt: true, security: false, seo: { name: 'Example' } })
+      await build.serve({ routes, prebuilt: true, security: false, seo: { name: 'Example' } })
 
       expect(warned.mock.calls.filter(([message]) => message === missing)).toHaveLength(1)
 
       warned.mockClear()
-      await pages({ routes, prebuilt: true, security: false, seo: { name: 'Example' }, site: 'https://example.com' })
-      await pages({ routes, prebuilt: true, security: false })
+      await build.serve({ routes, prebuilt: true, security: false, seo: { name: 'Example' }, site: 'https://example.com' })
+      await build.serve({ routes, prebuilt: true, security: false })
 
       expect(warned.mock.calls.filter(([message]) => message === missing)).toEqual([])
     }
@@ -1216,9 +1214,9 @@ describe('revalidation', () => {
     const warned = spyOn(console, 'warn').mockImplementation(() => undefined)
 
     try {
-      expect((await readManifest(root))!.pages!['/origin']!.readsSite).toBe(true)
+      expect((await readManifest(root, build.dir))!.pages!['/origin']!.readsSite).toBe(true)
 
-      const app = await pages({ routes, prebuilt: true, security: false, site: 'https://example.com' })
+      const app = await build.serve({ routes, prebuilt: true, security: false, site: 'https://example.com' })
 
       expect(await (await app.handle(new Request('http://localhost/origin'))).text()).toContain('<p class="origin">https://example.com</p>')
       // Built for no site and served for one, as one build for several hosts is, it goes quietly.
@@ -1234,7 +1232,7 @@ describe('revalidation', () => {
     const { news } = await import('./fixtures/production/src/news')
 
     try {
-      const app = await pages({ routes, prebuilt: true, security: false })
+      const app = await build.serve({ routes, prebuilt: true, security: false })
       const { publish } = await import(NEWS) as { publish: Action<{ edition: number }, void> }
       const visit = async (headers: Record<string, string> = {}) => app.handle(new Request('http://localhost/news', { headers }))
       const built = await visit()
@@ -1271,9 +1269,9 @@ describe('revalidation', () => {
 
     try {
       await build.keeping(async () => {
-        await hookPrerendered(root, extensions.map(extension => extension.transformPage), { clientDir: (await readClient(root))!.dir, publicDir: join(root, 'public'), base: '' })
+        await hookPrerendered(root, extensions.map(extension => extension.transformPage), { clientDir: (await build.client()).dir, publicDir: join(root, 'public'), base: '' }, build.dir)
 
-        const app = await pages({ routes, prebuilt: true, security: false, extensions })
+        const app = await build.serve({ routes, prebuilt: true, security: false, extensions })
         const visit = async () => (await app.handle(new Request('http://localhost/news'))).text()
         const built = await visit()
 
@@ -1318,10 +1316,10 @@ describe('a prerendered page posted to', () => {
   const root = process.cwd()
   const withEntry = (client: ClientBuild): ClientBuild => ({ ...client, entry: '/_kay/entry.js', navigation: true })
 
-  prerendered({ routes }, withEntry)
+  const build = prerendered({ routes }, withEntry)
 
   it('renders for the post a form sent, and for the request carrying how it went, kept by no cache, the built file served before and after', async () => {
-    const app = await pages({ routes, prebuilt: true, security: false })
+    const app = await build.serve({ routes, prebuilt: true, security: false })
     const { join: subscribe } = await import(NEWSLETTER) as { join: Action<{ email: string }, string> }
     const visit = async (headers: Record<string, string> = {}) => app.handle(new Request('http://localhost/newsletter', { headers }))
     const post = async (email: string) => app.handle(new Request(`http://localhost${subscribe.url}`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded', 'referer': 'http://localhost/newsletter' }, body: new URLSearchParams({ email }) }))
@@ -1369,9 +1367,9 @@ describe('a prerendered page posted to', () => {
     const start = Date.now()
 
     try {
-      expect(await Bun.file(join(outputDir(root), 'pages/brochure.html')).text()).toContain('name="kay_since" value="kay-stamp:')
+      expect(await Bun.file(join(build.pages, 'brochure.html')).text()).toContain('name="kay_since" value="kay-stamp:')
 
-      const app = await pages({ routes, prebuilt: true, security: false })
+      const app = await build.serve({ routes, prebuilt: true, security: false })
       const { order } = await import(BROCHURE) as { order: Action<{ address: string }, number> }
       const visit = async (encoding: string) => app.handle(new Request('http://localhost/brochure', { headers: { 'accept-encoding': encoding } }))
       const stampOf = (html: string) => (/name="kay_since" value="([^"]+)"/).exec(html)![1]!
@@ -1406,9 +1404,9 @@ describe('a prerendered page posted to', () => {
   })
 
   it('signs a fresh proof-of-work challenge into a prerendered page on every visit, each solved once', async () => {
-    expect(await Bun.file(join(outputDir(root), 'pages/leaflet.html')).text()).toContain('"kay-work:')
+    expect(await Bun.file(join(build.pages, 'leaflet.html')).text()).toContain('"kay-work:')
 
-    const app = await pages({ routes, prebuilt: true, security: false })
+    const app = await build.serve({ routes, prebuilt: true, security: false })
     const { subscribe } = await import(LEAFLET) as { subscribe: Action<{ email: string }, number> }
     const challengeOf = async () => Object.values(JSON.parse((/data-kay-work>(.*?)<\/script>/).exec(await (await app.handle(new Request('http://localhost/leaflet'))).text())![1]!) as Record<string, string>)[0]!
     const post = async (solution: string) => app.handle(new Request(`http://localhost${subscribe.url}`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded', 'referer': 'http://localhost/leaflet', 'x-kay-work': solution }, body: new URLSearchParams({ email: 'a@b.c' }) }))

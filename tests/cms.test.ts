@@ -6,7 +6,6 @@ import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { afterEach, describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { t } from 'elysia'
-import { outputDir } from '../src/build/assets'
 import { readClientSources } from '../src/build/client'
 import { collection, collectionInfo, collections, entries, entryFile, entrySource, removeEntry, saveEntry } from '../src/content'
 import { entryIssues, registerCollections, registerEditSite } from '../src/content/edit'
@@ -14,7 +13,6 @@ import { contentPlace, parseEntry, setContentPlace } from '../src/content/load'
 import { MarkdownError } from '../src/content/markdown'
 import * as validate from '../src/content/validate'
 import { ContentError } from '../src/content/validate'
-import { resolveProject } from '../src/project'
 import { cached } from '../src/runtime/cache'
 import { showDraft } from '../src/runtime/edit'
 import { editableEntry, editMarks, placeFieldMarks, withFieldMarks } from '../src/runtime/fields'
@@ -22,13 +20,12 @@ import { child, loop } from '../src/runtime/html'
 import { navigation } from '../src/runtime/navigation'
 import { editing, previewing } from '../src/runtime/preview'
 import { editRequested, enterPreview, pages, previewUrl } from '../src/server'
-import { readClient, readManifest, writeManifest } from '../src/server/client'
 import { entryUrls } from '../src/server/entry-urls'
-import { prerenderPages } from '../src/server/prerender'
 import { inPreview, previewRequested, requestDrafts } from '../src/server/preview'
 import { extensionEditor } from '../src/server/routes'
 import { cms, resetCms } from './fixtures/cms/src/cms'
 import { articles, news, pages as pagesCollection } from './fixtures/cms/src/content.config'
+import { scratchBuild } from './prerendered'
 import { scratchDir } from './scratch'
 
 const FIXTURE = 'tests/fixtures/cms'
@@ -974,13 +971,12 @@ describe('preview mode', () => {
   })
 
   it('renders a prerendered page afresh for a visitor in preview mode, the copy served to everyone else', async () => {
-    const root = process.cwd()
-    const manifest = (await readManifest(root))!
+    const build = await scratchBuild()
 
     try {
-      expect(await prerenderPages(resolveProject(root, options), (await readClient(root))!)).toBe(1)
+      expect(await build.prerender(options)).toBe(1)
 
-      const served = await pages({ ...options, prebuilt: true })
+      const served = await build.serve(options)
       const visit = async (cookie?: string) => {
         const response = await served.handle(new Request('http://localhost/news/launch', { headers: cookie === undefined ? {} : { cookie } }))
 
@@ -998,8 +994,7 @@ describe('preview mode', () => {
       expect((await visit()).html).toContain('<h1>Launch moved</h1>')
     }
     finally {
-      await rm(join(outputDir(root), 'pages/news'), { recursive: true, force: true })
-      await writeManifest(root, manifest)
+      await build.remove()
     }
   })
 

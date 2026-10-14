@@ -5,13 +5,10 @@ import process from 'node:process'
 import { Database } from 'bun:sqlite'
 import { afterAll, afterEach, describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { Elysia } from 'elysia'
-import { outputDir } from '../src/build/assets'
-import { resolveProject } from '../src/project'
 import { cached, invalidate, sqliteCache } from '../src/runtime/cache.server'
 import { pages } from '../src/server'
-import { readClient, readManifest, writeManifest } from '../src/server/client'
-import { prerenderPages } from '../src/server/prerender'
 import { feed } from './fixtures/production/src/news'
+import { scratchBuild } from './prerendered'
 import { scratchDir } from './scratch'
 
 afterEach(() => {
@@ -188,16 +185,15 @@ describe('cached with a store', () => {
   })
 
   it('marks a prerendered page stale when another process sharing a store invalidated it, rendering it afresh with no one request\'s timings', async () => {
-    const root = process.cwd()
-    const manifest = (await readManifest(root))!
+    const build = await scratchBuild()
     const { news } = await import('./fixtures/production/src/news')
     const path = await storePath()
 
     sqliteCache(path)
 
     try {
-      await prerenderPages(resolveProject(root, { routes: 'tests/fixtures/production/src/routes' }), (await readClient(root))!)
-      const app = await pages({ routes: 'tests/fixtures/production/src/routes', prebuilt: true, security: false, serverTiming: true })
+      await build.prerender({ routes: 'tests/fixtures/production/src/routes' })
+      const app = await build.serve({ routes: 'tests/fixtures/production/src/routes', security: false, serverTiming: true })
       const visit = async () => (await app.handle(new Request('http://localhost/news'))).text()
 
       expect(await visit()).toContain('<h1>Edition 1</h1>')
@@ -219,8 +215,7 @@ describe('cached with a store', () => {
     }
     finally {
       news.edition = 1
-      await rm(join(outputDir(root), 'pages'), { recursive: true, force: true })
-      await writeManifest(root, manifest)
+      await build.remove()
     }
   })
 

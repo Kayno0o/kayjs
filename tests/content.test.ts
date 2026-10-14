@@ -12,11 +12,9 @@ import { feedXml } from '../src/content/feed'
 import { contentMode, manifestFile, setContentMode, setContentPlace } from '../src/content/load'
 import { compileMarkdown, MarkdownError } from '../src/content/markdown'
 import { writeContentManifests } from '../src/content/server'
-import { resolveProject } from '../src/project'
 import { sanitizeHtml } from '../src/runtime'
 import { pages, shutdown } from '../src/server'
-import { readClient, readManifest, writeManifest } from '../src/server/client'
-import { prerenderPages } from '../src/server/prerender'
+import { scratchBuild } from './prerendered'
 import { fixtureCopy } from './scratch'
 
 const FIXTURE = 'tests/fixtures/content'
@@ -153,19 +151,16 @@ describe('feeds', () => {
 
 describe('prerendering a collection', () => {
   it('renders a page for every entry of the collection it exports as prerender, from what kay build compiled', async () => {
-    const root = process.cwd()
-    const manifest = (await readManifest(root))!
+    const build = await scratchBuild()
 
     try {
-      expect(await writeContentManifests(root, outputDir(root), content)).toBe(5)
-      expect(await prerenderPages(resolveProject(root, { routes, content }), (await readClient(root))!)).toBe(2)
-      expect(await Bun.file(join(outputDir(root), 'pages/blog/hello.html')).text()).toContain('<h1 class="title">Hello world</h1>')
-      expect(await Bun.file(join(outputDir(root), 'pages/blog/draft.html')).exists()).toBe(false)
+      expect(await writeContentManifests(process.cwd(), build.dir, content)).toBe(5)
+      expect(await build.prerender({ routes, content })).toBe(2)
+      expect(await Bun.file(join(build.pages, 'blog/hello.html')).text()).toContain('<h1 class="title">Hello world</h1>')
+      expect(await Bun.file(join(build.pages, 'blog/draft.html')).exists()).toBe(false)
     }
     finally {
-      await rm(join(outputDir(root), 'pages'), { recursive: true, force: true })
-      await rm(join(outputDir(root), 'content'), { recursive: true, force: true })
-      await writeManifest(root, manifest)
+      await build.remove()
     }
   })
 })

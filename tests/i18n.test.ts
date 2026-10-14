@@ -1,4 +1,5 @@
 import type { I18nConfig } from '../src/config'
+import type { ScratchBuild } from './prerendered'
 import { existsSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -7,21 +8,18 @@ import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, beforeAll, describe, expect, it, jest, spyOn } from 'bun:test'
 import { Elysia, t } from 'elysia'
 import { chromium } from 'playwright-core'
-import { outputDir } from '../src/build/assets'
 import { check } from '../src/check'
 import { compileKay } from '../src/compiler'
 import { islandMessages } from '../src/compiler/codegen'
 import { collection } from '../src/content'
 import { ContentError } from '../src/content/validate'
-import { resolveProject } from '../src/project'
 import { flattenMessages, localePath, localizedLink, textDirection, translate, untranslatedPath } from '../src/runtime/i18n'
 import { relativeTime } from '../src/runtime/i18n.server'
 import { runInLocale } from '../src/runtime/locale-state'
 import { pages } from '../src/server'
-import { readClient, readManifest, writeManifest } from '../src/server/client'
 import { acceptedLocale, localeSettings, messagesScript, requestLocale } from '../src/server/i18n'
-import { prerenderPages } from '../src/server/prerender'
 import { browserPath, testSite } from '../src/test'
+import { scratchBuild } from './prerendered'
 import { fixtureCopy } from './scratch'
 
 const FIXTURE = 'tests/fixtures/i18n'
@@ -432,26 +430,24 @@ describe('locale detection', () => {
 })
 
 describe('prerendering', () => {
-  async function prerendered(config: I18nConfig, check: () => Promise<void>): Promise<void> {
-    const root = process.cwd()
-    const manifest = (await readManifest(root))!
+  async function prerendered(config: I18nConfig, check: (build: ScratchBuild) => Promise<void>): Promise<void> {
+    const build = await scratchBuild()
 
     try {
-      expect(await prerenderPages(resolveProject(root, { routes, i18n: config }), (await readClient(root))!)).toBe(2)
-      await check()
+      expect(await build.prerender({ routes, i18n: config })).toBe(2)
+      await check(build)
     }
     finally {
-      await rm(join(outputDir(root), 'pages'), { recursive: true, force: true })
-      await writeManifest(root, manifest)
+      await build.remove()
     }
   }
 
   it('renders a page once per locale, each served back from its file', async () => {
-    await prerendered(i18n, async () => {
-      expect(await Bun.file(join(outputDir(process.cwd()), 'pages/index.html')).text()).toContain('<h1>Bonjour Ada</h1>')
-      expect(await Bun.file(join(outputDir(process.cwd()), 'pages/en.html')).text()).toContain('<h1>Hello Ada</h1>')
+    await prerendered(i18n, async (build) => {
+      expect(await Bun.file(join(build.pages, 'index.html')).text()).toContain('<h1>Bonjour Ada</h1>')
+      expect(await Bun.file(join(build.pages, 'en.html')).text()).toContain('<h1>Hello Ada</h1>')
 
-      const built = new Elysia().use(await pages({ routes, prebuilt: true, security: false, i18n }))
+      const built = new Elysia().use(await build.serve({ routes, security: false, i18n }))
       const english = await get('/en', built)
 
       expect(english.html).toContain('<h1>Hello Ada</h1>')
@@ -462,8 +458,8 @@ describe('prerendering', () => {
   it('keeps each domain\'s copy apart, served to its host', async () => {
     const domains = { ...i18n, domains: { fr: 'x.fr', en: 'x.com' } }
 
-    await prerendered(domains, async () => {
-      const built = new Elysia().use(await pages({ routes, prebuilt: true, security: false, i18n: domains }))
+    await prerendered(domains, async (build) => {
+      const built = new Elysia().use(await build.serve({ routes, security: false, i18n: domains }))
       const english = await get('http://x.com/', built)
       const french = await get('http://x.fr/', built)
 

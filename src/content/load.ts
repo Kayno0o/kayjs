@@ -42,16 +42,21 @@ export function setContentPlace(root: string, base: string): void {
 }
 
 let mode: ContentMode | undefined
+// Where the build holds the entries, when the running server's project keeps it elsewhere than `.kay/client`.
+let output: string | undefined
 
 // The running server's, which shows drafts and the loaders' preview in development and reads the build's entries when prebuilt; a script that started none takes `NODE_ENV`'s.
-export function setContentMode(value: ContentMode): void {
+export function setContentMode(value: ContentMode, built?: string): void {
   mode = value
+  output = built
 }
 
 // Called as the server that set it stops, so a script running after it takes `NODE_ENV`'s again; another server's since is left alone.
 export function clearContentMode(value: ContentMode): void {
-  if (mode === value)
+  if (mode === value) {
     mode = undefined
+    output = undefined
+  }
 }
 
 export function contentMode(): ContentMode {
@@ -89,7 +94,7 @@ export function manifestFile(base: string, dir: string): string {
 
 async function builtEntries(dir: string): Promise<RawEntry[] | undefined> {
   const source = projectSource()
-  const base = source.contentBuild(rootOf(), contentMode().prebuilt)
+  const base = source.contentBuild(rootOf(), contentMode().prebuilt, output)
 
   if (base === undefined)
     return undefined

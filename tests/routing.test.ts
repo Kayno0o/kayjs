@@ -1,9 +1,7 @@
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
-import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
-import { outputDir } from '../src/build/assets'
 import { check } from '../src/check'
 import { localPath } from '../src/runtime/base'
 import { integer } from '../src/runtime/params'
@@ -194,7 +192,7 @@ describe('prerendering', () => {
   const build = prerendered({ routes })
 
   it('renders an optional param\'s path with and without it, the matcher\'s value handed over', async () => {
-    const dir = join(outputDir(process.cwd()), 'pages')
+    const dir = build.pages
 
     expect(build.count()).toBe(2)
     expect(await Bun.file(join(dir, 'blog.html')).text()).toContain('<p class="page">Page 1, a undefined</p>')

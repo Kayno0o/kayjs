@@ -74,8 +74,8 @@ export async function applyPageHooks(hooks: PageHook[], path: string, html: stri
 }
 
 // Runs the hooks over every page `kay build` prerendered, several pages at once, once the files they link are written and before they are compressed.
-export async function hookPrerendered(root: string, hooks: PageHook[], dirs: AssetDirs): Promise<void> {
-  const manifest = await readManifest(root)
+export async function hookPrerendered(root: string, hooks: PageHook[], dirs: AssetDirs, base = outputDir(root)): Promise<void> {
+  const manifest = await readManifest(root, base)
 
   if (hooks.length === 0 || !manifest?.pages)
     return
@@ -84,14 +84,14 @@ export async function hookPrerendered(root: string, hooks: PageHook[], dirs: Ass
   const hooking = limiter(PAGES_AT_ONCE)
 
   await Promise.all(Object.entries(manifest.pages).map(async ([path, page]) => hooking(async () => {
-    const name = join(outputDir(root), PRERENDERED_DIR, page.file)
+    const name = join(base, PRERENDERED_DIR, page.file)
     const html = await applyPageHooks(hooks, path, await Bun.file(name).text(), file)
 
     await Bun.write(name, html)
     page.etag = pageEtag(html)
   })))
 
-  await writeManifest(root, manifest)
+  await writeManifest(root, manifest, base)
 }
 
 // A page the server renders again in place of a prerendered one, through the same hooks.
