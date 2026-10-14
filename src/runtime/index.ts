@@ -186,34 +186,33 @@ interface Flag {
 // One selected key among many rows: `is(key)` reads a flag of that key's own, so a change re-runs what read the old key and the new one, not every row.
 // Flags are made on first read and dropped once nothing reads them.
 export function selection<Key extends string | number>(initial?: Key): Selection<Key> {
-  const [read, write] = createSignal<Key | undefined>(initial)
   const flags = new Map<Key, Flag>()
-  let current = initial
+  // The key the flags were last set for, which a write kept in a request's scope leaves behind: the key to answer with is the signal's own.
+  let flagged = initial
+  // Follows every write of the main signal, so an optimistic change's undo, which writes it alone, moves the flags too.
+  const [read, write] = createSignal<Key | undefined>(initial, {
+    written: (key) => {
+      if (flagged !== undefined)
+        flags.get(flagged)?.write(false)
 
-  const set: Selection<Key>['set'] = (next) => {
-    const key = typeof next === 'function' ? next(current) : next
+      if (key !== undefined)
+        flags.get(key)?.write(true)
 
-    if (key === current)
-      return
+      flagged = key
+    },
+  })
+  const current = () => untrack(read)
 
-    if (current !== undefined)
-      flags.get(current)?.write(false)
-
-    if (key !== undefined)
-      flags.get(key)?.write(true)
-
-    current = key
-    write(key)
-  }
+  const set: Selection<Key>['set'] = next => write(typeof next === 'function' ? next(current()) : next)
 
   const is = (key: Key): boolean => {
     if (!tracking())
-      return key === current
+      return key === current()
 
     let flag = flags.get(key)
 
     if (!flag) {
-      const [readFlag, writeFlag] = ownSignal(key === current)
+      const [readFlag, writeFlag] = ownSignal(key === current())
 
       flag = { read: readFlag, write: writeFlag, readers: 0 }
       flags.set(key, flag)

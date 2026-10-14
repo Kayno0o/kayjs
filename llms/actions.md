@@ -319,7 +319,7 @@ form(action={add})
 - Once a call went through, the page shows what it changed, its loads run again as `refresh()` runs them, where the page swap runs: islands whose props did not change keep their state.
 - `add({ title }, { refresh: false })` leaves the page as it is.
 - `add.pending()` reads, reactively, whether a call the page made is still in flight, and `add.progress()` how much of a call carrying files the browser sent, from 0 to 1: `button(disabled={add.pending()})`.
-- `await move({ id, to }, { optimistic: () => tiers.set(moved) })` shows the change at once: if the call fails, or the function throws, each signal the function wrote goes back to what it held, those another optimistic call made inside it wrote included, unless something wrote it since, while that call's `pending()` follows its own request, and the call throws as any does.
+- `await move({ id, to }, { optimistic: () => tiers.set(moved) })` shows the change at once: if the call fails, or the function throws, each signal the function wrote goes back to what it held, those another optimistic call made inside it wrote included, a `selection` among them with its `is(key)` flags, unless something wrote it since, while that call's `pending()` follows its own request, and the call throws as any does.
 - Two such calls over one signal failing out of order may leave the first one's value, so an island lets one move finish before the next, as `add.pending()` tells.
 - Once it went through, the refresh brings what the server kept, which a `linked` signal then takes.
 - `{ signal }` aborts a call: it rejects with the signal's reason, what `optimistic` showed goes back, and the action records no outcome.

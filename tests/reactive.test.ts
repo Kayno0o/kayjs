@@ -301,6 +301,97 @@ describe('selection', () => {
   })
 })
 
+describe('selection in an optimistic change', () => {
+  it('reads its old key again through its value and is(key) once the change is undone, a flag made meanwhile included', () => {
+    const selected = selection<number>(1)
+    const seen: boolean[][] = []
+    const dispose = root((dispose) => {
+      effect(() => {
+        seen.push([selected.is(1), selected.is(2)])
+      })
+
+      return dispose
+    })
+
+    flush()
+
+    const undo = undoable(() => {
+      selected.set(2)
+      // A flag made while the change shows, for a key the change selected.
+      expect(selected.is(2)).toBe(true)
+      expect(selected.is(3)).toBe(false)
+    })
+
+    flush()
+    expect(selected()).toBe(2)
+    expect(selected.is(1)).toBe(false)
+    expect(selected.is(2)).toBe(true)
+
+    undo()
+    flush()
+    expect(selected()).toBe(1)
+    expect(selected.is(1)).toBe(true)
+    expect(selected.is(2)).toBe(false)
+    expect(seen.at(-1)).toEqual([true, false])
+
+    // The function form reads the key it was undone to.
+    selected.set(current => (current ?? 0) + 10)
+    expect(selected()).toBe(11)
+    dispose()
+  })
+
+  it('undoes a first key and a cleared selection, for a reader made before the change', () => {
+    const selected = selection<number>()
+    const undo = undoable(() => selected.set(4))
+    const reads: boolean[] = []
+    const stop = root((stop) => {
+      effect(() => {
+        reads.push(selected.is(4))
+      })
+
+      return stop
+    })
+
+    flush()
+    expect(reads).toEqual([true])
+    undo()
+    flush()
+    expect(reads).toEqual([true, false])
+    expect(selected()).toBeUndefined()
+
+    const cleared = selection<number>(7)
+    const undoClear = undoable(() => cleared.set(undefined))
+
+    expect(cleared.is(7)).toBe(false)
+    undoClear()
+    expect(cleared()).toBe(7)
+    expect(cleared.is(7)).toBe(true)
+    stop()
+  })
+
+  it('undoes at once a selection set in a change that throws, and leaves one set since', () => {
+    const selected = selection<string>('a')
+
+    expect(() => undoable(() => {
+      selected.set('b')
+
+      throw new Error('no such tier')
+    })).toThrow('no such tier')
+    expect(selected()).toBe('a')
+    expect(selected.is('a')).toBe(true)
+    expect(selected.is('b')).toBe(false)
+
+    const undo = undoable(() => selected.set('b'))
+
+    selected.set('c')
+    undo()
+    expect(selected()).toBe('c')
+    expect(selected.is('c')).toBe(true)
+    expect(selected.is('b')).toBe(false)
+    expect(selected.is('a')).toBe(false)
+  })
+})
+
 describe('recordSignals', () => {
   it('gives an edited version the values of the signals its script made, in order, until one changes kind', () => {
     const first = recordSignals(() => {

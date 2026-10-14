@@ -6,6 +6,8 @@ type Equals<T> = false | ((previous: T, next: T) => boolean)
 export interface SignalOptions<T> {
   // `false` notifies on every write; the default skips a write of the same value.
   equals?: Equals<T> | undefined
+  // Runs after every write that changes the value, an optimistic change's undo included, which writes the signal itself.
+  written?: ((value: T) => void) | undefined
 }
 
 // A node others can depend on: a signal, or a memo.
@@ -120,6 +122,7 @@ export function createSignal<T>(value: T, options?: SignalOptions<T>): [read: ()
 
     interceptor?.writing?.(node as SignalNode<unknown>, write as (value: unknown) => void)
     node.value = next
+    options?.written?.(next)
     notify(node)
   }
 
