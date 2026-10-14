@@ -48,9 +48,9 @@ const DISK: ProjectSource = {
   mode: options => modeOf(options),
   root: fallback => resolve(fallback),
   config: async (root, options) => withConfig(root, options),
-  client: async ({ root, config, mode }) => {
+  client: async ({ root, config, mode, paths }) => {
     if (mode.prebuilt) {
-      const built = await readClient(root)
+      const built = await readClient(root, paths.output)
 
       if (built)
         return built

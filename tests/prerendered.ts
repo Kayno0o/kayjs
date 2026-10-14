@@ -31,15 +31,17 @@ export interface ScratchBuild {
   remove: () => Promise<void>
 }
 
-export async function scratchBuild(): Promise<ScratchBuild> {
+// `manifestOnly` leaves the client build's files out, for a prerender refused before it reads any.
+export async function scratchBuild(manifestOnly = false): Promise<ScratchBuild> {
   const root = process.cwd()
   const dir = await scratchDir('build-')
   const pages = join(dir, PRERENDERED_DIR)
 
   try {
-    await cp(outputDir(root), dir, { recursive: true, filter: source => source !== join(outputDir(root), PRERENDERED_DIR) })
+    if (!manifestOnly)
+      await cp(outputDir(root), dir, { recursive: true, filter: source => source !== join(outputDir(root), PRERENDERED_DIR) })
 
-    const manifest = (await readManifest(root, dir))!
+    const manifest = (await readManifest(root, manifestOnly ? outputDir(root) : dir))!
 
     delete manifest.pages
     delete manifest.site
@@ -119,9 +121,9 @@ export function prerendered(config: KayConfig, client: (built: ClientBuild) => C
   }
 }
 
-// A prerender a test expects refused, which throws before it writes the manifest.
+// A prerender a test expects refused, which throws before it writes the manifest or reads the build's files: only the manifest is copied.
 export async function refusedPrerender(config: KayConfig, client: ClientBuild, options?: PrerenderOptions): Promise<number> {
-  const build = await scratchBuild()
+  const build = await scratchBuild(true)
 
   try {
     return await build.prerender(config, options, client)

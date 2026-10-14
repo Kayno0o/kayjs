@@ -14,7 +14,7 @@ import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { parse, stringify } from 'devalue'
 import { Elysia } from 'elysia'
 import { outputDir } from '../src/build/assets'
-import { projectPaths } from '../src/project'
+import { projectPaths, resolveProject } from '../src/project'
 import { ActionError } from '../src/runtime'
 import { inlineScriptHashes, pages } from '../src/server'
 import { readClient, readInlineStyles, readManifest } from '../src/server/client'
@@ -26,6 +26,7 @@ import { htmlFallbacks, publicFiles, servedPublicly } from '../src/server/public
 import { renderPage } from '../src/server/render'
 import { refuseClashes } from '../src/server/route-table'
 import { scanRoutes } from '../src/server/routes'
+import { projectSource } from '../src/server/source'
 import { speculationRules } from '../src/server/speculation'
 import { KEEP_ALIVE_MS, streamDocument } from '../src/server/stream'
 import { setTracer } from '../src/server/trace'
@@ -618,6 +619,20 @@ describe('route params in guards and actions', () => {
     expect(team.headers.get('x-guarded')).toBe('{"org":"acme","team":7}')
     expect(other.status).toBe(403)
     expect(other.headers.get('x-guarded')).toBe('{"org":"other"}')
+  })
+
+  it('reads the client build under the project\'s output directory, not the checkout\'s', async () => {
+    const build = await scratchBuild()
+
+    try {
+      const project = resolveProject(process.cwd(), {})
+      const read = await projectSource().client({ ...project, paths: { ...project.paths, output: build.dir } })
+
+      expect(read.dir).toBe(join(build.dir, 'dist'))
+    }
+    finally {
+      await build.remove()
+    }
   })
 
   it('gives a prerendered page\'s guards its params', async () => {
