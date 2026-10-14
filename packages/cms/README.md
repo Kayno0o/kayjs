@@ -31,7 +31,7 @@ export default defineConfig({
   extensions: [cms({
     // Who may use the screens, and the API outside edit mode.
     guard: auth.guard({ require: 'editor' }),
-    // Left out, a file entry is written in the working tree, for `kay dev`.
+    // Left out, a file entry is written in the working tree, for `kay dev`: a production server refuses to boot without it.
     files: process.env.FORGEJO_TOKEN ? forgejo({ url: 'https://git.example.com', repo: 'me/site', token: process.env.FORGEJO_TOKEN }) : undefined,
   })],
   // Edit mode is kay's preview mode: it needs the secret signing its cookie.
@@ -41,7 +41,9 @@ export default defineConfig({
 
 The screens live at `/admin` (`prefix` moves them) and stay closed without a `guard`. In edit mode, kay renders the editor at the end of every page, with the entries the page read. The CMS's API answers requests kay let into edit mode, and those the guard admits. Their "Edit on page" links go through `/admin/page?path=`, which puts the editor the guard admitted in edit mode with kay's `enterPreview(ctx, { edit: true })`. The editor's "Stop editing" button leaves it, through kay's `exitPreview`.
 
-A commit shows on the site once it has rebuilt from it. The Forgejo token needs write access to the repository's contents; the commit is the token's user's. The server reads a folder collection's entries from its source files, so they ship with it: kay refuses to edit a folder missing from a build alone, or lying outside the repository.
+A commit shows on the site once it has rebuilt from it. The Forgejo token needs write access to the repository's contents; the commit is the token's user's. A save fails with the forge's reason when it takes over 15 seconds (`timeout`) or the forge cannot be reached, saying so when the commit may still have gone through.
+
+Each save and delete names the version of the file the editor opened, so one made over another save, or over one's own before the site rebuilt from it, is refused rather than writing over it. The refusal stays on the form, and its Keep my edits button lets the next save write the edits over that save. A repository checked out with CRLF line endings, or using SHA-256 object names, gives files another version than the editor computes, so every save conflicts. The server reads a folder collection's entries from its source files, so they ship with it: kay refuses to edit a folder missing from a build alone, or lying outside the repository.
 
 An image or file field (`imageField()`, `fileField()` from `kay/content`) takes a file dropped or picked, stored through kay's file storage, and keeps the path that serves it, so a page renders it as `img(src={entry.data.photo})`; a path typed in works too. kay keeps files in `data/files` by default: a deployed site sets `storage` in kay.config.ts to an S3 store or a disk that outlives a deploy.
 

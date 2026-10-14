@@ -7,7 +7,13 @@ import { settings } from './settings'
 import { scriptInBody } from './unsafe'
 
 // `version` is the saved file's, for the next save of a folder entry to name.
-export type SaveOutcome = { issues: Issue[] } | { saved: true, commit?: Commit | undefined, version?: string | undefined }
+// A refusal over another save carries `conflict`, the version the file is at now, null once deleted, which a save writing over it names.
+export type SaveOutcome = { issues: Issue[], conflict?: { version: string | null } | undefined } | { saved: true, commit?: Commit | undefined, version?: string | undefined }
+
+// What saving or deleting a folder entry the server holds asks of the editor: an editor sending no version is older than the server, which would write over any save made since it opened the entry.
+export interface VersionRule {
+  required?: boolean | undefined
+}
 
 export class UnknownCollection extends Error {}
 
@@ -55,7 +61,7 @@ function refused(ref: EntryRef, message: string, key?: Issue['key'] | 'body'): {
 
 // Saves an entry where its collection keeps it: a loaded one through its loader, a folder one as a file through the configured saver.
 // `version` is the one the editor opened, so a save made over someone else's is refused; a new entry's file must not exist yet.
-export async function saveEntry(entry: DraftEntry, { create = false, version, verb, author, bodyKept = false }: { create?: boolean | undefined, version?: string | undefined, verb?: string | undefined, author?: Identity | undefined, bodyKept?: boolean | undefined } = {}): Promise<SaveOutcome> {
+export async function saveEntry(entry: DraftEntry, { create = false, version, required = false, verb, author, bodyKept = false }: { create?: boolean | undefined, version?: string | undefined, verb?: string | undefined, author?: Identity | undefined, bodyKept?: boolean | undefined } & VersionRule = {}): Promise<SaveOutcome> {
   const collection = await collectionNamed(entry.collection)
 
   if (entry.body !== undefined && !bodyKept && !settings().rawHtml.has(collection.name)) {
@@ -70,6 +76,9 @@ export async function saveEntry(entry: DraftEntry, { create = false, version, ve
 
     return issues?.length ? { issues } : { saved: true }
   }
+
+  if (required && !create && version === undefined && await versionOf(entry) !== undefined)
+    return unversioned(entry)
 
   const source = await entrySource(collection.name, entry.slug, entry.data, { locale: entry.locale, body: entry.body, create })
 
@@ -88,7 +97,7 @@ export async function saveEntry(entry: DraftEntry, { create = false, version, ve
   return 'issues' in committed ? committed : { saved: true, commit: committed.commit, version: fileVersion(source.file.text) }
 }
 
-export async function deleteEntry(ref: EntryRef, author?: Identity): Promise<SaveOutcome> {
+export async function deleteEntry(ref: EntryRef, author?: Identity, { version, required = false }: { version?: string | undefined } & VersionRule = {}): Promise<SaveOutcome> {
   const collection = await collectionNamed(ref.collection)
 
   if (collection.kind === 'loaded') {
@@ -106,7 +115,10 @@ export async function deleteEntry(ref: EntryRef, author?: Identity): Promise<Sav
   if ('issues' in found)
     return found
 
-  const committed = await commitChange(ref, { repoPath: found.file.repoPath, absolute: found.file.absolute, text: undefined, message: `content(${collection.name}): delete ${ref.slug}`, author })
+  if (required && version === undefined && await versionOf(ref) !== undefined)
+    return unversioned(ref)
+
+  const committed = await commitChange(ref, { repoPath: found.file.repoPath, absolute: found.file.absolute, text: undefined, message: `content(${collection.name}): delete ${ref.slug}`, author, base: version })
 
   return 'issues' in committed ? committed : { saved: true, commit: committed.commit }
 }
@@ -130,19 +142,25 @@ export async function publishEntry(ref: EntryRef, author?: Identity): Promise<Sa
 }
 
 // Hands a change to the configured saver, turning a conflict or a forge that failed into the issue the editor shows.
-async function commitChange(ref: EntryRef, change: FileChange): Promise<{ commit: Commit | undefined } | { issues: Issue[] }> {
+async function commitChange(ref: EntryRef, change: FileChange): Promise<{ commit: Commit | undefined } | { issues: Issue[], conflict?: { version: string | null } | undefined }> {
   try {
     return { commit: await settings().files.save(change) }
   }
   catch (error) {
     if (error instanceof SaveConflict)
-      return refused(ref, error.message)
+      return { ...refused(ref, error.message), ...error.creating || error.current === undefined ? {} : { conflict: { version: error.current } } }
 
     if (!(error instanceof ForgeError))
       throw error
 
     log.error(`saving ${change.repoPath} failed`, error)
 
-    return refused(ref, `Not saved: ${error.message}`)
+    return refused(ref, error.message)
   }
+}
+
+function unversioned(ref: EntryRef): { issues: Issue[] } {
+  log.warn(`refused a change to ${ref.collection}/${ref.slug} naming no version, from an editor older than the server`)
+
+  return refused(ref, 'This editor is older than the server: copy your changes, reload the page, then make them again')
 }

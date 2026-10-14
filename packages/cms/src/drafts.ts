@@ -13,6 +13,12 @@ export interface DraftsOptions {
 
 export type Drafts = ReturnType<typeof createDrafts>
 
+// Why the last save of an entry was refused as a whole, kept until it saves or its edits are dropped; `conflict` is the version another save left the file at.
+export interface Refusal {
+  message: string
+  conflict?: { version: string | null } | undefined
+}
+
 // The unsaved edits of the entries a page renders, rendering the page with them shortly after each change.
 export function createDrafts({ show, delay = 150 }: DraftsOptions) {
   const saved = new Map<string, DraftEntry>()
@@ -20,6 +26,7 @@ export function createDrafts({ show, delay = 150 }: DraftsOptions) {
   const versions = new Map<string, string | undefined>()
   const current = signal<ReadonlyMap<string, DraftEntry>>(new Map())
   const issues = signal<readonly Issue[]>([])
+  const refusals = signal<ReadonlyMap<string, Refusal>>(new Map())
   const failure = signal<string>()
   const rendering = signal(false)
   let timer: ReturnType<typeof setTimeout> | undefined
@@ -56,6 +63,17 @@ export function createDrafts({ show, delay = 150 }: DraftsOptions) {
       if (call === latest)
         rendering.set(false)
     }
+  }
+
+  function refuse(ref: EntryRef, refusal: Refusal | undefined): void {
+    const next = new Map(refusals())
+
+    if (refusal)
+      next.set(entryKey(ref), refusal)
+    else
+      next.delete(entryKey(ref))
+
+    refusals.set(next)
   }
 
   function update(ref: EntryRef, change: (entry: DraftEntry) => DraftEntry | undefined): void {
@@ -107,6 +125,7 @@ export function createDrafts({ show, delay = 150 }: DraftsOptions) {
     },
     // Drops the entry's unsaved edits, rendering the page without them.
     reset(ref: EntryRef): void {
+      refuse(ref, undefined)
       update(ref, () => undefined)
     },
     // Takes the entry as it was sent for its saved state, once a save went through: an edit made while it was on its way stays unsaved.
@@ -116,6 +135,22 @@ export function createDrafts({ show, delay = 150 }: DraftsOptions) {
       saved.set(key, sent)
       versions.set(key, version)
       current.set(new Map(current()))
+      refuse(ref, undefined)
+    },
+    // Keeps why a save was refused as a whole, which no render replaces, or forgets it.
+    refuse,
+    refusal(ref: EntryRef): Refusal | undefined {
+      return refusals().get(entryKey(ref))
+    },
+    // After a conflict, takes the version the other save left as the one the edits were made from, so the next save writes them over it.
+    keepEdits(ref: EntryRef): void {
+      const conflict = refusals().get(entryKey(ref))?.conflict
+
+      if (!conflict)
+        return
+
+      versions.set(entryKey(ref), conflict.version ?? undefined)
+      refuse(ref, undefined)
     },
     // Shows the issues a save was refused with, as a render's are shown.
     report(refusals: readonly Issue[]): void {

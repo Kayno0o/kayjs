@@ -58,7 +58,7 @@ async function publish(): Promise<void> {
 }
 
 async function remove(): Promise<void> {
-  if (await deleteSaved(ref))
+  if (await deleteSaved(ref, drafts.version(ref)))
     await navigate(collectionPath(prefix, collection.name), { replace: true })
 }
 ---

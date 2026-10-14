@@ -3,11 +3,53 @@ import type { EntryRef, Issue } from '../kay/contract'
 import { attempt, toast } from '@kaynooo/kayjs-ui'
 import { call } from 'kay'
 import entriesApi from '../api/entries'
+import { entryKey } from '../markers'
 
-type Outcome = { issues: Issue[] } | { saved: true, commit?: unknown, version?: string | undefined }
+type Outcome = { issues: Issue[], conflict?: { version: string | null } | undefined } | { saved: true, commit?: unknown, version?: string | undefined }
+interface SaveOptions { slug?: string, locale?: string | undefined, create?: boolean }
+
+// The save of each entry on its way, and whether another was asked for meanwhile.
+const saving = new WeakMap<Drafts, Map<string, { done: Promise<boolean>, again: boolean }>>()
 
 // Saves an entry's draft, under the slug and locale a new entry was given, and says how it went; true once saved.
-export async function saveDraft(drafts: Drafts, ref: EntryRef, { slug = ref.slug, locale = ref.locale, create = false }: { slug?: string, locale?: string | undefined, create?: boolean } = {}): Promise<boolean> {
+// A save asked for while one is on its way waits for it, then saves the edits typed meanwhile once, so the same version is never sent twice.
+export async function saveDraft(drafts: Drafts, ref: EntryRef, options: SaveOptions = {}): Promise<boolean> {
+  const inFlight = saving.get(drafts) ?? new Map<string, { done: Promise<boolean>, again: boolean }>()
+  const key = entryKey(ref)
+  const running = inFlight.get(key)
+
+  saving.set(drafts, inFlight)
+
+  if (running) {
+    // A new entry saved again would be created twice; its page saves the rest.
+    running.again ||= options.create !== true
+
+    return running.done
+  }
+
+  const flight = { done: Promise.resolve(false), again: false }
+
+  flight.done = (async () => {
+    try {
+      let saved = await saveOnce(drafts, ref, options)
+
+      while (saved && flight.again && drafts.changed(ref)) {
+        flight.again = false
+        saved = await saveOnce(drafts, ref, options)
+      }
+
+      return saved
+    }
+    finally {
+      inFlight.delete(key)
+    }
+  })()
+  inFlight.set(key, flight)
+
+  return flight.done
+}
+
+async function saveOnce(drafts: Drafts, ref: EntryRef, { slug = ref.slug, locale = ref.locale, create = false }: SaveOptions): Promise<boolean> {
   const entry = drafts.entry(ref)
 
   if (!entry)
@@ -21,7 +63,18 @@ export async function saveDraft(drafts: Drafts, ref: EntryRef, { slug = ref.slug
 
   if (outcome && 'issues' in outcome) {
     // A new entry's issues name the slug it was saved under, not the one its draft is kept by.
-    drafts.report(outcome.issues.map(issue => ({ ...issue, collection: ref.collection, slug: ref.slug, locale: ref.locale })))
+    const issues = outcome.issues.map(issue => ({ ...issue, collection: ref.collection, slug: ref.slug, locale: ref.locale }))
+    const whole = issues.find(issue => issue.path === '' && issue.key === undefined && issue.body !== true)
+
+    // A refusal of the entry as a whole, a conflict or a forge that failed, stays shown while the editor types, as no render clears it.
+    if (whole) {
+      drafts.refuse(ref, { message: whole.message, conflict: outcome.conflict })
+      toast.error(`Not saved: ${whole.message}`)
+
+      return false
+    }
+
+    drafts.report(issues)
     toast.error('Not saved: some fields need fixing')
 
     return false
@@ -36,12 +89,13 @@ export async function saveDraft(drafts: Drafts, ref: EntryRef, { slug = ref.slug
   return true
 }
 
-// Deletes a saved entry and says how it went; true once deleted.
-export async function deleteSaved(ref: EntryRef): Promise<boolean> {
-  const outcome = await attempt(() => call(entriesApi, '/:collection/:slug', {
+// Deletes a saved entry, naming the version it was opened at, and says how it went; true once deleted.
+// A list of entries shows no version, so a delete from it names the one the entry is at as it is asked.
+export async function deleteSaved(ref: EntryRef, version?: string | undefined): Promise<boolean> {
+  const outcome = await attempt(async () => call(entriesApi, '/:collection/:slug', {
     method: 'delete',
     params: { collection: ref.collection, slug: ref.slug },
-    query: localeOf(ref),
+    query: { ...localeOf(ref), ...versionOf(version ?? await currentVersion(ref)) },
   }), 'Could not delete')
 
   return settled(outcome, 'Deleted', 'Not deleted')
@@ -56,6 +110,12 @@ export async function publishSaved(ref: EntryRef): Promise<boolean> {
   }), 'Could not publish')
 
   return settled(outcome, 'Published', 'Not published')
+}
+
+async function currentVersion(ref: EntryRef): Promise<string | undefined> {
+  const { entry } = await call(entriesApi, '/:collection/:slug', { params: { collection: ref.collection, slug: ref.slug }, query: localeOf(ref) })
+
+  return entry.version
 }
 
 function localeOf({ locale }: EntryRef): { locale?: string } {

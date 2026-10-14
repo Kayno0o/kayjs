@@ -4,6 +4,7 @@ import { authors } from '../authors'
 import { collectionNamed, deleteEntry, entryOf, publishEntry, saveEntry, UnknownCollection } from '../store'
 
 const locale = s.Object({ locale: s.Optional(s.String()) })
+const versioned = s.Object({ locale: s.Optional(s.String()), version: s.Optional(s.String()) })
 
 export default api()
   .onError(({ error, status }) => error instanceof UnknownCollection ? status(404, error.message) : undefined)
@@ -13,7 +14,7 @@ export default api()
 
     return entry ? { collection, entry } : status(404, `No entry ${params.slug} in ${params.collection}`)
   }, { query: locale })
-  .post('/:collection/:slug', async ({ params, body, request }) => saveEntry({ collection: params.collection, slug: params.slug, locale: body.locale, data: body.data, body: body.body }, { create: body.create, version: body.version, author: authors.get(request) }), {
+  .post('/:collection/:slug', async ({ params, body, request }) => saveEntry({ collection: params.collection, slug: params.slug, locale: body.locale, data: body.data, body: body.body }, { create: body.create, version: body.version, required: true, author: authors.get(request) }), {
     body: s.Object({
       locale: s.Optional(s.String()),
       data: s.Record(s.String(), s.Unknown()),
@@ -23,4 +24,4 @@ export default api()
     }),
   })
   .post('/:collection/:slug/publish', async ({ params, query, request }) => publishEntry({ collection: params.collection, slug: params.slug, locale: query.locale }, authors.get(request)), { query: locale })
-  .delete('/:collection/:slug', async ({ params, query, request }) => deleteEntry({ collection: params.collection, slug: params.slug, locale: query.locale }, authors.get(request)), { query: locale })
+  .delete('/:collection/:slug', async ({ params, query, request }) => deleteEntry({ collection: params.collection, slug: params.slug, locale: query.locale }, authors.get(request), { version: query.version, required: true }), { query: versioned })

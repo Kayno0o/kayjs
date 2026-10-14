@@ -164,6 +164,27 @@ describe('saving', () => {
     expect(drafts.value(post, 'title')).toBe('Sent')
   })
 
+  it('keeps a refusal of the whole entry through renders, until it saves, resets or keeps its edits over a conflict', async () => {
+    const { drafts } = setup(async () => ({ issues: [] }))
+
+    drafts.set(post, 'title', 'Mine')
+    drafts.refuse(post, { message: 'saved since', conflict: { version: 'f00d' } })
+    drafts.set(post, 'title', 'Mine, typed on')
+    await settled()
+    expect(drafts.refusal(post)?.message).toBe('saved since')
+
+    drafts.keepEdits(post)
+    expect([drafts.refusal(post), drafts.version(post), drafts.value(post, 'title')]).toEqual([undefined, 'f00d', 'Mine, typed on'])
+
+    drafts.refuse(post, { message: 'Forgejo did not answer' })
+    drafts.markSaved(post, drafts.entry(post)!, 'f00e')
+    expect(drafts.refusal(post)).toBeUndefined()
+
+    drafts.refuse(post, { message: 'Forgejo did not answer' })
+    drafts.reset(post)
+    expect(drafts.refusal(post)).toBeUndefined()
+  })
+
   it('shows the issues a save was refused with', () => {
     const { drafts } = setup()
 

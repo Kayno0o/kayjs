@@ -1,6 +1,7 @@
 ---
 import type { Drafts } from '../drafts'
 import type { CollectionInfo, EntryRef } from '../kay/contract'
+import Button from '@kaynooo/kayjs-ui/button.kay'
 import FormField from '@kaynooo/kayjs-ui/form-field.kay'
 import MarkdownEditor from '@kaynooo/kayjs-ui/markdown-editor.kay'
 import { fieldsOf } from '../fields'
@@ -12,6 +13,12 @@ const { drafts, entry, collection } = props<{ drafts: Drafts, entry: EntryRef, c
 
 const fields = memo(() => fieldsOf(collection.schema))
 ---
+if drafts.refusal(entry) as refusal
+  .kcms-entry-failure.kcms-refusal(role="alert")
+    p Not saved: {refusal.message}.
+    if refusal.conflict
+      p Keeping your edits makes the next save write them over that save.
+      Button(label="Keep my edits" onClick={() => drafts.keepEdits(entry)})
 for issue of drafts.issues(entry, '') key={issue.message}
   p.kcms-entry-failure(role="alert") {issue.message}
 for field of fields() key={field.key}

@@ -126,7 +126,41 @@ describe('saveEntry', () => {
     configure({ files: { save: async () => {
       throw new ForgeError(504, 'Forgejo did not answer within 15 s')
     } } })
-    expect(await deleteEntry({ collection: 'posts', slug: 'hello' })).toHaveProperty('issues.0.message', 'Not saved: Forgejo did not answer within 15 s')
+    expect(await deleteEntry({ collection: 'posts', slug: 'hello' })).toHaveProperty('issues.0.message', 'Forgejo did not answer within 15 s')
+  })
+
+  test('hands the editor the version another save left, to write over it, but none for a new entry whose slug is taken', async () => {
+    configure({ files: { save: async () => {
+      throw new SaveConflict('f00d')
+    } } })
+    expect(await saveEntry({ collection: 'posts', slug: 'hello', data: { title: 'Hi' } }, { version: 'old' })).toMatchObject({ conflict: { version: 'f00d' } })
+
+    configure({ files: { save: async () => {
+      throw new SaveConflict('f00d', true)
+    } } })
+    expect(await saveEntry({ collection: 'posts', slug: 'fresh', data: { title: 'Hi' } }, { create: true })).not.toHaveProperty('conflict')
+  })
+
+  test('refuses a save or a delete naming no version of a file the server holds, when the editor must name one', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kayjs-cms-store-'))
+    const path = join(dir, 'hello.md')
+
+    try {
+      await Bun.write(path, 'hello')
+      stored.posts = [{ slug: 'hello', path, data: { title: 'Hello' }, draft: false }]
+
+      const older = 'This editor is older than the server: copy your changes, reload the page, then make them again'
+
+      expect(await saveEntry({ collection: 'posts', slug: 'hello', data: { title: 'Hi' } }, { required: true })).toHaveProperty('issues.0.message', older)
+      expect(await deleteEntry({ collection: 'posts', slug: 'hello' }, undefined, { required: true })).toHaveProperty('issues.0.message', older)
+      expect(saved).toEqual([])
+
+      await deleteEntry({ collection: 'posts', slug: 'hello' }, undefined, { version: fileVersion('hello'), required: true })
+      expect(saved.map(change => change.base)).toEqual([fileVersion('hello')])
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
   })
 
   test('hands a loaded entry to its collection\'s loader', async () => {

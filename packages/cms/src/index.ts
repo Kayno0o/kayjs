@@ -1,5 +1,5 @@
 export { createDrafts } from './drafts'
-export type { Drafts, DraftsOptions } from './drafts'
+export type { Drafts, DraftsOptions, Refusal } from './drafts'
 export { cms } from './extension'
 export { emptyValue, fieldOf, fieldsOf, humanize } from './fields'
 export type { Choice, Field } from './fields'

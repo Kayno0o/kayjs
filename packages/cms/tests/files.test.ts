@@ -32,6 +32,17 @@ function forge(files: Record<string, string>, refuse?: Response) {
   return { sent, saver: forgejo({ url: 'https://git.example.com/', repo: 'me/site', branch: 'main', token: 't0k', fetch: request as typeof fetch }) }
 }
 
+async function failureOf<T extends Error>(save: Promise<unknown>): Promise<T> {
+  try {
+    await save
+  }
+  catch (error) {
+    return error as T
+  }
+
+  throw new Error('the save went through')
+}
+
 const change = { absolute: '/unused', message: 'content(posts): update hello', author: { name: 'Kay', email: 'kay@example.com' } }
 
 describe('forgejo', () => {
@@ -101,10 +112,57 @@ describe('forgejo', () => {
     await expect(failure).rejects.toThrow('Forgejo did not answer within 0.05 s')
   })
 
-  test('throws a proxy\'s plain-text refusal as it came', async () => {
+  test('throws a proxy\'s plain-text refusal as it came, cut to its first 200 characters', async () => {
     const { saver } = forge({}, new Response('Bad gateway', { status: 502 }))
 
     await expect(saver.save({ ...change, repoPath: 'a.md', text: 'a' })).rejects.toThrow('Forgejo answered 502: Bad gateway')
+
+    const page = `<html>${'x'.repeat(5000)}</html>`
+    const long = forge({}, new Response(page, { status: 502 }))
+    const failure = await failureOf(long.saver.save({ ...change, repoPath: 'a.md', text: 'a' }))
+
+    expect(failure.message).toBe(`Forgejo answered 502: ${page.slice(0, 200)}…`)
+  })
+
+  test('times the save as a whole, and says a commit timed out once sent may still have gone through', async () => {
+    const slow = async (input: string | URL | Request, init?: RequestInit) => new Promise<Response>((resolve, reject) => {
+      const timer = setTimeout(() => resolve(init?.method === 'POST' ? Response.json({ commit: { sha: 'c0ffee' } }) : Response.json({ message: 'not found' }, { status: 404 })), 40)
+
+      init?.signal?.addEventListener('abort', () => {
+        clearTimeout(timer)
+        reject(init.signal?.reason)
+      })
+      void input
+    })
+    // Each request is under the timeout, both together over it.
+    const saver = forgejo({ url: 'https://git.example.com', repo: 'me/site', token: 't0k', timeout: 60, fetch: slow as typeof fetch })
+
+    await expect(saver.save({ ...change, repoPath: 'a.md', text: 'a' })).rejects.toThrow('Forgejo did not answer within 0.06 s: the save may still have gone through, so check the repository before saving again')
+  })
+
+  test('names why the forge could not be reached', async () => {
+    const refused = async () => {
+      throw Object.assign(new Error('Unable to connect'), { code: 'ConnectionRefused' })
+    }
+    const saver = forgejo({ url: 'https://git.example.com', repo: 'me/site', token: 't0k', fetch: refused as unknown as typeof fetch })
+    const failure = await failureOf<ForgeError>(saver.save({ ...change, repoPath: 'a.md', text: 'a' }))
+
+    expect(failure).toBeInstanceOf(ForgeError)
+    expect([failure.status, failure.message]).toEqual([502, 'Could not reach Forgejo (ConnectionRefused)'])
+  })
+
+  test('takes Forgejo refusing the commit\'s sha as a conflict, with the version the branch holds now', async () => {
+    const files: Record<string, string> = { 'content/posts/hello.md': 'b10b' }
+    const { saver } = forge(files, Response.json({ message: 'sha does not match [given: b10b, expected: f00d]' }, { status: 422 }))
+    const raced = saver.save({ ...change, repoPath: 'content/posts/hello.md', text: 'mine', base: 'b10b' })
+
+    // Another save lands between the read and the commit.
+    files['content/posts/hello.md'] = 'f00d'
+    await expect(raced).rejects.toMatchObject({ current: 'f00d', creating: false })
+
+    const taken = forge({}, Response.json({ message: 'repository file already exists' }, { status: 409 }))
+
+    await expect(taken.saver.save({ ...change, repoPath: 'new.md', text: 'new', base: null })).rejects.toThrow('An entry with this slug already exists: pick another slug')
   })
 })
 
@@ -123,6 +181,18 @@ describe('workingTree', () => {
     await saver.save({ ...change, repoPath: 'content/posts/hello.md', absolute, text: undefined })
 
     expect(await Bun.file(absolute).exists()).toBe(false)
+  })
+
+  test('checks and writes one save of a file at a time, so two made from one version never both go through', async () => {
+    const absolute = join(dir, 'content', 'posts', 'twice.md')
+    const saver = workingTree()
+
+    await saver.save({ ...change, repoPath: 'content/posts/twice.md', absolute, text: 'first', base: null })
+
+    const outcomes = await Promise.allSettled(['mine', 'theirs'].map(async text => saver.save({ ...change, repoPath: 'content/posts/twice.md', absolute, text, base: fileVersion('first') })))
+
+    expect(outcomes.map(outcome => outcome.status)).toEqual(['fulfilled', 'rejected'])
+    expect(await Bun.file(absolute).text()).toBe('mine')
   })
 
   test('refuses a change made from a version the file no longer has', async () => {

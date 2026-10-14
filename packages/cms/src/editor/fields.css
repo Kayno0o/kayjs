@@ -50,3 +50,14 @@
   color: var(--color-kui-subtext0);
   font-size: 0.85rem;
 }
+
+.kcms-refusal {
+  display: grid;
+  color: var(--color-kui-error);
+  justify-items: start;
+  gap: 0.5rem;
+}
+
+.kcms-refusal p {
+  margin: 0;
+}

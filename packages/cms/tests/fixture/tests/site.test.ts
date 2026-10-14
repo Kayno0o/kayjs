@@ -148,6 +148,11 @@ async function send(method: string, path: string, body?: object): Promise<{ stat
   return { status: response.status, answer: await response.json() }
 }
 
+// The version of an entry's file as the editor opens it, which a save or a delete names.
+async function versionOf(path: string): Promise<string> {
+  return ((await send('GET', path)).answer as { entry: { version: string } }).entry.version
+}
+
 test('saving a file entry hands the file kay wrote to the saver, as a commit by the editor the app names', async () => {
   saved.length = 0
 
@@ -166,7 +171,7 @@ test('saving a file entry hands the file kay wrote to the saver, as a commit by 
 test('a save kay\'s schema refuses comes back as issues, and nothing is written', async () => {
   saved.length = 0
 
-  const { answer } = await send('POST', 'posts/hello', { data: { title: 3 } }) as { answer: { issues: { path: string }[] } }
+  const { answer } = await send('POST', 'posts/hello', { data: { title: 3 }, version: await versionOf('posts/hello') }) as { answer: { issues: { path: string }[] } }
 
   expect(answer.issues.map(issue => issue.path)).toContain('title')
   expect((await send('POST', 'posts/hello', { data: { title: 'Again' }, create: true })).answer).toEqual({ issues: [{ collection: 'posts', slug: 'hello', path: '', key: 'slug', message: 'names an entry the collection already holds' }] })
@@ -177,13 +182,13 @@ test('a body that would run as the site is refused, Markdown showing code kept',
   saved.length = 0
 
   for (const body of ['Hi <script>alert(1)</script>\n', '<img src="x" onerror="alert(1)">\n', '[link](javascript:alert(1))\n', '<a href="&#106;avascript:alert(1)">x</a>\n']) {
-    const { answer } = await send('POST', 'posts/hello', { data: { title: 'Hello' }, body }) as { answer: { issues: { body?: true, message: string }[] } }
+    const { answer } = await send('POST', 'posts/hello', { data: { title: 'Hello' }, body, version: await versionOf('posts/hello') }) as { answer: { issues: { body?: true, message: string }[] } }
 
     expect(answer.issues).toEqual([expect.objectContaining({ body: true, message: expect.stringContaining('would run as the site') })])
   }
 
   expect(saved).toEqual([])
-  expect((await send('POST', 'posts/hello', { data: { title: 'Hello' }, body: '```html\n<script>shown, not run</script>\n```\n\n<kbd>Ctrl</kbd> and ![a pixel](data:image/png;base64,iVBORw0KGgo=)\n' })).answer).toHaveProperty('saved', true)
+  expect((await send('POST', 'posts/hello', { data: { title: 'Hello' }, body: '```html\n<script>shown, not run</script>\n```\n\n<kbd>Ctrl</kbd> and ![a pixel](data:image/png;base64,iVBORw0KGgo=)\n', version: await versionOf('posts/hello') })).answer).toHaveProperty('saved', true)
 })
 
 test('a nested slug is published and deleted through its file', async () => {
@@ -191,7 +196,7 @@ test('a nested slug is published and deleted through its file', async () => {
 
   expect((await send('POST', 'posts/notes%2Fgarden/publish')).answer).toHaveProperty('saved', true)
   expect(saved[0]?.text).toContain('draft: false')
-  expect((await send('DELETE', 'posts/notes%2Fgarden')).answer).toHaveProperty('saved', true)
+  expect((await send('DELETE', `posts/notes%2Fgarden?version=${await versionOf('posts/notes%2Fgarden')}`)).answer).toHaveProperty('saved', true)
   expect(saved.map(({ repoPath, text }) => [repoPath, text])[1]).toEqual(['packages/cms/tests/fixture/src/content/posts/notes/garden.md', undefined])
 })
 
@@ -244,8 +249,8 @@ test('a file that does not parse lists as broken, why said on its link too, and 
 
     saved.length = 0
 
-    expect((await send('POST', 'posts/broken', { data: { title: 'Mended' } })).answer).toHaveProperty('saved', true)
-    expect((await send('DELETE', 'posts/broken')).answer).toHaveProperty('saved', true)
+    expect((await send('POST', 'posts/broken', { data: { title: 'Mended' }, version: await versionOf('posts/broken') })).answer).toHaveProperty('saved', true)
+    expect((await send('DELETE', `posts/broken?version=${await versionOf('posts/broken')}`)).answer).toHaveProperty('saved', true)
     expect(saved.map(({ repoPath, text }) => [repoPath, text === undefined ? undefined : JSON.parse(text)])).toEqual([['packages/cms/tests/fixture/src/content/posts/broken.json', { title: 'Mended' }], ['packages/cms/tests/fixture/src/content/posts/broken.json', undefined]])
   }
   finally {
