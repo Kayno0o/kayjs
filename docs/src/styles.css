@@ -1080,3 +1080,57 @@ pre code {
     grid-column: 1;
   }
 }
+
+/* A project tree: each folder's entries hang from a guide line under it. */
+.file-tree {
+  margin: 1.5rem 0;
+  padding: 0.9rem 1rem;
+  overflow-x: auto;
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  line-height: 1.5;
+  background: var(--mantle);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.file-tree .file-tree-list {
+  display: block;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.file-tree .file-tree-list .file-tree-list {
+  margin-left: 0.5rem;
+  padding-left: 0.9rem;
+  border-left: 1px solid var(--line);
+}
+
+.file-tree li {
+  margin: 0;
+}
+
+.file-tree-entry {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.1rem 0;
+  white-space: nowrap;
+}
+
+.file-tree-entry :is(svg, img) {
+  flex: none;
+  width: 1rem;
+  height: 1rem;
+  color: var(--muted);
+}
+
+.file-tree-entry img {
+  border-radius: 2px;
+}
+
+.file-tree-note {
+  margin-left: 0.75rem;
+  color: var(--muted);
+}

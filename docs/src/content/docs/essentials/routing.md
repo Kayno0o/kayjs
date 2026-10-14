@@ -4,15 +4,15 @@ order: 3
 description: Files in src/routes are pages, their path is their URL.
 ---
 
-```
+<FileTree tree="
 src/routes/
-├── index.kay          /
-├── about.kay          /about
-├── blog/
-│   ├── index.kay      /blog
-│   └── [slug].kay     /blog/:slug
-└── _layout.kay        wraps every page
-```
+  index.kay  /
+  about.kay  /about
+  blog/
+    index.kay  /blog
+    [[slug].kay](#dynamic-routes)  /blog/:slug
+  [_layout.kay](#layouts)  wraps every page
+" />
 
 Links are plain `a` tags, and `kay check` reports a link to a page that does not exist.
 

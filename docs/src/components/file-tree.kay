@@ -1,0 +1,9 @@
+---
+import { fileTree } from '../file-tree'
+import FileTreeEntries from './file-tree-entries.kay'
+
+// One file or folder per line, nested two spaces under its folder: a name, or a Markdown link to the page about it, then a note after two spaces.
+const { tree } = props<{ tree: string }>()
+---
+.file-tree
+  FileTreeEntries(entries={fileTree(tree)})

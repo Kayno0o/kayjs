@@ -1,6 +1,7 @@
 import { readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
+import { fileTree } from '../docs/src/file-tree'
 import { loadComponents, loadLibraries } from '../docs/src/libraries'
 import { loadReference } from '../docs/src/reference'
 import { check } from '../src/check'
@@ -132,6 +133,22 @@ describe('the documentation site', () => {
 
     for (const step of steps)
       expect(installation).toContain(`\n${step}\n\`\`\``)
+  })
+
+  it('reads a FileTree\'s outline, nesting each entry under the folder above it, its link and its note apart', () => {
+    expect(fileTree(`
+      src/
+        [[slug].kay](#dynamic-routes)  /blog/:slug
+        [x].kay  see [a](b)
+      kay.config.ts
+    `)).toEqual([
+      { name: 'src/', href: undefined, note: undefined, children: [
+        { name: '[slug].kay', href: '#dynamic-routes', note: '/blog/:slug', children: [] },
+        { name: '[x].kay', href: undefined, note: 'see [a](b)', children: [] },
+      ] },
+      { name: 'kay.config.ts', href: undefined, note: undefined, children: [] },
+    ])
+    expect(() => fileTree('src/ the sources')).toThrow('FileTree cannot read the line "src/ the sources"')
   })
 
   it('passes kay check, and so does the tutorial\'s example app', async () => {

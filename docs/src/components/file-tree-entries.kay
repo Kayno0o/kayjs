@@ -1,0 +1,25 @@
+---
+import type { FileEntry } from '../file-tree'
+import Icon from '@kaynooo/kayjs-ui/icon.kay'
+import { fileIcon } from '../file-icons'
+import FileTreeEntries from './file-tree-entries.kay'
+
+const { entries } = props<{ entries: FileEntry[] }>()
+---
+ul.file-tree-list
+  for entry of entries key={entry.name}
+    li
+      span.file-tree-entry
+        if fileIcon(entry.name) as icon
+          if icon === 'kay'
+            img(src="/favicon.svg" alt="" width="16" height="16")
+          else
+            Icon(icon={icon})
+        if entry.href
+          a(href={entry.href}) {entry.name}
+        else
+          span.file-tree-name {entry.name}
+        if entry.note
+          span.file-tree-note {entry.note}
+      if entry.children.length > 0
+        FileTreeEntries(entries={entry.children})

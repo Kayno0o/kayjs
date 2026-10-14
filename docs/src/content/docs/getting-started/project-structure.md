@@ -6,20 +6,20 @@ description: Where the files of a kay project live and what the two entry files 
 
 A project made by `kay new` looks like this. Only `src/routes` is required.
 
-```
+<FileTree tree="
 my-app/
-├── src/
-│   ├── routes/          pages and layouts, a file is a URL
-│   ├── components/      components shared by pages
-│   ├── api/             Elysia modules, served under /api
-│   ├── content/         Markdown, JSON and YAML read by collections
-│   ├── content.config.ts
-│   └── server.ts        the server entry
-├── public/              files served as they are, at their path
-├── kay.config.ts        project settings
-├── tsconfig.json        extends kay's
-└── .kay/                generated types and build output, git ignored
-```
+  src/
+    [routes/](/essentials/routing)  pages and layouts, a file is a URL
+    [components/](/essentials/components)  components shared by pages
+    [api/](/guides/api-routes)  Elysia modules, served under /api
+    [content/](/guides/content)  Markdown, JSON and YAML read by collections
+    [content.config.ts](/guides/content)  the collections
+    [server.ts](#the-server-entry)  the server entry
+  [public/](/essentials/styling-and-assets#public-files)  files served as they are, at their path
+  [kay.config.ts](#kayconfigts)  project settings
+  tsconfig.json  extends kay's
+  .kay/  generated types and build output, git ignored
+" />
 
 `.kay/` holds the generated types, the client build and the compile cache. Add it to `.gitignore`.
 
