@@ -14,7 +14,7 @@ src/routes/
 └── _layout.kay        wraps every page
 ```
 
-Links are plain `a` tags. kay swaps the next page in without a reload once a page has an island or a form, and `kay check` reports a link to a page that does not exist.
+Links are plain `a` tags, and `kay check` reports a link to a page that does not exist.
 
 ```kay
 a(href="/about") About
@@ -40,7 +40,7 @@ h1 {post.title}
 | `[[page]].kay` | `/blog` and `/blog/2` |
 | `[id=integer].kay` | `/items/42` only, `ctx.params.id` a `number` |
 
-When two pages match a URL, the first segment telling them apart decides: a fixed name wins over a param, and a param over a catch-all. `/docs/intro` goes to `docs/[...path].kay` rather than `[section]/[page].kay`. The same goes for any route ending in `*` against a page of params, whether a redirect's, an API module's or the app's own, over a listening server as through `app.handle()`. An app that passes `.use()` a promise, as `.use(import('./admin'))`, gets that once Elysia has loaded it, so a request in the moment after `listen()` may still reach the page of params.
+When two pages match a URL, a fixed name wins over a param, and a param over a catch-all. `/docs/intro` goes to `docs/[...path].kay` rather than `[section]/[page].kay`.
 
 <Callout type="tip">
 
@@ -60,7 +60,7 @@ main
   slot
 ```
 
-Layouts nest: `blog/_layout.kay` renders inside the root one. To group pages under a layout without changing their URL, put them in a folder in parentheses: `(marketing)/pricing.kay` is `/pricing`.
+Layouts nest: `blog/_layout.kay` renders inside the root one. A folder in parentheses groups pages under a layout without changing their URL: `(marketing)/pricing.kay` is `/pricing`.
 
 ## Page settings
 
@@ -72,7 +72,7 @@ export const page = { prerender: true, revalidate: '1h' }
 ---
 ```
 
-The keys are `prerender` and `revalidate` (see [Prerendering](#prerendering)), `layouts: false` to drop the layouts above the page, `query` (see [Data loading](/essentials/data-loading)), `sitemap` and `noindex` (see [Head and SEO](/essentials/head-and-seo)), `guards: false` to skip the guards above (see [Sessions and guards](/guides/sessions-and-guards)), `security` to add CSP sources or headers to the page's responses, `reload: true` to have every link load the page fully, and `search` to leave the page out of the [site search](/guides/search) or weigh it. A layout's `layouts`, `security` and `reload` apply to the pages under it, and its `guards: false` opens its own actions alone. `kay check` types the object, so the editor completes the keys and an unknown one is an error. A setting exported under its own name, `export const prerender = true`, is a compile error, and `kay check --fix` moves it into `page`.
+The usual keys are `prerender` and `revalidate` (see [Prerendering](#prerendering)), `layouts: false` to drop the layouts above the page, `query` (see [Data loading](/essentials/data-loading)), and `sitemap` and `noindex` (see [Head and SEO](/essentials/head-and-seo)). `kay check` types the object, so the editor completes the keys and an unknown one is an error.
 
 ## Loading data
 
@@ -94,9 +94,7 @@ export function GET({ params }: EndpointContext<{ slug: string }>) {
 }
 ```
 
-`GET` gets the `request`, `url`, `params` and `locals`, and returns a string, a `Blob` or a `Response`. A string goes out as the type its extension names, `text/plain` for `llms.txt`. The guards above it run first, as they do for a page, and `kay build --static` writes it to a file, for each set of params its `prerender` lists.
-
-A page and an endpoint cannot share a param path, `posts/[slug].kay` beside `posts/[slug].json.ts`: put the endpoint one level down, `posts/[slug]/feed.json.ts`. An endpoint at a path a page in any locale, a public file, a redirect, an API route or a feed serves stops the server at boot. A `.ts` file with no extension before `.ts` stays a helper.
+`GET` gets the `request`, `url`, `params` and `locals`, and returns a string, a `Blob` or a `Response`. A string goes out as the type its extension names, `text/plain` for `llms.txt`. The guards above it run first, as they do for a page, and `kay build --static` writes it to a file.
 
 ## Not found and errors
 
@@ -165,8 +163,6 @@ export default defineConfig({
 })
 ```
 
-An old path that a page in any locale, a public file, an endpoint, an API route or a feed serves stops the server at boot. An HTML file's path without `.html` gives way to a redirect, as does a translated page's untranslated path.
-
 ## Pages from a library
 
 A library can serve pages of its own, such as kayjs-auth's sign-in and sign-up, listed once in `extensions`:
@@ -180,10 +176,6 @@ export default defineConfig({ extensions: [authPages()] })
 
 Its pages serve under their prefix, `/auth/login`, inside your layouts and guards. To change one, put your own file at the same path, `src/routes/auth/login.kay`: it replaces that page alone, and the library's others stay.
 
-A CMS's extension can also name an `editor`, an island every page renders last in edit mode with its stylesheets, kept alive across pages, but the pages its own `routes` serve: see [Preview mode](/guides/content#preview-mode).
-
-While you write such a library, list its extension from an example or fixture app, by a relative import or through a link: `kay check` there, and the editor opened on the app, check the library's pages and its CMS editor as the app's own, their route params typed by the app's matchers. They compile under the app's `tsconfig.json`, so give the app the compiler options the library is written for, `exactOptionalPropertyTypes` say; the library's `.ts` modules stay its own `tsc`'s to check. A path its routes name is checked only under its own prefix, a locale's prefix before it included, so a redirect back to `/` passes in an app with no `/` page. Once installed from the registry, the errors inside its files are the library's to fix.
-
 <ReadMore href="/llms/components#extensions">Writing an extension, its layouts, messages, API modules and config, page hooks and editor.</ReadMore>
 
-<ReadMore href="/llms/routing">Matchers, server island options such as `noscript`, rewrites, base path and static export are in the full routing reference.</ReadMore>
+<ReadMore href="/llms/routing">Matchers, the page settings in full, server island options such as `noscript`, rewrites, base path and static export are in the full routing reference.</ReadMore>
