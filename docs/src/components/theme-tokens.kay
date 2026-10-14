@@ -1,9 +1,9 @@
 ---
 import CopyButton from '@kaynooo/kayjs-ui/copy-button.kay'
 import { memo } from 'kay'
-import { theme, themeCss } from '../theme'
+import { accent, scheme, themeCss } from '../theme'
 
-const css = memo(() => themeCss(theme()))
+const css = memo(() => themeCss(accent()))
 ---
 // The theme picked in the header, as an app's app.css and root layout would set it.
 .code.theme-tokens
@@ -12,5 +12,5 @@ const css = memo(() => themeCss(theme()))
     CopyButton(text={css()} label="Copy")
   pre
     code {css()}
-if theme().scheme !== 'system'
-  p And its root layout's #[code head] block holds #[code html(data-theme="{theme().scheme}")].
+// Hidden rather than left out on the system scheme: a stored scheme can apply while this island still hydrates (#451), and a branch on it would not match the server markup.
+p(hidden={scheme() === 'system'}) And its root layout's #[code head] block holds #[code html(data-theme="{scheme()}")].

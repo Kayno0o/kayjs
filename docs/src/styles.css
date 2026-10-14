@@ -9,7 +9,7 @@
   --text: var(--color-kui-text);
   --accent: var(--color-kui-accent);
   /* The accent the theme picker sets, faint under the page shown and a card hovered. */
-  --tint: color-mix(in srgb, var(--accent) 20%, var(--base));
+  --tint: color-mix(in srgb, var(--accent) 14%, var(--base));
   --line: color-mix(in srgb, var(--text) 12%, transparent);
   --edge: light-dark(rgb(23 32 46 / 0.2), rgb(0 0 0 / 0.6));
   --sans: var(--font-sans);

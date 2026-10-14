@@ -4,9 +4,10 @@ import { describe, expect, it } from 'bun:test'
 import { fileTree } from '../docs/src/file-tree'
 import { loadComponents, loadLibraries } from '../docs/src/libraries'
 import { loadReference } from '../docs/src/reference'
-import { ACCENTS, THEME_SCRIPT, themeCss } from '../docs/src/theme'
+import { accent, ACCENTS, pickTheme, scheme, THEME_SCRIPT, themeCss } from '../docs/src/theme'
 import { check } from '../src/check'
 import { renderMarkdown } from '../src/content/markdown'
+import { sendValue } from '../src/runtime/send'
 
 const root = join(import.meta.dir, '..')
 const llms = await Bun.file(join(root, 'llms.txt')).text()
@@ -153,27 +154,57 @@ describe('the documentation site', () => {
     expect(() => fileTree('src/ the sources')).toThrow('FileTree cannot read the line "src/ the sources"')
   })
 
-  it('puts the theme a visitor picked on the page from the head, and shows the tokens an app sets for it', () => {
-    const paint = (saved: string | null) => {
-      const root = { dataset: {} as Record<string, string>, style: { set: {} as Record<string, string>, setProperty(name: string, value: string) {
+  it('puts the theme a visitor picked on the page from the head, reading what kay kept, and shows the tokens an app sets for it', () => {
+    const paint = (kept: Record<string, unknown>) => {
+      const html = { dataset: {} as Record<string, string>, style: { set: {} as Record<string, string>, setProperty(name: string, value: string) {
         this.set[name] = value
       } } }
-
+      const storage = { getItem: (key: string) => key in kept ? sendValue(kept[key]) : null }
       // eslint-disable-next-line no-new-func -- the head runs the script as a string, and so does the test.
-      const run = new Function('localStorage', 'document', THEME_SCRIPT) as (storage: { getItem: () => string | null }, page: { documentElement: typeof root }) => void
+      const run = new Function('localStorage', 'document', THEME_SCRIPT) as (storage: { getItem: (key: string) => string | null }, page: { documentElement: typeof html }) => void
 
-      run({ getItem: () => saved }, { documentElement: root })
+      run(storage, { documentElement: html })
 
-      return { theme: root.dataset.theme, tokens: root.style.set }
+      return { theme: html.dataset.theme, tokens: html.style.set }
     }
-    const blue = ACCENTS.find(accent => accent.value === 'blue')!.tokens
+    const blue = ACCENTS.find(one => one.value === 'blue')!.tokens
 
-    expect(paint(JSON.stringify({ scheme: 'dark', accent: 'blue' }))).toEqual({ theme: 'dark', tokens: blue })
-    expect(paint(JSON.stringify({ scheme: 'system', accent: 'yellow' }))).toEqual({ theme: undefined, tokens: {} })
-    expect(paint('{"scheme":"neon","accent":"pink"}')).toEqual({ theme: undefined, tokens: {} })
-    expect(paint('not json')).toEqual({ theme: undefined, tokens: {} })
-    expect(paint(null)).toEqual({ theme: undefined, tokens: {} })
-    expect(themeCss({ scheme: 'light', accent: 'blue' })).toBe(`@theme {\n  --color-kui-accent: ${blue['--color-kui-accent']};\n  --color-kui-accent-hi: ${blue['--color-kui-accent-hi']};\n  --color-kui-on-accent: ${blue['--color-kui-on-accent']};\n}`)
+    expect(paint({ 'kay-docs-scheme': 'dark', 'kay-docs-accent': 'blue' })).toEqual({ theme: 'dark', tokens: blue })
+    expect(paint({ 'kay-docs-scheme': 'system', 'kay-docs-accent': 'yellow' })).toEqual({ theme: undefined, tokens: {} })
+    expect(paint({ 'kay-docs-scheme': 'neon', 'kay-docs-accent': 'pink' })).toEqual({ theme: undefined, tokens: {} })
+    expect(paint({})).toEqual({ theme: undefined, tokens: {} })
+    expect(themeCss('blue')).toBe(`@theme {\n  --color-kui-accent: ${blue['--color-kui-accent']};\n  --color-kui-accent-hi: ${blue['--color-kui-accent-hi']};\n  --color-kui-on-accent: ${blue['--color-kui-on-accent']};\n}`)
+  })
+
+  it('switches the theme on the page as the visitor picks it, taking the last accent\'s tokens off, the docs\' own accent being site.css\'s', async () => {
+    const set = new Map<string, string>()
+    const html = { dataset: {} as Record<string, string>, style: { setProperty: (name: string, value: string) => set.set(name, value), removeProperty: (name: string) => set.delete(name) } }
+    const globals = globalThis as unknown as Record<string, unknown>
+    const before = globals.document
+
+    globals.document = { documentElement: html }
+
+    try {
+      pickTheme({ scheme: 'dark', accent: 'violet' })
+      pickTheme({ accent: 'blue' })
+
+      expect(html.dataset.theme).toBe('dark')
+      expect(Object.fromEntries(set)).toEqual(ACCENTS.find(one => one.value === 'blue')!.tokens)
+      expect([scheme(), accent()]).toEqual(['dark', 'blue'])
+
+      pickTheme({ scheme: 'system', accent: 'yellow' })
+
+      expect(html.dataset.theme).toBeUndefined()
+      expect(set.size).toBe(0)
+    }
+    finally {
+      globals.document = before
+    }
+
+    const site = await Bun.file(join(root, 'docs/src/site.css')).text()
+
+    for (const [name, value] of Object.entries(ACCENTS[0]!.tokens))
+      expect(site).toContain(`${name}: ${value};`)
   })
 
   it('passes kay check, and so does the tutorial\'s example app', async () => {
