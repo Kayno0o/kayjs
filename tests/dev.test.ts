@@ -1206,6 +1206,42 @@ describe.concurrent('kay dev', () => {
       await build
       await Bun.sleep(300)
       expect(running()).toEqual([])
+      expect(builder.gone()).toBe(true)
+    }
+    finally {
+      await builder.stop()
+      await rm(root, { recursive: true, force: true })
+    }
+  }, 60_000)
+
+  it.serial('asks the process that replaced a dead one for a build that heard of the death after the swap', async () => {
+    const scratch = join(import.meta.dir, '../node_modules/.cache')
+
+    await mkdir(scratch, { recursive: true })
+    const root = await mkdtemp(join(scratch, 'dev-builder-late-'))
+    const real = realpathSync(root)
+
+    await Bun.write(join(root, 'kay.config.ts'), 'export default {}\n')
+    await Bun.write(join(root, 'src/routes/index.kay'), 'h1 Home\n')
+    const builder = startClientBuilder(root, process.env)
+
+    try {
+      expect(await builder.build(null)).toBeDefined()
+
+      // The second build starts a few microtasks after the first, so one of them lands after the first swapped the process in.
+      for (let delay = 0; delay < 6; delay++) {
+        process.kill(Number(childrenRunning(real, 'builder.ts')[0]), 'SIGKILL')
+        await until(() => builder.gone())
+
+        const first = builder.build(null)
+
+        for (let tick = 0; tick < delay; tick++)
+          await Promise.resolve()
+
+        const outcomes = await Promise.all([first, builder.build(null)])
+
+        expect(outcomes.map(outcome => outcome?.failed)).toEqual([false, false])
+      }
     }
     finally {
       await builder.stop()

@@ -18,7 +18,7 @@ export interface ClientBuilder {
 interface Builder {
   gone: boolean
   answered: boolean
-  replacing: Promise<Builder | undefined> | undefined
+  replacing: Promise<void> | undefined
   waiting: ((outcome: BuildOutcome | undefined) => void)[]
   child: Subprocess
 }
@@ -37,8 +37,8 @@ export function startClientBuilder(root: string, env: Record<string, string | un
       gone: false,
       // Whether it answered a build: one that never did failed as it started, as when the config failed to load.
       answered: false,
-      // The process taking its place once it died after answering, shared by the builds riding it.
-      replacing: undefined as Promise<Builder | undefined> | undefined,
+      // Spawning the process taking its place once it died after answering, shared by the builds riding it.
+      replacing: undefined,
       waiting: [],
       // Under `kay dev`, so it writes where its servers read.
       child: Bun.spawn([process.execPath, BUILDER], {
@@ -85,26 +85,21 @@ export function startClientBuilder(root: string, env: Record<string, string | un
       const dying = current
       const outcome = await ask(dying, changed)
 
-      // Killed or out of memory after it built before: replaced and asked again, once.
-      if (outcome !== undefined || !dying.answered || current !== dying)
+      // Killed or out of memory after it built before: replaced and asked again, once, of the process in its place, which a build hearing of the death late finds already there.
+      if (outcome !== undefined || !dying.answered)
         return outcome
 
       dying.replacing ??= (async () => {
         await dying.child.exited
 
-        if (stopped)
-          return undefined
-
-        current = spawn()
-
-        return current
+        if (!stopped)
+          current = spawn()
       })()
+      await dying.replacing
 
-      const next = await dying.replacing
-
-      return next && ask(next, null)
+      return stopped ? undefined : ask(current, null)
     },
-    gone: () => current.gone && current.replacing === undefined,
+    gone: () => current.gone && (stopped || current.replacing === undefined),
     loaded: file => file === CONFIG_FILE || modules.has(join(realRoot, file)),
     stop: async () => {
       stopped = true
