@@ -14,7 +14,7 @@ import { ASSET_FILE, clientDir, outputDir, writeAsset } from '../src/build/asset
 import { buildClient } from '../src/build/client'
 import { writeIfChanged } from '../src/build/files'
 import { reachesAny } from '../src/build/libraries'
-import { codecWarnings, thirdPartyNotices, unknownCodecVersions } from '../src/build/licenses'
+import { BUNDLED_LICENCES, codecWarnings, thirdPartyNotices, unknownCodecVersions } from '../src/build/licenses'
 import { formatSizeReport } from '../src/build/report'
 import { anchorModule } from '../src/build/runtime-chunk'
 import { runtimeConfig, withoutPlugins } from '../src/build/runtime-config'
@@ -1515,13 +1515,16 @@ describe('codec licences', () => {
   })
 
   it('names only files that exist in LICENSES', async () => {
-    const source = await Bun.file(join(import.meta.dir, '../src/build/licenses.ts')).text()
-    const files = [...source.matchAll(/files: \[([^\]]*)\]/g)].flatMap(([, list]) => [...list!.matchAll(/'([^']+)'/g)].map(([, file]) => file!))
+    const files = Object.values(BUNDLED_LICENCES).flatMap(versions => Object.values(versions).flatMap(codecs => codecs.flatMap(codec => codec.files)))
 
     expect(files.length).toBeGreaterThan(0)
 
     for (const file of files)
       expect(existsSync(join(import.meta.dir, '../LICENSES', file))).toBe(true)
+  })
+
+  it('leaves the codec warning to the build stage, so a compiled build prints it once', async () => {
+    expect(await Bun.file(join(import.meta.dir, '../src/build/compile.ts')).text()).not.toContain('codecWarnings')
   })
 
   it('warns of an installed version it holds no texts for, and of none otherwise', async () => {

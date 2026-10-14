@@ -13,9 +13,9 @@ const LICENSES_DIR = 'LICENSES'
 const RULE = '='.repeat(80)
 
 // What a package's wasm compiles in, whose licences its own files do not carry: keyed by package and exact version, as a bump may change the codecs, and a test fails when the installed version leaves the map.
-// @jsquash/avif 2.1.1: packages/avif/codec/Makefile of jSquash (https://github.com/jamsinclair/jSquash/blob/da47a2be3b302beb5a5ae164a2ab7aa21a041d90/packages/avif/codec/Makefile, read at its main, as it has no tags) builds its decoder, the one wasm of it kay ships, from libavif v1.0.1 with libaom v3.7.0, and holds the string "AOMedia Project AV1 Decoder v3.7.0". kay's own encoder (codecs/avif) is kay's code: its codecs' texts are in kay's LICENSES/ and NOTICE.
+// @jsquash/avif 2.1.1: packages/avif/codec/Makefile of jSquash (https://github.com/jamsinclair/jSquash/blob/da47a2be3b302beb5a5ae164a2ab7aa21a041d90/packages/avif/codec/Makefile, a commit of its main, as it has no tags) builds its decoder, the one wasm of it kay ships, from libavif v1.0.1 with libaom v3.7.0, and holds the string "AOMedia Project AV1 Decoder v3.7.0". kay's own encoder (codecs/avif) is kay's code: its codecs' texts are in kay's LICENSES/ and NOTICE.
 // The texts are those of each repository at that tag or commit. Emscripten 3.1.57 (the build script's EMSDK_VERSION) generates the glue and links musl into the wasm; their texts are those of that tag. compiler-rt is left out: its LLVM exception frees code embedded in object form from the attribution conditions.
-const BUNDLED_LICENCES: Record<string, Record<string, { codec: string, files: string[] }[]>> = {
+export const BUNDLED_LICENCES: Record<string, Record<string, { codec: string, files: string[] }[]>> = {
   '@jsquash/avif': {
     '2.1.1': [
       { codec: 'libavif 1.0.1 (BSD-2-Clause), https://github.com/AOMediaCodec/libavif/blob/v1.0.1/LICENSE', files: ['libavif.txt'] },
@@ -169,7 +169,7 @@ export function unknownCodecVersions(dirs: Iterable<string>): string[] {
 
 // One line per installed package whose codecs kay holds no licence texts for, so its notices would lack them.
 export function codecWarnings(root: string): string[] {
-  return unknownCodecVersions(installedDependencies(root)).map(spec => `kay: ${spec} is a version kay holds no codec licence texts for, so ${NOTICES_FILE} lacks the licences of the codecs its wasm compiles in`)
+  return unknownCodecVersions(installedDependencies(root)).map(spec => `kay: ${spec} is a version kay holds no codec licence texts for, so ${NOTICES_FILE} lacks the licences of the codecs its wasm compiles in; add the texts for that version to BUNDLED_LICENCES in src/build/licenses.ts and to LICENSES/`)
 }
 
 function bundledTexts(name: string, version: string | undefined): string[] {

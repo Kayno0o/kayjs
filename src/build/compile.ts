@@ -10,7 +10,7 @@ import { DEFAULT_LANG, extensionMessageFiles, messagesFile } from '../server/i18
 import { matcherFile } from '../server/params'
 import { refuseClashes } from '../server/route-table'
 import { extensionEditor, routeMounts, routeTrees, scanEndpoints, scanRoutes, specialPagesOf } from '../server/routes'
-import { codecWarnings, installedDependencies, NOTICES_FILE, thirdPartyNotices } from './licenses'
+import { installedDependencies, NOTICES_FILE, thirdPartyNotices } from './licenses'
 import { kay } from './plugin'
 import { runtimeConfig, withoutPlugins } from './runtime-config'
 import { withoutStyles } from './styles'
@@ -86,9 +86,6 @@ export async function compileServer(project: Project, options: CompileOptions): 
   const embedded = (dir: string) => `join(import.meta.dir, ${JSON.stringify(basename(dir))})`
 
   const notices = join(paths.compile, NOTICES_FILE)
-
-  for (const warning of codecWarnings(root))
-    console.warn(warning)
 
   await Bun.write(notices, thirdPartyNotices([...installedDependencies(root), ...options.packages ?? []]))
   await Bun.write(generated, [
