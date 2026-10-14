@@ -25,7 +25,7 @@ import type { AuthStore, LinkType, SessionRecord, UserRecord } from './store'
 import type { Proof, ProofFailure, TwoFactorResult, TwoFactorSetup } from './twoFactor'
 import type { Level, PolicyContext, Predicate, Requirement } from './types'
 import { Elysia } from 'elysia'
-import { clientAddress, rateKey } from 'kay/server'
+import { clientAddress, crossSiteRefused, rateKey } from 'kay/server'
 import { changePassword, changeUsername, deleteAccount, unlink } from './account'
 import { actingAdmin, adminAuditLog, banUser, changeRole, deleteUser, getUser, isAdmin, listUsers, unbanUser } from './admin'
 import { bearerUser, createToken, issueToken, listTokens, revokeToken, tokenUser } from './bearer'
@@ -80,6 +80,25 @@ const FORM_POST_FIELDS = ['code', 'state', 'error', 'user']
 
 // What a route, a guard or a gate asks of the user: a role, a predicate, or a list of which any one passes.
 export type AuthRequirement<Role extends string> = Requirement<User, Role>
+
+// A session that refuses, as a 403, to be read or written by a cross-site POST or websocket upgrade: a plain Elysia app has no Origin check of kay's own.
+function guardSession(session: Session<AuthSessionData>, refuse: () => boolean): Session<AuthSessionData> {
+  const guard = <Args extends unknown[], Result>(call: (...args: Args) => Promise<Result>) => async (...args: Args): Promise<Result> => {
+    if (refuse())
+      throw new Response('Cross-site request refused', { status: 403 })
+
+    return call(...args)
+  }
+
+  return {
+    get: guard(async key => session.get(key)),
+    set: guard(async (key, value) => session.set(key, value)),
+    unset: guard(async key => session.unset(key)),
+    destroy: guard(async () => session.destroy()),
+    regenerate: guard(async () => session.regenerate()),
+    lifetime: guard(async maxAge => session.lifetime(maxAge)),
+  }
+}
 
 // The plugin kay's `session()` returns, whichever data the app keeps beside kayjs-auth's.
 export interface SessionPlugin<Data extends AuthSessionData> { '~Ephemeral': { derive: { readonly session: Session<Data> } } }
@@ -166,10 +185,17 @@ export class Auth<Scope extends string = string, Role extends string = string, O
   private source: 'session' | 'bearer' | null = null
   private tokenScopes: string[] | null = null
 
-  constructor(private readonly session: Session<AuthSessionData>, private readonly core: Core, private readonly request: Request, client: string, address: string) {
+  private readonly session: Session<AuthSessionData>
+
+  constructor(session: Session<AuthSessionData>, private readonly core: Core, private readonly request: Request, client: string, address: string) {
+    const crossSite = () => request.headers.get('authorization') === null && crossSiteRefused(request, core.url)
+
+    this.session = guardSession(session, crossSite)
+
     this[STATE] = {
       core,
-      session,
+      session: this.session,
+      crossSite,
       client,
       address,
       userAgent: request.headers.get('user-agent') ?? '',
@@ -1012,6 +1038,12 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
 
       if (!(state instanceof Auth))
         return null
+
+      if (state[STATE].crossSite()) {
+        ws.close?.(SOCKET_USER_GONE, 'cross-site')
+
+        return null
+      }
 
       const user = await state.user()
 

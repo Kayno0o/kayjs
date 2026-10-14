@@ -2,6 +2,7 @@ import { rm } from 'node:fs/promises'
 import { join, relative } from 'node:path'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { check } from '../src/check'
+import { admitCrossSite, crossSiteRefused } from '../src/server/actions'
 import { corsRule } from '../src/server/cors'
 import { testSite } from '../src/test'
 import { scratchDir } from './scratch'
@@ -152,5 +153,25 @@ describe('an API module opening its routes to other sites', () => {
     finally {
       await rm(dir, { recursive: true, force: true })
     }
+  })
+})
+
+describe('crossSiteRefused', () => {
+  const post = (headers: Record<string, string>) => new Request('http://app.test/x', { method: 'POST', headers })
+
+  it('refuses a cross-site POST or upgrade, not a safe method, a missing Origin or the app\'s own host', () => {
+    expect(crossSiteRefused(post({ origin: 'http://evil.example' }))).toBe(true)
+    expect(crossSiteRefused(new Request('http://app.test/x', { headers: { origin: 'http://evil.example', upgrade: 'websocket' } }))).toBe(true)
+    expect(crossSiteRefused(new Request('http://app.test/x', { headers: { origin: 'http://evil.example' } }))).toBe(false)
+    expect(crossSiteRefused(post({}))).toBe(false)
+    expect(crossSiteRefused(post({ origin: 'http://app.test' }))).toBe(false)
+    expect(crossSiteRefused(post({ origin: 'https://public.example' }), 'https://public.example')).toBe(false)
+  })
+
+  it('leaves a request an API module\'s cors let in', () => {
+    const request = post({ origin: 'http://other.example' })
+
+    admitCrossSite(request)
+    expect(crossSiteRefused(request)).toBe(false)
   })
 })

@@ -16,7 +16,7 @@ import { projectPaths } from '../project'
 import { API_MOUNT, END_EVENT, ERROR_EVENT } from '../runtime/live'
 import { kayLog } from '../runtime/log'
 import { encodeValue, unsendable } from '../runtime/wire'
-import { guardsFirst, inLocale, isCrossSite, passGuards } from './actions'
+import { admitCrossSite, crossSiteRefused, guardsFirst, inLocale, passGuards } from './actions'
 import { importModule } from './bundle'
 import { corsAdmits, corsResponse, corsRule, preflight, withCors } from './cors'
 import { loadGuard, requiredGuards } from './guards'
@@ -61,7 +61,6 @@ const ROUTER_SYNTAX = /[:*']/
 // Bun closes a connection idle for 10 s by default, and proxies after a minute or so: a comment line now and then keeps a quiet stream open.
 const HEARTBEAT_MS = 5000
 const HEARTBEAT = new TextEncoder().encode(':\n\n')
-const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
 const REGEX_SYNTAX = /[.*+?^${}()|[\]\\]/g
 const TEXT = { 'content-type': 'text/plain; charset=utf-8' }
 // Where `api({ bodyLimit })` keeps its limit on the instance it makes.
@@ -344,7 +343,10 @@ async function admit(guards: LoadedGuard[], context: { request: Request, params?
     admitted.add(context.request)
 
   // A browser lets any page open a websocket or post a form to any host, the user's cookies attached; a request with neither header, such as a webhook, is no browser's.
-  if ((!SAFE_METHODS.has(context.request.method) || context.request.headers.get('upgrade')?.toLowerCase() === 'websocket') && isCrossSite(context.request) && !(cors && corsAdmits(cors, context.request)))
+  if (cors && corsAdmits(cors, context.request))
+    admitCrossSite(context.request)
+
+  if (crossSiteRefused(context.request))
     return new Response('Cross-site request refused', { status: 403 })
 
   if (!passed)

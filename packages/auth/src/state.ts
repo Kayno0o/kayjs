@@ -13,6 +13,8 @@ export interface RequestState {
   userAgent: string
   // The languages the browser asks for, most wanted first.
   languages: string[]
+  // Whether the request is a browser's cross-site POST or upgrade, which the session refuses to be read or written by.
+  crossSite: () => boolean
   current: () => Promise<UserRecord | null>
   // How the current user was read, once `current` has been.
   via: () => 'session' | 'bearer' | null

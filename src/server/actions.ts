@@ -54,6 +54,7 @@ const TEXT = 'text/plain; charset=utf-8'
 // What a visitor reads when the handler throws and its action words nothing of its own.
 const SERVER_ERROR = 'Something went wrong on our side; try again later'
 // What a post from the site's own pages carries in `Sec-Fetch-Site`; `none` is the user's own doing, such as a bookmark.
+const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
 const SAME_SITE_FETCH = new Set(['same-origin', 'none'])
 // The first proxy's `X-Forwarded-Proto` saying the browser came over https.
 const FORWARDED_HTTPS = /^\s*https\s*(?:,|$)/i
@@ -363,11 +364,23 @@ function crossSiteRefusal(): Response {
 }
 
 // A browser names where a request comes from in `Origin`, and in `Sec-Fetch-Site` too, which it sends even when it leaves `Origin` out.
-export function isCrossSite(request: Request): boolean {
+export function isCrossSite(request: Request, site?: string): boolean {
   const origin = request.headers.get('origin')
-  const site = request.headers.get('sec-fetch-site')
+  const fetchSite = request.headers.get('sec-fetch-site')
 
-  return (origin !== null && !sameHost(request, origin)) || (site !== null && !SAME_SITE_FETCH.has(site))
+  return (origin !== null && !sameHost(request, origin, site)) || (fetchSite !== null && !SAME_SITE_FETCH.has(fetchSite))
+}
+
+// The requests an `api({ cors })` module let in from another site, which a library checking Origin itself, such as kayjs-auth, leaves alone.
+const corsAdmitted = new WeakSet<Request>()
+
+export function admitCrossSite(request: Request): void {
+  corsAdmitted.add(request)
+}
+
+// Whether a browser's cross-site POST or websocket upgrade should be refused, for code on a plain Elysia app that kay's own actions and API do not reach; `site` is the app's public URL, whose host counts as the request's own.
+export function crossSiteRefused(request: Request, site?: string): boolean {
+  return (!SAFE_METHODS.has(request.method) || request.headers.get('upgrade')?.toLowerCase() === 'websocket') && isCrossSite(request, site) && !corsAdmitted.has(request)
 }
 
 // Over https, kay's cookies never travel in clear; behind a proxy, `X-Forwarded-Proto` says how the browser came, and without one, in production, an https `site` in kay.config.ts stands in, for a proxy that does not pass it on.
@@ -458,14 +471,14 @@ export async function passGuards(guards: LoadedGuard[], context: { request: Requ
 }
 
 // Hosts rather than origins: behind a TLS-terminating proxy the browser says https while the request arrives as http. The host of `site` in kay.config.ts counts too, for a proxy that does not pass the browser's `Host` on.
-function sameHost(request: Request, url: string | null): url is string {
+function sameHost(request: Request, url: string | null, appUrl?: string): url is string {
   if (url === null || !URL.canParse(url))
     return false
 
   const { host } = new URL(url)
   const site = configuredSite()
 
-  return host === new URL(request.url).host || (site !== undefined && host === new URL(site.origin).host)
+  return host === new URL(request.url).host || (site !== undefined && host === new URL(site.origin).host) || (appUrl !== undefined && URL.canParse(appUrl) && host === new URL(appUrl).host)
 }
 
 // A fetch from an island wants a result; a plain form post goes back to the page it came from.

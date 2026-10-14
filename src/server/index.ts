@@ -9,6 +9,7 @@ import { projectSource } from './source'
 
 export type { KayConfig, KayExtension } from '../config'
 export { defineConfig } from '../config'
+export { crossSiteRefused } from './actions'
 export type { ApiModule, ApiOptions } from './api'
 export { api, eventStream } from './api'
 export type { PagesOptions } from './app'
