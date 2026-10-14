@@ -43,6 +43,8 @@ const TAGS = /<[^>]*>/g
 const SPACES = /\s+/g
 const HTML_ENTITY = /&(?:amp|lt|gt|quot|#39);/g
 const TRAILING_SLASH = /(?<=.)\/$/
+// Characters the URL parser leaves in a path as they are; a dot segment, `/.` or `/..`, it resolves.
+const PLAIN_PATH = /^[\w/.~-]*$/
 const DECODED: Record<string, string> = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': '\'' }
 const LINK_TAG = /<a\s[^>]*>/gi
 const LINK_HREF = /(\shref=")([^"]*)"/i
@@ -117,7 +119,9 @@ export function currentPage(href: unknown): string {
   if (path === undefined || typeof href !== 'string' || !href.startsWith('/') || href.startsWith('//') || href.includes('?') || href.includes('#'))
     return ''
 
-  return new URL(href, 'http://localhost').pathname.replace(TRAILING_SLASH, '') === path.replace(TRAILING_SLASH, '') ? ' aria-current="page"' : ''
+  const linked = PLAIN_PATH.test(href) && !href.includes('/.') ? href : new URL(href, 'http://localhost').pathname
+
+  return linked.replace(TRAILING_SLASH, '') === path.replace(TRAILING_SLASH, '') ? ' aria-current="page"' : ''
 }
 
 // A `class` value: a string, or an array or object of classes, an object's keys kept when their value is truthy.

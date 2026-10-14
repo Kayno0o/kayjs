@@ -22,6 +22,10 @@ const ENCODED_COPY = /\.(?:br|gz)$/
 // Below this a response fits in a packet or two anyway.
 const MIN_SIZE = 256
 const ACCEPTED = /^\s*([\w*-]+)\s*(?:;\s*q\s*=\s*([\d.]+))?/i
+// The `Accept-Encoding` headers kept parsed: a few browsers' worth, so headers made up to fill it cost nothing more than parsing.
+const KEPT_ACCEPTS = 64
+const KEPT_ACCEPT_LENGTH = 256
+const acceptedWeights = new Map<string, Record<Encoding, number>>()
 // Levels for what compresses while serving: brotli 4 costs a third less CPU than 5 on a 110 KB page for 6% more bytes, about what gzip 6 costs.
 const BROTLI_QUALITY = 4
 const GZIP_LEVEL = 6
@@ -454,6 +458,24 @@ export function preferredEncoding(accept: string | null, available: ReadonlySet<
   if (accept === null || accept === '' || !available || available.size === 0)
     return undefined
 
+  const weights = encodingWeights(accept)
+  let best: Encoding | undefined
+
+  for (const encoding of ENCODINGS) {
+    if (available.has(encoding) && weights[encoding] > 0 && (best === undefined || weights[encoding] > weights[best]))
+      best = encoding
+  }
+
+  return best
+}
+
+// What `accept` weighs each encoding at, parsed once per header: browsers send a handful, and a page, its assets and the compression of its reply all ask.
+function encodingWeights(accept: string): Record<Encoding, number> {
+  const known = acceptedWeights.get(accept)
+
+  if (known)
+    return known
+
   const weights = new Map<string, number>()
 
   for (const part of accept.split(',')) {
@@ -464,8 +486,12 @@ export function preferredEncoding(accept: string | null, available: ReadonlySet<
   }
 
   const weight = (encoding: Encoding) => weights.get(encoding) ?? weights.get('*') ?? 0
+  const parsed = { br: weight('br'), gzip: weight('gzip') }
 
-  return ENCODINGS.filter(encoding => available.has(encoding) && weight(encoding) > 0).sort((a, b) => weight(b) - weight(a))[0]
+  if (accept.length <= KEPT_ACCEPT_LENGTH && acceptedWeights.size < KEPT_ACCEPTS)
+    acceptedWeights.set(accept, parsed)
+
+  return parsed
 }
 
 export async function filesUnder(dir: string): Promise<string[]> {

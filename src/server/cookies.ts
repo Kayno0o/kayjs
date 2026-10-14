@@ -20,3 +20,17 @@ export function cookieJar(request: Request): CookieJar {
     },
   }
 }
+
+const parsed = new WeakMap<Request, CookieMap>()
+
+// The cookies the request came with, parsed once however many of kay's sessions, locales and scopes read them; shared, so only read, never set.
+export function requestCookies(request: Request): CookieMap {
+  let cookies = parsed.get(request)
+
+  if (!cookies) {
+    cookies = new Bun.CookieMap(request.headers.get('cookie') ?? '')
+    parsed.set(request, cookies)
+  }
+
+  return cookies
+}

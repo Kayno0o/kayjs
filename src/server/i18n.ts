@@ -8,6 +8,8 @@ import { throughLinks } from '../build/links'
 import { flattenMessages, localePath, pathSegment, splitLocale, translatedPath } from '../runtime/i18n'
 import { localeState } from '../runtime/locale-state'
 import { importModule } from './bundle'
+import { requestCookies } from './cookies'
+import { requestUrl } from './request-url'
 import { projectSource } from './source'
 
 // Where a visitor's choice of locale is kept, read before their browser's languages.
@@ -255,12 +257,12 @@ async function projectI18n(): Promise<I18n> {
 
 // The state a request runs in for that locale, the page's path given without its prefix.
 export function stateFor(i18n: I18n, locale: string, path: string, request: Request): LocaleState {
-  return { ...i18n.translations.get(locale)!, settings: i18n.settings, path, host: new URL(request.url).host, ...i18n.implicit && { implicit: true } }
+  return { ...i18n.translations.get(locale)!, settings: i18n.settings, path, host: requestUrl(request).host, ...i18n.implicit && { implicit: true } }
 }
 
 // The locale a request's host serves, when locales go by domain.
 export function hostLocale(settings: LocaleSettings, request: Request): string {
-  const { host } = new URL(request.url)
+  const { host } = requestUrl(request)
 
   return Object.entries(settings.hosts ?? {}).find(([, served]) => served === host)?.[0] ?? settings.defaultLocale
 }
@@ -277,7 +279,7 @@ export function preferredLocale(settings: LocaleSettings, request: Request): str
 
 // The locale the visitor's cookie keeps, which may name one the site no longer has.
 export function cookieLocale(request: Request): string | undefined {
-  return new Bun.CookieMap(request.headers.get('cookie') ?? '').get(LOCALE_COOKIE) ?? undefined
+  return requestCookies(request).get(LOCALE_COOKIE) ?? undefined
 }
 
 // The locale an action runs in: its host's, its page's, as the `Referer` or the form names it, or the visitor's preferred one.
@@ -285,7 +287,7 @@ export function requestLocale(settings: LocaleSettings, request: Request, refere
   if (settings.hosts)
     return hostLocale(settings, request)
 
-  if (referer !== null && URL.canParse(referer) && new URL(referer).host === new URL(request.url).host) {
+  if (referer !== null && URL.canParse(referer) && new URL(referer).host === requestUrl(request).host) {
     const { locale } = splitLocale(settings, new URL(referer).pathname)
 
     if (locale !== undefined)

@@ -29,6 +29,7 @@ import { answeringRequest } from './log'
 import { countSucceeded, PRETEND, protectionRefusal, requestId } from './protection'
 import { sharedContext } from './render'
 import { reportServerError } from './report'
+import { requestUrl } from './request-url'
 import { guardUrl } from './routes'
 import { Denied, Redirect } from './signals'
 import { answered, SERVER_SPAN, traced } from './trace'
@@ -386,7 +387,7 @@ export function crossSiteRefused(request: Request, site?: string): boolean {
 
 // Over https, kay's cookies never travel in clear; behind a proxy, `X-Forwarded-Proto` says how the browser came, and without one, in production, an https `site` in kay.config.ts stands in, for a proxy that does not pass it on.
 export function overHttps(request: Request): boolean {
-  if (new URL(request.url).protocol === 'https:')
+  if (requestUrl(request).protocol === 'https:')
     return true
 
   const forwarded = request.headers.get('x-forwarded-proto')
@@ -406,7 +407,7 @@ export function overHttps(request: Request): boolean {
 }
 
 function warnUnknownScheme(request: Request): void {
-  if (warnedScheme || LOCAL_HOST.test(new URL(request.url).hostname))
+  if (warnedScheme || LOCAL_HOST.test(requestUrl(request).hostname))
     return
 
   warnedScheme = true
@@ -416,7 +417,7 @@ function warnUnknownScheme(request: Request): void {
 export function inLocale<T>(request: Request, options: ActionOptions, run: () => T): T {
   const locale = requestLocale(options.i18n.settings, request, postedFrom(request) ?? null)
 
-  return runInLocale(stateFor(options.i18n, locale, new URL(request.url).pathname, request), run)
+  return runInLocale(stateFor(options.i18n, locale, requestUrl(request).pathname, request), run)
 }
 
 // What `ctx.locale` reads: the request's locale, or the site's single language.
@@ -479,7 +480,7 @@ function sameHost(request: Request, url: string | null, appUrl?: string): url is
   const { host } = new URL(url)
   const site = configuredSite()
 
-  return host === new URL(request.url).host || (site !== undefined && host === new URL(site.origin).host) || (appUrl !== undefined && URL.canParse(appUrl) && host === new URL(appUrl).host)
+  return host === requestUrl(request).host || (site !== undefined && host === new URL(site.origin).host) || (appUrl !== undefined && URL.canParse(appUrl) && host === new URL(appUrl).host)
 }
 
 // A fetch from an island wants a result; a plain form post goes back to the page it came from.
@@ -494,7 +495,7 @@ function isFormCall(request: Request): boolean {
 // The page a post came from on this site: the one its form names when a refused post rendered it, else the one kay's script names, else its `Referer`.
 function postedFrom(request: Request): string | undefined {
   const page = (named: string | null) => named !== null && URL.canParse(named, request.url) ? new URL(named, request.url).href : null
-  const back = page(new URL(request.url).searchParams.get(BACK_PARAMETER))
+  const back = page(requestUrl(request).searchParams.get(BACK_PARAMETER))
   const sent = page(request.headers.get(PAGE_HEADER))
   const referer = request.headers.get('referer')
 

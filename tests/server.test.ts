@@ -16,16 +16,20 @@ import { Elysia } from 'elysia'
 import { outputDir } from '../src/build/assets'
 import { projectPaths, resolveProject } from '../src/project'
 import { ActionError } from '../src/runtime'
+import { currentPage } from '../src/runtime/html'
 import { inlineScriptHashes, pages } from '../src/server'
 import { readClient, readInlineStyles, readManifest } from '../src/server/client'
 import { compressFiles, preferredEncoding } from '../src/server/compress'
+import { requestCookies } from '../src/server/cookies'
 import { sourceHash } from '../src/server/csp'
 import { submittedValues } from '../src/server/flash'
 import { historyScript } from '../src/server/history'
 import { htmlFallbacks, publicFiles, servedPublicly } from '../src/server/public'
 import { renderPage } from '../src/server/render'
+import { requestUrl } from '../src/server/request-url'
 import { refuseClashes } from '../src/server/route-table'
 import { scanRoutes } from '../src/server/routes'
+import { inServerScope } from '../src/server/scope'
 import { projectSource } from '../src/server/source'
 import { speculationRules } from '../src/server/speculation'
 import { KEEP_ALIVE_MS, streamDocument } from '../src/server/stream'
@@ -1064,6 +1068,27 @@ describe('prerendering', () => {
     expect(preferredEncoding('identity', both)).toBeUndefined()
     expect(preferredEncoding('br', new Set<Encoding>(['gzip']))).toBeUndefined()
     expect(preferredEncoding(null, both)).toBeUndefined()
+    // A header parsed once answers each set of copies on its own.
+    expect(preferredEncoding('br;q=0.5, gzip', new Set<Encoding>(['br']))).toBe('br')
+
+    // Past the headers kept parsed, each is still read in full.
+    for (let index = 0; index < 100; index++)
+      expect(preferredEncoding(`gzip;q=0.${index % 9 + 1}, br;q=0.5, x-${index}`, both)).toBe(index % 9 + 1 > 5 ? 'gzip' : 'br')
+  })
+
+  it('parses a request\'s URL and cookies once for every reader, and marks a link to the page however it spells the path', () => {
+    const request = new Request('http://localhost/docs/guide', { headers: { cookie: 'locale=fr; theme=dark' } })
+
+    expect(requestUrl(request)).toBe(requestUrl(request))
+    expect(requestUrl(request).pathname).toBe('/docs/guide')
+    expect(requestCookies(request)).toBe(requestCookies(request))
+    expect(requestCookies(request).get('theme')).toBe('dark')
+    expect(requestCookies(new Request('http://localhost/')).size).toBe(0)
+
+    const current = (href: string) => inServerScope(request, () => undefined, () => currentPage(href))
+
+    expect(['/docs/guide', '/docs/guide/', '/docs/./guide', '/blog/../docs/guide', '/blog/./../docs/guide/'].map(current)).toEqual(new Array(5).fill(' aria-current="page"'))
+    expect(['/docs', '/docs/guide.html', '/docs/guide?x=1', '//docs/guide'].map(current)).toEqual(new Array(4).fill(''))
   })
 
   it('refuses what no build can prerender, logging what a page throws rather than handing it to the app\'s onError, and builds without the server\'s preview secret', async () => {

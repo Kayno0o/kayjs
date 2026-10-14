@@ -35,7 +35,7 @@ import { encodeValue, unsendable } from '../runtime/wire'
 import { rebaseHtml } from './base'
 import { importModule } from './bundle'
 import { preferredEncoding, wholeResponse } from './compress'
-import { cookieJar } from './cookies'
+import { cookieJar, requestCookies } from './cookies'
 import { A11Y_SCRIPT, DEV_BOOT, devToolScripts, errorPageScripts, LIVE_RELOAD, problemsBlock } from './dev'
 import { FLASH_COOKIE, handedOverFlash, readFlash } from './flash'
 import { formsScript } from './forms'
@@ -536,7 +536,7 @@ export function hasFlash(request: Request): boolean {
   const cookie = request.headers.get('cookie')
 
   // The substring first: most requests carry no such cookie, and parsing is for the few that might.
-  return cookie?.includes(FLASH_COOKIE) === true && new Bun.CookieMap(cookie).has(FLASH_COOKIE)
+  return cookie?.includes(FLASH_COOKIE) === true && requestCookies(request).has(FLASH_COOKIE)
 }
 
 // A page under a mount point has its paths put under it as it goes out, unless they are already.

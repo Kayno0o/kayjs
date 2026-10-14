@@ -5,6 +5,8 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 import { setRequestOutcome } from '../runtime/action'
 import { readParam } from '../runtime/query-param'
 import { setServerScope } from '../runtime/reactive'
+import { requestCookies } from './cookies'
+import { requestUrl } from './request-url'
 
 // Requests whose page read who sent them, through their session or a cookie, so no shared cache may keep the answer.
 const personal = new WeakSet<Request>()
@@ -20,7 +22,7 @@ export function inServerScope<T>(request: Request, report: (error: unknown) => v
 
   const cookie = (name: string) => {
     if (!cookies) {
-      cookies = new Bun.CookieMap(request.headers.get('cookie') ?? '')
+      cookies = requestCookies(request)
       personal.add(request)
       cookieRead?.()
     }
@@ -28,7 +30,7 @@ export function inServerScope<T>(request: Request, report: (error: unknown) => v
     return cookies.get(name) ?? undefined
   }
 
-  const url = new URL(request.url)
+  const url = requestUrl(request)
 
   return store.run({ values: new WeakMap(), cookie, param: name => readParam(rules, name, url.searchParams), report, path: url.pathname }, run)
 }

@@ -1,5 +1,6 @@
 import type { Elysia } from 'elysia'
 import type { Server } from 'elysia/universal'
+import { requestUrl } from './request-url'
 import { withoutSlash } from './routes'
 
 export const DEFAULT_BODY_LIMIT = 1024 * 1024
@@ -30,7 +31,7 @@ export function limitBodies(app: Elysia, bytes: number, actions: Map<string, Bod
       return undefined
 
     // Elysia serves `/path/` as `/path`, so a trailing slash reaches the same route.
-    const path = withoutSlash(new URL(request.url).pathname)
+    const path = withoutSlash(requestUrl(request).pathname)
     const limit = actions.get(path) ?? prefixes.find(([mount]) => path === mount || path.startsWith(`${mount}/`))?.[1]
     const allowed = limit?.bytes ?? bytes
 

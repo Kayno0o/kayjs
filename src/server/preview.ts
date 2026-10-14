@@ -14,6 +14,7 @@ import { setPreviewScope } from '../runtime/preview'
 import { DRAFT_ROUTE } from '../runtime/swap'
 import { isCrossSite, overHttps } from './actions'
 import { nodeCrypto } from './builtins'
+import { requestCookies } from './cookies'
 import { useStampSecret } from './stamp'
 import { visitAs } from './visit'
 
@@ -151,7 +152,7 @@ export function previewRequested(request: Request): PreviewMode | undefined {
   if (!settings)
     return undefined
 
-  const [until, ...rest] = new Bun.CookieMap(request.headers.get('cookie') ?? '').get(PREVIEW_COOKIE)?.split('.') ?? []
+  const [until, ...rest] = requestCookies(request).get(PREVIEW_COOKIE)?.split('.') ?? []
   const edit = rest.length === 2 && rest[0] === EDIT
   const sig = rest.at(-1)
 
