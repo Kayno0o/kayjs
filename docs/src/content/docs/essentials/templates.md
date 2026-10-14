@@ -122,7 +122,7 @@ button(onClick={() => name.set('')}) Clear
 
 ## Markup in a spread
 
-A spread sets `innerHTML` only from markup that `sanitizeHtml`, `trustHtml` or an icon import vouched for, and drops any other value, with a warning in development. An icon keeps drawing, `svg({...Home})`, and a record's plain-string `innerHTML` no longer renders as markup.
+A spread sets `innerHTML` only from markup that `sanitizeHtml`, `trustHtml` or an icon import vouched for, and drops any other value, with a warning in development. An icon keeps drawing, `svg({...Home})`, while a record's plain-string `innerHTML` is dropped.
 
 The vouching travels with the value from the server to the browser in island props, action results and event streams, and from nowhere else: a request's input, a cookie and `localStorage` bring plain strings. A string derived from a vouched one, such as `markup + '<b>'`, is plain again.
 

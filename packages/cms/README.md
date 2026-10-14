@@ -2,8 +2,6 @@
 
 A CMS for kay sites, in the spirit of TinaCMS: open the real page in edit mode, click a title, edit it in a sidebar, and the page updates as you type. The same package holds collection screens, generated from each collection's schema, to list, search, add, edit, publish and delete entries. Both save the same way: a file entry as a Forgejo commit, or in the working tree under `kay dev`, and a loaded entry through its collection's loader.
 
-kay's side of it is kaynooo/kayjs#262; the plan is kaynooo/kayjs#342.
-
 ## Install
 
 kayjs-cms is published to the Forgejo registry at git.kaynooo.fr, beside kay. Tell Bun where the `@kaynooo` scope lives once, in `~/.bunfig.toml`:

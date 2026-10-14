@@ -1,6 +1,6 @@
 # Noticeboard
 
-A club noticeboard running kay with its libraries together, as a site migrated to kay does. Members join and sign in through [kayjs-auth](../../packages/auth), with passwords and mailed links; [kayjs-mail](../../packages/mail) sends those mails and the notices; [kayjs-ui](../../packages/ui) draws the cards, the dialog pinning a notice and the toasts. Postgres keeps the members and the notices through `@kaynooo/pg-orm`, a `queue()` job mails each new notice to the members with a confirmed address, and a `rooms()` websocket shows who is reading and each notice as it is pinned.
+A club noticeboard running kay with its libraries together. Members join and sign in through [kayjs-auth](../../packages/auth), with passwords and mailed links; [kayjs-mail](../../packages/mail) sends those mails and the notices; [kayjs-ui](../../packages/ui) draws the cards, the dialog pinning a notice and the toasts. Postgres keeps the members and the notices through `@kaynooo/pg-orm`, a `queue()` job mails each new notice to the members with a confirmed address, and a `rooms()` websocket shows who is reading and each notice as it is pinned.
 
 It runs on the kay of this checkout, and on the libraries kay's repository installs: kay's own tests check it, run its tests and compile it, so a change that breaks kay with its libraries fails there before it reaches a site.
 

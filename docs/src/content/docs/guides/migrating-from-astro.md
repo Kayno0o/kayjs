@@ -17,7 +17,7 @@ The new project has:
 
 - `src/routes` with each page of `src/pages`, `404.astro` becoming `_404.kay` and `500.astro` `_error.kay`.
 - Components and layouts in their own folders, named in kebab-case (`BaseLayout.astro` becomes `base-layout.kay`), with every import of them rewritten, through `tsconfig.json` aliases such as `~/*` too.
-- `src/content.config.ts` rewritten for kay, its zod schemas written in `t`.
+- `src/content.config.ts` rewritten for kay, its zod schemas written in `s`.
 - The project's other files under `src` and `public` (stylesheets, modules, images, Markdown content, the favicon) copied as they are, those beside the pages moving with them into `src/routes`.
 - A `package.json` with kay's scripts, and the Astro project's own packages minus Astro's.
 - A `kay.config.ts` with the `site`, `base` and `<html lang>` the Astro site set.

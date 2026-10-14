@@ -83,7 +83,7 @@ class SchemaTranslator {
       built = `s.Union([${args[0].elements.map(element => element ? this.schema(element) : '').join(', ')}])`
     }
     else if (kind === 'coerce' || !(kind in SAME)) {
-      return this.untranslated(node, `z.${kind} has no \`t\` counterpart kay migrate knows`)
+      return this.untranslated(node, `z.${kind} has no \`s\` counterpart kay migrate knows`)
     }
     else {
       const builder = integer ? 's.Integer' : `s.${SAME[kind]}`
@@ -107,7 +107,7 @@ class SchemaTranslator {
       else if (name === 'default' && call.arguments[0])
         result = result.endsWith(')') && !result.startsWith('s.Optional(') ? `${result.slice(0, -1)}${result.endsWith('()') ? '' : ', '}{ default: ${this.text(call.arguments[0])} })` : this.untranslated(node, '`.default` on a schema already given options')
       else
-        return this.untranslated(node, `.${name}() has no \`t\` counterpart kay migrate knows`)
+        return this.untranslated(node, `.${name}() has no \`s\` counterpart kay migrate knows`)
     }
 
     return result
