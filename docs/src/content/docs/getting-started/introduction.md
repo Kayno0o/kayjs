@@ -50,6 +50,7 @@ Counter
 - [Installation](/getting-started/installation) creates a project.
 - [Project structure](/getting-started/project-structure) shows where things live.
 - [Templates](/essentials/templates) and [Components](/essentials/components) teach the syntax.
+- [How a request runs](/essentials/how-a-request-runs) shows what runs on the server and what in the browser.
 - [The tutorial](/guides/tutorial) builds a small app step by step.
 - [Migrating from Astro](/guides/migrating-from-astro) moves an Astro site over with one command.
 

@@ -1,0 +1,43 @@
+// The steps of a request in order, each in the lane of the side it runs on, so the list reads the same as text and as a diagram.
+figure.request-flow
+  .request-flow-lanes(aria-hidden="true")
+    span Server
+    span Browser
+  ol.request-flow-steps
+    li(data-side="server")
+      span.sr-only On the server:
+      a(href="/essentials/routing") Route
+      p The URL picks a file under #[code src/routes], wrapped by each #[code _layout.kay] above it.
+    li(data-side="server")
+      span.sr-only On the server:
+      a(href="/guides/sessions-and-guards#guards") Guard
+      p Each #[code _guard.ts] above the page runs, outermost first, and can deny or redirect.
+    li(data-side="server")
+      span.sr-only On the server:
+      a(href="/essentials/data-loading") Load
+      p The page's and its layouts' #[code --- server] fences run side by side, for each request, or once at build time with #[code prerender].
+    li(data-side="server")
+      span.sr-only On the server:
+      a(href="/essentials/components#fences") Render
+      p Templates and their #[code ---] scripts render to HTML; #[code await] blocks stream in as they resolve, server islands render for this request.
+    li(data-side="browser")
+      span.sr-only In the browser:
+      a(href="/essentials/islands") Show
+      p The browser shows the HTML. A page with no island ships no JavaScript bundle.
+    li(data-side="browser")
+      span.sr-only In the browser:
+      a(href="/essentials/islands#when-to-hydrate") Hydrate
+      p Each island's #[code ---] script runs again and attaches its handlers: on load, once idle, or as it scrolls into view.
+    li(data-side="browser")
+      span.sr-only In the browser:
+      a(href="/essentials/forms-and-actions") Post
+      p A form posts to an action, with or without JavaScript, or an island calls it like a function.
+    li(data-side="server")
+      span.sr-only On the server:
+      a(href="/essentials/forms-and-actions#showing-errors") Act
+      p The input is checked against the action's schema, the guards run, then the handler: a refusal renders the page again with its errors, a success goes back to the page or redirects.
+    li(data-side="browser")
+      span.sr-only In the browser:
+      a(href="/essentials/islands#page-navigation") Swap
+      p On a page with an island or a form, the next page is fetched and swapped in without a reload: its islands hydrate, and a #[code persist] one keeps playing.
+  figcaption A request, from the server to the browser and back through an action.
