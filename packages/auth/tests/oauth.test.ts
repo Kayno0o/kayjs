@@ -66,6 +66,12 @@ describe('safeRedirect', () => {
     '/%250a/evil.com?q=%25',
     `/%${'25'.repeat(9)}09/evil.com`,
     '/%E0%A4%A',
+    '/%E0%A4%A?x=1',
+    '/%E0%A4%A#%',
+    '/a%?x=1',
+    '/%2F/evil.com?x=%',
+    '/%5Cevil.com#%',
+    '/%2509/evil.com?x=%zz',
     '/%09/%E0%A4%A',
     'https://evil.com',
     'http:evil.com',
@@ -76,6 +82,12 @@ describe('safeRedirect', () => {
   test('rejects tab, newline and backslash hidden behind an escape', () => {
     for (const path of hostile)
       expect([path, safeRedirect(path)]).toEqual([path, '/'])
+  })
+
+  test('a bare percent after the path no longer rejects the value', () => {
+    const legit = ['/a?x=%25zz#%', '/a?x=%', '/a#%', '/a?x=%zz&y=%E0%A4%A#100%', '/a/b?next=%09//x%']
+
+    expect(legit.map(path => safeRedirect(path))).toEqual(legit)
   })
 
   test('every answer stays on the site, resolved raw and decoded once', () => {
