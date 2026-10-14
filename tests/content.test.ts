@@ -320,6 +320,21 @@ describe('Markdown outside collections', () => {
     expect(await html('<IMG SRC="/a.png" Loading="eager">\n')).toBe('<img decoding="async" SRC="/a.png" Loading="eager">\n')
   })
 
+  it('leaves an img inside a comment or a raw-text element alone, and ends the pass at an unclosed comment', async () => {
+    const html = async (markdown: string) => (await renderMarkdown(markdown)).html
+    const bare = '<img src="/a.png">'
+
+    for (const tag of ['script', 'style', 'textarea', 'title']) {
+      const out = await html(`<${tag}>${bare}</${tag}>\n\n${bare}\n`)
+
+      expect(out).toContain(`<${tag}>${bare}</${tag}>`)
+      expect(out).toContain('<img loading="lazy" decoding="async" src="/a.png">')
+    }
+
+    expect(await html(`<!-- ${bare} -->\n\n${bare}\n`)).toContain(`<!-- ${bare} -->`)
+    expect(await html(`<!-- ${bare}\n`)).not.toContain('loading=')
+  })
+
   it('reads a page of unclosed img tags in linear time', async () => {
     const start = performance.now()
     const { html } = await renderMarkdown(`<div>\n${'<img '.repeat(20_000)}`)
