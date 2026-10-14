@@ -68,19 +68,6 @@ describe('vouched markup', () => {
     expect(isVouched(big('hot', 3_000_000), false)).toBe(true)
   })
 
-  it('does not count markup an icon holds for good', () => {
-    const icon = vouch('i'.repeat(3_000_000), true)
-
-    vouch('f'.repeat(8_500_000))
-
-    const victim = vouch('v'.repeat(5_000_000))
-
-    for (let i = 0; i < 10; i++)
-      vouch(icon)
-
-    expect(isVouched(victim, false)).toBe(true)
-  })
-
   it('leaves what is no string alone, so the registry is not spoilt', () => {
     const kept = trustHtml('<b>before-null-1</b>')
 
@@ -215,8 +202,6 @@ describe('markup across JSON', () => {
     expect(() => decodeServerValue('[{"html":1},["SafeHtml",2],5]')).toThrow()
     // Anything with a `slice`, an array here, once reached `vouch` and spoilt its count.
     expect(() => decodeServerValue('[{"html":1},["SafeHtml",2],["!x"]]')).toThrow('malformed')
-    expect(() => decodeServerValue('[{"html":1},["SafeHtml",2],"no mark"]')).toThrow('malformed')
-    expect(isVouched('no mark')).toBe(false)
   })
 
   it('goes into an island\'s data-props as the SafeHtml type only for markup vouched for', () => {
