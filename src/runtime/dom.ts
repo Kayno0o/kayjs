@@ -7,7 +7,7 @@ import { FAILED, ISLAND, PART_END, PART_START } from './markers'
 import { catchError, createSignal, getOwner, hydrationEnded, hydrationStarted, memo, onCleanup, renderEffect, reportError, root, runWithOwner, scope, unrecorded, untrack } from './reactive'
 import { freshPrefix, withIds } from './uid'
 import { safeUrl } from './url'
-import { attributeName, attributeValue, classText, eachChild, elementName, handlerName, merge, styleText } from './values'
+import { attributeName, attributeValue, classText, eachChild, elementName, handlerName, merge, spreadAttributes, styleText } from './values'
 
 export { renderEffect as effect, memo, untrack } from './reactive'
 export { transition } from './transition'
@@ -1066,7 +1066,7 @@ export function dynamic(tag: unknown, props: Record<string, unknown>): unknown {
 
   const element = claim ? claimNode() as Element : createElement(elementName(tag))
 
-  spread(element, () => [props], 'children' in props)
+  spread(element, () => [spreadAttributes(props)], 'children' in props)
 
   return element
 }
@@ -1224,19 +1224,29 @@ export function spread(element: Element, sources: () => readonly object[], conte
 
       set.set(name, value)
 
-      if (name === 'ref')
+      if (name === 'ref') {
         ref(element, value)
-      else if (handlerName(name) && typeof value === 'function')
+      }
+      else if (handlerName(name) && typeof value === 'function') {
         listen(element, name, value as (event: Event) => void, previous as ((event: Event) => void) | undefined)
+      }
       // A handler given as text runs as script, which the server never writes either.
-      else if (handlerName(name))
+      else if (handlerName(name)) {
         continue
-      else if (name === 'class')
+      }
+      else if (name === 'class') {
         setClass(element, value)
-      else if (name === 'style')
+      }
+      else if (name === 'style') {
         setStyle(element, value)
-      else
-        property(element, name, value, Object.hasOwn(props, 'hreflang'))
+      }
+      else {
+        try {
+          property(element, name, value, Object.hasOwn(props, 'hreflang'))
+        }
+        // A name the server writes but the browser refuses to set, such as `@click`.
+        catch {}
+      }
     }
 
     for (const [name, previous] of set) {

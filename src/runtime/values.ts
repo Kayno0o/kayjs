@@ -3,8 +3,8 @@
 const ARIA = /^aria-/i
 // A name HTML reads as one attribute: a key holding a space, a quote, `=`, `/` or `>` would open others.
 const ATTRIBUTE_NAME = /^[^\0-\x20"'>/=\x7F]+$/
-// An event handler in any case, as HTML reads attribute names; `open` is the one attribute starting with `on` that is none.
-const HANDLER = /^on(?!en$)/i
+// An event handler in any case, as HTML reads attribute names.
+const HANDLER = /^on/i
 // A tag name HTML reads as one, which a dynamic tag given as text must be.
 const ELEMENT_NAME = /^[a-z][^\0-\x20"'>/=\x7F]*$/i
 // A whole document in a frame, which no spread sets; `innerHTML` stays, as an icon's props bring their markup by it.

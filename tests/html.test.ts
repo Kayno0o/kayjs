@@ -34,6 +34,7 @@ describe('element', () => {
     expect((dynamic('my-tag', { title: 'a' }) as { t: string }).t).toBe('<my-tag title="a"></my-tag>')
     expect(() => dynamic('img src=x onerror=alert(1)', {})).toThrow('is not an element name')
     expect(() => dynamic('a>', {})).toThrow('is not an element name')
+    expect((dynamic('iframe', { SRCDOC: '<script>alert(1)</script>', onen: 'x', title: 'a' }) as { t: string }).t).toBe('<iframe title="a"></iframe>')
   })
 
   it('takes from a spread only attributes, handlers as functions, and no srcdoc, getters kept', () => {
@@ -129,6 +130,13 @@ describe('head', () => {
     const { head: rendered } = collectHead(() => head([{ tag: 'link', props: { 'rel': 'canonical', 'HREF': ' javascript:alert(1)', 'ONLOAD': 'alert(1)', 'x" y': 1 } }, { tag: 'script', props: { children: 'var a = "<!--<script>"; var b = "</SCRIPT>"' } }]))
 
     expect(rendered.html).toBe('<link rel="canonical" href="unsafe: javascript:alert(1)"><script>var a = "<\\!--<script>"; var b = "<\\/SCRIPT>"</script>')
+  })
+
+  it('writes no handler on the html tag, and keeps a JSON script such as an import map valid', () => {
+    const { head: rendered } = collectHead(() => head([{ tag: 'html', props: { class: 'dark', OnLoad: 'alert(1)' } }, { tag: 'script', props: { type: 'importmap', children: '{"imports":{"a":"/<!--</script>"}}' } }]))
+
+    expect(rendered.root).toBe(' class="dark"')
+    expect(rendered.html).toContain('<script type="importmap">{"imports":{"a":"/\\u003c!--\\u003c/script>"}}</script>')
   })
 
   it('sets nothing outside a render', () => {

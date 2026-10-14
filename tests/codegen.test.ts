@@ -363,6 +363,17 @@ describe('head', () => {
     expect(checked).not.toContain('KayUseHead')
   })
 
+  it('filters a spread onto an element, a component taking its props as they are', () => {
+    const source = '---\nimport Card from "./card.kay"\nconst a = { title: "x" }\n---\ndiv({...a})\nCard({...a})'
+
+    for (const output of ['html', 'dom'] as const) {
+      const code = compileKay(source, 'test.kay', { output }).tsx
+
+      expect(code).toContain('[KaySpreadAttributes(a)]')
+      expect(code).toContain('KayComponent(Card, KayMerge((a)))')
+    }
+  })
+
   it('rejects a computed style or script inside svg or math, where HTML reads it as markup', () => {
     expect(errors('---\nconst css = "a{}"\n---\nsvg\n  style {css}')).toEqual(['A `style` inside `svg` or `math` takes static text only'])
     expect(errors('---\nconst c = "red"\n---\nsvg\n  style {`.a{fill:${c}}`}')).toHaveLength(1)

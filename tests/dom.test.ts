@@ -109,6 +109,16 @@ describe('client bundle', () => {
   })
 })
 
+describe('a dynamic tag', () => {
+  it('refuses a tag that is no element name, and takes from its props what a spread may set', async () => {
+    const { dynamic } = await import('../src/runtime/dom')
+    const frame = dynamic('iframe', { srcdoc: '<script>alert(1)</script>', onclick: 'alert(1)', title: 'a' }) as Element
+
+    expect(frame.outerHTML).toBe('<iframe title="a"></iframe>')
+    expect(() => dynamic('img src=x onerror=alert(1)', {})).toThrow('is not an element name')
+  })
+})
+
 describe('component class', () => {
   it('hands a component the merged class as one string, following what it merges', async () => {
     const { root, dispose } = await mountKay({

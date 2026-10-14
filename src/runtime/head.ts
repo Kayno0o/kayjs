@@ -51,6 +51,8 @@ const SCRIPT_BREAK = /<(\/(?=script)|!(?=--))/gi
 // JSON holds `<` only inside strings, where `\u003c` reads the same, so no `<!--` or `</script` survives in it.
 const JSON_LT = /</g
 const JSON_TYPE = /json/i
+// Scripts holding JSON whatever their type says, where `\u003c` keeps them valid and `<\!` would not.
+const DATA_SCRIPT = /json|^(?:importmap|speculationrules)$/i
 const ABSOLUTE_PATH = /^\/(?!\/)/
 const STYLE_END = /<\/(style)/gi
 const VIEWPORT = 'meta:name:viewport'
@@ -338,7 +340,7 @@ function markupOf(attributes: Map<string, string | true>): string {
 
 // A JSON script, such as JSON-LD, takes its data as an object or as text.
 function scriptText(tag: HeadTag): string {
-  if (!JSON_TYPE.test(String(tag.props.type ?? '')))
+  if (!DATA_SCRIPT.test(String(tag.props.type ?? '')))
     return text(tag).replace(SCRIPT_BREAK, '<\\$1')
 
   const { children } = tag.props

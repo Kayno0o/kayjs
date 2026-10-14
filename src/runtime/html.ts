@@ -16,7 +16,7 @@ import { currentServerScope, scope } from './reactive'
 import { ISLAND_PARAM } from './server-islands'
 import { failedIds, idMark } from './uid'
 import { safeUrl } from './url'
-import { attributeName, attributeValue, classText, eachChild, elementName, handlerName, styleText } from './values'
+import { attributeName, attributeValue, classText, eachChild, elementName, handlerName, spreadAttributes, styleText } from './values'
 
 export { escape, escapeAttribute } from './escape'
 export { head } from './head'
@@ -199,7 +199,7 @@ export function element(tag: string, sources: readonly object[], content?: () =>
 // A component tag read off a prop or through a call: a string names an element, a function is the component.
 export function dynamic(tag: unknown, props: object): unknown {
   if (typeof tag === 'string')
-    return element(elementName(tag), [props])
+    return element(elementName(tag), [spreadAttributes(props)])
 
   return typeof tag === 'function' ? component(tag as (props: object) => unknown, props) : undefined
 }
