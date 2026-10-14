@@ -202,6 +202,17 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay/test i
     }, { timeout: 200 })).rejects.toThrow(/to hold$/)
   })
 
+  it('answers the next call once a wait timed out on a try the page was still running, as on a slow machine', async () => {
+    await expect(page.waitUntil(() => {
+      const end = Date.now() + 300
+
+      while (Date.now() < end);
+
+      return false
+    }, { timeout: 50 })).rejects.toThrow(/to hold$/)
+    expect(await page.evaluate(() => 1)).toBe(1)
+  })
+
   it('says why it opens no page, without a browser build or a browser', async () => {
     const plain = await testSite({ routes: 'tests/fixtures/navigation/src/routes' })
 
