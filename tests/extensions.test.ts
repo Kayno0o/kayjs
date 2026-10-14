@@ -1,7 +1,7 @@
 import type { BunPlugin } from 'bun'
 import { mkdir, mkdtemp, rm, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { basename, join, resolve } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { parse } from 'devalue'
@@ -11,6 +11,7 @@ import { readShadowSettings } from '../src/check/shadow'
 import { writeShadowTypes } from '../src/check/shadow-types'
 import { mergeConfig } from '../src/config'
 import { UNSERVED_MESSAGE } from '../src/runtime/checks'
+import { apiStubs } from '../src/server/api'
 import { routeMounts, scanRoutes } from '../src/server/routes'
 import { scratchDir } from './scratch'
 
@@ -486,6 +487,30 @@ describe('an extension listed from beside the app', () => {
       await rm(dir, { recursive: true, force: true })
     }
   }, 30_000)
+})
+
+describe('an API module of a linked library', () => {
+  it('give an island its mount when the library is linked, whichever side of the link the island imports it from', async () => {
+    const base = await scratchDir('api-link-')
+    const real = join(base, 'lib')
+    const linked = join(base, 'app/node_modules/lib')
+
+    try {
+      await Bun.write(join(real, 'api/who.ts'), 'import { serve } from \'bun\'\n\nexport default { serve }\n')
+      await Bun.write(join(real, 'island.ts'), 'import who from \'./api/who\'\n\nconsole.log(who)\n')
+      await mkdir(dirname(linked), { recursive: true })
+      await symlink(real, linked)
+
+      for (const [dir, entry] of [[join(linked, 'api'), join(real, 'island.ts')], [join(real, 'api'), join(linked, 'island.ts')]] as const) {
+        const built = await Bun.build({ entrypoints: [entry], target: 'browser', plugins: [apiStubs([{ dir, prefix: '/lib' }])] })
+
+        expect(await built.outputs[0]!.text()).toContain('"/api/lib/who"')
+      }
+    }
+    finally {
+      await rm(base, { recursive: true, force: true })
+    }
+  })
 })
 
 describe('a library outside the app\'s directory', () => {
