@@ -49,6 +49,8 @@ const SPECULATION = 'script[type="speculationrules"]'
 const HISTORY = 'script[data-kay-history]'
 // The head elements a swap leaves to itself rather than merging.
 const UNMERGED = `title,${SPECULATION},${HISTORY}`
+// The attributes naming a meta, a head holding one per name and media.
+const META_NAMES = ['name', 'property', 'http-equiv']
 const SWAP_PATTERN = /\$kayAwait/
 // Scripts the browser runs; any other type, such as `application/json` or `application/ld+json`, holds data of the page it came with.
 const RUNNABLE_TYPES = new Set(['', 'module', 'text/javascript', 'application/javascript', 'importmap'])
@@ -372,11 +374,11 @@ function tokens(value: string | undefined): string[] {
 }
 
 // Adds what the next head serves that this one lacks now, and drops what the server alone served here as the page is swapped: the page keeps its own styles until the next one's loaded.
-// An element a script changed or added since stays the script's, and the next page's copy of it is not added again.
+// An element a script changed or added since stays the script's, and the next page's copy of it is not added again, nor its meta of the same name serving another value.
 function mergeHead(next: Document): { loaded: Promise<unknown>, commit: () => void } {
   const incoming = [...next.head.children].filter(element => !element.matches(UNMERGED))
-  const take = (key: string | undefined) => {
-    const at = incoming.findIndex(element => element.outerHTML === key)
+  const take = (key: string | undefined, of: (element: Element) => string | undefined = element => element.outerHTML) => {
+    const at = key === undefined ? -1 : incoming.findIndex(element => of(element) === key)
 
     if (at !== -1)
       incoming.splice(at, 1)
@@ -393,8 +395,10 @@ function mergeHead(next: Document): { loaded: Promise<unknown>, commit: () => vo
     const key = element._$s
 
     if (key !== element.outerHTML) {
-      take(element.outerHTML)
-      take(key)
+      const same = take(element.outerHTML)
+
+      if (!take(key) && !same)
+        take(metaName(element), metaName)
     }
     else if (!take(key) && element.tagName !== 'TITLE' && !ranAlready(element)) {
       stale.push(element)
@@ -425,6 +429,16 @@ function mergeHead(next: Document): { loaded: Promise<unknown>, commit: () => vo
       }
     },
   }
+}
+
+// Which meta an element is: the attribute naming it, and the media it is for.
+function metaName(element: Element): string | undefined {
+  if (element.tagName !== 'META')
+    return undefined
+
+  const by = META_NAMES.find(name => element.hasAttribute(name))
+
+  return by === undefined ? undefined : `${by}=${element.getAttribute(by)} ${element.getAttribute('media') ?? ''}`
 }
 
 // A script that ran stays, since taking it out undoes nothing; one holding data, such as the schemas of the page's forms, goes with its page.

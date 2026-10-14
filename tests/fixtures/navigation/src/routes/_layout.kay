@@ -5,11 +5,11 @@ import { Tone } from '../tone'
 Tone.provide('layout')
 --- server
 const page = ctx.url.pathname
-// A page whose layout sets nothing on `<html>`.
+// A page whose layout sets nothing on `<html>`, and serves another theme colour.
 const bare = page === '/later'
 ---
 head
-  meta(name="theme-color" content="#ffffff")
+  meta(name="theme-color" content={bare ? '#000000' : '#ffffff'})
   html(class={bare ? undefined : 'served'} data-theme={bare ? undefined : 'light'} data-label={bare ? undefined : 'say "hi" & <b>\r\nbye'})
 nav
   a.home(href="/") Home

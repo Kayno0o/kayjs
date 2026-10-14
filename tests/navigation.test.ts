@@ -366,6 +366,11 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     expect(await state()).toEqual({ themes: ['#123456'], added: 1, secondOnly: 1, mode: 'dark' })
     await go('home', 'Home')
     expect(await state()).toEqual({ themes: ['#123456'], added: 1, secondOnly: 0, mode: 'dark' })
+    // A page serving another colour leaves the script's in place of its own.
+    await go('later', 'Later')
+    expect(await state()).toEqual({ themes: ['#123456'], added: 1, secondOnly: 0, mode: 'dark' })
+    await go('home', 'Home')
+    expect(await state()).toEqual({ themes: ['#123456'], added: 1, secondOnly: 0, mode: 'dark' })
   })
 
   it('restores where the page was scrolled to when going back, focusing its heading without scrolling and announcing its title', async () => {
