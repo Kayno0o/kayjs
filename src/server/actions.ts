@@ -47,6 +47,8 @@ class Refusal {
 const guarded = new WeakMap<Request, GuardedRequest>()
 // The params of the page each post came from, read by its guards and its action alike.
 const pageParams = new WeakMap<Request, RouteParams>()
+// The page each guarded post came from, which its guards read as `ctx.url`.
+const pageUrls = new WeakMap<Request, URL>()
 const TEXT = 'text/plain; charset=utf-8'
 // What a visitor reads when the handler throws and its action words nothing of its own.
 const SERVER_ERROR = 'Something went wrong on our side; try again later'
@@ -126,9 +128,9 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], m
         transform: async (context) => {
           refuseCrossSite(context.request)
 
-          // Guards may check the params, so a post from no page of the file never reaches them; without guards, only an action reading `ctx.params` needs its page.
+          // Guards may check the params and the page's URL, so a post from no page of the file never reaches them; without guards, only an action reading `ctx.params` needs its page.
           if (guards.length > 0)
-            readPage(context.request, page, match, options)
+            pageUrls.set(context.request, guardedPage(context.request, page, match, options))
 
           const call = isCall(context.request)
           // A call may send a form's fields, read as a plain form post's are.
@@ -145,7 +147,7 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], m
           context.body = asForm ? formInput(value.schema, withoutEmptyFiles(context.body)) : callInput(context.body)
         },
         // After validation, the one stage where the app's `resolve` values are there for `ctx.locals`.
-        ...(guards.length > 0 && { beforeHandle: async (context: { request: Request }) => inLocale(context.request, options, async () => admit(guards, sharedContext(context.request, () => ({ ...context })), pageParams.get(context.request) ?? {}, options)) }),
+        ...(guards.length > 0 && { beforeHandle: async (context: { request: Request }) => inLocale(context.request, options, async () => admit(guards, sharedContext(context.request, () => ({ ...context })), pageParams.get(context.request) ?? {}, pageUrls.get(context.request), options)) }),
         error: async ({ code, error, request, body, server, set }) => {
           if (code === 'VALIDATION')
             return refused(value, error, request, server, back)
@@ -231,20 +233,49 @@ function readPage(request: Request, page: ActionPage, match: RouteMatch, { base 
   if (page.params.length === 0)
     return
 
-  const from = postedFrom(request)
-  const path = routerPath(new URL(from ?? '/', request.url).pathname, base)
+  if (postedPage(request, page, match, base) === undefined)
+    throw notFromPage()
+}
 
-  for (const route of from === undefined ? [] : page.routes) {
+// The page of the file a guarded post came from, its params kept: the guards see its URL rather than the action's. A post naming none, such as from a script, stands for the file's one page without params, and is refused when the file has none.
+function guardedPage(request: Request, page: ActionPage, match: RouteMatch, { base = '' }: ActionOptions): URL {
+  const from = postedPage(request, page, match, base)
+
+  if (from !== undefined)
+    return from
+
+  const plain = page.params.length === 0 ? page.routes.find(route => route.params.length === 0) : undefined
+
+  if (plain === undefined)
+    throw notFromPage()
+
+  return new URL(`${base}${plain.pattern}`, request.url)
+}
+
+function postedPage(request: Request, page: ActionPage, match: RouteMatch, base: string): URL | undefined {
+  const from = postedFrom(request)
+
+  if (from === undefined)
+    return undefined
+
+  const url = new URL(from)
+  const path = routerPath(url.pathname, base)
+
+  for (const route of page.routes) {
     const params = match(route, path)
 
     if (params) {
       pageParams.set(request, Object.fromEntries(Object.entries(params).filter(([name]) => page.params.includes(name))))
 
-      return
+      return url
     }
   }
 
-  throw new Refusal(new Response('Action posted from no page of its route', { status: 400, headers: { 'content-type': TEXT } }))
+  return undefined
+}
+
+function notFromPage(): Refusal {
+  return new Refusal(new Response('Action posted from no page of its route', { status: 400, headers: { 'content-type': TEXT } }))
 }
 
 // A call's input comes encoded, multipart when it carries files; input that does not decode is answered 400.
@@ -354,8 +385,8 @@ function contextLocale(): Locale {
 }
 
 // The guards of the action's page, answering for it when one stops the request.
-async function admit(guards: LoadedGuard[], context: { request: Request }, params: RouteParams, options: ActionOptions): Promise<Response | undefined> {
-  const passed = await passGuards(guards, context, params, options)
+async function admit(guards: LoadedGuard[], context: { request: Request }, params: RouteParams, url: URL | undefined, options: ActionOptions): Promise<Response | undefined> {
+  const passed = await passGuards(guards, context, params, options, url)
 
   if (passed instanceof Response)
     return passed
@@ -366,12 +397,12 @@ async function admit(guards: LoadedGuard[], context: { request: Request }, param
 }
 
 // Runs the guards of an action or an API route: the response when one stops the request, else the cookies and headers they set.
-export async function passGuards(guards: LoadedGuard[], context: { request: Request }, params: RouteParams, options: ActionOptions): Promise<Response | GuardedRequest> {
+export async function passGuards(guards: LoadedGuard[], context: { request: Request }, params: RouteParams, options: ActionOptions, url = new URL(context.request.url)): Promise<Response | GuardedRequest> {
   const { request } = context
   const state: GuardedRequest = { jar: cookieJar(request), headers: new Headers() }
   const ctx: GuardContext = {
     request,
-    url: new URL(request.url),
+    url,
     locale: contextLocale(),
     params,
     get cookies() {

@@ -8,10 +8,11 @@ const CLI = resolve('src/cli.ts')
 const KEY = { 'x-key': 'open' }
 const projects: string[] = []
 const site = await testSite({ routes: 'tests/fixtures/openapi/src/routes', api: 'tests/fixtures/openapi/src/api', openapi: { title: 'Shop', version: '2.1.0', reference: true }, base: '/shop' })
+const signedIn = await testSite({ routes: 'tests/fixtures/openapi/src/routes', api: 'tests/fixtures/openapi/src/api', openapi: true, locals: request => ({ key: request.headers.get('x-session-key') ?? undefined }) })
 const hidden = await testSite({ routes: 'tests/fixtures/openapi/src/routes', api: 'tests/fixtures/openapi/src/api', openapi: { dev: true } })
 
 afterAll(async () => {
-  await Promise.all([site.close(), hidden.close(), ...projects.map(async dir => rm(dir, { recursive: true, force: true }))])
+  await Promise.all([site.close(), signedIn.close(), hidden.close(), ...projects.map(async dir => rm(dir, { recursive: true, force: true }))])
 })
 
 async function documented(): Promise<{ info: unknown, servers: unknown, paths: Record<string, Record<string, Record<string, unknown>>> }> {
@@ -107,6 +108,11 @@ describe('the OpenAPI document', () => {
   it('is served behind the API directory\'s own guard, and nothing below it', async () => {
     expect((await site.fetch('/api/openapi.json')).status).toBe(401)
     expect((await site.fetch('/api/reference')).status).toBe(401)
+  })
+
+  it('gives that guard what an API route\'s gets, the app\'s session included', async () => {
+    expect((await signedIn.fetch('/api/openapi.json', { headers: { 'x-session-key': 'open' } })).status).toBe(200)
+    expect((await signedIn.fetch('/api/openapi.json')).status).toBe(401)
   })
 
   it('renders a reference page listing the routes, with no script', async () => {

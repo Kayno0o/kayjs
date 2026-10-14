@@ -264,7 +264,9 @@ export default defineConfig({ requireGuards: true })
 - Its `ctx` has `request`, `url`, `locale`, `params`, `cookies`, `locals`, `headers`, `redirect` and `deny`; cookies and headers it sets reach the response either way.
 - `ctx.params` holds the params of the page asked for, each matcher's value in place of its text: `src/routes/orgs/[org]/_guard.ts` reads `params.org`.
 - They are typed `Readonly<Record<string, unknown>>`, since a guard covers every route below it.
-- For an action they are those of the page it was posted from, which the action reads in its own `ctx.params` (see actions), and `url` is the action's.
+- For an action they are those of the page it was posted from, which the action reads in its own `ctx.params` (see actions).
+- An action's guards read that page as `url`, never the action's own, so a root guard testing `url.pathname.startsWith('/admin')` covers the actions of `/admin` too.
+- A post naming no page of the action's file, such as from a script, has the file's page without params as its `url`, and is refused when there is none.
 - For a module under `src/api/`, they are those of the route the request matched, as its handler reads them.
 - Checks on one record still belong in the load and the action.
 - An action's guards run once its input is valid, when the app's `resolve` values are there: input the schema refuses gets its field errors back without reaching a guard or the handler.

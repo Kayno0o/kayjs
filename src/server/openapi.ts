@@ -6,6 +6,7 @@ import type { ServedPaths } from './served-paths'
 import { escape } from '../runtime/escape'
 import { inLocale, passGuards } from './actions'
 import { API_PREFIX } from './api'
+import { sharedContext } from './render'
 import { apiRoutePath } from './routes'
 
 export interface OpenApiConfig {
@@ -237,18 +238,20 @@ function jsonSchema(schema: unknown): unknown {
 // The document at `/api/openapi.json`, and the reference page when asked for, behind the guard of the API directory itself when it has one.
 export function serveOpenApi(app: Elysia, document: Schema, config: OpenApiConfig, guards: LoadedGuard[], options: ActionOptions): void {
   const json = JSON.stringify(document)
-  const admitted = async (request: Request, answer: () => Response) => {
-    const passed = guards.length > 0 ? await inLocale(request, options, async () => passGuards(guards, { request }, {}, options)) : undefined
+  // The guard gets what an API route's does, the app's session and other plugins included.
+  const admitted = async (context: { request: Request }, answer: () => Response) => {
+    const { request } = context
+    const passed = guards.length > 0 ? await inLocale(request, options, async () => passGuards(guards, sharedContext(request, () => ({ ...context })), {}, options)) : undefined
 
     return passed instanceof Response ? passed : answer()
   }
 
-  app.get(OPENAPI_PATH, async ({ request }) => admitted(request, () => new Response(json, { headers: { 'content-type': 'application/json; charset=utf-8' } })))
+  app.get(OPENAPI_PATH, async context => admitted(context, () => new Response(json, { headers: { 'content-type': 'application/json; charset=utf-8' } })))
 
   if (config.reference === true) {
     const html = referencePage(document)
 
-    app.get(REFERENCE_PATH, async ({ request }) => admitted(request, () => new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8' } })))
+    app.get(REFERENCE_PATH, async context => admitted(context, () => new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8' } })))
   }
 }
 
