@@ -96,13 +96,15 @@ describe('admin', () => {
   test('users list newest first, a page at a time, searched', async () => {
     const { admin, member } = await setup()
 
+    // Created a second later, as users sharing a millisecond list in no set order.
+    setSystemTime(new Date(Date.now() + 1000))
     await member('bob@example.com')
 
     const all = await admin.browser.call('listUsers')
 
     expect(all.total).toBe(3)
     expect(all.users.map((user: User) => user.email)).toContain('bob@example.com')
-    expect(all.users[0]).toMatchObject({ roles: [], ban: null, hasPassword: true })
+    expect(all.users[0]).toMatchObject({ email: 'bob@example.com', roles: [], ban: null, hasPassword: true })
     expect(await admin.browser.call('listUsers', { search: 'BOB', limit: 1 })).toMatchObject({ ok: true, users: [{ email: 'bob@example.com' }], total: 1 })
     expect((await admin.browser.call('listUsers', { offset: 2, limit: 5 })).users).toHaveLength(1)
   })
