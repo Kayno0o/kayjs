@@ -201,6 +201,36 @@ describe('props read off the props object', () => {
   })
 })
 
+// The non-island render (no signal in the component), whose first render parity.test.ts only holds as an island.
+describe('slots, template consts and match', () => {
+  const rows = '--- <T>\nimport type { JSX } from \'kay\'\n\nconst { items, row } = props<{ items: T[], row: (item: T, index: number) => JSX.Element }>()\n---\nul\n  for item, i of items key={i}\n    | {row(item, i)}\n'
+  const card = '---\nimport type { JSX } from \'kay\'\n\nconst { items, actions, row } = props<{ items: string[], actions?: JSX.Element, row?: (item: string, index: number) => JSX.Element }>()\n---\nheader\n  slot actions\n    | No actions\nul\n  for item, i of items key={i}\n    slot row(item, i)\n      li {item}\nslot\n  p Empty\n'
+  const box = '---\nimport type { JSX } from \'kay\'\n\nconst { children } = props<{ children: JSX.Element }>()\n---\ndiv.box\n  slot\n'
+  const status = '---\nconst { status } = props<{ status: string }>()\n---\nmatch status\n  when \'draft\'\n    p Draft\n  when \'published\', \'scheduled\'\n    p Live\n  else\n    p Unknown'
+  const consts = '---\nimport Box from \'./box.kay\'\n\nconst { products } = props<{ products: { name: string, cents: number, stock: number }[] }>()\n---\nconst count = products.length\np {count} products\nfor product of products\n  const price = (product.cents / 100).toFixed(2)\n  const { name, stock: left = 0 } = product\n  li(title={price}) {name}: {price}\n    if left < 3 as low\n      const label = \'only \' + low\n      b {label}\nBox\n  const total = products.reduce((sum, product) => sum + product.cents, 0)\n  | {total}\ntry\n  const twice = count * 2\n  i {twice}'
+  const siblings = '---\nconst { n } = props<{ n: number }>()\n---\nconst double = n * 2\nbutton#up {double}\ndiv\n  p\n    const label = \'p\' + n\n    b {label}\n    i(title={label}) {double}\n  span\n    const label = \'s\' + double\n    | {label}\nif n > 1\n  const { big } = { big: n * 10 }\n  em {big}'
+  const products = [{ name: 'Tea', cents: 250, stock: 1 }, { name: 'Mug', cents: 900, stock: 8 }]
+
+  const table: [string, string, Record<string, unknown>, string][] = [
+    ['a slot called once per item with its arguments', '---\nimport Rows from \'./rows.kay\'\nconst { names } = props<{ names: string[] }>()\n---\nRows(items={names})\n  @row(name, i)\n    li {i}: {name}', { names: ['a', 'b'] }, '<ul><li>0: a</li><li>1: b</li></ul>'],
+    ['named slots given', '---\nimport Card from \'./card.kay\'\n---\nCard(items={[\'a\', \'b\']})\n  @actions\n    button Add\n  @row(name, i)\n    li {i}: {name}\n  p Body', {}, '<header><button>Add</button></header><ul><li>0: a</li><li>1: b</li></ul><p>Body</p>'],
+    ['named slots left to their fallbacks', '---\nimport Card from \'./card.kay\'\n---\nCard(items={[\'a\']})', {}, '<header>No actions</header><ul><li>a</li></ul><p>Empty</p>'],
+    ['template consts per block, in a slot and in a try', consts, { products }, '<p>2 products</p><li title="2.50">Tea: 2.50<b>only true</b></li><li title="9.00">Mug: 9.00</li><div class="box">1150</div><i>4</i>'],
+    ['same-named consts in sibling elements, one in an if', siblings, { n: 1 }, '<button id="up">2</button><div><p><b>p1</b><i title="p1">2</i></p><span>s2</span></div>'],
+    ['same-named consts with the if present', siblings, { n: 2 }, '<button id="up">4</button><div><p><b>p2</b><i title="p2">4</i></p><span>s4</span></div><em>20</em>'],
+    ['match on a list of whens', status, { status: 'scheduled' }, '<p>Live</p>'],
+    ['match falling to its else', status, { status: 'gone' }, '<p>Unknown</p>'],
+  ]
+
+  it.each(table)('render %s', async (_name, source, props, expected) => {
+    await Bun.write(join(scratch, 'rows.kay'), rows)
+    await Bun.write(join(scratch, 'card.kay'), card)
+    await Bun.write(join(scratch, 'box.kay'), box)
+
+    expect(await renderKay(source, props)).toBe(expected)
+  })
+})
+
 describe('named slots', () => {
   it('read a line made of an expression as text', async () => {
     expect(await renderKay('---\nconst { name } = props<{ name: string }>()\n---\np\n  {name} <b>\n  | !', { name: 'kay' })).toBe('<p>kay &lt;b>\n!</p>')

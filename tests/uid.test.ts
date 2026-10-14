@@ -89,6 +89,7 @@ describe('uid', () => {
     }
   })
 
+  // Not a parity case: a fresh browser render prefixes ids differently from the server island (K0 against K13-0), so only a hydrated island keeps the ids the server wrote.
   it('draws the same ids in the browser as the server wrote, island by island', async () => {
     const entry = join(dir, 'client.ts')
 

@@ -107,6 +107,9 @@ const FIXTURES: Record<string, Record<string, string | Blob>> = {
     ].join('\n'),
     'box.kay': '---\nimport type { JSX } from \'kay\'\n\nconst { children } = props<{ children: JSX.Element }>()\n---\ndiv.box\n  slot\n',
   },
+  'sibling consts': {
+    'main.kay': '---\nimport { signal } from \'kay\'\n\nconst n = signal(1)\nconst m = signal(2)\n---\nconst double = n() * 2\nbutton#up {double}\ndiv\n  p\n    const label = \'p\' + n()\n    b {label}\n    i(title={label}) {double}\n  span\n    const label = \'s\' + double\n    | {label}\nif n() > 1\n  const { big } = { big: n() * 10 }\n  em {big}\nif m() > 1\n  const { big } = { big: m() * 10 }\n  em {big}\n',
+  },
   'imported images': {
     'main.kay': [
       '---',
