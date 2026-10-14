@@ -269,6 +269,41 @@ describe('coming back from the provider', () => {
     expect(await visitor.json('/me')).toBe('anonymous')
   })
 
+  test('a callback with a wrong, empty or missing state leaves the pending flow usable, and the right one spends it once', async () => {
+    providers({ 1: { id: '1', username: 'ada' } })
+    const { browser } = setup()
+    const visitor = browser()
+    const leaving = await visitor.fetch('/auth/discord')
+    const state = new URL(leaving.headers.get('location')!).searchParams.get('state')!
+
+    for (const query of ['code=code-1&state=forged', 'code=code-1&state=', 'code=code-1', 'error=access_denied', `code=code-1&state=${state.toUpperCase()}`])
+      expect((await visitor.fetch(`/auth/discord/callback?${query}`)).headers.get('location')).toBe('/login?error=oauth')
+
+    expect((await visitor.fetch(`/auth/discord/callback?code=code-1&state=${state}`)).headers.get('location')).toBe('/')
+    expect(await visitor.json('/me')).not.toBe('anonymous')
+    expect((await visitor.fetch(`/auth/discord/callback?code=code-1&state=${state}`)).headers.get('location')).toBe('/login?error=oauth')
+  })
+
+  test('a callback in a browser with no pending flow answers oauth', async () => {
+    providers({ 1: { id: '1', username: 'ada' } })
+    const { browser } = setup()
+    const visitor = browser()
+
+    expect((await visitor.fetch('/auth/discord/callback?code=code-1&state=x')).headers.get('location')).toBe('/login?error=oauth')
+    expect((await visitor.fetch('/auth/discord/callback')).headers.get('location')).toBe('/login?error=oauth')
+  })
+
+  test('starting a sign-in again replaces the pending flow: the earlier state no longer works', async () => {
+    providers({ 1: { id: '1', username: 'ada' } })
+    const { browser } = setup()
+    const visitor = browser()
+    const first = new URL((await visitor.fetch('/auth/discord')).headers.get('location')!).searchParams.get('state')!
+    const second = new URL((await visitor.fetch('/auth/discord')).headers.get('location')!).searchParams.get('state')!
+
+    expect((await visitor.fetch(`/auth/discord/callback?code=code-1&state=${first}`)).headers.get('location')).toBe('/login?error=oauth')
+    expect((await visitor.fetch(`/auth/discord/callback?code=code-1&state=${second}`)).headers.get('location')).toBe('/')
+  })
+
   test('a flow older than ten minutes is refused', async () => {
     providers({ 1: { id: '1', username: 'ada' } })
     const { browser } = setup()
@@ -397,6 +432,19 @@ describe('linking a provider', () => {
 
     expect((await shared.fetch(`/auth/github/callback?code=code-7&state=${state}`)).headers.get('location')).toBe('/login?error=signed-out')
     expect(await store.identities.find('github', '7')).toBeUndefined()
+  })
+
+  test('a forged callback leaves a pending link usable', async () => {
+    providers({ 1: { id: '1', username: 'ada' }, 7: { id: '7', username: 'ada-gh', email: 'ada@example.com' } })
+    const { browser } = setup()
+    const ada = browser()
+
+    await signInWith(ada, 'discord', '1')
+    const started = await ada.call('linkProvider', 'github', {}, { redirect: undefined })
+    const state = new URL(started.url).searchParams.get('state')!
+
+    expect((await ada.fetch('/auth/github/callback?code=code-7&state=forged')).headers.get('location')).toBe('/login?error=oauth')
+    expect((await ada.fetch(`/auth/github/callback?code=code-7&state=${state}`)).headers.get('location')).toBe('/')
   })
 
   test('an account with a password links once the password proves it, even right after signing in, so a stolen session alone adds no way in', async () => {
