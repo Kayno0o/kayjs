@@ -820,18 +820,19 @@ describe('accessibility checks', () => {
     expect(checked(`li(role="option" ${click}) x`)).toEqual([])
   })
 
-  it('ask a field for a label, one around it, pointing at its id or written as an attribute', () => {
-    expect(checked('input(name="email")\nselect(name="size")\ntextarea#bio\ninput(id="age")')).toEqual([
+  it('ask a field for a label, one around it, pointing at its id or written as an attribute, a placeholder being none', () => {
+    expect(checked('input(name="email")\nselect(name="size")\ntextarea#bio\ninput(id="age")\ninput(placeholder="Search")')).toEqual([
       'This `input` has no label',
       'This `select` has no label',
       'This `textarea` has no label',
+      'This `input` has no label',
       'This `input` has no label',
     ])
     expect(checked([
       'label Email\n  input(name="email")',
       'label(for="bio") Bio\ntextarea#bio',
       'input(id="age")\nlabel(for="age") Age',
-      'input(aria-label="Search")\ninput(placeholder="Search")\ninput(title="Search")\ninput(aria-labelledby="heading")',
+      'input(aria-label="Search")\ninput(title="Search")\ninput(aria-labelledby="heading")\nh2#heading Search',
       'input(type="hidden" name="id")\ninput(type="submit" value="Send")\ninput(type="button" value="Go")',
       'input(name="website" aria-hidden="true" tabindex="-1")\n.trap(hidden)\n  input(name="phone")',
     ].join('\n'))).toEqual([])
