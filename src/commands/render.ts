@@ -10,11 +10,18 @@ import { loadConfig } from '../config'
 import { environmentWithoutDotenv, PAGES_ENTRY } from '../dev'
 import { projectPaths } from '../project'
 import { basePath, routerPath } from '../server/base'
+import { START_PARENT } from '../server/lifecycle'
 import { projectRoot } from './command'
 
 const SOCKET_PRELOAD = join(import.meta.dir, '..', 'dev', 'render-socket.ts')
 const SCHEME = /^https?:\/\//
 const STOPS = ['SIGINT', 'SIGTERM', 'SIGHUP'] as const
+// An HTTP method is a token, as RFC 9110 writes it.
+const METHOD = /^[!#$%&'*+.^`|~\w-]+$/
+const BODILESS = new Set(['GET', 'HEAD'])
+// Long enough for a large app's first client build; a server that never listens is said to.
+const SERVE_TIMEOUT_MS = 60_000
+const STOP_WAIT_MS = 5000
 const REDIRECT_STATUS = new Set([301, 302, 303, 307, 308])
 
 // Answers one request as `kay dev` would serve it, the server entry and its plugins included, and prints the body: a server listening on a Unix socket of its own, gone once it answered.
@@ -31,7 +38,7 @@ export const render: Command = {
     if (url === undefined)
       return refuse('kay render takes the URL to render, such as /about')
 
-    if (!url.startsWith('/') && !SCHEME.test(url))
+    if ((!url.startsWith('/') || url.startsWith('//')) && !SCHEME.test(url))
       return refuse(`kay render takes a path such as /about or an http URL, not ${url}`)
 
     const headers = new Headers()
@@ -57,6 +64,12 @@ export const render: Command = {
     const target = new URL(url, 'http://localhost')
     const verb = typeof method === 'string' ? method.toUpperCase() : body === undefined ? 'GET' : 'POST'
 
+    if (!METHOD.test(verb))
+      return refuse(`--method takes an HTTP method, not ${String(method)}`)
+
+    if (typeof body === 'string' && BODILESS.has(verb))
+      return refuse(`a ${verb} request has no body, so --body needs another --method, such as POST`)
+
     // As curl sends `-d`, and as a form posts.
     if (typeof body === 'string' && !headers.has('content-type'))
       headers.set('content-type', 'application/x-www-form-urlencoded')
@@ -72,7 +85,7 @@ export const render: Command = {
       serving = resolve
     })
     // The server's own output is a log, which goes beside the body rather than into it.
-    const server = Bun.spawn([process.execPath, '--preload', SOCKET_PRELOAD, typeof option === 'string' ? resolve(option) : existsSync(entry) ? entry : PAGES_ENTRY], { cwd: root, env: { ...env, NODE_ENV: 'development', KAY_RENDER_SOCKET: socket, [RENDER_OUTPUT]: basename(output) }, stdin: 'ignore', stdout: 2, stderr: 'inherit', ipc: (message: { serving?: boolean }) => message.serving === true && serving(true) })
+    const server = Bun.spawn([process.execPath, '--preload', SOCKET_PRELOAD, typeof option === 'string' ? resolve(option) : existsSync(entry) ? entry : PAGES_ENTRY], { cwd: root, env: { ...env, NODE_ENV: 'development', [START_PARENT]: String(process.pid), KAY_RENDER_SOCKET: socket, [RENDER_OUTPUT]: basename(output) }, stdin: 'ignore', stdout: 2, stderr: 'inherit', ipc: (message: { serving?: boolean }) => message.serving === true && serving(true) })
 
     // Interrupted, it leaves no server or build behind.
     const stops = STOPS.map(signal => [signal, () => {
@@ -86,7 +99,15 @@ export const render: Command = {
       process.once(signal, stop)
 
     try {
-      if (await Promise.race([served, server.exited]) !== true) {
+      const outcome = await Promise.race([served, server.exited, Bun.sleep(SERVE_TIMEOUT_MS)])
+
+      if (outcome === undefined) {
+        console.error(`kay render: the server did not listen within ${SERVE_TIMEOUT_MS / 1000} s; its entry starts one through Elysia's \`listen()\` or \`Bun.serve\``)
+
+        return 1
+      }
+
+      if (outcome !== true) {
         console.error(`kay render: the server exited with code ${server.exitCode ?? server.signalCode} before it served`)
 
         return 1
@@ -113,7 +134,12 @@ export const render: Command = {
       for (const [signal, stop] of stops)
         process.off(signal, stop)
 
+      // A server that drains, or ignores SIGTERM, is not waited on for long.
       server.kill()
+
+      if (await Promise.race([server.exited, Bun.sleep(STOP_WAIT_MS)]) === undefined)
+        server.kill('SIGKILL')
+
       await server.exited
       await Promise.all([rm(dir, { recursive: true, force: true }), rm(output, { recursive: true, force: true })])
     }

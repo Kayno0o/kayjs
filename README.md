@@ -44,7 +44,7 @@ In production the server serves what `kay build` wrote and bundles nothing at bo
 | `kay build [dir] --static [--outdir dist]` | the same, then the whole site as static files for a host with no server |
 | `kay check [dir] [paths...] [-p tsconfig.json] [--entry <file>] [--deny-warnings] [--fix] [--only <group>] [--format text\|github\|json] [--watch]` | type-check the project, `.kay` files included, `-p` naming another tsconfig and `--entry` the server entry whose `app` types `ctx.locals`; warnings fail it only with `--deny-warnings`, and `--fix` applies the fixes that change nothing else first |
 | `kay start [dir] [--entry <file>] [--port <port>]` | serve the last build as production does |
-| `kay render <url> [dir] [--method <method>] [--body <text>] [--header <name: value>] [--cookie <name=value>] [-i]` | print what the server answers for one URL, as `kay dev` serves it, without starting it on a port |
+| `kay render <url> [dir] [--method <method>] [--body <text>] [--header <name: value>] [--cookie <name=value>] [-i] [--entry <file>]` | print what the server answers for one URL, as `kay dev` serves it, without starting it on a port |
 | `kay routes [dir]` | list every route the project serves, and the file serving it |
 | `kay explain [lint\|group]` | list the lints, or a group's, or explain one with an example it reports and the same written right |
 | `kay fmt [paths...] [--check]` | format `.kay` files |

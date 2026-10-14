@@ -196,13 +196,15 @@ kay render /account --cookie session=…
 kay render /_kay/action/src/routes/index.kay/add --body 'title=Milk' -i
 ```
 
-It answers one request as `kay dev` serves it, the server entry and what it uses included, and prints the body on stdout, so a script or an agent sees what a page renders without starting a server and fetching it. The server runs on a Unix socket of its own rather than a port, so it runs beside a `kay dev` holding the port, and stops once it answered; it builds the browser code into a directory of its own under `.kay`, removed afterwards, never touching what `kay build` or `kay dev` wrote. What the server logs, the error report of a page that throws included, goes to stderr.
+It answers one request as the server entry answers it under `NODE_ENV=development`, what it uses included, as `kay dev` serves it but without the inspector's attributes, and prints the body on stdout, so a script or an agent sees what a page renders without starting a server and fetching it. The server runs on a Unix socket of its own rather than a port, so it runs beside a `kay dev` holding the port, and stops once it answered; it builds the browser code into a directory of its own under `.kay`, removed afterwards, never touching what `kay build` or `kay dev` wrote. What the server logs, the error report of a page that throws included, goes to stderr.
+
+The whole app boots for it, as for `kay dev`: its jobs and the top-level code of its modules run, and a `POST` to an action runs the action against the app's database. The request goes to the first server the entry starts. A full URL gives its host to the request, as a site served on several hosts or a locale's domain reads it; it is sent over plain HTTP whatever its scheme. A server that has not listened after 60 seconds fails the command.
 
 A redirect prints `kay render: 302 Found, to /login` on stderr and nothing on stdout, and exits 0. A status of 400 or above prints its line on stderr, the body still on stdout, and exits 1. A server that exits before it serves, as on an error at the entry's top level, fails with its code. Under `base`, a path under it is taken as the proxy in front of the server hands it over, so a link a page printed renders as it is, and so does the same path without it.
 
 | Option | Effect |
 | --- | --- |
-| `--method <method>` | The request's method, `GET` by default, `POST` with `--body` |
+| `--method <method>` | The request's method, `GET` by default, `POST` with `--body`, which `GET` and `HEAD` refuse |
 | `--body <text>` | The request's body, sent as a form posts it, `application/x-www-form-urlencoded`, unless a `--header` names another `content-type` |
 | `--header <name: value>` | A request header; repeat it for more |
 | `--cookie <name=value>` | A cookie; repeat it for more. A guarded page renders signed in with the session cookie a browser holds, copied from its developer tools |

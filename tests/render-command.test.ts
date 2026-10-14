@@ -108,6 +108,9 @@ describe('kay render', () => {
     expect(await render('about', bare)).toMatchObject({ code: 1, err: expect.stringContaining('kay: kay render takes a path such as /about or an http URL, not about') })
     expect(await render('/', bare, '--header', 'nocolon')).toMatchObject({ code: 1, err: expect.stringContaining('kay: --header takes "name: value", not nocolon') })
     expect(await render()).toMatchObject({ code: 1, err: expect.stringContaining('kay: kay render takes the URL to render') })
+    expect(await render('//elsewhere/about', bare)).toMatchObject({ code: 1, err: expect.stringContaining('not //elsewhere/about') })
+    expect(await render('/', bare, '--method', 'get', '--body', 'a=1')).toMatchObject({ code: 1, err: expect.stringContaining('kay: a GET request has no body, so --body needs another --method, such as POST') })
+    expect(await render('/', bare, '--method', 'not a method')).toMatchObject({ code: 1, err: expect.stringContaining('kay: --method takes an HTTP method, not not a method') })
   })
 })
 
@@ -185,6 +188,20 @@ p {user} via {via}
 
     expect((await render('/', other)).code).toBe(0)
   })
+
+  it('gives a full URL\'s host to the request', async () => {
+    const dir = await project(undefined, SERVER)
+
+    await writeFile(join(dir, 'src', 'routes', 'host.kay'), `--- server\nconst host = ctx.url.host\n---\np {host}\n`)
+
+    expect((await render('https://shop.example/host', dir)).out).toContain('<p>shop.example</p>')
+  })
+
+  it('stops a server ignoring SIGTERM once it answered', async () => {
+    const stubborn = await project(undefined, `process.on('SIGTERM', () => {})\nBun.serve({ fetch: () => new Response('up') })\n`)
+
+    expect(await render('/', stubborn)).toMatchObject({ code: 0, out: 'up' })
+  }, 15_000)
 
   it('fails when the entry exits before it serves', async () => {
     const broken = await project(undefined, `throw new Error('no database')\n`)
