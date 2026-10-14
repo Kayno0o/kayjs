@@ -1,0 +1,22 @@
+--- server
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
+import Notice from '@kaynooo/kayjs-ui/notice.kay'
+import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
+import UnusedUploads from '../components/unused-uploads.kay'
+import { unusedUploads } from '../orphans'
+import { settings } from '../settings'
+
+const { prefix } = settings()
+const scan = await unusedUploads()
+---
+head
+  title Unused uploads
+PageSection(title="Unused uploads" level={1})
+  @actions
+    Button(href={prefix} label="Content")
+  if 'blocked' in scan
+    EmptyState(title="Uploads cannot be checked" description={`${scan.blocked.join('; ')}. Nothing is listed while an entry or a collection cannot be read, since it may use any upload.`})
+  else
+    Notice(tone="warning" label="These uploads are mentioned in no entry of any collection, locale or draft. A URL written by hand in a page, a file of the repository outside the collections, or an older revision a revert brings back is not seen, so check each before you delete it: deleting is permanent, variants included.")
+    UnusedUploads(uploads={scan.unused})

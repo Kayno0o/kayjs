@@ -313,6 +313,41 @@ test('an upload is stored in its collection\'s folder, answered by the path that
   expect((await site.fetch('/api/cms/files/nope', { method: 'POST', body: form })).status).toBe(404)
 })
 
+test('the unused-uploads screen lists an upload no entry mentions, and deleting one removes it, a referenced one staying', async () => {
+  const upload = async () => {
+    const form = new FormData()
+
+    form.append('file', new File([PIXEL], 'pixel.png', { type: 'image/png' }))
+
+    return ((await (await site.fetch('/api/cms/files/products', { method: 'POST', body: form })).json()) as { path: string }).path
+  }
+  const [used, stray] = [await upload(), await upload()]
+  const keyOf = (path: string) => path.slice('/_kay/files/'.length)
+  const remove = async (keys: string[]) => site.fetch('/api/cms/files/unused/delete', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ keys }) })
+
+  products.push({ slug: 'cup', data: { name: 'Cup', photo: used } as { name: string } })
+
+  try {
+    const listed = async () => (await site.visit('/admin/uploads')).find('.kcms-uploads a').map(link => link.text)
+
+    expect(await listed()).toContain(keyOf(stray))
+    expect(await listed()).not.toContain(keyOf(used))
+    expect((await site.visit('/admin/uploads')).text('main')).toContain('A URL written by hand in a page')
+    expect(await (await remove([keyOf(used), keyOf(stray)])).json()).toEqual({ deleted: [keyOf(stray)], kept: [keyOf(used)] })
+    expect(await listed()).not.toContain(keyOf(stray))
+    expect((await site.fetch(stray)).status).toBe(404)
+    expect((await site.fetch(used)).status).toBe(200)
+
+    outage.message = 'down'
+    expect((await remove([keyOf(used)])).status).toBe(409)
+    expect((await site.visit('/admin/uploads')).text('main')).toContain('Uploads cannot be checked')
+  }
+  finally {
+    outage.message = undefined
+    products.splice(products.findIndex(product => product.slug === 'cup'), 1)
+  }
+})
+
 test('an upload of a type the CMS does not take is refused, whatever type it was sent as', async () => {
   for (const file of [new File(['alert(1)'], 'app.js', { type: 'image/png' }), new File(['<svg/>'], 'drawing.svg', { type: 'image/svg+xml' }), new File(['<p>'], 'page', { type: 'text/html' })]) {
     const form = new FormData()

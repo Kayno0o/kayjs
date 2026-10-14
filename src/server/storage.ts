@@ -1,7 +1,7 @@
 import type { Elysia } from 'elysia'
 import type { Duration } from '../runtime/duration'
 import { readdir, rename, rm } from 'node:fs/promises'
-import { basename, join, resolve } from 'node:path'
+import { basename, join, relative, resolve, sep } from 'node:path'
 import { durationSeconds } from '../runtime/duration'
 import { FILES_ROUTE } from '../runtime/image'
 import { kayLog } from '../runtime/log'
@@ -15,6 +15,8 @@ export interface FileStore {
   // The file, or undefined when none is stored under the key.
   read: (key: string) => Promise<Blob | undefined>
   delete: (key: string) => Promise<void>
+  // Every key stored under the prefix, all of them without one, in no order; `files.list()` needs it, so a store of the app's own gives it for anything listing the files.
+  list?: ((prefix?: string) => Promise<string[]>) | undefined
   // Where a store on this machine's disk keeps a file, which the image route reads in place rather than copying.
   path?: ((key: string) => string) | undefined
   // Where the files are reachable over HTTP without kay, such as a public bucket or a CDN in front of it, which a static export links.
@@ -80,6 +82,20 @@ export function diskFiles(dir: string = DEFAULT_DIR): FileStore {
     async delete(key) {
       await rm(path(key), { force: true })
     },
+    async list(prefix = '') {
+      try {
+        const root = resolve(dir)
+        const found = await readdir(root, { recursive: true, withFileTypes: true })
+
+        return found.filter(entry => entry.isFile()).map(entry => relative(root, join(entry.parentPath, entry.name)).split(sep).join('/')).filter(key => key.startsWith(prefix))
+      }
+      catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT')
+          return []
+
+        throw error
+      }
+    },
     path,
   }
 }
@@ -99,6 +115,19 @@ export function s3Files(options: Bun.S3Options & { publicUrl?: string | undefine
     async delete(key) {
       await bucket.delete(key)
     },
+    async list(prefix = '') {
+      const keys: string[] = []
+      let token: string | undefined
+
+      do {
+        const page = await bucket.list(token === undefined ? { prefix } : { prefix, continuationToken: token })
+
+        keys.push(...(page.contents ?? []).map(object => object.key))
+        token = page.isTruncated ? page.nextContinuationToken : undefined
+      } while (token !== undefined)
+
+      return keys
+    },
     publicUrl,
   }
 }
@@ -116,6 +145,9 @@ export function memoryFiles(): FileStore {
     },
     async delete(key) {
       stored.delete(key)
+    },
+    async list(prefix = '') {
+      return [...stored.keys()].filter(key => key.startsWith(prefix))
     },
   }
 }
@@ -181,19 +213,44 @@ export const files = {
     if (current.cacheDir !== undefined)
       await rm(join(current.cacheDir, key), { force: true })
 
-    const { variantsDir } = current
-
-    if (variantsDir === undefined)
-      return
-
     try {
-      const prefix = storedVariants(key)
-
-      await Promise.all((await readdir(variantsDir)).filter(name => name.startsWith(prefix)).map(async name => rm(join(variantsDir, name), { force: true })))
+      await Promise.all((await files.variants(key)).map(async name => rm(join(current.variantsDir!, name), { force: true })))
     }
     catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT')
         kayLog('warn', `the image variants of ${key} could not all be removed`, error)
+    }
+  },
+
+  // The keys of the stored files, those in a folder alone when one is given, in no order; the store must be able to list, as the built-in ones do.
+  async list(options: { folder?: string | undefined } = {}): Promise<string[]> {
+    const store = await activeStore()
+
+    if (!store.list)
+      throw new Error('kay: files.list() needs a store with a list method; the one `storage` names has none')
+
+    const prefix = options.folder === undefined ? undefined : `${options.folder.replace(TRAILING_SLASH, '')}/`
+
+    return (await store.list(prefix)).filter(key => KEY.test(key))
+  },
+
+  // The file names the image route made of a stored file, resized variants and social cards, which `files.delete` removes with it.
+  async variants(key: string): Promise<string[]> {
+    const { variantsDir } = current
+
+    if (variantsDir === undefined)
+      return []
+
+    const prefix = storedVariants(checkedKey(key, 'files.variants()'))
+
+    try {
+      return (await readdir(variantsDir)).filter(name => name.startsWith(prefix)).toSorted()
+    }
+    catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT')
+        return []
+
+      throw error
     }
   },
 

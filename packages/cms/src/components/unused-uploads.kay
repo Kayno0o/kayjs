@@ -1,0 +1,32 @@
+---
+import type { Column } from '@kaynooo/kayjs-ui'
+import type { UnusedUpload } from '../orphans'
+import ConfirmDelete from '@kaynooo/kayjs-ui/confirm-delete.kay'
+import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
+import Table from '@kaynooo/kayjs-ui/table.kay'
+import { refresh } from 'kay'
+import { deleteUnusedUpload } from '../editor/save'
+
+const { uploads } = props<{ uploads: UnusedUpload[] }>()
+
+const columns: Column<UnusedUpload>[] = [
+  { key: 'key', header: 'Upload', cell: true },
+  { key: 'variants', header: 'Variants', cell: true },
+  { key: 'actions', header: 'Actions', align: 'end', cell: true },
+]
+
+async function remove(upload: UnusedUpload): Promise<void> {
+  if (await deleteUnusedUpload(upload.key))
+    await refresh()
+}
+---
+Table.kcms-uploads(columns={columns} rows={uploads} rowKey={upload => upload.key})
+  @cell(row, column)
+    if column.key === 'key'
+      a(href={row.url} target="_blank" rel="noopener") {row.key}
+    else if column.key === 'variants'
+      span(data-tooltip={row.variants.join(", ")} tabindex="0") {row.variants.length === 0 ? 'None' : `${row.variants.length} variant${row.variants.length === 1 ? '' : 's'}`}
+    else
+      ConfirmDelete(message={`Delete ${row.key}${row.variants.length === 0 ? '' : ` and its ${row.variants.length} variant${row.variants.length === 1 ? '' : 's'}`}? This cannot be undone.`} label={`Delete ${row.key}`} failure="Could not delete" size="sm" variant="ghost" onConfirm={() => remove(row)})
+  @empty
+    EmptyState(title="No unused uploads" description="Every upload is mentioned in an entry.")

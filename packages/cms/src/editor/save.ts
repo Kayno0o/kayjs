@@ -3,6 +3,7 @@ import type { EntryRef, Issue } from '../kay/contract'
 import { attempt, toast } from '@kaynooo/kayjs-ui'
 import { call } from 'kay'
 import entriesApi from '../api/entries'
+import filesApi from '../api/files'
 import { entryKey } from '../markers'
 
 type Outcome = { issues: Issue[], conflict?: { version: string | null } | undefined } | { saved: true, commit?: unknown, version?: string | undefined }
@@ -99,6 +100,24 @@ export async function deleteSaved(ref: EntryRef, version?: string | undefined): 
   }), 'Could not delete')
 
   return settled(outcome, 'Deleted', 'Not deleted')
+}
+
+// Deletes an unused upload and its variants, and says how it went; true once deleted.
+export async function deleteUnusedUpload(key: string): Promise<boolean> {
+  const result = await attempt(() => call(filesApi, '/unused/delete', { method: 'post', body: { keys: [key] } }), 'Could not delete')
+
+  if (!result)
+    return false
+
+  if (result.deleted.length === 0) {
+    toast.error('Not deleted: an entry references this file now')
+
+    return false
+  }
+
+  toast.success('Deleted')
+
+  return true
 }
 
 // Turns a draft entry public and says how it went; true once published.

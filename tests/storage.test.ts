@@ -300,6 +300,86 @@ describe('a static export', () => {
   }, 30_000)
 })
 
+describe('files.list', () => {
+  it('gives the keys of a disk store or a memory one, those of a folder alone when asked, and nothing for stray files', async () => {
+    for (const store of [diskFiles(join(dir, 'listed')), memoryFiles()]) {
+      setupStorage(store, join(dir, 'cache'))
+
+      const cover = await files.put(await hero(), { folder: 'covers/2026' })
+      const avatar = await files.put(await hero(), { folder: 'avatars' })
+      const locked = await files.put(await hero(), { private: true })
+
+      await store.write('stray file.txt', new Blob(['x']))
+      expect((await files.list()).toSorted()).toEqual([avatar, cover, locked].toSorted())
+      expect(await files.list({ folder: 'covers' })).toEqual([cover])
+      expect(await files.list({ folder: 'covers/' })).toEqual([cover])
+      expect(await files.list({ folder: 'covers/20' })).toEqual([])
+    }
+
+    expect(await files.list()).not.toContain('stray file.txt')
+    setupStorage(memoryFiles(), join(dir, 'cache'))
+  })
+
+  it('lists an empty disk store that was never written to', async () => {
+    setupStorage(diskFiles(join(dir, 'never-written')), join(dir, 'cache'))
+    expect(await files.list()).toEqual([])
+    setupStorage(memoryFiles(), join(dir, 'cache'))
+  })
+
+  it('refuses a store of the app\'s own with no list method', async () => {
+    const { read, write, delete: remove } = memoryFiles()
+
+    setupStorage({ read, write, delete: remove }, join(dir, 'cache'))
+    await expect(files.list()).rejects.toThrow('needs a store with a list method')
+    setupStorage(memoryFiles(), join(dir, 'cache'))
+  })
+
+  it('reads every page of a bucket\'s listing', async () => {
+    const asked: string[] = []
+    const server = Bun.serve({
+      port: 0,
+      fetch(request) {
+        const query = new URL(request.url).searchParams
+
+        asked.push(`${query.get('prefix')}|${query.get('continuation-token')}`)
+
+        const first = !query.has('continuation-token')
+
+        return new Response(`<?xml version="1.0"?><ListBucketResult><IsTruncated>${first}</IsTruncated>${first ? '<NextContinuationToken>next</NextContinuationToken>' : ''}<Contents><Key>${first ? 'photos/0123456789abcdef0123.png' : 'photos/89abcdef012345670123.png'}</Key></Contents></ListBucketResult>`, { headers: { 'content-type': 'application/xml' } })
+      },
+    })
+
+    try {
+      setupStorage(s3Files({ bucket: 'site', endpoint: `http://localhost:${server.port}`, accessKeyId: 'id', secretAccessKey: 'secret', region: 'us-east-1' }), join(dir, 'cache'))
+      expect(await files.list({ folder: 'photos' })).toEqual(['photos/0123456789abcdef0123.png', 'photos/89abcdef012345670123.png'])
+      expect(asked).toEqual(['photos/|null', 'photos/|next'])
+    }
+    finally {
+      setupStorage(memoryFiles(), join(dir, 'cache'))
+      await server.stop(true)
+    }
+  })
+})
+
+describe('files.variants', () => {
+  it('names the variants and cards made of a stored file, and none once it is deleted', async () => {
+    const get = await serve(memoryFiles())
+    const key = await files.put(await hero())
+    const other = await files.put(await hero())
+    const variants = cacheDir(process.cwd(), `images${testWorker()}`)
+
+    await mkdir(variants, { recursive: true })
+    expect(await files.variants(key)).toEqual([])
+    expect((await get(`/_kay/image?src=${encodeURIComponent(files.url(key))}&w=640`)).status).toBe(200)
+    expect((await get(`/_kay/image?src=${encodeURIComponent(files.url(other))}&w=640`)).status).toBe(200)
+    expect(await files.variants(key)).toEqual([expect.stringMatching(/^stored-\w+-\w+-640\.webp$/)])
+    await files.delete(key)
+    expect(await files.variants(key)).toEqual([])
+    expect(await files.variants(other)).toHaveLength(1)
+    await files.delete(other)
+  })
+})
+
 describe('s3Files', () => {
   it('stores, reads and deletes objects in a bucket', async () => {
     const objects = new Map<string, { body: ArrayBuffer, type: string }>()

@@ -113,8 +113,9 @@ if upload.progress() !== undefined
 - A key under `private/` is private whatever its case.
 - `img(src={files.url(key)})` and `image(files.url(key), { sizes })` give a stored PNG, JPEG, WebP, GIF or AVIF the same variants as an imported image, with its size; an animated GIF is answered as it is.
 - `shareImage` and `shareCard` take one too.
-- `files.get(key)` resolves with the file as a `Blob`, or `undefined`; `files.delete(key)` deletes it with every variant the image route made of it, a key with no file being no error.
+- `files.get(key)` resolves with the file as a `Blob`, or `undefined`; `files.delete(key)` deletes it with every variant and social card the image route made of it, a key with no file being no error.
 - A JPEG, PNG or WebP is stored without the EXIF, XMP, IPTC, text chunks and comments a camera or phone writes in it, such as where the photo was taken, keeping its colour profile and a JPEG's orientation; `files.put(file, { keepMetadata: true })` stores it byte for byte (see [Privacy](privacy.md)).
+- `files.list({ folder })` resolves with the keys stored, those under the folder alone when one is given, in no order; `files.variants(key)` with the names of the variants and social cards the image route made of the file, which `files.delete` removes with it.
 - Each throws on a key `files.put` never gives, `../` say.
 
 ### Private files
@@ -140,7 +141,7 @@ export default defineConfig({
 - `s3Files(options)` keeps them in an S3 bucket, or any service speaking its API, such as R2, Spaces or MinIO; options left out are read from `S3_BUCKET`, `S3_ENDPOINT`, `S3_REGION`, `S3_ACCESS_KEY_ID` and `S3_SECRET_ACCESS_KEY`, as Bun's S3 client reads them, and it takes the client's own options, `virtualHostedStyle` say.
 - `/_kay/files/` streams them from the bucket, whole, and the image route copies an image it resizes once into its cache.
 - `publicUrl` is where the bucket serves its files without kay, which a static export links; the bucket serves each file with the type it was uploaded with, none of the above, so files the site's visitors upload belong on another origin than the site's.
-- `memoryFiles()` from `kay/server` keeps them in the process; `FileStore` is the shape of an app's own: `write`, `read` and `delete` by key, and `path` for one on this machine's disk, which the image route reads in place.
+- `memoryFiles()` from `kay/server` keeps them in the process; `FileStore` is the shape of an app's own: `write`, `read` and `delete` by key, `list(prefix?)` for `files.list` to work, which the built-in stores have, and `path` for one on this machine's disk, which the image route reads in place.
 - A script or a test that started no server reads `storage` from the kay.config.ts where it runs.
 - Under `bun test` files stay in memory, and `testSite` gives each site a store of its own unless its options name one.
 - `kay build --static` fails on a page linking a stored file, which has no server to serve it, unless the store has a `publicUrl`: the page then links the file there, unresized.

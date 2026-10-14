@@ -25,7 +25,7 @@ for key of photos key={key}
   img(src={files.url(key)} alt="")
 ```
 
-A key looks like `photos/1f3a9c0b2d4e6f8a0b1c.1600x1200.jpg`: an image's key holds its size, so `img` gives a stored image the same responsive variants as an imported one without opening the file. Keys are never reused, so a new avatar is a new file: `files.put(file, { replace: user.avatar })` deletes the old one once the new one is stored, and `files.delete(key)` deletes a file with every resized variant of it.
+A key looks like `photos/1f3a9c0b2d4e6f8a0b1c.1600x1200.jpg`: an image's key holds its size, so `img` gives a stored image the same responsive variants as an imported one without opening the file. Keys are never reused, so a new avatar is a new file: `files.put(file, { replace: user.avatar })` deletes the old one once the new one is stored, and `files.delete(key)` deletes a file with every resized variant and social card of it. `files.list({ folder })` resolves with the keys stored, which is how an app finds the files nothing references any more, and `files.variants(key)` names the variants made of one; a store of the app's own gives `list(prefix?)` for the first.
 
 A JPEG, PNG or WebP is stored without the metadata a camera or phone writes in it, such as where and when the photo was taken, keeping its colour profile and orientation. `files.put(file, { keepMetadata: true })` stores it byte for byte.
 

@@ -1,5 +1,6 @@
 --- server
 import Badge from '@kaynooo/kayjs-ui/badge.kay'
+import Button from '@kaynooo/kayjs-ui/button.kay'
 import CardRow from '@kaynooo/kayjs-ui/card-row.kay'
 import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
 import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
@@ -14,6 +15,8 @@ const listed = await collections()
 head
   title Content
 PageSection(title="Content" level={1})
+  @actions
+    Button(href={`${prefix}/uploads`} label="Unused uploads")
   for collection of listed key={collection.name}
     CardRow
       @right
