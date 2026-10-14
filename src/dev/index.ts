@@ -31,6 +31,8 @@ export interface DevOptions {
   onRestart?: ((child: Subprocess) => void) | undefined
   // Where the address, each restart and a server exiting on its own are reported, `console.log` by default.
   log?: ((line: string) => void) | undefined
+  // `json` reports each as one JSON object per line, the errors the servers meet included, and sends the servers' own output to stderr.
+  format?: 'text' | 'json' | undefined
 }
 
 // Long enough to gather the few events one save makes, which come within a millisecond.
@@ -69,6 +71,7 @@ const WS_SCHEME = /^ws:\/\//
 // A server listening on every address is reached on this machine as localhost.
 const ANY_ADDRESS = /(?<=\/\/)(?:0\.0\.0\.0|\[::\])(?=:)/
 const ANY_FILE = /^/
+const STDERR = 2
 
 // Runs the server entry in development and restarts it on every change; a fresh process is the only way to drop modules Bun has loaded.
 // The client is built beside it, by a process kept from one change to the next, which a stylesheet edit alone needs no restart for.
@@ -129,7 +132,10 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     sockets.delete(server)
     await rm(socket, { force: true })
   }
-  const color = options.log === undefined && process.stdout.isTTY && process.env.NO_COLOR === undefined
+  const json = options.format === 'json'
+  // One event, as a line of text, or as a JSON object of its fields under `json`.
+  const say = (event: string, fields: object, line: string) => log(json ? JSON.stringify({ event, time: new Date().toISOString(), ...fields }) : line)
+  const color = options.log === undefined && !json && process.stdout.isTTY && process.env.NO_COLOR === undefined
   const stamp = () => {
     const time = new Date().toLocaleTimeString('en-GB')
 
@@ -149,18 +155,18 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     pagePort = port
 
     if (address === undefined) {
-      log(`kay dev: ${url} (ready in ${took}${moved === undefined ? '' : `, ${asked} was in use`})`)
+      say('ready', { url, ms, ...moved !== undefined && { inUse: asked } }, `kay dev: ${url} (ready in ${took}${moved === undefined ? '' : `, ${asked} was in use`})`)
 
       if (inspector !== undefined)
-        log(`kay dev: debugger on ${inspector.url}, https://debug.bun.sh/#${inspector.url.replace(WS_SCHEME, '')}`)
+        say('debugger', { url: inspector.url }, `kay dev: debugger on ${inspector.url}, https://debug.bun.sh/#${inspector.url.replace(WS_SCHEME, '')}`)
 
       if (options.open === true)
-        openBrowser(url, log)
+        openBrowser(url, command => say('no-browser', { command }, `kay dev: no browser to open ${url} with: ${command} is not installed`))
     }
     else {
       const changed = describe(restartedFor)
 
-      log(`${stamp()} ${changed}: restarted in ${took}${url === address ? '' : `, now on ${url}`}`)
+      say('restart', { changed: restartedFor, ms, url }, `${stamp()} ${changed}: restarted in ${took}${url === address ? '' : `, now on ${url}`}`)
       tell(server, { built: { changed, ms } })
     }
 
@@ -173,7 +179,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     const code = await server.exited
 
     if (server === child && !stopping && !STOP_SIGNALS.has(server.signalCode ?? '')) {
-      log(`${stamp()} the server exited with code ${code}, waiting for a change`)
+      say('exit', { code }, `${stamp()} the server exited with code ${code}, waiting for a change`)
       readySpare()
     }
   }
@@ -206,7 +212,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     // Gone on its own while building, as when the config failed to load: the next build starts it again.
     if (current !== undefined && current === builder && !stopping && !ownClient) {
       if (!builderExitSaid)
-        log(`${stamp()} the process building the client exited; each change starts it again, the servers building their own until one build succeeds`)
+        say('builder-exit', {}, `${stamp()} the process building the client exited; each change starts it again, the servers building their own until one build succeeds`)
 
       builderExitSaid = true
     }
@@ -258,6 +264,10 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     if ('serving' in message && server === child)
       readySpare()
 
+    // The server logged it already; only `json` repeats it, as an event.
+    if ('devError' in message && json && typeof message.devError === 'object')
+      say('error', message.devError ?? {}, '')
+
     listened(server, message)
   }
   // A running server that reads the build takes the stylesheets of an edit to stylesheets alone; false when it needs a restart instead, as when the build failed.
@@ -272,11 +282,12 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     if (!outcome || outcome.failed || server !== child)
       return false
 
-    const changed = describe(changedFilesNamed(root, files))
+    const named = changedFilesNamed(root, files)
+    const changed = describe(named)
     const ms = Math.round(performance.now() - started)
 
     tell(server, { ...outcome.styles && { styles: outcome.styles }, built: { changed, ms, styles: true } })
-    log(`${stamp()} ${changed}: stylesheets swapped in ${ms} ms`)
+    say('styles', { changed: named, ms }, `${stamp()} ${changed}: stylesheets swapped in ${ms} ms`)
 
     return true
   }
@@ -287,7 +298,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
 
     spareEntry = entryToRun()
 
-    const server = Bun.spawn([process.execPath, '--preload', SPARE, spareEntry], { cwd: root, env: { ...env, NODE_ENV: 'development', ...options.port === undefined ? {} : { PORT: String(options.port) }, KAY_DEV_HOST: options.host ?? 'localhost', ...socket === undefined ? {} : { BUN_INSPECT: `ws+unix://${socket}` } }, stdin: 'pipe', stdout: 'inherit', stderr: 'inherit', ipc: (message, server) => received(server, message) })
+    const server = Bun.spawn([process.execPath, '--preload', SPARE, spareEntry], { cwd: root, env: { ...env, NODE_ENV: 'development', ...options.port === undefined ? {} : { PORT: String(options.port) }, KAY_DEV_HOST: options.host ?? 'localhost', ...socket === undefined ? {} : { BUN_INSPECT: `ws+unix://${socket}` } }, stdin: 'pipe', stdout: json ? STDERR : 'inherit', stderr: 'inherit', ipc: (message, server) => received(server, message) })
 
     if (socket !== undefined) {
       sockets.set(server, socket)
@@ -432,15 +443,15 @@ function changedFilesNamed(root: string, files: string[]): string[] {
   return kept.length > 0 ? kept : files.filter(file => !files.some(other => other.startsWith(`${file}/`)))
 }
 
-// The system's browser, or the command `BROWSER` names; a machine without one says so.
-function openBrowser(url: string, log: (line: string) => void): void {
+// The system's browser, or the command `BROWSER` names; `missing` hears of a machine without one.
+function openBrowser(url: string, missing: (command: string) => void): void {
   const command = process.env.BROWSER !== undefined && process.env.BROWSER !== '' ? [process.env.BROWSER] : process.platform === 'darwin' ? ['open'] : process.platform === 'win32' ? ['cmd', '/c', 'start', '""'] : ['xdg-open']
 
   try {
     Bun.spawn([...command, url], { stdio: ['ignore', 'ignore', 'ignore'] }).unref()
   }
   catch {
-    log(`kay dev: no browser to open ${url} with: ${command[0]} is not installed`)
+    missing(command[0]!)
   }
 }
 

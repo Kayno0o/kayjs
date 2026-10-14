@@ -5,6 +5,7 @@ import { resolveProject } from '../project'
 import { kayLog } from '../runtime/log'
 import { servePages } from './app'
 import { bootFailure } from './dev'
+import { recordBootFailure, trackDevErrors } from './dev-errors'
 import { projectSource } from './source'
 
 export type { KayConfig, KayExtension } from '../config'
@@ -62,11 +63,14 @@ export async function pages(options: PagesOptions = {}) {
   if (!mode.dev)
     return servePages(project, loadClient)
 
+  trackDevErrors(root)
+
   try {
     return await servePages(project, loadClient)
   }
   catch (error) {
     kayLog('error', 'the server could not start', error)
+    recordBootFailure(error)
 
     return bootFailure(error, root)
   }

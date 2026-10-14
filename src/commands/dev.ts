@@ -13,8 +13,8 @@ const PORT_FIRST = /^\d+(?:\/|$)/
 
 // Restarts the server on every change until interrupted.
 export const dev: Command = {
-  usage: 'dev [dir] [--entry <file>] [--port <port>] [--host[=<address>]] [--inspect[=<address>]] [--open]',
-  options: { entry: { type: 'string' }, port: { type: 'string' }, host: { type: 'string' }, inspect: { type: 'string' }, open: { type: 'boolean' } },
+  usage: 'dev [dir] [--entry <file>] [--port <port>] [--host[=<address>]] [--inspect[=<address>]] [--open] [--format text|json]',
+  options: { entry: { type: 'string' }, port: { type: 'string' }, host: { type: 'string' }, inspect: { type: 'string' }, open: { type: 'boolean' }, format: { type: 'string' } },
   positionals: 1,
   // A bare `--inspect` or `--host` takes the default address, as Bun's does, rather than the next argument.
   normalize: args => args.map(arg => arg === '--inspect' || arg === '--host' ? `${arg}=` : arg),
@@ -32,13 +32,16 @@ export const dev: Command = {
     if (path !== undefined && !inDir && typeof option === 'string')
       return refuse(`${path} is not a directory, and --entry names the server entry already`)
 
-    const { port, inspect, open } = values
+    const { port, inspect, open, format = 'text' } = values
     // A bare `--host` opens the server to the network.
     const host = typeof values.host === 'string' ? values.host || '0.0.0.0' : undefined
     const debuggerAt = typeof inspect === 'string' ? inspectorAddress(inspect) : undefined
 
     if (typeof port === 'string' && !isPort(port))
       return refuse(`--port takes a port number, not ${port}`)
+
+    if (format !== 'text' && format !== 'json')
+      return refuse(`--format takes \`text\` or \`json\`, not \`${String(format)}\``)
 
     if (debuggerAt !== undefined && host === undefined && !isLoopback(new URL(debuggerAt).hostname))
       return refuse(`--inspect=${inspect} opens the debugger past this machine, and whoever reaches it runs code on it; add --host to mean it`)
@@ -51,7 +54,7 @@ export const dev: Command = {
     let stop: () => Promise<void>
 
     try {
-      stop = await startDev(root, { entry, port: typeof port === 'string' ? Number(port) : undefined, host, inspect: debuggerAt, open: open === true, config })
+      stop = await startDev(root, { entry, port: typeof port === 'string' ? Number(port) : undefined, host, inspect: debuggerAt, open: open === true, format, config })
     }
     catch (error) {
       if (!(error instanceof InspectorAddressInUse))

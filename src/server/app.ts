@@ -27,6 +27,7 @@ import { serveBuildFiles } from './build-files'
 import { serveCards } from './card'
 import { compressResponse, fixedTexts } from './compress'
 import { DEV_A11Y, DEV_AXE, DEV_EVENTS, DEV_INSPECTOR, DEV_OPEN, DEV_PATCH, DEV_ROUTES, DEV_TOOL, devA11y, devAxe, devEvents, devInspector, devPatch, devRoutes, devTool, followBuilds, hotSwap, openInEditor, refuseForeignHosts } from './dev'
+import { clearDevErrorsOnAnswer } from './dev-errors'
 import { claimEndpoints, serveEndpoints } from './endpoints'
 import { entryUrls } from './entry-urls'
 import { servePublicEnv } from './env'
@@ -105,7 +106,7 @@ function compress(app: App, client: ClientBuild, base: string) {
   app.mapResponse({ as: 'scoped' }, ({ request, responseValue }) => responseValue instanceof Response ? compressResponse(request, responseValue, fixed) : undefined)
 }
 
-function serveDevRoutes(app: App, root: string, client: ClientBuild, mode: Mode) {
+function serveDevRoutes(app: App, root: string, client: ClientBuild, mode: Mode, base: string) {
   const hot = hotSwap(root, client)
 
   app.get(DEV_EVENTS, () => devEvents(false, hot))
@@ -116,6 +117,7 @@ function serveDevRoutes(app: App, root: string, client: ClientBuild, mode: Mode)
 
   if (mode.underKayDev) {
     followBuilds()
+    clearDevErrorsOnAnswer(app, base)
     app.get(DEV_INSPECTOR, () => devInspector())
     app.post(DEV_OPEN, async ({ request }) => openInEditor(root, request))
   }
@@ -222,7 +224,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
 
   // `kay dev` restarts the process on every change, so it has nothing to wait for.
   if (mode.dev)
-    serveDevRoutes(app, root, client, mode)
+    serveDevRoutes(app, root, client, mode, base)
   else
     stopOnSignal(app, lifecycle, options.shutdownTimeout)
 

@@ -46,7 +46,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .copy { flex: none; padding: .35rem .8rem; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--fg); text-decoration: none; }
 `
 
-interface Frame {
+export interface Frame {
   fn: string | undefined
   file: string
   line: number
@@ -118,6 +118,11 @@ function parseFrames(stack: string): Frame[] {
   }
 
   return frames
+}
+
+// The first frame of a stack in the project's own code, where the error page shows the lines around.
+export function firstOwnFrame(stack: string): Frame | undefined {
+  return parseFrames(stack).find(frame => ownFile(frame.file))
 }
 
 function insideProject(file: string): boolean {

@@ -1,0 +1,197 @@
+import type { Elysia } from 'elysia'
+import type { FileDiagnostic } from '../build/transform'
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { dirname, join, relative } from 'node:path'
+import process from 'node:process'
+import { outputDir, underKayDev } from '../build/assets'
+import { describeThrown } from '../build/sourcemap'
+import { codeFrame } from '../compiler/frame'
+import { offsetAt, positionAt } from '../compiler/mapping'
+import { pathOf } from './log'
+import { firstOwnFrame } from './overlay'
+
+// One error a `kay dev` server met, as `.kay/dev/errors.json` lists it for a reader without a browser, such as a coding agent.
+export interface DevError {
+  // `compile` and `boot` stopped the server from starting; `request` is a request that threw, `browser` an error an island met on a page.
+  kind: 'compile' | 'boot' | 'request' | 'browser'
+  time: string
+  message: string
+  // The request that threw, or the page a browser error was met on.
+  request?: { method: string, path: string }
+  // The island's component a browser error was met in, when the browser knows it.
+  island?: string
+  // Each compile error's position, from the project's root.
+  problems?: { file: string, line: number, column: number, code?: string, message: string }[]
+  // The compile errors as `kay check` prints them, or the stack mapped to `.kay` lines.
+  report: string
+  // Where the project's own code threw, from its root, and the lines leading to it.
+  at?: { file: string, line: number, column: number, frame: string }
+}
+
+export const DEV_ERRORS_FILE = 'errors.json'
+// A page a crawler or a loop keeps failing on under many paths keeps the file readable.
+const MAX_ERRORS = 50
+const BOOT = 'boot'
+
+let tracked: { root: string, file: string, errors: Map<string, DevError>, base: string } | undefined
+// The requests that met an error, which their response then never clears.
+const failed = new WeakSet<Request>()
+
+// Under `kay dev`, keeps the errors of the requests the last servers met, and forgets why the last one failed to boot: this one either boots or says why.
+export function trackDevErrors(root: string): void {
+  if (!underKayDev()) {
+    tracked = undefined
+
+    return
+  }
+
+  if (tracked?.root !== root) {
+    const file = join(outputDir(root), DEV_ERRORS_FILE)
+
+    tracked = { root, file, errors: new Map(readErrors(file)), base: '' }
+  }
+
+  tracked.errors.delete(BOOT)
+  save()
+}
+
+// Why the server failed to boot, which stays listed until a server boots.
+export function recordBootFailure(error: unknown): void {
+  if (tracked === undefined)
+    return
+
+  const diagnostics = error instanceof Error && error.name === 'KayCompileError' ? (error as Error & { diagnostics?: FileDiagnostic[] }).diagnostics : undefined
+
+  if (diagnostics !== undefined && diagnostics.length > 0) {
+    const root = tracked.root
+    const problems = diagnostics.map(diagnostic => ({ file: relative(root, diagnostic.file), ...positionAt(diagnostic.source, diagnostic.start), ...diagnostic.code !== undefined && { code: diagnostic.code }, message: diagnostic.message }))
+
+    record(BOOT, { kind: 'compile', time: new Date().toISOString(), message: `${problems.length} compile error${problems.length === 1 ? '' : 's'}`, problems, report: (error as Error).message.trimStart() })
+
+    return
+  }
+
+  record(BOOT, { kind: 'boot', time: new Date().toISOString(), ...thrown(error) })
+}
+
+// An error met answering `request`, or one a browser reported of a page, which stays listed until that page or request is answered again without one.
+export function recordRequestError(error: unknown, request: Request): void {
+  if (tracked === undefined)
+    return
+
+  failed.add(request)
+
+  const time = new Date().toISOString()
+
+  if (error instanceof Error && error.name === 'BrowserError') {
+    const { url, island } = error as Error & { url: string, island?: string }
+    const path = appPath(URL.parse(url, 'http://localhost')?.pathname ?? url, tracked.base)
+
+    record(`browser ${path}`, { kind: 'browser', time, request: { method: 'GET', path }, ...island !== undefined && { island }, ...thrown(error) })
+
+    return
+  }
+
+  const method = request.method
+  const path = pathOf(request.url)
+
+  record(`request ${method} ${path}`, { kind: 'request', time, request: { method, path }, ...thrown(error) })
+}
+
+// Clears what a request last met once it is answered without an error, and for a page what its islands met; `base` is the mount point a browser's page path carries and the app's requests do not.
+export function clearDevErrorsOnAnswer(app: Elysia, base: string): void {
+  if (tracked === undefined)
+    return
+
+  tracked.base = base
+  app.onAfterResponse({ as: 'global' }, ({ request, set, responseValue }) => answeredWithoutError(request, responseValue instanceof Response ? responseValue.status : typeof set.status === 'number' ? set.status : 200))
+}
+
+export function answeredWithoutError(request: Request, status: number): void {
+  if (tracked === undefined || failed.has(request) || status >= 500)
+    return
+
+  const path = pathOf(request.url)
+  const cleared = [tracked.errors.delete(`request ${request.method} ${path}`), request.method === 'GET' && tracked.errors.delete(`browser ${path}`)]
+
+  if (cleared.includes(true))
+    save()
+}
+
+function appPath(path: string, base: string): string {
+  return base !== '' && (path === base || path.startsWith(`${base}/`)) ? path.slice(base.length) || '/' : path
+}
+
+function thrown(error: unknown): Pick<DevError, 'message' | 'report' | 'at'> {
+  const report = describeThrown(error)
+  const frame = firstOwnFrame(report)
+  const at = frame && excerpt(frame)
+
+  return { message: error instanceof Error ? error.message : report, report, ...at && { at } }
+}
+
+function excerpt(frame: { file: string, line: number, column: number }): DevError['at'] {
+  try {
+    const source = readFileSync(frame.file, 'utf8')
+
+    return { file: relative(tracked!.root, frame.file), line: frame.line, column: frame.column, frame: codeFrame(source, offsetAt(source, frame)) }
+  }
+  catch {
+    return undefined
+  }
+}
+
+// The latest error of a kind and place replaces the one before; `kay dev` hears of each, which `--format json` prints.
+function record(key: string, error: DevError): void {
+  const errors = tracked!.errors
+
+  errors.delete(key)
+  errors.set(key, error)
+
+  for (const oldest of errors.keys()) {
+    if (errors.size <= MAX_ERRORS)
+      break
+
+    errors.delete(oldest)
+  }
+
+  save()
+
+  try {
+    process.send?.({ devError: error })
+  }
+  // `kay dev` gone, as when it stops.
+  catch {}
+}
+
+function readErrors(file: string): [string, DevError][] {
+  try {
+    const { errors } = JSON.parse(readFileSync(file, 'utf8')) as { errors: DevError[] }
+
+    return errors.map(error => [keyOf(error), error])
+  }
+  catch {
+    return []
+  }
+}
+
+function keyOf(error: DevError): string {
+  if (error.kind === 'request')
+    return `request ${error.request!.method} ${error.request!.path}`
+
+  return error.kind === 'browser' ? `browser ${error.request!.path}` : BOOT
+}
+
+// Written whole and renamed into place, so a reader never meets half a file.
+function save(): void {
+  const { file, errors } = tracked!
+  const partial = `${file}.${process.pid}`
+
+  try {
+    mkdirSync(dirname(file), { recursive: true })
+    writeFileSync(partial, `${JSON.stringify({ errors: [...errors.values()] }, null, 2)}\n`)
+    renameSync(partial, file)
+  }
+  // A disk full or a directory removed under it costs the agent its list, never the server its answer.
+  catch {}
+}

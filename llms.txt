@@ -13,6 +13,7 @@
 - `window`, `document`, `localStorage` and the other globals only a browser has are read in `effect` or `onMount`, or in a component whose script fence is `--- client`; reading one while rendering throws on the server.
 - Durations kay's config and server code take are seconds as a number, or a number with its unit as a string, `'30s'`, `'5m'`, `'1.5h'`, `'30d'` or `'2w'` (type `Duration` from `kay`): `cached`'s `ttl`, `revalidate`, a session's `maxAge`, `rateLimit`'s `window`, an action's `minTime` and `shutdownTimeout`. Each must be positive, which `kay check` reports for a literal `cached` ttl and the server for the rest. Only `kay/test`'s browser `timeout` is in milliseconds, as `bun:test`'s own timeouts are; a store's `set(id, data, maxAge)` gets seconds.
 - Indentation is spaces only, consistent within a block. Text after a tag needs one space: `p Hello`, never `p:Hello`.
+- Under `kay dev`, `.kay/dev/errors.json` lists the errors the server met, a compile error, a request that threw or an island's in the browser, each at its `.kay` line: read it rather than opening the browser.
 - Pug features that do not exist: `- code` lines, `#{}` and `!{}` interpolation, `+mixins`, `include`, `extends`, `block`, filters, `&attributes`, `case`, `each`, `while`, `unless`, `doctype`; a line starting with one is reported, with what kay writes instead.
 
 ## Docs

@@ -79,6 +79,7 @@ kay: accents needs tailwind: add --with tailwind, or drop it with --without acce
 | `--host[=<address>]` | Listens past this machine: `0.0.0.0` alone, or the address given, and answers to this machine's own name and `<name>.local` too. Without it, a server naming no `hostname` listens on `localhost` only, so `kay dev` in a container publishing its port needs `--host` |
 | `--inspect[=<address>]` | Opens Bun's debugger in the server, at `ws://localhost:6499/kay` or the port, host and port, or address given, port 0 taking a free one, the same address after every restart: `kay dev` listens there and passes each connection on to the server running, and a debugger's connection closes when the server restarts, for it to connect again; an address another process holds, at `localhost` on either loopback address, stops `kay dev`, and one past this machine needs `--host` too, as whoever reaches the debugger runs code on the machine. A page reaches it only from the dev server's own `localhost` address or `debug.bun.sh` |
 | `--open` | Opens the address in the browser (the command `BROWSER` names, else the system's) once the server is ready |
+| `--format text\|json` | `json` prints each line below as one JSON object on stdout, `{ "event": "ready", "time": "...", "url": "http://localhost:3000", "ms": 412 }`, then `restart`, `styles`, `exit` and an `error` event for each error the server meets, the server's own output going to stderr |
 
 When another process holds the port, the server moves to the next free one, and the ready line names the port it found in use: `kay dev: http://localhost:3001 (ready in 412 ms, 3000 was in use)`. It works however the server picks its port, and restarts keep the port it moved to, so open pages stay connected.
 
@@ -98,6 +99,29 @@ kay dev: http://localhost:3000 (ready in 412 ms)
 An entry's own `Listening on http://localhost:3000` line is left out; kay's own start line only shows in production.
 
 A project that fails to compile prints its errors there once, as the server boots, formatted as `kay check` prints them, and a request that throws prints its error with its stack mapped to `.kay` lines.
+
+### Errors without a browser
+
+`.kay/dev/errors.json` lists the errors the dev server met, for a reader that never opens the browser, such as a coding agent running `kay dev` in the background:
+
+```json
+{
+  "errors": [
+    {
+      "kind": "request",
+      "time": "2026-10-14T14:02:31.000Z",
+      "request": { "method": "GET", "path": "/blog" },
+      "message": "posts is not iterable",
+      "report": "TypeError: posts is not iterable\n    at load (/app/src/routes/blog.kay:12:5)",
+      "at": { "file": "src/routes/blog.kay", "line": 12, "column": 5, "frame": "11 | ul\n12 |   for post of posts\n   |     ^" }
+    }
+  ]
+}
+```
+
+- `kind` is `compile` when the project failed to compile, with each problem's position in `problems` and the report `kay check` prints in `report`; `boot` when the server failed to start otherwise; `request` for a request that threw; `browser` for an error an island met, under its page's path, `island` naming its component.
+- A boot failure goes once a server boots, a request's error once that method and path are answered without one, and a browser error once its page is served again.
+- Requests' errors stay across restarts, the latest 50 kept. A server not run by `kay dev` writes none.
 
 ### Dev tool
 
