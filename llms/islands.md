@@ -332,7 +332,7 @@ const dispose = mount(Panel, document.querySelector('#panel')!, { title: 'Ticket
 - Importing `uid` alone keeps a component static.
 - The ids of a page differ from one render to the next, so a test reads them off the markup rather than writing them, and a prerendered page that revalidates gets a new ETag each time.
 - A `try` whose block fails on the server draws its `catch` block's ids apart, so the ids after it match the browser's, which keeps the server's markup there.
-- `describeField(ids)` from `kay`, called in a component's script, adds `ids` to the `aria-describedby` of the first `input`, `select` or `textarea` the component renders on the server, its slot included, after the field's own ids, so a form field ties the control its parent writes to its hint and message; a field with a spread keeps it too.
+- `describeField(ids)` from `kay`, called in a component's script, adds `ids` to the `aria-describedby` of the first `input`, `select` or `textarea` the component renders on the server, its slot included, after the field's own ids and a refused field's message, so a form field ties the control its parent writes to its hint and message; a field with a spread keeps it too, and a `hidden`, `submit`, `button`, `reset` or `image` input is skipped whether its `type` is written or an expression.
 - It acts on the server's markup alone: inside an island, the browser keeps such a link itself as the messages change. Importing it keeps a component static.
 
 ### Browser-only components

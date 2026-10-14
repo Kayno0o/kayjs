@@ -383,9 +383,19 @@ export class HtmlTemplate extends TemplateWriter {
     const filled = field?.fill === 'value' || field?.fill === 'checked' ? field.fill : undefined
     let ownFill: (() => void) | undefined
     let checkboxValue: (() => void) | undefined
-    // A field takes the ids a component around it hands it, beside its own, unless a refused form already describes it.
-    const describable = FIELD_ELEMENTS.has(name) && !described && !plan.attributes.some(attribute => attribute.kind === 'text' && attribute.name === 'type' && UNCHECKED_TYPES.has(attribute.text.toLowerCase()))
+    // A field takes the ids a component around it hands it, beside its own, unless its type shows no text to describe; a type an expression gives is decided as it renders.
+    const type = plan.attributes.find(attribute => 'name' in attribute && attribute.name === 'type')
+    const describable = FIELD_ELEMENTS.has(name) && !(type?.kind === 'text' && UNCHECKED_TYPES.has(type.text.toLowerCase()))
     let ownDescribed: (() => void) | undefined
+    const fieldDescribed = (own: (() => void) | undefined) => {
+      b.add(`${helperName('fieldDescribed')}(`)
+      own?.()
+
+      if (type?.kind === 'value')
+        b.add(own ? ', (' : 'undefined, (').addSource(type.expression).add(')')
+
+      b.add(')')
+    }
 
     markup.text(`<${name}`)
 
@@ -423,7 +433,8 @@ export class HtmlTemplate extends TemplateWriter {
       const written = attribute.kind === 'image' ? 'src' : attribute.kind === 'selected' ? 'value' : attribute.name
 
       if (describable && written === 'aria-describedby') {
-        ownDescribed = attribute.kind === 'text' ? () => void b.add(JSON.stringify(attribute.text)) : attribute.kind === 'value' ? read(attribute.expression, false) : undefined
+        // A bare `aria-describedby` is kept as the empty one it renders elsewhere.
+        ownDescribed = attribute.kind === 'value' ? read(attribute.expression, false) : () => void b.add(JSON.stringify('text' in attribute ? attribute.text : ''))
 
         continue
       }
@@ -530,11 +541,21 @@ export class HtmlTemplate extends TemplateWriter {
           b.add('))')
         })
 
+        // A refused field's description still takes the ids a component around it hands it, so a later field does not.
         if (described) {
-          markup.dynamic(() => {
-            b.add(`${helperName('attribute')}("aria-describedby", KayFormInvalid`)
+          const refused = () => {
+            b.add('KayFormInvalid')
             fieldArguments()
-            b.add(`${describedValue(described)})`)
+            b.add(describedValue(described))
+          }
+
+          markup.dynamic(() => {
+            if (describable)
+              return fieldDescribed(refused)
+
+            b.add(`${helperName('attribute')}("aria-describedby", `)
+            refused()
+            b.add(')')
           })
         }
       }
@@ -551,13 +572,8 @@ export class HtmlTemplate extends TemplateWriter {
       }
     }
 
-    if (describable) {
-      markup.dynamic(() => {
-        b.add(`${helperName('fieldDescribed')}(`)
-        ownDescribed?.()
-        b.add(')')
-      })
-    }
+    if (describable && !described)
+      markup.dynamic(() => fieldDescribed(ownDescribed))
 
     if (action) {
       if (action.method)

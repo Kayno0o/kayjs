@@ -89,6 +89,14 @@ describe('describeField', () => {
 
     expect(html).toBe('<label><input type="hidden" name="x"><input name="a" aria-describedby="own hint"><input name="b"></label><label><select name="s" aria-describedby="hint issues"></select></label><label><textarea name="t"></textarea></label><input name="outside">')
   })
+
+  // A signal makes the page an island, whose server render writes its fields through the same helpers.
+  it.each([['a static component', ''], ['an island', 'import { signal } from \'kay\'\n\nconst n = signal(0)\n']])('skips a field a type expression makes hidden or a button and keeps a bare description of the field\'s own, in %s', async (_name, island) => {
+    const template = `---\n${island}import Described from './described.kay'\n\nconst hidden = 'hidden'\nconst text = 'text'\nconst submit = 'SUBMIT'\n---\nDescribed(ids="hint")\n  input(type={hidden} name="h")\n  input(type={text} name="t")\nDescribed(ids="more")\n  input(type={submit} name="s" aria-describedby="own")\n  input(name="b" aria-describedby)\ninput(name="o" aria-describedby)\n${island ? 'button(onClick={() => n.set(1)}) {n()}\n' : ''}`
+    const html = (await renderKay(template)).replace(MARKERS, '')
+
+    expect(html).toContain('<label><input type="hidden" name="h"><input type="text" name="t" aria-describedby="hint"></label><label><input type="SUBMIT" name="s" aria-describedby="own"><input name="b" aria-describedby="more"></label><input name="o" aria-describedby="">')
+  })
 })
 
 describe('server fence declarations', () => {

@@ -69,6 +69,16 @@ describe('a form posting to an action', () => {
     expect(html).toContain('<input name="topic" value="abc">')
   })
 
+  it('hands a component\'s describeField ids to a field the template describes when refused, before and after the post, and to no later field', async () => {
+    const { pick } = await import(join(import.meta.dir, 'fixtures/forms/src/routes/described.kay')) as { pick: Action<Record<string, string>, unknown> }
+    const before = await site.visit('/described')
+    const refused = await site.submit(pick, { first: 'ab', second: 'x' }, { from: '/described' })
+
+    expect(before.html).toContain('<label><input name="first" aria-describedby="pick-hint"><input name="second"></label>')
+    expect(refused.status).toBe(422)
+    expect(refused.html).toContain('<label><input name="first" value="ab" aria-invalid="true" aria-describedby="pick-first-error pick-hint"><input name="second" value="x"></label>')
+  })
+
   it('leaves the honeypot empty when a bot filled it in', async () => {
     const { status, html } = await site.submit(save, { ...REFUSED, name: 'Ada', website: 'spam.example' }, { from: '/' })
 
@@ -130,8 +140,8 @@ describe('the messages a refused form is described by', () => {
   it('names the element an if block shows first, or one holding the error, after a description of the field\'s own', () => {
     const { tsx } = compileKay(FORM, 'page.kay', { output: 'html' })
 
-    expect(tsx).toContain('"<input name=\\"title\\"" + KayAttribute("value", KayFormValue((add), "title")) + KayAttribute("aria-invalid", KayFormInvalid((add), "title")) + KayAttribute("aria-describedby", KayFormInvalid((add), "title") ? "help add-title-error" : "help")')
-    expect(tsx).toContain('KayAttribute("aria-describedby", KayFormInvalid((add), "tag") ? "add-tag-error" : undefined)')
+    expect(tsx).toContain('"<input name=\\"title\\"" + KayAttribute("value", KayFormValue((add), "title")) + KayAttribute("aria-invalid", KayFormInvalid((add), "title")) + KayFieldDescribed(KayFormInvalid((add), "title") ? "help add-title-error" : "help")')
+    expect(tsx).toContain('KayFieldDescribed(KayFormInvalid((add), "tag") ? "add-tag-error" : undefined)')
     expect(tsx).toContain('<p id=\\"add-tag-error\\">')
     expect(tsx).toContain('<p id=\\"add-title-error\\">')
     expect(tsx).toContain('KayAttribute("aria-describedby", KayFormInvalid((add), "") ? "own-form" : undefined)')
@@ -148,7 +158,7 @@ describe('the messages a refused form is described by', () => {
   it('names an element inline in text holding the error', () => {
     const { tsx } = compileKay('form(action={add})\n  input(name="tag")\n  p Problem: #[span {add.error(\'tag\')}]\n', 'page.kay', { output: 'html' })
 
-    expect(tsx).toContain('KayAttribute("aria-describedby", KayFormInvalid((add), "tag") ? "add-tag-error" : undefined)')
+    expect(tsx).toContain('KayFieldDescribed(KayFormInvalid((add), "tag") ? "add-tag-error" : undefined)')
     expect(tsx).toContain('<span id=\\"add-tag-error\\">')
   })
 

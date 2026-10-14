@@ -145,11 +145,9 @@ function lastValue(sources: readonly object[], name: string): unknown {
   return source?.[name]
 }
 
-// ` aria-describedby="..."` for a field whose own, if any, is `own`: what a component around it hands it, beside its own ids.
-export function fieldDescribed(own?: unknown): string {
-  const ids = fieldDescription(own)
-
-  return ids === undefined ? '' : attribute('aria-describedby', ids)
+// ` aria-describedby="..."` for a field whose own, if any, is `own`: what a component around it hands it, beside its own ids, unless the `type` an expression gave it shows no text to describe.
+export function fieldDescribed(own?: unknown, type?: unknown): string {
+  return attribute('aria-describedby', UNDESCRIBED_TYPES.has(String(type ?? '').toLowerCase()) ? own : fieldDescription(own))
 }
 
 // An element whose attributes are only known at render time: spreads, or a component tag that names an element.
@@ -215,10 +213,7 @@ export function element(tag: string, sources: readonly object[], content?: () =>
   }
 
   if (field)
-    described = fieldDescription(described)
-
-  if (described != null)
-    markup += attribute('aria-describedby', described)
+    markup += attribute('aria-describedby', fieldDescription(described))
 
   if (isVoid)
     return { t: `${markup}>` }

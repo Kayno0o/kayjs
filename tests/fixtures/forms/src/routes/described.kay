@@ -1,0 +1,19 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+export const pick = action(t.Object({
+  first: t.String({ minLength: 3, maxLength: 40, error: 'Too short' }),
+  second: t.Optional(t.String({ maxLength: 40 })),
+}), () => undefined)
+--- script
+import Described from '../components/described.kay'
+---
+form.described(action={pick})
+  Described(ids="pick-hint")
+    input(name="first")
+    input(name="second")
+  p#pick-hint Three letters at least
+  if pick.error('first') as message
+    p {message}
+  button Pick

@@ -1,0 +1,9 @@
+---
+import { describeField } from 'kay'
+
+const { ids } = props<{ ids: string }>()
+
+describeField(ids)
+---
+label
+  slot

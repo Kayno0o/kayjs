@@ -14,15 +14,14 @@ export function describeField(ids: string): void {
   provideContext(DESCRIBED, { ids, taken: ids === '' } satisfies Description)
 }
 
-// The ids the nearest `describeField` above hands the field rendering now, once: the first field takes them.
-export function fieldDescription(own?: unknown): string | undefined {
+// The field's own description with the ids the nearest `describeField` above hands the field rendering now, once: the first field takes them.
+export function fieldDescription(own?: unknown): unknown {
   const found = readContext(DESCRIBED).value as Description | undefined
-  const ownIds = typeof own === 'string' && own !== '' ? own : undefined
 
   if (!found || found.taken)
-    return ownIds
+    return own
 
   found.taken = true
 
-  return ownIds === undefined ? found.ids : `${ownIds} ${found.ids}`
+  return typeof own === 'string' && own !== '' ? `${own} ${found.ids}` : found.ids
 }
