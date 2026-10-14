@@ -1,6 +1,6 @@
 import type { FileStore } from '../src/server'
 import { existsSync } from 'node:fs'
-import { mkdir, mkdtemp, readdir, rm } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, readdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
@@ -321,6 +321,22 @@ describe('files.list', () => {
   it('refuses a folder files.put refuses', async () => {
     for (const folder of ['', 'a b', '../x', 'private', 'Private/x', 'covers/'])
       await expect(files.list({ folder })).rejects.toThrow('files.list() was given the folder')
+  })
+
+  it.skipIf(process.getuid?.() === 0)('skips a file whose stat fails instead of failing the listing', async () => {
+    const root = await scratchDir('unreadable-')
+    const store = diskFiles(root)
+
+    await store.write('open/a.txt', new Blob(['a']))
+    await store.write('shut/b.txt', new Blob(['b']))
+    await chmod(join(root, 'shut'), 0o444)
+
+    try {
+      expect((await store.list?.())?.map(file => file.key)).toEqual(['open/a.txt'])
+    }
+    finally {
+      await chmod(join(root, 'shut'), 0o755)
+    }
   })
 
   it('lists an empty disk store that was never written to', async () => {

@@ -97,7 +97,17 @@ export function diskFiles(dir: string = DEFAULT_DIR): FileStore {
         const found = await readdir(join(root, base), { recursive: true, withFileTypes: true })
         const keys = found.filter(entry => entry.isFile()).map(entry => relative(root, join(entry.parentPath, entry.name)).split(sep).join('/')).filter(key => key.startsWith(prefix))
 
-        return await Promise.all(keys.map(async key => ({ key, modified: (await stat(path(key))).mtime })))
+        // A file deleted since the walk, or unreadable, is left out rather than failing the whole listing.
+        const listed = await Promise.all(keys.map(async (key) => {
+          try {
+            return { key, modified: (await stat(path(key))).mtime }
+          }
+          catch {
+            return undefined
+          }
+        }))
+
+        return listed.filter(file => file !== undefined)
       }
       catch (error) {
         if ((error as NodeJS.ErrnoException).code === 'ENOENT')
@@ -255,6 +265,7 @@ export const files = {
   // The file names the image route made of each stored file, resized variants and social cards, which `files.delete` removes with it; the directory is read once.
   async variants(keys: string[]): Promise<Map<string, string[]>> {
     const { variantsDir } = current
+    // The prefix hashes the whole key in 64 bits, so two keys share one only on a hash collision.
     const made = new Map(keys.map(key => [storedVariants(checkedKey(key, 'files.variants()')), { key, names: [] as string[] }]))
 
     if (variantsDir !== undefined) {
