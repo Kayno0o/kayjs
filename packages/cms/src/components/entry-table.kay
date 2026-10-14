@@ -16,7 +16,7 @@ const { prefix, collection, rows, searched } = props<{ prefix: string, collectio
 const columns: Column<EntryRow>[] = [
   { key: 'title', header: 'Title', sortValue: true, defaultDirection: 'asc', cell: true },
   ...(collection.localized ? [{ key: 'locale', header: 'Locale', sortValue: true } satisfies Column<EntryRow>] : []),
-  ...(collection.draftField === undefined ? [] : [{ key: 'draft', header: 'Status', sortValue: true, cell: true } satisfies Column<EntryRow>]),
+  ...(collection.draftField === undefined ? [] : [{ key: 'draft', header: 'Status', cell: true } satisfies Column<EntryRow>]),
   { key: 'actions', header: 'Actions', align: 'end', cell: true },
 ]
 
