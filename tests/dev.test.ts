@@ -1,7 +1,7 @@
 import type { Subprocess } from 'bun'
 import { chmodSync, existsSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { mkdir, mkdtemp, rename, rm } from 'node:fs/promises'
-import { hostname, networkInterfaces, tmpdir } from 'node:os'
+import { hostname, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
 import { PassThrough } from 'node:stream'
@@ -11,7 +11,7 @@ import { buildClient } from '../src/build/client'
 import { KayCompileError } from '../src/build/transform'
 import { readShadowSettings } from '../src/check/shadow'
 import { loadConfig } from '../src/config'
-import { dev, watchProject } from '../src/dev'
+import { dev, networkAddress, watchProject } from '../src/dev'
 import { startClientBuilder } from '../src/dev/client'
 import { InspectorAddressInUse, inspectorProxy } from '../src/dev/inspector'
 import { bootFailure, hotSwap } from '../src/server/dev'
@@ -670,7 +670,7 @@ describe.concurrent('kay dev', () => {
           expect(await (await fetch(`http://localhost:${port}`)).text()).toBe(expected)
 
           // Opened to the network, the address a phone on it reaches, when this machine has one.
-          const network = Object.values(networkInterfaces()).flat().find(entry => entry?.family === 'IPv4' && !entry.internal)?.address
+          const network = networkAddress()
 
           if (host !== undefined && network !== undefined) {
             await until(() => lines.length === 2)
@@ -769,10 +769,20 @@ describe.concurrent('kay dev', () => {
       expect(lines[2]).toMatch(/^\d\d:\d\d:\d\d r pressed: restarted in \d+ ms$/)
       expect(readFileSync(opened, 'utf8')).toBe(`${address}\n`)
 
+      // Alt+q, an escape sequence, presses no key.
+      keys.write('\x1Bq')
       keys.write('q')
       // Ctrl+C, which a terminal in raw mode sends as a key rather than a signal.
       keys.write('\x03')
       await until(() => quit === 2)
+      await Bun.sleep(50)
+      expect(quit).toBe(2)
+
+      // Pressed with only a stylesheet changed, which would only swap it in, it restarts all the same.
+      await Bun.write(join(root, 'src/app.css'), 'p { color: red }\n')
+      keys.write('r')
+      await until(() => lines.length === 4)
+      expect(lines[3]).toMatch(/^\d\d:\d\d:\d\d (?:src\/app\.css|r pressed): restarted in \d+ ms$/)
     }
     finally {
       process.env.BROWSER = previous

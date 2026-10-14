@@ -78,6 +78,9 @@ const ANY_ADDRESS = /(?<=\/\/)(?:0\.0\.0\.0|\[::\])(?=:)/
 const ANY_FILE = /^/
 const CLEAR_SCREEN = '\x1B[2J\x1B[3J\x1B[H'
 const CTRL_C = '\x03'
+const ESCAPE = '\x1B'
+// The interfaces of containers, bridges and VPNs, whose address a phone on the network does not reach.
+const VIRTUAL_INTERFACE = /^(?:docker|br-|veth|virbr|vmnet|vboxnet|tun|tap|wg|tailscale|zt|lxc|lxd|cni|flannel)/
 const STDERR = 2
 
 // Runs the server entry in development and restarts it on every change; a fresh process is the only way to drop modules Bun has loaded.
@@ -108,6 +111,8 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   // What the last restart came from and when it began, for its report, `r` pressed when nothing changed.
   let restartedFor: string[] = []
   let restartAsked = false
+  // `r` was pressed since the last restart began, which restarts even when only stylesheets changed.
+  let forced = false
   let restartedAt = performance.now()
   let address: string | undefined
   // The port the first server asked for and the one it moved to, busy, which every next server takes first.
@@ -356,14 +361,17 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   const restart = async () => {
     const files = [...touched]
 
-    touched = new Set()
+    const asked = forced
 
-    if (await swapStylesheets(files))
+    touched = new Set()
+    forced = false
+
+    if (!asked && await swapStylesheets(files))
       return
 
     restartedAt = performance.now()
     restartedFor = changedFilesNamed(root, files)
-    restartAsked = files.length === 0
+    restartAsked = asked && files.length === 0
     building = wantsClient ? buildClient() : undefined
 
     const previous = child
@@ -435,9 +443,14 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     },
   })
 
-  // A terminal in raw mode hands over each key as it is pressed, Ctrl+C included, which no longer interrupts.
+  // A terminal in raw mode hands over each key as it is pressed, Ctrl+C included, which no longer interrupts; an escape sequence, as Alt+key or an arrow sends, is none of them.
   const onKey = (chunk: Buffer | string) => {
-    for (const key of String(chunk)) {
+    const keys = String(chunk)
+
+    if (keys.startsWith(ESCAPE))
+      return
+
+    for (const key of keys) {
       if (key === 'o' && address !== undefined)
         openBrowser(address, command => log(`kay dev: no browser to open ${address} with: ${command} is not installed`))
       else if (key === 'r')
@@ -463,6 +476,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
 
   // As a change does, but for no file: open pages load the page again.
   function restartNow() {
+    forced = true
     codeVersion++
     changed = true
     restarting ??= drain()
@@ -513,9 +527,11 @@ function openBrowser(url: string, missing: (command: string) => void): void {
   }
 }
 
-// The first address of this machine others on its network reach it by.
-function networkAddress(): string | undefined {
-  return Object.values(networkInterfaces()).flat().find(entry => entry?.family === 'IPv4' && !entry.internal)?.address
+// The address of this machine others on its network reach it by: the first of an interface no container, bridge or VPN made, else the first.
+export function networkAddress(): string | undefined {
+  const external = Object.entries(networkInterfaces()).flatMap(([name, entries]) => (entries ?? []).filter(entry => entry.family === 'IPv4' && !entry.internal).map(entry => ({ name, address: entry.address })))
+
+  return (external.find(entry => !VIRTUAL_INTERFACE.test(entry.name)) ?? external[0])?.address
 }
 
 // A server killed for a restart meanwhile takes no message.
