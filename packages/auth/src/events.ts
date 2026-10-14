@@ -67,19 +67,40 @@ export async function report(state: RequestState, record: UserRecord, event: Aut
   }
 }
 
-// The audit log, newest first, for one user or everyone, a page of `limit` before `before`.
-export async function auditEntries(core: Core, query: { userId?: string | undefined, before?: AuditCursor | undefined, limit?: number | undefined }): Promise<AuditEntry[]> {
+// A cursor as an app may hand it on after a JSON hop, which leaves a `Date` as its ISO text.
+export type AuditCursorInput = AuditCursor | string | { at: Date | string, id: string }
+
+// The audit log, newest first, for one user or everyone, a page of `limit` before `before`. A cursor that is no date answers an empty page, in every store.
+export async function auditEntries(core: Core, query: { userId?: string | undefined, before?: AuditCursorInput | undefined, limit?: number | undefined }): Promise<AuditEntry[]> {
   if (!core.audit)
     return []
 
   const limit = clamp(Math.trunc(query.limit ?? 50), 1, AUDIT_PAGE_MAX)
+  const before = query.before === undefined ? undefined : normalizeCursor(query.before)
 
-  return (await audit(core).list({ ...query.userId === undefined ? {} : { userId: query.userId }, ...query.before === undefined ? {} : { before: normalizeCursor(query.before) }, limit })).map(entry => ({ ...entry, event: entry.event as AuthEvent }))
+  if (before === null)
+    return []
+
+  return (await audit(core).list({ ...query.userId === undefined ? {} : { userId: query.userId }, ...before === undefined ? {} : { before }, limit })).map(entry => ({ ...entry, event: entry.event as AuthEvent }))
 }
 
-// An entry's `at` is text after a JSON hop, which an app forwarding the last entry of a page may have made.
-function normalizeCursor(before: AuditCursor): AuditCursor {
-  return before instanceof Date ? before : { id: before.id, at: new Date(before.at) }
+// Typed loosely as it may come straight off a JSON body, where an Invalid Date is null.
+function normalizeCursor(before: unknown): AuditCursor | null {
+  if (typeof before !== 'object' || before === null || before instanceof Date)
+    return validDate(before)
+
+  if (!('at' in before) || !('id' in before) || typeof before.id !== 'string')
+    return null
+
+  const at = validDate(before.at)
+
+  return at && { id: before.id, at }
+}
+
+function validDate(value: unknown): Date | null {
+  const date = value instanceof Date || typeof value === 'string' ? new Date(value) : null
+
+  return date && !Number.isNaN(date.getTime()) ? date : null
 }
 
 function audit(core: Core): NonNullable<Core['store']['audit']> {

@@ -8,7 +8,7 @@ import type { BearerToken, CreateTokenResult, IssueTokenResult, TokenOptions } f
 import type { CaptchaAction, CaptchaOptions } from './captcha'
 import type { AuthSessionData, Core, OAuthApp, Profile, SignedIn, User } from './core'
 import type { ChangeEmailResult, CodeResult, EmailOptions, LinkResult, MailRequestResult, ResetPasswordResult, VerifyEmailResult } from './email'
-import type { AuditEntry, AuthEvent, EventContext } from './events'
+import type { AuditCursorInput, AuditEntry, AuthEvent, EventContext } from './events'
 import type { DataExport } from './export'
 import type { ScopeRequirement } from './gate'
 import type { Limits } from './limits'
@@ -21,7 +21,7 @@ import type { RoleHierarchy } from './roles'
 import type { PasswordProblem } from './rules'
 import type { UserSession } from './sessions'
 import type { RequestState } from './state'
-import type { AuditCursor, AuthStore, LinkType, SessionRecord, UserRecord } from './store'
+import type { AuthStore, LinkType, SessionRecord, UserRecord } from './store'
 import type { Proof, ProofFailure, TwoFactorResult, TwoFactorSetup } from './twoFactor'
 import type { Level, PolicyContext, Predicate, Requirement } from './types'
 import { Elysia } from 'elysia'
@@ -576,7 +576,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
   }
 
   // The signed-in user's own audit log, newest first, a page of `limit` (50 by default) before `before`, an instant or the last entry of the page (which tells entries of one millisecond apart); empty without the `audit` option.
-  async auditLog(options: { before?: AuditCursor, limit?: number } = {}): Promise<AuditEntry[]> {
+  async auditLog(options: { before?: AuditCursorInput, limit?: number } = {}): Promise<AuditEntry[]> {
     const record = await this.record()
 
     return record ? auditEntries(this.core, { ...options, userId: record.id }) : []
@@ -616,7 +616,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
   }
 
   // Everyone's audit log, or `userId`'s, newest first.
-  async adminAuditLog(query: { userId?: string, before?: AuditCursor, limit?: number } = {}): Promise<{ ok: true, entries: AuditEntry[] } | { ok: false, error: 'forbidden' }> {
+  async adminAuditLog(query: { userId?: string, before?: AuditCursorInput, limit?: number } = {}): Promise<{ ok: true, entries: AuditEntry[] } | { ok: false, error: 'forbidden' }> {
     return adminAuditLog(this[STATE], query)
   }
 

@@ -138,6 +138,17 @@ describe('the audit log', () => {
     expect(first.event).toBe('password-changed')
     expect(next.map((entry: { event: string }) => entry.event)).toEqual(['signed-in'])
     expect(await ada.call('auditLog', { before: JSON.parse(JSON.stringify(next[0])) })).toEqual([])
+    expect((await ada.call('auditLog', { before: JSON.parse(JSON.stringify(new Date(first.at))) })).map((entry: { event: string }) => entry.event)).toEqual(['signed-in'])
+  })
+
+  test('answers an empty page for a cursor that is no date', async () => {
+    const { browser } = setup({ audit: true })
+    const ada = browser()
+
+    await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
+
+    for (const before of [new Date(Number.NaN), null, 'soon', 12, { at: 'soon', id: 'x' }, { at: new Date().toISOString() }])
+      expect(await ada.call('auditLog', { before })).toEqual([])
   })
 
   test('reads entries of one millisecond newest written first', async () => {
