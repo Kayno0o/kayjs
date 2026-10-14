@@ -1,3 +1,4 @@
+import type { AvifResult, AvifTask } from '../src/server/avif-worker'
 import { mkdtemp, readdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -9,7 +10,7 @@ import { Elysia } from 'elysia'
 import { testWorker } from '../src/build/assets'
 import { cappedSizes, DEFAULT_ASPECTS, image, imageUrl, recordVariants, registerImage, setAspects, setMaxDensity, setRemoteImages, shareCard, shareImage } from '../src/runtime/image'
 import { imageSize, pages, processImage } from '../src/server'
-import { AVIF_ENCODER, AVIF_SPEED, encodeAvif } from '../src/server/avif'
+import { AVIF_ENCODER, AVIF_SPEED, AVIF_WORKER_SOURCE, encodeAvif } from '../src/server/avif'
 import { coverImage } from '../src/server/crop'
 import { avifQuality, drawing, serveImages, variantName, writeImageVariants } from '../src/server/image'
 import { decodePng, encodePng } from '../src/server/png'
@@ -433,6 +434,36 @@ describe('AVIF', () => {
     expect(Buffer.from(wasm).includes(`AOMedia Project AV1 Encoder v${version}`)).toBe(true)
     // This build's sizes, within 1% of @jsquash/avif 2.1.1's 1441 and 3706 B; libavif 1.4 left to pick tune IQ writes 822 B at quality 30.
     expect([(await encodeAvif(new Bun.Image(png), 30)).length, (await encodeAvif(new Bun.Image(png), 50)).length]).toEqual([1434, 3702])
+  })
+
+  it('fails the task a trap in the encoder stopped, with its message, and encodes the next on a new instance', async () => {
+    const worker = new Worker(AVIF_WORKER_SOURCE, { preload: [join(import.meta.dir, 'fixtures/avif-trap/preload.ts')] })
+    const results = new Map<number, AvifResult>()
+    const png = encodePng(new Uint8Array(32 * 16 * 4).fill(200), 32, 16)
+    const tasks: AvifTask[] = [1, 2].map(id => ({ id, png: png.slice(), quality: 50, speed: AVIF_SPEED }))
+
+    try {
+      await new Promise<void>((resolve, reject) => {
+        worker.onmessage = ({ data }: MessageEvent<AvifResult>) => {
+          results.set(data.id, data)
+
+          if (results.size === tasks.length)
+            resolve()
+        }
+        worker.onerror = event => reject(new Error(event.message))
+
+        for (const task of tasks)
+          worker.postMessage(task)
+      })
+    }
+    finally {
+      worker.terminate()
+    }
+
+    const next = results.get(2)!
+
+    expect(results.get(1)).toEqual({ id: 1, error: 'unreachable' })
+    expect('bytes' in next && isAvif(next.bytes)).toBe(true)
   })
 
   it('writes an AVIF beside each WebP variant given its quality, cached under it and the encoder speed', async () => {

@@ -17,7 +17,9 @@ export type AvifResult = { id: number, bytes: Uint8Array } | { id: number, error
 
 declare const self: Worker
 
-const encoder = loadEncoder()
+// Compiled once, as a trap has the encoder made again.
+const compiled = compileEncoder()
+let encoder = loadEncoder()
 let decoder: Promise<AvifDecoder> | undefined
 
 // Encodes and decodes AVIF off the main thread: libavif in wasm holds the thread it runs on for up to a second per image.
@@ -35,17 +37,32 @@ self.onmessage = async ({ data: task }: MessageEvent<AvifTask>) => {
 
 async function encoded(png: Uint8Array, quality: number, speed: number): Promise<Uint8Array> {
   const { pixels, width, height } = decodePng(png)
-  const codec = await encoder
+  const loading = encoder
+  const codec = await loading
+
+  // A task run meanwhile may have trapped, and had the encoder replaced.
+  if (loading !== encoder)
+    return encoded(png, quality, speed)
+
   const input = codec._malloc(pixels.length)
 
   if (input === 0)
     throw new Error(`no memory left for a ${width}x${height} image`)
 
+  let size: number
+
   try {
     codec.HEAPU8.set(pixels, input)
+    size = codec._kay_avif_encode(input, width, height, quality, speed)
+  }
+  catch (error) {
+    // A trap (an abort in libaom, an access out of bounds) leaves the module's memory and statics as it stopped them, so the next task gets a new instance.
+    encoder = loadEncoder()
 
-    const size = codec._kay_avif_encode(input, width, height, quality, speed)
+    throw error
+  }
 
+  try {
     if (size === 0)
       throw new Error(codec.UTF8ToString(codec._kay_avif_error()))
 
@@ -60,7 +77,23 @@ async function encoded(png: Uint8Array, quality: number, speed: number): Promise
 }
 
 async function decoded(avif: Uint8Array, width: number, height: number): Promise<Uint8Array> {
-  const image = (await (decoder ??= loadDecoder())).decode(avif, 8)
+  const loading = decoder ??= loadDecoder()
+  const codec = await loading
+
+  if (loading !== decoder)
+    return decoded(avif, width, height)
+
+  let image: ReturnType<AvifDecoder['decode']>
+
+  try {
+    image = codec.decode(avif, 8)
+  }
+  catch (error) {
+    // A trap, as for the encoder: libavif answers a file it cannot decode with null.
+    decoder = undefined
+
+    throw error
+  }
 
   if (!image)
     throw new Error('libavif could not decode it')
@@ -72,8 +105,12 @@ async function decoded(avif: Uint8Array, width: number, height: number): Promise
 }
 
 // kay's own build of libavif and libaom, with SIMD (codecs/avif); jsquash's scalar one encodes about half as fast.
+async function compileEncoder(): Promise<WebAssembly.Module> {
+  return WebAssembly.compile(await Bun.file(wasmPath).arrayBuffer())
+}
+
 async function loadEncoder(): ReturnType<typeof factory> {
-  const module = await WebAssembly.compile(await Bun.file(wasmPath).arrayBuffer())
+  const module = await compiled
 
   return factory({
     instantiateWasm: (imports, done) => {
