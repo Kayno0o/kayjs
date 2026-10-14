@@ -18,7 +18,7 @@ setServerScope(() => store.getStore())
 // Renders for `request`: a module's signals keep what this render writes to itself, persisted signals read its cookies and query, `queryParam` its query by the page's `rules`, and a `try` block reports what it caught.
 // `cookieRead` runs once a persisted signal read a cookie, the page then depending on it.
 export function inServerScope<T>(request: Request, report: (error: unknown) => void, run: () => T, cookieRead?: () => void, rules?: QueryRules): T {
-  let cookies: Bun.CookieMap | undefined
+  let cookies: ReturnType<typeof requestCookies> | undefined
 
   const cookie = (name: string) => {
     if (!cookies) {

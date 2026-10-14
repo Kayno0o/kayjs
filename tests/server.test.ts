@@ -1083,7 +1083,7 @@ describe('prerendering', () => {
     expect(requestUrl(request).pathname).toBe('/docs/guide')
     expect(requestCookies(request)).toBe(requestCookies(request))
     expect(requestCookies(request).get('theme')).toBe('dark')
-    expect(requestCookies(new Request('http://localhost/')).size).toBe(0)
+    expect(requestCookies(new Request('http://localhost/')).has('theme')).toBe(false)
 
     const current = (href: string) => inServerScope(request, () => undefined, () => currentPage(href))
 
