@@ -17,7 +17,7 @@ ul
     li: a(href={`/blog/${post.slug}`}) {post.title}
 ```
 
-Top-level `await` works, and a layout's and a page's loads run in parallel.
+Top-level `await` works.
 
 ## The request
 
@@ -41,7 +41,7 @@ p(class={theme}) Hello {user?.name}
 
 ## Query strings
 
-A page sets a `query` schema in its `page` object to read the search params typed. A value the schema refuses renders `_error.kay` with status 400.
+A page sets a `query` schema in its `page` object to read the search params typed.
 
 ```kay
 --- server
@@ -82,7 +82,7 @@ h1 {post.title}
 
 <Callout type="warning">
 
-`ctx.redirect` goes to any http(s) URL, so a `?next=` param goes through `localPath(value, fallback)` from `kay`: `ctx.redirect(localPath(ctx.query.next, '/account'))`.
+`ctx.redirect` goes to any URL, so a `?next=` param goes through `localPath(value, fallback)` from `kay`: `ctx.redirect(localPath(ctx.query.next, '/account'))`.
 
 </Callout>
 
@@ -112,7 +112,7 @@ Caching a load with `cached()` is covered in [Caching and streaming](/guides/cac
 
 ## Environment variables
 
-`defineEnv` reads `process.env` once against a schema when the server boots, typed, and stops the boot naming every missing or refused variable.
+`defineEnv` reads `process.env` once against a schema when the server boots and gives it back typed. A missing variable stops the boot.
 
 ```ts
 // src/env.ts
@@ -125,6 +125,6 @@ export const env = defineEnv(s.Object({
 }))
 ```
 
-Import `env` from server code: a fence, a `.ts` module or the server entry. An island never sees it.
+Import `env` from server code. An island never sees it.
 
 <ReadMore href="/llms/server">Locals, sessions, guards and the environment variables an island may read are in the full server reference.</ReadMore>
