@@ -1090,6 +1090,11 @@
 
   .kui-multi-select-action {
     @apply cursor-pointer text-kui-2xs tracking-kui-label text-kui-subtext0 uppercase hover:text-kui-text disabled:cursor-default disabled:opacity-40;
+
+    &:focus-visible {
+      outline: 2px solid var(--color-kui-accent);
+      outline-offset: 2px;
+    }
   }
 
   .kui-multi-select-options {
@@ -1098,6 +1103,14 @@
 
   .kui-multi-select-option {
     @apply flex cursor-pointer items-center gap-2 px-2 py-1.5 text-sm text-kui-text hover:bg-kui-row-hover;
+
+    /* The checkbox's own ring is too small to find, so the row the keyboard stands on takes the menu's tint and accent bar; forced colours paint the transparent outline instead. */
+    &:has(.kui-multi-select-checkbox:focus-visible) {
+      @apply bg-kui-row-hover;
+      box-shadow: inset 2px 0 0 var(--color-kui-accent);
+      outline: 2px solid transparent;
+      outline-offset: -2px;
+    }
   }
 
   .kui-multi-select-checkbox {

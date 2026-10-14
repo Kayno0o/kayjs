@@ -101,6 +101,7 @@ describe('MultiSelect', () => {
     expect(seen.planets).toEqual([['mars'], ['venus', 'mars']])
     expect(summary()).toBe('2 selected')
     expect(root.querySelector('.kui-multi-select-trigger')?.getAttribute('aria-label')).toEndWith(': 2 selected')
+    expect(root.querySelector('.kui-multi-select-trigger')?.getAttribute('aria-description')).toBe('Venus, Mars')
     expect(posted()).toEqual(['venus', 'mars'])
 
     click(root.querySelectorAll('.kui-multi-select-action')[1]!)
@@ -113,6 +114,45 @@ describe('MultiSelect', () => {
 
     expect(posted()).toHaveLength(9)
     expect(root.querySelector<HTMLButtonElement>('.kui-multi-select-action')?.disabled).toBe(true)
+  })
+
+  test('ArrowDown leaves the search box for the options, where the arrows, Home and End move between them', async () => {
+    const root = await inputs()
+
+    root.querySelector<HTMLElement>('#planets')!.showPopover()
+    await settle()
+
+    const focused = () => document.activeElement?.closest('.kui-multi-select-option')?.textContent
+    const moves = ['ArrowDown', 'ArrowDown', 'ArrowUp', 'ArrowUp', 'End', 'Home'].map((name) => {
+      key(document.activeElement, name)
+
+      return focused()
+    })
+
+    expect(moves).toEqual(['Mercury', 'Venus', 'Mercury', 'Pluto', 'Pluto', 'Mercury'])
+
+    root.querySelector<HTMLElement>('.kui-multi-select-action')!.focus()
+    key(document.activeElement, 'ArrowDown')
+
+    expect(focused()).toBe('Mercury')
+  })
+
+  test('closes once focus moves on past its controls, staying open while it moves among them', async () => {
+    const root = await inputs()
+    const panel = root.querySelector<HTMLElement>('#planets')!
+    const boxes = root.querySelectorAll<HTMLInputElement>('.kui-multi-select-checkbox')
+    const leave = (to: Element | null) => boxes[0]!.dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: to }))
+
+    panel.showPopover()
+    await settle()
+    leave(boxes[1]!)
+    leave(null)
+
+    expect(panel.matches(':popover-open')).toBe(true)
+
+    leave(root.querySelector('#field'))
+
+    expect(panel.matches(':popover-open')).toBe(false)
   })
 
   test('picks and drops only the options a search shows', async () => {

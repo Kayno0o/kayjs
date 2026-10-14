@@ -3,12 +3,21 @@ import type { JSX } from 'kay'
 import type { MultiSelectOption } from './multi-select'
 import type { PopoverPlacement } from './popover'
 import { effect, signal } from 'kay'
+import { stepIndex } from './cycle'
 import Icon from './icon.kay'
-import { pickedShown, selectionSummary, toggledValue } from './multi-select'
+import { pickedLabels, pickedShown, selectionSummary, toggledValue } from './multi-select'
 import Popover from './popover.kay'
 
 // Past this many options the panel opens on a search box.
 const SEARCH_FROM = 8
+
+// The keys that move focus through the options once one has it.
+const MOVES: Partial<Record<string, (index: number, count: number) => number>> = {
+  ArrowDown: (index, count) => stepIndex(index, 1, count),
+  ArrowUp: (index, count) => stepIndex(index, -1, count),
+  Home: () => 0,
+  End: (_, count) => count - 1,
+}
 
 const { id, options, value = [], label, placeholder = 'Any', searchLabel = 'Search', allLabel = 'All', noneLabel = 'None', emptyLabel = 'No match', selectedLabel, name, search, disabled = false, placement = 'bottom-start', onChange, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'id' | 'class' | 'children' | 'onChange'> & {
   // The panel's id, unique on the page; one is drawn when none is given.
@@ -65,12 +74,34 @@ function toggled(open: boolean) {
   else
     query.set('')
 }
+
+// From the search box or the bar, ArrowDown reaches the first option; there the arrows, Home and End move between options, which Tab would walk one by one.
+function keyDown(event: KeyboardEvent) {
+  const boxes = [...root?.querySelectorAll<HTMLInputElement>('.kui-multi-select-checkbox') ?? []]
+  const index = boxes.indexOf(event.target as HTMLInputElement)
+  const move = index === -1 ? (event.key === 'ArrowDown' ? () => 0 : undefined) : MOVES[event.key]
+
+  if (!move || boxes.length === 0)
+    return
+
+  event.preventDefault()
+  boxes[move(index, boxes.length)]?.focus()
+}
+
+// Tab past the last control closes the panel rather than leaving it open over the page; focus going nowhere, as on a click on the panel's padding, keeps it.
+function focusLeft(event: FocusEvent) {
+  const panel = event.currentTarget as HTMLElement
+  const next = event.relatedTarget as Node | null
+
+  if (next && !panel.contains(next) && panel.matches(':popover-open'))
+    panel.hidePopover()
+}
 ---
 .kui-multi-select({...rest} ref={element => root = element} class={className})
-  Popover(id={id} placement={placement} class="kui-multi-select-panel" role="group" aria-label={label} onToggle={toggled})
+  Popover(id={id} placement={placement} class="kui-multi-select-panel" role="group" aria-label={label} onToggle={toggled} onKeyDown={keyDown} onFocusOut={focusLeft})
     @trigger(attributes)
-      // Named by its label and what is picked, which a name of the label alone would hide.
-      button.kui-field-input.kui-multi-select-trigger({...attributes} type="button" aria-label={`${label}: ${summary()}`} disabled={disabled} data-empty={picked().length === 0 || undefined})
+      // Named by its label and what is picked, which a name of the label alone would hide; a count is described by the labels it stands for.
+      button.kui-field-input.kui-multi-select-trigger({...attributes} type="button" aria-label={`${label}: ${summary()}`} aria-description={picked().length > 1 ? pickedLabels(options, picked()).join(', ') : undefined} disabled={disabled} data-empty={picked().length === 0 || undefined})
         span.kui-multi-select-summary {summary()}
         Icon(icon="chevron" class="kui-multi-select-chevron")
     if searchable()

@@ -9,9 +9,14 @@ export function selectionSummary(options: readonly MultiSelectOption[], value: r
     return placeholder
 
   if (value.length === 1)
-    return options.find(option => option.value === value[0])?.label ?? value[0]!
+    return pickedLabels(options, value)[0]!
 
   return counted(value.length)
+}
+
+// The label of each value picked, or the value itself when no option names it.
+export function pickedLabels(options: readonly MultiSelectOption[], value: readonly string[]): string[] {
+  return value.map(entry => options.find(option => option.value === entry)?.label ?? entry)
 }
 
 // `value` with every option in `shown` picked, or none of them, the rest left as they were and kept in the options' order.
