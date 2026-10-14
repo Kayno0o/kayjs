@@ -1,14 +1,14 @@
 import type { AwaitNode, ElementNode, ElseBlock, ErrorMessages, ErrorNode, ForNode, IfNode, MatchNode, NamedAttribute, Node, Span, TemplateFacts, TryNode } from './ast'
 import type { DynamicItem, Item } from './items'
 import type { CodeBuilder } from './mapping'
-import { actionOf, keyedByPosition, marksServerIsland, serverIslandOf } from './ast'
+import { actionOf, FIELD_ELEMENTS, keyedByPosition, marksServerIsland, serverIslandOf, UNCHECKED_TYPES } from './ast'
 import { decodeEntities } from './expression'
 import { childItems, constDeclaration, errorParagraphArguments, slotValue, soleDynamic } from './items'
 import { BEHAVIOUR, describedValue, END_MARKER, escapeStaticAttribute, escapeText, fromRoot, helperName, RAW_ELEMENTS, START_MARKER, TemplateWriter, VOID_ELEMENTS } from './markup'
 import { SUBJECT } from './names'
 
 // The `kay/html` helpers static server output calls, each imported under a `Kay` name.
-const HTML_HELPERS = ['attempt', 'attribute', 'child', 'className', 'component', 'componentClass', 'currentPage', 'dynamic', 'element', 'errorParagraph', 'formConstraints', 'head', 'imageAttributes', 'localHref', 'loop', 'memo', 'merge', 'nonEmptyAttribute', 'omit', 'raw', 'refillOptions', 'selectOptions', 'serverIsland', 'show', 'spreadAttributes', 'style', 'untrack']
+const HTML_HELPERS = ['attempt', 'attribute', 'child', 'className', 'component', 'componentClass', 'currentPage', 'dynamic', 'element', 'errorParagraph', 'fieldDescribed', 'formConstraints', 'head', 'imageAttributes', 'localHref', 'loop', 'memo', 'merge', 'nonEmptyAttribute', 'omit', 'raw', 'refillOptions', 'selectOptions', 'serverIsland', 'show', 'spreadAttributes', 'style', 'untrack']
 
 export function htmlHelperImport(): string {
   return `import { ${HTML_HELPERS.map(helper => `${helper} as ${helperName(helper)}`).join(', ')} } from 'kay/html'\n`
@@ -383,6 +383,9 @@ export class HtmlTemplate extends TemplateWriter {
     const filled = field?.fill === 'value' || field?.fill === 'checked' ? field.fill : undefined
     let ownFill: (() => void) | undefined
     let checkboxValue: (() => void) | undefined
+    // A field takes the ids a component around it hands it, beside its own, unless a refused form already describes it.
+    const describable = FIELD_ELEMENTS.has(name) && !described && !plan.attributes.some(attribute => attribute.kind === 'text' && attribute.name === 'type' && UNCHECKED_TYPES.has(attribute.text.toLowerCase()))
+    let ownDescribed: (() => void) | undefined
 
     markup.text(`<${name}`)
 
@@ -418,6 +421,12 @@ export class HtmlTemplate extends TemplateWriter {
       }
 
       const written = attribute.kind === 'image' ? 'src' : attribute.kind === 'selected' ? 'value' : attribute.name
+
+      if (describable && written === 'aria-describedby') {
+        ownDescribed = attribute.kind === 'text' ? () => void b.add(JSON.stringify(attribute.text)) : attribute.kind === 'value' ? read(attribute.expression, false) : undefined
+
+        continue
+      }
 
       if (written === filled) {
         ownFill = attribute.kind === 'boolean' ? () => void b.add('true') : attribute.kind === 'text' || attribute.kind === 'rooted' ? () => void b.add(JSON.stringify(attribute.text)) : read(attribute.expression, false)
@@ -540,6 +549,14 @@ export class HtmlTemplate extends TemplateWriter {
           own ? own() : b.add('undefined')
         }
       }
+    }
+
+    if (describable) {
+      markup.dynamic(() => {
+        b.add(`${helperName('fieldDescribed')}(`)
+        ownDescribed?.()
+        b.add(')')
+      })
     }
 
     if (action) {

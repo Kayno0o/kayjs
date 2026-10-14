@@ -120,6 +120,13 @@ describe('the prebuilt pages', () => {
 
     expect(refused.status).toBe(400)
     expect(refused.find('.kui-form-field-issue').map(issue => issue.text)).toEqual(['An account already uses this address.', 'Use at least 10 characters.'])
+
+    // With no script, the server links each control to its hint and its message.
+    const ids = (selector: string) => refused.find(selector).map(found => found.attributes.id)
+    const [hint] = ids('.kui-form-field-hint')
+    const [email, password] = ids('.kui-form-field-issues')
+
+    expect(refused.find('input[name="email"], input[name="password"]').map(input => input.attributes['aria-describedby'])).toEqual([email, `${hint} ${password}`])
   })
 
   test('a wrong password is refused with a message, and the right one signs in to where the visitor was going', async () => {
@@ -228,6 +235,8 @@ describe('the prebuilt pages', () => {
     const listed = await ada.visit('/auth/account/sessions')
 
     expect(listed.find('[data-session]')).toHaveLength(2)
+    // Each sign-out button names the device it signs out, its visible text first.
+    expect(listed.find('[data-session] button').map(button => button.attributes['aria-label'])).toEqual(Array.from({ length: 2 }, () => expect.stringMatching(/^Sign out: .+/)))
     await ada.submit(endOthers, {}, { from: '/auth/account/sessions' })
     expect(text(await phone.visit('/'), '#who')).toBe('Anonymous')
 
@@ -244,6 +253,8 @@ describe('the prebuilt pages', () => {
     expect(text(created, '#kayjs-auth-token')).toBeString()
 
     const [token] = (await ada.visit('/auth/account/tokens')).find('[data-token]')
+
+    expect((await ada.visit('/auth/account/tokens')).find('[data-token] button').map(button => button.attributes['aria-label'])).toEqual(['Revoke: CI'])
 
     expect((await ada.visit('/auth/account/tokens')).find('#kayjs-auth-token')).toHaveLength(0)
     await ada.submit(revoke, { id: token!.attributes['data-token']! }, { from: '/auth/account/tokens' })

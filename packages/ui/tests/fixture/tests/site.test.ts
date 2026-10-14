@@ -3,7 +3,7 @@ import { describe, expect, test } from 'bun:test'
 import { testSite } from 'kay/test'
 
 // An id kay draws for a page, which differs per render.
-const DRAWN_ID = /\b(id|data-kui-field)="k\w+-\d+"/g
+const DRAWN_ID = /\b(id|data-kui-field|aria-describedby)="k\w+-\d+"/g
 
 // The fixture is an app installing the library, linked back to this repository by scripts/link-fixture.ts.
 const ROOT = join(import.meta.dir, '..')
@@ -190,13 +190,18 @@ describe('FormField', () => {
   test('labels its control with what it takes, and shows the message a plain form post was refused with', async () => {
     const field = (await element('/form', 'field')).replaceAll(/<!--[^>]*-->/g, '').replaceAll(DRAWN_ID, '$1="id"')
 
-    // Static on a page of its own: the ids are drawn for a FormField inside an island to tie its control to them.
-    expect(field).toBe('<section id="field"><div class="kui-form-field" data-kui-field="id"><label class="kui-form-field-label"><span class="kui-form-field-head"><span class="kui-label-text">Name<span class="kui-form-field-required" aria-hidden="true">*</span></span></span><input name="name"></label><span class="kui-form-field-hint" id="id">As it shows on the site</span><span class="kui-form-field-issues" id="id" aria-live="polite"></span></div></section>')
+    // Static on a page of its own, the server links the control to its hint; the message region takes an id once it holds one.
+    expect(field).toBe('<section id="field"><div class="kui-form-field" data-kui-field="id"><label class="kui-form-field-label"><span class="kui-form-field-head"><span class="kui-label-text">Name<span class="kui-form-field-required" aria-hidden="true">*</span></span></span><input name="name" aria-describedby="id"></label><span class="kui-form-field-hint" id="id">As it shows on the site</span><span class="kui-form-field-issues" aria-live="polite"></span></div></section>')
 
     const { rename } = await import('../src/routes/form.kay')
     const refused = await site.submit(rename, { name: 'A' }, { from: '/form' })
 
     expect(refused.html).toContain('<span class="kui-form-field-issue">Two letters at least</span>')
+
+    const [hint] = refused.find('#field .kui-form-field-hint').map(found => found.attributes.id)
+    const [issues] = refused.find('#field .kui-form-field-issues').map(found => found.attributes.id)
+
+    expect(refused.find('#field input').map(input => input.attributes['aria-describedby'])).toEqual([`${hint} ${issues}`])
   })
 
   test('sizes itself by its control when compact, holding no message region without a name or an issue', async () => {

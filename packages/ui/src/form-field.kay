@@ -41,7 +41,7 @@ if group
     if hint
       span.kui-form-field-hint(id={links.hint}) {hint}
     if reports()
-      span.kui-form-field-issues(id={links.issues} aria-live="polite" data-field={name})
+      span.kui-form-field-issues(id={messages().length > 0 ? links.issues : undefined} aria-live="polite" data-field={name})
         for message, index of messages() key={index}
           span.kui-form-field-issue {message}
 else
@@ -59,6 +59,6 @@ else
     if hint
       span.kui-form-field-hint(id={links.hint}) {hint}
     if reports()
-      span.kui-form-field-issues(id={links.issues} aria-live="polite" data-field={name})
+      span.kui-form-field-issues(id={messages().length > 0 ? links.issues : undefined} aria-live="polite" data-field={name})
         for message, index of messages() key={index}
           span.kui-form-field-issue {message}

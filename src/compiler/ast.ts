@@ -254,7 +254,8 @@ export const FIELD_ELEMENTS = new Set(['input', 'textarea', 'select'])
 export const FIELD_ATTRIBUTE = 'field'
 // A password or a file is never sent back; the others post no text the visitor typed.
 const UNFILLED_TYPES = new Set(['password', 'file', 'hidden', 'submit', 'button', 'reset', 'image'])
-const UNCHECKED_TYPES = new Set(['hidden', 'submit', 'button', 'reset', 'image'])
+
+export const UNCHECKED_TYPES = new Set(['hidden', 'submit', 'button', 'reset', 'image'])
 
 // Only an element whose name and type are written out: the compiler then knows which field it is and how it shows its value.
 export function formFieldOf(element: ElementNode, source: string): FormField | undefined {

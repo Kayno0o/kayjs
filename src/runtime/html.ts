@@ -4,6 +4,7 @@
 import type { Truthy } from './checks'
 import type { FieldSchema } from './form'
 import { isAction } from './action'
+import { fieldDescription } from './described'
 import { escape, escapeAttribute } from './escape'
 import { fieldMarks, markedAttribute, markedList, markedText, withFieldMarks } from './fields'
 import { nativeConstraints } from './form'
@@ -134,6 +135,23 @@ export function nonEmptyAttribute(name: string, text: string): string {
   return text === '' ? '' : ` ${name}="${text}"`
 }
 
+// The fields a component's `describeField` reaches, but those showing no text of their own to describe.
+const DESCRIBED_FIELDS = new Set(['input', 'select', 'textarea'])
+const UNDESCRIBED_TYPES = new Set(['hidden', 'submit', 'button', 'reset', 'image'])
+
+function lastValue(sources: readonly object[], name: string): unknown {
+  const source = sources.findLast(source => source != null && Object.hasOwn(source, name)) as Record<string, unknown> | undefined
+
+  return source?.[name]
+}
+
+// ` aria-describedby="..."` for a field whose own, if any, is `own`: what a component around it hands it, beside its own ids.
+export function fieldDescribed(own?: unknown): string {
+  const ids = fieldDescription(own)
+
+  return ids === undefined ? '' : attribute('aria-describedby', ids)
+}
+
 // An element whose attributes are only known at render time: spreads, or a component tag that names an element.
 // An attribute set by several sources takes the last one's value and place; `content`, the markup of the lines under the tag, wins over a `children` or `innerHTML` property.
 export function element(tag: string, sources: readonly object[], content?: () => string): Html {
@@ -142,6 +160,9 @@ export function element(tag: string, sources: readonly object[], content?: () =>
   let markup = `<${tag}`
   let inner = content?.()
   let selected: unknown
+  // A field takes the ids a component around it hands it, beside its own.
+  const field = DESCRIBED_FIELDS.has(tag) && !UNDESCRIBED_TYPES.has(String(lastValue(sources, 'type') ?? '').toLowerCase())
+  let described: unknown
 
   for (const [index, source] of sources.entries()) {
     if (source == null)
@@ -174,6 +195,12 @@ export function element(tag: string, sources: readonly object[], content?: () =>
       if (name === 'value')
         selected = value
 
+      if (field && name === 'aria-describedby') {
+        described = value
+
+        continue
+      }
+
       if (name === 'class')
         markup += ` class="${className(value)}"`
       else if (name === 'style')
@@ -186,6 +213,12 @@ export function element(tag: string, sources: readonly object[], content?: () =>
         markup += attribute(name, value)
     }
   }
+
+  if (field)
+    described = fieldDescription(described)
+
+  if (described != null)
+    markup += attribute('aria-describedby', described)
 
   if (isVoid)
     return { t: `${markup}>` }

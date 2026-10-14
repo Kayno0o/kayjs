@@ -47,7 +47,7 @@ PageSection(title={t('auth.account.tokens.title')})
         @right
           form(action={revoke})
             input(type="hidden" name="id" value={token.id})
-            Button(type="submit" variant="danger" label={t('auth.account.tokens.revoke')})
+            Button(type="submit" variant="danger" label={t('auth.account.tokens.revoke')} aria-label={`${t('auth.account.tokens.revoke')}: ${token.label}`})
         .flex.flex-col
           span.flex.flex-wrap.items-center.gap-2
             strong {token.label}

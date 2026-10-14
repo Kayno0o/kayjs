@@ -18,7 +18,7 @@
 
   /* The one accent, the two statuses, and the fills state is drawn with. */
   --color-kui-accent: light-dark(#ab433a, #ec9086);
-  --color-kui-accent-hi: light-dark(#a03a30, #f4a79d);
+  --color-kui-accent-hi: light-dark(#7d2a22, #f8c0b8);
   --color-kui-on-accent: light-dark(#ffffff, #1a0d0b);
   --color-kui-success: light-dark(#4f6b2e, #b4c79b);
   --color-kui-warning: light-dark(#8a5a12, #d8b27a);
@@ -67,7 +67,7 @@
   --color-kui-stamp-fill-hover: var(--color-kui-fill-hover);
   --kui-border-stamp: 1px;
 
-  /* A text field's inset, its border, and its look while focused. */
+  /* A text field's inset, its border, and its look while focused. The border, which buttons, toggles, carousel dots and empty stars draw too, is solid at 3:1 on every surface: an app changing its surfaces sets it to match, since overlay0's hairline reads under 3:1. */
   --spacing-kui-field-x: 0.5625rem;
   --spacing-kui-field-y: 0.25rem;
   --color-kui-field-border: light-dark(#8a8379, #6e6a63);
@@ -181,6 +181,7 @@
   }
 
   .kui-btn {
+    --kui-shell-line: var(--color-kui-field-border);
     --kui-shell-fill: var(--color-kui-canvas);
     @apply inline-flex cursor-pointer items-center justify-center gap-kui-inline border-0 px-3 py-1 text-xs whitespace-nowrap font-kui-label tracking-kui-action text-kui-text uppercase transition-[color,translate,box-shadow] duration-150;
   }
@@ -762,7 +763,7 @@
 
   /* The dot is drawn small, and pressed through a margin around it wide enough for a finger. */
   .kui-carousel-dot {
-    @apply relative h-2 w-2 bg-kui-overlay0 transition-all after:absolute after:-inset-2 after:content-[''] hover:bg-kui-subtext0;
+    @apply relative h-2 w-2 bg-kui-field-border transition-all after:absolute after:-inset-2 after:content-[''] hover:bg-kui-subtext0;
 
     &[aria-current='true'] {
       @apply w-6 bg-kui-accent;
@@ -771,7 +772,7 @@
 
   /* The empty stars, with a copy of them over the top cut to the rating's share. */
   .kui-rating {
-    @apply relative inline-flex text-kui-overlay0;
+    @apply relative inline-flex text-kui-field-border;
   }
 
   .kui-rating-stars {
@@ -1794,7 +1795,7 @@
   }
 
   .kui-toggle-track {
-    @apply relative inline-flex h-5 w-9 shrink-0 items-center border border-kui-overlay0 bg-kui-surface0 transition-colors;
+    @apply relative inline-flex h-5 w-9 shrink-0 items-center border border-kui-field-border bg-kui-surface0 transition-colors;
 
     &::before {
       content: '';

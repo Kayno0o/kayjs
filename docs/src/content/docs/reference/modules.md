@@ -32,6 +32,7 @@ import { collection } from 'kay/content'
 | `localPath`, `withBase` | A path with the locale prefix or the `base` applied |
 | `sanitizeHtml`, `trustHtml` | Clean untrusted HTML, its options typed `SanitizeOptions`, or mark HTML as safe to render |
 | `uid` | A unique id that matches between server and browser |
+| `describeField` | Adds ids to the `aria-describedby` of the first field a component renders on the server, its slot included, for a form field linking the control its parent writes to its hint |
 | `previewing` | Whether the visitor is in preview mode |
 | `editing` | Whether the visitor is in edit mode, a CMS editing content on the page |
 | `logFrom` | A library's log, `logFrom('my-library').error(message, error)`, written where the app's `log` setting sends kay's messages, or to the console as `[my-library] message` outside a server |

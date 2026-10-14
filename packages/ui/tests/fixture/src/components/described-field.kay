@@ -1,0 +1,11 @@
+---
+import { signal } from 'kay'
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+
+// A FormField inside an island, whose message shows once the button refuses the name.
+const issue = signal<string>()
+---
+FormField(label="Name" hint="As it shows on the site" issue={issue()})
+  input#name(name="name" aria-describedby="name-note")
+p#name-note Public
+button#refuse(type="button" onClick={() => issue.set('Taken')}) Refuse

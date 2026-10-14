@@ -10,7 +10,7 @@ import { PAGE, PAGE_SETTINGS } from './page-settings'
 import { loadTraverse, POSITION_SUFFIX } from './rewrite'
 
 // What `kay` exports that a static component may use and stay static.
-const STATIC_EXPORTS = new Set(['uid', 'sanitizeHtml', 'trustHtml', 'defer'])
+const STATIC_EXPORTS = new Set(['uid', 'describeField', 'sanitizeHtml', 'trustHtml', 'defer'])
 // What `kay/i18n` exports that makes a component an island; the rest of it reads the locale alike on both sides.
 const REACTIVE_I18N = new Set(['relativeTime'])
 const SIGNAL_TYPES: Record<string, SignalKind> = { Signal: 'signal', Memo: 'memo' }

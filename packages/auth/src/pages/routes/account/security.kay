@@ -140,7 +140,7 @@ if features.passkeys
             input(type="hidden" name="id" value={passkey.id})
             FormField(label={t('auth.account.passkeys.name')})
               input(name="name" value={passkey.name} required)
-            Button(type="submit" label={t('auth.account.passkeys.rename')})
+            Button(type="submit" label={t('auth.account.passkeys.rename')} aria-label={`${t('auth.account.passkeys.rename')}: ${passkey.name}`})
           p.text-kui-muted
             | {t('auth.account.passkeys.created', { date: formatDate(passkey.createdAt, { dateStyle: 'medium' }) })}
           form.flex.flex-wrap.items-end.gap-2(action={removePasskey})
@@ -148,7 +148,7 @@ if features.passkeys
             Proof(user={user})
             if removeRefused?.id === passkey.id
               Message(text={failure(removeRefused.error)})
-            Button(type="submit" variant="danger" label={t('auth.account.passkeys.remove')})
+            Button(type="submit" variant="danger" label={t('auth.account.passkeys.remove')} aria-label={`${t('auth.account.passkeys.remove')}: ${passkey.name}`})
       else
         EmptyState(title={t('auth.account.passkeys.none')})
       PasskeyAdd(user={user} label={t('auth.account.passkeys.add')} nameLabel={t('auth.account.passkeys.name')} unsupported={t('auth.account.passkeys.unsupported')} failed={t('auth.account.passkeys.failed')} errors={passkeyErrors})

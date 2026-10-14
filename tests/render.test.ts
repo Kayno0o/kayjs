@@ -80,6 +80,17 @@ describe('images', () => {
   })
 })
 
+describe('describeField', () => {
+  it('hands the first described field its component renders the ids, beside its own, whether written out or spread', async () => {
+    await Bun.write(join(scratch, 'describe-field.ts'), 'import { describeField } from \'kay\'\n\nexport const describe = (ids: string) => describeField(ids)\n')
+    await Bun.write(join(scratch, 'described.kay'), '---\nimport { describe } from \'./describe-field\'\n\nconst { ids } = props<{ ids: string }>()\n\ndescribe(ids)\n---\nlabel\n  slot\n')
+
+    const html = await renderKay('---\nimport Described from \'./described.kay\'\n\nconst spread = { name: \'s\' }\n---\nDescribed(ids="hint")\n  input(type="hidden" name="x")\n  input(name="a" aria-describedby="own")\n  input(name="b")\nDescribed(ids="hint issues")\n  select({...spread})\nDescribed(ids="")\n  textarea(name="t")\ninput(name="outside")')
+
+    expect(html).toBe('<label><input type="hidden" name="x"><input name="a" aria-describedby="own hint"><input name="b"></label><label><select name="s" aria-describedby="hint issues"></select></label><label><textarea name="t"></textarea></label><input name="outside">')
+  })
+})
+
 describe('server fence declarations', () => {
   it('render when a declaration carries a type annotation', async () => {
     expect(await renderKay('--- server\nconst title: string = \'T\'\nlet count: number = 3\n---\nh1 {title} {count}')).toBe('<h1>T 3</h1>')

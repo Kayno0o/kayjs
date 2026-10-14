@@ -16,4 +16,4 @@ The control goes inside as the child. `label` names it, `hint` explains it below
 
 ## Screen readers
 
-Inside an island, as in a FormDialog, the control is described by the hint and, while one shows, by its messages, beside the ids its own `aria-describedby` held, and marked `aria-invalid` while a message shows. A FormDialog refusing a field focuses the first one marked so, which reads its message with it. On a static page, kay marks the fields of a refused plain form post `aria-invalid` itself.
+The control is described by the hint and, while one shows, by its messages, beside the ids its own `aria-describedby` holds: on a static page the server writes the link, and inside an island, as in a FormDialog, the browser keeps it as messages come and go, marking the control `aria-invalid` while one shows. A FormDialog refusing a field focuses the first one marked so, which reads its message with it. On a static page, kay marks the fields of a refused plain form post `aria-invalid` itself.

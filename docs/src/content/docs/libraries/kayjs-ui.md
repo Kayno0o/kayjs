@@ -31,7 +31,7 @@ The palette in this site's header picks a scheme and an accent, and the whole si
 
 <ThemeTokens />
 
-Colours are `--color-kui-<name>`, used as `bg-kui-<name>`, and hold `light-dark(light, dark)`. A few tokens shape boxes rather than colour them, such as `--kui-border-card` for every hairline. A brutalist skin sets `--kui-shadow-raised` (under cards, rows, widgets and toasts), `--kui-shadow-press` (under framed buttons) and `--kui-press-travel` (how far a pressed button moves down, dropping its shadow), which draw nothing by default. The theme is dark unless the visitor's system asks for light, and `data-theme="light"` or `"dark"` on `html` wins over both. A site in one theme sets it in its root layout's `head` block:
+Colours are `--color-kui-<name>`, used as `bg-kui-<name>`, and hold `light-dark(light, dark)`. `--color-kui-field-border` is the solid line of text fields, buttons, toggles, carousel dots and empty stars, at 3:1 on every surface: a palette changing the surfaces sets it to match. A few tokens shape boxes rather than colour them, such as `--kui-border-card` for every hairline. A brutalist skin sets `--kui-shadow-raised` (under cards, rows, widgets and toasts), `--kui-shadow-press` (under framed buttons) and `--kui-press-travel` (how far a pressed button moves down, dropping its shadow), which draw nothing by default. The theme is dark unless the visitor's system asks for light, and `data-theme="light"` or `"dark"` on `html` wins over both. A site in one theme sets it in its root layout's `head` block:
 
 ```kay
 head

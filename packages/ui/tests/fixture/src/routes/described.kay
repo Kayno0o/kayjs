@@ -1,0 +1,5 @@
+---
+import DescribedField from '../components/described-field.kay'
+---
+main
+  DescribedField

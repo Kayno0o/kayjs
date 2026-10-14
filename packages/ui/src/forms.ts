@@ -1,4 +1,4 @@
-import { context, effect, uid } from 'kay'
+import { context, describeField, effect, uid } from 'kay'
 
 // The messages a FormDialog's last call was refused with, by field name, which each FormField inside it reads for its own `name`.
 export const formIssues = context<(() => Record<string, string>) | undefined>(undefined)
@@ -8,7 +8,7 @@ const CONTROL = 'input:not([type="hidden"]), select, textarea, button, [contente
 const SPACES = /\s+/
 
 export interface FieldLinks {
-  // Marks the field's frame, for the link to find its control.
+  // Marks the field's frame, for the link to find its control: a `ref` would make the component an island.
   frame: string
   hint: string
   issues: string
@@ -17,13 +17,16 @@ export interface FieldLinks {
 }
 
 // A FormField's ids, and the link from its control to its hint and messages: kept in the control's `aria-describedby` beside the page's own ids, and `aria-invalid` while a message shows.
-// The control is the page's own markup, so the link runs in the browser, wherever the field renders inside an island; drawn here rather than in the component, which stays static on a page of its own.
+// The control is the page's own markup: the server hands it the ids as it renders, and inside an island the browser keeps the link as the messages change; drawn here rather than in the component, which stays static on a page of its own.
 export function fieldLinks(group: boolean, hint: boolean, messages: () => readonly unknown[]): FieldLinks {
   const links: FieldLinks = { frame: uid(), hint: uid(), issues: uid(), described: () => [hint ? links.hint : undefined, messages().length > 0 ? links.issues : undefined].filter(id => id !== undefined) }
 
   // A static page renders the field outside any island, where nothing drops the effect as an island's server render does.
-  if (typeof document === 'undefined')
+  if (typeof document === 'undefined') {
+    describeField(group ? '' : links.described().join(' '))
+
     return links
+  }
 
   let marked = false
 

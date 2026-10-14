@@ -21,10 +21,13 @@ import zoomFit from '~icons/tabler/zoom-reset'
 // The icons the library's own components ask for, by what they mean rather than by a name in some set.
 export type IconSlot = 'alert' | 'back' | 'chevron' | 'close' | 'delete' | 'globe' | 'info' | 'menu' | 'pause' | 'play' | 'plus' | 'search' | 'spinner' | 'star' | 'success' | 'zoomFit' | 'zoomIn' | 'zoomOut'
 
+// The slots added since apps first wrote icon maps of their own: optional, so such a map still type-checks, each drawing its default when left out.
+export type AddedSlot = 'pause'
+
 // What an app may replace through `settings` in its kay.config.ts, spreading these defaults to change a few.
 export interface Settings {
   // An icon of any set kay imports, `~icons/<prefix>/<name>`, standing in for each slot.
-  icons: Record<IconSlot, IconProps>
+  icons: Record<Exclude<IconSlot, AddedSlot>, IconProps> & Partial<Record<AddedSlot, IconProps>>
 }
 
 const defaults: Settings = {

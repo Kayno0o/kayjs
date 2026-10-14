@@ -37,7 +37,7 @@ PageSection(title={t('auth.account.sessions.title')})
         @right
           form(action={end})
             input(type="hidden" name="id" value={session.id})
-            Button(type="submit" label={t('auth.account.sessions.end')})
+            Button(type="submit" label={t('auth.account.sessions.end')} aria-label={`${t('auth.account.sessions.end')}: ${describe(session)}`})
         .flex.flex-col
           span.flex.flex-wrap.items-center.gap-2
             strong {describe(session)}

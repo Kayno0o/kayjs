@@ -4,7 +4,7 @@ description: Short messages shown above the page and gone after a few seconds.
 
 <Demo name="toaster/basic" />
 
-Render one `Toaster` in the root layout, then call `toast.success`, `toast.error` or `toast.info` from an island. A toast stays for six seconds, an error for ten, or until dismissed, and waits while the pointer is on it or focus is inside it.
+Render one `Toaster` in the root layout, then call `toast.success`, `toast.error` or `toast.info` from an island. A toast stays for six seconds, an error for ten, or until dismissed, and waits while the pointer is on it or focus is inside it. Screen readers hear it from two status regions the Toaster renders before its popover, kept in the page.
 
 <Callout type="note">
 

@@ -114,7 +114,17 @@ describe('theme.css', () => {
     for (const scheme of [0, 1] as const) {
       for (const fill of ['accent', 'accent-hi'])
         expect(contrast(colour('on-accent', scheme), colour(fill, scheme))).toBeGreaterThanOrEqual(4.5)
+
+      // A hovered accent button shows it is hovered.
+      expect(contrast(colour('accent', scheme), colour('accent-hi', scheme))).toBeGreaterThanOrEqual(1.4)
     }
+  })
+
+  test('draws the controls a hairline would leave under 3:1 with the field border', () => {
+    const rule = (selector: string) => theme.slice(theme.indexOf(`${selector} {`), theme.indexOf('}', theme.indexOf(`${selector} {`)))
+
+    for (const selector of ['.kui-carousel-dot', '.kui-rating', '.kui-toggle-track', '  .kui-btn'])
+      expect(rule(selector)).toContain('kui-field-border')
   })
 
   test('defines every colour its classes paint with', () => {

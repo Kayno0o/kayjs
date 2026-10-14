@@ -360,6 +360,7 @@ export type { Action, ActionContext, ActionProtection, ActionRateLimit, CallOpti
 export { action, ActionError, ActionRedirect } from './action'
 export { localPath, withBase } from './base'
 export type { ApiRoutesOf, AwaitProps, CheckedHref, CheckedHtml, Deferred, ExtensionServersOf, FunctionProp, HydrateWhen, IdentityKeyed, Inferred, IslandBrand, IslandComponent, IslandOptions, IslandProp, Locals, LocalsOf, Redirect, Register, RouteParams, SafeHtml, TemplateHelpers } from './checks'
+export { describeField } from './described'
 export type { Duration } from './duration'
 export type { PublicEnv, PublicEnvOf } from './env'
 export { publicEnv } from './env'
