@@ -46,6 +46,7 @@ Counter
 
 ## Where to go next
 
+- [Choosing kay](/getting-started/choosing-kay) compares kay with Astro, SvelteKit, Next and HTMX, and says what it costs.
 - [Installation](/getting-started/installation) creates a project.
 - [Project structure](/getting-started/project-structure) shows where things live.
 - [Templates](/essentials/templates) and [Components](/essentials/components) teach the syntax.

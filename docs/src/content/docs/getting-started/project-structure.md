@@ -1,6 +1,6 @@
 ---
 title: Project structure
-order: 3
+order: 4
 description: Where the files of a kay project live and what the two entry files look like.
 ---
 

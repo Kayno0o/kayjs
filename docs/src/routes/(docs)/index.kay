@@ -121,6 +121,7 @@ head
     .hero-actions
       Button(class="px-4 py-2 text-sm" variant="accent" href="/getting-started/introduction" label="Get started")
       Button(class="px-4 py-2 text-sm" href="/guides/tutorial" label="Follow the tutorial")
+      Button(class="px-4 py-2 text-sm" href="/getting-started/choosing-kay" label="Choosing kay")
     ol.install
       li
         p Once, point Bun at kay's registry in #[code ~/.bunfig.toml]:

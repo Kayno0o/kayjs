@@ -1,6 +1,6 @@
 ---
 title: Installation
-order: 2
+order: 3
 description: Point Bun at the registry, scaffold a project with kay new and start the dev server.
 ---
 
