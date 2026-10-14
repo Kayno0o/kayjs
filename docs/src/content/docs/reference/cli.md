@@ -314,6 +314,16 @@ kay explain --format json    # every lint, for a tool to read
 
 `kay explain` and `kay fmt` take `--format json` too ([Output for tools](#output-for-tools)).
 
+## Quiet and plain output
+
+`kay build`, `kay check`, `kay fmt`, `kay migrate` and `kay new` take `--quiet`: they print the problems and one summary line, without the size report, the files one by one or the next step to run. `kay routes` and `kay explain`, whose output is the answer, refuse it.
+
+```sh
+kay fmt src --quiet   # formatted 3 files
+```
+
+Colour only goes to a terminal, and not under `NO_COLOR` or `TERM=dumb`; `FORCE_COLOR` brings it back to a pipe, as a CI log showing colour wants. The build's progress line and `kay check --watch`'s cleared screen only ever go to a terminal, `FORCE_COLOR` or not.
+
 ## Output for tools
 
 `kay build`, `kay routes`, `kay explain`, `kay fmt` and `kay migrate` take `--format json`, as `kay check` does, for a script or an agent to read: stdout then holds one JSON document on one line, what the app's own code prints through the console or `process.stdout`, such as `kay.config.ts`, an API module or a prerendered page, going to stderr; a write straight to the file descriptor, as `Bun.write(Bun.stdout, ...)`, still lands on stdout. The exit code is the one the text output gives.

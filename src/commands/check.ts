@@ -12,7 +12,7 @@ import { isLint, isLintGroup, LINT_GROUPS, LINTS } from '../compiler/lints'
 import { CONFIG_FILE, loadConfig } from '../config'
 import { watchProject } from '../dev'
 import { buildingWithoutEnv } from '../server/env'
-import { count, done, formatOption, printFailure, printProblems, PROBLEM_FORMATS, projectRoot } from './command'
+import { count, done, formatOption, printFailure, printProblems, PROBLEM_FORMATS, projectRoot, takesControlCodes } from './command'
 
 const CLI = join(import.meta.dir, '../cli.ts')
 // What makes a directory given first the project rather than a path to report on.
@@ -24,8 +24,8 @@ const WATCH_DEBOUNCE_MS = 50
 
 // `--format github` annotates a CI diff and `--format json` gives tools one document; the exit code is the same in every format.
 export const check: Command = {
-  usage: 'check [dir] [paths...] [-p tsconfig.json] [--entry <file>] [--deny-warnings] [--fix] [--only <group>] [--format text|github|json] [--watch]',
-  options: { 'project': { type: 'string', short: 'p' }, 'entry': { type: 'string' }, 'deny-warnings': { type: 'boolean' }, 'fix': { type: 'boolean' }, 'only': { type: 'string' }, 'format': { type: 'string' }, 'watch': { type: 'boolean' } },
+  usage: 'check [dir] [paths...] [-p tsconfig.json] [--entry <file>] [--deny-warnings] [--fix] [--only <group>] [--format text|github|json] [--watch] [--quiet]',
+  options: { 'project': { type: 'string', short: 'p' }, 'entry': { type: 'string' }, 'deny-warnings': { type: 'boolean' }, 'fix': { type: 'boolean' }, 'only': { type: 'string' }, 'format': { type: 'string' }, 'watch': { type: 'boolean' }, 'quiet': { type: 'boolean' } },
   positionals: Infinity,
   run: async ({ values, positionals }) => {
     const { project, entry } = values
@@ -69,6 +69,7 @@ export const check: Command = {
         ...typeof entry === 'string' ? ['--entry', entry] : [],
         ...values['deny-warnings'] === true ? ['--deny-warnings'] : [],
         ...values.fix === true ? ['--fix'] : [],
+        ...values.quiet === true ? ['--quiet'] : [],
         ...only === undefined ? [] : ['--only', only],
       ]
 
@@ -84,7 +85,7 @@ export const check: Command = {
     const started = performance.now()
 
     try {
-      const { failing, found } = await checkProject(root, await loadConfig(root), typeof project === 'string' ? project : 'tsconfig.json', typeof entry === 'string' ? relative(root, resolve(entry)) : undefined, { denyWarnings: values['deny-warnings'] === true, fix: values.fix === true, only, launch: only === 'seo', format, scope })
+      const { failing, found } = await checkProject(root, await loadConfig(root), typeof project === 'string' ? project : 'tsconfig.json', typeof entry === 'string' ? relative(root, resolve(entry)) : undefined, { denyWarnings: values['deny-warnings'] === true, fix: values.fix === true, only, launch: only === 'seo', format, scope, quiet: values.quiet === true })
 
       if (found === 0 && format !== 'json')
         done('checked', 'with no problems', performance.now() - started)
@@ -102,7 +103,7 @@ export const check: Command = {
 // Checks now and again on every change to the project, its tests included, a change during a check bringing one more; until interrupted.
 // Each check is a `kay check` of its own, so an edit to kay.config.ts or a module it imports is read again, which a process's import cache would not, and a check that throws or exits leaves the watch going.
 async function watchChecks(root: string, args: string[], format: ProblemFormat): Promise<never> {
-  const clear = format === 'text' && process.stderr.isTTY
+  const clear = format === 'text' && takesControlCodes(process.stderr)
   let changed = false
   let running: Promise<void> | undefined
   let timer: Timer | undefined
@@ -217,17 +218,17 @@ function inScope(diagnostic: CheckDiagnostic, scope: string[]): boolean {
 
 // Prints what `kay check` finds in the project and answers how many it found and how many of those fail it: the errors, and the warnings too with `denyWarnings`.
 // With `fix`, applies the safe fixes first, then checks again and prints what is left; with `only`, prints that group's lints alone; with a `scope`, the problems in those files and directories alone, the project still checked as a whole.
-async function checkProject(root: string, config: KayConfig, tsconfig: string, entry: string | undefined, { denyWarnings, fix, only, launch, format, scope }: { denyWarnings: boolean, fix: boolean, only: LintGroup | undefined, launch: boolean, format: ProblemFormat, scope: string[] }): Promise<{ failing: number, found: number }> {
+async function checkProject(root: string, config: KayConfig, tsconfig: string, entry: string | undefined, { denyWarnings, fix, only, launch, format, scope, quiet }: { denyWarnings: boolean, fix: boolean, only: LintGroup | undefined, launch: boolean, format: ProblemFormat, scope: string[], quiet: boolean }): Promise<{ failing: number, found: number }> {
   const options = { ...configCheckOptions(config), tsconfig, entry, launch }
   const checkScope = async () => (await checkTypes(root, options)).filter(diagnostic => inScope(diagnostic, scope))
   let diagnostics = await checkScope()
   const fixed = fix ? await applySafeFixes(root, diagnostics) : 0
 
   if (fixed > 0) {
-    // JSON is the whole of stdout.
+    // JSON is the whole of stdout; quiet, what is left is all that is said.
     if (format === 'json')
       console.error(`kay check: fixed ${count(fixed, 'problem')}`)
-    else
+    else if (!quiet)
       done('fixed', count(fixed, 'problem'))
 
     diagnostics = await checkScope()

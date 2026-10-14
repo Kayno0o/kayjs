@@ -6,8 +6,8 @@ import { createProject, FEATURE_NAMES, pickFeatures, PRESET_NAMES, PRESETS, refu
 import { count, done, shellQuote } from './command'
 
 export const scaffold: Command = {
-  usage: 'new <dir> [--kay <dependency>] [--template blank|server|site|app] [--with <features>] [--without <features>] [-y]',
-  options: { kay: { type: 'string' }, template: { type: 'string' }, with: { type: 'string' }, without: { type: 'string' }, yes: { type: 'boolean', short: 'y' } },
+  usage: 'new <dir> [--kay <dependency>] [--template blank|server|site|app] [--with <features>] [--without <features>] [-y] [--quiet]',
+  options: { kay: { type: 'string' }, template: { type: 'string' }, with: { type: 'string' }, without: { type: 'string' }, yes: { type: 'boolean', short: 'y' }, quiet: { type: 'boolean' } },
   positionals: 1,
   run: async ({ values, positionals: [dir] }, refuse) => {
     if (dir === undefined || dir === '')
@@ -62,8 +62,10 @@ export const scaffold: Command = {
       const files = await createProject(dir, { kay: typeof values.kay === 'string' ? values.kay : undefined, features })
 
       done('created', `${dir}, ${features.length > 0 ? features.join(', ') : 'blank'}, ${count(files.length, 'file')}`)
+
       // An app's database runs in the container its compose.dev.yaml describes, migrated before the first start.
-      console.log(`\n  ${colors.cyan(`cd ${shellQuote(dir)} && bun install && ${features.includes('auth') ? 'docker compose up -d --wait && bun run db:migrate && ' : ''}bun run dev`)}`)
+      if (values.quiet !== true)
+        console.log(`\n  ${colors.cyan(`cd ${shellQuote(dir)} && bun install && ${features.includes('auth') ? 'docker compose up -d --wait && bun run db:migrate && ' : ''}bun run dev`)}`)
 
       return 0
     }

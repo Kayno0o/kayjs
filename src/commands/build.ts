@@ -16,8 +16,8 @@ import { progressLine } from './progress'
 
 // With `--compile`, also bundles the server and all of it into one executable; with `--static`, writes the whole site to `--outdir`, `dist` by default, for a host with no server. `--no-check` builds without checking.
 export const build: Command = {
-  usage: 'build [dir] [--compile <executable>] [--entry <file>] [--static] [--outdir <dir>] [--no-check] [--analyze] [-p tsconfig.json] [--format text|github|json]',
-  options: { 'compile': { type: 'string' }, 'entry': { type: 'string' }, 'static': { type: 'boolean' }, 'outdir': { type: 'string' }, 'no-check': { type: 'boolean' }, 'analyze': { type: 'boolean' }, 'project': { type: 'string', short: 'p' }, 'format': { type: 'string' } },
+  usage: 'build [dir] [--compile <executable>] [--entry <file>] [--static] [--outdir <dir>] [--no-check] [--analyze] [-p tsconfig.json] [--format text|github|json] [--quiet]',
+  options: { 'compile': { type: 'string' }, 'entry': { type: 'string' }, 'static': { type: 'boolean' }, 'outdir': { type: 'string' }, 'no-check': { type: 'boolean' }, 'analyze': { type: 'boolean' }, 'project': { type: 'string', short: 'p' }, 'format': { type: 'string' }, 'quiet': { type: 'boolean' } },
   positionals: 1,
   run: async ({ values, positionals }, refuseUsage) => {
     const { compile, outdir, project: tsconfig } = values
@@ -74,7 +74,7 @@ export const build: Command = {
     let result: BuildResult
 
     try {
-      result = await buildProject(root, await loadConfig(root), { ...options, onStage: async (stage, result) => printStage(stage, result, format), onProgress: progress?.update })
+      result = await buildProject(root, await loadConfig(root), { ...options, onStage: async (stage, result) => printStage(stage, result, format, values.quiet === true), onProgress: progress?.update })
     }
     finally {
       progress?.stop()
@@ -110,7 +110,8 @@ export const build: Command = {
 }
 
 // Each stage as it ends, so its problems come before what a later stage's code logs, and are shown though that code ends the process.
-async function printStage(stage: BuildStage, result: BuildResult, format: ProblemFormat): Promise<void> {
+// `quiet` leaves the size report out, each stage still saying what it made.
+async function printStage(stage: BuildStage, result: BuildResult, format: ProblemFormat, quiet: boolean): Promise<void> {
   if (stage === 'check')
     await printProblems(result.checked, false, format)
 
@@ -122,7 +123,7 @@ async function printStage(stage: BuildStage, result: BuildResult, format: Proble
 
       done('built', `${count(islands, 'island')}, ${count(stylesheets, 'stylesheet')} and ${count(prerendered, 'prerendered page')}${entries > 0 ? ` from ${entries} content ${entries === 1 ? 'entry' : 'entries'}` : ''}`, ms)
 
-      if (report)
+      if (report && !quiet)
         console.log(formatSizeReport(report))
     }
   }

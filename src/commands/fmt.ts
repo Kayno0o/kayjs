@@ -4,12 +4,12 @@ import process from 'node:process'
 import { fromCompile } from '../check/shadow-types'
 import { formatDiagnostic } from '../compiler'
 import { formatFiles } from '../format'
-import { done, formatOption, printDocument, printedProblems, printFailure, problemCounts, toStderr } from './command'
+import { count, done, formatOption, printDocument, printedProblems, printFailure, problemCounts, toStderr } from './command'
 
 // Formats in place, or with `--check` lists the files that are not formatted and fails.
 export const fmt: Command = {
-  usage: 'fmt [paths...] [--check] [--format text|json]',
-  options: { check: { type: 'boolean' }, format: { type: 'string' } },
+  usage: 'fmt [paths...] [--check] [--format text|json] [--quiet]',
+  options: { check: { type: 'boolean' }, format: { type: 'string' }, quiet: { type: 'boolean' } },
   positionals: Infinity,
   run: async ({ values, positionals: paths }) => {
     const write = values.check !== true
@@ -44,11 +44,15 @@ export const fmt: Command = {
         console.error(`${formatDiagnostic(source, relative(process.cwd(), file), diagnostic, toStderr)}\n`)
     }
 
+    // Quiet, the files formatted are counted, those left unformatted still named.
+    if (write && values.quiet === true && changed.length > 0)
+      done('formatted', count(changed.length, 'file'))
+
     for (const file of changed) {
-      if (write)
-        done('formatted', relative(process.cwd(), file))
-      else
+      if (!write)
         console.error(`not formatted: ${relative(process.cwd(), file)}`)
+      else if (values.quiet !== true)
+        done('formatted', relative(process.cwd(), file))
     }
 
     if (changed.length === 0 && errors.length === 0)

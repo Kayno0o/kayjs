@@ -188,7 +188,7 @@ export default defineConfig({
 
 ### Commands
 
-- `kay new <dir> [--kay <dependency>] [--template blank|server|site|app] [--with <features>] [--without <features>] [-y]`:
+- `kay new <dir> [--kay <dependency>] [--template blank|server|site|app] [--with <features>] [--without <features>] [-y] [--quiet]`:
   - Scaffold a project in an empty directory.
   - A project is a set of features: `server` (an Elysia server; off, a static site), `starter` (a header, a skip link, a `_404.kay`, a home page greeting from the server with a counter island), `tailwind` (Tailwind through `bun-plugin-tailwind` over the Catppuccin Mocha palette; off, the markup carries no classes), `accents` (an accent picker in the header, kept in a cookie, which needs `starter` and `tailwind`), `eslint`, `tests`, `ci` (the Forgejo workflow below), `docker` (the container below), `auth` (the app's sessions, sign-in and members, which needs `server`) and `ws` (the app's API module and websocket island, shown on the home page, which needs `server`).
   - A preset names a set: `blank` none, one layout and one bare page built as a static site; `server`, `site` and `app` as described below.
@@ -254,7 +254,7 @@ export default defineConfig({
   - On a Linux machine with no display, as one reached over SSH, only code-server counts, opening the file in its window already open on the project.
   - With none, the page says so and the terminal prints the position; an editor command exiting with an error within 2 seconds prints its error in the terminal and the page says it failed.
   - A server run any other way, `pages({ dev: true })` included, has the dev tool without the inspector, and a production build has neither.
-- `kay build [dir] [-p tsconfig.json] [--no-check] [--analyze] [--format text|github|json]`:
+- `kay build [dir] [-p tsconfig.json] [--no-check] [--analyze] [--format text|github|json] [--quiet]`:
   - Bundle the islands and stylesheets for production, whatever `NODE_ENV` the shell holds and with none of the server's secrets, such as `preview.secret`, needed, minified, into `.kay/client` while checking the project as `kay check` does, `-p` naming the tsconfig as there;
   - Once the check passed, render the pages marked `prerender`, so no page, API module or guard runs before then.
   - With the check on, a problem it reports, check-only ones included, or a build that fails leaves the last build in `.kay/client` as it was; `--no-check` skips the check and builds in place.
@@ -289,7 +289,7 @@ export default defineConfig({
   - `--body` posts as a form does, `application/x-www-form-urlencoded`, unless a `--header` names another `content-type`; `--header` and `--cookie` repeat, a guarded page rendering signed in with the session cookie a browser holds; `-i` prints the status and headers on stderr.
   - Under `base`, a path under it is taken as the proxy in front of the server hands it over, so a link a page printed renders as it is.
   - The whole app boots for it: its jobs and modules' top-level code run, and a `POST` to an action runs it against the app's database. The request goes to the first server the entry starts, with the host a full URL names, over plain HTTP; a server not listening after 60 seconds fails it.
-- `kay check [dir] [paths...] [-p tsconfig.json] [--entry <file>] [--deny-warnings] [--fix] [--only <group>] [--format text|github|json] [--watch]`:
+- `kay check [dir] [paths...] [-p tsconfig.json] [--entry <file>] [--deny-warnings] [--fix] [--only <group>] [--format text|github|json] [--watch] [--quiet]`:
   - Type-check the project, `.kay` files included;
   - The first path is the project when it is a directory holding a `kay.config.ts`, `package.json` or `tsconfig.json`, or any directory outside the current directory, so a directory given first to narrow the report must be neither;
   - The other paths, files or directories relative to the current directory, a symlink read as what it points to, narrow the report, and `--fix`, to the problems in them, the project still checked as a whole, and one outside the project fails the check;
@@ -312,9 +312,9 @@ export default defineConfig({
   - What the server entry adds, as a `.use(auth.plugin)`, and an extension's `server` given as a function are only known as the server starts: a last line names them, unlisted.
 - `kay explain [lint|group] [--format text|json]`:
   - List the lints with their groups and default levels, or a group's, or print one with an example it reports and the same written right.
-- `kay fmt [paths...] [--check] [--format text|json]`:
+- `kay fmt [paths...] [--check] [--format text|json] [--quiet]`:
   - Format `.kay` files; `--check` lists unformatted files and fails.
-- `kay migrate astro [dir] [--out <dir>] [--format text|json]`:
+- `kay migrate astro [dir] [--out <dir>] [--format text|json] [--quiet]`:
   - Translate an Astro project's `.astro` files into `.kay` ones, `src/pages` into `src/routes` (`404` as `_404`), components and layouts kept in their folder with kebab-case names and the imports of them rewritten, and `src/content.config.ts` into kay's, its zod schemas written in `s`.
   - The frontmatter becomes the fence, a page's `--- server` with `Astro.url`, `params`, `cookies` and `redirect` read from `ctx`, `Astro.props` becomes `props<Props>()`, and the markup the indented template: static classes as the `.class` shorthand, `class:list` as `class`, `&&`, ternaries and `.map` as `if` and `for`, slots as `slot` and `@name` blocks, `client:idle` and `client:visible` as `hydrate`, `set:html` as `innerHTML` through `trustHtml`, a layout's `head` as a `head` block.
   - It writes into the project, or into `--out`, never over a file that exists, formats what it writes, and lists what it could not translate at its line in the Astro file: a script Astro bundles, an `await` or `Astro.url` in a component, an endpoint, markup written another way, each commented out under a `// kay migrate:` line where it stays in the code, and Tailwind 3, as kay builds with Tailwind 4.
@@ -329,6 +329,8 @@ export default defineConfig({
   - It runs the project's `kay.config.ts`, and the modules it imports, as soon as a `.kay` file is opened, as `bun` would: open only a project you trust, as with its `package.json` scripts.
 
 - Every command prints its usage for `--help` or `-h`, and refuses an option or argument it does not take.
+- `kay build`, `kay check`, `kay fmt`, `kay migrate` and `kay new` take `--quiet`: the problems and one summary line, without the size report, the files one by one or the next step; the commands whose output is the answer refuse it.
+- Colour only goes to a terminal, never under `NO_COLOR` or `TERM=dumb`, and `FORCE_COLOR` brings it back to a pipe; a redrawn line or a cleared screen only ever goes to a terminal.
 - `kay build`, `kay routes`, `kay explain`, `kay fmt` and `kay migrate` take `--format json`, as `kay check` does: stdout holds one JSON document on one line, what the app's own code prints through the console or `process.stdout` going to stderr (a write straight to file descriptor 1 is not caught), and the exit code is the text output's.
   - `kay build`: `{ errors, warnings, problems }` as `kay check` prints them, a template that does not compile at its place and any other failure as one problem with `code: null`, then `failed: { stage }` when a stage stopped it, `built: { islands, stylesheets, prerendered, entries, ms, sizes }` (`sizes` the entry's and each island's `raw` and `gzip` bytes, `modules` under `--analyze`), `exported: { pages, files, dir, ms }` and `compiled: { executable, ms }`; code that ends the process mid-build leaves the problems so far, one saying it ended and the stage; `--format github` annotates the check's problems as `kay check` does, and a template that does not compile or a failed stage too.
   - `kay routes`: `{ routes, unlisted }`, each route's `methods`, `path`, `kind`, `by`, and `file`, `notes`, `layouts`, `guards` when it has them, every locale's copy with its chains.

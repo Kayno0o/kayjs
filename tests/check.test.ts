@@ -1763,6 +1763,8 @@ describe.concurrent('kay check, unused code', () => {
       expect((await runCheck(root, '--fix', join(root, 'src/a.kay'))).report).toStartWith('fixed 1 problem\n')
       expect(await Bun.file(join(root, 'src/a.kay')).text()).toBe(button.replace('onclick', 'onClick'))
       expect(await Bun.file(join(root, 'src/b.kay')).text()).toBe(button)
+      // Quiet, the one line left says what remains.
+      expect((await runCheck(root, '--fix', '--quiet', join(root, 'src/b.kay'))).report).toStartWith('checked with no problems')
     }
     finally {
       await rm(root, { recursive: true, force: true })

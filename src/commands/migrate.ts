@@ -8,8 +8,8 @@ import { count, done, formatOption, printDocument, printFailure, shellQuote } fr
 
 // Translates an Astro project's `.astro` files and content config, in place or into `--out`, a directory with no package.json getting the kay project around them, and lists what is left to do by hand.
 export const migrate: Command = {
-  usage: 'migrate astro [dir] [--out <dir>] [--format text|json]',
-  options: { out: { type: 'string' }, format: { type: 'string' } },
+  usage: 'migrate astro [dir] [--out <dir>] [--format text|json] [--quiet]',
+  options: { out: { type: 'string' }, format: { type: 'string' }, quiet: { type: 'boolean' } },
   positionals: 2,
   run: async ({ values, positionals }) => {
     const [from, dir = '.'] = positionals
@@ -52,21 +52,26 @@ export const migrate: Command = {
       return 0
     }
 
-    for (const file of written)
-      done('wrote', shown(file))
+    // Quiet, what is left to do and the count alone.
+    const quiet = values.quiet === true
 
-    for (const file of skipped)
-      console.log(`${colors.bold.yellow('kept')} ${shown(file)}, which exists`)
+    if (!quiet) {
+      for (const file of written)
+        done('wrote', shown(file))
 
-    if (copied.length > 0)
-      done('copied', `${count(copied.length, 'other file')} of src and public`)
+      for (const file of skipped)
+        console.log(`${colors.bold.yellow('kept')} ${shown(file)}, which exists`)
+
+      if (copied.length > 0)
+        done('copied', `${count(copied.length, 'other file')} of src and public`)
+    }
 
     if (noted.length > 0)
       console.log(`\nLeft to do by hand, the code it concerns marked \`kay migrate:\` where it was commented out:\n${noted.map(each => `${each.file}:${each.line}${each.target === undefined ? '' : ` (${each.target})`}: ${each.message}`).join('\n')}`)
 
     console.log(`\n${count(written.length, 'file')} written, ${count(notes.length, 'item')} left to do by hand`)
 
-    if (written.includes('package.json'))
+    if (written.includes('package.json') && !quiet)
       console.log(`\n  ${colors.cyan(`cd ${shellQuote(relative(process.cwd(), out) || '.')} && bun install && bun run dev`)}`)
 
     return 0
