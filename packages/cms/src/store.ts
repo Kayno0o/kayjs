@@ -1,8 +1,8 @@
 import type { Commit, Identity } from './files'
 import type { CollectionInfo, DraftEntry, EntryRef, Issue, SourceEntry } from './kay/contract'
-import { collectionInfo, entries, entryFile, entrySource, removeEntry, renderMarkdown, saveEntry as saveLoaded } from './kay/content'
+import { collectionInfo, entries, entryFile, entrySource, removeEntry, saveEntry as saveLoaded } from './kay/content'
 import { settings } from './settings'
-import { scriptIn } from './unsafe'
+import { scriptInBody } from './unsafe'
 
 export type SaveOutcome = { issues: Issue[] } | { saved: true, commit?: Commit | undefined }
 
@@ -25,17 +25,22 @@ export async function entryOf({ collection, slug, locale }: EntryRef): Promise<S
   return (await entries(collection, { slug, locale }))[0]
 }
 
-function refused(ref: EntryRef, message: string, key?: Issue['key']): SaveOutcome {
-  return { issues: [{ collection: ref.collection, slug: ref.slug, locale: ref.locale, path: '', ...(key === undefined ? {} : { key }), message }] }
+function refused(ref: EntryRef, message: string, key?: Issue['key'] | 'body'): SaveOutcome {
+  const at = key === undefined ? {} : key === 'body' ? { body: true as const } : { key }
+
+  return { issues: [{ collection: ref.collection, slug: ref.slug, locale: ref.locale, path: '', ...at, message }] }
 }
 
 // Saves an entry where its collection keeps it: a loaded one through its loader, a folder one as a file through the configured saver.
 export async function saveEntry(entry: DraftEntry, { create = false, verb, author, bodyKept = false }: { create?: boolean | undefined, verb?: string | undefined, author?: Identity | undefined, bodyKept?: boolean | undefined } = {}): Promise<SaveOutcome> {
   const collection = await collectionNamed(entry.collection)
-  const script = entry.body === undefined || bodyKept || settings().rawHtml.has(collection.name) ? undefined : scriptIn((await renderMarkdown(entry.body)).html)
 
-  if (script !== undefined)
-    return { issues: [{ collection: entry.collection, slug: entry.slug, locale: entry.locale, path: '', body: true, message: `The text holds ${script}, which would run as the site: write it as Markdown, or list ${collection.name} in cms({ rawHtml })` }] }
+  if (entry.body !== undefined && !bodyKept && !settings().rawHtml.has(collection.name)) {
+    const script = await scriptInBody(entry.body, collection.components)
+
+    if (script !== undefined)
+      return refused(entry, `The text holds ${script}, which would run as the site: write it as Markdown, or list ${collection.name} in cms({ rawHtml })`, 'body')
+  }
 
   if (collection.kind === 'loaded') {
     const { issues } = await saveLoaded(collection.name, { slug: entry.slug, locale: entry.locale, data: entry.data, body: entry.body }, { create })

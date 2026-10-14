@@ -34,9 +34,9 @@ export default defineConfig({
 })
 ```
 
-The screens live at `/admin` (`prefix` moves them) and stay closed without a `guard`. In edit mode, kay renders the editor at the end of every page, with the entries the page read; "Edit on page" links on the screens put an editor the guard admitted in edit mode, and the editor's "Stop editing" button leaves it. Once there is a guard, every save needs it, edit mode included: an edit cookie or link is tied to no user. `author` names who a save is committed as, such as the signed-in user.
+The screens live at `/admin` (`prefix` moves them) and stay closed without a `guard`. In edit mode, kay renders the editor at the end of every page, with the entries the page read; "Edit on page" links on the screens put an editor the guard admitted in edit mode, and the editor's "Stop editing" button leaves it. Once there is a guard, every save needs it, edit mode included: an edit cookie or link is tied to no user. With a guard, `author` names who a save is committed as, such as the signed-in user.
 
-A file field takes PNG, JPEG, WebP, GIF, AVIF and PDF files unless `uploads` lists others (`['image/*', 'application/pdf']`). A body whose Markdown renders HTML that would run as the site, a `<script>`, an `onclick` or a `javascript:` link, is refused on save unless `rawHtml` lists the collection; HTML shown in a code block is fine.
+A file field takes PNG, JPEG, WebP, GIF, AVIF and PDF files unless `uploads` lists others (`['image/*', 'application/pdf']`). A body whose Markdown renders HTML that would run as the site or cover it, a `<script>`, an `onclick`, a `style` or a `javascript:` link, is refused on save unless `rawHtml` lists the collection; the collection's own components and HTML shown in a code block are fine.
 
 A commit shows on the site once it has rebuilt from it. The Forgejo token needs write access to the repository's contents, and the commit is the token's user's. An image or file field (`imageField()`, `fileField()` from `kay/content`) takes a file dropped or picked, stored through kay's [file storage](/guides/file-storage), and keeps the path that serves it.
 
