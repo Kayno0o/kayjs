@@ -6,7 +6,7 @@ import { basename, join, posix } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { parse, stringify } from 'devalue'
-import { outputDir } from '../src/build/assets'
+import { clientDir, outputDir } from '../src/build/assets'
 import { buildClient } from '../src/build/client'
 import { check, configCheckOptions } from '../src/check'
 import { loadConfig } from '../src/config'
@@ -419,29 +419,33 @@ describe('kay new', () => {
     expect((await formatFiles([join(dir, 'src')], { write: false })).changed).toEqual([])
     expect((await lint(dir, '.')).flatMap(result => result.messages)).toEqual([])
 
-    // A page's server fence is linted with the project's types, at its .kay line.
-    await Bun.write(join(dir, 'src/routes/later.kay'), '--- server\nBun.write(\'later.txt\', \'later\')\n---\np Later\n')
-    expect(await checked(dir)).toEqual([])
-    expect((await lint(dir, 'src/routes/later.kay'))[0]!.messages).toEqual([expect.objectContaining({ ruleId: 'ts/no-floating-promises', line: 2 })])
-    await rm(join(dir, 'src/routes/later.kay'))
+    // What this test adds to the scaffold the compile test shares is removed whatever its asserts find.
+    try {
+      // A page's server fence is linted with the project's types, at its .kay line.
+      await Bun.write(join(dir, 'src/routes/later.kay'), '--- server\nBun.write(\'later.txt\', \'later\')\n---\np Later\n')
+      expect(await checked(dir)).toEqual([])
+      expect((await lint(dir, 'src/routes/later.kay'))[0]!.messages).toEqual([expect.objectContaining({ ruleId: 'ts/no-floating-promises', line: 2 })])
 
-    // The accent picker as a visitor meets it: rendered from the cookie, a value it does not know read as the default, and changed by a click.
-    await Bun.write(join(dir, 'tests/accent.test.ts'), ACCENT_TEST.replace('__WIRE__', JSON.stringify(join(repo, 'src/runtime/wire'))))
+      // The accent picker as a visitor meets it: rendered from the cookie, a value it does not know read as the default, and changed by a click.
+      await Bun.write(join(dir, 'tests/accent.test.ts'), ACCENT_TEST.replace('__WIRE__', JSON.stringify(join(repo, 'src/runtime/wire'))))
 
-    const tests = Bun.spawn([process.execPath, 'test'], { cwd: dir, stdout: 'pipe', stderr: 'pipe' })
-    const [report, code] = await Promise.all([new Response(tests.stderr).text(), tests.exited])
+      const tests = Bun.spawn([process.execPath, 'test'], { cwd: dir, stdout: 'pipe', stderr: 'pipe' })
+      const [report, code] = await Promise.all([new Response(tests.stderr).text(), tests.exited])
 
-    expect(report).toContain('3 pass')
-    expect(code).toBe(0)
-    await rm(join(dir, 'tests/accent.test.ts'))
+      expect(report).toContain('3 pass')
+      expect(code).toBe(0)
 
-    const client = await buildClient(dir)
+      const client = await buildClient(dir)
 
-    // In the order the bundler wrote their chunks, not the source's.
-    expect(Object.keys(client.islands).sort()).toEqual(['src/components/accent-picker.kay', 'src/components/counter.kay'])
-    const stylesheet = client.styles.get(join(dir, 'src/routes/_layout.kay'))!
+      // In the order the bundler wrote their chunks, not the source's.
+      expect(Object.keys(client.islands).sort()).toEqual(['src/components/accent-picker.kay', 'src/components/counter.kay'])
+      const stylesheet = client.styles.get(join(dir, 'src/routes/_layout.kay'))!
 
-    expect(await Bun.file(join(client.dir, stylesheet.slice('/_kay/'.length))).text()).toMatch(/@media \(prefers-reduced-motion: ?no-preference\) ?\{\s*@view-transition/)
+      expect(await Bun.file(join(client.dir, stylesheet.slice('/_kay/'.length))).text()).toMatch(/@media \(prefers-reduced-motion: ?no-preference\) ?\{\s*@view-transition/)
+    }
+    finally {
+      await Promise.all([rm(join(dir, 'src/routes/later.kay'), { force: true }), rm(join(dir, 'tests/accent.test.ts'), { force: true }), rm(clientDir(dir), { recursive: true, force: true })])
+    }
   }, 60_000)
 
   it('scaffolds a static site that type-checks and exports to dist, with a Pages workflow and a container beside it', async () => {
