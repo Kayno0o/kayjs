@@ -1,7 +1,7 @@
 import type { SafeHtml } from './checks'
 
 // The runtime mark of `SafeHtml`: a string is vouched for by value, since a symbol or a class would not survive the JSON an island's props travel as.
-// A repeat of markup the newer generation already holds counts for nothing, so a hot path cannot push other markup out.
+// A repeat of markup the newer generation or an icon already holds counts for nothing, so a hot path cannot push other markup out.
 // Markup vouched for at run time lives in two generations of up to 8M characters each: a use of one in the older moves it to the newer, and one used by neither for a whole generation is forgotten. An icon's stays for good.
 const GENERATION = 2 ** 23
 const forever = new Set<string>()
@@ -13,7 +13,7 @@ export function vouch(markup: string, always = false): SafeHtml {
   if (always) {
     forever.add(markup)
   }
-  else if (!young.has(markup)) {
+  else if (!young.has(markup) && !forever.has(markup)) {
     young.add(markup)
     size += markup.length
 

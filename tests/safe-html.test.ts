@@ -54,18 +54,31 @@ describe('vouched markup', () => {
     expect(isVouched(icon)).toBe(true)
   })
 
-  it('counts a repeat of markup the newer generation holds for nothing, so a hot path cannot push other markup out', () => {
-    const big = (mark: string) => mark + 'x'.repeat(5_000_000)
+  it('counts a repeat of markup the registry holds for nothing, so a hot path cannot push other markup out', () => {
+    const big = (mark: string, size: number) => mark + 'x'.repeat(size)
 
-    vouch(big('k'))
+    // Fills a generation, so the count starts from nothing.
+    vouch(big('fill', 8_500_000))
+    vouch(big('victim', 5_000_000))
 
     for (let i = 0; i < 10; i++)
-      vouch(big('k'))
+      vouch(big('hot', 3_000_000))
 
-    vouch(big('l'))
+    expect(isVouched(big('victim', 5_000_000), false)).toBe(true)
+    expect(isVouched(big('hot', 3_000_000), false)).toBe(true)
+  })
 
-    // Ten repeats of `k` counted once, so `k` and `l` have not yet filled the generation and `k` is not forgotten.
-    expect(isVouched(big('k'), false)).toBe(true)
+  it('does not count markup an icon holds for good', () => {
+    const icon = vouch('i'.repeat(3_000_000), true)
+
+    vouch('f'.repeat(8_500_000))
+
+    const victim = vouch('v'.repeat(5_000_000))
+
+    for (let i = 0; i < 10; i++)
+      vouch(icon)
+
+    expect(isVouched(victim, false)).toBe(true)
   })
 
   it('leaves what is no string alone, so the registry is not spoilt', () => {
