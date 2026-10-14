@@ -315,11 +315,21 @@ describe('selection in an optimistic change', () => {
 
     flush()
 
+    let stop: (() => void) | undefined
+    const meanwhile: boolean[] = []
     const undo = undoable(() => {
       selected.set(2)
-      // A flag made while the change shows, for a key the change selected.
-      expect(selected.is(2)).toBe(true)
-      expect(selected.is(3)).toBe(false)
+      // A reader made while the change shows, so its flag is made then.
+      stop = root((stop) => {
+        effect(() => {
+          meanwhile.push(selected.is(3))
+        })
+        effect(() => {
+          meanwhile.push(selected.is(2))
+        })
+
+        return stop
+      })
     })
 
     flush()
@@ -333,6 +343,8 @@ describe('selection in an optimistic change', () => {
     expect(selected.is(1)).toBe(true)
     expect(selected.is(2)).toBe(false)
     expect(seen.at(-1)).toEqual([true, false])
+    expect(meanwhile).toEqual([false, true, false])
+    stop!()
 
     // The function form reads the key it was undone to.
     selected.set(current => (current ?? 0) + 10)

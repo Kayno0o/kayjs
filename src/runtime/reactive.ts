@@ -6,6 +6,10 @@ type Equals<T> = false | ((previous: T, next: T) => boolean)
 export interface SignalOptions<T> {
   // `false` notifies on every write; the default skips a write of the same value.
   equals?: Equals<T> | undefined
+}
+
+// What kay's own signals take beyond what an app does.
+interface InternalSignalOptions<T> extends SignalOptions<T> {
   // Runs after every write that changes the value, an optimistic change's undo included, which writes the signal itself.
   written?: ((value: T) => void) | undefined
 }
@@ -94,7 +98,7 @@ let afterHydration: (() => void)[] = []
 
 const defaultEquals = <T>(previous: T, next: T) => previous === next
 
-export function createSignal<T>(value: T, options?: SignalOptions<T>): [read: () => T, write: (next: T) => void] {
+export function createSignal<T>(value: T, options?: InternalSignalOptions<T>): [read: () => T, write: (next: T) => void] {
   const node: SignalNode<T> = { value, observers: undefined, equals: options?.equals ?? defaultEquals, shared: serverRendering === 0 }
 
   if (interceptor?.created)
