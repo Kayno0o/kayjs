@@ -25,7 +25,7 @@ export interface OpenIdCheck {
   /** The expected `iss`, or a test of the claims for a provider whose issuer names the tenant, as Microsoft's does. */
   issuer: string | string[] | ((claims: Record<string, unknown>) => boolean)
   jwksUrl: string
-  /** The `alg` header values an ID token may carry, `RS256`, `PS256`, `ES256` and `EdDSA` when left out; a token signed otherwise, with `none` or with a shared-secret `HS*` included, is refused. */
+  /** The `alg` header values an ID token may carry, every asymmetric one (`RS*`, `PS*`, `ES*`, `EdDSA`) when left out; a token signed otherwise, with `none` or with a shared-secret `HS*` included, is refused. */
   algorithms?: string[] | undefined
 }
 

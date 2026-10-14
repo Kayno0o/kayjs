@@ -96,7 +96,7 @@ export interface OpenIdClaims {
 /** Options every OpenID Connect preset takes: other scopes than its own, and extra authorize URL parameters, such as Google's `{ access_type: 'offline', prompt: 'consent' }` for a refresh token. */
 export interface OpenIdOptions {
   scopes?: string[]
-  /** The `alg` values the provider signs ID tokens with, when not `RS256`, `PS256`, `ES256` or `EdDSA`, as `['RS384']`. */
+  /** The `alg` values the provider signs ID tokens with, to narrow the asymmetric ones accepted by default (`RS*`, `PS*`, `ES*`, `EdDSA`), as `['RS256']`. */
   algorithms?: string[]
   params?: Record<string, string>
 }
@@ -109,8 +109,6 @@ function requireHttps(url: string, what: string): void {
     throw new Error(`${what} ${url} is not https, which production refuses`)
 }
 
-const idTokenAlgorithms = (opts: OpenIdOptions) => opts.algorithms === undefined ? {} : { algorithms: opts.algorithms }
-
 /** Any OpenID Connect provider by its issuer URL, its endpoints read off its discovery document on first use: Keycloak, Authentik, Auth0, Okta, Zitadel... */
 export function oidcProvider(opts: OpenIdOptions & { issuer: string, name?: string }): OAuthProvider<OpenIdClaims> {
   const issuer = opts.issuer.replace(TRAILING_SLASHES, '')
@@ -122,7 +120,7 @@ export function oidcProvider(opts: OpenIdOptions & { issuer: string, name?: stri
     scopes: opts.scopes ?? OPENID_SCOPES,
     ...opts.params === undefined ? {} : { authorizeParams: opts.params },
     discover: async () => {
-      const res = await fetch(`${issuer}/.well-known/openid-configuration`, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS) })
+      const res = await fetch(`${issuer}/.well-known/openid-configuration`, { headers: { Accept: 'application/json' }, redirect: 'error', signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS) })
 
       if (!res.ok)
         throw new Error(`discovery document answered ${res.status}`)
@@ -147,7 +145,7 @@ export function oidcProvider(opts: OpenIdOptions & { issuer: string, name?: stri
         authorizeUrl: doc.authorization_endpoint as string,
         tokenUrl: doc.token_endpoint as string,
         userUrl: typeof doc.userinfo_endpoint === 'string' ? doc.userinfo_endpoint : undefined,
-        openId: { issuer: doc.issuer, jwksUrl: doc.jwks_uri as string, ...idTokenAlgorithms(opts) },
+        openId: { issuer: doc.issuer, jwksUrl: doc.jwks_uri as string, algorithms: opts.algorithms },
       }
     },
     parseTokens: parseStandardTokens,
@@ -162,7 +160,7 @@ export function googleProvider(opts: OpenIdOptions = {}): OAuthProvider<OpenIdCl
     label: 'Google',
     authorizeUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
     tokenUrl: 'https://oauth2.googleapis.com/token',
-    openId: { issuer: ['https://accounts.google.com', 'accounts.google.com'], jwksUrl: 'https://www.googleapis.com/oauth2/v3/certs', ...idTokenAlgorithms(opts) },
+    openId: { issuer: ['https://accounts.google.com', 'accounts.google.com'], jwksUrl: 'https://www.googleapis.com/oauth2/v3/certs', algorithms: opts.algorithms },
     scopes: opts.scopes ?? OPENID_SCOPES,
     ...opts.params === undefined ? {} : { authorizeParams: opts.params },
     parseTokens: parseStandardTokens,
@@ -182,7 +180,7 @@ export function microsoftProvider(opts: OpenIdOptions & { tenant?: string } = {}
     authorizeUrl: `${base}/oauth2/v2.0/authorize`,
     tokenUrl: `${base}/oauth2/v2.0/token`,
     // The issuer names the account's own tenant, so a multi-tenant app checks it against the token's `tid`.
-    openId: { issuer: claims => microsoftIssued(tenant, claims), jwksUrl: `${base}/discovery/v2.0/keys`, ...idTokenAlgorithms(opts) },
+    openId: { issuer: claims => microsoftIssued(tenant, claims), jwksUrl: `${base}/discovery/v2.0/keys`, algorithms: opts.algorithms },
     scopes: opts.scopes ?? OPENID_SCOPES,
     ...opts.params === undefined ? {} : { authorizeParams: opts.params },
     parseTokens: parseStandardTokens,
@@ -226,7 +224,7 @@ export function gitlabProvider(opts: OpenIdOptions & { url?: string } = {}): OAu
     authorizeUrl: `${base}/oauth/authorize`,
     tokenUrl: `${base}/oauth/token`,
     userUrl: `${base}/oauth/userinfo`,
-    openId: { issuer: base, jwksUrl: `${base}/oauth/discovery/keys`, ...idTokenAlgorithms(opts) },
+    openId: { issuer: base, jwksUrl: `${base}/oauth/discovery/keys`, algorithms: opts.algorithms },
     scopes: opts.scopes ?? OPENID_SCOPES,
     ...opts.params === undefined ? {} : { authorizeParams: opts.params },
     parseTokens: parseStandardTokens,

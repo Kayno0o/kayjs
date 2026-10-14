@@ -7,7 +7,7 @@ import { PROVIDER_TIMEOUT_MS } from './timeout'
 const CLOCK_TOLERANCE_S = 60
 
 // What an ID token may be signed with when the provider names no list: asymmetric algorithms only, so neither `none` nor a shared-secret one passes.
-const ID_TOKEN_ALGORITHMS = ['RS256', 'PS256', 'ES256', 'EdDSA']
+const ID_TOKEN_ALGORITHMS = ['RS256', 'RS384', 'RS512', 'PS256', 'PS384', 'PS512', 'ES256', 'ES384', 'ES512', 'EdDSA']
 
 interface AuthorizeUrlOptions {
   state?: string

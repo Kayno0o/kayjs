@@ -150,7 +150,7 @@ describe('any OpenID Connect provider', () => {
     }
   })
 
-  test('an ID token signed with an algorithm outside the allow-list, or none, signs nobody in', async () => {
+  test('an ID token signed with none, a shared secret or an algorithm outside the app's list signs nobody in', async () => {
     const rs384 = await generateKeyPair('RS384')
     const rs384Jwk = { ...await exportJWK(rs384.publicKey), kid: 'k1', use: 'sig' }
     const now = Math.floor(Date.now() / 1000)
@@ -173,11 +173,6 @@ describe('any OpenID Connect provider', () => {
         mock.key = hmac
         mock.jwks = [{ kty: 'oct', k: Buffer.from(hmac).toString('base64url'), kid: 'k1', alg: 'HS256' }]
       }],
-      ['an RSA algorithm the list leaves out', (mock) => {
-        mock.alg = 'RS384'
-        mock.key = rs384.privateKey
-        mock.jwks = [rs384Jwk]
-      }],
     ]
 
     for (const [name, forge] of cases) {
@@ -190,17 +185,19 @@ describe('any OpenID Connect provider', () => {
       expect(await store.users.findByEmail('ada@example.com')).toBeUndefined()
     }
 
-    // The same RS384 token is taken once the app lists the algorithm.
-    const mock = provider(ISSUER, ENDPOINTS, ACCOUNTS)
-    const { signIn } = setup('keycloak', oidcProvider({ issuer: ISSUER, algorithms: ['RS384'] }))
+    // An RS384 token is taken by default, and refused once the app narrows the list to RS256.
+    for (const [algorithms, landed] of [[undefined, '/'], [['RS384'], '/'], [['RS256'], '/login?error=oauth']] as const) {
+      const mock = provider(ISSUER, ENDPOINTS, ACCOUNTS)
+      const { signIn } = setup('keycloak', oidcProvider({ issuer: ISSUER, ...algorithms && { algorithms: [...algorithms] } }))
 
-    mock.alg = 'RS384'
-    mock.key = rs384.privateKey
-    mock.jwks = [rs384Jwk]
+      mock.alg = 'RS384'
+      mock.key = rs384.privateKey
+      mock.jwks = [rs384Jwk]
 
-    expect((await signIn(mock, 'ada')).landed).toBe('/')
+      expect([algorithms, (await signIn(mock, 'ada')).landed]).toEqual([algorithms, landed])
+    }
 
-    // And a list without RS256 refuses an RS256 token.
+    // A list without RS256 refuses an RS256 token.
     const strict = provider(ISSUER, ENDPOINTS, ACCOUNTS)
     const { signIn: strictSignIn } = setup('keycloak', oidcProvider({ issuer: ISSUER, algorithms: ['ES256'] }))
 
