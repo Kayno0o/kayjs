@@ -21,11 +21,47 @@ async function charts() {
 }
 
 describe('LineChart', () => {
-  test('draws each series in its colour, the next palette token for one without', async () => {
+  test('draws each series in its colour, the next palette token for one without, and in its own dash after the first', async () => {
     const root = await charts()
     const lines = [...root.querySelectorAll('#line .ct-line')].map(line => line.getAttribute('style'))
 
-    expect(lines).toEqual(['stroke: var(--kui-chart-1)', 'stroke: red'])
+    expect(lines).toEqual(['stroke: var(--kui-chart-1)', 'stroke: red; stroke-dasharray: 6 3'])
+  })
+
+  test('walks the points from the keyboard, announcing each one\'s readings, and picks a span with Shift then Enter', async () => {
+    const root = await charts()
+    const slider = root.querySelector<HTMLElement>('#line [role="slider"]')!
+    const press = async (key: string, shiftKey = false) => {
+      slider.dispatchEvent(new KeyboardEvent('keydown', { key, shiftKey, bubbles: true, cancelable: true }))
+      await settle()
+    }
+
+    expect(slider.getAttribute('aria-valuetext')).toBe('Wed: Visits 5 v, Sales 1 v')
+
+    await press('Home')
+    expect(slider.getAttribute('aria-valuenow')).toBe('0')
+    expect(slider.getAttribute('aria-valuetext')).toBe('Mon: Visits -, Sales 1 v')
+    expect(root.querySelector('.kui-line-chart-tooltip-label')?.textContent).toBe('Mon')
+
+    await press('ArrowRight', true)
+    await press('ArrowRight', true)
+    expect(slider.getAttribute('aria-valuetext')).toBe('Wed: Visits 5 v, Sales 1 v; Mon - Wed')
+
+    await press('Enter')
+    expect(ranges).toEqual([[0, 2]])
+
+    await press('ArrowLeft', true)
+    await press('Escape')
+    await press('Enter')
+    expect(ranges).toEqual([[0, 2]])
+    expect(slider.getAttribute('aria-valuetext')).toBe('Tue: Visits 3 v, Sales 2 v')
+  })
+
+  test('tells screen readers how to pick a span once the chart takes onRange', async () => {
+    const root = await charts()
+    const slider = root.querySelector('#line [role="slider"]')!
+
+    expect(document.getElementById(slider.getAttribute('aria-describedby')!)?.textContent).toBe('Shift with the arrow keys picks a span, Enter applies it, Escape drops it')
   })
 
   test('reads every series at the hovered point in its tooltip, a gap as a dash', async () => {

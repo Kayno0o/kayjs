@@ -3,7 +3,7 @@ import { monthStarts } from '../src/contribution'
 import { stepIndex } from '../src/cycle'
 import { isPlayable } from '../src/media'
 import { pickedShown, selectionSummary, toggledValue } from '../src/multi-select'
-import { axisExtent, axisPercent, dotSize } from '../src/plot'
+import { axisExtent, axisPercent, dashSample, dotSize, steppedPoint } from '../src/plot'
 import { rangeFrom } from '../src/range'
 
 const OPTIONS = [{ value: 'rpg', label: 'RPG' }, { value: 'fps', label: 'Shooter' }, { value: 'sim', label: 'Simulation' }]
@@ -29,6 +29,21 @@ describe('axes', () => {
     expect(dotSize(0, 4)).toBe(0.625)
     expect(dotSize(4, 4)).toBe(1.75)
     expect(dotSize(1, 4)).toBeCloseTo(0.625 + 1.125 / 2)
+  })
+
+  test('samples a dashed line as a repeating gradient, a solid one as a plain colour', () => {
+    expect(dashSample('red', '')).toBe('background-color: red')
+    expect(dashSample('red', '10 3 2 3')).toBe('background-image: repeating-linear-gradient(90deg, red 0px 10px, transparent 10px 13px, red 13px 15px, transparent 15px 18px)')
+  })
+
+  test('steps a point along the line by key, clamped to its ends, and ignores other keys', () => {
+    expect(steppedPoint('ArrowRight', 1, 3)).toBe(2)
+    expect(steppedPoint('ArrowRight', 2, 3)).toBe(2)
+    expect(steppedPoint('ArrowDown', 0, 3)).toBe(0)
+    expect(steppedPoint('Home', 2, 3)).toBe(0)
+    expect(steppedPoint('End', 0, 3)).toBe(2)
+    expect(steppedPoint('End', 0, 0)).toBe(0)
+    expect(steppedPoint('a', 1, 3)).toBeUndefined()
   })
 })
 

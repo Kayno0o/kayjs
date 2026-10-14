@@ -76,3 +76,34 @@ export interface ChartSeries {
   // Any CSS colour; a series without one takes the next `--color-kui-chart-*` token.
   color?: string
 }
+
+// The dash each series of a LineChart draws with, by its place in the list, so lines stay apart without their colours: solid, then patterns in px of a 2px stroke.
+export const SERIES_DASHES = ['', '6 3', '2 3', '10 3 2 3', '1 4', '6 2 1 2'] as const
+
+// A horizontal sample of a dashed line as a CSS background, for the legend to show each series as its line draws.
+export function dashSample(color: string, dash: string): string {
+  const lengths = dash.split(' ').filter(Boolean).map(Number)
+
+  if (lengths.length === 0)
+    return `background-color: ${color}`
+
+  let at = 0
+  const stops = lengths.map((length, index) => {
+    const stop = `${index % 2 === 0 ? color : 'transparent'} ${at}px ${at + length}px`
+
+    at += length
+
+    return stop
+  })
+
+  return `background-image: repeating-linear-gradient(90deg, ${stops.join(', ')})`
+}
+
+const KEY_STEPS: Record<string, number> = { ArrowLeft: -1, ArrowDown: -1, ArrowRight: 1, ArrowUp: 1, Home: -Infinity, End: Infinity }
+
+// Where a key moves a point along a line of `count` points from `index`: the arrows step one, Home and End reach either end; undefined for any other key.
+export function steppedPoint(key: string, index: number, count: number): number | undefined {
+  const step = KEY_STEPS[key]
+
+  return step === undefined ? undefined : Math.min(Math.max(0, count - 1), Math.max(0, index + step))
+}

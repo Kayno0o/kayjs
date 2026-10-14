@@ -3,18 +3,19 @@ import type { Axis, ChartRect, LineChartOptions } from 'chartist'
 import type { JSX } from 'kay'
 import type { ChartSeries } from './plot'
 import { LineChart } from 'chartist'
-import { effect, memo, onCleanup, onMount, signal } from 'kay'
+import { effect, memo, onCleanup, onMount, signal, uid } from 'kay'
 import { chartData, indexAt, labelTimes, positionOf, xAxisOptions } from './chart-axis'
+import { dashSample, SERIES_DASHES, steppedPoint } from './plot'
 
 const PALETTE = ['var(--kui-chart-1)', 'var(--kui-chart-2)', 'var(--kui-chart-3)', 'var(--kui-chart-4)', 'var(--kui-chart-5)', 'var(--kui-chart-6)']
 
 // Which attribute of each drawn part takes its series' colour.
 const PAINT: Record<string, string> = { line: 'stroke', point: 'stroke', area: 'fill' }
 
-const { labels, series, formatValue = (value: number) => value.toLocaleString(), xLabels = false, legend, options, onRange, label, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role'> & {
+const { labels, series, formatValue = (value: number) => value.toLocaleString(), xLabels = false, legend, options, onRange, rangeHint = 'Shift with the arrow keys picks a span, Enter applies it, Escape drops it', label, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role'> & {
   labels: string[]
   series: ChartSeries[]
-  // Formats the y-axis labels and the tooltip's values.
+  // Formats the y-axis labels, the tooltip's values and the readings screen readers hear.
   formatValue?: ((value: number) => string) | undefined
   // Draws the x-axis labels: up to five, spaced by time when every label is a date.
   xLabels?: boolean | undefined
@@ -22,15 +23,19 @@ const { labels, series, formatValue = (value: number) => value.toLocaleString(),
   legend?: boolean | undefined
   // Merged over the defaults, for what the props do not cover.
   options?: LineChartOptions | undefined
-  // Lets a drag across the plot pick a span, handed over as the indices of its first and last points, such as to zoom in on it.
+  // Lets a drag across the plot, or Shift with the arrow keys then Enter, pick a span, handed over as the indices of its first and last points, such as to zoom in on it.
   onRange?: ((from: number, to: number) => unknown) | undefined
-  // Describes the chart for screen readers, which cannot read the drawing.
+  // Tells screen readers how to pick a span from the keyboard, once the chart takes `onRange`.
+  rangeHint?: string | undefined
+  // Names the chart for screen readers, which read its values from a table they alone see.
   label: string
   class?: string | undefined
 }>()
 
+const id = uid()
 const times = memo(() => labelTimes(labels))
 const colors = memo(() => series.map((item, index) => item.color ?? PALETTE[index % PALETTE.length]!))
+const dashes = memo(() => series.map((_, index) => SERIES_DASHES[index % SERIES_DASHES.length]!))
 
 const settings = (): LineChartOptions => {
   const padding = typeof options?.chartPadding === 'object' ? options.chartPadding : {}
@@ -49,7 +54,7 @@ const settings = (): LineChartOptions => {
 // Where chartist last drew the plot, which the hover cursor and dots are placed against.
 const plot = signal<{ rect: ChartRect, axisY: Axis } | null>(null)
 const hovered = signal<{ index: number, clientX: number, clientY: number } | null>(null)
-// The points a drag under way started and stands at.
+// The points a drag or a keyboard pick under way started and stands at.
 const dragged = signal<{ from: number, to: number } | null>(null)
 let canvas: HTMLDivElement | undefined
 
@@ -69,11 +74,29 @@ const dot = (index: number) => {
   return drawn && typeof value === 'number' ? `left: ${cursor()}px; top: ${drawn.rect.y1 - drawn.axisY.projectValue(value)}px; background-color: ${colors()[index]}` : undefined
 }
 
-const reading = (index: number) => {
-  const at = hovered()
-  const value = at ? series[index]!.values[at.index] : undefined
+const valueText = (item: ChartSeries, index: number) => {
+  const value = item.values[index]
 
   return typeof value === 'number' ? formatValue(value) : '-'
+}
+
+const reading = (index: number) => {
+  const at = hovered()
+
+  return at ? valueText(series[index]!, at.index) : '-'
+}
+
+// The point the keyboard stands at, the latest one before it moved.
+const current = () => hovered()?.index ?? Math.max(0, labels.length - 1)
+
+// What screen readers announce as the keyboard moves: the point's label, each series' reading, then the span being picked.
+const announced = () => {
+  const index = current()
+  const span = dragged()
+  const readings = series.map(item => `${item.name} ${valueText(item, index)}`).join(', ')
+  const picked = span && span.from !== span.to ? `; ${labels[Math.min(span.from, span.to)]} - ${labels[Math.max(span.from, span.to)]}` : ''
+
+  return `${labels[index] ?? ''}: ${readings}${picked}`
 }
 
 // Drawn in the browser alone: chartist measures the box it draws into.
@@ -83,12 +106,16 @@ onMount(() => {
   chart.on('created', (event) => {
     plot.set({ rect: event.chartRect, axisY: event.axisY })
   })
-  // Colours go on each drawn part, so any number of series takes any colour with no stylesheet per chart.
+  // Colours and dashes go on each drawn part, so any number of series takes any colour with no stylesheet per chart.
   chart.on('draw', (event) => {
     const paint = PAINT[event.type]
 
-    if (paint && 'seriesIndex' in event)
-      event.element.attr({ style: `${paint}: ${colors()[event.seriesIndex]}` })
+    if (!paint || !('seriesIndex' in event))
+      return
+
+    const dash = event.type === 'line' ? dashes()[event.seriesIndex] : ''
+
+    event.element.attr({ style: `${paint}: ${colors()[event.seriesIndex]}${dash ? `; stroke-dasharray: ${dash}` : ''}` })
   })
 
   effect(() => {
@@ -149,7 +176,7 @@ function pointerDown(event: PointerEvent) {
   dragged.set({ from: index, to: index })
 }
 
-function pointerUp() {
+function finishSpan() {
   const span = dragged()
 
   dragged.set(null)
@@ -157,10 +184,54 @@ function pointerUp() {
   if (span && span.from !== span.to)
     void onRange?.(Math.min(span.from, span.to), Math.max(span.from, span.to))
 }
+
+// Shows the cursor, dots and tooltip at a point the keyboard reached, the tooltip over the plot's top at that point.
+function show(index: number, overlay: HTMLElement) {
+  const drawn = plot()
+  const box = overlay.getBoundingClientRect()
+  const x = drawn ? drawn.rect.x1 + positionOf(index, labels.length, times()) * drawn.rect.width() : 0
+
+  hovered.set({ index, clientX: box.left + x, clientY: box.top + (drawn?.rect.y2 ?? 0) })
+}
+
+function keyDown(event: KeyboardEvent) {
+  if (event.key === 'Escape' && dragged()) {
+    event.preventDefault()
+    dragged.set(null)
+
+    return
+  }
+
+  if (event.key === 'Enter' && dragged()) {
+    event.preventDefault()
+    finishSpan()
+
+    return
+  }
+
+  const index = steppedPoint(event.key, current(), labels.length)
+
+  if (index === undefined || labels.length === 0)
+    return
+
+  event.preventDefault()
+  dragged.set(event.shiftKey && onRange ? { from: dragged()?.from ?? current(), to: index } : null)
+  show(index, event.currentTarget as HTMLElement)
+}
+
+function focused(event: FocusEvent) {
+  if (!hovered() && labels.length > 0)
+    show(current(), event.currentTarget as HTMLElement)
+}
+
+function blurred() {
+  hovered.set(null)
+  dragged.set(null)
+}
 ---
-.kui-line-chart({...rest} role="img" aria-label={label} class={className})
+.kui-line-chart({...rest} role="figure" aria-label={label} class={className})
   .kui-line-chart-frame
-    .kui-line-chart-plot(ref={element => canvas = element})
+    .kui-line-chart-plot(ref={element => canvas = element} aria-hidden="true")
     if cursor() !== null
       .kui-line-chart-cursor(style={`left: ${cursor()}px; top: ${plot()!.rect.y2}px; height: ${plot()!.rect.height()}px`})
       for item, index of series key={item.name}
@@ -168,18 +239,33 @@ function pointerUp() {
           .kui-line-chart-dot(style={dot(index)})
     if band() !== null
       .kui-line-chart-band(style={band()})
-    .kui-line-chart-overlay(role="presentation" data-range={onRange ? '' : undefined} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={() => dragged.set(null)} onPointerLeave={() => hovered.set(null)})
+    .kui-line-chart-overlay(role="slider" tabindex={labels.length > 0 ? '0' : '-1'} aria-label={label} aria-valuemin="0" aria-valuemax={Math.max(0, labels.length - 1)} aria-valuenow={current()} aria-valuetext={announced()} aria-describedby={onRange ? `${id}-hint` : undefined} data-range={onRange ? '' : undefined} onKeyDown={keyDown} onFocus={focused} onBlur={blurred} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={finishSpan} onPointerCancel={() => dragged.set(null)} onPointerLeave={() => hovered.set(null)})
   if hovered()
-    .kui-line-chart-tooltip(style={`left: ${hovered()!.clientX}px; top: ${hovered()!.clientY}px`})
+    .kui-line-chart-tooltip(style={`left: ${hovered()!.clientX}px; top: ${hovered()!.clientY}px`} aria-hidden="true")
       .kui-line-chart-tooltip-label {labels[hovered()!.index]}
       for item, index of series key={item.name}
         .kui-line-chart-tooltip-row
           span.kui-line-chart-swatch(style={`background-color: ${colors()[index]}`})
           span.kui-line-chart-tooltip-name {item.name}
           span.kui-line-chart-tooltip-value {reading(index)}
+  table.kui-line-chart-data
+    caption {label}
+    thead
+      tr
+        td
+        for item of series key={item.name}
+          th(scope="col") {item.name}
+    tbody
+      for name, index of labels key={index}
+        tr
+          th(scope="row") {name}
+          for item of series key={item.name}
+            td {valueText(item, index)}
+  if onRange
+    span.kui-line-chart-hint(id={`${id}-hint`}) {rangeHint}
   if legend ?? series.length > 1
     ul.kui-line-chart-legend
       for item, index of series key={item.name}
         li.kui-line-chart-legend-item
-          span.kui-line-chart-swatch(style={`background-color: ${colors()[index]}`})
+          span.kui-line-chart-key(style={dashSample(colors()[index]!, dashes()[index]!)})
           | {item.name}
