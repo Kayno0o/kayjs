@@ -30,7 +30,7 @@ import { slashedPath } from '../server/routes'
 import { linkStoredFiles } from '../server/storage'
 import { buildClient } from './client'
 import { compileServer } from './compile'
-import { iconSetPackages, iconSetWarnings, NOTICES_FILE, packagesOf, thirdPartyNotices } from './licenses'
+import { codecWarnings, iconSetPackages, iconSetWarnings, NOTICES_FILE, packagesOf, thirdPartyNotices } from './licenses'
 import { writeSearchIndex } from './search'
 import { exportStatic, refuseStaticConfig } from './static'
 
@@ -268,7 +268,7 @@ async function outputStage(project: Project, exported: boolean, client: ClientBu
   if (favicon !== undefined)
     await writeFavicons(favicon, join(client.dir, '..', FAVICON_DIR), checking ? () => undefined : undefined)
 
-  for (const warning of iconSetWarnings(root))
+  for (const warning of [...iconSetWarnings(root), ...codecWarnings(root)])
     console.warn(warning)
 
   await Bun.write(join(client.dir, NOTICES_FILE), thirdPartyNotices(shippedPackages(project, client)))

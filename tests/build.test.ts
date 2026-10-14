@@ -14,7 +14,7 @@ import { ASSET_FILE, clientDir, outputDir, writeAsset } from '../src/build/asset
 import { buildClient } from '../src/build/client'
 import { writeIfChanged } from '../src/build/files'
 import { reachesAny } from '../src/build/libraries'
-import { thirdPartyNotices, unknownCodecVersions } from '../src/build/licenses'
+import { codecWarnings, thirdPartyNotices, unknownCodecVersions } from '../src/build/licenses'
 import { formatSizeReport } from '../src/build/report'
 import { anchorModule } from '../src/build/runtime-chunk'
 import { runtimeConfig, withoutPlugins } from '../src/build/runtime-config'
@@ -1514,6 +1514,8 @@ describe('codec licences', () => {
     expect(notices).toContain('Alliance for Open Media Patent License 1.0')
     expect(notices).toContain('Copyright (c) 2010, Google Inc.')
     expect(notices).toContain('Additional IP Rights Grant (Patents)')
+    expect(notices).toContain('Emscripten is available under 2 licenses')
+    expect(notices).toContain('musl as a whole is licensed under the following standard MIT license')
   })
 
   it('knows the installed version of every package it holds codec licences for', () => {
@@ -1531,6 +1533,34 @@ describe('codec licences', () => {
     }
     finally {
       await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('names only files that exist in LICENSES', async () => {
+    const source = await Bun.file(join(import.meta.dir, '../src/build/licenses.ts')).text()
+    const files = [...source.matchAll(/files: \[([^\]]*)\]/g)].flatMap(([, list]) => [...list!.matchAll(/'([^']+)'/g)].map(([, file]) => file!))
+
+    expect(files.length).toBeGreaterThan(0)
+
+    for (const file of files)
+      expect(existsSync(join(import.meta.dir, '../LICENSES', file))).toBe(true)
+  })
+
+  it('warns of an installed version it holds no texts for, and of none otherwise', async () => {
+    const root = await scratchDir('avif-warn-')
+
+    try {
+      await Bun.write(join(root, 'package.json'), JSON.stringify({ name: 'app', dependencies: { '@jsquash/avif': '*' } }))
+      await Bun.write(join(root, 'node_modules/@jsquash/avif/package.json'), JSON.stringify({ name: '@jsquash/avif', version: '2.1.2' }))
+
+      expect(codecWarnings(root)).toEqual([expect.stringContaining('@jsquash/avif@2.1.2 is a version kay holds no codec licence texts for')])
+
+      await Bun.write(join(root, 'node_modules/@jsquash/avif/package.json'), JSON.stringify({ name: '@jsquash/avif', version: '2.1.1' }))
+
+      expect(codecWarnings(root)).toEqual([])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
     }
   })
 })

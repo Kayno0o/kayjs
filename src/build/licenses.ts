@@ -13,14 +13,16 @@ const LICENSES_DIR = 'LICENSES'
 const RULE = '='.repeat(80)
 
 // What a package's wasm compiles in, whose licences its own files do not carry: keyed by package and exact version, as a bump may change the codecs, and a test fails when the installed version leaves the map.
-// @jsquash/avif 2.1.1: packages/avif/codec/Makefile of github.com/jamsinclair/jSquash builds libavif v1.0.1 with libaom v3.7.0 (encoder and decoder) and, in the encoder, libsharpyuv from the libwebp commit e2c85878f6a33f29948b43d3492d9cdaf801aa54; the wasm files hold the string "AOMedia Project AV1 Encoder v3.7.0" and "Decoder v3.7.0".
-// The texts are those of each repository at that tag or commit. The Emscripten runtime and libc in the wasm are not covered.
+// @jsquash/avif 2.1.1: packages/avif/codec/Makefile of jSquash (https://github.com/jamsinclair/jSquash/blob/da47a2be3b302beb5a5ae164a2ab7aa21a041d90/packages/avif/codec/Makefile, read at its main, as it has no tags) builds libavif v1.0.1 with libaom v3.7.0 (encoder and decoder) and, in the encoder, libsharpyuv from the libwebp commit e2c85878f6a33f29948b43d3492d9cdaf801aa54; the wasm files hold the string "AOMedia Project AV1 Encoder v3.7.0" and "Decoder v3.7.0".
+// The texts are those of each repository at that tag or commit. Emscripten 3.1.57 (the build script's EMSDK_VERSION) generates the glue and links musl into the wasm; their texts are those of that tag. compiler-rt is left out: its LLVM exception frees code embedded in object form from the attribution conditions.
 const BUNDLED_LICENCES: Record<string, Record<string, { codec: string, files: string[] }[]>> = {
   '@jsquash/avif': {
     '2.1.1': [
       { codec: 'libavif 1.0.1 (BSD-2-Clause), https://github.com/AOMediaCodec/libavif/blob/v1.0.1/LICENSE', files: ['libavif.txt'] },
       { codec: 'libaom 3.7.0 (BSD-2-Clause and the AOMedia Patent License 1.0), https://aomedia.googlesource.com/aom/+/refs/tags/v3.7.0', files: ['libaom.txt', 'libaom-PATENTS.txt'] },
       { codec: 'libsharpyuv from libwebp e2c85878f6a33f29948b43d3492d9cdaf801aa54 (BSD-3-Clause), https://chromium.googlesource.com/webm/libwebp/+/e2c85878f6a33f29948b43d3492d9cdaf801aa54', files: ['libwebp.txt', 'libwebp-PATENTS.txt'] },
+      { codec: 'Emscripten 3.1.57 (MIT and NCSA), the glue and runtime, https://github.com/emscripten-core/emscripten/blob/3.1.57/LICENSE', files: ['emscripten.txt'] },
+      { codec: 'musl, linked in by Emscripten 3.1.57 (MIT), https://github.com/emscripten-core/emscripten/blob/3.1.57/system/lib/libc/musl/COPYRIGHT', files: ['musl.txt'] },
     ],
   },
 }
@@ -164,6 +166,11 @@ export function unknownCodecVersions(dirs: Iterable<string>): string[] {
 
     return name !== undefined && name in BUNDLED_LICENCES && (version === undefined || BUNDLED_LICENCES[name]![version] === undefined) ? [`${name}@${version}`] : []
   })
+}
+
+// One line per installed package whose codecs kay holds no licence texts for, so its notices would lack them.
+export function codecWarnings(root: string): string[] {
+  return unknownCodecVersions(installedDependencies(root)).map(spec => `kay: ${spec} is a version kay holds no codec licence texts for, so ${NOTICES_FILE} lacks the licences of the codecs its wasm compiles in`)
 }
 
 function bundledTexts(name: string, version: string | undefined): string[] {
