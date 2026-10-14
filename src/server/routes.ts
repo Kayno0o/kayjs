@@ -101,6 +101,8 @@ const PARAM_NAME = /:[^/]+/g
 const TRAILING_SLASH = /\/$/
 const EDGE_SLASHES = /^\/+|\/+$/g
 const LEADING_SLASHES = /^\/+/
+// What a decoded segment must escape before the URL parser reads it as one segment: the rest it encodes itself where a browser would.
+const SEGMENT_ESCAPES = /[%/\\?#]/g
 
 // The route a file under the routes directory serves; files starting with `_` (layouts, partials) serve none.
 export function routeOf(routesDir: string, file: string, prefix = ''): Omit<Route, 'layouts' | 'special' | 'guards'> | undefined {
@@ -591,11 +593,12 @@ export function canonicalPath(pathname: string): string {
   return pathname.split('/').map(segment => encodeURIComponent(decodePath(segment) ?? segment)).join('/')
 }
 
-// The URL a guard reads, spelled one way whichever way the request spelled it: `/%61dmin` and `//admin` both read as `/admin`, as the params and the router do.
+// The URL a guard reads, each segment decoded then spelled as `new URL` spells it, so `/%61dmin` and `//admin` read as `/admin`, as the params and the router do, while `/@admin` stays as a browser sends it.
+// A segment holding a malformed escape stays as sent.
 export function guardUrl(url: string | URL): URL {
   const guarded = new URL(url)
 
-  guarded.pathname = canonicalPath(guarded.pathname.replace(LEADING_SLASHES, '/'))
+  guarded.pathname = guarded.pathname.replace(LEADING_SLASHES, '/').split('/').map(segment => decodePath(segment)?.replace(SEGMENT_ESCAPES, escaped => encodeURIComponent(escaped)) ?? segment).join('/')
 
   return guarded
 }

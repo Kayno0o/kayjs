@@ -93,9 +93,9 @@ export default guard(({ locals, redirect, deny }) => {
 
 A guard reads the params of the page asked for in `ctx.params`, as `src/routes/orgs/[org]/_guard.ts` reads `params.org`. An action under it gets the params of the page it was posted from, in its guards and in its own `ctx.params` alike, and is refused when posted from no page of its route, before the guard runs, so the guard is never skipped. Its guards read that page as `ctx.url` too, as a visit to it would, never the action's own URL, so a guard testing `url.pathname.startsWith('/admin')` covers the actions of the pages under `/admin`. A layout's action is posted from whichever of its pages the caller names, so a path guard covers it only when all its pages sit under that path. The guard checked the visitor against those params, not against the action's input, so the action scopes what it touches by `ctx.params`. Checks on one record still belong in the load and in the action.
 
-A guard reads `ctx.url` spelled one way, each segment decoded then encoded and leading slashes collapsed, so `/%61dmin/x` and `//admin/x` both read as `/admin/x` and a path check holds however the URL was written.
+A guard reads `ctx.url` spelled one way, each segment decoded then written as `new URL` writes it and leading slashes collapsed, so `/%61dmin/x` and `//admin/x` both read as `/admin/x`, `/@admin` stays `/@admin`, and a path check holds however the URL was written.
 
-Input an action or an API route refuses meets its guards first: a caller they refuse gets their redirect or denial, never the field errors or the values sent back. Only what the app derives is in `ctx.locals` there, as `resolve` runs after the schema, so a guard reads the user from what the app derives, such as the session `session()` derives.
+Input an action or an API route refuses meets its guards first: a caller they refuse gets their redirect or denial, never the field errors or the values sent back. Only what the app derives is in `ctx.locals` there, as `resolve` runs after the schema, so a guard reads the user from what the app derives, such as the session `session()` derives. A guard throwing there answers 500, as it does on valid input.
 
 </Callout>
 

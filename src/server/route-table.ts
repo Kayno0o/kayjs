@@ -128,12 +128,12 @@ export function refuseClashes(routesDir: string, routes: Route[], served = new S
 
 // Reads a path as the router would for one route, under every locale's pattern, to give an action the params of the page it was posted from.
 export function routeMatch(table: RouteTable, matchers: Map<string, Matcher>, trailingSlash: TrailingSlash = 'never'): RouteMatch {
+  // A path the router serves wins over one it sends on, which a bare catch-all under `prefixDefault` would also match.
+  const tried = new Map([...table.shapes].map(([route, shapes]) => [route, [...shapes.filter(shape => !table.sentOn.has(shape)), ...shapes.filter(shape => table.sentOn.has(shape))]]))
+
   return {
     posted: (route, path) => {
-      const shapes = table.shapes.get(route) ?? []
-
-      // A path the router serves wins over one it sends on, which a bare catch-all under `prefixDefault` would also match.
-      for (const shape of [...shapes.filter(shape => !table.sentOn.has(shape)), ...shapes.filter(shape => table.sentOn.has(shape))]) {
+      for (const shape of tried.get(route) ?? []) {
         const params = shapeParams(shape, route, path, matchers)
 
         if (params)

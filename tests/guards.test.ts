@@ -147,13 +147,18 @@ describe('input a guarded route\'s schema refuses', () => {
       Bun.write(join(dir, 'routes/admin/_guard.ts'), ADMINS),
       Bun.write(join(dir, 'routes/admin/index.kay'), NAMED),
       Bun.write(join(dir, 'routes/broken/_guard.ts'), BROKEN),
+      Bun.write(join(dir, 'routes/admin/upload.kay'), '--- server\nimport { t } from \'elysia\'\nimport { action } from \'kay\'\n\nexport const upload = action(t.Object({ file: t.File({ type: \'image/png\' }) }), () => \'ok\')\n---\nh1 Upload\n'),
+      Bun.write(join(dir, 'routes/where/_guard.ts'), 'import { guard } from \'kay\'\n\nexport default guard(({ url, headers }) => {\n  headers.set(\'x-url\', url.pathname)\n})\n'),
+      Bun.write(join(dir, 'routes/where/[id].json.ts'), 'export function GET() {\n  return \'here\'\n}\n'),
+      Bun.write(join(dir, 'api/where/_guard.ts'), 'import { guard } from \'kay\'\n\nexport default guard(({ url, headers }) => {\n  headers.set(\'x-url\', url.pathname)\n})\n'),
+      Bun.write(join(dir, 'api/where/index.ts'), 'import { api } from \'kay/server\'\n\nexport default api().get(\'/:id\', ({ params }) => params.id)\n'),
       Bun.write(join(dir, 'routes/broken/index.kay'), NAMED),
       Bun.write(join(dir, 'api/owned/_guard.ts'), ADMINS),
       Bun.write(join(dir, 'api/owned/index.ts'), 'import { t } from \'elysia\'\nimport { api } from \'kay/server\'\n\nexport default api().onError(({ code }) => code === \'VALIDATION\' ? new Response(\'own\', { status: 400 }) : undefined).post(\'/\', ({ body }) => body.name, { body: t.Object({ name: t.String({ maxLength: 3 }) }) })\n'),
       Bun.write(join(dir, 'api/counted/_guard.ts'), 'import { guard } from \'kay\'\n\nexport default guard(({ headers }) => {\n  const runs = (globalThis as { guardRuns?: number }).guardRuns = ((globalThis as { guardRuns?: number }).guardRuns ?? 0) + 1\n\n  headers.set(\'x-runs\', String(runs))\n})\n'),
       Bun.write(join(dir, 'api/counted/index.ts'), 'import { t } from \'elysia\'\nimport { api } from \'kay/server\'\n\nexport default api().get(\'/\', () => \'text\' as unknown as number, { response: t.Number() })\n'),
       Bun.write(join(dir, 'api/admin/_guard.ts'), ADMINS),
-      Bun.write(join(dir, 'api/admin/index.ts'), 'import { t } from \'elysia\'\nimport { api } from \'kay/server\'\n\nexport default api().post(\'/\', ({ body }) => body.name, { body: t.Object({ name: t.String({ maxLength: 3 }) }) })\n'),
+      Bun.write(join(dir, 'api/admin/index.ts'), 'import { t } from \'elysia\'\nimport { api } from \'kay/server\'\n\nexport default api().post(\'/\', ({ body }) => body.name, { body: t.Object({ name: t.String({ maxLength: 3 }) }) }).post(\'/upload\', () => \'ok\', { body: t.Object({ file: t.File({ type: \'image/png\' }) }) })\n'),
     ])
     app = await pages({ routes: join(dir, 'routes'), api: join(dir, 'api'), prebuilt: false })
   })
@@ -184,12 +189,41 @@ describe('input a guarded route\'s schema refuses', () => {
     const before = (globalThis as { guardRuns?: number }).guardRuns ?? 0
     const counted = await app.handle(new Request('http://localhost/api/counted'))
 
-    expect(counted.status).not.toBe(200)
+    expect(counted.status).toBe(422)
     expect((globalThis as { guardRuns?: number }).guardRuns).toBe(before + 1)
   })
 
-  it('gives the field errors when a guard throws for want of a value set up after the schema', async () => {
-    expect((await act('broken')).status).toBe(422)
+  it('answers a file of the wrong type with the guards\' refusal first, on an action and an API route', async () => {
+    const upload = async (path: string, headers: Record<string, string> = {}) => {
+      const form = new FormData()
+
+      form.set('file', new File(['not a png'], 'photo.png', { type: 'text/plain' }))
+
+      return (await app.handle(new Request(`http://localhost${path}`, { method: 'POST', headers: { referer: 'http://localhost/admin/upload', ...headers }, body: form }))).status
+    }
+    const action = `/_kay/action/${relative(process.cwd(), join(dir, 'routes'))}/admin/upload.kay/upload`
+
+    expect(await upload(action)).toBe(403)
+    expect(await upload(action, { 'x-admin': '1' })).toBe(422)
+    expect(await upload('/api/admin/upload')).toBe(403)
+    expect(await upload('/api/admin/upload', { 'x-admin': '1' })).toBe(422)
+  })
+
+  it('gives an API route\'s and an endpoint\'s guards the url spelled as a browser sends it, each segment decoded', async () => {
+    const seen = async (path: string) => (await app.handle(new Request(`http://localhost${path}`))).headers.get('x-url')
+
+    expect(await seen('/api/where/@me')).toBe('/api/where/@me')
+    expect(await seen('/api/where/a%2Fb')).toBe('/api/where/a%2Fb')
+    expect(await seen('/api/where/%61+b:c')).toBe('/api/where/a+b:c')
+    expect(await seen('/where/@me.json')).toBe('/where/@me.json')
+    expect(await seen('/where/a%2Fb.json')).toBe('/where/a%2Fb.json')
+  })
+
+  it('answers 500 when a guard throws on refused input, as on valid input, never with the field errors', async () => {
+    const thrown = await act('broken')
+
+    expect(thrown.status).toBe(500)
+    expect(thrown.body).not.toContain('secret-value')
   })
 })
 

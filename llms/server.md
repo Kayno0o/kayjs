@@ -265,7 +265,8 @@ export default defineConfig({ requireGuards: true })
 - A `_guard.ts` in a routes directory runs before every page and every action in that directory and below, outermost first.
 - It lets the request through unless it redirects or denies.
 - Its `ctx` has `request`, `url`, `locale`, `params`, `cookies`, `locals`, `headers`, `redirect` and `deny`; cookies and headers it sets reach the response either way.
-- Its `url` is spelled one way whatever the request sent: each segment decoded then encoded, leading slashes collapsed, so `/%61dmin/x` and `//admin/x` read as `/admin/x`, as `ctx.params` reads them; the page itself keeps the URL as sent.
+- Its `url` is spelled one way whatever the request sent: each segment decoded, then written as `new URL` writes it, leading slashes collapsed, so `/%61dmin/x` and `//admin/x` read as `/admin/x`, as `ctx.params` reads them, while `/@admin` stays `/@admin`; a segment with a malformed escape stays as sent, and so does the page's own URL.
+- A page or an action has its trailing slash as `trailingSlash` writes it; an API route, an endpoint or an image keeps the one sent.
 - `ctx.params` holds the params of the page asked for, each matcher's value in place of its text: `src/routes/orgs/[org]/_guard.ts` reads `params.org`.
 - They are typed `Readonly<Record<string, unknown>>`, since a guard covers every route below it.
 - For an action they are those of the page it was posted from, which the action reads in its own `ctx.params` (see actions).
@@ -275,8 +276,9 @@ export default defineConfig({ requireGuards: true })
 - For a module under `src/api/`, they are those of the route the request matched, as its handler reads them.
 - Checks on one record still belong in the load and the action.
 - An action's guards run once its input is valid, when the app's `resolve` values are there.
-- Input the schema refuses meets the guards first, so a caller they refuse gets their redirect or denial, never the field errors or the values sent back; a caller they let through gets the field errors, without reaching the handler.
-- On that path only what the app derives is in `ctx.locals`, `resolve` running after the schema: a guard reading a user the app resolves refuses a signed-in caller there, so read the user from what the app derives, such as the session `session()` derives. A guard throwing there leaves the field errors.
+- A cross-site post, a refusal of the action's protection (`rateLimit`, `honeypot`, `minTime`, `proofOfWork`), a body over `bodyLimit`, one that does not parse, and an action posted from no page of its file answer before any guard runs.
+- Input the schema refuses, or a file of the wrong type, meets the guards first, so a caller they refuse gets their redirect or denial, never the field errors or the values sent back; a caller they let through gets the field errors, without reaching the handler.
+- On that path only what the app derives is in `ctx.locals`, `resolve` running after the schema: a guard reading a user the app resolves refuses a signed-in caller there, so read the user from what the app derives, such as the session `session()` derives. A guard throwing there answers 500 and is reported, as on valid input, never with the field errors.
 - A refused form post gets the redirect, or the denial as plain text.
 - A denied page renders the nearest `_error.kay` outside the guard's directory, inside the layouts outside it, so nothing the guard protects renders.
 - A layout's `ctx.redirect` is no guard: actions never run layout loads.
