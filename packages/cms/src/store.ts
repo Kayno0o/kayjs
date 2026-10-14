@@ -1,7 +1,8 @@
-import type { Commit } from './files'
+import type { Commit, Identity } from './files'
 import type { CollectionInfo, DraftEntry, EntryRef, Issue, SourceEntry } from './kay/contract'
-import { collectionInfo, entries, entryFile, entrySource, removeEntry, saveEntry as saveLoaded } from './kay/content'
+import { collectionInfo, entries, entryFile, entrySource, removeEntry, renderMarkdown, saveEntry as saveLoaded } from './kay/content'
 import { settings } from './settings'
+import { scriptIn } from './unsafe'
 
 export type SaveOutcome = { issues: Issue[] } | { saved: true, commit?: Commit | undefined }
 
@@ -29,8 +30,12 @@ function refused(ref: EntryRef, message: string, key?: Issue['key']): SaveOutcom
 }
 
 // Saves an entry where its collection keeps it: a loaded one through its loader, a folder one as a file through the configured saver.
-export async function saveEntry(entry: DraftEntry, { create = false, verb }: { create?: boolean | undefined, verb?: string | undefined } = {}): Promise<SaveOutcome> {
+export async function saveEntry(entry: DraftEntry, { create = false, verb, author, bodyKept = false }: { create?: boolean | undefined, verb?: string | undefined, author?: Identity | undefined, bodyKept?: boolean | undefined } = {}): Promise<SaveOutcome> {
   const collection = await collectionNamed(entry.collection)
+  const script = entry.body === undefined || bodyKept || settings().rawHtml.has(collection.name) ? undefined : scriptIn((await renderMarkdown(entry.body)).html)
+
+  if (script !== undefined)
+    return { issues: [{ collection: entry.collection, slug: entry.slug, locale: entry.locale, path: '', body: true, message: `The text holds ${script}, which would run as the site: write it as Markdown, or list ${collection.name} in cms({ rawHtml })` }] }
 
   if (collection.kind === 'loaded') {
     const { issues } = await saveLoaded(collection.name, { slug: entry.slug, locale: entry.locale, data: entry.data, body: entry.body }, { create })
@@ -48,12 +53,13 @@ export async function saveEntry(entry: DraftEntry, { create = false, verb }: { c
     absolute: source.file.absolute,
     text: source.file.text,
     message: `content(${collection.name}): ${verb ?? (create ? 'add' : 'update')} ${entry.slug}`,
+    author,
   })
 
   return { saved: true, commit }
 }
 
-export async function deleteEntry(ref: EntryRef): Promise<SaveOutcome> {
+export async function deleteEntry(ref: EntryRef, author?: Identity): Promise<SaveOutcome> {
   const collection = await collectionNamed(ref.collection)
 
   if (collection.kind === 'loaded') {
@@ -71,13 +77,13 @@ export async function deleteEntry(ref: EntryRef): Promise<SaveOutcome> {
   if ('issues' in found)
     return found
 
-  const commit = await settings().files.save({ repoPath: found.file.repoPath, absolute: found.file.absolute, text: undefined, message: `content(${collection.name}): delete ${ref.slug}` })
+  const commit = await settings().files.save({ repoPath: found.file.repoPath, absolute: found.file.absolute, text: undefined, message: `content(${collection.name}): delete ${ref.slug}`, author })
 
   return { saved: true, commit }
 }
 
 // Sets the collection's draft field to false, keeping the rest of the entry as saved.
-export async function publishEntry(ref: EntryRef): Promise<SaveOutcome> {
+export async function publishEntry(ref: EntryRef, author?: Identity): Promise<SaveOutcome> {
   const collection = await collectionNamed(ref.collection)
 
   if (collection.draftField === undefined)
@@ -91,5 +97,5 @@ export async function publishEntry(ref: EntryRef): Promise<SaveOutcome> {
   if (!existing.data)
     return refused(ref, `${ref.slug}'s file does not parse: ${existing.problem}`)
 
-  return saveEntry({ ...ref, data: { ...existing.data, [collection.draftField]: false }, body: existing.body }, { verb: 'publish' })
+  return saveEntry({ ...ref, data: { ...existing.data, [collection.draftField]: false }, body: existing.body }, { verb: 'publish', author, bodyKept: true })
 }

@@ -5,6 +5,7 @@ import type { CompiledMarkdown } from './markdown'
 import { existsSync } from 'node:fs'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import { t } from 'elysia'
+import { kayLog } from '../runtime/log'
 import { isDraft } from './drafts'
 import { contentPlace, entryFiles, parseEntry, slugOf } from './load'
 import { compileMarkdown, MarkdownError, splitFrontmatter } from './markdown'
@@ -568,7 +569,10 @@ async function bodyHeld(name: string, collection: Collection<unknown>, dir: stri
     return await holdsBody(name, collection, dir)
   }
   catch (error) {
-    return { body: true, problem: error instanceof Error ? error.message : String(error) }
+    // A loader's error may name its database or its credentials, which every editor and edit link would see.
+    kayLog('error', `${name}'s entries failed to read`, error)
+
+    return { body: true, problem: `kay: ${name}'s entries failed to read; the server's log says why` }
   }
 }
 

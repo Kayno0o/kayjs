@@ -6,7 +6,7 @@ import { recorder } from './src/saved'
 
 // The fixture lets everyone into the screens, and keeps the files they save.
 export default defineConfig({
-  extensions: [cms({ guard: guard(() => undefined), files: recorder })],
+  extensions: [cms({ guard: guard(() => undefined), files: recorder, author: () => ({ name: 'Fixture editor', email: 'editor@example.com' }) })],
   plugins: [tailwind],
   preview: { secret: 'a-preview-secret-long-enough-for-kay-0123456789' },
 })

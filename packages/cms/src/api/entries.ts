@@ -1,5 +1,6 @@
 import { s } from 'kay'
 import { api } from 'kay/server'
+import { authors } from '../authors'
 import { collectionNamed, deleteEntry, entryOf, publishEntry, saveEntry, UnknownCollection } from '../store'
 
 const locale = s.Object({ locale: s.Optional(s.String()) })
@@ -12,7 +13,7 @@ export default api()
 
     return entry ? { collection, entry } : status(404, `No entry ${params.slug} in ${params.collection}`)
   }, { query: locale })
-  .post('/:collection/:slug', async ({ params, body }) => saveEntry({ collection: params.collection, slug: params.slug, locale: body.locale, data: body.data, body: body.body }, { create: body.create }), {
+  .post('/:collection/:slug', async ({ params, body, request }) => saveEntry({ collection: params.collection, slug: params.slug, locale: body.locale, data: body.data, body: body.body }, { create: body.create, author: authors.get(request) }), {
     body: s.Object({
       locale: s.Optional(s.String()),
       data: s.Record(s.String(), s.Unknown()),
@@ -20,5 +21,5 @@ export default api()
       create: s.Optional(s.Boolean()),
     }),
   })
-  .post('/:collection/:slug/publish', async ({ params, query }) => publishEntry({ collection: params.collection, slug: params.slug, locale: query.locale }), { query: locale })
-  .delete('/:collection/:slug', async ({ params, query }) => deleteEntry({ collection: params.collection, slug: params.slug, locale: query.locale }), { query: locale })
+  .post('/:collection/:slug/publish', async ({ params, query, request }) => publishEntry({ collection: params.collection, slug: params.slug, locale: query.locale }, authors.get(request)), { query: locale })
+  .delete('/:collection/:slug', async ({ params, query, request }) => deleteEntry({ collection: params.collection, slug: params.slug, locale: query.locale }, authors.get(request)), { query: locale })

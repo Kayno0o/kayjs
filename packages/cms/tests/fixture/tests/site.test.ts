@@ -147,13 +147,14 @@ async function send(method: string, path: string, body?: object): Promise<{ stat
   return { status: response.status, answer: await response.json() }
 }
 
-test('saving a file entry hands the file kay wrote to the saver, as a commit', async () => {
+test('saving a file entry hands the file kay wrote to the saver, as a commit by the editor the app names', async () => {
   saved.length = 0
 
   expect(await send('POST', 'posts/hello', { data: { title: 'Hello again', tags: ['kay'] }, body: 'New body.\n' })).toEqual({ status: 200, answer: { saved: true, commit: { sha: 'c0ffee' } } })
   expect(saved.map(({ repoPath, message }) => [repoPath, message])).toEqual([['packages/cms/tests/fixture/src/content/posts/hello.md', 'content(posts): update hello']])
   expect(saved[0]?.text).toContain('title: Hello again')
   expect(saved[0]?.text).toContain('New body.')
+  expect(saved[0]?.author).toEqual({ name: 'Fixture editor', email: 'editor@example.com' })
 })
 
 test('a save kay\'s schema refuses comes back as issues, and nothing is written', async () => {
@@ -164,6 +165,19 @@ test('a save kay\'s schema refuses comes back as issues, and nothing is written'
   expect(answer.issues.map(issue => issue.path)).toContain('title')
   expect((await send('POST', 'posts/hello', { data: { title: 'Again' }, create: true })).answer).toEqual({ issues: [{ collection: 'posts', slug: 'hello', path: '', key: 'slug', message: 'names an entry the collection already holds' }] })
   expect(saved).toEqual([])
+})
+
+test('a body that would run as the site is refused, Markdown showing code kept', async () => {
+  saved.length = 0
+
+  for (const body of ['Hi <script>alert(1)</script>\n', '<img src="x" onerror="alert(1)">\n', '[link](javascript:alert(1))\n', '<a href="&#106;avascript:alert(1)">x</a>\n']) {
+    const { answer } = await send('POST', 'posts/hello', { data: { title: 'Hello' }, body }) as { answer: { issues: { body?: true, message: string }[] } }
+
+    expect(answer.issues).toEqual([expect.objectContaining({ body: true, message: expect.stringContaining('would run as the site') })])
+  }
+
+  expect(saved).toEqual([])
+  expect((await send('POST', 'posts/hello', { data: { title: 'Hello' }, body: '```html\n<script>shown, not run</script>\n```\n\n<kbd>Ctrl</kbd> and ![a pixel](data:image/png;base64,iVBORw0KGgo=)\n' })).answer).toHaveProperty('saved', true)
 })
 
 test('a nested slug is published and deleted through its file', async () => {
@@ -227,17 +241,22 @@ test('a file that does not parse lists as broken, and is written over or deleted
   }
 })
 
-test('a collection whose loader throws shows why on its screens, the others still listed', async () => {
-  outage.message = 'the database is down'
+test('a collection whose loader throws says so on its screens, its error kept to the log, the others still listed', async () => {
+  outage.message = 'the database at db.internal:5432 is down'
 
   try {
     const index = await site.visit('/admin')
 
-    expect(index.find('.kui-badge').map(badge => [badge.text, badge.attributes['data-tooltip']])).toEqual([['Cannot be read', expect.stringContaining('the database is down')]])
+    expect(index.find('.kui-badge').map(badge => [badge.text, badge.attributes['data-tooltip']])).toEqual([['Cannot be read', expect.stringContaining('failed to read')]])
+    expect(index.html).not.toContain('db.internal')
     expect(index.text('main')).toContain('2 entries')
 
-    for (const path of ['/admin/collections/products', '/admin/collections/products/mug', '/admin/new/products'])
-      expect((await site.visit(path)).text('main')).toContain('the database is down')
+    for (const path of ['/admin/collections/products', '/admin/collections/products/mug', '/admin/new/products']) {
+      const page = await site.visit(path)
+
+      expect(page.text('main')).toContain('failed to read')
+      expect(page.html).not.toContain('db.internal')
+    }
   }
   finally {
     outage.message = undefined
@@ -271,6 +290,19 @@ test('an upload is stored in its collection\'s folder, answered by the path that
   expect(path).toMatch(/^\/_kay\/files\/products\/\w+\.1x1\.png$/)
   expect(new Uint8Array(await (await site.fetch(path)).arrayBuffer())).toEqual(PIXEL)
   expect((await site.fetch('/api/cms/files/nope', { method: 'POST', body: form })).status).toBe(404)
+})
+
+test('an upload of a type the CMS does not take is refused, whatever type it was sent as', async () => {
+  for (const file of [new File(['alert(1)'], 'app.js', { type: 'image/png' }), new File(['<svg/>'], 'drawing.svg', { type: 'image/svg+xml' }), new File(['<p>'], 'page', { type: 'text/html' })]) {
+    const form = new FormData()
+
+    form.append('file', file)
+
+    const response = await site.fetch('/api/cms/files/products', { method: 'POST', body: form })
+
+    expect(response.status).toBe(415)
+    expect(await response.text()).toContain('which uploads here do not take')
+  }
 })
 
 test('an image field previews what it holds, takes a drop or a pick, and still a typed path', async () => {

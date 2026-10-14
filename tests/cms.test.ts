@@ -401,7 +401,7 @@ describe('the collections a CMS edits', () => {
       expect(await rejection(entries('odd'))).toMatchObject({ message: 'kay: odd\'s load gave string, not an array of entries' })
       expect(await rejection(entries('slugless'))).toMatchObject({ message: 'kay: slugless\'s load gave an entry with no slug: {"data":{}}' })
       expect((await entries('listy')).map(entry => entry.problem)).toEqual(['a list', 'a string', 'undefined'].map((kind, at) => `kay: listy's entry ${'abc'[at]} holds ${kind} as its data, not an object of fields`))
-      expect((await collections()).find(each => each.name === 'broken')).toMatchObject({ body: { kind: 'markdown' }, problem: 'kay: broken\'s load threw: the CMS is down' })
+      expect((await collections()).find(each => each.name === 'broken')).toMatchObject({ body: { kind: 'markdown' }, problem: 'kay: broken\'s entries failed to read; the server\'s log says why' })
       expect(await rejection(entries('broken'))).toMatchObject({ message: 'kay: broken\'s load threw: the CMS is down' })
       expect((await collections()).find(each => each.name === 'titled')).not.toHaveProperty('problem')
 

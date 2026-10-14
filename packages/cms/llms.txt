@@ -12,7 +12,7 @@
 - An `imageField()` or `fileField()` holds a path the site serves. A file dropped or picked on it goes to `POST /api/cms/files/:collection`, 20 MB at most, which stores it public through kay's `files.put` in a folder named for the collection, and the field keeps `files.url(key)`, `/_kay/files/<key>`; a typed path works as well, so a page renders either with `img(src={entry.data.photo})`. Replacing a file leaves the old one stored.
 - The app imports kayjs-ui's theme. The screens and the editor render their own `Toaster` and `TooltipHost`, which render nothing while the app's are mounted; kayjs-ui is a peer dependency, so both resolve the one copy that guard lives in.
 - The screens are closed without a `guard`: kayjs-cms has no users of its own.
-- Edit mode is kay's preview mode, so the app sets `preview.secret`. The API admits a request when `editRequested(request)` from `kay/server` says so, or the guard does.
+- Edit mode is kay's preview mode, so the app sets `preview.secret`. Edit mode alone reads entries through the API; once there is a guard, every save, publish, delete and upload needs it too, since an edit cookie or link is tied to no user.
 
 ## Setup
 
@@ -23,10 +23,10 @@ import { defineConfig } from 'kay/server'
 export default defineConfig({ extensions: [cms({ guard: auth.guard({ require: 'editor' }), files: forgejo({ url, repo: 'me/site', token }) })] })
 ```
 
-- `cms({ prefix, guard, files })`: `prefix` is where the screens live (`/admin`), `guard` who may use them and the API outside edit mode, `files` where a folder entry's file goes, `workingTree()` by default.
+- `cms({ prefix, guard, files, uploads, rawHtml, author })`: `prefix` is where the screens live (`/admin`), `guard` who may use them and the API, `files` where a folder entry's file goes, `workingTree()` by default. `uploads` lists the types a file field takes, exact or `image/*`, PNG, JPEG, WebP, GIF, AVIF and PDF by default, the type read off the file name's extension as kay's storage serves it; another is answered 415. A save whose body renders HTML that would run as the site, a `<script>`, an `on*` attribute or a `javascript:` link, is refused with an issue on the body, unless `rawHtml` lists its collection; publishing keeps the stored body unchecked. `author` names who a save is committed as, from the guard's context: `author: async ({ locals }) => { const user = await locals.auth.user(); return user && { name: user.name, email: user.email } }`.
 - `forgejo({ url, repo, branch?, token, fetch? })`: commits each file through Forgejo's contents API, reading the file's current sha first, so the last write wins. Throws `ForgeError` with Forgejo's `status` and message.
 - `workingTree()`: writes or deletes the file in place, for `kay dev`.
-- A folder collection's source files ship with the server: kay throws for a folder missing from the build, and for one outside the repository. Slugs follow kay's rules, and a file that does not parse lists as broken, its form opening empty to write over it, a Markdown file keeping its body. A collection whose loader throws is listed as one that cannot be read, its screens showing why.
+- A folder collection's source files ship with the server: kay throws for a folder missing from the build, and for one outside the repository. Slugs follow kay's rules, and a file that does not parse lists as broken, its form opening empty to write over it, a Markdown file keeping its body. A collection whose loader throws is listed as one that cannot be read, its error going to the server's log rather than the screens, which may name a database or its credentials.
 
 ## Screens
 

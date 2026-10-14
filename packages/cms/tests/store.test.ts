@@ -2,6 +2,7 @@ import type { FileChange } from '../src/files'
 import type * as Content from '../src/kay/content'
 import type { CollectionInfo, SourceEntry } from '../src/kay/contract'
 import { beforeEach, describe, expect, mock, test } from 'bun:test'
+import { renderMarkdown } from 'kay/content'
 import { configure } from '../src/settings'
 
 const posts: CollectionInfo = { name: 'posts', kind: 'folder', dir: 'content/posts', schema: { type: 'object', properties: { title: { type: 'string' }, draft: { type: 'boolean' } } }, components: [], localized: false, draftField: 'draft' }
@@ -18,6 +19,7 @@ let stored: Record<string, SourceEntry[]>
 
 // kay's content API, answering from `stored` and recording what a loader was handed.
 const content: typeof Content = {
+  renderMarkdown,
   collections: async () => [posts, products, outside],
   collectionInfo: async name => [posts, products, outside].find(collection => collection.name === name),
   entries: async (collection, filter) => (stored[collection] ?? []).filter(entry => (filter?.slug === undefined || entry.slug === filter.slug) && (filter?.locale === undefined || entry.locale === filter.locale)),
@@ -70,6 +72,26 @@ describe('saveEntry', () => {
   test('commits a folder entry\'s file, named by what kay wrote', async () => {
     expect(await saveEntry({ collection: 'posts', slug: 'hello', data: { title: 'Hi there' }, body: 'Body' })).toEqual({ saved: true, commit: { sha: 'abc' } })
     expect(saved).toEqual([{ repoPath: 'content/posts/hello.md', absolute: '/site/content/posts/hello.md', text: '{"title":"Hi there"}\nBody', message: 'content(posts): update hello' }])
+  })
+
+  test('commits as the author the guard found, on saves, publishes and deletes', async () => {
+    const author = { name: 'Ada', email: 'ada@example.com' }
+
+    await saveEntry({ collection: 'posts', slug: 'hello', data: { title: 'Hi' } }, { author })
+    await publishEntry({ collection: 'posts', slug: 'hello' }, author)
+    await deleteEntry({ collection: 'posts', slug: 'hello' }, author)
+    expect(saved.map(change => change.author)).toEqual([author, author, author])
+  })
+
+  test('refuses a body that would run as the site, unless its collection takes raw HTML, and publishes one already stored', async () => {
+    expect(await saveEntry({ collection: 'posts', slug: 'hello', data: { title: 'Hi' }, body: '<div onclick="steal()">x</div>' })).toEqual({ issues: [{ collection: 'posts', slug: 'hello', locale: undefined, path: '', body: true, message: 'The text holds the attribute onclick, which would run as the site: write it as Markdown, or list posts in cms({ rawHtml })' }] })
+    expect(saved).toEqual([])
+
+    stored.posts![0]!.body = '<script>trusted()</script>'
+    expect(await publishEntry({ collection: 'posts', slug: 'hello' })).toHaveProperty('saved', true)
+
+    configure({ files: { save: async change => void saved.push(change) }, rawHtml: ['posts'] })
+    expect(await saveEntry({ collection: 'posts', slug: 'hello', data: { title: 'Hi' }, body: '<script>trusted()</script>' })).toHaveProperty('saved', true)
   })
 
   test('passes on the schema\'s issues and writes nothing', async () => {
