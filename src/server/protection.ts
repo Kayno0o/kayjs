@@ -204,7 +204,7 @@ export async function protectionRefusal(action: ServerAction<TSchema, unknown>, 
   const minTime = action.protection && minTimesOf(action.protection)
 
   // With `plain`, only a post the browser sends itself: not a call, nor the page swap's.
-  const checked = minTime && (minTime.plain ? plain && request.headers.get(NAVIGATE_HEADER) !== '1' : plain || fields[STAMP_FIELD] !== undefined)
+  const checked = minTime && (typeof action.protection?.minTime === 'object' && action.protection.minTime.plain === true ? plain && request.headers.get(NAVIGATE_HEADER) !== '1' : plain || fields[STAMP_FIELD] !== undefined)
 
   if (form && checked) {
     const time = stampTime(action.url, fields[STAMP_FIELD])

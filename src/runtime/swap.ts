@@ -16,5 +16,3 @@ export const RELOAD_HEADER = 'x-kay-reload'
 export const DRAFT_ROUTE = '/_kay/draft'
 // Marks the data script holding the challenges of the actions a page's forms post to, by action URL.
 export const WORK_SCRIPT = 'data-kay-work'
-// A form field carrying a `workChallenge` in the same attribute, which posts the solution in place of its value.
-export const WORK_FIELD = `input[${WORK_SCRIPT}]`

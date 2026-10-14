@@ -47,16 +47,16 @@ describe('the noticeboard example', () => {
       if (code !== 0 || !report.includes('compiled '))
         throw new Error(`kay build --compile failed:\n${report}${errors}`)
 
-      // Nothing reaches the database or a mail server until a page asks: the sign-in page needs neither.
+      // Nothing reaches the database or a mail server until a page asks: the page a reset link opens needs neither, where the sign-in page reads the client's attempts for its proof of work.
       const server = Bun.spawn([join(dir, 'server')], { cwd: dir, env: { PATH: process.env.PATH, PORT: '0', ...SECRETS, DATABASE_URL: 'postgres://app:app@127.0.0.1:1/none', SMTP_HOST: 'localhost' }, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' })
 
       try {
         const origin = `http://localhost:${await listeningPort(server)}`
-        const login = await (await fetch(`${origin}/login`)).text()
-        const stylesheet = (/<link rel="stylesheet" href="(\/_kay\/[^"]+\.css)"/).exec(login)![1]!
+        const reset = await (await fetch(`${origin}/reset?token=mailed`)).text()
+        const stylesheet = (/<link rel="stylesheet" href="(\/_kay\/[^"]+\.css)"/).exec(reset)![1]!
 
-        expect(login).toContain('<title>Sign in | Noticeboard</title>')
-        expect(login).toContain('class="kui-form-field')
+        expect(reset).toContain('<title>Reset your password | Noticeboard</title>')
+        expect(reset).toContain('class="kui-form-field')
         expect(await (await fetch(`${origin}${stylesheet}`)).text()).toContain('.kui-btn')
         expect(await Bun.spawn([join(dir, 'server'), '--health'], { cwd: dir, env: { PATH: process.env.PATH, PORT: new URL(origin).port }, stdin: 'ignore', stdout: 'ignore', stderr: 'ignore' }).exited).toBe(0)
       }
