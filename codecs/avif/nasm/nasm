@@ -1,0 +1,13 @@
+#!/bin/bash
+# Stand-in assembler so libaom's CMake accepts an x86 target under Emscripten: every .asm becomes an empty wasm object, so the asm-only functions are left to the C fallbacks (see build.sh).
+case "$1" in
+  -hf|-hO) echo "-Ox elf32 elf64"; exit 0 ;;
+  -v|-version|--version) echo "NASM version 2.16.01"; exit 0 ;;
+esac
+out=""
+while [[ $# -gt 0 ]]; do
+  if [[ $1 == -o ]]; then out=$2; shift; fi
+  shift
+done
+[[ -n $out ]] && emcc -c -x c /dev/null -o "$out"
+exit 0

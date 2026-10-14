@@ -15,3 +15,5 @@ bench/apps/next/next-env.d.ts
 bench/apps/nuxt/.nuxt
 bench/apps/nuxt/.output
 bench/sites/results*.md
+
+codecs/avif/.cache

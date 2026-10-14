@@ -9,7 +9,7 @@ import { Elysia } from 'elysia'
 import { testWorker } from '../src/build/assets'
 import { cappedSizes, DEFAULT_ASPECTS, image, imageUrl, recordVariants, registerImage, setAspects, setMaxDensity, setRemoteImages, shareCard, shareImage } from '../src/runtime/image'
 import { imageSize, pages, processImage } from '../src/server'
-import { AVIF_SPEED } from '../src/server/avif'
+import { AVIF_ENCODER, AVIF_SPEED } from '../src/server/avif'
 import { coverImage } from '../src/server/crop'
 import { avifQuality, drawing, serveImages, variantName, writeImageVariants } from '../src/server/image'
 import { decodePng } from '../src/server/png'
@@ -437,7 +437,7 @@ describe('AVIF', () => {
 
       expect(await writeImageVariants(client, undefined, cache, { avif: 50 })).toBe(8)
       expect((await readdir(join(client, 'images'))).sort()).toEqual(widths.flatMap(width => [variantName('hero-abc.png', width), variantName('hero-abc.png', width, 'avif')]).sort())
-      expect((await readdir(cache)).sort()).toEqual(widths.flatMap(width => [`80-${variantName('hero-abc.png', width)}`, `50s${AVIF_SPEED}-${variantName('hero-abc.png', width, 'avif')}`]).sort())
+      expect((await readdir(cache)).sort()).toEqual(widths.flatMap(width => [`80-${variantName('hero-abc.png', width)}`, `50s${AVIF_SPEED}-${AVIF_ENCODER}-${variantName('hero-abc.png', width, 'avif')}`]).sort())
       expect(isAvif(await Bun.file(join(client, 'images', 'hero-abc-640.avif')).bytes())).toBe(true)
     }
     finally {

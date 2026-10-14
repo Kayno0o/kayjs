@@ -25,6 +25,7 @@ import { devBuilder } from '../src/dev/builder'
 import { projectPaths } from '../src/project'
 import { serveBuildFiles } from '../src/server/build-files'
 import { compileErrorPage } from '../src/server/overlay'
+import { encodePng } from '../src/server/png'
 import { fixtureCopy, scratchDir } from './scratch'
 
 const root = join(import.meta.dir, 'fixtures/islands')
@@ -1263,6 +1264,36 @@ describe('the files a build writes', () => {
   })
 })
 
+describe('a compiled server\'s images', () => {
+  it('encodes an AVIF variant at run time with the encoder the executable carries', async () => {
+    const root = await scratchProject({
+      'tsconfig.json': tsconfig,
+      'kay.config.ts': 'export default { favicon: false }\n',
+      'src/routes/index.kay': '---\nimport { image } from \'kay/image\'\nimport hero from \'../hero.png\'\n---\nimg({...image(hero, { sizes: \'100vw\' })} alt="Hero")\n',
+      // 48 pixels wide is no width the build writes, so the server encodes it on the first request.
+      'src/server.ts': 'import process from \'node:process\'\nimport { Elysia } from \'elysia\'\nimport { pages } from \'kay/server\'\n\nconst app = new Elysia().use(await pages({ security: false }))\nconst page = await (await app.handle(new Request(\'http://localhost/\'))).text()\nconst src = /src=(%2F_kay%2Fassets%2F[^&]+)&amp;/.exec(page)![1]\nconst response = await app.handle(new Request(`http://localhost/_kay/image?src=${src}&w=48`, { headers: { accept: \'image/avif\' } }))\nconst bytes = new Uint8Array(await response.arrayBuffer())\n\nconsole.log(JSON.stringify({ status: response.status, type: response.headers.get(\'content-type\'), brand: new TextDecoder().decode(bytes.subarray(8, 12)) }))\nprocess.exit(0)\n',
+    })
+
+    await Bun.write(join(root, 'src/hero.png'), encodePng(new Uint8Array(96 * 64 * 4).map((_, at) => at % 4 === 3 ? 255 : (at * 37) % 251), 96, 64))
+
+    try {
+      const [report, code] = await printed(Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', root, '--compile', join(root, 'server')], { stdout: 'pipe', stderr: 'pipe' }))
+
+      expect(report).not.toContain('error')
+      expect(code).toBe(0)
+
+      const child = Bun.spawn([join(root, 'server')], { cwd: root, env: { ...process.env, NODE_ENV: 'production' }, stdout: 'pipe', stderr: 'pipe' })
+      const [output, errors, exit] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+
+      expect({ exit, errors }).toEqual({ exit: 0, errors: expect.any(String) })
+      expect(JSON.parse(output.trim().split('\n').at(-1)!)).toEqual({ status: 200, type: 'image/avif', brand: 'avif' })
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  }, 60_000)
+})
+
 describe('a stylesheet imported as text', () => {
   it('reads the file under Bun, in the executable and in an island, types as a string in kay check, and stays out of the page\'s stylesheets', async () => {
     const root = await scratchProject({
@@ -1512,10 +1543,19 @@ describe('codec licences', () => {
     expect(notices).toContain('Copyright 2019 Joe Drago')
     expect(notices).toContain('Copyright (c) 2016, Alliance for Open Media')
     expect(notices).toContain('Alliance for Open Media Patent License 1.0')
-    expect(notices).toContain('Copyright (c) 2010, Google Inc.')
-    expect(notices).toContain('Additional IP Rights Grant (Patents)')
     expect(notices).toContain('Emscripten is available under 2 licenses')
     expect(notices).toContain('musl as a whole is licensed under the following standard MIT license')
+    // Only its decoder ships, which compiles no libsharpyuv.
+    expect(notices).not.toContain('Additional IP Rights Grant (Patents)')
+  })
+
+  it('carries the texts of kay\'s own AVIF encoder with kay\'s licence', () => {
+    const notices = thirdPartyNotices([join(import.meta.dir, '..')])
+
+    expect(notices).toContain('Files: third_party/iccjpeg/*')
+    expect(notices).toContain('Copyright (c) 2010, Google Inc.')
+    expect(notices).toContain('Additional IP Rights Grant (Patents)')
+    expect(notices).toContain('LICENSES/musl-emscripten-6.0.12.txt')
   })
 
   it('knows the installed version of every package it holds codec licences for', () => {

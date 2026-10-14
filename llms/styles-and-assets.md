@@ -321,7 +321,7 @@ img(src={hero} sizes="(min-width: 60rem) 50vw, 100vw" alt="The workshop")
 - `images.quality` sets the WebP quality, 80 by default.
 - Each variant also comes as an AVIF, a third to a half smaller than the WebP, on the same URL: the route answers it to a browser whose `Accept` names `image/avif`, about 95% of them, and the WebP to any other, with `Vary: Accept` on both.
 - `images.avif: { quality: 60 }` sets its quality, 50 by default, and `images.avif: false` serves WebP alone.
-- `kay build` writes both formats of every imported image's variants, the AVIF taking 50 ms to a second each, on up to four threads, cached between builds as the WebP is.
+- `kay build` writes both formats of every imported image's variants, the AVIF taking 25 ms to half a second each, on up to four threads, cached between builds as the WebP is.
 - A runtime or remote image's AVIF is encoded on its first request, on a worker thread the server starts then and stops after 30 seconds with nothing to encode, so a request for another page never waits on it.
 - Development and a static export serve WebP alone, and the share card stays a JPEG.
 - A CDN in front of the site must key its cache on `Accept`, or it could hand an AVIF to a browser that cannot read it.

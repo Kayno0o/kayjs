@@ -11,7 +11,7 @@ import { basename, extname, join, normalize, resolve, sep } from 'node:path'
 import { ASSET_PREFIX } from '../build/assets'
 import { aspectKey, CARD, croppedSize, cutOrBelow, DEFAULT_ASPECTS, DEFAULT_MAX_DENSITY, FILES_ROUTE, IMAGE_ROUTE, IMAGE_WIDTHS, parseAspect, recordVariants, requestedRemoteVariants, requestedVariants, RESIZABLE, setAspects, setMaxDensity, setRemoteImages, setResolvedImages, SMALL_STEP, variantHeight, variantSuffix } from '../runtime/image'
 import { inLocale, passGuards } from './actions'
-import { AVIF_SPEED, DEFAULT_AVIF_QUALITY, encodeAvif } from './avif'
+import { AVIF_ENCODER, AVIF_SPEED, DEFAULT_AVIF_QUALITY, encodeAvif } from './avif'
 import { coverImage } from './crop'
 import { decodable, imageHeader } from './image-format'
 import { limiter } from './limit'
@@ -139,12 +139,12 @@ export async function writeImageVariants(clientDir: string, quality = DEFAULT_QU
     // A width below the ladder a page asked for may be the image's own, written already.
     const variants = [...IMAGE_WIDTHS.filter(step => step < width), width, ...requestedVariants(name).filter(variant => cutOrBelow(variant, width))]
     // The share card stays a JPEG, which social sites read best.
-    const encodings = variants.flatMap(variant => [{ variant, format: 'webp' as const, level: String(quality) }, ...avif === undefined || variant === 'card' ? [] : [{ variant, format: 'avif' as const, level: `${avif}s${AVIF_SPEED}` }]])
+    const encodings = variants.flatMap(variant => [{ variant, format: 'webp' as const, level: String(quality) }, ...avif === undefined || variant === 'card' ? [] : [{ variant, format: 'avif' as const, level: `${avif}s${AVIF_SPEED}-${AVIF_ENCODER}` }]])
     const missing: { variant: number | ImageVariant, format: VariantFormat, target: string, cached: string | undefined }[] = []
 
     await Promise.all(encodings.map(async ({ variant, format, level }) => {
       const target = join(clientDir, VARIANTS_DIR, variantName(name, variant, format))
-      // Asset names carry a hash of their content, so a cached variant only goes stale when the quality or the AVIF encoder speed changes.
+      // Asset names carry a hash of their content, so a cached variant only goes stale when the quality, the AVIF encoder or its speed changes.
       const cachedName = `${level}-${variantName(name, variant, format)}`
       const cached = cacheDir !== undefined && cacheDir !== '' ? join(cacheDir, cachedName) : undefined
 
