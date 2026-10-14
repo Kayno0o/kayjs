@@ -1,4 +1,5 @@
 import type { Duration } from '../runtime/duration'
+import { resolve } from 'node:path'
 import process from 'node:process'
 import { parse, stringify } from 'devalue'
 import { Elysia } from 'elysia'
@@ -81,6 +82,7 @@ const TAG_BYTES = 16
 const SWEEP_EVERY = 1000
 // How often a SQLite store drops expired sessions on its own, so a quiet site does not keep them.
 const SWEEP_MS = 60 * 60 * 1000
+const sqliteStores = new Map<string, SessionStore & { deleteWhere: NonNullable<SessionStore['deleteWhere']> }>()
 
 // Sessions for kay pages and plain Elysia routes alike, as `session` in the context: `ctx.locals.session` in a page, an action or a guard.
 // The cookie is read on first use and written only when the session changed or is due an extension; it is HttpOnly, SameSite=Lax, and over https Secure and named `__Host-` unless shared under a domain.
@@ -365,10 +367,11 @@ export function memoryStore(): SessionStore & { deleteWhere: NonNullable<Session
       sessions.delete(id)
     },
     deleteWhere(match) {
+      const now = Date.now()
       let deleted = 0
 
       for (const [id, entry] of sessions) {
-        if (match(parse(entry.text) as SessionData)) {
+        if (entry.expires >= now && matchesSession(entry.text, match)) {
           sessions.delete(id)
           deleted++
         }
@@ -380,7 +383,23 @@ export function memoryStore(): SessionStore & { deleteWhere: NonNullable<Session
 }
 
 // Sessions in a SQLite file, surviving restarts and shared by the processes on one machine.
+// One store per file, so a config read again, as in development, opens no second database and sweep timer.
 export function sqliteStore(path: string): SessionStore & { deleteWhere: NonNullable<SessionStore['deleteWhere']> } {
+  const file = path === ':memory:' || path === '' ? undefined : resolve(path)
+  const opened = file === undefined ? undefined : sqliteStores.get(file)
+
+  if (opened)
+    return opened
+
+  const store = openSqliteStore(path)
+
+  if (file !== undefined)
+    sqliteStores.set(file, store)
+
+  return store
+}
+
+function openSqliteStore(path: string): SessionStore & { deleteWhere: NonNullable<SessionStore['deleteWhere']> } {
   const db = openSqlite(path)
 
   db.run('CREATE TABLE IF NOT EXISTS kay_sessions (id TEXT PRIMARY KEY, data TEXT NOT NULL, expires INTEGER NOT NULL)')
@@ -389,11 +408,18 @@ export function sqliteStore(path: string): SessionStore & { deleteWhere: NonNull
   const upsert = db.query('INSERT INTO kay_sessions (id, data, expires) VALUES (?, ?, ?) ON CONFLICT (id) DO UPDATE SET data = excluded.data, expires = excluded.expires')
   const remove = db.query('DELETE FROM kay_sessions WHERE id = ?')
   const sweep = db.query('DELETE FROM kay_sessions WHERE expires < ?')
-  const all = db.query<{ id: string, data: string }, []>('SELECT id, data FROM kay_sessions')
+  const live = db.query<{ id: string, data: string }, [number]>('SELECT id, data FROM kay_sessions WHERE expires >= ?')
   let writes = 0
 
   sweep.run(Date.now())
-  setInterval(() => sweep.run(Date.now()), SWEEP_MS).unref()
+  setInterval(() => {
+    try {
+      sweep.run(Date.now())
+    }
+    catch (error) {
+      kayLog('error', 'dropping the expired sessions failed; trying again in an hour', error)
+    }
+  }, SWEEP_MS).unref()
 
   return {
     get(id) {
@@ -411,7 +437,7 @@ export function sqliteStore(path: string): SessionStore & { deleteWhere: NonNull
       remove.run(id)
     },
     deleteWhere(match) {
-      const ids = all.all().filter(row => match(parse(row.data) as SessionData)).map(row => row.id)
+      const ids = live.all(Date.now()).filter(row => matchesSession(row.data, match)).map(row => row.id)
 
       db.transaction(() => {
         for (const id of ids)
@@ -421,4 +447,20 @@ export function sqliteStore(path: string): SessionStore & { deleteWhere: NonNull
       return ids.length
     },
   }
+}
+
+// Whether stored session data matches, a row that does not parse logged and skipped so the rest are still erased.
+function matchesSession(text: string, match: (data: SessionData) => boolean): boolean {
+  let data: SessionData
+
+  try {
+    data = parse(text) as SessionData
+  }
+  catch (error) {
+    kayLog('warn', 'a stored session does not parse; deleteWhere skipped it', error)
+
+    return false
+  }
+
+  return match(data)
 }

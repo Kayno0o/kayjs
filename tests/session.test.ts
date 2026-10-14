@@ -2,6 +2,7 @@ import type { Action } from '../src/runtime'
 import type { SessionStore } from '../src/server'
 import { join } from 'node:path'
 import process from 'node:process'
+import { Database } from 'bun:sqlite'
 import { afterEach, describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { stringify } from 'devalue'
 import { Elysia } from 'elysia'
@@ -19,6 +20,7 @@ const COOKIE_VALUE = /^session=([^;]*)/
 const ACCOUNT = './fixtures/production/src/routes/account.kay'
 const SESSIONS = './fixtures/production/src/sessions'
 const SIGN_IN = './fixtures/session/src/routes/index.kay'
+const LOG_SINK = Symbol.for('kay.log')
 
 afterEach(() => {
   setSystemTime()
@@ -66,6 +68,24 @@ function counter(options: Partial<Parameters<typeof session>[0]> = {}) {
 
       return 'remembered'
     })
+}
+
+// What kay logs while `run` runs, as `level: message`.
+async function logsOf(run: () => Promise<unknown>): Promise<string[]> {
+  const global = globalThis as { [LOG_SINK]?: unknown }
+  const sink = global[LOG_SINK]
+  const logged: string[] = []
+
+  global[LOG_SINK] = (level: string, message: string) => logged.push(`${level}: ${message}`)
+
+  try {
+    await run()
+  }
+  finally {
+    global[LOG_SINK] = sink
+  }
+
+  return logged
 }
 
 describe('sessions', () => {
@@ -416,6 +436,55 @@ describe('sessions', () => {
       expect([await store.get('a'), await store.get('b'), await store.get('c')]).toEqual([undefined, { userId: 2 }, undefined])
     })
   }
+
+  it('erases no expired session and skips a row that does not parse, logged, in sqlite and in memory alike', async () => {
+    const dir = await scratchDir('sessions-')
+    const file = join(dir, 'sessions.sqlite')
+    const store = sqliteStore(file)
+    const db = new Database(file)
+
+    await store.set('a', { userId: 1 }, 60)
+    await store.set('old', { userId: 1 }, -60)
+    db.run('INSERT INTO kay_sessions (id, data, expires) VALUES (?, ?, ?)', ['broken', '{not devalue', Date.now() + 60_000])
+
+    const logged = await logsOf(async () => {
+      expect(await store.deleteWhere(data => data.userId === 1)).toBe(1)
+    })
+
+    expect(db.query('SELECT id FROM kay_sessions ORDER BY id').all()).toEqual([{ id: 'broken' }, { id: 'old' }])
+    expect(logged).toEqual(['warn: a stored session does not parse; deleteWhere skipped it'])
+    db.close()
+
+    const memory = memoryStore()
+
+    await memory.set('old', { userId: 1 }, -60)
+    expect(await memory.deleteWhere(() => true)).toBe(0)
+  })
+
+  it('opens one sqlite store per file, whose hourly sweep logs a failure rather than throwing', async () => {
+    const sweeps: (() => void)[] = []
+    const intervals = spyOn(globalThis, 'setInterval').mockImplementation(((run: () => void) => {
+      sweeps.push(run)
+
+      return { unref: () => undefined }
+    }) as unknown as typeof setInterval)
+
+    try {
+      const file = join(await scratchDir('sessions-'), 'sessions.sqlite')
+
+      expect(sqliteStore(file)).toBe(sqliteStore(join(file, '..', 'sessions.sqlite')))
+      expect(sweeps).toHaveLength(1)
+
+      const db = new Database(file)
+
+      db.run('DROP TABLE kay_sessions')
+      db.close()
+      expect(await logsOf(async () => sweeps[0]!())).toEqual(['error: dropping the expired sessions failed; trying again in an hour'])
+    }
+    finally {
+      intervals.mockRestore()
+    }
+  })
 
   it('takes a store of the app\'s own, and refuses a short or published secret or a cookie too big to keep', async () => {
     const saved = new Map<string, unknown>()

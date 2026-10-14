@@ -30,6 +30,11 @@ function stampKey(): Uint8Array {
   return secret.key
 }
 
+// A key for `use` derived from the session's or the preview's secret, which every replica shares, or undefined while neither is set.
+export function sharedKey(use: string): Buffer | undefined {
+  return secret.from === 'process' ? undefined : nodeCrypto().createHmac('sha256', secret.key).update(`kay-key\0${use}`).digest()
+}
+
 // The value a prerendered page holds in place of a stamp, with the action it is for: the server signs one each time it serves the page.
 const STAMP_MARK = 'kay-stamp:'
 

@@ -73,6 +73,21 @@ describe('files', () => {
     await files.delete(next)
     expect(await files.get(next)).toBeUndefined()
   })
+
+  it('stores a photo without its metadata, read off its bytes whatever its name says, unless asked to keep it', async () => {
+    await serve(memoryFiles())
+
+    const jpeg = await new Bun.Image(await Bun.file(HERO).bytes()).resize(40, 24).jpeg().bytes()
+    const gps = 'GPS 48.8584 N 2.2945 E'
+    const xmp = new TextEncoder().encode(`http://ns.adobe.com/xap/1.0/\0${gps}`)
+    const tagged = new Uint8Array([...jpeg.subarray(0, 2), 0xFF, 0xE1, (xmp.length + 2) >> 8, (xmp.length + 2) & 0xFF, ...xmp, ...jpeg.subarray(2)])
+    const stored = async (name: string, keepMetadata?: boolean) => (await files.get(await files.put(new File([tagged], name), { keepMetadata })))!.text()
+
+    for (const name of ['photo.jpg', 'photo.bin', 'photo.txt'])
+      expect(await stored(name)).not.toContain(gps)
+
+    expect(await stored('photo.jpg', true)).toContain(gps)
+  })
 })
 
 describe('the file route', () => {

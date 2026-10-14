@@ -10,7 +10,7 @@ import { kayLog } from '../runtime/log'
 import { openSqlite } from '../runtime/sqlite.server'
 import { WORK_HEADER } from '../runtime/swap'
 import { rewrittenAddress } from './rewrite'
-import { stampTime } from './stamp'
+import { sharedKey, stampTime } from './stamp'
 import { proofOfWork, signWork, workRefusal } from './work'
 
 export interface ProtectionRefusal {
@@ -118,7 +118,7 @@ export function memoryRates(): { hit: (key: string, windowMs: number) => RateWin
 }
 
 // Windows kept in a SQLite file, so every process of the machine opening it counts the same attempts.
-// A key is stored hashed with a salt the file keeps, so the file holds no visitor's address.
+// A key is stored pseudonymised: hashed with a salt the file keeps, under an HMAC keyed by the session's or the preview's secret once one is set, so the file alone cannot be checked against a guessed address.
 export function sqliteRates(path: string): RateStore {
   const db = openSqlite(path)
 
@@ -127,7 +127,7 @@ export function sqliteRates(path: string): RateStore {
   db.query('INSERT OR IGNORE INTO kay_rates_salt (id, salt) VALUES (1, ?)').run(crypto.randomUUID())
 
   const salt = db.query<{ salt: string }, []>('SELECT salt FROM kay_rates_salt').get()!.salt
-  const hashed = (key: string) => new Bun.CryptoHasher('sha256').update(salt).update(key).digest('base64url')
+  const hashed = (key: string) => new Bun.CryptoHasher('sha256', sharedKey('rates')).update(salt).update(key).digest('base64url')
 
   // The row's old values are what both cases read: a closed window opens afresh, an open one counts one more.
   const hit = db.query<{ count: number, reset_at: number }, [string, number, number]>('INSERT INTO kay_rates (key, count, reset_at) VALUES (?1, 1, ?2 + ?3) ON CONFLICT (key) DO UPDATE SET count = CASE WHEN reset_at <= ?2 THEN 1 ELSE count + 1 END, reset_at = CASE WHEN reset_at <= ?2 THEN ?2 + ?3 ELSE reset_at END RETURNING count, reset_at')

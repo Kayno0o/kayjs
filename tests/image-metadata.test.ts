@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test'
+import { logSink, setLogSink } from '../src/runtime/log'
 import { stripImageMetadata } from '../src/server/image-metadata'
 
 const GPS = 'GPS 48.8584 N 2.2945 E'
@@ -15,6 +16,23 @@ function u32(value: number, little = false): number[] {
   const big = [value >>> 24, (value >>> 16) & 0xFF, (value >>> 8) & 0xFF, value & 0xFF]
 
   return little ? big.toReversed() : big
+}
+
+// The warnings kay logs while `run` runs, whatever sink another test file left set.
+function warnings(run: () => void): string[] {
+  const sink = logSink()
+  const logged: string[] = []
+
+  setLogSink((level, message) => void (level === 'warn' && logged.push(message)))
+
+  try {
+    run()
+  }
+  finally {
+    (globalThis as Record<symbol, unknown>)[Symbol.for('kay.log')] = sink
+  }
+
+  return logged
 }
 
 function holds(bytes: Uint8Array, text: string): boolean {
@@ -74,11 +92,47 @@ describe('stripImageMetadata', () => {
     expect(await new Bun.Image(stripped).metadata()).toEqual({ width: 40, height: 24, format: 'webp' })
   })
 
+  it('keeps of a JPEG only what its allow-list names: a JFIF header without its thumbnail, but no APP11 nor any other segment', async () => {
+    const jpeg = await new Bun.Image(await Bun.file('tests/fixtures/images/src/hero.png').bytes()).resize(40, 24).jpeg().bytes()
+    // A JFIF whose 8 by 1 thumbnail holds the text.
+    const jfif = bytesOf([0xFF, 0xE0], u16(16 + 24), 'JFIF\0', [1, 2, 0], u16(72), u16(72), [8, 1], GPS.padEnd(24))
+    const tagged = bytesOf(jpeg.subarray(0, 2), jfif, segment(0xEB, `JP\0\0c2pa${GPS}`), segment(0xE5, GPS), jpeg.subarray(2))
+    const stripped = stripImageMetadata(tagged)
+
+    expect(holds(stripped, GPS)).toBe(false)
+    expect(holds(stripped, 'c2pa')).toBe(false)
+    expect([...stripped.subarray(2, 20)]).toEqual([...jfif.subarray(0, 2), ...u16(16), ...jfif.subarray(4, 16), 0, 0])
+    expect(await new Bun.Image(stripped).png().bytes()).toEqual(await new Bun.Image(jpeg).png().bytes())
+  })
+
+  it('keeps of a PNG only what its allow-list names, a caBX chunk dropped', async () => {
+    const png = await Bun.file('tests/fixtures/images/src/hero.png').bytes()
+    const chunk = (type: string, data: string) => bytesOf(u32(data.length), type, data, [0, 0, 0, 0])
+    const stripped = stripImageMetadata(bytesOf(png.subarray(0, 33), chunk('caBX', GPS), chunk('pHYs', '\0\0\0\x01\0\0\0\x01\0'), png.subarray(33)))
+
+    expect([holds(stripped, GPS), holds(stripped, 'pHYs')]).toEqual([false, true])
+    expect(await new Bun.Image(stripped).metadata()).toEqual({ width: 1000, height: 600, format: 'png' })
+  })
+
+  it('reads a file of countless tiny segments in linear time, giving it back as it came', () => {
+    const pairs = new Uint8Array(10 * 1024 * 1024).fill(0x01)
+
+    for (let at = 0; at < pairs.length; at += 2)
+      pairs[at] = 0xFF
+
+    pairs.set([0xFF, 0xD8])
+
+    const started = performance.now()
+
+    expect(warnings(() => expect(stripImageMetadata(pairs)).toBe(pairs))).toHaveLength(1)
+    expect(performance.now() - started).toBeLessThan(500)
+  })
+
   it('leaves alone a format it does not read and a file it cannot follow', () => {
     const gif = bytesOf('GIF89a', GPS)
     const broken = bytesOf([0xFF, 0xD8, 0x00], GPS)
 
-    expect(stripImageMetadata(gif)).toBe(gif)
-    expect(stripImageMetadata(broken)).toBe(broken)
+    expect(warnings(() => expect(stripImageMetadata(gif)).toBe(gif))).toEqual([])
+    expect(warnings(() => expect(stripImageMetadata(broken)).toBe(broken))).toEqual(['an uploaded image could not be read through, so it is stored as it came, its metadata included'])
   })
 })

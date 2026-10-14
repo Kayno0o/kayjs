@@ -1,4 +1,4 @@
-import type { EnqueueOptions, KayExtension, QueueOptions } from 'kay/server'
+import type { EnqueueOptions, FailedJob, KayExtension, QueueOptions } from 'kay/server'
 import type { Relay } from './preview'
 import type { Address, Delivery, Envelope, Mail, Message, Transport } from './types'
 import process from 'node:process'
@@ -51,6 +51,10 @@ export type Mailer = Elysia & {
   render: <P extends object>(message: Message<P>) => Promise<Mail>
   // Sends every queued mail whose time has come, here and now, as a script or a test does without the server running the queue.
   drain: () => Promise<number>
+  // The queued mails given up after their last attempt, each with why it failed, kept as long as `queue.keepFailed` says.
+  failed: () => Promise<FailedJob<Mail>[]>
+  // Removes the queued mail of that id, every one, waiting or failed, sent to `{ recipient }` among its to, cc and bcc, a person's once they asked to be erased say, or every one `match` returns true for; resolves with how many went.
+  remove: (match: string | { recipient: string } | ((mail: Mail) => boolean)) => Promise<number>
 }
 
 const DOCTYPE = /^\s*<!doctype/i
@@ -347,6 +351,15 @@ export function mailer(options: MailerOptions = {}): Mailer {
     },
     render,
     drain: jobs.drain,
+    failed: jobs.failed,
+    remove: async (match: string | { recipient: string } | ((mail: Mail) => boolean)) => {
+      if (typeof match !== 'object')
+        return jobs.remove(match)
+
+      const recipient = match.recipient.toLowerCase()
+
+      return jobs.remove(mail => recipientsOf(mail).some(address => address.toLowerCase() === recipient))
+    },
   })
 
   // A getter, since `kay build` leaves a missing variable to throw where it is read.

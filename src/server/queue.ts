@@ -53,7 +53,7 @@ export interface QueueOptions<Payload> {
   concurrency?: number | undefined
   // How long a run may take: past it, the run counts as failed and frees its worker, and another process takes a job its dead process held as lost. 10 minutes by default.
   lostAfter?: Duration | undefined
-  // How long a failed job is kept, its payload included, from its last attempt: 30 days by default, `false` until removed.
+  // How long a failed job is kept, its payload included, from when its last attempt was due: 30 days by default, `false` until removed.
   keepFailed?: Duration | false | undefined
   // Gets a job that failed its last attempt, once it is kept as failed.
   onFailed?: ((payload: Payload, error: unknown) => unknown) | undefined
@@ -420,12 +420,13 @@ export function queue<Payload>(name: string, handler: (payload: Payload) => unkn
     },
     failed: async () => (await store().failed(name)).map(job => ({ id: job.id, payload: parse(job.payload) as Payload, attempts: job.attempts, error: job.error ?? '' })),
     remove: async (match: string | ((payload: Payload) => boolean)) => {
-      const listed = typeof match === 'string' ? undefined : store().jobs?.(name)
+      const listed = store().jobs?.(name)
 
       if (typeof match !== 'string' && !listed)
         throw new Error(`kay: queue('${name}')'s store lists no jobs, so remove() takes a job's id rather than a function`)
 
-      const ids = typeof match === 'string' ? [match] : (await listed ?? []).filter(job => match(parse(job.payload) as Payload)).map(job => job.id)
+      // A store listing its jobs tells an id of this queue from one it never held; one that does not counts the id as removed.
+      const ids = listed ? (await listed).filter(job => typeof match === 'string' ? job.id === match : match(parse(job.payload) as Payload)).map(job => job.id) : [match as string]
 
       for (const id of ids)
         await store().complete(id)

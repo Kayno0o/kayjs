@@ -226,7 +226,7 @@ export default defineConfig({ requireGuards: true })
 - In production the first `regenerate()` on a session without a store logs a warning saying so.
 - With a store, the cookie carries only a sealed id, and `destroy()` deletes the session itself.
 - `memoryStore()` from `kay/server` keeps sessions in the process, gone on restart.
-- `sqliteStore(path)` keeps them in a SQLite file shared by the processes on one machine, creating its directory, as `sqliteRates`, `sqliteCache` and `sqliteJobs` do.
+- `sqliteStore(path)` keeps them in a SQLite file shared by the processes on one machine, creating its directory, as `sqliteRates`, `sqliteCache` and `sqliteJobs` do; called again with the same file, it gives the store already open.
 - Any object with `get(id)`, `set(id, data, maxAge)` and `delete(id)`, each sync or async, is a store too, such as one over Redis.
 - `deleteWhere(match)` on `memoryStore()` and `sqliteStore(path)` deletes every session whose data `match` returns true for, a person's once they asked to be erased or changed their password say, resolving with how many went; `sqliteStore` also drops expired sessions every hour.
 - Values cross as island props do, Dates, Maps, Sets and bigints included.

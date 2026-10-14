@@ -427,6 +427,7 @@ describe('queue', () => {
       expect(await mail.remove(to => to === 'ada@example.com' || to === 'bounce@example.com')).toBe(3)
       expect(await mail.failed()).toEqual([])
       expect(await mail.remove(grace)).toBe(1)
+      expect([await mail.remove(grace), await mail.remove('no-such-job')]).toEqual([0, 0])
       setSystemTime(Date.now() + 3 * 3_600_000)
       expect(await mail.drain()).toBe(0)
     }

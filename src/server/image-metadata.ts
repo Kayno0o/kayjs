@@ -1,13 +1,24 @@
+import { kayLog } from '../runtime/log'
+
 // What a stored photo says beyond its pixels, such as where and when it was taken and on which camera, taken out on upload. The image's look is kept: its colour profile, and a JPEG's orientation, which Bun.Image and browsers apply.
+// Each format keeps what an allow-list names, so a kind of metadata it never heard of goes too.
 const JPEG = [0xFF, 0xD8]
 const PNG = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]
-const PNG_DROPPED = new Set(['eXIf', 'tEXt', 'zTXt', 'iTXt', 'tIME'])
-const WEBP_DROPPED = new Set(['EXIF', 'XMP '])
+// Frames, tables, restart interval and line count, and the hierarchical and arithmetic coding markers, which shape the picture.
+const JPEG_KEPT = new Set([0xC0, 0xC1, 0xC2, 0xC3, 0xC4, 0xC5, 0xC6, 0xC7, 0xC9, 0xCA, 0xCB, 0xCC, 0xCD, 0xCE, 0xCF, 0xDB, 0xDC, 0xDD, 0xDE, 0xDF])
+const PNG_KEPT = new Set(['IHDR', 'PLTE', 'IDAT', 'IEND', 'tRNS', 'gAMA', 'cHRM', 'sRGB', 'iCCP', 'cICP', 'mDCV', 'cLLI', 'sBIT', 'pHYs', 'bKGD', 'hIST', 'acTL', 'fcTL', 'fdAT'])
+const WEBP_KEPT = new Set(['VP8 ', 'VP8L', 'ALPH', 'ANIM', 'ANMF', 'ICCP'])
 // A VP8X chunk's flags saying the file holds EXIF and XMP chunks.
 const WEBP_METADATA_FLAGS = 0x08 | 0x04
 const ICC = 'ICC_PROFILE\0'
 const EXIF = 'Exif\0\0'
+const JFIF = 'JFIF\0'
+const ADOBE = 'Adobe'
+// A JFIF header up to its thumbnail's size, which is set to none.
+const JFIF_LENGTH = 16
 const ORIENTATION_TAG = 0x0112
+// Far past any real image's, so a file of tiny segments costs no more than a few of them.
+const MAX_SEGMENTS = 10_000
 
 // The image without its metadata, or the bytes as they came for a format it does not read or a file it cannot follow.
 export function stripImageMetadata(bytes: Uint8Array<ArrayBuffer>): Uint8Array<ArrayBuffer> {
@@ -18,20 +29,74 @@ export function stripImageMetadata(bytes: Uint8Array<ArrayBuffer>): Uint8Array<A
     if (startsWith(bytes, PNG))
       return stripPng(bytes)
 
-    if (ascii(bytes, 0, 4) === 'RIFF' && ascii(bytes, 8, 4) === 'WEBP')
+    if (isWebp(bytes))
       return stripWebp(bytes)
   }
-  catch {}
+  catch (error) {
+    kayLog('warn', 'an uploaded image could not be read through, so it is stored as it came, its metadata included', error)
+  }
 
   return bytes
 }
 
-// Keeps the segments that shape the picture, an Adobe APP14 and an ICC profile among them, and drops EXIF, XMP, IPTC, comments and the pictures appended after the image's end.
+// Whether the file is a JPEG, a PNG or a WebP, read from its first 12 bytes: the formats whose metadata is taken out.
+export function holdsImageMetadata(head: Uint8Array): boolean {
+  return startsWith(head, JPEG) || startsWith(head, PNG) || isWebp(head)
+}
+
+function isWebp(bytes: Uint8Array): boolean {
+  return ascii(bytes, 0, 4) === 'RIFF' && ascii(bytes, 8, 4) === 'WEBP'
+}
+
+// The byte ranges of a file kept, adjacent ones copied as one run, and the bytes written in place of others; it refuses a file of more segments than any image holds.
+class Kept {
+  private readonly parts: Uint8Array[] = []
+  private start = 0
+  private end = 0
+  private segments = 0
+
+  constructor(private readonly bytes: Uint8Array) {}
+
+  segment(): void {
+    if (++this.segments > MAX_SEGMENTS)
+      throw new Error(`more than ${MAX_SEGMENTS} segments`)
+  }
+
+  range(start: number, end: number): void {
+    if (start !== this.end)
+      this.flush(start)
+
+    this.end = end
+  }
+
+  add(part: Uint8Array): void {
+    this.flush(this.end)
+    this.parts.push(part)
+  }
+
+  join(): Uint8Array<ArrayBuffer> {
+    this.flush(this.end)
+
+    return concat(this.parts)
+  }
+
+  private flush(next: number): void {
+    if (this.end > this.start)
+      this.parts.push(this.bytes.subarray(this.start, this.end))
+
+    this.start = next
+    this.end = next
+  }
+}
+
+// Keeps the segments that shape the picture, a JFIF header without its thumbnail, an ICC profile, an Adobe APP14 and the orientation, and drops every other, EXIF, XMP, IPTC, C2PA and comments among them, and the pictures appended after the image's end.
 function stripJpeg(bytes: Uint8Array): Uint8Array<ArrayBuffer> {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
-  const parts: Uint8Array[] = [bytes.subarray(0, 2)]
+  const kept = new Kept(bytes)
   let orientationKept = false
   let at = 2
+
+  kept.range(0, 2)
 
   while (at < bytes.length) {
     if (bytes[at] !== 0xFF)
@@ -45,15 +110,17 @@ function stripJpeg(bytes: Uint8Array): Uint8Array<ArrayBuffer> {
       continue
     }
 
+    kept.segment()
+
     if (marker === 0xD9) {
-      parts.push(bytes.subarray(at, at + 2))
+      kept.range(at, at + 2)
 
       break
     }
 
     // Markers that carry no length.
     if (marker === 0x01 || (marker >= 0xD0 && marker <= 0xD7)) {
-      parts.push(bytes.subarray(at, at + 2))
+      kept.range(at, at + 2)
       at += 2
 
       continue
@@ -62,32 +129,48 @@ function stripJpeg(bytes: Uint8Array): Uint8Array<ArrayBuffer> {
     const end = at + 2 + view.getUint16(at + 2)
     const payload = bytes.subarray(at + 4, end)
 
+    if (end > bytes.length)
+      throw new Error('cut short')
+
     if (marker === 0xDA) {
       const scanned = scanEnd(bytes, end)
 
-      parts.push(bytes.subarray(at, scanned))
+      kept.range(at, scanned)
       at = scanned
 
       continue
     }
 
-    if (marker === 0xE1 && ascii(payload, 0, EXIF.length) === EXIF && !orientationKept) {
+    if (JPEG_KEPT.has(marker) || (marker === 0xE2 && ascii(payload, 0, ICC.length) === ICC) || (marker === 0xEE && ascii(payload, 0, ADOBE.length) === ADOBE)) {
+      kept.range(at, end)
+    }
+    else if (marker === 0xE0 && ascii(payload, 0, JFIF.length) === JFIF && end - at >= JFIF_LENGTH + 2) {
+      kept.add(jfifHeader(bytes.subarray(at, at + JFIF_LENGTH + 2)))
+    }
+    else if (marker === 0xE1 && ascii(payload, 0, EXIF.length) === EXIF && !orientationKept) {
       const orientation = exifOrientation(payload.subarray(EXIF.length))
 
       orientationKept = true
 
       if (orientation !== undefined && orientation !== 1)
-        parts.push(orientationSegment(orientation))
-    }
-    // A comment, EXIF or XMP, IPTC, and an APP2 other than the colour profile, such as the index of appended pictures, are dropped.
-    else if (marker !== 0xFE && marker !== 0xE1 && marker !== 0xED && (marker !== 0xE2 || ascii(payload, 0, ICC.length) === ICC)) {
-      parts.push(bytes.subarray(at, end))
+        kept.add(orientationSegment(orientation))
     }
 
     at = end
   }
 
-  return concat(parts)
+  return kept.join()
+}
+
+// The JFIF segment with its thumbnail's width and height set to none, and its thumbnail left out.
+function jfifHeader(segment: Uint8Array): Uint8Array {
+  const header = segment.slice()
+
+  new DataView(header.buffer).setUint16(2, JFIF_LENGTH)
+  header[16] = 0
+  header[17] = 0
+
+  return header
 }
 
 // Where a scan's entropy-coded data ends: at the first marker that is neither a stuffed 0xFF nor a restart.
@@ -147,7 +230,9 @@ function orientationSegment(orientation: number): Uint8Array {
 
 function stripPng(bytes: Uint8Array): Uint8Array<ArrayBuffer> {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
-  const parts: Uint8Array[] = [bytes.subarray(0, PNG.length)]
+  const kept = new Kept(bytes)
+
+  kept.range(0, PNG.length)
 
   for (let at = PNG.length; at < bytes.length;) {
     const end = at + 12 + view.getUint32(at)
@@ -156,8 +241,10 @@ function stripPng(bytes: Uint8Array): Uint8Array<ArrayBuffer> {
     if (end > bytes.length)
       throw new Error('cut short')
 
-    if (!PNG_DROPPED.has(type))
-      parts.push(bytes.subarray(at, end))
+    kept.segment()
+
+    if (PNG_KEPT.has(type))
+      kept.range(at, end)
 
     if (type === 'IEND')
       break
@@ -165,13 +252,15 @@ function stripPng(bytes: Uint8Array): Uint8Array<ArrayBuffer> {
     at = end
   }
 
-  return concat(parts)
+  return kept.join()
 }
 
 function stripWebp(bytes: Uint8Array): Uint8Array<ArrayBuffer> {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
-  const parts: Uint8Array[] = [bytes.slice(0, 12)]
+  const kept = new Kept(bytes)
   const riffEnd = Math.min(bytes.length, 8 + view.getUint32(4, true))
+
+  kept.add(bytes.slice(0, 12))
 
   for (let at = 12; at + 8 <= riffEnd;) {
     const size = view.getUint32(at + 4, true)
@@ -181,20 +270,22 @@ function stripWebp(bytes: Uint8Array): Uint8Array<ArrayBuffer> {
     if (end > riffEnd)
       throw new Error('cut short')
 
+    kept.segment()
+
     if (type === 'VP8X') {
       const chunk = bytes.slice(at, end)
 
       chunk[8]! &= ~WEBP_METADATA_FLAGS
-      parts.push(chunk)
+      kept.add(chunk)
     }
-    else if (!WEBP_DROPPED.has(type)) {
-      parts.push(bytes.subarray(at, end))
+    else if (WEBP_KEPT.has(type)) {
+      kept.range(at, end)
     }
 
     at = end
   }
 
-  const stripped = concat(parts)
+  const stripped = kept.join()
 
   new DataView(stripped.buffer).setUint32(4, stripped.length - 8, true)
 

@@ -235,6 +235,27 @@ describe('the queue', () => {
     expect(sent.map(each => each.subject)).toEqual(['Queued'])
     expect(sent[0]!.html).toContain('Welcome, Ada')
   })
+
+  it('lists the mails it gave up on, and removes a person\'s queued and failed mails, by recipient, id or match', async () => {
+    const refusing: Transport = { send: async (mail) => {
+      throw new Error(`550 no mailbox for ${mail.subject}`)
+    } }
+    const queued = mailer({ from: 'site@example.com', transport: refusing, queue: { name: 'erased-mail', attempts: 1 } })
+
+    await logged(async () => {
+      await queued.enqueue({ to: 'Ada <Ada@Example.com>', subject: 'Failed', text: 'T' })
+      await queued.drain()
+    })
+    await queued.enqueue({ to: 'bob@example.com', bcc: ['ada@example.com'], subject: 'Later', text: 'T' }, { delay: '1h' })
+    await queued.enqueue({ to: 'bob@example.com', subject: 'Bob', text: 'T' }, { delay: '1h' })
+    const cy = await queued.enqueue({ to: 'cy@example.com', subject: 'Cy', text: 'T' }, { delay: '1h' })
+
+    expect((await queued.failed()).map(job => [job.payload.subject, job.error])).toEqual([['Failed', '550 no mailbox for Failed']])
+    expect(await queued.remove({ recipient: 'ada@example.com' })).toBe(2)
+    expect(await queued.failed()).toEqual([])
+    expect([await queued.remove(cy), await queued.remove(cy)]).toEqual([1, 0])
+    expect(await queued.remove(mail => mail.subject === 'Bob')).toBe(1)
+  })
 })
 
 describe('the log', () => {

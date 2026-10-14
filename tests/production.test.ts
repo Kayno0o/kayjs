@@ -39,6 +39,8 @@ import { prerendered } from './prerendered'
 import { fixtureCopy, scratchDir } from './scratch'
 
 const ROUTES = 'tests/fixtures/seo/src/routes'
+// A rate key as `sqliteRates` stores it: a SHA-256 in base64url.
+const HASHED_KEY = /^[\w-]{43}$/
 
 function socket(address: string): Server<unknown> {
   return { requestIP: () => ({ address }) } as unknown as Server<unknown>
@@ -717,12 +719,39 @@ console.log(JSON.stringify(warnings))
       await rateLimit('reset', { max: 1, window: '1m', store: first }).hit('ada@example.com')
       const db = new Database(path, { readonly: true })
 
-      expect(db.query<{ key: string }, []>('SELECT key FROM kay_rates').all().filter(row => row.key.includes('ada') || row.key.includes('reset'))).toEqual([])
+      const keys = db.query<{ key: string }, []>('SELECT key FROM kay_rates').all().map(row => row.key)
+
+      expect([keys.length > 0, keys.filter(key => !HASHED_KEY.test(key))]).toEqual([true, []])
       expect((await stat(path)).mode & 0o777).toBe(0o600)
       db.close()
     }
     finally {
       setSystemTime()
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('keys the hash of a stored rate key with the session\'s secret once one is set', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kay-rates-'))
+    const script = `import { Database } from 'bun:sqlite'
+import { sqliteRates } from ${JSON.stringify(join(import.meta.dir, '../src/server/protection.ts'))}
+import { useStampSecret } from ${JSON.stringify(join(import.meta.dir, '../src/server/stamp.ts'))}
+const path = ${JSON.stringify(join(dir, 'rates.sqlite'))}
+const store = sqliteRates(path)
+store.hit('before', 60_000)
+useStampSecret('a session secret, long enough too', 'session')
+store.hit('after', 60_000)
+const db = new Database(path)
+const salt = db.query('SELECT salt FROM kay_rates_salt').get().salt
+const plain = key => new Bun.CryptoHasher('sha256').update(salt).update(key).digest('base64url')
+const keys = new Set(db.query('SELECT key FROM kay_rates').all().map(row => row.key))
+console.log(JSON.stringify([keys.has(plain('before')), keys.has(plain('after')), keys.size]))
+`
+
+    try {
+      expect(await isolated(script)).toEqual([true, false, 2])
+    }
+    finally {
       await rm(dir, { recursive: true, force: true })
     }
   })

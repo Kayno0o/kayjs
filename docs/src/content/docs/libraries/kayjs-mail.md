@@ -66,7 +66,7 @@ Tailwind classes do nothing in a mail. Style with `style` attributes.
 
 ## Sending
 
-`enqueue` renders the mail now and queues it, so a mail server outage never fails the visitor's action. `send` sends before it answers and throws on failure.
+`enqueue` renders the mail now and queues it, so a mail server outage never fails the visitor's action. `send` sends before it answers and throws on failure. `mail.failed()` lists the queued mails given up on, and `mail.remove({ recipient: 'ada@example.com' })` deletes every queued or failed mail to that address, for a person who asked to be erased.
 
 ```kay
 --- server

@@ -4,8 +4,9 @@ import { readdir, rename, rm } from 'node:fs/promises'
 import { basename, join, resolve } from 'node:path'
 import { durationSeconds } from '../runtime/duration'
 import { FILES_ROUTE } from '../runtime/image'
+import { kayLog } from '../runtime/log'
 import { imageHeader } from './image-format'
-import { stripImageMetadata } from './image-metadata'
+import { holdsImageMetadata, stripImageMetadata } from './image-metadata'
 import { signedText, signText } from './stamp'
 
 // Where files are kept: `diskFiles`, `s3Files` and `memoryFiles` make one, an app may write its own. Keys are never written twice, so a store needs no locking.
@@ -46,7 +47,6 @@ const TYPE_PARAMETERS = /;.*$/
 const NAME_EXTENSION = /\.([a-z\d]{1,10})$/i
 // What Bun.Image reads the size of, which the key then holds.
 const SIZED = /^(?:png|jpe?g|webp|gif|avif)$/
-const STRIPPED = /^(?:png|jpe?g|webp)$/
 // Types a browser shows without running anything; any other file is downloaded, sandboxed, so an uploaded page or SVG never runs as the site.
 const INLINE = /^(?:image\/(?:png|jpeg|webp|gif|avif)|video\/|audio\/|application\/pdf|text\/plain)/
 // An image keeps its type, so an SVG still shows in an `img`; any other downloaded file goes as bytes of no type, so a script or stylesheet never loads into one of the site's pages.
@@ -153,7 +153,9 @@ export const files = {
 
     const extension = fileExtension(data)
 
-    const stored = options.keepMetadata !== true && STRIPPED.test(extension) ? new Blob([stripImageMetadata(await data.bytes())], { type: data.type }) : data
+    // Read off the bytes rather than the name the uploader gave, which may say anything.
+    const strip = options.keepMetadata !== true && holdsImageMetadata(await data.slice(0, 12).bytes())
+    const stored = strip ? new Blob([stripImageMetadata(await data.bytes())], { type: data.type }) : data
     const size = SIZED.test(extension) ? await imageSize(stored) : undefined
     const id = Buffer.from(crypto.getRandomValues(new Uint8Array(10))).toString('hex')
     const key = `${options.private === true ? PRIVATE : ''}${options.folder === undefined ? '' : `${options.folder}/`}${id}${size ? `.${size.width}x${size.height}` : ''}.${extension}`
@@ -189,7 +191,10 @@ export const files = {
 
       await Promise.all((await readdir(variantsDir)).filter(name => name.startsWith(prefix)).map(async name => rm(join(variantsDir, name), { force: true })))
     }
-    catch {}
+    catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT')
+        kayLog('warn', `the image variants of ${key} could not all be removed`, error)
+    }
   },
 
   // Where a page links the file, a path of the site as a template's `href` is: `/_kay/files/<key>`, signed and expiring for a private one.

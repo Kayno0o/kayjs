@@ -2,7 +2,7 @@
 
 What kay keeps about visitors, where and for how long, and what an app calls to erase a person who asks, as the GDPR has it.
 
-kay sets no cookie and stores nothing of a visitor until the app uses a feature that does, and none of what it keeps tracks a visitor across sites, so no consent banner is needed for kay itself.
+kay sets no cookie and stores nothing of a visitor until the app uses a feature that does, and none of what it keeps tracks a visitor across sites; the Reference lists each cookie and what the server keeps, for the app to decide what its notice and consent need.
 
 ## Common tasks
 
@@ -31,7 +31,7 @@ export async function erase(userId: string) {
 
 ### Load analytics only once the visitor agreed
 
-An island keeps the answer in a persisted signal and loads the script once it is yes:
+An island keeps the answer in a persisted signal, loads the script once it is yes, and keeps a button that asks again, where refusing withdraws an earlier yes:
 
 ```kay
 ---
@@ -43,17 +43,31 @@ effect(() => {
   if (consent() === 'yes')
     document.head.append(Object.assign(document.createElement('script'), { src: '/stats.js', defer: true }))
 })
+
+// Refusing after agreeing clears what the script stored and reloads, so it no longer runs.
+function withdraw() {
+  const agreed = consent() === 'yes'
+
+  consent = 'no'
+
+  if (agreed) {
+    document.cookie = '_stats=; max-age=0; path=/'
+    location.reload()
+  }
+}
 ---
 if consent() === ''
   aside(aria-label="Visit statistics")
     p We count visits only if you agree.
     button(onClick={() => consent = 'yes'}) Agree
-    button(onClick={() => consent = 'no'}) Refuse
+    button(onClick={() => withdraw()}) Refuse
+else
+  button(onClick={() => consent = ''}) Visit statistics: change my choice
 ```
 
 ### Keep failed jobs for less time
 
-A failed job keeps its payload, an address say, 30 days from its last attempt; `keepFailed` shortens it:
+A failed job keeps its payload, an address say, 30 days from when its last attempt was due; `keepFailed` shortens it:
 
 ```ts
 import { queue } from 'kay/server'
@@ -90,14 +104,20 @@ export async function archive(scan: File) {
 - `onError` gets the request whole; an error tracker is sent its path and id, not `request.url`, whose query may hold an address or a token.
 - Sessions with a store live in it until they expire or `destroy()`; `sqliteStore` drops expired ones every hour and every 1000 writes, `memoryStore` every 1000 writes.
 - `deleteWhere(match)` on `memoryStore()` and `sqliteStore(path)` deletes every session whose data `match` returns true for, resolving with how many went; an app's own store may offer it too, and sessions kept in the cookie alone cannot be listed, only waited out or ended for everyone by replacing the secret.
-- Rate limits count by address in memory, or in `sqliteRates(path)`, which stores each key hashed with a salt the file keeps, so it holds no address; a window is dropped once it closed.
-- A queue keeps a waiting job's payload until it runs and a failed one's for `keepFailed`, 30 days by default from its last attempt, or for good with `false`.
+- Rate limits count by address in memory, or in `sqliteRates(path)`, which stores each key pseudonymised: hashed with a salt the file keeps, as an HMAC keyed by the session's or the preview's secret once one is set, so the file alone cannot be checked against a guessed address; a window is dropped once it closed.
+- A queue keeps a waiting job's payload until it runs and a failed one's for `keepFailed`, 30 days by default from when its last attempt was due, or for good with `false`.
 - `queue.remove(id)` removes one job, and `queue.remove(match)` every waiting or failed job whose payload `match` returns true for, resolving with how many went; an app's own `JobStore` takes a function only when it has `jobs(queue)`.
 - `sqliteRooms` from `kay/server` keeps a room's messages 30 seconds, for the processes sharing it to read.
 - The SQLite files `sqliteStore`, `sqliteRates`, `sqliteJobs`, `sqliteRooms` and `sqliteCache` create are readable by the server's user alone.
 
+### Upgrading from before kay kept this
+
+- A SQLite file created before keeps its mode: `chmod 600` it.
+- Variants the image route made before `files.delete` erased them stay in `.kay/cache/images` until it is emptied.
+- The first start purges the failed jobs past `keepFailed`, 30 days by default.
+
 ### Stored files
 
-- `files.put` stores a JPEG, PNG or WebP without its EXIF, XMP, IPTC, text chunks and comments, keeping its colour profile and a JPEG's orientation; any other format, AVIF and HEIC included, is stored as it came.
-- `files.delete(key)` deletes the file, its cached copy and every variant the image route made of it.
+- `files.put` tells a JPEG, PNG or WebP by its bytes, whatever its name, and stores it with only what draws it: its pixels, colour profile and a JPEG's orientation, every other segment or chunk, EXIF, XMP, IPTC, C2PA, text and comments among them, dropped; any other format, AVIF and HEIC included, and a file it cannot read through, logged, are stored as they came.
+- `files.delete(key)` deletes the file, its cached copy and every variant the image route made of it; a social card `shareImage()` or `shareCard()` drew from it stays in the build's cache until the next build drops it.
 - A photo of a person that only some visitors may see is stored with `private: true`, which only a link the page signed reaches.
