@@ -6,7 +6,7 @@ import FormField from '@kaynooo/kayjs-ui/form-field.kay'
 import { addPasskey, passkeyOptions } from '../routes/account/security.kay'
 import Proof from './proof.kay'
 
-const { user, label, nameLabel, unsupported, failed, errors } = props<{ user: User, label: string, nameLabel: string, unsupported: string, failed: string, errors: Record<string, string> }>()
+const { user, label, nameLabel, passwordLabel, codeLabel, unsupported, failed, errors } = props<{ user: User, label: string, nameLabel: string, passwordLabel: string, codeLabel: string, unsupported: string, failed: string, errors: Record<string, string> }>()
 
 const supported = signal<boolean>()
 const error = signal('')
@@ -50,7 +50,7 @@ else if supported()
   form.flex.flex-col.gap-3(onSubmit={add} novalidate)
     FormField(label={nameLabel})
       input(name="name" bind:value={name})
-    Proof(user={user} secondFactor)
+    Proof(user={user} secondFactor passwordLabel={passwordLabel} codeLabel={codeLabel})
     if error()
       p.kayjs-auth-error.text-kui-error(role="alert") {error()}
     Button(type="submit" label={label} busy={passkeyOptions.pending() || addPasskey.pending()})

@@ -3,12 +3,13 @@ import type { User } from '../../core'
 import { t } from 'kay/i18n'
 import FormField from '@kaynooo/kayjs-ui/form-field.kay'
 
-const { user, secondFactor = false } = props<{ user: User, secondFactor?: boolean }>()
+// An island renders it with the labels its page gives, as the messages only its server render or its own source name reach the browser.
+const { user, secondFactor = false, passwordLabel = t('auth.proof.password'), codeLabel = t('auth.proof.code') } = props<{ user: User, secondFactor?: boolean, passwordLabel?: string, codeLabel?: string }>()
 ---
 // What proves it is still the user: their password, or a code where they have none or the change asks for the second factor while it is on. An account with neither proves it by a recent sign-in.
 if user.hasPassword && !(secondFactor && user.twoFactor)
-  FormField(label={t('auth.proof.password')} required)
+  FormField(label={passwordLabel} required)
     input(name="password" type="password" autocomplete="current-password" required)
 else if user.twoFactor
-  FormField(label={t('auth.proof.code')} required)
+  FormField(label={codeLabel} required)
     input(name="code" autocomplete="one-time-code" autocapitalize="off" spellcheck="false" required)

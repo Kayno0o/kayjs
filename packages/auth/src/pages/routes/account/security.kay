@@ -151,4 +151,4 @@ if features.passkeys
             Button(type="submit" variant="danger" label={t('auth.account.passkeys.remove')} aria-label={`${t('auth.account.passkeys.remove')}: ${passkey.name}`})
       else
         EmptyState(title={t('auth.account.passkeys.none')})
-      PasskeyAdd(user={user} label={t('auth.account.passkeys.add')} nameLabel={t('auth.account.passkeys.name')} unsupported={t('auth.account.passkeys.unsupported')} failed={t('auth.account.passkeys.failed')} errors={passkeyErrors})
+      PasskeyAdd(user={user} label={t('auth.account.passkeys.add')} nameLabel={t('auth.account.passkeys.name')} passwordLabel={t('auth.proof.password')} codeLabel={t('auth.proof.code')} unsupported={t('auth.account.passkeys.unsupported')} failed={t('auth.account.passkeys.failed')} errors={passkeyErrors})
