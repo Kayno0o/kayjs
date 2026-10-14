@@ -31,7 +31,7 @@ li(class={size})
 - `---` is the component script: imports, props, signals, functions. It runs wherever the component renders.
 - `--- server` exists on pages and layouts only. It runs on the server for each request and never reaches the browser.
 
-A fence ends on a `---` line, or on a `--- server`, `--- client` or `--- script` line, which opens the next fence. `--- script` is the component script spelled out, for when it follows another fence.
+A fence ends on a `---` line, or on the line opening the next one. `--- script` is the component script spelled out, for when it follows another fence.
 
 ```kay
 --- server
@@ -43,11 +43,11 @@ p {greeting}
 Badge(label="new")
 ```
 
-`props`, `signal`, `memo`, `effect`, `onMount`, `onCleanup` and the translation `t` need no import. The rest of `kay`, such as `persisted` or `navigate`, is imported.
+`props`, `signal`, `memo`, `effect`, `onMount`, `onCleanup` and the translation `t` need no import. Anything else from `kay`, such as `persisted`, is imported.
 
 ## Props
 
-Props are declared once with `props<T>()`. Destructure them, with defaults, and they stay reactive. A default applies only to an `undefined` prop. A page has no props: its data comes from its `--- server` fence.
+Props are declared once with `props<T>()`. Destructure them, with defaults, and they stay reactive. A page has no props: its data comes from its `--- server` fence.
 
 ## Using a component
 
@@ -67,7 +67,7 @@ ul
 
 ## Many components at once
 
-`import.meta.glob` imports every file a pattern matches, as in Vite, keyed by its path as the pattern writes it:
+`import.meta.glob` imports every file a pattern matches, as in Vite:
 
 ```kay
 ---
@@ -79,11 +79,11 @@ for Card of Object.values(cards)
   Card
 ```
 
-Without `eager`, each value is a function importing the file when called. A pattern starts with `./`, `../` or `/` for the project's root, and one starting with `!` leaves its files out. Patterns and options are written in the call, as the build reads them, and `kay dev` picks up a file added or removed with nothing to rerun.
+Without `eager`, each value is a function importing the file when called. Write the patterns and options in the call itself, as the build reads them.
 
 ## Slots and blocks
 
-Children of a component go to its `slot`. A `@name` block directly under it becomes the prop `name`, which the component renders with `slot name`; the lines under a `slot` render when it gets nothing. `src/components/card.kay`:
+Children of a component go to its `slot`. A `@name` block under it becomes the prop `name`, which the component renders with `slot name`. `src/components/card.kay`:
 
 ```kay
 ---
@@ -112,7 +112,7 @@ Card(title="Todos")
 
 ## Signals
 
-`signal(value)` holds state. It is read by calling it, `{count()}`, and written by assigning it, `count++`, or with `.set`, in the template as in the script. Handed to a component as a prop, `Toggle(open={open})`, it passes the signal itself, for a prop typed `Signal<boolean>` to read and write. `kay check` narrows a signal within the template expression reading it, so `{error && error.message}` checks with `error` a `signal<Error>()`; reads inside a handler or a `.map` callback run later and are not narrowed at all: copy the value into a `const` first, or assert it, `error!`. `memo(fn)` caches a derived value.
+`signal(value)` holds state. Read it by calling it, `{count()}`, and write it by assigning it, `count++`, or with `.set`, in the template as in the script. Handed to a component as a prop, `Toggle(open={open})`, it passes the signal itself, for a prop typed `Signal<boolean>` to read and write. `memo(fn)` caches a derived value.
 
 ```kay
 ---

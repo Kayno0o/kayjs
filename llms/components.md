@@ -185,6 +185,7 @@ export default defineConfig({ extensions: [authPages()] })
 - Defaults go in the destructuring. A default applies only to an `undefined` prop (`null` stays `null`), and runs only then, once per component, the first time the prop is read.
 - Props stay reactive: the compiler turns each destructured name into a live read.
 - Props are read-only.
+- A page has no props: its data comes from its `--- server` fence.
 - A prop is a plain name in the template, `{title}`, not `{title()}`, unless its type is a signal.
 
 ### Signals
