@@ -1,7 +1,8 @@
 import type { Subprocess } from 'bun'
+import type { Feature } from '../src/new'
 import { cp, mkdir, mkdtemp, readdir, rm, stat, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { basename, join } from 'node:path'
+import { basename, join, posix } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { parse, stringify } from 'devalue'
@@ -11,7 +12,6 @@ import { check, configCheckOptions } from '../src/check'
 import { loadConfig } from '../src/config'
 import { formatFiles } from '../src/format'
 import { createProject, FEATURE_NAMES, PRESETS, toggle } from '../src/new'
-import { limiter } from '../src/server/limit'
 
 const repo = join(import.meta.dir, '..')
 const LISTENING = /localhost:(\d+)/
@@ -74,9 +74,28 @@ async function pack(): Promise<string> {
   return dir
 }
 
+// The default server preset, scaffolded and installed once: `kay new` checks it as written, then `kay build --compile` adds pages of its own and builds it.
+let serverPreset: Promise<{ dir: string, files: string[] }> | undefined
+
+async function scaffoldServerPreset(): Promise<{ dir: string, files: string[] }> {
+  serverPreset ??= (async () => {
+    const dir = join(await mkdtemp(join(tmpdir(), 'kay-new-')), 'my-app')
+    const files = await createProject(dir, { kay: '^1.0.0' })
+
+    await installKay(dir)
+
+    return { dir, files }
+  })()
+
+  return serverPreset
+}
+
 afterAll(async () => {
   if (packed)
     await rm(await packed, { recursive: true, force: true })
+
+  if (serverPreset)
+    await rm(join((await serverPreset).dir, '..'), { recursive: true, force: true })
 })
 
 // Stands in for `bun install` of a packed kay: its source and what `prepack` emits, copied rather than linked so they resolve from the project, beside this checkout's dependencies.
@@ -94,8 +113,96 @@ async function installKay(dir: string) {
   await cp(await packed, kay, { recursive: true })
 }
 
-// The scaffolds the concurrent tests below run at once: each runs tsgo, ESLint and its own tests, and all twenty at once ran a machine out of memory.
-const scaffold = limiter(4)
+// Each feature alone, and the app with each one left out.
+const VARIANTS = FEATURE_NAMES.flatMap(feature => [[`${feature} alone`, toggle(new Set(), feature)], [`the app without ${feature}`, toggle(new Set(PRESETS.app.features), feature)]] as const)
+// Installed, checked, linted and tested besides the four presets. With them, server runs with auth and ws (app), with ws alone (the app without auth) and with neither (server); starter and tailwind each run with accents (server) and without (the app without tailwind, the app without starter); server, starter and tailwind each run absent, and the tests of a project with neither a server nor the starter pages run in eslint and tests alone. ci and docker write only text files.
+const INSTALLED: [string, ReadonlySet<Feature>][] = [
+  ['the app without starter', toggle(new Set(PRESETS.app.features), 'starter')],
+  ['the app without tailwind', toggle(new Set(PRESETS.app.features), 'tailwind')],
+  ['the app without auth', toggle(new Set(PRESETS.app.features), 'auth')],
+  ['eslint and tests alone', new Set(['eslint', 'tests'])],
+]
+
+// What a file names in an import, a side-effect or dynamic one, or a CSS @import.
+const SPECIFIER = /\b(?:from|import)\s*(?:\(\s*)?(['"])([^'"\n]+)\1/g
+const ICON_SET = /^~icons\/([^/]+)\//
+// A script run as `bun run <name>` in a workflow, the Dockerfile, AGENTS.md or a comment, or as compose's `[bun, run, <name>]`.
+const SCRIPT_RUN = /\bbun,? run,? ([\w:-]+)/g
+const DOCKER_COPY = /^COPY (?!--from)(.+) \S+$/gm
+const MIGRATIONS = /migrationsDir: '([^']+)'/g
+// The package each command a script runs comes from, Bun aside.
+const SCRIPT_BINS: Record<string, string | undefined> = { 'bun': undefined, 'kay': 'kay', 'keslint': '@kaynooo/eslint', 'pg-orm': '@kaynooo/pg-orm' }
+// Declared though nothing imports them: Bun's types, and Elysia, which kay needs beside it.
+const UNIMPORTED = new Set(['@types/bun', 'elysia'])
+
+// What a scaffold's files name that it lacks: a relative import, preload, extended tsconfig, copied file or migrations folder, a package it imports without depending on it, a script package.json does not hold; and a dependency nothing imports.
+function unresolved(files: Record<string, string>): { paths: string[], undeclared: string[], unused: string[], scripts: string[] } {
+  const manifest = JSON.parse(files['package.json']!) as { scripts: Record<string, string>, dependencies: Record<string, string>, devDependencies: Record<string, string> }
+  const paths: string[] = []
+  const packages = new Set<string>()
+  const scripts = new Set<string>()
+  const name = (from: string, specifier: string) => {
+    if (specifier.startsWith('.')) {
+      const path = posix.join(posix.dirname(from), specifier)
+
+      if (![path, `${path}.ts`, `${path}.kay`, `${path}/index.ts`].some(candidate => candidate in files))
+        paths.push(`${from}: ${specifier}`)
+    }
+    else if (!specifier.startsWith('node:') && !specifier.startsWith('bun:')) {
+      const icons = ICON_SET.exec(specifier)
+
+      packages.add(icons ? `@iconify-json/${icons[1]}` : specifier.split('/').slice(0, specifier.startsWith('@') ? 2 : 1).join('/'))
+    }
+  }
+
+  for (const [script, command] of Object.entries(manifest.scripts)) {
+    const space = command.indexOf(' ')
+    const bin = space === -1 ? command : command.slice(0, space)
+
+    if (!(bin in SCRIPT_BINS))
+      scripts.add(`package.json: ${script} runs ${bin}`)
+    else if (SCRIPT_BINS[bin] !== undefined)
+      packages.add(SCRIPT_BINS[bin])
+  }
+
+  for (const [file, content] of Object.entries(files)) {
+    if ((/\.(?:ts|kay|css)$/).test(file)) {
+      for (const [, , specifier] of content.matchAll(SPECIFIER))
+        name(file, specifier!)
+    }
+
+    for (const [, script] of content.matchAll(SCRIPT_RUN)) {
+      if (!Object.hasOwn(manifest.scripts, script!))
+        scripts.add(`${file}: ${script}`)
+    }
+
+    for (const [, folder] of content.matchAll(MIGRATIONS)) {
+      if (!Object.keys(files).some(other => other.startsWith(`${folder}/`)))
+        paths.push(`${file}: ${folder}`)
+    }
+  }
+
+  for (const preload of (files['bunfig.toml'] === undefined ? [] : (Bun.TOML.parse(files['bunfig.toml']) as { test: { preload: string[] } }).test.preload))
+    name('bunfig.toml', preload)
+
+  name('tsconfig.json', (JSON.parse(files['tsconfig.json']!) as { extends: string }).extends)
+
+  for (const [, sources] of (files.Dockerfile ?? '').matchAll(DOCKER_COPY)) {
+    for (const source of sources!.split(' ').filter(source => source !== '.' && !source.includes('*'))) {
+      if (!(source in files))
+        paths.push(`Dockerfile: ${source}`)
+    }
+  }
+
+  const declared = [...Object.keys(manifest.dependencies), ...Object.keys(manifest.devDependencies)]
+
+  return {
+    paths,
+    undeclared: [...packages].filter(used => !declared.includes(used)),
+    unused: declared.filter(dependency => !packages.has(dependency) && !UNIMPORTED.has(dependency)),
+    scripts: [...scripts],
+  }
+}
 
 // Lints as `bun run lint` does, through keslint and the eslint it runs under Node, as JSON.
 async function lint(dir: string, path: string): Promise<{ filePath: string, messages: { ruleId: string | null, line: number }[] }[]> {
@@ -119,11 +226,10 @@ describe('kay command line', () => {
     const dir = await mkdtemp(join(tmpdir(), 'kay-cli-'))
 
     try {
-      for (const args of [['--help'], ['-h'], ['build', '--help'], ['check', '-h'], ['new', '--help'], ['fmt', '--help'], ['dev', '--help'], ['lsp', '--help']]) {
-        const { stdout, stderr, code } = await kay(args, dir)
+      const runs = await Promise.all([['--help'], ['-h'], ['build', '--help'], ['check', '-h'], ['new', '--help'], ['fmt', '--help'], ['dev', '--help'], ['lsp', '--help']].map(async args => ({ args, ...await kay(args, dir) })))
 
+      for (const { args, stdout, stderr, code } of runs)
         expect({ args, stdout: stdout.startsWith('Usage: kay new'), stderr, code }).toEqual({ args, stdout: true, stderr: '', code: 0 })
-      }
 
       expect(await readdir(dir)).toEqual([])
     }
@@ -136,11 +242,10 @@ describe('kay command line', () => {
     const dir = await mkdtemp(join(tmpdir(), 'kay-cli-'))
 
     try {
-      for (const args of [['new', '--bogus', 'app'], ['fmt', '--bogus'], ['build', '--bogus'], ['check', '--bogus'], ['dev', '--bogus'], ['build', 'a', 'b'], ['check', '-p'], ['new', 'a', 'b']]) {
-        const { stdout, stderr, code } = await kay(args, dir)
+      const runs = await Promise.all([['new', '--bogus', 'app'], ['fmt', '--bogus'], ['build', '--bogus'], ['check', '--bogus'], ['dev', '--bogus'], ['build', 'a', 'b'], ['check', '-p'], ['new', 'a', 'b']].map(async args => ({ args, ...await kay(args, dir) })))
 
+      for (const { args, stdout, stderr, code } of runs)
         expect({ args, stdout, usage: stderr.includes('Usage: kay new'), code }).toEqual({ args, stdout: '', usage: true, code: 1 })
-      }
 
       expect(await readdir(dir)).toEqual([])
     }
@@ -254,13 +359,18 @@ describe('kay command line', () => {
     }
   }, 15_000)
 
-  it('refuses to scaffold over a file with a message', async () => {
+  it('refuses to scaffold over a file or into a directory that already holds files, with a message and touching neither', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'kay-cli-'))
 
     try {
-      await Bun.write(join(dir, 'afile'), 'x')
+      await Promise.all([Bun.write(join(dir, 'afile'), 'x'), Bun.write(join(dir, 'full/keep.txt'), 'mine')])
 
-      expect(await kay(['new', 'afile'], dir)).toEqual({ stdout: '', stderr: 'kay: afile is not a directory\n', code: 1 })
+      expect(await Promise.all([kay(['new', 'afile'], dir), kay(['new', 'full'], dir)])).toEqual([
+        { stdout: '', stderr: 'kay: afile is not a directory\n', code: 1 },
+        { stdout: '', stderr: 'kay: full is not empty\n', code: 1 },
+      ])
+      expect(await Bun.file(join(dir, 'afile')).text()).toBe('x')
+      expect(await readdir(join(dir, 'full'))).toEqual(['keep.txt'])
     }
     finally {
       await rm(dir, { recursive: true, force: true })
@@ -271,69 +381,61 @@ describe('kay command line', () => {
 describe('kay new', () => {
   // Installing, checking, linting, testing and building the app takes about 30 s in CI, so it is given twice that.
   it('scaffolds a project that type-checks against the declarations of kay, is formatted and builds as it is', async () => {
-    const dir = join(await mkdtemp(join(tmpdir(), 'kay-new-')), 'my-app')
+    const { dir, files } = await scaffoldServerPreset()
+    const manifest = await Bun.file(join(dir, 'package.json')).json() as { dependencies: Record<string, string>, devDependencies: Record<string, string>, scripts: Record<string, string> }
 
-    try {
-      const files = await createProject(dir, { kay: '^1.0.0' })
-      const manifest = await Bun.file(join(dir, 'package.json')).json() as { dependencies: Record<string, string>, devDependencies: Record<string, string>, scripts: Record<string, string> }
+    expect(files).toContain('src/routes/index.kay')
+    // The container runs the one executable `kay build --compile` makes.
+    expect(files).toEqual(expect.arrayContaining(['Dockerfile', 'compose.prod.yaml', 'src/components/accent-picker.kay']))
+    expect(manifest.scripts.compile).toBe('kay build --compile server')
+    // A warning fails CI as an error does, so none piles up unread.
+    expect(manifest.scripts.check).toBe('kay check --deny-warnings')
+    expect(await Bun.file(join(dir, 'AGENTS.md')).text()).toContain('run `bun run check`, `bun run fmt`, `bun run lint`, and `bun run test`.')
+    expect(await Bun.file(join(dir, 'Dockerfile')).text()).toContain('RUN bun run compile')
+    expect(await Bun.file(join(dir, 'Dockerfile')).text()).toContain('HEALTHCHECK --interval=30s --timeout=6s CMD ["./server", "--health"]')
+    expect(Object.keys(manifest.devDependencies)).toEqual(['@iconify-json/tabler', '@kaynooo/eslint', '@types/bun', 'bun-plugin-tailwind', 'tailwindcss'])
+    expect(await Bun.file(join(dir, '.npmrc')).text()).toBe('@kaynooo:registry=https://git.kaynooo.fr/api/packages/kaynooo/npm/\n')
+    expect(manifest.dependencies.kay).toBe('^1.0.0')
+    expect(await Bun.file(join(dir, 'src/components/header.kay')).text()).toContain('(href="/") my-app\n')
+    // As strict as kay itself, and checked, linted and tested on every push.
+    expect(await Bun.file(join(dir, 'tsconfig.json')).json()).toEqual({ extends: 'kay/tsconfig.json' })
+    expect(((await Bun.file(join(repo, 'src/tsconfig.app.json')).json()) as { compilerOptions: Record<string, unknown> }).compilerOptions).toMatchObject({ strict: true, exactOptionalPropertyTypes: true, noFallthroughCasesInSwitch: true, noImplicitOverride: true, noUncheckedIndexedAccess: true })
+    expect(await Bun.file(join(dir, '.forgejo/workflows/test.yml')).text()).toContain('run: bun run check --format github\n\n      # After the check, which writes the types the lint of .kay files reads.\n      - name: Lint\n        run: bun run lint\n\n      - name: Test\n        run: bun run test\n')
 
-      expect(files).toContain('src/routes/index.kay')
-      // The container runs the one executable `kay build --compile` makes.
-      expect(files).toEqual(expect.arrayContaining(['Dockerfile', 'compose.prod.yaml', 'src/components/accent-picker.kay']))
-      expect(manifest.scripts.compile).toBe('kay build --compile server')
-      // A warning fails CI as an error does, so none piles up unread.
-      expect(manifest.scripts.check).toBe('kay check --deny-warnings')
-      expect(await Bun.file(join(dir, 'AGENTS.md')).text()).toContain('run `bun run check`, `bun run fmt`, `bun run lint`, and `bun run test`.')
-      expect(await Bun.file(join(dir, 'Dockerfile')).text()).toContain('RUN bun run compile')
-      expect(await Bun.file(join(dir, 'Dockerfile')).text()).toContain('HEALTHCHECK --interval=30s --timeout=6s CMD ["./server", "--health"]')
-      expect(Object.keys(manifest.devDependencies)).toEqual(['@iconify-json/tabler', '@kaynooo/eslint', '@types/bun', 'bun-plugin-tailwind', 'tailwindcss'])
-      expect(await Bun.file(join(dir, '.npmrc')).text()).toBe('@kaynooo:registry=https://git.kaynooo.fr/api/packages/kaynooo/npm/\n')
-      expect(manifest.dependencies.kay).toBe('^1.0.0')
-      expect(await Bun.file(join(dir, 'src/components/header.kay')).text()).toContain('(href="/") my-app\n')
-      // As strict as kay itself, and checked, linted and tested on every push.
-      expect(await Bun.file(join(dir, 'tsconfig.json')).json()).toEqual({ extends: 'kay/tsconfig.json' })
-      expect(((await Bun.file(join(repo, 'src/tsconfig.app.json')).json()) as { compilerOptions: Record<string, unknown> }).compilerOptions).toMatchObject({ strict: true, exactOptionalPropertyTypes: true, noFallthroughCasesInSwitch: true, noImplicitOverride: true, noUncheckedIndexedAccess: true })
-      expect(await Bun.file(join(dir, '.forgejo/workflows/test.yml')).text()).toContain('run: bun run check --format github\n\n      # After the check, which writes the types the lint of .kay files reads.\n      - name: Lint\n        run: bun run lint\n\n      - name: Test\n        run: bun run test\n')
+    // Stricter than kay itself: its source fails this flag, its declarations must not.
+    const scaffolded = await Bun.file(join(dir, 'tsconfig.json')).text()
+    const tsconfig = JSON.parse(scaffolded) as { compilerOptions: Record<string, unknown> }
 
-      await installKay(dir)
+    await Bun.write(join(dir, 'tsconfig.json'), JSON.stringify({ ...tsconfig, compilerOptions: { ...tsconfig.compilerOptions, exactOptionalPropertyTypes: true } }))
+    expect(await checked(dir)).toEqual([])
+    expect((await formatFiles([join(dir, 'src')], { write: false })).changed).toEqual([])
+    // The scaffolded tsconfig, as lint reads every file of the project.
+    await Bun.write(join(dir, 'tsconfig.json'), scaffolded)
+    expect((await lint(dir, '.')).flatMap(result => result.messages)).toEqual([])
 
-      // Stricter than kay itself: its source fails this flag, its declarations must not.
-      const scaffolded = await Bun.file(join(dir, 'tsconfig.json')).text()
-      const tsconfig = JSON.parse(scaffolded) as { compilerOptions: Record<string, unknown> }
+    // A page's server fence is linted with the project's types, at its .kay line.
+    await Bun.write(join(dir, 'src/routes/later.kay'), '--- server\nBun.write(\'later.txt\', \'later\')\n---\np Later\n')
+    expect(await checked(dir)).toEqual([])
+    expect((await lint(dir, 'src/routes/later.kay'))[0]!.messages).toEqual([expect.objectContaining({ ruleId: 'ts/no-floating-promises', line: 2 })])
+    await rm(join(dir, 'src/routes/later.kay'))
 
-      await Bun.write(join(dir, 'tsconfig.json'), JSON.stringify({ ...tsconfig, compilerOptions: { ...tsconfig.compilerOptions, exactOptionalPropertyTypes: true } }))
-      expect(await checked(dir)).toEqual([])
-      expect((await formatFiles([join(dir, 'src')], { write: false })).changed).toEqual([])
-      // The scaffolded tsconfig, as lint reads every file of the project.
-      await Bun.write(join(dir, 'tsconfig.json'), scaffolded)
-      expect((await lint(dir, '.')).flatMap(result => result.messages)).toEqual([])
+    // The accent picker as a visitor meets it: rendered from the cookie, a value it does not know read as the default, and changed by a click.
+    await Bun.write(join(dir, 'tests/accent.test.ts'), ACCENT_TEST.replace('__WIRE__', JSON.stringify(join(repo, 'src/runtime/wire'))))
 
-      // A page's server fence is linted with the project's types, at its .kay line.
-      await Bun.write(join(dir, 'src/routes/later.kay'), '--- server\nBun.write(\'later.txt\', \'later\')\n---\np Later\n')
-      expect(await checked(dir)).toEqual([])
-      expect((await lint(dir, 'src/routes/later.kay'))[0]!.messages).toEqual([expect.objectContaining({ ruleId: 'ts/no-floating-promises', line: 2 })])
-      await rm(join(dir, 'src/routes/later.kay'))
+    const tests = Bun.spawn([process.execPath, 'test'], { cwd: dir, stdout: 'pipe', stderr: 'pipe' })
+    const [report, code] = await Promise.all([new Response(tests.stderr).text(), tests.exited])
 
-      // The accent picker as a visitor meets it: rendered from the cookie, a value it does not know read as the default, and changed by a click.
-      await Bun.write(join(dir, 'tests/accent.test.ts'), ACCENT_TEST.replace('__WIRE__', JSON.stringify(join(repo, 'src/runtime/wire'))))
+    expect(report).toContain('3 pass')
+    expect(code).toBe(0)
+    await rm(join(dir, 'tests/accent.test.ts'))
 
-      const tests = Bun.spawn([process.execPath, 'test'], { cwd: dir, stdout: 'pipe', stderr: 'pipe' })
-      const [report, code] = await Promise.all([new Response(tests.stderr).text(), tests.exited])
+    const client = await buildClient(dir)
 
-      expect(report).toContain('3 pass')
-      expect(code).toBe(0)
+    // In the order the bundler wrote their chunks, not the source's.
+    expect(Object.keys(client.islands).sort()).toEqual(['src/components/accent-picker.kay', 'src/components/counter.kay'])
+    const stylesheet = client.styles.get(join(dir, 'src/routes/_layout.kay'))!
 
-      const client = await buildClient(dir)
-
-      // In the order the bundler wrote their chunks, not the source's.
-      expect(Object.keys(client.islands).sort()).toEqual(['src/components/accent-picker.kay', 'src/components/counter.kay'])
-      const stylesheet = client.styles.get(join(dir, 'src/routes/_layout.kay'))!
-
-      expect(await Bun.file(join(client.dir, stylesheet.slice('/_kay/'.length))).text()).toMatch(/@media \(prefers-reduced-motion: ?no-preference\) ?\{\s*@view-transition/)
-    }
-    finally {
-      await rm(join(dir, '..'), { recursive: true, force: true })
-    }
+    expect(await Bun.file(join(client.dir, stylesheet.slice('/_kay/'.length))).text()).toMatch(/@media \(prefers-reduced-motion: ?no-preference\) ?\{\s*@view-transition/)
   }, 60_000)
 
   it('scaffolds a static site that type-checks and exports to dist, with a Pages workflow and a container beside it', async () => {
@@ -485,38 +587,53 @@ describe('kay new', () => {
     }
   }, 30_000)
 
-  // Each feature alone, and the app with each one left out, a few at a time: every project is a directory of its own. A test's timeout counts its wait for a slot, so it holds the whole run of them.
-  for (const [label, variant] of FEATURE_NAMES.flatMap(feature => [[`${feature} alone`, toggle(new Set(), feature)], [`the app without ${feature}`, toggle(new Set(PRESETS.app.features), feature)]] as const)) {
-    it.concurrent(`scaffolds ${label} as a project that checks, is formatted, lints and passes its tests`, async () => {
-      await scaffold(async () => {
-        const features = [...variant]
-        const dir = join(await mkdtemp(join(tmpdir(), 'kay-new-')), 'my-app')
+  // Without installing, every variant is scaffolded formatted, naming only files it holds, packages it depends on and scripts it has, and depending on nothing it does not import.
+  for (const [label, variant] of VARIANTS) {
+    it(`scaffolds ${label} formatted, with every file, package and script it names`, async () => {
+      const features = [...variant]
+      const dir = join(await mkdtemp(join(tmpdir(), 'kay-new-')), 'my-app')
 
-        try {
-          await createProject(dir, { kay: '^1.0.0', features })
-          await installKay(dir)
-          expect({ features, problems: await checked(dir) }).toEqual({ features, problems: [] })
-          expect({ features, changed: (await formatFiles([join(dir, 'src')], { write: false })).changed }).toEqual({ features, changed: [] })
+      try {
+        const files = await createProject(dir, { kay: '^1.0.0', features })
+        const contents = Object.fromEntries(await Promise.all(files.map(async file => [file, await Bun.file(join(dir, file)).text()] as const)))
 
-          if (variant.has('docker') && !variant.has('server'))
-            expect({ features, notFound: (await Bun.file(join(dir, 'nginx.conf')).text()).includes('error_page 404 /404.html') }).toEqual({ features, notFound: variant.has('starter') })
+        expect({ features, ...unresolved(contents) }).toEqual({ features, paths: [], undeclared: [], unused: [], scripts: [] })
+        expect({ features, changed: (await formatFiles([join(dir, 'src')], { write: false })).changed }).toEqual({ features, changed: [] })
 
-          if (variant.has('eslint'))
-            expect({ features, messages: (await lint(dir, '.')).flatMap(result => result.messages) }).toEqual({ features, messages: [] })
+        if (variant.has('docker') && !variant.has('server'))
+          expect({ features, notFound: contents['nginx.conf']!.includes('error_page 404 /404.html') }).toEqual({ features, notFound: variant.has('starter') })
+      }
+      finally {
+        await rm(join(dir, '..'), { recursive: true, force: true })
+      }
+    })
+  }
 
-          // An app's tests need a Postgres, which the app preset's own test runs them on.
-          if (variant.has('tests') && !variant.has('auth')) {
-            const tests = Bun.spawn([process.execPath, 'test'], { cwd: dir, stdout: 'pipe', stderr: 'pipe' })
-            const [report, code] = await Promise.all([new Response(tests.stderr).text(), tests.exited])
+  for (const [label, variant] of INSTALLED) {
+    it.concurrent(`scaffolds ${label} as a project that checks, lints and passes its tests`, async () => {
+      const features = [...variant]
+      const dir = join(await mkdtemp(join(tmpdir(), 'kay-new-')), 'my-app')
 
-            expect({ features, code, report }).toEqual({ features, code: 0, report: expect.stringContaining(' 0 fail') })
-          }
+      try {
+        await createProject(dir, { kay: '^1.0.0', features })
+        await installKay(dir)
+        expect({ features, problems: await checked(dir) }).toEqual({ features, problems: [] })
+
+        if (variant.has('eslint'))
+          expect({ features, messages: (await lint(dir, '.')).flatMap(result => result.messages) }).toEqual({ features, messages: [] })
+
+        // An app's tests need a Postgres, which the app preset's own test runs them on.
+        if (variant.has('tests') && !variant.has('auth')) {
+          const tests = Bun.spawn([process.execPath, 'test'], { cwd: dir, stdout: 'pipe', stderr: 'pipe' })
+          const [report, code] = await Promise.all([new Response(tests.stderr).text(), tests.exited])
+
+          expect({ features, code, report }).toEqual({ features, code: 0, report: expect.stringContaining(' 0 fail') })
         }
-        finally {
-          await rm(join(dir, '..'), { recursive: true, force: true })
-        }
-      })
-    }, 240_000)
+      }
+      finally {
+        await rm(join(dir, '..'), { recursive: true, force: true })
+      }
+    }, 120_000)
   }
 
   it('checks what a feature needs along with it, and unchecks what needs it along with it', () => {
@@ -534,18 +651,6 @@ describe('kay new', () => {
     }
     finally {
       await rm(join(dir, '..'), { recursive: true, force: true })
-    }
-  })
-
-  it('refuses a directory that already holds files', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'kay-new-'))
-
-    try {
-      await Bun.write(join(dir, 'keep.txt'), 'mine')
-      await expect(createProject(dir)).rejects.toThrow('is not empty')
-    }
-    finally {
-      await rm(dir, { recursive: true, force: true })
     }
   })
 })
@@ -589,156 +694,149 @@ describe('kay build --compile', () => {
   })
 
   it('bundles the server, its pages and the client build into one executable that serves them from anywhere', async () => {
-    const dir = join(await mkdtemp(join(tmpdir(), 'kay-compile-')), 'my-app')
+    const { dir } = await scaffoldServerPreset()
+
+    await Promise.all(Object.entries({
+      'public/robots.txt': 'User-agent: *\n',
+      // A static component with relative imports of its own, so its island twin resolves them too.
+      'src/components/shout.ts': 'export const shout = (text: string) => text.toUpperCase()\n',
+      'src/components/dot.kay': 'i.dot\n',
+      'src/components/badge.kay': '---\nimport Dot from \'./dot.kay\'\nimport { shout } from \'./shout\'\n\nconst { labels } = props<{ labels: string[] }>()\n---\nul.badges\n  for label of labels key={label}\n    li\n      Dot\n      | {shout(label)}\n',
+      'src/components/tally.kay': '---\nimport { signal } from \'kay\'\nimport Badge from \'./badge.kay\'\n\nconst n = signal(0)\n---\nBadge(labels={[\'in\']})\nbutton(onClick={() => n.set(c => c + 1)}) {n()}\n',
+      'src/routes/badges.kay': '---\nimport Badge from \'../components/badge.kay\'\nimport Tally from \'../components/tally.kay\'\n---\nBadge(labels={[\'out\']})\nTally\n',
+      'src/routes/about.kay': '--- server\nexport const page = { prerender: true }\n---\np About\n',
+      'src/routes/echo.kay': '--- server\nimport { t } from \'elysia\'\nimport { action } from \'kay\'\n\nexport const shout = action(t.Object({ text: t.String({ maxLength: 200 }) }), ({ text }) => text.toUpperCase())\n---\np Echo\n',
+      'src/routes/admin/_guard.ts': 'import { guard } from \'kay\'\n\nexport default guard(({ deny }) => deny(403, \'Admins only\'))\n',
+      'src/routes/admin/index.kay': 'p Secret\n',
+      'src/content.config.ts': 'import { t } from \'elysia\'\nimport { collection } from \'kay/content\'\n\nexport const notes = collection(\'content/notes\', {\n  schema: t.Object({ title: t.String(), date: t.Date() }),\n  feed: { path: \'/notes.xml\', title: \'Notes\', item: note => ({ title: note.data.title, path: `/notes/${note.slug}`, date: note.data.date }) },\n})\n',
+      'src/content/notes/first.md': '---\ntitle: First note\ndate: 2026-09-01\n---\n\n## Read me\n',
+      'src/routes/notes/[slug].kay': '--- server\nimport { notes } from \'../../content.config\'\n\nconst note = await notes.get(ctx.params.slug) ?? ctx.notFound()\nconst { Content } = note\n---\nh1 {note.data.title}\nContent\n',
+      'src/routes/photo.kay': '---\nimport { image } from \'kay/image\'\nimport hero from \'../hero.png\'\n---\nimg({...image(hero)} alt="Hero")\n',
+      // An island loading wasm and starting a module worker, which the executable serves from its build.
+      'src/routes/lab.kay': '---\nimport { onMount, signal } from \'kay\'\nimport wasm from \'../add.wasm\'\n\nconst echoed = signal(\'\')\n\nonMount(() => {\n  const worker = new Worker(new URL(\'../echo.ts\', import.meta.url), { type: \'module\' })\n\n  worker.onmessage = (event: MessageEvent<string>) => echoed.set(event.data)\n})\n---\np.wasm {wasm}\np {echoed()}\n',
+      'src/api/ping.ts': 'import { Elysia } from \'elysia\'\n\nexport default new Elysia().get(\'/\', () => \'pong\')\n',
+      'src/api/members/_guard.ts': 'import { guard } from \'kay\'\n\nexport default guard(({ deny }) => deny(403, \'Members only\'))\n',
+      'src/api/members/index.ts': 'import { Elysia } from \'elysia\'\n\nexport default new Elysia().get(\'/\', () => \'secret\')\n',
+      // A kay library whose settings the app replaces, on a page the build prerenders and one the executable renders.
+      'node_modules/kay-lib/package.json': JSON.stringify({ name: 'kay-lib', version: '1.0.0', type: 'module', peerDependencies: { kay: '*' }, exports: { './*.kay': './src/*.kay' }, kay: { settings: './src/settings.ts' } }),
+      'node_modules/kay-lib/src/settings.ts': 'export default { icon: (name: string) => `default:${name}` }\n',
+      'node_modules/kay-lib/src/tag.kay': '---\nimport { signal } from \'kay\'\nimport settings from \'./settings\'\n\nconst { label } = props<{ label: string }>()\nconst open = signal(false)\n---\nbutton.tag(onClick={() => open.set(o => !o)}) {settings.icon(label)}\n',
+      'src/ui-settings.ts': 'export default { icon: (name: string) => `app:${name}` }\n',
+      'src/routes/tags.kay': '---\nimport Tag from \'kay-lib/tag.kay\'\n---\n--- server\nexport const page = { prerender: true }\n---\nTag(label="kept")\n',
+      'src/routes/live-tags.kay': '---\nimport Tag from \'kay-lib/tag.kay\'\n---\nTag(label="live")\n',
+      // A build plugin reading a file beside it as it loads, as a native binding does: the executable must not load it.
+      'node_modules/build-stamp/package.json': JSON.stringify({ name: 'build-stamp', version: '1.0.0', type: 'module', exports: { types: './index.d.ts', default: './index.js' } }),
+      'node_modules/build-stamp/index.d.ts': 'declare const stamp: () => import(\'bun\').BunPlugin\nexport default stamp\n',
+      'node_modules/build-stamp/index.js': 'import { readFileSync } from \'node:fs\'\nimport { join } from \'node:path\'\n\nconst binding = readFileSync(join(import.meta.dir, \'binding.txt\'), \'utf8\')\n\nexport default () => ({ name: binding, setup() {} })\n',
+      'node_modules/build-stamp/binding.txt': 'stamp',
+      'kay.config.ts': 'import stamp from \'build-stamp\'\nimport { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ plugins: [stamp()], lang: \'en\', site: \'https://example.com\', favicon: \'src/favicon.png\', fonts: [{ family: \'Display\', src: \'src/display.woff2\' }], settings: { \'kay-lib\': \'./src/ui-settings.ts\' }, images: { dirs: { \'/uploads/\': \'uploads\' } } })\n',
+    }).map(async ([path, content]) => Bun.write(join(dir, path), content)))
+    // Images, the favicon and fonts are read from the project at build time only: the executable serves what the build made of them.
+    await Promise.all([
+      Bun.write(join(dir, 'src/hero.png'), Bun.file(join(repo, 'tests/fixtures/images/src/hero.png'))),
+      Bun.write(join(dir, 'src/favicon.png'), Bun.file(join(repo, 'tests/fixtures/seo/src/favicon.png'))),
+      Bun.write(join(dir, 'src/display.woff2'), Bun.file(join(repo, 'tests/fixtures/seo/src/fonts/display.woff2'))),
+      Bun.write(join(dir, 'src/add.wasm'), Bun.file(join(repo, 'tests/fixtures/workers/src/add.wasm'))),
+      Bun.write(join(dir, 'src/echo.ts'), Bun.file(join(repo, 'tests/fixtures/workers/src/echo.ts'))),
+    ])
+
+    const manifest = await Bun.file(join(dir, 'package.json')).json() as { dependencies: Record<string, string> }
+
+    await Bun.write(join(dir, 'package.json'), JSON.stringify({ ...manifest, dependencies: { ...manifest.dependencies, 'kay-lib': '1.0.0' } }))
+
+    const build = Bun.spawn([process.execPath, join(repo, 'src/cli.ts'), 'build', '--compile', 'server'], { cwd: dir, stdout: 'pipe', stderr: 'pipe' })
+    const [report, code] = await Promise.all([new Response(build.stdout).text(), build.exited])
+
+    expect(report).toContain('compiled server in ')
+    expect(code).toBe(0)
+    // For `kay start` to run.
+    expect(await Bun.file(join(outputDir(dir), 'executable')).text()).toBe('server')
+    // Serving the build it embeds, it carries neither kay's compiler nor Babel, and loads zlib, crypto, http and SQLite only once a feature needs them.
+    const executable = Buffer.from(await Bun.file(join(dir, 'server')).bytes())
+
+    expect(executable.includes('compiler/codegen.ts')).toBe(false)
+    expect(EAGER_BUILTINS.filter(statement => executable.includes(statement))).toEqual([])
+    await rm(join(dir, 'node_modules/build-stamp'), { recursive: true })
+
+    // Run from elsewhere, with nothing of the project to read but an upload.
+    const elsewhere = join(dir, '..', 'elsewhere')
+
+    await Bun.write(join(elsewhere, 'uploads/photo.png'), Bun.file(join(repo, 'tests/fixtures/images/src/hero.png')))
+
+    // The temp directory the runtime images' variants go to is the run's.
+    const server = Bun.spawn([join(dir, 'server')], { cwd: elsewhere, env: { PATH: process.env.PATH, PORT: '0', TMPDIR: tmpdir() }, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' })
 
     try {
-      await createProject(dir, { kay: '^1.0.0' })
-      await installKay(dir)
-      await Promise.all(Object.entries({
-        'public/robots.txt': 'User-agent: *\n',
-        // A static component with relative imports of its own, so its island twin resolves them too.
-        'src/components/shout.ts': 'export const shout = (text: string) => text.toUpperCase()\n',
-        'src/components/dot.kay': 'i.dot\n',
-        'src/components/badge.kay': '---\nimport Dot from \'./dot.kay\'\nimport { shout } from \'./shout\'\n\nconst { labels } = props<{ labels: string[] }>()\n---\nul.badges\n  for label of labels key={label}\n    li\n      Dot\n      | {shout(label)}\n',
-        'src/components/tally.kay': '---\nimport { signal } from \'kay\'\nimport Badge from \'./badge.kay\'\n\nconst n = signal(0)\n---\nBadge(labels={[\'in\']})\nbutton(onClick={() => n.set(c => c + 1)}) {n()}\n',
-        'src/routes/badges.kay': '---\nimport Badge from \'../components/badge.kay\'\nimport Tally from \'../components/tally.kay\'\n---\nBadge(labels={[\'out\']})\nTally\n',
-        'src/routes/about.kay': '--- server\nexport const page = { prerender: true }\n---\np About\n',
-        'src/routes/echo.kay': '--- server\nimport { t } from \'elysia\'\nimport { action } from \'kay\'\n\nexport const shout = action(t.Object({ text: t.String({ maxLength: 200 }) }), ({ text }) => text.toUpperCase())\n---\np Echo\n',
-        'src/routes/admin/_guard.ts': 'import { guard } from \'kay\'\n\nexport default guard(({ deny }) => deny(403, \'Admins only\'))\n',
-        'src/routes/admin/index.kay': 'p Secret\n',
-        'src/content.config.ts': 'import { t } from \'elysia\'\nimport { collection } from \'kay/content\'\n\nexport const notes = collection(\'content/notes\', {\n  schema: t.Object({ title: t.String(), date: t.Date() }),\n  feed: { path: \'/notes.xml\', title: \'Notes\', item: note => ({ title: note.data.title, path: `/notes/${note.slug}`, date: note.data.date }) },\n})\n',
-        'src/content/notes/first.md': '---\ntitle: First note\ndate: 2026-09-01\n---\n\n## Read me\n',
-        'src/routes/notes/[slug].kay': '--- server\nimport { notes } from \'../../content.config\'\n\nconst note = await notes.get(ctx.params.slug) ?? ctx.notFound()\nconst { Content } = note\n---\nh1 {note.data.title}\nContent\n',
-        'src/routes/photo.kay': '---\nimport { image } from \'kay/image\'\nimport hero from \'../hero.png\'\n---\nimg({...image(hero)} alt="Hero")\n',
-        // An island loading wasm and starting a module worker, which the executable serves from its build.
-        'src/routes/lab.kay': '---\nimport { onMount, signal } from \'kay\'\nimport wasm from \'../add.wasm\'\n\nconst echoed = signal(\'\')\n\nonMount(() => {\n  const worker = new Worker(new URL(\'../echo.ts\', import.meta.url), { type: \'module\' })\n\n  worker.onmessage = (event: MessageEvent<string>) => echoed.set(event.data)\n})\n---\np.wasm {wasm}\np {echoed()}\n',
-        'src/api/ping.ts': 'import { Elysia } from \'elysia\'\n\nexport default new Elysia().get(\'/\', () => \'pong\')\n',
-        'src/api/members/_guard.ts': 'import { guard } from \'kay\'\n\nexport default guard(({ deny }) => deny(403, \'Members only\'))\n',
-        'src/api/members/index.ts': 'import { Elysia } from \'elysia\'\n\nexport default new Elysia().get(\'/\', () => \'secret\')\n',
-        // A kay library whose settings the app replaces, on a page the build prerenders and one the executable renders.
-        'node_modules/kay-lib/package.json': JSON.stringify({ name: 'kay-lib', version: '1.0.0', type: 'module', peerDependencies: { kay: '*' }, exports: { './*.kay': './src/*.kay' }, kay: { settings: './src/settings.ts' } }),
-        'node_modules/kay-lib/src/settings.ts': 'export default { icon: (name: string) => `default:${name}` }\n',
-        'node_modules/kay-lib/src/tag.kay': '---\nimport { signal } from \'kay\'\nimport settings from \'./settings\'\n\nconst { label } = props<{ label: string }>()\nconst open = signal(false)\n---\nbutton.tag(onClick={() => open.set(o => !o)}) {settings.icon(label)}\n',
-        'src/ui-settings.ts': 'export default { icon: (name: string) => `app:${name}` }\n',
-        'src/routes/tags.kay': '---\nimport Tag from \'kay-lib/tag.kay\'\n---\n--- server\nexport const page = { prerender: true }\n---\nTag(label="kept")\n',
-        'src/routes/live-tags.kay': '---\nimport Tag from \'kay-lib/tag.kay\'\n---\nTag(label="live")\n',
-        // A build plugin reading a file beside it as it loads, as a native binding does: the executable must not load it.
-        'node_modules/build-stamp/package.json': JSON.stringify({ name: 'build-stamp', version: '1.0.0', type: 'module', exports: { types: './index.d.ts', default: './index.js' } }),
-        'node_modules/build-stamp/index.d.ts': 'declare const stamp: () => import(\'bun\').BunPlugin\nexport default stamp\n',
-        'node_modules/build-stamp/index.js': 'import { readFileSync } from \'node:fs\'\nimport { join } from \'node:path\'\n\nconst binding = readFileSync(join(import.meta.dir, \'binding.txt\'), \'utf8\')\n\nexport default () => ({ name: binding, setup() {} })\n',
-        'node_modules/build-stamp/binding.txt': 'stamp',
-        'kay.config.ts': 'import stamp from \'build-stamp\'\nimport { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ plugins: [stamp()], lang: \'en\', site: \'https://example.com\', favicon: \'src/favicon.png\', fonts: [{ family: \'Display\', src: \'src/display.woff2\' }], settings: { \'kay-lib\': \'./src/ui-settings.ts\' }, images: { dirs: { \'/uploads/\': \'uploads\' } } })\n',
-      }).map(async ([path, content]) => Bun.write(join(dir, path), content)))
-      // Images, the favicon and fonts are read from the project at build time only: the executable serves what the build made of them.
-      await Promise.all([
-        Bun.write(join(dir, 'src/hero.png'), Bun.file(join(repo, 'tests/fixtures/images/src/hero.png'))),
-        Bun.write(join(dir, 'src/favicon.png'), Bun.file(join(repo, 'tests/fixtures/seo/src/favicon.png'))),
-        Bun.write(join(dir, 'src/display.woff2'), Bun.file(join(repo, 'tests/fixtures/seo/src/fonts/display.woff2'))),
-        Bun.write(join(dir, 'src/add.wasm'), Bun.file(join(repo, 'tests/fixtures/workers/src/add.wasm'))),
-        Bun.write(join(dir, 'src/echo.ts'), Bun.file(join(repo, 'tests/fixtures/workers/src/echo.ts'))),
-      ])
+      const port = await listeningPort(server)
+      const origin = `http://localhost:${port}`
+      const get = async (path: string) => {
+        const response = await fetch(`${origin}${path}`)
 
-      const manifest = await Bun.file(join(dir, 'package.json')).json() as { dependencies: Record<string, string> }
-
-      await Bun.write(join(dir, 'package.json'), JSON.stringify({ ...manifest, dependencies: { ...manifest.dependencies, 'kay-lib': '1.0.0' } }))
-
-      const build = Bun.spawn([process.execPath, join(repo, 'src/cli.ts'), 'build', '--compile', 'server'], { cwd: dir, stdout: 'pipe', stderr: 'pipe' })
-      const [report, code] = await Promise.all([new Response(build.stdout).text(), build.exited])
-
-      expect(report).toContain('compiled server in ')
-      expect(code).toBe(0)
-      // For `kay start` to run.
-      expect(await Bun.file(join(outputDir(dir), 'executable')).text()).toBe('server')
-      // Serving the build it embeds, it carries neither kay's compiler nor Babel, and loads zlib, crypto, http and SQLite only once a feature needs them.
-      const executable = Buffer.from(await Bun.file(join(dir, 'server')).bytes())
-
-      expect(executable.includes('compiler/codegen.ts')).toBe(false)
-      expect(EAGER_BUILTINS.filter(statement => executable.includes(statement))).toEqual([])
-      await rm(join(dir, 'node_modules/build-stamp'), { recursive: true })
-
-      // Run from elsewhere, with nothing of the project to read but an upload.
-      const elsewhere = join(dir, '..', 'elsewhere')
-
-      await Bun.write(join(elsewhere, 'uploads/photo.png'), Bun.file(join(repo, 'tests/fixtures/images/src/hero.png')))
-
-      // The temp directory the runtime images' variants go to is the run's.
-      const server = Bun.spawn([join(dir, 'server')], { cwd: elsewhere, env: { PATH: process.env.PATH, PORT: '0', TMPDIR: tmpdir() }, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' })
-
-      try {
-        const port = await listeningPort(server)
-        const origin = `http://localhost:${port}`
-        const get = async (path: string) => {
-          const response = await fetch(`${origin}${path}`)
-
-          return { status: response.status, text: await response.text() }
-        }
-        const home = await get('/')
-        const entry = (/<script type="module" src="([^"]+)"/).exec(home.text)![1]!
-        const badges = await get('/badges')
-        const about = await fetch(`${origin}/about`, { headers: { 'accept-encoding': 'br' } })
-        const call = await fetch(`${origin}/_kay/action/src/routes/echo.kay/shout`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-kay-action': '1', 'origin': origin }, body: stringify({ text: 'hi' }) })
-
-        expect(home.text).toContain('Hello from the server</h1>')
-        expect((await get(entry)).status).toBe(200)
-        expect(await get('/robots.txt')).toEqual({ status: 200, text: 'User-agent: *\n' })
-        // The copy `kay build` prerendered and compressed, not a render.
-        expect(about.headers.get('etag')).toEndWith('-br"')
-        expect(await about.text()).toContain('<p>About</p>')
-        expect(badges.text).toContain('<ul class="badges"><li><i class="dot"></i>OUT</li></ul>')
-        expect(badges.text).toContain('<slot data-component="src/components/tally.kay" data-props="[{}]"><!--[--><ul class="badges"><li><!--[--><i class="dot"></i><!--]--><!--[-->IN<!--]--></li></ul><!--]--><button>0</button></slot>')
-        expect(parse(await call.text())).toBe('HI')
-        expect(await get('/admin')).toEqual({ status: 403, text: 'Admins only' })
-        expect(await get('/api/ping')).toEqual({ status: 200, text: 'pong' })
-        expect(await get('/api/members')).toEqual({ status: 403, text: 'Members only' })
-        expect((await get('/missing')).text).toContain('Nothing here</h1>')
-
-        const lab = await fetch(`${origin}/lab`)
-        const wasm = await fetch(`${origin}${(/<p class="wasm">([^<]+)</).exec(await lab.text())![1]!}`)
-        const worker = [...new Bun.Glob('.kay/*/dist/assets/echo-*.js').scanSync({ cwd: dir, dot: true })]
-
-        expect(lab.headers.get('content-security-policy')).toContain('\'wasm-unsafe-eval\'')
-        expect([wasm.status, wasm.headers.get('content-type')]).toEqual([200, 'application/wasm'])
-        expect(worker).toHaveLength(1)
-        expect(await (await fetch(`${origin}/_kay/assets/${basename(worker[0]!)}`)).text()).toContain('instantiateStreaming')
-
-        const photo = await get('/photo')
-        const variant = (/srcset="([^ "]+) 320w/).exec(photo.text)![1]!.replaceAll('&amp;', '&')
-        const font = (/<style>@font-face\{font-family:"Display";src:url\("([^"]+)"\)/).exec(home.text)![1]!
-        const image = await fetch(`${origin}${variant}`)
-
-        expect(image.headers.get('cache-control')).toBe('public, max-age=31536000, immutable')
-        expect((await new Bun.Image(await image.bytes()).metadata()).width).toBe(320)
-
-        const avif = await fetch(`${origin}${variant}`, { headers: { accept: 'image/avif,image/webp' } })
-        // Encoded on request, on the worker thread the executable carries.
-        const upload = await fetch(`${origin}/_kay/image?src=${encodeURIComponent('/uploads/photo.png')}&w=320`, { headers: { accept: 'image/avif' } })
-
-        expect([avif.headers.get('content-type'), avif.headers.get('vary')]).toEqual(['image/avif', 'accept'])
-        expect(upload.headers.get('content-type')).toBe('image/avif')
-        expect(new TextDecoder().decode((await upload.bytes()).subarray(4, 12))).toBe('ftypavif')
-        expect((await fetch(`${origin}/favicon.ico`)).headers.get('content-type')).toBe('image/x-icon')
-        expect((await get('/manifest.webmanifest')).status).toBe(200)
-        expect((await get(font)).status).toBe(200)
-        expect((await get('/sitemap.xml')).text).toContain('<loc>https://example.com/about</loc>')
-        // Content entries come from what the build compiled, with nothing of src/content beside the executable.
-        expect((await get('/notes/first')).text).toContain('<h1>First note</h1><h2 id="read-me"><a href="#read-me">Read me</a></h2>')
-        expect((await get('/notes.xml')).text).toContain('<link>https://example.com/notes/first</link>')
-        expect((await get('/tags')).text).toContain('<slot data-component="node_modules/kay-lib/src/tag.kay" data-props="[{&quot;label&quot;:1},&quot;kept&quot;]"><button class="tag">app:kept</button></slot>')
-        expect((await get('/live-tags')).text).toContain('<button class="tag">app:live</button>')
-
-        // A container's health check runs the executable again, asking the server beside it.
-        const probe = async (on: string) => Bun.spawn([join(dir, 'server'), '--health'], { cwd: tmpdir(), env: { PATH: process.env.PATH, PORT: on }, stdin: 'ignore', stdout: 'ignore', stderr: 'ignore' }).exited
-
-        expect(await probe(String(port))).toBe(0)
-        expect(await probe('1')).toBe(1)
+        return { status: response.status, text: await response.text() }
       }
-      finally {
-        server.kill()
-        await server.exited
-      }
+      const home = await get('/')
+      const entry = (/<script type="module" src="([^"]+)"/).exec(home.text)![1]!
+      const badges = await get('/badges')
+      const about = await fetch(`${origin}/about`, { headers: { 'accept-encoding': 'br' } })
+      const call = await fetch(`${origin}/_kay/action/src/routes/echo.kay/shout`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-kay-action': '1', 'origin': origin }, body: stringify({ text: 'hi' }) })
+
+      expect(home.text).toContain('Hello from the server</h1>')
+      expect((await get(entry)).status).toBe(200)
+      expect(await get('/robots.txt')).toEqual({ status: 200, text: 'User-agent: *\n' })
+      // The copy `kay build` prerendered and compressed, not a render.
+      expect(about.headers.get('etag')).toEndWith('-br"')
+      expect(await about.text()).toContain('<p>About</p>')
+      expect(badges.text).toContain('<ul class="badges"><li><i class="dot"></i>OUT</li></ul>')
+      expect(badges.text).toContain('<slot data-component="src/components/tally.kay" data-props="[{}]"><!--[--><ul class="badges"><li><!--[--><i class="dot"></i><!--]--><!--[-->IN<!--]--></li></ul><!--]--><button>0</button></slot>')
+      expect(parse(await call.text())).toBe('HI')
+      expect(await get('/admin')).toEqual({ status: 403, text: 'Admins only' })
+      expect(await get('/api/ping')).toEqual({ status: 200, text: 'pong' })
+      expect(await get('/api/members')).toEqual({ status: 403, text: 'Members only' })
+      expect((await get('/missing')).text).toContain('Nothing here</h1>')
+
+      const lab = await fetch(`${origin}/lab`)
+      const wasm = await fetch(`${origin}${(/<p class="wasm">([^<]+)</).exec(await lab.text())![1]!}`)
+      const worker = [...new Bun.Glob('.kay/*/dist/assets/echo-*.js').scanSync({ cwd: dir, dot: true })]
+
+      expect(lab.headers.get('content-security-policy')).toContain('\'wasm-unsafe-eval\'')
+      expect([wasm.status, wasm.headers.get('content-type')]).toEqual([200, 'application/wasm'])
+      expect(worker).toHaveLength(1)
+      expect(await (await fetch(`${origin}/_kay/assets/${basename(worker[0]!)}`)).text()).toContain('instantiateStreaming')
+
+      const photo = await get('/photo')
+      const variant = (/srcset="([^ "]+) 320w/).exec(photo.text)![1]!.replaceAll('&amp;', '&')
+      const font = (/<style>@font-face\{font-family:"Display";src:url\("([^"]+)"\)/).exec(home.text)![1]!
+      const image = await fetch(`${origin}${variant}`)
+
+      expect(image.headers.get('cache-control')).toBe('public, max-age=31536000, immutable')
+      expect((await new Bun.Image(await image.bytes()).metadata()).width).toBe(320)
+
+      const avif = await fetch(`${origin}${variant}`, { headers: { accept: 'image/avif,image/webp' } })
+      // Encoded on request, on the worker thread the executable carries.
+      const upload = await fetch(`${origin}/_kay/image?src=${encodeURIComponent('/uploads/photo.png')}&w=320`, { headers: { accept: 'image/avif' } })
+
+      expect([avif.headers.get('content-type'), avif.headers.get('vary')]).toEqual(['image/avif', 'accept'])
+      expect(upload.headers.get('content-type')).toBe('image/avif')
+      expect(new TextDecoder().decode((await upload.bytes()).subarray(4, 12))).toBe('ftypavif')
+      expect((await fetch(`${origin}/favicon.ico`)).headers.get('content-type')).toBe('image/x-icon')
+      expect((await get('/manifest.webmanifest')).status).toBe(200)
+      expect((await get(font)).status).toBe(200)
+      expect((await get('/sitemap.xml')).text).toContain('<loc>https://example.com/about</loc>')
+      // Content entries come from what the build compiled, with nothing of src/content beside the executable.
+      expect((await get('/notes/first')).text).toContain('<h1>First note</h1><h2 id="read-me"><a href="#read-me">Read me</a></h2>')
+      expect((await get('/notes.xml')).text).toContain('<link>https://example.com/notes/first</link>')
+      expect((await get('/tags')).text).toContain('<slot data-component="node_modules/kay-lib/src/tag.kay" data-props="[{&quot;label&quot;:1},&quot;kept&quot;]"><button class="tag">app:kept</button></slot>')
+      expect((await get('/live-tags')).text).toContain('<button class="tag">app:live</button>')
+
+      // A container's health check runs the executable again, asking the server beside it.
+      const probe = async (on: string) => Bun.spawn([join(dir, 'server'), '--health'], { cwd: tmpdir(), env: { PATH: process.env.PATH, PORT: on }, stdin: 'ignore', stdout: 'ignore', stderr: 'ignore' }).exited
+
+      expect(await probe(String(port))).toBe(0)
+      expect(await probe('1')).toBe(1)
     }
     finally {
-      await rm(join(dir, '..'), { recursive: true, force: true })
+      server.kill()
+      await server.exited
     }
   }, 120_000)
 })
