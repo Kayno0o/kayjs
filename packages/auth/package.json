@@ -3,15 +3,15 @@
   "type": "module",
   "version": "1.43.1",
   "description": "Auth for kay apps on kay sessions: OAuth, passwords, two-factor, magic links and bearer tokens",
-  "author": "Kaynooo <https://git.kaynooo.fr/kaynooo>",
+  "author": "Kaynooo <https://github.com/Kayno0o>",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://git.kaynooo.fr/kaynooo/kayjs",
+    "url": "https://github.com/Kayno0o/kayjs",
     "directory": "packages/auth"
   },
   "bugs": {
-    "url": "https://git.kaynooo.fr/kaynooo/kayjs/issues"
+    "url": "https://github.com/Kayno0o/kayjs/issues"
   },
   "publishConfig": {
     "registry": "https://git.kaynooo.fr/api/packages/kaynooo/npm/"

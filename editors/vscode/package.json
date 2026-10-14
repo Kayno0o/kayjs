@@ -6,7 +6,7 @@
   "private": true,
   "description": "Language support for .kay components: highlighting, diagnostics, hover, completion, go-to-definition and formatting through the kay language server",
   "license": "UNLICENSED",
-  "repository": "https://git.kaynooo.fr/kaynooo/kayjs",
+  "repository": "https://github.com/Kayno0o/kayjs",
   "categories": [
     "Programming Languages"
   ],

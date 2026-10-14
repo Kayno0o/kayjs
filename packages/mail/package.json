@@ -3,15 +3,15 @@
   "type": "module",
   "version": "1.43.1",
   "description": "Mail for kay apps: SMTP configured from typed env variables, mails written as .kay components, a development outbox page, a test outbox and queued sending",
-  "author": "Kaynooo <https://git.kaynooo.fr/kaynooo>",
+  "author": "Kaynooo <https://github.com/Kayno0o>",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://git.kaynooo.fr/kaynooo/kayjs",
+    "url": "https://github.com/Kayno0o/kayjs",
     "directory": "packages/mail"
   },
   "bugs": {
-    "url": "https://git.kaynooo.fr/kaynooo/kayjs/issues"
+    "url": "https://github.com/Kayno0o/kayjs/issues"
   },
   "publishConfig": {
     "registry": "https://git.kaynooo.fr/api/packages/kaynooo/npm/"

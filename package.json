@@ -3,15 +3,15 @@
   "type": "module",
   "version": "1.43.1",
   "description": "Pug-like, fully typed web framework on Bun, Elysia and pg-orm, with its own island runtime",
-  "author": "Kaynooo <https://git.kaynooo.fr/kaynooo>",
+  "author": "Kaynooo <https://github.com/Kayno0o>",
   "license": "MIT",
   "homepage": "https://kayjs.kaynooo.fr",
   "repository": {
     "type": "git",
-    "url": "https://git.kaynooo.fr/kaynooo/kayjs"
+    "url": "https://github.com/Kayno0o/kayjs"
   },
   "bugs": {
-    "url": "https://git.kaynooo.fr/kaynooo/kayjs/issues"
+    "url": "https://github.com/Kayno0o/kayjs/issues"
   },
   "publishConfig": {
     "registry": "https://git.kaynooo.fr/api/packages/kaynooo/npm/"

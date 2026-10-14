@@ -4,7 +4,7 @@ order: 2
 description: A tour of the noticeboard example, which runs kay with kayjs-auth, kayjs-mail, kayjs-ui and Postgres together.
 ---
 
-The tutorial builds an app from kay alone. [examples/noticeboard](https://git.kaynooo.fr/kaynooo/kayjs/src/branch/main/examples/noticeboard) in kay's repository is the next step: a club noticeboard running kay with the libraries a real site takes, each wired as its own reference says.
+The tutorial builds an app from kay alone. [examples/noticeboard](https://github.com/Kayno0o/kayjs/tree/main/examples/noticeboard) in kay's repository is the next step: a club noticeboard running kay with the libraries a real site takes, each wired as its own reference says.
 
 - **Members** join and sign in through `@kaynooo/kayjs-auth`, with a password or a mailed link, and confirm their address from a mail. Its tables live in Postgres beside the app's, through `@kaynooo/pg-orm` and `pgStore`, and `/account` sits behind `auth.guard()`.
 - **Mail** goes through `@kaynooo/kayjs-mail`: kayjs-auth's links are queued on it, and a notice's announcement is a `.kay` component built from its `Layout`, `Heading` and `Button`.

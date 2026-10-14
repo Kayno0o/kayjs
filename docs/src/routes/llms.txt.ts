@@ -1,7 +1,7 @@
 import { join } from 'node:path'
 
 const ROOT = join(import.meta.dir, '../../..')
-const RAW = 'https://git.kaynooo.fr/kaynooo/kayjs/raw/branch/main/'
+const RAW = 'https://raw.githubusercontent.com/Kayno0o/kayjs/main/'
 const DOC_LINK = /\]\((llms\/[\w-]+\.md)/g
 
 // llms.txt for agents, its links made absolute on the forge since the site serves the docs it lists as pages.
