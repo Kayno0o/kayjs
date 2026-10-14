@@ -20,7 +20,7 @@ export interface Store<T> {
   request?: ((scope: ServerScope) => Stored<T>) | undefined
   stored: () => Stored<T>
   save: (value: T) => void
-  // Read once the page has hydrated, as the server rendered without it.
+  // A store the server never sees: an island claiming its markup reads the value it rendered with, the kept one applying once it has hydrated.
   afterHydration?: boolean | undefined
 }
 
@@ -62,12 +62,10 @@ export function keep<T>(store: Store<T>, read: () => T, write: (value: T) => voi
   }
 
   let loaded = false
-  // What the server rendered with, which never sees this store: an island claiming its markup reads it, whichever island hydrated first, then reads the kept value once it has hydrated.
-  const rendered = untrack(read)
+  // What the server rendered every island with: the default, or what a render wrote, as the server's render wrote it too.
+  let rendered = untrack(read)
   const [hydrated, bump] = createSignal(0)
   let bumping = false
-  // A render writing the signal writes it on the server too, so its markup holds that value.
-  let written = false
 
   return {
     read: () => {
@@ -76,7 +74,7 @@ export function keep<T>(store: Store<T>, read: () => T, write: (value: T) => voi
         whenHydrated(load)
       }
 
-      if (!isHydrating() || written)
+      if (!isHydrating())
         return read()
 
       hydrated()
@@ -92,10 +90,8 @@ export function keep<T>(store: Store<T>, read: () => T, write: (value: T) => voi
       return rendered
     },
     save: (value) => {
-      if (isHydrating() && !written) {
-        written = true
-        whenHydrated(() => written = false)
-      }
+      if (isHydrating())
+        rendered = value
 
       store.save(value)
     },
