@@ -74,7 +74,7 @@ async function firstEvent(response: Response): Promise<string> {
   return typeof value === 'string' ? value : new TextDecoder().decode(value)
 }
 
-describe('the dev watcher', () => {
+describe.concurrent('the dev watcher', () => {
   async function watched(files: Record<string, string>) {
     const root = await mkdtemp(join(tmpdir(), 'kay-watch-'))
     const changes: string[] = []
@@ -248,7 +248,7 @@ describe('the dev watcher', () => {
   }, 30_000)
 })
 
-describe('kay dev', () => {
+describe.concurrent('kay dev', () => {
   it('restarts the server on a change and keeps the generated types current, written from the config as kay check writes them', async () => {
     const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
     const children: Subprocess[] = []
@@ -360,7 +360,7 @@ describe('kay dev', () => {
     }
   })
 
-  it('runs from the command line on the project a directory names, or with the entry --entry names, on the port --port names', async () => {
+  it.serial('runs from the command line on the project a directory names, or with the entry --entry names, on the port --port names', async () => {
     const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
     const seen = join(root, '.seen')
     const cli = join(import.meta.dir, '../src/cli.ts')
@@ -430,7 +430,7 @@ describe('kay dev', () => {
     }
   })
 
-  it('restarts once per save, however the editor writes the file, on a machine slow enough to stretch the save', async () => {
+  it.serial('restarts once per save, however the editor writes the file, on a machine slow enough to stretch the save', async () => {
     const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
     const server = join(root, 'src/server.ts')
     const children: Subprocess[] = []
@@ -482,7 +482,7 @@ describe('kay dev', () => {
     }
   })
 
-  it('waits for a source an editor moved to its backup, and a deleted one beside a stale backup, for a moment only', async () => {
+  it.serial('waits for a source an editor moved to its backup, and a deleted one beside a stale backup, for a moment only', async () => {
     const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
     const server = join(root, 'src/server.ts')
     const restarts: number[] = []
@@ -590,7 +590,7 @@ describe('kay dev', () => {
     }
   })
 
-  it('reports the address once, then each restart with what changed, and a server exiting on its own', async () => {
+  it.serial('reports the address once, then each restart with what changed, and a server exiting on its own', async () => {
     const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
     const lines: string[] = []
     const free = Bun.serve({ port: 0, fetch: () => new Response() })
@@ -619,7 +619,7 @@ describe('kay dev', () => {
     expect(lines).toHaveLength(3)
   })
 
-  it('moves off a busy port, saying which was in use, and stays on the port it moved to after a restart', async () => {
+  it.serial('moves off a busy port, saying which was in use, and stays on the port it moved to after a restart', async () => {
     const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
     const lines: string[] = []
     const holder = Bun.serve({ port: 0, fetch: () => new Response('holder') })
@@ -649,7 +649,7 @@ describe('kay dev', () => {
     }
   })
 
-  it('listens on localhost alone unless --host opens it, keeping a hostname the app names', async () => {
+  it.serial('listens on localhost alone unless --host opens it, keeping a hostname the app names', async () => {
     const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
     const lines: string[] = []
 
@@ -677,7 +677,7 @@ describe('kay dev', () => {
     }
   })
 
-  it.each(['127.0.0.1', '::1'].filter(binds))('moves off a port %s alone holds, where Bun would take the other loopback address', async (hostname) => {
+  it.serial.each(['127.0.0.1', '::1'].filter(binds))('moves off a port %s alone holds, where Bun would take the other loopback address', async (hostname) => {
     const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
     const lines: string[] = []
     const holder = Bun.listen({ hostname, port: 0, socket: { data: () => undefined } })
@@ -697,7 +697,7 @@ describe('kay dev', () => {
     }
   })
 
-  it('opens the address in the BROWSER command once, not on a restart', async () => {
+  it.serial('opens the address in the BROWSER command once, not on a restart', async () => {
     const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
     const lines: string[] = []
     const opened = join(root, 'opened.txt')
@@ -725,7 +725,7 @@ describe('kay dev', () => {
     }
   })
 
-  it('opens the debugger --inspect names on every server it runs, at the address it prints once, which a client closing as it connects never ends', async () => {
+  it.serial('opens the debugger --inspect names on every server it runs, at the address it prints once, which a client closing as it connects never ends', async () => {
     const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
     // Outside the project, whose changes restart the server, and written before it listens, so it is there once kay dev prints the address.
     const spawned = `${root}-spawned.txt`
@@ -821,7 +821,7 @@ describe('kay dev', () => {
     }
   })
 
-  it('lets no page of another site reach the debugger, as Bun\'s inspector does', async () => {
+  it.serial('lets no page of another site reach the debugger, as Bun\'s inspector does', async () => {
     const proxy = inspectorProxy('ws://localhost:0/kay', () => undefined, () => 3000)
     const status = async (headers: Record<string, string>) => (await fetch(proxy.url.replace('ws:', 'http:'), { headers })).status
 
@@ -1077,7 +1077,7 @@ describe('kay dev', () => {
     }
   }, 60_000)
 
-  it('keeps one process building the client when the config changes while an island edit builds', async () => {
+  it.serial('keeps one process building the client when the config changes while an island edit builds', async () => {
     const scratch = join(import.meta.dir, '../node_modules/.cache')
 
     await mkdir(scratch, { recursive: true })
@@ -1100,11 +1100,11 @@ describe('kay dev', () => {
         await Bun.write(join(root, 'src/counter.kay'), counter(step))
         await Bun.sleep(step * 20)
         await Bun.write(join(root, 'kay.config.ts'), `export default {}\n// ${step}\n`)
-        await Bun.sleep(300)
+        await Bun.sleep(150)
       }
 
       // Settled: no restart for a while.
-      for (let seen = lines.length, quiet = Date.now(); Date.now() - quiet < 1500; await Bun.sleep(100)) {
+      for (let seen = lines.length, quiet = Date.now(); Date.now() - quiet < 800; await Bun.sleep(100)) {
         if (lines.length !== seen) {
           seen = lines.length
           quiet = Date.now()
@@ -1150,12 +1150,12 @@ describe('kay dev', () => {
       await stop()
     }
 
-    await Bun.sleep(1000)
+    await Bun.sleep(500)
     expect(childrenRunning(realpathSync(root), 'builder.ts')).toEqual([])
     await rm(root, { recursive: true, force: true })
   }, 60_000)
 
-  it('says once that the process building the client exited, until a build succeeds again', async () => {
+  it.serial('says once that the process building the client exited, until a build succeeds again', async () => {
     const scratch = join(import.meta.dir, '../node_modules/.cache')
 
     await mkdir(scratch, { recursive: true })
@@ -1165,7 +1165,7 @@ describe('kay dev', () => {
     const counter = (step: number) => `---\nimport { signal } from 'kay'\n\nconst count = signal(${step})\n---\nbutton(onClick={() => count.set(n => n + 1)}) {count()}\n`
     // No line for a while: the restarts and the builds a change started are over.
     const settled = async () => {
-      for (let seen = lines.length, quiet = Date.now(); Date.now() - quiet < 1500; await Bun.sleep(100)) {
+      for (let seen = lines.length, quiet = Date.now(); Date.now() - quiet < 800; await Bun.sleep(100)) {
         if (lines.length !== seen) {
           seen = lines.length
           quiet = Date.now()
@@ -1253,7 +1253,7 @@ describe('kay dev', () => {
   })
 })
 
-describe('hot swap', () => {
+describe.concurrent('hot swap', () => {
   it('names the new chunks of the edited islands, and of each island holding their code, for pages on the code before', async () => {
     const root = await mkdtemp(join(tmpdir(), 'kay-hot-'))
     // As Bun splits them: the counter, which the panel embeds, moves into a chunk of its own, leaving its island chunk a stub; both reach the runtime.
