@@ -1920,8 +1920,10 @@ describe('kay check --watch, stopped by a signal', () => {
     ['SIGINT, what the check started ignoring it', 'SIGINT', [], 130, 'what it started'],
     ['a second SIGINT, the check and what it started ignoring the first', 'SIGINT', ['SIGINT'], 130, 'both'],
   ] as const)('stops the check running, and what it started, when the watch gets %s', async (_, signal, before, code, ignoring) => {
-    const config = `${ignoring === 'both' ? 'process.on(\'SIGINT\', () => {})\n\n' : ''}const started = Bun.spawn(${ignoring === 'nothing' ? '[\'sleep\', \'30\']' : '[\'sh\', \'-c\', \'trap "" INT; exec sleep 30\']'})\n`
-    const root = await scratchProject({ 'kay.config.ts': `${config}\nawait Bun.write(import.meta.dir + '/pid', String(started.pid))\nawait Bun.sleep(30_000)\n\nexport default {}\n` })
+    // The shell writes its pid only once it ignores what it should, a signal landing earlier stopping it, and renames it into place, so it is never read half written.
+    const trap = ignoring === 'nothing' ? '' : 'trap "" INT; '
+    const config = `${ignoring === 'both' ? 'process.on(\'SIGINT\', () => {})\n\n' : ''}Bun.spawn(['sh', '-c', '${trap}echo $$ > "$0.tmp" && mv "$0.tmp" "$0" && exec sleep 30', import.meta.dir + '/pid'])\nawait Bun.sleep(30_000)\n\nexport default {}\n`
+    const root = await scratchProject({ 'kay.config.ts': config })
     const watch = watchChecks(root)
     const pid = join(root, 'pid')
     const alive = (id: number) => {
