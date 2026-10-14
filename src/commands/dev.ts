@@ -51,10 +51,13 @@ export const dev: Command = {
     warnOtherKay('dev', root)
     const entry = typeof option === 'string' ? resolve(option) : inDir ? undefined : path
     const config = await loadConfig(root)
+    const { promise, resolve: interrupted } = Promise.withResolvers<void>()
+    // Keys only from a person at a terminal: a pipe, a CI log or an agent gets the lines alone, and its stdin is left unread.
+    const keys = format === 'text' && process.stdin.isTTY && process.stdout.isTTY ? process.stdin : undefined
     let stop: () => Promise<void>
 
     try {
-      stop = await startDev(root, { entry, port: typeof port === 'string' ? Number(port) : undefined, host, inspect: debuggerAt, open: open === true, format, config })
+      stop = await startDev(root, { entry, port: typeof port === 'string' ? Number(port) : undefined, host, inspect: debuggerAt, open: open === true, format, keys, onQuit: interrupted, config })
     }
     catch (error) {
       if (!(error instanceof InspectorAddressInUse))
@@ -64,8 +67,6 @@ export const dev: Command = {
 
       return 1
     }
-
-    const { promise, resolve: interrupted } = Promise.withResolvers<void>()
 
     process.once('SIGINT', interrupted)
     process.once('SIGTERM', interrupted)

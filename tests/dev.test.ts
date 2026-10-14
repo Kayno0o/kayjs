@@ -1,9 +1,10 @@
 import type { Subprocess } from 'bun'
 import { chmodSync, existsSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { mkdir, mkdtemp, rename, rm } from 'node:fs/promises'
-import { hostname, tmpdir } from 'node:os'
+import { hostname, networkInterfaces, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
+import { PassThrough } from 'node:stream'
 import { describe, expect, it, spyOn } from 'bun:test'
 import { testWorker } from '../src/build/assets'
 import { buildClient } from '../src/build/client'
@@ -663,10 +664,21 @@ describe.concurrent('kay dev', () => {
         const stop = await dev(root, { host, log: line => lines.push(line) })
 
         try {
-          await until(() => lines.length === 1)
+          await until(() => lines.length > 0)
           const [, port] = (/^kay dev: http:\/\/localhost:(\d+) \(ready in \d+ ms\)$/).exec(lines[0]!) ?? []
 
           expect(await (await fetch(`http://localhost:${port}`)).text()).toBe(expected)
+
+          // Opened to the network, the address a phone on it reaches, when this machine has one.
+          const network = Object.values(networkInterfaces()).flat().find(entry => entry?.family === 'IPv4' && !entry.internal)?.address
+
+          if (host !== undefined && network !== undefined) {
+            await until(() => lines.length === 2)
+            expect(lines[1]).toBe(`kay dev: http://${network}:${port} on the network`)
+          }
+
+          await Bun.sleep(100)
+          expect(lines).toHaveLength(host !== undefined && network !== undefined ? 2 : 1)
         }
         finally {
           await stop()
@@ -722,6 +734,78 @@ describe.concurrent('kay dev', () => {
     finally {
       process.env.BROWSER = previous
       await stop()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it.serial('takes keys from the terminal it is given: o opens the address, r restarts, q quits, listed once under the ready line', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
+    const lines: string[] = []
+    const opened = join(root, '..', `${root.split('/').at(-1)}-opened.txt`)
+    const browser = `${opened}.sh`
+    const previous = process.env.BROWSER
+    const keys = new PassThrough()
+    let quit = 0
+    const free = Bun.serve({ port: 0, fetch: () => new Response() })
+    const port = free.port!
+
+    await free.stop()
+    await Bun.write(browser, `#!/bin/sh\necho "$1" >> ${JSON.stringify(opened)}\n`)
+    chmodSync(browser, 0o755)
+    await Bun.write(join(root, 'src/server.ts'), `Bun.serve({ port: ${port}, fetch: () => new Response() })\n`)
+    process.env.BROWSER = browser
+    const stop = await dev(root, { keys, onQuit: () => quit++, log: line => lines.push(line) })
+
+    try {
+      await until(() => lines.length === 2)
+      const [, address] = (/^kay dev: (\S+) /).exec(lines[0]!) ?? []
+
+      expect(lines[1]).toBe('kay dev: press o to open it in the browser, r to restart, c to clear the screen, q to quit')
+
+      keys.write('o')
+      await until(() => existsSync(opened))
+      keys.write('r')
+      await until(() => lines.length === 3)
+      expect(lines[2]).toMatch(/^\d\d:\d\d:\d\d r pressed: restarted in \d+ ms$/)
+      expect(readFileSync(opened, 'utf8')).toBe(`${address}\n`)
+
+      keys.write('q')
+      // Ctrl+C, which a terminal in raw mode sends as a key rather than a signal.
+      keys.write('\x03')
+      await until(() => quit === 2)
+    }
+    finally {
+      process.env.BROWSER = previous
+      await stop()
+      await rm(root, { recursive: true, force: true })
+      await rm(opened, { force: true })
+      await rm(browser, { force: true })
+    }
+  })
+
+  it('reads no key and says nothing of them when the terminal is not a TTY', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
+
+    await Bun.write(join(root, 'src/server.ts'), 'Bun.serve({ port: 0, fetch: () => new Response() })\n')
+    const child = Bun.spawn(['bun', join(import.meta.dir, '../src/cli.ts'), 'dev', root], { stdin: 'pipe', stdout: 'pipe', stderr: 'ignore' })
+    let output = ''
+    const reading = (async () => {
+      for await (const chunk of child.stdout.pipeThrough(new TextDecoderStream()))
+        output += chunk
+    })()
+
+    try {
+      await until(() => output.includes('ready in'), 20_000)
+      void child.stdin.write('q')
+      await child.stdin.flush()
+      await Bun.sleep(300)
+      expect(child.exitCode).toBeNull()
+      expect(output).toMatch(/^kay dev: \S+ \(ready in \d+ ms\)\n$/)
+    }
+    finally {
+      child.kill()
+      await child.exited
+      await reading
       await rm(root, { recursive: true, force: true })
     }
   })

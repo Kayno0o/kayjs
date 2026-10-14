@@ -1,10 +1,12 @@
 import type { Subprocess } from 'bun'
 import type { FSWatcher } from 'node:fs'
+import type { Readable } from 'node:stream'
 import type { KayConfig } from '../config'
 import type { BuildOutcome } from './builder'
 import type { ClientBuilder } from './client'
 import { existsSync, readdirSync, readFileSync, statSync, watch } from 'node:fs'
 import { rm } from 'node:fs/promises'
+import { networkInterfaces } from 'node:os'
 import { join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { findProjectFiles, IGNORED_DIRS } from '../build/files'
@@ -33,6 +35,9 @@ export interface DevOptions {
   log?: ((line: string) => void) | undefined
   // `json` reports each as one JSON object per line, the errors the servers meet included, and sends the servers' own output to stderr.
   format?: 'text' | 'json' | undefined
+  // The terminal's keys, read once the first server listens: `o` opens the address, `r` restarts, `c` clears the screen, `q` or Ctrl+C calls `onQuit`.
+  keys?: Readable | undefined
+  onQuit?: (() => void) | undefined
 }
 
 // Long enough to gather the few events one save makes, which come within a millisecond.
@@ -71,6 +76,8 @@ const WS_SCHEME = /^ws:\/\//
 // A server listening on every address is reached on this machine as localhost.
 const ANY_ADDRESS = /(?<=\/\/)(?:0\.0\.0\.0|\[::\])(?=:)/
 const ANY_FILE = /^/
+const CLEAR_SCREEN = '\x1B[2J\x1B[3J\x1B[H'
+const CTRL_C = '\x03'
 const STDERR = 2
 
 // Runs the server entry in development and restarts it on every change; a fresh process is the only way to drop modules Bun has loaded.
@@ -98,8 +105,9 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   let touched = new Set<string>()
   // The config the types are written from, read again once kay.config.ts changes.
   let typesConfig = options.config
-  // What the last restart came from and when it began, for its report.
+  // What the last restart came from and when it began, for its report, `r` pressed when nothing changed.
   let restartedFor: string[] = []
+  let restartAsked = false
   let restartedAt = performance.now()
   let address: string | undefined
   // The port the first server asked for and the one it moved to, busy, which every next server takes first.
@@ -136,11 +144,8 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   // One event, as a line of text, or as a JSON object of its fields under `json`.
   const say = (event: string, fields: object, line: string) => log(json ? JSON.stringify({ event, time: new Date().toISOString(), ...fields }) : line)
   const color = options.log === undefined && !json && process.stdout.isTTY && process.env.NO_COLOR === undefined
-  const stamp = () => {
-    const time = new Date().toLocaleTimeString('en-GB')
-
-    return color ? `\x1B[2m${time}\x1B[22m` : time
-  }
+  const dim = (text: string) => color ? `\x1B[2m${text}\x1B[22m` : text
+  const stamp = () => dim(new Date().toLocaleTimeString('en-GB'))
   // A server reports its address over IPC from the preload; only the one running counts, and only the first time it listens.
   const listened = (server: Subprocess, message: unknown) => {
     if (server !== child || typeof message !== 'object' || message === null || !('listening' in message) || typeof message.listening !== 'string')
@@ -155,16 +160,27 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     pagePort = port
 
     if (address === undefined) {
-      say('ready', { url, ms, ...moved !== undefined && { inUse: asked } }, `kay dev: ${url} (ready in ${took}${moved === undefined ? '' : `, ${asked} was in use`})`)
+      const network = ANY_ADDRESS.test(message.listening) ? networkAddress() : undefined
+      const reached = network === undefined ? undefined : url.replace('//localhost', `//${network}`)
+
+      say('ready', { url, ms, ...moved !== undefined && { inUse: asked }, ...reached !== undefined && { network: reached } }, `kay dev: ${url} (ready in ${took}${moved === undefined ? '' : `, ${asked} was in use`})`)
+
+      if (reached !== undefined && !json)
+        log(`kay dev: ${reached} on the network`)
 
       if (inspector !== undefined)
         say('debugger', { url: inspector.url }, `kay dev: debugger on ${inspector.url}, https://debug.bun.sh/#${inspector.url.replace(WS_SCHEME, '')}`)
 
       if (options.open === true)
         openBrowser(url, command => say('no-browser', { command }, `kay dev: no browser to open ${url} with: ${command} is not installed`))
+
+      if (options.keys !== undefined) {
+        log(`kay dev: ${dim('press o to open it in the browser, r to restart, c to clear the screen, q to quit')}`)
+        readKeys(options.keys)
+      }
     }
     else {
-      const changed = describe(restartedFor)
+      const changed = restartAsked ? 'r pressed' : describe(restartedFor)
 
       say('restart', { changed: restartedFor, ms, url }, `${stamp()} ${changed}: restarted in ${took}${url === address ? '' : `, now on ${url}`}`)
       tell(server, { built: { changed, ms } })
@@ -347,6 +363,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
 
     restartedAt = performance.now()
     restartedFor = changedFilesNamed(root, files)
+    restartAsked = files.length === 0
     building = wantsClient ? buildClient() : undefined
 
     const previous = child
@@ -418,11 +435,52 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     },
   })
 
+  // A terminal in raw mode hands over each key as it is pressed, Ctrl+C included, which no longer interrupts.
+  const onKey = (chunk: Buffer | string) => {
+    for (const key of String(chunk)) {
+      if (key === 'o' && address !== undefined)
+        openBrowser(address, command => log(`kay dev: no browser to open ${address} with: ${command} is not installed`))
+      else if (key === 'r')
+        restartNow()
+      else if (key === 'c')
+        process.stdout.write(CLEAR_SCREEN)
+      else if (key === 'q' || key === CTRL_C)
+        options.onQuit?.()
+    }
+  }
+  const rawMode = (on: boolean) => {
+    const keys = options.keys as Readable & { setRawMode?: (mode: boolean) => void }
+
+    keys.setRawMode?.(on)
+  }
+  const restoreTerminal = () => rawMode(false)
+
+  function readKeys(keys: Readable) {
+    rawMode(true)
+    process.once('exit', restoreTerminal)
+    keys.on('data', onKey)
+  }
+
+  // As a change does, but for no file: open pages load the page again.
+  function restartNow() {
+    codeVersion++
+    changed = true
+    restarting ??= drain()
+  }
+
   start()
   await regenerateTypes(root, options)
 
   return async () => {
     stopping = true
+
+    if (options.keys !== undefined) {
+      options.keys.off('data', onKey)
+      options.keys.pause()
+      restoreTerminal()
+      process.off('exit', restoreTerminal)
+    }
+
     clearTimeout(timer)
     stopWatching()
     await restarting
@@ -453,6 +511,11 @@ function openBrowser(url: string, missing: (command: string) => void): void {
   catch {
     missing(command[0]!)
   }
+}
+
+// The first address of this machine others on its network reach it by.
+function networkAddress(): string | undefined {
+  return Object.values(networkInterfaces()).flat().find(entry => entry?.family === 'IPv4' && !entry.internal)?.address
 }
 
 // A server killed for a restart meanwhile takes no message.

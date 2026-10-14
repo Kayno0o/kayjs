@@ -96,6 +96,10 @@ kay dev: http://localhost:3000 (ready in 412 ms)
 14:03:05 the server exited with code 1, waiting for a change
 ```
 
+Under `--host`, a second line names the address other devices on the network reach the server at: `kay dev: http://192.168.1.20:3000 on the network`.
+
+In a terminal, the line under the address lists the keys `kay dev` reads: `o` opens the address in the browser, `r` restarts the server, `c` clears the screen and `q` or Ctrl+C quits. Piped, as in CI or under a coding agent, or with `--format json`, it reads no key and prints no such line.
+
 An entry's own `Listening on http://localhost:3000` line is left out; kay's own start line only shows in production.
 
 A project that fails to compile prints its errors there once, as the server boots, formatted as `kay check` prints them, and a request that throws prints its error with its stack mapped to `.kay` lines.
