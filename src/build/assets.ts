@@ -16,9 +16,12 @@ export function underKayDev(): boolean {
 // Where kay keeps what it generates, under the project root.
 export const KAY_DIR = '.kay'
 
+// Names the directory under `.kay` the server `kay render` runs builds into: one of its own, removed once it answered, so it never deletes what `kay build` or a `kay dev` beside it wrote.
+export const RENDER_OUTPUT = 'KAY_RENDER_OUTPUT'
+
 // What `kay build` writes and production serves; a `kay dev` server builds into a directory of its own, so a build or a test run beside it never deletes the files its pages link, and so does each worker of `bun test --parallel`, the processes its tests start included.
 export function outputDir(root: string): string {
-  return join(root, KAY_DIR, `${underKayDev() ? 'dev' : 'client'}${testWorker()}`)
+  return join(root, KAY_DIR, process.env[RENDER_OUTPUT] ?? `${underKayDev() ? 'dev' : 'client'}${testWorker()}`)
 }
 
 // What sets apart the files each worker of `bun test --parallel` writes, which would otherwise overwrite one another's in a checkout they share.

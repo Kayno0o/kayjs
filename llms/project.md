@@ -92,6 +92,15 @@ kay build --static --outdir dist
 kay routes
 ```
 
+### Check what a page renders
+
+`kay render` prints the HTML the server answers for one URL, as `kay dev` serves it, without starting a server; what the server logs goes to stderr, and a status of 400 or above exits 1:
+
+```sh
+kay render /about
+kay render /account --cookie session=…
+```
+
 ### Format the templates
 
 `kay fmt` formats `.kay` files, and `--check` lists the unformatted ones and fails:
@@ -268,6 +277,11 @@ export default defineConfig({
   - The server runs in a process group of its own: Ctrl-Z suspends `kay start` alone, and once `kay start` is gone, as after a `SIGKILL` to the group, a kay server notices within a second and drains as on `SIGTERM`, or stops once booted when it was gone already;
   - It exits with the server's code, 0 when the server ended on a stop signal it passed on, 128 plus the signal's number when it died of another.
   - The `start` script `kay new` writes runs it.
+- `kay render <url> [dir] [--method <method>] [--body <text>] [--header <name: value>]... [--cookie <name=value>]... [-i|--include] [--entry <file>]`:
+  - Answer one request as `kay dev` serves it, the server entry included, and print the body on stdout; the server runs on a Unix socket of its own, not a port, stops once it answered, and builds the browser code into a directory under `.kay` it removes, never touching `kay build`'s or `kay dev`'s.
+  - What the server logs, a page's error report included, goes to stderr; a redirect prints `kay render: 302 Found, to /login` there and exits 0, a status of 400 or above prints its line there and exits 1, and a server exiting before it serves fails with its code.
+  - `--body` posts as a form does, `application/x-www-form-urlencoded`, unless a `--header` names another `content-type`; `--header` and `--cookie` repeat, a guarded page rendering signed in with the session cookie a browser holds; `-i` prints the status and headers on stderr.
+  - Under `base`, a path under it is taken as the proxy in front of the server hands it over, so a link a page printed renders as it is.
 - `kay check [dir] [paths...] [-p tsconfig.json] [--entry <file>] [--deny-warnings] [--fix] [--only <group>] [--format text|github|json] [--watch]`:
   - Type-check the project, `.kay` files included;
   - The first path is the project when it is a directory holding a `kay.config.ts`, `package.json` or `tsconfig.json`, or any directory outside the current directory, so a directory given first to narrow the report must be neither;

@@ -20,6 +20,7 @@ bun run dev
 | `kay dev [dir]` | Run the server, restarting on change, with errors shown in the browser |
 | `kay build [dir]` | Check the project and bundle the browser code for production |
 | `kay start [dir]` | Serve the last build as production does |
+| `kay render <url> [dir]` | Print what the server answers for one URL, without starting it on a port |
 | `kay check [dir]` | Type-check the project, `.kay` files included |
 | `kay routes [dir]` | List every route the project serves, and the file serving it |
 | `kay explain [lint\|group]` | List the lints, or a group's, or explain one |
@@ -186,6 +187,27 @@ It serves the last `kay build` with `NODE_ENV=production`: the executable `--com
 | `--port <port>` | The port to listen on: `--port`, else the shell's `PORT`, else the one `.env.production` or `.env` sets, else 3000 |
 
 Ctrl-C, `SIGTERM` and `SIGHUP` reach the server once each, whether sent to the terminal's process group or to `kay start` alone, and `kay start` waits for it to drain and exit; a second Ctrl-C stops it at once. `SIGQUIT` is passed on as well, and ends the server at once (131). The server runs in a process group of its own, so Ctrl-Z suspends `kay start` but not the server, and a `SIGKILL` to the whole group, which `kay start` cannot pass on, leaves the server alone: a kay server notices `kay start` is gone within a second and drains as on `SIGTERM`, or stops as soon as it boots when `kay start` died before. `kay start` exits with the server's code, with 0 when the server ended on a stop signal it passed on, and with 128 plus the signal's number when the server died of another, as an out-of-memory kill (137) or a crash (134, 139).
+
+## kay render
+
+```sh
+kay render /about                     # the page's HTML on stdout
+kay render /account --cookie session=…
+kay render /_kay/action/src/routes/index.kay/add --body 'title=Milk' -i
+```
+
+It answers one request as `kay dev` serves it, the server entry and what it uses included, and prints the body on stdout, so a script or an agent sees what a page renders without starting a server and fetching it. The server runs on a Unix socket of its own rather than a port, so it runs beside a `kay dev` holding the port, and stops once it answered; it builds the browser code into a directory of its own under `.kay`, removed afterwards, never touching what `kay build` or `kay dev` wrote. What the server logs, the error report of a page that throws included, goes to stderr.
+
+A redirect prints `kay render: 302 Found, to /login` on stderr and nothing on stdout, and exits 0. A status of 400 or above prints its line on stderr, the body still on stdout, and exits 1. A server that exits before it serves, as on an error at the entry's top level, fails with its code. Under `base`, a path under it is taken as the proxy in front of the server hands it over, so a link a page printed renders as it is, and so does the same path without it.
+
+| Option | Effect |
+| --- | --- |
+| `--method <method>` | The request's method, `GET` by default, `POST` with `--body` |
+| `--body <text>` | The request's body, sent as a form posts it, `application/x-www-form-urlencoded`, unless a `--header` names another `content-type` |
+| `--header <name: value>` | A request header; repeat it for more |
+| `--cookie <name=value>` | A cookie; repeat it for more. A guarded page renders signed in with the session cookie a browser holds, copied from its developer tools |
+| `-i`, `--include` | Prints the status line and the response's headers on stderr |
+| `--entry <file>` | Runs that server entry instead, relative to the current directory |
 
 ## kay check
 

@@ -11,11 +11,12 @@ import { fmt } from './commands/fmt'
 import { lsp } from './commands/lsp'
 import { migrate } from './commands/migrate'
 import { scaffold } from './commands/new'
+import { render } from './commands/render'
 import { routes } from './commands/routes'
 import { start } from './commands/start'
 
 // In the order the usage lists them.
-const COMMANDS: Record<string, Command> = { new: scaffold, dev, build, start, check, routes, explain, fmt, migrate, lsp }
+const COMMANDS: Record<string, Command> = { new: scaffold, dev, build, start, render, check, routes, explain, fmt, migrate, lsp }
 const USAGE = Object.values(COMMANDS).map((command, index) => `${index === 0 ? 'Usage: ' : '       '}kay ${command.usage}`).join('\n')
 
 async function main(args: string[]): Promise<number> {
