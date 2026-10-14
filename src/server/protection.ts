@@ -52,10 +52,10 @@ const limitLists = new WeakMap<object, ActionLimit[]>()
 // One memory store per limit, so clients flooding one never push another's windows out, such as a login form's.
 const memories = new Map<string, ReturnType<typeof memoryRates>>()
 let warnedUnconfigured = false
-// The proxy settings already warned about a forwarded header from a public peer, once each.
-const warnedUntrusted = new WeakSet<ProxyConfig>()
-// Each setting's `trusted` ranges, read once.
-const trustedRanges = new WeakMap<ProxyConfig, BlockList>()
+// The proxy settings already warned about a forwarded header from a public peer, once each, by what they say: plain Elysia may pass a fresh object per request.
+const warnedUntrusted = new Set<string>()
+// Each list of `trusted` ranges, read once.
+const trustedRanges = new Map<string, BlockList>()
 const RANGE = /^([^/]+)\/(\d{1,3})$/
 const requestIds = new WeakMap<Request, string>()
 
@@ -421,43 +421,53 @@ function fromTrusted(address: string, proxy: ProxyConfig | null | undefined): bo
     return true
 
   const ranges = proxy ? rangesOf(proxy) : undefined
-  const family = isIP(address)
+  const family = familyOf(address)
 
-  return ranges !== undefined && family !== 0 && ranges.check(address, family === 4 ? 'ipv4' : 'ipv6')
+  return ranges !== undefined && family !== undefined && ranges.check(address, family.name)
 }
 
 function rangesOf(proxy: ProxyConfig): BlockList | undefined {
   if (!proxy.trusted)
     return undefined
 
-  let ranges = trustedRanges.get(proxy)
+  const key = proxy.trusted.join(',')
+  let ranges = trustedRanges.get(key)
 
   if (!ranges) {
     ranges = new BlockList()
 
-    for (const range of proxy.trusted) {
-      const [, address = range, bits] = RANGE.exec(range.trim()) ?? []
-      const family = isIP(address)
-      const prefix = bits === undefined ? (family === 4 ? 32 : 128) : Number(bits)
+    for (const range of proxy.trusted as unknown[]) {
+      const [, address = '', bits] = typeof range === 'string' ? RANGE.exec(range.trim()) ?? [range, range.trim()] : []
+      const family = familyOf(address)
+      const prefix = bits === undefined ? family?.bits : Number(bits)
 
-      if (family === 0 || prefix > (family === 4 ? 32 : 128))
+      if (family === undefined || prefix === undefined || prefix > family.bits)
         throw new Error(`kay: proxy.trusted takes address ranges such as 173.245.48.0/20 or 2400:cb00::/32; got ${JSON.stringify(range)}`)
 
-      ranges.addSubnet(address, prefix, family === 4 ? 'ipv4' : 'ipv6')
+      ranges.addSubnet(address, prefix, family.name)
     }
 
-    trustedRanges.set(proxy, ranges)
+    trustedRanges.set(key, ranges)
   }
 
   return ranges
 }
 
+// An address's family as `BlockList` names it, and how many bits it has; none for anything but an address.
+function familyOf(address: string): { name: 'ipv4' | 'ipv6', bits: number } | undefined {
+  const family = isIP(address)
+
+  return family === 0 ? undefined : family === 4 ? { name: 'ipv4', bits: 32 } : { name: 'ipv6', bits: 128 }
+}
+
 function warnUntrusted(proxy: ProxyConfig, address: string): void {
-  if (warnedUntrusted.has(proxy))
+  const header = proxy.header ?? 'X-Forwarded-For'
+  const key = `${header} ${proxy.trusted?.join(',') ?? ''}`
+
+  if (warnedUntrusted.has(key))
     return
 
-  warnedUntrusted.add(proxy)
-  const header = proxy.header ?? 'X-Forwarded-For'
+  warnedUntrusted.add(key)
 
   kayLog('warn', `a request from ${address} carries ${header}, but that address is public and not in proxy.trusted, so kay counts it as the client and ignores the header; a CDN reaching the server from public addresses has its ranges listed in proxy.trusted`)
 }

@@ -1,12 +1,17 @@
 import type { Action } from '../src/runtime'
 import type { SessionStore } from '../src/server'
+import { join } from 'node:path'
 import process from 'node:process'
 import { afterEach, describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { stringify } from 'devalue'
 import { Elysia } from 'elysia'
 import { configuredSite, setSite } from '../src/runtime/site'
 import { memoryStore, pages, session, sqliteStore } from '../src/server'
+import { readClient } from '../src/server/client'
+import { renderPage } from '../src/server/render'
+import { scanRoutes } from '../src/server/routes'
 import { seal } from '../src/server/session'
+import { scratchDir } from './scratch'
 
 const SECRET = 'a test secret that is long enough to seal'
 const COOKIE_VALUE = /^session=([^;]*)/
@@ -484,7 +489,7 @@ describe('a page read by who sent it', () => {
     const plain = new Elysia().use(await pages({ routes: 'tests/fixtures/production/src/routes', prebuilt: false, security: false }))
     const personal = await app.handle(new Request('http://localhost/'))
     const shared = await plain.handle(new Request('http://localhost/feed'))
-    // Asking whether a form post failed reads no cookie when the request carries none for it.
+    // Asking whether a form post failed depends on a cookie even when the request carries none.
     const unposted = await plain.handle(new Request('http://localhost/notes'))
 
     expect(personal.status).toBe(200)
@@ -492,6 +497,35 @@ describe('a page read by who sent it', () => {
     expect(personal.headers.get('vary')).toContain('cookie')
     expect(shared.status).toBe(200)
     expect(shared.headers.get('cache-control')).toBeNull()
-    expect(unposted.headers.get('cache-control')).toBeNull()
+    expect(unposted.headers.get('cache-control')).toBe('private, no-cache')
+  })
+
+  it('counts ctx.cookies and redirects, leaves a page\'s own cache-control and Vary alone, and never marks a prerendered page', async () => {
+    const dir = await scratchDir('personal-')
+    const reading = '--- server\nconst seen = ctx.cookies.get("seen")\n'
+
+    await Promise.all([
+      Bun.write(join(dir, 'own.kay'), `${reading}ctx.headers.set("cache-control", "public, max-age=60")\n---\np {seen}\n`),
+      Bun.write(join(dir, 'varied.kay'), `${reading}ctx.headers.set("vary", "Accept-Language, Cookie")\n---\np {seen}\n`),
+      Bun.write(join(dir, 'away.kay'), `${reading}if (!seen)\n  ctx.redirect("/own")\n---\np {seen}\n`),
+      Bun.write(join(dir, 'themed.kay'), '--- server\nexport const page = { prerender: true }\n--- script\nimport { persisted } from "kay"\n\nconst theme = persisted("theme", "light")\n---\np {theme()}\n'),
+    ])
+
+    const app = new Elysia().use(await pages({ routes: dir, prebuilt: false, security: false }))
+    const visit = async (path: string) => (await app.handle(new Request(`http://localhost${path}`))).headers
+    const own = await visit('/own')
+    const varied = await visit('/varied')
+    const away = await visit('/away')
+    const themed = (await scanRoutes(dir)).find(route => route.pattern === '/themed')!
+    const prerendered = await renderPage({ ...themed, guards: [] }, { request: new Request('http://localhost/themed') }, {}, (await readClient(process.cwd()))!, { prerendering: true })
+
+    expect(own.get('cache-control')).toBe('public, max-age=60')
+    expect(varied.get('cache-control')).toBe('private, no-cache')
+    expect(varied.get('vary')).toBe('Accept-Language, Cookie')
+    expect(away.get('location')).toBe('/own')
+    expect(away.get('cache-control')).toBe('private, no-cache')
+    expect(prerendered.status).toBe(200)
+    expect(await prerendered.text()).toContain('<p>light</p>')
+    expect(prerendered.headers.get('cache-control')).toBeNull()
   })
 })

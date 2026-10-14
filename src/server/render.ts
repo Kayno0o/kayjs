@@ -150,6 +150,8 @@ interface Rendering {
   writeCookies: () => void
   // The site's mount point, which rendered HTML goes under.
   base: string
+  // Rendering at build time or on revalidation, for every visitor at once.
+  prerendering: boolean
   // The form post the browser came back from, if any.
   outcome: () => Outcome | null
   // Development only, for the dev tool: the route the request matched, and its loads as they were timed.
@@ -440,7 +442,12 @@ function createRendering(context: RequestContext, params: Record<string, unknown
 
     return jar.cookies
   }
-  const readOnce = () => flash ??= handedOverFlash(request) ?? (hasFlash(request) ? readFlash(personalCookies()) ?? null : null)
+  // Asking how a form post went reads the visitor's cookie, carried or not, so the page is theirs either way.
+  const readOnce = () => {
+    readPersonally(request)
+
+    return flash ??= handedOverFlash(request) ?? (hasFlash(request) ? readFlash(jar.cookies) ?? null : null)
+  }
   const headers = new Headers({ 'content-type': 'text/html; charset=utf-8' })
   const url = new URL(request.url)
   // The search params as text until the page's schema reads them; most pages never look.
@@ -449,6 +456,7 @@ function createRendering(context: RequestContext, params: Record<string, unknown
     headers,
     status: 200,
     base,
+    prerendering,
     // How a form post went is for the one page the browser went back to.
     outcome: readOnce,
     writeCookies: () => {
@@ -538,8 +546,8 @@ function respond(rendering: Rendering, output: Body | Rebased): Response {
 }
 
 // A page whose render read the session or a cookie is for that visitor alone: no CDN may keep it, unless the page set its own caching.
-function keepPersonal({ headers, ctx }: Rendering): void {
-  if (headers.has('cache-control') || !wasReadPersonally(ctx.request))
+function keepPersonal({ headers, ctx, prerendering }: Rendering): void {
+  if (prerendering || headers.has('cache-control') || !wasReadPersonally(ctx.request))
     return
 
   headers.set('cache-control', 'private, no-cache')
@@ -554,6 +562,7 @@ async function renderFailure(error: unknown, special: SpecialPages, rendering: R
     rendering.headers.delete('content-type')
     rendering.headers.set('location', error.location)
     rendering.writeCookies()
+    keepPersonal(rendering)
 
     return new Response(null, { status: error.status, headers: rendering.headers })
   }
