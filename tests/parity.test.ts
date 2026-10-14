@@ -127,6 +127,19 @@ const FIXTURES: Record<string, Record<string, string | Blob>> = {
     ].join('\n'),
     'hero.png': Bun.file(join(import.meta.dir, 'fixtures/images/src/hero.png')),
   },
+  'image loading': {
+    'main.kay': [
+      '---',
+      'import { signal } from \'kay\'',
+      '',
+      'const src = signal(\'/a.png\')',
+      '---',
+      'img.lazy(src={src()} alt="")',
+      'img.hero(src={src()} alt="" loading="eager")',
+      'img.spread(alt="" {...{ src: src() }})',
+      '',
+    ].join('\n'),
+  },
   'ARIA states and bound URLs': {
     'main.kay': [
       '---',
@@ -141,6 +154,7 @@ const FIXTURES: Record<string, Record<string, string | Blob>> = {
       'button(aria-expanded={open()} aria-selected={false} aria-checked={none()} hidden={open() === true} {...aria}) x',
       'div({...{ \'aria-busy\': open() }})',
       'div({...{ \'aria-busy\': none() }})',
+      'p(hidden={true} disabled={false}) shut',
       'a(href={url()}) home',
       'a(href={bad()}) bad',
       'img(alt="" {...{ src: bad() }})',
@@ -159,7 +173,8 @@ const FIXTURES: Record<string, Record<string, string | Blob>> = {
 const EXPECTED: Record<string, string> = {
   'slots': '<ul><li class="row">a!</li><li class="row">b!</li></ul><header><button>Add</button></header><ul><li>0: a</li><li>1: b</li></ul><p>Body</p><header>No actions</header><ul><li>a</li></ul><p>Empty</p>',
   'template consts and match': '<p>2 products</p><li title="2.50">Tea: 2.50<b>only true</b></li><li title="9.00">Mug: 9.00</li><div class="box">1150</div><i>4</i><p>Live</p><p>Unknown</p>',
-  'ARIA states and bound URLs': '<button aria-expanded="false" aria-label="x" aria-pressed="false" aria-selected="false">x</button><div aria-busy="false"></div><div></div><a href="/home">home</a><a href="unsafe: javascript:alert(1)">bad</a><img alt="" decoding="async" loading="lazy" src="unsafe: javascript:alert(1)"></img>',
+  'image loading': '<img alt="" class="lazy" decoding="async" loading="lazy" src="/a.png"></img><img alt="" class="hero" decoding="async" loading="eager" src="/a.png"></img><img alt="" class="spread" decoding="async" loading="lazy" src="/a.png"></img>',
+  'ARIA states and bound URLs': '<button aria-expanded="false" aria-label="x" aria-pressed="false" aria-selected="false">x</button><div aria-busy="false"></div><div></div><p hidden="">shut</p><a href="/home">home</a><a href="unsafe: javascript:alert(1)">bad</a><img alt="" decoding="async" loading="lazy" src="unsafe: javascript:alert(1)"></img>',
   'merged classes': '<div class="a on"></div><div class="a b from-spread" id="spread"></div><div class="shorthand yes">box</div><div class="shorthand from-spread">box</div><p title="[a from-spread on]"></p><p title="[a z]"></p><p title="[from-spread]"></p><p title="[undefined]"></p>',
 }
 
