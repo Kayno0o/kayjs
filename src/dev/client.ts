@@ -19,48 +19,74 @@ const BUILDER = join(import.meta.dir, 'builder.ts')
 // The process building the client for the servers `kay dev` starts, kept from one build to the next: its modules stay loaded and what it last built tells what an edit reaches.
 export function startClientBuilder(root: string, env: Record<string, string | undefined>): ClientBuilder {
   const realRoot = realpathSync(root)
-  const waiting: ((outcome: BuildOutcome | undefined) => void)[] = []
   let modules = new Set<string>()
-  let gone = false
-  // Under `kay dev`, so it writes where its servers read.
-  const child = Bun.spawn([process.execPath, BUILDER], {
-    cwd: root,
-    env: { ...env, NODE_ENV: 'development', KAY_DEV_CODE: '0' },
-    stdio: ['ignore', 'inherit', 'inherit'],
-    ipc: (message: { reads?: string[], built?: BuildOutcome }) => {
-      if (message.reads)
-        modules = new Set(message.reads)
+  let current = spawn()
 
-      if (message.built)
-        waiting.shift()?.(message.built)
-    },
-  })
-  const forget = async () => {
-    await child.exited
-    gone = true
+  function spawn() {
+    const state = {
+      gone: false,
+      // Whether it answered a build: one that never did failed as it started, as when the config failed to load.
+      answered: false,
+      waiting: [] as ((outcome: BuildOutcome | undefined) => void)[],
+      // Under `kay dev`, so it writes where its servers read.
+      child: Bun.spawn([process.execPath, BUILDER], {
+        cwd: root,
+        env: { ...env, NODE_ENV: 'development', KAY_DEV_CODE: '0' },
+        stdio: ['ignore', 'inherit', 'inherit'],
+        ipc: (message: { reads?: string[], built?: BuildOutcome }) => {
+          if (message.reads)
+            modules = new Set(message.reads)
 
-    for (const resolve of waiting.splice(0))
-      resolve(undefined)
+          if (message.built) {
+            state.answered = true
+            state.waiting.shift()?.(message.built)
+          }
+        },
+      }),
+    }
+
+    void (async () => {
+      await state.child.exited
+      state.gone = true
+
+      for (const resolve of state.waiting.splice(0))
+        resolve(undefined)
+    })()
+
+    return state
   }
 
-  void forget()
+  const ask = async (state: typeof current, changed: string[] | null) => {
+    if (state.gone)
+      return Promise.resolve(undefined)
+
+    const outcome = new Promise<BuildOutcome | undefined>(resolve => state.waiting.push(resolve))
+
+    // A process already dead drops it: its exit then answers undefined.
+    state.child.send({ build: changed } satisfies BuildRequest)
+
+    return outcome
+  }
 
   return {
     build: async (changed) => {
-      if (gone)
-        return undefined
+      const dying = current
+      const outcome = await ask(dying, changed)
 
-      const outcome = new Promise<BuildOutcome | undefined>(resolve => waiting.push(resolve))
+      // Killed or out of memory after it built before: replaced and asked again, once.
+      if (outcome !== undefined || !dying.answered || current !== dying)
+        return outcome
 
-      child.send({ build: changed } satisfies BuildRequest)
+      await dying.child.exited
+      current = spawn()
 
-      return outcome
+      return ask(current, null)
     },
-    gone: () => gone,
+    gone: () => current.gone,
     loaded: file => file === CONFIG_FILE || modules.has(join(realRoot, file)),
     stop: async () => {
-      child.kill()
-      await child.exited
+      current.child.kill()
+      await current.child.exited
     },
   }
 }

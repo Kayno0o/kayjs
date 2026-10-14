@@ -11,6 +11,7 @@ import { KayCompileError } from '../src/build/transform'
 import { readShadowSettings } from '../src/check/shadow'
 import { loadConfig } from '../src/config'
 import { dev, watchProject } from '../src/dev'
+import { startClientBuilder } from '../src/dev/client'
 import { InspectorAddressInUse, inspectorProxy } from '../src/dev/inspector'
 import { bootFailure, hotSwap } from '../src/server/dev'
 import { editorCommand } from '../src/server/editor'
@@ -1126,6 +1127,51 @@ describe.concurrent('kay dev', () => {
     }
     finally {
       await stop()
+      await rm(root, { recursive: true, force: true })
+    }
+  }, 60_000)
+
+  it.serial('replaces a process that built before and died before answering, once, and not one failing as it starts', async () => {
+    const scratch = join(import.meta.dir, '../node_modules/.cache')
+
+    await mkdir(scratch, { recursive: true })
+    const root = await mkdtemp(join(scratch, 'dev-builder-retry-'))
+    const real = realpathSync(root)
+    const starts = join(root, 'starts')
+
+    await Bun.write(join(root, 'kay.config.ts'), 'export default {}\n')
+    await Bun.write(join(root, 'src/routes/index.kay'), 'h1 Home\n')
+    const builder = startClientBuilder(root, process.env)
+
+    try {
+      expect(await builder.build(null)).toBeDefined()
+
+      const [first] = childrenRunning(real, 'builder.ts')
+
+      // Killed as a change comes in, before the exit is heard.
+      process.kill(Number(first), 'SIGKILL')
+      const outcome = await builder.build(null)
+
+      expect(outcome).toBeDefined()
+      expect(outcome?.failed).toBe(false)
+      expect(builder.gone()).toBe(false)
+      expect(childrenRunning(real, 'builder.ts')).not.toContain(first!)
+    }
+    finally {
+      await builder.stop()
+    }
+
+    // A config failing to load ends the process before it ever built: asked again by the next change, not at once.
+    await Bun.write(join(root, 'kay.config.ts'), `import { appendFileSync } from 'node:fs'\n\nappendFileSync(${JSON.stringify(starts)}, 'x')\n\nthrow new Error('no config')\n`)
+    const failing = startClientBuilder(root, process.env)
+
+    try {
+      expect(await failing.build(null)).toBeUndefined()
+      expect(failing.gone()).toBe(true)
+      expect(readFileSync(starts, 'utf8')).toBe('x')
+    }
+    finally {
+      await failing.stop()
       await rm(root, { recursive: true, force: true })
     }
   }, 60_000)
