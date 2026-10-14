@@ -124,6 +124,11 @@ export async function revokeToken(state: RequestState, id: string): Promise<bool
   return record ? state.core.store.bearerTokens.delete(record.id, id) : false
 }
 
+// Whether a request carries an `Authorization: Bearer` token, which no page can add to a cross-site request; a browser sends Basic credentials on its own.
+export function bearerRequest(request: Request): boolean {
+  return BEARER.test(request.headers.get('authorization') ?? '')
+}
+
 // The user a request's `Authorization: Bearer` token belongs to, with the token's scopes.
 export async function bearerUser(core: Core, request: Request): Promise<{ record: UserRecord, scopes: string[] | null } | undefined> {
   const token = BEARER.exec(request.headers.get('authorization') ?? '')?.[1]

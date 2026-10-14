@@ -334,6 +334,10 @@ async function admit(guards: LoadedGuard[], context: { request: Request, params?
   if (cors)
     withCors(cors, context.request, context.set.headers)
 
+  // Before the guards, so a library reading the session for them, such as kayjs-auth, knows the origin is let in.
+  if (cors && corsAdmits(cors, context.request))
+    admitCrossSite(context.request)
+
   const passed = guards.length > 0 ? await passGuards(guards, context, context.params ?? {}, options) : undefined
 
   if (passed instanceof Response)
@@ -343,9 +347,6 @@ async function admit(guards: LoadedGuard[], context: { request: Request, params?
     admitted.add(context.request)
 
   // A browser lets any page open a websocket or post a form to any host, the user's cookies attached; a request with neither header, such as a webhook, is no browser's.
-  if (cors && corsAdmits(cors, context.request))
-    admitCrossSite(context.request)
-
   if (crossSiteRefused(context.request))
     return new Response('Cross-site request refused', { status: 403 })
 

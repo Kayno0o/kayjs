@@ -22,3 +22,11 @@ await site.submit(register, fields, { from: await site.visit('/register') })
 ```
 
 A guest sign-in is now checked as `'guest'` rather than `'register'`, with its own `captcha.on.guest`. A custom `captcha.verify` that looks at the action needs to handle it.
+
+### kayjs-auth refuses cross-site requests on a plain Elysia app
+
+On a plain Elysia app mounting `auth.plugin`, a cross-site POST or websocket upgrade from a browser now reads the session as signed out, and a sign-in, a sign-out or any other session write answers a 403. kay's own actions and API already refused these, and an `api({ cors })` module still lets in the origins it names.
+
+Behind a proxy that does not pass the browser's `Host` on, set `url` in `createAuth` to the site's public address. Without it, every form post that touches the session answers a 403.
+
+Only an `Authorization: Bearer` header skips the check. Basic credentials, which a browser sends on its own, are checked like any other request.

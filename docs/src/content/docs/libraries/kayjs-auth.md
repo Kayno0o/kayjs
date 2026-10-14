@@ -74,7 +74,7 @@ else
   a(href="/auth/sign-in") Sign in
 ```
 
-On a plain Elysia app, which has no Origin check of kay's own, a browser's cross-site POST or websocket upgrade that touches the session is refused with a 403: its `Origin` must name the request's host or the host of `url`. `auth.socketUser(ws)` answers `null` and closes such a socket. Requests with no `Origin` (scripts, webhooks), safe methods and bearer tokens are left alone.
+On a plain Elysia app, which has no Origin check of kay's own, a browser's cross-site POST or websocket upgrade reads the session as signed out, and a session write from it, such as a sign-in or a sign-out, is refused with a 403. Its `Origin` must name the request's host or the host of `url`, so an app behind a proxy that does not pass `Host` on sets `url`. `auth.socketUser(ws)` answers `null` and closes such a socket. Requests with no `Origin` (scripts, webhooks), safe methods and `Authorization: Bearer` tokens are left alone.
 
 ## Signing in with a password
 

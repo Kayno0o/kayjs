@@ -28,7 +28,7 @@ import { Elysia } from 'elysia'
 import { clientAddress, crossSiteRefused, rateKey } from 'kay/server'
 import { changePassword, changeUsername, deleteAccount, unlink } from './account'
 import { actingAdmin, adminAuditLog, banUser, changeRole, deleteUser, getUser, isAdmin, listUsers, unbanUser } from './admin'
-import { bearerUser, createToken, issueToken, listTokens, revokeToken, tokenUser } from './bearer'
+import { bearerRequest, bearerUser, createToken, issueToken, listTokens, revokeToken, tokenUser } from './bearer'
 import { pwnedPassword } from './breached'
 import { admit, captchaChallenge, captchaRequired, proofOfWork } from './captcha'
 import { banned, newUserRecord, publicUser } from './core'
@@ -81,9 +81,9 @@ const FORM_POST_FIELDS = ['code', 'state', 'error', 'user']
 // What a route, a guard or a gate asks of the user: a role, a predicate, or a list of which any one passes.
 export type AuthRequirement<Role extends string> = Requirement<User, Role>
 
-// A session that refuses, as a 403, to be read or written by a cross-site POST or websocket upgrade: a plain Elysia app has no Origin check of kay's own.
+// A session a browser's cross-site POST or websocket upgrade reads as signed out and cannot write, a write answered with a 403: a plain Elysia app has no Origin check of kay's own.
 function guardSession(session: Session<AuthSessionData>, refuse: () => boolean): Session<AuthSessionData> {
-  const guard = <Args extends unknown[], Result>(call: (...args: Args) => Promise<Result>) => async (...args: Args): Promise<Result> => {
+  const write = <Args extends unknown[]>(call: (...args: Args) => Promise<void>) => async (...args: Args): Promise<void> => {
     if (refuse())
       throw new Response('Cross-site request refused', { status: 403 })
 
@@ -91,12 +91,12 @@ function guardSession(session: Session<AuthSessionData>, refuse: () => boolean):
   }
 
   return {
-    get: guard(async key => session.get(key)),
-    set: guard(async (key, value) => session.set(key, value)),
-    unset: guard(async key => session.unset(key)),
-    destroy: guard(async () => session.destroy()),
-    regenerate: guard(async () => session.regenerate()),
-    lifetime: guard(async maxAge => session.lifetime(maxAge)),
+    get: async key => refuse() ? undefined : session.get(key),
+    set: write(async (key, value) => session.set(key, value)),
+    unset: write(async key => session.unset(key)),
+    destroy: write(async () => session.destroy()),
+    regenerate: write(async () => session.regenerate()),
+    lifetime: write(async maxAge => session.lifetime(maxAge)),
   }
 }
 
@@ -188,7 +188,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
   private readonly session: Session<AuthSessionData>
 
   constructor(session: Session<AuthSessionData>, private readonly core: Core, private readonly request: Request, client: string, address: string) {
-    const crossSite = () => request.headers.get('authorization') === null && crossSiteRefused(request, core.url)
+    const crossSite = () => !bearerRequest(request) && crossSiteRefused(request, core.url)
 
     this.session = guardSession(session, crossSite)
 

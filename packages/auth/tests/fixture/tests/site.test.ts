@@ -356,6 +356,17 @@ describe('the prebuilt pages', () => {
     expect(await store.users.findByEmail('leaving@example.com')).toBeUndefined()
   })
 
+  test('an API module whose cors lets a site in reads the user its guard reads, and one it does not reads nobody', async () => {
+    const ada = await signedUp('partner@example.com')
+    const post = (origin: string) => ada.fetch('/api/partner', { method: 'POST', headers: { origin, 'sec-fetch-site': 'cross-site' } })
+    const admitted = await post('https://partner.example')
+
+    expect(admitted.status).toBe(200)
+    expect(await admitted.json()).toEqual({ email: 'partner@example.com' })
+    expect((await post('https://evil.example')).status).toBe(401)
+    expect(text(await ada.visit('/'), '#who')).toBe('Signed in as partner@example.com')
+  })
+
   test('the app replaces one text and keeps the rest, and each language reads its own', async () => {
     const visitor = await browser()
 

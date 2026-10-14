@@ -52,6 +52,7 @@ Types include `Component`, `Signal`, `Guard`, `Duration`, `PageContext`, `Endpoi
 | `session`, `memoryStore`, `sqliteStore` | Cookie sessions and their stores. See [Sessions and guards](/guides/sessions-and-guards) |
 | `defineEnv` | Reads `process.env` once against a schema, typed |
 | `rateLimit`, `memoryRates`, `sqliteRates`, `clientAddress`, `rateKey` | Rate limiting, and the key a limit counts an address under |
+| `crossSiteRefused` | Whether a browser's cross-site POST or websocket upgrade should be refused, for code that kay's actions and API do not reach |
 | `workChallenge`, `verifyWork` | Proof of work in a form field your own code checks |
 | `requestId` | The id of a request, on its log lines and its `X-Request-Id` header |
 | `schedule`, `background` | Jobs on a cron or every so long, and background work, in the server's process |

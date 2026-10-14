@@ -3,6 +3,8 @@ import { Elysia } from 'elysia'
 import { testApp, userRecord } from './helpers/app'
 
 const EVIL = { origin: 'http://evil.example' }
+// A call of one of `auth`'s methods posted from another site.
+const crossPost = (args: unknown[]) => ({ method: 'POST', headers: { ...EVIL, 'content-type': 'application/json' }, body: JSON.stringify(args) })
 
 describe('a plain Elysia app on auth.plugin', () => {
   async function signedIn() {
@@ -29,11 +31,12 @@ describe('a plain Elysia app on auth.plugin', () => {
     expect(await victim.json('/me')).toBe('anonymous')
   })
 
-  test('refuses a cross-site POST of a signed-in user and keeps them signed in', async () => {
-    const { ada } = await signedIn()
+  test('reads a cross-site POST of a signed-in user as signed out, refuses its sign-out and keeps them signed in', async () => {
+    const { app, ada } = await signedIn()
 
     expect((await ada.fetch('/sign-out', { method: 'POST', headers: EVIL })).status).toBe(403)
-    expect((await ada.fetch('/call/changeUsername', { method: 'POST', headers: { ...EVIL, 'content-type': 'application/json' }, body: '["mallory"]' })).status).toBe(403)
+    expect(await ada.json('/call/changeUsername', crossPost(['mallory']))).toEqual({ ok: false, error: 'signed-out' })
+    expect((await app.store.users.get('u1'))!.username).not.toBe('mallory')
     expect(await ada.json('/me')).toMatchObject({ id: 'u1' })
   })
 
@@ -71,6 +74,13 @@ describe('a plain Elysia app on auth.plugin', () => {
     expect(response.status).toBe(200)
   })
 
+  test('takes Basic credentials, which a browser sends on its own, for no bearer token', async () => {
+    const { ada } = await signedIn()
+
+    expect((await ada.fetch('/sign-out', { method: 'POST', headers: { ...EVIL, authorization: 'Basic YWRhOnNlY3JldA==' } })).status).toBe(403)
+    expect(await ada.json('/me')).toMatchObject({ id: 'u1' })
+  })
+
   test('leaves the OAuth form_post callback, a cross-site POST by design, to answer', async () => {
     const app = testApp()
     const response = await app.app.handle(new Request('http://localhost/auth/apple/callback', { method: 'POST', headers: { ...EVIL, 'content-type': 'application/x-www-form-urlencoded' }, body: 'code=1' }))
@@ -78,7 +88,7 @@ describe('a plain Elysia app on auth.plugin', () => {
     expect(response.status).toBe(404)
   })
 
-  test('socketUser answers nobody and closes a socket whose upgrade came from another origin', async () => {
+  test('socketUser answers nobody and closes a socket whose upgrade came from another origin, and the socket\'s own auth reads it as signed out', async () => {
     const { app, ada } = await signedIn()
     const cookie = [...ada.cookies].map(([name, value]) => `${name}=${value}`).join('; ')
 
@@ -89,10 +99,15 @@ describe('a plain Elysia app on auth.plugin', () => {
           ws.send(JSON.stringify(await app.auth.socketUser(ws)))
         },
       })
+      .ws('/raw', {
+        async message(ws) {
+          ws.send(JSON.stringify(await ws.data.auth.user() ?? 'anonymous'))
+        },
+      })
       .listen(0)
 
-    async function ask(origin: string) {
-      const socket = new WebSocket(`ws://localhost:${server.server!.port}/socket`, { headers: { cookie, origin } } as never)
+    async function ask(origin: string, path = '/socket') {
+      const socket = new WebSocket(`ws://localhost:${server.server!.port}${path}`, { headers: { cookie, origin } } as never)
       const closed = new Promise<number>(resolve => socket.addEventListener('close', event => resolve(event.code)))
       const answer = new Promise<unknown>(resolve => socket.addEventListener('message', event => resolve(JSON.parse(String(event.data))), { once: true }))
 
@@ -109,6 +124,8 @@ describe('a plain Elysia app on auth.plugin', () => {
     try {
       expect((await ask(`http://localhost:${server.server!.port}`)).answer).toMatchObject({ id: 'u1' })
       expect((await ask('http://evil.example')).answer).toBe(1008)
+      expect((await ask(`http://localhost:${server.server!.port}`, '/raw')).answer).toMatchObject({ id: 'u1' })
+      expect((await ask('http://evil.example', '/raw')).answer).toBe('anonymous')
     }
     finally {
       await server.stop()

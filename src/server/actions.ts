@@ -53,8 +53,9 @@ const pageUrls = new WeakMap<Request, URL>()
 const TEXT = 'text/plain; charset=utf-8'
 // What a visitor reads when the handler throws and its action words nothing of its own.
 const SERVER_ERROR = 'Something went wrong on our side; try again later'
-// What a post from the site's own pages carries in `Sec-Fetch-Site`; `none` is the user's own doing, such as a bookmark.
+// The methods that change nothing, which any page may send anywhere.
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
+// What a post from the site's own pages carries in `Sec-Fetch-Site`; `none` is the user's own doing, such as a bookmark.
 const SAME_SITE_FETCH = new Set(['same-origin', 'none'])
 // The first proxy's `X-Forwarded-Proto` saying the browser came over https.
 const FORWARDED_HTTPS = /^\s*https\s*(?:,|$)/i
