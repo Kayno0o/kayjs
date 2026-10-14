@@ -219,9 +219,12 @@ function keyDown(event: KeyboardEvent) {
   show(index, event.currentTarget as HTMLElement)
 }
 
+// Only focus from the keyboard shows a point: a press focuses the plot too, and its pointer places the tooltip itself.
 function focused(event: FocusEvent) {
-  if (!hovered() && labels.length > 0)
-    show(current(), event.currentTarget as HTMLElement)
+  const overlay = event.currentTarget as HTMLElement
+
+  if (!hovered() && labels.length > 0 && overlay.matches(':focus-visible'))
+    show(current(), overlay)
 }
 
 function blurred() {
