@@ -405,7 +405,7 @@ export function sqliteStore(path: string): SqliteSessionStore {
 }
 
 // The file's device, inode and creation time, which a file recreated at the same path does not keep whole; undefined once it is gone.
-function fileId(file: string): number | undefined {
+function fileId(file: string): string | undefined {
   try {
     const stat = statSync(file, { throwIfNoEntry: false })
 
