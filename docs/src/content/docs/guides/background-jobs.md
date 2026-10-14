@@ -4,6 +4,14 @@ order: 8.5
 description: Run work on a schedule, keep a worker running with the server, and queue jobs that survive a restart.
 ---
 
+Three tools run work outside a request, each for its own kind of job:
+
+| The job | Use |
+| --- | --- |
+| runs at set times or every so often, such as purging expired carts | [`schedule`](#scheduled-jobs) |
+| runs as long as the server does, such as reading another service's queue | [`background`](#long-running-work) |
+| is started by a request and must run even after a restart, retried when it fails, such as a welcome mail | [`queue`](#queues) |
+
 ## Scheduled jobs
 
 `schedule(cron, job)` from `kay/server` is an Elysia plugin: the server runs the job from `.listen()` until it stops.

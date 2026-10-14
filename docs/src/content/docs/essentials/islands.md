@@ -13,6 +13,8 @@ const count = signal(0)
 button(onClick={() => count++}) Clicked {count()} times
 ```
 
+An island is for what reacts to the user in the browser. What only has to differ per request, such as a greeting or a stock count inside a prerendered page, needs no JavaScript: make it a [server island](/essentials/routing#server-islands), rendered on the server for each request.
+
 ## Signals, memos and effects
 
 A signal is read by calling it, `count()`, and written by assigning it, `count++` or `open = !open()`, in the template as in the script. `memo` derives a value, `effect` runs after the render and again when a signal it read changes.

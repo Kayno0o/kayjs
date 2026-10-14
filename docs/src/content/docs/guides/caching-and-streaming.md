@@ -4,6 +4,17 @@ order: 7
 description: Keep slow loads in memory, and stream slow parts of a page in after the rest.
 ---
 
+Each tool fits a different slow part:
+
+| The slow part | Use |
+| --- | --- |
+| a value that is the same for every request, such as a list of posts or another service's feed | [`cached`](#caching-a-load) |
+| a whole page that is the same for everyone | [the page cache](#page-cache) |
+| a value the rest of the page can show without, such as comments under a post | [streaming](#streaming) |
+| a part that differs per request in a page otherwise the same for everyone, such as a greeting | [a server island](/essentials/routing#server-islands) |
+
+They combine: a streamed value can come from `cached`, and a prerendered page can hold server islands.
+
 ## Caching a load
 
 `cached(key, ttl, load)` from `kay/cache` keeps what a load fetched for `ttl`, shared by every request in the process. `ttl` is in seconds or a string such as `'5m'`.
