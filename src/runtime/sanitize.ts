@@ -26,7 +26,8 @@ interface Allowed {
   attributes: Record<string, readonly string[]>
 }
 
-const DEFAULTS: Allowed = { tags: KEPT, attributes: Object.assign(Object.create(null), { a: LINK_ATTRIBUTES }) }
+// Made on first use, so an island build reaching `trustHtml` alone leaves it out.
+let defaults: Allowed | undefined
 const resolved = new WeakMap<SanitizeOptions, Allowed>()
 // Elements whose content is code or another document rather than text, dropped whole, and comments.
 const DROPPED = /<(script|style|template|textarea|title|noscript|iframe|object|svg|math)\b|<!--/gi
@@ -75,7 +76,7 @@ function openingTag(tag: string, attributes: string | undefined, kept: readonly 
 // The tags and attributes kept, the defaults with what the options add; read once per options object.
 function allowed(options: SanitizeOptions | undefined): Allowed {
   if (!options)
-    return DEFAULTS
+    return defaults ??= { tags: KEPT, attributes: Object.assign(Object.create(null), { a: LINK_ATTRIBUTES }) }
 
   let found = resolved.get(options)
 
