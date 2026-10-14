@@ -68,6 +68,8 @@ export interface ScriptAnalysis {
   functions: string[]
   diagnostics: Diagnostic[]
   fence?: ParsedFence | undefined
+  // A fence Babel cannot parse, as one being typed with a quote not closed yet, emitted whole at module level so the editor completes in it through TypeScript's own recovery.
+  unparsed?: Span | undefined
 }
 
 // A fence parsed once, which every analysis and check of it reads: `shift` maps a node to its span in the file.
@@ -131,16 +133,15 @@ interface FenceStatement {
   gap: Span | undefined
 }
 
-type FenceAnalysis = Pick<ScriptAnalysis, 'hoisted' | 'imports' | 'specifiers' | 'implicit' | 'diagnostics' | 'fence'>
+type FenceAnalysis = Pick<ScriptAnalysis, 'hoisted' | 'imports' | 'specifiers' | 'implicit' | 'diagnostics' | 'fence' | 'unparsed'>
 
 // Parses a fence once, moves its imports and types to module level and finds which of `globals` it reads undeclared; the other statements are left in order, then what follows the last.
 // `names` are values from elsewhere that a type of the fence may take the type of, which keeps it out of module level too.
 function splitFence(source: string, fence: Span, globals: string[], names: string[], analysis: FenceAnalysis): (ParsedFence & { statements: FenceStatement[], tail: Span | undefined }) | undefined {
   const parsed = parseFence(source, fence, analysis.diagnostics)
 
-  // A fence Babel cannot recover from, as one being typed with a quote not closed yet, still reaches the editor whole at module level, where TypeScript's own recovery parses it.
   if (!parsed) {
-    analysis.hoisted.push(fence)
+    analysis.unparsed = fence
 
     return undefined
   }
@@ -250,6 +251,7 @@ export interface ServerAnalysis {
   separate: SeparateSetting[]
   diagnostics: Diagnostic[]
   fence?: ParsedFence | undefined
+  unparsed?: Span | undefined
 }
 
 // Splits a `--- server` fence into module-level code and the body of `load(ctx)`, and lists the names the page receives.

@@ -415,6 +415,15 @@ describe('kay lsp imports', () => {
     const list = await editor.request<CompletionList>('textDocument/completion', page, 1, 44)
 
     expect(list.items.map(item => item.label)).toContain('brand-github')
+
+    const typing = '---\nimport BrandGithub from \'~icons/tabler/brand\nconst todos = listTo\n---\np {todos.length}\n'
+
+    await editor.change(page, typing, 10)
+
+    const names = await editor.request<CompletionList>('textDocument/completion', page, 2, 20)
+    const item = await editor.connection.request<CompletionItem>('completionItem/resolve', names.items.find(entry => entry.label === 'listTodos'))
+
+    expect(applyEdits(typing, item.additionalTextEdits ?? [])).toBe('---\nimport { listTodos } from \'../data\'\nimport BrandGithub from \'~icons/tabler/brand\nconst todos = listTo\n---\np {todos.length}\n')
   })
 
   it('types a library component, goes to its .kay source and imports it as a quick fix', async () => {

@@ -192,6 +192,11 @@ class ModuleShell {
         this.emitHoisted(span, fence.specifiers, fence.imports, duplicates)
     }
 
+    for (const unparsed of [script.unparsed, fence?.unparsed]) {
+      if (unparsed)
+        this.emitHoisted(unparsed, [], [], [])
+    }
+
     if (server)
       b.add(`import type { ${this.options.errorPage ? 'ErrorPageContext' : 'PageContext'} as KayPageContext, PageData as KayPageData${this.declaresQuery() !== undefined ? ', QueryOf as KayQueryOf' : ''}${this.settingType(PRERENDER) !== undefined ? ', PrerenderedContext as KayPrerenderedContext' : ''}${mode === 'check' && server.page ? ', PageSettings as KayPageSettings' : ''} } from 'kay'\n`)
 

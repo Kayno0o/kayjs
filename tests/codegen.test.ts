@@ -321,6 +321,7 @@ describe('fences', () => {
   it('report markup as belonging in the template, a fence holding TypeScript only', () => {
     expect(reports('---\nconst el = <p>x</p>\n---\np x')).toEqual([{ message: 'A fence holds TypeScript, never JSX', at: '<p>x</p>', help: 'put markup in the template, or in a component of its own' }])
     expect(errors('--- server\nconst el = <><b /></>\n---\np x')).toEqual(['A fence holds TypeScript, never JSX'])
+    expect(compileKay('---\nimport { signal } from \'kay\'\nconst count = signal(0)\nconst el = <p>x</p>\n---\np {count}\n', 'test.kay', { check: true }).diagnostics.map(d => d.message)).toEqual(['A fence holds TypeScript, never JSX'])
     expect(errors('---\nconst x = 1 +\n---\np x')).toEqual(['Unexpected token'])
   })
 
@@ -332,6 +333,7 @@ describe('fences', () => {
       ['---\nconst a = \'one\nconst b = "two\n---\np {a}\n', 1],
       ['--- server\nimport { listTodos } from \'../da\nexport const page = {}\n---\n---\nconst label = "x\n---\np x\n', 2],
       ['---\nconst count = 1\nconst label = \'x\n---\np {count}\n', 1],
+      ['--- client\nconst label = "x\n---\np x\n', 1],
     ]
 
     for (const [source, broken] of components) {
