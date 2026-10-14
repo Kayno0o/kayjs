@@ -1032,6 +1032,55 @@ describe('watch', () => {
     expect(cleaned).toEqual([2, 3])
   })
 
+  it('takes a write the script makes before its first read as part of it', () => {
+    const turn = signal(1)
+    const seen: [number, number][] = []
+    const dispose = root((dispose) => {
+      watch(turn, (next, previous) => {
+        seen.push([next, previous])
+      })
+      turn.set(2)
+
+      return dispose
+    })
+
+    flush()
+    turn.set(3)
+    flush()
+    expect(seen).toEqual([[3, 2]])
+    dispose()
+  })
+
+  it('keeps watching after a run throws, reporting it, and takes `immediate` from a boolean', () => {
+    const turn = signal(1)
+    const seen: number[] = []
+    const reported = spyOn(console, 'error').mockImplementation(() => undefined)
+    const immediate = turn() > 1
+    const dispose = root((dispose) => {
+      watch(turn, (next: number, previous: number | undefined) => {
+        seen.push(next)
+
+        if (previous === 1)
+          throw new Error('failed')
+      }, { immediate })
+
+      return dispose
+    })
+
+    try {
+      flush()
+      turn.set(2)
+      flush()
+      turn.set(3)
+      flush()
+      expect([seen, reported.mock.calls.length]).toEqual([[2, 3], 1])
+    }
+    finally {
+      reported.mockRestore()
+      dispose()
+    }
+  })
+
   it('runs nothing while the server renders', () => {
     const turn = signal(1)
     let runs = 0

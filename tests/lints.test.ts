@@ -256,6 +256,13 @@ describe('uncalled-signal', () => {
     ])
   })
 
+  it('reports a debounced value left uncalled, a memo kay makes', () => {
+    const source = '---\nimport { debounced, signal } from \'kay\'\n\nconst typed = signal(\'\')\nconst settled = debounced(typed, 300)\n---\np {settled}\n'
+    const found = compileKay(source, 'search.kay', { check: true }).diagnostics.filter(d => d.code === 'uncalled-signal')
+
+    expect(found.map(d => d.message)).toEqual(['`settled` is a memo, read by calling it'])
+  })
+
   it('leaves a call, a write, a bind and the signal handed whole to a component or a function, which pass the signal itself', () => {
     const source = script('const open = signal(false)', 'button(onClick={() => open++}) {open()}\ninput(aria-label="Open" bind:checked={open})\nToggle(open={open} label={describe(open)})\nbutton(onClick={() => open.set(true)}) Open')
 

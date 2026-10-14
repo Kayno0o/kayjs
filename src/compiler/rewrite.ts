@@ -13,8 +13,8 @@ const IDENTIFIER = /^[A-Z_$][\w$]*$/i
 const CAPITAL = /^[A-Z]/
 // The names the compiler gives its own helpers and tags, `KayIdentityKey` or `KayLoopFor`.
 const COMPILER_NAME = /^Kay[A-Z]/
-// What `kay` exports that is read by calling it, in the template as in the script.
-const ACCESSORS = new Set(['signal', 'memo', 'persisted', 'linked', 'queryParam'])
+// What `kay` exports that is read by calling it, in the template as in the script, and whether it is written too.
+const ACCESSORS: Record<string, 'signal' | 'memo'> = { signal: 'signal', persisted: 'signal', linked: 'signal', queryParam: 'signal', memo: 'memo', debounced: 'memo' }
 
 export const POSITION_SUFFIX = / \(\d+:\d+\)$/
 const require = createRequire(import.meta.url)
@@ -458,8 +458,10 @@ class RewriteFinder {
     const binding = path.scope.getBinding(id.name)
     const start = this.input.map.isExact(id.start!) ? this.input.map.toSource(id.start!) : undefined
 
-    if (binding && made !== undefined && ACCESSORS.has(made))
-      this.signalBinding(binding, id.name, made === 'memo' ? 'memo' : 'signal')
+    const kind = made !== undefined && Object.hasOwn(ACCESSORS, made) ? ACCESSORS[made] : undefined
+
+    if (binding && kind !== undefined)
+      this.signalBinding(binding, id.name, kind)
 
     if (start !== undefined && made === 'signal' && onlyRead(binding, this.uncalled))
       this.constantSignals.set(start, { name: { start, end: start + id.name.length }, value: sourceSpan(this.input.map, init.arguments[0]) })

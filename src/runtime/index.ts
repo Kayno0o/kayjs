@@ -109,9 +109,10 @@ export interface WatchOptions {
 }
 
 // Runs `run` whenever `source` gives a new value, not on its first read, handed the value it gave before: `watch(turn, (next, previous) => ...)`.
+// The first read is the island's effects' first run, once its render is done: a write the script makes before then is part of it.
 // Only `source` is tracked, never what `run` reads, and a value equal to the last one runs nothing; nothing runs while the server renders.
 export function watch<T>(source: () => T, run: (next: T, previous: T) => unknown, options?: WatchOptions & { immediate?: false | undefined }): void
-export function watch<T>(source: () => T, run: (next: T, previous: T | undefined) => unknown, options: WatchOptions & { immediate: true }): void
+export function watch<T>(source: () => T, run: (next: T, previous: T | undefined) => unknown, options?: WatchOptions): void
 export function watch<T>(source: () => T, run: (next: T, previous: T | undefined) => unknown, options?: WatchOptions): void {
   // A memo, so a read that gives the same value again reruns nothing, and what `run` registered with `onCleanup` stays.
   const value = memo(source, { equals: Object.is })
@@ -138,11 +139,6 @@ export function debounced<T>(source: () => T, ms: number): Memo<T> {
 
   effect(() => {
     const next = source()
-
-    // Back to the settled value, the pending one is dropped and nothing waits.
-    if (Object.is(next, untrack(settled)))
-      return
-
     const timer = setTimeout(write, ms, next)
 
     onCleanup(() => clearTimeout(timer))
