@@ -37,15 +37,16 @@ const DEFAULT_DIR = 'data/files'
 const PRIVATE = 'private/'
 const KEY = /^(?:[\w-]+\/)*[\w-]+(?:\.\d{1,5}x\d{1,5})?\.[a-z\d]{1,10}$/
 const FOLDER = /^[\w-]+(?:\/[\w-]+)*$/
-const PRIVATE_FOLDER = /^private(?:\/|$)/i
-// A key under `Private/` is private too, as a store matching keys whatever their case reads `private/` for it.
-const PRIVATE_KEY = /^private\//i
+// A folder or key under `private`, whatever its case, since a store matching keys whatever their case reads `Private/` as `private/`.
+const PRIVATE_SEGMENT = /^private(?:\/|$)/i
 const TYPE_PARAMETERS = /;.*$/
 const NAME_EXTENSION = /\.([a-z\d]{1,10})$/i
 // What Bun.Image reads the size of, which the key then holds.
 const SIZED = /^(?:png|jpe?g|webp|gif|avif)$/
-// Types a browser shows without running anything; any other file is downloaded as bytes of no type, so an uploaded page, SVG, script or stylesheet never runs as the site, nor loads into one of its pages.
+// Types a browser shows without running anything; any other file is downloaded, sandboxed, so an uploaded page or SVG never runs as the site.
 const INLINE = /^(?:image\/(?:png|jpeg|webp|gif|avif)|video\/|audio\/|application\/pdf|text\/plain)/
+// An image keeps its type, so an SVG still shows in an `img`; any other downloaded file goes as bytes of no type, so a script or stylesheet never loads into one of the site's pages.
+const IMAGE = /^image\//
 const RANGE = /^bytes=(\d*)-(\d*)$/
 const TRAILING_SLASH = /\/+$/
 const IMMUTABLE = 'public, max-age=31536000, immutable'
@@ -143,7 +144,7 @@ async function activeStore(): Promise<FileStore> {
 export const files = {
   // Stores a file under a new key and gives it back, for the app to save; an image's key holds its size.
   async put(data: Blob, options: PutOptions = {}): Promise<string> {
-    if (options.folder !== undefined && (!FOLDER.test(options.folder) || PRIVATE_FOLDER.test(options.folder)))
+    if (options.folder !== undefined && (!FOLDER.test(options.folder) || PRIVATE_SEGMENT.test(options.folder)))
       throw new Error(`kay: files.put() was given the folder ${JSON.stringify(options.folder)}: a folder is letters, digits, - and _ in segments split by /, and starts with no \`private\` segment`)
 
     const extension = fileExtension(data)
@@ -178,7 +179,7 @@ export const files = {
     checkedKey(key, 'files.url()')
 
     if (current.exported) {
-      if (PRIVATE_KEY.test(key))
+      if (PRIVATE_SEGMENT.test(key))
         throw new Error(`kay: a static export links private file ${key}, which only a server can serve once it checked the link`)
 
       if (current.store?.publicUrl === undefined)
@@ -187,7 +188,7 @@ export const files = {
       return `${current.store.publicUrl.replace(TRAILING_SLASH, '')}/${key}`
     }
 
-    if (!PRIVATE_KEY.test(key))
+    if (!PRIVATE_SEGMENT.test(key))
       return `${FILES_ROUTE}${key}`
 
     const seconds = durationSeconds(options.expires ?? DEFAULT_EXPIRES, 'files.url()\'s expires')
@@ -211,7 +212,7 @@ export function serveFiles(app: Elysia): void {
     if (!KEY.test(key))
       return new Response('Not found', { status: 404, headers: TEXT })
 
-    if (!PRIVATE_KEY.test(key))
+    if (!PRIVATE_SEGMENT.test(key))
       return fileResponse(key, request, IMMUTABLE)
 
     const query = new URL(request.url).searchParams
@@ -232,7 +233,7 @@ export async function storedImage(src: string): Promise<{ path: string, immutabl
   if (!url?.pathname.startsWith(FILES_ROUTE) || !KEY.test(key))
     return undefined
 
-  const locked = PRIVATE_KEY.test(key)
+  const locked = PRIVATE_SEGMENT.test(key)
 
   if (locked && !linkSigned(key, url.searchParams))
     return { status: 403, message: 'Not a valid link to this file' }
@@ -275,7 +276,7 @@ async function fileResponse(key: string, request: Request | undefined, cacheCont
   const type = Bun.file(key).type
   const inline = INLINE.test(type)
   const headers: Record<string, string> = {
-    'content-type': inline ? type : 'application/octet-stream',
+    'content-type': inline || IMAGE.test(type) ? type : 'application/octet-stream',
     'x-content-type-options': 'nosniff',
     'content-disposition': inline ? 'inline' : `attachment; filename="${basename(key)}"`,
     'cache-control': cacheControl,

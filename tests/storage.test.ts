@@ -87,10 +87,12 @@ describe('the file route', () => {
     expect(response.headers.get('content-disposition')).toBe('inline')
     expect((await response.arrayBuffer()).byteLength).toBe(Bun.file(HERO).size)
 
-    for (const name of ['page.html', 'drawing.svg', 'app.js', 'theme.css', 'module.mjs']) {
+    expect(response.headers.get('content-security-policy')).toBeNull()
+
+    for (const [name, type] of [['page.html', 'application/octet-stream'], ['drawing.svg', 'image/svg+xml'], ['app.js', 'application/octet-stream'], ['theme.css', 'application/octet-stream'], ['module.mjs', 'application/octet-stream']] as const) {
       const ran = await get(files.url(await files.put(new File(['<script>alert(1)</script>'], name))))
 
-      expect(ran.headers.get('content-type')).toBe('application/octet-stream')
+      expect(ran.headers.get('content-type')).toBe(type)
       expect(ran.headers.get('content-disposition')).toStartWith('attachment; filename=')
       expect(ran.headers.get('content-security-policy')).toBe('sandbox')
     }
@@ -119,6 +121,7 @@ describe('the file route', () => {
     expect(key).toStartWith('private/')
     expect((await get(`/_kay/files/${key}`)).status).toBe(403)
     expect((await get(`/_kay/files/${key.replace('private/', 'Private/')}`)).status).toBe(403)
+    expect(files.url(key.replace('private/', 'Private/'))).toContain('sig=')
 
     setSystemTime(new Date('2026-06-01T12:01:00Z'))
 
