@@ -31,7 +31,7 @@ A line is `tag.class#id(attributes) text`, every part optional. A line starting 
   input(type="text" disabled)
 ```
 
-Classes take Tailwind names, `:` and `/` included. Attributes sit in one pair of parentheses, separated by spaces: a quoted string, `{expression}`, or a bare name for a boolean attribute. `tag: child` nests one element on the same line:
+Attributes sit in one pair of parentheses, separated by spaces. A value is a quoted string or `{expression}`, and a bare name is a boolean attribute. `tag: child` nests one element on the same line:
 
 ```kay
 li: a(href="/") Home
@@ -52,7 +52,7 @@ p Hello {user.name}, you have {messages.length} messages
 | {summary}
 ```
 
-`#[tag text]` puts an element inside text, and `\{` is a literal brace:
+`#[tag text]` puts an element inside text:
 
 ```kay
 p Read #[a(href="/terms") the terms] first
@@ -75,7 +75,7 @@ ul
     li No posts yet
 ```
 
-`match` picks among the values of one expression, rendering the block of the first `when` listing it, else the `else` block:
+`match` renders the block of the first `when` that lists the value, else the `else` block:
 
 ```kay
 match post.status
@@ -87,11 +87,11 @@ match post.status
     p Archived
 ```
 
-The expression is read once, and `kay check` narrows it in each block as a TypeScript `switch` does: on a union of objects, `match shape.kind` types `shape` per `when`, and a `when` value the type cannot hold is an error.
+`if user as u` binds the truthy value to `u` for the children.
 
-`if value as name` binds the truthy value for the children: a last `as` followed by a lowercase name aliases the whole condition, `if a && b as found` included, while a capitalized name or any other type, `as Row`, `as string`, `as const` or `as Box<T>`, stays a cast. A `for` matches its rows by `item.id`, else by the item itself. When your items have neither, name a key: `for post of posts key={post.slug}`.
+A `for` tracks its rows by `item.id`. When your items have no `id`, name a key: `for post of posts key={post.slug}`.
 
-A `const` line names a value for the lines after it and their children, so a row computes it once however often it reads it:
+A `const` line names a value for the lines after it, computed once per row:
 
 ```kay
 for product of products
@@ -101,8 +101,6 @@ for product of products
     if stock < 3
       span.badge Only {stock} left
 ```
-
-In an island it follows what it reads, as a `memo` does, and redraws only what reads it. A name the template already sees, `let` and reassigning it are errors.
 
 ## Events and bindings
 
@@ -120,11 +118,11 @@ label
 button(onClick={() => name.set('')}) Clear
 ```
 
-`bind:value` and `bind:checked` read and write a signal both ways. A lowercase `onclick` attaches nothing, and `kay check` reports it.
+`bind:value` and `bind:checked` read and write a signal both ways.
 
 ## Comments and slots
 
-`// note` is a comment, and so is everything indented under it. `slot` is where a layout or wrapper component renders its children:
+`// note` is a comment. `slot` is where a layout or wrapper component renders its children:
 
 ```kay
 // not rendered
@@ -134,4 +132,4 @@ main
 
 See [Components](/essentials/components) for named slots.
 
-<ReadMore href="/llms/templates">The full template reference covers `class` merging, `ref`, `innerHTML` and `sanitizeHtml`, `await` and `try` blocks and transitions.</ReadMore>
+<ReadMore href="/llms/templates">The full template reference covers `match` narrowing, `if ... as` casts, `class` merging, `ref`, `innerHTML` and `sanitizeHtml`, `await` and `try` blocks and transitions.</ReadMore>
