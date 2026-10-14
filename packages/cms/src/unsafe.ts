@@ -1,12 +1,11 @@
 import { bodyHtml, MarkdownError } from './kay/content'
 
 // Tags that run code, load another document, take input, style or cover the page, or swallow the rest of it, whatever their attributes; `sanitizeHtml` drops the same.
-const UNSAFE_TAGS = new Set(['applet', 'base', 'button', 'embed', 'fencedframe', 'form', 'frame', 'frameset', 'iframe', 'input', 'link', 'math', 'meta', 'noembed', 'noscript', 'object', 'plaintext', 'portal', 'script', 'select', 'style', 'svg', 'template', 'textarea', 'title', 'xmp'])
+const UNSAFE_TAGS = new Set(['applet', 'base', 'button', 'embed', 'fencedframe', 'form', 'frame', 'frameset', 'iframe', 'input', 'link', 'math', 'meta', 'noembed', 'noframes', 'noscript', 'object', 'plaintext', 'portal', 'script', 'select', 'style', 'svg', 'template', 'textarea', 'title', 'xmp'])
 // What Markdown's own task list gives a checkbox.
 const TASK_ATTRIBUTES = new Set(['type', 'class', 'disabled', 'checked'])
-// Where bodyHtml stands a component, and what closes the body here: either one read other than as an element sits inside a tag, a comment or raw text, which what kay puts there could close.
-const COMPONENT = /<kay-component n="\d+"/g
-const END = 'kay-body-end'
+// Where bodyHtml opens and closes a component, as kay itself reads them.
+const PLACEHOLDER = /<kay-component n="\d+" \/>|<kay-component n="\d+">|<\/kay-component>/g
 const URL_ATTRIBUTES = new Set(['action', 'background', 'data', 'formaction', 'href', 'poster', 'src', 'xlink:href'])
 const UNSAFE_ATTRIBUTE = /^(?:on|style$|srcdoc$)/i
 const HEX_ENTITY = /&#x([\da-f]+);?/gi
@@ -32,19 +31,29 @@ export async function scriptInBody(body: string): Promise<string | undefined> {
     throw error
   }
 
-  let components = 0
+  // Each component's ends, and the body's own, become tags named after a nonce the body cannot write: one the tokenizer does not read as an element sits inside a tag, a comment or raw text, which what kay puts there could close.
+  const nonce = Bun.randomUUIDv7()
+  const mark = `kay-mark-${nonce}`
+  const end = `kay-end-${nonce}`
+  let marks = 0
+  let seen = 0
   let ended = false
-  const found = await scriptIn(`${html}<${END}></${END}>`, (tag) => {
-    if (tag === 'kay-component')
-      components++
-    else if (tag === END)
+  const marked = html.replace(PLACEHOLDER, () => {
+    marks++
+
+    return `<${mark}></${mark}>`
+  })
+  const found = await scriptIn(`${marked}<${end}></${end}>`, (tag) => {
+    if (tag === mark)
+      seen++
+    else if (tag === end)
       ended = true
   })
 
   if (found !== undefined)
     return found
 
-  if (components < (html.match(COMPONENT)?.length ?? 0))
+  if (seen < marks)
     return 'a component inside a tag'
 
   return ended ? undefined : 'a tag left open'

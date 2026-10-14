@@ -25,6 +25,7 @@ describe('scriptInBody', () => {
       ['<input type=checkbox disabled formaction=javascript:alert(1)>', 'a <input> tag'],
       ['<plaintext>the rest of the page', 'a <plaintext> tag'],
       ['<xmp>the rest of the page', 'a <xmp> tag'],
+      ['<noframes>the rest of the page', 'a <noframes> tag'],
       ['<!-- the rest of the page\n\nnever shown', 'a tag left open'],
       ['<div onclick=alert(1)', 'the attribute onclick'],
       ['<div title="x', 'a tag left open'],
@@ -55,6 +56,9 @@ describe('scriptInBody', () => {
     expect(await scriptInBody(`<img src='x <Callout />' onerror=alert(1)>`)).toBe('the attribute onerror')
     expect(await scriptInBody('<Callout>\n\n<div title="</Callout>" onclick=alert(1)>x</div>')).toBe('the attribute onclick')
     expect(await scriptInBody('<div title="<Callout />">x</div>')).toBe('a component inside a tag')
+    expect(await scriptInBody('<!-- <Callout /> <script>alert(1)</script> -->\n\n<kay-component>')).toBe('a component inside a tag')
+    expect(await scriptInBody('<Callout>\n\n<!-- </Callout> <script>alert(1)</script> -->')).toBe('a component inside a tag')
+    expect(await scriptInBody('<kay-body-end>\n\n<div onmouseover=alert(1) title="x')).toBe('a tag left open')
     expect(await scriptInBody('<Callout title="a"><script>alert(1)</script></Callout>')).toBe('a <script> tag')
   })
 })

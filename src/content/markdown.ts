@@ -341,7 +341,6 @@ function componentSegments(html: string, components: ExtractedComponent[]): Segm
   return root.children
 }
 
-// `name="text"`, `name='text'`, `name={json}` or a bare `name`, which is `true`.
 // Whether a JSON value holds an object with a string `t`, the shape kay renders as markup.
 function holdsMarkup(value: unknown): boolean {
   if (typeof value !== 'object' || value === null)
@@ -353,6 +352,7 @@ function holdsMarkup(value: unknown): boolean {
   return Object.values(value).some(holdsMarkup)
 }
 
+// `name="text"`, `name='text'`, `name={json}` or a bare `name`, which is `true`.
 function readAttributes(text: string, component: string, line: number): Record<string, unknown> {
   const props: Record<string, unknown> = {}
   let rest = text.trim()
