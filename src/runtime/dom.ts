@@ -1276,3 +1276,31 @@ export function render(fn: () => unknown, container: Element): () => void {
     }
   })
 }
+
+// Renders `render`'s result at the end of `container`, between two markers of its own; returns what removes those nodes again and leaves the rest of `container` as it was.
+export function renderAppended(fn: () => unknown, container: Element): () => void {
+  const start = document.createComment('')
+  const end = document.createComment('')
+
+  container.append(start, end)
+
+  return root((dispose) => {
+    insert(null, start, end, fn, false)
+
+    return () => {
+      dispose()
+
+      const parent = start.parentNode
+
+      // The app may have emptied or rebuilt the element already.
+      if (!parent)
+        return
+
+      while (end.parentNode === parent && start.nextSibling && start.nextSibling !== end)
+        parent.removeChild(start.nextSibling)
+
+      start.remove()
+      end.remove()
+    }
+  })
+}

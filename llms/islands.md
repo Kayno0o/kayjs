@@ -451,7 +451,7 @@ const dispose = mount(Panel, document.querySelector('#panel')!, { title: 'Ticket
 
 - A page another server or tool bundles, such as an HTML file `Bun.serve` imports, renders `.kay` components too.
 - The plugin `kay` from `kay/bun` compiles them, for the browser in a browser build: list `"kay/bun"` under `[serve.static] plugins` in `bunfig.toml`, which `Bun.serve` reads from the directory it starts in, or pass `kay({ root })` to `Bun.build`'s `plugins`, `root` being where `.kay/` goes, the working directory by default.
-- `mount(Component, element, props)` from `kay/mount` renders one into an element, as an island renders but with no server markup to hydrate, and returns what disposes it, ending its effects and emptying the element.
+- `mount(Component, element, props)` from `kay/mount` renders one into an element, as an island renders but with no server markup to hydrate, and returns what disposes it, ending its effects and removing only the nodes it rendered, so several components mounted into one element are disposed one at a time and the rest of the element stays as it was.
 - `props` may be left out for a component taking none.
 - A signal a `.ts` module exports reaches every component mounted from that module's bundle, so a module feeding signals from a WebSocket keeps them current.
 - Imports of `.kay` files are typed through `.kay/types` as in a kay project, which `kay check` writes, with the tsconfig settings of [Project setup](project.md#project-setup).

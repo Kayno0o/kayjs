@@ -19,9 +19,29 @@ button(onClick={() => count++}) Clicked {count()}
 const ENTRY = `import { mount } from 'kay/mount'
 import Counter from './counter.kay'
 
+export { mount }
+export { default as Label } from './label.kay'
+export { default as Switch } from './switch.kay'
+
 export function show(element: HTMLElement, onGone: () => void) {
   return mount(Counter, element, { start: 2, onGone })
 }
+`
+
+const LABEL = `---
+const { text } = props<{ text: string }>()
+---
+{text}
+`
+
+const SWITCH = `---
+let shown = signal(true)
+---
+button(onClick={() => shown.set(!shown())}) Switch
+if shown()
+  p On
+else
+  p Off
 `
 
 const SCRIPT_SRC = /<script[^>]+src="([^"]+)"/
@@ -33,13 +53,24 @@ let dir: string
 beforeAll(async () => {
   GlobalRegistrator.register()
   dir = await scratchDir('outside-page-')
-  await Promise.all([Bun.write(join(dir, 'counter.kay'), COUNTER), Bun.write(join(dir, 'entry.ts'), ENTRY)])
+  await Promise.all([Bun.write(join(dir, 'counter.kay'), COUNTER), Bun.write(join(dir, 'entry.ts'), ENTRY), Bun.write(join(dir, 'label.kay'), LABEL), Bun.write(join(dir, 'switch.kay'), SWITCH)])
 })
 
 afterAll(async () => {
   await GlobalRegistrator.unregister()
   await rm(dir, { recursive: true, force: true })
 })
+
+interface Built { mount: typeof import('../src/runtime/mount').mount, Label: (props: { text: string }) => unknown, Switch: () => unknown }
+
+async function built(): Promise<Built> {
+  const build = await Bun.build({ entrypoints: [join(dir, 'entry.ts')], outdir: join(dir, 'out-built'), target: 'browser', plugins: [kay({ root: dir })] })
+
+  if (!build.success)
+    throw new AggregateError(build.logs, 'client build failed')
+
+  return await import(build.outputs[0]!.path) as Built
+}
 
 describe('a page kay does not serve', () => {
   it('bundles a component with kay/bun\'s plugin, which mount renders, keeps reacting and disposes', async () => {
@@ -67,6 +98,49 @@ describe('a page kay does not serve', () => {
     expect(gone).toBe(1)
     expect(element.innerHTML).toBe('')
     element.remove()
+  })
+
+  it('disposes of only the nodes a mount rendered, leaving the rest of the element, other mounts included, as it was', async () => {
+    const { mount, Label, Switch } = await built()
+    const element = document.createElement('div')
+
+    element.innerHTML = '<h1>Title</h1>'
+    document.body.append(element)
+    element.append('tail')
+
+    const first = mount(Label, element, { text: 'one' })
+    const second = mount(Switch, element)
+    const third = mount(Label, element, { text: 'three' })
+
+    expect(element.textContent).toBe('Titletailone' + 'Switch' + 'On' + 'three')
+
+    // A mount's own reactive updates stay between its own markers.
+    element.querySelector('button')!.click()
+    await settle()
+    expect(element.textContent).toBe('Titletailone' + 'Switch' + 'Off' + 'three')
+
+    second()
+    expect(element.textContent).toBe('Titletailonethree')
+    expect(element.querySelector('h1')).not.toBeNull()
+
+    first()
+    expect(element.textContent).toBe('Titletailthree')
+
+    // Disposing twice does nothing more.
+    first()
+    third()
+    expect(element.innerHTML).toBe('<h1>Title</h1>tail')
+    element.remove()
+  })
+
+  it('disposes of a mount whose element the app already emptied or moved out of', async () => {
+    const { mount, Switch } = await built()
+    const element = document.createElement('div')
+    const dispose = mount(Switch, element)
+
+    element.textContent = ''
+    expect(() => dispose()).not.toThrow()
+    expect(element.innerHTML).toBe('')
   })
 
   it('builds a Bun.serve HTML import through bunfig\'s [serve.static] plugins', async () => {

@@ -162,4 +162,6 @@ import Panel from './panel.kay'
 const dispose = mount(Panel, document.querySelector('#panel')!, { title: 'Tickets' })
 ```
 
+A mount renders after what the element already holds, and disposing it removes only the nodes it rendered, so several components mounted into one element are disposed one at a time.
+
 <ReadMore href="/llms/islands">Transitions, error fallbacks with `try`, context, `uid`, `guardLeave`, the edge cases of props and persisted state, and the navigation details are in the full islands reference.</ReadMore>
