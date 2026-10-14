@@ -177,23 +177,25 @@ function asleep(): boolean {
 // Runs `reconnect` after the attempt's backoff, shortened by up to half at random so the clients a restart dropped together come back apart, and not before the tab is visible and online again; gives what cancels it.
 function scheduleRetry(attempt: number, reconnect: () => void): () => void {
   const delay = backoff(attempt)
-  let waking = false
-  const listen = (on: boolean) => {
-    waking = on
+  // Read only once asleep, which a browser alone can be.
+  const wakers = () => [[globalThis, 'online'], [document, 'visibilitychange']] as const
+  let waiting = false
 
-    for (const [target, type] of [[globalThis, 'online'], [document, 'visibilitychange']] as const) {
-      if (on)
-        target.addEventListener(type, wake)
-      else
-        target.removeEventListener(type, wake)
-    }
+  function stopWaiting() {
+    if (!waiting)
+      return
+
+    waiting = false
+
+    for (const [target, type] of wakers())
+      target.removeEventListener(type, wake)
   }
 
   function wake() {
     if (asleep())
       return
 
-    listen(false)
+    stopWaiting()
     reconnect()
   }
 
@@ -204,14 +206,15 @@ function scheduleRetry(attempt: number, reconnect: () => void): () => void {
       return
     }
 
-    listen(true)
+    waiting = true
+
+    for (const [target, type] of wakers())
+      target.addEventListener(type, wake)
   }, delay - Math.random() * delay / 2)
 
   return () => {
     clearTimeout(timer)
-
-    if (waking)
-      listen(false)
+    stopWaiting()
   }
 }
 

@@ -99,7 +99,7 @@ export function setRemoteImages(listed: ((src: string) => boolean) | undefined):
     if (!REMOTE.test(src) || listed(src))
       return false
 
-    const host = URL.parse(src)?.host ?? src
+    const host = hostOf(src)
 
     if (!warnedHosts.has(host)) {
       warnedHosts.add(host)
@@ -108,6 +108,16 @@ export function setRemoteImages(listed: ((src: string) => boolean) | undefined):
 
     return true
   })
+}
+
+// Not `URL.parse`, which Safari before 18 lacks, as this module ships to the browser too.
+function hostOf(src: string): string {
+  try {
+    return new URL(src).host
+  }
+  catch {
+    return src
+  }
 }
 
 export function recordVariants(): void {

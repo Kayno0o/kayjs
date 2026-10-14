@@ -47,11 +47,21 @@ export function joinBase(mount: string, path: string): string {
 
 // `value` when it is a path of this site, as a `?next=` param should be, else `fallback`: `ctx.redirect(localPath(ctx.query.next, '/account'))` never sends anyone to another site. The path comes back as a browser reads it, with no backslash or control character left.
 export function localPath<const Fallback extends string>(value: unknown, fallback: Fallback & CheckedHref<Fallback>): string {
-  if (typeof value !== 'string' || !value.startsWith('/') || !URL.canParse(value, NOWHERE))
-    return fallback
+  const url = typeof value === 'string' && value.startsWith('/') ? parsed(value) : undefined
 
-  const url = new URL(value, NOWHERE)
+  if (!url)
+    return fallback
 
   // A dot segment can leave the path starting `//`, `/.//evil.example` for one, which a browser reads as a host.
   return url.origin === NOWHERE && !url.pathname.startsWith('//') ? `${url.pathname}${url.search}${url.hash}` : fallback
+}
+
+// Not `URL.canParse`, which Safari before 17 lacks.
+function parsed(path: string): URL | undefined {
+  try {
+    return new URL(path, NOWHERE)
+  }
+  catch {
+    return undefined
+  }
 }

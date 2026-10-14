@@ -55,11 +55,11 @@ const TAGS = /<[^>]*>/g
 const SPACE = /\s/
 const ENTITY = /&(?:amp|lt|gt|quot|#39|#x27);/g
 const DECODED: Record<string, string> = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': '\'', '&#x27;': '\'' }
-// Line breaks in the text before an offset, for the line a problem sits on.
 // An image, and the attributes that keep it from loading lazily and decoding off the main thread, as a template's does.
-const IMAGE_TAG = /<img\b[^>]*>/gi
+const IMAGE_TAG = /<img\b(?:[^>"']|"[^"]*"|'[^']*')*>/gi
 const EAGER = /\s(?:loading|fetchpriority)\s*=/i
 const DECODING = /\sdecoding\s*=/i
+// Line breaks in the text before an offset, for the line a problem sits on.
 const LINE_BREAK = /\n/g
 
 export class MarkdownError extends Error {

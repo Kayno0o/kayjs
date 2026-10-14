@@ -233,6 +233,46 @@ describe('API modules', () => {
     }
   })
 
+  it('holds the reconnect while offline until the browser is online, and drops it once closed', async () => {
+    const tab = Object.assign(new EventTarget(), { hidden: false })
+    const globals = globalThis as Record<string, unknown>
+    const network = (onLine: boolean) => Object.defineProperty(navigator, 'onLine', { value: onLine, configurable: true })
+
+    globals.document = tab
+    network(false)
+
+    try {
+      let calls = 0
+      const reader = readEvents<number>(async () => {
+        calls++
+
+        return new Response('data: [1]\n\n')
+      }, true)
+
+      reader.start()
+      await Bun.sleep(700)
+      expect(calls).toBe(1)
+
+      network(true)
+      globalThis.dispatchEvent(new Event('online'))
+      await Bun.sleep(50)
+      expect(calls).toBe(2)
+
+      network(false)
+      await Bun.sleep(700)
+      reader.close()
+      network(true)
+      globalThis.dispatchEvent(new Event('online'))
+      tab.dispatchEvent(new Event('visibilitychange'))
+      await Bun.sleep(50)
+      expect(calls).toBe(2)
+    }
+    finally {
+      delete globals.document
+      delete (navigator as { onLine?: boolean }).onLine
+    }
+  })
+
   it('gives an island a module\'s mount in the browser build, none of its server code', async () => {
     const outdir = await mkdtemp(join(tmpdir(), 'kay-live-'))
 

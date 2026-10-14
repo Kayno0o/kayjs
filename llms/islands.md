@@ -231,7 +231,7 @@ const dispose = mount(Panel, document.querySelector('#panel')!, { title: 'Ticket
 - An interactive component renders on the server and hydrates in the browser as an island.
 - Everything else ships no JavaScript, except the small script swapping pages in on a page posting a form to an action, and elsewhere one line keeping Back right after a reload (see [Navigation](#navigation)).
 - Interactive components rendered inside an island are part of it.
-- kay's browser code runs on Chrome and Edge 98, Firefox 104 and Safari 16.4 or later; kayjs-ui's popovers, tooltips and toasts need the Popover API, Chrome and Edge 114, Firefox 125, Safari 17. Bun bundles an island's code as written, newer syntax and APIs included, so an app keeping those browsers stays off what they lack, such as `Map.groupBy` or `Promise.withResolvers`.
+- kay's browser code runs on Chrome and Edge 98, Firefox 104 and Safari 16.4 or later; kayjs-ui's popovers, tooltips and toasts need the Popover API, Chrome and Edge 114, Firefox 125, Safari 17, and its popovers, tooltips and site nav lists sit beside their trigger through CSS anchor positioning, so a browser lacking it opens them away from their trigger. Bun bundles an island's code as written, newer syntax and APIs included, so an app keeping those browsers stays off what they lack, such as `Map.groupBy` or `Promise.withResolvers`.
 - A component the server renders per request inside an otherwise prerendered page, such as a form carrying a fresh token, is a server island instead: see [Server islands](routing.md#server-islands).
 
 ### Props to an island

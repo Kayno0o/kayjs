@@ -490,7 +490,8 @@ function swapBody(next: Document, policy: Policy): void {
   // Every island left is taken away, as the morph never keeps one.
   navigation.hooks!.dispose(old)
 
-  const opened = [...old.querySelectorAll(':popover-open')]
+  // A browser without popovers throws on the selector.
+  const opened = 'popover' in HTMLElement.prototype ? [...old.querySelectorAll(':popover-open')] : []
 
   // What ran already, the hydration script for one, runs once.
   const ran = new Set([...document.scripts].map(script => script.outerHTML))

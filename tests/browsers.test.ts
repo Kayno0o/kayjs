@@ -13,7 +13,12 @@ const PAST_THE_FLOOR: [RegExp, string][] = [
   [/\.(?:values|keys|entries)\(\)\.(?:map|filter|take|drop|flatMap|reduce|toArray|forEach|some|every|find)\(/, 'iterator helpers (Firefox 131, Safari 18.4)'],
   [/\b(?:Iterator\.from|RegExp\.escape|Error\.isError|Math\.sumPrecise)\(/, 'ES2025 statics (Chrome 122 on, Safari 18.4 on)'],
   [/\.(?:isWellFormed|toWellFormed)\(/, 'well-formed strings (Chrome 111, Firefox 119)'],
+  [/\bURL\.(?:canParse|parse)\(/, 'URL.canParse (Chrome 120, Safari 17) and URL.parse (Chrome 126, Safari 18)'],
 ]
+
+// A selector kay's own runtime may only query behind a check, as one a browser lacks throws; kayjs-ui states the Popover API as its floor.
+const UNGUARDED_POPOVER = /querySelector(?:All)?\(':popover-open'/
+const POPOVER_CHECK = /'popover' in /
 
 // The code an island ships: kay's runtime, its server-only and dev-only modules left out, and kayjs-ui's components.
 async function browserFiles(): Promise<string[]> {
@@ -35,6 +40,9 @@ describe('the browsers kay supports', () => {
           if (pattern.test(line))
             found.push(`${path}:${index + 1} uses ${feature}`)
         }
+
+        if (path.startsWith('src/') && UNGUARDED_POPOVER.test(line) && !POPOVER_CHECK.test(line))
+          found.push(`${path}:${index + 1} queries :popover-open unguarded (Chrome 114, Firefox 125, Safari 17)`)
       }
     }
 
