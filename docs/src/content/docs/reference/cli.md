@@ -316,7 +316,7 @@ kay explain --format json    # every lint, for a tool to read
 
 ## Quiet and plain output
 
-`kay build`, `kay check`, `kay fmt`, `kay migrate` and `kay new` take `--quiet`: they print the problems and one summary line, without the size report, the files one by one or the next step to run. `kay routes` and `kay explain`, whose output is the answer, refuse it.
+`kay build`, `kay check`, `kay fmt`, `kay migrate` and `kay new` take `--quiet`: they print the problems and one summary line, without the size report, the files one by one or the next step to run. `kay build` keeps one line per step it ran, `--static` and `--compile` adding theirs, and `kay fmt --check` names the unformatted files alone. Every other command refuses it.
 
 ```sh
 kay fmt src --quiet   # formatted 3 files
