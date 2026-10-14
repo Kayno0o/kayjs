@@ -270,7 +270,9 @@ export default defineConfig({ requireGuards: true })
 - A post naming no page of the action's file, such as from a script, has the file's shortest page without params as its `url`, else its first page with each param named, `/orgs/:org`, and is refused when the file reads params.
 - For a module under `src/api/`, they are those of the route the request matched, as its handler reads them.
 - Checks on one record still belong in the load and the action.
-- An action's guards run once its input is valid, when the app's `resolve` values are there: input the schema refuses gets its field errors back without reaching a guard or the handler.
+- An action's guards run once its input is valid, when the app's `resolve` values are there.
+- Input the schema refuses meets the guards first, so a caller they refuse gets their redirect or denial, never the field errors or the values sent back; a caller they let through gets the field errors, without reaching the handler.
+- On that path only what the app derives is in `ctx.locals`, `resolve` running after the schema: a guard reading a user the app resolves refuses a signed-in caller there, so keep the user in `derive`, as `session()` does. A guard throwing there leaves the field errors.
 - A refused form post gets the redirect, or the denial as plain text.
 - A denied page renders the nearest `_error.kay` outside the guard's directory, inside the layouts outside it, so nothing the guard protects renders.
 - A layout's `ctx.redirect` is no guard: actions never run layout loads.

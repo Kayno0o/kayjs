@@ -119,6 +119,63 @@ describe('requireGuards', () => {
   })
 })
 
+describe('input a guarded route\'s schema refuses', () => {
+  const NAMED = '--- server\nimport { t } from \'elysia\'\nimport { action } from \'kay\'\n\nexport const rename = action(t.Object({ name: t.String({ maxLength: 3 }) }), input => input.name)\n---\nh1 Admin\n'
+  const BROKEN = 'import { guard } from \'kay\'\n\nexport default guard(({ locals }) => {\n  if ((locals as { user?: { id: string } }).user!.id === \'\')\n    throw new Error(\'no user\')\n})\n'
+  let dir = ''
+  let app: Awaited<ReturnType<typeof pages>>
+
+  const act = async (folder: string, headers: Record<string, string> = {}, form = false) => {
+    const response = await app.handle(new Request(`http://localhost/_kay/action/${relative(process.cwd(), join(dir, 'routes'))}/${folder}/index.kay/rename`, {
+      method: 'POST',
+      headers: { referer: `http://localhost/${folder}`, ...form ? { 'content-type': 'application/x-www-form-urlencoded' } : { 'content-type': 'application/json', 'x-kay-action': '1' }, ...headers },
+      body: form ? 'name=secret-value' : stringify({ name: 'secret-value' }),
+    }))
+
+    return { status: response.status, body: await response.text() }
+  }
+  const call = async (headers: Record<string, string> = {}) => {
+    const response = await app.handle(new Request('http://localhost/api/admin', { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify({ name: 'secret-value' }) }))
+
+    return { status: response.status, body: await response.text() }
+  }
+
+  beforeAll(async () => {
+    dir = await scratchDir('guards-first-')
+    await Promise.all([
+      Bun.write(join(dir, 'routes/index.kay'), 'h1 Home\n'),
+      Bun.write(join(dir, 'routes/admin/_guard.ts'), ADMINS),
+      Bun.write(join(dir, 'routes/admin/index.kay'), NAMED),
+      Bun.write(join(dir, 'routes/broken/_guard.ts'), BROKEN),
+      Bun.write(join(dir, 'routes/broken/index.kay'), NAMED),
+      Bun.write(join(dir, 'api/admin/_guard.ts'), ADMINS),
+      Bun.write(join(dir, 'api/admin/index.ts'), 'import { t } from \'elysia\'\nimport { api } from \'kay/server\'\n\nexport default api().post(\'/\', ({ body }) => body.name, { body: t.Object({ name: t.String({ maxLength: 3 }) }) })\n'),
+    ])
+    app = await pages({ routes: join(dir, 'routes'), api: join(dir, 'api'), prebuilt: false })
+  })
+
+  afterAll(async () => rm(dir, { recursive: true, force: true }))
+
+  it('answers an action\'s caller the guards refuse with their refusal, never the field errors and values', async () => {
+    expect(await act('admin')).toEqual({ status: 403, body: 'Admins only' })
+    expect((await act('admin', {}, true)).status).toBe(403)
+
+    const admitted = await act('admin', { 'x-admin': '1' })
+
+    expect(admitted.status).toBe(422)
+    expect(admitted.body).toContain('name')
+  })
+
+  it('answers an API route\'s caller the guards refuse with their refusal, never the validation error', async () => {
+    expect(await call()).toEqual({ status: 403, body: 'Admins only' })
+    expect((await call({ 'x-admin': '1' })).status).toBe(422)
+  })
+
+  it('gives the field errors when a guard throws for want of a value set up after the schema', async () => {
+    expect((await act('broken')).status).toBe(422)
+  })
+})
+
 describe('the OpenAPI document on a site requiring guards', () => {
   let dir = ''
 

@@ -533,7 +533,7 @@ describe('guards', () => {
     expect(html).not.toContain('Admin tools')
   })
 
-  it('guards the actions of its pages once their input is valid', async () => {
+  it('guards the actions of its pages, a caller they refuse getting their answer before any field error', async () => {
     const away = await promote({ name: 'bob' })
     const denied = await promote({ name: 'bob' }, { 'x-user': 'bob' })
 
@@ -541,7 +541,8 @@ describe('guards', () => {
     expect(away.status).toBe(303)
     expect(away.headers.get('location')).toBeNull()
     expect(away.headers.get('x-kay-redirect')).toBe('/about')
-    expect((await promote({ name: '' })).status).toBe(422)
+    expect((await promote({ name: '' })).headers.get('x-kay-redirect')).toBe('/about')
+    expect((await promote({ name: '' }, { 'x-user': 'bob' })).status).toBe(403)
     expect(denied.status).toBe(403)
     expect(await denied.text()).toBe('Admins only')
     expect((await promote({ name: '' }, { 'x-user': 'ada' })).status).toBe(422)

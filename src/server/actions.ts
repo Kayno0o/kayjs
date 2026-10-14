@@ -152,7 +152,16 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], m
         },
         // After validation, the one stage where the app's `resolve` values are there for `ctx.locals`.
         ...(guards.length > 0 && { beforeHandle: async (context: { request: Request }) => inLocale(context.request, options, async () => admit(guards, sharedContext(context.request, () => ({ ...context })), pageParams.get(context.request) ?? {}, pageUrls.get(context.request), options)) }),
-        error: async ({ code, error, request, body, server, set }) => {
+        error: async (context) => {
+          const { code, error, request, body, server, set } = context
+
+          if ((code === 'VALIDATION' || code === 'INVALID_FILE_TYPE') && guards.length > 0) {
+            const refusal = await inLocale(request, options, async () => guardsFirst(guards, sharedContext(request, () => ({ ...context })), pageParams.get(request) ?? {}, pageUrls.get(request), options))
+
+            if (refusal)
+              return refusal
+          }
+
           if (code === 'VALIDATION')
             return refused(value, error, request, server, back)
 
@@ -413,8 +422,16 @@ async function admit(guards: LoadedGuard[], context: { request: Request }, param
   return undefined
 }
 
-// Runs the guards of an action or an API route: the response when one stops the request, else the cookies and headers they set.
-export async function passGuards(guards: LoadedGuard[], context: { request: Request }, params: RouteParams, options: ActionOptions, url = new URL(context.request.url)): Promise<Response | GuardedRequest> {
+// The guards of a route whose input the schema refused, run before its field errors go out, so a caller they refuse learns nothing of the input, nor sees its values echoed.
+// Only `derive` values are there, `resolve` running after the schema: a guard throwing for want of one leaves the field errors.
+export async function guardsFirst(guards: LoadedGuard[], context: { request: Request }, params: RouteParams, url: URL | undefined, options: ActionOptions): Promise<Response | undefined> {
+  const passed = await passGuards(guards, context, params, options, url, false)
+
+  return passed instanceof Response ? passed : undefined
+}
+
+// Runs the guards of an action or an API route: the response when one stops the request, else the cookies and headers they set; a guard throwing anything but a redirect or a denial answers 500, or lets the request on without `answerThrown`.
+export async function passGuards(guards: LoadedGuard[], context: { request: Request }, params: RouteParams, options: ActionOptions, url = new URL(context.request.url), answerThrown = true): Promise<Response | GuardedRequest> {
   const { request } = context
   const state: GuardedRequest = { jar: cookieJar(request), headers: new Headers() }
   const ctx: GuardContext = {
@@ -436,7 +453,10 @@ export async function passGuards(guards: LoadedGuard[], context: { request: Requ
   }
   const refusal = await runGuards(guards, ctx)
 
-  return refusal ? stopped(refusal.error, request, state, options) : state
+  if (!refusal || (!answerThrown && !(refusal.error instanceof Redirect || refusal.error instanceof Denied)))
+    return state
+
+  return stopped(refusal.error, request, state, options)
 }
 
 // Hosts rather than origins: behind a TLS-terminating proxy the browser says https while the request arrives as http. The host of `site` in kay.config.ts counts too, for a proxy that does not pass the browser's `Host` on.

@@ -16,7 +16,7 @@ import { projectPaths } from '../project'
 import { API_MOUNT, END_EVENT, ERROR_EVENT } from '../runtime/live'
 import { kayLog } from '../runtime/log'
 import { encodeValue, unsendable } from '../runtime/wire'
-import { inLocale, isCrossSite, passGuards } from './actions'
+import { guardsFirst, inLocale, isCrossSite, passGuards } from './actions'
 import { importModule } from './bundle'
 import { corsAdmits, corsResponse, corsRule, preflight, withCors } from './cors'
 import { loadGuard, requiredGuards } from './guards'
@@ -216,6 +216,18 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
 
           if (span)
             failed(span, error)
+        })
+        // Before the module's own `onError`, so no custom answer to refused input reaches a caller the guards refuse.
+        .onError(async (context) => {
+          if (context.code !== 'VALIDATION' || guards.length === 0)
+            return undefined
+
+          const refusal = await answeringRequest(context.request, async () => inLocale(context.request, options, async () => guardsFirst(guards, sharedContext(context.request, () => ({ ...context })), (context as { params?: Record<string, unknown> }).params ?? {}, undefined, options)))
+
+          if (refusal && cors)
+            withCors(cors, context.request, refusal.headers)
+
+          return refusal
         })
         .onAfterHandle(({ request, responseValue, set }) => {
           // A Vary the route set itself keeps Origin.
