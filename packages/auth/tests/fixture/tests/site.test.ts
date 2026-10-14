@@ -23,7 +23,7 @@ const { connect } = await import(join(PAGES, 'account', 'connections.kay'))
 const { disable, enable, setUp } = await import(join(PAGES, 'account', 'security.kay'))
 const { end, endOthers } = await import(join(PAGES, 'account', 'sessions.kay'))
 const { create, revoke } = await import(join(PAGES, 'account', 'tokens.kay'))
-const { prove, remove } = await import(join(PAGES, 'account', 'data.kay'))
+const { prove, remove, signInAgain } = await import(join(PAGES, 'account', 'data.kay'))
 const { confirm } = await import(join(PAGES, 'confirm-email.kay'))
 const { magicLink, password } = await import(join(PAGES, 'sign-in.kay'))
 const { register } = await import(join(PAGES, 'register.kay'))
@@ -31,6 +31,7 @@ const { request, reset } = await import(join(PAGES, 'reset-password.kay'))
 const { verify } = await import(join(PAGES, 'two-factor.kay'))
 const { verify: verifyEmail } = await import(join(PAGES, 'verify-email.kay'))
 const { spend } = await import('../src/routes/auth/magic-link.kay')
+const { impersonate } = await import('../src/routes/impersonate.kay')
 const { rename } = await import('../src/routes/orgs/[org]/index.kay')
 
 type Page = Awaited<ReturnType<Awaited<ReturnType<typeof browser>>['visit']>>
@@ -307,6 +308,42 @@ describe('the prebuilt pages', () => {
     finally {
       setSystemTime()
     }
+  })
+
+  test('the data page asks an account with nothing to prove it by to sign in again once the sign-in is old', async () => {
+    const ada = await signedUp('bare@example.com')
+    const { id } = (await store.users.findByEmail('bare@example.com'))!
+
+    await store.users.update(id, { passwordHash: null })
+    setSystemTime(new Date(Date.now() + 11 * 60_000))
+
+    try {
+      const page = await ada.visit('/auth/account/data')
+
+      expect(page.find('a[download]')).toHaveLength(0)
+      expect(page.find('p').map(p => p.text)).toContain('For your safety, sign in again before doing this.')
+      expect(page.find('form button').map(button => button.text)).toEqual(['Sign out', 'Sign in again', 'Sign in again'])
+      expect(await ada.submit(signInAgain, {}, { from: page })).toMatchObject({ url: '/auth/sign-in?redirect=%2Fauth%2Faccount%2Fdata', status: 200 })
+      expect(text(await ada.visit('/'), '#who')).toBe('Anonymous')
+    }
+    finally {
+      setSystemTime()
+    }
+  })
+
+  test('the data page offers neither the export nor the deletion to an admin acting as the user', async () => {
+    const root = await signedUp('data-admin@example.com')
+    const { id: rootId } = (await store.users.findByEmail('data-admin@example.com'))!
+
+    await signedUp('acted@example.com')
+    await store.users.update(rootId, { roles: ['admin'] })
+
+    const { id } = (await store.users.findByEmail('acted@example.com'))!
+    const page = await root.submit(impersonate, { id }, { from: await root.visit('/impersonate') })
+
+    expect(page).toMatchObject({ url: '/auth/account/data', status: 200 })
+    expect(page.find('form button').map(button => button.text)).toEqual(['Sign out'])
+    expect(page.find('p').map(p => p.text)).toContain('Not while acting as another user.')
   })
 
   test('the data page downloads the user\'s data and deletes the account once proved', async () => {

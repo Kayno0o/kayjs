@@ -1,0 +1,14 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+// An admin's way into a user's account, as an app's admin page would offer it.
+export const impersonate = action(t.Object({ id: t.String({ maxLength: 100 }) }), async ({ id }, ctx) => {
+  const result = await ctx.locals.auth.impersonate(id)
+
+  return result.ok ? ctx.redirect('/auth/account/data') : ctx.fail(400, { error: result.error })
+})
+---
+form(action={impersonate})
+  input(name="id" aria-label="id")
+  button Impersonate
