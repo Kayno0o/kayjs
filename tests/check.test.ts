@@ -1,19 +1,39 @@
 import type { CheckOptions } from '../src/check'
-import { chmod, mkdir, mkdtemp, rm, symlink, utimes } from 'node:fs/promises'
+import { chmod, mkdtemp, rm, symlink, utimes } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, join, relative, resolve } from 'node:path'
 import process from 'node:process'
-import { describe, expect, it, spyOn } from 'bun:test'
+import { describe, expect, it, setDefaultTimeout, spyOn } from 'bun:test'
 import { findKayFiles } from '../src/build/files'
-import { applySafeFixes, check } from '../src/check'
+import { applySafeFixes, check as checkProject } from '../src/check'
 import { islandOnlyComponents } from '../src/check/island-only'
 import { probe } from '../src/check/project'
 import { compileShadow, shadowPath, shadowSource } from '../src/check/shadow'
 import { warnOtherKay } from '../src/commands/command'
 import { compileKay } from '../src/compiler'
 import { SHADOW_DIR } from '../src/project'
+import { limiter } from '../src/server/limit'
+import { scratchDir } from './scratch'
 
 const fixtures = join(import.meta.dir, 'fixtures')
+// Tests on a scratch project of their own run together, but four checks at most at a time, as tsgo is multithreaded itself; a test's wait for its turn counts in its timeout.
+const turn = limiter(4)
+
+setDefaultTimeout(30_000)
+
+async function check(root: string, options?: CheckOptions): ReturnType<typeof checkProject> {
+  return turn(async () => checkProject(root, options))
+}
+
+// Runs the kay CLI as a user would, in its turn, answering its exit code, what it did on stdout and the problems it found on stderr.
+async function kay(args: string[], options: { cwd?: string, env?: Record<string, string> } = {}): Promise<{ code: number, output: string, report: string }> {
+  return turn(async () => {
+    const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), ...args], { cwd: options.cwd ?? process.cwd(), stdout: 'pipe', stderr: 'pipe', env: { ...process.env, ...options.env } })
+    const [report, output, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+
+    return { code, output, report }
+  })
+}
 
 describe('kay check', () => {
   it('passes a valid app, .ts files importing .kay components included', async () => {
@@ -89,26 +109,13 @@ describe('kay check', () => {
     expect(shadowSource(root, shadowPath(root, outside))).toBe(outside)
   })
 
-  it('checks the directory given on the command line', async () => {
-    const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'check', join(fixtures, 'broken')], { stdout: 'pipe', stderr: 'pipe' })
-    const [errors, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
-
-    expect(code).toBe(1)
-    expect(errors).toContain('26 errors')
-    expect(errors).toContain('2 | const id = Number(ctx.params.slug)\n  |                              ^')
-    expect(errors).not.toContain('but the project imports')
-  })
-
   it('warns when the project imports another copy of kay than the one running the command', async () => {
     const root = await mkdtemp(join(tmpdir(), 'kay-other-'))
 
     try {
       await Bun.write(join(root, 'node_modules/kay/package.json'), JSON.stringify({ name: 'kay', exports: { '.': './src/runtime/index.ts' } }))
       await Bun.write(join(root, 'node_modules/kay/src/runtime/index.ts'), 'export {}\n')
-      const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'check', root], { stdout: 'pipe', stderr: 'pipe' })
-      const [errors] = await Promise.all([new Response(child.stderr).text(), child.exited])
-
-      expect(errors).toContain(`kay check: this is the kay at ${join(import.meta.dir, '..')}, but the project imports the one at ${join(root, 'node_modules/kay')}; run the project's own, \`bun node_modules/kay/src/cli.ts\``)
+      expect((await runCheck(root)).output).toContain(`kay check: this is the kay at ${join(import.meta.dir, '..')}, but the project imports the one at ${join(root, 'node_modules/kay')}; run the project's own, \`bun node_modules/kay/src/cli.ts\``)
     }
     finally {
       await rm(root, { recursive: true, force: true })
@@ -131,17 +138,12 @@ describe('kay check', () => {
 
   it('refuses a path that is not there, for check and build alike', async () => {
     for (const command of ['check', 'build']) {
-      const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), command, join(fixtures, 'missing')], { stdout: 'pipe', stderr: 'pipe' })
-      const [errors, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
-
-      expect(code).toBe(1)
       // A path check is given is what to report on, unless it is a project.
-      expect(errors).toBe(`kay ${command}: ${join(fixtures, 'missing')} ${command === 'check' ? 'does not exist' : 'is not a directory'}\n`)
+      expect(await kay([command, join(fixtures, 'missing')])).toMatchObject({ code: 1, output: `kay ${command}: ${join(fixtures, 'missing')} ${command === 'check' ? 'does not exist' : 'is not a directory'}\n` })
     }
   })
 })
 
-const scratchRoot = join(import.meta.dir, '../node_modules/.cache')
 // What `kay check --watch` writes to a terminal before each check: the screen and its scrollback erased.
 const CLEAR = '\x1B[2J\x1B[3J\x1B[H'
 const tsconfig = JSON.stringify({
@@ -149,18 +151,8 @@ const tsconfig = JSON.stringify({
   include: ['src', '.kay/types'],
 })
 
-// A project under the checkout's node_modules, so `kay` and the types resolve without installing anything.
-// Runs `kay check` on the project as a user would, answering its exit code and what it printed.
-// What `kay check` reports: what it did on stdout, the problems it found on stderr.
 async function runCheck(root: string, ...flags: string[]): Promise<{ code: number, output: string, report: string }> {
-  return runCheckIn({}, root, ...flags)
-}
-
-async function runCheckIn(env: Record<string, string>, root: string, ...flags: string[]): Promise<{ code: number, output: string, report: string }> {
-  const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'check', root, ...flags], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, ...env } })
-  const [report, output, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
-
-  return { code, output, report }
+  return kay(['check', root, ...flags])
 }
 
 // `kay check --watch` with JSON reports, the next of them at each `report()`, one document per line.
@@ -194,16 +186,41 @@ function watchChecks(root: string, ...flags: string[]): { report: () => Promise<
   }
 }
 
+// A project inside the checkout, so `kay` and the types resolve without installing anything.
 async function scratchProject(files: Record<string, string>): Promise<string> {
-  await mkdir(scratchRoot, { recursive: true })
-  const root = await mkdtemp(join(scratchRoot, 'check-'))
+  const root = await scratchDir('check-')
 
   await Promise.all(Object.entries({ 'tsconfig.json': tsconfig, ...files }).map(async ([path, content]) => Bun.write(join(root, path), content)))
 
   return root
 }
 
-describe('kay check, edge cases', () => {
+// Moves the start of the project's last clean check a clock slack past `written`, as though the files written by then had settled: kay counts one written within a second before a check as changed since. `Date.now()` rounds down, the file times do not.
+async function settledBefore(root: string, written: number): Promise<void> {
+  const file = join(root, '.kay/cache/check/clean.json')
+  const entry = await Bun.file(file).json() as { value: { started: number } }
+
+  entry.value.started = written + 1001
+  await Bun.write(file, JSON.stringify(entry))
+}
+
+describe.concurrent('kay check, edge cases', () => {
+  it('checks the directory given on the command line, each problem under its code frame', async () => {
+    const root = await scratchProject({ 'src/routes/[id].kay': '--- server\nconst id = Number(ctx.params.slug)\n---\np {id}\n', 'src/a.ts': 'export const a: number = \'a\'\n' })
+
+    try {
+      const { code, output } = await runCheck(root)
+
+      expect(code).toBe(1)
+      expect(output).toContain('2 | const id = Number(ctx.params.slug)\n  |                              ^')
+      expect(output.trim().split('\n').at(-1)).toBe('2 errors')
+      expect(output).not.toContain('but the project imports')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('types a signal the template reads by calling it as its value', async () => {
     const root = await scratchProject({ 'src/routes/index.kay': '---\nimport { signal } from \'kay\'\n\nconst count = signal(0)\n---\nbutton(onClick={() => count.set(count() + 1)}) {count().toFixed(1)} {count().nope}\n' })
 
@@ -421,11 +438,7 @@ describe('kay check, edge cases', () => {
       expect((await check(root, { tsconfig: 'nope.json' })).map(d => d.code)).toEqual(['TS5058'])
       expect((await check(root, { tsconfig: 'empty/tsconfig.json' })).map(d => d.code)).toEqual(['TS18003'])
 
-      const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'check', root, '-p', 'nope.json'], { stdout: 'pipe', stderr: 'pipe' })
-      const [errors, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
-
-      expect(code).toBe(1)
-      expect(errors).toContain('TS5058')
+      expect(await runCheck(root, '-p', 'nope.json')).toMatchObject({ code: 1, output: expect.stringContaining('TS5058') })
     }
     finally {
       await rm(root, { recursive: true, force: true })
@@ -434,12 +447,12 @@ describe('kay check, edge cases', () => {
 
   it('skips tsgo while nothing its last clean run read has changed, and runs it for a file added since', async () => {
     const root = await scratchProject({ 'src/a.ts': 'export const a: number = 1\n', 'src/routes/index.kay': 'p hi\n' })
+    const written = Date.now()
     const buildInfo = join(root, '.kay/cache/check/tsbuildinfo')
 
     try {
-      // A file written within a second before a run counts as changed since, but for the shadow tree kay writes then.
-      await Bun.sleep(1100)
       expect(await check(root)).toEqual([])
+      await settledBefore(root, written)
       await rm(buildInfo)
       expect(await check(root)).toEqual([])
       expect(await Bun.file(buildInfo).exists()).toBe(false)
@@ -450,7 +463,7 @@ describe('kay check, edge cases', () => {
     finally {
       await rm(root, { recursive: true, force: true })
     }
-  }, 15_000)
+  })
 
   it('runs tsgo again when a package\'s types are replaced by an older file, as an install linking them from its cache does', async () => {
     const root = await scratchProject({
@@ -458,11 +471,12 @@ describe('kay check, edge cases', () => {
       'node_modules/dep/index.d.ts': 'export declare const value: number\n',
       'src/a.ts': 'import { value } from \'dep\'\n\nexport const a: number = value\n',
     })
+    const written = Date.now()
     const types = join(root, 'node_modules/dep/index.d.ts')
 
     try {
-      await Bun.sleep(1100)
       expect(await check(root)).toEqual([])
+      await settledBefore(root, written)
       await rm(types)
       await Bun.write(types, 'export declare const value: string\n')
       await utimes(types, new Date('2020-01-01'), new Date('2020-01-01'))
@@ -471,7 +485,7 @@ describe('kay check, edge cases', () => {
     finally {
       await rm(root, { recursive: true, force: true })
     }
-  }, 15_000)
+  })
 
   it('reports a file that did not compile with its own errors only, none TypeScript makes of the code around them', async () => {
     const root = await scratchProject({ 'src/a.kay': '---\nconst a = \n---\np {a}\n', 'src/b.kay': 'p {1 +}\n' })
@@ -779,16 +793,12 @@ describe('kay check, edge cases', () => {
   })
 
   it('reports two extensions giving an editor at the config', async () => {
-    const root = await scratchProject({
-      'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ extensions: [{ name: \'one\', editor: \'./one.kay\' }, { name: \'two\', editor: \'./two.kay\' }] })\n',
-      'src/routes/index.kay': 'p home\n',
-    })
+    const root = await scratchProject({ 'src/routes/index.kay': 'p home\n' })
 
     try {
-      const { code, output } = await runCheck(root)
-
-      expect(code).toBe(1)
-      expect(output).toContain(`error: kay: the extensions one and two each give an editor, and a page shows one: list one of them in extensions\n --> ${relative(process.cwd(), join(root, 'kay.config.ts'))}:1:1`)
+      expect((await check(root, { extensions: [{ name: 'one', editor: './one.kay' }, { name: 'two', editor: './two.kay' }] })).map(d => [relative(root, d.file), d.line, d.message])).toEqual([
+        ['kay.config.ts', 1, 'kay: the extensions one and two each give an editor, and a page shows one: list one of them in extensions'],
+      ])
     }
     finally {
       await rm(root, { recursive: true, force: true })
@@ -825,13 +835,11 @@ describe('kay check, edge cases', () => {
     })
 
     try {
-      const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'check', root], { stdout: 'pipe', stderr: 'pipe' })
-      const output = await new Response(child.stdout).text() + await new Response(child.stderr).text()
+      const { output, report } = await runCheck(root)
 
-      await child.exited
       // Strict, the config, content or messages probe would stop on the variable; kay's own sources typed against this scratch project may still report, which is not at stake here.
-      expect(output).not.toContain('KAY_CHECK_UNSET_SECRET')
-      expect(output).not.toContain('failed')
+      expect(report + output).not.toContain('KAY_CHECK_UNSET_SECRET')
+      expect(report + output).not.toContain('failed')
     }
     finally {
       await rm(root, { recursive: true, force: true })
@@ -854,7 +862,7 @@ describe('kay check, edge cases', () => {
     finally {
       await rm(root, { recursive: true, force: true })
     }
-  }, 30_000)
+  })
 
   it('reports a lint or a level `lints` names that kay does not have once, in kay\'s words rather than also as a type error', async () => {
     const root = await scratchProject({ 'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ lints: { \'no-such-lint\': \'deny\', \'missing-alt\': \'denyy\' } })\n' })
@@ -868,7 +876,7 @@ describe('kay check, edge cases', () => {
     finally {
       await rm(root, { recursive: true, force: true })
     }
-  }, 30_000)
+  })
 
   it('lets a static component only islands render pass functions to interactive children, which render inline with the island', async () => {
     const files = {
@@ -1130,7 +1138,7 @@ describe('kay check on compiler output', () => {
   })
 })
 
-describe('kay check, what the server refuses at boot', () => {
+describe.concurrent('kay check, what the server refuses at boot', () => {
   // The problems kay finds itself, as file and message, sorted; TypeScript's own left out.
   const refusals = async (root: string, options: CheckOptions = {}) => (await check(root, options))
     .filter(d => d.code === undefined || d.message.startsWith('It must export'))
@@ -1318,7 +1326,7 @@ describe('kay check, string fields an action leaves unbounded', () => {
   })
 })
 
-describe('kay check, URLs written out besides links', () => {
+describe.concurrent('kay check, URLs written out besides links', () => {
   it('checks img src, link href, a form action sent with GET and navigate() as links, and a literal segment against the matcher kay ships for its param', async () => {
     const page = [
       '---',
@@ -1401,7 +1409,7 @@ describe('kay check, URLs written out besides links', () => {
   })
 })
 
-describe('kay check, markup', () => {
+describe.concurrent('kay check, markup', () => {
   it('reports innerHTML and srcdoc bound to a string nobody made safe, and leaves markup written out or made safe alone', async () => {
     const page = [
       '---',
@@ -1435,7 +1443,7 @@ describe('kay check, markup', () => {
   })
 })
 
-describe('kay check, unused code', () => {
+describe.concurrent('kay check, unused code', () => {
   it('reports what a .kay file declares and never reads, and leaves .ts files to the tsconfig', async () => {
     const root = await scratchProject({
       'src/routes/index.kay': [
@@ -1592,12 +1600,7 @@ describe('kay check, unused code', () => {
       expect(plain).not.toContain('missing-share-image')
 
       // kay build, the site about to go public, reports them, but a missing site only for a static export: a server reads SITE_URL when it boots.
-      const build = async (...args: string[]) => {
-        const built = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', root, ...args], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, SITE_URL: '' } })
-        const [output] = await Promise.all([new Response(built.stderr).text(), built.exited])
-
-        return output
-      }
+      const build = async (...args: string[]) => (await kay(['build', root, ...args], { env: { SITE_URL: '' } })).output
       const served = await build()
 
       expect(served).toContain('warning[missing-share-image]')
@@ -1618,12 +1621,11 @@ describe('kay check, unused code', () => {
     })
 
     try {
-      const build = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', root, '--static'], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, SITE_URL: '' } })
-      const [stdout, stderr, code] = await Promise.all([new Response(build.stdout).text(), new Response(build.stderr).text(), build.exited])
+      const { code, output, report } = await kay(['build', root, '--static'], { env: { SITE_URL: '' } })
 
       expect(code).toBe(0)
-      expect(stderr).toContain('warning[missing-site]')
-      expect(stdout + stderr).not.toContain('kay: `seo` is set')
+      expect(output).toContain('warning[missing-site]')
+      expect(report + output).not.toContain('kay: `seo` is set')
     }
     finally {
       await rm(root, { recursive: true, force: true })
@@ -1678,9 +1680,9 @@ describe('kay check, unused code', () => {
 
       await Bun.write(config, 'export default {}\n')
 
-      expect((await runCheckIn({ GITHUB_WORKSPACE: root }, root, '--format', 'github')).report).toStartWith('::error file=src/a.kay,line=1,col=1,')
+      expect((await kay(['check', root, '--format', 'github'], { env: { GITHUB_WORKSPACE: root } })).report).toStartWith('::error file=src/a.kay,line=1,col=1,')
       // A project outside the workspace keeps its paths from the current directory.
-      expect((await runCheckIn({ GITHUB_WORKSPACE: join(root, 'src/elsewhere') }, root, '--format', 'github')).report).toStartWith(`::error file=${relative(process.cwd(), join(root, 'src/a.kay'))},line=1,col=1,`)
+      expect((await kay(['check', root, '--format', 'github'], { env: { GITHUB_WORKSPACE: join(root, 'src/elsewhere') } })).report).toStartWith(`::error file=${relative(process.cwd(), join(root, 'src/a.kay'))},line=1,col=1,`)
     }
     finally {
       await rm(root, { recursive: true, force: true })
@@ -1711,11 +1713,7 @@ describe('kay check, unused code', () => {
     const root = await scratchProject({ 'src/a.kay': 'img(src="/a.png")\n', 'src/b.kay': 'img(src="/b.png")\n', '..foo/c.kay': 'img(src="/c.png")\n' })
     const link = `${root}-link`
     const files = async (result: Promise<{ report: string }>) => (JSON.parse((await result).report) as { problems: { file: string }[] }).problems.map(problem => basename(problem.file))
-    const inRoot = async (...args: string[]) => {
-      const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'check', ...args, '--format', 'json'], { cwd: root, stdout: 'pipe', stderr: 'pipe' })
-
-      return { report: await new Response(child.stdout).text(), code: await child.exited }
-    }
+    const inRoot = async (...args: string[]) => kay(['check', ...args, '--format', 'json'], { cwd: root })
 
     try {
       await symlink(join(root, 'src'), join(root, 'src2'))
@@ -1768,7 +1766,7 @@ describe('kay check, unused code', () => {
       await watch.stop()
       await rm(root, { recursive: true, force: true })
     }
-  }, 30_000)
+  })
 
   it('reads kay.config.ts again on every check with --watch, an edit to it or a mistake in it included', async () => {
     const root = await scratchProject({ 'kay.config.ts': 'export default { lints: { \'missing-alt\': \'allow\' } }\n', 'src/a.kay': 'img(src="/a.png")\n' })
@@ -1787,7 +1785,7 @@ describe('kay check, unused code', () => {
       await watch.stop()
       await rm(root, { recursive: true, force: true })
     }
-  }, 30_000)
+  })
 
   // Root writes a read-only file, as in a CI container, and nothing else makes a write fail for it.
   it.skipIf(process.getuid?.() === 0)('keeps watching after a check that throws, as a fix it cannot write', async () => {
@@ -1807,7 +1805,7 @@ describe('kay check, unused code', () => {
       await watch.stop()
       await rm(root, { recursive: true, force: true })
     }
-  }, 30_000)
+  })
 
   it('keeps watching after a check that exits or dies, as a kay.config.ts calling process.exit(), saying so', async () => {
     const root = await scratchProject({ 'kay.config.ts': 'const crash = Bun.file(import.meta.dir + \'/crash\')\n\nif (await crash.exists() && await crash.text() === \'kill\')\n  process.kill(process.pid, \'SIGKILL\')\nelse if (await crash.exists())\n  process.exit(9)\n\nexport default {}\n', 'src/a.kay': 'p a\n' })
@@ -1829,8 +1827,93 @@ describe('kay check, unused code', () => {
       await watch.stop()
       await rm(root, { recursive: true, force: true })
     }
-  }, 30_000)
+  })
 
+  it('clears the terminal before each check with --watch', async () => {
+    const root = await scratchProject({ 'src/a.kay': 'p a\n' })
+    let output = ''
+    const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'check', root, '--watch'], { terminal: { data: (_terminal, data) => {
+      output += new TextDecoder().decode(data)
+    } } })
+    const printed = async (times: number, text: string) => {
+      while (output.split(text).length <= times)
+        await Bun.sleep(20)
+    }
+
+    try {
+      await printed(1, 'with no problems')
+      expect(output.split(CLEAR).length).toBe(2)
+      expect(output.indexOf(CLEAR)).toBeLessThan(output.indexOf('with no problems'))
+      await Bun.write(join(root, 'src/a.kay'), 'img(src="/a.png")\n')
+      await printed(1, 'missing-alt')
+      expect(output.split(CLEAR).length).toBe(3)
+      expect(output.lastIndexOf(CLEAR)).toBeLessThan(output.indexOf('missing-alt'))
+    }
+    finally {
+      child.kill()
+      await child.exited
+      child.terminal?.close()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('leaves a file outside the project alone when applying safe fixes', async () => {
+    const root = await scratchProject({ 'src/a.kay': 'p a\n' })
+    const outside = await scratchProject({ 'lib/b.kay': 'button(onclick={go}) x\n' })
+    const fix = { title: 'Write `onClick`', edits: [{ start: 7, end: 14, text: 'onClick' }], safe: true }
+
+    try {
+      expect(await applySafeFixes(root, [{ file: join(outside, 'lib/b.kay'), line: 1, column: 8, message: 'm', fixes: [fix] }])).toBe(0)
+      expect(await Bun.file(join(outside, 'lib/b.kay')).text()).toBe('button(onclick={go}) x\n')
+      expect(await applySafeFixes(outside, [{ file: join(outside, 'lib/b.kay'), line: 1, column: 8, message: 'm', fixes: [fix, fix] }, { file: join(outside, 'lib/b.kay'), line: 1, column: 8, message: 'm', fixes: [fix] }])).toBe(1)
+      expect(await Bun.file(join(outside, 'lib/b.kay')).text()).toBe('button(onClick={go}) x\n')
+    }
+    finally {
+      await Promise.all([root, outside].map(async dir => rm(dir, { recursive: true, force: true })))
+    }
+  })
+
+  it('applies the safe fixes with --fix, then prints what is left', async () => {
+    const root = await scratchProject({
+      'src/card.kay': '---\nconst { title, subtitle } = props<{ title: string, subtitle?: string }>()\n---\np {title}\niframe(src="https://example.com")\n',
+      'src/button.kay': '---\nfunction go() {}\n---\nbutton(onclick={go}) x\n',
+    })
+
+    try {
+      const { code, output, report } = await runCheck(root, '--fix')
+
+      expect(await Bun.file(join(root, 'src/card.kay')).text()).toBe('---\nconst { title } = props<{ title: string, subtitle?: string }>()\n---\np {title}\niframe(src="https://example.com")\n')
+      expect(await Bun.file(join(root, 'src/button.kay')).text()).toBe('---\nfunction go() {}\n---\nbutton(onClick={go}) x\n')
+      expect(report).toBe('fixed 2 problems\n')
+      expect(output).toStartWith('error[missing-title]: An `iframe` needs a `title`\n')
+      expect(code).toBe(1)
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+})
+
+describe.concurrent('kay check, public environment', () => {
+  it('types publicEnv from what kay.config.ts declares, and nothing else', async () => {
+    const root = await scratchProject({
+      'kay.config.ts': 'import { t } from \'elysia\'\nimport { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ publicEnv: t.Object({ MAP_KEY: t.String(), ZOOM: t.Optional(t.Number()) }) })\n',
+      'src/map.kay': '---\nimport { publicEnv } from \'kay\'\n\nconst key: string = publicEnv.MAP_KEY\nconst zoom: number | undefined = publicEnv.ZOOM\n---\np {key} {zoom} {publicEnv.DATABASE_URL}\n',
+    })
+
+    try {
+      expect((await check(root)).map(d => [d.line, d.message])).toEqual([
+        [7, 'Property \'DATABASE_URL\' does not exist on type \'Readonly<{ MAP_KEY: string; ZOOM?: number | undefined; }>\'.'],
+      ])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+})
+
+// Alone, as a busy machine would stretch the moments they wait for a signal to land.
+describe('kay check --watch, stopped by a signal', () => {
   it.each([
     ['SIGTERM', 'SIGTERM', [], 143, 'nothing'],
     ['SIGHUP', 'SIGHUP', [], 129, 'nothing'],
@@ -1873,88 +1956,6 @@ describe('kay check, unused code', () => {
     }
     finally {
       await watch.stop()
-      await rm(root, { recursive: true, force: true })
-    }
-  }, 30_000)
-
-  it('clears the terminal before each check with --watch', async () => {
-    const root = await scratchProject({ 'src/a.kay': 'p a\n' })
-    let output = ''
-    const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'check', root, '--watch'], { terminal: { data: (_terminal, data) => {
-      output += new TextDecoder().decode(data)
-    } } })
-    const printed = async (times: number, text: string) => {
-      while (output.split(text).length <= times)
-        await Bun.sleep(20)
-    }
-
-    try {
-      await printed(1, 'with no problems')
-      expect(output.split(CLEAR).length).toBe(2)
-      expect(output.indexOf(CLEAR)).toBeLessThan(output.indexOf('with no problems'))
-      await Bun.write(join(root, 'src/a.kay'), 'img(src="/a.png")\n')
-      await printed(1, 'missing-alt')
-      expect(output.split(CLEAR).length).toBe(3)
-      expect(output.lastIndexOf(CLEAR)).toBeLessThan(output.indexOf('missing-alt'))
-    }
-    finally {
-      child.kill()
-      await child.exited
-      child.terminal?.close()
-      await rm(root, { recursive: true, force: true })
-    }
-  }, 30_000)
-
-  it('leaves a file outside the project alone when applying safe fixes', async () => {
-    const root = await scratchProject({ 'src/a.kay': 'p a\n' })
-    const outside = await scratchProject({ 'lib/b.kay': 'button(onclick={go}) x\n' })
-    const fix = { title: 'Write `onClick`', edits: [{ start: 7, end: 14, text: 'onClick' }], safe: true }
-
-    try {
-      expect(await applySafeFixes(root, [{ file: join(outside, 'lib/b.kay'), line: 1, column: 8, message: 'm', fixes: [fix] }])).toBe(0)
-      expect(await Bun.file(join(outside, 'lib/b.kay')).text()).toBe('button(onclick={go}) x\n')
-      expect(await applySafeFixes(outside, [{ file: join(outside, 'lib/b.kay'), line: 1, column: 8, message: 'm', fixes: [fix, fix] }, { file: join(outside, 'lib/b.kay'), line: 1, column: 8, message: 'm', fixes: [fix] }])).toBe(1)
-      expect(await Bun.file(join(outside, 'lib/b.kay')).text()).toBe('button(onClick={go}) x\n')
-    }
-    finally {
-      await Promise.all([root, outside].map(async dir => rm(dir, { recursive: true, force: true })))
-    }
-  })
-
-  it('applies the safe fixes with --fix, then prints what is left', async () => {
-    const root = await scratchProject({
-      'src/card.kay': '---\nconst { title, subtitle } = props<{ title: string, subtitle?: string }>()\n---\np {title}\niframe(src="https://example.com")\n',
-      'src/button.kay': '---\nfunction go() {}\n---\nbutton(onclick={go}) x\n',
-    })
-
-    try {
-      const { code, output, report } = await runCheck(root, '--fix')
-
-      expect(await Bun.file(join(root, 'src/card.kay')).text()).toBe('---\nconst { title } = props<{ title: string, subtitle?: string }>()\n---\np {title}\niframe(src="https://example.com")\n')
-      expect(await Bun.file(join(root, 'src/button.kay')).text()).toBe('---\nfunction go() {}\n---\nbutton(onClick={go}) x\n')
-      expect(report).toBe('fixed 2 problems\n')
-      expect(output).toStartWith('error[missing-title]: An `iframe` needs a `title`\n')
-      expect(code).toBe(1)
-    }
-    finally {
-      await rm(root, { recursive: true, force: true })
-    }
-  })
-})
-
-describe('kay check, public environment', () => {
-  it('types publicEnv from what kay.config.ts declares, and nothing else', async () => {
-    const root = await scratchProject({
-      'kay.config.ts': 'import { t } from \'elysia\'\nimport { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ publicEnv: t.Object({ MAP_KEY: t.String(), ZOOM: t.Optional(t.Number()) }) })\n',
-      'src/map.kay': '---\nimport { publicEnv } from \'kay\'\n\nconst key: string = publicEnv.MAP_KEY\nconst zoom: number | undefined = publicEnv.ZOOM\n---\np {key} {zoom} {publicEnv.DATABASE_URL}\n',
-    })
-
-    try {
-      expect((await check(root)).map(d => [d.line, d.message])).toEqual([
-        [7, 'Property \'DATABASE_URL\' does not exist on type \'Readonly<{ MAP_KEY: string; ZOOM?: number | undefined; }>\'.'],
-      ])
-    }
-    finally {
       await rm(root, { recursive: true, force: true })
     }
   })
