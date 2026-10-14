@@ -1,5 +1,6 @@
 import type { Server } from 'bun'
 import type { Action } from '../src/runtime'
+import type { ClientBuild } from '../src/server/client'
 import type { LogEntry } from '../src/server/log'
 import type { ProtectionRefusal } from '../src/server/protection'
 import { mkdtemp, rm, stat } from 'node:fs/promises'
@@ -22,7 +23,7 @@ import { logSink, setLogSink } from '../src/runtime/log'
 import { solveWork } from '../src/runtime/work'
 import { inlineScriptHashes, invalidatePage, pages, requestId, shutdown, sqliteJobs, sqliteStore } from '../src/server'
 import { servePages } from '../src/server/app'
-import { readClient, readManifest, writeManifest } from '../src/server/client'
+import { readClient, readManifest } from '../src/server/client'
 import { compressTextStrongest } from '../src/server/compress'
 import { probeHealth } from '../src/server/lifecycle'
 import { answeringRequest, useLogger } from '../src/server/log'
@@ -34,6 +35,7 @@ import { signStamp } from '../src/server/stamp'
 import { CspViolation } from '../src/server/violations'
 import { testSite } from '../src/test'
 import { parsingRoutes, routePaths } from './elysia'
+import { prerendered } from './prerendered'
 import { fixtureCopy, scratchDir } from './scratch'
 
 const ROUTES = 'tests/fixtures/seo/src/routes'
@@ -997,14 +999,13 @@ describe('revalidation', () => {
   const routes = 'tests/fixtures/production/src/routes'
   // Held in a variable so tsc leaves the .kay import to Bun.
   const NEWS = './fixtures/production/src/routes/news.kay'
+  const root = process.cwd()
+  const build = prerendered({ routes })
 
   it('invalidates the prerendered pages of the apps still running, an app stopped letting go of its own', async () => {
-    const root = process.cwd()
-    const manifest = (await readManifest(root))!
     const { news } = await import('./fixtures/production/src/news')
 
     try {
-      await prerenderPages(resolveProject(root, { routes }), (await readClient(root))!)
       const stopped = await pages({ routes, prebuilt: true, security: false, log: false })
       const running = await pages({ routes, prebuilt: true, security: false, log: false })
       const edition = async (app: typeof running) => (await (await app.handle(new Request('http://localhost/news'))).text()).match(/<h1>(Edition \d)<\/h1>/)?.[1]
@@ -1027,14 +1028,10 @@ describe('revalidation', () => {
     }
     finally {
       news.edition = 1
-      await rm(join(outputDir(root), 'pages'), { recursive: true, force: true })
-      await writeManifest(root, manifest)
     }
   })
 
   it('lets go of an app nothing reaches any more, one that only answered through handle() included', async () => {
-    const root = process.cwd()
-    const manifest = (await readManifest(root))!
     // The paths invalidatePage meets, one per prerendered page of every app it reaches.
     const reached = () => {
       const paths: string[] = []
@@ -1048,41 +1045,31 @@ describe('revalidation', () => {
       return paths.filter(path => path === '/news').length
     }
 
-    try {
-      await prerenderPages(resolveProject(root, { routes }), (await readClient(root))!)
-      const before = reached()
-      const dropped = await (async () => {
-        const app = await pages({ routes, prebuilt: true, security: false, log: false })
+    const before = reached()
+    const dropped = await (async () => {
+      const app = await pages({ routes, prebuilt: true, security: false, log: false })
 
-        await app.handle(new Request('http://localhost/news'))
+      await app.handle(new Request('http://localhost/news'))
 
-        return new WeakRef(app)
-      })()
+      return new WeakRef(app)
+    })()
 
-      expect(reached()).toBe(before + 1)
+    expect(reached()).toBe(before + 1)
 
-      // A timer of the request holds it a little while.
-      for (let attempt = 0; attempt < 40 && (dropped.deref() !== undefined || reached() > before); attempt++) {
-        Bun.gc(true)
-        await Bun.sleep(50)
-      }
-
-      expect(dropped.deref()).toBeUndefined()
-      expect(reached()).toBeLessThanOrEqual(before)
+    // A timer of the request holds it a little while.
+    for (let attempt = 0; attempt < 40 && (dropped.deref() !== undefined || reached() > before); attempt++) {
+      Bun.gc(true)
+      await Bun.sleep(50)
     }
-    finally {
-      await rm(join(outputDir(root), 'pages'), { recursive: true, force: true })
-      await writeManifest(root, manifest)
-    }
+
+    expect(dropped.deref()).toBeUndefined()
+    expect(reached()).toBeLessThanOrEqual(before)
   })
 
   it('serves a stale prerendered page while rendering it again in the background, then the new one with its own tag', async () => {
-    const root = process.cwd()
-    const manifest = (await readManifest(root))!
     const { news } = await import('./fixtures/production/src/news')
 
     try {
-      await prerenderPages(resolveProject(root, { routes }), (await readClient(root))!)
       const app = await pages({ routes, prebuilt: true, security: false })
       const visit = async (headers: Record<string, string> = {}) => app.handle(new Request('http://localhost/news', { headers }))
       const built = await visit()
@@ -1109,19 +1096,14 @@ describe('revalidation', () => {
       setSystemTime()
       news.edition = 1
       news.delay = 0
-      await rm(join(outputDir(root), 'pages'), { recursive: true, force: true })
-      await writeManifest(root, manifest)
     }
   }, UNTIL_TEST_MS)
 
   it('keeps the page it has when a render fails, trying again a minute later at most', async () => {
-    const root = process.cwd()
-    const manifest = (await readManifest(root))!
     const { news } = await import('./fixtures/production/src/news')
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
 
     try {
-      await prerenderPages(resolveProject(root, { routes }), (await readClient(root))!)
       const app = await pages({ routes, prebuilt: true, security: false })
       const visit = async () => (await app.handle(new Request('http://localhost/news'))).text()
 
@@ -1147,41 +1129,37 @@ describe('revalidation', () => {
       logged.mockRestore()
       news.edition = 1
       news.failing = false
-      await rm(join(outputDir(root), 'pages'), { recursive: true, force: true })
-      await writeManifest(root, manifest)
     }
   }, UNTIL_TEST_MS)
 
   it('renders the pages again on their first request when the server runs for another site than the build', async () => {
-    const root = process.cwd()
-    const manifest = (await readManifest(root))!
     const warned = spyOn(console, 'warn').mockImplementation(() => undefined)
     const canonical = async (app: Awaited<ReturnType<typeof pages>>) => (await (await app.handle(new Request('http://localhost/news'))).text()).match(/<link rel="canonical" href="([^"]+)">/)?.[1]
 
     try {
-      await prerenderPages(resolveProject(root, { routes, site: 'https://example.com' }), (await readClient(root))!)
+      await build.keeping(async () => {
+        await prerenderPages(resolveProject(root, { routes, site: 'https://example.com' }), (await readClient(root))!)
 
-      expect(await canonical(await pages({ routes, prebuilt: true, security: false, site: 'https://example.com' }))).toBe('https://example.com/news')
-      expect(warned).not.toHaveBeenCalled()
+        expect(await canonical(await pages({ routes, prebuilt: true, security: false, site: 'https://example.com' }))).toBe('https://example.com/news')
+        expect(warned).not.toHaveBeenCalled()
 
-      // Built where the variable naming the host is unset, run where it is.
-      expect(await canonical(await pages({ routes, prebuilt: true, security: false, site: 'http://127.0.0.1:4173' }))).toBe('http://127.0.0.1:4173/news')
-      expect(warned).toHaveBeenCalledWith('kay: kay build rendered its pages for https://example.com and this server runs for http://127.0.0.1:4173: each renders again on its first request')
+        // Built where the variable naming the host is unset, run where it is.
+        expect(await canonical(await pages({ routes, prebuilt: true, security: false, site: 'http://127.0.0.1:4173' }))).toBe('http://127.0.0.1:4173/news')
+        expect(warned).toHaveBeenCalledWith('kay: kay build rendered its pages for https://example.com and this server runs for http://127.0.0.1:4173: each renders again on its first request')
 
-      // Once rendered again, it goes out as small as the build would have written it.
-      const moved = await pages({ routes, prebuilt: true, security: false, site: 'http://127.0.0.1:4173' })
-      const html = await (await moved.handle(new Request('http://localhost/news'))).text()
+        // Once rendered again, it goes out as small as the build would have written it.
+        const moved = await pages({ routes, prebuilt: true, security: false, site: 'http://127.0.0.1:4173' })
+        const html = await (await moved.handle(new Request('http://localhost/news'))).text()
 
-      const strongest = (await compressTextStrongest(html)).br!
-      const served = async () => (await moved.handle(new Request('http://localhost/news', { headers: { 'accept-encoding': 'br' } }))).bytes()
+        const strongest = (await compressTextStrongest(html)).br!
+        const served = async () => (await moved.handle(new Request('http://localhost/news', { headers: { 'accept-encoding': 'br' } }))).bytes()
 
-      // The strongest compression runs in the background, after the page is served.
-      await until(async () => Buffer.from(await served()).equals(strongest), 'the strongest brotli to be served')
+        // The strongest compression runs in the background, after the page is served.
+        await until(async () => Buffer.from(await served()).equals(strongest), 'the strongest brotli to be served')
+      })
     }
     finally {
       warned.mockRestore()
-      await rm(join(outputDir(root), 'pages'), { recursive: true, force: true })
-      await writeManifest(root, manifest)
     }
   }, UNTIL_TEST_MS)
 
@@ -1206,13 +1184,9 @@ describe('revalidation', () => {
   })
 
   it('builds a page reading the site with none set, and renders it again for the site the server runs for', async () => {
-    const root = process.cwd()
-    const manifest = (await readManifest(root))!
     const warned = spyOn(console, 'warn').mockImplementation(() => undefined)
 
     try {
-      await prerenderPages(resolveProject(root, { routes }), (await readClient(root))!)
-
       expect((await readManifest(root))!.pages!['/origin']!.readsSite).toBe(true)
 
       const app = await pages({ routes, prebuilt: true, security: false, site: 'https://example.com' })
@@ -1220,22 +1194,18 @@ describe('revalidation', () => {
       expect(await (await app.handle(new Request('http://localhost/origin'))).text()).toContain('<p class="origin">https://example.com</p>')
       // Built for no site and served for one, as one build for several hosts is, it goes quietly.
       expect(warned).not.toHaveBeenCalled()
-      await expect(prerenderPages(resolveProject(root, { routes }), (await readClient(root))!, { exportAll: true })).rejects.toThrow('origin.kay: it reads the site, through siteUrl() or siteOrigin()')
+      // The pages before the refused one are written again.
+      await build.keeping(async () => expect(prerenderPages(resolveProject(root, { routes }), (await readClient(root))!, { exportAll: true })).rejects.toThrow('origin.kay: it reads the site, through siteUrl() or siteOrigin()'))
     }
     finally {
       warned.mockRestore()
-      await rm(join(outputDir(root), 'pages'), { recursive: true, force: true })
-      await writeManifest(root, manifest)
     }
   })
 
   it('renders a page an action invalidated before the next request gets it, whatever its revalidate period', async () => {
-    const root = process.cwd()
-    const manifest = (await readManifest(root))!
     const { news } = await import('./fixtures/production/src/news')
 
     try {
-      await prerenderPages(resolveProject(root, { routes }), (await readClient(root))!)
       const app = await pages({ routes, prebuilt: true, security: false })
       const { publish } = await import(NEWS) as { publish: Action<{ edition: number }, void> }
       const visit = async (headers: Record<string, string> = {}) => app.handle(new Request('http://localhost/news', { headers }))
@@ -1264,57 +1234,50 @@ describe('revalidation', () => {
     }
     finally {
       news.edition = 1
-      await rm(join(outputDir(root), 'pages'), { recursive: true, force: true })
-      await writeManifest(root, manifest)
     }
   })
 
   it('runs the page hook of an extension over a page the server renders again, as the build ran it', async () => {
-    const root = process.cwd()
-    const manifest = (await readManifest(root))!
     const { news } = await import('./fixtures/production/src/news')
     const extensions = [{ name: 'signed', transformPage: ({ path, html }: { path: string, html: string }) => html.replace('</body>', `<!--signed ${path}--></body>`) }]
 
     try {
-      await prerenderPages(resolveProject(root, { routes }), (await readClient(root))!)
-      await hookPrerendered(root, extensions.map(extension => extension.transformPage), { clientDir: (await readClient(root))!.dir, publicDir: join(root, 'public'), base: '' })
+      await build.keeping(async () => {
+        await hookPrerendered(root, extensions.map(extension => extension.transformPage), { clientDir: (await readClient(root))!.dir, publicDir: join(root, 'public'), base: '' })
 
-      const app = await pages({ routes, prebuilt: true, security: false, extensions })
-      const visit = async () => (await app.handle(new Request('http://localhost/news'))).text()
-      const built = await visit()
+        const app = await pages({ routes, prebuilt: true, security: false, extensions })
+        const visit = async () => (await app.handle(new Request('http://localhost/news'))).text()
+        const built = await visit()
 
-      expect(built).toContain('<h1>Edition 1</h1>')
-      expect(built).toContain('<!--signed /news--></body>')
-      expect(built.match(/<!--signed/g)).toHaveLength(1)
+        expect(built).toContain('<h1>Edition 1</h1>')
+        expect(built).toContain('<!--signed /news--></body>')
+        expect(built.match(/<!--signed/g)).toHaveLength(1)
 
-      news.edition = 2
-      invalidatePage('/news')
+        news.edition = 2
+        invalidatePage('/news')
 
-      const fresh = await visit()
+        const fresh = await visit()
 
-      expect(fresh).toContain('<h1>Edition 2</h1>')
-      expect(fresh).toContain('<!--signed /news--></body>')
+        expect(fresh).toContain('<h1>Edition 2</h1>')
+        expect(fresh).toContain('<!--signed /news--></body>')
+      })
     }
     finally {
       news.edition = 1
-      await rm(join(outputDir(root), 'pages'), { recursive: true, force: true })
-      await writeManifest(root, manifest)
     }
   })
 
   it('refuses a revalidate that is no positive duration', async () => {
-    const root = process.cwd()
-    const manifest = (await readManifest(root))!
     const copy = await fixtureCopy('production')
 
     try {
       await Bun.write(join(copy, 'src/routes/broken.kay'), '--- server\nexport const page = { prerender: true, revalidate: \'hourly\' }\n---\np Broken\n')
 
-      await expect(prerenderPages(resolveProject(root, { routes: `${copy}/src/routes` }), (await readClient(root))!)).rejects.toThrow('broken.kay\'s revalidate is \'hourly\'; it takes a positive duration')
+      // The pages before the refused one are written over the describe's.
+      await build.keeping(async () => expect(prerenderPages(resolveProject(root, { routes: `${copy}/src/routes` }), (await readClient(root))!)).rejects.toThrow('broken.kay\'s revalidate is \'hourly\'; it takes a positive duration'))
     }
     finally {
       await rm(copy, { recursive: true, force: true })
-      await writeManifest(root, manifest)
     }
   })
 })
@@ -1325,69 +1288,59 @@ describe('a prerendered page posted to', () => {
   const NEWSLETTER = './fixtures/production/src/routes/newsletter.kay'
   const BROCHURE = './fixtures/production/src/routes/brochure.kay'
   const LEAFLET = './fixtures/production/src/routes/leaflet.kay'
+  const root = process.cwd()
+  const withEntry = (client: ClientBuild): ClientBuild => ({ ...client, entry: '/_kay/entry.js', navigation: true })
+  const build = prerendered({ routes }, withEntry)
 
   it('renders for the post a form sent, and for the request carrying how it went, kept by no cache, the built file served before and after', async () => {
-    const root = process.cwd()
-    const manifest = (await readManifest(root))!
+    const app = await pages({ routes, prebuilt: true, security: false })
+    const { join: subscribe } = await import(NEWSLETTER) as { join: Action<{ email: string }, string> }
+    const visit = async (headers: Record<string, string> = {}) => app.handle(new Request('http://localhost/newsletter', { headers }))
+    const post = async (email: string) => app.handle(new Request(`http://localhost${subscribe.url}`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded', 'referer': 'http://localhost/newsletter' }, body: new URLSearchParams({ email }) }))
+    // What the browser does with the redirect a post that went through answers: back to the page, sending the cookie it was just given.
+    const followed = async (response: Response) => {
+      const cookie = response.headers.get('set-cookie')!
 
-    try {
-      await prerenderPages(resolveProject(root, { routes }), (await readClient(root))!)
-      const app = await pages({ routes, prebuilt: true, security: false })
-      const { join: subscribe } = await import(NEWSLETTER) as { join: Action<{ email: string }, string> }
-      const visit = async (headers: Record<string, string> = {}) => app.handle(new Request('http://localhost/newsletter', { headers }))
-      const post = async (email: string) => app.handle(new Request(`http://localhost${subscribe.url}`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded', 'referer': 'http://localhost/newsletter' }, body: new URLSearchParams({ email }) }))
-      // What the browser does with the redirect a post that went through answers: back to the page, sending the cookie it was just given.
-      const followed = async (response: Response) => {
-        const cookie = response.headers.get('set-cookie')!
+      expect(response.headers.get('location')).toBe('http://localhost/newsletter')
 
-        expect(response.headers.get('location')).toBe('http://localhost/newsletter')
-
-        return visit({ cookie: cookie.slice(0, cookie.indexOf(';')) })
-      }
-
-      const built = await visit()
-      const etag = built.headers.get('etag')!
-
-      expect(etag).toBeTruthy()
-      expect(await built.text()).not.toContain('<p class="joined">')
-      // A cookie whose name merely holds the result cookie's is no result.
-      expect((await visit({ cookie: 'not_kay_flash=1' })).headers.get('etag')).toBe(etag)
-
-      const refused = await post('nope')
-
-      expect(refused.status).toBe(422)
-      expect(refused.headers.get('cache-control')).toBe('private, no-store')
-      expect(refused.headers.has('etag')).toBe(false)
-
-      const html = await refused.text()
-
-      expect(html).toContain('<p class="error">Not an email</p>')
-      expect(html).toContain('value="nope"')
-
-      const joined = await followed(await post('ada@example.com'))
-
-      expect(joined.headers.get('cache-control')).toBe('private, no-store')
-      expect(joined.headers.get('set-cookie')).toContain('kay_flash=;')
-      expect(await joined.text()).toContain('<p class="joined">Welcome ada</p>')
-
-      const after = await visit({ 'if-none-match': etag })
-
-      expect(after.status).toBe(304)
-      expect(after.headers.get('cache-control')).toBe('public, max-age=0, must-revalidate')
+      return visit({ cookie: cookie.slice(0, cookie.indexOf(';')) })
     }
-    finally {
-      await rm(join(outputDir(root), 'pages'), { recursive: true, force: true })
-      await writeManifest(root, manifest)
-    }
+
+    const built = await visit()
+    const etag = built.headers.get('etag')!
+
+    expect(etag).toBeTruthy()
+    expect(await built.text()).not.toContain('<p class="joined">')
+    // A cookie whose name merely holds the result cookie's is no result.
+    expect((await visit({ cookie: 'not_kay_flash=1' })).headers.get('etag')).toBe(etag)
+
+    const refused = await post('nope')
+
+    expect(refused.status).toBe(422)
+    expect(refused.headers.get('cache-control')).toBe('private, no-store')
+    expect(refused.headers.has('etag')).toBe(false)
+
+    const html = await refused.text()
+
+    expect(html).toContain('<p class="error">Not an email</p>')
+    expect(html).toContain('value="nope"')
+
+    const joined = await followed(await post('ada@example.com'))
+
+    expect(joined.headers.get('cache-control')).toBe('private, no-store')
+    expect(joined.headers.get('set-cookie')).toContain('kay_flash=;')
+    expect(await joined.text()).toContain('<p class="joined">Welcome ada</p>')
+
+    const after = await visit({ 'if-none-match': etag })
+
+    expect(after.status).toBe(304)
+    expect(after.headers.get('cache-control')).toBe('public, max-age=0, must-revalidate')
   })
 
   it('signs the stamp of a form posting to an action with `minTime` on every visit, the page rendered once at build, kept by no cache', async () => {
-    const root = process.cwd()
-    const manifest = (await readManifest(root))!
     const start = Date.now()
 
     try {
-      await prerenderPages(resolveProject(root, { routes }), (await readClient(root))!)
       expect(await Bun.file(join(outputDir(root), 'pages/brochure.html')).text()).toContain('name="kay_since" value="kay-stamp:')
 
       const app = await pages({ routes, prebuilt: true, security: false })
@@ -1421,38 +1374,26 @@ describe('a prerendered page posted to', () => {
     }
     finally {
       setSystemTime()
-      await rm(join(outputDir(root), 'pages'), { recursive: true, force: true })
-      await writeManifest(root, manifest)
     }
   })
 
   it('signs a fresh proof-of-work challenge into a prerendered page on every visit, each solved once', async () => {
-    const root = process.cwd()
-    const manifest = (await readManifest(root))!
-    const client = { ...(await readClient(root))!, entry: '/_kay/entry.js', navigation: true }
+    expect(await Bun.file(join(outputDir(root), 'pages/leaflet.html')).text()).toContain('"kay-work:')
 
-    try {
-      await prerenderPages(resolveProject(root, { routes }), client)
-      expect(await Bun.file(join(outputDir(root), 'pages/leaflet.html')).text()).toContain('"kay-work:')
+    const app = await pages({ routes, prebuilt: true, security: false })
+    const { subscribe } = await import(LEAFLET) as { subscribe: Action<{ email: string }, number> }
+    const challengeOf = async () => Object.values(JSON.parse((/data-kay-work>(.*?)<\/script>/).exec(await (await app.handle(new Request('http://localhost/leaflet'))).text())![1]!) as Record<string, string>)[0]!
+    const post = async (solution: string) => app.handle(new Request(`http://localhost${subscribe.url}`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded', 'referer': 'http://localhost/leaflet', 'x-kay-work': solution }, body: new URLSearchParams({ email: 'a@b.c' }) }))
+    const first = await challengeOf()
 
-      const app = await pages({ routes, prebuilt: true, security: false })
-      const { subscribe } = await import(LEAFLET) as { subscribe: Action<{ email: string }, number> }
-      const challengeOf = async () => Object.values(JSON.parse((/data-kay-work>(.*?)<\/script>/).exec(await (await app.handle(new Request('http://localhost/leaflet'))).text())![1]!) as Record<string, string>)[0]!
-      const post = async (solution: string) => app.handle(new Request(`http://localhost${subscribe.url}`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded', 'referer': 'http://localhost/leaflet', 'x-kay-work': solution }, body: new URLSearchParams({ email: 'a@b.c' }) }))
-      const first = await challengeOf()
+    expect(await challengeOf()).not.toBe(first)
 
-      expect(await challengeOf()).not.toBe(first)
+    const solution = solveWork(first)!
 
-      const solution = solveWork(first)!
-
-      expect((await post(solution)).status).toBe(303)
-      expect((await post(solution)).status).toBe(422)
-      await expect(prerenderPages(resolveProject(root, { routes }), client, { exportAll: true })).rejects.toThrow('flyer.kay: a form in it posts to an action with `minTime` or `proofOfWork`')
-    }
-    finally {
-      await rm(join(outputDir(root), 'pages'), { recursive: true, force: true })
-      await writeManifest(root, manifest)
-    }
+    expect((await post(solution)).status).toBe(303)
+    expect((await post(solution)).status).toBe(422)
+    // The pages before the refused one are written again.
+    await build.keeping(async () => expect(prerenderPages(resolveProject(root, { routes }), withEntry((await readClient(root))!), { exportAll: true })).rejects.toThrow('flyer.kay: a form in it posts to an action with `minTime` or `proofOfWork`'))
   })
 })
 

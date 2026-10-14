@@ -5,15 +5,13 @@ import { describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
 import { outputDir } from '../src/build/assets'
 import { check } from '../src/check'
-import { resolveProject } from '../src/project'
 import { localPath } from '../src/runtime/base'
 import { integer } from '../src/runtime/params'
 import { pages } from '../src/server'
-import { readClient, readManifest, writeManifest } from '../src/server/client'
 import { routerShapes, shapeParams } from '../src/server/params'
-import { prerenderPages } from '../src/server/prerender'
 import { readRedirects, redirectProblems } from '../src/server/redirects'
 import { routeOf } from '../src/server/routes'
+import { prerendered } from './prerendered'
 import { fixtureCopy } from './scratch'
 
 const FIXTURE = 'tests/fixtures/routing'
@@ -193,19 +191,14 @@ describe('trailing slashes', () => {
 })
 
 describe('prerendering', () => {
-  it('renders an optional param\'s path with and without it, the matcher\'s value handed over', async () => {
-    const root = process.cwd()
-    const manifest = (await readManifest(root))!
+  const build = prerendered({ routes })
 
-    try {
-      expect(await prerenderPages(resolveProject(root, { routes }), (await readClient(root))!)).toBe(2)
-      expect(await Bun.file(join(outputDir(root), 'pages/blog.html')).text()).toContain('<p class="page">Page 1, a undefined</p>')
-      expect(await Bun.file(join(outputDir(root), 'pages/blog/2.html')).text()).toContain('<p class="page">Page 2, a number</p>')
-    }
-    finally {
-      await rm(join(outputDir(root), 'pages'), { recursive: true, force: true })
-      await writeManifest(root, manifest)
-    }
+  it('renders an optional param\'s path with and without it, the matcher\'s value handed over', async () => {
+    const dir = join(outputDir(process.cwd()), 'pages')
+
+    expect(build.count()).toBe(2)
+    expect(await Bun.file(join(dir, 'blog.html')).text()).toContain('<p class="page">Page 1, a undefined</p>')
+    expect(await Bun.file(join(dir, 'blog/2.html')).text()).toContain('<p class="page">Page 2, a number</p>')
   })
 })
 

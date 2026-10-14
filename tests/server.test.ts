@@ -1,3 +1,4 @@
+import type { KayConfig } from '../src/config'
 import type { Action, Failure } from '../src/runtime'
 import type { ClientBuild, ClientManifest } from '../src/server/client'
 import type { Encoding } from '../src/server/compress'
@@ -32,6 +33,8 @@ import { setTracer } from '../src/server/trace'
 import { parsingRoutes, routePaths } from './elysia'
 import { auth } from './fixtures/site/src/auth'
 import { resetTodos } from './fixtures/site/src/data'
+import { prerendered } from './prerendered'
+import { scratchDir } from './scratch'
 
 const app = await pages({ routes: 'tests/fixtures/site/src/routes', publicDir: 'tests/fixtures/site/public' })
 // No _404.kay nor _error.kay: failures answer in plain text.
@@ -922,88 +925,64 @@ describe('await blocks', () => {
 
 describe('prerendering', () => {
   const routes = 'tests/fixtures/site/src/routes'
+  const root = process.cwd()
+  const build = prerendered({ routes })
 
   it('renders the pages marked prerender once at build time and serves them behind their guards', async () => {
-    const root = process.cwd()
-    const manifest = (await readManifest(root))!
+    expect(build.count()).toBe(4)
 
-    try {
-      expect(await prerenderPages(resolveProject(root, { routes }), (await readClient(root))!)).toBe(4)
-      const file = await Bun.file(join(outputDir(root), 'pages/admin/report.html')).text()
-      const signedIn = new Elysia().use(auth).use(await pages({ routes, publicDir: 'tests/fixtures/site/public', prebuilt: true }))
-      const visit = async (user: string, headers: Record<string, string> = {}) => signedIn.handle(new NativeRequest('http://localhost/admin/report', { headers: { 'x-user': user, ...headers } }))
-      const served = await visit('ada')
-      const etag = served.headers.get('etag')!
+    const file = await Bun.file(join(outputDir(root), 'pages/admin/report.html')).text()
+    const signedIn = new Elysia().use(auth).use(await pages({ routes, publicDir: 'tests/fixtures/site/public', prebuilt: true }))
+    const visit = async (user: string, headers: Record<string, string> = {}) => signedIn.handle(new NativeRequest('http://localhost/admin/report', { headers: { 'x-user': user, ...headers } }))
+    const served = await visit('ada')
+    const etag = served.headers.get('etag')!
 
-      expect(file).toContain('<nav class="admin">Admin tools</nav><h1>Report</h1>')
-      expect(served.status).toBe(200)
-      expect(await served.text()).toBe(file)
-      expect(served.headers.get('cache-control')).toBe('private, no-cache')
-      expect(served.headers.get('set-cookie')).toStartWith('seen=admin;')
-      expect((await visit('ada', { 'if-none-match': `"other", W/${etag}` })).status).toBe(304)
-      expect((await visit('bob')).status).toBe(403)
-    }
-    finally {
-      await rm(join(outputDir(root), 'pages'), { recursive: true, force: true })
-      await writeManifest(root, manifest)
-    }
+    expect(file).toContain('<nav class="admin">Admin tools</nav><h1>Report</h1>')
+    expect(served.status).toBe(200)
+    expect(await served.text()).toBe(file)
+    expect(served.headers.get('cache-control')).toBe('private, no-cache')
+    expect(served.headers.get('set-cookie')).toStartWith('seen=admin;')
+    expect((await visit('ada', { 'if-none-match': `"other", W/${etag}` })).status).toBe(304)
+    expect((await visit('bob')).status).toBe(403)
   })
 
   it('writes the stylesheets into the pages it prerenders with inlineStyles', async () => {
-    const root = process.cwd()
-    const manifest = (await readManifest(root))!
-
-    try {
+    await build.keeping(async () => {
       await prerenderPages(resolveProject(root, { routes, inlineStyles: true }), (await readClient(root))!)
       const file = await Bun.file(join(outputDir(root), 'pages/admin/report.html')).text()
 
       expect(file).toContain('<style>')
       expect(file).toContain('background: url("/paper.png")')
       expect(file).not.toContain('rel="stylesheet"')
-    }
-    finally {
-      await rm(join(outputDir(root), 'pages'), { recursive: true, force: true })
-      await writeManifest(root, manifest)
-    }
+    })
   })
 
   it('renders a dynamic route for each params its prerender export lists, and the others per request', async () => {
-    const root = process.cwd()
-    const manifest = (await readManifest(root))!
+    const served = new Elysia().use(await pages({ routes, publicDir: 'tests/fixtures/site/public', prebuilt: true }))
+    const visit = async (path: string) => {
+      const response = await served.handle(new NativeRequest(`http://localhost${path}`))
 
-    try {
-      await prerenderPages(resolveProject(root, { routes }), (await readClient(root))!)
-      const served = new Elysia().use(await pages({ routes, publicDir: 'tests/fixtures/site/public', prebuilt: true }))
-      const visit = async (path: string) => {
-        const response = await served.handle(new NativeRequest(`http://localhost${path}`))
-
-        return { html: (await response.text()), etag: response.headers.get('etag') }
-      }
-
-      expect(await Bun.file(join(outputDir(root), 'pages/docs/guide/intro.html')).text()).toBe((await get('/docs/guide/intro')).html)
-      expect(await Bun.file(join(outputDir(root), 'pages/docs/a%20b.html')).exists()).toBe(true)
-      expect(await visit('/docs/guide/intro')).toMatchObject({ html: expect.stringContaining('<p class="path">Docs at guide/intro</p>'), etag: expect.any(String) })
-      expect(await visit('/docs/a%20b')).toMatchObject({ html: expect.stringContaining('<p class="path">Docs at a b</p>'), etag: expect.any(String) })
-      expect(await visit('/docs/other')).toMatchObject({ html: expect.stringContaining('<p class="path">Docs at other</p>'), etag: null })
-
-      // Served from its file however the path is spelled: as a browser sends it, or encoded.
-      for (const spelling of ['/docs/a@b+c/d,e', '/docs/a%40b%2Bc/d%2Ce'])
-        expect(await visit(spelling)).toMatchObject({ html: expect.stringContaining('<p class="path">Docs at a@b+c/d,e</p>'), etag: expect.any(String) })
+      return { html: (await response.text()), etag: response.headers.get('etag') }
     }
-    finally {
-      await rm(join(outputDir(root), 'pages'), { recursive: true, force: true })
-      await writeManifest(root, manifest)
-    }
+
+    expect(await Bun.file(join(outputDir(root), 'pages/docs/guide/intro.html')).text()).toBe((await get('/docs/guide/intro')).html)
+    expect(await Bun.file(join(outputDir(root), 'pages/docs/a%20b.html')).exists()).toBe(true)
+    expect(await visit('/docs/guide/intro')).toMatchObject({ html: expect.stringContaining('<p class="path">Docs at guide/intro</p>'), etag: expect.any(String) })
+    expect(await visit('/docs/a%20b')).toMatchObject({ html: expect.stringContaining('<p class="path">Docs at a b</p>'), etag: expect.any(String) })
+    expect(await visit('/docs/other')).toMatchObject({ html: expect.stringContaining('<p class="path">Docs at other</p>'), etag: null })
+
+    // Served from its file however the path is spelled: as a browser sends it, or encoded.
+    for (const spelling of ['/docs/a@b+c/d,e', '/docs/a%40b%2Bc/d%2Ce'])
+      expect(await visit(spelling)).toMatchObject({ html: expect.stringContaining('<p class="path">Docs at a@b+c/d,e</p>'), etag: expect.any(String) })
   })
 
   it('serves the compressed copies kay build writes to a browser accepting them, each encoding with its own tag', async () => {
-    const root = process.cwd()
     const manifest = (await readManifest(root))!
     const client = (await readClient(root))!
+    const prerenderedDir = join(outputDir(root), 'pages')
 
     try {
-      await prerenderPages(resolveProject(root, { routes }), client)
-      await Promise.all([compressFiles(client.dir), compressFiles(join(outputDir(root), 'pages'))])
+      await Promise.all([compressFiles(client.dir), compressFiles(prerenderedDir)])
       const served = new Elysia().use(await pages({ routes, publicDir: 'tests/fixtures/site/public', prebuilt: true }))
       const fetch = async (path: string, headers: Record<string, string> = {}) => served.handle(new NativeRequest(`http://localhost${path}`, { headers }))
       const plain = await fetch(manifest.entry!)
@@ -1055,10 +1034,10 @@ describe('prerendering', () => {
       expect(report.headers.get('vary')).toBe('x-user, accept-encoding')
     }
     finally {
-      for (const copy of new Bun.Glob('**/*.{br,gz}').scanSync(client.dir))
-        await rm(join(client.dir, copy))
-      await rm(join(outputDir(root), 'pages'), { recursive: true, force: true })
-      await writeManifest(root, manifest)
+      for (const dir of [client.dir, prerenderedDir]) {
+        for (const copy of new Bun.Glob('**/*.{br,gz}').scanSync(dir))
+          await rm(join(dir, copy))
+      }
     }
   })
 
@@ -1074,69 +1053,43 @@ describe('prerendering', () => {
     expect(preferredEncoding(null, both)).toBeUndefined()
   })
 
-  it('asks a dynamic route marked prerender = true for the params to render', async () => {
-    const root = process.cwd()
-    const manifest = (await readManifest(root))!
-    const dir = await mkdtemp(join(root, '.kay/routes-'))
-
-    try {
-      await Bun.write(join(dir, 'posts/[slug].kay'), '--- server\nexport const page = { prerender: true }\n---\np {ctx.params.slug}\n')
-      await expect(prerenderPages(resolveProject(root, { routes: dir }), (await readClient(root))!)).rejects.toThrow('so `prerender` lists them: export const page = { prerender: [{ slug: \'...\' }] }')
-      await rm(join(dir, 'posts'), { recursive: true })
-      // Another file, since the first one stays in the module cache.
-      await Bun.write(join(dir, 'tags/[slug].kay'), '--- server\nexport const page = { prerender: [{ slug: 1 }] }\n---\np {ctx.params.slug}\n')
-      await expect(prerenderPages(resolveProject(root, { routes: dir }), (await readClient(root))!)).rejects.toThrow('lists {"slug":1} in prerender, which needs a string for each of slug')
-      await rm(join(dir, 'tags'), { recursive: true })
-      await Bun.write(join(dir, 'files/[...path].kay'), '--- server\nexport const page = { prerender: [{ path: \'a/../../x\' }] }\n---\np {ctx.params.path}\n')
-      await expect(prerenderPages(resolveProject(root, { routes: dir }), (await readClient(root))!)).rejects.toThrow('with no empty, . or .. segment')
-      await rm(join(dir, 'files'), { recursive: true })
-      await Bun.write(join(dir, 'notes/[slug].kay'), '--- server\nexport const page = { prerender: \'yes\' }\n---\np {ctx.params.slug}\n')
-      await expect(prerenderPages(resolveProject(root, { routes: dir }), (await readClient(root))!)).rejects.toThrow('exports a prerender that is neither true, false')
-    }
-    finally {
-      await rm(dir, { recursive: true, force: true })
-      await writeManifest(root, manifest)
-    }
-  })
-
-  it('refuses to prerender two paths into one file', async () => {
-    const root = process.cwd()
-    const manifest = (await readManifest(root))!
-    const dir = await mkdtemp(join(root, '.kay/routes-'))
-
-    try {
-      await Bun.write(join(dir, 'index.kay'), '--- server\nexport const page = { prerender: true }\n---\np Home\n')
-      await Bun.write(join(dir, '[slug].kay'), '--- server\nexport const page = { prerender: [{ slug: \'index\' }] }\nconst slug = ctx.params.slug\n---\np {slug}\n')
-      await expect(prerenderPages(resolveProject(root, { routes: dir }), (await readClient(root))!)).rejects.toThrow('kay: /index and / would both be prerendered to index.html')
-    }
-    finally {
-      await rm(dir, { recursive: true, force: true })
-      await rm(join(outputDir(root), 'pages'), { recursive: true, force: true })
-      await writeManifest(root, manifest)
-    }
-  })
-
-  it('logs what a prerendered page throws rather than handing it to the app\'s onError, and builds without the server\'s preview secret', async () => {
-    const root = process.cwd()
-    const manifest = (await readManifest(root))!
-    const dir = await mkdtemp(join(root, '.kay/routes-'))
+  it('refuses what no build can prerender, logging what a page throws rather than handing it to the app\'s onError, and builds without the server\'s preview secret', async () => {
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
     const reported: unknown[] = []
+    // Each case's routes, by file, with what its render comes to: the pages it wrote, or the error refusing it.
+    const cases: { files: Record<string, string>, config?: Partial<KayConfig>, outcome: number | string }[] = [
+      { files: { 'posts/[slug].kay': '--- server\nexport const page = { prerender: true }\n---\np {ctx.params.slug}\n' }, outcome: 'so `prerender` lists them: export const page = { prerender: [{ slug: \'...\' }] }' },
+      { files: { 'tags/[slug].kay': '--- server\nexport const page = { prerender: [{ slug: 1 }] }\n---\np {ctx.params.slug}\n' }, outcome: 'lists {"slug":1} in prerender, which needs a string for each of slug' },
+      { files: { 'files/[...path].kay': '--- server\nexport const page = { prerender: [{ path: \'a/../../x\' }] }\n---\np {ctx.params.path}\n' }, outcome: 'with no empty, . or .. segment' },
+      { files: { 'notes/[slug].kay': '--- server\nexport const page = { prerender: \'yes\' }\n---\np {ctx.params.slug}\n' }, outcome: 'exports a prerender that is neither true, false' },
+      { files: { 'index.kay': '--- server\nexport const page = { prerender: true }\n---\np Home\n', '[slug].kay': '--- server\nexport const page = { prerender: [{ slug: \'index\' }] }\nconst slug = ctx.params.slug\n---\np {slug}\n' }, outcome: 'kay: /index and / would both be prerendered to index.html' },
+      { files: { 'plain.kay': '--- server\nexport const page = { prerender: true }\n---\np Plain\n' }, config: { preview: { secret: undefined as unknown as string } }, outcome: 1 },
+      { files: { 'broken.kay': '--- server\nexport const page = { prerender: true }\nconst fail = () => {\n  throw new Error(\'no database at build time\')\n}\n\nfail()\n---\np Broken\n' }, config: { onError: error => void reported.push(error) }, outcome: 'failed with 500' },
+    ]
+    const dirs: string[] = []
 
     try {
-      await Bun.write(join(dir, 'plain.kay'), '--- server\nexport const page = { prerender: true }\n---\np Plain\n')
-      expect(await prerenderPages(resolveProject(root, { routes: dir, preview: { secret: undefined as unknown as string } }), (await readClient(root))!)).toBe(1)
+      // A directory each, as a page stays in the module cache.
+      for (const { files, config, outcome } of cases) {
+        const dir = await scratchDir('routes-')
 
-      await Bun.write(join(dir, 'broken.kay'), '--- server\nexport const page = { prerender: true }\nconst fail = () => {\n  throw new Error(\'no database at build time\')\n}\n\nfail()\n---\np Broken\n')
-      await expect(prerenderPages(resolveProject(root, { routes: dir, onError: error => void reported.push(error) }), (await readClient(root))!)).rejects.toThrow('failed with 500')
+        dirs.push(dir)
+        await Promise.all(Object.entries(files).map(async ([file, source]) => Bun.write(join(dir, file), source)))
+
+        const rendering = build.keeping(async () => prerenderPages(resolveProject(root, { routes: dir, ...config }), (await readClient(root))!))
+
+        if (typeof outcome === 'number')
+          expect(await rendering).toBe(outcome)
+        else
+          await expect(rendering).rejects.toThrow(outcome)
+      }
+
       expect(reported).toEqual([])
       expect(logged).toHaveBeenCalledWith(expect.stringContaining('no database at build time'))
     }
     finally {
       logged.mockRestore()
-      await rm(dir, { recursive: true, force: true })
-      await rm(join(outputDir(root), 'pages'), { recursive: true, force: true })
-      await writeManifest(root, manifest)
+      await Promise.all(dirs.map(async dir => rm(dir, { recursive: true, force: true })))
     }
   })
 
