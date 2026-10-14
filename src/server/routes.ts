@@ -101,8 +101,8 @@ const PARAM_NAME = /:[^/]+/g
 const TRAILING_SLASH = /\/$/
 const EDGE_SLASHES = /^\/+|\/+$/g
 const LEADING_SLASHES = /^\/+/
-// What a decoded segment must escape before the URL parser reads it as one segment: the rest it encodes itself where a browser would.
-const SEGMENT_ESCAPES = /[%/\\?#]/g
+// What a decoded segment must escape before the URL parser reads it as one segment, tab and line breaks included, which it would drop: the rest it encodes itself where a browser would.
+const SEGMENT_ESCAPES = /[%/\\?#\t\n\r]/g
 
 // The route a file under the routes directory serves; files starting with `_` (layouts, partials) serve none.
 export function routeOf(routesDir: string, file: string, prefix = ''): Omit<Route, 'layouts' | 'special' | 'guards'> | undefined {

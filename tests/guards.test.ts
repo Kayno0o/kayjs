@@ -215,6 +215,8 @@ describe('input a guarded route\'s schema refuses', () => {
     expect(await seen('/api/where/@me')).toBe('/api/where/@me')
     expect(await seen('/api/where/a%2Fb')).toBe('/api/where/a%2Fb')
     expect(await seen('/api/where/%61+b:c')).toBe('/api/where/a+b:c')
+    expect(await seen('/api/where/pub%09lic')).toBe('/api/where/pub%09lic')
+    expect(await seen('/api/where/a%0Ab%0Dc')).toBe('/api/where/a%0Ab%0Dc')
     expect(await seen('/where/@me.json')).toBe('/where/@me.json')
     expect(await seen('/where/a%2Fb.json')).toBe('/where/a%2Fb.json')
   })
