@@ -14,7 +14,7 @@
 
 ## Setup
 
-kayjs-auth is published as `@kaynooo/kayjs-auth` to `https://git.kaynooo.fr/api/packages/kaynooo/npm/`, beside kay. kay, Elysia and, for the Postgres store, `@kaynooo/pg-orm` are peer dependencies.
+kayjs-auth is published as `@kaynooo/kayjs-auth` to `https://git.kaynooo.fr/api/packages/kaynooo/npm/`, beside kay. kay, Elysia, kayjs-ui (for the prebuilt pages) and, for the Postgres store, `@kaynooo/pg-orm` are peer dependencies.
 
 ```ts
 // src/auth.ts

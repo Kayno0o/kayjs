@@ -76,6 +76,8 @@ const blog = paginate(posts, 10)
 export const page = { prerender: blog }
 
 const list = await blog.page(ctx.params.page) ?? ctx.notFound()
+--- script
+import Pagination from '@kaynooo/kayjs-ui/pagination.kay'
 ---
 for post of list.items key={post.slug}
   a(href={`/blog/${post.slug}`}) {post.data.title}

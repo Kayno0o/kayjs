@@ -29,7 +29,7 @@ export const auth = createAuth({
   sessions: session<AuthSessionData>({ secret: process.env.SESSION_SECRET! }),
   // At least 32 characters, and not the session's secret.
   secret: process.env.AUTH_SECRET!,
-  // In the process, for trying it out; `pgStore(db)` from '@kaynooo/kayjs-auth/pg' keeps it in Postgres, or in SQLite on a pg-orm `Database` opened at a `sqlite://` URL.
+  // In the process, for trying it out; `pgStore(db)` from '@kaynooo/kayjs-auth/pg' keeps it in Postgres, or in SQLite on a pg-orm `Database` opened at a `sqlite://` URL, whose `tables` list `...authTables` and are migrated with the app's own.
   store: memoryStore(),
   signInPage: '/login',
 })

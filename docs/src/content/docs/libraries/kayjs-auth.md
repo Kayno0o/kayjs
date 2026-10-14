@@ -3,7 +3,9 @@ title: kayjs-auth
 order: 1
 description: Sessions-based auth for kay apps - passwords, OAuth, mailed links, two-factor and route guards.
 ---
-`@kaynooo/kayjs-auth` builds on kay's `session()`: passwords, OAuth sign-in, mailed links (verification, reset, magic links), TOTP two-factor, bearer tokens and a fail-closed gate for routes. It ships no UI, your pages call it.
+`@kaynooo/kayjs-auth` builds on kay's `session()`: passwords, OAuth sign-in, mailed links (verification, reset, magic links), TOTP two-factor, bearer tokens and a fail-closed gate for routes.
+
+It ships every sign-in and account page, styled with kayjs-ui, in English and French. Turn them on with one line, then replace any page or text with your own. Or write every page yourself and call it from them.
 
 ## Install
 
@@ -15,11 +17,10 @@ The `@kaynooo` scope must point at the Forgejo registry in your `.npmrc` (a proj
 
 ## Setup
 
-`src/auth.ts` creates the auth object. `memoryStore()` keeps users in the process for trying it out, `pgStore(db)` from `@kaynooo/kayjs-auth/pg` keeps them in Postgres:
+`src/auth.ts` creates the auth object. `memoryStore()` keeps users in the process, for trying it out:
 
 ```ts
 import type { AuthSessionData } from '@kaynooo/kayjs-auth'
-import type { LocalsOf } from 'kay'
 import { createAuth, memoryStore } from '@kaynooo/kayjs-auth'
 import { session } from 'kay/server'
 
@@ -27,23 +28,37 @@ export const auth = createAuth({
   sessions: session<AuthSessionData>({ secret: process.env.SESSION_SECRET! }),
   secret: process.env.AUTH_SECRET!,
   store: memoryStore(),
-  signInPage: '/login',
+  pages: true,
 })
-
-declare module 'kay' {
-  interface Register {
-    locals: LocalsOf<typeof auth.plugin>
-  }
-}
 ```
 
-`secret` is at least 32 characters and not the session's secret. Use the plugin before the pages in `src/server.ts`:
+`secret` is at least 32 characters and not the session's secret.
+
+Then hand the plugin to kay in `kay.config.ts`. It is imported only when the server starts, so the config never loads your database:
 
 ```ts
-export const app = new Elysia().use(auth.plugin).use(await pages()).listen(3000)
+import { authPages } from '@kaynooo/kayjs-auth'
+import { defineConfig } from 'kay/server'
+
+export default defineConfig({
+  extensions: [authPages({ server: async () => (await import('./src/auth')).auth.plugin })],
+})
 ```
 
-Every page, action and guard now reads `ctx.locals.auth`.
+Every page, action and guard can now read `ctx.locals.auth`, typed. `pages: true` serves the prebuilt pages under `/auth`: `/auth/sign-in`, `/auth/register`, `/auth/account` and the rest. A file of yours at the same path, such as `src/routes/auth/sign-in.kay`, replaces that page. To write every page yourself, leave out `pages` and set `signInPage` to your sign-in page.
+
+### Postgres
+
+`pgStore(db)` from `@kaynooo/kayjs-auth/pg` keeps users in Postgres. Its tables come from `authTables`: list them in your pg-orm `Database`, then migrate as for your own tables.
+
+```ts
+import { authTables, pgStore } from '@kaynooo/kayjs-auth/pg'
+import { Database } from '@kaynooo/pg-orm'
+
+export const db = new Database({ url: process.env.DATABASE_URL!, tables: [...authTables] })
+
+// in createAuth: store: pgStore(db)
+```
 
 ## The signed-in user
 
@@ -56,7 +71,7 @@ const user = await ctx.locals.auth.user()
 if user as signedIn
   p Signed in as {signedIn.email}
 else
-  a(href="/login") Sign in
+  a(href="/auth/sign-in") Sign in
 ```
 
 ## Signing in with a password
@@ -126,12 +141,12 @@ A proof of work costs a bot CPU rather than proving a human: a site bots target 
 
 ## Guarding routes
 
-A `_guard.ts` default-exports the guard. An anonymous visitor goes to `redirect`, one without the role gets a 403:
+A `_guard.ts` default-exports the guard. An anonymous visitor goes to the sign-in page, then back; one without the role gets a 403:
 
 ```ts
 import { auth } from '../../auth'
 
-export default auth.guard({ redirect: '/login', require: 'editor' })
+export default auth.guard({ require: 'editor' })
 ```
 
 ## OAuth
@@ -166,6 +181,6 @@ A mailed link opens a page of yours that shows a button posting the token to an 
 
 </Callout>
 
-The `email` option wires verification, reset and magic-link mails to [kayjs-mail](/libraries/kayjs-mail): `email: { mailer: { send: mail.enqueue }, links: { 'verify-email': '/verify', ... } }`. The `examples/noticeboard` project in the kay repository uses all of it with Postgres.
+The `email` option sends the verification, reset and magic-link mails. With [kayjs-mail](/libraries/kayjs-mail), `email: { mailer: authMailer(mail.enqueue) }` renders them as themed mails; `authMailer` comes from kayjs-mail and needs its `mailExtension` in `kay.config.ts`. The `examples/noticeboard` project in the kay repository runs kayjs-auth on Postgres.
 
 <ReadMore href="/llms/kayjs-auth">Two-factor, bearer tokens, API gates, roles, limits, account changes and the store contract are in the full kayjs-auth reference.</ReadMore>

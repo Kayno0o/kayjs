@@ -110,11 +110,14 @@ a(href="/") Back to the list
 
 ## Add a book with an action
 
-A server fence exports actions: a schema and a handler. The form posts to it without any JavaScript, and `kay check` verifies each field name against the schema. Add to the server fence of `src/routes/index.kay`:
+A server fence exports actions: a schema and a handler. The form posts to it without any JavaScript, and `kay check` verifies each field name against the schema. In the server fence of `src/routes/index.kay`, import `addBook` beside `listBooks` and `s` from `kay`, then export the action after `books`:
 
-```ts
+```kay
+--- server
 import { s } from 'kay'
 import { addBook, listBooks } from '../books'
+
+const books = await listBooks()
 
 export const add = action(s.Object({
   title: s.String({ minLength: 1, maxLength: 200, error: 'Write a title' }),
@@ -125,6 +128,7 @@ export const add = action(s.Object({
 
   return (await addBook(title, author)).id
 })
+---
 ```
 
 Then the form, under the list:
@@ -186,10 +190,14 @@ ul
 
 The script fence, a bare `---`, runs where the component renders. `signal` holds a value, `memo` derives one, and `bind:value` keeps the field and the signal in step. A signal is read by calling it, `shown()`, in the template as in the script, while `bind:value={query}` takes the signal itself, to write it. The `else` under the `for` renders when the list is empty.
 
-Use it in the page in place of the list: import it in a script fence after the server fence, and pass the books as a prop:
+Use it in the page in place of the list: import it in a `--- script` fence after the server fence, and pass the books as a prop:
 
 ```kay
----
+--- server
+import { listBooks } from '../books'
+
+const books = await listBooks()
+--- script
 import BookFilter from '../components/book-filter.kay'
 ---
 head
@@ -209,4 +217,4 @@ bun run build   # the browser bundle, minified, after the same checks
 bun run start   # the production server
 ```
 
-From here, the reference covers each part in depth: [Pages and routing](/reference/pages-and-routing), [Actions](/reference/actions), [Islands](/reference/islands) and [Testing](/reference/testing). `kay new --template app` scaffolds an app with sessions, a sign-in form and a guarded account page, and this site, in `docs/` in kay's repository, is itself built with kay from content collections.
+From here, the reference covers each part in depth: [Routing](/essentials/routing), [Forms and actions](/essentials/forms-and-actions), [Islands](/essentials/islands) and [Testing](/guides/testing). `kay new --template app` scaffolds an app with sessions, a sign-in form and a guarded account page, and this site, in `docs/` in kay's repository, is itself built with kay from content collections.

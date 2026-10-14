@@ -83,7 +83,7 @@ An action reads the params of the page it was posted from in `ctx.params`. In `s
 import { action } from 'kay'
 import { projects } from '../../../db'
 
-export const remove = action(s.Object({ id: s.String() }), async ({ id }, ctx) => {
+export const remove = action(s.Object({ id: s.String({ maxLength: 36 }) }), async ({ id }, ctx) => {
   await projects.remove({ org: String(ctx.params.org), id })
 })
 ---
