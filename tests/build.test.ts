@@ -860,6 +860,13 @@ describe('kay build checks the project first', () => {
       expect(built.failed).toBeUndefined()
       expect(await Bun.file(join(root, 'dist/index.html')).text()).toContain('>Home</a>')
 
+      // A plain build drops the record of an executable an earlier build compiled, so `kay start` runs the entry of this one.
+      const record = join(outputDir(root), 'executable')
+
+      await Bun.write(record, 'bin/server')
+      expect(await buildProject({ check: false })).toMatchObject({ built: { prerendered: 1 } })
+      expect(existsSync(record)).toBe(false)
+
       // A callback that throws once the output is written puts the last build back.
       await Bun.write(join(root, 'src/routes/index.kay'), '--- server\nexport const page = { prerender: true }\n---\na(href="/") Away\n')
       const script = `import { buildProject } from ${JSON.stringify(join(import.meta.dir, '../src/build/pipeline'))}\n\ntry {\n  await buildProject(${JSON.stringify(root)}, {}, { onStage: (stage) => { if (stage === 'output') throw new Error('printer down') } })\n}\ncatch (error) {\n  console.log(error.message)\n}\n`

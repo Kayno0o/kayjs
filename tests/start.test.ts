@@ -329,14 +329,15 @@ describe('kay start', () => {
     await build()
     await mkdir(join(dir, 'bin'), { recursive: true })
     await rename(compiledAside, join(dir, 'bin/server'))
-    await Bun.write(join(outputDir(dir), 'executable'), 'bin/server')
-    expect(await Bun.file(join(outputDir(dir), 'executable')).text()).toBe('bin/server')
 
     const moved = `${dir}-moved`
-
-    await rename(dir, moved)
+    let isMoved = false
 
     try {
+      await Bun.write(join(outputDir(dir), 'executable'), 'bin/server')
+      expect(await Bun.file(join(outputDir(dir), 'executable')).text()).toBe('bin/server')
+      await rename(dir, moved)
+      isMoved = true
       await rm(join(moved, 'src/server.ts'))
 
       const port = String(freePort())
@@ -349,7 +350,10 @@ describe('kay start', () => {
       expect(served.code).toBe(0)
     }
     finally {
-      await rename(moved, dir)
+      if (isMoved)
+        await rename(moved, dir)
+
+      await rename(join(dir, 'bin/server'), compiledAside)
       await Bun.write(join(dir, 'src/server.ts'), SERVER)
     }
   }, 120_000)
