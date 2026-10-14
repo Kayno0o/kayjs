@@ -14,6 +14,9 @@ import type { Challenge } from './twoFactor'
 import { Buffer } from 'node:buffer'
 import { timingSafeEqual } from 'node:crypto'
 
+// A visit or a token use is recorded at most this often, so a busy browser or device does not write on every request.
+export const TOUCH_EVERY_MS = 5 * 60 * 1000
+
 // What kayjs-auth keeps in the app's kay session: the app's session type includes it, `session<AuthSessionData & { cart: Cart }>(...)`.
 export interface AuthSessionData {
   auth?: SignedIn

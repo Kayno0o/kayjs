@@ -1,4 +1,5 @@
 import type { Level, PolicyContext, Principal, Requirement } from './types'
+import { meetsRequirement } from './requirement'
 
 /** Injected grant lookups the decision needs. No built-in super-user: model it as a role (`hasRole('ROLE_SUPER_ADMIN')`). */
 export interface GrantStore<P, G extends string> {
@@ -23,32 +24,22 @@ export async function decide<P, G extends string>(
   return evaluate(store, principal, requirement, level, ctx)
 }
 
-async function evaluate<P, G extends string>(
+function evaluate<P, G extends string>(
   store: GrantStore<P, G>,
   principal: P,
   requirement: Requirement<P, G>,
   level: Level,
   ctx: PolicyContext,
 ): Promise<boolean> {
-  if (Array.isArray(requirement)) {
-    for (const rule of requirement) {
-      if (await evaluate(store, principal, rule, level, ctx))
-        return true
-    }
+  return meetsRequirement(principal, requirement, ctx, async (grant) => {
+    const type = typeof grant === 'string' ? grant : grant.type
+    const resourceId = typeof grant === 'string' ? undefined : grant.resourceId
 
-    return false
-  }
+    const permission = await store.getPermission(store.subjectId(principal), type, resourceId)
 
-  if (typeof requirement === 'function')
-    return Boolean(await requirement(principal, ctx))
+    if (!permission)
+      return false
 
-  const type = typeof requirement === 'string' ? requirement : requirement.type
-  const resourceId = typeof requirement === 'string' ? undefined : requirement.resourceId
-
-  const permission = await store.getPermission(store.subjectId(principal), type, resourceId)
-
-  if (!permission)
-    return false
-
-  return level === 'read' || permission === 'write'
+    return level === 'read' || permission === 'write'
+  })
 }

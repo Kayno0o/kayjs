@@ -49,6 +49,7 @@ import { acceptInvitation, createOrganization, declineInvitation, deleteOrganiza
 import { featuresOf, pagePaths, pagesOf } from './pages'
 import { listPasskeys, passkeyProofOptions, passkeyRegistrationOptions, passkeySignInOptions, registerPasskey, removePasskey, renamePasskey, signInWithPasskey, twoFactorPasskeyOptions, verifyTwoFactorPasskey } from './passkeys'
 import { createUser, register, signInWithPassword } from './password'
+import { meetsRequirement } from './requirement'
 import { createRoleHierarchy } from './roles'
 import { applyLifetime, chooseRemember, listSessions, liveSession, openSession, revokeBearerTokens } from './sessions'
 import { challenged, completeSignIn, disableTwoFactor, enableTwoFactor, provedLately, regenerateRecoveryCodes, reprove, setUpTwoFactor, verifyTwoFactor } from './twoFactor'
@@ -934,25 +935,13 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
       return redirect(`${core.prefix}/${params.provider}/callback?${query}`, 303)
     })
 
-  const evaluate = async (user: User, requirement: AuthRequirement<Role>, ctx: PolicyContext): Promise<boolean> => {
-    if (Array.isArray(requirement)) {
-      for (const rule of requirement) {
-        if (await evaluate(user, rule, ctx))
-          return true
-      }
-
-      return false
-    }
-
-    if (typeof requirement === 'function')
-      return Boolean(await requirement(user, ctx))
-
-    if (typeof requirement === 'string')
-      return isGranted(requirement, user.roles as Role[])
+  const evaluate = async (user: User, requirement: AuthRequirement<Role>, ctx: PolicyContext): Promise<boolean> => meetsRequirement(user, requirement, ctx, (grant) => {
+    if (typeof grant === 'string')
+      return isGranted(grant, user.roles as Role[])
 
     // A grant on one record needs the app's own `authorize`.
-    return requirement.resourceId == null && isGranted(requirement.type, user.roles as Role[])
-  }
+    return grant.resourceId == null && isGranted(grant.type, user.roles as Role[])
+  })
 
   const authorize = options.authorize ?? (async (user, requirement, _level, ctx) => user !== null && evaluate(user, requirement, ctx))
   const signedIn: Predicate<User> = user => user !== null

@@ -2,13 +2,11 @@ import type { Core } from './core'
 import type { RequestState } from './state'
 import type { BearerTokenRecord, UserRecord } from './store'
 import type { Proof, ProofFailure } from './twoFactor'
-import { banned } from './core'
+import { banned, TOUCH_EVERY_MS } from './core'
 import { digest, randomToken } from './keys'
 import { notify } from './notify'
 import { reprove } from './twoFactor'
 
-// A use is recorded at most this often, so a busy device does not write on every request.
-const TOUCH_EVERY_MS = 5 * 60 * 1000
 const LABEL_MAX_LENGTH = 64
 const BEARER = /^Bearer\s+(\S+)$/i
 const TOKEN = /^\S{16,4096}$/

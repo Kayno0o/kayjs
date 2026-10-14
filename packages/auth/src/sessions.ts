@@ -2,11 +2,10 @@ import type { Core, SignedIn } from './core'
 import type { Device } from './device'
 import type { RequestState } from './state'
 import type { SessionRecord, UserRecord } from './store'
+import { TOUCH_EVERY_MS } from './core'
 import { readDevice } from './device'
 import { log } from './log'
 
-// A visit is recorded at most this often, so a busy browser does not write on every request.
-const TOUCH_EVERY_MS = 5 * 60 * 1000
 const USER_AGENT_MAX_LENGTH = 512
 
 // Where the user is signed in, as the app lists it.
