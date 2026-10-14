@@ -3,7 +3,7 @@ import type { BuildOptions, BuildResult } from '../src/build/pipeline'
 import type { KayConfig } from '../src/config'
 import type { ClientBuild } from '../src/server/client'
 import { existsSync } from 'node:fs'
-import { mkdir, mkdtemp, readdir, rename, rm, stat, symlink } from 'node:fs/promises'
+import { mkdir, mkdtemp, readdir, realpath, rename, rm, stat, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join, relative, resolve } from 'node:path'
 import process from 'node:process'
@@ -12,7 +12,7 @@ import { describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
 import { ASSET_FILE, clientDir, outputDir, writeAsset } from '../src/build/assets'
 import { buildClient } from '../src/build/client'
-import { writeIfChanged } from '../src/build/files'
+import { realPath, writeIfChanged } from '../src/build/files'
 import { reachesAny } from '../src/build/libraries'
 import { BUNDLED_LICENCES, codecWarnings, thirdPartyNotices, unknownCodecVersions } from '../src/build/licenses'
 import { formatSizeReport } from '../src/build/report'
@@ -1197,6 +1197,23 @@ describe('the files a build writes', () => {
         delete process.env.BUN_TEST_WORKER_ID
       else
         process.env.BUN_TEST_WORKER_ID = worker
+    }
+  })
+
+  it('resolves a symlinked folder in the path of a file that is gone too, as Bun keys its module cache', async () => {
+    const dir = await scratchDir('real-path-')
+
+    try {
+      await mkdir(join(dir, 'real'))
+      await symlink(join(dir, 'real'), join(dir, 'link'))
+
+      const real = await realpath(dir)
+
+      expect(realPath(join(dir, 'link/gone.ts'))).toBe(join(real, 'real/gone.ts'))
+      expect(realPath(join(dir, 'link/a/b/gone.ts'))).toBe(join(real, 'real/a/b/gone.ts'))
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
     }
   })
 

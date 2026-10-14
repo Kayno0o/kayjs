@@ -1,12 +1,10 @@
 import type { ImportedSignals, SignalKind } from '../compiler/module-signals'
 import { readFileSync, statSync } from 'node:fs'
-import { dirname } from 'node:path'
 import { moduleSignals } from '../compiler/module-signals'
-import { scriptLoader, transpilerFor } from './files'
-import { fences } from './libraries'
+import { resolveFrom, scriptLoader, transpilerFor } from './files'
+import { fences, SCRIPT_FILE } from './libraries'
 
 const KAY_MODULE = /^kay(?:\/|$)/
-const SCRIPT_MODULE = /\.[cm]?[jt]sx?$/
 const scanned = new Map<string, { stamp: string, signals: Record<string, SignalKind> }>()
 // What each component imports, read again only once its text changes.
 const imports = new Map<string, { hash: number | bigint, specifiers: string[] }>()
@@ -36,7 +34,7 @@ export function importedSignals(file: string, source: string): ImportedSignals {
   for (const specifier of specifiers) {
     const path = KAY_MODULE.test(specifier) ? undefined : resolveFrom(specifier, file)
 
-    if (path === undefined || !SCRIPT_MODULE.test(path) || (!specifier.startsWith('.') && path.includes('/node_modules/')))
+    if (path === undefined || !SCRIPT_FILE.test(path) || (!specifier.startsWith('.') && path.includes('/node_modules/')))
       continue
 
     const signals = signalsOf(path)
@@ -78,14 +76,5 @@ function signalsOf(path: string): Record<string, SignalKind> {
   }
   catch {
     return {}
-  }
-}
-
-function resolveFrom(specifier: string, file: string): string | undefined {
-  try {
-    return Bun.resolveSync(specifier, dirname(file))
-  }
-  catch {
-    return undefined
   }
 }

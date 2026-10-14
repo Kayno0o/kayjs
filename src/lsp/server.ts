@@ -7,12 +7,12 @@ import type { Span } from '../compiler/ast'
 import type { KayConfig } from '../config'
 import type { RouteMount } from '../server/routes'
 import type { CodeAction, CodeActionParams, CompletionItem, CompletionList, Diagnostic, DidChangeTextDocumentParams, DocumentDiagnosticReport, DocumentHighlight, FileEvent, Hover, InitializeParams, Location, LocationLink, Position, Range, TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams, TextEdit, WorkspaceEdit } from './protocol'
-import { existsSync, realpathSync } from 'node:fs'
-import { basename, dirname, join, relative, resolve, sep } from 'node:path'
+import { existsSync } from 'node:fs'
+import { basename, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { KAY_DIR } from '../build/assets'
-import { findKayFiles } from '../build/files'
+import { findKayFiles, realPath } from '../build/files'
 import { importedSignals } from '../build/signals'
 import { configCheckOptions, configProblems, contentChecks, generatedChecks, generatedProblem, projectProblems, stopProbes, TSGO, writeShadowTypes } from '../check'
 import { diagnoseShadow, reportsTypeErrors, servedByTheApp, servedLocales } from '../check/diagnose'
@@ -901,18 +901,6 @@ async function projectConfig(root: string): Promise<KayConfig> {
     console.error('kay lsp: kay.config.ts failed to load', error)
 
     return {}
-  }
-}
-
-// The path as Bun keys its module cache, a symlinked folder resolved, for a file deleted too.
-function realPath(path: string): string {
-  try {
-    return realpathSync(path)
-  }
-  catch {
-    const parent = dirname(path)
-
-    return parent === path ? path : join(realPath(parent), basename(path))
   }
 }
 

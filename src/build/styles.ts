@@ -7,12 +7,11 @@ import { parseKay } from '../compiler/parser'
 import { projectPaths } from '../project'
 import { ASSET_FILE, writeAsset } from './assets'
 import { collectionComponents, importedNames, rendersContent } from './collection-components'
-import { scriptLoader, transpilerFor } from './files'
+import { resolveFrom, scriptLoader, transpilerFor } from './files'
 import { globbedFiles } from './glob'
-import { importsOf, libraryOf } from './libraries'
+import { importsOf, libraryOf, SCRIPT_FILE } from './libraries'
 
 const KAY_FILE = /\.kay$/
-const SCRIPT_FILE = /\.[cm]?[jt]sx?$/
 
 export const CSS_FILE = /\.css$/
 const ABSOLUTE_URL = /^\//
@@ -70,18 +69,10 @@ export function styleImports(root: string, libraries: KayLibrary[] = []): BunPlu
   // Tailwind reads the class names of every module the bundle parses, so importing the ones kay collected from the `.class` shorthand hands them over with no `@source` line.
   const classesFile = projectPaths(root).classes
   const classes = `import ${JSON.stringify(classesFile)}\n`
-  const resolve = (specifier: string, importer: string): string | undefined => {
-    try {
-      return Bun.resolveSync(specifier, dirname(importer))
-    }
-    catch {
-      return undefined
-    }
-  }
   const inProject = (path: string) => path.startsWith(project) && !path.includes(`${sep}node_modules${sep}`)
   // A kay library's components and modules are followed as the app's own are.
   const followed = (path: string) => CSS_FILE.test(path) || ((inProject(path) || libraryOf(libraries, path) !== undefined) && (KAY_FILE.test(path) || SCRIPT_FILE.test(path)))
-  const scan = (code: string, importer: string, loader: Bun.JavaScriptLoader) => [...importedSpecifiers(code, loader).map(path => resolve(path, importer)).filter(path => path !== undefined), ...globbedFiles(code, importer, root, loader)]
+  const scan = (code: string, importer: string, loader: Bun.JavaScriptLoader) => [...importedSpecifiers(code, loader).map(path => resolveFrom(path, importer)).filter(path => path !== undefined), ...globbedFiles(code, importer, root, loader)]
   const imports = async (code: string, importer: string, loader: Bun.JavaScriptLoader) => {
     const paths = scan(code, importer, loader)
 
@@ -115,7 +106,7 @@ export function styleImports(root: string, libraries: KayLibrary[] = []): BunPlu
   const readCollections = async (module: string) => collectionComponents(await Bun.file(module).text())
   const contentImports = async (code: string, importer: string) => {
     const files = await Promise.all([...importedNames(code)].map(async ([specifier, names]) => {
-      const module = resolve(specifier, importer)
+      const module = resolveFrom(specifier, importer)
 
       if (module === undefined || !SCRIPT_FILE.test(module) || !(inProject(module) || libraryOf(libraries, module) !== undefined))
         return []
@@ -124,7 +115,7 @@ export function styleImports(root: string, libraries: KayLibrary[] = []): BunPlu
 
       collections.set(module, exported)
 
-      return [...await exported].flatMap(([name, components]) => names.has(name) || names.has('*') ? components.flatMap(component => resolve(component, module) ?? []) : [])
+      return [...await exported].flatMap(([name, components]) => names.has(name) || names.has('*') ? components.flatMap(component => resolveFrom(component, module) ?? []) : [])
     }))
 
     return importing([...new Set(files.flat())].filter(followed))

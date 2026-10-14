@@ -1,5 +1,5 @@
-import { dirname, sep } from 'node:path'
-import { findProjectFiles } from '../build/files'
+import { sep } from 'node:path'
+import { findProjectFiles, resolveFrom } from '../build/files'
 import { importsOf, SCRIPT_FILE } from '../build/libraries'
 import { rendersAsIsland } from '../compiler'
 
@@ -56,13 +56,4 @@ export async function islandOnlyComponents(root: string, routesDir: string, file
   }
 
   return reached
-}
-
-function resolveFrom(specifier: string, file: string): string | undefined {
-  try {
-    return Bun.resolveSync(specifier, dirname(file))
-  }
-  catch {
-    return undefined
-  }
 }

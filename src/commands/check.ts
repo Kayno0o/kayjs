@@ -6,6 +6,7 @@ import type { Command, ProblemFormat } from './command'
 import { existsSync, realpathSync, statSync } from 'node:fs'
 import { isAbsolute, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
+import { realPath } from '../build/files'
 import { applySafeFixes, check as checkTypes, configCheckOptions } from '../check'
 import { isLint, isLintGroup, LINT_GROUPS, LINTS } from '../compiler/lints'
 import { CONFIG_FILE, loadConfig } from '../config'
@@ -215,15 +216,6 @@ function inScope(diagnostic: CheckDiagnostic, scope: string[]): boolean {
   const file = realPath(diagnostic.file)
 
   return scope.some(path => file === path || file.startsWith(path + sep))
-}
-
-function realPath(file: string): string {
-  try {
-    return realpathSync(file)
-  }
-  catch {
-    return file
-  }
 }
 
 // Prints what `kay check` finds in the project and answers how many it found and how many of those fail it: the errors, and the warnings too with `denyWarnings`.

@@ -1,6 +1,7 @@
 import type { Dirent } from 'node:fs'
+import { realpathSync } from 'node:fs'
 import { mkdir, readdir, readFile, rename, rm } from 'node:fs/promises'
-import { dirname, join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import { KAY_DIR } from './assets'
 
 // Never source at any depth: dependencies, kay's own output and version control.
@@ -30,6 +31,28 @@ export function transpilerFor(loader: Bun.JavaScriptLoader): Bun.Transpiler {
     transpilers.set(loader, found = new Bun.Transpiler({ loader }))
 
   return found
+}
+
+// The path as Bun keys its module cache, a symlinked folder resolved, for a file deleted too.
+export function realPath(path: string): string {
+  try {
+    return realpathSync(path)
+  }
+  catch {
+    const parent = dirname(path)
+
+    return parent === path ? path : join(realPath(parent), basename(path))
+  }
+}
+
+// What `specifier` resolves to from the folder of `file`, or nothing when it does not resolve.
+export function resolveFrom(specifier: string, file: string): string | undefined {
+  try {
+    return Bun.resolveSync(specifier, dirname(file))
+  }
+  catch {
+    return undefined
+  }
 }
 
 export function scriptLoader(path: string): Bun.JavaScriptLoader {
