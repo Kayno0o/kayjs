@@ -9,6 +9,7 @@ import { existsSync, realpathSync } from 'node:fs'
 import { dirname, relative, resolve, sep } from 'node:path'
 import { libraryOf, packageRoot } from '../build/libraries'
 import { typeLint } from '../compiler/lints'
+import { WRITABLE } from '../compiler/names'
 import { UNSERVED_MESSAGE } from '../runtime/checks'
 import { localePrefixes, localeSettings } from '../server/i18n'
 import { sourceSpan } from './shadow'
@@ -77,6 +78,10 @@ export function diagnoseShadow(shadow: ShadowFile, diagnostic: TsgoDiagnostic, l
 
     return level === 'allow' ? undefined : { code: 'unread-name', severity: severityOf(level), message: diagnostic.message, span, unread: true }
   }
+
+  // An assignment to a name holding no signal, which kay wrote through `.set`.
+  if (shadow.tsx.slice(diagnostic.start - WRITABLE.length, diagnostic.start) === WRITABLE)
+    return { message: diagnostic.message, help: 'only a signal is written by assigning its name: a memo through the signals it derives from, and a plain value declared with `let`', span }
 
   return unreadSignal(diagnostic) ? { message: diagnostic.message, help: signalHelp(diagnostic, signalName(diagnostic, shadow.source, offset)), span } : { message: diagnostic.message, span }
 }

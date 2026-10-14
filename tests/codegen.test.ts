@@ -720,7 +720,7 @@ describe('signal writes', () => {
   })
 
   it('reject a write to a memo, a signal written by destructuring and a constant plainly holding no signal', () => {
-    const source = '---\nimport { loud } from \'./theme\'\nconst count = signal(0)\nconst double = memo(() => count() * 2)\nconst plain = 1\nconst params = new URLSearchParams() as URLSearchParams\nconst list = [1]\nconst sum = count() + 1\nlet free = 0\nfunction f() {\n  double = 3\n  loud++\n  plain += 1\n  params = new URLSearchParams()\n  list = []\n  sum ??= 2\n  free++\n  ;[count] = [signal(1)]\n}\n---\np x'
+    const source = '---\nimport { loud } from \'./theme\'\nconst count = signal(0)\nconst double = memo(() => count() * 2)\nconst plain = 1\nconst params = new URLSearchParams()\nconst cast = {} as never\nconst list = [1]\nconst sum = count() + 1\nlet free = 0\nfunction f() {\n  double = 3\n  loud++\n  plain += 1\n  params = new URLSearchParams()\n  cast = 1\n  list = []\n  sum ??= 2\n  free++\n  ;[count] = [signal(1)]\n}\n---\np x'
     const found = compileKay(source, 'test.kay', { importedSignals: { './theme': { loud: 'memo' } } }).diagnostics.map(d => [source.slice(d.start, d.end), d.message])
 
     expect(found).toEqual([

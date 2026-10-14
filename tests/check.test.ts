@@ -237,13 +237,14 @@ describe.concurrent('kay check, edge cases', () => {
     const page = '---\nimport { makeCounter, makeCount, makeMemo, makeParams } from \'../theme\'\n\nconst counter = makeCounter()\nconst doubled = makeMemo()\nconst n = makeCount()\nconst params = makeParams()\n---\nbutton(onClick={() => { counter += 1; counter = \'x\'; doubled = 2; n = 3; params = makeParams() }}) {counter()} {doubled()}\n'
     const root = await scratchProject({ 'src/theme.ts': theme, 'src/routes/index.kay': page })
     const line = page.split('\n')[8]!
+    const written = 'only a signal is written by assigning its name: a memo through the signals it derives from, and a plain value declared with `let`'
 
     try {
-      expect((await check(root)).map(d => [d.line, line.slice(d.column - 1, d.column - 1 + 8), d.code])).toEqual([
-        [9, '\'x\'; dou', 'TS2345'],
-        [9, 'doubled ', 'TS2741'],
-        [9, 'n = 3; p', 'TS2345'],
-        [9, 'params =', 'TS2345'],
+      expect((await check(root)).map(d => [d.line, line.slice(d.column - 1, d.column - 1 + 8), d.code, d.help])).toEqual([
+        [9, '\'x\'; dou', 'TS2345', undefined],
+        [9, 'doubled ', 'TS2741', written],
+        [9, 'n = 3; p', 'TS2345', written],
+        [9, 'params =', 'TS2345', written],
       ])
     }
     finally {

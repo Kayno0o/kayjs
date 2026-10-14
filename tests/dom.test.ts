@@ -397,10 +397,11 @@ describe('signal writes', () => {
   const unseen = site({
     'theme.ts': 'import { signal } from \'kay\'\n\nconst accent = signal(\'red\')\n\nexport { accent }\nexport function makeCounter() {\n  return signal(0)\n}\nexport function useDialog() {\n  return { open: signal(false) }\n}\n',
     'colors.ts': 'export { accent } from \'./theme\'\n',
-    'main.kay': '---\nimport { accent } from \'./colors\'\nimport { makeCounter, useDialog } from \'./theme\'\n\nconst counter = makeCounter()\nconst { open } = useDialog()\n\nfunction reset() {\n  counter = 0\n}\n---\nbutton.more(onClick={() => counter += 2}) {counter()}\nbutton.reset(onClick={reset}) reset\nbutton.accent(onClick={() => accent = \'blue\'}) {accent()}\nbutton.open(onClick={() => open = !open()}) {open() ? \'open\' : \'closed\'}\n',
+    'size.ts': 'import { signal } from \'kay\'\n\nexport default signal<number | undefined>()\n',
+    'main.kay': '---\nimport { accent } from \'./colors\'\nimport { makeCounter, useDialog } from \'./theme\'\nimport size from \'./size\'\n\nconst counter = makeCounter()\nconst { open } = useDialog()\n\nfunction reset() {\n  counter = 0\n}\n---\nbutton.more(onClick={() => counter += 2}) {counter()}\nbutton.reset(onClick={reset}) reset\nbutton.one(onClick={() => counter++}) one\nbutton.size(onClick={() => size ??= 3}) {size() ?? \'none\'}\nbutton.accent(onClick={() => accent = \'blue\'}) {accent()}\nbutton.open(onClick={() => open = !open()}) {open() ? \'open\' : \'closed\'}\n',
   })
 
-  it('assigns a signal kay cannot see made: a re-export, one a function returns and one destructured off what it returns', async () => {
+  it('assigns a signal kay cannot see made: a re-export, a default export, one a function returns and one destructured off what it returns', async () => {
     const { root, dispose } = await unseen()
     const text = (selector: string) => root.querySelector(selector)!.textContent
     const click = async (selector: string) => {
@@ -414,6 +415,11 @@ describe('signal writes', () => {
       expect(text('.more')).toBe('4')
       await click('.reset')
       expect(text('.more')).toBe('0')
+      await click('.one')
+      expect(text('.more')).toBe('1')
+      expect(text('.size')).toBe('none')
+      await click('.size')
+      expect(text('.size')).toBe('3')
       await click('.accent')
       expect(text('.accent')).toBe('blue')
       await click('.open')

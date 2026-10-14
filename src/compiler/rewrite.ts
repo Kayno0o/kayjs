@@ -7,7 +7,7 @@ import type { SignalKind } from './module-signals'
 import type { PropsBinding } from './script'
 import { createRequire } from 'node:module'
 import { parse } from '@babel/parser'
-import { CURRENT, defaultName, PROPS, VALUES } from './names'
+import { CURRENT, defaultName, PROPS, VALUES, WRITABLE } from './names'
 
 const IDENTIFIER = /^[A-Z_$][\w$]*$/i
 const CAPITAL = /^[A-Z]/
@@ -15,6 +15,7 @@ const CAPITAL = /^[A-Z]/
 const COMPILER_NAME = /^Kay[A-Z]/
 // What `kay` exports that is read by calling it, in the template as in the script, and whether it is written too.
 const ACCESSORS: Record<string, 'signal' | 'memo'> = { signal: 'signal', persisted: 'signal', linked: 'signal', queryParam: 'signal', memo: 'memo', debounced: 'memo' }
+const CHECKED_WRITE: Rewrite = { before: WRITABLE, after: ')' }
 
 export const POSITION_SUFFIX = / \(\d+:\d+\)$/
 const require = createRequire(import.meta.url)
@@ -564,7 +565,7 @@ class RewriteFinder {
       if (holdsNoSignal(binding))
         this.diagnostics.push({ start, end: start + name.length, message: `\`${name}\` holds no signal, so it cannot be assigned`, help: 'declare it with `let`, or make it a `signal`' })
       else
-        this.signalWrite(path, name, 'signal', this.input.check === true ? { before: 'KayWritable(', after: ')' } : {})
+        this.signalWrite(path, name, 'signal', this.input.check === true ? CHECKED_WRITE : {})
     }
   }
 }
@@ -572,13 +573,16 @@ class RewriteFinder {
 // What a constant is set to that is never a signal: a literal, an object, an array, a function, a class, an instance or an operation.
 const HOLDS_NO_SIGNAL = new Set(['StringLiteral', 'NumericLiteral', 'BooleanLiteral', 'NullLiteral', 'BigIntLiteral', 'RegExpLiteral', 'TemplateLiteral', 'ObjectExpression', 'ArrayExpression', 'ArrowFunctionExpression', 'FunctionExpression', 'ClassExpression', 'NewExpression', 'BinaryExpression', 'UnaryExpression'])
 
-// Whether a constant plainly holds no signal, `as` and the like seen through.
+// What leaves the value it wraps as it is; a cast may make a signal of anything, so it is left to the type checker.
+const TRANSPARENT = new Set(['TSSatisfiesExpression', 'TSNonNullExpression', 'ParenthesizedExpression'])
+
+// Whether a constant plainly holds no signal, parentheses and `satisfies` seen through.
 function holdsNoSignal(binding: Binding): boolean {
   const declarator = binding.path.node
   let init = declarator.type === 'VariableDeclarator' && declarator.id.type === 'Identifier' ? declarator.init : undefined
 
-  while (init?.type === 'TSAsExpression' || init?.type === 'TSSatisfiesExpression' || init?.type === 'TSNonNullExpression' || init?.type === 'TSTypeAssertion' || init?.type === 'ParenthesizedExpression')
-    init = init.expression
+  while (init && TRANSPARENT.has(init.type))
+    init = (init as t.TSSatisfiesExpression | t.TSNonNullExpression | t.ParenthesizedExpression).expression
 
   return init != null && HOLDS_NO_SIGNAL.has(init.type)
 }

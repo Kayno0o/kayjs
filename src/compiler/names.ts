@@ -6,6 +6,8 @@ export const PROPS = '__props'
 export const CURRENT = 'KayCurrent'
 // What type checking reads a template's signal through, `(void count, __values.count)`, a property TypeScript narrows where it narrows no call.
 export const VALUES = '__values'
+// What type checking wraps a name kay sees no signal made in, assigned, so the type checker asserts it holds one: `KayWritable(theme).set('dark')`.
+export const WRITABLE = 'KayWritable('
 // A `case` block's subject, read once for every `when`.
 export const SUBJECT = 'KaySubject'
 // The server fence's function, which hands its data to the template.
