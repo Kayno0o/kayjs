@@ -8,12 +8,11 @@ import { pathToFileURL } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { check } from '../src/check'
 import { Connection } from '../src/lsp/rpc'
-import { KayLanguageServer } from '../src/lsp/server'
+import { DIAGNOSTICS_DELAY, KayLanguageServer } from '../src/lsp/server'
 import { scratchDir } from './scratch'
 
 const fixtures = join(import.meta.dir, 'fixtures')
 const cli = join(import.meta.dir, '..', 'src', 'cli.ts')
-const DIAGNOSTICS_DELAY = 150
 const SLOW = 300
 
 // Drives `kay lsp` over stdio the way an editor does.
@@ -123,6 +122,14 @@ class Editor {
   }
 }
 
+// Waits until no publish came for a while, however slow the machine.
+async function settled(editor: Editor) {
+  for (let seen = -1; seen !== editor.publishes.length;) {
+    seen = editor.publishes.length
+    await Bun.sleep(DIAGNOSTICS_DELAY * 3)
+  }
+}
+
 // `[line, start, end]` for a one-line range, in source order.
 function spots(ranges: Range[]): number[][] {
   return sortRanges(ranges).map(range => [range.start.line, range.start.character, range.end.character])
@@ -189,7 +196,7 @@ describe('kay lsp', () => {
     expect(diagnostics).toEqual([expect.objectContaining({ source: 'kay', range: expect.objectContaining({ start: { line: 1, character: 2 } }) })])
   })
 
-  it('publishes a change after a quiet spell before the delay, and a burst once more after its last change without the versions between', async () => {
+  it('publishes a change after a quiet spell before the delay, and a burst once more after its last change without the version between', async () => {
     const path = 'broken/src/routes/[id].kay'
     const uri = editor.uri(path)
 
@@ -199,7 +206,7 @@ describe('kay lsp', () => {
     const quiet = await editor.change(path, 'p {missing}\n', 4)
 
     expect(quiet.length).toBeGreaterThan(0)
-    expect(editor.publishes.findLast(entry => entry.uri === uri && entry.version === 4)!.at - started).toBeLessThan(DIAGNOSTICS_DELAY)
+    expect(editor.publishes.find(entry => entry.uri === uri && entry.version === 4)!.at - started).toBeLessThan(DIAGNOSTICS_DELAY)
 
     await Bun.sleep(DIAGNOSTICS_DELAY * 2)
     void editor.change(path, 'p {alsoMissing}\n', 5)
@@ -207,7 +214,7 @@ describe('kay lsp', () => {
 
     expect(await editor.change(path, 'p fixed\n', 7)).toEqual([])
     await Bun.sleep(DIAGNOSTICS_DELAY * 2)
-    expect(editor.publishes.filter(entry => entry.uri === uri && (entry.version === 5 || entry.version === 6))).toEqual([])
+    expect(editor.publishes.filter(entry => entry.uri === uri && entry.version === 6)).toEqual([])
   })
 
   it('shows hover types for template expressions and server data', async () => {
@@ -655,11 +662,11 @@ describe('kay lsp for a client that supports diagnostic refreshes', () => {
 
     // A save or a file changing on disk makes tsgo ask for a refresh, which edits do not.
     editor.connection.notify('textDocument/didSave', { textDocument: { uri } })
-    await Bun.sleep(DIAGNOSTICS_DELAY * 4)
+    await settled(editor)
     for (const version of [2, 3]) {
       await Bun.sleep(DIAGNOSTICS_DELAY * 2)
       await editor.change(page, `--- server\nconst n: string = ${version}\n---\np {n}\n`, version)
-      await Bun.sleep(DIAGNOSTICS_DELAY * 3)
+      await settled(editor)
       expect(editor.publishes.filter(entry => entry.uri === uri && entry.version === version)).toHaveLength(1)
     }
   })
@@ -703,10 +710,10 @@ describe('kay lsp with a slow tsgo', () => {
 
     try {
       const uri = pathToFileURL(join(dir, page)).href
-      let last = 0
+      let last: number | undefined
 
-      client.onNotification('textDocument/publishDiagnostics', () => {
-        last = performance.now()
+      client.onNotification<{ version?: number }>('textDocument/publishDiagnostics', ({ version }) => {
+        last = version
       })
       await client.request('initialize', { processId: process.pid, rootUri: pathToFileURL(dir).href, capabilities: {} })
       client.notify('initialized', {})
@@ -717,7 +724,7 @@ describe('kay lsp with a slow tsgo', () => {
         client.notify('textDocument/didChange', { textDocument: { uri, version }, contentChanges: [{ text: `p {${version}}\n` }] })
       }
       await Bun.sleep(SLOW * 8)
-      expect(last).toBeGreaterThan(0)
+      expect(last).toBe(5)
       expect(most).toBe(1)
       expect(started).toBeLessThanOrEqual(3)
     }

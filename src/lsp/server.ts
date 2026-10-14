@@ -81,8 +81,9 @@ const CHANGED = 2
 const DELETED = 3
 // What the editor reports changing on disk: components, the modules they import, the configs deciding how those resolve, and the collections' entries.
 const WATCHED = '**/*.{kay,ts,tsx,js,jsx,json,md,yaml,yml}'
+
 // How long a change waits for the next before the files are checked again, as typing makes many; the first after a quiet spell is checked at once.
-const DIAGNOSTICS_DELAY = 150
+export const DIAGNOSTICS_DELAY = 150
 // How long the project-wide checks wait after a save for the next, as saving every file at once makes.
 const PROJECT_CHECKS_DELAY = 300
 const QUICK_FIX = 'quickfix'
@@ -479,7 +480,12 @@ export class KayLanguageServer {
     this.publishing = true
 
     try {
-      await Promise.all([...this.documents.values()].map(async document => this.publishDiagnostics(document)))
+      // Settled, not rejected at the first failure, so none is still running when the next publish starts.
+      const settled = await Promise.allSettled([...this.documents.values()].map(async document => this.publishDiagnostics(document)))
+      const failed = settled.find(result => result.status === 'rejected')
+
+      if (failed)
+        throw failed.reason
     }
     finally {
       this.publishing = false
