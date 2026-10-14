@@ -44,6 +44,8 @@ export interface PrerenderOptions {
   exportAll?: boolean
   // Receives every page rendered, for `kay build` to lint their heads.
   rendered?: RenderedPage[] | undefined
+  // Hears how many of the routes it went through, those it prerenders nothing of included.
+  onRoute?: ((done: number, total: number) => void) | undefined
 }
 
 // Renders every page whose server fence exports `prerender = true` into `pages` under the project's `paths.output` (`.kay/client`), listing them in the manifest the server boots from.
@@ -143,7 +145,9 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
   // What keeps a page from a static export, each named, so one build reports them all.
   const problems: string[] = []
 
-  for (const route of routes) {
+  for (const [index, route] of routes.entries()) {
+    options.onRoute?.(index, routes.length)
+
     // Read off the source first: a page that prerenders nothing is never imported, nor anything it imports.
     const marked = route.params.length === 0 && await reachesServerIsland(route.file)
 
@@ -162,6 +166,8 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
       problems.push(`${file}: ${error instanceof Error ? error.message.replace(KAY_PREFIX, '') : String(error)}`)
     }
   }
+
+  options.onRoute?.(routes.length, routes.length)
 
   const apiProblems = options.exportAll ? (await projectApi(root, config)).map(module => `${relative(root, module.file)}: an API module answers requests, which only a server does; a file such as src/routes/llms.txt.ts exporting GET is written to a file`) : []
   const endpointProblems = options.exportAll ? (await exportedEndpoints(root, await scanEndpoints(routesDir, mounts), config.requireGuards)).problems : []

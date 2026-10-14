@@ -117,7 +117,8 @@ export async function writeVariant(source: string | Blob | Uint8Array, variant: 
 
 // Every width of the ladder below an imported image's own, and its own, written next to the build for the route to serve as files, with the crops and share cards pages asked for, each in AVIF too given its quality; returns how many were encoded.
 // With a cache directory, a variant an earlier build encoded is copied from it, and what this build no longer uses is pruned from it, unless `prune` is off for a pass that sees only some of the build's images.
-export async function writeImageVariants(clientDir: string, quality = DEFAULT_QUALITY, cacheDir?: string, { prune = true, avif }: { prune?: boolean | undefined, avif?: number | undefined } = {}): Promise<number> {
+// `onImage` hears of each source image once its variants are written, with how many there are.
+export async function writeImageVariants(clientDir: string, quality = DEFAULT_QUALITY, cacheDir?: string, { prune = true, avif, onImage }: { prune?: boolean | undefined, avif?: number | undefined, onImage?: ((done: number, total: number) => void) | undefined } = {}): Promise<number> {
   const assets = join(clientDir, 'assets')
   const used = new Set<string>()
   let encoded = 0
@@ -125,10 +126,10 @@ export async function writeImageVariants(clientDir: string, quality = DEFAULT_QU
   if (!existsSync(assets))
     return encoded
 
-  const names = await readdir(assets)
+  const resizable = (await readdir(assets)).filter(name => RESIZABLE.test(name))
   const decoding = limiter(DECODED_AT_ONCE)
-
-  await Promise.all(names.filter(name => RESIZABLE.test(name)).map(async name => decoding(async () => {
+  let done = 0
+  const writeVariants = async (name: string) => decoding(async () => {
     const source = join(assets, name)
     const { width, animated } = await imageHeader(Bun.file(source))
 
@@ -172,7 +173,15 @@ export async function writeImageVariants(clientDir: string, quality = DEFAULT_QU
       if (cached !== undefined)
         await Bun.write(target, Bun.file(cached))
     }))
-  })))
+  })
+
+  if (resizable.length > 0)
+    onImage?.(0, resizable.length)
+
+  await Promise.all(resizable.map(async (name) => {
+    await writeVariants(name)
+    onImage?.(++done, resizable.length)
+  }))
 
   if (prune && cacheDir !== undefined && cacheDir !== '' && existsSync(cacheDir))
     await Promise.all((await readdir(cacheDir)).filter(name => !used.has(name)).map(async name => rm(join(cacheDir, name), { force: true })))

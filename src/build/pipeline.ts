@@ -36,6 +36,16 @@ import { exportStatic, refuseStaticConfig } from './static'
 
 export type BuildStage = 'check' | 'bundle' | 'output' | 'export' | 'compile'
 
+// What the build is doing now, and how far through it, where the number of things to go through is known.
+export interface BuildProgress {
+  step: string
+  done?: number | undefined
+  total?: number | undefined
+  unit?: string | undefined
+}
+
+type Report = (progress: BuildProgress) => void
+
 export interface BuildOptions {
   // Paths are relative to the root.
   // Checks the project as `kay check` does, with that tsconfig and server entry, before running any of its code; false builds without checking.
@@ -48,6 +58,8 @@ export interface BuildOptions {
   analyze?: boolean | undefined
   // Called with the result so far once each stage that answers something is done, for the command line to print it as it comes rather than after a later stage's own output: the check, the output, the export and the compile.
   onStage?: ((stage: BuildStage, result: BuildResult) => Promise<void> | void) | undefined
+  // Called as the build moves on to each step, and through the images it encodes and the routes it prerenders.
+  onProgress?: Report | undefined
 }
 
 export interface BuildResult {
@@ -90,8 +102,31 @@ export async function buildProject(root: string, config: KayConfig, options: Bui
   else
     await rm(previous, { recursive: true, force: true })
 
+  const report: Report = options.onProgress ?? (() => undefined)
+  let checkEnded = !checking
+  const checkRun = async () => {
+    try {
+      return checkWith ? await checkStage(project, checkWith, exported) : []
+    }
+    finally {
+      checkEnded = true
+    }
+  }
+  // The check most often outlasts the bundle, which says so as it ends.
+  const bundleRun = async () => {
+    try {
+      return await bundleStage(project, exported, options.analyze === true, report)
+    }
+    finally {
+      if (!checkEnded)
+        report({ step: 'checking' })
+    }
+  }
   const started = performance.now()
-  const [checked, bundled] = await Promise.allSettled([checkWith ? checkStage(project, checkWith, exported) : [], bundleStage(project, exported, options.analyze === true)])
+
+  report({ step: checking ? 'checking and bundling' : 'bundling' })
+
+  const [checked, bundled] = await Promise.allSettled([checkRun(), bundleRun()])
 
   if (checked.status === 'rejected') {
     await putBack(output, previous)
@@ -119,7 +154,7 @@ export async function buildProject(root: string, config: KayConfig, options: Bui
   let made: Awaited<ReturnType<typeof outputStage>>
 
   try {
-    made = await outputStage(project, exported, client, checking)
+    made = await outputStage(project, exported, client, checking, report)
   }
   catch (error) {
     if (checking)
@@ -148,6 +183,8 @@ export async function buildProject(root: string, config: KayConfig, options: Bui
   if (options.exportTo !== undefined) {
     const stage = performance.now()
 
+    report({ step: 'exporting' })
+
     try {
       const dir = resolve(root, options.exportTo)
       const site = await exportStatic(project, client, dir)
@@ -163,6 +200,8 @@ export async function buildProject(root: string, config: KayConfig, options: Bui
 
   if (options.compile) {
     const stage = performance.now()
+
+    report({ step: 'compiling' })
 
     try {
       const executable = await compileServer(project, { outfile: resolve(root, options.compile.outfile), entry: options.compile.entry === undefined ? undefined : resolve(root, options.compile.entry), packages: shippedPackages(project, client) })
@@ -215,7 +254,7 @@ async function putBack(output: string, previous: string) {
 }
 
 // The browser bundles and the variants of the images they import, which run no page, API module or guard, so they build while the check runs.
-async function bundleStage(project: Project, exported: boolean, analyze: boolean): Promise<ClientBuild> {
+async function bundleStage(project: Project, exported: boolean, analyze: boolean, report: Report): Promise<ClientBuild> {
   const { root, config } = project
 
   if (exported)
@@ -229,13 +268,13 @@ async function bundleStage(project: Project, exported: boolean, analyze: boolean
   // Each AVIF holds a thread for up to a second, while WebP encodes on Bun's own.
   setAvifThreads(Math.min(4, availableParallelism()))
   // The prerender may import more images, so the cache is pruned once it has.
-  await writeImageVariants(client.dir, config.images?.quality, cacheDir(root, 'variants'), { prune: false, avif })
+  await writeImageVariants(client.dir, config.images?.quality, cacheDir(root, 'variants'), { prune: false, avif, onImage: imageProgress(report) })
 
   return client
 }
 
 // The rest of what the server serves from `.kay/client`, which runs the app's content config and pages, so only once the check passed: content manifests, prerendered pages, the variants of images only they import, and favicons, compressed.
-async function outputStage(project: Project, exported: boolean, client: ClientBuild, checking: boolean): Promise<{ prerendered: number, entries: number, linted: CheckDiagnostic[] }> {
+async function outputStage(project: Project, exported: boolean, client: ClientBuild, checking: boolean, report: Report): Promise<{ prerendered: number, entries: number, linted: CheckDiagnostic[] }> {
   const { root, config, paths } = project
   // Before prerendering, whose pages read the collections from what it writes.
   const entries = await writeContentManifests(root, paths.output, config.content)
@@ -247,7 +286,10 @@ async function outputStage(project: Project, exported: boolean, client: ClientBu
   }
 
   const rendered: RenderedPage[] = []
-  const prerendered = await prerenderPages(project, client, { exportAll: exported, rendered })
+
+  report({ step: 'prerendering' })
+
+  const prerendered = await prerenderPages(project, client, { exportAll: exported, rendered, onRoute: (done, total) => report({ step: 'prerendering', done, total, unit: 'routes' }) })
 
   if (config.search === true)
     await writeSearchIndex(client.dir, rendered.flatMap(page => page.search === false ? [] : [{ path: slashedPath(page.path, config.trailingSlash), html: page.html, weight: page.search }]))
@@ -258,7 +300,7 @@ async function outputStage(project: Project, exported: boolean, client: ClientBu
   // Remote originals are kept between builds, revalidated as the image route does.
   const remote = remoteImages(cacheDir(root, 'remote'), remotePatterns(config.images?.remote))
 
-  await writeImageVariants(client.dir, config.images?.quality, cacheDir(root, 'variants'), { avif: exported ? undefined : avifQuality(config.images) })
+  await writeImageVariants(client.dir, config.images?.quality, cacheDir(root, 'variants'), { avif: exported ? undefined : avifQuality(config.images), onImage: imageProgress(report) })
   await writeRemoteVariants(client.dir, remote, config.images?.quality)
   await writeCards(client.dir, cacheDir(root, 'cards'), remote)
 
@@ -273,7 +315,12 @@ async function outputStage(project: Project, exported: boolean, client: ClientBu
 
   await Bun.write(join(client.dir, NOTICES_FILE), thirdPartyNotices(shippedPackages(project, client)))
   await hookPrerendered(root, pageHooks(config.extensions), { clientDir: client.dir, publicDir: paths.public, base: basePath(config.base), aspects: config.images?.aspects }, paths.output)
+  report({ step: 'compressing' })
   await Promise.all([compressFiles(client.dir), compressFiles(join(paths.output, PRERENDERED_DIR))])
 
   return { prerendered, entries, linted }
+}
+
+function imageProgress(report: Report): (done: number, total: number) => void {
+  return (done, total) => report({ step: 'encoding images', done, total, unit: 'images' })
 }

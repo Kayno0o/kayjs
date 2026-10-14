@@ -12,6 +12,7 @@ import { ContentError } from '../content/validate'
 import { buildingWithoutEnv } from '../server/env'
 import { ExportError } from '../server/prerender'
 import { count, done, failureProblem, formatOption, printDocument, printedProblems, printFailure, printProblems, PROBLEM_FORMATS, problemCounts, projectRoot, withStdoutOnStderr, workflowCommand } from './command'
+import { progressLine } from './progress'
 
 // With `--compile`, also bundles the server and all of it into one executable; with `--static`, writes the whole site to `--outdir`, `dist` by default, for a host with no server. `--no-check` builds without checking.
 export const build: Command = {
@@ -67,7 +68,17 @@ export const build: Command = {
     if (format === 'json')
       return buildToDocument(root, options)
 
-    const result = await buildProject(root, await loadConfig(root), { ...options, onStage: async (stage, result) => printStage(stage, result, format) })
+    // On a terminal, a line tells what the build is doing until it ends; annotations are for CI, which has none.
+    const progress = format === 'text' ? progressLine() : undefined
+    let result: BuildResult
+
+    try {
+      result = await buildProject(root, await loadConfig(root), { ...options, onStage: async (stage, result) => printStage(stage, result, format), onProgress: progress?.update })
+    }
+    finally {
+      progress?.stop()
+    }
+
     const { failed } = result
 
     if (failed?.stage === 'check') {
