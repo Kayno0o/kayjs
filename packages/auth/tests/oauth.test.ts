@@ -38,7 +38,8 @@ describe('pkce', () => {
 
     expect(a.method).toBe('S256')
     expect(a.verifier).not.toBe(b.verifier)
-    expect(a.challenge).not.toBe(a.verifier)
-    expect(a.challenge).toMatch(/^[\w-]+$/)
+    // RFC 7636: the challenge is base64url(sha256(verifier)), unpadded.
+    expect(a.challenge).toBe(new Bun.CryptoHasher('sha256').update(a.verifier).digest('base64url'))
+    expect(a.verifier).toMatch(/^[\w-]{43,128}$/)
   })
 })

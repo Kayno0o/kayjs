@@ -1,7 +1,10 @@
 import type { Mail } from '../src/mail'
 import { describe, expect, setSystemTime, test } from 'bun:test'
 import { Elysia } from 'elysia'
+import { totpCode, totpStep } from '../src/totp'
 import { browser, testApp, userRecord } from './helpers/app'
+import { authenticator } from './helpers/authenticator'
+import { mailbox } from './helpers/mail'
 
 const PASSWORD = 'correct horse battery'
 const FIREFOX = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:140.0) Gecko/20100101 Firefox/140.0'
@@ -90,21 +93,6 @@ describe('sessions', () => {
 
     await laptop.fetch('/sign-out-everywhere?keep=1', { method: 'POST' })
 
-    expect(await laptop.call('sessions')).toMatchObject([{ current: true }])
-    expect(await phone.json('/me')).toBe('anonymous')
-  })
-
-  test('changing the password keeps only this session on the list', async () => {
-    const { browser } = await setup()
-    const laptop = browser()
-
-    await laptop.call('register', { email: 'bob@example.com', password: PASSWORD })
-    const phone = browser()
-
-    await phone.post('/password', { identifier: 'bob@example.com', password: PASSWORD })
-    expect(await laptop.call('sessions')).toHaveLength(2)
-
-    expect(await laptop.call('changePassword', { password: PASSWORD }, 'a brand new password')).toMatchObject({ ok: true })
     expect(await laptop.call('sessions')).toMatchObject([{ current: true }])
     expect(await phone.json('/me')).toBe('anonymous')
   })
@@ -235,5 +223,124 @@ describe('sessions', () => {
     expect(notice.url).toBe('https://site.test/account/sessions')
     expect(notice.text).toContain('https://site.test/account/sessions')
     expect(notice.html).toContain('href="https://site.test/account/sessions"')
+  })
+})
+
+describe('what ends the user\'s other sessions and bearer tokens', () => {
+  // A signed-in user with a password, and a way to add another browser and a device token that the action under test must end.
+  async function account() {
+    const { mails, mailer } = mailbox()
+    const app = testApp({ url: 'https://site.test', site: 'Site', email: { mailer, links: { 'verify-email': '/v', 'reset-password': '/r', 'magic-link': '/m', 'change-email': '/c' }, requireVerified: false } })
+    const ada = app.browser()
+
+    await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
+    const { id } = await ada.json('/me') as { id: string }
+    const tokenOf = (kind: Mail['kind']) => new URL(mails.findLast(mail => mail.kind === kind)!.url!).searchParams.get('token')!
+
+    const otherWaysIn = async () => {
+      const elsewhere = app.browser()
+
+      await elsewhere.fetch(`/sign-in/${id}`, { method: 'POST' })
+      const minted = await ada.call('createToken', { password: PASSWORD }, 'phone')
+
+      expect(await elsewhere.json('/me')).toMatchObject({ id })
+      expect(await app.browser().json('/me', { headers: { authorization: `Bearer ${minted.token}` } })).toMatchObject({ id })
+
+      // `kept` is the browser the action leaves signed in, this one unless the action signs in another.
+      return async (kept = ada) => {
+        expect(await kept.json('/me')).toMatchObject({ id })
+        expect(await elsewhere.json('/me')).toBe('anonymous')
+        expect(await app.browser().json('/me', { headers: { authorization: `Bearer ${minted.token}` } })).toBe('anonymous')
+
+        if (kept === ada)
+          expect(await ada.call('sessions')).toMatchObject([{ current: true }])
+      }
+    }
+
+    return { ...app, ada, id, tokenOf, otherWaysIn }
+  }
+
+  type Account = Awaited<ReturnType<typeof account>>
+
+  async function twoFactorSecret({ ada }: Account) {
+    const setup = await ada.call('setUpTwoFactor', { password: PASSWORD })
+
+    return setup.setup.secret as string
+  }
+
+  const actions: [string, (app: Account) => Promise<void>][] = [
+    ['changing the password', async (app) => {
+      const ended = await app.otherWaysIn()
+
+      expect(await app.ada.call('changePassword', { password: PASSWORD }, 'a brand new password')).toEqual({ ok: true })
+      await ended()
+    }],
+    ['signing out everywhere but here', async (app) => {
+      const ended = await app.otherWaysIn()
+
+      await app.ada.fetch('/sign-out-everywhere?keep=1', { method: 'POST' })
+      await ended()
+    }],
+    ['resetting the password, which signs in where the link is spent', async (app) => {
+      const ended = await app.otherWaysIn()
+      const reset = app.browser()
+
+      await reset.call('requestPasswordReset', 'ada@example.com')
+      expect(await reset.call('resetPassword', app.tokenOf('reset-password'), 'a brand new password')).toEqual({ ok: true, redirect: '/' })
+      await ended(reset)
+      expect(await app.ada.json('/me')).toBe('anonymous')
+    }],
+    ['confirming a new email address', async (app) => {
+      const ended = await app.otherWaysIn()
+
+      await app.ada.call('changeEmail', { password: PASSWORD }, 'ada@new.test')
+      expect(await app.ada.call('confirmEmailChange', app.tokenOf('change-email'))).toEqual({ ok: true, redirect: '/' })
+      await ended()
+    }],
+    ['unlinking a provider', async (app) => {
+      await app.store.identities.create({ provider: 'discord', providerId: '1', userId: app.id, accessToken: null, refreshToken: null, tokenExpiresAt: null, createdAt: new Date() })
+      const ended = await app.otherWaysIn()
+
+      expect(await app.ada.call('unlink', 'discord', { password: PASSWORD })).toEqual({ ok: true })
+      await ended()
+    }],
+    ['removing a passkey', async (app) => {
+      const device = authenticator()
+      const { options } = await app.ada.call('passkeyRegistrationOptions', { password: PASSWORD })
+
+      await app.ada.call('registerPasskey', await device.create(options), 'Laptop')
+      const ended = await app.otherWaysIn()
+
+      expect(await app.ada.call('removePasskey', device.credentials[0]!.id, { password: PASSWORD })).toEqual({ ok: true })
+      await ended()
+    }],
+    ['turning on the second factor', async (app) => {
+      const secret = await twoFactorSecret(app)
+      const ended = await app.otherWaysIn()
+
+      expect(await app.ada.call('enableTwoFactor', await totpCode(secret, totpStep()))).toMatchObject({ ok: true })
+      await ended()
+    }],
+    ['new recovery codes', async (app) => {
+      const secret = await twoFactorSecret(app)
+
+      await app.ada.call('enableTwoFactor', await totpCode(secret, totpStep()))
+      const ended = await app.otherWaysIn()
+
+      expect(await app.ada.call('regenerateRecoveryCodes', { code: await totpCode(secret, totpStep() + 1) })).toMatchObject({ ok: true })
+      await ended()
+    }],
+    ['turning off the second factor', async (app) => {
+      const secret = await twoFactorSecret(app)
+      const { recoveryCodes } = await app.ada.call('enableTwoFactor', await totpCode(secret, totpStep()))
+      const ended = await app.otherWaysIn()
+
+      expect(await app.ada.call('disableTwoFactor', { code: recoveryCodes[0] })).toEqual({ ok: true })
+      await ended()
+    }],
+  ]
+
+  test.each(actions)('%s ends them, this session kept', async (_name, run) => {
+    await run(await account())
   })
 })

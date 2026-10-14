@@ -86,20 +86,6 @@ describe('bearer tokens', () => {
     expect(await auth.userFromToken('forged')).toBeNull()
   })
 
-  test('die when the user signs out everywhere or changes their password, so one minted from a stolen session does not outlive it', async () => {
-    for (const end of [
-      (ada: ReturnType<typeof browserOf>) => ada.post('/sign-out-everywhere?keep=1', {}),
-      (ada: ReturnType<typeof browserOf>) => ada.call('changePassword', { password: PASSWORD }, 'another long password'),
-    ]) {
-      const { ada, browser, bearer } = await withToken()
-
-      await end(ada)
-
-      expect(await browser().json('/me', { headers: bearer })).toBe('anonymous')
-      expect(await ada.json('/me')).toMatchObject({ email: 'ada@example.com' })
-    }
-  })
-
   test('die with their user', async () => {
     const { ada, browser, bearer } = await withToken()
 

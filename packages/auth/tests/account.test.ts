@@ -1,6 +1,10 @@
 import type { User } from '../src/auth'
+import type { Proof } from '../src/twoFactor'
 import { afterEach, describe, expect, setSystemTime, test } from 'bun:test'
+import { githubProvider } from '../src/oauth/providers'
+import { totpCode, totpStep } from '../src/totp'
 import { testApp, userRecord } from './helpers/app'
+import { mailbox } from './helpers/mail'
 
 const PASSWORD = 'correct horse battery'
 const POST = { method: 'POST' }
@@ -19,18 +23,14 @@ async function registered(options: Parameters<typeof testApp>[0] = {}) {
 }
 
 describe('changing the password', () => {
-  test('needs the current one, keeps this session and ends the others', async () => {
+  test('needs the current one and sets the new one', async () => {
     const { ada, browser } = await registered()
-    const elsewhere = browser()
-
-    await elsewhere.post('/password', { identifier: 'ada@example.com', password: PASSWORD })
 
     expect(await ada.call('changePassword', { password: 'wrong password!' }, 'a brand new password')).toEqual({ ok: false, error: 'proof' })
     expect(await ada.call('changePassword', { password: PASSWORD }, 'short')).toEqual({ ok: false, errors: { password: 'too-short' } })
     expect(await ada.call('changePassword', { password: PASSWORD }, 'a brand new password')).toEqual({ ok: true })
 
     expect(await ada.json('/me')).toMatchObject({ email: 'ada@example.com' })
-    expect(await elsewhere.json('/me')).toBe('anonymous')
     expect(await browser().post('/password', { identifier: 'ada@example.com', password: 'a brand new password' })).toMatchObject({ ok: true })
   })
 
@@ -44,32 +44,84 @@ describe('changing the password', () => {
   })
 })
 
-describe('an account with neither a password nor a second factor', () => {
-  async function passwordless() {
-    const app = testApp()
+describe('the actions that re-prove the user', () => {
+  type Browser = ReturnType<ReturnType<typeof testApp>['browser']>
 
-    await app.store.users.create(userRecord({ id: 'u1', email: 'ada@example.com' }))
+  // `codeOnly` is whether an account with a second factor refuses the password alone, as what adds a way in does; changing the password or the email is asked of whoever knows the password.
+  const actions: [string, boolean, (ada: Browser, proof: Proof) => Promise<any>][] = [
+    ['changing the password', false, (ada, proof) => ada.call('changePassword', proof, 'a first password')],
+    ['changing the email', false, (ada, proof) => ada.call('changeEmail', proof, 'ada@new.test')],
+    ['adding a passkey', true, (ada, proof) => ada.call('passkeyRegistrationOptions', proof)],
+    ['linking a provider', true, (ada, proof) => ada.call('linkProvider', 'github', proof)],
+  ]
+
+  // One account of each shape, signed in, with the action's own failures told apart from its refusals by `error`.
+  async function shaped(shape: 'bare' | 'password' | 'twoFactor') {
+    const app = testApp({
+      url: 'https://site.test',
+      site: 'Site',
+      email: { mailer: mailbox().mailer, links: { 'verify-email': '/v', 'reset-password': '/r', 'magic-link': '/m', 'change-email': '/c' }, requireVerified: false },
+      oauth: { github: { provider: githubProvider(), clientId: 'github-id', clientSecret: 'github-secret' } },
+    })
     const ada = app.browser()
+    let recoveryCodes: string[] = []
 
-    await ada.fetch('/sign-in/u1', POST)
+    if (shape === 'bare') {
+      await app.store.users.create(userRecord({ id: 'u1', email: 'ada@example.com' }))
+      await ada.fetch('/sign-in/u1', POST)
+    }
+    else {
+      await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
+    }
 
-    return { ...app, ada }
+    if (shape === 'twoFactor') {
+      const { setup } = await ada.call('setUpTwoFactor', { password: PASSWORD })
+
+      recoveryCodes = (await ada.call('enableTwoFactor', await totpCode(setup.secret, totpStep()))).recoveryCodes
+    }
+
+    return { ...app, ada, recoveryCodes }
   }
 
-  test('sets a first password right after signing in', async () => {
-    const { ada } = await passwordless()
+  describe.each(actions)('%s', (_name, codeOnly, act) => {
+    test('on an account with neither a password nor a second factor, takes a sign-in under ten minutes old, so a stolen session cannot take the account over', async () => {
+      const { ada, browser } = await shaped('bare')
 
-    expect(await ada.call('changePassword', {}, 'a first password')).toEqual({ ok: true })
-    expect(await ada.json('/me')).toMatchObject({ hasPassword: true })
-  })
+      expect(await act(browser(), {})).toEqual({ ok: false, error: 'signed-out' })
+      expect(await act(ada, {})).not.toHaveProperty('error')
 
-  test('asks to sign in again once the sign-in is ten minutes old, so a stolen session cannot take the account over', async () => {
-    const { ada } = await passwordless()
+      // A second account, whose sign-in the clock then ages.
+      const old = await shaped('bare')
 
-    setSystemTime(Date.now() + 11 * 60 * 1000)
+      setSystemTime(Date.now() + 11 * 60 * 1000)
 
-    expect(await ada.call('changePassword', {}, 'a first password')).toEqual({ ok: false, error: 'stale' })
-    expect(await ada.call('changeEmail', {}, 'thief@example.com')).toEqual({ ok: false, error: 'stale' })
+      expect(await act(old.ada, {})).toEqual({ ok: false, error: 'stale' })
+    })
+
+    test('on an account with a password, takes the password, even right after signing in and long after', async () => {
+      const { ada } = await shaped('password')
+
+      expect(await act(ada, {})).toEqual({ ok: false, error: 'proof' })
+      expect(await act(ada, { password: 'wrong password!' })).toEqual({ ok: false, error: 'proof' })
+
+      setSystemTime(Date.now() + 11 * 60 * 1000)
+
+      expect(await act(ada, { password: PASSWORD })).not.toHaveProperty('error')
+    })
+
+    test('on an account with a second factor, takes a code, and the password alone only where it is enough', async () => {
+      const { ada, recoveryCodes } = await shaped('twoFactor')
+
+      expect(await act(ada, {})).toEqual({ ok: false, error: 'proof' })
+
+      if (codeOnly) {
+        expect(await act(ada, { password: PASSWORD })).toEqual({ ok: false, error: 'proof' })
+        expect(await act(ada, { code: recoveryCodes[0]! })).not.toHaveProperty('error')
+      }
+      else {
+        expect(await act(ada, { password: PASSWORD })).not.toHaveProperty('error')
+      }
+    })
   })
 })
 
@@ -159,21 +211,6 @@ describe('unlinking a provider', () => {
 
     expect(await ada.call('unlink', 'discord', { password: 'a first password' })).toEqual({ ok: true })
     expect(await ada.call('identities')).toEqual([])
-  })
-
-  test('ends the user\'s other sessions and bearer tokens, this one kept', async () => {
-    const { ada, browser, store } = await registered()
-    const { id } = await ada.json('/me') as User
-    const elsewhere = browser()
-
-    await store.identities.create({ provider: 'discord', providerId: '1', userId: id, accessToken: null, refreshToken: null, tokenExpiresAt: null, createdAt: new Date() })
-    await elsewhere.fetch(`/sign-in/${id}`, POST)
-    const minted = await ada.call('createToken', { password: PASSWORD }, 'phone')
-
-    expect(await ada.call('unlink', 'discord', { password: PASSWORD })).toEqual({ ok: true })
-    expect(await ada.json('/me')).toMatchObject({ id })
-    expect(await elsewhere.json('/me')).toBe('anonymous')
-    expect(await browser().json('/me', { headers: { authorization: `Bearer ${minted.token}` } })).toBe('anonymous')
   })
 })
 
