@@ -407,10 +407,16 @@ describe('kay new', () => {
     const tsconfig = JSON.parse(scaffolded) as { compilerOptions: Record<string, unknown> }
 
     await Bun.write(join(dir, 'tsconfig.json'), JSON.stringify({ ...tsconfig, compilerOptions: { ...tsconfig.compilerOptions, exactOptionalPropertyTypes: true } }))
-    expect(await checked(dir)).toEqual([])
+
+    // The scaffolded tsconfig comes back whatever the check finds, as lint and the compile test after this one read it.
+    try {
+      expect(await checked(dir)).toEqual([])
+    }
+    finally {
+      await Bun.write(join(dir, 'tsconfig.json'), scaffolded)
+    }
+
     expect((await formatFiles([join(dir, 'src')], { write: false })).changed).toEqual([])
-    // The scaffolded tsconfig, as lint reads every file of the project.
-    await Bun.write(join(dir, 'tsconfig.json'), scaffolded)
     expect((await lint(dir, '.')).flatMap(result => result.messages)).toEqual([])
 
     // A page's server fence is linted with the project's types, at its .kay line.
