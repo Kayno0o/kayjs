@@ -17,14 +17,20 @@ const cli = join(import.meta.dir, '..', 'src', 'cli.ts')
 class Editor {
   readonly connection: Connection
   private readonly process = Bun.spawn([process.execPath, cli, 'lsp', '--stdio'], { stdin: 'pipe', stdout: 'pipe', stderr: 'ignore' })
-  private readonly waiting = new Map<string, (diagnostics: Diagnostic[]) => void>()
+  // Who waits for the next diagnostics of a file, of a version of it when they changed it.
+  private readonly waiting = new Map<string, { resolve: (diagnostics: Diagnostic[]) => void, version?: number }>()
 
   constructor(readonly root: string, private readonly vscode = false) {
     this.connection = new Connection(this.process.stdout, (data) => {
       void this.process.stdin.write(data)
       void this.process.stdin.flush()
     })
-    this.connection.onNotification<{ uri: string, diagnostics: Diagnostic[] }>('textDocument/publishDiagnostics', ({ uri, diagnostics }) => this.waiting.get(uri)?.(diagnostics))
+    this.connection.onNotification<{ uri: string, version?: number, diagnostics: Diagnostic[] }>('textDocument/publishDiagnostics', ({ uri, version, diagnostics }) => {
+      const waiting = this.waiting.get(uri)
+
+      if (waiting && (waiting.version === undefined || waiting.version === version))
+        waiting.resolve(diagnostics)
+    })
   }
 
   async start() {
@@ -52,7 +58,7 @@ class Editor {
 
   async change(path: string, text: string, version: number): Promise<Diagnostic[]> {
     const uri = this.uri(path)
-    const published = this.diagnostics(uri)
+    const published = this.diagnostics(uri, version)
 
     this.connection.notify('textDocument/didChange', { textDocument: { uri, version }, contentChanges: [{ text }] })
 
@@ -102,9 +108,9 @@ class Editor {
     await this.process.exited
   }
 
-  private async diagnostics(uri: string): Promise<Diagnostic[]> {
+  private async diagnostics(uri: string, version?: number): Promise<Diagnostic[]> {
     return new Promise((resolve) => {
-      this.waiting.set(uri, resolve)
+      this.waiting.set(uri, { resolve, version })
     })
   }
 }
@@ -173,6 +179,12 @@ describe('kay lsp', () => {
     const diagnostics = await editor.change('broken/src/routes/[id].kay', 'ul\n  for of [1, 2]\n    li x\n', 3)
 
     expect(diagnostics).toEqual([expect.objectContaining({ source: 'kay', range: expect.objectContaining({ start: { line: 1, character: 2 } }) })])
+  })
+
+  it('publishes a burst of changes once more after the last, with its diagnostics', async () => {
+    void editor.change('broken/src/routes/[id].kay', 'p {missing}\n', 4)
+
+    expect(await editor.change('broken/src/routes/[id].kay', 'p fixed\n', 5)).toEqual([])
   })
 
   it('shows hover types for template expressions and server data', async () => {

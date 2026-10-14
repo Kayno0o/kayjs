@@ -81,6 +81,7 @@ const CHANGED = 2
 const DELETED = 3
 // What the editor reports changing on disk: components, the modules they import, the configs deciding how those resolve, and the collections' entries.
 const WATCHED = '**/*.{kay,ts,tsx,js,jsx,json,md,yaml,yml}'
+// How long a change waits for the next before the files are checked again, as typing makes many; the first after a quiet spell is checked at once.
 const DIAGNOSTICS_DELAY = 150
 // How long the project-wide checks wait after a save for the next, as saving every file at once makes.
 const PROJECT_CHECKS_DELAY = 300
@@ -104,7 +105,9 @@ export class KayLanguageServer {
   private readonly projects = new Map<string, Project>()
   private tsgo?: { connection: Connection, process: Subprocess<'pipe', 'pipe', 'ignore'> }
   private readonly documents = new Map<string, Document>()
-  private diagnosticsTimer?: Timer
+  // The quiet spell after a publish, and whether a change came during it, which publishes again once it ends.
+  private diagnosticsTimer: Timer | undefined
+  private diagnosticsDue = false
   private projectChecksTimer?: Timer
   // The run of the project-wide checks in flight, and whether a save came during it.
   private projectChecks: Promise<void> | undefined
@@ -367,8 +370,20 @@ export class KayLanguageServer {
   }
 
   private scheduleDiagnostics() {
+    if (this.diagnosticsTimer === undefined)
+      void guard(this.publishAllDiagnostics())
+    else
+      this.diagnosticsDue = true
+
     clearTimeout(this.diagnosticsTimer)
-    this.diagnosticsTimer = setTimeout(() => void guard(this.publishAllDiagnostics()), DIAGNOSTICS_DELAY)
+    this.diagnosticsTimer = setTimeout(() => {
+      this.diagnosticsTimer = undefined
+
+      if (this.diagnosticsDue) {
+        this.diagnosticsDue = false
+        void guard(this.publishAllDiagnostics())
+      }
+    }, DIAGNOSTICS_DELAY)
   }
 
   // What `kay check` finds across the project, run after a save rather than on every keystroke, since it reads every collection, catalog and route.
