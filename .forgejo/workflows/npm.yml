@@ -139,6 +139,7 @@ jobs:
       - name: Generate changelog
         run: |
           echo "@kaynooo:registry=https://git.kaynooo.fr/api/packages/kaynooo/npm/" > ~/.npmrc
-          bun x @kaynooo/changelogitea@1.6.5
+          bun x @kaynooo/changelogitea@1.7.1
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+          DISCORD_WEBHOOK: ${{secrets.DISCORD_WEBHOOK}}
