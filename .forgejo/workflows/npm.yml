@@ -135,7 +135,10 @@ jobs:
         env:
           PACKAGE_TOKEN: ${{ secrets.PACKAGE_TOKEN }}
 
+      # bun x in CI resolves the scope from npmjs, which holds an old changelogitea, unless ~/.npmrc points it at Forgejo; no token needed to read.
       - name: Generate changelog
-        run: bun x @kaynooo/changelogitea@1.6.5
+        run: |
+          echo "@kaynooo:registry=https://git.kaynooo.fr/api/packages/kaynooo/npm/" > ~/.npmrc
+          bun x @kaynooo/changelogitea@1.6.5
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
