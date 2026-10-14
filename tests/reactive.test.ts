@@ -301,6 +301,23 @@ describe('selection', () => {
   })
 })
 
+describe('selection in a server scope', () => {
+  it('answers the key a request sets through its value and untracked is(key), and the initial key outside the request', () => {
+    const selected = selection<number>(1)
+
+    const inside = inServerScope(new Request('http://localhost/'), () => undefined, () => {
+      selected.set(2)
+
+      return [selected(), selected.is(2), selected.is(1)]
+    })
+
+    expect(inside).toEqual([2, true, false])
+    expect(selected()).toBe(1)
+    expect(selected.is(1)).toBe(true)
+    expect(selected.is(2)).toBe(false)
+  })
+})
+
 describe('selection in an optimistic change', () => {
   it('reads its old key again through its value and is(key) once the change is undone, a flag made meanwhile included', () => {
     const selected = selection<number>(1)
