@@ -1,5 +1,6 @@
 import { mkdir, mkdtemp, rm, stat } from 'node:fs/promises'
-import { join, resolve } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
+import process from 'node:process'
 import { VOUCH_MODULE } from '../build/icons'
 import { kay } from '../build/plugin'
 import { loadConfig } from '../config'
@@ -89,7 +90,18 @@ export async function mount(file: string, props: Record<string, unknown> = {}): 
 const sharedMarks: Bun.BunPlugin = {
   name: 'kay-shared-marks',
   setup(build) {
-    build.onResolve({ filter: /(?:^|[/\\])safe-html(?:\.ts)?$/ }, () => ({ path: VOUCH_MODULE, external: true }))
+    build.onResolve({ filter: /(?:^|[/\\])safe-html(?:\.ts)?$/ }, (args) => {
+      // Only kay's own module, by its resolved path: another `safe-html` keeps its own.
+      try {
+        if (Bun.resolveSync(args.path, args.importer ? dirname(args.importer) : process.cwd()) !== VOUCH_MODULE)
+          return undefined
+      }
+      catch {
+        return undefined
+      }
+
+      return { path: VOUCH_MODULE, external: true }
+    })
   },
 }
 

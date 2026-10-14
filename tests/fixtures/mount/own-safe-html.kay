@@ -1,0 +1,4 @@
+---
+import { own } from './own/safe-html'
+---
+p.own {own}

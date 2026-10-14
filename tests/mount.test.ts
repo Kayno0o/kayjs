@@ -164,6 +164,13 @@ describe('mount', () => {
     }
   })
 
+  it('shares only kay\'s own safe-html module with the test process, not any module of that name', async () => {
+    const { root, unmount } = await mount('tests/fixtures/mount/own-safe-html.kay')
+
+    expect(root.querySelector('.own')!.textContent).toBe('its own copy')
+    unmount()
+  })
+
   it('reports a component that does not compile, and builds it again once fixed', async () => {
     const dir = await scratchDir('mount-')
     const file = join(dir, 'broken.kay')
