@@ -1,6 +1,6 @@
 import type { CollectionInfo, EntryFilter, SourceEntry } from '../src/kay/contract'
 import { describe, expect, it } from 'bun:test'
-import { entryPath, newEntryPath, onPagePath, PAGE_SIZE, pageOf, pageRows, rowsOf, searchRows } from '../src/listing'
+import { entryPath, newEntryPath, onPagePath, PAGE_SIZE, pageOf, pageRows, problemId, rowsOf, searchRows } from '../src/listing'
 
 const posts: CollectionInfo = {
   name: 'posts',
@@ -80,5 +80,11 @@ describe('paths', () => {
     expect(entryPath('/admin', { collection: 'docs', slug: 'guides/a b', locale: 'fr' })).toBe('/admin/collections/docs/guides/a%20b?locale=fr')
     expect(newEntryPath('/admin', 'posts')).toBe('/admin/new/posts')
     expect(onPagePath('/admin', '/blog/hello?x=1')).toBe('/admin/page?path=%2Fblog%2Fhello%3Fx%3D1')
+  })
+
+  it('draws a problem id with no space nor slash, two keys never meeting', () => {
+    expect(problemId('posts')).toBe('kcms-problem-posts')
+    expect(problemId('docs', 'guides/a b@fr')).toBe('kcms-problem-docs-guides_2f_a_20_b_40_fr')
+    expect(problemId('docs', 'a_20_b')).not.toBe(problemId('docs', 'a b'))
   })
 })

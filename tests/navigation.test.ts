@@ -706,6 +706,12 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     expect(await sameDocument()).toBe(true)
     expect(await page.evaluate(() => [location.search, scrollY, document.activeElement?.className])).toEqual(['?q=again&sort=name', scrolled, 'sort'])
     expect(await page.textContent('p.searched')).toBe('Searched again')
+
+    // Back to an entry of the same path keeps the focus where it was, as following the query did.
+    await page.goBack()
+    await page.locator('p.sorted', { hasText: 'Sorted none' }).waitFor()
+
+    expect(await page.evaluate(() => document.activeElement?.className)).toBe('sort')
     expect(warnings).toEqual([])
   })
 
@@ -914,6 +920,33 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     await page.locator('button.faint').waitFor()
 
     expect(await page.evaluate(() => [document.activeElement?.tagName, document.activeElement?.getAttribute('tabindex')])).toEqual(['MAIN', '-1'])
+
+    // Focusable only while focused, so a click inside it later draws no ring around it.
+    await page.evaluate(() => (document.activeElement as HTMLElement).blur())
+
+    expect(await page.evaluate(() => document.querySelector('main')!.hasAttribute('tabindex'))).toBe(false)
+  })
+
+  it('focuses a page\'s autofocus field when visited, and its heading on Back', async () => {
+    const follow = async (href: string) => page.evaluate((to: string) => {
+      const link = Object.assign(document.createElement('a'), { href: to })
+
+      document.body.append(link)
+      link.click()
+    }, href)
+
+    await page.goto(origin)
+    await follow('/focused')
+    await page.locator('h1', { hasText: 'Focused' }).waitFor()
+
+    expect(await page.evaluate(() => document.activeElement?.className)).toBe('name')
+
+    await follow('/contrast')
+    await page.locator('button.faint').waitFor()
+    await page.goBack()
+    await page.locator('h1', { hasText: 'Focused' }).waitFor()
+
+    expect(await page.evaluate(() => document.activeElement?.tagName)).toBe('H1')
   })
 
   it('announces the swapped page without making it any taller, so one filling the screen gets no scrollbar', async () => {

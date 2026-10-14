@@ -343,7 +343,7 @@ describe('literal-tag', () => {
 })
 
 describe('a11y lints', () => {
-  const A11Y = new Set(['unknown-aria', 'unknown-role', 'missing-state', 'hidden-focusable', 'positive-tabindex', 'autofocus', 'link-as-button', 'nested-control', 'duplicate-id', 'dangling-label', 'missing-captions', 'redundant-alt', 'invalid-autocomplete', 'dangling-aria', 'unreachable-tooltip', 'meta-refresh', 'ungrouped-radios'])
+  const A11Y = new Set(['unknown-aria', 'unknown-role', 'missing-state', 'hidden-focusable', 'positive-tabindex', 'autofocus', 'link-as-button', 'nested-control', 'duplicate-id', 'dangling-label', 'missing-captions', 'redundant-alt', 'invalid-autocomplete', 'dangling-aria', 'unannounced-click', 'unreachable-tooltip', 'meta-refresh', 'ungrouped-radios'])
   const a11y = (source: string) => lints(source).filter(d => A11Y.has(d.code ?? '')).map(d => `${d.code} ${d.at}`)
   // One lint alone, for those the other examples here would trip.
   const only = (code: string, source: string) => lints(source).filter(d => d.code === code).map(d => `${d.code} ${d.at}`)
@@ -395,8 +395,13 @@ describe('a11y lints', () => {
     expect(only('missing-label', 'input(name="q" placeholder="Search")\ninput(name="r" aria-label="R" placeholder="Search")\nmeter(value="3" max="5")\nmeter(value="3" max="5" aria-label="Storage")\ndiv(role="slider" aria-valuenow="2")\nlabel\n  | Rating\n  meter(value="2")\n')).toEqual(['missing-label input', 'missing-label meter', 'missing-label div'])
   })
 
-  it('takes only a control\'s role as making a click reachable', () => {
-    expect(only('unreachable-click', 'div(onClick={go}) a\ndiv(role="presentation" onClick={go}) b\nli(role="option" onClick={go}) c\ndiv(role={kind} onClick={go}) d\nspan(role="button" tabindex="0" onClick={go}) e\n')).toEqual(['unreachable-click div', 'unreachable-click div'])
+  it('refuses a click with no role, and warns of one whose role names no widget', () => {
+    const source = 'div(onClick={go}) a\ndiv(role="presentation" onClick={go}) b\nli(role="option" onClick={go}) c\ndiv(role={kind} onClick={go}) d\nspan(role="button" tabindex="0" onClick={go}) e\nsection(role="region" onClick={go}) f\n'
+
+    expect(only('unreachable-click', source)).toEqual(['unreachable-click div'])
+    expect(only('unannounced-click', source)).toEqual(['unannounced-click div', 'unannounced-click section'])
+    expect(compileKay(source, 'list.kay', { check: true }).diagnostics.find(d => d.code === 'unreachable-click')?.help).toContain('// kay-allow unreachable-click')
+    expect(only('unannounced-click', '// kay-allow unannounced-click\ndiv(role="presentation" onClick={close})\n')).toEqual([])
   })
 
   it('reports an aria-labelledby or aria-describedby id nothing has, unless an id may come from an expression', () => {

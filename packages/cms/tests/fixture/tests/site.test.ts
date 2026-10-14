@@ -259,7 +259,8 @@ test('a collection whose loader throws says so on its screens, its error kept to
   try {
     const index = await site.visit('/admin')
 
-    expect(index.find('.kui-badge').map(badge => [badge.text, badge.attributes['data-tooltip']])).toEqual([['Cannot be read', expect.stringContaining('failed to read')]])
+    expect(index.find('.kui-badge').map(badge => badge.text)).toEqual(['Cannot be read'])
+    expect(index.find('main a[data-tooltip]').map(link => link.attributes['data-tooltip'])).toEqual([expect.stringContaining('failed to read')])
     expect(index.html).not.toContain('db.internal')
     expect(index.find('h1').map(heading => heading.text)).toEqual(['Content'])
     expect(index.text(`#${index.find('main a[aria-describedby]')[0]!.attributes['aria-describedby']}`)).toContain('failed to read')

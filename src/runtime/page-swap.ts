@@ -681,12 +681,14 @@ function later(from: ChildNode | null, node: Node): ChildNode | undefined {
   return undefined
 }
 
-// The element focused before, found again on a refreshed page; on a new page, Back and Forward included, its autofocus field, its heading or its main, so a screen reader starts there, the title announced.
+// The element focused before, found again on a refreshed page or on Back and Forward between entries of one path; on a new page, its autofocus field, its heading or its main, so a screen reader starts there, the title announced. Back and Forward skip the autofocus field, which the visitor left already.
 async function moveFocus(swap: Swap, policy: Policy): Promise<void> {
   if (policy.focus === 'refused' && swap.refused && await showRefusal(document.forms[swap.refused.form], swap.refused.control))
     return
 
-  if (policy.focus !== 'page') {
+  const traversed = swap.intent === 'traverse'
+
+  if (policy.focus !== 'page' || (traversed && swap.focused !== undefined)) {
     const before = swap.focused ?? null
 
     if (before?.isConnected)
@@ -701,11 +703,14 @@ async function moveFocus(swap: Swap, policy: Policy): Promise<void> {
   }
 
   // Going back to a position the entry saved leaves the window there, the focus moving without scrolling.
-  const target = document.querySelector<HTMLElement>('[autofocus]') ?? document.querySelector<HTMLElement>('h1') ?? document.querySelector<HTMLElement>('main')
+  const target = (traversed ? null : document.querySelector<HTMLElement>('[autofocus]')) ?? document.querySelector<HTMLElement>('h1') ?? document.querySelector<HTMLElement>('main')
 
   if (target) {
-    if (!target.matches('[autofocus]') && !target.hasAttribute('tabindex'))
+    // Focusable only while it holds the focus, so a click inside it later draws no ring around it.
+    if (!target.matches('[autofocus]') && !target.hasAttribute('tabindex')) {
       target.setAttribute('tabindex', '-1')
+      target.addEventListener('blur', () => target.removeAttribute('tabindex'), { once: true })
+    }
 
     target.focus({ preventScroll: true })
   }

@@ -27,7 +27,7 @@ export interface Swap {
   replace?: boolean
   // The position a traversal's entry saved.
   saved?: [number, number] | undefined
-  // The element focused before, found again by id or name once swapped.
+  // The element focused before, found again by id or name once swapped: a traversal sets it between entries of one path, which keep the focus.
   focused?: Element | null
   // A form the server refused a post of, and the control focused in it, by their index among the page's forms and the form's controls.
   refused?: { form: number, control: number }

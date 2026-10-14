@@ -418,8 +418,8 @@ class Validator {
     const required = REQUIRED_TEXT.get(element.name)
     const type = element.attributes.find(attribute => attribute.kind === 'static' && this.text(attribute.name) === 'type')
     const role = element.attributes.find(attribute => this.text((attribute as NamedAttribute).name) === 'role')
-    // A role written as an expression may be any; a written one counts when it names a control.
-    const controlRole = role !== undefined && (role.kind !== 'static' || role.text.trim().toLowerCase().split(WHITESPACE).some(token => WIDGET_ROLES.has(token)))
+    // A role written as an expression may be any; a written one counts when it names a widget.
+    const widgetRole = role !== undefined && (role.kind !== 'static' || role.text.trim().toLowerCase().split(WHITESPACE).some(token => WIDGET_ROLES.has(token)))
 
     if (required && !names.has(required[0]))
       this.lint(at, required[0] === 'alt' ? 'missing-alt' : 'missing-title', required[1], { help: required[2] })
@@ -427,8 +427,14 @@ class Validator {
     if (element.name === 'input' && type?.kind === 'static' && type.text === 'image' && !names.has('alt'))
       this.lint(at, 'missing-alt', 'An image button needs `alt`', { help: 'name what it does' })
 
-    if (names.has('onClick') && !controlRole && !INTERACTIVE_TAGS.has(element.name))
-      this.lint(at, 'unreachable-click', `This \`${element.name}\` reacts to \`onClick\` but is out of reach of the keyboard and screen readers`, { help: 'use a `button`, or give it a control\'s `role`, such as `button` or `option`, along with a `tabindex` and a key handler' })
+    if (!names.has('onClick') || widgetRole || INTERACTIVE_TAGS.has(element.name))
+      return
+
+    // A role naming no widget, as a backdrop's `presentation`, was taken as reachable once: a warning, so such apps keep building.
+    if (role === undefined)
+      this.lint(at, 'unreachable-click', `This \`${element.name}\` reacts to \`onClick\` but is out of reach of the keyboard and screen readers`, { help: 'use a `button`, or give it a widget\'s `role`, such as `button` or `option`, along with a `tabindex` and a key handler; `// kay-allow unreachable-click` keeps a click a keyboard has another way to, such as a backdrop Escape also closes' })
+    else
+      this.lint(at, 'unannounced-click', `This \`${element.name}\` reacts to \`onClick\` but its \`role\` names no widget, so screen readers do not announce it as one`, { help: 'use a `button`, or a widget\'s `role`, such as `button` or `option`; `// kay-allow unannounced-click` keeps a click a keyboard has another way to, such as a backdrop Escape also closes' })
   }
 
   private text(span: Span): string {

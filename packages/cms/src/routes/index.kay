@@ -5,7 +5,7 @@ import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
 import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
 import { humanize } from '../fields'
 import { collections } from '../kay/content'
-import { collectionPath } from '../listing'
+import { collectionPath, problemId } from '../listing'
 import { settings } from '../settings'
 
 const { prefix } = settings()
@@ -18,10 +18,10 @@ PageSection(title="Content" level={1})
     CardRow
       @right
         if collection.problem as problem
-          Badge(tone="danger" label="Cannot be read" data-tooltip={problem})
-          span.kcms-sr-only(id={`kcms-problem-${collection.name}`}) {problem}
+          Badge(tone="danger" label="Cannot be read")
+          span.kcms-sr-only(id={problemId(collection.name)}) {problem}
         else
           span {collection.count === 1 ? '1 entry' : `${collection.count ?? 0} entries`}
-      a(href={collectionPath(prefix, collection.name)} data-tooltip={collection.problem} aria-describedby={collection.problem === undefined ? undefined : `kcms-problem-${collection.name}`}) {humanize(collection.name)}
+      a(href={collectionPath(prefix, collection.name)} data-tooltip={collection.problem} aria-describedby={collection.problem === undefined ? undefined : problemId(collection.name)}) {humanize(collection.name)}
   else
     EmptyState(title="No collections" description="This site declares no content collection in its content config.")

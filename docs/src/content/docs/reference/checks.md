@@ -55,6 +55,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `autofocus` | warn | a11y | `autofocus` outside a `dialog` |
 | `dangling-label` | warn | a11y | A `label(for)` pointing at no id |
 | `missing-captions` | warn | a11y | A `video` with no captions |
+| `unannounced-click` | warn | a11y | An `onClick` on an element whose `role` names no widget |
 | `dangling-aria` | warn | a11y | An `aria-labelledby` or `aria-describedby` pointing at no id |
 | `unreachable-tooltip` | warn | a11y | A `data-tooltip` the keyboard never reaches |
 | `uncontrolled-autoplay` | warn | a11y | Media playing by itself with no `controls` |

@@ -194,7 +194,7 @@ export const ROLES: ReadonlySet<string> = new Set([
 export const ABSTRACT_ROLES: ReadonlySet<string> = new Set(['command', 'composite', 'input', 'landmark', 'range', 'roletype', 'section', 'sectionhead', 'select', 'structure', 'widget', 'window'])
 
 // Roles of the controls a person operates, and of the composites holding them, which a click handler may stand behind.
-export const WIDGET_ROLES: ReadonlySet<string> = new Set(['button', 'checkbox', 'columnheader', 'combobox', 'grid', 'gridcell', 'link', 'listbox', 'menu', 'menubar', 'menuitem', 'menuitemcheckbox', 'menuitemradio', 'option', 'radio', 'radiogroup', 'row', 'rowheader', 'scrollbar', 'searchbox', 'separator', 'slider', 'spinbutton', 'switch', 'tab', 'tablist', 'textbox', 'toolbar', 'tree', 'treegrid', 'treeitem'])
+export const WIDGET_ROLES: ReadonlySet<string> = new Set(['button', 'checkbox', 'combobox', 'grid', 'gridcell', 'link', 'listbox', 'menu', 'menubar', 'menuitem', 'menuitemcheckbox', 'menuitemradio', 'option', 'radio', 'radiogroup', 'scrollbar', 'searchbox', 'separator', 'slider', 'spinbutton', 'switch', 'tab', 'tablist', 'textbox', 'tree', 'treegrid', 'treeitem'])
 
 // The states a role needs to be announced at all, such as whether a checkbox is checked.
 export const REQUIRED_STATES: ReadonlyMap<string, string[]> = new Map([

@@ -1,0 +1,5 @@
+head
+  title Focused
+h1 Focused
+// kay-allow autofocus
+input.name(aria-label="Name" autofocus)

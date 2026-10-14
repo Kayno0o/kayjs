@@ -123,7 +123,7 @@ kay check && keslint --cache
 - What a page needs to be usable without seeing it:
   - An `img` has `alt` (`alt=""` for decoration) and so has an `input(type="image")` (`missing-alt`).
   - An `iframe` has a `title` (`missing-title`).
-  - An element with `onClick` is one a keyboard reaches, such as a `button` or an `a`, or has a control's `role`, such as `button`, `option` or `tab` (`unreachable-click`).
+  - An element with `onClick` is one a keyboard reaches, such as a `button` or an `a`, or has a `role` (`unreachable-click`); `// kay-allow unreachable-click` keeps a click the keyboard has another way to, such as a backdrop Escape also closes.
   - A `button` or a link has text, a value or an `aria-label` to announce, an icon alone not counting (`empty-control`).
   - An `input`, `select`, `textarea`, `meter`, `role="slider"` or `role="meter"` has a `label` around it or pointing at its id, or an `aria-label`, `aria-labelledby` or `title`, a `placeholder` being no label (`missing-label`).
   - A heading follows the one before it by at most a level, each branch of an `if` following the heading before the block (`skipped-heading`).
@@ -144,6 +144,7 @@ kay check && keslint --cache
   - An `aria-labelledby` or `aria-describedby` listing ids of the template, on the same terms (`dangling-aria`).
   - A `data-tooltip` on an element the keyboard reaches, or whose `aria-label`, `aria-labelledby` or `aria-describedby` says it (`unreachable-tooltip`).
   - A captions `track` in a `video` that is not `muted` (`missing-captions`).
+  - The `role` of an element with `onClick` names a widget, such as `button`, `option` or `tab`, rather than `presentation`, `none` or `region` (`unannounced-click`).
   - `controls` on a `video` or `audio` playing by itself (`uncontrolled-autoplay`).
   - No `meta(http-equiv="refresh")` with a delay (`meta-refresh`).
   - Radios sharing a `name` inside a `fieldset` or a `role="radiogroup"` or `role="group"` (`ungrouped-radios`).
@@ -179,7 +180,7 @@ kay check && keslint --cache
 | `unread-name` | deny | code | A prop, server value, import or declaration nothing reads (see [What `kay check` verifies](#what-kay-check-verifies)). |
 | `missing-alt` | deny | a11y | An `img` or `input(type="image")` with no `alt`. |
 | `missing-title` | deny | a11y | An `iframe` with no `title`. |
-| `unreachable-click` | deny | a11y | An `onClick` on an element no keyboard reaches and no control's `role` names. |
+| `unreachable-click` | deny | a11y | An `onClick` on an element no keyboard reaches, with no `role`. |
 | `empty-control` | deny | a11y | A `button`, or an `a` with an `href`, with nothing for a screen reader to announce: no text, no value, no `aria-label`, an icon alone. |
 | `unknown-aria` | deny | a11y | An `aria-*` attribute ARIA does not define, such as `aria-labeledby`. The quick fix writes the closest one. |
 | `unknown-role` | deny | a11y | A `role` ARIA does not define, or an abstract one such as `widget`. |
@@ -198,6 +199,7 @@ kay check && keslint --cache
 | `autofocus` | warn | a11y | `autofocus` outside a `dialog`, on an element without `tabindex="-1"`. |
 | `dangling-label` | warn | a11y | A `label(for="...")` pointing at an id nothing in the template has. |
 | `missing-captions` | warn | a11y | A `video` that is not `muted` with no captions `track`. |
+| `unannounced-click` | warn | a11y | An `onClick` on an element whose `role` names no widget, such as `presentation` or `region`. |
 | `dangling-aria` | warn | a11y | An `aria-labelledby` or `aria-describedby` listing an id nothing in the template has. |
 | `unreachable-tooltip` | warn | a11y | A `data-tooltip` on an element the keyboard never reaches and no `aria-label`, `aria-labelledby` or `aria-describedby` speaks for. |
 | `uncontrolled-autoplay` | warn | a11y | A `video` or `audio` with `autoplay` and no `controls`. |

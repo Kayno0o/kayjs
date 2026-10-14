@@ -249,10 +249,17 @@ function onPopState(event: PopStateEvent): void {
   if (saved?.at !== undefined)
     navigation.at = saved.at
 
-  if (pageKey(url) === navigation.shown)
+  if (pageKey(url) === navigation.shown) {
     restoreScroll(swap.saved, url.hash)
-  else
-    void follow(url, swap)
+
+    return
+  }
+
+  // Entries of one path that only their query tells apart are one page to the visitor, as following a query param is.
+  if (navigation.shown !== '' && new URL(navigation.shown).pathname === url.pathname)
+    swap.focused = document.activeElement
+
+  void follow(url, swap)
 }
 
 async function traverseAsked(url: URL, delta: number): Promise<void> {

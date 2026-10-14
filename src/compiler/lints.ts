@@ -59,7 +59,7 @@ export const LINTS = {
   'unreachable-click': {
     level: 'deny',
     group: 'a11y',
-    summary: 'An element with `onClick` that neither a keyboard reaches nor a screen reader announces as a control: no `button`, `a` or other interactive tag, and no control\'s `role`, such as `button`, `option` or `tab`. A role that names no control, `presentation` or `region`, still leaves it out of reach.',
+    summary: 'An element with `onClick` that neither a keyboard reaches nor a screen reader announces as a widget: no `button`, `a` or other interactive tag, and no `role`. `// kay-allow unreachable-click` keeps a click the keyboard has another way to, such as a backdrop Escape also closes.',
     wrong: 'li(onClick={open}) {item.title}',
     right: 'li\n  button(onClick={open}) {item.title}',
   },
@@ -160,6 +160,13 @@ export const LINTS = {
     summary: 'A `video` with no `track(kind="captions")`, so a deaf visitor gets nothing of what is said. A `muted` video, one with no sound worth hearing, is left alone.',
     wrong: 'video(src="/intro.mp4" controls)',
     right: 'video(src="/intro.mp4" controls)\n  track(kind="captions" src="/intro.vtt" srclang="en")',
+  },
+  'unannounced-click': {
+    level: 'warn',
+    group: 'a11y',
+    summary: 'An element with `onClick` whose `role` names no widget, such as `presentation`, `none`, `dialog` or `region`: a screen reader does not announce it as something to press. `// kay-allow unannounced-click` keeps a click the keyboard has another way to, such as a backdrop Escape also closes.',
+    wrong: 'div(role="region" onClick={open}) Details',
+    right: 'div(role="button" tabindex="0" onClick={open} onKeyDown={openOnEnter}) Details',
   },
   'dangling-aria': {
     level: 'warn',

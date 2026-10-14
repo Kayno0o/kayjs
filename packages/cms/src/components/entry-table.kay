@@ -9,7 +9,7 @@ import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
 import Table from '@kaynooo/kayjs-ui/table.kay'
 import { refresh } from 'kay'
 import { deleteSaved, publishSaved } from '../editor/save'
-import { entryPath, onPagePath } from '../listing'
+import { entryPath, onPagePath, problemId } from '../listing'
 
 const { prefix, collection, rows, searched } = props<{ prefix: string, collection: CollectionInfo, rows: EntryRow[], searched: boolean }>()
 
@@ -22,7 +22,6 @@ const columns: Column<EntryRow>[] = [
 
 const ref = (row: EntryRow) => ({ collection: collection.name, slug: row.slug, locale: row.locale })
 const keyOf = (row: EntryRow) => row.locale === undefined ? row.slug : `${row.slug}@${row.locale}`
-const problemId = (row: EntryRow) => `kcms-problem-${collection.name}-${keyOf(row)}`
 
 async function publish(row: EntryRow): Promise<void> {
   if (await publishSaved(ref(row)))
@@ -38,10 +37,10 @@ Table.kcms-entries(columns={columns} rows={rows} rowKey={keyOf})
   @cell(row, column)
     if column.key === 'title'
       // Why an entry is broken shows on the link too, so a keyboard reaches it and a screen reader reads it with the title.
-      a(href={entryPath(prefix, ref(row))} data-tooltip={row.problem} aria-describedby={row.problem === undefined ? undefined : problemId(row)}) {row.title}
+      a(href={entryPath(prefix, ref(row))} data-tooltip={row.problem} aria-describedby={row.problem === undefined ? undefined : problemId(collection.name, keyOf(row))}) {row.title}
       if row.problem as problem
-        Badge(tone="danger" label="Broken" data-tooltip={problem})
-        span.kcms-sr-only(id={problemId(row)}) {problem}
+        Badge(tone="danger" label="Broken")
+        span.kcms-sr-only(id={problemId(collection.name, keyOf(row))}) {problem}
     else if column.key === 'draft'
       if row.draft
         Badge(tone="warning" label="Draft")
@@ -52,7 +51,7 @@ Table.kcms-entries(columns={columns} rows={rows} rowKey={keyOf})
         if row.draft && collection.draftField !== undefined
           Button(label="Publish" aria-label={`Publish ${row.title}`} onClick={() => publish(row)})
         if row.url as url
-          Button(href={onPagePath(prefix, url)} label="Edit on page" aria-label={`Edit ${row.title} on page`})
+          Button(href={onPagePath(prefix, url)} label="Edit on page" aria-label={`Edit on page: ${row.title}`})
         ConfirmDelete(message={`Delete ${row.title}? This cannot be undone.`} label={`Delete ${row.title}`} failure="Could not delete" size="sm" variant="ghost" onConfirm={() => remove(row)})
   @empty
     if searched

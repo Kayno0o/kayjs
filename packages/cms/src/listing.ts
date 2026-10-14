@@ -1,6 +1,8 @@
 import type { CollectionInfo, EntryFilter, EntryRef, SourceEntry } from './kay/contract'
 import { fieldsOf } from './fields'
 
+const UNSAFE_ID = /[^a-z0-9-]/giu
+
 export interface EntryRow {
   slug: string
   locale?: string | undefined
@@ -68,6 +70,11 @@ export function entryPath(prefix: string, { collection, slug, locale }: EntryRef
   const path = `${collectionPath(prefix, collection)}/${parts.includes('') ? encodeURIComponent(slug) : parts.map(encodeURIComponent).join('/')}`
 
   return locale === undefined ? path : `${path}?locale=${encodeURIComponent(locale)}`
+}
+
+// The id of the text saying why a collection or an entry cannot be read: a slug or a locale may hold a space or a slash, so each character but a letter, a digit or `-` is spelled by its code, two keys never meeting.
+export function problemId(collection: string, key?: string): string {
+  return `kcms-problem-${[collection, key].filter(part => part !== undefined).join('-').replace(UNSAFE_ID, char => `_${char.codePointAt(0)!.toString(16)}_`)}`
 }
 
 export function newEntryPath(prefix: string, collection: string): string {
