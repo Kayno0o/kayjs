@@ -2,6 +2,7 @@
 import type { ParseArgsOptionsConfig } from 'node:util'
 import type { CheckDiagnostic } from '../check'
 import type { Paint } from '../compiler/frame'
+import { Console } from 'node:console'
 import { existsSync, realpathSync, statSync } from 'node:fs'
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
@@ -15,6 +16,8 @@ const SHELL_SAFE = /^[\w@%+=:,./-]+$/
 const COMMAND_DATA = /[%\r\n]/g
 const COMMAND_PROPERTY = /[%\r\n:,]/g
 const PORT = /^\d{1,5}$/
+// What the console writes to stdout.
+const STDOUT_METHODS = ['log', 'info', 'debug', 'dir', 'dirxml', 'table', 'group', 'groupCollapsed', 'groupEnd', 'count', 'countReset', 'time', 'timeEnd', 'timeLog']
 // Colours a report as rustc does when stderr is a terminal that takes colours, and leaves it plain otherwise.
 const stderrColors = createColors({ stream: process.stderr })
 
@@ -66,8 +69,8 @@ export async function runCommand(command: Command, args: string[], usage: string
   return command.run(parsed, refuse)
 }
 
-// The directory a command works on, or nothing once it said that the path is none.
-export function projectRoot(command: string, path = '.'): string | undefined {
+// The directory a command works on, or nothing once it said, in `format`, that the path is none.
+export function projectRoot(command: string, path = '.', format: ProblemFormat = 'text'): string | undefined {
   const root = resolve(path)
 
   if (statSync(root, { throwIfNoEntry: false })?.isDirectory()) {
@@ -76,7 +79,7 @@ export function projectRoot(command: string, path = '.'): string | undefined {
     return root
   }
 
-  console.error(`kay ${command}: ${path} is not a directory`)
+  printFailure(command, `${path} is not a directory`, format)
 
   return undefined
 }
@@ -150,25 +153,47 @@ export interface PrintedProblem {
   related?: { line: number, column: number, label: string }[] | undefined
 }
 
-export function isProblemFormat(value: string): value is ProblemFormat {
-  return (PROBLEM_FORMATS as readonly string[]).includes(value)
+// A problem that may lie in no file, as what stops a command does.
+export type FailureProblem = Omit<PrintedProblem, 'file' | 'line' | 'column'> & Partial<Pick<PrintedProblem, 'file' | 'line' | 'column'>>
+
+// `--format`, `text` when not given, among the `formats` the command prints in: undefined, once said which it takes, for another.
+export function formatOption(command: string, value: string | boolean | undefined, formats: readonly ProblemFormat[] = ['text', 'json']): ProblemFormat | undefined {
+  const format = typeof value === 'string' ? value : 'text'
+
+  if ((formats as readonly string[]).includes(format))
+    return format as ProblemFormat
+
+  console.error(`kay ${command}: --format takes ${formats.map(name => `\`${name}\``).join(', ')}, not \`${format}\``)
+
+  return undefined
+}
+
+// The problems as `--format json` and `github` print them, each file read once.
+export async function printedProblems(diagnostics: CheckDiagnostic[], format: ProblemFormat = 'json'): Promise<PrintedProblem[]> {
+  const sources = await diagnosticSources(diagnostics)
+
+  return diagnostics.map(diagnostic => printedProblem(diagnostic, sources.get(diagnostic.file), format))
+}
+
+export function problemCounts(problems: { severity: 'error' | 'warning' }[]): { errors: number, warnings: number } {
+  const warnings = problems.filter(problem => problem.severity === 'warning').length
+
+  return { errors: problems.length - warnings, warnings }
+}
+
+// A command's whole answer under `--format json`, alone on stdout and on one line.
+export function printDocument(document: object): void {
+  console.log(JSON.stringify(document))
 }
 
 // Prints problems in `format`, then, but in JSON, how many there are, and answers how many of those fail: the errors, and the warnings too with `denyWarnings`.
 export async function printProblems(diagnostics: CheckDiagnostic[], denyWarnings = false, format: ProblemFormat = 'text'): Promise<{ failing: number, found: number }> {
-  const sources = new Map<string, string | undefined>()
-
-  for (const diagnostic of diagnostics) {
-    if (!sources.has(diagnostic.file))
-      sources.set(diagnostic.file, await readSource(diagnostic.file))
-  }
-
+  const sources = await diagnosticSources(diagnostics)
   const problems = diagnostics.map(diagnostic => printedProblem(diagnostic, sources.get(diagnostic.file), format))
-  const warnings = diagnostics.filter(diagnostic => diagnostic.severity === 'warning').length
-  const errors = diagnostics.length - warnings
+  const { errors, warnings } = problemCounts(problems)
 
   if (format === 'json') {
-    console.log(JSON.stringify({ errors, warnings, problems }))
+    printDocument({ errors, warnings, problems })
 
     return { failing: errors + (denyWarnings ? warnings : 0), found: diagnostics.length }
   }
@@ -186,21 +211,43 @@ export async function printProblems(diagnostics: CheckDiagnostic[], denyWarnings
   return { failing: errors + (denyWarnings ? warnings : 0), found: diagnostics.length }
 }
 
-// A check that could not run, on a missing path or a config that does not load: on stderr as always, and as one error in JSON or an Actions annotation, which a tool reading stdout would otherwise get nothing from.
+// A command that could not run, on a missing path or a config that does not load: on stderr as always, and as one error in JSON or an Actions annotation, which a tool reading stdout would otherwise get nothing from.
 export function printFailure(command: string, failure: unknown, format: ProblemFormat): void {
   console.error(typeof failure === 'string' ? `kay ${command}: ${failure}` : failure)
 
-  if (format === 'text')
-    return
-
-  // Bun's error for a module that does not parse tells where.
-  const { message, position } = (typeof failure === 'object' && failure !== null ? failure : {}) as { message?: unknown, position?: { file: string, line: number, column: number } | null }
-  const problem = { ...position && { file: shownPath(position.file, format), line: position.line, column: position.column }, severity: 'error' as const, code: null, message: typeof failure === 'string' ? failure : typeof message === 'string' ? message : String(failure) }
-
   if (format === 'json')
-    console.log(JSON.stringify({ errors: 1, warnings: 0, problems: [problem] }))
-  else
-    console.log(workflowCommand(problem))
+    printDocument({ errors: 1, warnings: 0, problems: [failureProblem(failure, format)] })
+  else if (format === 'github')
+    console.log(workflowCommand(failureProblem(failure, format)))
+}
+
+// What stopped a command as a problem with no code, placed where Bun's error for a module that does not parse tells.
+export function failureProblem(failure: unknown, format: ProblemFormat): FailureProblem {
+  const { message, position } = (typeof failure === 'object' && failure !== null ? failure : {}) as { message?: unknown, position?: { file: string, line: number, column: number } | null }
+
+  return { ...position && { file: shownPath(position.file, format), line: position.line, column: position.column }, severity: 'error', code: null, message: typeof failure === 'string' ? failure : typeof message === 'string' ? message.trim() : String(failure) }
+}
+
+// Runs `run` with what it and the code it loads print to stdout sent to stderr, so stdout keeps the one document a format gives it.
+export async function withStdoutOnStderr<T>(run: () => Promise<T>): Promise<T> {
+  const toStderr = new Console({ stdout: process.stderr, stderr: process.stderr })
+  const saved = STDOUT_METHODS.map(name => [name, Reflect.get(console, name)] as const)
+  const write: unknown = Reflect.get(process.stdout, 'write')
+
+  for (const name of STDOUT_METHODS)
+    Reflect.set(console, name, (Reflect.get(toStderr, name) as (...args: unknown[]) => void).bind(toStderr))
+
+  Reflect.set(process.stdout, 'write', process.stderr.write.bind(process.stderr))
+
+  try {
+    return await run()
+  }
+  finally {
+    for (const [name, method] of saved)
+      Reflect.set(console, name, method)
+
+    Reflect.set(process.stdout, 'write', write)
+  }
 }
 
 // GitHub and Forgejo resolve an annotation's file from the repository's root, where the job checked it out, whatever directory the step ran in; a file outside it keeps its path from the current directory.
@@ -233,7 +280,7 @@ function printedProblem(diagnostic: CheckDiagnostic, source: string | undefined,
 }
 
 // `::error file=src/a.kay,line=4,col=3,title=missing-alt::An img needs alt`, which an Actions runner shows on the diff; the note and the help go on lines of their own.
-function workflowCommand(problem: Omit<PrintedProblem, 'file' | 'line' | 'column'> & Partial<Pick<PrintedProblem, 'file' | 'line' | 'column'>>): string {
+function workflowCommand(problem: FailureProblem): string {
   const properties = [['file', problem.file], ['line', problem.line], ['col', problem.column], ['endLine', problem.endLine], ['endColumn', problem.endColumn], ['title', problem.code ?? 'kay check']] as const
   const text = [problem.message, ...problem.note === undefined ? [] : [`note: ${problem.note}`], ...problem.help === undefined ? [] : [`help: ${problem.help}`]].join('\n')
 
@@ -242,6 +289,17 @@ function workflowCommand(problem: Omit<PrintedProblem, 'file' | 'line' | 'column
 
 function escapeCommand(text: string, characters: RegExp): string {
   return text.replace(characters, character => `%${character.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0')}`)
+}
+
+async function diagnosticSources(diagnostics: CheckDiagnostic[]): Promise<Map<string, string | undefined>> {
+  const sources = new Map<string, string | undefined>()
+
+  for (const diagnostic of diagnostics) {
+    if (!sources.has(diagnostic.file))
+      sources.set(diagnostic.file, await readSource(diagnostic.file))
+  }
+
+  return sources
 }
 
 // A diagnostic can point at a file that is gone by now, such as a tsconfig tsgo could not read.

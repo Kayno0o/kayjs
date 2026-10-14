@@ -254,7 +254,7 @@ export default defineConfig({
   - On a Linux machine with no display, as one reached over SSH, only code-server counts, opening the file in its window already open on the project.
   - With none, the page says so and the terminal prints the position; an editor command exiting with an error within 2 seconds prints its error in the terminal and the page says it failed.
   - A server run any other way, `pages({ dev: true })` included, has the dev tool without the inspector, and a production build has neither.
-- `kay build [dir] [-p tsconfig.json] [--no-check] [--analyze]`:
+- `kay build [dir] [-p tsconfig.json] [--no-check] [--analyze] [--format text|github|json]`:
   - Bundle the islands and stylesheets for production, whatever `NODE_ENV` the shell holds and with none of the server's secrets, such as `preview.secret`, needed, minified, into `.kay/client` while checking the project as `kay check` does, `-p` naming the tsconfig as there;
   - Once the check passed, render the pages marked `prerender`, so no page, API module or guard runs before then.
   - With the check on, a problem it reports, check-only ones included, or a build that fails leaves the last build in `.kay/client` as it was; `--no-check` skips the check and builds in place.
@@ -304,16 +304,16 @@ export default defineConfig({
   - The exit code is the same in every format.
   - It also reports what the server would refuse when it boots, with the same functions: two pages serving one path, a redirect from a path a page serves or with syntax the router refuses, a page under a locale's prefix, a public file a page serves, two files whose actions share a URL (`a b.kay` and `a_b.kay`), a `base`, `site` or `shutdownTimeout` it cannot read, a collection feed without `site`, and a guard, API module or matcher whose default export is not a guard, an Elysia instance or a function.
   - `kay build` reports them as it checks, and the editor after a save or a change on disk.
-- `kay routes [dir]`:
+- `kay routes [dir] [--format text|json]`:
   - List the routes the project serves, without running a page or a guard: each page's pattern with its matchers, `/items/:id=integer`, and file, once per locale's path (`/about`, `/fr/a-propos`), with its layouts and guards, outermost first, `prerendered` with `prerender: true` or a server island, `prerendered as its prerender setting lists` with a list or a function, `open` with `guards: false` and the 403 `requireGuards` gives one with no guard;
   - Each action, endpoint, API module route with its method, `WS` and `OPTIONS` included, and a library's with the guards of its own directory (API modules are imported, as only they know their routes, so their top-level code runs: what it writes to stdout, through the console or `process.stdout`, goes to stderr, and one that fails to load or calls `process.exit()` is listed by its mount with why), the routes of an extension's `server` given as an Elysia instance, each redirect and collection feed;
   - And kay's own routes the config turns on, such as `/_kay/health`, the favicons and the sitemap.
   - What the server entry adds, as a `.use(auth.plugin)`, and an extension's `server` given as a function are only known as the server starts: a last line names them, unlisted.
-- `kay explain [lint|group]`:
+- `kay explain [lint|group] [--format text|json]`:
   - List the lints with their groups and default levels, or a group's, or print one with an example it reports and the same written right.
-- `kay fmt [paths...] [--check]`:
+- `kay fmt [paths...] [--check] [--format text|json]`:
   - Format `.kay` files; `--check` lists unformatted files and fails.
-- `kay migrate astro [dir] [--out <dir>]`:
+- `kay migrate astro [dir] [--out <dir>] [--format text|json]`:
   - Translate an Astro project's `.astro` files into `.kay` ones, `src/pages` into `src/routes` (`404` as `_404`), components and layouts kept in their folder with kebab-case names and the imports of them rewritten, and `src/content.config.ts` into kay's, its zod schemas written in `s`.
   - The frontmatter becomes the fence, a page's `--- server` with `Astro.url`, `params`, `cookies` and `redirect` read from `ctx`, `Astro.props` becomes `props<Props>()`, and the markup the indented template: static classes as the `.class` shorthand, `class:list` as `class`, `&&`, ternaries and `.map` as `if` and `for`, slots as `slot` and `@name` blocks, `client:idle` and `client:visible` as `hydrate`, `set:html` as `innerHTML` through `trustHtml`, a layout's `head` as a `head` block.
   - It writes into the project, or into `--out`, never over a file that exists, formats what it writes, and lists what it could not translate at its line in the Astro file: a script Astro bundles, an `await` or `Astro.url` in a component, an endpoint, markup written another way, each commented out under a `// kay migrate:` line where it stays in the code, and Tailwind 3, as kay builds with Tailwind 4.
@@ -328,6 +328,13 @@ export default defineConfig({
   - It runs the project's `kay.config.ts`, and the modules it imports, as soon as a `.kay` file is opened, as `bun` would: open only a project you trust, as with its `package.json` scripts.
 
 - Every command prints its usage for `--help` or `-h`, and refuses an option or argument it does not take.
+- `kay build`, `kay routes`, `kay explain`, `kay fmt` and `kay migrate` take `--format json`, as `kay check` does: stdout holds one JSON document on one line, what the app's own code prints going to stderr, and the exit code is the text output's.
+  - `kay build`: `{ errors, warnings, problems }` as `kay check` prints them, a template that does not compile at its place and any other failure as one problem with `code: null`, then `failed: { stage }` when a stage stopped it, `built: { islands, stylesheets, prerendered, entries, ms, sizes }` (`sizes` the entry's and each island's `raw` and `gzip` bytes, `modules` under `--analyze`), `exported: { pages, files, dir, ms }` and `compiled: { executable, ms }`; `--format github` prints the check's problems as `kay check` does.
+  - `kay routes`: `{ routes, unlisted }`, each route's `methods`, `path`, `kind`, `by`, and `file`, `notes`, `layouts`, `guards` when it has them.
+  - `kay explain`: `{ groups, lints }` with each lint's `name`, `group`, `level` and whole `summary`, or one lint's fields, its `wrong` and `right` examples included.
+  - `kay fmt`: `{ errors, warnings, problems, written, changed }`, what does not parse as problems.
+  - `kay migrate`: `{ written, kept, copied, notes }`, each note's `file`, `line`, `target` and `message`.
+  - A command that cannot run prints `{ errors: 1, warnings: 0, problems: [{ severity, code: null, message }] }`.
 - `kay fmt` refuses a path that is missing or is neither a directory nor a `.kay` file.
 
 - The TextMate grammar the extension highlights `.kay` files with ships as `kay/kay.tmLanguage.json`, for a highlighter such as Shiki: register it as `{ ...grammar, name: 'kay', embeddedLangs: ['typescript'] }`.

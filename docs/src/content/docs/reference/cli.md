@@ -197,6 +197,7 @@ The build runs `kay check` first and keeps the last build when the check or the 
 | `--no-check` | Skips the check |
 | `--analyze` | Lists the modules weighing most in the entry and each island |
 | `-p <tsconfig>` | Names another tsconfig |
+| `--format <format>` | `text` by default; `github` prints the check's problems as `kay check --format github` does; `json` prints the whole build as one document once it ends, see [Output for tools](#output-for-tools) |
 
 The build prints the JavaScript a page with islands loads, gzip and minified: the entry, then what each island adds.
 
@@ -305,5 +306,19 @@ kay explain positional-key   # one lint, with an example and the fix
 kay fmt src                  # format a folder
 kay fmt --check              # list unformatted files and fail
 ```
+
+## Output for tools
+
+`kay build`, `kay routes`, `kay explain`, `kay fmt` and `kay migrate` take `--format json`, as `kay check` does, for a script or an agent to read: stdout then holds one JSON document on one line and nothing else, what the app's own code prints, such as `kay.config.ts` or an API module, going to stderr. The exit code is the one the text output gives.
+
+| Command | Document |
+| --- | --- |
+| `kay build` | `{ errors, warnings, problems }` as `kay check` prints them, a template that does not compile at its place and any other failure as one problem with `code: null`; `failed: { stage }` when a stage stopped it (`check`, `bundle`, `output`, `export` or `compile`); `built: { islands, stylesheets, prerendered, entries, ms, sizes }`, `sizes` holding the entry's and each island's `raw` and `gzip` bytes, with their heaviest `modules` under `--analyze`; `exported: { pages, files, dir, ms }` with `--static`; `compiled: { executable, ms }` with `--compile` |
+| `kay routes` | `{ routes, unlisted }`, each route with its `methods`, `path`, `kind`, `by` as the listing shows it, and `file`, `notes`, `layouts` and `guards` when it has them |
+| `kay explain` | `{ groups, lints }`, each lint's `name`, `group`, `level` and whole `summary`; for one lint, its `name`, `level`, `group`, `summary`, the `wrong` and `right` examples, and `typed`, `site` and `launch` when set |
+| `kay fmt` | `{ errors, warnings, problems, written, changed }`: what does not parse as problems, and the files it formatted, or under `--check` would, `written` false |
+| `kay migrate` | `{ written, kept, copied, notes }`: the files written and those kept as they exist, how many other files it copied, and each item left to do by hand with its `file`, `line`, `target` and `message` |
+
+A command that cannot run, on a directory that does not exist, a `kay.config.ts` that does not load or a lint that is none, prints `{ errors: 1, warnings: 0, problems: [{ severity, code: null, message }] }`. Paths are relative to the current directory.
 
 <ReadMore href="/llms/project">Every `kay new` feature, what `kay dev` restarts on, the compiled executable's limits and what `kay migrate` translates are in the full project reference.</ReadMore>

@@ -2,7 +2,6 @@ import type { KayConfig } from '../config'
 import type { LocaleSettings } from '../runtime/i18n'
 import type { GuardFile, Route } from '../server/routes'
 import type { Command } from './command'
-import { Console } from 'node:console'
 import { existsSync } from 'node:fs'
 import { relative } from 'node:path'
 import process from 'node:process'
@@ -30,7 +29,7 @@ import { PREVIEW_ROUTE } from '../server/preview'
 import { apiRoutePath, endpointPath, ROUTE_METHODS, routeMounts, scanEndpoints, scanRoutes } from '../server/routes'
 import { ROBOTS, SITEMAP } from '../server/sitemap'
 import { CSP_REPORTS } from '../server/violations'
-import { projectRoot } from './command'
+import { formatOption, printDocument, printFailure, projectRoot, withStdoutOnStderr } from './command'
 
 // One line of the listing, and the chains printed under it.
 interface Listed {
@@ -39,24 +38,29 @@ interface Listed {
   kind: 'page' | 'action' | 'endpoint' | 'api' | 'plugin' | 'redirect' | 'feed' | 'kay'
   // The file serving it, or what it does when kay serves it.
   by: string
+  // The file serving it, relative to the current directory, when one does.
+  file?: string | undefined
   notes?: string[] | undefined
   layouts?: string[] | undefined
   guards?: string[] | undefined
 }
 
 const PARAM = /:([^/?]+)/g
-// What the console writes to stdout, where the listing goes.
-const STDOUT_METHODS = ['log', 'info', 'debug', 'dir', 'dirxml', 'table', 'group', 'groupCollapsed', 'groupEnd', 'count', 'countReset', 'time', 'timeEnd', 'timeLog']
 const SVG_ICON = '/favicon.svg'
 const MASKABLE_ICON = /^\/icon-maskable-/
 
 // Every route the project serves, as its server would boot, without running a page or a guard: what a URL that does not match was meant to hit. API modules run as they are imported, as the server imports them.
 export const routes: Command = {
-  usage: 'routes [dir]',
-  options: {},
+  usage: 'routes [dir] [--format text|json]',
+  options: { format: { type: 'string' } },
   positionals: 1,
-  run: async ({ positionals: [path] }) => {
-    const root = projectRoot('routes', path)
+  run: async ({ values, positionals: [path] }) => {
+    const format = formatOption('routes', values.format)
+
+    if (format === undefined)
+      return 1
+
+    const root = projectRoot('routes', path, format)
 
     if (root === undefined)
       return 1
@@ -64,14 +68,32 @@ export const routes: Command = {
     // The machine listing them lacks the server's environment, which kay.config.ts and API modules may read.
     buildingWithoutEnv()
 
-    const config = await loadConfig(root)
-    const listed = [...await appRoutes(root, config), ...await apiRoutes(root, config), ...pluginRoutes(config), ...redirectRoutes(config), ...await feedRoutes(root, config), ...kayRoutes(root, config)]
-    const unlisted = unlistedServers(root, config)
+    if (format === 'json') {
+      try {
+        printDocument(await withStdoutOnStderr(async () => listRoutes(root)))
+      }
+      catch (error) {
+        printFailure('routes', error, format)
+
+        return 1
+      }
+
+      return 0
+    }
+
+    const { routes: listed, unlisted } = await listRoutes(root)
 
     console.log(formatListing(listed) + (unlisted.length === 0 ? '' : `\n\nNot listed: the routes ${unlisted.join(' and ')} ${unlisted.length === 1 ? 'adds' : 'add'} when the server starts.`))
 
     return 0
   },
+}
+
+async function listRoutes(root: string): Promise<{ routes: Listed[], unlisted: string[] }> {
+  const config = await loadConfig(root)
+  const routes = [...await appRoutes(root, config), ...await apiRoutes(root, config), ...pluginRoutes(config), ...redirectRoutes(config), ...await feedRoutes(root, config), ...kayRoutes(root, config)]
+
+  return { routes, unlisted: unlistedServers(root, config) }
 }
 
 async function appRoutes(root: string, config: KayConfig): Promise<Listed[]> {
@@ -88,19 +110,19 @@ async function appRoutes(root: string, config: KayConfig): Promise<Listed[]> {
 
     // Each locale's copy, the layouts and guards under the first alone, as every copy shares them.
     for (const [index, copy] of localeCopies(settings, route.pattern).entries())
-      listed.push({ methods: 'GET', path: withMatchers(copy.path, route), kind: 'page', by: shown(route.file), notes: [...localeNotes(copy, settings), ...prerendered, ...guards], ...index === 0 && { layouts: route.layouts.map(shown), guards: route.guards.map(guard => shown(guard.file)) } })
+      listed.push({ methods: 'GET', path: withMatchers(copy.path, route), kind: 'page', by: shown(route.file), file: shown(route.file), notes: [...localeNotes(copy, settings), ...prerendered, ...guards], ...index === 0 && { layouts: route.layouts.map(shown), guards: route.guards.map(guard => shown(guard.file)) } })
 
     // A layout's actions once, though every page under it renders it.
     for (const file of [...route.layouts, route.file].filter(file => !actionFiles.has(file))) {
       actionFiles.add(file)
 
       for (const name of (await serverOf(file))?.analysis.actionNames ?? [])
-        listed.push({ methods: 'POST', path: actionUrl(islandId(file, root), name), kind: 'action', by: `${shown(file)} ${name}` })
+        listed.push({ methods: 'POST', path: actionUrl(islandId(file, root), name), kind: 'action', by: `${shown(file)} ${name}`, file: shown(file) })
     }
   }
 
   for (const endpoint of endpoints)
-    listed.push({ methods: 'GET', path: endpointPath(endpoint), kind: 'endpoint', by: shown(endpoint.file), notes: guardNotes(endpoint.guards, endpoint.open, config), guards: endpoint.guards.map(guard => shown(guard.file)) })
+    listed.push({ methods: 'GET', path: endpointPath(endpoint), kind: 'endpoint', by: shown(endpoint.file), file: shown(endpoint.file), notes: guardNotes(endpoint.guards, endpoint.open, config), guards: endpoint.guards.map(guard => shown(guard.file)) })
 
   return listed
 }
@@ -126,10 +148,10 @@ async function apiRoutes(root: string, config: KayConfig): Promise<Listed[]> {
         throw new Error('it exports no Elysia instance by default')
 
       for (const route of instance.routes.filter(route => ROUTE_METHODS.test(route.method)))
-        listed.push({ methods: route.method.toUpperCase(), path: apiRoutePath(module.mount, route.path), kind: 'api', by: shown(module.file), notes, guards })
+        listed.push({ methods: route.method.toUpperCase(), path: apiRoutePath(module.mount, route.path), kind: 'api', by: shown(module.file), file: shown(module.file), notes, guards })
     }
     catch (error) {
-      listed.push({ methods: '?', path: `${module.mount}/*`, kind: 'api', by: shown(module.file), notes: [`not loaded: ${error instanceof Error ? error.message : String(error)}`, ...notes], guards })
+      listed.push({ methods: '?', path: `${module.mount}/*`, kind: 'api', by: shown(module.file), file: shown(module.file), notes: [`not loaded: ${error instanceof Error ? error.message : String(error)}`, ...notes], guards })
     }
   }
 
@@ -138,27 +160,16 @@ async function apiRoutes(root: string, config: KayConfig): Promise<Listed[]> {
 
 // An API module runs as it is imported: what it writes to stdout goes to stderr, off the listing, and its `process.exit()` fails it alone.
 async function importApi(file: string): Promise<{ default?: unknown }> {
-  const toStderr = new Console({ stdout: process.stderr, stderr: process.stderr })
-  const saved = STDOUT_METHODS.map(name => [name, Reflect.get(console, name)] as const)
-  const write: unknown = Reflect.get(process.stdout, 'write')
   const exit: unknown = Reflect.get(process, 'exit')
 
-  for (const name of STDOUT_METHODS)
-    Reflect.set(console, name, (Reflect.get(toStderr, name) as (...args: unknown[]) => void).bind(toStderr))
-
-  Reflect.set(process.stdout, 'write', process.stderr.write.bind(process.stderr))
   process.exit = (code?: number) => {
     throw new Error(`it calls process.exit(${code ?? ''})`)
   }
 
   try {
-    return await importModule<{ default?: unknown }>(file)
+    return await withStdoutOnStderr(async () => importModule<{ default?: unknown }>(file))
   }
   finally {
-    for (const [name, method] of saved)
-      Reflect.set(console, name, method)
-
-    Reflect.set(process.stdout, 'write', write)
     Reflect.set(process, 'exit', exit)
   }
 }

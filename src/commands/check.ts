@@ -12,7 +12,7 @@ import { isLint, isLintGroup, LINT_GROUPS, LINTS } from '../compiler/lints'
 import { CONFIG_FILE, loadConfig } from '../config'
 import { watchProject } from '../dev'
 import { buildingWithoutEnv } from '../server/env'
-import { count, done, isProblemFormat, printFailure, printProblems, PROBLEM_FORMATS, projectRoot } from './command'
+import { count, done, formatOption, printFailure, printProblems, PROBLEM_FORMATS, projectRoot } from './command'
 
 const CLI = join(import.meta.dir, '../cli.ts')
 // What makes a directory given first the project rather than a path to report on.
@@ -30,13 +30,10 @@ export const check: Command = {
   run: async ({ values, positionals }) => {
     const { project, entry } = values
     const only = typeof values.only === 'string' ? values.only : undefined
-    const format = typeof values.format === 'string' ? values.format : 'text'
+    const format = formatOption('check', values.format, PROBLEM_FORMATS)
 
-    if (!isProblemFormat(format)) {
-      console.error(`kay check: --format takes ${PROBLEM_FORMATS.map(name => `\`${name}\``).join(', ')}, not \`${format}\``)
-
+    if (format === undefined)
       return 1
-    }
 
     if (only !== undefined && !isLintGroup(only)) {
       console.error(`kay check: --only takes a group of lints, ${Object.keys(LINT_GROUPS).map(group => `\`${group}\``).join(', ')}, not \`${only}\``)
@@ -56,7 +53,7 @@ export const check: Command = {
       return 1
     }
 
-    const root = projectRoot('check', dir)
+    const root = projectRoot('check', dir, format)
 
     if (root === undefined)
       return 1

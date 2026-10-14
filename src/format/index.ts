@@ -28,13 +28,13 @@ export async function formatFiles(paths: string[], options: { write: boolean }):
     const info = await statIfExists(path)
 
     if (!info)
-      throw new Error(`kay fmt: ${path} does not exist`)
+      throw new Error(`${path} does not exist`)
 
     if (info.isDirectory())
       return findKayFiles(resolve(path), { project: existsSync(join(path, 'package.json')) })
 
     if (!path.endsWith('.kay'))
-      throw new Error(`kay fmt: ${path} is not a .kay file`)
+      throw new Error(`${path} is not a .kay file`)
 
     return [resolve(path)]
   }))).flat()
