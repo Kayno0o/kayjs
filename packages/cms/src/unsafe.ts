@@ -4,7 +4,9 @@ import { bodyHtml, MarkdownError } from './kay/content'
 const UNSAFE_TAGS = new Set(['applet', 'base', 'button', 'embed', 'fencedframe', 'form', 'frame', 'frameset', 'iframe', 'input', 'link', 'math', 'meta', 'noembed', 'noscript', 'object', 'plaintext', 'portal', 'script', 'select', 'style', 'svg', 'template', 'textarea', 'title', 'xmp'])
 // What Markdown's own task list gives a checkbox.
 const TASK_ATTRIBUTES = new Set(['type', 'class', 'disabled', 'checked'])
-const UNCLOSED_COMMENT = /<!--(?![\s\S]*-->)/
+// Where bodyHtml stands a component, and what closes the body here: either one read other than as an element sits inside a tag, a comment or raw text, which what kay puts there could close.
+const COMPONENT = /<kay-component n="\d+"/g
+const END = 'kay-body-end'
 const URL_ATTRIBUTES = new Set(['action', 'background', 'data', 'formaction', 'href', 'poster', 'src', 'xlink:href'])
 const UNSAFE_ATTRIBUTE = /^(?:on|style$|srcdoc$)/i
 const HEX_ENTITY = /&#x([\da-f]+);?/gi
@@ -16,38 +18,45 @@ const IGNORED = /[\0-\x20]/g
 const SCRIPT_URL = /^(?:javascript|vbscript|data):(?!image\/(?:png|jpe?g|gif|webp|avif)[;,])/i
 
 // What of a Markdown body would run as the site once kay renders it, such as `<script>` or an `onclick` attribute, or undefined when nothing does: read off the HTML kay puts on the page, so components drop out exactly as kay takes them.
+// A body kay cannot read is left to kay's own save, which says why.
 export async function scriptInBody(body: string): Promise<string | undefined> {
-  let parts: string[]
+  let html: string
 
   try {
-    parts = await bodyHtml(body)
+    html = await bodyHtml(body)
   }
   catch (error) {
     if (error instanceof MarkdownError)
-      return `components that do not nest (line ${error.line}: ${error.message})`
+      return undefined
 
     throw error
   }
 
-  for (const part of parts) {
-    if (UNCLOSED_COMMENT.test(part))
-      return 'a comment left open'
+  let components = 0
+  let ended = false
+  const found = await scriptIn(`${html}<${END}></${END}>`, (tag) => {
+    if (tag === 'kay-component')
+      components++
+    else if (tag === END)
+      ended = true
+  })
 
-    const found = await scriptIn(part)
+  if (found !== undefined)
+    return found
 
-    if (found !== undefined)
-      return found
-  }
+  if (components < (html.match(COMPONENT)?.length ?? 0))
+    return 'a component inside a tag'
 
-  return undefined
+  return ended ? undefined : 'a tag left open'
 }
 
 // Read with Bun's HTML tokenizer, as a browser reads it: a hand-written pattern reads `<img src="x>" onerror=...>` or `<script/x>` otherwise.
-export async function scriptIn(html: string): Promise<string | undefined> {
+export async function scriptIn(html: string, seen?: (tag: string) => void): Promise<string | undefined> {
   let found: string | undefined
 
   await new HTMLRewriter().on('*', {
     element(element) {
+      seen?.(element.tagName)
       found ??= unsafeElement(element.tagName, [...element.attributes])
     },
   }).transform(new Response(html)).text()

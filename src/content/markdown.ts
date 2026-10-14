@@ -83,21 +83,14 @@ export async function compileMarkdown(body: string, bodyLine: number, highlight?
   return { segments: componentSegments(html, components), headings }
 }
 
-// The HTML an entry's Markdown body puts on the page outside its components' own markup, one part per run of text, so a CMS can check what an editor wrote before saving it; throws a MarkdownError for components that do not nest.
-export async function bodyHtml(body: string): Promise<string[]> {
-  const parts: string[] = []
-  const collect = (segments: Segment[]): void => {
-    for (const segment of segments) {
-      if (typeof segment === 'string')
-        parts.push(segment)
-      else
-        collect(segment.children)
-    }
-  }
+// The HTML an entry's Markdown body puts on the page, each component standing as a `<kay-component>` element around what it wraps, so a CMS can check what an editor wrote before saving it; throws a MarkdownError for components kay cannot read.
+export async function bodyHtml(body: string): Promise<string> {
+  const { text, components } = extractComponents(body, 1)
+  const { html } = await renderMarkdown(text)
 
-  collect((await compileMarkdown(body, 1)).segments)
+  componentSegments(html, components)
 
-  return parts
+  return html
 }
 
 export interface RenderedMarkdown {
@@ -349,6 +342,17 @@ function componentSegments(html: string, components: ExtractedComponent[]): Segm
 }
 
 // `name="text"`, `name='text'`, `name={json}` or a bare `name`, which is `true`.
+// Whether a JSON value holds an object with a string `t`, the shape kay renders as markup.
+function holdsMarkup(value: unknown): boolean {
+  if (typeof value !== 'object' || value === null)
+    return false
+
+  if (typeof (value as { t?: unknown }).t === 'string')
+    return true
+
+  return Object.values(value).some(holdsMarkup)
+}
+
 function readAttributes(text: string, component: string, line: number): Record<string, unknown> {
   const props: Record<string, unknown> = {}
   let rest = text.trim()
@@ -360,6 +364,10 @@ function readAttributes(text: string, component: string, line: number): Record<s
       throw new MarkdownError(`<${component}> has an attribute kay cannot read at ${JSON.stringify(rest.slice(0, 20))}`, line)
 
     rest = rest.slice(name.length).trimStart()
+
+    // A body may come from an editor, whose text never reaches the page as markup.
+    if (name === 'innerHTML')
+      throw new MarkdownError(`<${component}> sets innerHTML, which would put its text on the page as markup: write what it wraps between its tags`, line)
 
     if (!rest.startsWith('=')) {
       props[name] = true
@@ -391,6 +399,9 @@ function readAttributes(text: string, component: string, line: number): Record<s
     catch {
       throw new MarkdownError(`<${component}> sets ${name} to ${rest.slice(0, end)}, which is not JSON: braces take a JSON value such as {3}, {true} or {["a", "b"]}`, line)
     }
+
+    if (holdsMarkup(props[name]))
+      throw new MarkdownError(`<${component}> sets ${name} to an object with a "t" text, which kay renders as markup: name that key otherwise`, line)
 
     rest = rest.slice(end)
 

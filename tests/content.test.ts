@@ -204,6 +204,13 @@ describe('compiling Markdown', () => {
     expect(segments).toEqual([{ component: 'Chart', props: { title: 'Sales & costs', data: [1, { a: '}' }], wide: true }, children: [], line: 1 }, '\n'])
   })
 
+  it('refuses an attribute that would put its text on the page as markup', async () => {
+    await expect(compileMarkdown('<Callout innerHTML="<script>alert(1)</script>" />\n', 1)).rejects.toMatchObject({ line: 1, message: '<Callout> sets innerHTML, which would put its text on the page as markup: write what it wraps between its tags' })
+    await expect(compileMarkdown('<Callout title={{"t":"<script>alert(1)</script>"}} />\n', 1)).rejects.toBeInstanceOf(MarkdownError)
+    await expect(compileMarkdown('<Callout items={[{"t":"<b>x</b>"}]} />\n', 1)).rejects.toBeInstanceOf(MarkdownError)
+    expect((await compileMarkdown('<Callout items={[{"t":1}]} />\n', 1)).segments).toContainEqual({ component: 'Callout', props: { items: [{ t: 1 }] }, children: [], line: 1 })
+  })
+
   it('leaves a tag written in code alone, and refuses one never closed at its line', async () => {
     const { segments } = await compileMarkdown('`<Callout>` in code\n', 1)
 
@@ -280,8 +287,8 @@ describe('Markdown outside collections', () => {
   })
 
   it('gives the HTML a body puts on the page outside its components, with their markup as kay takes it', async () => {
-    expect(await bodyHtml('Hi <b>there</b>\n\n<Callout title="a}">In <i>it</i></Callout>\n\nBye')).toEqual(['<p>Hi <b>there</b></p>\n<p>', 'In <i>it</i>', '</p>\n<p>Bye</p>\n'])
-    expect(await bodyHtml('<Callout onclick=alert(1)//}>hi')).toEqual(['<p><Callout onclick=alert(1)//}>hi</p>\n'])
+    expect(await bodyHtml('Hi <b>there</b>\n\n<Callout title="a}">In <i>it</i></Callout>\n\nBye')).toBe('<p>Hi <b>there</b></p>\n<p><kay-component n="0">In <i>it</i></kay-component></p>\n<p>Bye</p>\n')
+    expect(await bodyHtml('<Callout onclick=alert(1)//}>hi')).toBe('<p><Callout onclick=alert(1)//}>hi</p>\n')
     await expect(bodyHtml('<Callout>open')).rejects.toBeInstanceOf(MarkdownError)
   })
 

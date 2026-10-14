@@ -25,7 +25,10 @@ describe('scriptInBody', () => {
       ['<input type=checkbox disabled formaction=javascript:alert(1)>', 'a <input> tag'],
       ['<plaintext>the rest of the page', 'a <plaintext> tag'],
       ['<xmp>the rest of the page', 'a <xmp> tag'],
-      ['<!-- the rest of the page\n\nnever shown', 'a comment left open'],
+      ['<!-- the rest of the page\n\nnever shown', 'a tag left open'],
+      ['<div onclick=alert(1)', 'the attribute onclick'],
+      ['<div title="x', 'a tag left open'],
+      ['Text\n\n<div class="the layout up to its next quote', 'a tag left open'],
     ] as const)
       expect(await scriptInBody(body), body).toBe(found)
   })
@@ -48,6 +51,10 @@ describe('scriptInBody', () => {
   test('still finds script inside a component, or after a brace ending a component tag early', async () => {
     expect(await scriptInBody('<Callout onclick=alert(1)//}>hi')).toBe('the attribute onclick')
     expect(await scriptInBody('<Callout onmouseover=alert(1)//} />')).toBe('the attribute onmouseover')
+    expect(await scriptInBody(`<div title='<Callout />' onclick=alert(1)>x</div>`)).toBe('the attribute onclick')
+    expect(await scriptInBody(`<img src='x <Callout />' onerror=alert(1)>`)).toBe('the attribute onerror')
+    expect(await scriptInBody('<Callout>\n\n<div title="</Callout>" onclick=alert(1)>x</div>')).toBe('the attribute onclick')
+    expect(await scriptInBody('<div title="<Callout />">x</div>')).toBe('a component inside a tag')
     expect(await scriptInBody('<Callout title="a"><script>alert(1)</script></Callout>')).toBe('a <script> tag')
   })
 })

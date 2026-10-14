@@ -105,7 +105,7 @@ Back up first.
 </Callout>
 ```
 
-An interactive component renders as an island. A page rendering an entry's `Content` links the stylesheets those components import, for every collection its `--- server` fence imports. A component the collection does not name fails `kay check` and the build.
+An interactive component renders as an island. A page rendering an entry's `Content` links the stylesheets those components import, for every collection its `--- server` fence imports. A component the collection does not name fails `kay check` and the build, and so does an attribute that would put its text on the page as markup: `innerHTML`, or JSON holding an object with a string `t`.
 
 ## Feeds
 
