@@ -97,6 +97,8 @@ kay dev: http://localhost:3000 (ready in 412 ms)
 
 An entry's own `Listening on http://localhost:3000` line is left out; kay's own start line only shows in production.
 
+A project that fails to compile prints its errors there once, as the server boots, formatted as `kay check` prints them, and a request that throws prints its error with its stack mapped to `.kay` lines.
+
 ### Dev tool
 
 Every page a dev server serves carries a bar at the bottom left, `kay` and a count of the page's problems, red when one is an error. A click on it, or Alt+Shift+K, opens its drawer; Escape closes it.

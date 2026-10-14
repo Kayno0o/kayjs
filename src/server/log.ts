@@ -111,6 +111,10 @@ function thrown(error: unknown): NonNullable<MessageEntry['error']> {
   if (!(error instanceof Error))
     return { name: typeof error, message: describeThrown(error) }
 
+  // Told by its name, as `kay dev` rebuilds it from its client build: its message is the report `kay check` prints, and its frames are the compiler's.
+  if (error.name === 'KayCompileError')
+    return { name: error.name, message: error.message, stack: error.message.trimStart() }
+
   return { name: error.name, message: error.message, ...error.stack !== undefined && error.stack !== '' && { stack: describeThrown(error) } }
 }
 

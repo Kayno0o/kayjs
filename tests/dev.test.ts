@@ -1320,13 +1320,17 @@ describe.concurrent('kay dev', () => {
     }
   }, 90_000)
 
-  it('serves the compile errors of a project that failed to boot, and the reload stream', async () => {
+  it('serves the compile errors of a project that failed to boot on every page, logging them only as it boots, and the reload stream', async () => {
     const source = 'p ok\nelse\n  p no\n'
     const error = new KayCompileError([{ file: join(process.cwd(), 'src/broken.kay'), source, start: 5, end: 9, message: '`else` must directly follow an `if`' }])
     const app = bootFailure(error, process.cwd())
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
     const page = await app.handle(new Request('http://localhost/any/page'))
     const html = await page.text()
 
+    await app.handle(new Request('http://localhost/other'))
+    logged.mockRestore()
+    expect(logged).not.toHaveBeenCalled()
     expect(page.status).toBe(500)
     expect(html).toContain(' --&gt; src/broken.kay:2:1\n')
     expect(html).toContain('2 | else\n  | ^^^^')

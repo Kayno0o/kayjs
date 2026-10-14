@@ -13,6 +13,7 @@ import { describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { parse, stringify } from 'devalue'
 import { Elysia, t } from 'elysia'
 import { version } from '../package.json'
+import { KayCompileError } from '../src/build/transform'
 import { check } from '../src/check'
 import { compileKay } from '../src/compiler'
 import { resolveProject } from '../src/project'
@@ -1860,6 +1861,32 @@ describe('request logging', () => {
       await custom.handle(new Request('http://localhost/_kay/health'))
       expect(logged).toHaveBeenCalledTimes(1)
       expect(entries).toEqual([{ type: 'message', time: expect.any(String), level: 'error', from: 'kay', message: 'the health check failed', request: { method: 'GET', path: '/_kay/health', id: expect.any(String) }, error: { name: 'Error', message: 'Database down', stack: expect.any(String) } }])
+    }
+    finally {
+      logged.mockRestore()
+      useLogger(true)
+    }
+  })
+
+  it('writes a compile error as kay check prints it, the report in place of a stack, the one the dev server rebuilds from IPC included', () => {
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+    const thrown = new KayCompileError([{ file: join(process.cwd(), 'src/broken.kay'), source: 'p ok\nelse\n  p no\n', start: 5, end: 9, message: '`else` must directly follow an `if`' }])
+    // As `kay dev`'s client build hands it over: a plain error named after the class, its stack the class name over the message.
+    const rebuilt = Object.assign(new Error(thrown.message), { name: 'KayCompileError' })
+    const report = 'error: `else` must directly follow an `if`\n --> src/broken.kay:2:1\n  |\n1 | p ok\n2 | else\n  | ^^^^'
+
+    rebuilt.stack = `KayCompileError: ${thrown.message}`
+
+    try {
+      for (const error of [thrown, rebuilt]) {
+        useLogger(true)
+        logFrom('kay').error('the server could not start', error)
+        expect(logged.mock.calls.at(-1)![0]).toBe(`kay: the server could not start\n${report}`)
+
+        useLogger('json')
+        logFrom('kay').error('the server could not start', error)
+        expect((JSON.parse(String(logged.mock.calls.at(-1)![0])) as LogEntry & { type: 'message' }).error).toEqual({ name: 'KayCompileError', message: thrown.message, stack: report })
+      }
     }
     finally {
       logged.mockRestore()
