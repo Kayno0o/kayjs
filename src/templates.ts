@@ -494,7 +494,7 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 function authFiles({ tw }: Setup): Record<string, string> {
   return {
     // What production sets, for compose.prod.yaml; development's own settings are in the .env `kay new` wrote.
-    '.env.example': `# Each one generated and kept out of the repository: \`bun -e "console.log((crypto.randomUUID() + crypto.randomUUID()).replaceAll('-', ''))"\`.\nSESSION_SECRET=\nPOSTGRES_PASSWORD=\n`,
+    '.env.example': `# Each one generated and kept out of the repository: \`bun -e "console.log((crypto.randomUUID() + crypto.randomUUID()).replaceAll('-', ''))"\`.\nSESSION_SECRET=\nPOSTGRES_PASSWORD=\n# true keeps the demo sign-in, which lets anyone in under any name, for a site that is only a demo.\nDEMO_SIGN_IN=\n`,
     'src/env.ts': `import process from 'node:process'
 import { s } from 'kay'
 import { defineEnv } from 'kay/server'

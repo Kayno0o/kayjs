@@ -401,14 +401,36 @@ describe('kay new', () => {
       expect(files).toEqual(expect.arrayContaining(['.env', '.env.example', '.env.test', 'compose.dev.yaml', 'migrations/0001_member.sql', 'pg-orm.config.ts', 'src/db/index.ts', 'src/routes/account/_guard.ts', 'src/api/online.ts', 'tests/account.test.ts', 'tests/database.ts', 'tests/members.test.ts', 'tests/online.test.ts']))
       expect((await stat(join(dir, '.env'))).mode & 0o777).toBe(0o600)
       expect(await Bun.file(join(dir, '.env')).text()).toMatch(/^SESSION_SECRET=[0-9a-f]{64}\nDATABASE_URL=postgres:\/\/app:app@127\.0\.0\.1:5433\/app\nCOMPOSE_FILE=compose\.dev\.yaml\n$/)
-      expect(await Bun.file(join(dir, '.gitignore')).text()).toContain('.env')
-      expect(await Bun.file(join(dir, 'compose.prod.yaml')).text()).toContain('SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET}')
-      expect(await Bun.file(join(dir, '.env.example')).text()).toMatch(/\nSESSION_SECRET=\nPOSTGRES_PASSWORD=\n$/)
+      // Every env file but the example and the tests' own stays out of git, and all of them out of the image.
+      expect((await Bun.file(join(dir, '.gitignore')).text()).split('\n')).toEqual(expect.arrayContaining(['.env', '.env.*', '!.env.example', '!.env.test']))
+      expect((await Bun.file(join(dir, '.dockerignore')).text()).split('\n')).toEqual(expect.arrayContaining(['.git', '.env', '.env.*']))
+      const compose = await Bun.file(join(dir, 'compose.prod.yaml')).text()
+
+      expect(compose).toContain('SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET}')
+      // Reached through the reverse proxy on this machine alone.
+      expect(compose).toContain('- 127.0.0.1:3000:3000')
+      expect(compose).not.toContain('- 3000:3000')
+      // On the Bun that scaffolded it, rather than whatever is latest when it builds.
+      expect(await Bun.file(join(dir, 'Dockerfile')).text()).toStartWith(`FROM oven/bun:${Bun.version} AS build\n`)
+      expect(await Bun.file(join(dir, '.forgejo/workflows/test.yml')).text()).toContain(`bun-version: ${Bun.version}\n`)
+      expect(await Bun.file(join(dir, '.env.example')).text()).toMatch(/\nSESSION_SECRET=\nPOSTGRES_PASSWORD=\n# true keeps the demo sign-in[^\n]*\nDEMO_SIGN_IN=\n$/)
+      // The demo sign-in refuses before it reaches the database, in production unless DEMO_SIGN_IN says the site is a demo.
+      expect(await Bun.file(join(dir, 'src/routes/login.kay')).text()).toMatch(/=> \{\n {2}if \(!demoSignIn\)\n {4}return ctx\.fail\(403, [^\n]+\n\n {2}await db\.repo/)
 
       await installKay(dir)
       expect(await checked(dir)).toEqual([])
       expect((await formatFiles([join(dir, 'src')], { write: false })).changed).toEqual([])
       expect((await lint(dir, '.')).flatMap(result => result.messages)).toEqual([])
+
+      const demoSignIn = async (env: Record<string, string>) => {
+        const child = Bun.spawn([process.execPath, '-e', 'console.log((await import(\'./src/env\')).demoSignIn)'], { cwd: dir, stdout: 'pipe', stderr: 'pipe', env: { ...process.env, DEMO_SIGN_IN: '', ...env } })
+
+        return (await new Response(child.stdout).text()).trim()
+      }
+
+      expect(await demoSignIn({ NODE_ENV: 'production' })).toBe('false')
+      expect(await demoSignIn({ NODE_ENV: 'production', DEMO_SIGN_IN: 'true' })).toBe('true')
+      expect(await demoSignIn({ NODE_ENV: 'development' })).toBe('true')
 
       // Signs in through the action and lands in the guarded section, reads a seeded member, and counts the visitors online over the websocket, each test file on a database of its own.
       // They need a Postgres the test user may create databases on, which CI always has.
