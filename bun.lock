@@ -50,7 +50,7 @@
     },
     "packages/auth": {
       "name": "@kaynooo/kayjs-auth",
-      "version": "1.42.0",
+      "version": "1.43.0",
       "dependencies": {
         "@kaynooo/utils": "^2.27.0",
         "@simplewebauthn/server": "^14.0.3",
@@ -71,7 +71,7 @@
         "@kaynooo/kayjs-ui": "workspace:~",
         "@kaynooo/pg-orm": "^7.0.0",
         "elysia": "^1.4.30",
-        "kay": "~1.42.0",
+        "kay": "~1.43.0",
       },
       "optionalPeers": [
         "@kaynooo/pg-orm",
@@ -79,7 +79,7 @@
     },
     "packages/cms": {
       "name": "@kaynooo/kayjs-cms",
-      "version": "1.42.0",
+      "version": "1.43.0",
       "devDependencies": {
         "@happy-dom/global-registrator": "^20.14.5",
         "@kaynooo/eslint": "^6.0.1",
@@ -92,12 +92,12 @@
       },
       "peerDependencies": {
         "@kaynooo/kayjs-ui": "workspace:~",
-        "kay": "~1.42.0",
+        "kay": "~1.43.0",
       },
     },
     "packages/mail": {
       "name": "@kaynooo/kayjs-mail",
-      "version": "1.42.0",
+      "version": "1.43.0",
       "dependencies": {
         "nodemailer": "^10.0.16",
       },
@@ -110,12 +110,12 @@
       },
       "peerDependencies": {
         "elysia": "^1.4.30",
-        "kay": "~1.42.0",
+        "kay": "~1.43.0",
       },
     },
     "packages/ui": {
       "name": "@kaynooo/kayjs-ui",
-      "version": "1.42.0",
+      "version": "1.43.0",
       "dependencies": {
         "@kaynooo/utils": "^2.24.1",
       },
@@ -134,7 +134,7 @@
         "@iconify-json/tabler": "^1.2.41",
         "chartist": "^1.5.0",
         "hls.js": "^1.7.0",
-        "kay": "~1.42.0",
+        "kay": "~1.43.0",
         "tailwindcss": "^4.3.3",
       },
       "optionalPeers": [
