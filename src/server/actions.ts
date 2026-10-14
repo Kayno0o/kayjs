@@ -29,6 +29,7 @@ import { answeringRequest } from './log'
 import { countSucceeded, PRETEND, protectionRefusal, requestId } from './protection'
 import { sharedContext } from './render'
 import { reportServerError } from './report'
+import { guardUrl } from './routes'
 import { Denied, Redirect } from './signals'
 import { answered, SERVER_SPAN, traced } from './trace'
 import { visitAs } from './visit'
@@ -431,7 +432,7 @@ export async function guardsFirst(guards: LoadedGuard[], context: { request: Req
 }
 
 // Runs the guards of an action or an API route: the response when one stops the request, else the cookies and headers they set; a guard throwing anything but a redirect or a denial answers 500, or lets the request on without `answerThrown`.
-export async function passGuards(guards: LoadedGuard[], context: { request: Request }, params: RouteParams, options: ActionOptions, url = new URL(context.request.url), answerThrown = true): Promise<Response | GuardedRequest> {
+export async function passGuards(guards: LoadedGuard[], context: { request: Request }, params: RouteParams, options: ActionOptions, url = guardUrl(context.request.url), answerThrown = true): Promise<Response | GuardedRequest> {
   const { request } = context
   const state: GuardedRequest = { jar: cookieJar(request), headers: new Headers() }
   const ctx: GuardContext = {

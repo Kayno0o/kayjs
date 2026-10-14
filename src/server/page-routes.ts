@@ -26,11 +26,9 @@ import { requestId } from './protection'
 import { hasFlash, renderPage, renderUnmatched, servePrerendered, sharedContext, withEditor } from './render'
 import { reportServerError } from './report'
 import { revalidateStale } from './revalidate'
-import { decodePath, withoutSlash } from './routes'
+import { canonicalPath, withoutSlash } from './routes'
 import { serveServerIslands } from './server-islands'
 import { answered, SERVER_SPAN, traced } from './trace'
-
-// Every slash at either end of a path.
 
 // The params come resolved, each matcher's value in place of its text.
 export type PageResponder = (route: ServedRoute, params: Record<string, unknown>, context: RequestContext, url: URL) => Promise<Response>
@@ -79,11 +77,6 @@ export async function loadPrerendered(client: ClientBuild): Promise<Map<string, 
   return byRoute
 }
 
-// A browser sends `/p/a@b` where `kay build` names the page `/p/a%40b`: each segment is decoded, then encoded the one way the build does.
-function canonicalPath(pathname: string): string {
-  return pathname.split('/').map(segment => encodeURIComponent(decodePath(segment) ?? segment)).join('/')
-}
-
 // Rendered for this visitor alone, kept by no cache.
 async function forVisitor(render: () => Promise<Response>): Promise<Response> {
   const response = await render()
@@ -124,7 +117,7 @@ export function pageResponder({ client, renderOptions, prerendered, settings, tr
   }
 }
 
-// The redirect giving a page one URL, so its relative links resolve one way.
+// The redirect giving a page one URL, so its relative links resolve one way, and `//host/` never sends a visitor off the site.
 function slashRedirect(url: URL, shape: RouterShape, trailingSlash: TrailingSlash): Response | undefined {
   const wanted = slashSpelling(url.pathname, shape, trailingSlash)
 

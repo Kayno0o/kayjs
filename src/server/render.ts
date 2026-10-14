@@ -49,6 +49,7 @@ import { pageSetting } from './page-settings'
 import { matchesEtag } from './public'
 import { queryRules, queryScript, readQuery } from './query'
 import { reportServerError } from './report'
+import { guardUrl } from './routes'
 import { inServerScope, readPersonally, wasReadPersonally, withOutcome } from './scope'
 import { Denied, NotFound, Redirect } from './signals'
 import { speculationRules } from './speculation'
@@ -199,7 +200,8 @@ async function renderRoute(route: ServedRoute, rendering: Rendering, client: Cli
 
 // The response a guard refusing the request gives, if one does.
 async function refused(route: ServedRoute, rendering: Rendering, client: ClientBuild, options: RenderOptions): Promise<Response | undefined> {
-  const refusal = route.guards.length > 0 ? await runGuards(route.guards, rendering.ctx) : undefined
+  // The page keeps the URL as sent; its guards read it spelled one way.
+  const refusal = route.guards.length > 0 ? await runGuards(route.guards, Object.create(rendering.ctx, { url: { value: guardUrl(rendering.ctx.url) } }) as typeof rendering.ctx) : undefined
 
   return refusal && renderFailure(refusal.error, refusal.guard.special, rendering, new Map(), client, options)
 }

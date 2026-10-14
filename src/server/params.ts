@@ -3,7 +3,7 @@ import type { Route } from './routes'
 import { join } from 'node:path'
 import * as builtIn from '../runtime/params'
 import { importModule } from './bundle'
-import { decodePath, patternShapes, withoutSlash } from './routes'
+import { decodePath, guardUrl, patternShapes, withoutSlash } from './routes'
 import { projectSource } from './source'
 
 const EDGE_SLASHES = /^\/+|\/+$/g
@@ -123,7 +123,7 @@ export function matchedParams(route: Route, params: Record<string, string>, matc
 
 // A path `shapeParams` accepted, spelled as a visit to it reaches the guards: each static segment as the shape names it, a param's as sent, its slashes as the redirects leave them.
 export function servedPath(shape: RouterShape, path: string, trailingSlash: TrailingSlash): string {
-  const segments = path.split('/')
+  const segments = withoutSlash(path).split('/')
   const served: string[] = []
 
   for (const [index, segment] of shape.path.split('/').entries()) {
@@ -136,7 +136,11 @@ export function servedPath(shape: RouterShape, path: string, trailingSlash: Trai
     served.push(segment.startsWith(':') ? segments[index]! : segment)
   }
 
-  return slashSpelling(served.join('/') || '/', shape, trailingSlash)
+  const sent = served.join('/') || '/'
+  // Under `ignore` a visit keeps the trailing slash it was sent with, a static page's as a catch-all's.
+  const slashed = trailingSlash === 'ignore' && path.length > 1 && path.endsWith('/') && !sent.endsWith('/') ? `${sent}/` : sent
+
+  return slashSpelling(guardUrl(`http://localhost${slashed}`).pathname, shape, trailingSlash)
 }
 
 // The spelling of a path a visit is redirected to: `/about/` to `/about`, or the other way with `always`, leading slashes collapsed, so `//host/` never leaves the site; a catch-all's own directory keeps one slash, as `/docs` is not one of its paths.

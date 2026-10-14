@@ -726,6 +726,7 @@ describe('the url an action\'s guards see', () => {
   let served: Awaited<ReturnType<typeof pages>>
   let shop: Awaited<ReturnType<typeof pages>>
   let slashed: Awaited<ReturnType<typeof pages>>
+  let ignored: Awaited<ReturnType<typeof pages>>
 
   const post = async (headers: Record<string, string> = {}, file = 'admin/index.kay', app = served) => {
     const response = await app.handle(new NativeRequest(`http://localhost/_kay/action/${dir.slice(root.length + 1)}/routes/${file}/ping`, {
@@ -750,6 +751,7 @@ describe('the url an action\'s guards see', () => {
     served = await pages({ routes: join(dir, 'routes'), prebuilt: true })
     shop = await pages({ routes: join(dir, 'routes'), prebuilt: true, base: '/shop' })
     slashed = await pages({ routes: join(dir, 'routes'), prebuilt: true, trailingSlash: 'always' })
+    ignored = await pages({ routes: join(dir, 'routes'), prebuilt: true, trailingSlash: 'ignore' })
   })
 
   afterAll(async () => rm(dir, { recursive: true, force: true }))
@@ -770,6 +772,21 @@ describe('the url an action\'s guards see', () => {
     expect(await post({ referer: 'http://localhost/docs' }, 'docs/_...rest_.kay')).toEqual({ status: 200, url: '/docs/' })
     expect(await post({ referer: 'http://localhost/admin' }, 'admin/index.kay', slashed)).toEqual({ status: 403, url: '/admin/' })
     expect(await post({}, 'admin/index.kay', slashed)).toEqual({ status: 403, url: '/admin/' })
+  })
+
+  it('reads a page however its path is spelled, on a visit and an action alike, as its params do', async () => {
+    const visit = async (path: string, app = served) => {
+      const response = await app.handle(new NativeRequest(`http://localhost${path}`))
+
+      return { status: response.status, url: response.headers.get('x-url') }
+    }
+
+    expect(await visit('/%61dmin/x')).toEqual({ status: 403, url: '/admin/x' })
+    expect(await visit('//admin/x', ignored)).toEqual({ status: 403, url: '/admin/x' })
+    expect(await post({ referer: 'http://localhost/%61dmin/x' }, '_...path_.kay')).toEqual({ status: 403, url: '/admin/x' })
+    expect(await post({ referer: 'http://localhost//admin/x' }, '_...path_.kay', ignored)).toEqual({ status: 403, url: '/admin/x' })
+    expect(await post({ referer: 'http://localhost/admin/' }, 'admin/index.kay', ignored)).toEqual({ status: 403, url: '/admin/' })
+    expect(await post({ referer: 'http://localhost/docs/a/' }, 'docs/_...rest_.kay', ignored)).toEqual({ status: 200, url: '/docs/a/' })
   })
 
   it('is the action\'s page when the post names none of its own, as a script\'s or another page\'s would, a layout\'s shortest', async () => {

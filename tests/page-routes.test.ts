@@ -42,6 +42,11 @@ describe('routeTable', () => {
     expect(prefixed.posted(about, '/about')).toEqual({ params: {}, path: undefined })
     expect(prefixed.posted(about, '/en/about')).toEqual({ params: {}, path: '/en/about' })
     expect(prefixed.served(about)).toBe('/en/about')
+
+    const rest = served('[...path].kay')
+    const caught = routeMatch(routeTable([rest], localeSettings({ locales: ['en', 'fr'], defaultLocale: 'en', prefixDefault: true })), new Map())
+
+    expect(caught.posted(rest, '/en/docs/x')).toEqual({ params: { path: 'docs/x' }, path: '/en/docs/x' })
   })
 
   it('tries the pages a matcher checks before the one without, then by file path in UTF-16 code unit order, upper case first', () => {

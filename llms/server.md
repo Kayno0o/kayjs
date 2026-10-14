@@ -262,10 +262,11 @@ export default defineConfig({ requireGuards: true })
 - A `_guard.ts` in a routes directory runs before every page and every action in that directory and below, outermost first.
 - It lets the request through unless it redirects or denies.
 - Its `ctx` has `request`, `url`, `locale`, `params`, `cookies`, `locals`, `headers`, `redirect` and `deny`; cookies and headers it sets reach the response either way.
+- Its `url` is spelled one way whatever the request sent: each segment decoded then encoded, leading slashes collapsed, so `/%61dmin/x` and `//admin/x` read as `/admin/x`, as `ctx.params` reads them; the page itself keeps the URL as sent.
 - `ctx.params` holds the params of the page asked for, each matcher's value in place of its text: `src/routes/orgs/[org]/_guard.ts` reads `params.org`.
 - They are typed `Readonly<Record<string, unknown>>`, since a guard covers every route below it.
 - For an action they are those of the page it was posted from, which the action reads in its own `ctx.params` (see actions).
-- An action's guards read that page as `url`, as a visit to it reaches them, never the action's own: without `base`, in its locale's translated path, its slashes as `trailingSlash` writes them, `/%61dmin/` read as `/admin`.
+- An action's guards read that page as `url`, as a visit to it reaches them, never the action's own: without `base`, in its locale's translated path, its trailing slash as `trailingSlash` writes it, or as sent under `ignore`, `/%61dmin/` read as `/admin`.
 - A root guard testing `url.pathname.startsWith('/admin')` thus covers the actions of `/admin`, and of any file whose pages all sit under it; a file serving pages on either side, a layout or a catch-all, is posted from the one the caller names.
 - A post naming no page of the action's file, such as from a script, has the file's shortest page without params as its `url`, else its first page with each param named, `/orgs/:org`, and is refused when the file reads params.
 - For a module under `src/api/`, they are those of the route the request matched, as its handler reads them.

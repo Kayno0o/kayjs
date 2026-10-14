@@ -100,6 +100,7 @@ const BRACKETS = /[[\]]/
 const PARAM_NAME = /:[^/]+/g
 const TRAILING_SLASH = /\/$/
 const EDGE_SLASHES = /^\/+|\/+$/g
+const LEADING_SLASHES = /^\/+/
 
 // The route a file under the routes directory serves; files starting with `_` (layouts, partials) serve none.
 export function routeOf(routesDir: string, file: string, prefix = ''): Omit<Route, 'layouts' | 'special' | 'guards'> | undefined {
@@ -583,6 +584,20 @@ export function directoriesUp(at: string): string[] {
 // The directory of the URL tree holding `at`: `/a` for `/a/b`, `''` for `/a`.
 function parentOf(at: string): string {
   return at.slice(0, at.lastIndexOf('/'))
+}
+
+// A browser sends `/p/a@b` where `kay build` names the page `/p/a%40b`: each segment is decoded, then encoded the one way the build does.
+export function canonicalPath(pathname: string): string {
+  return pathname.split('/').map(segment => encodeURIComponent(decodePath(segment) ?? segment)).join('/')
+}
+
+// The URL a guard reads, spelled one way whichever way the request spelled it: `/%61dmin` and `//admin` both read as `/admin`, as the params and the router do.
+export function guardUrl(url: string | URL): URL {
+  const guarded = new URL(url)
+
+  guarded.pathname = canonicalPath(guarded.pathname.replace(LEADING_SLASHES, '/'))
+
+  return guarded
 }
 
 // A percent-encoded URL path, or undefined when the encoding is malformed (`/100%`).
