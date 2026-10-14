@@ -16,9 +16,8 @@
   --mono: ui-monospace, 'JetBrains Mono', 'Cascadia Code', Menlo, Consolas, monospace;
   --radius: 3px;
   --bar: 0px;
-  /* The width a paragraph keeps, and the one a demo or code block may grow to beyond it. */
-  --measure: 48rem;
-  --wide: 72rem;
+  /* The width of a page's text, its demos and code blocks included. */
+  --measure: 54rem;
   /* The whole page scales from 1920px up to 125% at 3200px, so a 2k or 4k screen does not shrink it. */
   font-size: clamp(100%, 62.5% + 0.3125vw, 125%);
   font-family: var(--sans);
@@ -264,13 +263,13 @@ main {
 .page {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  max-width: 54rem;
+  max-width: var(--measure);
   margin-inline: auto;
 }
 
 /* The home page has no table of contents, so its content takes the width the docs pages split with theirs. */
 .page.home {
-  max-width: var(--wide);
+  max-width: 72rem;
 }
 
 .page-head {
@@ -359,10 +358,10 @@ main {
   display: none;
 }
 
-/* Wide screens: the table of contents at the right edge, the text centered in the room left of it, and demos, code and the props table breaking out of the text on both sides. */
+/* Wide screens: the table of contents at the right edge, the text centered in the room left of it. */
 @media (min-width: 84rem) {
   .page:not(.home) {
-    grid-template-columns: [wide-start] minmax(0, 1fr) [text-start] minmax(0, var(--measure)) [text-end] minmax(0, 1fr) [wide-end] 3.5rem [toc-start] 14rem [toc-end];
+    grid-template-columns: minmax(0, 1fr) [text-start] minmax(0, var(--measure)) [text-end] minmax(0, 1fr) 3.5rem [toc-start] 14rem [toc-end];
     max-width: none;
   }
 
@@ -372,27 +371,13 @@ main {
   }
 
   .page:not(.home) > .prose {
-    display: grid;
     grid-row: 2;
-    grid-column: wide;
-    grid-template-columns: subgrid;
+    grid-column: text;
   }
 
   .page-foot {
     grid-row: 3;
     grid-column: text;
-  }
-
-  .prose > * {
-    grid-column: text;
-  }
-
-  .prose > :is(.code, .example, .file-tree, .request-flow, .props) {
-    grid-column: wide;
-    justify-self: center;
-    box-sizing: border-box;
-    width: 100%;
-    max-width: var(--wide);
   }
 
   .toc {
