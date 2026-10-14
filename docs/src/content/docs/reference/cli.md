@@ -79,7 +79,7 @@ kay: accents needs tailwind: add --with tailwind, or drop it with --without acce
 | `--host[=<address>]` | Listens past this machine: `0.0.0.0` alone, or the address given, and answers to this machine's own name and `<name>.local` too. Without it, a server naming no `hostname` listens on `localhost` only, so `kay dev` in a container publishing its port needs `--host` |
 | `--inspect[=<address>]` | Opens Bun's debugger in the server, at `ws://localhost:6499/kay` or the port, host and port, or address given, port 0 taking a free one, the same address after every restart: `kay dev` listens there and passes each connection on to the server running, and a debugger's connection closes when the server restarts, for it to connect again; an address another process holds, at `localhost` on either loopback address, stops `kay dev`, and one past this machine needs `--host` too, as whoever reaches the debugger runs code on the machine. A page reaches it only from the dev server's own `localhost` address or `debug.bun.sh` |
 | `--open` | Opens the address in the browser (the command `BROWSER` names, else the system's) once the server is ready |
-| `--format text\|json` | `json` prints each line below as one JSON object on stdout, `{ "event": "ready", "time": "...", "url": "http://localhost:3000", "ms": 412 }`, then `restart`, `styles`, `exit` and an `error` event for each error the server meets, the server's own output going to stderr |
+| `--format text\|json` | `json` prints each line below as one JSON object on stdout, `{ "event": "ready", "time": "...", "url": "http://localhost:3000", "ms": 412 }`, with `network` under `--host`, then `restart`, `styles`, `exit`, `debugger`, `no-browser`, `builder-exit` and an `error` event for each error the server meets, the server's own output going to stderr |
 
 When another process holds the port, the server moves to the next free one, and the ready line names the port it found in use: `kay dev: http://localhost:3001 (ready in 412 ms, 3000 was in use)`. It works however the server picks its port, and restarts keep the port it moved to, so open pages stay connected.
 
@@ -123,9 +123,9 @@ A project that fails to compile prints its errors there once, as the server boot
 }
 ```
 
-- `kind` is `compile` when the project failed to compile, with each problem's position in `problems` and the report `kay check` prints in `report`; `boot` when the server failed to start otherwise; `request` for a request that threw; `browser` for an error an island met, under its page's path, `island` naming its component.
+- `kind` is `compile` when the project failed to compile, with each problem's position in `problems` and the report `kay check` prints in `report`; `boot` when the server failed to start otherwise; `request` for a request that threw; `browser` for an error an island met, under its page's path, `island` naming its component and `report` holding the stack as the browser sent it.
 - A boot failure goes once a server boots, a request's error once that method and path are answered without one, and a browser error once its page is served again.
-- Requests' errors stay across restarts, the latest 50 kept. A server not run by `kay dev` writes none.
+- Requests' errors stay across restarts, the latest 50 kept. A server not run by `kay dev` writes none, nor does an entry that throws before it calls `pages()`.
 
 ### Dev tool
 

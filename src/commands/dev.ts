@@ -48,6 +48,9 @@ export const dev: Command = {
 
     const root = resolve(inDir ? path : '.')
 
+    // Under `json`, stdout holds the events alone: what this process prints otherwise, as kay.config.ts read below, goes to stderr.
+    const events = format === 'json' ? eventWriter() : undefined
+
     warnOtherKay('dev', root)
     const entry = typeof option === 'string' ? resolve(option) : inDir ? undefined : path
     const config = await loadConfig(root)
@@ -57,7 +60,7 @@ export const dev: Command = {
     let stop: () => Promise<void>
 
     try {
-      stop = await startDev(root, { entry, port: typeof port === 'string' ? Number(port) : undefined, host, inspect: debuggerAt, open: open === true, format, keys, onQuit: interrupted, config })
+      stop = await startDev(root, { entry, port: typeof port === 'string' ? Number(port) : undefined, host, inspect: debuggerAt, open: open === true, format, keys, onQuit: interrupted, log: events, config })
     }
     catch (error) {
       if (!(error instanceof InspectorAddressInUse))
@@ -83,4 +86,13 @@ function inspectorAddress(value: string): string {
   const withHost = address === '' ? 'localhost:6499' : PORT_FIRST.test(address) ? `localhost:${address}` : address
 
   return `ws://${withHost}${withHost.includes('/') ? '' : '/kay'}`
+}
+
+// Writes each event to stdout, and every other `console.log` of this process to stderr.
+function eventWriter(): (line: string) => void {
+  const print = console.log.bind(console)
+
+  console.log = console.error
+
+  return line => print(line)
 }

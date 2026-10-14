@@ -26,7 +26,8 @@ interface Builder {
 const BUILDER = join(import.meta.dir, 'builder.ts')
 
 // The process building the client for the servers `kay dev` starts, kept from one build to the next: its modules stay loaded and what it last built tells what an edit reaches.
-export function startClientBuilder(root: string, env: Record<string, string | undefined>): ClientBuilder {
+// `stdout` is where what the build prints goes, `kay dev`'s own by default.
+export function startClientBuilder(root: string, env: Record<string, string | undefined>, stdout: 'inherit' | number = 'inherit'): ClientBuilder {
   const realRoot = realpathSync(root)
   let modules = new Set<string>()
   let current = spawn()
@@ -44,7 +45,7 @@ export function startClientBuilder(root: string, env: Record<string, string | un
       child: Bun.spawn([process.execPath, BUILDER], {
         cwd: root,
         env: { ...env, NODE_ENV: 'development', KAY_DEV_CODE: '0' },
-        stdio: ['ignore', 'inherit', 'inherit'],
+        stdio: ['ignore', stdout, 'inherit'],
         ipc: (message: { reads?: string[], built?: BuildOutcome }) => {
           if (message.reads)
             modules = new Set(message.reads)

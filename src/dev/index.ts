@@ -207,7 +207,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
 
     if (builderStale || builder?.gone() === true) {
       await builder?.stop()
-      builder = startClientBuilder(root, env)
+      builder = startClientBuilder(root, env, json ? STDERR : 'inherit')
       builderStale = false
       unbuilt = null
     }

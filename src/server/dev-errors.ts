@@ -57,13 +57,32 @@ export function trackDevErrors(root: string): void {
 
 // Why the server failed to boot, which stays listed until a server boots.
 export function recordBootFailure(error: unknown): void {
+  if (tracked !== undefined)
+    neverThrowing(() => bootFailureOf(error))
+}
+
+// An error met answering `request`, or one a browser reported of a page, which stays listed until that page or request is answered again without one.
+export function recordRequestError(error: unknown, request: Request): void {
   if (tracked === undefined)
     return
 
+  failed.add(request)
+  neverThrowing(() => requestErrorOf(error, request))
+}
+
+// Listing an error never costs the server its answer, nor the app its `onError`: a browser's report may hold a stack no path reads from.
+function neverThrowing(run: () => void): void {
+  try {
+    run()
+  }
+  catch {}
+}
+
+function bootFailureOf(error: unknown): void {
   const diagnostics = error instanceof Error && error.name === 'KayCompileError' ? (error as Error & { diagnostics?: FileDiagnostic[] }).diagnostics : undefined
 
   if (diagnostics !== undefined && diagnostics.length > 0) {
-    const root = tracked.root
+    const root = tracked!.root
     const problems = diagnostics.map(diagnostic => ({ file: relative(root, diagnostic.file), ...positionAt(diagnostic.source, diagnostic.start), ...diagnostic.code !== undefined && { code: diagnostic.code }, message: diagnostic.message }))
 
     record(BOOT, { kind: 'compile', time: new Date().toISOString(), message: `${problems.length} compile error${problems.length === 1 ? '' : 's'}`, problems, report: (error as Error).message.trimStart() })
@@ -74,18 +93,12 @@ export function recordBootFailure(error: unknown): void {
   record(BOOT, { kind: 'boot', time: new Date().toISOString(), ...thrown(error) })
 }
 
-// An error met answering `request`, or one a browser reported of a page, which stays listed until that page or request is answered again without one.
-export function recordRequestError(error: unknown, request: Request): void {
-  if (tracked === undefined)
-    return
-
-  failed.add(request)
-
+function requestErrorOf(error: unknown, request: Request): void {
   const time = new Date().toISOString()
 
   if (error instanceof Error && error.name === 'BrowserError') {
     const { url, island } = error as Error & { url: string, island?: string }
-    const path = appPath(URL.parse(url, 'http://localhost')?.pathname ?? url, tracked.base)
+    const path = appPath(URL.parse(url, 'http://localhost')?.pathname ?? url, tracked!.base)
 
     record(`browser ${path}`, { kind: 'browser', time, request: { method: 'GET', path }, ...island !== undefined && { island }, ...thrown(error) })
 
@@ -124,10 +137,21 @@ function appPath(path: string, base: string): string {
 
 function thrown(error: unknown): Pick<DevError, 'message' | 'report' | 'at'> {
   const report = describeThrown(error)
-  const frame = firstOwnFrame(report)
-  const at = frame && excerpt(frame)
+  const at = ownPlace(report)
 
   return { message: error instanceof Error ? error.message : report, report, ...at && { at } }
+}
+
+// Where the project's own code threw; none when a frame names no file a path reads from, as a browser's report may.
+function ownPlace(report: string): DevError['at'] {
+  try {
+    const frame = firstOwnFrame(report)
+
+    return frame && excerpt(frame)
+  }
+  catch {
+    return undefined
+  }
 }
 
 function excerpt(frame: { file: string, line: number, column: number }): DevError['at'] {

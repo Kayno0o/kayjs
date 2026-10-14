@@ -103,6 +103,12 @@ describe('the errors kay dev lists for a reader without a browser', () => {
     expect((await app.handle(new Request('http://localhost/_kay/error', { method: 'POST', headers: { 'content-type': 'application/json', 'origin': 'http://localhost' }, body: JSON.stringify(report) }))).status).toBe(204)
     expect(listed(root, '/')).toEqual([{ kind: 'browser', time: expect.any(String), request: { method: 'GET', path: '/' }, island: 'src/components/counter.kay', message: 'count is undefined', report: expect.stringContaining('TypeError: count is undefined') }])
 
+    // A stack naming a file no path reads from, as a hostile page could send, is listed as it came, the report still answered and handed to onError.
+    const hostile = { ...report, url: 'http://localhost/repo/hostile', stack: 'Error: x\n    at x (file:///%2F:1:1)' }
+
+    expect((await app.handle(new Request('http://localhost/_kay/error', { method: 'POST', headers: { 'content-type': 'application/json', 'origin': 'http://localhost' }, body: JSON.stringify(hostile) }))).status).toBe(204)
+    expect(listed(root, '/hostile')).toEqual([expect.objectContaining({ kind: 'browser', report: expect.stringContaining('file:///%2F:1:1') })])
+
     // A post to the page is no page served again.
     await app.handle(new Request('http://localhost/', { method: 'POST' }))
     expect(listed(root, '/')).toHaveLength(1)
@@ -139,6 +145,16 @@ describe('the errors kay dev lists for a reader without a browser', () => {
     expect(listed(own)).toEqual([request])
   })
 
+  it('lists a kay.config.ts that failed to load, as a new process', async () => {
+    const own = await scratchDir('dev-errors-')
+
+    await Bun.write(join(own, 'kay.config.ts'), 'throw new Error(\'config broke\')\n')
+    const run = Bun.spawnSync([process.execPath, '-e', `import { pages } from ${JSON.stringify(join(import.meta.dir, '../src/server'))}\nawait pages({ root: ${JSON.stringify(own)}, dev: true }).catch(() => undefined)`], { env: { ...process.env, KAY_DEV_CODE: 'test' }, stderr: 'pipe' })
+
+    expect(run.exitCode).toBe(0)
+    expect(listed(own)).toEqual([expect.objectContaining({ kind: 'boot', message: expect.stringContaining('config broke') })])
+  })
+
   // Last, as it stops this process tracking errors.
   it('writes nothing for a server run outside kay dev', async () => {
     delete process.env.KAY_DEV_CODE
@@ -162,6 +178,8 @@ describe('kay dev --format json', () => {
     const project = await scratchDir('dev-errors-')
 
     await throwingPage(project, 'src/routes/index.kay')
+    // Read by the process building the client as by the server, whose output goes to stderr alike.
+    await Bun.write(join(project, 'kay.config.ts'), 'console.log(\'config read\')\nexport default {}\n')
     const free = Bun.serve({ port: 0, fetch: () => new Response() })
     const port = free.port!
 
@@ -185,7 +203,10 @@ describe('kay dev --format json', () => {
       expect((await fetch(`http://localhost:${port}/`)).status).toBe(500)
       await until(() => lines.length > 1, 10_000)
       expect(JSON.parse(lines[1]!)).toEqual(expect.objectContaining({ event: 'error', kind: 'request', request: { method: 'GET', path: '/' }, message: 'load broke' }))
-      await until(() => errors.includes('Error: load broke'))
+      await until(() => errors.includes('Error: load broke') && errors.includes('config read'))
+
+      for (const line of lines)
+        expect(() => JSON.parse(line) as unknown).not.toThrow()
     }
     finally {
       child.kill()

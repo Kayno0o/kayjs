@@ -57,13 +57,15 @@ export async function pages(options: PagesOptions = {}) {
   const source = projectSource()
   const mode = source.mode(options)
   const root = source.root(options.root ?? process.cwd())
-  const project = resolveProject(root, { ...await source.config(root, options), dev: mode.dev, prebuilt: mode.prebuilt }, mode)
+
+  if (mode.dev)
+    trackDevErrors(root)
+
+  const project = resolveProject(root, { ...await withBootFailure(source.config(root, options)), dev: mode.dev, prebuilt: mode.prebuilt }, mode)
   const loadClient = async () => source.client(project)
 
   if (!mode.dev)
     return servePages(project, loadClient)
-
-  trackDevErrors(root)
 
   try {
     return await servePages(project, loadClient)
@@ -73,5 +75,17 @@ export async function pages(options: PagesOptions = {}) {
     recordBootFailure(error)
 
     return bootFailure(error, root)
+  }
+}
+
+// A config that fails to load still stops the server, `kay dev` listing why.
+async function withBootFailure<T>(loading: Promise<T>): Promise<T> {
+  try {
+    return await loading
+  }
+  catch (error) {
+    recordBootFailure(error)
+
+    throw error
   }
 }
