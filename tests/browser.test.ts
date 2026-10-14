@@ -7,6 +7,7 @@ import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { t } from 'elysia'
 import { chromium } from 'playwright-core'
+import { previewUrl } from '../src/server'
 import { browserPath, testSite } from '../src/test'
 import { chromeTree, killAll, removeFetcherDirs } from '../src/test/browser'
 import { scratchDir } from './scratch'
@@ -453,7 +454,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('edit mode 
     const cms = await testSite({ routes: `${fixture}/routes`, content: `${fixture}/content.config.ts`, api: `${fixture}/api`, preview: { secret }, browser: { path }, extensions: [{ name: 'editor', editor: `${fixture}/components/draft-editor.kay` }] })
 
     try {
-      const editor = await cms.open(`/_kay/preview?path=/marks/launch&edit&secret=${secret}`)
+      const editor = await cms.open(previewUrl('/marks/launch', { edit: true }))
 
       await editor.waitFor('h1', { text: 'Launch day' })
       await editor.click('button.count')

@@ -26,7 +26,7 @@ for key of photos key={key}
 
 ## Private files
 
-`files.put(file, { private: true })` gives a key starting `private/`, which `/_kay/files/` serves only to a link `files.url(key)` signed: the page rendering it is what decides who gets the file, behind its guard. The link stays valid an hour, `files.url(key, { expires: '1d' })` longer, rounded up to the next ten minutes so a page rendered again soon gives the same link, which the browser keeps cached. It is signed with the preview secret, else the session's, else a key of the process, which a restart changes, and which several processes do not share. A private image is resized through its signed link, its variants kept by no shared cache.
+`files.put(file, { private: true })` gives a key starting `private/`, which `/_kay/files/` serves only to a link `files.url(key)` signed: the page rendering it is what decides who gets the file, behind its guard. The link stays valid an hour, `files.url(key, { expires: '1d' })` longer, rounded up to the next ten minutes so a page rendered again soon gives the same link, which the browser keeps cached. It is signed with a key derived from the session's secret, else from the preview secret, else a key of the process, which a restart changes, which several processes do not share, and which a production server warns of once. A private image is resized through its signed link, its variants kept by no shared cache.
 
 A route of the app's own that decides by itself who gets a file answers with `files.response(key, request)`: the file, its range included, kept by no cache.
 

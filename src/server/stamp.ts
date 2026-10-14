@@ -1,14 +1,33 @@
 import { setStamper, STAMP_FIELD } from '../runtime/action'
 import { prerendering } from '../runtime/html'
+import { kayLog } from '../runtime/log'
 import { WORK_SCRIPT } from '../runtime/swap'
 import { nodeCrypto } from './builtins'
 
-// What signs the stamps `minTime` reads and the links to private stored files, and seals the flash cookie: the preview secret, else a session's, else one of this process, which a restart changes, refusing what was signed before it.
-let secret: { key: string | Uint8Array, from: 'process' | 'session' | 'preview' } = { key: crypto.getRandomValues(new Uint8Array(32)), from: 'process' }
+const KEY_BYTES = 32
 
-export function useStampSecret(key: string, from: 'session' | 'preview'): void {
-  if (from === 'preview' || secret.from === 'process')
-    secret = { key, from }
+// What signs the stamps `minTime` reads and the links to private stored files, and seals the flash cookie: a key derived from the session's secret, else the preview one, which a CMS may also hold, else one of this process, which a restart changes, refusing what was signed before it.
+// Derived, so what leaks of one never signs for the other: a preview link's signature is no stamp's.
+let secret: { key: Uint8Array, from: 'process' | 'session' | 'preview' } = { key: crypto.getRandomValues(new Uint8Array(KEY_BYTES)), from: 'process' }
+let warnOnProcessKey = false
+
+export function useStampSecret(value: string, from: 'session' | 'preview'): void {
+  if (from === 'session' || secret.from === 'process')
+    secret = { key: new Uint8Array(nodeCrypto().hkdfSync('sha256', value, '', 'kay stamps', KEY_BYTES)), from }
+}
+
+// A production server says so the first time it signs with the process's own key, which no restart and no other replica shares.
+export function warnOnStampKey(): void {
+  warnOnProcessKey = true
+}
+
+function stampKey(): Uint8Array {
+  if (warnOnProcessKey && secret.from === 'process') {
+    warnOnProcessKey = false
+    kayLog('warn', 'links to private files, form stamps and the flash cookie are signed with a key of this process, as neither session() nor preview sets a secret: a restart refuses what was signed before it, and other replicas refuse it too')
+  }
+
+  return secret.key
 }
 
 // The value a prerendered page holds in place of a stamp, with the action it is for: the server signs one each time it serves the page.
@@ -23,7 +42,7 @@ export const STAMP_HOLE = new RegExp(`name="${STAMP_FIELD}" value="${STAMP_MARK}
 
 // `use` keeps what one feature signs from passing for another's.
 export function signText(use: string, text: string): string {
-  return nodeCrypto().createHmac('sha256', secret.key).update(`${use}\0${text}`).digest('base64url')
+  return nodeCrypto().createHmac('sha256', stampKey()).update(`${use}\0${text}`).digest('base64url')
 }
 
 export function signedText(use: string, text: string, given: string): boolean {
@@ -37,7 +56,7 @@ const IV_BYTES = 12
 const TAG_BYTES = 16
 
 function sealKey(use: string): Buffer {
-  return nodeCrypto().createHmac('sha256', secret.key).update(`kay-seal\0${use}`).digest()
+  return nodeCrypto().createHmac('sha256', stampKey()).update(`kay-seal\0${use}`).digest()
 }
 
 // AES-256-GCM under a key of its own per `use`: what it seals can be neither read nor altered without the secret.

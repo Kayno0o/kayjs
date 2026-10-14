@@ -122,7 +122,7 @@ export interface SeoConfig {
 }
 
 export interface PreviewConfig {
-  // Signs preview links and the preview cookie, and is what a CMS's preview link carries, `/_kay/preview?secret=...&path=/blog/draft`: at least 32 random characters, read from the environment.
+  // Signs preview links and the preview cookie, never carried in a URL: at least 32 random characters, read from the environment.
   secret: string
   // How long a visitor stays in preview mode once in, seconds or a string such as '2h'; an hour by default.
   maxAge?: Duration | undefined

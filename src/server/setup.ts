@@ -23,6 +23,7 @@ import { refuseClashes } from './route-table'
 import { routeMounts } from './routes'
 import { configHead, siteOrigin } from './seo'
 import { projectSource } from './source'
+import { warnOnStampKey } from './stamp'
 import { setupStorage } from './storage'
 import { setTracer } from './trace'
 
@@ -80,6 +81,9 @@ export async function setupPages(project: Project, loadClient: () => Promise<Cli
     setupPreview(config.preview, base)
     setTracer(config.tracer)
     setupStorage(config.storage, join(imageCache, 'stored'))
+
+    if (!mode.dev)
+      warnOnStampKey()
   }
 
   if (config.inlineStyles === true && !mode.dev)

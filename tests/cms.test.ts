@@ -607,22 +607,23 @@ describe('the collections a CMS edits', () => {
 })
 
 describe('preview mode', () => {
-  it('lets in a CMS link carrying the secret, or a signed link, and refuses any other', async () => {
-    const entered = await app.handle(new Request(`http://localhost/_kay/preview?path=${encodeURIComponent('/news/roadmap')}&secret=${SECRET}`))
+  it('lets in a signed link, and refuses any other, one carrying the secret itself included', async () => {
+    const link = previewUrl('/news/roadmap')
+    const entered = await app.handle(new Request(`http://localhost${link}`))
 
     expect(entered.status).toBe(307)
     expect(entered.headers.get('location')).toBe('/news/roadmap')
     expect(entered.headers.get('cache-control')).toBe('no-store')
     expect(entered.headers.get('set-cookie')).toMatch(/^kay_preview=\d+\.[\w-]+; Path=\/; Max-Age=3600; HttpOnly; SameSite=Lax$/)
 
-    const link = previewUrl('/news/roadmap')
-
     expect(link).toStartWith('/_kay/preview?path=%2Fnews%2Froadmap&until=')
     expect(await previewCookie(link)).toStartWith('kay_preview=')
 
     const refuse = async (path: string) => (await app.handle(new Request(`http://localhost${path}`))).status
 
-    expect(await refuse(`/_kay/preview?path=/news&secret=${SECRET.slice(0, -1)}x`)).toBe(403)
+    // A URL stays in histories and proxy logs, so the secret itself opens nothing.
+    expect(await refuse(`/_kay/preview?path=/news&secret=${SECRET}`)).toBe(403)
+    expect(await refuse(`/_kay/preview?path=/news&edit&secret=${SECRET}`)).toBe(403)
     expect(await refuse('/_kay/preview?path=/news')).toBe(403)
     expect(await refuse(link.replace('roadmap', 'launch'))).toBe(403)
     expect(await refuse(`/_kay/preview?path=//evil.example&secret=${SECRET}`)).toBe(400)
@@ -631,7 +632,7 @@ describe('preview mode', () => {
     expect(await refuse(link)).toBe(403)
   })
 
-  it('puts a visitor in edit mode through the secret, a signed link or a guard, signed apart from preview mode so neither turns into it', async () => {
+  it('puts a visitor in edit mode through a signed link or a guard, signed apart from preview mode so neither turns into it', async () => {
     const mode = (cookie: string) => {
       const request = new Request('http://localhost/', { headers: { cookie } })
 
@@ -639,34 +640,34 @@ describe('preview mode', () => {
 
       return previewRequested(request)
     }
-    const bySecret = await previewCookie(`/_kay/preview?path=/news&edit&secret=${SECRET}`)
+    const byLink = await previewCookie(previewUrl('/news', { edit: true }))
     const link = previewUrl('/news', { edit: true })
     const cookies = new Bun.CookieMap()
 
     enterPreview({ cookies, request: new Request('http://localhost/') }, { edit: true })
 
-    expect(bySecret).toMatch(/^kay_preview=\d+\.edit\.[\w-]+$/)
-    expect(mode(bySecret)).toBe('edit')
+    expect(byLink).toMatch(/^kay_preview=\d+\.edit\.[\w-]+$/)
+    expect(mode(byLink)).toBe('edit')
     expect(link).toContain('&edit=&sig=')
     expect(mode(await previewCookie(link))).toBe('edit')
     expect(mode(`kay_preview=${cookies.get('kay_preview')}`)).toBe('edit')
-    expect(mode(await previewCookie(`/_kay/preview?path=/news&secret=${SECRET}`))).toBe('preview')
+    expect(mode(await previewCookie(previewUrl('/news')))).toBe('preview')
 
     const preview = await previewCookie(previewUrl('/news'))
     const [until, sig] = preview.slice('kay_preview='.length).split('.')
 
     expect(mode(`kay_preview=${until}.edit.${sig}`)).toBeUndefined()
-    expect(mode(bySecret.replace('.edit.', '.'))).toBeUndefined()
+    expect(mode(byLink.replace('.edit.', '.'))).toBeUndefined()
     expect((await app.handle(new Request(`http://localhost${previewUrl('/news')}&edit`))).status).toBe(403)
-    expect((await get('/news', bySecret)).headers.get('cache-control')).toBe('private, no-store')
+    expect((await get('/news', byLink)).headers.get('cache-control')).toBe('private, no-store')
     expect([previewing(), editing()]).toEqual([false, false])
     expect(inPreview(() => [previewing(), editing()], true)).toEqual([true, true])
     expect(inPreview(() => [previewing(), editing()])).toEqual([true, false])
   })
 
   it('marks in edit mode the markup each field and body renders, the same page byte for byte outside it', async () => {
-    const edit = await previewCookie(`/_kay/preview?path=/news&edit&secret=${SECRET}`)
-    const preview = await previewCookie(`/_kay/preview?path=/news&secret=${SECRET}`)
+    const edit = await previewCookie(previewUrl('/news', { edit: true }))
+    const preview = await previewCookie(previewUrl('/news'))
     const { html } = await get('/marks/launch', edit)
 
     expect(html).toContain('<h1 data-kay-field="news:launch:title">Launch day</h1>')
@@ -694,8 +695,8 @@ describe('preview mode', () => {
   })
 
   it('renders the extension\'s editor last in edit mode alone, kept alive across pages, given each entry the page read', async () => {
-    const edit = await previewCookie(`/_kay/preview?path=/news&edit&secret=${SECRET}`)
-    const preview = await previewCookie(`/_kay/preview?path=/news&secret=${SECRET}`)
+    const edit = await previewCookie(previewUrl('/news', { edit: true }))
+    const preview = await previewCookie(previewUrl('/news'))
     const editor = `${FIXTURE}/src/components/draft-editor.kay`
     const slot = new RegExp(`<slot data-component="${editor}" data-props="[^"]+" data-persist="${editor}"><button class="count">[\\s\\S]*<ul class="edited">(.*)</ul></slot></body></html>$`)
     const edited = async (path: string) => slot.exec((await get(path, edit)).html)?.[1]?.replaceAll(HYDRATION_MARK, '')
@@ -821,8 +822,8 @@ describe('preview mode', () => {
   })
 
   it('renders a page with the entries an editor has not saved, for a visitor in edit mode alone, refusing a draft its schema refuses', async () => {
-    const edit = await previewCookie(`/_kay/preview?path=/news&edit&secret=${SECRET}`)
-    const preview = await previewCookie(`/_kay/preview?path=/news&secret=${SECRET}`)
+    const edit = await previewCookie(previewUrl('/news', { edit: true }))
+    const preview = await previewCookie(previewUrl('/news'))
     const post = async (body: unknown, cookie = edit, headers: Record<string, string> = {}) => app.handle(new Request('http://localhost/_kay/draft', { method: 'POST', headers: { cookie, 'content-type': 'application/json', ...headers }, body: JSON.stringify(body) }))
     const draft = { path: '/marks/launch', entries: [{ collection: 'news', slug: 'launch', data: { title: 'Draft title', published: true, tags: ['draft'] }, body: '## Drafted' }] }
     const drafted = await post(draft)
@@ -859,7 +860,7 @@ describe('preview mode', () => {
   })
 
   it('refuses a draft body using a component its collection does not name, and a locale a localized collection alone has', async () => {
-    const edit = await previewCookie(`/_kay/preview?path=/news&edit&secret=${SECRET}`)
+    const edit = await previewCookie(previewUrl('/news', { edit: true }))
     const post = async (entries: unknown[], path = '/marks/launch') => app.handle(new Request('http://localhost/_kay/draft', { method: 'POST', headers: { 'cookie': edit, 'content-type': 'application/json' }, body: JSON.stringify({ path, entries }) }))
     const refused = await post([
       { collection: 'news', slug: 'launch', data: { title: 'T', published: true, tags: [] }, body: 'Hi\n\n<Nope />' },
@@ -886,7 +887,7 @@ describe('preview mode', () => {
   })
 
   it('forgets the drafts once their page is rendered, so the id naming them shows nothing again', async () => {
-    const edit = await previewCookie(`/_kay/preview?path=/news&edit&secret=${SECRET}`)
+    const edit = await previewCookie(previewUrl('/news', { edit: true }))
     const id = '00000000-0000-4000-8000-000000000000'
     const uuid = spyOn(crypto, 'randomUUID').mockReturnValue(id)
 
@@ -906,7 +907,7 @@ describe('preview mode', () => {
   })
 
   it('shows drafts to that visitor alone, from a fresh load no cache keeps, until the cookie runs out or they leave', async () => {
-    const cookie = await previewCookie(`/_kay/preview?path=/news&secret=${SECRET}`)
+    const cookie = await previewCookie(previewUrl('/news'))
 
     await get('/news')
     cms.loads = []
@@ -952,7 +953,7 @@ describe('preview mode', () => {
 
         return { html: await response.text(), etag: response.headers.get('etag'), cache: response.headers.get('cache-control') }
       }
-      const cookie = await previewCookie(`/_kay/preview?path=/news&secret=${SECRET}`)
+      const cookie = await previewCookie(previewUrl('/news'))
 
       cms.entries[0]!.title = 'Launch moved'
 

@@ -193,7 +193,7 @@ export function previewUrl(path: string, options: { ttl?: Duration, edit?: boole
   return `${current.base}${PREVIEW_ROUTE}?${new URLSearchParams({ path, until: String(until), ...edit && { edit: '' }, sig: sign(current, linkText(path, String(until), edit)) })}`
 }
 
-// `/_kay/preview?path=/blog/draft&secret=...`, the link a CMS opens, or a link `previewUrl` signed, sets the preview cookie and goes to the path, `&edit` in edit mode; `?exit&path=...` clears it.
+// A link `previewUrl` signed sets the preview cookie and goes to the path, `&edit` in edit mode; `?exit&path=...` clears it. The secret itself is never taken, as a URL stays in histories and proxy logs.
 export function servePreview(app: Elysia): void {
   app.get(PREVIEW_ROUTE, ({ request }) => {
     const current = settings!
@@ -208,7 +208,9 @@ export function servePreview(app: Elysia): void {
 
     if (query.has('exit'))
       exitPreview({ cookies })
-    else if (validSecret(current, query.get('secret')) || validLink(current, path, edit, query.get('until'), query.get('sig')))
+    else if (query.has('secret'))
+      return new Response('A preview link carries a signature, not the secret: make one with previewUrl() from kay/server', { status: 403, headers: TEXT })
+    else if (validLink(current, path, edit, query.get('until'), query.get('sig')))
       enterPreview({ cookies, request }, { edit })
     else
       return new Response('Not a valid preview link', { status: 403, headers: TEXT })
@@ -220,10 +222,6 @@ export function servePreview(app: Elysia): void {
 
     return new Response(null, { status: 307, headers })
   })
-}
-
-function validSecret(current: PreviewSettings, given: string | null): boolean {
-  return given !== null && sameText(given, current.secret)
 }
 
 function validLink(current: PreviewSettings, path: string, edit: boolean, until: string | null, sig: string | null): boolean {

@@ -1376,11 +1376,11 @@ describe('a compiled server with an editor', () => {
       'src/routes/index.kay': 'h1 Home\n',
       'src/server.ts': `import process from 'node:process'
 import { Elysia } from 'elysia'
-import { pages } from 'kay/server'
+import { pages, previewUrl } from 'kay/server'
 
 const app = new Elysia().use(await pages({ security: false }))
 const get = async (path: string, cookie = '') => app.handle(new Request(\`http://localhost\${path}\`, { headers: { cookie } }))
-const cookie = (await get('/_kay/preview?path=/&edit&secret=${secret}')).headers.getSetCookie()[0]!.split(';')[0]!
+const cookie = (await get(previewUrl('/', { edit: true }))).headers.getSetCookie()[0]!.split(';')[0]!
 const page = await (await get('/', cookie)).text()
 const sheet = /<link rel="stylesheet" href="([^"]+)">/.exec(page)?.[1]
 

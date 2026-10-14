@@ -29,7 +29,7 @@ import { hookPrerendered } from '../src/server/page-hook'
 import { prerenderPages } from '../src/server/prerender'
 import { clientAddress, countSucceeded, memoryRates, protectionRefusal, rateKey, rateLimit, sqliteRates } from '../src/server/protection'
 import { securityHeaders } from '../src/server/security'
-import { signStamp, stampTime, useStampSecret } from '../src/server/stamp'
+import { signStamp } from '../src/server/stamp'
 import { CspViolation } from '../src/server/violations'
 import { testSite } from '../src/test'
 import { parsingRoutes, routePaths } from './elysia'
@@ -550,20 +550,49 @@ describe('action protection', () => {
     expect((await site.submit(quick, { message: 'hello' }, { from: page, openedFor: 0 })).html).toContain('<p class="sent">Sent </p>')
   })
 
-  it('signs the stamps with the preview secret over a session\'s, which replaces only the key of the process', () => {
-    const stamp = signStamp('/_kay/action/a', 1000)
+  it('signs the stamps with a key derived from the session\'s secret over the preview one, which replaces only the key of the process', async () => {
+    // A process of its own, as a test file run before may have given this one a secret already.
+    const script = `import { signStamp, stampTime, useStampSecret } from ${JSON.stringify(join(import.meta.dir, '../src/server/stamp.ts'))}
+const seen = []
+const stamp = signStamp('/_kay/action/a', 1000)
+seen.push(stampTime('/_kay/action/a', stamp), stampTime('/_kay/action/b', stamp) ?? null)
+useStampSecret('the preview secret, long enough', 'preview')
+const preview = signStamp('/_kay/action/a', 1000)
+seen.push(stampTime('/_kay/action/a', stamp) ?? null)
+useStampSecret('a session secret, long enough too', 'session')
+const session = signStamp('/_kay/action/a', 1000)
+seen.push(stampTime('/_kay/action/a', preview) ?? null)
+useStampSecret('the preview secret, long enough', 'preview')
+seen.push(stampTime('/_kay/action/a', session))
+console.log(JSON.stringify(seen))
+`
+    const run = Bun.spawn([process.execPath, '-e', script], { stdout: 'pipe' })
 
-    expect(stampTime('/_kay/action/a', stamp)).toBe(1000)
-    expect(stampTime('/_kay/action/b', stamp)).toBeUndefined()
+    expect(JSON.parse(await new Response(run.stdout).text())).toEqual([1000, null, null, null, 1000])
+  })
 
-    useStampSecret('the preview secret, long enough', 'preview')
+  it('warns once, on a production server, when it signs with the key of the process alone', async () => {
+    const warned = async (secret: string) => {
+      const script = `import { setLogSink } from ${JSON.stringify(join(import.meta.dir, '../src/runtime/log.ts'))}
+import { signStamp, useStampSecret, warnOnStampKey } from ${JSON.stringify(join(import.meta.dir, '../src/server/stamp.ts'))}
+const warnings = []
+setLogSink((level, message) => warnings.push(level + ' ' + message))
+warnOnStampKey()
+${secret}
+signStamp('/_kay/action/a', 1000)
+signStamp('/_kay/action/a', 2000)
+console.log(JSON.stringify(warnings))
+`
+      const run = Bun.spawn([process.execPath, '-e', script], { stdout: 'pipe' })
 
-    const preview = signStamp('/_kay/action/a', 1000)
+      return JSON.parse(await new Response(run.stdout).text()) as string[]
+    }
 
-    expect(stampTime('/_kay/action/a', stamp)).toBeUndefined()
+    const alone = await warned('')
 
-    useStampSecret('a session secret, long enough too', 'session')
-    expect(stampTime('/_kay/action/a', preview)).toBe(1000)
+    expect(alone).toHaveLength(1)
+    expect(alone[0]).toStartWith('warn links to private files, form stamps and the flash cookie are signed with a key of this process')
+    expect(await warned('useStampSecret("the preview secret, long enough", "preview")')).toEqual([])
   })
 
   it('lets a client post as often as the limit allows in a window, then answers 429 with when to retry', async () => {
