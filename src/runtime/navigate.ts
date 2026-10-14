@@ -91,6 +91,10 @@ export async function navigate(to: string | { query: QueryChanges }, options: Na
   // A query change keeps the path and the other params, and leaves the hash out.
   const url = new URL(typeof to === 'string' ? withBase(to) : location.pathname + location.search, location.href)
 
+  // A `javascript:` URL, as one read from a query param could be, would run in the page; a `data:` one browsers refuse to load, and `vbscript:` is gone.
+  if (url.protocol === 'javascript:')
+    throw new TypeError('kay: navigate() refuses javascript:')
+
   if (typeof to !== 'string') {
     for (const [name, value] of Object.entries(to.query)) {
       if (value === null || value === undefined || value === '')
@@ -284,13 +288,13 @@ function onPrefetchHint(event: Event): void {
 }
 
 async function prefetch(link: HTMLAnchorElement): Promise<void> {
-  const url = link.closest('[data-no-prefetch]') ? undefined : followable(link)
+  const url = followable(link)
 
   if (!url)
     return
 
   try {
-    ;(await loadSwap()).prefetch(url)
+    ;(await loadSwap()).prefetch(url, link)
   }
   catch {}
 }

@@ -105,10 +105,6 @@ function askLeave(): boolean {
 
 // A full load instead, taking the place of the current entry when `replace`, as one going back already made.
 export function leave(target: URL, replace = false): void {
-  // A `javascript:` or `data:` URL, as one read from a query param could be, would run in the page.
-  if (target.protocol !== 'http:' && target.protocol !== 'https:')
-    throw new TypeError(`kay: a page goes to an http(s) URL, not to ${target.protocol}`)
-
   navigation.released = true
 
   if (replace)

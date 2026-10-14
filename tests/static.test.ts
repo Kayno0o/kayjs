@@ -189,6 +189,10 @@ describe('kay build --static', () => {
 
   it('writes the public files, the sitemap, robots.txt and kay\'s mark under the mount point, and 404.html', async () => {
     expect((await get('/humans.txt')).text).toBe('User-agent: test\n')
+    // A static host's own dotfile goes along, a backup or another dotfile left behind does not.
+    expect(await Bun.file(join(out, '.nojekyll')).exists()).toBe(true)
+    expect(await Bun.file(join(out, 'humans.txt.bak')).exists()).toBe(false)
+    expect(await Bun.file(join(out, '.secret')).exists()).toBe(false)
     expect((await get('/sitemap.xml')).text).toContain('<loc>https://x.example/repo/about</loc>')
     expect((await get('/robots.txt')).text).toContain('Sitemap: https://x.example/repo/sitemap.xml')
     expect((await get('/favicon.svg')).text).toBe(await Bun.file('src/server/favicon.svg').text())

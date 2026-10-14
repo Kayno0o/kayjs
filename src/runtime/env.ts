@@ -14,7 +14,7 @@ function values(): Record<string, unknown> {
   const held = (globalThis as { [PUBLIC_ENV]?: Record<string, unknown> })[PUBLIC_ENV]
 
   if (!held)
-    throw new Error('kay: publicEnv reads what kay.config.ts declares as `publicEnv`, and the app declares nothing there')
+    throw new Error('kay: kay.config.ts declares no publicEnv')
 
   return held
 }

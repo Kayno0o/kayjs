@@ -18,6 +18,7 @@ nav
   a.reload(href="/plain" data-reload) Plain
   a.whole(href="/whole") Whole
   a.isolated(href="/isolated") Isolated
+  a.nofollow(href="/state" rel="nofollow") State
 ul#side(style="height: 40px; overflow-y: auto; margin: 0")
   li(style="height: 400px") Side
 div#drawer(popover) Drawer

@@ -41,7 +41,7 @@ Import `src/app.css` from the root `_layout.kay`. It needs only `@import 'tailwi
 
 ## Public files
 
-A file in `public/` is served at its path as it is: `public/robots.txt` is `/robots.txt`. Use it for anything that needs a fixed URL. Dotfiles (but `.well-known/`), `.env` files and editor backups (`.bak`, `.old`, `.orig`, `.swp`, `.tmp`, `~`) are left out, neither served nor exported.
+A file in `public/` is served at its path as it is: `public/robots.txt` is `/robots.txt`. Use it for anything that needs a fixed URL. Dotfiles (but `.well-known/`), `.env` files and editor backups (`.bak`, `.old`, `.orig`, `.swp`, `.tmp`, `~`) are left out, neither served nor exported; a static export keeps `.htaccess` and `.nojekyll`, which the host reads.
 
 An HTML file is also served without its `.html`, as a static host does: `public/shelf/books.html` at `/shelf/books`, and `public/shelf/index.html` at `/shelf`.
 

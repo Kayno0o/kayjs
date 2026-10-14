@@ -22,7 +22,7 @@ import { sourceHash } from '../src/server/csp'
 import { submittedValues } from '../src/server/flash'
 import { historyScript } from '../src/server/history'
 import { prerenderPages } from '../src/server/prerender'
-import { htmlFallbacks, publicFiles } from '../src/server/public'
+import { htmlFallbacks, publicFiles, servedPublicly } from '../src/server/public'
 import { renderPage } from '../src/server/render'
 import { refuseClashes } from '../src/server/route-table'
 import { scanRoutes } from '../src/server/routes'
@@ -1490,10 +1490,12 @@ describe('public files', () => {
     const dir = await mkdtemp(join(tmpdir(), 'kay-public-'))
 
     try {
-      for (const name of ['.env', '.env.production', 'prod.env', '.git/config', 'assets/.DS_Store', 'index.html.bak', 'notes.txt~', '.well-known/security.txt', 'env.svg'])
+      for (const name of ['.env', '.env.production', 'prod.env', '.ENV', '.git/config', 'assets/.DS_Store', 'index.html.bak', 'INDEX.HTML.BAK', 'backup.old/logo.png', 'notes.txt~', '.htaccess', '.well-known/security.txt', 'env.svg'])
         await Bun.write(join(dir, name), name)
 
       expect((await publicFiles(dir)).map(file => file.url)).toEqual(['/.well-known/security.txt', '/env.svg'])
+      // A static export keeps the dotfiles a static host reads, and only those.
+      expect(['.htaccess', '.nojekyll', '.git/config', '.env'].map(path => servedPublicly(path, true))).toEqual([true, true, false, false])
     }
     finally {
       await rm(dir, { recursive: true, force: true })

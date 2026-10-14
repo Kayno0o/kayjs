@@ -79,7 +79,7 @@ export async function exportStatic(project: Project, client: ClientBuild, outdir
   }
 
   if (existsSync(publicDir)) {
-    await cp(publicDir, out, { recursive: true, filter: source => servedPublicly(relative(publicDir, source)) })
+    await cp(publicDir, out, { recursive: true, filter: source => servedPublicly(relative(publicDir, source), true) })
     written.push(...(await publicFiles(publicDir)).map(file => join(out, relative(publicDir, file.path))))
   }
 

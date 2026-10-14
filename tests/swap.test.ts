@@ -5,14 +5,13 @@ import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { t, ValidationError } from 'elysia'
 import { clientDir } from '../src/build/assets'
 import { resolveProject } from '../src/project'
-import { persisted, signal } from '../src/runtime'
+import { navigate, persisted, signal } from '../src/runtime'
 import { action } from '../src/runtime/action'
 import { hydrateIslands } from '../src/runtime/client'
 import { attempt, hydrate, HydrationMismatch } from '../src/runtime/dom'
 import { formInput } from '../src/runtime/form'
 import { child } from '../src/runtime/html'
 import { island } from '../src/runtime/island.server'
-import { leave } from '../src/runtime/navigation'
 import { pageData } from '../src/runtime/page-data'
 import { createSignal } from '../src/runtime/reactive'
 import { checkForm } from '../src/runtime/validate'
@@ -103,10 +102,10 @@ describe('page swap, on the server', () => {
     expect(await report(sent, { origin: 'http://localhost' })).toBe(204)
     expect(caught).toHaveLength(1)
     expect(caught[0]).toBeInstanceOf(BrowserError)
-    expect(caught[0]).toMatchObject({ kind: 'TypeError', message: 'x is undefined', url: 'http://localhost/fallback' })
-    // A forged log line or a terminal escape goes in as plain text, the stack keeping its line breaks.
-    expect(await report(JSON.stringify({ name: 'Error', message: 'broke\nkay: GET / 200\u001B[2J', stack: 'Error: broke\r\n    at chunk.js:1:2', url: '/' }))).toBe(204)
-    expect(caught[1]).toMatchObject({ message: 'broke kay: GET / 200 [2J', stack: 'Error: broke \n    at chunk.js:1:2' })
+    expect(caught[0]).toMatchObject({ kind: 'TypeError', message: 'x is undefined', url: 'http://localhost/fallback', stack: 'TypeError: x is undefined\n    at chunk.js:1:2' })
+    // A forged log line, a terminal escape or a bidi override goes in as plain text, the stack keeping its line breaks with every line but its header indented.
+    expect(await report(JSON.stringify({ name: 'Error', message: 'broke\nkay: GET / 200\u001B[2J\u202E', stack: 'Error: broke\r\n    at chunk.js:1:2\nkay: GET /admin 200', url: '/' }))).toBe(204)
+    expect(caught[1]).toMatchObject({ message: 'broke kay: GET / 200 [2J ', stack: '    Error: broke \n    at chunk.js:1:2\n    kay: GET /admin 200' })
     expect(await report(sent, { origin: 'https://evil.example' })).toBe(403)
     expect(await report('{"message":1}')).toBe(400)
 
@@ -250,9 +249,9 @@ describe('page swap, checking a form in the browser', () => {
       expect([name, element.querySelector<HTMLInputElement>(`input[name="${name}"]`)!.validationMessage]).toEqual([name, server[name]!])
   })
 
-  it('loads no javascript: or data: URL a navigation is handed, as one read from a query param could be', () => {
-    for (const href of ['javascript:alert(1)', 'data:text/html,<script>alert(1)</script>'])
-      expect(() => leave(new URL(href))).toThrow('kay: a page goes to an http(s) URL')
+  it('goes to no javascript: URL navigate() is handed, as one read from a query param could be', async () => {
+    for (const href of ['javascript:alert(1)', ' JavaScript:alert(1)'])
+      await expect(navigate(href as never)).rejects.toThrow('kay: navigate() refuses javascript:')
   })
 
   it('leaves the default for a persisted cookie cut short', () => {

@@ -61,7 +61,7 @@ export function remotePatterns(entries: readonly string[] = []): RemotePattern[]
 
     // `*.com` would let any site of a whole top-level domain have the server download from it.
     if (wildcard && !url.hostname.slice(2).includes('.'))
-      throw new Error(`images.remote holds ${entry}: a *. wildcard covers the subdomains of one domain, never a whole top-level domain`)
+      throw new Error(`images.remote holds ${entry}: a *. wildcard covers the subdomains of one domain, never a whole top-level domain such as *.com`)
 
     return { protocol: url.protocol, host: wildcard ? url.host.slice(2) : url.host, wildcard, path: url.pathname }
   })

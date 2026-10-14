@@ -62,7 +62,7 @@ export function defineEnv<Schema extends EnvSchema>(schema: Schema, source: Reco
 }
 
 // Names a variable meant for the server alone goes by, which no visitor should read: a map or analytics key is public by design, a secret or a database address never is.
-const SERVER_ONLY = /SECRET|PASSWORD|PASSWD|PRIVATE|^DATABASE_URL$|^REDIS_URL$/i
+const SERVER_ONLY = /SECRET|PASSWORD|PASSWD|PRIVATE|(?:^|_)(?:DATABASE|DB|POSTGRES|PG|MYSQL|REDIS|MONGO(?:DB)?)_URL$/i
 
 // The module the island entry imports the public variables from, served from the environment the server runs in, so an executable or a prerendered page reads today's values rather than those of the build.
 export const PUBLIC_ENV_PATH = '/_kay/env.js'

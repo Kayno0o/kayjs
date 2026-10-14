@@ -544,6 +544,29 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     }
   })
 
+  it('never fetches a rel=nofollow link ahead, and swaps it in once clicked', async () => {
+    const fetched: string[] = []
+    const fetch = (request: { url: () => string }) => {
+      if (new URL(request.url()).pathname === '/state')
+        fetched.push(request.url())
+    }
+
+    await page.goto(origin)
+    await page.evaluate(() => {
+      (window as { kayAlive?: boolean }).kayAlive = true
+    })
+    page.on('request', fetch)
+    await page.hover('a.nofollow')
+    await Bun.sleep(400)
+    expect(fetched).toEqual([])
+    await page.click('a.nofollow')
+    await until(() => new URL(page.url()).pathname === '/state')
+    page.off('request', fetch)
+
+    expect(fetched).toHaveLength(1)
+    expect(await sameDocument()).toBe(true)
+  })
+
   it('loads a page from a link opting out', async () => {
     await page.click('a.reload')
     await page.locator('h1', { hasText: 'Plain' }).waitFor()

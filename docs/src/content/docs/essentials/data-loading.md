@@ -82,7 +82,7 @@ h1 {post.title}
 
 <Callout type="warning">
 
-`ctx.redirect` goes to any URL, so a `?next=` param goes through `localPath(value, fallback)` from `kay`: `ctx.redirect(localPath(ctx.query.next, '/account'))`.
+`ctx.redirect` goes to any URL, `//other.example/` included, so a `?next=` param goes through `localPath(value, fallback)` from `kay`: `ctx.redirect(localPath(ctx.query.next, '/account'))`.
 
 </Callout>
 

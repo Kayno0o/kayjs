@@ -68,7 +68,11 @@ interface KeptIsland extends HTMLElement {
 }
 
 // Fetches a link's page ahead of the click, kept a few seconds for it.
-export function prefetch(url: URL): void {
+// A link opting out, or a `rel=nofollow` one such as a sign-out, which may do something once fetched, is followed when clicked, never ahead.
+export function prefetch(url: URL, link: Element): void {
+  if (link.closest('[data-no-prefetch],[rel~=nofollow]'))
+    return
+
   const key = pageKey(url)
   const held = prefetched.get(key)
 

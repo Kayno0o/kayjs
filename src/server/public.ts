@@ -13,8 +13,10 @@ const SENT_AS_IS = /%(?:40|2B|2C|3B|3D|26|24|5B|5D|7C)/g
 const ROUTER_SYNTAX = /['*]/g
 const WEAK_PREFIX = /^W\//
 const HTML = '.html'
-// What an editor, a deploy or a secret leaves in `public/` rather than what a visitor is meant to fetch: dotfiles and dot-directories but `.well-known/`, `.env` files and backups.
-const LEFT_BEHIND = /(?:^|\/)\.(?!well-known(?:\/|$))|\.env(?:\.[^/]*)?$|(?:\.(?:bak|old|orig|swp|tmp)|~)$/
+// What an editor, a deploy or a secret leaves in `public/` rather than what a visitor is meant to fetch, a file or a directory: `.env` files and backups.
+const LEFT_BEHIND = /\.env(?:\..*)?$|\.(?:bak|old|orig|swp|tmp)$|~$/i
+// The dotfiles a static host reads rather than serves, which a static export keeps.
+const HOST_FILES = new Set(['.htaccess', '.nojekyll'])
 const INDEX = '/index.html'
 
 export interface PublicFile {
@@ -41,9 +43,9 @@ export async function publicFiles(dir: string): Promise<PublicFile[]> {
   }).toSorted((a, b) => a.url < b.url ? -1 : a.url > b.url ? 1 : 0)
 }
 
-// Whether a file of `public/`, by its path from it, goes out: never one left behind there, which a static export leaves out as well.
-export function servedPublicly(path: string): boolean {
-  return !LEFT_BEHIND.test(path.split(sep).join('/'))
+// Whether a file of `public/`, by its path from it, goes out: never one left behind there, nor under a dot-directory or as a dotfile but `.well-known/` and, exported, the static host's own.
+export function servedPublicly(path: string, exported = false): boolean {
+  return path.split(sep).every(segment => !LEFT_BEHIND.test(segment) && (!segment.startsWith('.') || segment === '.well-known' || (exported && HOST_FILES.has(segment))))
 }
 
 function urlSegment(name: string): string {

@@ -415,7 +415,7 @@ const dispose = mount(Panel, document.querySelector('#panel')!, { title: 'Ticket
 
 ### Navigating from code
 
-- `navigate('/todos/1')`, imported from `kay`, goes to a page as a link would, `{ replace: true }` taking the current history entry's place; another site's page loads, so a `?next=` param goes through `localPath()` as a redirect's does, and a URL other than http(s), such as `javascript:`, throws. A link or `navigate()` that a redirect takes to another site loads that page fully rather than swapping it in.
+- `navigate('/todos/1')`, imported from `kay`, goes to a page as a link would, `{ replace: true }` taking the current history entry's place; another site's page loads, so a `?next=` param goes through `localPath()` as a redirect's does, and a `javascript:` URL throws, as it would run in the page; `mailto:`, `tel:` and other schemes go to the browser as a link would. A link or `navigate()` that a redirect takes to another site loads that page fully rather than swapping it in.
 - `navigate({ query: { sort: 'name', page: null } })` goes to the current page with those params set and a null, undefined or empty one dropped, the others and the path kept and the hash left out, keeping the scroll and the focus as `refresh()` does: a filter or a sort picked in place.
 - `refresh()` from `kay` runs the current page's loads again and shows what they return, keeping the scroll, the focus and every island whose props did not change, as a call to an action does by itself once it went through.
 - An island calls `refresh()` once something else changed what the page shows, or polls with it, `every(3000, refresh, { while: () => issuing })`.
