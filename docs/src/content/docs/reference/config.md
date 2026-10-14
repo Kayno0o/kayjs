@@ -48,6 +48,7 @@ Every option is optional. The ones below are the common ones, the rest are in th
 | --- | --- |
 | `routes` | The page directory, `src/routes` by default. See [Routing](/essentials/routing) |
 | `api` | The directory of API modules, `src/api` by default. See [API routes](/guides/api-routes) |
+| `publicDir` | The directory of files served as they are at their path, `public` by default. See [Styling and assets](/essentials/styling-and-assets#public-files) |
 | `redirects` | Old paths sent to new ones with a 308 |
 | `rewrite` | Serves a request from another path, such as a host's pages from a section |
 | `base` | Where the site is mounted when not at its host's root, `/docs` |

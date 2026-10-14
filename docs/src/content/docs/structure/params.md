@@ -13,6 +13,6 @@ export default (value: string) =>
   Number(value) % 2 === 0 ? Number(value) : undefined
 ```
 
-`items/[id=even].kay` then serves `/items/4` with `ctx.params.id` a `number`, and not `/items/3`. kay ships `integer`, `uuid` and `slug` in `kay/params`; a project's matcher of the same name wins over kay's. `kay check` reports a matcher whose default export is not a function.
+`items/[id=even].kay` then serves `/items/4` with `ctx.params.id` a `number`, and not `/items/3`. kay ships `integer`, `uuid` and `slug` in `kay/params`; a project's matcher of the same name wins over kay's.
 
 <ReadMore href="/structure/matcher">How a page uses a matcher.</ReadMore>

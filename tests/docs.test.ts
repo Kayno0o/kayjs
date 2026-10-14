@@ -20,6 +20,7 @@ const SITE_LINK = /(?:\]\(|href=")(\/[\w/-]*?)\/?(?:#[\w-]*)?[)"]/g
 const CODE = /```[\s\S]*?```|`[^`\n]*`/g
 const LINK = /\]\(((?:llms\/)?[\w-]+\.md)?(#[\w-]+)?\)/g
 const CARD_LINK = /ModuleCard\([^)]*\bhref="([^"]+)"/g
+const FRONTMATTER_PATH = /^path: (.+)$/m
 const SECTION_LINK = /href[=:] ?["'](\/[\w/-]+)#([\w-]+)["']/g
 
 describe('llms.txt', () => {
@@ -169,6 +170,14 @@ describe('the documentation site', () => {
       { name: 'kay.config.ts', href: '/structure/kay-config', children: [] },
     ])
     expect(() => pathTree([{ path: 'src/', href: '/a' }, { path: 'src/', href: '/b' }])).toThrow('Two pages are about src/')
+  })
+
+  it('gives every Structure page a path, together drawing each file and folder of a kay project', async () => {
+    const folder = join(root, 'docs/src/content/docs/structure')
+    const paths = await Promise.all((await readdir(folder)).map(async name => FRONTMATTER_PATH.exec(await Bun.file(join(folder, name)).text())?.[1]))
+
+    expect(paths).not.toContain(undefined)
+    expect(paths).toEqual(expect.arrayContaining(['src/routes/', 'src/routes/_layout.kay', 'src/routes/_404.kay', 'src/routes/[param].kay', 'src/routes/[[optional]].kay', 'src/routes/(group)/', 'src/routes/[param=matcher].kay', 'src/routes/feed.xml.ts', 'src/components/', 'src/api/', 'src/content/', 'src/content.config.ts', 'src/server.ts', 'public/', 'kay.config.ts', 'tsconfig.json', '.kay/']))
   })
 
   it('reads each page in its part, the sidebar listing only that part\'s pages', () => {
