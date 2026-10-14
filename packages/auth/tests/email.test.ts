@@ -150,12 +150,12 @@ describe('verifying an email', () => {
     expect((await take({ to: 'ada@example.com' }))[0]).toMatchObject({ kind: 'account-exists', url: 'https://site.test/', subject: 'You already have a Site account' })
 
     // The resend button answers alike too, mailing the holder nothing more.
+    await take({ to: 'bob@example.com' })
     const sent = mails.length
 
     expect(await held.call('sendVerification')).toEqual(await fresh.call('sendVerification'))
     expect(await held.call('verifyEmailCode', '000000')).toEqual(await fresh.call('verifyEmailCode', '000000'))
-    // The registration's and the resend's.
-    await take({ to: 'bob@example.com' }, 2)
+    await take({ to: 'bob@example.com' })
     expect(mails.slice(sent).map(mail => mail.to)).toEqual(['bob@example.com'])
   })
 
