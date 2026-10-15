@@ -555,8 +555,12 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     if (typesWriting !== undefined) {
       const grace = setTimeout(() => typesChild?.kill(), TYPES_GRACE_MS)
 
-      await typesWriting
-      clearTimeout(grace)
+      try {
+        await typesWriting
+      }
+      finally {
+        clearTimeout(grace)
+      }
     }
 
     child?.kill()
