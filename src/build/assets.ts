@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { basename, extname, join } from 'node:path'
 import process from 'node:process'
 
@@ -19,9 +20,16 @@ export const KAY_DIR = '.kay'
 // Names the directory under `.kay` the server `kay render` runs builds into: one of its own, removed once it answered, so it never deletes what `kay build` or a `kay dev` beside it wrote.
 export const RENDER_OUTPUT = 'KAY_RENDER_OUTPUT'
 
+const outputOf = new AsyncLocalStorage<string>()
+
+// Runs `work` with every build it starts writing into `.kay/<name>`, whatever `outputDir` would say, for a build that must leave `kay build`'s output alone.
+export async function inOutput<Result>(name: string, work: () => Promise<Result>): Promise<Result> {
+  return outputOf.run(name, work)
+}
+
 // What `kay build` writes and production serves; a `kay dev` server builds into a directory of its own, so a build or a test run beside it never deletes the files its pages link, and so does each worker of `bun test --parallel`, the processes its tests start included.
 export function outputDir(root: string): string {
-  return join(root, KAY_DIR, process.env[RENDER_OUTPUT] ?? `${underKayDev() ? 'dev' : 'client'}${testWorker()}`)
+  return join(root, KAY_DIR, outputOf.getStore() ?? process.env[RENDER_OUTPUT] ?? `${underKayDev() ? 'dev' : 'client'}${testWorker()}`)
 }
 
 // What sets apart the files each worker of `bun test --parallel` writes, which would otherwise overwrite one another's in a checkout they share.

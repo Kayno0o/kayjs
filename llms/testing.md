@@ -260,8 +260,7 @@ expect(jar.cookies.has('session')).toBe(true)
 - `bun test --isolate` runs each file in modules of its own, so each reads its own copy, and files never see each other's rows; the app's `bun run test` passes it, while a plain `bun test` runs the preload once and every file shares one copy.
 - The test database in `.env.test` need not exist, its server's user only needs `CREATEDB`.
 - Without `browser`, pages render their islands' markup without scripts.
-- `testSite()` still builds the islands for the browser, unminified, into `.kay/client` (or `.kay/client-<n>` in a `bun test --parallel` worker) and throws that build's error when one fails, such as an island reaching a Bun builtin or a server module (`browser-builtin-import`), which no server-side render meets.
-- The build clears what `kay build` left in that folder, prerendered pages included, so run `kay build` after the tests, not before.
+- `testSite()` still builds the islands for the browser, unminified, into `.kay/test-client` (`.kay/test-client-<n>` in a `bun test --parallel` worker), leaving what `kay build` wrote in `.kay/client` alone, and throws that build's error when one fails, such as an island reaching a Bun builtin or a server module (`browser-builtin-import`), which no server-side render meets.
 - It runs once per process (once per file under `bun test --isolate`) for as long as the files under `src`, the routes and the API stay unchanged, one at a time, and `browser: true` shares it; `kay.config.ts`, `public` and library sources are not watched.
 - On a large app the build may outlast a hook's 5 second timeout: pass `testSite({ islands: false })` there, or a longer timeout to `beforeAll`.
 - Test files import `.kay` files directly, `import { add } from '../src/routes/index.kay'`, through `[test] preload = ["kay/test/preload"]` in `bunfig.toml`, which `kay new` writes along with a first test.

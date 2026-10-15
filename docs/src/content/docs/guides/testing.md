@@ -88,7 +88,7 @@ A test that drives an Elysia app of its own, rather than `testSite`, keeps a bro
 
 ## Islands that fail the browser build
 
-Every `testSite()` call builds the islands for the browser and throws that build's error when one fails, such as an island importing a module that reaches `bun:sqlite` or the database. Pages still render without scripts, and no browser is needed. The build goes to `.kay/client`, clearing what `kay build` left there, so run `kay build` after your tests. It runs once per process (once per file under `bun test --isolate`) while the files under `src`, your routes and your API are unchanged, and takes a fraction of a second on a small app. On a large one it may outlast a hook's 5 second timeout: pass `testSite({ islands: false })` to skip it, or a longer timeout to `beforeAll`.
+Every `testSite()` call builds the islands for the browser and throws that build's error when one fails, such as an island importing a module that reaches `bun:sqlite` or the database. Pages still render without scripts, and no browser is needed. The build goes to `.kay/test-client`, so what `kay build` wrote stays as it was. It runs once per process (once per file under `bun test --isolate`) while the files under `src`, your routes and your API are unchanged, and takes a fraction of a second on a small app. On a large one it may outlast a hook's 5 second timeout: pass `testSite({ islands: false })` to skip it, or a longer timeout to `beforeAll`.
 
 ## In a browser
 

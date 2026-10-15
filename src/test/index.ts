@@ -11,7 +11,7 @@ import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { beforeEach } from 'bun:test'
 import { Elysia } from 'elysia'
-import { clientDir } from '../build/assets'
+import { clientDir, inOutput, testWorker } from '../build/assets'
 import { buildClient } from '../build/client'
 import { withConfig } from '../config'
 import { clientOptionsOf, PRODUCTION, resolveProject } from '../project'
@@ -53,7 +53,7 @@ export interface TestOptions extends PagesOptions {
   locals?: ((request: Request) => Record<string, unknown> | Promise<Record<string, unknown>>) | undefined
   // Loads pages in a headless Chrome with `open()`, served from the islands built for the browser.
   browser?: boolean | BrowserOptions | undefined
-  // Builds the islands for the browser, unminified, into `.kay/client` (clearing what a `kay build` left there), so one a browser cannot build, such as a server module reaching it, fails `testSite()` here and not only under `kay dev`; no browser needed. On unless `false`, built again only when the files under `src`, the routes or the API change.
+  // Builds the islands for the browser, unminified, into `.kay/test-client`, or `.kay/client` with `browser`, so one a browser cannot build, such as a server module reaching it, fails `testSite()` here and not only under `kay dev`; no browser needed. On unless `false`, built again only when the files under `src`, the routes or the API change.
   islands?: boolean | undefined
 }
 
@@ -182,10 +182,12 @@ function optionsKey(options: ClientOptions): string {
   return JSON.stringify(options, (_, value: unknown) => typeof value === 'bigint' ? String(value) : value)
 }
 
-// One build per root, rebuilt when its options or sources changed, and one at a time: every build clears and rewrites the root's output, which the sites of a process share.
-async function islandsBuilt(root: string, options: ClientOptions): Promise<ClientBuild> {
+// One build per root and output, rebuilt when its options or sources changed, and one at a time: every build clears and rewrites its output, which the sites of a process share.
+// A site not loaded in a browser builds into `.kay/test-client`, so `kay build`'s output stays as it was.
+async function islandsBuilt(root: string, options: ClientOptions, inBrowser: boolean): Promise<ClientBuild> {
   const key = `${optionsKey(options)}\0${await editedAt(root, options)}`
-  const held = builds.get(root)
+  const slot = `${root}\0${inBrowser}`
+  const held = builds.get(slot)
 
   if (held?.key === key)
     return held.build
@@ -196,10 +198,10 @@ async function islandsBuilt(root: string, options: ClientOptions): Promise<Clien
     }
     catch {}
 
-    return buildClient(root, options)
+    return inBrowser ? buildClient(root, options) : inOutput(`test-client${testWorker()}`, async () => buildClient(root, options))
   })()
 
-  builds.set(root, { key, build })
+  builds.set(slot, { key, build })
 
   return build
 }
@@ -212,7 +214,7 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
   const config = { ...loaded, site: loaded.site ?? ORIGIN, storage: options.storage ?? memoryFiles() }
   const project = resolveProject(root, config, { dev: config.dev === true, prebuilt: false, underKayDev: false })
   const inBrowser = options.browser !== undefined && options.browser !== false
-  const wanted = inBrowser || options.islands !== false ? await islandsBuilt(root, clientOptionsOf(config, PRODUCTION)) : undefined
+  const wanted = inBrowser || options.islands !== false ? await islandsBuilt(root, clientOptionsOf(config, PRODUCTION), inBrowser) : undefined
   // Without a browser the pages render their islands' markup and load no script, so the build only had to succeed.
   const client: ClientBuild = inBrowser && wanted ? wanted : { entryImports: [], islands: {}, styles: new Map(), pages: new Map(), dir: clientDir(root) }
   const browser = typeof options.browser === 'object' ? options.browser : {}
