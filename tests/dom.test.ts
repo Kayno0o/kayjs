@@ -1149,6 +1149,49 @@ describe('transitions', () => {
     }
   })
 
+  const mount23 = site({
+    'main.kay': `---\nimport { signal } from 'kay'\n\nconst items = signal(['a', 'b', 'c'])\n---\nbutton.drop(onClick={() => items.set(['a', 'c'])}) Drop\nbutton.add(onClick={() => items.set(['a', 'c', 'd'])}) Add\nul\n  for item of items()\n    li(transition="row" ${STYLE}) {item}\n`,
+  })
+
+  it('keep an if branch shown again during its leave phase once, and in its place', async () => {
+    const { root, dispose } = await mount20()
+
+    try {
+      const button = root.querySelector('button')!
+
+      button.click()
+      await updated()
+      await twoFrames()
+      button.click()
+      await updated()
+      await done()
+      expect([...root.querySelectorAll('.panel')].map(panel => panel.isConnected)).toEqual([true])
+      expect(root.querySelector('.panel')!.className).toBe('panel')
+    }
+    finally {
+      await dispose()
+    }
+  })
+
+  it('keep a for row dropped and added again by key during its leave phase once, and in its place', async () => {
+    const { root, dispose } = await mount23()
+
+    try {
+      const texts = () => [...root.querySelectorAll('li')].map(row => row.textContent)
+
+      root.querySelector<HTMLElement>('button.drop')!.click()
+      await updated()
+      await twoFrames()
+      root.querySelector<HTMLElement>('button.add')!.click()
+      await updated()
+      await done()
+      expect(texts()).toEqual(['a', 'c', 'd'])
+    }
+    finally {
+      await dispose()
+    }
+  })
+
   it('draw a unit after a leaving node at the end of the part', async () => {
     const { root, dispose } = await mountKeptMoves()
     const step = (globalThis as unknown as { step: () => void }).step
@@ -1217,10 +1260,6 @@ describe('transitions', () => {
     finally {
       await dispose()
     }
-  })
-
-  const mount23 = site({
-    'main.kay': `---\nimport { signal } from 'kay'\n\nconst items = signal(['a', 'b', 'c'])\n---\nbutton.drop(onClick={() => items.set(['a', 'c'])}) Drop\nbutton.add(onClick={() => items.set(['a', 'c', 'd'])}) Add\nul\n  for item of items()\n    li(transition="row" ${STYLE}) {item}\n`,
   })
 
   it('play a for row out as its item goes and the new rows in, the rows left in their order', async () => {
