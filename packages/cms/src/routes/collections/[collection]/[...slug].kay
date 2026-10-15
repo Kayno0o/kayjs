@@ -6,13 +6,14 @@ import EntryEditor from '../../../components/entry-editor.kay'
 import { humanize } from '../../../fields'
 import { collectionPath } from '../../../listing'
 import { settings } from '../../../settings'
-import { entryOf, findCollection } from '../../../store'
+import { entryScreen } from '../../../store'
 
 export const page = { query: s.Object({ locale: s.Optional(s.String()) }) }
 
 const { prefix } = settings()
-const collection = await findCollection(ctx.params.collection) ?? ctx.notFound()
-const entry = collection.problem === undefined ? await entryOf({ collection: collection.name, slug: ctx.params.slug, locale: ctx.query.locale }) ?? ctx.notFound() : undefined
+const screen = await entryScreen({ collection: ctx.params.collection, slug: ctx.params.slug, locale: ctx.query.locale }) ?? ctx.notFound()
+const { collection } = screen
+const entry = collection.problem === undefined ? screen.entry ?? ctx.notFound() : undefined
 const name = ctx.query.locale === undefined ? ctx.params.slug : `${ctx.params.slug} (${ctx.query.locale})`
 ---
 head

@@ -20,13 +20,18 @@ let saved: FileChange[]
 let loaded: { slug: string, data: unknown }[]
 let removed: string[]
 let stored: Record<string, SourceEntry[]>
+let infoCalls: unknown[]
 
 // kay's content API, answering from `stored` and recording what a loader was handed.
 const content: typeof Content = {
   bodyHtml,
   MarkdownError,
   collections: async () => [posts, products, outside],
-  collectionInfo: async name => [posts, products, outside].find(collection => collection.name === name),
+  collectionInfo: async (name, options) => {
+    infoCalls.push([name, options])
+
+    return [posts, products, outside].find(collection => collection.name === name)
+  },
   entries: async (collection, filter) => (stored[collection] ?? []).filter(entry => (filter?.slug === undefined || entry.slug === filter.slug) && (filter?.locale === undefined || entry.locale === filter.locale)),
   entrySource: async (collection, slug, data, options) => options?.create && stored[collection]?.some(entry => entry.slug === slug)
     ? { issues: [{ collection, slug, path: '', key: 'slug', message: TAKEN }] }
@@ -59,12 +64,13 @@ const content: typeof Content = {
 void mock.module('../src/kay/content', () => content)
 
 // Imported once the mock is in place, so the store reads it.
-const { deleteEntry, entryOf, publishEntry, saveEntry, UnknownCollection } = await import('../src/store')
+const { deleteEntry, entryOf, entryScreen, publishEntry, saveEntry, UnknownCollection } = await import('../src/store')
 
 beforeEach(() => {
   saved = []
   loaded = []
   removed = []
+  infoCalls = []
   stored = { posts: [{ slug: 'hello', path: 'content/posts/hello.md', data: { title: 'Hello', draft: true }, body: 'Hi', draft: true }], products: [{ slug: 'mug', data: { name: 'Mug' }, draft: false }] }
   configure({ files: { save: async (change) => {
     saved.push(change)
@@ -167,6 +173,18 @@ describe('saveEntry', () => {
     expect(await saveEntry({ collection: 'products', slug: 'mug', data: { name: 'Big mug' } })).toEqual({ saved: true })
     expect(loaded).toEqual([{ slug: 'mug', data: { name: 'Big mug' } }])
     expect(saved).toEqual([])
+  })
+
+  test('asks for the collection without its counts, which a loaded one\'s loader is run to tell', async () => {
+    await saveEntry({ collection: 'products', slug: 'mug', data: { name: 'Big mug' } })
+    await deleteEntry({ collection: 'products', slug: 'mug' })
+    expect(infoCalls).toEqual([['products', { counts: false }], ['products', { counts: false }]])
+  })
+
+  test('reads an entry screen\'s collection and entry together, the collection with its counts once', async () => {
+    expect(await entryScreen({ collection: 'products', slug: 'mug' })).toEqual({ collection: products, entry: stored.products![0] })
+    expect(infoCalls).toEqual([['products', { counts: false }], ['products', undefined]])
+    expect(await entryScreen({ collection: 'nothing', slug: 'x' })).toBeUndefined()
   })
 
   test('throws for a collection kay does not list', async () => {

@@ -38,7 +38,7 @@ export default defineConfig({ extensions: [cms({ guard: auth.guard({ require: 'e
 - `<prefix>/collections/<collection>`: its entries, 50 a page, titled by their first one-line text field, searched by title and slug (`?q=`), with Publish for a draft, Edit on page for an entry kay knows the page of, and Delete.
 - `<prefix>/collections/<collection>/<slug>` (`?locale=`): the entry's form, with Save, Reset, Publish, Delete and Edit on page.
 - `<prefix>/new/<collection>` (`?locale=`): a new entry, its slug typed, and in a localized collection its locale, one the site serves.
-- `<prefix>/uploads`: the unused uploads, each with its variants and a Delete that asks first.
+- `<prefix>/uploads`: the unused uploads, each with its variants and a Delete that asks first; ticked rows are deleted together, the content read once for all.
 - `<prefix>/page?path=`: opens the page in edit mode.
 
 ## API

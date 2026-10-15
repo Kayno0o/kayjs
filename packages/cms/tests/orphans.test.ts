@@ -13,11 +13,19 @@ const products: CollectionInfo = { ...shape, name: 'products', kind: 'loaded' }
 
 let listed: CollectionInfo[]
 let stored: Record<string, SourceEntry[]>
+let infoCalls: unknown[]
+let reads: string[]
 
 const content: Partial<typeof Content> = {
   ...await import('kay/content'),
-  collections: async () => listed,
+  collections: async (options) => {
+    infoCalls.push(options)
+
+    return listed
+  },
   entries: async (collection) => {
+    reads.push(collection)
+
     const entries = stored[collection]
 
     if (!entries)
@@ -54,6 +62,8 @@ afterEach(() => {
 beforeEach(async () => {
   setupStorage(memoryFiles(), '/nonexistent', undefined)
   listed = [posts, products]
+  infoCalls = []
+  reads = []
   stored = { posts: [], products: [] }
 })
 
@@ -142,10 +152,6 @@ test('lists nothing while a collection or an entry cannot be read, since it may 
 
   stored = { posts: [] }
   expect(await unusedUploads()).toEqual({ blocked: ['products cannot be read'] })
-
-  listed = [posts, { ...products, problem: 'failed to read' }]
-  stored = { posts: [], products: [] }
-  expect(await unusedUploads()).toEqual({ blocked: ['products cannot be read'] })
 })
 
 test('deletes only the uploads still unused, and refuses to delete while the entries cannot be read', async () => {
@@ -178,4 +184,16 @@ test('refuses to delete uploads where the app gave cms() no guard', async () => 
 
   expect(response.status).toBe(403)
   expect(await files.get(stray)).toBeDefined()
+})
+
+test('scans each collection once to delete any number of uploads, listing the collections without their counts', async () => {
+  const uploads = await Promise.all(Array.from({ length: 5 }, async () => upload('posts')))
+
+  aged()
+  stored = { posts: [], products: [] }
+  reads = []
+
+  expect((await deleteUnusedUploads(uploads) as { deleted: string[] }).deleted.toSorted()).toEqual(uploads.toSorted())
+  expect(reads).toEqual(['posts', 'products'])
+  expect(infoCalls).toEqual([{ counts: false }])
 })

@@ -102,20 +102,23 @@ export async function deleteSaved(ref: EntryRef, version?: string | undefined): 
   return settled(outcome, 'Deleted', 'Not deleted')
 }
 
-// Deletes an unused upload and its variants, and says how it went; true once the row is stale, deleted or not.
-export async function deleteUnusedUpload(key: string): Promise<boolean> {
-  const result = await attempt(() => call(filesApi, '/unused/delete', { method: 'post', body: { keys: [key] } }), 'Could not delete')
+// Deletes unused uploads and their variants in one request, so the server reads the content once for all, and says how it went; true once the rows are stale, deleted or not.
+export async function deleteUnusedUploads(keys: string[]): Promise<boolean> {
+  const result = await attempt(() => call(filesApi, '/unused/delete', { method: 'post', body: { keys } }), 'Could not delete')
 
   if (!result)
     return false
 
   if (result.deleted.length === 0) {
-    toast.info('No longer unused, or already deleted')
+    toast.info(keys.length === 1 ? 'No longer unused, or already deleted' : 'None are unused any longer, or all are already deleted')
 
     return true
   }
 
-  toast.success('Deleted')
+  toast.success(result.deleted.length === 1 ? 'Deleted' : `Deleted ${result.deleted.length}`)
+
+  if (result.kept.length > 0)
+    toast.info(`${result.kept.length} no longer unused, or already deleted`)
 
   return true
 }

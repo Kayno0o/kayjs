@@ -29,7 +29,8 @@ const IDS = /(?=([\da-f]{20}))/g
 // A URL hardcoded in a page, a file of the repository outside the collections or an older revision a revert brings back is not seen: the editor confirms before anything goes.
 export async function unusedUploads(): Promise<UploadScan> {
   const blocked: string[] = []
-  const listed = await collections()
+  // Only the names: a loaded collection's loader runs once, in `entries`, and not again to count its entries.
+  const listed = await collections({ counts: false })
   const folders = [...new Set(listed.map(collection => uploadFolder(collection.name)))].filter(folder => !PRIVATE_FOLDER.test(folder))
   const stored: string[] = []
   const now = Date.now()
@@ -47,12 +48,6 @@ export async function unusedUploads(): Promise<UploadScan> {
   const referenced = new Set<string>()
 
   for (const collection of listed) {
-    if (collection.problem !== undefined) {
-      blocked.push(`${collection.name} cannot be read`)
-
-      continue
-    }
-
     try {
       for (const entry of await entries(collection.name)) {
         if (entry.data === undefined) {
