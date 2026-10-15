@@ -29,6 +29,7 @@ import { reportServerError } from './report'
 import { requestUrl } from './request-url'
 import { revalidateStale } from './revalidate'
 import { canonicalPath, withoutSlash } from './routes'
+import { carryContext } from './security'
 import { serveServerIslands } from './server-islands'
 import { answered, SERVER_SPAN, traced } from './trace'
 
@@ -199,8 +200,7 @@ export function servePageRoutes(app: Elysia, { table, served: claims, matchers, 
     if (served.size === 0)
       continue
 
-    app.get(path, async (given) => {
-      const context = sharedContext(given.request, () => ({ ...given }))
+    const handle = async (context: RequestContext & { params: unknown }) => {
       const url = requestUrl(context.request)
       // On a host, the path is served in the host's locale, or not at all when only another locale's translation names it.
       const locale = settings?.hosts ? hostLocale(settings, context.request) : served.keys().next().value
@@ -239,15 +239,17 @@ export function servePageRoutes(app: Elysia, { table, served: claims, matchers, 
       const response = await runInLocale(state, async () => answeringRequest(context.request, async () => answer(own.candidates, context, url)))
 
       return settings.prefixDefault ? remembered(response, context.request, locale) : response
-    })
+    }
+
+    // The context is spread rather than handed over whole, which would make Elysia parse cookies and query for every request.
+    app.get(path, async given => carryContext(given.set, await handle(sharedContext(given.request, () => ({ ...given })))))
   }
 
   // Every route above wins over this one, so it only answers what no page serves.
   if (!(fallback.notFound ?? fallback.error))
     return
 
-  app.get('/*', async (given) => {
-    const context = sharedContext(given.request, () => ({ ...given }))
+  const unmatched = async (context: RequestContext) => {
     const url = requestUrl(context.request)
 
     if (!i18n || !settings)
@@ -262,5 +264,7 @@ export function servePageRoutes(app: Elysia, { table, served: claims, matchers, 
       response.headers.append('vary', 'cookie, accept-language')
 
     return response
-  })
+  }
+
+  app.get('/*', async given => carryContext(given.set, await unmatched(sharedContext(given.request, () => ({ ...given })))))
 }

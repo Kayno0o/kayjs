@@ -32,6 +32,7 @@ import { sharedContext } from './render'
 import { reportServerError } from './report'
 import { requestUrl } from './request-url'
 import { guardUrl } from './routes'
+import { carryContext } from './security'
 import { Denied, Redirect } from './signals'
 import { answered, SERVER_SPAN, traced } from './trace'
 import { visitAs } from './visit'
@@ -131,7 +132,7 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], m
         if (span)
           answered(span, response.status)
 
-        return response
+        return carryContext(context.set, response)
       }), {
         body: value.schema,
         transform: async (context) => {

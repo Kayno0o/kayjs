@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, it } from 'bun:test'
+import { Elysia } from 'elysia'
 import { files, memoryFiles, pages } from '../src/server'
 import { fixtureCopy } from './scratch'
 
@@ -98,5 +99,33 @@ describe('the headers of every kind of answer', () => {
 
     await expectAnswer(await get(action, { origin: ORIGIN, referer: `${ORIGIN}/` }, post), 303, { 'location': `${ORIGIN}/`, 'set-cookie': 'kay_flash=<value>; Path=<value>; Max-Age=<value>; HttpOnly; SameSite=<value>' })
     await expectAnswer(await get(action, { origin: 'http://evil.test' }, post), 403, {})
+  })
+
+  it('hands Elysia the response the route made, with no copy of it', async () => {
+    const dir = await fixtureCopy('answers')
+    let made: unknown
+    const inner = await pages({ routes: `${dir}/src/routes`, api: `${dir}/src/api`, prebuilt: false, log: false, compress: false, storage: memoryFiles() })
+    const outer = new Elysia().onAfterResponse({ as: 'global' }, ({ responseValue }) => {
+      made = responseValue
+    }).use(inner)
+    const sent = async (path: string, init?: RequestInit) => {
+      const response = await outer.handle(new Request(`${ORIGIN}${path}`, init))
+
+      // After-response hooks run once the response is out.
+      await Bun.sleep(5)
+
+      return { response, same: response === made }
+    }
+
+    expect((await sent('/')).same).toBe(true)
+    expect((await sent('/api/items')).same).toBe(true)
+    expect((await sent('/api/items/headed')).same).toBe(true)
+    expect((await sent(asset)).same).toBe(true)
+
+    const own = (/<form[^>]*action="([^"]+)"/).exec(await (await sent('/')).response.text())![1]!.replaceAll('&amp;', '&')
+    const posted = await sent(own, { method: 'POST', body: new URLSearchParams({ title: 'x' }), headers: { origin: ORIGIN, referer: `${ORIGIN}/` } })
+
+    expect(posted.response.status).toBe(303)
+    expect(posted.same).toBe(true)
   })
 })

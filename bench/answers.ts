@@ -4,7 +4,7 @@ import process from 'node:process'
 import { files, memoryFiles, pages } from '../src/server'
 import { scratchDir } from '../tests/scratch'
 
-// Requests per second of each kind of answer through `app.handle`, no socket: `bun bench/answers.ts [rounds]`.
+// CPU microseconds per request of each kind of answer through `app.handle`, no socket: `bun bench/answers.ts [rounds]`.
 const root = await scratchDir('answers-bench-')
 
 await cp(join(import.meta.dir, '../tests/fixtures/answers'), root, { recursive: true })
@@ -25,21 +25,33 @@ const cases: Record<string, () => Request> = {
   action: () => new Request(`${origin}${form}`, { method: 'POST', body: new URLSearchParams({ title: 'x' }), headers: { origin, referer: `${origin}/` } }),
 }
 const rounds = Number(Bun.argv[2] ?? 5000)
+const only = Bun.argv[3]?.split(',')
+const repeats = Number(Bun.argv[4] ?? 5)
 
 for (const [name, make] of Object.entries(cases)) {
-  const probe = await app.handle(make())
+  if (only && !only.includes(name))
+    continue
 
-  console.log(name, probe.status, [...probe.headers.keys()].join(','))
+  await app.handle(make())
 
   for (let i = 0; i < 300; i++)
     await (await app.handle(make())).arrayBuffer()
 
-  const start = Bun.nanoseconds()
+  // CPU time rather than wall time, which other processes on the machine stretch.
+  const best: number[] = []
 
-  for (let i = 0; i < rounds; i++)
-    await (await app.handle(make())).arrayBuffer()
+  for (let round = 0; round < repeats; round++) {
+    const start = process.cpuUsage()
 
-  console.log(name.padEnd(10), Math.round(rounds / ((Bun.nanoseconds() - start) / 1e9)), 'req/s')
+    for (let i = 0; i < rounds; i++)
+      await (await app.handle(make())).arrayBuffer()
+
+    const used = process.cpuUsage(start)
+
+    best.push((used.user + used.system) / rounds)
+  }
+
+  console.log(name.padEnd(10), Math.min(...best).toFixed(2), `us/request (best of ${repeats})`)
 }
 
 await rm(root, { recursive: true, force: true })

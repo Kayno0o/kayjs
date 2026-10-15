@@ -212,7 +212,13 @@ function jsonReply(value: unknown, set: { status?: number | string, headers: Rec
   if (!headers.has('content-type'))
     headers.set('content-type', 'application/json;charset=utf-8')
 
-  return new Response(text, { status: set.status ?? 200, headers })
+  const response = new Response(text, { status: set.status ?? 200, headers })
+
+  // Everything the context held is on the response, so Elysia has nothing to copy it for.
+  set.headers = {}
+  set.status = 200
+
+  return response
 }
 
 // Plain first, the bigint-aware pass only for a value the plain one threw on; undefined for a cycle, which Elysia's own pass names.

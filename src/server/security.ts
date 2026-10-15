@@ -155,6 +155,46 @@ export function ownHeaders(set: Context['set'], copies: HeaderCopies): Record<st
   return copies.plain
 }
 
+// The names a response was given from the context, by response: a response answered twice, as a constant is, has them taken off before it gets the second request's.
+const carried = new WeakMap<Response, string[]>()
+
+// What the context holds goes onto the response itself, so Elysia has no header to copy the response for; a response of the route's own wins over the context, as it does in Elysia's merge.
+// Left to Elysia's copy: a cookie (the jar's, or a header of the context's), a status the response would not keep, a response that streams, and headers that cannot be written (`Response.redirect`).
+// A static response is cloned by Elysia after this runs, so it carries the headers of the request that is answered, not the one before.
+export function carryContext<T extends Response>(set: Context['set'], response: T): T {
+  const { status } = set
+
+  if (set.cookie || set.headers['set-cookie'] !== undefined || (status !== undefined && status !== 200 && (typeof status !== 'number' || response.status === 200)) || response.headers.get('transfer-encoding') === 'chunked')
+    return response
+
+  const { headers } = response
+  const names: string[] = []
+
+  try {
+    for (const name of carried.get(response) ?? [])
+      headers.delete(name)
+
+    for (const name in set.headers) {
+      if (!headers.has(name)) {
+        headers.set(name, set.headers[name] as string)
+        names.push(name)
+      }
+    }
+  }
+  catch {
+    // Immutable headers, nothing written: the context's go on through Elysia's copy.
+    return response
+  }
+
+  carried.set(response, names)
+  set.headers = {}
+
+  if (status !== 200)
+    set.status = 200
+
+  return response
+}
+
 function requestIdAlone(headers: Context['set']['headers']): string | undefined {
   let id: string | undefined
 
