@@ -211,6 +211,26 @@ guardLeave(() => draft() !== '')
 textarea(bind:value={draft} aria-label="Draft")
 ```
 
+### Bind a keyboard shortcut
+
+`shortcut` from `kay` runs a function when keys are pressed, for as long as the island lives. `mod` is Cmd on macOS and Ctrl elsewhere:
+
+```kay
+---
+import { shortcut } from 'kay'
+
+let form: HTMLFormElement | undefined
+
+function save(): void {
+  form?.requestSubmit()
+}
+
+shortcut('mod+s', save, { on: () => form })
+---
+form(ref={element => form = element} onSubmit={event => event.preventDefault()})
+  input(aria-label="Title")
+```
+
 ### Render a component on a page kay does not serve
 
 With `"kay/bun"` listed under `[serve.static] plugins` in `bunfig.toml`, `mount` from `kay/mount` renders one into an element and returns what disposes it:
@@ -424,6 +444,11 @@ const dispose = mount(Panel, document.querySelector('#panel')!, { title: 'Ticket
 - `refresh()` from `kay` runs the current page's loads again and shows what they return, keeping the scroll, the focus and every island whose props did not change, as a call to an action does by itself once it went through.
 - An island calls `refresh()` once something else changed what the page shows, or polls with it, `every(3000, refresh, { while: () => issuing })`.
 - `navigate` and `refresh` do nothing on the server.
+- `shortcut(keys, handler, options?)` from `kay`, called in an island's script, runs `handler(event)` on a keydown, for as long as the island lives, and does nothing on the server. `keys` joins modifiers (`mod`, `ctrl`, `meta`, `alt`, `shift`) and one key with `+`: `mod+s`, `shift+?`, `/`, `escape`, `arrowup`, `space`. The modifiers must match exactly, except that `shift` is ignored for a symbol key such as `?`.
+- A shortcut binds the whole page; `on: element` or `on: () => element`, the function form reading a `ref` variable once the island mounted, scopes it to that element, which gets `aria-keyshortcuts` while the island lives.
+- A shortcut with `mod`, `ctrl`, `meta` or `alt` fires while a text field, select or `contenteditable` element has the focus; a bare key (`/`, `?`, `g`) does not, unless `{ inputs: true }`. Named keys such as `escape` fire there too.
+- It cancels the browser's default (`mod+s` saving the page) unless `{ preventDefault: false }`, and skips a press that is part of an IME composition, a held key unless `{ repeat: true }`, and an event something already handled (`defaultPrevented`), so of two bindings on one key the innermost one, an element's before the page's, wins.
+- A letter or digit matches the character typed, else the physical key (`event.code`), so `mod+s` still works on a Cyrillic layout or with Option held on a Mac. An unknown modifier or an empty key throws.
 - `guardLeave(() => dirty())` from `kay`, called in an island's script, asks before the page is left while the function returns true, for as long as the island lives.
 - Under a guard, a link of the app, `navigate()` and going back or forward wait for the answer, a refused back or forward returning the URL and its history entry to the page, scroll and islands as they were.
 - A reload, closing the tab or a link loading fully gets the browser's own prompt, listened for only while a guard holds changes, so the page stays in the back-forward cache otherwise.

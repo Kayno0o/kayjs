@@ -6,6 +6,7 @@ import { kay } from '../src/build/plugin'
 import { compileKay } from '../src/compiler'
 import { patch } from '../src/runtime/dev-patch'
 import { cappedSizes } from '../src/runtime/image'
+import { shortcut } from '../src/runtime/shortcut'
 import { LIVE_RELOAD } from '../src/server/dev'
 import { settle } from '../src/test'
 import { scratchDir } from './scratch'
@@ -1755,5 +1756,128 @@ describe('a form submitted in the browser', () => {
 
     expect(err).toBe('')
     expect(JSON.parse(out)).toEqual({ reasons: ['refused'], busy: [null, null] })
+  })
+})
+
+describe('shortcut', () => {
+  const mountShortcuts = site({ 'main.kay': '---\nimport { shortcut, signal } from \'kay\'\n\nconst log = signal<string[]>([])\nlet form: HTMLElement | undefined\nconst note = (name: string) => () => log.set([...log(), name])\n\nshortcut(\'mod+s\', note(\'save\'))\nshortcut(\'/\', note(\'slash\'))\nshortcut(\'escape\', note(\'escape\'))\nshortcut(\'alt+s\', note(\'alt-s\'), { preventDefault: false })\nshortcut(\'mod+e\', note(\'page-e\'))\nshortcut(\'mod+e\', note(\'form-e\'), { on: () => form })\nshortcut(\'mod+r\', note(\'repeat\'), { repeat: true })\nshortcut(\'?\', note(\'help\'), { inputs: true })\n---\nform.editor(ref={element => form = element})\n  input.field\n  div.rich(contenteditable="true")\np.log {log().join(\',\')}\n' })
+
+  function press(target: EventTarget, key: string, init: KeyboardEventInit = {}): KeyboardEvent {
+    const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...init })
+
+    target.dispatchEvent(event)
+
+    return event
+  }
+
+  const logged = async (root: HTMLElement) => {
+    await settle()
+
+    return root.querySelector('.log')!.textContent
+  }
+
+  it('binds mod to Ctrl, cancels the default and matches the modifiers exactly', async () => {
+    const { root, dispose } = await mountShortcuts()
+
+    try {
+      expect(press(document.body, 's', { ctrlKey: true }).defaultPrevented).toBe(true)
+      press(document.body, 's', { metaKey: true })
+      press(document.body, 's', { ctrlKey: true, shiftKey: true })
+      press(document.body, 's')
+      expect(await logged(root)).toBe('save')
+    }
+    finally {
+      await dispose()
+    }
+  })
+
+  it('binds mod to Cmd on an Apple platform', async () => {
+    const platform = Object.getOwnPropertyDescriptor(navigator, 'platform')
+
+    Object.defineProperty(navigator, 'platform', { value: 'MacIntel', configurable: true })
+
+    const { root, dispose } = await mountShortcuts()
+
+    try {
+      press(document.body, 's', { ctrlKey: true })
+      press(document.body, 's', { metaKey: true })
+      expect(await logged(root)).toBe('save')
+    }
+    finally {
+      await dispose()
+
+      if (platform)
+        Object.defineProperty(navigator, 'platform', platform)
+      else
+        delete (navigator as unknown as { platform?: string }).platform
+    }
+  })
+
+  it('fires a modified key in a field and leaves a bare key to the text', async () => {
+    const { root, dispose } = await mountShortcuts()
+
+    try {
+      const field = root.querySelector('.field')!
+      const rich = root.querySelector('.rich')!
+
+      press(field, '/')
+      press(rich, '/')
+      press(root.querySelector('.log')!, '/')
+      press(field, 's', { ctrlKey: true })
+      press(field, 'Escape')
+      press(field, '?', { shiftKey: true })
+      expect(await logged(root)).toBe('slash,save,escape,help')
+    }
+    finally {
+      await dispose()
+    }
+  })
+
+  it('ignores IME composition and a held key unless repeat is set, and reads the physical key on another layout', async () => {
+    const { root, dispose } = await mountShortcuts()
+
+    try {
+      press(document.body, 's', { ctrlKey: true, isComposing: true })
+      press(document.body, 's', { ctrlKey: true, repeat: true })
+      press(document.body, 'r', { ctrlKey: true, repeat: true })
+      press(document.body, 'ы', { ctrlKey: true, code: 'KeyS' })
+      press(document.body, 'ß', { altKey: true, code: 'KeyS' })
+      press(document.body, 'ы', { ctrlKey: true, code: 'KeyA' })
+      expect(await logged(root)).toBe('repeat,save,alt-s')
+    }
+    finally {
+      await dispose()
+    }
+  })
+
+  it('lets the innermost binding win, sets aria-keyshortcuts on its element and keeps the default when asked', async () => {
+    const { root, dispose } = await mountShortcuts()
+
+    try {
+      const form = root.querySelector('form')!
+
+      expect(form.getAttribute('aria-keyshortcuts')).toBe('Control+E')
+      press(form.querySelector('.field')!, 'e', { ctrlKey: true })
+      press(document.body, 'e', { ctrlKey: true })
+      expect(press(document.body, 's', { altKey: true, code: 'KeyS', key: 'ß' }).defaultPrevented).toBe(false)
+      expect(await logged(root)).toBe('form-e,page-e,alt-s')
+    }
+    finally {
+      await dispose()
+    }
+  })
+
+  it('is removed with the island', async () => {
+    const { root, dispose } = await mountShortcuts()
+    const form = root.querySelector('form')!
+
+    await dispose()
+    expect(press(document.body, 's', { ctrlKey: true }).defaultPrevented).toBe(false)
+    expect(form.hasAttribute('aria-keyshortcuts')).toBe(false)
+  })
+
+  it('refuses a spec with an unknown modifier or no key', () => {
+    expect(() => shortcut('hyper+s', () => undefined)).toThrow('unknown modifier')
+    expect(() => shortcut('', () => undefined)).toThrow('no key')
   })
 })

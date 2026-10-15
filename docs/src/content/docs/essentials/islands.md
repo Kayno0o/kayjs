@@ -153,6 +153,28 @@ Reading a browser global while the component renders throws on the server. `kay 
 
 </Callout>
 
+## Keyboard shortcuts
+
+`shortcut` from `kay` runs a function when keys are pressed, for as long as the island lives. `mod` is Cmd on macOS and Ctrl elsewhere, and `on` scopes the shortcut to one element, read once the island mounted:
+
+```kay
+---
+import { shortcut } from 'kay'
+
+let form: HTMLFormElement | undefined
+
+function save(): void {
+  form?.requestSubmit()
+}
+
+shortcut('mod+s', save, { on: () => form })
+---
+form(ref={element => form = element} onSubmit={event => event.preventDefault()})
+  input(aria-label="Title")
+```
+
+Without `on` the shortcut binds the whole page. It cancels the browser's own action for the key, ignores IME composition and a held key, and does nothing on the server. A shortcut with `mod`, `ctrl`, `meta` or `alt` fires in a text field too, a bare key such as `/` only with `{ inputs: true }`. Of two bindings on one key the innermost wins. An element-scoped shortcut sets `aria-keyshortcuts` on its element.
+
 ## A page kay does not serve
 
 A page bundled by something else, such as an HTML file `Bun.serve` imports, renders `.kay` components too. List `"kay/bun"` under `[serve.static] plugins` in `bunfig.toml`, or pass `kay({ root })` from `kay/bun` to `Bun.build`, then render one with `mount` from `kay/mount`, which returns what disposes it:
@@ -166,4 +188,4 @@ const dispose = mount(Panel, document.querySelector('#panel')!, { title: 'Ticket
 
 A mount renders after what the element already holds, and disposing it removes only the nodes it rendered, so several components mounted into one element are disposed one at a time.
 
-<ReadMore href="/llms/islands">Transitions, error fallbacks with `try`, context, `uid`, `guardLeave`, the edge cases of props and persisted state, and the navigation details are in the full islands reference.</ReadMore>
+<ReadMore href="/llms/islands">Transitions, error fallbacks with `try`, context, `uid`, `guardLeave`, the options of `shortcut`, the edge cases of props and persisted state, and the navigation details are in the full islands reference.</ReadMore>

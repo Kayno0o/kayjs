@@ -344,7 +344,7 @@ PageSection(title="Moons")
 CommandPalette(entries={[{ label: 'Moons', group: 'Pages', href: '/moons' }, { label: 'New moon', group: 'Actions', icon: 'plus', onSelect: () => creating.set(true) }]} groups={['Actions', 'Pages']} recent={recent()} onRecentChange={keepRecent})
 ```
 
-- A modal search over places to go and things to do, opened and closed by Ctrl or Cmd with `hotkey` (`k` by default) from anywhere, unless something handled the key first; `hotkey={null}` leaves opening to the app through `open`, and `onOpenChange(open)` reports each change.
+- A modal search over places to go and things to do, opened and closed by Cmd on macOS and Ctrl elsewhere with `hotkey` (`k` by default) from anywhere, unless something handled the key first; `hotkey={null}` leaves opening to the app through `open`, and `onOpenChange(open)` reports each change.
 - An entry has a `label`, a `group` it is listed under, an optional `icon`, and `keywords` a query matches without showing them. A `PaletteLink` has an `href`, followed in place or in a new tab with Ctrl or Cmd held, or always with `external`; a `PaletteAction` has an `onSelect`, run once the palette has closed.
 - With no query, entries are listed under their groups in `groups` order, the rest after them, below the links of `recent` that still exist; following a link hands the new list to `onRecentChange(recent)`, for the app to keep.
 - A query ranks the matches in one list: a label starting with it, then a label holding it, then its group or keywords, then its characters in order. The arrows walk it, wrapping, an accent bar marking the highlighted row, and Enter takes it.

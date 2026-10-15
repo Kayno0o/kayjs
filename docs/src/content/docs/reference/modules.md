@@ -30,6 +30,7 @@ import { collection } from 'kay/content'
 | `defer` | Makes a promise an `await` block can stream |
 | `navigate`, `refresh` | Go to a page, or re-render the current one, without a reload |
 | `searchResults`, `searchSite` | The site search from an island: following a signal holding the query, or as a promise |
+| `shortcut` | Binds a keyboard shortcut such as `mod+s` for as long as the island lives, on the page or one element. See [Islands](/essentials/islands#keyboard-shortcuts) |
 | `guardLeave` | Warns before leaving a page with unsaved changes |
 | `resource`, `call`, `socket`, `stream`, `dispatch` | Typed reads and calls of API routes, websockets and event streams from islands; `call` throws `ApiError`. See [API routes](/guides/api-routes) |
 | `publicEnv` | The variables `publicEnv` in the config exposed to islands |

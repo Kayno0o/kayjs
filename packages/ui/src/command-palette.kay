@@ -1,7 +1,7 @@
 ---
 import type { SearchHit } from 'kay'
 import type { PaletteAction, PaletteEntry, PaletteLink } from './palette'
-import { effect, memo, onCleanup, onMount, searchResults, signal, uid } from 'kay'
+import { effect, memo, searchResults, shortcut, signal, uid } from 'kay'
 import { stepIndex } from './cycle'
 import Icon from './icon.kay'
 import { isPaletteLink, paletteHits, paletteMatches, paletteSections, withRecent } from './palette'
@@ -113,18 +113,8 @@ function closed() {
   setShown(false)
 }
 
-function toggle(event: KeyboardEvent) {
-  if (event.defaultPrevented || event.key.toLowerCase() !== hotkey?.toLowerCase() || !(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey)
-    return
-
-  event.preventDefault()
-  setShown(!(dialog?.open ?? shown()))
-}
-
-onMount(() => {
-  window.addEventListener('keydown', toggle)
-  onCleanup(() => window.removeEventListener('keydown', toggle))
-})
+if (hotkey)
+  shortcut(`mod+${hotkey}`, () => setShown(!(dialog?.open ?? shown())))
 
 // A section the site search found is not kept as recent: the list only shows the entries' own links.
 function followed(link: PaletteLink, found: boolean) {

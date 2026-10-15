@@ -61,7 +61,7 @@ describe('CommandPalette', () => {
     expect(input()).not.toBeNull()
     expect(labels()).toEqual(['# Actions', 'New moon', '# Pages', 'Table', 'Content', '# Links', 'Docs'])
 
-    press(window, 'k', { metaKey: true })
+    press(window, 'k', { ctrlKey: true })
     await settle()
 
     expect(dialog.open).toBe(false)
