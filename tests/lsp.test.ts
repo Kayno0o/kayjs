@@ -1102,3 +1102,92 @@ describe('kay lsp on an app holding a nested project and listing an extension be
     expect((await editor.open('../lib/routes/out.kay')).map(diagnostic => [diagnostic.range.start.line, diagnostic.message.match(/serves (\S+?)"/)?.[1]])).toEqual([[2, '/lib/no/such'], [4, '/fr/lib/no/such']])
   })
 })
+
+describe('kay lsp project checks after a save', () => {
+  it('runs a checking script again only when something it read changed', async () => {
+    const dir = await scratchDir('lsp-probes-')
+    const encoder = new TextEncoder()
+    const toServer = new TransformStream<Uint8Array>()
+    const toClient = new TransformStream<Uint8Array>()
+    const writeToServer = toServer.writable.getWriter()
+    const writeToClient = toClient.writable.getWriter()
+    const client = new Connection(toClient.readable, (data) => {
+      void writeToServer.write(encoder.encode(data))
+    })
+    const server = new KayLanguageServer(new Connection(toServer.readable, (data) => {
+      void writeToClient.write(encoder.encode(data))
+    }))
+    const page = 'src/routes/index.kay'
+    const unrelated = 'src/unrelated.kay'
+    const files = {
+      'tsconfig.json': await Bun.file(join(fixtures, 'site/tsconfig.json')).text(),
+      'kay.config.ts': 'export default { i18n: { locales: [\'fr\', \'en\'], defaultLocale: \'fr\' } }\n',
+      'src/messages/fr.ts': 'export default { hello: \'Bonjour\' }\n',
+      'src/messages/en.ts': 'export default { hello: \'Hello\' }\n',
+      'src/helper.ts': 'export const shape = 1\n',
+      'src/callout.kay': 'aside\n  slot\n',
+      'src/content.config.ts': 'import { t } from \'elysia\'\nimport { collection } from \'kay/content\'\nimport Callout from \'./callout.kay\'\nimport { shape } from \'./helper\'\n\nexport const notes = collection(\'content/notes\', { schema: t.Object({}), components: { Callout }, ...shape ? {} : {} })\n',
+      'src/content/notes/a.md': 'Text\n',
+      [page]: 'h1 Home\n',
+      [unrelated]: 'p one\n',
+    }
+    const ran = { content: 0, messages: 0 }
+    const spawn = Bun.spawn
+    const counting = spyOn(Bun, 'spawn').mockImplementation(((command: string[], ...rest: unknown[]) => {
+      if (command[1]?.endsWith('content/problems.ts'))
+        ran.content++
+      else if (command[1]?.endsWith('check/messages.ts'))
+        ran.messages++
+
+      return (spawn as (...args: unknown[]) => unknown)(command, ...rest)
+    }) as typeof Bun.spawn)
+
+    await Promise.all(Object.entries(files).map(async ([path, text]) => Bun.write(join(dir, path), text)))
+
+    // Writes a file, tells the server and waits for the project checks it makes.
+    const save = async (path: string, text: string) => {
+      await Bun.write(join(dir, path), text)
+      client.notify('workspace/didChangeWatchedFiles', { changes: [{ uri: pathToFileURL(join(dir, path)).href, type: 2 }] })
+      await Bun.sleep(1500)
+
+      return { ...ran }
+    }
+
+    try {
+      await client.request('initialize', { processId: process.pid, rootUri: pathToFileURL(dir).href, capabilities: {} })
+      client.notify('initialized', {})
+      await Bun.sleep(2500)
+      expect(ran).toEqual({ content: 1, messages: 1 })
+
+      // A component neither the collections nor the messages use.
+      expect(await save(unrelated, 'p two\n')).toEqual({ content: 1, messages: 1 })
+      expect(await save(page, 'h1 Other\n')).toEqual({ content: 1, messages: 1 })
+
+      // A module the content config imports, and a component its entries use.
+      expect(await save('src/helper.ts', 'export const shape = 2\n')).toEqual({ content: 2, messages: 1 })
+      expect(await save('src/callout.kay', 'aside.note\n  slot\n')).toEqual({ content: 3, messages: 1 })
+      expect(await save('src/content/notes/a.md', 'Other text\n')).toEqual({ content: 4, messages: 1 })
+
+      // A messages file.
+      expect(await save('src/messages/en.ts', 'export default { hello: \'Hi\' }\n')).toEqual({ content: 4, messages: 2 })
+
+      // The config both scripts run under, which also names a catalog the messages newly read.
+      expect(await save('kay.config.ts', 'export default { i18n: { locales: [\'fr\', \'en\', \'es\'], defaultLocale: \'fr\' } }\n')).toEqual({ content: 5, messages: 3 })
+      expect(await save('src/messages/es.ts', 'export default { hello: \'Hola\' }\n')).toEqual({ content: 5, messages: 4 })
+      expect(await save('src/messages/es.ts', 'export default { hello: \'Hola!\' }\n')).toEqual({ content: 5, messages: 5 })
+
+      // A module the content config starts importing is tracked from then on.
+      await Bun.write(join(dir, 'src/extra.ts'), 'export const extra = 1\n')
+      expect(await save('src/content.config.ts', files['src/content.config.ts'].replace('\n\nexport', '\nimport \'./extra\'\n\nexport'))).toEqual({ content: 6, messages: 5 })
+      expect(await save('src/extra.ts', 'export const extra = 2\n')).toEqual({ content: 7, messages: 5 })
+    }
+    finally {
+      counting.mockRestore()
+
+      const { tsgo } = server as unknown as { tsgo?: { process: { kill: () => void } } }
+
+      tsgo?.process.kill()
+      await rm(dir, { recursive: true, force: true })
+    }
+  }, 60_000)
+})

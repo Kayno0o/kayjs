@@ -5,7 +5,7 @@ import type { ServedPaths } from '../server/served-paths'
 import type { Collection } from './index'
 import type { Segment } from './markdown'
 import type { ContentProblem } from './validate'
-import { dirname, relative } from 'node:path'
+import { dirname, relative, resolve } from 'node:path'
 import { projectPaths } from '../project'
 import { nameCollection } from '../runtime/fields'
 import { localePath } from '../runtime/i18n'
@@ -103,10 +103,12 @@ export async function writeContentManifests(root: string, clientBase: string, co
 
 // Every entry that fails to compile or to match its schema, across the project's collections, and the components their Markdown uses, for `kay check`. A loader's entries are read only when the server runs.
 // `site` says whether the config sets the site's URL, which a collection's feed needs.
-export async function contentProblems(root: string, config?: string, site = true): Promise<{ problems: ContentProblem[], uses: ComponentUse[], feeds: CollectionFeed[] }> {
+export async function contentProblems(root: string, config?: string, site = true): Promise<{ problems: ContentProblem[], uses: ComponentUse[], feeds: CollectionFeed[], read: string[] }> {
   const problems: ContentProblem[] = []
   const uses: ComponentUse[] = []
   const feeds: CollectionFeed[] = []
+  // What the collections were read from, beside the modules loaded: the config and each folder of entries.
+  const read = [projectPaths(root, { content: config }).content]
 
   for (const [name, collection] of await namedCollections(root, config)) {
     if (collection.options.feed)
@@ -117,6 +119,8 @@ export async function contentProblems(root: string, config?: string, site = true
 
     if (collection.dir === undefined)
       continue
+
+    read.push(resolve(dirname(read[0]!), collection.dir))
 
     try {
       const entries = await loadEntries(collection.dir, collection.options.highlight, true)
@@ -134,7 +138,7 @@ export async function contentProblems(root: string, config?: string, site = true
     }
   }
 
-  return { problems, uses, feeds }
+  return { problems, uses, feeds, read }
 }
 
 // A component the collection lacks is a content problem of its own, so only those it has are typed.

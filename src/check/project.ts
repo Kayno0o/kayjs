@@ -18,6 +18,7 @@ import { FEEDS_MARKER, PROBLEMS_MARKER, USES_MARKER } from '../content/server'
 import { projectPaths } from '../project'
 import { bootProblems } from './boot'
 import { CONTENT_CHECK, contentPropsCheck } from './generated'
+import { FILES_MARKER, stampOf } from './loaded'
 import { configSeoLints } from './seo'
 import { fromCompile } from './shadow-types'
 
@@ -33,6 +34,14 @@ const probes = new Set<Subprocess>()
 // An unknown property, and a value of the wrong type, with or without a suggestion.
 const LINT_TYPE_ERRORS = new Set(['TS2353', 'TS2322', 'TS2820'])
 
+// What a checking script last found, with the files it read and where they were: the script runs again only when its arguments or one of those files changed. The editor keeps one per project, by script.
+export type ProbeMemory = Map<string, { args: string, files: string[], stamp: string, result: ProbeResult }>
+
+type ProbeResult = { marked: <Value>(marker: string) => Value | undefined } | { failed: string }
+
+// A file written this close to the script starting may have been read before or after the write, so a result is remembered only when every file it read is older.
+const STAMP_MARGIN = 100
+
 // The collections as read, and the props their Markdown entries give components, written for tsgo to type with the rest.
 export interface ContentChecks {
   problems: CheckDiagnostic[]
@@ -41,8 +50,8 @@ export interface ContentChecks {
 }
 
 // The collections read, in a process of their own, and the props their entries give components written to the module tsgo types them in.
-export async function contentChecks(root: string, options: CheckOptions): Promise<ContentChecks> {
-  const content = await checkContent(root, options.content, options.site !== undefined)
+export async function contentChecks(root: string, options: CheckOptions, memory?: ProbeMemory): Promise<ContentChecks> {
+  const content = await checkContent(root, options.content, options.site !== undefined, memory)
   const props = contentPropsCheck(resolve(root), projectPaths(root, options).content, content.uses)
 
   await writeIfChanged(join(projectPaths(root).types, CONTENT_CHECK), props.code)
@@ -58,8 +67,8 @@ export function configProblems(root: string, options: CheckOptions, types: Shado
 }
 
 // The collections, the messages, what the server refuses when it boots and the lints of the project's scripts, reported after the type errors.
-export async function projectProblems(root: string, options: CheckOptions, content: ContentChecks): Promise<CheckDiagnostic[]> {
-  const [messages, boot, modules] = await Promise.all([checkMessages(root, options.i18n, options.extensions), bootProblems(resolve(root), options, content.feeds), moduleLints(root, options.lints)])
+export async function projectProblems(root: string, options: CheckOptions, content: ContentChecks, memory?: ProbeMemory): Promise<CheckDiagnostic[]> {
+  const [messages, boot, modules] = await Promise.all([checkMessages(root, options.i18n, options.extensions, memory), bootProblems(resolve(root), options, content.feeds), moduleLints(root, options.lints)])
 
   return [...content.problems, ...messages, ...boot, ...modules]
 }
@@ -90,7 +99,15 @@ async function moduleLints(root: string, levels: LintLevels | undefined): Promis
 }
 
 // What a checking script printed on the lines it marked, whatever else the project's code logged, run in a process of its own so an edited file is read afresh; the reason it failed otherwise.
-export async function probe(root: string, script: string, args: string[], reading: string, timeout = PROBE_TIMEOUT): Promise<{ marked: <Value>(marker: string) => Value | undefined } | { failed: string }> {
+// With a `memory`, the last result stands while the arguments and every file the script listed as read are as they were.
+export async function probe(root: string, script: string, args: string[], reading: string, timeout = PROBE_TIMEOUT, memory?: ProbeMemory): Promise<ProbeResult> {
+  const key = JSON.stringify(args)
+  const remembered = memory?.get(script)
+
+  if (remembered && remembered.args === key && stampOf(remembered.files).stamp === remembered.stamp)
+    return remembered.result
+
+  const started = Date.now()
   const child = Bun.spawn([process.execPath, script, resolve(root), ...args], { cwd: root, stdout: 'pipe', stderr: 'pipe', timeout })
 
   probes.add(child)
@@ -98,6 +115,7 @@ export async function probe(root: string, script: string, args: string[], readin
   const [output, errors, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
 
   probes.delete(child)
+  memory?.delete(script)
 
   if (child.signalCode !== null)
     return { failed: `${reading} did not finish within ${timeout / 1000} s and was stopped: the code it runs waits on something that never comes` }
@@ -106,14 +124,24 @@ export async function probe(root: string, script: string, args: string[], readin
     return { failed: errors.trim() || `${reading} exited with code ${code}` }
 
   const lines = output.split('\n')
-
-  return {
+  const result: ProbeResult = {
     marked: <Value>(marker: string) => {
       const line = lines.find(text => text.startsWith(marker))
 
       return line === undefined ? undefined : JSON.parse(line.slice(marker.length)) as Value
     },
   }
+  const listed = lines.find(text => text.startsWith(FILES_MARKER))
+
+  if (memory && listed !== undefined) {
+    const files = JSON.parse(listed.slice(FILES_MARKER.length)) as string[]
+    const { stamp, newest } = stampOf(files)
+
+    if (newest < started - STAMP_MARGIN)
+      memory.set(script, { args: key, files, stamp, result })
+  }
+
+  return result
 }
 
 export function stopProbes(): void {
@@ -126,11 +154,11 @@ function problemsOf(root: string, problems: ContentProblem[] = []): CheckDiagnos
 }
 
 // Each locale's messages against the default locale's.
-async function checkMessages(root: string, config: I18nConfig | undefined, extensions: KayExtension[] = []): Promise<CheckDiagnostic[]> {
+async function checkMessages(root: string, config: I18nConfig | undefined, extensions: KayExtension[] = [], memory?: ProbeMemory): Promise<CheckDiagnostic[]> {
   if (!config)
     return []
 
-  const read = await probe(root, MESSAGE_PROBLEMS, [JSON.stringify(config), JSON.stringify(extensions.map(({ name, messages }) => ({ name, messages })))], 'reading the messages')
+  const read = await probe(root, MESSAGE_PROBLEMS, [JSON.stringify(config), JSON.stringify(extensions.map(({ name, messages }) => ({ name, messages })))], 'reading the messages', undefined, memory)
 
   if ('failed' in read)
     return [{ file: join(root, CONFIG_FILE), line: 1, column: 1, message: read.failed }]
@@ -139,11 +167,11 @@ async function checkMessages(root: string, config: I18nConfig | undefined, exten
 }
 
 // The collections' entries that fail to compile or to match their schema, the components their entries use and the feeds they serve.
-export async function checkContent(root: string, config: string | undefined, site: boolean): Promise<{ problems: CheckDiagnostic[], uses: ComponentUse[], feeds: CollectionFeed[] }> {
+export async function checkContent(root: string, config: string | undefined, site: boolean, memory?: ProbeMemory): Promise<{ problems: CheckDiagnostic[], uses: ComponentUse[], feeds: CollectionFeed[] }> {
   if (config === undefined && !existsSync(projectPaths(root).content))
     return { problems: [], uses: [], feeds: [] }
 
-  const read = await probe(root, CONTENT_PROBLEMS, [config ?? '', site ? 'site' : ''], 'reading the collections')
+  const read = await probe(root, CONTENT_PROBLEMS, [config ?? '', site ? 'site' : ''], 'reading the collections', undefined, memory)
 
   if ('failed' in read)
     return { problems: [{ file: projectPaths(root, { content: config }).content, line: 1, column: 1, message: read.failed }], uses: [], feeds: [] }

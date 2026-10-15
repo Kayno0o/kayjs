@@ -1,6 +1,6 @@
 import type { Subprocess } from 'bun'
 import type { KayLibrary } from '../build/libraries'
-import type { CheckDiagnostic, CheckOptions, ShadowTypes } from '../check'
+import type { CheckDiagnostic, CheckOptions, ProbeMemory, ShadowTypes } from '../check'
 import type { ShadowFile, SpanMode } from '../check/shadow'
 import type { Diagnostic as KayDiagnostic } from '../compiler'
 import type { Span } from '../compiler/ast'
@@ -51,6 +51,8 @@ interface Project {
   islandOnly: Set<string>
   unreached: Set<string>
   libraries: KayLibrary[]
+  // What the checking scripts found last, run again only for a change in what they read.
+  probes: ProbeMemory
   // The last shadow write, which the project-wide checks read.
   types?: ShadowTypes
   configured: boolean
@@ -392,7 +394,7 @@ export class KayLanguageServer {
     let project = this.projects.get(root)
 
     if (!project)
-      this.projects.set(root, project = { root, options: {}, routesDir: projectPaths(root).routes, mounts: [], locales: [], shadowTree: `${projectPaths(root).types}/`, shadowFiles: new Set(), shadowStamps: new Map(), islandOnly: new Set(), unreached: new Set(), libraries: [], configured: false })
+      this.projects.set(root, project = { root, options: {}, routesDir: projectPaths(root).routes, mounts: [], locales: [], shadowTree: `${projectPaths(root).types}/`, shadowFiles: new Set(), shadowStamps: new Map(), islandOnly: new Set(), unreached: new Set(), libraries: [], probes: new Map(), configured: false })
 
     return project
   }
@@ -496,8 +498,8 @@ export class KayLanguageServer {
     if (!types)
       return []
 
-    const content = await contentChecks(root, options)
-    const [problems, typeErrors] = await Promise.all([projectProblems(root, options, content), this.generatedTypeErrors(root)])
+    const content = await contentChecks(root, options, project.probes)
+    const [problems, typeErrors] = await Promise.all([projectProblems(root, options, content, project.probes), this.generatedTypeErrors(root)])
 
     return [...configProblems(root, options, types), ...typeErrors.flatMap(diagnostic => generatedProblem(root, diagnostic, types, content) ?? []), ...problems]
   }

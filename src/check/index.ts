@@ -20,6 +20,7 @@ import { parseTscOutput, resolvedConfig, tsgoCode, tsgoDiagnostic, typecheck } f
 
 export { applySafeFixes } from './fixes'
 export { generatedChecks, generatedProblem } from './generated'
+export type { ProbeMemory } from './project'
 export { configProblems, contentChecks, projectProblems, stopProbes } from './project'
 export type { ContentChecks } from './project'
 export { writeShadowTypes } from './shadow-types'

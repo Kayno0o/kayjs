@@ -2,12 +2,13 @@ import type { I18nConfig, KayExtension } from '../config'
 import type { ContentProblem } from '../content/validate'
 import type { Message, MessageTree } from '../runtime/i18n'
 import { existsSync } from 'node:fs'
-import { relative } from 'node:path'
+import { relative, resolve } from 'node:path'
 import process from 'node:process'
 import { PROBLEMS_MARKER } from '../content/server'
 import { flattenMessages, isPlural, MESSAGE_TAG } from '../runtime/i18n'
 import { buildingWithoutEnv } from '../server/env'
 import { extensionMessageFiles, messagesFile } from '../server/i18n'
+import { FILES_MARKER, loadedFiles } from './loaded'
 
 const PLACEHOLDER = /\{(\w+)\}/g
 const SPECIAL = /[.*+?^${}()|[\]\\]/g
@@ -174,7 +175,11 @@ if (import.meta.main) {
 
   // The checking machine lacks the server's environment, as `kay build` does.
   buildingWithoutEnv()
-  console.log(`${PROBLEMS_MARKER}${JSON.stringify(await messageProblems(root!, JSON.parse(config!) as I18nConfig, JSON.parse(extensions ?? '[]') as KayExtension[]))}`)
+  const i18n = JSON.parse(config!) as I18nConfig
+  const catalogs = JSON.parse(extensions ?? '[]') as KayExtension[]
+
+  console.log(`${PROBLEMS_MARKER}${JSON.stringify(await messageProblems(root!, i18n, catalogs))}`)
+  console.log(`${FILES_MARKER}${JSON.stringify(loadedFiles(resolve(root!), i18n.locales.flatMap(locale => [messagesFile(root!, i18n, locale), ...extensionMessageFiles(root!, catalogs, locale)])))}`)
   // A timer or a connection a message file left open would keep the check waiting.
   process.exit(0)
 }
