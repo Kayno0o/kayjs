@@ -20,9 +20,11 @@ import { bootDevTool } from '../runtime/dev-boot'
 import { kayLog } from '../runtime/log'
 import { isCrossSite } from './actions'
 import { BUILD_FAILURE, clientOptionsKey, fromManifest, readManifest } from './client'
+import { redirectedBy } from './dev-notes'
 import { editorCommand } from './editor'
 import { localeCopies } from './i18n'
 import { compileErrorPage } from './overlay'
+import { requestId } from './protection'
 import { apiRoutePath, endpointPath, ROUTE_METHODS } from './routes'
 
 export const DEV_EVENTS = '/_kay/dev/events'
@@ -34,6 +36,7 @@ export const DEV_A11Y = '/_kay/dev/a11y.js'
 export const DEV_AXE = '/_kay/dev/axe.js'
 export const DEV_ROUTES = '/_kay/dev/routes'
 export const DEV_HEAD = '/_kay/dev/head'
+export const DEV_REQUEST = '/_kay/dev/request'
 const PATCH_SOURCE = resolve(import.meta.dir, '../runtime/dev-patch.ts')
 const TOOL_SOURCE = resolve(import.meta.dir, '../runtime/dev-tool.ts')
 const INSPECTOR_SOURCE = resolve(import.meta.dir, '../runtime/dev-inspector.ts')
@@ -412,6 +415,84 @@ export interface DevRequest {
   status: number
   error?: string | undefined
   loads: { file: string, ms?: number | undefined }[]
+  // The id the server recorded the response under, which `DEV_REQUEST` answers with the headers, the time and the redirects.
+  id: string
+  // Every guard of the route in the order they run, with what each did; the ones after a refusal did not run.
+  guards: { file: string, outcome: string }[]
+  // What `kay build` does with the page: written ahead (`page`), for the paths its setting lists (`listed`), or because it holds a server island; none when it is rendered on request only.
+  prerender?: 'page' | 'listed' | 'server islands' | undefined
+}
+
+// What the server recorded of one response, for the Request tab to ask for once the page is in view.
+export interface DevResponse {
+  headers: [name: string, value: string][]
+  // From the request reaching the server to its response being made, the loads, guards and render included; a streamed page's body goes on after.
+  ms: number
+  // The redirects the request went through before this one, the first first.
+  redirects: { from: string, status: number, by?: string | undefined }[]
+}
+
+const RECORDED_RESPONSES = 50
+const REDIRECT_MEMORY_MS = 30_000
+const FRAMEWORK_PATH = /^\/_kay\//
+
+// Records what each response of a dev server carried, and the redirect hops leading to a path, so the Request tab can say how a page was answered and sent.
+// Registered after the hooks that shape a response, so the headers are the ones sent.
+export function recordResponses(app: Elysia): void {
+  const started = new WeakMap<Request, number>()
+  const recorded = new Map<string, DevResponse>()
+  const hops = new Map<string, { redirects: DevResponse['redirects'], at: number }>()
+
+  app.onRequest(({ request }) => {
+    started.set(request, performance.now())
+  })
+
+  app.mapResponse({ as: 'global' }, ({ request, responseValue, set }) => {
+    const url = new URL(request.url)
+
+    if (FRAMEWORK_PATH.test(url.pathname))
+      return
+
+    const response = responseValue instanceof Response ? responseValue : undefined
+    const headers = new Headers(response?.headers)
+
+    for (const [name, value] of Object.entries(set.headers)) {
+      if (!headers.has(name) && value !== undefined)
+        headers.set(name, String(value))
+    }
+
+    const status = response?.status ?? (typeof set.status === 'number' ? set.status : 200)
+    const here = `${url.pathname}${url.search}`
+    const now = performance.now()
+    const prior = hops.get(here)
+    const redirects = prior && Date.now() - prior.at < REDIRECT_MEMORY_MS ? prior.redirects : []
+
+    hops.delete(here)
+
+    const location = status >= 300 && status < 400 ? headers.get('location') : null
+    const target = location === null ? undefined : URL.parse(location, request.url)
+
+    if (target) {
+      hops.set(`${target.pathname}${target.search}`, { redirects: [...redirects, { from: here, status, by: redirectedBy(request) }], at: Date.now() })
+
+      if (hops.size > RECORDED_RESPONSES)
+        hops.delete(hops.keys().next().value!)
+    }
+
+    recorded.set(requestId(request), { headers: [...headers.entries()], ms: now - (started.get(request) ?? now), redirects })
+
+    if (recorded.size > RECORDED_RESPONSES)
+      recorded.delete(recorded.keys().next().value!)
+  })
+
+  app.get(DEV_REQUEST, ({ request }) => {
+    if (request.headers.get(OPEN_HEADER) === null || isCrossSite(request))
+      return new Response(null, { status: 403 })
+
+    const found = recorded.get(new URL(request.url).searchParams.get('id') ?? '')
+
+    return found ? Response.json(found) : new Response(null, { status: 404 })
+  })
 }
 
 // What the dev tool's Head tab asks of the server about the page in view: what `kay check` would flag in its head, and whether the sitemap lists it.

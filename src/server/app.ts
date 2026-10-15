@@ -28,7 +28,7 @@ import { DEFAULT_BODY_LIMIT, limitBodies } from './body'
 import { serveBuildFiles } from './build-files'
 import { serveCards } from './card'
 import { compressResponse, fixedTexts } from './compress'
-import { DEV_A11Y, DEV_AXE, DEV_EVENTS, DEV_HEAD, DEV_INSPECTOR, DEV_OPEN, DEV_PATCH, DEV_ROUTES, DEV_TOOL, devA11y, devAxe, devEvents, devInspector, devPatch, devRoutes, devTool, followBuilds, hotSwap, openInEditor, refuseForeignHosts } from './dev'
+import { DEV_A11Y, DEV_AXE, DEV_EVENTS, DEV_HEAD, DEV_INSPECTOR, DEV_OPEN, DEV_PATCH, DEV_ROUTES, DEV_TOOL, devA11y, devAxe, devEvents, devInspector, devPatch, devRoutes, devTool, followBuilds, hotSwap, openInEditor, recordResponses, refuseForeignHosts } from './dev'
 import { clearDevErrorsOnAnswer } from './dev-errors'
 import { claimEndpoints, serveEndpoints } from './endpoints'
 import { entryUrls } from './entry-urls'
@@ -118,6 +118,7 @@ function serveDevRoutes(app: App, root: string, client: ClientBuild, mode: Mode,
   app.get(DEV_TOOL, () => devTool())
   app.get(DEV_A11Y, () => devA11y())
   app.get(DEV_AXE, () => devAxe())
+  recordResponses(app)
 
   if (mode.underKayDev) {
     followBuilds()

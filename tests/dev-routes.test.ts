@@ -1,10 +1,10 @@
-import type { DevRequest, DevRoutes } from '../src/server/dev'
+import type { DevRequest, DevResponse, DevRoutes } from '../src/server/dev'
 import { join, relative } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it, spyOn } from 'bun:test'
 import { Elysia } from 'elysia'
 import { pages } from '../src/server'
-import { DEV_ROUTES } from '../src/server/dev'
+import { DEV_REQUEST, DEV_ROUTES } from '../src/server/dev'
 import { scratchDir } from './scratch'
 
 const REQUEST_BLOCK = /<script type="application\/json" id="kay-dev-request">(.*?)<\/script>/
@@ -165,5 +165,68 @@ describe('the dev tool\'s routes served by kay', () => {
 
     expect((await custom.handle(new Request('http://localhost/ping'))).status).toBe(200)
     expect((await standard.handle(new Request('http://localhost/_kay/health'))).status).toBe(200)
+  })
+
+  it('says how a page was answered: the guards that ran and their outcome, a redirect before it, what `kay build` does with it, the headers and the time', async () => {
+    const dir = await scratchDir('dev-routes-answered-')
+    const routes = relative(process.cwd(), join(dir, 'routes'))
+    const members = 'import { guard } from \'kay\'\n\nexport default guard(({ request, redirect }) => {\n  if (!request.headers.has(\'x-member\'))\n    redirect(\'/login\')\n})\n'
+    const vip = 'import { guard } from \'kay\'\n\nexport default guard(({ request, deny }) => {\n  if (!request.headers.has(\'x-vip\'))\n    deny(403, \'VIPs only\')\n})\n'
+
+    await Promise.all([
+      Bun.write(join(dir, 'routes/index.kay'), 'p Home\n'),
+      Bun.write(join(dir, 'routes/login.kay'), 'p Login\n'),
+      Bun.write(join(dir, 'routes/_error.kay'), 'p Failed\n'),
+      Bun.write(join(dir, 'routes/static.kay'), '--- server\nexport const page = { prerender: true }\n---\np Static\n'),
+      Bun.write(join(dir, 'routes/members/_guard.ts'), members),
+      Bun.write(join(dir, 'routes/members/index.kay'), 'p Members\n'),
+      Bun.write(join(dir, 'routes/members/vip/_guard.ts'), vip),
+      Bun.write(join(dir, 'routes/members/vip/index.kay'), 'p VIP\n'),
+    ])
+
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+
+    try {
+      const dev = await pages({ routes, dev: true, redirects: { '/old': '/static' } })
+      const visit = async (path: string, headers: Record<string, string> = {}) => {
+        const response = await dev.handle(new Request(`http://localhost${path}`, { headers, redirect: 'manual' }))
+        const block = REQUEST_BLOCK.exec(await response.text())
+
+        return { response, request: block ? JSON.parse(block[1]!) as DevRequest : undefined }
+      }
+      const recorded = async (id: string) => (await dev.handle(new Request(`http://localhost${DEV_REQUEST}?id=${id}`, { headers: { 'x-kay-dev': '1' } }))).json() as Promise<DevResponse>
+
+      expect((await visit('/')).request).toMatchObject({ guards: [] })
+      expect((await visit('/static')).request).toMatchObject({ prerender: 'page' })
+      expect((await visit('/login')).request!.prerender).toBeUndefined()
+      expect((await visit('/members', { 'x-member': '1' })).request).toMatchObject({ guards: [{ file: `${routes}/members/_guard.ts`, outcome: 'passed' }] })
+      expect((await visit('/members/vip', { 'x-member': '1' })).request).toMatchObject({ status: 403, guards: [{ outcome: 'passed' }, { file: `${routes}/members/vip/_guard.ts`, outcome: 'denied with 403: VIPs only' }] })
+
+      // A guard that redirects: the page it sends the visitor to knows where they came from, and by which guard.
+      const refused = await visit('/members')
+
+      expect(refused.response.status).toBeGreaterThanOrEqual(300)
+      expect(refused.request).toBeUndefined()
+
+      const login = await visit('/login')
+      const answered = await recorded(login.request!.id)
+
+      expect(answered.redirects).toEqual([{ from: '/members', status: refused.response.status, by: `the guard ${routes}/members/_guard.ts` }])
+      expect(answered.ms).toBeGreaterThan(0)
+      expect(answered.headers.map(([name]) => name)).toContain('x-request-id')
+
+      // The redirect is told once, to the request that follows it.
+      expect((await recorded((await visit('/login')).request!.id)).redirects).toEqual([])
+
+      // A setting redirect, then the page.
+      await visit('/old')
+
+      expect((await recorded((await visit('/static')).request!.id)).redirects).toEqual([{ from: '/old', status: 308, by: 'the redirect from /old' }])
+      expect((await dev.handle(new Request(`http://localhost${DEV_REQUEST}?id=nothing`, { headers: { 'x-kay-dev': '1' } }))).status).toBe(404)
+      expect((await dev.handle(new Request(`http://localhost${DEV_REQUEST}?id=nothing`))).status).toBe(403)
+    }
+    finally {
+      logged.mockRestore()
+    }
   })
 })

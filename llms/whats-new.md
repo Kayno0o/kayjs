@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- The dev tool's Request tab also shows the response headers (CSP and cache-control first), whether `kay build` prerenders the page, the guards that ran and their outcome, the redirects the request went through before the page and what made them, and the server's time to answer ([Commands](project.md#commands)).
 - The dev tool has a Head tab: the page's search result, title and description with their lengths and limit, canonical, alternates, robots and sitemap membership, og and twitter tags with the social card, JSON-LD parsed or failing, and what `kay check` would flag in the head, read again after each page swap ([Commands](project.md#commands)).
 - kayjs-ui: `LineChart` reads chartist once it is on the page, so an island showing one runs before chartist loads, and a `Table` reads each row's sort value once per sort ([kayjs-ui](../packages/ui/llms.txt)).
 - A loader takes optional `count`, `body` and `get`, so a CMS lists its collection or opens one entry without running `load` for every entry, `collections({ counts: false })` skips the counting, and reads at the same moment share one run ([Content](content.md#loaded-collections)). kayjs-cms reads an entry screen's collection and entry together, saves without counting, and deletes the unused uploads it selects in one scan ([kayjs-cms](../packages/cms/llms.txt)).

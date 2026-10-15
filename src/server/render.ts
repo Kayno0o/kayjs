@@ -11,7 +11,7 @@ import type { ClientBuild, PrerenderedPage } from './client'
 import type { Encoding } from './compress'
 import type { DevRequest } from './dev'
 import type { Flash, SuccessFlash } from './flash'
-import type { ServedRoute } from './guards'
+import type { Refusal, ServedRoute } from './guards'
 import type { Revalidation } from './revalidate'
 import type { SpecialPage, SpecialPages } from './routes'
 import type { SeoHead } from './seo'
@@ -37,6 +37,7 @@ import { importModule } from './bundle'
 import { preferredEncoding, wholeResponse } from './compress'
 import { cookieJar, requestCookies } from './cookies'
 import { A11Y_SCRIPT, DEV_BOOT, devToolScripts, errorPageScripts, LIVE_RELOAD, problemsBlock } from './dev'
+import { noteRedirect } from './dev-notes'
 import { FLASH_COOKIE, handedOverFlash, readFlash } from './flash'
 import { formsScript } from './forms'
 import { runGuards } from './guards'
@@ -46,6 +47,7 @@ import { DEFAULT_LANG, messagesScript } from './i18n'
 import { registerScript } from './offline'
 import { errorPage } from './overlay'
 import { pageSetting } from './page-settings'
+import { requestId } from './protection'
 import { matchesEtag } from './public'
 import { chainQuery, queryRules, queryScript, readQuery, readQueryLeniently } from './query'
 import { reportServerError } from './report'
@@ -162,6 +164,8 @@ interface Rendering {
   // Development only, for the dev tool: the route the request matched, and its loads as they were timed.
   matched?: string | undefined
   loads?: Pick<LoadedRoute, 'files' | 'modules' | 'timings'> | undefined
+  guards?: DevRequest['guards'] | undefined
+  prerender?: DevRequest['prerender']
 }
 
 const CHARSET = '<meta charset="utf-8">'
@@ -205,7 +209,62 @@ async function refused(route: ServedRoute, rendering: Rendering, client: ClientB
   // The page keeps the URL as sent; its guards read it spelled one way.
   const refusal = route.guards.length > 0 ? await runGuards(route.guards, Object.create(rendering.ctx, { url: { value: guardUrl(rendering.ctx.url) } }) as typeof rendering.ctx) : undefined
 
+  if (options.dev) {
+    rendering.guards = guardRuns(route.guards, refusal)
+
+    if (refusal?.error instanceof Redirect)
+      noteRedirect(rendering.ctx.request, `the guard ${projectPath(refusal.guard.file)}`)
+  }
+
   return refusal && renderFailure(refusal.error, refusal.guard.special, rendering, new Map(), client, options)
+}
+
+// What each guard did, for the dev tool: those before a refusal passed, the one refusing says how, the rest did not run.
+function guardRuns(guards: ServedRoute['guards'], refusal: Refusal | undefined): NonNullable<Rendering['guards']> {
+  const refused = refusal ? guards.indexOf(refusal.guard) : -1
+
+  return guards.map((guard, index) => ({ file: projectPath(guard.file), outcome: index < refused || refused === -1 ? 'passed' : index > refused ? 'did not run' : refusalOutcome(refusal!.error) }))
+}
+
+// Whether `kay build` writes this page ahead, from its `prerender` setting or a server island its template reaches; read off the source in development only, where the compiler is loaded anyway.
+const serverIslandReach = new Map<string, Promise<boolean>>()
+
+async function willPrerender(route: ServedRoute, page: PageModule): Promise<DevRequest['prerender']> {
+  const setting = pageSetting(page, 'prerender')
+
+  if (setting === true)
+    return 'page'
+
+  if (setting !== undefined && setting !== false)
+    return 'listed'
+
+  if (route.params.length > 0)
+    return undefined
+
+  let reach = serverIslandReach.get(route.file)
+
+  if (reach === undefined) {
+    reach = reachesIsland(route.file)
+    serverIslandReach.set(route.file, reach)
+  }
+
+  return await reach ? 'server islands' : undefined
+}
+
+async function reachesIsland(file: string): Promise<boolean> {
+  const { reachesServerIsland } = await import('./prerender')
+
+  return reachesServerIsland(file)
+}
+
+function refusalOutcome(error: unknown): string {
+  if (error instanceof Redirect)
+    return `redirected to ${error.location} (${error.status})`
+
+  if (error instanceof Denied)
+    return `denied with ${error.status}${error.message === '' ? '' : `: ${error.message}`}`
+
+  return error instanceof NotFound ? 'answered not found' : `failed: ${error instanceof Error ? error.message : String(error)}`
 }
 
 // Past the route's guards, its modules and their loads; a refusal or a failed load answers as the page would.
@@ -232,8 +291,10 @@ async function loadRoute(route: ServedRoute, rendering: Rendering, client: Clien
     // A prerendered page is stored with its headers and served to everyone, so it carries no one render's timings.
     const timings = (options.serverTiming === true || options.dev === true) && !options.prerendering ? Array.from<number>({ length: files.length }) : undefined
 
-    if (options.dev)
+    if (options.dev) {
       rendering.loads = { files, modules, timings }
+      rendering.prerender = await willPrerender(route, modules.at(-1)!)
+    }
 
     return { files, modules, data: await runLoads(files, modules, rendering.ctx, loaded, timings), loaded, timings }
   }
@@ -734,6 +795,9 @@ function requestBlock(files: string[], rendering: Rendering): string {
     page: projectPath(files.at(-1)!),
     layouts: files.slice(0, -1).map(projectPath),
     params: rendering.ctx.params,
+    id: requestId(rendering.ctx.request),
+    guards: rendering.guards ?? [],
+    prerender: rendering.prerender,
     locale: rendering.ctx.locale,
     status: rendering.status,
     error: (rendering.ctx as Partial<ErrorPageContext>).error?.message,

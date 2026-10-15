@@ -16,6 +16,7 @@ import { localeState, runInLocale } from '../runtime/locale-state'
 import { overHttps } from './actions'
 import { PRERENDERED_DIR } from './client'
 import { encodedCopies, encodedPath, filesUnder } from './compress'
+import { noteRedirect } from './dev-notes'
 import { handedOverFlash } from './flash'
 import { cookieLocale, hostLocale, localeCookie, preferredLocale, prerenderKey, stateFor } from './i18n'
 import { answeringRequest } from './log'
@@ -206,15 +207,21 @@ export function servePageRoutes(app: Elysia, { table, served: claims, matchers, 
       const own = served.get(locale)
       const redirect = slashRedirect(url, (own ?? served.values().next().value!).candidates[0]!.shape, trailingSlash)
 
-      if (redirect)
+      if (redirect) {
+        noteRedirect(context.request, 'the trailing slash setting')
+
         return redirect
+      }
 
       if (!i18n || !settings)
         return inImplicitLocale(url, context.request, async () => answeringRequest(context.request, async () => answer(own!.candidates, context, url)))
 
       // With every locale prefixed, a path without one goes to the visitor's.
-      if (locale === undefined)
+      if (locale === undefined) {
+        noteRedirect(context.request, 'the visitor\'s locale')
+
         return localeRedirect(settings, context.request, url)
+      }
 
       const rest = url.pathname.slice(own?.prefix.length ?? 0) || '/'
 

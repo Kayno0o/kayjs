@@ -1,6 +1,6 @@
 // Loaded by every page a dev server serves: a bar in a corner of the page opens a drawer whose tabs show what kay knows of the page, its problems first; under `kay dev` the inspector adds its own tab and buttons.
 // It runs in the browser from its own route, so it imports types only; its elements live in a shadow root on the root element, which a page swap keeps, styled by an adopted stylesheet, which a policy without inline styles allows.
-import type { DevHead, DevRequest, DevRoute, DevRoutes } from '../server/dev'
+import type { DevHead, DevRequest, DevResponse, DevRoute, DevRoutes } from '../server/dev'
 import type { DevProblem, DevProblems } from './dev-boot'
 
 const HOST = 'kay-dev'
@@ -10,6 +10,10 @@ const REQUEST = 'kay-dev-request'
 const ROUTES_URL = '/_kay/dev/routes'
 const HEAD_URL = '/_kay/dev/head'
 const HEAD_HEADER = 'x-kay-dev'
+const REQUEST_URL = '/_kay/dev/request'
+// Shown first among the response headers.
+const FIRST_HEADERS = ['content-security-policy', 'content-security-policy-report-only', 'cache-control']
+const PRERENDER = { 'page': 'prerendered by kay build', 'listed': 'prerendered by kay build for the paths its setting lists', 'server islands': 'prerendered by kay build, its server islands rendered on request' }
 // The most problem texts a tab remembers as dismissed.
 const MAX_DISMISSED = 200
 // How long an error page's copy button says it copied.
@@ -639,10 +643,44 @@ function problemsTab(doc: Document, tool: DevTool, state: DevState, save: () => 
 // What served the page: the route it matched, the files that rendered it, its params and status, and how long each load took; read again after each page swap.
 function requestTab(doc: Document, tool: DevTool): { stop: () => void } {
   const tab = tool.tab({ id: 'request', label: 'Request' })
+  // The block the tab shows now.
+  let current: string | undefined
+  // What the server recorded of the response: asked for once the page is in view, and dropped if another page's block replaced this one while it was out.
+  const showResponse = async (id: string, block: string, fact: (term: string, ...values: (Node | string)[]) => void, lines: (nodes: Node[], none: string) => Node[]) => {
+    let recorded: DevResponse | undefined
+
+    try {
+      const response = await doc.defaultView!.fetch(`${REQUEST_URL}?id=${encodeURIComponent(id)}`, { headers: { [HEAD_HEADER]: '1' }, cache: 'no-store' })
+
+      recorded = response.ok ? await response.json() as DevResponse : undefined
+    }
+    catch {
+      recorded = undefined
+    }
+
+    if (current !== block)
+      return
+
+    if (recorded === undefined) {
+      fact('Response', tool.make('span', 'note', 'not recorded by the server'))
+
+      return
+    }
+
+    const hops = recorded.redirects.map(hop => tool.make('span', 'mono', `${hop.from} (${hop.status}${hop.by === undefined ? '' : `, by ${hop.by}`})`))
+    const rank = (name: string) => !FIRST_HEADERS.includes(name) ? FIRST_HEADERS.length : FIRST_HEADERS.indexOf(name)
+    const headers = [...recorded.headers].sort(([a], [b]) => rank(a) - rank(b))
+
+    fact('Server time', formatMs(recorded.ms))
+    fact('Redirected from', ...lines(hops, 'none'))
+    fact('Headers', ...lines(headers.map(([name, value]) => tool.make('span', 'mono', `${name}: ${value}`)), 'none'))
+  }
   const read = () => {
     // A swap adds the next page's block before it drops this one's.
     const block = [...doc.querySelectorAll(`script#${REQUEST}`)].at(-1)?.textContent
     const facts = tool.make('dl', 'facts')
+
+    current = block ?? undefined
 
     if (block === undefined || block === null) {
       tab.panel.replaceChildren(tool.make('div', 'empty', 'kay served no request block with this page.'))
@@ -676,6 +714,14 @@ function requestTab(doc: Document, tool: DevTool): { stop: () => void } {
     fact('Params', ...lines(params.map(([name, value]) => tool.make('span', 'mono', `${name} = ${JSON.stringify(value)}`)), 'none'))
 
     fact('Locale', request.locale)
+    fact('Rendered', request.prerender === undefined ? 'on request' : `on request here, ${PRERENDER[request.prerender]}`)
+    fact('Guards', ...lines(request.guards.map((guard) => {
+      const line = tool.make('span')
+
+      line.append(positionButton(tool, guard.file), tool.make('span', guard.outcome === 'passed' ? 'ms mono' : guard.outcome === 'did not run' ? 'note' : 'error', guard.outcome))
+
+      return line
+    }), 'none'))
 
     fact(request.loads.length > 1 ? `Loads, ${formatMs(total)}` : 'Loads', ...lines(request.loads.map((load) => {
       const line = tool.make('span')
@@ -685,6 +731,7 @@ function requestTab(doc: Document, tool: DevTool): { stop: () => void } {
       return line
     }), 'none'))
     tab.panel.replaceChildren(facts)
+    void showResponse(request.id, block, fact, lines)
   }
   // A page swap, or the patch a page without one gets, brings the next page's block.
   const swaps = new MutationObserver((records) => {

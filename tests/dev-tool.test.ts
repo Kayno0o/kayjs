@@ -1,5 +1,5 @@
 import type { DevTool } from '../src/runtime/dev-tool'
-import type { DevHead } from '../src/server/dev'
+import type { DevHead, DevResponse } from '../src/server/dev'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, afterEach, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { startDevTool } from '../src/runtime/dev-tool'
@@ -319,21 +319,50 @@ describe('the dev tool', () => {
     }
     const facts = () => [...shadow().querySelectorAll('#kay-dev-request dt')].map(term => `${term.textContent}: ${[...term.nextElementSibling!.children].map(line => line.textContent).join(' / ') || term.nextElementSibling!.textContent}`)
     const opened: string[] = []
+    let recorded: DevResponse | undefined = {
+      headers: [['x-request-id', 'abc'], ['cache-control', 'no-store'], ['content-type', 'text/html'], ['content-security-policy', 'default-src \'self\'']],
+      ms: 51.2,
+      redirects: [{ from: '/members', status: 307, by: 'the guard src/routes/members/_guard.ts' }],
+    }
+    const asked: string[] = []
+    const fetching = spyOn(window, 'fetch').mockImplementation((async (url: string) => {
+      asked.push(url)
 
-    document.head.append(block({ route: '/items/:id', page: 'src/routes/items/[id].kay', layouts: ['src/routes/_layout.kay'], params: { id: '7' }, locale: 'fr', status: 200, loads: [{ file: 'src/routes/_layout.kay', ms: 1.5 }, { file: 'src/routes/items/[id].kay', ms: 42.4 }] }))
+      return recorded ? new Response(JSON.stringify(recorded)) : new Response(null, { status: 404 })
+    }) as unknown as typeof window.fetch)
+
+    document.head.append(block({ route: '/items/:id', page: 'src/routes/items/[id].kay', layouts: ['src/routes/_layout.kay'], params: { id: '7' }, id: 'abc', guards: [{ file: 'src/routes/_guard.ts', outcome: 'passed' }, { file: 'src/routes/items/_guard.ts', outcome: 'redirected to /login (307)' }], prerender: 'listed', locale: 'fr', status: 200, loads: [{ file: 'src/routes/_layout.kay', ms: 1.5 }, { file: 'src/routes/items/[id].kay', ms: 42.4 }] }))
     tool = startDevTool()
     shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-request')!.click()
     await Bun.sleep(0)
 
-    expect(facts()).toEqual(['Route: /items/:id', 'Status: 200', 'Page: src/routes/items/[id].kay', 'Layouts: src/routes/_layout.kay', 'Params: id = "7"', 'Locale: fr', 'Loads, 44 ms: src/routes/_layout.kay1.5 ms / src/routes/items/[id].kay42 ms'])
+    await Bun.sleep(0)
+
+    expect(asked).toEqual(['/_kay/dev/request?id=abc'])
+    expect(facts()).toEqual([
+      'Route: /items/:id',
+      'Status: 200',
+      'Page: src/routes/items/[id].kay',
+      'Layouts: src/routes/_layout.kay',
+      'Params: id = "7"',
+      'Locale: fr',
+      'Rendered: on request here, prerendered by kay build for the paths its setting lists',
+      'Guards: src/routes/_guard.tspassed / src/routes/items/_guard.tsredirected to /login (307)',
+      'Loads, 44 ms: src/routes/_layout.kay1.5 ms / src/routes/items/[id].kay42 ms',
+      'Server time: 51 ms',
+      'Redirected from: /members (307, by the guard src/routes/members/_guard.ts)',
+      'Headers: content-security-policy: default-src \'self\' / cache-control: no-store / x-request-id: abc / content-type: text/html',
+    ])
 
     // The swap adds the next page's block, then drops this one's.
-    document.head.append(block({ page: 'src/routes/_404.kay', layouts: [], params: {}, locale: 'en', status: 404, error: 'Not Found', loads: [] }))
+    recorded = undefined
+    document.head.append(block({ page: 'src/routes/_404.kay', layouts: [], params: {}, id: 'def', guards: [], locale: 'en', status: 404, error: 'Not Found', loads: [] }))
     await Bun.sleep(0)
     document.head.firstElementChild!.remove()
     await Bun.sleep(0)
+    await Bun.sleep(0)
 
-    expect(facts()).toEqual(['Route: none matched', 'Status: 404 Not Found', 'Page: src/routes/_404.kay', 'Layouts: none', 'Params: none', 'Locale: en', 'Loads: none'])
+    expect(facts()).toEqual(['Route: none matched', 'Status: 404 Not Found', 'Page: src/routes/_404.kay', 'Layouts: none', 'Params: none', 'Locale: en', 'Rendered: on request', 'Guards: none', 'Loads: none', 'Response: not recorded by the server'])
     expect(shadow().querySelector('#kay-dev-request dd .error')?.textContent).toBe('404 Not Found')
 
     tool.setOpener(async (source) => {
@@ -345,6 +374,7 @@ describe('the dev tool', () => {
     await Bun.sleep(0)
 
     expect(opened).toEqual(['src/routes/_404.kay:1:1'])
+    fetching.mockRestore()
   })
 
   it('lists the routes the server serves as the tab shows and after each restart, filtered as typed, linking the paths no request fills in, the page shown marked', async () => {

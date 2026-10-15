@@ -1,5 +1,6 @@
 import type { Elysia } from 'elysia'
 import type { ServedPaths } from './served-paths'
+import { noteRedirect } from './dev-notes'
 
 // A path moved elsewhere, by its old path: `'/blog/:slug': '/posts/:slug'`, a `*` carrying the rest of the path. Permanent, a 308, unless it says otherwise.
 export type Redirects = Record<string, string | { to: string, permanent?: boolean }>
@@ -108,6 +109,8 @@ export function serveRedirects(app: Elysia, redirects: Redirect[]): void {
       const { search } = new URL(request.url)
       const path = target.startsWith('/') ? target.replace(LEADING_SLASHES, '/') : target
       const location = search !== '' && !path.includes('?') ? `${path}${search}` : path
+
+      noteRedirect(request, `the redirect from ${redirect.path}`)
 
       return new Response(null, { status: redirect.status, headers: { location } })
     })
