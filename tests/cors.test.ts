@@ -100,6 +100,15 @@ describe('an API module opening its routes to other sites', () => {
     expect(grants).toEqual([APP, 'capacitor://localhost', null])
   })
 
+  it('answers overlapping requests for one reused Response each with its own request id and grant', async () => {
+    const origins = [APP, 'capacitor://localhost', 'https://eu.shop.partner.example', undefined, APP]
+    const answers = await Promise.all(origins.map(async origin => site.fetch('/api/shared/slow', origin === undefined ? {} : { headers: { origin } })))
+
+    expect(answers.map(answer => answer.headers.get('access-control-allow-origin'))).toEqual(origins.map(origin => origin ?? null))
+    expect(new Set(answers.map(answer => answer.headers.get('x-request-id'))).size).toBe(origins.length)
+    expect(await Promise.all(answers.map(async answer => answer.text()))).toEqual(origins.map(() => 'reused'))
+  })
+
   it('opens its websockets to the origins it lists only', async () => {
     expect((await site.handle(upgrade('/api/shared/live', { origin: APP }))).status).not.toBe(403)
     expect((await site.handle(upgrade('/api/shared/live', { origin: 'https://evil.example' }))).status).toBe(403)

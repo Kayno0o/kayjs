@@ -18,4 +18,9 @@ export default api({ cors: { origins: ['https://app.example.com', 'https://*.par
   })
   .get('/built', () => new Response('built', { headers: { vary: 'Accept-Encoding' } }))
   .get('/reused', () => reused)
+  .get('/slow', async () => {
+    await Bun.sleep(5)
+
+    return reused
+  })
   .ws('/live', { message: (ws, message) => ws.send(message) })

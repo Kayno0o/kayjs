@@ -23,7 +23,7 @@ import { requestId } from './protection'
 import { sharedContext } from './render'
 import { reportServerError } from './report'
 import { requestUrl } from './request-url'
-import { carryContext } from './security'
+import { carriedNames, carryContext } from './security'
 import { answered, failed, SERVER_SPAN, startSpan } from './trace'
 
 // Bun closes a connection idle for 10 s by default, and proxies after a minute or so: a comment line now and then keeps a quiet stream open.
@@ -155,11 +155,26 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
   return { limits, mounted }
 }
 
+const answeredBefore = new WeakSet<Response>()
+
 // A Response of the route's own that carries everything the context held, which leaves Elysia nothing to copy it for; undefined when `carryContext` left something on the context, a cookie or a status, for Elysia to merge.
-function carriedOver(set: { status?: number | string, headers: Record<string, unknown>, cookie?: object }, response: Response): Response | undefined {
+function carriedOver(set: { status?: number | string, headers: Record<string, unknown>, cookie?: object }, given: Response): Response | undefined {
   // Nothing on the context: a page route's response, which carried it already and must not be stripped of it by a second pass.
   if (Object.keys(set.headers).length === 0)
     return undefined
+
+  let response = given
+
+  // A Response answered before is answered again as a copy, so two requests in flight never share one object whose headers each rewrites; the first request's headers come off the copy.
+  if (answeredBefore.has(given)) {
+    response = given.clone()
+
+    for (const name of carriedNames(given))
+      response.headers.delete(name)
+  }
+  else {
+    answeredBefore.add(given)
+  }
 
   carryContext(set as Context['set'], response)
 
