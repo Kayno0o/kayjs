@@ -433,6 +433,47 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay dev in
     ])
   }, 60_000)
 
+  it('sizes the page in the Performance tab with Chromium\'s own gzip, within a few percent of the same bytes gzipped here', async () => {
+    const shown = await dev.open('/state', { strict: false })
+
+    await shown.evaluate(() => document.querySelector('kay-dev')!.shadowRoot!.querySelector<HTMLButtonElement>('#kay-dev-tab-performance')!.click())
+    await shown.waitUntil(() => document.querySelector('kay-dev')!.shadowRoot!.querySelector('#kay-dev-performance')!.textContent.includes('Dev sizes'))
+
+    const [html, files] = await shown.evaluate(() => {
+      const panel = document.querySelector('kay-dev')!.shadowRoot!.querySelector('#kay-dev-performance')!
+      const facts = [...panel.querySelectorAll('dt')].find(term => term.textContent === 'HTML')!
+
+      return [facts.nextElementSibling!.textContent, [...panel.querySelectorAll('.note.mono')].map(note => note.textContent.split(' '))] as const
+    })
+    const bytes = (text: string) => {
+      const [value, unit] = text.split(' ')
+
+      return Number(value) * (unit === 'KB' ? 1024 : 1)
+    }
+    const near = (shown: number, here: number) => Math.abs(shown - here) <= Math.max(24, here * 0.05)
+
+    expect(files.length).toBeGreaterThan(0)
+
+    for (const file of files) {
+      const [url, size, unit] = file
+      const text = await (await dev.fetch(url!)).text()
+
+      expect(near(bytes(`${size} ${unit}`), Bun.gzipSync(text).length)).toBe(true)
+    }
+
+    // The HTML is the document the browser holds, tool left out.
+    const held = await shown.evaluate(() => {
+      const copy = window.document.documentElement.cloneNode(true) as HTMLElement
+
+      for (const host of copy.querySelectorAll('kay-dev'))
+        host.remove()
+
+      return `<!doctype html>${copy.outerHTML}`
+    })
+
+    expect(near(bytes(html), Bun.gzipSync(held).length)).toBe(true)
+  }, 60_000)
+
   it('shows what axe-core finds on the rendered page in the problem panel', async () => {
     const shown = await dev.open('/contrast', { strict: false })
 

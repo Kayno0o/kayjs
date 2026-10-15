@@ -764,10 +764,12 @@ describe('the dev tool', () => {
       '/_kay/page-swap-aa11bb22.js': 'export const swap = () => 3\n'.repeat(30),
       '/_kay/dev/tool.js': 'the tool itself, left out',
       '/_kay/env.js': 'export default {}\n',
+      '/_kay/lib-calendar.js': 'export const calendar = () => 4\n'.repeat(20),
+      '/_kay/lib-original.js': 'export const original = () => 5\n'.repeat(25),
       '/_kay/old-1.css': 'a { color: red }\n',
     }
     // What the browser loaded over the page's life: the island rebuilt since, a stylesheet swapped with a query, and one the page no longer links.
-    const loaded = ['/_kay/_layout-1.css', '/_kay/_layout-1.css?kay-dev=2', '/_kay/entry-abc12345.js', '/_kay/counter-00000000.js', '/_kay/counter-def45678.js', '/_kay/page-swap-aa11bb22.js', '/_kay/dev/tool.js', '/_kay/env.js', '/_kay/old-1.css']
+    const loaded = ['/_kay/_layout-1.css', '/_kay/_layout-1.css?kay-dev=2', '/_kay/entry-abc12345.js', '/_kay/counter-00000000.js', '/_kay/counter-def45678.js', '/_kay/page-swap-aa11bb22.js', '/_kay/lib-calendar.js', '/_kay/lib-original.js', '/_kay/dev/tool.js', '/_kay/env.js', '/_kay/old-1.css']
     const fetched: string[] = []
 
     happyDOM.setURL('http://localhost/')
@@ -799,7 +801,7 @@ describe('the dev tool', () => {
       await Bun.sleep(30)
 
       expect(facts().slice(0, 3)).toEqual(['LCP: 3000 ms - needs improvement', 'CLS: 0.120 - needs improvement', 'INP: no interaction yet'])
-      expect(shadow().querySelector('#kay-dev-performance .note')?.textContent).toBe(' (good up to 2500 ms, poor past 4000 ms)')
+      expect(shadow().querySelector('#kay-dev-performance dd .note')?.textContent).toBe(' (good up to 2500 ms, poor past 4000 ms)')
 
       // Interactions: the slowest of each, the worst taken; a later report moves the open tab.
       observed.report('event', [{ interactionId: 1, duration: 80 }, { interactionId: 1, duration: 120 }, { interactionId: 2, duration: 240 }, { duration: 900 }, { interactionId: 3, duration: 800, target: shadow().host }])
@@ -807,16 +809,25 @@ describe('the dev tool', () => {
       expect(facts()[2]).toBe('INP: 240 ms - needs improvement')
       expect(shadow().querySelector('#kay-dev-tab-performance .count')?.textContent).toBe('3')
 
-      expect(fetched.sort()).toEqual(['/', '/_kay/_layout-1.css', '/_kay/counter-def45678.js', '/_kay/entry-abc12345.js', '/_kay/page-swap-aa11bb22.js'])
+      // The HTML is sized from the document the browser holds, not fetched again; two unhashed files whose names end in 8 letters stay two.
+      expect(fetched.sort()).toEqual(['/_kay/_layout-1.css', '/_kay/counter-def45678.js', '/_kay/entry-abc12345.js', '/_kay/lib-calendar.js', '/_kay/lib-original.js', '/_kay/page-swap-aa11bb22.js'])
       expect(facts().slice(3)).toEqual([
-        `HTML: ${size(files['/']!)}`,
+        expect.stringMatching(/^HTML: \d/),
         `CSS: ${size(files['/_kay/_layout-1.css']!)}`,
-        `JS: ${size(files['/_kay/entry-abc12345.js']!, files['/_kay/counter-def45678.js']!, files['/_kay/page-swap-aa11bb22.js']!)}`,
+        `JS: ${size(files['/_kay/entry-abc12345.js']!, files['/_kay/counter-def45678.js']!, files['/_kay/page-swap-aa11bb22.js']!, files['/_kay/lib-calendar.js']!, files['/_kay/lib-original.js']!)}`,
         `Entry: ${size(files['/_kay/entry-abc12345.js']!)}`,
         `Island chunks: ${size(files['/_kay/counter-def45678.js']!)}`,
-        `Other chunks: ${size(files['/_kay/page-swap-aa11bb22.js']!)}`,
+        `Other chunks: ${size(files['/_kay/page-swap-aa11bb22.js']!, files['/_kay/lib-calendar.js']!, files['/_kay/lib-original.js']!)}`,
       ])
       expect(shadow().querySelector('#kay-dev-performance')!.textContent).toContain('Dev sizes: not minified')
+      expect(shadow().querySelector('#kay-dev-performance')!.textContent).toContain('Measured on the load of /.')
+
+      // A link swaps in another page without a load: the vitals say which load they belong to.
+      happyDOM.setURL('http://localhost/next')
+      document.head.insertAdjacentHTML('beforeend', '<meta name="swapped">')
+      await Bun.sleep(30)
+
+      expect(shadow().querySelector('#kay-dev-performance')!.textContent).toContain('Measured on the load of /, not on this page')
     }
     finally {
       fetching.mockRestore()
@@ -824,6 +835,7 @@ describe('the dev tool', () => {
       delete (window as { PerformanceObserver?: unknown }).PerformanceObserver
       document.body.innerHTML = ''
       document.head.querySelector('link[rel=stylesheet]')?.remove()
+      document.head.querySelector('meta[name=swapped]')?.remove()
       happyDOM.setURL(href)
     }
   })

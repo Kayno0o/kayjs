@@ -1164,6 +1164,8 @@ const SHIFT_WINDOW_MS = 5000
 type VitalName = keyof typeof VITAL_LIMITS
 
 interface Vitals {
+  // The page the browser loaded them for: a link swapping in another page starts no new load.
+  path: string
   // The largest paint so far, the element it painted when it is on the page.
   lcp?: { ms: number, element: Element | undefined } | undefined
   cls: number
@@ -1190,7 +1192,7 @@ interface EventEntry extends PerformanceEntry {
 
 // The page's LCP, CLS and INP as the browser reports them from the moment the tool loads, earlier entries included; a browser without an entry type leaves that vital out.
 function watchVitals(win: Window & typeof globalThis, signal: AbortSignal): Vitals {
-  const vitals: Vitals = { cls: 0, changed: [] }
+  const vitals: Vitals = { path: win.location.pathname, cls: 0, changed: [] }
   const observe = (type: string, handle: (entries: PerformanceEntry[]) => void, options: PerformanceObserverInit & { durationThreshold?: number } = {}) => {
     try {
       const observer = new win.PerformanceObserver(list => handle(list.getEntries()))
@@ -1438,6 +1440,16 @@ async function gzipSize(text: string): Promise<number> {
   return (await new Response(stream).arrayBuffer()).byteLength
 }
 
+// The page's HTML as the browser holds it, without the dev tool: what the server sent, as live reload and swaps changed it, so the server renders nothing again.
+function deliveredHtml(doc: Document): string {
+  const copy = doc.documentElement.cloneNode(true) as HTMLElement
+
+  for (const host of copy.querySelectorAll(HOST))
+    host.remove()
+
+  return `<!doctype html>${copy.outerHTML}`
+}
+
 interface Weight {
   html: number
   css: { url: string, bytes: number }[]
@@ -1447,9 +1459,10 @@ interface Weight {
 }
 
 // A built file's name without its hash, `counter` of `counter-48rr5xzz.js`.
-const HASHED_NAME = /^(.*)-[a-z\d]{8}\.(?:js|css)$/
+// The hash holds a digit, which a name ending in 8 letters, `chart-calendar.js`, does not.
+const HASHED_NAME = /^(.*)-(?=[a-z]*\d)[a-z\d]{8}\.(?:js|css)$/
 
-// The page's HTML, the stylesheets and scripts it loaded gzipped, as sent in development: not minified, with the dev-only code, so larger than `kay build` makes them. The dev tool's own scripts, the live reload and the public env stay out; a file rebuilt since it first loaded counts once, in its latest form, and a stylesheet only while the page links it.
+// The page's HTML (the document the browser holds), the stylesheets and scripts it loaded gzipped, as sent in development: not minified, with the dev-only code, so larger than `kay build` makes them. The dev tool's own scripts, the live reload and the public env stay out; a file rebuilt since it first loaded counts once, in its latest form, and a stylesheet only while the page links it.
 async function pageWeight(doc: Document): Promise<Weight> {
   const win = doc.defaultView!
   const here = win.location.origin
@@ -1480,10 +1493,7 @@ async function pageWeight(doc: Document): Promise<Weight> {
 
     return gzipSize(await response.text())
   }
-  const [html, settled] = await Promise.all([
-    sized(win.location.href, 'text/html'),
-    Promise.allSettled([...latest.values()].map(async url => ({ url, bytes: await sized(url) }))),
-  ])
+  const settled = await Promise.allSettled([...latest.values()].map(async url => ({ url, bytes: await sized(url) })))
   const files = settled.flatMap(result => result.status === 'fulfilled' ? [result.value] : [])
   const components = new Set([...doc.querySelectorAll('[data-component]')].map(element => (element.getAttribute('data-component') ?? '').replace(/^.*\//, '').replace(/\.kay$/, '')))
   const isEntry = (url: string) => url.slice(url.lastIndexOf('/') + 1).startsWith('entry-')
@@ -1491,7 +1501,7 @@ async function pageWeight(doc: Document): Promise<Weight> {
   const scripts = files.filter(file => file.url.endsWith('.js'))
 
   return {
-    html,
+    html: await gzipSize(deliveredHtml(doc)),
     css: files.filter(file => file.url.endsWith('.css')),
     entry: scripts.filter(file => isEntry(file.url)),
     islands: scripts.filter(file => !isEntry(file.url) && isIsland(file.url)),
@@ -1506,6 +1516,7 @@ function performanceTab(doc: Document, tool: DevTool, vitals: Vitals, signal: Ab
   const tab = tool.tab({ id: 'performance', label: 'Performance', shown: () => reread() })
   const vitalsPanel = tool.make('dl', 'facts')
   const weightPanel = tool.make('div')
+  const loadNote = tool.make('div', 'note')
   let asked = 0
   const vital = (name: VitalName, label: string, value: number | undefined, format: (value: number) => string, detail?: string) => {
     const [good, poor] = VITAL_LIMITS[name]
@@ -1531,6 +1542,7 @@ function performanceTab(doc: Document, tool: DevTool, vitals: Vitals, signal: Ab
     const rated = [vitals.lcp?.ms === undefined ? undefined : rateVital('lcp', vitals.lcp.ms), vitals.inp === undefined ? undefined : rateVital('inp', vitals.inp), rateVital('cls', vitals.cls)]
     const bad = rated.filter(rating => rating !== undefined && rating !== 'good').length
 
+    loadNote.textContent = doc.defaultView!.location.pathname === vitals.path ? `Measured on the load of ${vitals.path}.` : `Measured on the load of ${vitals.path}, not on this page: a link swapped it in without a load.`
     vitalsPanel.replaceChildren()
     vital('lcp', 'LCP', vitals.lcp?.ms, ms => `${Math.round(ms)} ms`, painted === undefined ? undefined : `painted: ${painted}`)
     vital('cls', 'CLS', vitals.cls, value => value.toFixed(3))
@@ -1596,7 +1608,7 @@ function performanceTab(doc: Document, tool: DevTool, vitals: Vitals, signal: Ab
 
   swaps.observe(doc.head, { childList: true })
   signal.addEventListener('abort', () => swaps.disconnect())
-  tab.panel.append(tool.make('h3', 'heading', 'Web Vitals of the page load'), vitalsPanel, weightPanel)
+  tab.panel.append(tool.make('h3', 'heading', 'Web Vitals of the page load'), loadNote, vitalsPanel, weightPanel)
   renderVitals()
 }
 
