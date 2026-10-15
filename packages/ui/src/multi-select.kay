@@ -4,6 +4,7 @@ import type { MultiSelectOption } from './multi-select'
 import type { PopoverPlacement } from './popover'
 import { effect, signal } from 'kay'
 import { stepIndex } from './cycle'
+import { onFormDefaults, onFormReset } from './form-reset'
 import Icon from './icon.kay'
 import { pickedLabels, pickedShown, selectionSummary, toggledValue } from './multi-select'
 import Popover from './popover.kay'
@@ -50,6 +51,8 @@ const { id, options, value = [], label, placeholder = 'Any', searchLabel = 'Sear
 const picked = signal<readonly Value[]>(value)
 const query = signal('')
 let root: HTMLElement | undefined
+// What a reset goes back to: the values it started with, or the ones last saved by a SaveForm.
+let initial: readonly Value[] = value
 
 effect(() => picked.set(value))
 
@@ -66,6 +69,26 @@ function set(next: Value[]) {
   picked.set(next)
   onChange?.(next)
 }
+
+// A reset puts the boxes back on their defaults, which are not the picked values; the control goes back to `initial` and tells the app.
+onFormReset(() => root, () => {
+  const boxes = [...root?.querySelectorAll<HTMLInputElement>('.kui-multi-select-checkbox') ?? []]
+  const same = initial.length === picked().length && initial.every(one => picked().includes(one))
+
+  if (!same)
+    set([...initial])
+
+  for (const [index, box] of boxes.entries())
+    box.checked = picked().some(one => one === shown()[index]?.value)
+})
+
+onFormDefaults(() => root, () => {
+  const held = picked()
+
+  return () => {
+    initial = held
+  }
+})
 
 // The panel only shows once the browser has opened the popover, so focus moves on its toggle rather than on the click; closing clears the search.
 function toggled(open: boolean) {

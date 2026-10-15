@@ -1,0 +1,50 @@
+---
+import { signal } from 'kay'
+import Checkbox from '@kaynooo/kayjs-ui/checkbox.kay'
+import ChipGroup from '@kaynooo/kayjs-ui/chip-group.kay'
+import IconPicker from '@kaynooo/kayjs-ui/icon-picker.kay'
+import MarkdownEditor from '@kaynooo/kayjs-ui/markdown-editor.kay'
+import MultiSelect from '@kaynooo/kayjs-ui/multi-select.kay'
+import RangeInput from '@kaynooo/kayjs-ui/range-input.kay'
+import Segmented from '@kaynooo/kayjs-ui/segmented.kay'
+import Select from '@kaynooo/kayjs-ui/select.kay'
+import Textarea from '@kaynooo/kayjs-ui/textarea.kay'
+import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
+import Toggle from '@kaynooo/kayjs-ui/toggle.kay'
+import type { IconChoice, RangeValue } from '@kaynooo/kayjs-ui'
+
+// Every signal-driven control of the library, each one's value kept in a signal of the page and printed in `#state`, so a reset shows whether the page heard of it.
+const { search } = props<{ search: (query: string, limit: number) => Promise<IconChoice[]> }>()
+
+const agree = signal(true)
+const power = signal(false)
+const decks = signal(['films'])
+const size = signal<'s' | 'm' | 'l' | null>('m')
+const level = signal<'a' | 'b' | 'c'>('b')
+const tags = signal<('x' | 'y' | 'z')[]>(['x', 'y'])
+const title = signal('Ada')
+const bio = signal('Hello')
+const notes = signal('# Notes')
+const range = signal<RangeValue>([2, 8])
+const icon = signal('star')
+const free = signal(false)
+const options = [{ value: 'films', label: 'Films' }, { value: 'games', label: 'Games' }, { value: 'books', label: 'Books' }] as const
+const sizes = [{ value: 's', label: 'S' }, { value: 'm', label: 'M' }, { value: 'l', label: 'L' }] as const
+const levels = [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }, { value: 'c', label: 'C' }] as const
+const choices = [{ value: 'x', label: 'X' }, { value: 'y', label: 'Y' }, { value: 'z', label: 'Z' }] as const
+---
+form#form
+  Checkbox(name="agree" label="Agree" checked={agree()} onChange={agree.set})
+  Toggle(name="power" label="Power" checked={power()} onChange={power.set})
+  Checkbox#free(label="Free" onChange={free.set})
+  ChipGroup(label="Decks" name="decks" options={options} value={decks()} onChange={decks.set})
+  Segmented(label="Size" name="size" options={sizes} value={size()} onChange={size.set})
+  Select#level(name="level" options={levels} value={level()} onChange={level.set})
+  MultiSelect(label="Tags" name="tags" options={choices} value={tags()} onChange={tags.set})
+  TextInput#title(name="title" value={title()} onInput={title.set})
+  Textarea#bio(name="bio" value={bio()} onInput={bio.set})
+  MarkdownEditor#notes(value={notes()} onInput={notes.set})
+  RangeInput(label="Range" value={range()} onChange={range.set})
+  IconPicker(name="icon" value={icon()} search={search} onChange={icon.set})
+  button#reset(type="reset") Reset
+p#state {JSON.stringify({ agree: agree(), power: power(), free: free(), decks: decks(), size: size(), level: level(), tags: tags(), title: title(), bio: bio(), notes: notes(), range: range(), icon: icon() })}

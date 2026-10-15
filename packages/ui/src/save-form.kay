@@ -3,6 +3,7 @@ import type { Action, Failure, FailureData } from 'kay'
 import { guardLeave, onCleanup, onMount, signal } from 'kay'
 import Button from './button.kay'
 import { callAction, formIssues } from './forms'
+import { holdDefaults, onFormReset } from './form-reset'
 import { toast } from './toast'
 
 const { action, failure, refused, saved, onSaved, onDiscard, dirtyLabel = 'Unsaved changes.', cleanLabel = 'No unsaved change.', savingLabel = 'Saving…', saveLabel = 'Save', discardLabel = 'Discard', class: className } = props<{
@@ -16,7 +17,7 @@ const { action, failure, refused, saved, onSaved, onDiscard, dirtyLabel = 'Unsav
   saved?: string | undefined
   // What the action returned, for the page to patch into what it shows. The form is clean again once it has run.
   onSaved?: ((result: Exclude<Output, Failure<unknown>>) => void) | undefined
-  // Called after Discard has put the controls back to their initial values, for state the page keeps in signals.
+  // Called after Discard has put the controls back to their initial values, for state the page keeps beyond them: the library's controls and their `onChange` need nothing from it.
   onDiscard?: (() => void) | undefined
   // The bar's texts: unsaved changes, nothing to save, the save under way, and the two buttons.
   dirtyLabel?: string | undefined
@@ -39,7 +40,7 @@ function snapshot() {
   return JSON.stringify([...new FormData(form)].map(([name, value]) => [name, typeof value === 'string' ? value : [value.name, value.size, value.lastModified]]))
 }
 
-// What each control holds now, which becomes its default once saved: a Discard then goes back to the saved values, not to the ones first rendered.
+// What each control holds now, which becomes its default once saved, the library's signal-driven ones included: a Discard then goes back to the saved values, not to the ones first rendered.
 function values(): () => void {
   const held = [...form!.elements].map((control): (() => void) => {
     if (control instanceof HTMLInputElement || control instanceof HTMLTextAreaElement) {
@@ -59,22 +60,29 @@ function values(): () => void {
 
       return () => {
         for (const [index, option] of [...control.options].entries())
-          option.defaultSelected = picked[index] ?? false
+          option.toggleAttribute('selected', picked[index] ?? false)
       }
     }
 
     return () => undefined
   })
 
+  const adoptSignals = holdDefaults(form!)
+
   return () => {
     for (const keep of held)
       keep()
+
+    adoptSignals()
   }
 }
 
 function check() {
   dirty.set(snapshot() !== baseline)
 }
+
+// A reset the bar did not start, from a reset button among the fields, leaves the form clean too, once the controls driven by signals have followed.
+onFormReset(() => form, check, true)
 
 // Leaving asks while there are unsaved changes, but not while a save is under way: it may be what takes the page elsewhere.
 guardLeave(() => dirty() && !action.pending())

@@ -1,0 +1,32 @@
+---
+import type { Action, Failure } from 'kay'
+import { signal } from 'kay'
+import Checkbox from '@kaynooo/kayjs-ui/checkbox.kay'
+import ChipGroup from '@kaynooo/kayjs-ui/chip-group.kay'
+import MultiSelect from '@kaynooo/kayjs-ui/multi-select.kay'
+import SaveForm from '@kaynooo/kayjs-ui/save-form.kay'
+import Select from '@kaynooo/kayjs-ui/select.kay'
+import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
+import Toggle from '@kaynooo/kayjs-ui/toggle.kay'
+
+// The library's signal-driven controls in a SaveForm, with no `onDiscard`: the page's signals follow a Discard on their own.
+const agree = signal(false)
+const power = signal(false)
+const decks = signal<string[]>([])
+const level = signal<'a' | 'b'>('a')
+const tags = signal<('x' | 'y' | 'z')[]>(['x'])
+const title = signal('Ada')
+
+const save = Object.assign(async () => 'ok', { pending: signal(false), url: '/_kay/action/form/save' }) as unknown as Action<never, string | Failure<never>>
+const options = [{ value: 'films', label: 'Films' }, { value: 'games', label: 'Games' }]
+const levels = [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }] as const
+const choices = [{ value: 'x', label: 'X' }, { value: 'y', label: 'Y' }, { value: 'z', label: 'Z' }] as const
+---
+SaveForm(action={save} failure="Could not save")
+  Checkbox(name="agree" label="Agree" checked={agree()} onChange={agree.set})
+  Toggle(name="power" label="Power" checked={power()} onChange={power.set})
+  ChipGroup(label="Decks" name="decks" options={options} value={decks()} onChange={decks.set})
+  Select#level(name="level" options={levels} value={level()} onChange={level.set})
+  MultiSelect(label="Tags" name="tags" options={choices} value={tags()} onChange={tags.set})
+  TextInput#title(name="title" value={title()} onInput={title.set})
+p#state {JSON.stringify({ agree: agree(), power: power(), decks: decks(), level: level(), tags: tags(), title: title() })}

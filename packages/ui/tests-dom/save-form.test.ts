@@ -21,11 +21,11 @@ async function saveForm(save: (input: { name: string }) => Promise<Answer>) {
   return mounted.root
 }
 
-function type(root: HTMLElement, value: string, selector = '#name') {
+function type(root: HTMLElement, value: string, selector = '#name', event = 'input') {
   const input = root.querySelector<HTMLInputElement>(selector)!
 
   input.value = value
-  input.dispatchEvent(new Event('input', { bubbles: true }))
+  input.dispatchEvent(new Event(event, { bubbles: true }))
 }
 
 const status = (root: HTMLElement) => root.querySelector('.kui-save-bar-status')!.textContent
@@ -247,5 +247,40 @@ describe('SaveForm', () => {
     await settle()
 
     expect(saved).toEqual(['Grace', 'Hopper'])
+  })
+
+  test('Discard puts the library\'s signal-driven controls back on the saved values, and the page signals with them', async () => {
+    mounted = await mount('src/components/save-form-controls.kay', {})
+    await settle()
+
+    const root = mounted.root
+    const state = () => JSON.parse(root.querySelector('#state')!.textContent!) as Record<string, unknown>
+    const edit = async (deck: string, level: string, title: string) => {
+      click(root.querySelector('input[name="agree"]'))
+      click(root.querySelector('input[name="power"]'))
+      click(root.querySelector(`input[name="decks"][value="${deck}"]`))
+      type(root, level, '#level', 'change')
+      click(root.querySelectorAll('.kui-multi-select-checkbox')[1] ?? null)
+      type(root, title, '#title')
+      await settle()
+    }
+
+    await edit('films', 'b', 'Grace')
+    expect(state()).toEqual({ agree: true, power: true, decks: ['films'], level: 'b', tags: ['x', 'y'], title: 'Grace' })
+
+    root.querySelector('form')!.requestSubmit()
+    await settle()
+    expect(status(root)).toBe('No unsaved change.')
+
+    await edit('games', 'a', 'Hopper')
+    expect(status(root)).toBe('Unsaved changes.')
+
+    click(buttons(root)[0]!)
+    // The controls follow a task after the reset, and the bar reads them a task after that.
+    await settle()
+    await settle()
+
+    expect(state()).toEqual({ agree: true, power: true, decks: ['films'], level: 'b', tags: ['x', 'y'], title: 'Grace' })
+    expect(status(root)).toBe('No unsaved change.')
   })
 })

@@ -4,6 +4,7 @@ import type { IconChoice } from './icon-picker'
 import { batch, effect, flush, onCleanup, signal } from 'kay'
 import Icon from './icon.kay'
 import IconButton from './icon-button.kay'
+import { onFormDefaults, onFormReset } from './form-reset'
 import { nameOf } from './icon-picker'
 
 const PAGE_SIZE = 50
@@ -38,6 +39,8 @@ const pending = signal(true)
 // The last pick, whose icon the selection keeps drawing once a new search no longer finds it.
 const last = signal<IconChoice>()
 let hidden: HTMLInputElement | undefined
+// What a reset goes back to: the icon it started with, or the one last saved by a SaveForm.
+let initial = value
 let request = 0
 
 effect(() => picked.set(value))
@@ -86,6 +89,20 @@ function pick(next: string) {
   flush()
   hidden.dispatchEvent(new Event('input', { bubbles: true }))
 }
+
+// The hidden input is no default of its own to reset to, so a reset sends the picker back to `initial`.
+onFormReset(() => hidden, () => {
+  if (picked() !== initial)
+    pick(initial)
+})
+
+onFormDefaults(() => hidden, () => {
+  const held = picked()
+
+  return () => {
+    initial = held
+  }
+})
 
 function choose(choice: IconChoice) {
   last.set(choice)

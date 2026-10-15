@@ -1,6 +1,7 @@
 ---
 import type { JSX } from 'kay'
 import { effect, untrack } from 'kay'
+import { onFormReset } from './form-reset'
 
 const { value, onInput, onChange, onBlur, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['textarea'], 'value' | 'class' | 'children' | 'onInput' | 'onChange'> & {
   // Without it, the box starts empty and keeps what is typed, for a form posting it by its `name`.
@@ -12,15 +13,37 @@ const { value, onInput, onChange, onBlur, class: className, ...rest } = props<Om
 }>()
 
 let box: HTMLTextAreaElement | undefined
+// What the parent was last told or handed, which a reset that changes the box has to tell it again.
+let seen = untrack(() => value ?? '')
 
 // The parent may write back its own reading of the text, such as without the blank line just typed: the box takes it once left, never while focused, which would throw the caret to the end.
 function sync(left = false) {
   const next = value
 
-  if (box && next !== undefined && box.value !== next && (left || document.activeElement !== box))
+  if (box && next !== undefined && box.value !== next && (left || document.activeElement !== box)) {
     box.value = next
+    seen = next
+  }
+}
+
+// The ref runs again whenever the box's attributes do, but the box starts only once: its default is what it was first drawn with.
+function held(element: HTMLTextAreaElement) {
+  const start = untrack(() => value)
+
+  if (start !== undefined)
+    element.defaultValue = start
 }
 
 effect(() => sync())
+
+// A reset puts the box back on its default, which the parent is then told of as if typed.
+onFormReset(() => box, () => {
+  if (!box || box.value === seen)
+    return
+
+  seen = box.value
+  onInput?.(box.value)
+  onChange?.(box.value)
+})
 ---
-textarea.kui-field-input({...rest} ref={element => box = element} value={untrack(() => value)} class={className} onInput={event => onInput?.(event.currentTarget.value)} onChange={event => onChange?.(event.currentTarget.value)} onBlur={event => { sync(true); onBlur?.(event) }})
+textarea.kui-field-input({...rest} ref={element => { if (box !== element) { box = element; held(element) } }} value={untrack(() => value)} class={className} onInput={event => { seen = event.currentTarget.value; onInput?.(seen) }} onChange={event => { seen = event.currentTarget.value; onChange?.(seen) }} onBlur={event => { sync(true); onBlur?.(event) }})

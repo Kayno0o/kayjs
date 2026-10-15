@@ -1,7 +1,9 @@
 --- <Value extends string | number, Empty extends string | boolean | undefined = undefined>
 import type { JSX } from 'kay'
+import { untrack } from 'kay'
+import { onFormReset } from './form-reset'
 
-const { value, options, onChange, submit = false, emptyOption, loading = false, loadingLabel = 'Loading…', class: className, ...rest } = props<Omit<JSX.IntrinsicElements['select'], 'value' | 'options' | 'class' | 'children' | 'onChange'> & {
+const { value, options, onChange, submit = false, emptyOption, loading = false, loadingLabel = 'Loading…', class: className, ...rest } = props<Omit<JSX.IntrinsicElements['select'], 'value' | 'options' | 'class' | 'children' | 'onChange' | 'ref'> & {
   // One of the options' values, or the empty string once there is an `emptyOption`.
   value: Value | (Empty extends string | true ? '' : never)
   options: readonly { value: Value, label: string }[]
@@ -17,21 +19,33 @@ const { value, options, onChange, submit = false, emptyOption, loading = false, 
   class?: string | undefined
 }>()
 
-function picked(select: HTMLSelectElement) {
+let box: HTMLSelectElement | undefined
+
+function report(select: HTMLSelectElement) {
   const choice = options.find(option => String(option.value) === select.value)
 
   // No option matches only the empty one, which the type allows exactly when there is one.
   onChange?.(choice === undefined ? '' as never : choice.value)
+}
+
+function picked(select: HTMLSelectElement) {
+  report(select)
 
   if (submit)
     select.form?.requestSubmit()
 }
+
+// A reset puts the select back on its default option, which the app's `onChange` then hears of, without submitting.
+onFormReset(() => box, () => {
+  if (box && box.value !== String(value))
+    report(box)
+})
 ---
 // Each option says whether it is selected, so the right one stays chosen when the options arrive after the value.
-select.kui-field-input({...rest} class={className} onChange={event => picked(event.currentTarget)})
+select.kui-field-input({...rest} ref={element => box = element} class={className} onChange={event => picked(event.currentTarget)})
   if emptyOption !== undefined && emptyOption !== false
     option(value="") {typeof emptyOption === 'string' ? emptyOption : ''}
   if loading
     option(value="" disabled) {loadingLabel}
   for choice of options key={choice.value}
-    option(value={choice.value} selected={String(choice.value) === String(value)}) {choice.label}
+    option(ref={element => element.toggleAttribute('selected', untrack(() => String(choice.value) === String(value)))} value={choice.value} selected={String(choice.value) === String(value)}) {choice.label}
