@@ -1,0 +1,40 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+export const choose = action(t.Object({
+  first: t.String({ minLength: 3, maxLength: 40, error: 'Too short' }),
+  last: t.String({ minLength: 3, maxLength: 40, error: 'Too short' }),
+}), () => undefined)
+--- script
+import { signal } from 'kay'
+import Described from '../components/described.kay'
+
+// A signal makes the page an island, which hydrates over the ids the server wrote.
+const bumped = signal(0)
+
+async function send(first: string, last: string) {
+  try {
+    await choose({ first, last }, { refresh: false })
+  }
+  catch {
+    // What the call was refused for shows through choose.error.
+  }
+}
+---
+form.described(action={choose})
+  Described(ids="choose-hint")
+    input(name="first")
+  Described(ids="last-hint")
+    input(name="last" aria-describedby="last-note")
+  p#choose-hint Three letters at least
+  p#last-hint Three letters too
+  p#last-note As on your passport
+  if choose.error('first') as message
+    p {message}
+  if choose.error('last') as message
+    p {message}
+  button.choose(formnovalidate) Choose
+button.bump(type="button" onClick={() => bumped.set(1)}) {bumped()}
+button.accept(type="button" onClick={() => void send('abcd', 'abcd')}) Accept
+button.refuse(type="button" onClick={() => void send('ab', 'ab')}) Refuse

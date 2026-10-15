@@ -165,11 +165,11 @@ describe('the messages a refused form is described by', () => {
   it('describes the fields and the form of an island alike', () => {
     const { tsx } = compileKay(FORM, 'page.kay', { output: 'dom' })
 
-    expect(tsx).toContain('"aria-describedby", KayFormInvalid((add), "title") ? "help add-title-error" : "help"));')
-    // The effect writes the field's own description, which the template leaves out.
-    expect(tsx).not.toContain('aria-describedby=\\"help\\"')
-    expect(tsx).toContain('"aria-describedby", KayFormInvalid((add), "tag") ? "add-tag-error" : undefined));')
-    expect(tsx).toContain('"aria-describedby", KayFormInvalid((add), "") ? "own-form" : undefined));')
+    // The template keeps the field's own description, the effect adding and removing the message's id alone, so ids a component wrote stay.
+    expect(tsx).toContain('<input name=\\"title\\" aria-describedby=\\"help\\">')
+    expect(tsx).toMatch(/KayFormDescribed\(\w+, \(add\), "title", "add-title-error"\)/)
+    expect(tsx).toMatch(/KayFormDescribed\(\w+, \(add\), "tag", "add-tag-error"\)/)
+    expect(tsx).toMatch(/KayFormDescribed\(\w+, \(add\), "", "own-form"\)/)
     expect(tsx).toContain('<p id=\\"add-tag-error\\">')
     expect(tsx).not.toContain('KayFormInvalid((add), "slug") ?')
   })
@@ -327,6 +327,32 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
     // The error line names the message, before the element an if block shows.
     expect(await page.evaluate(() => document.querySelector('p.joined')?.outerHTML)).toBe('<p id="join-email-error" class="error joined">Not an email</p>')
     expect(await page.evaluate(() => document.querySelector('p.signup-error')?.id)).toBe('')
+    expect(page.errors).toEqual([])
+  })
+
+  it('keeps the ids a component handed a refused field once the island hydrates, and as the field turns valid and refused again', async () => {
+    const page = await site.open('/described-island', { path })
+    const described = async () => page.evaluate(() => [...document.querySelectorAll('form.described input')].map(input => [input.getAttribute('aria-describedby'), input.getAttribute('aria-invalid')]))
+
+    await page.fill('form.described input[name="first"]', 'ab')
+    await page.fill('form.described input[name="last"]', 'ab')
+    await page.click('button.choose')
+    await page.waitFor('#choose-first-error')
+    // A click the island answers tells it hydrated.
+    await page.click('button.bump')
+    await page.waitFor('button.bump', { text: '1' })
+
+    expect(await described()).toEqual([['choose-first-error choose-hint', 'true'], ['last-note choose-last-error last-hint', 'true']])
+
+    await page.click('button.accept')
+    await page.waitUntil(() => document.querySelector('form.described input[name="first"]')?.getAttribute('aria-invalid') === null)
+
+    expect(await described()).toEqual([['choose-hint', null], ['last-note last-hint', null]])
+
+    await page.click('button.refuse')
+    await page.waitUntil(() => document.querySelector('form.described input[name="first"]')?.getAttribute('aria-invalid') === 'true')
+
+    expect(await described()).toEqual([['choose-hint choose-first-error', 'true'], ['last-note last-hint choose-last-error', 'true']])
     expect(page.errors).toEqual([])
   })
 })

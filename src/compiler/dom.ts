@@ -5,7 +5,7 @@ import type { PlannedAttribute } from './markup'
 import { keyedByPosition, marksServerIsland } from './ast'
 import { decodeEntities, isFunctionAt } from './expression'
 import { childItems, constDeclaration, errorParagraphArguments, slotValue, soleDynamic } from './items'
-import { addBindWrite, bindRead, describedValue, END_MARKER, escapeStaticAttribute, escapeText, helperName, RAW_ELEMENTS, START_MARKER, TemplateWriter, VOID_ELEMENTS } from './markup'
+import { addBindWrite, bindRead, END_MARKER, escapeStaticAttribute, escapeText, helperName, RAW_ELEMENTS, START_MARKER, TemplateWriter, VOID_ELEMENTS } from './markup'
 import { SUBJECT } from './names'
 import { bindEvent } from './validate'
 
@@ -469,15 +469,19 @@ export class DomTemplate extends TemplateWriter {
           html += ' enctype="multipart/form-data"'
 
         if (described)
-          own.push(variable => b.add(`KayEffect(() => KayProperty(${variable(node)}, "aria-describedby", KayFormInvalid((`).addSource(action.expression).add(`), ""${describedValue(described)}));`))
+          own.push(variable => b.add(`KayEffect(() => KayFormDescribed(${variable(node)}, (`).addSource(action.expression).add(`), "", ${JSON.stringify(described.id)}));`))
       }
 
       if (field?.invalid && target) {
         own.push(variable => b.add(`KayEffect(() => KayProperty(${variable(node)}, "aria-invalid", KayFormInvalid((`).addSource(target).add(`), ${JSON.stringify(field.name)})));`))
 
         if (described)
-          own.push(variable => b.add(`KayEffect(() => KayProperty(${variable(node)}, "aria-describedby", KayFormInvalid((`).addSource(target).add(`), ${JSON.stringify(field.name)}${describedValue(described)}));`))
+          own.push(variable => b.add(`KayEffect(() => KayFormDescribed(${variable(node)}, (`).addSource(target).add(`), ${JSON.stringify(field.name)}, ${JSON.stringify(described.id)}));`))
       }
+
+      // The template's own description stays as written, the effect adding and removing the message's id alone.
+      if (described?.own !== undefined)
+        html += ` aria-describedby="${escapeStaticAttribute(described.own)}"`
     }
 
     const located = this.located?.(element)

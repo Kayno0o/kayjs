@@ -395,15 +395,15 @@ export function errorMessages(nodes: Node[], source: string): ErrorMessages {
   return found
 }
 
-// What `aria-describedby` reads while a field, or the form for `''`, is refused, and what it reads otherwise: the error's id after the template's own static value, which then renders through this alone; nothing for a value the template binds.
-export function describedByOf(element: ElementNode, source: string, errors: ErrorMessages | undefined, action: Span, field: string): { refused: string, own?: string } | undefined {
+// The id of the error a refused field, or the form for `''`, is described by, and the template's own static `aria-describedby`, which then renders through this alone; nothing for a value the template binds.
+export function describedByOf(element: ElementNode, source: string, errors: ErrorMessages | undefined, action: Span, field: string): { id: string, own?: string } | undefined {
   const id = errors?.describing.get(errorKey(source.slice(action.start, action.end), field))
   const own = element.attributes.find((attribute): attribute is NamedAttribute => attribute.kind !== 'spread' && source.slice(attribute.name.start, attribute.name.end) === 'aria-describedby')
 
   if (id === undefined || (own !== undefined && own.kind !== 'static'))
     return undefined
 
-  return own ? { refused: `${own.text} ${id}`, own: own.text } : { refused: id }
+  return own ? { id, own: own.text } : { id }
 }
 
 export function isHead(node: Node): node is ElementNode & { name: 'head' } {

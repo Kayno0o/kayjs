@@ -32,6 +32,7 @@ export const OUTCOME_SCRIPT = 'data-kay-outcome'
 export const INPUT_PART = '$kay'
 export const FILE_MARK = '$kayFile'
 const FILE_TYPE = 'KayFile'
+const SPACES = /\s+/
 const HTTP_PROTOCOLS = new Set(['http:', 'https:'])
 
 // The `x-kay-action` of a call whose input is a form's fields rather than encoded.
@@ -435,6 +436,22 @@ export function formChecked(target: unknown, name: string, value: unknown): bool
 // `aria-invalid` for a field a refused post or call got an error for.
 export function formInvalid(target: unknown, name: string): 'true' | undefined {
   return isAction(target) && (target as FormTarget).error(name) !== undefined ? 'true' : undefined
+}
+
+// Adds `id` to an island field's `aria-describedby` while a refused post or call gave `field` of a form posting to `target` a message (`''` for the form's own), and takes it out once there is none, leaving the ids others wrote there.
+export function formDescribed(element: Element, target: unknown, field: string, id: string): void {
+  const ids = (element.getAttribute('aria-describedby') ?? '').split(SPACES).filter(name => name !== '')
+  const refused = formError(target, field) !== undefined
+
+  if (refused === ids.includes(id))
+    return
+
+  const next = refused ? [...ids, id] : ids.filter(name => name !== id)
+
+  if (next.length > 0)
+    element.setAttribute('aria-describedby', next.join(' '))
+  else
+    element.removeAttribute('aria-describedby')
 }
 
 // The message a refused post or call gave `field` of a form posting to `target`, or under '' the form's own: what an `error` line shows.

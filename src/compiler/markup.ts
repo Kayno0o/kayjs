@@ -59,9 +59,9 @@ export function escapeStaticAttribute(text: string): string {
   return text.replace(STATIC_ATTRIBUTE, char => ATTRIBUTE_ENTITY[char] ?? '&amp;')
 }
 
-// What follows `KayFormInvalid(...` for a refused field or form: the value naming its error, else the template's own or none.
-export function describedValue(described: { refused: string, own?: string }): string {
-  return `) ? ${JSON.stringify(described.refused)} : ${described.own === undefined ? 'undefined' : JSON.stringify(described.own)}`
+// What follows `KayFormInvalid(...` for a refused field or form: the value naming its error after the template's own, else the template's own or none.
+export function describedValue(described: { id: string, own?: string }): string {
+  return `) ? ${JSON.stringify(described.own === undefined ? described.id : `${described.own} ${described.id}`)} : ${described.own === undefined ? 'undefined' : JSON.stringify(described.own)}`
 }
 
 // An attribute of an element without spreads, as both templates read it; a static text is decoded.
@@ -98,7 +98,7 @@ export interface ElementPlan {
   target: Span | undefined
   field: FormField | undefined
   // The `aria-describedby` a refused field or form takes.
-  described: { refused: string, own?: string } | undefined
+  described: { id: string, own?: string } | undefined
 }
 
 // What the server and browser templates write alike: an element's attributes as props objects and a component's props.
