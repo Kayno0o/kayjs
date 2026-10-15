@@ -678,6 +678,60 @@ describe('queue', () => {
       }
     })
 
+    it('hands the look to a sleeping worker while a job runs, so jobs enqueued then run at once, one worker after another', async () => {
+      jest.useFakeTimers({ now: 0 })
+
+      const release = Promise.withResolvers<void>()
+      const idle = await watch({ concurrency: 3, handler: async (payload: string) => {
+        if (payload === 'slow')
+          await release.promise
+      } })
+
+      try {
+        await idle.advance(20_000)
+        await idle.work.enqueue('slow')
+        await flush()
+        await idle.work.enqueue('q1')
+        await flush()
+        await idle.work.enqueue('q2')
+        await flush()
+        // No time passed: each enqueue woke whoever looked, and each claim woke a sleeper to look next.
+        expect(idle.ran).toEqual(['slow', 'q1', 'q2'])
+        release.resolve()
+      }
+      finally {
+        jest.useRealTimers()
+        await shutdown(idle.app)
+      }
+    })
+
+    it('wakes a poller waiting out a store outage on an enqueue', async () => {
+      jest.useFakeTimers({ now: 0 })
+
+      const idle = await watch({ concurrency: 2 })
+      const claim = idle.store.claim.bind(idle.store)
+      let down = true
+
+      try {
+        await idle.advance(5000)
+        idle.store.claim = async (name, now, until) => {
+          if (down)
+            throw new Error('locked')
+
+          return claim(name, now, until)
+        }
+        await idle.advance(20_000)
+        down = false
+        await idle.work.enqueue('a')
+        await flush()
+        expect(idle.ran).toEqual(['a'])
+      }
+      finally {
+        jest.useRealTimers()
+        await shutdown(idle.app)
+      }
+    })
+
     it('notices a job another process enqueued within idlePoll, and with a job running another worker takes over the look', async () => {
       jest.useFakeTimers({ now: 0 })
 

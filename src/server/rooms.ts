@@ -225,11 +225,12 @@ export function sqliteRooms(path: string, { poll = POLL }: { poll?: number } = {
   let pruned = 0
 
   // Drops the members of processes gone quiet and the messages past `KEPT`.
-  const prune = (now: number) => {
+  // One transaction, so a process beating between two of the deletes never finds its row kept while its members went.
+  const prune = db.transaction((now: number) => {
     db.run('DELETE FROM kay_room_members WHERE process IN (SELECT process FROM kay_room_processes WHERE seen <= ?)', [now - EXPIRY])
     db.run('DELETE FROM kay_room_processes WHERE seen <= ?', [now - EXPIRY])
     db.run('DELETE FROM kay_room_messages WHERE at <= ?', [now - KEPT])
-  }
+  })
 
   const beat = () => {
     const now = Date.now()
@@ -300,14 +301,14 @@ export function sqliteRooms(path: string, { poll = POLL }: { poll?: number } = {
 
       insert.run(room, text, self, recipients.except ?? null, recipients.to ?? null, now)
 
-      // A process only publishing has no beat, so its publishes prune, as often as a beat would.
-      if (!beating && now - pruned >= HEARTBEAT) {
-        pruned = now
-        prune(now)
-      }
-
       for (const listener of listeners)
         listener(room, text, recipients)
+
+      // A process only publishing has no beat, so its publishes prune, as often as a beat would; the message is stored and delivered by now, so a failing prune is only logged.
+      if (!beating && now - pruned >= HEARTBEAT) {
+        pruned = now
+        guarded('pruning the rooms store', () => prune(now))()
+      }
     },
     subscribe(listener) {
       listeners.add(listener)

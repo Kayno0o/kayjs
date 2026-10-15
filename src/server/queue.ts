@@ -290,6 +290,10 @@ export function queue<Payload>(name: string, handler: (payload: Payload) => unkn
 
     for (const sleeper of pollers)
       sleeper()
+
+    // A poller whose store failed waits in the outage set; an enqueue gives it a reason to ask again now.
+    for (const sleeper of outage)
+      sleeper()
   }
   const wakeIdler = () => {
     const [sleeper] = idlers
@@ -420,7 +424,7 @@ export function queue<Payload>(name: string, handler: (payload: Payload) => unkn
         if (ran)
           continue
 
-        // One worker looks at the store; the others sleep until a job is claimed, enqueued or retried.
+        // One worker looks at the store; the others sleep until a claim leaves no worker looking and wakes one of them.
         if (polling) {
           await sleep(MAX_TIMER_MS, signal, idlers)
 

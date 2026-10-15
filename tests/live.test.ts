@@ -1290,6 +1290,27 @@ describe('rooms', () => {
         store.close()
       }
     })
+
+    it('stores and delivers a message even when the prune after it fails', () => {
+      const path = join(dir, 'prune-fails.sqlite')
+      const store = sqliteRooms(path, { poll: 5 })
+      const file = new Database(path)
+      const heard: string[] = []
+      const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+
+      try {
+        store.subscribe((_room, text) => void heard.push(text))
+        file.run('DROP TABLE kay_room_processes')
+        expect(() => store.publish('hall', 'one', {})).not.toThrow()
+        expect(heard).toEqual(['one'])
+        expect(file.query<{ n: number }, []>('SELECT count(*) AS n FROM kay_room_messages').get()!.n).toBe(1)
+      }
+      finally {
+        logged.mockRestore()
+        file.close()
+        store.close()
+      }
+    })
   })
 
   it('calls the handler a message\'s type names, and refuses a type none names', () => {
