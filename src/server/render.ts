@@ -47,7 +47,7 @@ import { registerScript } from './offline'
 import { errorPage } from './overlay'
 import { pageSetting } from './page-settings'
 import { matchesEtag } from './public'
-import { queryRules, queryScript, readQuery } from './query'
+import { chainQuery, queryRules, queryScript, readQuery } from './query'
 import { reportServerError } from './report'
 import { guardUrl, routeChain } from './routes'
 import { inServerScope, readPersonally, wasReadPersonally, withOutcome } from './scope'
@@ -221,8 +221,8 @@ async function loadRoute(route: ServedRoute, rendering: Rendering, client: Clien
 
   try {
     const modules = await importAll(files, options)
-    // Read once the guards let the request through, so a refused query never renders what they protect; the layouts see the page's.
-    const query = pageSetting(modules.at(-1)!, 'query')
+    // Read once the guards let the request through, so a refused query never renders what they protect; the layouts and the page share it.
+    const query = chainQuery(files, modules)
 
     if (query !== undefined && !options.prerendering)
       rendering.ctx.query = readQuery(query, rendering.ctx.url)
@@ -385,7 +385,7 @@ export async function renderServerIslands(route: ServedRoute, context: RequestCo
     try {
       const started = performance.now()
       const islands = newServerIslands(path === undefined, path, skip)
-      const rules = queryRules(pageSetting(page.modules.at(-1)!, 'query'))
+      const rules = queryRules(chainQuery(page.files, page.modules))
       const inScope = <T>(run: () => T) => inServerScope(request, report, run, () => rendering.headers.append('vary', 'cookie'), rules)
       const { deferred } = inScope(() => withServerIslands(islands, () => renderStatic(viewOf(page.modules, page.data))))
       // What a block inside an island renders is the island's own, every component of it included.
@@ -641,7 +641,7 @@ export function withEditor(page: { editorOwn?: true | undefined }, options: Rend
 
 // The last module is the page, the others its layouts, outermost first. A page with pending `await` blocks streams.
 function renderDocument(files: string[], modules: PageModule[], data: Record<string, unknown>[], client: ClientBuild, rendering: Rendering, options: RenderOptions): string | ReadableStream<Uint8Array> {
-  const rules = queryRules(pageSetting(modules.at(-1)!, 'query'))
+  const rules = queryRules(chainQuery(files, modules))
 
   // A page a persisted signal's cookie shaped is told apart by it in any cache.
   return inServerScope(rendering.ctx.request, error => reportServerError(error, rendering.ctx.request, options.onError), () => documentOf(files, modules, data, client, rendering, options, rules), () => rendering.headers.append('vary', 'cookie'), rules)

@@ -23,6 +23,7 @@ import { refuseClashes } from '../server/route-table'
 import { routeMounts, scanEndpoints, scanRoutes } from '../server/routes'
 import { siteOrigin } from '../server/seo'
 import { ServedPaths } from '../server/served-paths'
+import { queryClashes } from './queries'
 
 // What the server refuses when it boots, found by the functions it calls then, so `kay check` and the boot cannot disagree; the collections' feeds come from the process that read them.
 export async function bootProblems(root: string, options: CheckOptions, feeds: CollectionFeed[] = []): Promise<CheckDiagnostic[]> {
@@ -98,6 +99,8 @@ export async function bootProblems(root: string, options: CheckOptions, feeds: C
     refused(projectPaths(root, options).content, () => claimFeed(served, feed, settings))
 
   diagnostics.push(...await actionClashes(root, [...new Set(routes.flatMap(route => [...route.layouts, route.file]))]))
+
+  diagnostics.push(...await queryClashes(routes))
 
   return diagnostics
 }

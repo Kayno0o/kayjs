@@ -4,19 +4,21 @@ import type { LintLevels } from '../compiler/lints'
 import type { ImportedSignals } from '../compiler/module-signals'
 import type { Route } from '../server/routes'
 import { existsSync, readFileSync } from 'node:fs'
-import { dirname, join, relative, resolve, sep } from 'node:path'
+import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import { importedSignals } from '../build/signals'
 import { compileKay } from '../compiler'
 import { parseKay } from '../compiler/parser'
+import { analyzeServer } from '../compiler/script'
 import { projectPaths } from '../project'
 import * as builtInMatchers from '../runtime/params'
 import { matcherFile } from '../server/params'
-import { routeOf } from '../server/routes'
+import { falseKeys, routeOf } from '../server/routes'
 
 // What the shadow tree was last compiled with, for tools that compile one file at a time without reading kay.config.ts, such as the ESLint processor.
 export const SHADOW_SETTINGS = 'kay-shadow.json'
 const TS_EXTENSION = /\.ts$/
 const KAY_EXTENSION = /\.kay$/
+const LAYOUT = '_layout.kay'
 const PARENT = '..'
 const OUTSIDE = '__'
 const WORD_CHARACTER = /[\w$]/
@@ -95,11 +97,38 @@ export function compileShadow(root: string, file: string, source: string, { rout
 
     return relative(shadowDir, target)
   }
-  const { tsx, map, diagnostics } = compileKay(source, file, { root, params: route?.params, paramTypes: route && paramTypesOf(routesDir, shadowDir, route), check: true, insideIsland, relocateImport, lints, importedSignals: signals })
+  const { tsx, map, diagnostics } = compileKay(source, file, { root, params: route?.params, paramTypes: route && paramTypesOf(routesDir, shadowDir, route), outerQueries: route || basename(file) === LAYOUT ? outerQueries(file, source, mounts.find(dir => file.startsWith(dir + sep)) ?? routesDir) : undefined, check: true, insideIsland, relocateImport, lints, importedSignals: signals })
   // Reported as the server reports it, rather than as a type error in the shadow file.
   const unknown = Object.values(route?.matchers ?? {}).filter(matcher => matcherSource(routesDir, matcher) === undefined)
 
   return { shadow: { source, file, tsx, map }, diagnostics: [...diagnostics, ...unknown.map(matcher => ({ start: 0, end: 0, message: `names the matcher ${matcher}, which is neither ${relative(root, matcherFile(routesDir, matcher))} nor one kay ships: ${Object.keys(builtInMatchers).join(', ')}` }))] }
+}
+
+// The type of each `query` schema declared by the layouts above `file` in its routes directory, outermost first: a layout or page reads them through `ctx.query` as the server merges them.
+export function outerQueries(file: string, source: string, pagesDir: string): string[] {
+  if (!file.startsWith(pagesDir + sep) || falseKeys(source).has('layouts'))
+    return []
+
+  const above: { layout: string, text: string }[] = []
+
+  for (let dir = dirname(file); dir.startsWith(pagesDir); dir = dirname(dir)) {
+    const layout = join(dir, LAYOUT)
+
+    if (layout !== file && existsSync(layout))
+      above.push({ layout, text: readFileSync(layout, 'utf8') })
+
+    if (dir === pagesDir)
+      break
+  }
+
+  // The innermost layout that leaves its parents out starts the chain.
+  const reset = above.findIndex(({ text }) => falseKeys(text).has('layouts'))
+
+  return (reset === -1 ? above : above.slice(0, reset + 1)).reverse().filter(({ text }) => analyzeServer(text, parseKay(text).server)?.page?.settings.has('query')).map(({ layout }) => {
+    const path = relative(dirname(file), layout).split(sep).join('/')
+
+    return `(typeof import(${JSON.stringify(path.startsWith('.') ? path : `./${path}`)}))["page"]["query"]`
+  })
 }
 
 // A generated span back in the source, where the mode allows it; an end that maps nowhere, or before the start, runs to the end of the word at the start.

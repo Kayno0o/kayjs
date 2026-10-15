@@ -1,0 +1,8 @@
+--- server
+import { s } from 'kay'
+
+export const page = { query: s.Object({ site: s.Optional(s.String()) }) }
+
+const { period, rows, site } = ctx.query
+---
+p.read {period} {rows} {site ?? 'all'} {typeof rows}

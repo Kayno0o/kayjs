@@ -1,0 +1,9 @@
+--- server
+import { s } from 'kay'
+
+export const page = { query: s.Object({ view: s.UnionEnum(['grid', 'list'], { default: 'grid' }) }) }
+
+const { period, view } = ctx.query
+---
+div.deep(data-view={view} data-period={period})
+  slot

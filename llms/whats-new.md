@@ -6,6 +6,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 - kayjs-ui: `infiniteList` and `LoadMore` own an infinite-scroll list's rows, offset or cursor paging, the end of the list, a retry after a failed page and the "Loading more" row, dropping a row already shown when the list shifts ([kayjs-ui](../packages/ui/llms.txt)).
 - A `for` over plain objects with no `id`, edited immutably, keeps each row's nodes, fields and focus through an edit, a removal or an insertion, with no id of your own ([Templates](templates.md)).
+- A layout declares a `query` of its own, read through `ctx.query` typed and validated with the page's, so the pages under it no longer repeat the schema, and an island's `queryParam` reads it too ([`ctx.query`](routing.md#the-server-fence)).
 - A static export writes its endpoint files, sitemap and feeds sixteen at a time, so an endpoint's `GET` no longer runs alone ([Endpoint files](routing.md#endpoint-files)).
 - `markInvalid(element, by, invalid)` from `kay` marks a field `aria-invalid` for one source among several, so an island's refused field stays invalid while a kayjs-ui `FormField` still shows a message for it ([Islands](islands.md#forms-posting-in-place)).
 

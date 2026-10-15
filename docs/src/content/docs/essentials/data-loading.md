@@ -27,7 +27,7 @@ The fence's `ctx` holds the request:
 | --- | --- |
 | `ctx.params` | Route params, typed from the file name |
 | `ctx.url` | The request URL |
-| `ctx.query` | Search params, typed by the page's `query` schema |
+| `ctx.query` | Search params, typed by the `query` schemas of the page and its layouts |
 | `ctx.cookies` | A `Bun.CookieMap`, changes are sent back |
 | `ctx.locals` | What the app's Elysia `derive` adds, such as the signed-in user |
 
@@ -58,6 +58,22 @@ const { q, page: number = 1 } = ctx.query
 ---
 h1 Results for {q}, page {number}
 ```
+
+A layout declares the params every page under it shares the same way, in its own `page`, and reads them through `ctx.query` typed and validated like a page does. The pages under it do not repeat the schema: `ctx.query` is read once against the layouts' `query` and the page's merged, so a page reads a layout's params as its own. A layout's `ctx.query` holds the params of the layouts above it and its own.
+
+```kay
+--- server
+import { s } from 'kay'
+
+export const page = { query: s.Object({ period: s.String({ maxLength: 4, default: '24h' }) }) }
+
+const { period } = ctx.query
+---
+nav Showing the last {period}
+slot
+```
+
+A name two files of one route declare is accepted when their schemas are the same, and refused when they differ: `kay check` reports it on the later file, and the render fails for a schema it cannot compare. A special page (`_error.kay`, `_404.kay`) declares no query, and a page with `layouts: false` reads none of the dropped layouts' params.
 
 ## Redirect, not found and deny
 

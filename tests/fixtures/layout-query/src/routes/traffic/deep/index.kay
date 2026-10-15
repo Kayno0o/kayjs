@@ -1,0 +1,4 @@
+--- server
+const { period, view, rows } = ctx.query
+---
+p.read {period} {view} {rows}

@@ -1,0 +1,8 @@
+--- server
+import { s } from 'kay'
+
+export const page = { query: s.Object({ period: s.String({ maxLength: 4, default: '24h' }) }) }
+
+const { period } = ctx.query
+---
+p.read {period}

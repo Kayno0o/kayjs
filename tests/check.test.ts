@@ -547,16 +547,39 @@ describe.concurrent('kay check, edge cases', () => {
     }
   })
 
-  it('types ctx.query from the page\'s query schema, and reports one a layout declares', async () => {
-    const page = '--- server\nimport { t } from \'elysia\'\n\nexport const page = { query: t.Object({ page: t.Integer() }) }\n\nconst label: string = ctx.query.page\nconst other = ctx.query.pag\n---\np {label} {String(other)}\n'
-    const layout = '--- server\nimport { t } from \'elysia\'\n\nexport const page = { query: t.Object({ q: t.String() }) }\n---\nslot\n'
+  it('types ctx.query from the page\'s query schema and the layouts\' above it', async () => {
+    const page = '--- server\nimport { t } from \'elysia\'\n\nexport const page = { query: t.Object({ page: t.Integer() }) }\n\nconst label: string = ctx.query.page\nconst other = ctx.query.pag\nconst q: string = ctx.query.q\nconst wrong: number = ctx.query.q\n---\np {label} {String(other)} {q} {wrong}\n'
+    const layout = '--- server\nimport { t } from \'elysia\'\n\nexport const page = { query: t.Object({ q: t.String() }) }\n\nconst q: string = ctx.query.q\nconst inner: string = ctx.query.page\n---\np {q} {inner}\nslot\n'
     const root = await scratchProject({ 'src/routes/index.kay': page, 'src/routes/_layout.kay': layout })
 
     try {
       expect((await check(root)).map(d => [basename(d.file), d.line, d.code ?? firstLine(d.message)])).toEqual([
-        ['_layout.kay', 4, 'Only a page declares its query'],
+        ['_layout.kay', 7, 'TS2339'],
         ['index.kay', 6, 'TS2322'],
         ['index.kay', 7, 'TS2551'],
+        ['index.kay', 9, 'TS2322'],
+      ])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('reports a name a layout and its page declare with different schemas, and a special page declaring a query', async () => {
+    const schema = (field: string) => `--- server\nimport { s } from 'kay'\n\nexport const page = { query: s.Object({ period: ${field} }) }\n---\np Page\n`
+    const root = await scratchProject({
+      'src/routes/_layout.kay': schema('s.String({ default: "24h" })').replace('p Page', 'slot'),
+      'src/routes/same.kay': schema('s.String({ default:   "24h" })'),
+      'src/routes/clash.kay': schema('s.Integer()'),
+      'src/routes/_error.kay': schema('s.String()'),
+    })
+
+    try {
+      const found = await check(root)
+
+      expect(found.map(d => [basename(d.file), d.line, d.code ?? firstLine(d.message)])).toEqual([
+        ['_error.kay', 4, 'Only a page or a layout declares its query'],
+        ['clash.kay', 4, expect.stringContaining('`period` is declared by the `query` of')],
       ])
     }
     finally {

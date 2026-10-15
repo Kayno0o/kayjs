@@ -32,6 +32,8 @@ export interface CompileOptions {
   params?: string[] | undefined
   // A param's type when it is not `string`, such as a matcher's value.
   paramTypes?: Record<string, string> | undefined
+  // The type of each `query` schema the layouts above this file declare, which its `ctx.query` includes.
+  outerQueries?: string[] | undefined
   // Output for type checking: adds the link, form field and island prop assertions.
   check?: boolean | undefined
   relocateImport?: ((specifier: string) => string | undefined) | undefined
@@ -71,8 +73,9 @@ const KAY_EXTENSION = /\.kay$/
 // A read of a member of `t`, which a schema builder named so gets: `t.Object(...)`.
 const MEMBER_OF_T = /(?<![\w$.])t\s*\.(?!\.)/
 const ERROR_PAGE = '_error.kay'
+const LAYOUT = '_layout.kay'
 // Rendered by the server around or instead of a page, never inside an island.
-const ROUTE_FILES = new Set(['_layout.kay', '_404.kay', ERROR_PAGE])
+const ROUTE_FILES = new Set([LAYOUT, '_404.kay', ERROR_PAGE])
 const BACKSLASH = /\\/g
 // An icon of an installed set, `~icons/tabler/home`, which the template may draw as a tag.
 const ICON_IMPORT = /^~icons\//
@@ -100,7 +103,7 @@ export function compileKay(source: string, filename: string, options: CompileOpt
   const hydratableServer = options.output === 'html' && options.hydratable === true
   const twin = hydratableServer && !options.twinBuild && island === undefined && !routeFile ? `./${basename(filename)}${ISLAND_TWIN}` : undefined
   const promote = island === undefined && !routeFile && mayPromote(file, script) ? islandId(filename, options.root) : undefined
-  const generateOptions = { island, client, twin, promote, output: options.output, hydratable: hydratableServer && (island !== undefined || options.twinBuild === true), moduleId: islandId(filename, options.root), includeServer: options.includeServer, params: options.params, paramTypes: options.paramTypes, check: options.check, insideIsland: options.insideIsland, inspect: options.inspect, relocateImport: options.relocateImport, errorPage: basename(filename) === ERROR_PAGE, special: basename(filename).startsWith('_') }
+  const generateOptions = { island, client, twin, promote, output: options.output, hydratable: hydratableServer && (island !== undefined || options.twinBuild === true), moduleId: islandId(filename, options.root), includeServer: options.includeServer, params: options.params, paramTypes: options.paramTypes, outerQueries: options.outerQueries, check: options.check, insideIsland: options.insideIsland, inspect: options.inspect, relocateImport: options.relocateImport, errorPage: basename(filename) === ERROR_PAGE, special: basename(filename).startsWith('_') && basename(filename) !== LAYOUT }
   // The analysis pass names the component so no read resolves to it, then the name is chosen free of what the code reads.
   const analysis = generate(file, script, server, { ...generateOptions, name: SELF })
   const imported = new Map<string, SignalKind>([...script.imports, ...server?.imports ?? []].flatMap((binding) => {

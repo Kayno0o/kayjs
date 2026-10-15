@@ -110,7 +110,7 @@ class Validator {
     const query = server?.page?.settings.get(QUERY)?.key
 
     if (query && this.options.special)
-      this.error(query, 'Only a page declares its query', { help: 'read the page\'s query through `ctx.query`' })
+      this.error(query, 'Only a page or a layout declares its query', { help: 'read the route\'s query through `ctx.query`' })
 
     const head = this.head(this.file.template)
 

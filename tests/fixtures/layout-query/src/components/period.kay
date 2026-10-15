@@ -1,0 +1,6 @@
+---
+import { queryParam } from 'kay'
+
+const period = queryParam<string>('period')
+---
+button.period(onClick={() => period.set('7d')}) {period()}

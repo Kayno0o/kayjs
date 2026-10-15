@@ -1,0 +1,4 @@
+--- server
+import Period from '../../components/period.kay'
+---
+Period

@@ -40,8 +40,10 @@ export interface GenerateOptions {
   paramTypes?: Record<string, string> | undefined
   // `_error.kay`, whose `ctx` carries the error it renders.
   errorPage?: boolean | undefined
-  // A layout or special page, which reads the query its page declares rather than one of its own.
+  // A special page (`_error.kay`, `_404.kay`), which declares no query and reads its route's.
   special?: boolean | undefined
+  // The type of each `query` schema the layouts above this file declare, outermost first.
+  outerQueries?: string[] | undefined
   // Server output without hydration markers for a static component: inside an island it renders through this hydratable build of itself instead.
   twin?: string | undefined
   // Set for a static component that may pass an island what only an island sends: the id it renders as an island by when it does.
@@ -364,9 +366,15 @@ class ModuleShell {
     return this.options.output === 'html' || this.kind === 'twin' || this.kind === 'promotable twin' || this.fence !== undefined
   }
 
-  // The type of the page's query schema, when it declares one; a layout or special page reads its page's.
+  // What `ctx.query` is typed by: the schemas of the layouts above and this file's own, when there are any; a special page reads its route's.
   private declaresQuery(): string | undefined {
-    return this.options.special ? undefined : this.settingType(QUERY)
+    if (this.options.special)
+      return undefined
+
+    const own = this.settingType(QUERY)
+    const types = [...this.options.outerQueries ?? [], ...own === undefined ? [] : [own]]
+
+    return types.length === 0 ? undefined : types.map(type => `KayQueryOf<${type}>`).join(' & ')
   }
 
   // What `load` types a setting from: its key of `page`.
@@ -455,7 +463,7 @@ class ModuleShell {
     // An unused parameter would trip `noUnusedParameters` in the user's tsconfig, so it is named `_ctx` when the fence never reads it.
     const ctx = server.body.some(span => CTX_REFERENCE.test(this.text(span))) ? 'ctx' : '_ctx'
 
-    const context = `KayPageContext<${params}${query !== undefined ? `, KayQueryOf<${query}>` : ''}>`
+    const context = `KayPageContext<${params}${query !== undefined ? `, ${query}` : ''}>`
     const prerender = this.settingType(PRERENDER)
 
     b.add(`\nexport async function ${LOAD}(${ctx}: ${prerender !== undefined ? `KayPrerenderedContext<${prerender}, ${context}>` : context}) {\n`)

@@ -1,9 +1,12 @@
 import type { TSchema } from 'elysia'
 import type { TypeCheck } from 'elysia/type-system'
 import type { ParamRule, QueryRules } from '../runtime/query-param'
+import { relative } from 'node:path'
+import process from 'node:process'
 import { mapValueError } from 'elysia'
 import { TypeCompiler } from 'elysia/type-system'
 import { formInput } from '../runtime/form'
+import { pageSetting } from './page-settings'
 import { Denied } from './signals'
 
 export type ReadFields = { value: Record<string, unknown> } | { refused: Map<string, string> }
@@ -28,9 +31,58 @@ interface ParamSchema {
 const KIND = Symbol.for('TypeBox.Kind')
 const checks = new WeakMap<TSchema, TypeCheck<TSchema>>()
 const rulesCache = new WeakMap<TSchema, QueryRules>()
+const mergedQueries = new WeakMap<TSchema, { parts: TSchema[], merged: TSchema }>()
 const PLAIN_TYPES = new Set<unknown>(['string', 'number', 'integer', 'boolean', 'array'])
 // The top-level field of a validation path such as `/page`.
 const FIELD = /^\/([^/]*)/
+
+// The schema a route's `ctx.query` is read against: its layouts' `query` and its page's merged, a name two of them declare allowed when their schemas are the same and an error otherwise.
+// `files` and `modules` are the route's chain, the page last.
+export function chainQuery(files: string[], modules: object[]): unknown {
+  const declared = modules.flatMap((module, index) => {
+    const schema = pageSetting(module, 'query')
+
+    return isSchema(schema) ? [{ file: files[index]!, schema }] : []
+  })
+  const last = declared.at(-1)
+
+  if (declared.length <= 1)
+    return last?.schema ?? pageSetting(modules.at(-1)!, 'query')
+
+  const parts = declared.map(({ schema }) => schema)
+  const known = mergedQueries.get(last!.schema)
+
+  if (known?.parts.length === parts.length && known.parts.every((part, index) => part === parts[index]))
+    return known.merged
+
+  const properties = new Map<string, { file: string, field: TSchema }>()
+  const required = new Set<string>()
+
+  for (const { file, schema } of declared) {
+    const own = schema as { properties?: Record<string, TSchema>, required?: string[] }
+
+    for (const [name, field] of Object.entries(own.properties ?? {})) {
+      const first = properties.get(name)
+
+      if (first && first.field !== field && JSON.stringify(first.field) !== JSON.stringify(field))
+        throw new Error(`\`${name}\` is declared by the \`query\` of both ${relative(process.cwd(), first.file)} and ${relative(process.cwd(), file)}, with different schemas`)
+
+      properties.set(name, first ?? { file, field })
+    }
+
+    for (const name of own.required ?? [])
+      required.add(name)
+  }
+
+  const merged = { ...last!.schema, properties: Object.fromEntries([...properties].map(([name, { field }]) => [name, field])), required: [...required] } as TSchema
+
+  if (required.size === 0)
+    delete (merged as { required?: string[] }).required
+
+  mergedQueries.set(last!.schema, { parts, merged })
+
+  return merged
+}
 
 // `ctx.query`: the search params read against the page's `query` schema, a refusal answering 400.
 // Without a schema, each parameter's text, a repeated one as a list.

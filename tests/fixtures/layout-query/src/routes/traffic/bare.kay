@@ -1,0 +1,6 @@
+--- server
+export const page = { layouts: false }
+
+const names = Object.keys(ctx.query).join(',')
+---
+p.read {names}
