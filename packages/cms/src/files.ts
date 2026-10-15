@@ -108,7 +108,7 @@ export interface ForgejoOptions {
   branch?: string | undefined
   // A token allowed to write the repository's contents.
   token: string
-  // How long a save may take, its requests to the forge together, before it fails, in milliseconds: 15 seconds by default.
+  // How long a save may take, its requests to the forge together, before it fails, in milliseconds: 15 seconds by default. The extra read naming the file's version after a conflict has its own.
   timeout?: number | undefined
   fetch?: typeof fetch | undefined
 }

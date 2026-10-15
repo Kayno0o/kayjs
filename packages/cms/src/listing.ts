@@ -60,12 +60,12 @@ function pageAt(total: number, page: number, size: number): { page: number, page
 
 // A page of the collection's rows: a search reads every entry to match their titles, a plain page its own entries alone.
 // `versionOf` reads the version of a folder entry's file, for the rows of the page shown alone.
-export async function pageRows(collection: CollectionInfo, search: string, page: number, read: (filter: EntryFilter) => Promise<SourceEntry[]>, versionOf?: (ref: EntryRef) => Promise<string | undefined>): Promise<{ rows: EntryRow[], page: number, pages: number }> {
+export async function pageRows(collection: CollectionInfo, search: string, page: number, read: (filter: EntryFilter) => Promise<SourceEntry[]>, versionOf: (ref: EntryRef) => Promise<string | undefined>): Promise<{ rows: EntryRow[], page: number, pages: number }> {
   if (collection.problem !== undefined)
     return pageOf([], 1)
 
   const versioned = async <T extends { rows: EntryRow[] }>(listed: T): Promise<T> => {
-    if (!versionOf || collection.kind !== 'folder')
+    if (collection.kind !== 'folder')
       return listed
 
     const rows = await Promise.all(listed.rows.map(async row => ({ ...row, version: await versionOf({ collection: collection.name, slug: row.slug, locale: row.locale }) })))

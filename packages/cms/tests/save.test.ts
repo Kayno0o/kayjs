@@ -115,16 +115,6 @@ describe('saveDraft targets', () => {
     expect(sent.map(({ url, body }) => [url, body.data.title])).toEqual([['/api/cms/entries/posts/a', 'First'], ['/api/cms/entries/posts/b', 'Second']])
   })
 
-  it('answers a join under another slug with the running save\'s outcome when nothing changed since', async () => {
-    const sent = server(() => ({ saved: true, version: 'v2' }))
-    const drafts = opened()
-
-    drafts.set(post, 'title', 'Once')
-
-    expect(await Promise.all([saveDraft(drafts, post, { slug: 'a' }), saveDraft(drafts, post, { slug: 'b' })])).toEqual([true, true])
-    expect(sent).toHaveLength(1)
-  })
-
   it('writes the edits kept over a deleted file as a new entry, so a file made meanwhile is not written over', async () => {
     const sent = server(() => ({ saved: true, version: 'v2' }))
     const drafts = opened()

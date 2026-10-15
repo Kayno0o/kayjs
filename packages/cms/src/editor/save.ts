@@ -26,9 +26,9 @@ export async function saveDraft(drafts: Drafts, ref: EntryRef, options: SaveOpti
   saving.set(drafts, inFlight)
 
   if (running && running.target !== target) {
-    const outcome = await running.done
+    await running.done
 
-    return outcome && !drafts.changed(ref) ? outcome : saveDraft(drafts, ref, options)
+    return saveDraft(drafts, ref, options)
   }
 
   if (running) {

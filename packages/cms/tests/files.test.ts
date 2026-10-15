@@ -175,11 +175,11 @@ describe('forgejo timeout', () => {
     const request = async (_input: string | URL | Request, init?: RequestInit): Promise<Response> => {
       const posting = init?.method === 'POST'
 
-      await wait(init?.signal, posting ? 50 : 20)
+      await wait(init?.signal, posting ? 40 : 30)
 
       return posting ? Response.json({ message: 'conflict' }, { status: 409 }) : Response.json({ sha: 'f00d' })
     }
-    const saver = forgejo({ url: 'https://git.example.com', repo: 'me/site', token: 't0k', timeout: 80, fetch: request as typeof fetch })
+    const saver = forgejo({ url: 'https://git.example.com', repo: 'me/site', token: 't0k', timeout: 60, fetch: request as typeof fetch })
 
     await expect(saver.save({ ...change, repoPath: 'a.md', text: 'mine', base: 'f00d' })).rejects.toMatchObject({ current: 'f00d' })
   })
