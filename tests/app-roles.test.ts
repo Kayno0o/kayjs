@@ -9,6 +9,8 @@ import { APP_ROLES_SCRIPT } from '../src/templates'
 // A Postgres whose user may create databases and roles, as the app template's tests take: CI sets it.
 const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL ?? ''
 const url = TEST_DATABASE_URL === '' ? undefined : new URL(TEST_DATABASE_URL)
+// The database the URL names may not exist, so the test creates and drops its own from the cluster's `postgres` one.
+const adminUrl = url === undefined ? undefined : Object.assign(new URL(url.href), { pathname: '/postgres' })
 const PASSWORD = 'rolepass0123'
 const DATABASE = 'kay_app_roles_test'
 // CI has psql, so a missing one fails there instead of skipping: the workflows set CI.
@@ -36,7 +38,7 @@ async function permission(sql: SQL, statement: string): Promise<string> {
 }
 
 describe('the app template\'s db/roles.sh', () => {
-  const admin = url === undefined ? undefined : new SQL(url.href)
+  const admin = adminUrl === undefined ? undefined : new SQL(adminUrl.href)
 
   afterAll(async () => {
     if (admin === undefined)
