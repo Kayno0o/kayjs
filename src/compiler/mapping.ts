@@ -29,7 +29,12 @@ export class CodeBuilder {
   readonly mappings: Mapping[] = []
   readonly ranges: RangeMapping[] = []
 
-  constructor(private readonly source: string, private readonly rewrites: ReadonlyMap<number, Rewrite & { end: number }> = new Map()) {}
+  // The rewrites by where they start, so a span finds the ones inside it by bisection rather than scanning them all.
+  private readonly sorted: [number, Rewrite & { end: number }][]
+
+  constructor(private readonly source: string, rewrites: ReadonlyMap<number, Rewrite & { end: number }> = new Map()) {
+    this.sorted = [...rewrites].sort((a, b) => a[0] - b[0])
+  }
 
   add(text: string): this {
     this.code += text
@@ -114,13 +119,24 @@ export class CodeBuilder {
 
   private rewritesIn(span: Span): [number, Rewrite & { end: number }][] {
     const found: [number, Rewrite & { end: number }][] = []
+    let low = 0
+    let high = this.sorted.length
 
-    for (const entry of this.rewrites) {
-      if (entry[0] >= span.start && entry[1].end <= span.end)
-        found.push(entry)
+    while (low < high) {
+      const middle = (low + high) >> 1
+
+      if (this.sorted[middle]![0] < span.start)
+        low = middle + 1
+      else
+        high = middle
     }
 
-    return found.sort((a, b) => a[0] - b[0])
+    for (let index = low; index < this.sorted.length && this.sorted[index]![0] <= span.end; index++) {
+      if (this.sorted[index]![1].end <= span.end)
+        found.push(this.sorted[index]!)
+    }
+
+    return found
   }
 }
 

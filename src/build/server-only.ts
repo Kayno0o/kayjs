@@ -102,7 +102,7 @@ function namesIn(program: t.File): Set<string> {
 function parsed(source: string, fenced: boolean): t.File | undefined {
   try {
     // Built output is plain JavaScript, where `a < b > (c)` is a comparison rather than type arguments.
-    return parse(source, { sourceType: 'unambiguous', allowReturnOutsideFunction: true, errorRecovery: true, plugins: fenced ? ['typescript', 'jsx'] : [] })
+    return parse(source, { sourceType: 'unambiguous', allowReturnOutsideFunction: true, errorRecovery: true, attachComment: false, plugins: fenced ? ['typescript', 'jsx'] : [] })
   }
   catch {
     return undefined

@@ -86,7 +86,7 @@ export function expandGlobs(code: string, importer: string, root: string, loader
 
 function globCalls(code: string, importer: string, loader: Bun.JavaScriptLoader): GlobCall[] {
   const calls: GlobCall[] = []
-  const ast = parse(code, { sourceType: 'module', plugins: loader === 'tsx' || loader === 'jsx' ? ['typescript', 'jsx'] : ['typescript'], errorRecovery: true })
+  const ast = parse(code, { sourceType: 'module', attachComment: false, plugins: loader === 'tsx' || loader === 'jsx' ? ['typescript', 'jsx'] : ['typescript'], errorRecovery: true })
 
   loadTraverse()(ast, {
     CallExpression(path) {

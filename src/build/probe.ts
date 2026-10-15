@@ -22,8 +22,8 @@ export function mayImportPackage(source: string): boolean {
   return QUOTED_PACKAGE.test(source)
 }
 
-// Whether a package the script fence imports, type-only imports aside, throws as it loads without a DOM: such a component cannot render on the server.
-export async function importsBrowserOnly(source: string, script: ScriptAnalysis, importer: string, cacheDir?: string): Promise<boolean> {
+// The packages a script fence imports, type-only imports aside, which are the ones that may throw as they load.
+export function packagesToProbe(source: string, script: ScriptAnalysis): string[] {
   const { imports, specifiers: quoted } = script
   const specifiers = new Set(imports.filter(binding => !binding.typeOnly).map(binding => binding.source))
 
@@ -35,9 +35,19 @@ export async function importsBrowserOnly(source: string, script: ScriptAnalysis,
       specifiers.add(specifier)
   }
 
-  const results = await Promise.all([...specifiers].filter(specifier => PACKAGE_IMPORT.test(specifier)).map(async specifier => browserOnly(specifier, dirname(importer), cacheDir)))
+  return [...specifiers].filter(specifier => PACKAGE_IMPORT.test(specifier))
+}
+
+// Whether any of the packages throws as it loads without a DOM.
+export async function anyBrowserOnly(specifiers: string[], importer: string, cacheDir?: string): Promise<boolean> {
+  const results = await Promise.all(specifiers.map(async specifier => browserOnly(specifier, dirname(importer), cacheDir)))
 
   return results.includes(true)
+}
+
+// Whether a package the script fence imports, type-only imports aside, throws as it loads without a DOM: such a component cannot render on the server.
+export async function importsBrowserOnly(source: string, script: ScriptAnalysis, importer: string, cacheDir?: string): Promise<boolean> {
+  return anyBrowserOnly(packagesToProbe(source, script), importer, cacheDir)
 }
 
 // Imported once per package version in a process of its own; the answer is kept in `.kay/cache` when there is one.

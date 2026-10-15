@@ -18,7 +18,7 @@ export function moduleSignals(source: string, jsx = false): Record<string, Signa
   let ast: t.File
 
   try {
-    ast = parse(source, { sourceType: 'module', plugins: jsx ? ['typescript', 'jsx'] : ['typescript'] })
+    ast = parse(source, { sourceType: 'module', attachComment: false, plugins: jsx ? ['typescript', 'jsx'] : ['typescript'] })
   }
   catch {
     return {}

@@ -17,6 +17,7 @@ import { basePath } from '../server/base'
 import { PRERENDERED_DIR } from '../server/client'
 import { compressPaths } from '../server/compress'
 import { localeSettings } from '../server/i18n'
+import { limiter } from '../server/limit'
 import { applyPageHooks, assetFiles } from '../server/page-hook'
 import { publicFiles, servedPublicly } from '../server/public'
 import { withoutSlash } from '../server/routes'
@@ -29,6 +30,8 @@ interface App {
 
 const MARKER = '.kay-static'
 const COPIES = ['.br', '.gz']
+// Pages rendered or copied at once.
+const FILES_AT_ONCE = 16
 const SOURCE_MAP = /\.map$/
 const PARAM_OR_REST = /(?:^|\/)(?::|\*)/
 const REST = /\*/
@@ -65,18 +68,31 @@ export async function exportStatic(project: Project, client: ClientBuild, outdir
 
   await cp(client.dir, join(out, '_kay'), { recursive: true, filter: source => !SOURCE_MAP.test(source) })
 
-  for (const [path, page] of built) {
-    for (const target of pageFiles(path)) {
-      for (const copy of ['', ...COPIES]) {
-        const source = join(pagesDir, `${page.file}${copy}`)
+  const limit = limiter(FILES_AT_ONCE)
+  let failed = false
+  // The first failure stops the files still waiting for their turn, as a loop stopped at it.
+  const writing = async <T>(task: () => Promise<T>): Promise<T | undefined> => limit(async () => {
+    if (failed)
+      return undefined
 
-        if (existsSync(source)) {
-          await mkdir(dirname(join(out, `${target}${copy}`)), { recursive: true })
-          await cp(source, join(out, `${target}${copy}`))
-        }
-      }
+    try {
+      return await task()
     }
-  }
+    catch (error) {
+      failed = true
+
+      throw error
+    }
+  })
+
+  await Promise.all(built.flatMap(([path, page]) => pageFiles(path).flatMap(target => ['', ...COPIES].map(async copy => writing(async () => {
+    const source = join(pagesDir, `${page.file}${copy}`)
+
+    if (existsSync(source)) {
+      await mkdir(dirname(join(out, `${target}${copy}`)), { recursive: true })
+      await cp(source, join(out, `${target}${copy}`))
+    }
+  })))))
 
   if (existsSync(publicDir)) {
     await cp(publicDir, out, { recursive: true, filter: source => servedPublicly(relative(publicDir, source), true) })
@@ -89,7 +105,8 @@ export async function exportStatic(project: Project, client: ClientBuild, outdir
   const pages = await pagesApp(resolveProject(root, { ...config, extensions, log: false, health: false, security: false, compress: false }, project.mode), async () => client, true)
   const app = new Elysia().use(pages.app)
 
-  for (const path of await pages.served.exported()) {
+  // Rendered a few at a time, so a page waiting on a data source or a hook does not hold the others back.
+  written.push(...(await Promise.all((await pages.served.exported()).map(async path => writing(async () => {
     const response = await app.handle(new Request(`http://localhost${path}`))
 
     if (!response.ok)
@@ -98,8 +115,9 @@ export async function exportStatic(project: Project, client: ClientBuild, outdir
     const file = join(out, decodeURIComponent(path))
 
     await Bun.write(file, await response.arrayBuffer())
-    written.push(file)
-  }
+
+    return file
+  })))).filter(file => file !== undefined))
 
   const missing = await app.handle(new Request(`http://localhost${MISSING}`))
 

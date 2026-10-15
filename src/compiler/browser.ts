@@ -70,7 +70,7 @@ export function browserReads(file: KayFile, island: boolean, serverNames: string
   let ast: t.File
 
   try {
-    ast = parse(program.code, { sourceType: 'module', plugins: ['typescript'], errorRecovery: true })
+    ast = parse(program.code, { sourceType: 'module', attachComment: false, plugins: ['typescript'], errorRecovery: true })
   }
   catch {
     return []

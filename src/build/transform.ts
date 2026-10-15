@@ -1,5 +1,6 @@
 import type { Diagnostic, SourceMap } from '../compiler'
 import type { LintLevels } from '../compiler/lints'
+import type { ImportedSignals } from '../compiler/module-signals'
 import type { CacheSlot } from './cache'
 import { readdirSync, readFileSync } from 'node:fs'
 import { dirname, join, relative } from 'node:path'
@@ -10,7 +11,7 @@ import { parseKay } from '../compiler/parser'
 import { analyzeScript } from '../compiler/script'
 import { readCacheEntry, writeCacheEntry } from './cache'
 import { throughLinks } from './links'
-import { importsBrowserOnly, mayImportPackage } from './probe'
+import { anyBrowserOnly, mayImportPackage, packagesToProbe } from './probe'
 import { importedSignals, keepImportedSignals } from './signals'
 import { registerSourceMap } from './sourcemap'
 
@@ -64,8 +65,8 @@ export class KayCompileError extends Error {
 }
 
 // .kay source to TypeScript building HTML strings on the server and DOM nodes in the browser; Bun strips the types when it loads the result.
-export function transformKay(source: string, filename: string, options: TransformOptions): string {
-  const { code, map } = compile(source, filename, options)
+export function transformKay(source: string, filename: string, options: TransformOptions, signals?: ImportedSignals): string {
+  const { code, map } = compile(source, filename, options, signals)
 
   registerSourceMap(filename, { source, tsx: code, map }, options.target === 'dom')
 
@@ -79,13 +80,15 @@ export async function transformKayCached(source: string, filename: string, given
   if (options.cacheDir === undefined)
     return transformKay(source, filename, options)
 
+  // Read once: it is part of the cache key and, on a miss, what the compile reads too.
+  const signals = importedSignals(withoutTwin(filename), source)
   const hydratable = options.hydratable ?? false
-  const entry = cacheEntry(options.cacheDir, filename, `${options.target}${hydratable ? '-hydratable' : ''}${options.inspect === true ? '-inspect' : ''}`, `${options.target}\0${hydratable}\0${options.clientOnly === true}\0${options.inspect === true}\0${options.root ?? process.cwd()}\0${throughLinks(options.root ?? process.cwd(), filename)}\0${JSON.stringify(importedSignals(withoutTwin(filename), source))}\0${source}`)
+  const entry = cacheEntry(options.cacheDir, filename, `${options.target}${hydratable ? '-hydratable' : ''}${options.inspect === true ? '-inspect' : ''}`, `${options.target}\0${hydratable}\0${options.clientOnly === true}\0${options.inspect === true}\0${options.root ?? process.cwd()}\0${throughLinks(options.root ?? process.cwd(), filename)}\0${JSON.stringify(signals)}\0${source}`)
   const cached = await readCacheEntry<string>(entry)
 
   if (cached !== undefined) {
     registerSourceMap(filename, () => {
-      const { code, map } = compile(source, filename, options)
+      const { code, map } = compile(source, filename, options, signals)
 
       return { source, tsx: code, map }
     }, options.target === 'dom')
@@ -93,7 +96,7 @@ export async function transformKayCached(source: string, filename: string, given
     return cached
   }
 
-  const code = transformKay(source, filename, options)
+  const code = transformKay(source, filename, options, signals)
 
   await writeCacheEntry(entry, code)
 
@@ -151,12 +154,12 @@ export function cacheEntry(cacheDir: string, filename: string, kind: string, inp
 }
 
 // `filename` may name a static component's `?island` twin, the build of it that renders inside islands.
-function compile(source: string, filename: string, options: TransformOptions): Compiled {
+function compile(source: string, filename: string, options: TransformOptions, signals = importedSignals(withoutTwin(filename), source)): Compiled {
   const server = options.target === 'ssr'
   const file = withoutTwin(filename)
   const isTwin = file !== filename
   const hydratable = options.hydratable ?? false
-  const { tsx, map, diagnostics } = compileKay(source, throughLinks(options.root ?? process.cwd(), file), { root: options.root, includeServer: server, output: server ? 'html' : 'dom', hydratable, twinBuild: isTwin, clientOnly: options.clientOnly, inspect: options.inspect, importedSignals: importedSignals(file, source) })
+  const { tsx, map, diagnostics } = compileKay(source, throughLinks(options.root ?? process.cwd(), file), { root: options.root, includeServer: server, output: server ? 'html' : 'dom', hydratable, twinBuild: isTwin, clientOnly: options.clientOnly, inspect: options.inspect, importedSignals: signals })
 
   if (diagnostics.length > 0)
     throw new KayCompileError(diagnostics.map(diagnostic => ({ ...diagnostic, file, source })))
@@ -165,19 +168,34 @@ function compile(source: string, filename: string, options: TransformOptions): C
 }
 
 // An island importing a package that throws as it loads without a DOM renders in the browser only, with no flag to write.
+// The packages its script imports are read off the source once and kept with the other cache entries, so a file already compiled is not parsed again to ask.
 async function clientOnlyIsland(source: string, filename: string, cacheDir: string | undefined): Promise<boolean> {
   if (filename !== withoutTwin(filename) || !mayImportPackage(source))
     return false
 
+  const slot = cacheDir === undefined ? undefined : cacheEntry(cacheDir, filename, 'probed', source)
+  let packages = slot && await readCacheEntry<string[]>(slot)
+
+  if (packages === undefined) {
+    packages = probedPackages(source)
+
+    if (slot)
+      await writeCacheEntry(slot, packages)
+  }
+
+  return packages.length > 0 && await anyBrowserOnly(packages, filename, cacheDir)
+}
+
+// The packages to probe: none for a page or layout, which never switches, nor for a component that is not an island.
+function probedPackages(source: string): string[] {
   const file = parseKay(source)
 
-  // A page or layout never switches, so it is not probed.
   if (file.client || !file.script || file.server)
-    return false
+    return []
 
   const script = analyzeScript(source, file.script)
 
-  return isInteractive(file, script) && await importsBrowserOnly(source, script, filename, cacheDir)
+  return isInteractive(file, script) ? packagesToProbe(source, script) : []
 }
 
 function compilerFingerprint(): string {

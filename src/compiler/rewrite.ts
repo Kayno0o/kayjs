@@ -108,7 +108,7 @@ export function findRewrites(input: RewriteInput): FoundRewrites {
   let ast: t.File
 
   try {
-    ast = parse(input.code, { sourceType: 'module', plugins: ['typescript', 'jsx'] })
+    ast = parse(input.code, { sourceType: 'module', attachComment: false, plugins: ['typescript', 'jsx'] })
   }
   catch (error) {
     return { plan: { rewrites: new Map(), translates: false, values: new Map() }, findings: { unread: new Set(), serverReads: new Set(), constantSignals: [], globalReads: new Set() }, diagnostics: [], syntaxError: syntaxError(error, input.map) }

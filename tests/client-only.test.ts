@@ -7,6 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { kay } from '../src/build/plugin'
 import { importsBrowserOnly } from '../src/build/probe'
 import { browserOnlyHint, mapStack } from '../src/build/sourcemap'
+import { transformKayCached } from '../src/build/transform'
 import { compileKay } from '../src/compiler'
 import { parseKay } from '../src/compiler/parser'
 import { analyzeScript } from '../src/compiler/script'
@@ -141,6 +142,32 @@ describe('client-only islands', () => {
 
     expect(await importsBrowserOnly(holding, analyzeScript(holding, parseKay(holding).script), join(dir, 'chart.kay'), cacheDir)).toBe(false)
     expect(performance.now() - started).toBeLessThan(5000)
+  })
+})
+
+describe('client-only islands through the cache', () => {
+  it('keeps the packages to probe beside the compiled file, so a compile found in the cache parses nothing to ask', async () => {
+    const cacheDir = join(dir, 'probed-cache')
+    const file = join(dir, 'chart.kay')
+    const options = { target: 'ssr', hydratable: true, root: dir, cacheDir } as const
+    const first = await transformKayCached(FILES['chart.kay']!, file, options)
+    const probed = (await readdir(cacheDir)).filter(name => name.endsWith('-probed.json'))
+
+    expect(first).toContain('KayIsland(')
+    expect(probed).toHaveLength(1)
+
+    // The entry is what the second call reads, so one only the entry can answer shows it is read.
+    const entry = join(cacheDir, probed[0]!)
+    const kept = await Bun.file(entry).json() as { key: string, value: string[] }
+
+    expect(kept.value).toEqual(['dom-only'])
+    await Bun.write(entry, JSON.stringify({ ...kept, value: [] }))
+    expect(await transformKayCached(FILES['chart.kay']!, file, options)).not.toBe(first)
+
+    // A source that changes replaces it, and a component that is no island probes nothing.
+    await transformKayCached('---\nimport { describe } from \'dom-only\'\n---\np {describe()}\n', file, options)
+    expect((await Bun.file(entry).json() as { value: string[] }).value).toEqual([])
+    expect(await transformKayCached(FILES['chart.kay']!, file, options)).toBe(first)
   })
 })
 

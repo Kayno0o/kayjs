@@ -295,6 +295,29 @@ describe('kay build --static', () => {
     }
   })
 
+  it('renders the files it writes itself a few at a time', async () => {
+    const fixture = await fixtureCopy('static')
+    const elsewhere = await mkdtemp(join(tmpdir(), 'kay-static-'))
+    const flags = await mkdtemp(join(tmpdir(), 'kay-static-'))
+    // Each endpoint waits for the other to have started, which a loop rendering one after the other never lets happen.
+    const together = (own: string, other: string) => `import { existsSync, writeFileSync } from 'node:fs'\n\nexport async function GET() {\n  writeFileSync(${JSON.stringify(join(flags, own))}, '')\n\n  for (let waited = 0; waited < 100 && !existsSync(${JSON.stringify(join(flags, other))}); waited++)\n    await Bun.sleep(50)\n\n  return existsSync(${JSON.stringify(join(flags, other))}) ? 'together' : 'alone'\n}\n`
+
+    try {
+      await Bun.write(join(fixture, 'src/routes/first.txt.ts'), together('first', 'second'))
+      await Bun.write(join(fixture, 'src/routes/second.txt.ts'), together('second', 'first'))
+
+      const { code, errors } = await exportSite(elsewhere, fixture)
+
+      expect(errors).not.toContain('kay:')
+      expect([code, await Bun.file(join(elsewhere, 'first.txt')).text(), await Bun.file(join(elsewhere, 'second.txt')).text()]).toEqual([0, 'together', 'together'])
+    }
+    finally {
+      await rm(fixture, { recursive: true, force: true })
+      await rm(elsewhere, { recursive: true, force: true })
+      await rm(flags, { recursive: true, force: true })
+    }
+  })
+
   it('never clears a directory it did not write', async () => {
     const foreign = await mkdtemp(join(tmpdir(), 'kay-static-'))
 
