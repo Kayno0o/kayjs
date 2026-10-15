@@ -9,6 +9,7 @@ import { findKayLibraries } from '../src/build/libraries'
 import { classTokens, pruneClasses, pruneNodes, unusedLibraryClasses } from '../src/build/prune'
 import { mergeSupports, mergingSupports, parse, print } from '../src/build/supports'
 import { devBuilder } from '../src/dev/builder'
+import { stylesOnly, watchProject } from '../src/dev/sources'
 import { scratchDir } from './scratch'
 
 const projects: string[] = []
@@ -222,6 +223,38 @@ describe('a library\'s stylesheet in an app', () => {
     const again = await build(['src/routes/index.kay'])
 
     expect(libraryRules(await stylesheet(again.styles))).toEqual([...KEPT, '.ui-unused-too'].sort())
+  })
+
+  it('builds the stylesheets again in kay dev once a root Markdown file names a class it pruned, which the watcher reports without a restart', async () => {
+    const root = await newProject(PLAIN_CSS)
+    const build = devBuilder(root, {})
+    const stylesheet = async (styles: Record<string, string> | undefined) => Bun.file(join(clientDir(root), styles!['src/routes/index.kay']!.slice('/_kay/'.length))).text()
+    const changes: string[] = []
+    const stop = watchProject(root, file => changes.push(file))
+
+    try {
+      expect(libraryRules(await stylesheet((await build(null)).styles))).toEqual(KEPT)
+
+      await build([])
+      await Bun.write(join(root, 'NOTES.md'), 'The `ui-unused-too` class.\n')
+
+      for (let waited = 0; waited < 5000 && !changes.includes('NOTES.md'); waited += 100) {
+        await Bun.write(join(root, 'NOTES.md'), `The \`ui-unused-too\` class ${waited}.\n`)
+        await Bun.sleep(100)
+      }
+
+      expect(changes).toContain('NOTES.md')
+      expect(stylesOnly('NOTES.md')).toBe(true)
+      expect(libraryRules(await stylesheet((await build(['NOTES.md'])).styles))).toEqual([...KEPT, '.ui-unused-too'].sort())
+    }
+    finally {
+      stop()
+    }
+  })
+
+  it('tells a change that only needs the stylesheets built again from one that restarts the server', () => {
+    expect(['a.css', 'src/a.css', 'README.md', 'docs.mdx', 'index.htm'].map(stylesOnly)).toEqual([true, true, true, true, true])
+    expect(['src/README.md', 'src/content/a.md', 'a.ts', 'index.html', 'package.json', 'LICENSE'].map(stylesOnly)).toEqual([false, false, false, false, false, false])
   })
 
   it('builds the stylesheets again in kay dev once the app reaches a library component naming a class it pruned, from a file naming none', async () => {

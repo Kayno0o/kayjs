@@ -9,13 +9,12 @@ import { networkInterfaces } from 'node:os'
 import { join, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { ASSET_EXTENSIONS } from '../build/assets'
-import { CSS_FILE } from '../build/files'
 import { CONFIG_FILE, loadConfig } from '../config'
 import { projectPaths, savedPublicDir } from '../project'
 import { startClientBuilder } from './client'
 import { inspectorProxy } from './inspector'
 import { CONFIG_REFUSED, REFUSE } from './refuse'
-import { environmentWithoutDotenv, PAGES_ENTRY, watchProject } from './sources'
+import { environmentWithoutDotenv, PAGES_ENTRY, stylesOnly, watchProject } from './sources'
 
 export interface DevOptions {
   // The server entry, relative to the root, `src/server.ts` by default; with no file there, a server of kay's own serves the pages.
@@ -365,7 +364,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   }
   // A running server that reads the build takes the stylesheets of an edit to stylesheets alone; false when it needs a restart instead, as when the build failed.
   const swapStylesheets = async (files: string[]) => {
-    if (files.length === 0 || !files.every(file => CSS_FILE.test(file)) || child === undefined || follower !== child || builder === undefined || builderStale)
+    if (files.length === 0 || !files.every(stylesOnly) || child === undefined || follower !== child || builder === undefined || builderStale)
       return false
 
     const server = child
@@ -506,7 +505,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
 
     unbuilt?.add(file)
 
-    if (!CSS_FILE.test(file)) {
+    if (!stylesOnly(file)) {
       codeVersion++
       changedFiles.add(file)
     }

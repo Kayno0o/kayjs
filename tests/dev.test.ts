@@ -189,17 +189,16 @@ describe.concurrent('the dev watcher', () => {
     }
   })
 
-  it('ignores tests and the root files no server reads, and keeps what it reads', async () => {
+  it('ignores tests and the root files nothing reads, and keeps what it reads, a root Markdown file a stylesheet\'s pruning reads included', async () => {
     const { root, sees, cleanup } = await watched({ 'src/server.ts': '', 'src/a.test.ts': '', 'src/__tests__/a.ts': '', 'tests/a.test.ts': '', '.env': '', 'README.md': '', 'LICENSE': '', 'kay.config.ts': '', 'package.json': '{}', 'bun.lock': '', 'public/a.txt': '' })
 
     try {
       expect(await sees('tests/a.test.ts', async attempt => Bun.write(join(root, 'tests/a.test.ts'), String(attempt)), 300)).toBe(false)
       expect(await sees('src/a.test.ts', async attempt => Bun.write(join(root, 'src/a.test.ts'), String(attempt)), 300)).toBe(false)
       expect(await sees('src/__tests__/a.ts', async attempt => Bun.write(join(root, 'src/__tests__/a.ts'), String(attempt)), 300)).toBe(false)
-      expect(await sees('README.md', async attempt => Bun.write(join(root, 'README.md'), String(attempt)), 300)).toBe(false)
       expect(await sees('LICENSE', async attempt => Bun.write(join(root, 'LICENSE'), String(attempt)), 300)).toBe(false)
 
-      for (const file of ['kay.config.ts', '.env', 'package.json', 'bun.lock', 'src/server.ts', 'public/a.txt'])
+      for (const file of ['kay.config.ts', '.env', 'package.json', 'bun.lock', 'src/server.ts', 'public/a.txt', 'README.md'])
         expect(await sees(file, async attempt => Bun.write(join(root, file), String(attempt)))).toBe(true)
 
       expect(await sees('public', async () => rm(join(root, 'public'), { recursive: true }))).toBe(true)

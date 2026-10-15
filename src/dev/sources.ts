@@ -2,7 +2,7 @@ import type { FSWatcher } from 'node:fs'
 import { readdirSync, readFileSync, statSync, watch } from 'node:fs'
 import { join, relative, sep } from 'node:path'
 import process from 'node:process'
-import { findProjectFiles, IGNORED_DIRS } from '../build/files'
+import { CSS_FILE, findProjectFiles, IGNORED_DIRS } from '../build/files'
 import { TRAILING_SLASH } from '../runtime/base'
 
 // What the project's sources are and how they are watched, apart from `./index` so `kay start` and `kay render` need none of the dev loop.
@@ -14,6 +14,8 @@ const LEADING_SLASH = /^\//
 const GLOB_OR_DEEPER = /[*?[\]/]/
 // The root files a server reads: what Bun reads as it starts, the lockfile, and what a module can import. A README, a licence or a justfile is none of them.
 const SERVER_ROOT_FILE = /^(?:\.env.*|bun\.lockb?)$|\.(?:[cm]?[jt]sx?|json[c5]?|toml|ya?ml|kay|css|txt|html|sql|graphql|gql|wasm|node)$/
+// The root files no server reads but a stylesheet's pruning does: a class named in a README is kept.
+const ROOT_NAMING_FILE = /\.(?:mdx?|htm)$/
 // Tests, which no server imports.
 const TEST_DIRS = new Set(['tests', 'test', '__tests__', 'e2e'])
 const TEST_FILE = /(?:^|\/)__tests__\/|\.(?:test|spec)\.[cm]?[jt]sx?$/
@@ -78,6 +80,11 @@ function watchedName(name: string): boolean {
   return !IGNORED_DIRS.has(name) && !TEST_DIRS.has(name) && (!name.startsWith('.') || name.startsWith('.env'))
 }
 
+// A change that needs no restart, only the stylesheets built again: a stylesheet, or a root file only the pruning of a library's classes reads. Nested paths are never one of the latter, as a Markdown entry below the root is content.
+export function stylesOnly(file: string): boolean {
+  return CSS_FILE.test(file) || (!file.includes('/') && ROOT_NAMING_FILE.test(file) && !SERVER_ROOT_FILE.test(file))
+}
+
 function isDirectory(path: string): boolean {
   try {
     return statSync(path, { throwIfNoEntry: false })?.isDirectory() ?? false
@@ -131,7 +138,7 @@ export function watchProject(root: string, onChange: (file: string) => void, { t
 
     watchDirectory(name)
 
-    if (directory || isDirectory(join(root, name)) || SERVER_ROOT_FILE.test(name))
+    if (directory || isDirectory(join(root, name)) || SERVER_ROOT_FILE.test(name) || ROOT_NAMING_FILE.test(name))
       onChange(name)
   })
 
