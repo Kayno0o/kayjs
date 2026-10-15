@@ -21,6 +21,8 @@ type Phases = Partial<Record<'name' | Phase | `${Phase}-from` | `${Phase}-to`, s
 const phasesOf = new WeakMap<Element, Phases>()
 // Ends the phase an element is playing, as the other one starts.
 const playing = new WeakMap<Element, () => void>()
+// The elements playing their leave phase.
+const leaving = new WeakSet<Node>()
 const CLASS_LIST = /\s+/
 const PRESET_STEP = { '': '', '-from': 'From', '-to': 'To' } as const
 const REDUCED_MOTION = '(prefers-reduced-motion: reduce)'
@@ -105,23 +107,37 @@ function play(element: Element, phase: Phase, done: () => void): void {
   playing.set(element, stop)
 }
 
-// As a block shows it: plays the element's enter phase.
-function enter(element: Element): void {
-  if (element.isConnected && !still())
-    play(element, 'enter', () => undefined)
+// As a block shows it: plays the enter phase of an element with a transition.
+function enter(node: Node): void {
+  if (hasTransition(node) && node.isConnected && !still())
+    play(node, 'enter', () => undefined)
 }
 
-// As a block takes it away: plays the element's leave phase, then removes it.
-function leave(element: Element): void {
-  const remove = () => void element.parentNode?.removeChild(element)
+// As a block takes it away: plays the leave phase of an element with a transition, then removes it.
+function leave(element: Node): void {
+  const remove = () => {
+    leaving.delete(element)
+    element.parentNode?.removeChild(element)
+  }
 
-  if (!element.isConnected || still())
+  if (!hasTransition(element) || !element.isConnected || still()) {
     remove()
-  else
+  }
+  else {
+    leaving.add(element)
     play(element, 'leave', remove)
+  }
 }
 
-const HOOKS = { has: hasTransition, enter, leave }
+// As a block shows what is still leaving again: its enter phase cancels the leave.
+function back(nodes: Node[]): void {
+  for (const node of nodes) {
+    if (leaving.delete(node))
+      enter(node)
+  }
+}
+
+const HOOKS = { has: hasTransition, enter, leave, leaving: (node: Node) => leaving.has(node), back }
 
 // Called by the generated code for `transition` (part `name`), a name or a preset, and each `transition:` part.
 export function transition(element: Element, part: string, value: unknown): void {

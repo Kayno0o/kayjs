@@ -51,8 +51,12 @@ let claim: Claim | undefined
 // What plays an element's transition, set by the first one a template sets, so a page whose islands set none ships none of its code.
 export interface Transitions {
   has: (node: Node) => node is Element
-  enter: (element: Element) => void
-  leave: (element: Element) => void
+  enter: (node: Node) => void
+  leave: (node: Node) => void
+  // Whether the element plays its leave phase.
+  leaving: (node: Node) => boolean
+  // Ends the leave phase of the elements, which play their enter phase instead.
+  back: (nodes: Node[]) => void
 }
 
 let transitions: Transitions | undefined
@@ -353,22 +357,15 @@ function nodesOf(unit: Unit): Node[] {
 
 // An element with a `transition` plays its leave phase first.
 function removeUnit(unit: Unit): void {
-  for (const node of nodesOf(unit)) {
-    if (transitions?.has(node))
-      transitions.leave(node)
-    else
-      node.parentNode?.removeChild(node)
-  }
+  for (const node of nodesOf(unit))
+    transitions ? transitions.leave(node) : node.parentNode?.removeChild(node)
 }
 
 // What a block shows after its first render plays its enter phase, the elements with a `transition` it starts with.
 function entered(unit: Unit | null): void {
-  if (!unit || !transitions)
-    return
-
-  for (const node of nodesOf(unit)) {
-    if (transitions.has(node))
-      transitions.enter(node)
+  if (unit) {
+    for (const node of nodesOf(unit))
+      transitions?.enter(node)
   }
 }
 
@@ -503,12 +500,15 @@ export function insert(element: Node | null, start: Node | null, end: Node | nul
         removeUnit(unit)
     }
 
+    // A unit back before its leave phase ended is still in the document; its enter phase ends that leave.
+    transitions?.back(next.flatMap(nodesOf))
+
     // Each unit goes before the first node not yet placed, unless already there, so a kept unit is not moved.
     let at = region.start ? region.start.nextSibling : region.element!.firstChild
 
     for (const unit of next) {
-      // A node playing its leave phase, one that is no unit of `next`, stays between the kept units until it ends.
-      while (at && transitions?.has(at) && !next.some(placed => firstOf(placed) === at))
+      // The cursor only lands on a unit's first node or a node playing its leave phase, one that is no unit of `next` now, which stays between the kept units until it ends.
+      while (at && transitions?.leaving(at))
         at = at.nextSibling
 
       if (firstOf(unit) === at)

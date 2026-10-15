@@ -1004,6 +1004,79 @@ describe('transitions', () => {
     }
   })
 
+  const mountReturning = site({
+    'panel.kay': 'p.panel(transition="fade" style="transition-duration: 200ms") Hi\n',
+    'main.kay': '---\nimport { signal } from \'kay\'\nimport Panel from \'./panel.kay\'\n\nconst a = document.createElement(\'i\')\nconst panel = Panel({})\nconst open = signal(true)\n;(globalThis as { flip?: () => void }).flip = () => open.set(!open())\n---\ndiv\n  | {[a, open() ? panel : null]}\n',
+  })
+
+  it('keep a unit that comes back during its leave phase, and play its enter phase instead', async () => {
+    const { root, dispose } = await mountReturning()
+    const flip = (globalThis as unknown as { flip: () => void }).flip
+
+    try {
+      const panel = root.querySelector('.panel')!
+
+      flip()
+      await updated()
+      await twoFrames()
+      expect(panel.className).toBe('panel fade-leave-active fade-leave-to')
+      flip()
+      await updated()
+      expect([panel.isConnected, panel.className]).toEqual([true, 'panel fade-enter-from fade-enter-active'])
+      await done()
+      expect([panel.isConnected, panel.className, [...root.querySelector('div')!.children].map(child => child.localName)]).toEqual([true, 'panel', ['i', 'p']])
+    }
+    finally {
+      await dispose()
+    }
+  })
+
+  it('does work linear in the kept units with transitions when one is appended or the order changes', async () => {
+    const { insert, playTransitions, Range } = await import('../src/runtime/dom')
+    const { createSignal } = await import('../src/runtime/reactive')
+    const parent = document.createElement('div')
+    const units = Array.from({ length: 1000 }, () => new Range(document.createElement('p'), document.createElement('p')))
+    const marked = new Set<Node>(units.flatMap(unit => [unit.first, unit.last]))
+    let reads = 0
+
+    for (const unit of units) {
+      const first = unit.first
+
+      Object.defineProperty(unit, 'first', {
+        get: () => {
+          reads++
+
+          return first
+        },
+      })
+      document.createDocumentFragment().append(first, unit.last)
+    }
+
+    const hooks = { enter: () => undefined, leave: (node: Node) => void node.parentNode?.removeChild(node), leaving: () => false, back: () => undefined }
+
+    playTransitions({ ...hooks, has: (node): node is Element => marked.has(node) })
+
+    try {
+      const [list, setList] = createSignal(units.slice(0, 999))
+
+      insert(parent, null, null, list)
+      expect(parent.childNodes.length).toBe(1998)
+      reads = 0
+      setList(units)
+      await settle()
+      expect(parent.childNodes.length).toBe(2000)
+      expect(reads).toBeLessThan(5000)
+      reads = 0
+      setList([...units].reverse())
+      await settle()
+      expect(reads).toBeLessThan(5000)
+      expect(parent.firstChild as Node | null).toBe(units[999]!.first)
+    }
+    finally {
+      playTransitions({ ...hooks, has: (_node): _node is Element => false })
+    }
+  })
+
   const mountKeptMoves = site({
     'panel.kay': 'p.panel(transition="fade" style="transition-duration: 200ms") Hi\n',
     'main.kay': '---\nimport { signal } from \'kay\'\nimport Panel from \'./panel.kay\'\n\nconst b = document.createElement(\'b\')\nconst u = document.createElement(\'u\')\nconst panel = Panel({})\nconst step = signal(0)\n;(globalThis as { step?: () => void }).step = () => step.set(step() + 1)\nconst steps = [[panel, b], [b, panel], [b, u]]\n---\ndiv\n  | {steps[step()]}\n',
