@@ -1,13 +1,14 @@
 import type { StoredReport } from '../build/report'
 import type { RouteMatch } from './actions'
 import type { ServedRoute } from './guards'
+import type { RouteTable } from './route-table'
 import { stat } from 'node:fs/promises'
+import { Elysia } from 'elysia'
 import { readStoredReport } from '../build/report'
 import { isCrossSite } from './actions'
 import { routerPath } from './base'
 
 const HEADER = 'x-kay-dev'
-const PARAM = /[:*]/
 
 // What the last `kay build` measured for a page, for the Performance tab to set beside the dev sizes.
 export interface DevSizes {
@@ -22,8 +23,13 @@ export interface DevSizes {
   built: number
 }
 
+// A route entry a report may hold, which a file edited or written by another version may not.
+function sized(entry: StoredReport['routes'][string] | undefined): boolean {
+  return entry !== undefined && entry !== null && Number.isFinite(entry.js) && Number.isFinite(entry.css)
+}
+
 export interface SizesSite {
-  routes: ServedRoute[]
+  table: RouteTable
   match: RouteMatch
   base: string
   // The files `kay build` keeps its reports in: a server build's, then a static export's.
@@ -31,7 +37,47 @@ export interface SizesSite {
 }
 
 // The server's side of the Performance tab's production sizes: the route serving the page, as the router reads it, looked up in the report the last build kept under `.kay`. Only the page's path is read, from the dev tool, and nothing is built or rendered.
-export async function devSizes(request: Request, { routes, match, base, reports }: SizesSite): Promise<Response> {
+// Elysia's own router over the paths the pages are served at, which answers with the path matching: the order the real router tries them in, a static segment before a param and a param before a catch-all.
+const routers = new WeakMap<RouteTable, Elysia>()
+
+async function routeOf(table: RouteTable, match: RouteMatch, path: string): Promise<ServedRoute | undefined> {
+  let router = routers.get(table)
+
+  if (router === undefined) {
+    router = new Elysia()
+
+    for (const served of table.paths.keys())
+      router.get(served, () => served)
+
+    routers.set(table, router)
+  }
+
+  let served: string
+
+  try {
+    const response = await router.handle(new Request(`http://localhost${path}`))
+
+    if (!response.ok)
+      return undefined
+
+    served = await response.text()
+  }
+  catch {
+    return undefined
+  }
+
+  // The pages of that path in any locale, in the order they are tried; the first that reads the path as its own.
+  for (const { candidates } of table.paths.get(served)?.values() ?? []) {
+    const found = candidates.find(candidate => match.posted(candidate.route, path) !== undefined)
+
+    if (found !== undefined)
+      return found.route
+  }
+
+  return undefined
+}
+
+export async function devSizes(request: Request, { table, match, base, reports }: SizesSite): Promise<Response> {
   if (request.headers.get(HEADER) === null || isCrossSite(request))
     return new Response(null, { status: 403 })
 
@@ -55,11 +101,9 @@ export async function devSizes(request: Request, { routes, match, base, reports 
   if (found.length === 0)
     return Response.json({ sizes: undefined })
 
-  // A page whose pattern names no param wins over one that does, as the router has it.
-  const served = routerPath(path, base)
-  const route = routes.toSorted((a, b) => Number(PARAM.test(a.pattern)) - Number(PARAM.test(b.pattern))).find(candidate => match.posted(candidate, served) !== undefined)
+  const route = await routeOf(table, match, routerPath(path, base))
   // The newest of the reports that know the route.
-  const latest = found.filter(report => route !== undefined && report.stored.routes[route.pattern] !== undefined).sort((a, b) => b.built - a.built)[0]
+  const latest = found.filter(report => route !== undefined && sized(report.stored.routes?.[route.pattern])).sort((a, b) => b.built - a.built)[0]
 
   if (route === undefined || latest === undefined)
     return Response.json({ sizes: undefined })

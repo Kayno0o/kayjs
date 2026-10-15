@@ -19,6 +19,9 @@ const rooted = (async () => {
     Bun.write(join(root, 'src/routes/about.kay'), 'h1 About\n'),
     Bun.write(join(root, 'src/routes/[slug].kay'), 'h1 Slug\n'),
     Bun.write(join(root, 'src/routes/docs/[...rest].kay'), 'h1 Docs\n'),
+    Bun.write(join(root, 'src/routes/blog/[...rest].kay'), 'h1 Rest\n'),
+    Bun.write(join(root, 'src/routes/blog/[post].kay'), 'h1 Post\n'),
+    Bun.write(join(root, 'src/routes/[section]/new.kay'), 'h1 New\n'),
   ])
   await mkdir(join(root, '.kay'), { recursive: true })
 
@@ -63,6 +66,15 @@ describe('the dev tool\'s production sizes', () => {
     expect((await ask(root, '/docs/a/b')).sizes).toMatchObject({ route: '/docs/*', js: 9000 })
   })
 
+  it('picks the route the router would, whatever the order of the files', async () => {
+    const root = await site({ server: report(false, { '/blog/*': { js: 1, css: 0 }, '/blog/:post': { js: 2, css: 0 }, '/:slug': { js: 3, css: 0 }, '/:section/new': { js: 4, css: 0 } }) })
+
+    // A param before a catch-all, though the catch-all's file sorts first; a static segment before a param.
+    expect((await ask(root, '/blog/x')).sizes).toMatchObject({ route: '/blog/:post' })
+    expect((await ask(root, '/blog/x/y')).sizes).toMatchObject({ route: '/blog/*' })
+    expect((await ask(root, '/anything/new')).sizes).toMatchObject({ route: '/:section/new' })
+  })
+
   it('takes the newest of a server build and a static export, under a base, and says nothing without a report or a route in it', async () => {
     const root = await site({ server: report(false, { '/about': { js: 1, css: 1 } }), exported: report(true, { '/about': { js: 2, css: 2 } }) })
 
@@ -72,6 +84,27 @@ describe('the dev tool\'s production sizes', () => {
     expect((await ask(root, '/about')).sizes).toMatchObject({ js: 2, exported: true })
     expect((await ask(await site({ server: report(false, {}) }), '/about')).sizes).toBeUndefined()
     expect((await ask(await site(), '/about')).sizes).toBeUndefined()
+  })
+
+  it('says nothing for a report with no routes, a path no route serves or a malformed one, and answers 400 without a path', async () => {
+    const root = await site({ server: { version: 1, exported: false, islands: {} } as unknown as StoredReport })
+
+    expect((await ask(root, '/about')).sizes).toBeUndefined()
+
+    await site({ server: report(false, { '/about': { js: 1, css: 1 } }) })
+
+    expect((await ask(root, '/a/b/c/d')).sizes).toBeUndefined()
+    expect((await ask(root, '/%E0%A4%A')).sizes).toBeUndefined()
+
+    const dev = await pages({ root, prebuilt: false, security: false, dev: true })
+
+    expect((await dev.handle(new Request(`http://localhost${DEV_SIZES}`, { headers: { 'x-kay-dev': '1' } }))).status).toBe(400)
+  })
+
+  it('is not served in production', async () => {
+    const prod = await pages({ root: await site(), prebuilt: false, security: false, dev: false })
+
+    expect((await prod.handle(new Request(`http://localhost${DEV_SIZES}?path=%2Fabout`, { headers: { 'x-kay-dev': '1' } }))).status).toBe(404)
   })
 
   it('refuses a request the dev tool did not make', async () => {

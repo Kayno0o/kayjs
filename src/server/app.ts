@@ -277,7 +277,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
     app.post(DEV_HEAD, async ({ request }) => devHead(request, { config: { site, seo: options.seo, favicon: options.favicon, lints: options.lints }, routes, base, trailingSlash: options.trailingSlash, locales: i18n?.settings }))
     const { devSizes } = await import('./dev-sizes')
 
-    app.get(DEV_SIZES, async ({ request }) => devSizes(request, { routes, match: routeMatch(table, matchers, options.trailingSlash), base, reports: [paths.report, paths.report.replace(/\.json$/, '-static.json')] }))
+    app.get(DEV_SIZES, async ({ request }) => devSizes(request, { table, match: routeMatch(table, matchers, options.trailingSlash), base, reports: [paths.report, paths.report.replace(/\.json$/, '-static.json')] }))
     app.get(DEV_ROUTES, () => Response.json(devRoutes(root, routes, endpoints, api.mounted, i18n?.settings, base, { claims: served.kay(), extensions: mountedByExtensions, notes: options.seo !== undefined && site === undefined ? [NO_ORIGIN_NOTE] : [] })))
   }
 

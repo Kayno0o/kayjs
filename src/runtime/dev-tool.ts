@@ -1461,7 +1461,12 @@ function ago(ms: number): string {
   if (minutes < 60)
     return `${minutes} min ago`
 
-  return minutes < 1440 ? `${Math.floor(minutes / 60)} h ago` : `${Math.floor(minutes / 1440)} days ago`
+  if (minutes < 1440)
+    return `${Math.floor(minutes / 60)} h ago`
+
+  const days = Math.floor(minutes / 1440)
+
+  return days === 1 ? '1 day ago' : `${days} days ago`
 }
 
 function formatBytes(bytes: number): string {
@@ -1634,7 +1639,7 @@ function performanceTab(doc: Document, tool: DevTool, vitals: Vitals, signal: Ab
     const mark = built.estimated ? '~' : ''
 
     production.append(tool.make('dt', '', 'JS'), tool.make('dd', '', `${mark}${formatBytes(built.js)}`), tool.make('dt', '', 'CSS'), tool.make('dd', '', formatBytes(built.css)))
-    weightPanel.append(tool.make('h3', 'heading', 'Last kay build'), production, tool.make('div', 'note', `Route ${built.route}, ${built.exported ? 'static export' : 'server build'} made ${ago(Date.now() - built.built)}, minified and without the dev-only code${built.estimated ? '; ~ marks an estimate, as no page of the route was prerendered, the scripts being what its components can load' : ''}. Build again for sizes of the code as it is now.`))
+    weightPanel.append(tool.make('h3', 'heading', 'Last kay build'), production, tool.make('div', 'note', `Route ${built.route}, ${built.exported ? 'static export' : 'server build'} made ${ago(Date.now() - built.built)}, gzipped, minified and without the dev-only code${built.estimated ? '; ~ marks an estimate, as no page of the route was prerendered, the scripts being what its components can load' : ''}. Build again for sizes of the code as it is now.`))
   }
 
   reread = () => void reload()
