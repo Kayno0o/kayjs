@@ -13,10 +13,11 @@ import { buildingWithoutEnv } from '../server/env'
 import { ExportError } from '../server/prerender'
 import { count, done, failureProblem, formatOption, printDocument, printedProblems, printFailure, printProblems, PROBLEM_FORMATS, problemCounts, projectRoot, withStdoutOnStderr, workflowCommand } from './command'
 import { progressLine } from './progress'
+import { USAGES } from './usages'
 
 // With `--compile`, also bundles the server and all of it into one executable; with `--static`, writes the whole site to `--outdir`, `dist` by default, for a host with no server. `--no-check` builds without checking.
 export const build: Command = {
-  usage: 'build [dir] [--compile <executable>] [--entry <file>] [--static] [--outdir <dir>] [--no-check] [--analyze] [-p tsconfig.json] [--format text|github|json] [--quiet]',
+  usage: USAGES.build,
   options: { 'compile': { type: 'string' }, 'entry': { type: 'string' }, 'static': { type: 'boolean' }, 'outdir': { type: 'string' }, 'no-check': { type: 'boolean' }, 'analyze': { type: 'boolean' }, 'project': { type: 'string', short: 'p' }, 'format': { type: 'string' }, 'quiet': { type: 'boolean' } },
   positionals: 1,
   run: async ({ values, positionals }, refuseUsage) => {

@@ -188,6 +188,28 @@ describe('kay start', () => {
     expect((await listening(start(dir))).warned).toContain('the build is older than .kay/scratch/')
   }, 60_000)
 
+  it('serves the entry the build recorded without loading kay.config.ts, the supervisor holding little memory', async () => {
+    await build()
+    await rm(join(outputDir(dir), 'executable'), { force: true })
+    await Bun.write(join(dir, 'kay.config.ts'), 'import process from \'node:process\'\n\n// The server it starts has this set, the supervisor has not.\nif (process.env.KAY_START_PID === undefined)\n  throw new Error(\'config loaded\')\n\nexport default {}\n')
+
+    try {
+      const child = start(dir)
+      let anon = 0
+      const served = await listening(child, async () => {
+        anon = Number((/RssAnon:\s+(\d+)/).exec(await Bun.file(`/proc/${child.pid}/status`).text())?.[1])
+      })
+
+      expect(served).toMatchObject({ code: 0 })
+      expect(served.warned).not.toContain('config loaded')
+      // The supervisor imports no compiler or checker: about 8 MB, against 25 when it did.
+      expect(anon).toBeLessThan(16_000)
+    }
+    finally {
+      await rm(join(dir, 'kay.config.ts'))
+    }
+  }, 60_000)
+
   it('runs the executable the last build compiled, relative to the root, warning when the build is newer, and the entry once it is gone', async () => {
     await build()
 

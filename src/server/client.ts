@@ -76,6 +76,8 @@ export const MANIFEST = 'manifest.json'
 export const BUILD_FAILURE = 'failure.json'
 // Where `kay build --compile` wrote the executable, for `kay start` to run; a later build without it leaves none.
 export const EXECUTABLE_RECORD = 'executable'
+// Where `kay build` wrote the server entry the config names, relative to the root, so `kay start` runs it without loading the config.
+export const ENTRY_RECORD = 'entry'
 
 export const PRERENDERED_DIR = 'pages'
 

@@ -5,10 +5,11 @@ import { fromCompile } from '../check/shadow-types'
 import { formatDiagnostic } from '../compiler'
 import { formatFiles } from '../format'
 import { count, done, formatOption, printDocument, printedProblems, printFailure, problemCounts, toStderr } from './command'
+import { USAGES } from './usages'
 
 // Formats in place, or with `--check` lists the files that are not formatted and fails.
 export const fmt: Command = {
-  usage: 'fmt [paths...] [--check] [--format text|json] [--quiet]',
+  usage: USAGES.fmt,
   options: { check: { type: 'boolean' }, format: { type: 'string' }, quiet: { type: 'boolean' } },
   positionals: Infinity,
   run: async ({ values, positionals: paths }) => {

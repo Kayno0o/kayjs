@@ -7,11 +7,13 @@ import { basename, join, resolve } from 'node:path'
 import process from 'node:process'
 import { KAY_DIR, RENDER_OUTPUT } from '../build/assets'
 import { loadConfig } from '../config'
-import { environmentWithoutDotenv, PAGES_ENTRY } from '../dev'
+import { environmentWithoutDotenv, PAGES_ENTRY } from '../dev/sources'
 import { projectPaths } from '../project'
 import { basePath, routerPath } from '../server/base'
-import { alive, START_COMMAND, START_PARENT } from '../server/lifecycle'
+import { alive } from '../server/lifecycle'
+import { START_COMMAND, START_PARENT } from '../server/parent'
 import { projectRoot } from './command'
+import { USAGES } from './usages'
 
 const SOCKET_PRELOAD = join(import.meta.dir, '..', 'dev', 'render-socket.ts')
 const SCHEME = /^https?:\/\//
@@ -28,7 +30,7 @@ const OWN_SOCKET = /^kay-render-(\d+)-/
 
 // Answers one request as `kay dev` would serve it, the server entry and its plugins included, and prints the body: a server listening on a Unix socket of its own, gone once it answered.
 export const render: Command = {
-  usage: 'render <url> [dir] [--entry <file>] [--method <method>] [--body <text>] [--header <name: value>]... [--cookie <name=value>]... [-i|--include]',
+  usage: USAGES.render,
   options: { entry: { type: 'string' }, method: { type: 'string' }, body: { type: 'string' }, header: { type: 'string', multiple: true }, cookie: { type: 'string', multiple: true }, include: { type: 'boolean', short: 'i' } },
   positionals: 2,
   run: async ({ values, positionals: [url, path] }, refuse) => {

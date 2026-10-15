@@ -2,10 +2,11 @@ import type { Lint, LintGroup } from '../compiler/lints'
 import type { Command } from './command'
 import { explainLint, isLint, isLintGroup, LINT_GROUPS, lintList, LINTS } from '../compiler/lints'
 import { formatOption, printDocument, printFailure } from './command'
+import { USAGES } from './usages'
 
 // Lists the lints, or a group's, or explains the lint named.
 export const explain: Command = {
-  usage: 'explain [lint|group] [--format text|json]',
+  usage: USAGES.explain,
   options: { format: { type: 'string' } },
   positionals: 1,
   run: ({ values, positionals: [name] }) => {

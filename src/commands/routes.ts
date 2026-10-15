@@ -30,6 +30,7 @@ import { apiRoutePath, endpointPath, ROUTE_METHODS, routeMounts, scanEndpoints, 
 import { ROBOTS, SITEMAP } from '../server/sitemap'
 import { CSP_REPORTS } from '../server/violations'
 import { formatOption, printDocument, printFailure, projectRoot, withStdoutOnStderr } from './command'
+import { USAGES } from './usages'
 
 // One line of the listing, and the chains printed under it.
 interface Listed {
@@ -53,7 +54,7 @@ const MASKABLE_ICON = /^\/icon-maskable-/
 
 // Every route the project serves, as its server would boot, without running a page or a guard: what a URL that does not match was meant to hit. API modules run as they are imported, as the server imports them.
 export const routes: Command = {
-  usage: 'routes [dir] [--format text|json]',
+  usage: USAGES.routes,
   options: { format: { type: 'string' } },
   positionals: 1,
   run: async ({ values, positionals: [path] }) => {

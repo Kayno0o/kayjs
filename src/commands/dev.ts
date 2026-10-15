@@ -7,13 +7,14 @@ import { dev as startDev } from '../dev'
 import { InspectorAddressInUse } from '../dev/inspector'
 import { isLoopback } from '../dev/loopback'
 import { isPort, warnOtherKay } from './command'
+import { USAGES } from './usages'
 
 const WS_SCHEME = /^ws:\/\//
 const PORT_FIRST = /^\d+(?:\/|$)/
 
 // Restarts the server on every change until interrupted.
 export const dev: Command = {
-  usage: 'dev [dir] [--entry <file>] [--port <port>] [--host[=<address>]] [--inspect[=<address>]] [--open] [--format text|json] [--quiet]',
+  usage: USAGES.dev,
   options: { entry: { type: 'string' }, port: { type: 'string' }, host: { type: 'string' }, inspect: { type: 'string' }, open: { type: 'boolean' }, format: { type: 'string' }, quiet: { type: 'boolean' } },
   positionals: 1,
   // A bare `--inspect` or `--host` takes the default address, as Bun's does, rather than the next argument.

@@ -18,7 +18,7 @@ import { linkVariantFiles } from '../runtime/image'
 import { setAvifThreads } from '../server/avif'
 import { basePath } from '../server/base'
 import { writeCards } from '../server/card'
-import { EXECUTABLE_RECORD, PRERENDERED_DIR } from '../server/client'
+import { ENTRY_RECORD, EXECUTABLE_RECORD, PRERENDERED_DIR } from '../server/client'
 import { compressFiles } from '../server/compress'
 import { FAVICON_DIR, faviconSource, writeFavicons } from '../server/favicon'
 import { fontFiles } from '../server/fonts'
@@ -230,6 +230,8 @@ export async function buildProject(root: string, config: KayConfig, options: Bui
     // `kay start` runs the entry of this build, not what an earlier one compiled.
     await rm(join(output, EXECUTABLE_RECORD), { force: true })
   }
+
+  await Bun.write(join(output, ENTRY_RECORD), relative(root, project.paths.entry))
 
   return result
 }

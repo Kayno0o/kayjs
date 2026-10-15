@@ -6,16 +6,13 @@ import { durationSeconds } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
 import { wholeResponse } from './compress'
 import { logMessage } from './log'
+import { START_COMMAND, START_PARENT } from './parent'
 
 export const HEALTH_PATH = '/_kay/health'
 const DEFAULT_SHUTDOWN_TIMEOUT = 10
 // A check slower than this fails, so a hung database never hangs the probe with it.
 const CHECK_TIMEOUT_MS = 5000
 
-// Names the `kay start` or `kay render` running the server, which a SIGKILL of that process alone, or of `kay start`'s group, leaves running: the server stops once that process is gone.
-export const START_PARENT = 'KAY_START_PID'
-// Which of the two it is, for the line the server logs as it stops.
-export const START_COMMAND = 'KAY_START_COMMAND'
 // Set on `globalThis` while a server watches its parent, so the watch `kay render` preloads, for a server nothing else stops, leaves it the stop.
 const PARENT_WATCHED = Symbol.for('kay.parentWatched')
 const PARENT_POLL_MS = 1000

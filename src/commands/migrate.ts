@@ -5,10 +5,11 @@ import process from 'node:process'
 import { colors } from '@kaynooo/utils/tools/colors'
 import { migrateAstroProject } from '../migrate/project'
 import { count, done, formatOption, printDocument, printFailure, shellQuote } from './command'
+import { USAGES } from './usages'
 
 // Translates an Astro project's `.astro` files and content config, in place or into `--out`, a directory with no package.json getting the kay project around them, and lists what is left to do by hand.
 export const migrate: Command = {
-  usage: 'migrate astro [dir] [--out <dir>] [--format text|json] [--quiet]',
+  usage: USAGES.migrate,
   options: { out: { type: 'string' }, format: { type: 'string' }, quiet: { type: 'boolean' } },
   positionals: 2,
   run: async ({ values, positionals }) => {

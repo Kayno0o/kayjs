@@ -2,22 +2,24 @@
 import type { Command } from './commands/command'
 import process from 'node:process'
 import { bunProblem } from './bun'
-import { build } from './commands/build'
-import { check } from './commands/check'
 import { runCommand } from './commands/command'
-import { dev } from './commands/dev'
-import { explain } from './commands/explain'
-import { fmt } from './commands/fmt'
-import { lsp } from './commands/lsp'
-import { migrate } from './commands/migrate'
-import { scaffold } from './commands/new'
-import { render } from './commands/render'
-import { routes } from './commands/routes'
-import { start } from './commands/start'
+import { USAGES } from './commands/usages'
 
-// In the order the usage lists them.
-const COMMANDS: Record<string, Command> = { new: scaffold, dev, build, start, render, check, routes, explain, fmt, migrate, lsp }
-const USAGE = Object.values(COMMANDS).map((command, index) => `${index === 0 ? 'Usage: ' : '       '}kay ${command.usage}`).join('\n')
+// In the order the usage lists them, each loaded when it is the one run.
+const COMMANDS: Record<keyof typeof USAGES, () => Promise<Command>> = {
+  new: async () => (await import('./commands/new')).scaffold,
+  dev: async () => (await import('./commands/dev')).dev,
+  build: async () => (await import('./commands/build')).build,
+  start: async () => (await import('./commands/start')).start,
+  render: async () => (await import('./commands/render')).render,
+  check: async () => (await import('./commands/check')).check,
+  routes: async () => (await import('./commands/routes')).routes,
+  explain: async () => (await import('./commands/explain')).explain,
+  fmt: async () => (await import('./commands/fmt')).fmt,
+  migrate: async () => (await import('./commands/migrate')).migrate,
+  lsp: async () => (await import('./commands/lsp')).lsp,
+}
+const USAGE = Object.values(USAGES).map((line, index) => `${index === 0 ? 'Usage: ' : '       '}kay ${line}`).join('\n')
 
 async function main(args: string[]): Promise<number> {
   const [name, ...rest] = args
@@ -35,15 +37,15 @@ async function main(args: string[]): Promise<number> {
     return 0
   }
 
-  const command = name === undefined || !Object.hasOwn(COMMANDS, name) ? undefined : COMMANDS[name]
+  const load = name === undefined || !Object.hasOwn(COMMANDS, name) ? undefined : COMMANDS[name as keyof typeof COMMANDS]
 
-  if (!command) {
+  if (!load) {
     console.error(USAGE)
 
     return 1
   }
 
-  return runCommand(command, rest, USAGE)
+  return runCommand(await load(), rest, USAGE)
 }
 
 process.exit(await main(process.argv.slice(2)))

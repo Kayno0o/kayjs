@@ -10,9 +10,10 @@ import { realPath } from '../build/files'
 import { applySafeFixes, check as checkTypes, configCheckOptions } from '../check'
 import { isLint, isLintGroup, LINT_GROUPS, LINTS } from '../compiler/lints'
 import { CONFIG_FILE, loadConfig } from '../config'
-import { watchProject } from '../dev'
+import { watchProject } from '../dev/sources'
 import { buildingWithoutEnv } from '../server/env'
 import { count, done, formatOption, printFailure, printProblems, PROBLEM_FORMATS, projectRoot, takesControlCodes } from './command'
+import { USAGES } from './usages'
 
 const CLI = join(import.meta.dir, '../cli.ts')
 // What makes a directory given first the project rather than a path to report on.
@@ -24,7 +25,7 @@ const WATCH_DEBOUNCE_MS = 50
 
 // `--format github` annotates a CI diff and `--format json` gives tools one document; the exit code is the same in every format.
 export const check: Command = {
-  usage: 'check [dir] [paths...] [-p tsconfig.json] [--entry <file>] [--deny-warnings] [--fix] [--only <group>] [--format text|github|json] [--watch] [--quiet]',
+  usage: USAGES.check,
   options: { 'project': { type: 'string', short: 'p' }, 'entry': { type: 'string' }, 'deny-warnings': { type: 'boolean' }, 'fix': { type: 'boolean' }, 'only': { type: 'string' }, 'format': { type: 'string' }, 'watch': { type: 'boolean' }, 'quiet': { type: 'boolean' } },
   positionals: Infinity,
   run: async ({ values, positionals }) => {

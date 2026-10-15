@@ -8,7 +8,6 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { parseArgs } from 'node:util'
 import { colors, createColors } from '@kaynooo/utils/tools/colors'
-import { formatCheckDiagnostic } from '../check'
 import { offsetAt, positionAt } from '../compiler/mapping'
 
 const SHELL_SAFE = /^[\w@%+=:,./-]+$/
@@ -203,6 +202,8 @@ export async function printProblems(diagnostics: CheckDiagnostic[], denyWarnings
 
     return { failing: errors + (denyWarnings ? warnings : 0), found: diagnostics.length }
   }
+
+  const { formatCheckDiagnostic } = await import('../check')
 
   for (const [index, diagnostic] of diagnostics.entries()) {
     if (format === 'github')
