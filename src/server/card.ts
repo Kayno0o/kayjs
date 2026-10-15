@@ -12,7 +12,7 @@ import { join } from 'node:path'
 import { ASSET_PREFIX } from '../build/assets'
 import { CARD, CARD_ROUTE, IMPORTED, setCardMaker, variantFilesLinked, VARIANTS } from '../runtime/image'
 import { nodeCrypto } from './builtins'
-import { drawCard } from './card-draw'
+import { drawCard, LOGO_SIZE } from './card-draw'
 import { coverImage } from './crop'
 import { readFace } from './face'
 import { DEFAULT_QUALITY, drawing, findSource, MAX_UPLOAD_PIXELS, VARIANTS_DIR } from './image'
@@ -26,6 +26,8 @@ export interface CardSetup {
   // The fonts kay.config.ts lists, as the head declares them.
   fonts: FontAssets | undefined
   config?: CardConfig | undefined
+  // `images.card.logo`, absolute.
+  logo?: string | undefined
   // `seo.name`, written under the title.
   name?: string | undefined
   quality?: number | undefined
@@ -47,11 +49,13 @@ export interface Cards {
   background: Color
   color: Color
   name?: string | undefined
+  logo?: Uint8Array | undefined
   quality: number
   collect: boolean
 }
 
 const KEY_FILE = 'card.key'
+const LOGO_FILE = 'card-logo.png'
 const COLOR = /^#(?:[\da-f]{3}|[\da-f]{6})$/i
 const SPACES = /\s+/g
 const TEXT = { 'content-type': 'text/plain; charset=utf-8' }
@@ -62,6 +66,7 @@ const DEFAULT_WEIGHT = 700
 // Past this many characters a title is cut before it is signed: three lines of the smallest size hold far fewer.
 const MAX_TITLE = 200
 const REMOTE = /^https?:\/\//i
+const SVG_FILE = /\.svg$/i
 
 // The setup pages link cards with, and the cards prerendered pages asked for, by file name, for `kay build` to write.
 let current: Cards | undefined
@@ -77,16 +82,18 @@ export async function setupCards(setup: CardSetup): Promise<Cards> {
   const background = cardColor('background', setup.config?.background ?? '#111111')
   const color = cardColor('color', setup.config?.color ?? '#ffffff')
   const quality = setup.quality ?? DEFAULT_QUALITY
+  const logo = await cardLogo(setup)
   const keyFile = Bun.file(join(setup.dir, KEY_FILE))
   const cards: Cards = {
     font,
     key: await keyFile.exists() ? await keyFile.bytes() : undefined,
     dir: setup.dir,
     bundled: setup.bundled ?? false,
-    look: Bun.hash(JSON.stringify([DRAWING, font instanceof Error ? '' : font.path, background, color, setup.name ?? '', quality])).toString(36),
+    look: Bun.hash(JSON.stringify([DRAWING, font instanceof Error ? '' : font.path, background, color, setup.name ?? '', quality, ...logo === undefined ? [] : [Bun.hash(logo).toString(36)]])).toString(36),
     background,
     color,
     name: setup.name,
+    logo,
     quality,
     collect: setup.collect ?? false,
   }
@@ -121,6 +128,58 @@ function cardFont(clientDir: string, faces: FontAssets['faces'], wanted: CardCon
     return new Error(`kay: images.card.font names ${family}, of which \`fonts\` in kay.config.ts lists no upright face`)
 
   return { family, path: join(clientDir, decodeURIComponent(chosen.url.slice(ASSET_PREFIX.length))) }
+}
+
+// The logo drawn at the size a card shows it. A build keeps that drawing beside the key, as an executable carries no SVG drawer and reads it instead, and drops one the config no longer names.
+async function cardLogo(setup: CardSetup): Promise<Uint8Array | undefined> {
+  const built = join(setup.dir, LOGO_FILE)
+
+  if (setup.logo === undefined) {
+    if (setup.collect)
+      await rm(built, { force: true })
+
+    return undefined
+  }
+
+  if (setup.bundled) {
+    if (!await Bun.file(built).exists())
+      throw new Error('kay: this executable holds no drawing of images.card.logo; build it again with kay build --compile')
+
+    return Bun.file(built).bytes()
+  }
+
+  const logo = await drawLogo(setup.logo)
+
+  if (setup.collect)
+    await Bun.write(built, logo)
+
+  return logo
+}
+
+async function drawLogo(file: string): Promise<Uint8Array> {
+  if (!await Bun.file(file).exists())
+    throw new Error(`kay: images.card.logo names ${file}, which does not exist`)
+
+  if (SVG_FILE.test(file)) {
+    // Imported here alone, as an executable leaves the module out.
+    const { svgIcon } = await import('./svg-icon')
+
+    return (await svgIcon(file, 'images.card.logo'))(LOGO_SIZE)
+  }
+
+  let size: { width: number, height: number }
+
+  try {
+    size = await new Bun.Image(file).metadata()
+  }
+  catch {
+    throw new Error(`kay: images.card.logo names ${file}, which is no SVG, PNG, JPEG or WebP kay can draw`)
+  }
+
+  if (size.width !== size.height)
+    throw new Error(`kay: images.card.logo, ${file}, is ${size.width}x${size.height}; it has to be square`)
+
+  return new Bun.Image(file).resize(LOGO_SIZE, LOGO_SIZE).png().bytes()
 }
 
 function cardColor(setting: string, value: string): Color {
@@ -358,7 +417,7 @@ export async function writeCards(clientDir: string, cacheDir?: string, remote?: 
 // Written under a temporary name and moved into place, so a reader never sees a card half written.
 async function writeCard(cards: Cards, target: string, title: string, image?: { path: string, maxPixels?: number | undefined }): Promise<void> {
   const partial = `${target}.${crypto.randomUUID()}.tmp`
-  const look: CardLook = { face: await cardFace(cards), background: cards.background, color: cards.color, name: cards.name, quality: cards.quality }
+  const look: CardLook = { face: await cardFace(cards), background: cards.background, color: cards.color, name: cards.name, logo: cards.logo, quality: cards.quality }
 
   await Bun.write(partial, await drawCard(look, title, image && await coverImage(Bun.file(image.path), CARD.width, CARD.height, image.maxPixels)))
   await rename(partial, target)

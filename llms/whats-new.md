@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- `images.card.logo` draws a square image, an SVG or a raster, at the top left of every share card: [Draw a share card for a page](styles-and-assets.md#draw-a-share-card-for-a-page).
 - kay's default favicon is a kingfisher on a navy tile, for a site that names none: [Set a favicon and make the site installable](head.md#set-a-favicon-and-make-the-site-installable).
 - `kay render <url>` prints what the server answers for one URL, as `kay dev` serves it, without starting it on a port: [Check what a page renders](project.md#check-what-a-page-renders).
 - `--format json` on `kay build`, `kay routes`, `kay explain`, `kay fmt` and `kay migrate` prints one JSON document on stdout, as `kay check` does; `kay routes --format json` lists each route with its file, layouts and guards: [Commands](project.md#commands).

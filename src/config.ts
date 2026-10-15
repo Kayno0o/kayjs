@@ -249,6 +249,8 @@ export interface CardConfig {
   background?: string | undefined
   // The text's `#rrggbb`, `#ffffff` by default.
   color?: string | undefined
+  // A square image relative to the root, an SVG or a PNG, JPEG or WebP, drawn at the top left of every card: `'src/logo.svg'`.
+  logo?: string | undefined
 }
 
 export type TrailingSlash = 'never' | 'always' | 'ignore'

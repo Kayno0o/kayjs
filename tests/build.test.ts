@@ -1505,13 +1505,13 @@ describe('a stylesheet imported as text', () => {
 })
 
 describe('a compiled server', () => {
-  it('boots with its sources gone, each layout\'s actions behind the guards of its own directory, a library\'s too, rendering an extension\'s editor with its stylesheet, serving the icons drawn from an SVG favicon without resvg, and printing the notices of what it ships', async () => {
+  it('boots with its sources gone, each layout\'s actions behind the guards of its own directory, a library\'s too, rendering an extension\'s editor with its stylesheet, serving the icons drawn from an SVG favicon and a share card with an SVG logo without resvg, and printing the notices of what it ships', async () => {
     const secret = 'a-preview-secret-long-enough-for-kay-0123456789'
     const action = (name: string, settings = '') => `--- server\nimport { t } from 'elysia'\nimport { action } from 'kay'\n\n${settings}export const ${name} = action(t.Object({}), () => '${name}')\n---\nslot\n`
     const root = await scratchProject({
       'package.json': JSON.stringify({ name: 'notices', private: true, dependencies: { elysia: '*' }, devDependencies: { '@iconify-json/tabler': '*' } }),
       'tsconfig.json': tsconfig,
-      'kay.config.ts': `export default { favicon: 'src/favicon.svg', requireGuards: true, preview: { secret: '${secret}' }, fonts: [{ fontsource: '@fontsource/inter', weights: [700] }], extensions: [{ name: 'lib', routes: { dir: 'lib/routes', prefix: '/lib' }, editor: \`\${import.meta.dir}/lib/editor.kay\` }] }\n`,
+      'kay.config.ts': `export default { favicon: 'src/favicon.svg', images: { card: { logo: 'src/favicon.svg' } }, requireGuards: true, preview: { secret: '${secret}' }, fonts: [{ fontsource: '@fontsource/inter', weights: [700] }], extensions: [{ name: 'lib', routes: { dir: 'lib/routes', prefix: '/lib' }, editor: \`\${import.meta.dir}/lib/editor.kay\` }] }\n`,
       'src/favicon.svg': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#c00"/></svg>',
       'lib/editor.css': '.edited { outline: 1px dashed teal }\n',
       'lib/editor.kay': '---\nimport { signal } from \'kay\'\nimport \'./editor.css\'\n\nconst clicks = signal(0)\n---\nbutton.edited(onClick={() => clicks.set(n => n + 1)}) Edit {clicks()}\n',
@@ -1520,7 +1520,7 @@ describe('a compiled server', () => {
       'lib/routes/index.kay': 'h1 Library\n',
       'src/encoded.kay': '---\nimport { signal } from \'kay\'\nimport { stringify } from \'devalue\'\n\nconst on = signal(false)\n---\nbutton(onClick={() => on.set(o => !o)}) {on() ? stringify([1]) : \'off\'}\n',
       'src/routes/_layout.kay': action('leave', 'export const page = { guards: false }\n'),
-      'src/routes/index.kay': '---\nimport Encoded from \'../encoded.kay\'\n---\n--- server\nexport const page = { guards: false }\n---\nh1 Home\nEncoded\n',
+      'src/routes/index.kay': '---\nimport { shareCard } from \'kay/image\'\nimport Encoded from \'../encoded.kay\'\n---\n--- server\nexport const page = { guards: false }\n---\nhead\n  meta(property="og:image" content={shareCard({ title: \'Home\' })})\nh1 Home\nEncoded\n',
       'src/routes/staff/_guard.ts': 'import { guard } from \'kay\'\n\nexport default guard(({ request, deny }) => {\n  if (!request.headers.has(\'x-admin\'))\n    deny(403, \'Admins only\')\n})\n',
       'src/routes/staff/_layout.kay': action('promote'),
       'src/routes/staff/sign-in.kay': '--- server\nexport const page = { guards: false }\n---\nh1 Staff\n',
@@ -1536,8 +1536,10 @@ const page = await (await get('/', cookie)).text()
 const sheets = [...page.matchAll(/<link rel="stylesheet" href="([^"]+)">/g)].map(match => match[1]!)
 const styles = (await Promise.all(sheets.map(async sheet => (await get(sheet)).text()))).join('')
 const icons = await Promise.all(['/favicon.ico', '/icon-512.png', '/favicon.svg'].map(async path => (await get(path)).status))
+const card = new URL(page.split('property="og:image" content="')[1]!.split('"')[0]!.replaceAll('&amp;', '&'), 'http://localhost')
+const drawn = await get(card.pathname + card.search)
 
-console.log(JSON.stringify({ home: (await get('/')).status, leave: await post('_layout.kay', 'leave'), promote: await post('staff/_layout.kay', 'promote'), admin: await post('staff/_layout.kay', 'promote', { 'x-admin': '1' }), track: await post('../../lib/routes/_layout.kay', 'track'), tracked: await post('../../lib/routes/_layout.kay', 'track', { 'x-lib': '1' }), editor: page.includes('class="edited"'), sheet: styles.includes('dashed teal'), icons }))
+console.log(JSON.stringify({ home: (await get('/')).status, leave: await post('_layout.kay', 'leave'), promote: await post('staff/_layout.kay', 'promote'), admin: await post('staff/_layout.kay', 'promote', { 'x-admin': '1' }), track: await post('../../lib/routes/_layout.kay', 'track'), tracked: await post('../../lib/routes/_layout.kay', 'track', { 'x-lib': '1' }), editor: page.includes('class="edited"'), sheet: styles.includes('dashed teal'), icons, card: [drawn.status, drawn.headers.get('content-type')] }))
 process.exit(0)
 `,
     })
@@ -1584,7 +1586,7 @@ process.exit(0)
       const [output, errors, exited] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
 
       expect({ exited, errors }).toEqual({ exited: 0, errors: expect.any(String) })
-      expect(JSON.parse(output.trim().split('\n').at(-1)!)).toEqual({ home: 200, leave: 200, promote: 403, admin: 200, track: 403, tracked: 200, editor: true, sheet: true, icons: [200, 200, 200] })
+      expect(JSON.parse(output.trim().split('\n').at(-1)!)).toEqual({ home: 200, leave: 200, promote: 403, admin: 200, track: 403, tracked: 200, editor: true, sheet: true, icons: [200, 200, 200], card: [200, 'image/jpeg'] })
       expect((await Bun.file(join(root, 'server')).text()).includes('resvg-js')).toBe(false)
     }
     finally {

@@ -223,6 +223,64 @@ describe('share cards', () => {
     await expect(pages({ ...config, images: { card: { font: { family: 'Inter' } } } })).rejects.toThrow('images.card.font names Inter')
   })
 
+  it('draws images.card.logo at the top left, an SVG or a raster image, on a card with or without an image', async () => {
+    const near = (actual: number[], expected: number[]) => actual.every((channel, index) => Math.abs(channel - expected[index]!) < 24)
+    const svg = await pages({ ...config, images: { card: { logo: 'tests/fixtures/cards/src/logo.svg' } } })
+    const plain = await pixelsOf(await (await svg.handle(new Request(`http://localhost${await cardPath('/plain', svg)}`))).bytes())
+
+    expect(near(plain(100, 100), [0, 255, 0])).toBe(true)
+    expect(near(plain(160, 160), [255, 0, 0])).toBe(true)
+    expect(near(plain(200, 128), [0x11, 0x11, 0x11])).toBe(true)
+    expect(near(plain(60, 60), [0x11, 0x11, 0x11])).toBe(true)
+
+    const covered = await pixelsOf(await (await svg.handle(new Request(`http://localhost${await cardPath('/', svg)}`))).bytes())
+
+    expect(near(covered(160, 160), [255, 0, 0])).toBe(true)
+
+    const png = await pages({ ...config, images: { card: { logo: 'tests/fixtures/cards/src/logo.png' } } })
+    const blue = await pixelsOf(await (await png.handle(new Request(`http://localhost${await cardPath('/plain', png)}`))).bytes())
+
+    expect(near(blue(128, 128), [0, 0, 255])).toBe(true)
+  })
+
+  it('refuses a logo that is missing, not square or no image', async () => {
+    await expect(pages({ ...config, images: { card: { logo: 'tests/fixtures/cards/src/none.svg' } } })).rejects.toThrow(`images.card.logo names ${join(FIXTURE, 'src/none.svg')}, which does not exist`)
+    await expect(pages({ ...config, images: { card: { logo: 'tests/fixtures/cards/src/hero.png' } } })).rejects.toThrow('is 1000x600; it has to be square')
+    await expect(pages({ ...config, images: { card: { logo: 'tests/fixtures/cards/src/fonts/archivo-black-latin-400-normal.woff' } } })).rejects.toThrow('which is no SVG, PNG, JPEG or WebP kay can draw')
+  })
+
+  it('keeps the logo\'s drawing at build time for an executable, which draws with it, and drops it once no logo is named', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kay-card-logo-'))
+    const client = clientDir(process.cwd())
+    const built = join(dir, 'card-logo.png')
+
+    try {
+      const fonts = await prepareFonts(process.cwd(), config.fonts, dir)
+      const build = await setupCards({ dir, clientDir: client, fonts, logo: join(FIXTURE, 'src/logo.svg'), collect: true })
+
+      expect(await Bun.file(built).exists()).toBe(true)
+
+      // The executable's own copy of the source is gone, and the look matches the build's, so it serves the cards the build prerendered.
+      const executable = await setupCards({ dir, clientDir: client, fonts, logo: join(dir, 'gone.svg'), bundled: true })
+
+      expect(executable.look).toBe(build.look)
+
+      // A card's file name changes with its logo, so a site's cards are drawn again when it changes.
+      const png = await setupCards({ dir, clientDir: client, fonts, logo: join(FIXTURE, 'src/logo.png') })
+      const none = await setupCards({ dir, clientDir: client, fonts })
+
+      expect(new Set([build.look, png.look, none.look]).size).toBe(3)
+
+      await setupCards({ dir, clientDir: client, fonts, collect: true })
+
+      expect(await Bun.file(built).exists()).toBe(false)
+      await expect(setupCards({ dir, clientDir: client, fonts, logo: join(dir, 'gone.svg'), bundled: true })).rejects.toThrow('this executable holds no drawing of images.card.logo')
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
   it('fails a page asking for a card when no font is listed, and the browser has none to draw', async () => {
     const fontless = await pages({ ...config, fonts: [] })
 
@@ -316,7 +374,7 @@ describe('share cards', () => {
     }
   })
 
-  it('links the card files of a static export', async () => {
+  it('links the card files of a static export, drawn with the logo', async () => {
     const outdir = await mkdtemp(join(tmpdir(), 'kay-cards-static-'))
 
     try {
@@ -332,6 +390,7 @@ describe('share cards', () => {
         expect(link).toBeDefined()
         expect(html).toContain('<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">')
         expect(await new Bun.Image(Bun.file(join(outdir, link!))).metadata()).toEqual({ width: 1200, height: 630, format: 'jpeg' })
+        expect((await pixelsOf(await Bun.file(join(outdir, link!)).bytes()))(160, 160).every((channel, index) => Math.abs(channel - [255, 0, 0][index]!) < 24)).toBe(true)
       }
     }
     finally {

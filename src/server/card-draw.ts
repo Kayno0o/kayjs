@@ -1,3 +1,4 @@
+import type { Png } from './crop'
 import type { Face } from './face'
 import type { Canvas, Color } from './raster'
 import { CARD } from '../runtime/image'
@@ -10,10 +11,14 @@ export interface CardLook {
   background: Color
   color: Color
   name?: string | undefined
+  // `images.card.logo` as a PNG of LOGO_SIZE pixels a side.
+  logo?: Uint8Array | undefined
   quality: number
 }
 
 const PADDING = 80
+
+export const LOGO_SIZE = 96
 
 export const TEXT_WIDTH = CARD.width - 2 * PADDING
 const TITLE_SIZES = [76, 68, 60, 52, 46]
@@ -30,13 +35,16 @@ const ELLIPSIS = '…'
 
 // The title at the largest size that fits three lines, the last cut short past that, above the site's name, at the bottom left; an image, a PNG already cut to the card, covers it, fading into the background below the text.
 export async function drawCard(look: CardLook, title: string, image?: Uint8Array): Promise<Uint8Array> {
-  const { face, background, color, name, quality } = look
+  const { face, background, color, name, logo, quality } = look
   const canvas: Canvas = { width: CARD.width, height: CARD.height, pixels: new Uint8Array(CARD.width * CARD.height * 3) }
 
   if (image)
     paintImage(canvas, image, background)
   else
     fill(canvas, background)
+
+  if (logo)
+    paintLogo(canvas, logo)
 
   const { size, lines } = fitTitle(face, title)
   let baseline = CARD.height - PADDING
@@ -62,12 +70,34 @@ function fill(canvas: Canvas, color: Color): void {
     canvas.pixels.set(color, at)
 }
 
-// Each pixel over the background by its alpha, then the background over it by the row's fade.
-function paintImage(canvas: Canvas, image: Uint8Array, background: Color): void {
+function rgbPng(image: Uint8Array): Png {
   const png = decodePng(image)
 
   if (png.depth !== 8 || (png.colorType !== 2 && png.colorType !== 6))
     throw new Error('kay: a card is drawn on an RGB image')
+
+  return png
+}
+
+// Each pixel of the logo over the card by its alpha, at the top left.
+function paintLogo(canvas: Canvas, logo: Uint8Array): void {
+  const png = rgbPng(logo)
+
+  for (const [y, row] of png.rows.entries()) {
+    for (let x = 0; x < png.width; x++) {
+      const from = x * png.bpp
+      const alpha = png.colorType === 6 ? row[from + 3]! / 255 : 1
+      const at = ((PADDING + y) * canvas.width + PADDING + x) * 3
+
+      for (let channel = 0; channel < 3; channel++)
+        canvas.pixels[at + channel] = Math.round(canvas.pixels[at + channel]! + (row[from + channel]! - canvas.pixels[at + channel]!) * alpha)
+    }
+  }
+}
+
+// Each pixel over the background by its alpha, then the background over it by the row's fade.
+function paintImage(canvas: Canvas, image: Uint8Array, background: Color): void {
+  const png = rgbPng(image)
 
   for (const [y, row] of png.rows.entries()) {
     const position = Math.max(0, (y / canvas.height - FADE_START) / (1 - FADE_START))

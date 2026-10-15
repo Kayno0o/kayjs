@@ -7,7 +7,7 @@ import type { Matcher } from './params'
 import type { RenderOptions } from './render'
 import type { Route, RouteMount } from './routes'
 import type { ProjectSource } from './source'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { setContentMode } from '../content/load'
 import { projectCollections } from '../content/server'
 import { renderOptionsOf } from '../project'
@@ -91,7 +91,7 @@ export async function setupPages(project: Project, loadClient: () => Promise<Cli
   const headAndCards = async () => {
     const { fonts, ...head } = await configHead(root, config, client.dir, source.embedded)
 
-    return { ...head, cards: await setupCards({ dir: join(client.dir, '..'), clientDir: client.dir, fonts, config: config.images?.card, name: config.seo?.name, quality: config.images?.quality, bundled: source.embedded, collect: prerendering }) }
+    return { ...head, cards: await setupCards({ dir: join(client.dir, '..'), clientDir: client.dir, fonts, config: config.images?.card, logo: config.images?.card?.logo === undefined ? undefined : resolve(root, config.images.card.logo), name: config.seo?.name, quality: config.images?.quality, bundled: source.embedded, collect: prerendering }) }
   }
   const [{ head, scripts, styles, cards }, collections] = await Promise.all([headAndCards(), projectCollections(root, config.content)])
 

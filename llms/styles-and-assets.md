@@ -281,6 +281,7 @@ img(src={hero} sizes="(min-width: 60rem) 50vw, 100vw" alt="The workshop")
 - The title is drawn at the bottom left in a face of `fonts`, at the largest of five sizes that holds it in three lines, cut short with an ellipsis past that, `seo.name` under it.
 - `image`, an imported image or one from `images.dirs` or `images.remote`, covers the card and fades into its background below the text, which is the whole card without one.
 - `images.card` in `kay.config.ts` picks the face, `{ font: { family: 'Inter', weight: 800 } }`, by default the first family listed at its weight nearest 700, the `background` (`#111111`) and the text's `color` (`#ffffff`).
+- `images.card.logo` names a square image relative to the root, an SVG or a PNG, JPEG or WebP, drawn 96 pixels wide at the top left of every card: `images: { card: { logo: 'src/logo.svg' } }`. A missing or non-square one stops the boot, a changed one renames every card, and `kay build` keeps its drawing for an executable, which draws no SVG.
 - The face is read from its `.woff2`, `.woff` or `.ttf` file, TrueType outlines only, which every Fontsource face has.
 - A variable face draws at its default weight, a letter the face lacks draws as its missing-glyph box, and letters are kerned by the face's `GPOS` table but set one by one, with no ligatures or right-to-left text.
 - A page asking for a card fails when `fonts` lists none.
