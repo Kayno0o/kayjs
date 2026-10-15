@@ -1,0 +1,5 @@
+---
+import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
+---
+EmptyState#missing(title="Not found" level={1})
+EmptyState#empty(title="No posts yet")
