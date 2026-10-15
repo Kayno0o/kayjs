@@ -451,36 +451,55 @@ test('QrCode with inline draws the SVG in the page, so CSS colours resolve, and 
   expect(await element('/paging', 'qr-decor-inline')).not.toContain('role=')
 })
 
-// A path to a script, in a page's HTML or another script's imports, static or dynamic.
-const SCRIPT_PATH = /["'`]((?:\.{1,2}\/|\/)[^"'`\s]+\.js)["'`]/g
+// A script a page loads.
+const SCRIPT_PATH = /src="(\/[^"]+\.js)"/g
+// A script a module imports, statically or through `import()`.
+const STATIC_IMPORT = /(?:from|import)\s*["'](\.\/[^"']+\.js)["']/g
+const DYNAMIC_IMPORT = /import\(\s*["'](\.\/[^"']+\.js)["']/g
 const TURNDOWN = /turndown/i
 
-test('a page with CopyButtons and no MarkdownEditor ships no HTML to Markdown converter, loaded or lazy', async () => {
+test('a CopyButton island ships no HTML to Markdown converter, and MarkdownEditor loads it only on demand', async () => {
   // Built for the browser, never opened in one.
   const built = await testSite({ root: ROOT, browser: true })
-  const seen = new Set<string>()
-  const converting: string[] = []
+  const scripts = new Map<string, string>()
+  const script = async (path: string) => {
+    if (!scripts.has(path))
+      scripts.set(path, await (await built.fetch(path)).text())
+
+    return scripts.get(path)!
+  }
+  const imports = (code: string, kind: RegExp) => [...code.matchAll(kind)].map(([, file = '']) => `/_kay/${file.slice(2)}`)
+  // Every script that loads with `path`, itself included.
+  const loadedWith = async (path: string, seen = new Set<string>()): Promise<Set<string>> => {
+    if (!seen.has(path)) {
+      seen.add(path)
+      for (const next of imports(await script(path), STATIC_IMPORT))
+        await loadedWith(next, seen)
+    }
+
+    return seen
+  }
+  const converting = async (paths: Set<string>) => (await Promise.all([...paths].map(async path => TURNDOWN.test(await script(path)) ? [path] : []))).flat()
 
   try {
-    const pending = [...(await built.visit('/data')).html.matchAll(SCRIPT_PATH)].map(([, path = '']) => path)
+    const entry = [...(await built.visit('/data')).html.matchAll(SCRIPT_PATH)].map(([, path = '']) => path).find(path => path.includes('/entry-'))!
+    const island = (name: string) => imports(scripts.get(entry)!, DYNAMIC_IMPORT).find(path => path.startsWith(`/_kay/${name}-`))!
 
-    for (let path = pending.pop(); path !== undefined; path = pending.pop()) {
-      if (seen.has(path))
-        continue
+    await script(entry)
+    const copyButton = await loadedWith(island('copy-button'))
+    const editor = await loadedWith(island('markdown-editor'))
+    const onPaste = new Set<string>()
 
-      seen.add(path)
-      const script = await (await built.fetch(path)).text()
-
-      if (TURNDOWN.test(script))
-        converting.push(path)
-
-      pending.push(...[...script.matchAll(SCRIPT_PATH)].map(([, spec = '']) => new URL(spec, `http://site${path}`).pathname))
+    for (const path of editor) {
+      for (const next of imports(await script(path), DYNAMIC_IMPORT))
+        await loadedWith(next, onPaste)
     }
+
+    expect(await converting(copyButton)).toEqual([])
+    expect(await converting(editor)).toEqual([])
+    expect((await converting(onPaste)).length).toBeGreaterThan(0)
   }
   finally {
     await built.close()
   }
-
-  expect(seen.size).toBeGreaterThan(0)
-  expect(converting).toEqual([])
 })

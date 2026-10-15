@@ -83,6 +83,11 @@ describe('MarkdownEditor', () => {
     const state = await editor('')
 
     expect(paste(state.area, [], '<p>Read <strong>this</strong></p>').defaultPrevented).toBe(true)
+
+    // The converter loads on the first paste.
+    for (let tries = 0; tries < 200 && state.value === ''; tries++)
+      await Bun.sleep(5)
+
     expect(state.value).toBe('Read **this**')
   })
 
