@@ -273,19 +273,28 @@ export function queue<Payload>(name: string, handler: (payload: Payload) => unkn
   const store = () => options.store ?? defaultJobStore()
   let controller: AbortController | undefined
   let workers: Promise<void>[] = []
-  // The workers sleeping until their next look, woken when this process enqueues a job or retries one, or claims one.
-  const sleepers = new Set<() => void>()
+  // The worker looking for jobs while the queue is idle sleeps until its next look, woken when this process enqueues a job or retries one.
+  const pollers = new Set<() => void>()
+  // The others sleep until a claim leaves no worker looking, which wakes one of them to take over.
+  const idlers = new Set<() => void>()
+  // The workers waiting out a store that fails, which nothing wakes but a stop.
+  const outage = new Set<() => void>()
   // Whether a worker is the one looking for jobs while the queue is idle: the others sleep until something wakes them.
   let polling = false
   // The wait of the next empty look: the poll, doubling up to `idlePoll` while no job is found, shared by the workers as one looks at a time.
   let idleWait = POLL_MS
-  // Counts the wakes, so a worker finding one came while it awaited the store looks again.
+  // Counts the wakes of the poller, so one finding that came while it awaited the store looks again.
   let wakes = 0
-  const wake = () => {
+  const wakePoller = () => {
     wakes++
 
-    for (const sleeper of sleepers)
+    for (const sleeper of pollers)
       sleeper()
+  }
+  const wakeIdler = () => {
+    const [sleeper] = idlers
+
+    sleeper?.()
   }
 
   const reportFailed = async (job: StoredJob, error: unknown) => {
@@ -321,9 +330,11 @@ export function queue<Payload>(name: string, handler: (payload: Payload) => unkn
     if (!job)
       return false
 
-    // The workers asleep wake, one of them to look for the next job while this one runs.
+    // Unless another worker looks, one asleep wakes to look for the next job while this one runs.
     idleWait = POLL_MS
-    wake()
+
+    if (!polling)
+      wakeIdler()
 
     // Only runs whose process died never mark how they went: a job that kills its process stops here rather than crash every next one.
     if (job.attempts > attempts) {
@@ -348,7 +359,7 @@ export function queue<Payload>(name: string, handler: (payload: Payload) => unkn
 
         await store().retry(job.id, Date.now() + wait, message)
         // The worker looking for jobs may sleep past the time this one is due.
-        wake()
+        wakePoller()
         kayLog('warn', `a job of queue('${name}') failed, attempt ${job.attempts} of ${attempts}, and runs again in ${Math.round(wait / 1000)} s: ${message}`)
 
         return true
@@ -411,7 +422,7 @@ export function queue<Payload>(name: string, handler: (payload: Payload) => unkn
 
         // One worker looks at the store; the others sleep until a job is claimed, enqueued or retried.
         if (polling) {
-          await sleep(MAX_TIMER_MS, signal, sleepers)
+          await sleep(MAX_TIMER_MS, signal, idlers)
 
           continue
         }
@@ -423,14 +434,14 @@ export function queue<Payload>(name: string, handler: (payload: Payload) => unkn
         try {
           const next = await store().nextRunAt(name)
 
-          // Something was enqueued, retried or claimed meanwhile, before the sleep could be woken.
+          // Something was enqueued or retried meanwhile, before the sleep could be woken.
           if (wakes !== seen)
             continue
 
           const wait = next === undefined ? idleWait : Math.min(idleWait, Math.max(0, next - Date.now()))
 
           idleWait = Math.min(idleWait * 2, idlePoll)
-          await sleep(wait, signal, sleepers)
+          await sleep(wait, signal, pollers)
         }
         finally {
           polling = false
@@ -444,7 +455,7 @@ export function queue<Payload>(name: string, handler: (payload: Payload) => unkn
         }
 
         outageWait = Math.min(outageWait === 0 ? POLL_MS : outageWait * 2, MAX_OUTAGE_MS)
-        await sleep(outageWait, signal, sleepers)
+        await sleep(outageWait, signal, outage)
       }
     }
   }
@@ -475,7 +486,7 @@ export function queue<Payload>(name: string, handler: (payload: Payload) => unkn
       await store().add({ id, queue: name, payload: stringify(payload), attempts: 0, runAt: Date.now() + delay })
 
       // A delayed job too: the worker looking for jobs sleeps until the next one is due, which this may precede.
-      wake()
+      wakePoller()
 
       return id
     },

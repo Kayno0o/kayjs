@@ -658,6 +658,26 @@ describe('queue', () => {
       }
     })
 
+    it('wakes the worker looking for jobs on an enqueue, and one sleeping worker on a claim, not all of them', async () => {
+      jest.useFakeTimers({ now: 0 })
+
+      const idle = await watch({ concurrency: 8 })
+
+      try {
+        await idle.advance(20_000)
+        idle.claims.length = 0
+        await idle.work.enqueue('a')
+        await flush()
+        expect(idle.ran).toEqual(['a'])
+        // The poller's claim finds the job, the worker woken to take over looks, and the poller looks once more after the run.
+        expect(idle.claims).toHaveLength(3)
+      }
+      finally {
+        jest.useRealTimers()
+        await shutdown(idle.app)
+      }
+    })
+
     it('notices a job another process enqueued within idlePoll, and with a job running another worker takes over the look', async () => {
       jest.useFakeTimers({ now: 0 })
 
