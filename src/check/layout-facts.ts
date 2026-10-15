@@ -10,23 +10,28 @@ export interface ServerFacts {
   leavesLayoutsOut: boolean
 }
 
-// More files than any app has; a cache past it starts over rather than growing with every file an editor session ever opened.
+// More files than any app has; a cache past it drops its oldest entry rather than growing with every file an editor session ever opened.
 const LIMIT = 4096
-const facts = new Map<string, { text: string, facts: ServerFacts }>()
+// Keyed by a hash of the text, so a long session keeps no file's text.
+const facts = new Map<string, { hash: bigint, facts: ServerFacts }>()
 
 // What a file's server fence says, parsed once per change of its text: the shadows of every page under a layout, the action clashes and the query clashes all read the same layouts, and the LSP asks again on every save.
 export function serverFacts(file: string, text: string): ServerFacts {
   const known = facts.get(file)
+  const hash = Bun.hash.wyhash(text)
 
-  if (known?.text === text)
+  if (known?.hash === hash)
     return known.facts
 
   const found = { server: analyzeServer(text, parseKay(text).server), leavesLayoutsOut: falseKeys(text).has('layouts') }
 
-  if (facts.size >= LIMIT)
-    facts.clear()
+  // Deleted first so a file read again is the newest.
+  facts.delete(file)
 
-  facts.set(file, { text, facts: found })
+  if (facts.size >= LIMIT)
+    facts.delete(facts.keys().next().value!)
+
+  facts.set(file, { hash, facts: found })
 
   return found
 }

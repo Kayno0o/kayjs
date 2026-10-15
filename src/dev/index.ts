@@ -405,7 +405,10 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   }
 
   // Each restart takes the process waiting with kay loaded, or a fresh one when none is ready yet.
+  let booted = false
   const start = () => {
+    booted = true
+
     if (startupChanged || spare === undefined || spare.exitCode !== null || spareEntry !== entryToRun()) {
       spare?.kill()
       spare = spawn()
@@ -560,8 +563,6 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     restarting ??= drain()
   }
 
-  start()
-
   const stop = async () => {
     stopping = true
 
@@ -595,8 +596,21 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     await inspector?.stop()
   }
 
-  await writeTypes()
-  verified.resolve()
+  // Asked to refuse a config that does not load, the first server waits for the first types: its own boot failure would print the same error again. The process it will run in loads kay meanwhile.
+  if (options.refuseConfig === true)
+    readySpare()
+  else
+    start()
+
+  try {
+    await writeTypes()
+  }
+  finally {
+    verified.resolve()
+  }
+
+  if (!booted && !configRefused && !stopping)
+    start()
 
   if (configRefused) {
     await stop()

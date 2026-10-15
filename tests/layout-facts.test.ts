@@ -1,6 +1,7 @@
 import { join } from 'node:path'
 import { describe, expect, it, spyOn } from 'bun:test'
 import { actionClashes } from '../src/check/boot'
+import { serverFacts } from '../src/check/layout-facts'
 import { queryClashes } from '../src/check/queries'
 import { layoutQueries } from '../src/check/shadow'
 import * as script from '../src/compiler/script'
@@ -40,6 +41,31 @@ describe('the layouts above a page', () => {
       layoutQueries(join(routes, 'a/one.kay'), 'p x\n', routes, [])
 
       expect(analyse.mock.calls.filter(([text]) => text.includes('export const page'))).toHaveLength(3)
+    }
+    finally {
+      analyse.mockRestore()
+    }
+  })
+})
+
+describe('the facts of a long session', () => {
+  it('drop the oldest file once there are too many, keeping the others', () => {
+    const analyse = spyOn(script, 'analyzeServer')
+
+    try {
+      for (let index = 0; index <= 4096; index++)
+        serverFacts(`evict/${index}.kay`, `p ${index}\n`)
+
+      const analysed = analyse.mock.calls.length
+
+      serverFacts('evict/4096.kay', 'p 4096\n')
+      serverFacts('evict/1.kay', 'p 1\n')
+
+      expect(analyse.mock.calls.length).toBe(analysed)
+
+      serverFacts('evict/0.kay', 'p 0\n')
+
+      expect(analyse.mock.calls.length).toBe(analysed + 1)
     }
     finally {
       analyse.mockRestore()

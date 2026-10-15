@@ -403,8 +403,8 @@ describe.concurrent('kay dev', () => {
 
     try {
       await expect(dev(root, { refuseConfig: true, onRestart: child => children.push(child) })).rejects.toBeInstanceOf(ConfigRefused)
-      expect(children).toHaveLength(1)
-      expect(children[0]!.killed).toBe(true)
+      // No server started to print the same error again.
+      expect(children).toHaveLength(0)
 
       await Bun.write(join(root, 'kay.config.ts'), 'export default {}\n')
 
