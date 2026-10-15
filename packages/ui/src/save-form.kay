@@ -1,0 +1,110 @@
+--- <Output>
+import type { Action, Failure, FailureData } from 'kay'
+import { guardLeave, onCleanup, onMount, signal } from 'kay'
+import Button from './button.kay'
+import { callAction, formIssues } from './forms'
+import { toast } from './toast'
+
+const { action, failure, refused, saved, onSaved, onDiscard, dirtyLabel = 'Unsaved changes.', cleanLabel = 'No unsaved change.', savingLabel = 'Saving…', saveLabel = 'Save', discardLabel = 'Discard', class: className } = props<{
+  // The page's action the form calls with its fields, as FormDialog does.
+  action: Action<never, Output>
+  // Toasted when the call fails other than on a field.
+  failure: string
+  // What a refusal of the action's handler says, as FormDialog's `refused`.
+  refused?: ((data: FailureData<Output>) => Record<string, string> | string | undefined) | undefined
+  // Toasted as a success once the action has run.
+  saved?: string | undefined
+  // What the action returned, for the page to patch into what it shows. The form is clean again once it has run.
+  onSaved?: ((result: Exclude<Output, Failure<unknown>>) => void) | undefined
+  // Called after Discard has put the controls back to their initial values, for state the page keeps in signals.
+  onDiscard?: (() => void) | undefined
+  // The bar's texts: unsaved changes, nothing to save, the save under way, and the two buttons.
+  dirtyLabel?: string | undefined
+  cleanLabel?: string | undefined
+  savingLabel?: string | undefined
+  saveLabel?: string | undefined
+  discardLabel?: string | undefined
+  class?: string | undefined
+}>()
+
+const issues = signal<Record<string, string>>({})
+const dirty = signal(false)
+let form: HTMLFormElement | undefined
+// What the controls held when they were last clean, as text.
+let baseline = ''
+
+formIssues.provide(issues)
+
+function snapshot() {
+  return JSON.stringify([...new FormData(form)].map(([name, value]) => [name, typeof value === 'string' ? value : [value.name, value.size, value.lastModified]]))
+}
+
+function check() {
+  dirty.set(snapshot() !== baseline)
+}
+
+// Leaving asks while there are unsaved changes, but not while a save is under way: it may be what takes the page elsewhere.
+guardLeave(() => dirty() && !action.pending())
+
+// A control added or removed changes what the form holds without an input event.
+onMount(() => {
+  baseline = snapshot()
+
+  const observer = new MutationObserver(check)
+
+  observer.observe(form!, { childList: true, subtree: true })
+  onCleanup(() => observer.disconnect())
+})
+
+async function submit(event: SubmitEvent) {
+  event.preventDefault()
+
+  if (action.pending() || !dirty() || !form)
+    return
+
+  // Edits made while the save is under way stay unsaved.
+  const sent = snapshot()
+  const done = await callAction(form, action, issues, failure, refused)
+
+  if (!done)
+    return
+
+  issues.set({})
+  baseline = sent
+  check()
+
+  if (saved)
+    toast.success(saved)
+
+  onSaved?.(done.result)
+}
+
+function discard() {
+  if (!dirty() || action.pending())
+    return
+
+  form?.reset()
+  issues.set({})
+  onDiscard?.()
+  check()
+}
+
+// Ctrl or Cmd with S saves, the browser's own save dialog kept away even when there is nothing to save.
+function saveOnShortcut(event: KeyboardEvent) {
+  if (event.key.toLowerCase() !== 's' || !(event.ctrlKey || event.metaKey) || event.altKey)
+    return
+
+  event.preventDefault()
+  form?.requestSubmit()
+}
+---
+form.kui-save-form(class={className} ref={element => form = element} novalidate onSubmit={submit} onInput={check} onChange={check} onKeyDown={saveOnShortcut})
+  .kui-form-grid
+    slot
+  .kui-save-bar
+    // Announced as it changes, so a screen reader hears the changes pile up, the save start and the form come back clean.
+    p.kui-save-bar-status(role="status" data-dirty={dirty() || undefined}) {action.pending() ? savingLabel : dirty() ? dirtyLabel : cleanLabel}
+    .kui-save-bar-actions
+      // `aria-disabled` rather than `disabled`, so the button pressed keeps the focus as the form turns clean.
+      Button(label={discardLabel} aria-disabled={!dirty() || action.pending() || undefined} onClick={discard})
+      Button(label={saveLabel} type="submit" variant="accent" busy={action.pending()} aria-disabled={!dirty() || action.pending() || undefined})

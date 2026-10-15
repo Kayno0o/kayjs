@@ -1,4 +1,6 @@
-import { context, describeField, effect, markInvalid, uid } from 'kay'
+import type { Action, Failure, FailureData, Signal } from 'kay'
+import { ActionError, context, describeField, effect, focusInvalid, markInvalid, uid } from 'kay'
+import { toast } from './toast'
 
 // The messages a FormDialog's last call was refused with, by field name, which each FormField inside it reads for its own `name`.
 export const formIssues = context<(() => Record<string, string>) | undefined>(undefined)
@@ -83,5 +85,30 @@ function markGroup(links: FieldLinks, shown: boolean, marked: Set<HTMLElement>):
 
     markInvalid(field, links, false)
     marked.delete(field)
+  }
+}
+
+// Calls the action with the form's fields. A refusal sets the messages for each FormField, toasts the ones no field shows (or `failure` when it carries none) and focuses the first invalid field, answering undefined; what the action returned is answered inside an object, so a result of undefined is told apart.
+// The schema refuses fields; the handler refuses with data of its own, which `refused` reads, a single message going under the empty name as the whole form's.
+export async function callAction<Output>(form: HTMLFormElement, action: Action<never, Output>, issues: Signal<Record<string, string>>, failure: string, refused?: ((data: FailureData<Output>) => Record<string, string> | string | undefined) | undefined): Promise<{ result: Exclude<Output, Failure<unknown>> } | undefined> {
+  try {
+    return { result: await action(new FormData(form)) }
+  }
+  catch (error) {
+    const said = error instanceof ActionError && error.data !== undefined ? refused?.(error.data as FailureData<Output>) : undefined
+    const byField = { ...error instanceof ActionError ? error.errors : {}, ...typeof said === 'string' ? said === '' ? {} : { '': said } : said }
+    const messages = Object.entries(byField)
+    const shown = (name: string) => [...form.querySelectorAll('[data-field]')].some(field => field.getAttribute('data-field') === name)
+
+    issues.set(byField)
+
+    // A message no FormField shows, such as a limit or a refusal of the whole form under the empty name, is toasted rather than lost; a failure carrying none toasts the page's own message.
+    for (const message of messages.length === 0 ? [failure] : messages.filter(([name]) => !shown(name)).map(([, message]) => message))
+      toast.error(message)
+
+    // Each FormField marks its control invalid as its message renders; the first one takes the focus, so the message is read with it.
+    await focusInvalid(form)
+
+    return undefined
   }
 }

@@ -710,6 +710,28 @@
     @apply ml-auto flex flex-wrap justify-end gap-2;
   }
 
+  /* Sticks to the bottom of the screen while the form is taller than it, clear of a phone's home bar; the buttons wrap under the text when the line is short. */
+  .kui-save-form {
+    @apply flex flex-col gap-3;
+  }
+
+  .kui-save-bar {
+    @apply sticky bottom-0 z-10 flex flex-wrap items-center gap-2 border border-kui-surface2 bg-kui-canvas px-3 py-2;
+    padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));
+  }
+
+  .kui-save-bar-status {
+    @apply m-0 text-sm text-kui-subtext0;
+
+    &:where([data-dirty]) {
+      @apply text-kui-warning;
+    }
+  }
+
+  .kui-save-bar-actions {
+    @apply ml-auto flex flex-wrap justify-end gap-2;
+  }
+
   .kui-icon-grid {
     @apply grid max-h-48 grid-cols-8 gap-1 overflow-y-auto border border-kui-surface2 bg-kui-mantle p-2;
   }
@@ -1956,7 +1978,9 @@
 
   /* Last, so a disabled button keeps its muted look under the pointer whatever its variant's hover says, flat and still whatever a skin's press says. */
   :where(button, a, [role='button']).kui-shell:disabled,
-  .kui-btn:disabled {
+  :where(button, a, [role='button']).kui-shell[aria-disabled='true'],
+  .kui-btn:disabled,
+  .kui-btn[aria-disabled='true'] {
     --kui-shell-line: var(--color-kui-surface2);
     --kui-shell-fill: var(--color-kui-canvas);
     color: var(--color-kui-overlay1);

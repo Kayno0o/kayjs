@@ -8,6 +8,8 @@ This page lists what each release adds, newest first, with a link to where each 
 ## Unreleased
 
 - **kayjs-ui `Table` `selectable`** adds a checkbox per row, a tri-state select-all with `N selected`, keys of rows that left `rows` dropped, and a `@bulk(keys, clear)` block for bulk actions beside the count, in stacked cards too. [Table](/ui/table)
+||||||| parent of 9659b9a (feat(ui): SaveForm, a form with a sticky bar of unsaved changes, saving, Discard and Save)
+- **kayjs-ui `SaveForm`** is a form calling a page's action with a sticky bar of unsaved changes, the save under way, Discard and Save, its dirty state read from the form's own controls, leaving with unsaved changes asking and Ctrl+S saving. [SaveForm](/ui/save-form)
 - **kayjs-ui `infiniteList` and `LoadMore`** own an infinite-scroll list's rows, offset or cursor paging, the end of the list, a retry after a failed page and the "Loading more" row, dropping a row already shown when the list shifts. [LoadMore](/ui/load-more)
 - **Rows without an id keep their fields** when a `for` over plain objects is edited immutably: an edit, a removal or an insertion keeps every other row's nodes and focus. [Templates](/essentials/templates)
 - **Layout `query`** declares the params every page under a layout shares. They are read through `ctx.query` typed and validated with the page's own, and an island's `queryParam` reads them too. [Data loading](/essentials/data-loading)
