@@ -13,12 +13,13 @@ export interface SanitizeOptions {
 // What `sanitizeHtml` keeps, written back without attributes but a link's `href`: formatted text, such as a comment or rendered Markdown, and nothing that loads, runs, styles or covers the page.
 const KEPT = new Set(['a', 'b', 'blockquote', 'br', 'code', 'del', 'em', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr', 'i', 'ins', 'li', 'ol', 'p', 'pre', 's', 'small', 'strong', 'sub', 'sup', 'u', 'ul'])
 const VOID = new Set(['area', 'br', 'col', 'hr', 'img', 'param', 'source', 'track', 'wbr'])
+
 // Never kept, whatever the options say: what runs code, loads another document, takes the user's input or swallows the rest of the page.
-const UNSAFE_TAGS = new Set(['applet', 'base', 'bgsound', 'button', 'embed', 'fencedframe', 'form', 'frame', 'frameset', 'iframe', 'input', 'keygen', 'link', 'math', 'meta', 'noembed', 'noframes', 'noscript', 'object', 'plaintext', 'portal', 'script', 'select', 'style', 'svg', 'template', 'textarea', 'title', 'xmp'])
+export const UNSAFE_TAGS: ReadonlySet<string> = new Set(['applet', 'base', 'bgsound', 'button', 'embed', 'fencedframe', 'form', 'frame', 'frameset', 'iframe', 'input', 'keygen', 'link', 'math', 'meta', 'noembed', 'noframes', 'noscript', 'object', 'plaintext', 'portal', 'script', 'select', 'style', 'svg', 'template', 'textarea', 'title', 'xmp'])
 // Handlers and styles, which run code or cover the page.
-const UNSAFE_ATTRIBUTE = /^(?:on|style$|srcdoc$|formaction$)/i
-// The URL attributes besides the shared ones, which no page of the app sets but a user's markup may.
-const SANITIZED_ONLY = /^(?:background|cite|longdesc|ping)$/
+export const UNSAFE_ATTRIBUTE = /^(?:on|style$|srcdoc$|formaction$)/i
+// Every attribute holding a URL in a user's markup: the shared ones, and those no page of the app sets but such markup may.
+export const SANITIZED_URL_ATTRIBUTES: ReadonlySet<string> = new Set([...URL_ATTRIBUTES, 'background', 'cite', 'longdesc', 'ping'])
 const SRCSET_CANDIDATE = /\s*,\s*/
 const DESCRIPTOR = /\s+\S+$/
 const ATTRIBUTE = /([a-z][\w:-]*)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/gi
@@ -53,7 +54,7 @@ function safeValue(attribute: string, value: string): boolean {
   if (attribute === 'srcset')
     return value.trim().split(SRCSET_CANDIDATE).every(candidate => isSafeUrl(candidate.replace(DESCRIPTOR, '')))
 
-  return !((attribute !== 'data' && URL_ATTRIBUTES.includes(attribute)) || SANITIZED_ONLY.test(attribute)) || isSafeUrl(value)
+  return attribute === 'data' || !SANITIZED_URL_ATTRIBUTES.has(attribute) || isSafeUrl(value)
 }
 
 // The opening tag with the attributes kept for it, a URL only when safe, and a link marked as the user's.

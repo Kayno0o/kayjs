@@ -1,13 +1,10 @@
+import { SANITIZED_URL_ATTRIBUTES, UNSAFE_ATTRIBUTE, UNSAFE_TAGS } from 'kay/library'
 import { bodyHtml, MarkdownError } from './kay/content'
 
-// Tags that run code, load another document, take input, style or cover the page, or swallow the rest of it, whatever their attributes; `sanitizeHtml` drops the same.
-const UNSAFE_TAGS = new Set(['applet', 'base', 'button', 'embed', 'fencedframe', 'form', 'frame', 'frameset', 'iframe', 'input', 'link', 'math', 'meta', 'noembed', 'noframes', 'noscript', 'object', 'plaintext', 'portal', 'script', 'select', 'style', 'svg', 'template', 'textarea', 'title', 'xmp'])
 // What Markdown's own task list gives a checkbox.
 const TASK_ATTRIBUTES = new Set(['type', 'class', 'disabled', 'checked'])
 // Where bodyHtml opens and closes a component, as kay itself reads them.
 const PLACEHOLDER = /<kay-component n="\d+" \/>|<kay-component n="\d+">|<\/kay-component>/g
-const URL_ATTRIBUTES = new Set(['action', 'background', 'data', 'formaction', 'href', 'poster', 'src', 'xlink:href'])
-const UNSAFE_ATTRIBUTE = /^(?:on|style$|srcdoc$)/i
 const HEX_ENTITY = /&#x([\da-f]+);?/gi
 const DECIMAL_ENTITY = /&#(\d+);?/g
 const NAMED_ENTITY = /&(colon|tab|newline);/gi
@@ -88,7 +85,7 @@ function unsafeElement(tag: string, attributes: [string, string][]): string | un
     if (UNSAFE_ATTRIBUTE.test(key))
       return `the attribute ${key}`
 
-    if (URL_ATTRIBUTES.has(key) && SCRIPT_URL.test(decoded(value)))
+    if (SANITIZED_URL_ATTRIBUTES.has(key) && SCRIPT_URL.test(decoded(value)))
       return `a ${key} running script`
   }
 
