@@ -200,6 +200,26 @@ describe('a library\'s stylesheet in an app', () => {
     expect(unused).toContain('ui-unused-too')
   })
 
+  it('prunes the stylesheets an exported one pulls in with a relative import, however deep, and leaves the unexported ones that nothing imports', async () => {
+    const root = await newProject(PLAIN_CSS)
+    const library = join(root, 'node_modules/ui-lib')
+    const theme = join(library, 'src/theme.css')
+
+    await Promise.all([
+      Bun.write(theme, `@import "./parts/extra.css";\n@import url(./parts/quoted.css);\n${LIBRARY_THEME}`),
+      Bun.write(join(library, 'src/parts/extra.css'), '@import \'../deep.css\';\n.ui-part { padding: 12px; }\n.ui-part-used { padding: 13px; }\n'),
+      Bun.write(join(library, 'src/parts/quoted.css'), '.ui-quoted { padding: 14px; }\n'),
+      Bun.write(join(library, 'src/deep.css'), '.ui-deep { padding: 15px; }\n'),
+      Bun.write(join(root, 'src/notes.txt'), 'ui-part-used\n'),
+    ])
+
+    const unused = await unusedLibraryClasses(root, await findKayLibraries(root), [])
+
+    expect([...unused].filter(name => (/part|deep|quoted/).test(name)).sort()).toEqual(['ui-deep', 'ui-part', 'ui-quoted'])
+    expect(unused).not.toContain('ui-demo')
+    expect(libraryRules(await pageCss(root, {}))).toEqual([...KEPT, '.ui-part-used'].sort())
+  })
+
   it('prunes what Tailwind inlines of it as well', async () => {
     const root = await newProject(TAILWIND_CSS)
     const css = await pageCss(root, { plugins: [tailwind] })

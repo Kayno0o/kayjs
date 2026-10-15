@@ -1,5 +1,6 @@
 import type { KayLibrary } from './libraries'
 import type { Node } from './supports'
+import { dirname, resolve } from 'node:path'
 import { CSS_FILE, findProjectFiles, readSource } from './files'
 import { exportsFile } from './libraries'
 import { COMMENTS, parse, print } from './supports'
@@ -11,6 +12,8 @@ const IDENT_CHAR = /[\w\u0080-\uFFFF-]/
 // A class written with no escape, the only kind a word of a source file names as written.
 const PLAIN_CLASS = /^-?[A-Z_][\w-]*$/i
 const TOKEN = /[\w-]+/g
+// A relative `@import`, its path quoted or inside `url()`.
+const RELATIVE_IMPORT = /@import\s+(?:url\(\s*)?(?:"(\.\.?\/[^"]*)"|'(\.\.?\/[^']*)'|(\.\.?\/[^\s'"();]+))/gi
 
 // The files of an app a class may be written in: those Tailwind reads, stylesheets restyling one and data files.
 export const NAMING_FILE = /\.(?:kay|[cm]?[jt]sx?|html?|mdx?|css|json|ya?ml|txt)$/
@@ -215,9 +218,34 @@ function tokensOf(file: string): ReadonlySet<string> {
   return tokens
 }
 
+// The stylesheets of a library an app can import: those its exports map names, and every one of its own those pull in with a relative `@import`, however deep.
+function importableSheets(library: KayLibrary, files: string[]): string[] {
+  const found = new Set(files.filter(file => exportsFile(library, file)))
+  const own = new Set(files)
+  const pending = [...found]
+
+  for (const file of pending) {
+    const text = readable(file)?.text
+
+    if (text === undefined)
+      continue
+
+    for (const match of text.matchAll(RELATIVE_IMPORT)) {
+      const imported = resolve(dirname(file), match[1] ?? match[2] ?? match[3]!)
+
+      if (own.has(imported) && !found.has(imported)) {
+        found.add(imported)
+        pending.push(imported)
+      }
+    }
+  }
+
+  return [...found]
+}
+
 // The classes the stylesheets an app can import from its kay libraries style which nothing names: no file of the app, and none of `named`, the words kay read of the library files it reaches.
 export async function unusedLibraryClasses(root: string, libraries: KayLibrary[], named: Iterable<string>): Promise<Set<string>> {
-  const sheets = (await Promise.all(libraries.map(async library => (await findProjectFiles(library.realDir, CSS_FILE, { project: true, ownKayOnly: true })).filter(file => exportsFile(library, file))))).flat()
+  const sheets = (await Promise.all(libraries.map(async library => importableSheets(library, await findProjectFiles(library.realDir, CSS_FILE, { project: true, ownKayOnly: true }))))).flat()
   const unused = new Set(sheets.flatMap(stylesheetClasses))
 
   if (unused.size === 0)
