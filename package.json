@@ -171,6 +171,7 @@
     "test:timings": "bun test --parallel --timings=tests/timings.json --update-timings",
     "bench": "$npm_execpath bench/run.ts",
     "bench:origins": "$npm_execpath bench/origins.ts",
+    "bench:server": "$npm_execpath bench/server-cost.ts",
     "bench:sites": "$npm_execpath bench/sites/run.ts",
     "bench:test": "$npm_execpath test ./bench",
     "docs:build": "$npm_execpath src/cli.ts build docs --static",
