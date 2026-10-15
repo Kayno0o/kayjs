@@ -287,7 +287,13 @@ class RewriteFinder {
   private insert(at: number, text: string) {
     const found = this.rewrites.get(at)
 
-    this.rewrites.set(at, !found ? { after: text, end: at } : found.end === at ? { ...found, after: `${found.after ?? ''}${text}` } : { ...found, before: `${text}${found.before ?? ''}` })
+    if (!found) {
+      this.rewrites.set(at, { after: text, end: at })
+
+      return
+    }
+
+    this.rewrites.set(at, found.end === at ? { ...found, after: `${found.after ?? ''}${text}` } : { ...found, before: `${text}${found.before ?? ''}` })
   }
 
   // An assignment to a signal writes it: `count = 1` through `count.set(1)`, `count += 1` and `count++` through an updater, so an effect writing it does not track it too.
@@ -302,8 +308,9 @@ class RewriteFinder {
       return
 
     const span = { start: at, end: at + name.length }
-    const target = node.type === 'AssignmentExpression' ? node.left : node.type === 'UpdateExpression' ? node.argument : undefined
-    const right = node.type === 'AssignmentExpression' ? node.right : undefined
+    const assignment = node.type === 'AssignmentExpression' ? node : undefined
+    const target = assignment?.left ?? (node.type === 'UpdateExpression' ? node.argument : undefined)
+    const right = assignment?.right
     const start = map.isExact(node.start!) ? map.toSource(node.start!) : undefined
     // Babel leaves a parenthesized right side's parentheses out of its span, so the span runs from the first one to the assignment's end, keeping them.
     const rightFrom = right && ((right.extra?.parenStart as number | undefined) ?? right.start!)
@@ -691,19 +698,13 @@ function assignedIdentifier(violation: t.Node, name: string): t.Identifier | und
     if (pattern?.type === 'AssignmentPattern')
       return find(pattern.left)
 
-    if (pattern?.type === 'RestElement')
-      return find(pattern.argument)
-
-    return undefined
+    return pattern?.type === 'RestElement' ? find(pattern.argument) : undefined
   }
 
   if (violation.type === 'AssignmentExpression' || violation.type === 'ForInStatement' || violation.type === 'ForOfStatement')
     return find(violation.left)
 
-  if (violation.type === 'UpdateExpression')
-    return find(violation.argument)
-
-  return undefined
+  return violation.type === 'UpdateExpression' ? find(violation.argument) : undefined
 }
 
 // A renamed or quoted key replaces the local name; an unrenamed one keeps it, so the read stays mapped to the source.

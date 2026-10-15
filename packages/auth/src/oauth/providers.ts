@@ -205,10 +205,7 @@ function microsoftIssued(tenant: string, claims: Record<string, unknown>): boole
   if (tenant === 'consumers')
     return tid === MICROSOFT_PERSONAL_TENANT
 
-  if (tenant === 'organizations')
-    return tid !== MICROSOFT_PERSONAL_TENANT
-
-  return tid === tenant
+  return tenant === 'organizations' ? tid !== MICROSOFT_PERSONAL_TENANT : tid === tenant
 }
 
 /** GitLab sign-in, on gitlab.com or a self-hosted instance at `url`. */

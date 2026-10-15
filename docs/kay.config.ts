@@ -5,8 +5,10 @@ import { defineConfig } from 'kay/server'
 import { pageWeight } from './src/page-weight'
 import { THEME_SCRIPT } from './src/theme'
 
+const MARKDOWN_EXTENSION = /\.md$/
+
 // The full reference moved from /reference to /llms; /reference/checks is the people's page on kay check now.
-const moved = readdirSync(join(import.meta.dir, '../llms')).map(file => file.replace(/\.md$/, '')).filter(topic => topic !== 'checks')
+const moved = readdirSync(join(import.meta.dir, '../llms')).map(file => file.replace(MARKDOWN_EXTENSION, '')).filter(topic => topic !== 'checks')
 
 export default defineConfig({
   log: false,

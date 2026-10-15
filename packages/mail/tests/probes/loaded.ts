@@ -3,6 +3,8 @@ import process from 'node:process'
 import { mailer } from '../../src/mailer'
 import { startSmtp } from '../helpers/smtp'
 
+const PACKAGE_PATH = /(?:node_modules|packages\/mail)\/(.+)/
+
 const mode = process.argv[2]
 const server = mode === 'smtp' ? startSmtp() : undefined
 
@@ -36,7 +38,7 @@ if (mode === 'dev')
 
 // The files loaded under node_modules from the package's name, and kayjs-mail's own by their path from src.
 function packages(): string[] {
-  return Object.keys(require.cache).map(path => (/(?:node_modules|packages\/mail)\/(.+)/).exec(path)?.[1]).filter(Boolean) as string[]
+  return Object.keys(require.cache).map(path => PACKAGE_PATH.exec(path)?.[1]).filter(Boolean) as string[]
 }
 
 console.log(JSON.stringify({ before, after: packages() }))

@@ -741,7 +741,8 @@ async function moveFocus(swap: Swap, policy: Policy): Promise<void> {
     if (before?.isConnected)
       return
 
-    const again = before?.id !== undefined && before.id !== '' ? document.getElementById(before.id) : (before?.getAttribute('name') ?? '') !== '' ? document.getElementsByName(before!.getAttribute('name')!)[0] : null
+    const byName = (before?.getAttribute('name') ?? '') !== '' ? document.getElementsByName(before!.getAttribute('name')!)[0] : null
+    const again = before?.id !== undefined && before.id !== '' ? document.getElementById(before.id) : byName
 
     if (again instanceof HTMLElement)
       again.focus({ preventScroll: true })

@@ -76,7 +76,12 @@ async function fieldsOf(file: string): Promise<Map<string, Field> | undefined> {
       if (property.type !== 'ObjectProperty' || property.computed)
         continue
 
-      const name = property.key.type === 'Identifier' ? property.key.name : property.key.type === 'StringLiteral' ? property.key.value : undefined
+      let name: string | undefined
+
+      if (property.key.type === 'Identifier')
+        name = property.key.name
+      else if (property.key.type === 'StringLiteral')
+        name = property.key.value
 
       if (name !== undefined)
         found.set(name, { file, source, at: query.value.start + property.key.start!, length: property.key.end! - property.key.start!, text: JSON.stringify(property.value, withoutPositions) })

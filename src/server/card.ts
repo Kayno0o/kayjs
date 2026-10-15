@@ -126,7 +126,10 @@ function cardFont(clientDir: string, faces: FontAssets['faces'], wanted: CardCon
   const distance = (face: { weight: string }) => {
     const [low, high = low] = face.weight.split(' ').map(Number) as [number, number?]
 
-    return weight < low ? low - weight : weight > high ? weight - high : 0
+    if (weight < low)
+      return low - weight
+
+    return weight > high ? weight - high : 0
   }
   const chosen = faces.filter(face => face.family === family && face.style === 'normal').toSorted((a, b) => distance(a) - distance(b))[0]
 

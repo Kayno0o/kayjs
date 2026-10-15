@@ -23,8 +23,5 @@ export function partOf(path: string): Part {
   if (path.startsWith('/ui/'))
     return 'ui'
 
-  if (path === '/llms' || path.startsWith('/llms/'))
-    return 'agents'
-
-  return 'docs'
+  return path === '/llms' || path.startsWith('/llms/') ? 'agents' : 'docs'
 }

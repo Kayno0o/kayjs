@@ -938,8 +938,15 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
     .get(`${core.prefix}/export` as `${Prefix}/export`, async ({ auth, set, status }) => {
       const exported = await auth.exportData()
 
-      if (!exported.ok)
-        return exported.error === 'limited' ? status(429, 'Too many exports; try again later') : exported.error === 'impersonating' ? status(403, 'Not while acting as the user') : exported.error === 'stale' ? status(403, 'Sign in again to continue') : status(401, 'Sign in to continue')
+      if (!exported.ok) {
+        if (exported.error === 'limited')
+          return status(429, 'Too many exports; try again later')
+
+        if (exported.error === 'impersonating')
+          return status(403, 'Not while acting as the user')
+
+        return exported.error === 'stale' ? status(403, 'Sign in again to continue') : status(401, 'Sign in to continue')
+      }
 
       set.headers['content-disposition'] = `attachment; filename="${core.site.replaceAll(/[^\w.-]/g, '-')}-data.json"`
       set.headers['cache-control'] = 'no-store'
@@ -962,7 +969,7 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
       return redirect('error' in outcome ? failed(outcome.error) : outcome.redirect, 303)
     })
     // Apple, or any provider asked for `response_mode=form_post`, comes back with a cross-site POST, which a SameSite=Lax session cookie does not ride on: the GET it is turned into does.
-    .post(`${core.prefix}/:provider/callback` as `${Prefix}/:provider/callback`, async ({ params, body, redirect, status }) => {
+    .post(`${core.prefix}/:provider/callback` as `${Prefix}/:provider/callback`, ({ params, body, redirect, status }) => {
       if (!core.oauth.has(params.provider))
         return status(404, 'Not Found')
 
@@ -1156,7 +1163,7 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
       ? undefined
       : { id: options.passkeys?.rpId ?? new URL(url).hostname, name: options.site ?? new URL(url).host, origins: options.passkeys?.origins ?? [new URL(url).origin] },
     captcha: options.captcha === false ? undefined : options.captcha ?? proofOfWork(),
-    breached: options.breachedPasswords === true ? pwnedPassword : typeof options.breachedPasswords === 'function' ? options.breachedPasswords : undefined,
+    breached: breachedCheck(options.breachedPasswords),
     email: options.email && {
       ...options.email,
       links: emailLinks(options.email.links, paths?.links),
@@ -1201,6 +1208,13 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
   }
 
   return core
+}
+
+function breachedCheck(option: boolean | ((password: string) => boolean | Promise<boolean>) | undefined): ((password: string) => boolean | Promise<boolean>) | undefined {
+  if (option === true)
+    return pwnedPassword
+
+  return typeof option === 'function' ? option : undefined
 }
 
 // A query value as text: a name repeated in the URL arrives as a list, which no flow takes.

@@ -31,7 +31,10 @@ function shape(response: Response): Record<string, string> {
     if (name === 'x-request-id')
       expect(value).toMatch(REQUEST_ID)
 
-    seen[name] = name === 'x-request-id' ? '<id>' : name === 'set-cookie' ? value.replace(/=[^;]*/g, '=<value>') : value
+    if (name === 'x-request-id')
+      seen[name] = '<id>'
+    else
+      seen[name] = name === 'set-cookie' ? value.replace(/=[^;]*/g, '=<value>') : value
   }
 
   return seen

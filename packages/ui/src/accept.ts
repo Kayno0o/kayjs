@@ -14,9 +14,6 @@ export function acceptsFile(accept: string | undefined, file: Pick<File, 'name' 
     if (token.startsWith('.'))
       return name.endsWith(token)
 
-    if (token.endsWith('/*'))
-      return type.startsWith(token.slice(0, -1))
-
-    return type === token
+    return token.endsWith('/*') ? type.startsWith(token.slice(0, -1)) : type === token
   })
 }

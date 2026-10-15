@@ -17,7 +17,12 @@ if ((await $`git status --porcelain`.text()).trim() !== '')
   throw new Error('the working tree has changes: commit them first')
 
 const current = ((await Bun.file('package.json').json()) as { version: string }).version
-const parts = current.split('.').map((part, index) => index < level ? Number(part) : index === level ? Number(part) + 1 : 0)
+const parts = current.split('.').map((part, index) => {
+  if (index < level)
+    return Number(part)
+
+  return index === level ? Number(part) + 1 : 0
+})
 const version = parts.join('.')
 // Any patch of the minor, so an app a patch behind the libraries meets their peer.
 const peer = `~${parts[0]}.${parts[1]}.0`

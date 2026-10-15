@@ -15,6 +15,7 @@ export interface FontAssets {
 
 const FONTS_FILE = 'fonts.json'
 const FORMATS: Record<string, string> = { '.woff2': 'woff2', '.woff': 'woff', '.ttf': 'truetype', '.otf': 'opentype' }
+const PRELOAD_EXTENSIONS = new Map([['truetype', 'ttf'], ['opentype', 'otf']])
 const QUOTE = /["\\]/g
 const RELATIVE = /^\.{1,2}\//
 const VARIABLE_SCOPE = '@fontsource-variable/'
@@ -51,7 +52,7 @@ export async function prepareFonts(root: string, fonts: (FontConfig | Fontsource
     faces.push({ family: font.family, weight: String(font.weight ?? 400), style: font.style ?? 'normal', url })
 
     if (font.preload === true)
-      preload.push({ href: url, type: `font/${format === 'truetype' ? 'ttf' : format === 'opentype' ? 'otf' : format}` })
+      preload.push({ href: url, type: `font/${PRELOAD_EXTENSIONS.get(format) ?? format}` })
   }
 
   const assets = { css: rules.join(''), preload, faces }
@@ -109,7 +110,7 @@ function fontsourceFaces(root: string, font: FontsourceConfig): FontConfig[] {
   const metadata = JSON.parse(readFileSync(file, 'utf8')) as FontsourceMetadata
   const subsets = typeof font.subset === 'string' ? [font.subset] : font.subset ?? [metadata.defSubset]
   // A static package's metadata describes the family's variable axes too: only a `@fontsource-variable` package ships them.
-  const variable = fontsource.startsWith(VARIABLE_SCOPE) ? metadata.variable !== undefined && metadata.variable !== false ? metadata.variable.wght : undefined : undefined
+  const variable = fontsource.startsWith(VARIABLE_SCOPE) && metadata.variable !== undefined && metadata.variable !== false ? metadata.variable.wght : undefined
 
   if (fontsource.startsWith(VARIABLE_SCOPE) && !variable)
     throw new KayError('font-invalid', `kay: ${fontsource} has no weight axis to declare`)

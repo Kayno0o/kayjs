@@ -71,7 +71,8 @@ export async function environmentTypes(root: string, options: CheckOptions, serv
   // `t()` reads the default locale's catalogs, or without `i18n` the site's one language's, when it has any.
   const textLocale = options.i18n?.defaultLocale ?? options.lang ?? DEFAULT_LANG
   const catalogs = [...extensionMessageFiles(root, options.extensions, textLocale), messagesFile(root, options.i18n ?? {}, textLocale)].filter(file => existsSync(file)).map(modulePath)
-  const texts = options.i18n ? settings && { locales: options.i18n.locales, prefixes, messages: catalogs } : catalogs.length > 0 ? { locales: [textLocale], prefixes: [], messages: catalogs } : undefined
+  const singleLanguage = catalogs.length > 0 ? { locales: [textLocale], prefixes: [], messages: catalogs } : undefined
+  const texts = options.i18n ? settings && { locales: options.i18n.locales, prefixes, messages: catalogs } : singleLanguage
   // An endpoint with params is linked to as a template: `/feeds/${string}.json`.
   const endpointPaths = endpoints.map(endpoint => endpoint.params.length === 0 ? JSON.stringify(endpoint.pattern) : `\`${endpoint.pattern.replace(PARAM_SEGMENT, () => `\${string}`)}${endpoint.suffix ?? ''}\``)
 

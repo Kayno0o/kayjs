@@ -256,7 +256,7 @@ export function offsetAt(source: string, position: Position): number {
   }
 
   const newline = source.indexOf('\n', offset)
-  const end = newline === -1 ? source.length : source[newline - 1] === '\r' ? newline - 1 : newline
+  const end = newline === -1 ? source.length : newline - Number(source[newline - 1] === '\r')
 
   return Math.min(offset + position.column - 1, end)
 }

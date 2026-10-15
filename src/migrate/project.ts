@@ -29,6 +29,9 @@ const ASTRO_CONFIGS = ['astro.config.mjs', 'astro.config.ts', 'astro.config.mts'
 const SERVER_OUTPUT = /\boutput\s*:\s*['"]server['"]|\badapter\s*:/
 // The Astro config's `site` and `base`, their value captured when it is a plain string.
 const CONFIG_KEYS = [['site', /\bsite\s*:\s*(?:['"]([^'"\n]+)['"](?=\s*[,}\n]))?/], ['base', /\bbase\s*:\s*(?:['"]([^'"\n]+)['"](?=\s*[,}\n]))?/]] as const
+const ASTRO_EXTENSION = /\.astro$/
+// Astro's error pages under the names kay gives them.
+const ERROR_PAGES = new Map([['404.kay', '_404.kay'], ['500.kay', '_error.kay']])
 const MARKDOWN_PAGE = /\.mdx?$/
 // Astro, its integrations and its plugins for other tools, which a kay project has no use for.
 const ASTRO_PACKAGE = /^(?:astro|astro-.+|.+-astro|@astrojs\/.+|@tailwindcss\/vite)$/
@@ -55,9 +58,9 @@ function kebab(name: string): string {
 // Where an `.astro` file goes: a page keeps its path under `src/routes`, `404` becoming `_404`; anything else keeps its folder, its name in kebab-case.
 function targetOf(file: string): { path: string, role: Role } {
   if (file.startsWith('src/pages/')) {
-    const path = file.slice('src/pages/'.length).replace(/\.astro$/, '.kay')
+    const path = file.slice('src/pages/'.length).replace(ASTRO_EXTENSION, '.kay')
 
-    return { path: join('src/routes', path === '404.kay' ? '_404.kay' : path === '500.kay' ? '_error.kay' : path), role: 'page' }
+    return { path: join('src/routes', ERROR_PAGES.get(path) ?? path), role: 'page' }
   }
 
   return { path: join(dirname(file), `${kebab(basename(file, '.astro'))}.kay`), role: 'component' }
@@ -141,7 +144,8 @@ export async function migrateAstroProject(root: string, out = root, options: Mig
     // An `.astro` import, relative or through an alias, pointed at the `.kay` file it became.
     const rewriteImport = (specifier: string) => {
       const alias = aliases.find(([prefix]) => specifier.startsWith(prefix))
-      const imported = RELATIVE.test(specifier) ? join(dirname(file), specifier) : alias ? join(alias[1], specifier.slice(alias[0].length)) : undefined
+      const aliased = alias ? join(alias[1], specifier.slice(alias[0].length)) : undefined
+      const imported = RELATIVE.test(specifier) ? join(dirname(file), specifier) : aliased
       const target = imported === undefined ? undefined : targets.get(imported)?.path
 
       if (target === undefined)

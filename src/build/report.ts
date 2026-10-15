@@ -110,7 +110,8 @@ function heaviest(root: string, chunks: Record<string, { bytesInOutput?: number 
       const own = relative(KAY_ROOT, file)
       const path = relative(root, file).replaceAll('\\', '/')
       const pkg = PACKAGE.exec(path)?.[1]
-      const name = pkg === undefined && !path.startsWith('..') ? path : own.startsWith('..') ? pkg ?? path : `kay/${own.replaceAll('\\', '/')}`
+      const outside = own.startsWith('..') ? pkg ?? path : `kay/${own.replaceAll('\\', '/')}`
+      const name = pkg === undefined && !path.startsWith('..') ? path : outside
 
       bytes.set(name, (bytes.get(name) ?? 0) + bytesInOutput)
     }
@@ -234,7 +235,7 @@ export function formatRouteTable(routes: RouteSize[], { width = Infinity, previo
 
     return [
       route.route,
-      route.pages === 0 ? 'on request' : route.pages === 1 ? 'prerendered' : `prerendered x${route.pages}`,
+      pagesLabel(route.pages),
       `${route.estimated ? '~' : ''}${kb(route.js)}${change(route.js, before?.js, compared)}`,
       `${kb(route.css)}${change(route.css, before?.css, compared)}`,
     ] as const
@@ -323,6 +324,13 @@ function kilobytes(size: Size): string {
   return `${kb(size.gzip)} (${(size.raw / 1024).toFixed(1)} KB)`
 }
 
+function pagesLabel(pages: number): string {
+  if (pages === 0)
+    return 'on request'
+
+  return pages === 1 ? 'prerendered' : `prerendered x${pages}`
+}
+
 function kb(bytes: number): string {
   return `${(bytes / 1024).toFixed(1)} KB`
 }
@@ -337,10 +345,7 @@ function change(bytes: number, before: number | undefined, compared: boolean): s
 
   const delta = (bytes - before) / 1024
 
-  if (Math.abs(delta) < 0.05)
-    return ''
-
-  return ` [${delta > 0 ? '+' : '-'}${Math.abs(delta).toFixed(1)} KB]`
+  return Math.abs(delta) < 0.05 ? '' : ` [${delta > 0 ? '+' : '-'}${Math.abs(delta).toFixed(1)} KB]`
 }
 
 function duration(ms: number): string {

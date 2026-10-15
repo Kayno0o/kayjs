@@ -65,6 +65,7 @@ import { serveViolationReports } from './violations'
 import { agreeOnWildcards } from './wildcards'
 
 // What the dev tool's Routes tab says when `seo` is set without the origin the site is public at.
+const JSON_EXTENSION = /\.json$/
 const NO_ORIGIN_NOTE = 'seo is set but not the origin the site is public at, so there is no sitemap or robots.txt: set site in kay.config.ts or SITE_URL.'
 
 // Options given here win over the project's `kay.config.ts`.
@@ -181,12 +182,12 @@ function trackWhileRunning(app: App, prerendered: Map<string, Map<string, Served
 }
 
 // The Elysia app behind `pages()`, serving whatever browser build `loadClient` provides.
-export async function servePages(project: Project<PagesOptions>, loadClient: () => Promise<ClientBuild>) {
+export async function servePages(project: Project<PagesOptions>, loadClient: () => ClientBuild | Promise<ClientBuild>) {
   return (await pagesApp(project, loadClient)).app
 }
 
 // The app, with every path it serves, each claimed as its feature registers it; `exported` when `kay build --static` reads the site from it, its check having reported a missing site.
-export async function pagesApp(project: Project<PagesOptions>, loadClient: () => Promise<ClientBuild>, exported = false) {
+export async function pagesApp(project: Project<PagesOptions>, loadClient: () => ClientBuild | Promise<ClientBuild>, exported = false) {
   const { root, config: options, paths, mode } = project
   const setup = await setupPages(project, loadClient)
   const { source, client, mounts, matchers, collections, i18n, locales, base, site, scripts, styles, renderOptions, cards } = setup
@@ -282,7 +283,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
     app.post(DEV_HEAD, async ({ request }) => devHead(request, { config: { site, seo: options.seo, favicon: options.favicon, lints: options.lints }, routes, base, trailingSlash: options.trailingSlash, locales: i18n?.settings }))
     const { devSizes } = await import('./dev-sizes')
 
-    app.get(DEV_SIZES, async ({ request }) => devSizes(request, { table, match: routeMatch(table, matchers, options.trailingSlash), base, reports: [paths.report, paths.report.replace(/\.json$/, '-static.json')] }))
+    app.get(DEV_SIZES, async ({ request }) => devSizes(request, { table, match: routeMatch(table, matchers, options.trailingSlash), base, reports: [paths.report, paths.report.replace(JSON_EXTENSION, '-static.json')] }))
     app.get(DEV_ROUTES, () => Response.json(devRoutes(root, routes, endpoints, api.mounted, i18n?.settings, base, { claims: served.kay(), extensions: mountedByExtensions, notes: options.seo !== undefined && site === undefined ? [NO_ORIGIN_NOTE] : [] })))
   }
 

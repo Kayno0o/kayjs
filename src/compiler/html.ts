@@ -8,6 +8,8 @@ import { BEHAVIOUR, describedValue, END_MARKER, escapeStaticAttribute, escapeTex
 import { SUBJECT } from './names'
 
 // The `kay/html` helpers static server output calls, each imported under a `Kay` name.
+// The attribute an image's `src` or a select's `selected` value is written as.
+const WRITTEN_AS = { image: 'src', selected: 'value' } as const
 const HTML_HELPERS = ['attempt', 'attribute', 'child', 'className', 'component', 'componentClass', 'currentPage', 'dynamic', 'element', 'errorParagraph', 'fieldDescribed', 'formConstraints', 'head', 'imageAttributes', 'localHref', 'loop', 'memo', 'merge', 'nonEmptyAttribute', 'omit', 'raw', 'refillOptions', 'selectOptions', 'serverIsland', 'show', 'spreadAttributes', 'style', 'untrack']
 
 export function htmlHelperImport(): string {
@@ -430,7 +432,7 @@ export class HtmlTemplate extends TemplateWriter {
         continue
       }
 
-      const written = attribute.kind === 'image' ? 'src' : attribute.kind === 'selected' ? 'value' : attribute.name
+      const written = attribute.kind === 'image' || attribute.kind === 'selected' ? WRITTEN_AS[attribute.kind] : attribute.name
 
       if (describable && written === 'aria-describedby') {
         // A bare `aria-describedby` is kept, written as an empty value.
@@ -440,13 +442,24 @@ export class HtmlTemplate extends TemplateWriter {
       }
 
       if (written === filled) {
-        ownFill = attribute.kind === 'boolean' ? () => void b.add('true') : attribute.kind === 'text' || attribute.kind === 'rooted' ? () => void b.add(JSON.stringify(attribute.text)) : read(attribute.expression, false)
+        if (attribute.kind === 'boolean')
+          ownFill = () => void b.add('true')
+        else if (attribute.kind === 'text' || attribute.kind === 'rooted')
+          ownFill = () => void b.add(JSON.stringify(attribute.text))
+        else
+          ownFill = read(attribute.expression, false)
 
         continue
       }
 
-      if (filled === 'checked' && written === 'value')
-        checkboxValue = attribute.kind === 'boolean' ? () => void b.add('""') : attribute.kind === 'text' || attribute.kind === 'rooted' ? () => void b.add(JSON.stringify(attribute.text)) : read(attribute.expression, false)
+      if (filled === 'checked' && written === 'value') {
+        if (attribute.kind === 'boolean')
+          checkboxValue = () => void b.add('""')
+        else if (attribute.kind === 'text' || attribute.kind === 'rooted')
+          checkboxValue = () => void b.add(JSON.stringify(attribute.text))
+        else
+          checkboxValue = read(attribute.expression, false)
+      }
 
       switch (attribute.kind) {
         case 'boolean':

@@ -17,7 +17,7 @@ import { admitCrossSite, crossSiteRefused, guardsFirst, inLocale, passGuards } f
 import { importModule } from './bundle'
 import { corsAdmits, corsResponse, corsRule, preflight, withCors } from './cors'
 import { loadGuard, requiredGuards } from './guards'
-import { answeringRequest } from './log'
+import { answeringRequest, statusOf } from './log'
 import { requestId } from './protection'
 import { sharedContext } from './render'
 import { reportServerError } from './report'
@@ -58,7 +58,7 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
       return
 
     spans.delete(request)
-    answered(span, responseValue instanceof Response ? responseValue.status : typeof set.status === 'number' ? set.status : 200)
+    answered(span, statusOf(responseValue, set))
     span.end()
   })
 

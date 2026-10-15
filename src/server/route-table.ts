@@ -78,11 +78,15 @@ export function routeTable(routes: ServedRoute[], settings: LocaleSettings | und
       for (const shape of routerShapes(route, prefix, pattern)) {
         const claim = { path: shape.path, owner: route.file, kind: 'page' as const, scope: scope(locale), fallsThrough: !isPlain({ route, shape }), translated: pattern !== route.pattern }
 
-        served.claim(claim, taken => taken.kind !== 'page'
-          ? `kay: ${taken.owner} and ${route.file} both serve ${namedPath(shape)}`
-          : claim.translated || taken.translated === true
-            ? `kay: ${route.file} and ${taken.owner} are both served at ${pattern} in ${locale}, once i18n.paths translates them`
-            : `kay: ${taken.owner} and ${route.file} both serve ${namedPath(shape)}; give one a matcher, [id=integer], for the other to take what it refuses`)
+        served.claim(claim, (taken) => {
+          if (taken.kind !== 'page')
+            return `kay: ${taken.owner} and ${route.file} both serve ${namedPath(shape)}`
+
+          if (claim.translated || taken.translated === true)
+            return `kay: ${route.file} and ${taken.owner} are both served at ${pattern} in ${locale}, once i18n.paths translates them`
+
+          return `kay: ${taken.owner} and ${route.file} both serve ${namedPath(shape)}; give one a matcher, [id=integer], for the other to take what it refuses`
+        })
         serve(shape.path, locale, { prefix, candidates: [] }).candidates.push({ route, shape })
         shapes.get(route)!.push(shape)
 

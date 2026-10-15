@@ -27,10 +27,7 @@ export function offsetOf(index: number, from: number, to: number, shift: number)
   if (index > from && index <= to)
     return -shift
 
-  if (index < from && index >= to)
-    return shift
-
-  return 0
+  return index < from && index >= to ? shift : 0
 }
 
 // Where `key` sends the item at `from` in a list of `count`, held inside the list, or `null` for a key that moves nothing.

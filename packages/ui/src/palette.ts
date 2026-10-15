@@ -72,10 +72,7 @@ export function paletteScore(entry: Pick<PaletteBase, 'label' | 'group' | 'keywo
   if (label.includes(query))
     return 800
 
-  if (haystack.includes(query))
-    return 600
-
-  return Math.min(subsequenceScore(haystack, query), 599)
+  return haystack.includes(query) ? 600 : Math.min(subsequenceScore(haystack, query), 599)
 }
 
 // The entries matching `query`, best first, ties kept in `groups` order and then by label.

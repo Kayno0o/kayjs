@@ -312,10 +312,17 @@ function atEnd(element: HTMLRewriterTypes.Element, run: () => void): void {
     run()
 }
 
+function hexCode(hex: string | undefined): number | undefined {
+  return hex === undefined ? undefined : Number.parseInt(hex, 16)
+}
+
 function plain(html: string): string {
   return html.replace(ENTITY, (entity, decimal?: string, hex?: string, name?: string) => {
-    const code = decimal !== undefined ? Number(decimal) : hex !== undefined ? Number.parseInt(hex, 16) : undefined
+    const code = decimal === undefined ? hexCode(hex) : Number(decimal)
 
-    return code === undefined ? ENTITIES[name!] ?? ENTITIES[name!.toLowerCase()] ?? entity : code <= MAX_CODE_POINT ? String.fromCodePoint(code) : entity
+    if (code === undefined)
+      return ENTITIES[name!] ?? ENTITIES[name!.toLowerCase()] ?? entity
+
+    return code <= MAX_CODE_POINT ? String.fromCodePoint(code) : entity
   }).replace(INVISIBLE, '').replace(SPACES, ' ').trim()
 }

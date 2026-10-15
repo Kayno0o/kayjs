@@ -41,6 +41,8 @@ import { exportStatic, refuseStaticConfig } from './static'
 import { pruneCompileCache } from './transform'
 import { verifyExecutable } from './verify'
 
+const JSON_EXTENSION = /\.json$/
+
 export type BuildStage = 'check' | 'bundle' | 'output' | 'export' | 'compile'
 
 // What the build is doing now, and how far through it, where the number of things to go through is known.
@@ -98,7 +100,7 @@ async function runBuild(root: string, config: KayConfig, options: BuildOptions):
   const result: BuildResult = { checked: [], linted: [] }
   // The sizes of the last good build, read before this one can replace them.
   // A server build and a static export each compare to their own last one.
-  const reportFile = exported ? project.paths.report.replace(/\.json$/, '-static.json') : project.paths.report
+  const reportFile = exported ? project.paths.report.replace(JSON_EXTENSION, '-static.json') : project.paths.report
   const lastReport = await readStoredReport(reportFile, exported)
   let checkMs = 0
   let bundleMs = 0

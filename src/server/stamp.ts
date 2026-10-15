@@ -87,10 +87,7 @@ export function stampTime(action: string, stamp: unknown): number | undefined {
 
   const [time = '', given = ''] = stamp.split('.')
 
-  if (!signedText('kay-min-time', `${action}\0${time}`, given))
-    return undefined
-
-  return Number.parseInt(time, 36)
+  return !signedText('kay-min-time', `${action}\0${time}`, given) ? undefined : Number.parseInt(time, 36)
 }
 
 // The stamp field a prerendered page is served with, signed for this request.

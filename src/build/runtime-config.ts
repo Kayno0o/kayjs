@@ -132,7 +132,10 @@ function objectOf(node: t.Node | null | undefined, program: NodePath<t.Program>)
 }
 
 function keyName(key: t.Node): string | undefined {
-  return key.type === 'Identifier' ? key.name : key.type === 'StringLiteral' ? key.value : undefined
+  if (key.type === 'Identifier')
+    return key.name
+
+  return key.type === 'StringLiteral' ? key.value : undefined
 }
 
 // The whole statement declaring a binding at the top of the module, one a named export does not hand out.

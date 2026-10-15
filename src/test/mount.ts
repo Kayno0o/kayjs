@@ -21,6 +21,7 @@ interface MountModule {
 }
 
 // One bundle per component and version of its file, for the test process, evaluated again on every mount.
+const SAFE_HTML_MODULE = /(?:^|[/\\])safe-html(?:\.ts)?$/
 const bundles = new Map<string, Promise<string>>()
 
 // Lets queued effects and timers due now land, as after a click, before the DOM is read.
@@ -90,7 +91,7 @@ export async function mount(file: string, props: Record<string, unknown> = {}): 
 const sharedMarks: Bun.BunPlugin = {
   name: 'kay-shared-marks',
   setup(build) {
-    build.onResolve({ filter: /(?:^|[/\\])safe-html(?:\.ts)?$/ }, (args) => {
+    build.onResolve({ filter: SAFE_HTML_MODULE }, (args) => {
       // Only kay's own module, by its resolved path: another `safe-html` keeps its own.
       try {
         if (Bun.resolveSync(args.path, args.importer ? dirname(args.importer) : process.cwd()) !== VOUCH_MODULE)

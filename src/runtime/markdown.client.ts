@@ -28,12 +28,16 @@ function escapeText(text: string): string {
 // Bun.markdown writes numeric references and the common named ones as their characters; the other named ones stay written, which the browser displays the same.
 function decode(text: string): string {
   return text.replace(REFERENCE, (reference, decimal: string | undefined, hex: string | undefined, name: string | undefined) => {
-    const code = decimal === undefined ? hex === undefined ? undefined : Number.parseInt(hex, 16) : Number(decimal)
+    const fromHex = hex === undefined ? undefined : Number.parseInt(hex, 16)
+    const code = decimal === undefined ? fromHex : Number(decimal)
 
     if (name !== undefined)
       return NAMED[name.toLowerCase()]!
 
-    return code !== undefined && code > 0 && code <= 0x10FFFF && (code < 0xD800 || code > 0xDFFF) ? String.fromCodePoint(code) : code === undefined ? reference : '\uFFFD'
+    if (code === undefined)
+      return reference
+
+    return code > 0 && code <= 0x10FFFF && (code < 0xD800 || code > 0xDFFF) ? String.fromCodePoint(code) : '\uFFFD'
   })
 }
 

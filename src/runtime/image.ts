@@ -305,10 +305,7 @@ export function shareImage(src: string): string {
   if (!RESIZABLE.test(src))
     throw new Error(`kay: shareImage() cannot cut ${src}: it takes a PNG, JPEG, WebP, GIF or AVIF`)
 
-  if (unlistedCheck?.(src, 'shareImage()') === true)
-    return src
-
-  return variantUrl(src, 'card')
+  return unlistedCheck?.(src, 'shareImage()') === true ? src : variantUrl(src, 'card')
 }
 
 // `sizes` with entries ahead of each for screens denser than `density`, showing the image narrower there so the browser picks the variant that density needs: a 3x phone loads a 100vw image as a 2x one would.

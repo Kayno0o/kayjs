@@ -239,7 +239,14 @@ export function printFailure(command: string, failure: unknown, format: ProblemF
 export function failureProblem(failure: unknown, format: ProblemFormat, code: string | null = failureCode(failure)): FailureProblem {
   const { message, position } = (typeof failure === 'object' && failure !== null ? failure : {}) as { message?: unknown, position?: { file: string, line: number, column: number } | null }
 
-  return { ...position && { file: shownPath(position.file, format), line: position.line, column: position.column }, severity: 'error', code, message: typeof failure === 'string' ? failure : typeof message === 'string' ? message.trim() : String(failure) }
+  return { ...position && { file: shownPath(position.file, format), line: position.line, column: position.column }, severity: 'error', code, message: failureText(failure, message) }
+}
+
+function failureText(failure: unknown, message: unknown): string {
+  if (typeof failure === 'string')
+    return failure
+
+  return typeof message === 'string' ? message.trim() : String(failure)
 }
 
 function failureCode(failure: unknown): string | null {

@@ -367,10 +367,7 @@ export function attempt(render: () => string, fallback?: (error: unknown) => str
 
 // An `if` naming its value: the branch reads it through a function, as the island build of the same template does.
 export function show<T>(value: T, render: (value: () => Truthy<T>) => string, fallback?: () => string): string {
-  if (Boolean(value) === false)
-    return fallback?.() ?? ''
-
-  return render(() => value as Truthy<T>)
+  return Boolean(value) === false ? fallback?.() ?? '' : render(() => value as Truthy<T>)
 }
 
 // A `for`: each row's markup, or the fallback's when there is nothing to list.
@@ -391,10 +388,7 @@ function rows<T>(each: readonly T[], render: (item: T | (() => T), index: number
   for (let index = 0; index < each.length; index++) {
     const item = each[index]!
 
-    if (accessors === undefined)
-      markup += render(item, index)
-    else
-      markup += render(() => item, accessors === 'keyed' ? () => index : index)
+    markup += accessors === undefined ? render(item, index) : render(() => item, accessors === 'keyed' ? () => index : index)
   }
 
   return markup

@@ -52,7 +52,7 @@ export function paginate<Item>(source: Collection<unknown, Record<string, Compon
     [PAGINATED]: true,
     size,
     page: async (param) => {
-      const number = param === undefined ? 1 : typeof param === 'number' ? param : PAGE_NUMBER.test(param) ? Number(param) : Number.NaN
+      const number = pageNumber(param)
 
       if (!Number.isSafeInteger(number) || number < 1 || (param !== undefined && number === 1))
         return undefined
@@ -88,6 +88,16 @@ export function isPaginated(value: unknown): value is Paginated<unknown> {
 }
 
 // The path of the page being rendered, untranslated and without its locale's prefix, its page segment left out.
+function pageNumber(param: string | number | undefined): number {
+  if (param === undefined)
+    return 1
+
+  if (typeof param === 'number')
+    return param
+
+  return PAGE_NUMBER.test(param) ? Number(param) : Number.NaN
+}
+
 function listPath(numbered: boolean): string {
   const state = localeState()
 

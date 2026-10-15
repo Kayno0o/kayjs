@@ -310,6 +310,10 @@ export async function refuseServerOnlyReads(root: string, dir: string, outputs: 
     throw new KayError('server-only-in-island', `kay: ${refusals.join(' And ')}`)
 }
 
+function knownNames(known: string[] | null): Set<string> | undefined {
+  return known === null ? undefined : new Set(known)
+}
+
 // A chunk's server-only names, taken from the last build's scans when they hold its content, and recorded in this build's.
 function scanned(code: string, cached: Scans, scans: Scans): Set<string> | undefined {
   if (!MENTIONED.test(code))
@@ -317,7 +321,7 @@ function scanned(code: string, cached: Scans, scans: Scans): Set<string> | undef
 
   const hash = Bun.hash(code).toString(36)
   const known = cached[hash]
-  const names = known === undefined ? serverOnlyNames(code) : known === null ? undefined : new Set(known)
+  const names = known === undefined ? serverOnlyNames(code) : knownNames(known)
 
   scans[hash] = names === undefined ? null : [...names]
 

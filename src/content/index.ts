@@ -149,7 +149,7 @@ export function collection<Schema extends TSchema, Components extends Record<str
   const indexed = (entries: Entry<Data>[]): Entries<Data> => {
     const byLocale = new Map<string, Map<string, Entry<Data>>>()
 
-    entries.sort(options.sort ?? ((a, b) => a.slug < b.slug ? -1 : a.slug > b.slug ? 1 : a.locale! < b.locale! ? -1 : 1))
+    entries.sort(options.sort ?? bySlugThenLocale)
 
     for (const entry of entries) {
       if (entry.locale === undefined)
@@ -233,7 +233,7 @@ export function collection<Schema extends TSchema, Components extends Record<str
     let drafted = preview.loads.get(draftKey) as Promise<Entries<Data>> | undefined
 
     if (!drafted) {
-      preview.loads.set(draftKey, drafted = (async () => {
+      preview.loads.set(draftKey, drafted = new Promise<Entries<Data>>((resolve) => {
         const raw = raws.get(entries) ?? []
         const written = new Map<string, RawEntry>()
 
@@ -247,8 +247,8 @@ export function collection<Schema extends TSchema, Components extends Record<str
         // The drafted entries alone are decoded; the others are copied when localized, as indexing sets their translations and the collection's own are shared with every request.
         const kept = entries.list.filter(entry => !written.has(localized ? `${entry.locale}/${entry.slug}` : entry.slug))
 
-        return indexed([...localized ? kept.map(entry => ({ ...entry })) : kept, ...decodeEach([...written.values()])])
-      })())
+        resolve(indexed([...localized ? kept.map(entry => ({ ...entry })) : kept, ...decodeEach([...written.values()])]))
+      }))
     }
 
     return drafted
@@ -326,7 +326,8 @@ async function compileLoaded(loader: ContentLoader, preview: boolean, highlight:
     slugs.add(slug)
 
     try {
-      const compiled = typeof body === 'string' ? await compileMarkdown(body, 1, highlight) : typeof html === 'string' ? { segments: [html], headings: [] } : undefined
+      const fromHtml = typeof html === 'string' ? { segments: [html], headings: [] } : undefined
+      const compiled = typeof body === 'string' ? await compileMarkdown(body, 1, highlight) : fromHtml
 
       entries.push({ slug, file, data, lines: {}, segments: compiled?.segments, headings: compiled?.headings })
     }
@@ -346,6 +347,13 @@ export type FeedPathsOf<Module> = { [Name in keyof Module]: Module[Name] extends
 
 export function isCollection(value: unknown): value is Collection<unknown> {
   return typeof value === 'object' && value !== null && COLLECTION in value
+}
+
+function bySlugThenLocale(a: { slug: string, locale?: string | undefined }, b: { slug: string, locale?: string | undefined }): number {
+  if (a.slug !== b.slug)
+    return a.slug < b.slug ? -1 : 1
+
+  return a.locale! < b.locale! ? -1 : 1
 }
 
 function toEntry<Data>(entry: RawEntry, data: Data, components: Record<string, Component<never>>, localized: boolean): Entry<Data> {

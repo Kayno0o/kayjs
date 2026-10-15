@@ -1,6 +1,7 @@
 // A line a diff adds that is a git conflict marker, left in a file by a rebase resolved by hand.
 const MARKER = /^(?:<{7}(?: .*)?|={7}|>{7}(?: .*)?)$/
 const HUNK = /^@@ -\S+ \+(\d+)/
+const DIFF_B_PREFIX = /^b\//
 
 export interface Marker {
   file: string
@@ -23,7 +24,7 @@ export function addedMarkers(diff: string): Marker[] {
     }
 
     if (!inHunk && text.startsWith('+++ ')) {
-      file = text.slice(4).replace(/^b\//, '')
+      file = text.slice(4).replace(DIFF_B_PREFIX, '')
 
       continue
     }

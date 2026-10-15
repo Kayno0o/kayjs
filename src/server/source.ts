@@ -95,6 +95,7 @@ function embeddedSource(bundle: Bundle): ProjectSource {
     mode: () => PRODUCTION,
     root: () => bundle.root,
     // The root, routes and public files it was built with win over the options.
+    // eslint-disable-next-line ts/require-await -- the interface returns a promise
     config: async (_, options) => ({ ...mergeConfig(bundle.config, options), root: bundle.root, publicDir: bundle.publicDir }),
     client: async () => {
       const client = await readClient(bundle.root, bundle.clientDir)
@@ -104,11 +105,15 @@ function embeddedSource(bundle: Bundle): ProjectSource {
 
       return client
     },
+    // eslint-disable-next-line ts/require-await -- the interface returns a promise
     prepare: async () => undefined,
     has: file => file in bundle.modules,
+    // eslint-disable-next-line ts/require-await -- the interface returns a promise
     routes: async () => bundle.routes,
     fallback: () => bundle.fallback,
+    // eslint-disable-next-line ts/require-await -- the interface returns a promise
     api: async () => bundle.api ?? [],
+    // eslint-disable-next-line ts/require-await -- the interface returns a promise
     endpoints: async () => bundle.endpoints ?? [],
     // An extension names its catalogs under the executable's own path, so the build's are kept.
     extensionCatalogs: locale => bundle.extensionMessages?.[locale] ?? [],

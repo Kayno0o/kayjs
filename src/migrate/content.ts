@@ -8,7 +8,9 @@ import { parse } from '@babel/parser'
 const SAME: Record<string, string> = { string: 'String', number: 'Number', boolean: 'Boolean', date: 'Date', array: 'Array', object: 'Object', literal: 'Literal', any: 'Any', unknown: 'Unknown', null: 'Null' }
 // zod's string checks and the `s.String` option each becomes.
 const STRING_CHECKS: Record<string, string> = { min: 'minLength', max: 'maxLength', email: 'format', url: 'format', regex: 'pattern' }
+const LEADING_DOT_SLASH = /^\.\//
 const NUMBER_CHECKS: Record<string, string> = { min: 'minimum', max: 'maximum', gte: 'minimum', lte: 'maximum' }
+const CHECKS_BY_KIND = new Map([['string', STRING_CHECKS], ['number', NUMBER_CHECKS]])
 
 class SchemaTranslator {
   readonly notes: Note[] = []
@@ -49,7 +51,7 @@ class SchemaTranslator {
     let built: string
     let integer = false
     const options: string[] = []
-    const checks = kind === 'string' ? STRING_CHECKS : kind === 'number' ? NUMBER_CHECKS : undefined
+    const checks = CHECKS_BY_KIND.get(kind)
     const rest: t.CallExpression[] = []
 
     for (const call of chain) {
@@ -115,6 +117,17 @@ class SchemaTranslator {
 }
 
 // The folder a collection's entries are in, relative to the config: the `glob` loader's `base`, else Astro's `src/content/<name>`.
+function literalKey(key: t.Node): string | undefined {
+  if (key.type === 'Identifier')
+    return key.name
+
+  return key.type === 'StringLiteral' ? key.value : undefined
+}
+
+function callOf(node: t.Node | undefined): t.CallExpression | undefined {
+  return node?.type === 'CallExpression' ? node : undefined
+}
+
 function folderOf(options: t.ObjectExpression, name: string): string | undefined {
   const loader = options.properties.find((property): property is t.ObjectProperty => property.type === 'ObjectProperty' && property.key.type === 'Identifier' && property.key.name === 'loader')
 
@@ -130,7 +143,7 @@ function folderOf(options: t.ObjectExpression, name: string): string | undefined
     return undefined
 
   // Astro's `base` is relative to the project root, kay's folder to the config in `src/`.
-  const folder = base.value.value.replace(/^\.\//, '')
+  const folder = base.value.value.replace(LEADING_DOT_SLASH, '')
 
   return folder.startsWith('src/') ? folder.slice(4) : `../${folder}`
 }
@@ -195,9 +208,9 @@ function collectionsOf(object: t.ObjectExpression, declared: Map<string, t.CallE
     if (property.type !== 'ObjectProperty' && property.type !== 'ObjectMethod')
       continue
 
-    const name = property.key.type === 'Identifier' ? property.key.name : property.key.type === 'StringLiteral' ? property.key.value : undefined
+    const name = literalKey(property.key)
     const value = property.type === 'ObjectProperty' ? property.value : undefined
-    const call = value?.type === 'Identifier' ? declared.get(value.name) : value?.type === 'CallExpression' ? value : undefined
+    const call = value?.type === 'Identifier' ? declared.get(value.name) : callOf(value)
 
     if (name === undefined || name === '' || !call || call.arguments[0]?.type !== 'ObjectExpression') {
       notes.push({ line: property.loc!.start.line, message: `the collection ${name ?? source.slice(property.start!, property.end!)} is not a \`defineCollection({...})\` kay migrate reads: write it by hand` })

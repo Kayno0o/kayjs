@@ -231,7 +231,12 @@ function exportTargets(exports: unknown): [string, string][] | undefined {
   if (typeof exports === 'string')
     return [['.', exports]]
 
-  const target = (value: unknown): string | undefined => typeof value === 'string' ? value : value !== null && typeof value === 'object' ? target((value as Record<string, unknown>).default ?? Object.values(value)[0]) : undefined
+  const target = (value: unknown): string | undefined => {
+    if (typeof value === 'string')
+      return value
+
+    return value !== null && typeof value === 'object' ? target((value as Record<string, unknown>).default ?? Object.values(value)[0]) : undefined
+  }
 
   return Object.entries(exports as Record<string, unknown>).flatMap(([key, value]) => {
     const found = key.startsWith('.') ? target(value) : undefined

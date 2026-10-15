@@ -189,6 +189,13 @@ export function queryScript(rules: QueryRules | undefined): string {
   return rules ? `<script type="application/json" data-kay-query>${JSON.stringify(rules).replaceAll('<', '\\u003c')}</script>` : ''
 }
 
+function constantsType(values: unknown[]): 'number' | 'boolean' | 'string' {
+  if (values.every(value => typeof value === 'number'))
+    return 'number'
+
+  return values.every(value => typeof value === 'boolean') ? 'boolean' : 'string'
+}
+
 // `s.Integer()` and `s.Numeric()` are a numeric string or a number, a union of literals one of its values.
 function paramRule(field: ParamSchema): ParamRule {
   const members = field.anyOf ?? []
@@ -197,7 +204,7 @@ function paramRule(field: ParamSchema): ParamRule {
   let type = PLAIN_TYPES.has(field.type) ? field.type as ParamRule['type'] : undefined
 
   if (consts && consts.length > 0)
-    type = consts.every(value => typeof value === 'number') ? 'number' : consts.every(value => typeof value === 'boolean') ? 'boolean' : 'string'
+    type = constantsType(consts)
   else if (numeric)
     type = members.some(member => member.type === 'integer' || member.format === 'integer') ? 'integer' : 'number'
 

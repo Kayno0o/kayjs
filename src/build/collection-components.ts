@@ -58,7 +58,7 @@ export function collectionComponents(code: string): Map<string, string[]> {
 
     if (statement.type === 'ImportDeclaration') {
       for (const specifier of statement.specifiers)
-        bindings.set(specifier.local.name, { source: statement.source.value, imported: specifier.type === 'ImportSpecifier' ? nameOf(specifier.imported) : specifier.type === 'ImportDefaultSpecifier' ? 'default' : '*' })
+        bindings.set(specifier.local.name, { source: statement.source.value, imported: importedName(specifier) })
     }
 
     if (declaration?.type === 'VariableDeclaration') {
@@ -91,7 +91,10 @@ export function collectionComponents(code: string): Map<string, string[]> {
   const object = (node: t.Node | undefined): t.ObjectExpression | undefined => {
     const value = node && unwrapped(node)
 
-    return value?.type === 'ObjectExpression' ? value : value?.type === 'Identifier' ? object(declared.get(value.name)) : undefined
+    if (value?.type === 'ObjectExpression')
+      return value
+
+    return value?.type === 'Identifier' ? object(declared.get(value.name)) : undefined
   }
   const components = new Map<string, string[]>()
 
@@ -133,6 +136,16 @@ function nameOf(node: t.Identifier | t.StringLiteral): string {
   return node.type === 'Identifier' ? node.name : node.value
 }
 
+function importedName(specifier: t.ImportDeclaration['specifiers'][number]): string {
+  if (specifier.type === 'ImportSpecifier')
+    return nameOf(specifier.imported)
+
+  return specifier.type === 'ImportDefaultSpecifier' ? 'default' : '*'
+}
+
 function keyOf(node: t.Node): string | undefined {
-  return node.type === 'Identifier' ? node.name : node.type === 'StringLiteral' ? node.value : undefined
+  if (node.type === 'Identifier')
+    return node.name
+
+  return node.type === 'StringLiteral' ? node.value : undefined
 }

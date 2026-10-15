@@ -26,11 +26,17 @@ const NAMES: Record<string, string> = { ' ': 'Space', 'escape': 'Escape', 'arrow
 
 // Escape and the function keys type nothing, so a field has no use for them.
 const PASSES = /^(?:escape|f\d{1,2})$/
+const APPLE_PLATFORM = /mac|iphone|ipad|ipod/i
+const ALPHANUMERIC = /[a-z0-9]/
+const LETTER = /^[a-z]$/
+const PRINTABLE_ASCII = /^[\u0020-\u007E]$/
+const DIGIT = /^\d$/
+const TYPED_ALPHANUMERIC = /^[a-z0-9]$/
 
 function isApple(): boolean {
   const platform = (navigator as Navigator & { userAgentData?: { platform?: string } }).userAgentData?.platform ?? navigator.platform ?? ''
 
-  return (/mac|iphone|ipad|ipod/i).test(platform)
+  return APPLE_PLATFORM.test(platform)
 }
 
 function parse(spec: string, apple: boolean): Parsed {
@@ -52,7 +58,7 @@ function parse(spec: string, apple: boolean): Parsed {
       throw new Error(`shortcut('${spec}') has an unknown modifier '${modifier}': use mod, ctrl, meta, alt or shift`)
   }
 
-  parsed.symbol = parsed.key.length === 1 && parsed.key !== ' ' && !(/[a-z0-9]/).test(parsed.key)
+  parsed.symbol = parsed.key.length === 1 && parsed.key !== ' ' && !ALPHANUMERIC.test(parsed.key)
 
   return parsed
 }
@@ -64,10 +70,10 @@ function pressed(event: KeyboardEvent, key: string): boolean {
   if (typed === key)
     return true
 
-  if ((/^[a-z]$/).test(key))
-    return !(/^[\u0020-\u007E]$/).test(typed) && event.code === `Key${key.toUpperCase()}`
+  if (LETTER.test(key))
+    return !PRINTABLE_ASCII.test(typed) && event.code === `Key${key.toUpperCase()}`
 
-  return (/^\d$/).test(key) && !(/^[a-z0-9]$/).test(typed) && event.code === `Digit${key}`
+  return DIGIT.test(key) && !TYPED_ALPHANUMERIC.test(typed) && event.code === `Digit${key}`
 }
 
 function editable(event: KeyboardEvent, key: string): boolean {

@@ -51,7 +51,13 @@ function still(): boolean {
 function milliseconds(time: string): number {
   const value = Number.parseFloat(time)
 
-  return Number.isNaN(value) ? 0 : MILLISECONDS.test(time) ? value : SECONDS.test(time) ? value * 1000 : 0
+  if (Number.isNaN(value))
+    return 0
+
+  if (MILLISECONDS.test(time))
+    return value
+
+  return SECONDS.test(time) ? value * 1000 : 0
 }
 
 // The longest delay and duration pair of a comma-separated list, a shorter list of delays repeating as CSS repeats it.

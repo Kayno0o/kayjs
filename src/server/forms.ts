@@ -41,7 +41,12 @@ function fieldRules(field: unknown): FieldRules {
     if (!CHECKED.has(keyword) || (keyword === 'error' && typeof value !== 'string'))
       continue
 
-    rules[keyword] = keyword === 'items' ? fieldRules(value) : keyword === 'anyOf' ? (value as unknown[]).map(fieldRules) : value
+    if (keyword === 'items')
+      rules[keyword] = fieldRules(value)
+    else if (keyword === 'anyOf')
+      rules[keyword] = (value as unknown[]).map(fieldRules)
+    else
+      rules[keyword] = value
   }
 
   return rules

@@ -32,9 +32,16 @@ function hslOf([r, g, b]: Triple): Triple {
     return [0, 0, l]
 
   const s = d / (1 - Math.abs(2 * l - 1))
-  const h = max === r ? ((g - b) / d + 6) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4
+  const h = hueSector(max, [r, g, b], d)
 
   return [h * 60, s, l]
+}
+
+function hueSector(max: number, [r, g, b]: Triple, d: number): number {
+  if (max === r)
+    return ((g - b) / d + 6) % 6
+
+  return max === g ? (b - r) / d + 2 : (r - g) / d + 4
 }
 
 function rgbOfHsl([h, s, l]: Triple): Triple {

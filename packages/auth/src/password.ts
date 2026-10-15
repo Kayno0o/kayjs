@@ -242,9 +242,7 @@ export async function signInWithPassword(state: RequestState, input: PasswordSig
     return { ok: false, error: refused }
 
   // No password this long was ever accepted, and hashing it would cost the server for nothing.
-  const record = input.password.length > PASSWORD_MAX_LENGTH
-    ? undefined
-    : byEmail ? await store.users.findByEmail(identifier) : await store.users.findByUsername(identifier)
+  const record = input.password.length > PASSWORD_MAX_LENGTH ? undefined : await (byEmail ? store.users.findByEmail(identifier) : store.users.findByUsername(identifier))
   // Counted against the account, so its email and every spelling of its name share one count, or against what was typed when none matches, so a guess at a missing account runs out the same way.
   const accountKey = record ? `sign-in-account:${record.id}` : typedKey(state.core, 'sign-in-account', identifier.toLowerCase())
 

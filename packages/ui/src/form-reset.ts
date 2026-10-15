@@ -2,7 +2,12 @@ import { onCleanup, onMount } from 'kay'
 
 const HOLD = 'kui-hold-defaults'
 
-const formOf = (element: Element) => element instanceof HTMLFormElement ? element : 'form' in element ? element.form as HTMLFormElement | null : element.closest('form')
+function formOf(element: Element): HTMLFormElement | null {
+  if (element instanceof HTMLFormElement)
+    return element
+
+  return 'form' in element ? element.form as HTMLFormElement | null : element.closest('form')
+}
 
 // A ref that runs `first` on the control's element once, and `every` each time kay runs the ref again on a spread element, whose attributes it follows.
 // The `ref` the app put on the control gets the element once too, as it would on a plain element.

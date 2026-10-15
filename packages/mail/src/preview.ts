@@ -75,7 +75,7 @@ h2{font-size:15px;margin:24px 0 8px}
 `
 
 function shown(addresses: Address | Address[] | undefined): string {
-  const all = addresses === undefined ? [] : Array.isArray(addresses) ? addresses : [addresses]
+  const all = [addresses ?? []].flat()
 
   return escape(all.map(address => typeof address === 'string' ? address : `${address.name} <${address.address}>`).join(', '))
 }
@@ -137,9 +137,16 @@ function sendForm(relay: Relay, action: string, outcome: Outcome | undefined): s
 
   const server = escape(relay.server())
   const offered = outcome?.to ?? relay.to() ?? ''
-  const result = outcome === undefined ? '' : outcome.error === undefined ? `<p class="sent">Sent to ${escape(outcome.to)} over ${server}.</p>` : `<p class="warning">Not sent: ${escape(outcome.error)}</p>`
+  const result = outcome === undefined ? '' : outcomeNote(outcome, server)
 
   return `<h2>Send for real</h2>${result}<form class="bar" method="post" action="${action}"><label>Over ${server} to <input type="email" name="to" required value="${escape(ONE_ADDRESS.test(offered) ? offered : '')}"></label><button type="submit">Send</button></form>`
+}
+
+function outcomeNote(outcome: Outcome, server: string): string {
+  if (outcome.error === undefined)
+    return `<p class="sent">Sent to ${escape(outcome.to)} over ${server}.</p>`
+
+  return `<p class="warning">Not sent: ${escape(outcome.error)}</p>`
 }
 
 // Sends it over the relay, answering what went wrong, or nothing once the server took it.
@@ -376,9 +383,6 @@ export function preview(render: (message: Message) => Promise<Mail>, relay: Rela
     .get(`${PREVIEW_PATH}/:id/html`, ({ params }) => {
       const html = outbox.find(params.id)?.html
 
-      if (html === undefined)
-        return missing()
-
-      return mailHtml(html)
+      return html === undefined ? missing() : mailHtml(html)
     })
 }

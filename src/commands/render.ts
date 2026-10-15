@@ -65,7 +65,8 @@ export const render: Command = {
       return 1
 
     const target = new URL(url, 'http://localhost')
-    const verb = typeof method === 'string' ? method.toUpperCase() : body === undefined ? 'GET' : 'POST'
+    const defaultVerb = body === undefined ? 'GET' : 'POST'
+    const verb = typeof method === 'string' ? method.toUpperCase() : defaultVerb
 
     if (!METHOD.test(verb))
       return refuse(`--method takes an HTTP method, not ${String(method)}`)
@@ -91,7 +92,8 @@ export const render: Command = {
       serving = resolve
     })
     // The server's own output is a log, which goes beside the body rather than into it.
-    const server = Bun.spawn([process.execPath, '--preload', SOCKET_PRELOAD, typeof option === 'string' ? resolve(option) : existsSync(entry) ? entry : PAGES_ENTRY], { cwd: root, env: { ...env, NODE_ENV: 'development', [START_PARENT]: String(process.pid), [START_COMMAND]: 'kay render', KAY_RENDER_SOCKET: socket, [RENDER_OUTPUT]: basename(output) }, stdin: 'ignore', stdout: 2, stderr: 'inherit', ipc: (message: { serving?: boolean }) => message.serving === true && serving(true) })
+    const defaultServer = existsSync(entry) ? entry : PAGES_ENTRY
+    const server = Bun.spawn([process.execPath, '--preload', SOCKET_PRELOAD, typeof option === 'string' ? resolve(option) : defaultServer], { cwd: root, env: { ...env, NODE_ENV: 'development', [START_PARENT]: String(process.pid), [START_COMMAND]: 'kay render', KAY_RENDER_SOCKET: socket, [RENDER_OUTPUT]: basename(output) }, stdin: 'ignore', stdout: 2, stderr: 'inherit', ipc: (message: { serving?: boolean }) => message.serving === true && serving(true) })
 
     // Interrupted, it leaves no server or build behind.
     const stops = STOPS.map(signal => [signal, () => {

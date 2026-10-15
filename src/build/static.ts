@@ -103,7 +103,7 @@ export async function exportStatic(project: Project, client: ClientBuild, outdir
   // What kay serves itself comes from the app, as a server would answer it.
   // The extensions' server plugins are left out, since nothing a static site serves runs them and one may open a database.
   const extensions = config.extensions?.map(({ server: _, ...extension }) => extension)
-  const pages = await pagesApp(resolveProject(root, { ...config, extensions, log: false, health: false, security: false, compress: false }, project.mode), async () => client, true)
+  const pages = await pagesApp(resolveProject(root, { ...config, extensions, log: false, health: false, security: false, compress: false }, project.mode), () => client, true)
   const app = new Elysia().use(pages.app)
 
   // Rendered a few at a time, so a page waiting on a data source or a hook does not hold the others back.

@@ -123,10 +123,18 @@ export class ForgeError extends Error {
 const SHA_MISMATCH = /sha/i
 // How much of a refusal the editor is shown; the log gets it whole.
 const SHOWN_REFUSAL = 200
+const TRAILING_SLASHES = /\/+$/
+
+function commitOperation(text: string | undefined, sha: string | undefined): 'delete' | 'create' | 'update' {
+  if (text === undefined)
+    return 'delete'
+
+  return sha === undefined ? 'create' : 'update'
+}
 
 // Commits each change through Forgejo's contents API, so the site rebuilds from git and every edit has history.
 export function forgejo({ url, repo, branch, token, timeout = 15_000, fetch: request = fetch }: ForgejoOptions): FileSaver {
-  const api = `${url.replace(/\/+$/, '')}/api/v1/repos/${repo}`
+  const api = `${url.replace(TRAILING_SLASHES, '')}/api/v1/repos/${repo}`
   const headers = { 'authorization': `token ${token}`, 'content-type': 'application/json', 'accept': 'application/json' }
 
   async function answer<T>(response: Response): Promise<T> {
@@ -144,10 +152,7 @@ export function forgejo({ url, repo, branch, token, timeout = 15_000, fetch: req
       const query = branch === undefined ? '' : `?ref=${encodeURIComponent(branch)}`
       const response = await send(`${api}/contents/${repoPath.split('/').map(encodeURIComponent).join('/')}${query}`, {}, within)
 
-      if (response.status === 404)
-        return undefined
-
-      return (await answer<{ sha: string }>(response)).sha
+      return response.status === 404 ? undefined : (await answer<{ sha: string }>(response)).sha
     }
 
     const sha = await currentSha()
@@ -157,7 +162,7 @@ export function forgejo({ url, repo, branch, token, timeout = 15_000, fetch: req
     if (text === undefined && sha === undefined)
       return undefined
 
-    const operation = text === undefined ? 'delete' : sha === undefined ? 'create' : 'update'
+    const operation = commitOperation(text, sha)
     const file = { operation, path: repoPath, sha, content: text === undefined ? undefined : Buffer.from(text).toString('base64') }
 
     posting()

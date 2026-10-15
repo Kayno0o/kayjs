@@ -79,7 +79,7 @@ function createOutbox(): Outbox {
       if (mails.length > KEPT)
         mails.splice(0, mails.length - KEPT)
 
-      return { messageId: `<${id}@outbox>`, accepted: [...mail.to, ...mail.cc, ...mail.bcc].map(addressOf), rejected: [], response: 'kept in the outbox' }
+      return Promise.resolve({ messageId: `<${id}@outbox>`, accepted: [...mail.to, ...mail.cc, ...mail.bcc].map(addressOf), rejected: [], response: 'kept in the outbox' })
     },
     last: () => mails.at(-1),
     to: (address) => {

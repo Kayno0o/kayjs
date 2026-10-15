@@ -393,6 +393,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
 
       closed = true
     },
+    // eslint-disable-next-line ts/require-await -- the interface returns a promise
     [Symbol.asyncDispose]: async () => page.close(),
   }
 
@@ -648,7 +649,12 @@ async function axeSource(): Promise<string> {
 // A call of `run` in the page, an undefined argument kept as such rather than sent as JSON's null.
 // A function argument crosses as its source, so it must read nothing from its module.
 function script(run: (...args: never[]) => unknown, args: unknown[]): string {
-  return `(${run.toString()})(${args.map(arg => arg === undefined ? 'undefined' : typeof arg === 'function' ? arg.toString() : JSON.stringify(arg)).join(', ')})`
+  return `(${run.toString()})(${args.map((arg) => {
+    if (arg === undefined)
+      return 'undefined'
+
+    return typeof arg === 'function' ? arg.toString() : JSON.stringify(arg)
+  }).join(', ')})`
 }
 
 // Resolves once `promise` settles, either way.

@@ -121,6 +121,8 @@ function counts() {
   return chosen ??= { sessions: count('DEV_SESSIONS', 3), starts: count('DEV_STARTS', 5), rounds: count('DEV_EDITS', 7) }
 }
 
+const WHOLE_NUMBER = /^[1-9]\d*$/
+
 // A count from the environment, `fallback` when unset.
 function count(name: string, fallback: number): number {
   const value = process.env[name]
@@ -128,7 +130,7 @@ function count(name: string, fallback: number): number {
   if (value === undefined)
     return fallback
 
-  if (!(/^[1-9]\d*$/).test(value))
+  if (!WHOLE_NUMBER.test(value))
     throw new Error(`${name} must be a whole number above 0, not "${value}"`)
 
   return Number(value)

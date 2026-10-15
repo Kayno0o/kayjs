@@ -67,11 +67,18 @@ export async function cutOf(page: ServedPage, all: boolean): Promise<Cut> {
   }
 }
 
+function stampHole(match: RegExpMatchArray): Hole {
+  if (match[1] !== undefined)
+    return { action: decodeURIComponent(match[1]) }
+
+  return match[2] !== undefined ? { work: match[2] } : { field: match[3]! }
+}
+
 // The page text is read again for each of the two cuts rather than held beside the parts, which are the page deflated.
 async function cutAt(source: ServedPage['html'], all: boolean): Promise<Cut> {
   const html = typeof source === 'string' ? source : await source.text()
   const islands = [...html.matchAll(SERVER_ISLAND)].filter(match => all || modeOf(match) === 'inline').map(match => ({ match, hole: { island: Number(match[1]) } }))
-  const stamps = [...html.matchAll(STAMP_HOLE)].map(match => ({ match, hole: match[1] !== undefined ? { action: decodeURIComponent(match[1]) } : match[2] !== undefined ? { work: match[2] } : { field: match[3]! } }))
+  const stamps = [...html.matchAll(STAMP_HOLE)].map(match => ({ match, hole: stampHole(match) }))
   const parts: string[] = []
   const holes: Hole[] = []
   let from = 0
@@ -90,7 +97,15 @@ async function cutAt(source: ServedPage['html'], all: boolean): Promise<Cut> {
 // The page with its holes filled for this request, gzipped when the browser takes it.
 async function splice(page: ServedPage, all: boolean, islands: string[], request: Request): Promise<{ body: string | Uint8Array<ArrayBuffer> | ReadableStream<Uint8Array>, gzip: boolean }> {
   const { parts, holes } = await cutOf(page, all)
-  const between = holes.map(hole => 'action' in hole ? freshStamp(hole.action) : 'work' in hole ? freshWork(hole.work) : 'field' in hole ? freshFieldWork(hole.field) : islands[hole.island] ?? '')
+  const between = holes.map((hole) => {
+    if ('action' in hole)
+      return freshStamp(hole.action)
+
+    if ('work' in hole)
+      return freshWork(hole.work)
+
+    return 'field' in hole ? freshFieldWork(hole.field) : islands[hole.island] ?? ''
+  })
 
   if (!preferredEncoding(request.headers.get('accept-encoding'), GZIP))
     return { body: parts.map((part, index) => splicePartText(part) + (between[index] ?? '')).join(''), gzip: false }
@@ -117,7 +132,14 @@ export async function serveServerIslands(route: ServedRoute, page: ServedPage, p
   if (fetched && page.islands?.[Number(asked)] !== 'defer')
     return new Response(null, { status: 404 })
 
-  const rendered = await renderServerIslands(route, context, params, client, options, paths.get(route.file), fetched ? 'inline' : all ? undefined : 'defer')
+  let mode: 'inline' | 'defer' | undefined = 'defer'
+
+  if (fetched)
+    mode = 'inline'
+  else if (all)
+    mode = undefined
+
+  const rendered = await renderServerIslands(route, context, params, client, options, paths.get(route.file), mode)
 
   if (rendered instanceof Response)
     return rendered

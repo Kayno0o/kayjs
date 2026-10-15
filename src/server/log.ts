@@ -51,6 +51,14 @@ const answering = new AsyncLocalStorage<Request>()
 const inFlight = new WeakSet<Request>()
 
 // The path of a request's absolute URL, cut out rather than parsed: a request's URL comes normalized already, and parsing one costs more than logging it.
+// The status an Elysia response went out with: the response's own, else the one set on the context, else 200.
+export function statusOf(responseValue: unknown, set: { status?: unknown }): number {
+  if (responseValue instanceof Response)
+    return responseValue.status
+
+  return typeof set.status === 'number' ? set.status : 200
+}
+
 export function pathOf(url: string): string {
   const start = url.indexOf('/', url.indexOf('//') + 2)
   const query = url.indexOf('?', start)
@@ -178,7 +186,7 @@ export function logRequests(app: Elysia, logger: Exclude<Logger, false>, healthP
     if (!start)
       return
 
-    const status = responseValue instanceof Response ? responseValue.status : typeof set.status === 'number' ? set.status : 200
+    const status = statusOf(responseValue, set)
 
     writeLine({ type: 'request', time: new Date().toISOString(), level: 'info', method: start.method, path: start.path, status, duration: Math.round((start.answered ?? performance.now()) - start.at), id: requestId(request) })
   })

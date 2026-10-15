@@ -736,11 +736,15 @@ function requestTab(doc: Document, tool: DevTool): { stop: () => void } {
     // Read off the page once the guards pass, so a request one refused says nothing of it.
     const refusedByGuard = request.guards.some(guard => guard.outcome !== 'passed' && guard.outcome !== 'did not run')
 
-    fact('Rendered', refusedByGuard ? 'not known, a guard refused the request' : request.prerender === undefined ? 'on request' : `on request here, ${PRERENDER[request.prerender]}`)
+    const rendered = request.prerender === undefined ? 'on request' : `on request here, ${PRERENDER[request.prerender]}`
+
+    fact('Rendered', refusedByGuard ? 'not known, a guard refused the request' : rendered)
     fact('Guards', ...lines(request.guards.map((guard) => {
       const line = tool.make('span')
 
-      line.append(positionButton(tool, guard.file), tool.make('span', guard.outcome === 'passed' ? 'ms mono' : guard.outcome === 'did not run' ? 'note' : 'error', guard.outcome))
+      const unpassed = guard.outcome === 'did not run' ? 'note' : 'error'
+
+      line.append(positionButton(tool, guard.file), tool.make('span', guard.outcome === 'passed' ? 'ms mono' : unpassed, guard.outcome))
 
       return line
     }), 'none'))
@@ -833,11 +837,12 @@ function headTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
     }
 
     const snippet = tool.make('div', 'snippet')
+    const clipped = limit !== undefined && description !== undefined && description.length > limit ? `${description.slice(0, limit).trimEnd()}...` : description
 
     snippet.append(
       tool.make('div', 'site', canonical ?? href),
       tool.make('div', 'title', title === '' ? 'No title' : title),
-      tool.make('div', 'description', description === undefined ? 'No description' : limit !== undefined && description.length > limit ? `${description.slice(0, limit).trimEnd()}...` : description),
+      tool.make('div', 'description', clipped ?? 'No description'),
     )
     children.push(snippet)
 
@@ -852,8 +857,16 @@ function headTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
     fact('Alternates', ...alternates.length === 0 ? [none()] : alternates.map(line => tool.make('div', 'mono', line)))
     fact('Robots', metaContent(head, 'robots') ?? tool.make('span', 'note', 'no tag, indexable'))
 
-    if (server !== undefined)
-      fact('Sitemap', server.sitemap === 'error' ? tool.make('span', 'error', `could not be read: ${server.sitemapError ?? 'unknown error'}`) : server.sitemap === 'none' ? tool.make('span', 'note', 'none, the site has no origin (set site in kay.config.ts or SITE_URL)') : server.sitemap === 'listed' ? 'listed' : 'not listed')
+    if (server !== undefined) {
+      let sitemap: ReturnType<typeof tool.make> | string = server.sitemap === 'listed' ? 'listed' : 'not listed'
+
+      if (server.sitemap === 'error')
+        sitemap = tool.make('span', 'error', `could not be read: ${server.sitemapError ?? 'unknown error'}`)
+      else if (server.sitemap === 'none')
+        sitemap = tool.make('span', 'note', 'none, the site has no origin (set site in kay.config.ts or SITE_URL)')
+
+      fact('Sitemap', sitemap)
+    }
 
     children.push(facts)
 
@@ -1178,7 +1191,10 @@ interface Vitals {
 function rateVital(name: VitalName, value: number): 'good' | 'needs' | 'poor' {
   const [good, poor] = VITAL_LIMITS[name]
 
-  return value <= good ? 'good' : value <= poor ? 'needs' : 'poor'
+  if (value <= good)
+    return 'good'
+
+  return value <= poor ? 'needs' : 'poor'
 }
 
 interface ShiftEntry extends PerformanceEntry {
@@ -1500,6 +1516,9 @@ interface Weight {
 
 // A built file's name without its hash, `counter` of `counter-48rr5xzz.js`.
 const HASHED_NAME = /^(.*)-[a-z\d]{8}\.(?:js|css)$/
+const DIRECTORY_PREFIX = /^.*\//
+const KAY_SUFFIX = /\.kay$/
+const SCRIPT_OR_STYLE = /\.(?:js|css)$/
 
 // The page's HTML (the document the browser holds), the stylesheets and scripts it loaded gzipped, as sent in development: not minified, with the dev-only code, so larger than `kay build` makes them. The dev tool's own scripts, the live reload and the public env stay out; a file rebuilt since it first loaded counts once, in its latest form, and a stylesheet only while the page links it.
 async function pageWeight(doc: Document): Promise<Weight> {
@@ -1507,12 +1526,12 @@ async function pageWeight(doc: Document): Promise<Weight> {
   const here = win.location.origin
   const linked = new Set([...doc.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]')].map(link => new URL(link.href, here).pathname))
   const latest = new Map<string, string>()
-  const components = new Set([...doc.querySelectorAll('[data-component]')].map(element => (element.getAttribute('data-component') ?? '').replace(/^.*\//, '').replace(/\.kay$/, '')))
+  const components = new Set([...doc.querySelectorAll('[data-component]')].map(element => (element.getAttribute('data-component') ?? '').replace(DIRECTORY_PREFIX, '').replace(KAY_SUFFIX, '')))
 
   for (const entry of win.performance.getEntriesByType('resource')) {
     const url = parseUrl(entry.name, here)
 
-    if (url === undefined || url.origin !== here || !(/\.(?:js|css)$/).test(url.pathname) || url.pathname.startsWith('/_kay/dev/') || url.pathname === '/_kay/env.js')
+    if (url === undefined || url.origin !== here || !SCRIPT_OR_STYLE.test(url.pathname) || url.pathname.startsWith('/_kay/dev/') || url.pathname === '/_kay/env.js')
       continue
 
     if (url.pathname.endsWith('.css') && !linked.has(url.pathname))
@@ -1819,7 +1838,11 @@ function withLine(source: string): string {
 function problemText({ text, error, island }: DevProblem): string {
   const { name, message, stack } = (typeof error === 'object' && error !== null ? error : {}) as { name?: unknown, message?: unknown, stack?: unknown }
   const head = `${String(name)}: ${String(message)}`
-  const shown = typeof stack !== 'string' || stack === '' ? text : stack.startsWith(String(name)) ? stack : `${head}\n${stack}`
+  let shown = text
+
+  if (typeof stack === 'string' && stack !== '')
+    shown = stack.startsWith(String(name)) ? stack : `${head}\n${stack}`
+
   const where = island === undefined ? '' : `in island ${island}: `
 
   return `${where}${text.startsWith('Uncaught (in promise) ') && shown !== text ? `Uncaught (in promise) ${shown}` : shown}`

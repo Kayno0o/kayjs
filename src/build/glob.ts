@@ -46,7 +46,9 @@ export function globFiles(patterns: string[], importer: string, root: string): M
 
       const path = relative(RELATIVE.test(pattern) ? from : root, found).split(sep).join('/')
 
-      files.set(RELATIVE.test(pattern) ? (path.startsWith('../') ? path : `./${path}`) : `/${path}`, found)
+      const relativeKey = path.startsWith('../') ? path : `./${path}`
+
+      files.set(RELATIVE.test(pattern) ? relativeKey : `/${path}`, found)
     }
   }
 
@@ -111,7 +113,7 @@ function globCalls(code: string, importer: string, loader: Bun.JavaScriptLoader)
       if (patterns.some(pattern => !RELATIVE.test(pattern!.replace(NEGATED, '')) && !pattern!.replace(NEGATED, '').startsWith('/')))
         throw refuse('takes patterns starting with ./, ../ or / for the project\'s root')
 
-      const options = second === undefined ? [] : second.type === 'ObjectExpression' ? second.properties : undefined
+      const options = second === undefined ? [] : objectProperties(second)
       const call: GlobCall = { start: path.node.start!, end: path.node.end!, patterns: patterns as string[], eager: false }
 
       for (const option of options ?? [undefined]) {
@@ -133,6 +135,10 @@ function globCalls(code: string, importer: string, loader: Bun.JavaScriptLoader)
   })
 
   return calls
+}
+
+function objectProperties(node: t.Node): t.ObjectExpression['properties'] | undefined {
+  return node.type === 'ObjectExpression' ? node.properties : undefined
 }
 
 function keyName(key: t.ObjectProperty['key']): string | undefined {

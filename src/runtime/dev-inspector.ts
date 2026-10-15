@@ -73,7 +73,10 @@ export function startInspector(tool: DevTool, doc: Document = document): Inspect
 
       const answer = await response.json() as { opened?: boolean, failed?: boolean }
 
-      return answer.opened === true ? 'opened' : answer.failed === true ? 'failed' : 'no editor'
+      if (answer.opened === true)
+        return 'opened'
+
+      return answer.failed === true ? 'failed' : 'no editor'
     }
     catch {
       return 'unreachable'
@@ -255,7 +258,12 @@ function formatted(value: unknown): string {
   let text: string
 
   try {
-    text = typeof value === 'function' ? 'function' : value instanceof Element ? `<${value.localName}>` : JSON.stringify(value) ?? String(value)
+    if (typeof value === 'function')
+      text = 'function'
+    else if (value instanceof Element)
+      text = `<${value.localName}>`
+    else
+      text = JSON.stringify(value) ?? String(value)
   }
   catch {
     text = String(value)

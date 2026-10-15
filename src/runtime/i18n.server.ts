@@ -50,20 +50,14 @@ export function locale(): Locale {
 export const localize = ((href: string, target?: string) => {
   const state = current('localize()')
 
-  if (state.implicit)
-    return href
-
-  return localePath(state.settings, href, target ?? state.locale, state.host)
+  return state.implicit ? href : localePath(state.settings, href, target ?? state.locale, state.host)
 }) as Localize
 
 // The page being rendered in another locale, for a language switcher.
 export function alternate(target: Locale): string {
   const state = current('alternate()')
 
-  if (state.implicit)
-    return state.path
-
-  return localePath(state.settings, state.path, target, state.host)
+  return state.implicit ? state.path : localePath(state.settings, state.path, target, state.host)
 }
 
 export function formatNumber(value: number, options?: Intl.NumberFormatOptions): string {

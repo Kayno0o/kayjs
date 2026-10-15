@@ -2,8 +2,6 @@ import type { TypedFlatConfigItem } from '@kaynooo/eslint'
 
 // What kay and each of its libraries lint with over @kaynooo/eslint's strict preset, so a library lints as strictly as kay.
 export const kayRules: TypedFlatConfigItem[] = [{
-  rules: { 'ts/no-explicit-any': 'error' },
-}, {
   files: ['**/tests/**/*.ts', '**/tests-dom/**/*.ts'],
   rules: {
     // Tests embed .kay sources, whose expressions hold JS template literals inside plain strings.

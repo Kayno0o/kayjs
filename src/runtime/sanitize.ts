@@ -213,5 +213,8 @@ export function sanitizeHtml(markup: string, options?: SanitizeOptions): SafeHtm
 // Marks markup the app made, such as its own Markdown renderer's or a trusted CMS's, as fit for `innerHTML` as it is.
 export function trustHtml(markup: string): SafeHtml {
   // Anything but a string is left as it is, so nothing but a string is ever vouched for.
-  return typeof (markup as unknown) === 'string' ? isVouched(markup) ? markup : vouch(markup) : markup as SafeHtml
+  if (typeof (markup as unknown) !== 'string')
+    return markup as SafeHtml
+
+  return isVouched(markup) ? markup : vouch(markup)
 }

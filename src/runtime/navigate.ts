@@ -196,10 +196,7 @@ function followable(link: HTMLAnchorElement): URL | undefined {
     return undefined
 
   // A jump within the page is the browser's own.
-  if (url.hash !== '' && url.pathname === location.pathname && url.search === location.search)
-    return undefined
-
-  return url
+  return url.hash !== '' && url.pathname === location.pathname && url.search === location.search ? undefined : url
 }
 
 function onClick(event: MouseEvent): void {

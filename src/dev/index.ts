@@ -322,8 +322,13 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   const answerClient = async (server: Subprocess) => {
     const outcome = await (building ??= buildClient())
 
+    let state: 'none' | 'failed' | 'built' = 'none'
+
+    if (outcome !== undefined)
+      state = outcome.failed ? 'failed' : 'built'
+
     try {
-      server.send({ client: outcome === undefined ? 'none' : outcome.failed ? 'failed' : 'built' })
+      server.send({ client: state })
     }
     // Killed for a restart meanwhile.
     catch {}
@@ -632,8 +637,18 @@ function changedFilesNamed(root: string, files: string[]): string[] {
 }
 
 // The system's browser, or the command `BROWSER` names; `missing` hears of a machine without one.
+function browserCommand(): string[] {
+  if (process.env.BROWSER !== undefined && process.env.BROWSER !== '')
+    return [process.env.BROWSER]
+
+  if (process.platform === 'darwin')
+    return ['open']
+
+  return process.platform === 'win32' ? ['cmd', '/c', 'start', '""'] : ['xdg-open']
+}
+
 function openBrowser(url: string, missing: (command: string) => void): void {
-  const command = process.env.BROWSER !== undefined && process.env.BROWSER !== '' ? [process.env.BROWSER] : process.platform === 'darwin' ? ['open'] : process.platform === 'win32' ? ['cmd', '/c', 'start', '""'] : ['xdg-open']
+  const command = browserCommand()
 
   try {
     Bun.spawn([...command, url], { stdio: ['ignore', 'ignore', 'ignore'] }).unref()

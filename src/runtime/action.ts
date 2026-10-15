@@ -396,7 +396,8 @@ export function workOf(protection: ActionProtection<string>): { difficulty: numb
   if (proofOfWork === undefined || proofOfWork === false)
     return undefined
 
-  const options = typeof proofOfWork === 'object' ? proofOfWork : typeof proofOfWork === 'number' ? { difficulty: proofOfWork } : {}
+  const numeric: ProofOfWorkOptions = typeof proofOfWork === 'number' ? { difficulty: proofOfWork } : {}
+  const options = typeof proofOfWork === 'object' ? proofOfWork : numeric
   const difficulty = options.difficulty ?? 100_000
 
   if (!Number.isInteger(difficulty) || difficulty < 1 || difficulty > 1e9)
@@ -486,9 +487,11 @@ function callable(url: () => string): { call: (input: never, options?: CallOptio
   const shift = (by: number) => setInFlight(untrack(inFlight) + by)
   const called = (page: number, outcome: Outcome | null) => setLast({ page, outcome })
   const outcome = () => {
-    const posted = requestOutcome?.()
+    let found = requestOutcome?.()
     const own = last()
-    const found = posted !== undefined ? posted : own?.page === navigation.page ? own.outcome : pageOutcome()
+
+    if (found === undefined)
+      found = own?.page === navigation.page ? own.outcome : pageOutcome()
 
     return found?.action === url() ? found : undefined
   }

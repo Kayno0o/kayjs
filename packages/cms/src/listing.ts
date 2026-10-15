@@ -28,9 +28,11 @@ export function rowsOf(collection: CollectionInfo, entries: SourceEntry[]): Entr
   })
 }
 
+const WHITESPACE = /\s+/
+
 // The rows whose title or slug holds every word of the search, whatever their case.
 export function searchRows(rows: EntryRow[], search: string): EntryRow[] {
-  const words = search.toLowerCase().split(/\s+/).filter(Boolean)
+  const words = search.toLowerCase().split(WHITESPACE).filter(Boolean)
 
   if (words.length === 0)
     return rows

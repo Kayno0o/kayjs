@@ -58,7 +58,12 @@ export function errorPage(error: PageError): string {
   const stack = error.stack ?? ''
 
   // A hint said in place of the message is copied along with the stack, which only holds the message.
-  const copied = stack === '' ? error.message : stack.includes(error.message) ? stack : `${error.message}\n\n${stack}`
+  let copied = `${error.message}\n\n${stack}`
+
+  if (stack === '')
+    copied = error.message
+  else if (stack.includes(error.message))
+    copied = stack
 
   return document(`${error.status} ${error.message}`, `${heading(`${error.status} error`, error.message)}${stackOf(stack)}${copyText(copied)}`)
 }

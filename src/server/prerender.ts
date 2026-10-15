@@ -71,7 +71,7 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
     throw new KayError('export-no-client-build', 'kay: no client build to add prerendered pages to; run buildClient first')
 
   const dir = join(output, PRERENDERED_DIR)
-  const { mounts, routes, matchers, i18n, locales, site, renderOptions } = await setupPages(project, async () => client, true)
+  const { mounts, routes, matchers, i18n, locales, site, renderOptions } = await setupPages(project, () => client, true)
 
   options.routes?.push(...routes)
 

@@ -224,7 +224,14 @@ async function refused(route: ServedRoute, rendering: Rendering, client: ClientB
 function guardRuns(guards: ServedRoute['guards'], refusal: Refusal | undefined): NonNullable<Rendering['guards']> {
   const refused = refusal ? guards.indexOf(refusal.guard) : -1
 
-  return guards.map((guard, index) => ({ file: projectPath(guard.file), outcome: index < refused || refused === -1 ? 'passed' : index > refused ? 'did not run' : refusalOutcome(refusal!.error) }))
+  return guards.map((guard, index) => {
+    const file = projectPath(guard.file)
+
+    if (index < refused || refused === -1)
+      return { file, outcome: 'passed' }
+
+    return { file, outcome: index > refused ? 'did not run' : refusalOutcome(refusal!.error) }
+  })
 }
 
 // Whether `kay build` writes this page ahead, from its `prerender` setting or a server island its template reaches; read off the source in development only, where the compiler is loaded anyway.
@@ -639,6 +646,13 @@ function keepPersonal({ headers, ctx, prerendering }: Rendering): void {
     headers.append('vary', 'cookie')
 }
 
+function pageErrorOf(error: unknown, dev: boolean | undefined): PageError {
+  if (error instanceof NotFound)
+    return { status: 404, message: 'Not Found' }
+
+  return error instanceof Denied ? { status: error.status, message: error.message } : describeError(error, dev)
+}
+
 // A redirect goes out as is; anything else renders the nearest special page, falling back to plain text.
 async function renderFailure(error: unknown, special: SpecialPages, rendering: Rendering, loaded: Map<string, Loaded>, client: ClientBuild, options: RenderOptions): Promise<Response> {
   if (error instanceof Redirect) {
@@ -656,7 +670,7 @@ async function renderFailure(error: unknown, special: SpecialPages, rendering: R
   if (!notFound && !denied)
     reportServerError(error, rendering.ctx.request, options.onError)
 
-  const pageError = notFound ? { status: 404, message: 'Not Found' } : denied ? { status: error.status, message: error.message } : describeError(error, options.dev)
+  const pageError = pageErrorOf(error, options.dev)
   const page = (notFound || (denied && error.status === 404) ? special.notFound : undefined) ?? special.error
 
   rendering.status = pageError.status

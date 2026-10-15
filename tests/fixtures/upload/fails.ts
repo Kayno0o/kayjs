@@ -2,12 +2,14 @@
 import type { Action } from '../../../src/runtime'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 
+const UPLOAD_MODULE = /[/\\]runtime[/\\]upload\.ts$/
+
 let loads = 0
 
 Bun.plugin({
   name: 'stale upload',
   setup(build) {
-    build.onLoad({ filter: /[/\\]runtime[/\\]upload\.ts$/ }, () => {
+    build.onLoad({ filter: UPLOAD_MODULE }, () => {
       loads++
 
       throw new Error('stale chunk')

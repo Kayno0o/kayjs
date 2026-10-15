@@ -54,7 +54,7 @@
     "nodemailer": "^10.0.16"
   },
   "devDependencies": {
-    "@kaynooo/eslint": "^6.1.0",
+    "@kaynooo/eslint": "^7.0.3",
     "@types/bun": "^1.4.2",
     "@typescript/native-preview": "^7.0.0-dev.20260707.2",
     "elysia": "^1.4.30",

@@ -808,8 +808,5 @@ function quoteAttribute(value: string): string {
   if (!value.includes('"'))
     return `"${value}"`
 
-  if (!value.includes('\''))
-    return `'${value}'`
-
-  return `{${JSON.stringify(value)}}`
+  return !value.includes('\'') ? `'${value}'` : `{${JSON.stringify(value)}}`
 }

@@ -33,10 +33,12 @@ export interface CmsSettings {
 
 const DEFAULT_UPLOADS = ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/avif', 'application/pdf']
 
+const TRAILING_SLASHES = /\/+$/
+
 let current: CmsSettings | undefined
 
 export function configure({ prefix = '/admin', guard, files = workingTree(), uploads = DEFAULT_UPLOADS, rawHtml = [], author }: CmsOptions): CmsSettings {
-  current = { prefix: prefix.replace(/\/+$/, '') || '/', guard: guard === undefined ? undefined : lazily(guard), files, uploads, rawHtml: new Set(rawHtml), author }
+  current = { prefix: prefix.replace(TRAILING_SLASHES, '') || '/', guard: guard === undefined ? undefined : lazily(guard), files, uploads, rawHtml: new Set(rawHtml), author }
 
   return current
 }

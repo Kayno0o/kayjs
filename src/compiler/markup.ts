@@ -42,7 +42,10 @@ const NUMERIC_INPUTS = new Set(['number', 'range'])
 
 // What a `bind:` reads from the input on its event: a checkbox's `checked`, a number or range input's number, else its text.
 export function bindRead(property: string, inputType: string): 'checked' | 'valueAsNumber' | 'value' {
-  return property === 'checked' ? 'checked' : NUMERIC_INPUTS.has(inputType) ? 'valueAsNumber' : 'value'
+  if (property === 'checked')
+    return 'checked'
+
+  return NUMERIC_INPUTS.has(inputType) ? 'valueAsNumber' : 'value'
 }
 
 // The body of a `bind:` event handler, `(kayEvent) => ` before it: it writes what the input holds back to the signal, which the caller closes.
@@ -118,7 +121,8 @@ export abstract class TemplateWriter {
     const sizes = this.imageSizes(element)
     const field = target && formFieldOf(element, this.src)
     const action = actionOf(element, this.src)
-    const described = field ? field.invalid ? describedByOf(element, this.src, errors, target, field.name) : undefined : action && describedByOf(element, this.src, errors, action.expression, '')
+    const fieldDescribed = target && field?.invalid ? describedByOf(element, this.src, errors, target, field.name) : undefined
+    const described = field ? fieldDescribed : action && describedByOf(element, this.src, errors, action.expression, '')
     const plan: ElementPlan = {
       id: element.id ? this.source(element.id) : errors?.ids.get(element),
       classes: undefined,

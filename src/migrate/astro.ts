@@ -25,6 +25,8 @@ export interface MigrateOptions {
   rewriteImport: (specifier: string) => string | undefined
 }
 
+// Astro attributes kay writes under another name.
+const RENAMED_ATTRIBUTES = new Map([['class:list', 'class'], ['set:text', 'textContent']])
 const FRONTMATTER = /^\s*---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/
 const RAW_BLOCK = /<(script|style)\b([^>]*)>([\s\S]*?)<\/\1\s*>/gi
 const DOCTYPE = /<!doctype[^>]*>/gi
@@ -659,7 +661,12 @@ class Translator {
 
       // Astro writes `set:html` as it is, which kay does for a value `trustHtml` marks.
       if (name === 'set:html') {
-        const html = value?.type === 'StringLiteral' ? JSON.stringify(value.value) : value?.type === 'JSXExpressionContainer' && value.expression.type !== 'JSXEmptyExpression' ? this.expression(value.expression) : undefined
+        let html: string | undefined
+
+        if (value?.type === 'StringLiteral')
+          html = JSON.stringify(value.value)
+        else if (value?.type === 'JSXExpressionContainer' && value.expression.type !== 'JSXEmptyExpression')
+          html = this.expression(value.expression)
 
         if (html !== undefined && this.jsonText(element) === undefined) {
           attributes.push(`innerHTML={trustHtml(${html})}`)
@@ -669,7 +676,7 @@ class Translator {
         continue
       }
 
-      const target = name === 'class:list' ? 'class' : name === 'set:text' ? 'textContent' : name
+      const target = RENAMED_ATTRIBUTES.get(name) ?? name
 
       if (value?.type === 'StringLiteral') {
         if (target === 'class') {

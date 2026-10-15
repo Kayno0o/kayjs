@@ -350,7 +350,8 @@ function repath(settings: LocaleSettings, href: string, locale: string, back: bo
 
   const { target, params } = best
   const filled = segmentsOf(target).flatMap((segment) => {
-    const name = segment === '*' ? '*' : segment.startsWith(':') ? segment.slice(1).replace(OPTIONAL_MARK, '') : undefined
+    const param = segment.startsWith(':') ? segment.slice(1).replace(OPTIONAL_MARK, '') : undefined
+    const name = segment === '*' ? '*' : param
     const value = name === undefined ? segment : params[name]
 
     return value === undefined || value === '' ? [] : [value]

@@ -83,7 +83,12 @@ export const PRERENDERED_DIR = 'pages'
 
 // What sets apart the builds of two sets of options; a plugin or a function counts by its name.
 export function clientOptionsKey(options: ClientOptions): string {
-  return JSON.stringify(options, (_key, value: unknown) => typeof value === 'function' ? `function ${value.name}` : isPlugin(value) ? `plugin ${value.name}` : value)
+  return JSON.stringify(options, (_key, value: unknown) => {
+    if (typeof value === 'function')
+      return `function ${value.name}`
+
+    return isPlugin(value) ? `plugin ${value.name}` : value
+  })
 }
 
 function isPlugin(value: unknown): value is { name: string } {
@@ -123,7 +128,12 @@ export async function readInlineStyles(client: ClientBuild, base: string): Promi
         return match
 
       const target = new URL(path, `${NOWHERE}${url}`)
-      const quote = double !== undefined ? '"' : single !== undefined ? '\'' : ''
+      let quote = ''
+
+      if (double !== undefined)
+        quote = '"'
+      else if (single !== undefined)
+        quote = '\''
 
       return `url(${quote}${target.pathname}${target.search}${target.hash}${quote})`
     })

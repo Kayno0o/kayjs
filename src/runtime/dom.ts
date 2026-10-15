@@ -416,6 +416,13 @@ function lastOf(unit: Unit): Node {
 }
 
 // The units a value renders to, read by `eachChild`: a text node for its text, a node or a range as it is.
+function rowUnit(made: Unit[]): Unit | null {
+  if (made.length === 0)
+    return null
+
+  return made.length === 1 ? made[0]! : new Range(firstOf(made[0]!), lastOf(made.at(-1)!))
+}
+
 function units(value: unknown): Unit[] {
   const out: Unit[] = []
 
@@ -694,7 +701,7 @@ export function loop<T>(element: Node | null, start: Node | null, end: Node | nu
       const value = render(readItem, readIndex)
       const made = units(value)
 
-      return { key: rowKey, unit: made.length === 0 ? null : made.length === 1 ? made[0]! : new Range(firstOf(made[0]!), lastOf(made.at(-1)!)), setItem: setItem as (item: unknown) => void, setIndex, dispose }
+      return { key: rowKey, unit: rowUnit(made), setItem: setItem as (item: unknown) => void, setIndex, dispose }
     }))
 
     built.push(row)

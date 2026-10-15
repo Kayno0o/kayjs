@@ -12,6 +12,10 @@ import { loadTraverse, POSITION_SUFFIX } from './rewrite'
 // What `kay` exports that a static component may use and stay static.
 // The keys of a Babel node that say where it is written, or hold its comments, rather than its children.
 const NOT_CHILDREN = new Set(['loc', 'start', 'end', 'extra', 'leadingComments', 'trailingComments', 'innerComments'])
+// A broken module whose first statement, comments aside, is a static import.
+const STATIC_IMPORT_START = /^(?:\s*\/\/.*\n)*\s*import\b(?!\s*\()/
+const WHITESPACE = /\s/
+const FIRST_TOKEN = /^[\w$]*/
 const STATIC_EXPORTS = new Set(['uid', 'describeField', 'sanitizeHtml', 'trustHtml', 'defer'])
 // What `kay/i18n` exports that makes a component an island; the rest of it reads the locale alike on both sides.
 const REACTIVE_I18N = new Set(['relativeTime'])
@@ -186,7 +190,7 @@ function splitFence(source: string, fence: Span, globals: string[], names: strin
   analysis.fence = parsed
 
   for (const span of parsed.broken) {
-    if ((/^(?:\s*\/\/.*\n)*\s*import\b(?!\s*\()/).test(source.slice(span.start, span.end)))
+    if (STATIC_IMPORT_START.test(source.slice(span.start, span.end)))
       analysis.brokenModule.push(span)
     else
       analysis.broken.push(span)
@@ -452,7 +456,10 @@ function readsItself(ast: ParseResult<t.File>, declaration: t.FunctionDeclaratio
 }
 
 function keyName(key: t.Node): string | undefined {
-  return key.type === 'Identifier' ? key.name : key.type === 'StringLiteral' ? key.value : undefined
+  if (key.type === 'Identifier')
+    return key.name
+
+  return key.type === 'StringLiteral' ? key.value : undefined
 }
 
 // How often the rest of the fence reads what `statement` declares as `name`: Babel counts the export itself as a read.
@@ -487,6 +494,17 @@ interface StatementReads {
   names: Map<string, Span[]>
   readsCtx: boolean
   awaits: boolean
+}
+
+// Why a statement has to run per request, or undefined when nothing forces it.
+function sharedReason(readsCtx: boolean, awaits: boolean, perRequestName: string | undefined): string | undefined {
+  if (readsCtx)
+    return 'it reads `ctx`'
+
+  if (awaits)
+    return 'it awaits'
+
+  return perRequestName === undefined ? undefined : `it reads \`${perRequestName}\`, which is computed per request`
 }
 
 // The statements an export reads, directly or through one another, which therefore run once at module level rather than per request in `load`.
@@ -568,7 +586,7 @@ function sharedWithExports(ast: ParseResult<t.File>, exported: t.Statement[], pe
 
           const { names, readsCtx, awaits } = reads.get(statement)!
           const perRequestName = [...names.keys()].find(name => why.has(declaredBy.get(name)!))
-          const reason = readsCtx ? 'it reads `ctx`' : awaits ? 'it awaits' : perRequestName === undefined ? undefined : `it reads \`${perRequestName}\`, which is computed per request`
+          const reason = sharedReason(readsCtx, awaits, perRequestName)
 
           if (reason !== undefined) {
             why.set(statement, reason)
@@ -711,15 +729,15 @@ function brokenStatement(code: string, pos: number): { start: number, end: numbe
 
   let probe = Math.min(pos, code.length)
   const row = Math.max(0, starts.findLastIndex(start => start <= probe))
-  const firstToken = (/^[\w$]*/).exec(lines[row]!)![0].length
+  const firstToken = FIRST_TOKEN.exec(lines[row]!)![0].length
   const inFirstToken = STATEMENT_START.test(lines[row]!) && probe <= starts[row]! + firstToken
   let before = inFirstToken ? starts[row]! : probe
 
-  while (before > 0 && (/\s/).test(code[before - 1]!))
+  while (before > 0 && WHITESPACE.test(code[before - 1]!))
     before--
 
   // An error at the end or in blank text is the fault of the text before it, and so is one in the first word of a statement when the text before it is unfinished: `count.` then `const` reads as `count.const`.
-  if (probe >= code.length || (/\s/).test(code[probe]!) || inFirstToken) {
+  if (probe >= code.length || WHITESPACE.test(code[probe]!) || inFirstToken) {
     if (!inFirstToken || (before > 0 && UNFINISHED.test(code[before - 1]!)))
       probe = Math.max(0, before - 1)
   }
@@ -911,10 +929,18 @@ function bodyTypes(statements: t.Statement[], extraNames: string[], shift: (node
     const found = { statement, name: declaration.id.name, values: new Set<string>(), types: new Set<string>() }
 
     eachNode(declaration, (node) => {
-      const reference = node.type === 'TSTypeQuery' ? leftmost(node.exprName) : node.type === 'TSTypeReference' ? leftmost(node.typeName) : undefined
+      if (node.type === 'TSTypeQuery') {
+        const reference = leftmost(node.exprName)
 
-      if (reference !== undefined)
-        (node.type === 'TSTypeQuery' ? found.values : found.types).add(reference)
+        if (reference !== undefined)
+          found.values.add(reference)
+      }
+      else if (node.type === 'TSTypeReference') {
+        const reference = leftmost(node.typeName)
+
+        if (reference !== undefined)
+          found.types.add(reference)
+      }
     })
     types.push(found)
   }
@@ -1000,7 +1026,7 @@ function propsDeclaration(statement: t.Statement, body: t.Statement[], shift: (n
       continue
     }
 
-    const key = property.key.type === 'Identifier' ? property.key.name : property.key.type === 'StringLiteral' ? property.key.value : undefined
+    const key = keyName(property.key)
     const value = property.value
     const local = value.type === 'AssignmentPattern' ? value.left : value
 
@@ -1012,7 +1038,7 @@ function propsDeclaration(statement: t.Statement, body: t.Statement[], shift: (n
 
     const next = properties[index + 1]
     const previous = properties[index - 1]
-    const removal = next ? { start: shift(property).start, end: shift(next).start } : previous ? { start: shift(previous).end, end: shift(property).end } : undefined
+    const removal = next ? { start: shift(property).start, end: shift(next).start } : previous && { start: shift(previous).end, end: shift(property).end }
 
     declaration.bindings.push({ local: shift(local), key, fallback: value.type === 'AssignmentPattern' ? shift(value.right) : undefined, removal, signal: signals.get(key) })
   }
@@ -1042,11 +1068,12 @@ function signalProps(type: t.TSType | undefined, body: t.Statement[]): Map<strin
   const named = type?.type === 'TSTypeReference' && type.typeName.type === 'Identifier' && !type.typeParameters ? type.typeName.name : undefined
   const declared = named === undefined ? undefined : body.map(typeDeclaration).find(declaration => declaration?.id.name === named)
   const literal = declared?.type === 'TSTypeAliasDeclaration' ? declared.typeAnnotation : type
-  const members = declared?.type === 'TSInterfaceDeclaration' ? declared.body.body : literal?.type === 'TSTypeLiteral' ? literal.members : []
+  const literalMembers = literal?.type === 'TSTypeLiteral' ? literal.members : []
+  const members = declared?.type === 'TSInterfaceDeclaration' ? declared.body.body : literalMembers
 
   for (const member of members) {
     const annotation = member.type === 'TSPropertySignature' && !member.optional && !member.computed ? member.typeAnnotation?.typeAnnotation : undefined
-    const key = member.type === 'TSPropertySignature' ? member.key.type === 'Identifier' ? member.key.name : member.key.type === 'StringLiteral' ? member.key.value : undefined : undefined
+    const key = member.type === 'TSPropertySignature' ? keyName(member.key) : undefined
     const kind = annotation?.type === 'TSTypeReference' && annotation.typeName.type === 'Identifier' ? kinds.get(annotation.typeName.name) : undefined
 
     if (key !== undefined && kind)

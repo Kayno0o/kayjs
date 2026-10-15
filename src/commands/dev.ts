@@ -53,7 +53,8 @@ export const dev: Command = {
 
     try {
       warnOtherKay('dev', root)
-      const entry = typeof option === 'string' ? resolve(option) : inDir ? undefined : path
+      const defaultEntry = inDir ? undefined : path
+      const entry = typeof option === 'string' ? resolve(option) : defaultEntry
 
       const { promise, resolve: interrupted } = Promise.withResolvers<void>()
       // Keys only from a person at a terminal: a pipe, a CI log or an agent gets the lines alone, and its stdin is left unread.
@@ -101,7 +102,8 @@ export const dev: Command = {
 // Where `--inspect` opens the debugger: a port, a host and port or a whole address, on a path of kay's own unless it names one, so a debugger reconnects to the same address after a restart.
 function inspectorAddress(value: string): string {
   const address = value.replace(WS_SCHEME, '')
-  const withHost = address === '' ? 'localhost:6499' : PORT_FIRST.test(address) ? `localhost:${address}` : address
+  const hosted = PORT_FIRST.test(address) ? `localhost:${address}` : address
+  const withHost = address === '' ? 'localhost:6499' : hosted
 
   return `ws://${withHost}${withHost.includes('/') ? '' : '/kay'}`
 }

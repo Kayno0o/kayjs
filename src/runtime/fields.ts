@@ -267,10 +267,7 @@ function wrap(marks: FieldMarks, value: unknown, name: string, path: string[]): 
           waiting.push(field)
       }
 
-      if (typeof read === 'string' || typeof read === 'number')
-        return read
-
-      return wrap(marks, read, name, [...path, key])
+      return typeof read === 'string' || typeof read === 'number' ? read : wrap(marks, read, name, [...path, key])
     },
   })
 

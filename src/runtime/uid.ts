@@ -14,10 +14,7 @@ let unscoped = 0
 
 // An id for a label and its control, a trigger and its popup: one per call, unique on the page.
 export function uid(): string {
-  if (!current)
-    return `K${unscoped++}`
-
-  return `${current.prefix}${current.next++}`
+  return !current ? `K${unscoped++}` : `${current.prefix}${current.next++}`
 }
 
 export function withIds<T>(prefix: string, run: () => T): T {

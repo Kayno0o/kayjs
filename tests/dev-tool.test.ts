@@ -595,7 +595,13 @@ describe('the dev tool', () => {
 
       return app.handle(new Request(`http://localhost${url}`))
     }) as unknown as typeof window.fetch)
-    const rows = () => [...shadow().querySelectorAll('#kay-dev-env dt')].map(term => `${term.textContent} = ${term.nextElementSibling!.querySelector('.mono')!.textContent}${term.nextElementSibling!.querySelector('.secret') ? ' (flagged)' : term.nextElementSibling!.querySelector('.note') ? ' (noted)' : ''}`)
+    const flag = (value: Element) => {
+      if (value.querySelector('.secret'))
+        return ' (flagged)'
+
+      return value.querySelector('.note') ? ' (noted)' : ''
+    }
+    const rows = () => [...shadow().querySelectorAll('#kay-dev-env dt')].map(term => `${term.textContent} = ${term.nextElementSibling!.querySelector('.mono')!.textContent}${flag(term.nextElementSibling!)}`)
 
     try {
       happyDOM.setURL('http://localhost/')
@@ -693,7 +699,10 @@ describe('the dev tool', () => {
       if (url.includes('gone') && missing)
         return new Response('missing', { status: 404, headers: { 'content-type': 'text/plain' } })
 
-      return new Response(null, { headers: { 'content-type': url.includes('logo') ? 'image/webp' : url.includes('photo') ? 'image/jpeg' : 'image/avif', 'content-length': url.includes('photo') ? '2500000' : '45000' } })
+      const photo = url.includes('photo')
+      const type = photo ? 'image/jpeg' : 'image/avif'
+
+      return new Response(null, { headers: { 'content-type': url.includes('logo') ? 'image/webp' : type, 'content-length': photo ? '2500000' : '45000' } })
     }) as unknown as typeof window.fetch)
     const rows = () => [...shadow().querySelectorAll('#kay-dev-images .image')].map(row => [...row.children].map(child => child.textContent).join(' | '))
 

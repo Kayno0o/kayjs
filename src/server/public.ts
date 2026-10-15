@@ -40,7 +40,12 @@ export async function publicFiles(dir: string): Promise<PublicFile[]> {
     const path = join(entry.parentPath, entry.name)
 
     return { path, url: `/${relative(dir, path).split(sep).map(urlSegment).join('/')}` }
-  }).toSorted((a, b) => a.url < b.url ? -1 : a.url > b.url ? 1 : 0)
+  }).toSorted((a, b) => {
+    if (a.url === b.url)
+      return 0
+
+    return a.url < b.url ? -1 : 1
+  })
 }
 
 // Whether a file of `public/`, by its path from it, goes out: never one left behind there, nor under a dot-directory or as a dotfile but `.well-known/` and, exported, the static host's own.

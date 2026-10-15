@@ -98,7 +98,10 @@ export function unusedCodesOf(shown: string | undefined): Set<number> {
 
   const { compilerOptions } = JSON.parse(shown) as { compilerOptions?: { noUnusedLocals?: boolean, noUnusedParameters?: boolean } }
 
-  return compilerOptions?.noUnusedLocals === true ? UNUSED_CODES : compilerOptions?.noUnusedParameters === true ? UNUSED_PARAMETER_CODES : new Set()
+  if (compilerOptions?.noUnusedLocals === true)
+    return UNUSED_CODES
+
+  return compilerOptions?.noUnusedParameters === true ? UNUSED_PARAMETER_CODES : new Set()
 }
 
 // A path an extension's routes name outside its own prefix, such as `/` to go back to the site, is the app's, which no extension can know: only a path into its own routes is checked, under a locale's prefix too.

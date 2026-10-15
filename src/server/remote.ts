@@ -288,7 +288,12 @@ async function saveCapped(response: Response, path: string): Promise<boolean> {
 function freshUntil(headers: Headers): number {
   const control = headers.get('cache-control') ?? ''
   const maxAge = MAX_AGE.exec(control)
-  const fresh = NO_CACHE.test(control) ? 0 : maxAge ? Number(maxAge[1]) * 1000 : DEFAULT_FRESH_MS
+  let fresh = DEFAULT_FRESH_MS
+
+  if (NO_CACHE.test(control))
+    fresh = 0
+  else if (maxAge)
+    fresh = Number(maxAge[1]) * 1000
 
   return Date.now() + Math.min(MAX_FRESH_MS, Math.max(MIN_FRESH_MS, fresh))
 }

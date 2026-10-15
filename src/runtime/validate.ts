@@ -81,10 +81,7 @@ export function checkForm(form: HTMLFormElement, action: string): boolean {
 function formRules(action: string): FormRules | undefined {
   const script = document.querySelector(FORMS_SCRIPT)
 
-  if (!script)
-    return undefined
-
-  return (JSON.parse(script.textContent ?? '{}') as Record<string, FormRules>)[action]
+  return !script ? undefined : (JSON.parse(script.textContent ?? '{}') as Record<string, FormRules>)[action]
 }
 
 // The first control posting under `name`, the one a message is shown on.

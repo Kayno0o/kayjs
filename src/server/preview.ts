@@ -161,7 +161,10 @@ export function previewRequested(request: Request): PreviewMode | undefined {
   if (until === undefined || sig === undefined || (rest.length !== 1 && !edit) || !(Number(until) > Date.now() / 1000))
     return undefined
 
-  return sameText(sig, sign(settings, cookieText(until, edit))) ? edit ? 'edit' : 'preview' : undefined
+  if (!sameText(sig, sign(settings, cookieText(until, edit))))
+    return undefined
+
+  return edit ? 'edit' : 'preview'
 }
 
 // Whether the request is in edit mode, for a CMS's API module or guard to let in the editor alone outside a page's render, where `editing()` tells.

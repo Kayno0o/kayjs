@@ -8,10 +8,7 @@ export function selectionSummary<Value extends string>(options: readonly MultiSe
   if (value.length === 0)
     return placeholder
 
-  if (value.length === 1)
-    return pickedLabels(options, value)[0]!
-
-  return counted(value.length)
+  return value.length === 1 ? pickedLabels(options, value)[0]! : counted(value.length)
 }
 
 // The label of each value picked, or the value itself when no option names it.

@@ -89,7 +89,10 @@ function entriesOf(sizes: string): string[] {
   let start = 0
 
   for (const [index, char] of [...sizes].entries()) {
-    depth += char === '(' ? 1 : char === ')' ? -1 : 0
+    if (char === '(')
+      depth++
+    else if (char === ')')
+      depth--
 
     if (char === ',' && depth === 0) {
       entries.push(sizes.slice(start, index).trim())
@@ -168,13 +171,19 @@ class LengthReader {
       if (this.take() !== ')')
         return Number.NaN
 
-      return token === 'min' ? Math.min(...values) : token === 'max' ? Math.max(...values) : values[0]!
+      if (token === 'min')
+        return Math.min(...values)
+
+      return token === 'max' ? Math.max(...values) : values[0]!
     }
 
     const number = Number.parseFloat(token ?? '')
     const unit = token?.replace(NUMBER, '')
 
-    return unit === 'vw' ? number / 100 * this.viewport.width : unit === 'rem' || unit === 'em' ? number * ROOT_FONT_PX : number
+    if (unit === 'vw')
+      return number / 100 * this.viewport.width
+
+    return unit === 'rem' || unit === 'em' ? number * ROOT_FONT_PX : number
   }
 }
 

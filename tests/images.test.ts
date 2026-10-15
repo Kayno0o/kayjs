@@ -50,6 +50,18 @@ async function get(path: string, headers: Record<string, string> = {}): Promise<
   return app.handle(new Request(`http://localhost${path}`, { headers }))
 }
 
+const THIRDS = [[255, 0, 0], [0, 255, 0], [0, 0, 255]]
+
+// Flat runs and noise between gradients, three bands of 256 bytes in turn.
+function noiseByte(index: number): number {
+  const band = (index >> 8) % 3
+
+  if (band === 0)
+    return (index * 7) & 0xFF
+
+  return band === 1 ? 128 : Math.floor(Math.random() * 256)
+}
+
 // How far apart two images of one size are, as the mean difference per channel from 0 to 255.
 function meanDifference(a: ArrayLike<number>, b: ArrayLike<number>): number {
   let total = 0
@@ -494,7 +506,7 @@ describe('AVIF', () => {
 
     // Gradients, flat runs and noise, so the encoder picks a different filter from row to row.
     for (let index = 0; index < pixels.length; index++)
-      pixels[index] = index % 4 === 3 ? 255 : (index >> 8) % 3 === 0 ? (index * 7) & 0xFF : (index >> 8) % 3 === 1 ? 128 : Math.floor(Math.random() * 256)
+      pixels[index] = index % 4 === 3 ? 255 : noiseByte(index)
 
     const header = new Uint8Array(13)
     const rows = new Uint8Array((width * 4 + 1) * height)
@@ -563,7 +575,7 @@ describe('crops and share cards', () => {
 
   it('keeps the middle of the image when it cuts', async () => {
     // A 300x100 image, red, green then blue thirds.
-    const rows = Array.from({ length: 100 }, () => [0, ...Array.from({ length: 300 }, (_, x) => x < 100 ? [255, 0, 0] : x < 200 ? [0, 255, 0] : [0, 0, 255]).flat()])
+    const rows = Array.from({ length: 100 }, () => [0, ...Array.from({ length: 300 }, (_, x) => THIRDS[Math.floor(x / 100)]!).flat()])
     const header = new Uint8Array(13)
 
     new DataView(header.buffer).setUint32(0, 300)

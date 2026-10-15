@@ -166,13 +166,16 @@ export function memoryFiles(): FileStore {
       stored.set(key, new Blob([await data.arrayBuffer()], { type: data.type }))
       written.set(key, new Date())
     },
+    // eslint-disable-next-line ts/require-await -- the interface returns a promise
     async read(key) {
       return stored.get(key)
     },
+    // eslint-disable-next-line ts/require-await -- the interface returns a promise
     async delete(key) {
       stored.delete(key)
       written.delete(key)
     },
+    // eslint-disable-next-line ts/require-await -- the interface returns a promise
     async list(prefix = '') {
       return [...stored.keys()].filter(key => key.startsWith(prefix)).map(key => ({ key, modified: written.get(key) }))
     },

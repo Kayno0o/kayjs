@@ -179,9 +179,16 @@ describe('MultiSelect', () => {
 })
 
 describe('FileDrop', () => {
+  function mimeOf(name: string) {
+    if (name.endsWith('.png'))
+      return 'image/png'
+
+    return name.endsWith('.svg') ? 'image/svg+xml' : 'text/plain'
+  }
+
   // A drop or a paste as the browser sends it, its files in `dataTransfer` or `clipboardData`.
   function files(...names: string[]) {
-    return names.map(name => new File(['x'], name, { type: name.endsWith('.png') ? 'image/png' : name.endsWith('.svg') ? 'image/svg+xml' : 'text/plain' }))
+    return names.map(name => new File(['x'], name, { type: mimeOf(name) }))
   }
 
   test('takes the first dropped file its accept allows, and lights up while files hover it', async () => {

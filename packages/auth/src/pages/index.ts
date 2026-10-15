@@ -44,6 +44,13 @@ export interface AuthFeatures {
 
 const DEFAULT_PREFIX = '/auth'
 
+function captchaFeature(captcha: Core['captcha']): AuthFeatures['captcha'] {
+  if (!captcha)
+    return null
+
+  return 'proofOfWork' in captcha ? 'proof-of-work' : captcha.widget ?? null
+}
+
 export function featuresOf(core: Core): AuthFeatures {
   return {
     providers: [...core.oauth].map(([name, { app }]) => ({ name, label: app.label ?? app.provider.label ?? name })),
@@ -52,7 +59,7 @@ export function featuresOf(core: Core): AuthFeatures {
     signUp: core.signUp,
     requireVerified: core.email?.requireVerified ?? false,
     passkeys: core.passkeys !== undefined,
-    captcha: !core.captcha ? null : 'proofOfWork' in core.captcha ? 'proof-of-work' : core.captcha.widget ?? null,
+    captcha: captchaFeature(core.captcha),
     scopes: [...core.scopes],
     prefix: core.prefix,
     signInPage: core.signInPage,

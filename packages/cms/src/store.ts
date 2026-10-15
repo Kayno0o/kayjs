@@ -90,7 +90,12 @@ export async function versionOf(ref: EntryRef): Promise<string | undefined> {
 }
 
 function refused(ref: EntryRef, message: string, key?: Issue['key'] | 'body'): { issues: Issue[] } {
-  const at = key === undefined ? {} : key === 'body' ? { body: true as const } : { key }
+  const at: { key?: Issue['key'], body?: true } = {}
+
+  if (key === 'body')
+    at.body = true
+  else if (key !== undefined)
+    at.key = key
 
   return { issues: [{ collection: ref.collection, slug: ref.slug, locale: ref.locale, path: '', ...at, message }] }
 }

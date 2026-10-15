@@ -173,7 +173,10 @@ function onTick(pace: number, run: () => void): () => void {
 }
 
 function tickPace(seconds: number): number {
-  return seconds < 60 ? 1000 : seconds < 3600 ? 60_000 : 3_600_000
+  if (seconds < 60)
+    return 1000
+
+  return seconds < 3600 ? 60_000 : 3_600_000
 }
 
 export function formatList(items: Iterable<string>, options?: Intl.ListFormatOptions): string {

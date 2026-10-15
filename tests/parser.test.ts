@@ -17,6 +17,20 @@ function element(node: Node | undefined): ElementNode {
   return node
 }
 
+function attributeValue(file: KayFile, attribute: ElementNode['attributes'][number]): string | true {
+  if (attribute.kind === 'static')
+    return attribute.text
+
+  return attribute.kind === 'expression' ? `{${text(file, attribute.expression)}}` : true
+}
+
+function partOutline(file: KayFile, part: TextNode['parts'][number]): unknown {
+  if (part.kind === 'chunk')
+    return part.text
+
+  return part.kind === 'expression' ? `{${text(file, part.expression)}}` : outline(file, [part])[0]
+}
+
 // Renders the tree compactly so a test reads like the template it parsed.
 function outline(file: KayFile, nodes: Node[] = file.template): unknown[] {
   return nodes.map((node) => {
@@ -26,11 +40,11 @@ function outline(file: KayFile, nodes: Node[] = file.template): unknown[] {
           tag: node.name,
           ...(node.classes.length > 0 && { classes: node.classes.map(span => text(file, span)) }),
           ...(node.id && { id: text(file, node.id) }),
-          ...(node.attributes.length > 0 && { attributes: node.attributes.map(attribute => attribute.kind === 'spread' ? `...${text(file, attribute.expression)}` : `${text(file, attribute.name)}:${attribute.kind === 'static' ? attribute.text : attribute.kind === 'expression' ? `{${text(file, attribute.expression)}}` : true}`) }),
+          ...(node.attributes.length > 0 && { attributes: node.attributes.map(attribute => attribute.kind === 'spread' ? `...${text(file, attribute.expression)}` : `${text(file, attribute.name)}:${attributeValue(file, attribute)}`) }),
           ...(node.children.length > 0 && { children: outline(file, node.children) }),
         }
       case 'text':
-        return node.parts.map(part => part.kind === 'chunk' ? part.text : part.kind === 'expression' ? `{${text(file, part.expression)}}` : outline(file, [part])[0])
+        return node.parts.map(part => partOutline(file, part))
       case 'if':
         return { if: node.branches.map(branch => ({ test: text(file, branch.test), alias: text(file, branch.alias), children: outline(file, branch.children) })), else: node.fallback && outline(file, node.fallback.children) }
       case 'match':

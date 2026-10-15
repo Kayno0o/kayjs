@@ -90,11 +90,19 @@ export async function faviconFiles({ image: source, svg, maskable }: FaviconSour
   return files
 }
 
+function iconType(path: string): string {
+  if (path === ICO)
+    return 'image/x-icon'
+
+  return path === SVG ? 'image/svg+xml' : 'image/png'
+}
+
 // Draws the image at each size: an SVG drawn at it, so even the 16-pixel icon is sharp, an image resized to it once checked square.
 async function drawer(image: string, what: string, warn?: (message: string) => void): Promise<(size: number) => Promise<Uint8Array<ArrayBuffer>>> {
   if (SVG_FILE.test(image)) {
     const draw = await svgIconOf(image, what, warn)
 
+    // eslint-disable-next-line ts/require-await -- the interface returns a promise
     return async size => draw(size)
   }
 
@@ -252,7 +260,7 @@ export function serveFavicons(app: Elysia, served: ServedPaths, options: Favicon
       files ??= read()
 
       try {
-        return respond(request, (await files).get(path)!, path === ICO ? 'image/x-icon' : path === SVG ? 'image/svg+xml' : 'image/png')
+        return respond(request, (await files).get(path)!, iconType(path))
       }
       catch (error) {
         // The next request tries again, once the source is fixed.

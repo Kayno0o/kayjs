@@ -19,7 +19,7 @@ export interface Site {
   // A second process a side's server needs, as an API the pages fetch from: started with it in its directory, counted with it, and given the paths nginx sends its way.
   sidecar?: Partial<Record<Variant['kind'], Sidecar>>
   // What the site's servers need besides themselves, as a database seeded afresh: started before the builds, given the variants measured, and stopped as the run ends, however far `start` got.
-  services?: { start: (variants: Variant[]) => Promise<void>, stop: () => Promise<void> }
+  services?: { start: (variants: Variant[]) => Promise<void> | void, stop: () => Promise<void> | void }
   // What its dev servers read from the environment, none unless set: production's `env` may point a dev server elsewhere, as at the live site for its reloads.
   devEnv?: Record<string, string>
   // Runs on each side's dev copy once installed, given its directory, as for pointing the dev server's reloads back at it.
@@ -86,7 +86,7 @@ const KAY_PACKAGE = process.env.KAY_PACKAGE ?? ''
 const CHECKOUT = join(import.meta.dir, '../..')
 const PUBLISHED = '@kaynooo/kayjs'
 // What stops the services the sites' servers need, in the order they started.
-const services: (() => Promise<void>)[] = []
+const services: (() => Promise<void> | void)[] = []
 // Beside a kay dev copy's install: where its kay came from.
 const KAY_SOURCE = 'kay-bench-source.txt'
 // The dev copies `staleInstalls` warned of, with why.

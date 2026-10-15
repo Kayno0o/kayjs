@@ -236,7 +236,12 @@ export async function protectionRefusal(action: ServerAction<TSchema, unknown>, 
       return PRETEND
 
     if (reason !== undefined) {
-      const message = messages?.proofOfWork ?? (refusal => refusal === 'missing' ? 'Turn JavaScript on to send this form' : refusal === 'expired' ? 'This form has expired; send it again' : 'This form could not be checked; send it again')
+      const message = messages?.proofOfWork ?? ((refusal) => {
+        if (refusal === 'missing')
+          return 'Turn JavaScript on to send this form'
+
+        return refusal === 'expired' ? 'This form has expired; send it again' : 'This form could not be checked; send it again'
+      })
 
       // The fresh challenge kay's script solves to send the post again.
       return { status: 422, field: '', message: typeof message === 'string' ? message : message(reason), headers: { [WORK_HEADER]: signWork(action.url, work.difficulty, work.maxAge) } }
@@ -474,7 +479,10 @@ function rangesOf(proxy: ProxyConfig): BlockList | undefined {
 function familyOf(address: string): { name: 'ipv4' | 'ipv6', bits: number } | undefined {
   const family = nodeNet().isIP(address)
 
-  return family === 0 ? undefined : family === 4 ? { name: 'ipv4', bits: 32 } : { name: 'ipv6', bits: 128 }
+  if (family === 0)
+    return undefined
+
+  return family === 4 ? { name: 'ipv4', bits: 32 } : { name: 'ipv6', bits: 128 }
 }
 
 function warnUntrusted(proxy: ProxyConfig, address: string): void {

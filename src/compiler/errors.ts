@@ -336,6 +336,7 @@ export interface ExportProblem {
 }
 
 const KAY_PREFIX = /^kay: /
+const FIRST_SENTENCE = /^.*?\.(?=\s|$)/
 
 export function exportProblem(file: string, error: unknown): ExportProblem {
   return { code: errorCodeOf(error) ?? 'export-page-error', message: `${file}: ${error instanceof Error ? error.message.replace(KAY_PREFIX, '') : String(error)}` }
@@ -370,5 +371,5 @@ export function explainError(name: ErrorName): string {
 }
 
 function firstSentence(text: string): string {
-  return (/^.*?\.(?=\s|$)/).exec(text)?.[0] ?? text
+  return FIRST_SENTENCE.exec(text)?.[0] ?? text
 }

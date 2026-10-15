@@ -49,10 +49,7 @@ export type RowKey<Row> = (keyof Row & string) | ((row: Row) => string | number)
 const COLLATOR = new Intl.Collator()
 
 export function compareValues(a: string | number, b: string | number): number {
-  if (typeof a === 'number' && typeof b === 'number')
-    return a - b
-
-  return COLLATOR.compare(String(a), String(b))
+  return typeof a === 'number' && typeof b === 'number' ? a - b : COLLATOR.compare(String(a), String(b))
 }
 
 export function rowKeyOf<Row>(row: Row, key: RowKey<Row>): unknown {

@@ -44,6 +44,11 @@ const FRENCH_SIGN_INS: Record<string, string> = {
   'guest': 'en invité',
 }
 
+// The phrase a detail maps to in `phrases`, or `fallback` when it maps to none.
+function byDetail(phrases: Record<string, string>, fallback: string): AuditPhrase {
+  return detail => (detail === null ? undefined : phrases[detail]) ?? fallback
+}
+
 function signedIn(label: string, methods: Record<string, string>, provider: (name: string) => string) {
   return (detail: string | null) => {
     if (detail?.startsWith(OAUTH_PREFIX))
@@ -58,9 +63,9 @@ function signedIn(label: string, methods: Record<string, string>, provider: (nam
 const english: AuditWording = {
   'signed-in': signedIn('Signed in', ENGLISH_SIGN_INS, name => `with ${name}`),
   // Before 0.15, signing out everywhere was a `signed-out` with this detail.
-  'signed-out': detail => detail === 'everywhere' ? 'Signed out everywhere' : detail === 'everywhere-else' ? 'Signed out everywhere else' : 'Signed out',
+  'signed-out': byDetail({ 'everywhere': 'Signed out everywhere', 'everywhere-else': 'Signed out everywhere else' }, 'Signed out'),
   'signed-out-everywhere': detail => detail === 'this-one-kept' ? 'Signed out everywhere else' : 'Signed out everywhere',
-  'sign-in-failed': detail => detail === 'two-factor' ? 'Failed sign-in: wrong code' : detail === 'passkey' ? 'Failed sign-in: passkey refused' : 'Failed sign-in: wrong password',
+  'sign-in-failed': byDetail({ 'two-factor': 'Failed sign-in: wrong code', 'passkey': 'Failed sign-in: passkey refused' }, 'Failed sign-in: wrong password'),
   'new-sign-in': 'Signed in from a new device or network',
   'password-changed': 'Password changed',
   'email-changed': naming(detail => `Email changed to ${detail}`, 'Email changed'),
@@ -90,9 +95,9 @@ const english: AuditWording = {
 
 const french: AuditWording = {
   'signed-in': signedIn('Connexion', FRENCH_SIGN_INS, name => `avec ${name}`),
-  'signed-out': detail => detail === 'everywhere' ? 'Déconnexion partout' : detail === 'everywhere-else' ? 'Déconnexion de tous les autres appareils' : 'Déconnexion',
+  'signed-out': byDetail({ 'everywhere': 'Déconnexion partout', 'everywhere-else': 'Déconnexion de tous les autres appareils' }, 'Déconnexion'),
   'signed-out-everywhere': detail => detail === 'this-one-kept' ? 'Déconnexion de tous les autres appareils' : 'Déconnexion partout',
-  'sign-in-failed': detail => detail === 'two-factor' ? 'Échec de connexion : code incorrect' : detail === 'passkey' ? 'Échec de connexion : clé d’accès refusée' : 'Échec de connexion : mot de passe incorrect',
+  'sign-in-failed': byDetail({ 'two-factor': 'Échec de connexion : code incorrect', 'passkey': 'Échec de connexion : clé d’accès refusée' }, 'Échec de connexion : mot de passe incorrect'),
   'new-sign-in': 'Connexion depuis un nouvel appareil ou réseau',
   'password-changed': 'Mot de passe modifié',
   'email-changed': naming(detail => `Adresse changée pour ${detail}`, 'Adresse modifiée'),

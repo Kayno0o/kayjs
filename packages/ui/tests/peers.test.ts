@@ -6,7 +6,7 @@ import { expect, test } from 'bun:test'
 const ROOT = join(import.meta.dir, '..')
 // A static value import; a type import ships nothing, and a dynamic one is checked by building it below.
 const STATIC_IMPORT = /^import (?!type )[^'\n]*'([^']+)'/gm
-const OPTIONAL = ['chartist', 'hls.js']
+const OPTIONAL = new Set(['chartist', 'hls.js'])
 
 const sources = new Map<string, string>()
 
@@ -21,7 +21,7 @@ function peersOf(path: string, seen = new Set<string>()): string[] {
   seen.add(path)
 
   return [...sources.get(path)!.matchAll(STATIC_IMPORT)].flatMap(([, target = '']) => {
-    if (OPTIONAL.includes(target))
+    if (OPTIONAL.has(target))
       return [target]
 
     if (!target.startsWith('.'))

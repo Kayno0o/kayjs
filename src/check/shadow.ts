@@ -202,7 +202,8 @@ function paramTypesOf(routesDir: string, shadowDir: string, route: Pick<Route, '
     const matcher = route.matchers?.[name]
     const source = matcher === undefined ? undefined : matcherSource(routesDir, matcher)
     const module = source === 'kay' ? `'kay/params').${matcher}` : `${JSON.stringify(relative(shadowDir, source ?? '').replace(TS_FILE, ''))}).default`
-    const type = matcher === undefined ? 'string' : source === undefined ? 'unknown' : `Exclude<ReturnType<typeof import(${module}>, undefined>`
+    const checked = source === undefined ? 'unknown' : `Exclude<ReturnType<typeof import(${module}>, undefined>`
+    const type = matcher === undefined ? 'string' : checked
 
     return [name, route.optional?.includes(name) ? `${type} | undefined` : type]
   }))

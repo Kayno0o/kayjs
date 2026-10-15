@@ -204,7 +204,7 @@
     "@fontsource/inter": "^5.3.0",
     "@happy-dom/global-registrator": "^20.14.5",
     "@iconify-json/tabler": "^1.2.41",
-    "@kaynooo/eslint": "^6.1.0",
+    "@kaynooo/eslint": "^7.0.3",
     "@kaynooo/kayjs-auth": "workspace:*",
     "@kaynooo/kayjs-cms": "workspace:*",
     "@kaynooo/kayjs-mail": "workspace:*",

@@ -169,7 +169,11 @@ async function buildToDocument(root: string, options: BuildOptions): Promise<num
   }
   const onStage = async (stage: BuildStage, sofar: BuildResult) => {
     found = await printedProblems([...sofar.checked, ...sofar.linted])
-    running = stage === 'check' ? 'output' : stage === 'output' && options.exportTo !== undefined ? 'export' : 'compile'
+
+    if (stage === 'check')
+      running = 'output'
+    else
+      running = stage === 'output' && options.exportTo !== undefined ? 'export' : 'compile'
   }
 
   process.on('exit', ended)

@@ -177,7 +177,10 @@ describe('forgejo timeout', () => {
       const posting = init?.method === 'POST'
 
       // The first read is quick, the commit takes most of the timeout, and the read after the conflict would not fit in what is left.
-      await wait(init?.signal, posting ? 40 : reads++ === 0 ? 2 : 30)
+      const firstRead = !posting && reads++ === 0
+      const delay = firstRead ? 2 : 30
+
+      await wait(init?.signal, posting ? 40 : delay)
 
       return posting ? Response.json({ message: 'conflict' }, { status: 409 }) : Response.json({ sha: 'f00d' })
     }

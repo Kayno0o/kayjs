@@ -17,6 +17,7 @@ const PACKAGE = resolve(import.meta.dir, '../../package.json')
 // An import or a re-export of a module, its clause and specifier as Bun prints them unminified; a bare `import "x"` has no clause.
 const IMPORT = /\b(?:import|export)(\s[^"';]*?)\bfrom\s*"([^"]+)"|\bimport\s*"([^"]+)"/g
 const NAMESPACE = /\*/
+const ANY_PATH = /.*/
 const DEFAULT_IMPORT = /^[\w$]+\s*(?:,|$)/
 const NAMED = /\{([^}]*)\}/
 const ALIAS = /\s+as\s+/
@@ -242,7 +243,7 @@ export function anchorModule(used: Map<string, Set<string>>): string {
   const imports: string[] = []
   const kept: string[] = []
 
-  for (const [specifier, names] of [...used].sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)) {
+  for (const [specifier, names] of [...used].sort(([a], [b]) => a < b ? -1 : 1)) {
     const from = JSON.stringify(specifier)
 
     if (names.has(ALL)) {
@@ -269,7 +270,7 @@ export function runtimeAnchor(chunk: RuntimeChunk, boot?: string): BunPlugin {
     name: 'kay-runtime-chunk',
     setup(build) {
       build.onResolve({ filter: new RegExp(`^${RegExp.escape(ANCHOR)}$`) }, () => ({ path: ANCHOR, namespace: ANCHOR_NAMESPACE }))
-      build.onLoad({ filter: /.*/, namespace: ANCHOR_NAMESPACE }, () => ({ contents: boot !== undefined && boot !== '' ? `${chunk.anchor}import ${JSON.stringify(boot)}\n` : chunk.anchor, loader: 'ts', resolveDir: chunk.dir }))
+      build.onLoad({ filter: ANY_PATH, namespace: ANCHOR_NAMESPACE }, () => ({ contents: boot !== undefined && boot !== '' ? `${chunk.anchor}import ${JSON.stringify(boot)}\n` : chunk.anchor, loader: 'ts', resolveDir: chunk.dir }))
     },
   }
 }

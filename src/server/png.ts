@@ -65,7 +65,10 @@ function predict(filter: number | undefined, left: number, above: number, corner
       const toAbove = Math.abs(estimate - above)
       const toCorner = Math.abs(estimate - corner)
 
-      return toLeft <= toAbove && toLeft <= toCorner ? left : toAbove <= toCorner ? above : corner
+      if (toLeft <= toAbove && toLeft <= toCorner)
+        return left
+
+      return toAbove <= toCorner ? above : corner
     }
     case undefined:
     default:

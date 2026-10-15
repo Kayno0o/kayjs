@@ -27,6 +27,10 @@ const CARD_LINK = /ModuleCard\([^)]*\bhref="([^"]+)"/g
 const FRONTMATTER_PATH = /^path: (.+)$/m
 const SECTION_LINK = /href[=:] ?["'](\/[\w/-]+)#([\w-]+)["']/g
 
+function linkTarget(file: string, path: string): string {
+  return file === 'llms.txt' ? path : `llms/${path}`
+}
+
 describe('llms.txt', () => {
   it('stays an index an agent reads whole, listing every doc of llms/ once', () => {
     const listed = [...llms.matchAll(LISTED)].map(match => match[1]!)
@@ -43,7 +47,7 @@ describe('llms.txt', () => {
 
     for (const file of files) {
       for (const [link, path, anchor] of (await Bun.file(join(root, file)).text()).matchAll(LINK)) {
-        const target = path === undefined ? file : file === 'llms.txt' ? path : `llms/${path}`
+        const target = path === undefined ? file : linkTarget(file, path)
 
         if (!ids.has(target) || (anchor !== undefined && !ids.get(target)!.has(anchor.slice(1))))
           broken.push(`${file}: ${link}`)

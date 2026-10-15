@@ -103,7 +103,12 @@ function translatedPaths(config: I18nConfig): Record<string, Record<string, stri
 function paramsOf(pattern: string): string {
   const segments = pattern.split('/')
 
-  return segments.flatMap((segment, index) => segment === '*' ? [index === segments.length - 1 ? '*' : '*inner'] : segment.startsWith(':') ? [segment] : []).sort().join(' ')
+  return segments.flatMap((segment, index) => {
+    if (segment === '*')
+      return [index === segments.length - 1 ? '*' : '*inner']
+
+    return segment.startsWith(':') ? [segment] : []
+  }).sort().join(' ')
 }
 
 // The locales served under a prefix: every one but an unprefixed default, none when each has its domain.

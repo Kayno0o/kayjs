@@ -39,7 +39,10 @@ export function withBase(path: string): string {
 export function rebasedAttribute(name: string, value: string): string {
   const rebase = (url: string) => withoutBase(url) === url ? withBase(url) : url
 
-  return name === 'srcset' ? rebaseSrcset(value, rebase) : URL_ATTRIBUTES.includes(name) ? rebase(value) : value
+  if (name === 'srcset')
+    return rebaseSrcset(value, rebase)
+
+  return URL_ATTRIBUTES.includes(name) ? rebase(value) : value
 }
 
 export function rebaseSrcset(srcset: string, rebase: (url: string) => string): string {

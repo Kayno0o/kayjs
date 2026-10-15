@@ -34,7 +34,8 @@ export function fitted(): Plate {
 
 // How far a wheel event takes the plate in or out, whichever units the browser reports it in.
 export function wheelZoom(deltaY: number, deltaMode = 0, notch = NOTCH_ZOOM): number {
-  const travelled = deltaY * (deltaMode === 1 ? LINE : deltaMode === 2 ? PAGE : 1)
+  const unit = { 1: LINE, 2: PAGE }[deltaMode] ?? 1
+  const travelled = deltaY * unit
 
   return notch ** (-travelled / NOTCH)
 }

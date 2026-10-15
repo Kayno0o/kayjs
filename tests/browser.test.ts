@@ -643,7 +643,19 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a docs-lik
 
 describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the browser\'s profile', () => {
   const LOCKED = 'kay-chrome-999999998-locked'
-  const kinds = (names: string[]) => names.filter(name => name !== LOCKED).map(name => name.startsWith('kay-chrome-') ? 'kay' : name.endsWith('.bun-chrome') ? 'bun' : name.includes('url_fetcher') ? 'fetcher' : name.startsWith('org.chromium.') ? 'chrome' : name).sort()
+  const kindOf = (name: string) => {
+    if (name.startsWith('kay-chrome-'))
+      return 'kay'
+
+    if (name.endsWith('.bun-chrome'))
+      return 'bun'
+
+    if (name.includes('url_fetcher'))
+      return 'fetcher'
+
+    return name.startsWith('org.chromium.') ? 'chrome' : name
+  }
+  const kinds = (names: string[]) => names.filter(name => name !== LOCKED).map(kindOf).sort()
   // The directory some Chrome makes of its own as it runs, Alpine's among them.
   const running = (kinds: string[]) => kinds.filter(kind => kind !== 'fetcher')
   // A temp directory of its own, short as Chrome's socket path must be, which macOS's own is not.

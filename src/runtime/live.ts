@@ -158,7 +158,13 @@ function readMessage(data: unknown): unknown {
   if (NUMERIC.test(data))
     return Number(data)
 
-  return data === 'true' ? true : data === 'false' ? false : data === 'null' ? null : data
+  if (data === 'true')
+    return true
+
+  if (data === 'false')
+    return false
+
+  return data === 'null' ? null : data
 }
 
 // The handler a message's `type` names, given the message: one function per type in place of a `switch`, every type handled, as the compiler checks.

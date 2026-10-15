@@ -305,9 +305,7 @@ function tagMarkup(tag: HeadTag): string {
   if (VOID_TAGS.has(tag.tag))
     return `<${tag.tag}${attributes}>`
 
-  const content = tag.tag === 'script' ? scriptText(tag) : tag.tag === 'style' ? inlineText(tag) ?? '' : escape(text(tag))
-
-  return `<${tag.tag}${attributes}>${content}</${tag.tag}>`
+  return `<${tag.tag}${attributes}>${tagContent(tag)}</${tag.tag}>`
 }
 
 // The attributes a tag renders, by their name in lowercase as HTML reads it, the last of a name winning: `true` for one written bare, none for `false` and `null`.
@@ -339,6 +337,13 @@ function markupOf(attributes: Map<string, string | true>): string {
 }
 
 // A JSON script, such as JSON-LD, takes its data as an object or as text.
+function tagContent(tag: HeadTag): string {
+  if (tag.tag === 'script')
+    return scriptText(tag)
+
+  return tag.tag === 'style' ? inlineText(tag) ?? '' : escape(text(tag))
+}
+
 function scriptText(tag: HeadTag): string {
   if (!DATA_SCRIPT.test(String(tag.props.type ?? '')))
     return text(tag).replace(SCRIPT_BREAK, '<\\$1')

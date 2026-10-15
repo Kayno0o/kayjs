@@ -16,6 +16,13 @@ const products: CollectionInfo = { name: 'products', kind: 'loaded', schema: { t
 const TAKEN = 'names an entry the collection already holds'
 const MISSING = 'names no entry of the collection'
 
+function validSource(collection: string, slug: string, data: unknown, body: string | undefined) {
+  if ((data as Record<string, unknown>).title === '')
+    return { issues: [{ collection, slug, path: 'title', message: 'Required' }] }
+
+  return { file: { path: `${slug}.md`, absolute: `/site/content/${collection}/${slug}.md`, repoPath: `content/${collection}/${slug}.md`, text: `${JSON.stringify(data)}\n${body ?? ''}` } }
+}
+
 let saved: FileChange[]
 let loaded: { slug: string, data: unknown }[]
 let removed: string[]
@@ -36,9 +43,7 @@ const content: typeof Content = {
   entries: async (collection, filter) => failing ? Promise.reject(new Error('kay: products\'s load threw: password for db.internal')) : (stored[collection] ?? []).filter(entry => (filter?.slug === undefined || entry.slug === filter.slug) && (filter?.locale === undefined || entry.locale === filter.locale)),
   entrySource: async (collection, slug, data, options) => options?.create && stored[collection]?.some(entry => entry.slug === slug)
     ? { issues: [{ collection, slug, path: '', key: 'slug', message: TAKEN }] }
-    : (data as Record<string, unknown>).title === ''
-      ? { issues: [{ collection, slug, path: 'title', message: 'Required' }] }
-      : { file: { path: `${slug}.md`, absolute: `/site/content/${collection}/${slug}.md`, repoPath: `content/${collection}/${slug}.md`, text: `${JSON.stringify(data)}\n${options?.body ?? ''}` } },
+    : validSource(collection, slug, data, options?.body),
   saveEntry: async (collection, entry, options) => {
     if (options?.create && stored[collection]?.some(stock => stock.slug === entry.slug))
       return { issues: [{ collection, slug: entry.slug, path: '', key: 'slug', message: TAKEN }] }

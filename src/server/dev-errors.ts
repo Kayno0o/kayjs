@@ -8,7 +8,7 @@ import { describeThrown } from '../build/sourcemap'
 import { codeFrame } from '../compiler/frame'
 import { offsetAt, positionAt } from '../compiler/mapping'
 import { alive } from './lifecycle'
-import { pathOf } from './log'
+import { pathOf, statusOf } from './log'
 import { firstOwnFrame } from './overlay'
 
 // One error a `kay dev` server met, as `.kay/dev/errors.json` lists it for a reader without a browser, such as a coding agent.
@@ -121,7 +121,7 @@ export function clearDevErrorsOnAnswer(app: Elysia, base: string): void {
     return
 
   tracked.base = base
-  app.onAfterResponse({ as: 'global' }, ({ request, set, responseValue }) => answeredWithoutError(request, responseValue instanceof Response ? responseValue.status : typeof set.status === 'number' ? set.status : 200))
+  app.onAfterResponse({ as: 'global' }, ({ request, set, responseValue }) => answeredWithoutError(request, statusOf(responseValue, set)))
 }
 
 export function answeredWithoutError(request: Request, status: number): void {

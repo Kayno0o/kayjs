@@ -90,6 +90,13 @@ export function failure(error: string): string {
   return message(`auth.errors.${error}` as never)
 }
 
+function captchaFailure(captcha: AuthFeatures['captcha'], error: string): string {
+  if (captcha !== 'proof-of-work')
+    return 'captcha'
+
+  return error === 'captcha' ? 'captchaAgain' : 'captchaScript'
+}
+
 // What a page open to visitors shows for a refused post: what kay refused it for before the action, or its failure code, a refused proof of work worded by whether the browser ran it.
 export function refusal(failed: { errors: Partial<Record<string, string>>, data?: unknown } | undefined, captcha: AuthFeatures['captcha']): string | undefined {
   const error = (failed?.data as { error?: string } | undefined)?.error
@@ -101,10 +108,7 @@ export function refusal(failed: { errors: Partial<Record<string, string>>, data?
   }
 
   // A proof of work refused with a solution is a stale one, which the page now holds a fresh challenge for; a widget keeps its one message.
-  if (error === 'captcha' || error === 'captchaScript')
-    return failure(captcha !== 'proof-of-work' ? 'captcha' : error === 'captcha' ? 'captchaAgain' : 'captchaScript')
-
-  return failure(error)
+  return error === 'captcha' || error === 'captchaScript' ? failure(captchaFailure(captcha, error)) : failure(error)
 }
 
 // What a page shows under a field refused for `problem`, with the limits the rule holds it to.

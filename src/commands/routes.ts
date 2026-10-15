@@ -209,7 +209,8 @@ async function feedRoutes(root: string, config: KayConfig): Promise<Listed[]> {
 function kayRoutes(root: string, config: KayConfig): Listed[] {
   const kay = (path: string, by: string, methods = 'GET'): Listed => ({ methods, path, kind: 'kay', by })
   const favicon = faviconSource(root, config.favicon, config.manifest)
-  const openapi = config.openapi === true ? {} : config.openapi === false ? undefined : config.openapi
+  const enabled = config.openapi === false ? undefined : config.openapi
+  const openapi = enabled === true ? {} : enabled
 
   return [
     ...config.health === false ? [] : [kay(config.health?.path ?? HEALTH_PATH, 'health check')],

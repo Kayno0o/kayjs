@@ -56,7 +56,8 @@ export function noteMessage(key: string): void {
 export function island<P extends object>(id: string, component: ((props: P) => JSX.Element) | undefined, messages: readonly string[] = [], client = false, why = 'is interactive'): IslandComponent<P> {
   const render = (props: P & IslandOptions) => {
     const when = props.hydrate
-    const persist = props.persist === true ? id : props.persist === false || props.persist === '' ? undefined : props.persist
+    const kept = props.persist === false || props.persist === '' || props.persist === true ? undefined : props.persist
+    const persist = props.persist === true ? id : kept
     const own = 'hydrate' in props || 'persist' in props ? omit(props, 'hydrate', 'persist') as P : props
     const browserOnly = client || when === 'client'
 

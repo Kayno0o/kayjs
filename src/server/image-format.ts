@@ -130,7 +130,12 @@ function boxes(bytes: Uint8Array, start: number, end: number): { type: string, s
   while (at + 8 <= end) {
     const size = view.getUint32(at)
     const header = size === 1 ? 16 : 8
-    const length = size === 0 ? end - at : size === 1 && at + 16 <= end ? Number(view.getBigUint64(at + 8)) : size
+    let length = size
+
+    if (size === 0)
+      length = end - at
+    else if (size === 1 && at + 16 <= end)
+      length = Number(view.getBigUint64(at + 8))
 
     if (length < header || at + length > end)
       break

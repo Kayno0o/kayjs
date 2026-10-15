@@ -88,14 +88,17 @@ function answer(socket: Socket<Session>, line: string, received: Received[], gre
     socket.write('502 not implemented\r\n')
 }
 
+const BOUNDARY = /boundary="([^"]+)"/
+const QUOTED_PRINTABLE = /^Content-Transfer-Encoding: quoted-printable$/im
+
 // A received message's body, or in a multipart one its `type` part, as its sender wrote it, quoted-printable decoded.
 export function bodyText(mail: Received, type = 'text/plain'): string {
-  const boundary = (/boundary="([^"]+)"/).exec(mail.data)?.[1]
+  const boundary = BOUNDARY.exec(mail.data)?.[1]
   const entity = boundary === undefined ? mail.data : mail.data.split(`--${boundary}`).find(part => part.includes(`Content-Type: ${type}`))?.trimStart() ?? ''
   const split = entity.indexOf('\n\n')
   const body = entity.slice(split + 2)
 
-  if (!(/^Content-Transfer-Encoding: quoted-printable$/im).test(entity.slice(0, split)))
+  if (!QUOTED_PRINTABLE.test(entity.slice(0, split)))
     return body
 
   const bytes = body.replace(/=\n/g, '').replace(/=([0-9A-F]{2})/g, (_, hex: string) => String.fromCharCode(Number.parseInt(hex, 16)))

@@ -20,8 +20,10 @@ export const explain: Command = {
     if (name === undefined || isLintGroup(name) || isErrorGroup(name)) {
       if (format === 'json')
         printDocument(isErrorGroup(name) ? errorDocument(name) : lintDocument(name))
+      else if (isErrorGroup(name))
+        console.log(errorList(name))
       else
-        console.log(isErrorGroup(name) ? errorList(name) : isLintGroup(name) ? lintList(name) : `${lintList()}\n\n${errorList()}`)
+        console.log(isLintGroup(name) ? lintList(name) : `${lintList()}\n\n${errorList()}`)
 
       return 0
     }

@@ -11,6 +11,7 @@ import { eachNode, parseFence } from './script'
 
 // A line break before a line with text: a blank line moving into `page` stays blank.
 const LINE_WITH_TEXT = /\n(?=[^\n])/g
+const NON_SPACE_OR_NEWLINE = /\S|\n/
 
 // Settings exported under their own names, with a fix moving every one it can into `page` at once: each diagnostic carries the same fix, applied once.
 export function separatePageSettings(source: string, server: ServerAnalysis): Diagnostic[] {
@@ -71,13 +72,24 @@ function indentValue(value: string): string {
 
 // Past the line break ending a statement, so its line goes with it.
 function lineEnd(source: string, end: number): number {
-  const at = source.slice(end).search(/\S|\n/)
+  const at = source.slice(end).search(NON_SPACE_OR_NEWLINE)
 
   return at !== -1 && source[end + at] === '\n' ? end + at + 1 : end
 }
 
 // What the quick fix bounds a string field to: room for a title or a name.
 const SUGGESTED_MAX_LENGTH = 200
+
+// Where and what to insert to bound a string field: a new options object, the first property of an empty one, or a property before the others.
+function maxLengthEdit(call: t.CallExpression, options: t.CallExpression['arguments'][number] | undefined): { at: number, text: string } {
+  if (options === undefined)
+    return { at: call.end! - 1, text: `{ maxLength: ${SUGGESTED_MAX_LENGTH} }` }
+
+  if (options.type === 'ObjectExpression' && options.properties.length === 0)
+    return { at: options.start! + 1, text: ` maxLength: ${SUGGESTED_MAX_LENGTH} ` }
+
+  return { at: (options as t.ObjectExpression).properties[0]!.start!, text: `maxLength: ${SUGGESTED_MAX_LENGTH}, ` }
+}
 
 // A string field of an action's schema with no `maxLength` takes whatever a visitor posts into it, up to the request body limit. A secret, such as a password, is checked or hashed rather than kept or shown, so it needs none.
 export function unboundedFields(server: ServerAnalysis | undefined): Diagnostic[] {
@@ -99,9 +111,7 @@ export function unboundedFields(server: ServerAnalysis | undefined): Diagnostic[
       if (!known || (options?.type === 'ObjectExpression' && options.properties.some(property => property.type !== 'SpreadElement' && propertyKey(property) === 'maxLength')) || (field !== undefined && isSecret(field)))
         return
 
-      const edit = options === undefined
-        ? { at: call.end! - 1, text: `{ maxLength: ${SUGGESTED_MAX_LENGTH} }` }
-        : options.properties.length === 0 ? { at: options.start! + 1, text: ` maxLength: ${SUGGESTED_MAX_LENGTH} ` } : { at: options.properties[0]!.start!, text: `maxLength: ${SUGGESTED_MAX_LENGTH}, ` }
+      const edit = maxLengthEdit(call, options)
       const at = fence.offset + edit.at
 
       diagnostics.push({
@@ -142,9 +152,8 @@ export function deprecatedSchemaNames(fence: ParsedFence, renamable = true): Dia
 
         const references = local.name === 't' ? path.scope.getBinding('t')?.referencePaths ?? [] : []
         const rename = renamable && local.name === 't' && !path.scope.hasBinding('s') && references.every(reference => !reference.scope.hasBinding('s'))
-        const edits = local.name !== 't'
-          ? [{ ...span(imported), text: 's' }]
-          : rename ? [path.node, ...references.map(reference => reference.node)].map(node => ({ ...span(node), text: 's' })) : [{ ...span(path.node), text: 's as t' }]
+        const renamed = rename ? [path.node, ...references.map(reference => reference.node)].map(node => ({ ...span(node), text: 's' })) : [{ ...span(path.node), text: 's as t' }]
+        const edits = local.name !== 't' ? [{ ...span(imported), text: 's' }] : renamed
 
         diagnostics.push({
           ...span(imported),
@@ -207,7 +216,10 @@ function propertyKey(property: t.ObjectProperty | t.ObjectMethod): string | unde
   if (property.computed)
     return undefined
 
-  return property.key.type === 'Identifier' ? property.key.name : property.key.type === 'StringLiteral' ? property.key.value : undefined
+  if (property.key.type === 'Identifier')
+    return property.key.name
+
+  return property.key.type === 'StringLiteral' ? property.key.value : undefined
 }
 
 // The checks a plain module takes, parsed only when one of them may find something.

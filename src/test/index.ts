@@ -218,7 +218,7 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
   // Without a browser the pages render their islands' markup and load no script, so the build only had to succeed.
   const client: ClientBuild = inBrowser && wanted ? wanted : { entryImports: [], islands: {}, styles: new Map(), pages: new Map(), dir: clientDir(root) }
   const browser = typeof options.browser === 'object' ? options.browser : {}
-  const pages = await servePages(project, async () => client)
+  const pages = await servePages(project, () => client)
   const locals = options.locals
   const before = [...options.use ?? [], ...locals ? [new Elysia().derive({ as: 'global' }, async ({ request }) => locals(request))] : []]
   const app = before.length === 0 ? pages : before.reduce<AnyElysia>((served, plugin) => served.use(plugin), new Elysia()).use(pages)

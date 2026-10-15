@@ -281,11 +281,11 @@ export async function bundleIslands(root: string, islands: Map<string, string>, 
   // Bun resolves packages' `development` export condition unless NODE_ENV is defined as production, which would ship a package's dev build; a build for development, not NODE_ENV, asks for theirs.
   const define: Record<string, string> = { 'KAY_BROWSER': 'true', 'process.env.NODE_ENV': JSON.stringify(options.hot === true ? 'development' : 'production'), ...options.exported === true && { KAY_STATIC_EXPORT: 'true' } }
   const external = publicEnv !== undefined ? [publicEnv] : []
-  const plugins = async (anchor?: string, anchored?: ReadonlySet<string>) => [withoutStyles(), api, kay({ target: 'dom', root, cacheDir: projectPaths(root).cache, settings: options.settings, anchor, anchored, inspect: options.inspect, api: trees, external }), ...options.plugins ?? []]
+  const plugins = (anchor?: string, anchored?: ReadonlySet<string>) => [withoutStyles(), api, kay({ target: 'dom', root, cacheDir: projectPaths(root).cache, settings: options.settings, anchor, anchored, inspect: options.inspect, api: trees, external }), ...options.plugins ?? []]
 
   await Bun.write(entryFile, `import ${JSON.stringify(bootFile)}\n`)
 
-  const chunk = await runtimeChunk(entryFile, { plugins: await plugins(), define, external, cache: { file: join(projectPaths(root).cache, `runtime-search-${options.hot ? 'dev' : 'build'}.json`), key: `${JSON.stringify([options.settings, options.inspect, options.navigation, trees])}\0${await Bun.file(bootFile).text()}` } })
+  const chunk = await runtimeChunk(entryFile, { plugins: plugins(), define, external, cache: { file: join(projectPaths(root).cache, `runtime-search-${options.hot ? 'dev' : 'build'}.json`), key: `${JSON.stringify([options.settings, options.inspect, options.navigation, trees])}\0${await Bun.file(bootFile).text()}` } })
 
   // In development the entry keeps its own code, the islands it imports by their hashed names included: the runtime's chunk then stays as it was through an edit of an island, which swaps in alone.
   // A second entry point importing the runtime alone has Bun give it that chunk of its own, which it would otherwise merge into the entry's.
@@ -308,7 +308,7 @@ export async function bundleIslands(root: string, islands: Map<string, string>, 
     define,
     naming: { entry: '[name]-[hash].[ext]', chunk: '[name]-[hash].[ext]' },
     external,
-    plugins: chunk ? [runtimeAnchor(chunk, options.hot ? undefined : bootFile), ...await plugins(ANCHOR, chunk.lazy)] : await plugins(),
+    plugins: chunk ? [runtimeAnchor(chunk, options.hot ? undefined : bootFile), ...plugins(ANCHOR, chunk.lazy)] : plugins(),
     throw: false,
   } satisfies Bun.BuildConfig
   const since = raisedMark()

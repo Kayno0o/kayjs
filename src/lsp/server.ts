@@ -355,7 +355,14 @@ export class KayLanguageServer {
       const stamps = new Map([...types.files].map(([path, shadow]) => [path, Bun.hash.wyhash(shadow.tsx)] as const))
 
       changes.push(
-        ...[...files].flatMap((path): FileEvent[] => project.shadowFiles.has(path) ? stamps.get(path) !== project.shadowStamps.get(path) ? [{ uri: pathToFileURL(path).href, type: CHANGED }] : [] : [{ uri: pathToFileURL(path).href, type: CREATED }]),
+        ...[...files].flatMap((path): FileEvent[] => {
+          const uri = pathToFileURL(path).href
+
+          if (!project.shadowFiles.has(path))
+            return [{ uri, type: CREATED }]
+
+          return stamps.get(path) !== project.shadowStamps.get(path) ? [{ uri, type: CHANGED }] : []
+        }),
         ...[...project.shadowFiles].filter(path => !files.has(path)).map((path): FileEvent => ({ uri: pathToFileURL(path).href, type: DELETED })),
         { uri: pathToFileURL(join(project.shadowTree, 'kay-env.d.ts')).href, type: CHANGED },
       )
@@ -699,7 +706,10 @@ export class KayLanguageServer {
   private async definitionsAt(at: TextDocumentPositionParams): Promise<(Location | LocationLink)[]> {
     const result = await this.server.request<Location | Location[] | LocationLink[] | null>('textDocument/definition', at)
 
-    return result === null ? [] : Array.isArray(result) ? result : [result]
+    if (result === null)
+      return []
+
+    return Array.isArray(result) ? result : [result]
   }
 
   // Definitions inside another component land in its shadow TSX; this points them back at the .kay file.

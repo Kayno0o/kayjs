@@ -51,7 +51,7 @@
   },
   "devDependencies": {
     "@happy-dom/global-registrator": "^20.14.5",
-    "@kaynooo/eslint": "^6.1.0",
+    "@kaynooo/eslint": "^7.0.3",
     "@kaynooo/kayjs-ui": "workspace:~",
     "@types/bun": "^1.4.2",
     "@typescript/native-preview": "^7.0.0-dev.20260707.2",

@@ -12,6 +12,7 @@ import { gzipSize } from './report'
 // A script a page loads from the build, whatever the mount point puts before it.
 const SCRIPT_URL = /(?:src|href)="[^"]*?(\/_kay\/[^"?#]+\.js)[?#"]/g
 // Every specifier a module names, static or dynamic, `from 'x'`, `import 'x'` or `import('x')`; one in a comment or a string only adds a file the estimate may overcount.
+const PATH_SEPARATOR = /[/\\]/
 const IMPORT = /\b(?:from|import)\s*(?:\(\s*)?['"]([^'"]+)['"]/g
 
 // What each route loads, gzip: the stylesheets of its layouts and page, and the scripts its prerendered pages link, the heaviest page of them.
@@ -147,5 +148,5 @@ function followed(file: string | undefined, root: string): string | undefined {
 
   const path = relative(root, file)
 
-  return SCRIPT_FILE.test(file) && !path.startsWith('..') && !path.split(/[/\\]/).includes('node_modules') ? file : undefined
+  return SCRIPT_FILE.test(file) && !path.startsWith('..') && !path.split(PATH_SEPARATOR).includes('node_modules') ? file : undefined
 }

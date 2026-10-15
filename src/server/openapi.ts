@@ -166,7 +166,12 @@ function responses(response: unknown): Record<string, Schema> {
 // A schema under the type it goes as: raw bytes as such, text as text, anything else as `fallback`.
 function content(schema: unknown, fallback: string): Record<string, { schema: unknown }> {
   const plain = schemaOf(schema) as Schema
-  const type = plain.format === 'binary' ? 'application/octet-stream' : plain.type === 'string' && fallback === 'application/json' ? 'text/plain' : fallback
+  let type = fallback
+
+  if (plain.format === 'binary')
+    type = 'application/octet-stream'
+  else if (plain.type === 'string' && fallback === 'application/json')
+    type = 'text/plain'
 
   return { [type]: { schema: plain } }
 }

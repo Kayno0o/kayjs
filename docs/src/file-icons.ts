@@ -48,8 +48,5 @@ export function fileIcon(name: string): IconProps | 'kay' {
   if (named)
     return named
 
-  if (CONFIG.test(name))
-    return Settings
-
-  return BY_EXTENSION[EXTENSION.exec(name)?.[1] ?? ''] ?? File
+  return CONFIG.test(name) ? Settings : BY_EXTENSION[EXTENSION.exec(name)?.[1] ?? ''] ?? File
 }

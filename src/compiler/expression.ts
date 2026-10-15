@@ -108,10 +108,7 @@ export function mayHoldFunction(code: string, names: ReadonlySet<string>): boole
     if (node.type === 'NewExpression' && (node.callee.type !== 'Identifier' || !SENDABLE_CLASSES.has(node.callee.name)))
       return true
 
-    if (node.type === 'Identifier')
-      return names.has(node.name)
-
-    return Object.values(node).some(visit)
+    return node.type === 'Identifier' ? names.has(node.name) : Object.values(node).some(visit)
   }
 
   return visit(expression)

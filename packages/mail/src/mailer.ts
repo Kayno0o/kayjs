@@ -101,7 +101,10 @@ const RECIPIENTS = `^\\s*${RECIPIENT}(?:\\s*,\\s*${RECIPIENT})*\\s*$`
 const OUTLOOK_SETTINGS = '<!--[if mso]><noscript><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings><w:WordDocument><w:DontUseAdvancedTypographyReadingMail/></w:WordDocument></xml></noscript><![endif]-->'
 
 function list(addresses: Address | Address[] | undefined): Address[] {
-  return addresses === undefined ? [] : Array.isArray(addresses) ? addresses : [addresses]
+  if (addresses === undefined)
+    return []
+
+  return Array.isArray(addresses) ? addresses : [addresses]
 }
 
 // An optional field left empty, as a form's blank reply-to gives it, names no one rather than a broken address.

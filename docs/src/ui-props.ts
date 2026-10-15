@@ -137,7 +137,10 @@ function unwrap(type: string): string {
   let depth = 0
 
   for (const [index, char] of [...type].entries()) {
-    depth += char === '(' ? 1 : char === ')' ? -1 : 0
+    if (char === '(')
+      depth++
+    else if (char === ')')
+      depth--
 
     if (depth === 0 && index < type.length - 1)
       return type

@@ -38,6 +38,8 @@ interface Component {
 
 type Glyph = { contours: OutlinePoint[][] } | { components: Component[] }
 
+// How well a cmap subtable's format covers the characters: 12 reaches past the basic plane, 4 does not.
+const CMAP_FORMAT_RANK = new Map([[12, 2], [4, 1]])
 const TRUETYPE = new Set([0x00010000, 0x74727565])
 const CFF = 0x4F54544F
 const COLLECTION = 0x74746366
@@ -144,10 +146,7 @@ class Reader {
     if (code === 255)
       return this.u8() + 253
 
-    if (code === 254)
-      return this.u8() + 506
-
-    return code
+    return code === 254 ? this.u8() + 506 : code
   }
 }
 
@@ -162,7 +161,7 @@ export function readFace(bytes: Uint8Array): Face {
   if (flavor === COLLECTION || !TRUETYPE.has(flavor))
     throw new Error('it is no single TrueType font')
 
-  const tables = signature === WOFF ? woffTables(bytes) : signature === WOFF2 ? woff2Tables(bytes) : sfntTables(bytes)
+  const tables = tablesOf(bytes, signature)
   const table = (tag: string) => {
     const found = tables.get(tag)
 
@@ -198,6 +197,13 @@ export function readFace(bytes: Uint8Array): Face {
       return outline
     },
   }
+}
+
+function tablesOf(bytes: Uint8Array, signature: number): Map<string, Table> {
+  if (signature === WOFF)
+    return woffTables(bytes)
+
+  return signature === WOFF2 ? woff2Tables(bytes) : sfntTables(bytes)
 }
 
 function sfntTables(bytes: Uint8Array): Map<string, Table> {
@@ -349,7 +355,12 @@ function compositeGlyph(reader: Reader): { components: Component[], instructions
     const glyph = reader.u16()
     const words = (flags & ARGS_ARE_WORDS) !== 0
     const xy = (flags & ARGS_ARE_XY) !== 0
-    const argument = () => words ? xy ? reader.i16() : reader.u16() : xy ? reader.i8() : reader.u8()
+    const argument = () => {
+      if (words)
+        return xy ? reader.i16() : reader.u16()
+
+      return xy ? reader.i8() : reader.u8()
+    }
     const [first, second] = [argument(), argument()]
     let matrix: Component['matrix'] = [1, 0, 0, 1]
 
@@ -519,7 +530,7 @@ function characterMap(cmap: Uint8Array): Map<number, number> {
     const [platform, encoding, offset] = [reader.u16(), reader.u16(), reader.u32()]
     const format = new Reader(cmap, offset).u16()
     const unicode = platform === 0 || (platform === 3 && (encoding === 1 || encoding === 10))
-    const rank = !unicode ? 0 : format === 12 ? 2 : format === 4 ? 1 : 0
+    const rank = unicode ? CMAP_FORMAT_RANK.get(format) ?? 0 : 0
 
     if (rank > (best?.rank ?? 0))
       best = { offset, rank }

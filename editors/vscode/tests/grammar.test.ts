@@ -23,7 +23,12 @@ beforeAll(async () => {
   const kay = await Bun.file(join(import.meta.dir, '..', 'syntaxes', 'kay.tmLanguage.json')).json() as IRawGrammar
   const registry = new Registry({
     onigLib: Promise.resolve({ createOnigScanner: patterns => new OnigScanner(patterns), createOnigString: text => new OnigString(text) }),
-    loadGrammar: async scopeName => scopeName === 'source.kay' ? kay : scopeName === 'source.ts' ? typescript as unknown as IRawGrammar : null,
+    loadGrammar: async (scopeName) => {
+      if (scopeName === 'source.kay')
+        return kay
+
+      return scopeName === 'source.ts' ? typescript as unknown as IRawGrammar : null
+    },
   })
 
   grammar = (await registry.loadGrammar('source.kay'))!
