@@ -192,16 +192,15 @@ export async function writeStoredReport(file: string, stored: StoredReport): Pro
 }
 
 export interface ReportView {
-  // Columns the terminal has; no line runs past it.
+  // Columns the terminal has, which no line runs past; none when the output is no terminal, whose log has room for whole paths.
   width?: number | undefined
   previous?: StoredReport | undefined
 }
 
-const DEFAULT_WIDTH = 100
 const SHOWN_ROUTES = 25
 
 // The islands as `kay build` prints them, one line each, the heaviest first.
-export function formatSizeReport(report: SizeReport, { width = DEFAULT_WIDTH, previous }: ReportView = {}): string {
+export function formatSizeReport(report: SizeReport, { width = Infinity, previous }: ReportView = {}): string {
   if (report.entry === undefined && report.islands.length === 0)
     return 'no JavaScript bundle: no page has an island'
 
@@ -224,7 +223,7 @@ export function formatSizeReport(report: SizeReport, { width = DEFAULT_WIDTH, pr
 }
 
 // One row per route, the heaviest first: its pattern, whether it was prerendered, and what it loads.
-export function formatRouteTable(routes: RouteSize[], { width = DEFAULT_WIDTH, previous }: ReportView = {}): string {
+export function formatRouteTable(routes: RouteSize[], { width = Infinity, previous }: ReportView = {}): string {
   if (routes.length === 0)
     return ''
 

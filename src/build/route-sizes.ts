@@ -19,10 +19,17 @@ export async function routeSizes(root: string, client: ClientBuild, routes: Rout
     let size = sizes.get(url)
 
     if (size === undefined) {
+      // A page's own text may name a URL that is no file of the build, a malformed escape or a `..` included.
       size = (async () => {
-        const file = Bun.file(join(client.dir, ...url.slice(ASSET_PREFIX.length).split('/').map(decodeURIComponent)))
+        try {
+          const parts = url.slice(ASSET_PREFIX.length).split('/').map(decodeURIComponent)
+          const file = Bun.file(join(client.dir, ...parts))
 
-        return await file.exists() ? gzipSize(await file.bytes()) : 0
+          return parts.includes('..') || !await file.exists() ? 0 : gzipSize(await file.bytes())
+        }
+        catch {
+          return 0
+        }
       })()
       sizes.set(url, size)
     }
@@ -67,7 +74,7 @@ export async function routeSizes(root: string, client: ClientBuild, routes: Rout
     if (pages.length > 0) {
       const each = await Promise.all(pages.map(async page => total(new Set([...page.html.matchAll(SCRIPT_URL)].map(match => match[1]!)))))
 
-      bySize.set(route.pattern, { route: route.pattern, js: Math.max(...each), css, pages: pages.length, estimated: false })
+      bySize.set(route.pattern, { route: route.pattern, js: each.reduce((most, size) => Math.max(most, size), 0), css, pages: pages.length, estimated: false })
 
       continue
     }

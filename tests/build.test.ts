@@ -1,8 +1,10 @@
 import type { BunPlugin } from 'bun'
 import type { BuildOptions, BuildResult } from '../src/build/pipeline'
 import type { BuildSummary, RouteSize, SizeReport, StoredReport } from '../src/build/report'
+import type { RenderedPage } from '../src/check/seo'
 import type { KayConfig } from '../src/config'
 import type { ClientBuild } from '../src/server/client'
+import type { Route } from '../src/server/routes'
 import { existsSync, utimesSync } from 'node:fs'
 import { mkdir, mkdtemp, readdir, realpath, rename, rm, stat, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -17,6 +19,7 @@ import { forgetSources, keepSources, readSource, realPath, writeIfChanged } from
 import { fileWords, reachesAny } from '../src/build/libraries'
 import { BUNDLED_LICENCES, codecWarnings, thirdPartyNotices, unknownCodecVersions } from '../src/build/licenses'
 import { formatBuildReport, formatRouteTable, formatSizeReport, shorten } from '../src/build/report'
+import { routeSizes } from '../src/build/route-sizes'
 import { anchorModule, runtimeChunk } from '../src/build/runtime-chunk'
 import { runtimeConfig, withoutPlugins } from '../src/build/runtime-config'
 import { importedSignals, inSignalsScope } from '../src/build/signals'
@@ -1709,6 +1712,24 @@ describe('the build report', () => {
     expect(printed).toMatch(/^ {2}entry, loaded by every page with an island +4\.0 KB \(8\.8 KB\)$/m)
   })
 
+  it('weighs only the build\'s own scripts a page names, whatever else its text holds', async () => {
+    const dir = await scratchDir('route-sizes-')
+
+    try {
+      await Bun.write(join(dir, 'a.js'), 'export const a = 1\n'.repeat(50))
+      await Bun.write(join(dir, '../outside.js'), 'x'.repeat(5000))
+
+      const html = '<script type="module" src="/base/_kay/a.js"></script><p><a href="/_kay/%zz.js">x</a><a href="/_kay/../outside.js">y</a></p>'
+      const sizes = await routeSizes('/app', { dir, styles: new Map() } as unknown as ClientBuild, [{ pattern: '/', file: '/app/src/routes/index.kay', params: [], layouts: [] } as unknown as Route], [{ path: '/', file: '/app/src/routes/index.kay', html } as RenderedPage], undefined)
+
+      expect(sizes).toEqual([{ route: '/', js: Bun.gzipSync(await Bun.file(join(dir, 'a.js')).bytes(), { level: 9 }).length, css: 0, pages: 1, estimated: false }])
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+      await rm(join(dir, '../outside.js'), { force: true })
+    }
+  })
+
   it('weighs each route, times the stages, counts what the caches answered, and keeps the sizes of the last good build only', async () => {
     const root = await scratchProject({
       'tsconfig.json': tsconfig,
@@ -1775,6 +1796,9 @@ describe('the build report', () => {
 
       // A static export weighs differently, so it is not compared to a server build.
       expect((await build({ exportTo: 'dist' })).built!.previous).toBeUndefined()
+      expect((await build({ exportTo: 'dist' })).built!.previous).toBeDefined()
+      // And each kind keeps its own, so switching between them loses neither.
+      expect((await build()).built!.previous).toBeDefined()
     }
     finally {
       await rm(root, { recursive: true, force: true })

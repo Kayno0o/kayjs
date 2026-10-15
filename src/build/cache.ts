@@ -1,3 +1,4 @@
+import type { CacheCount } from './report'
 import { mkdir, readdir, rename, rm } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import process from 'node:process'
@@ -27,7 +28,7 @@ export function resetCacheCounts(): void {
   counts.clear()
 }
 
-export function cacheCounts(): { name: string, cached: number, made: number }[] {
+export function cacheCounts(): CacheCount[] {
   return [...counts].map(([name, count]) => ({ name, ...count }))
 }
 

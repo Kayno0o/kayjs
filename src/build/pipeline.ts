@@ -95,7 +95,9 @@ async function runBuild(root: string, config: KayConfig, options: BuildOptions):
   const exported = options.exportTo !== undefined
   const result: BuildResult = { checked: [], linted: [] }
   // The sizes of the last good build, read before this one can replace them.
-  const lastReport = await readStoredReport(project.paths.report, exported)
+  // A server build and a static export each compare to their own last one.
+  const reportFile = exported ? project.paths.report.replace(/\.json$/, '-static.json') : project.paths.report
+  const lastReport = await readStoredReport(reportFile, exported)
   let checkMs = 0
   let bundleMs = 0
 
@@ -216,10 +218,6 @@ async function runBuild(root: string, config: KayConfig, options: BuildOptions):
 
   await rm(previous, { recursive: true, force: true })
 
-  // Kept only now that the build is known good, so a failed one leaves the sizes of the last.
-  if (result.built)
-    await writeStoredReport(project.paths.report, storedReport(result.built.report, result.built.summary, exported))
-
   if (options.exportTo !== undefined) {
     const stage = performance.now()
 
@@ -262,6 +260,10 @@ async function runBuild(root: string, config: KayConfig, options: BuildOptions):
   }
 
   await Bun.write(join(output, ENTRY_RECORD), relative(root, project.paths.entry))
+
+  // Kept only once every stage succeeded, so a failed build leaves the sizes of the last.
+  if (result.built)
+    await writeStoredReport(reportFile, storedReport(result.built.report, result.built.summary, exported))
 
   return result
 }

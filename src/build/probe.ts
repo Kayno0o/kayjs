@@ -82,7 +82,8 @@ async function cachedProbe(key: string, file: string, from: string, cacheDir: st
   const slot = cacheDir === undefined ? undefined : { file: join(cacheDir, `${Bun.hash(key).toString(36)}-browser-only.json`), key }
   const cached = slot && await readCacheEntry<boolean>(slot)
 
-  countCache('package probes', cached !== undefined)
+  if (slot)
+    countCache('package probes', cached !== undefined)
 
   if (cached !== undefined)
     return cached
