@@ -1,5 +1,5 @@
 import type { Collection } from '../src/content'
-import { mkdtemp, readdir, rm } from 'node:fs/promises'
+import { mkdtemp, readdir, rm, utimes } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
@@ -149,6 +149,38 @@ describe('the compile cache of entries', () => {
 
       expect(files).toHaveLength(2)
       expect(files.every(name => name.endsWith('.entry.json'))).toBe(true)
+    }
+    finally {
+      setContentPlace(before.root, before.base)
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('reads an entry edited within 2 seconds of caching again even at the same size and time, and trusts a stamp that had settled', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'kay-content-stamp-'))
+    const before = contentPlace()
+    const entry = (title: string) => `---\ntitle: ${title}\n---\n\nbody\n`
+
+    try {
+      const recent = new Date(Date.now() - 100)
+      const old = new Date(Date.now() - 3_600_000)
+
+      await Bun.write(join(root, 'posts/fresh.md'), entry('One'))
+      await Bun.write(join(root, 'posts/settled.md'), entry('One'))
+      await utimes(join(root, 'posts/fresh.md'), recent, recent)
+      await utimes(join(root, 'posts/settled.md'), old, old)
+      setContentPlace(root, root)
+
+      const titles = async () => (await loadEntries('posts', undefined, true)).map(found => (found.data as { title: string }).title)
+
+      expect(await titles()).toEqual(['One', 'One'])
+
+      await Bun.write(join(root, 'posts/fresh.md'), entry('Two'))
+      await Bun.write(join(root, 'posts/settled.md'), entry('Two'))
+      await utimes(join(root, 'posts/fresh.md'), recent, recent)
+      await utimes(join(root, 'posts/settled.md'), old, old)
+
+      expect(await titles()).toEqual(['Two', 'One'])
     }
     finally {
       setContentPlace(before.root, before.base)

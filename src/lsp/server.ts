@@ -46,8 +46,8 @@ interface Project {
   locales: string[]
   shadowTree: string
   shadowFiles: Set<string>
-  // The time of each, as the last write left it.
-  shadowStamps: Map<string, number>
+  // The content hash of each, as the last write left it: a time stamp cannot tell two writes within one millisecond apart.
+  shadowStamps: Map<string, number | bigint>
   // As of the last shadow write: the static components only islands render, the library components the app never imports, whose errors are the library's, and the libraries.
   islandOnly: Set<string>
   unreached: Set<string>
@@ -336,8 +336,7 @@ export class KayLanguageServer {
 
       const types = await writeShadowTypes(root, project.options)
       const files = new Set(types.files.keys())
-      // By the file as it is on disk, which another process, `kay dev` or `kay check`, may have written first.
-      const stamps = new Map(await Promise.all([...files].map(async path => [path, Bun.file(path).lastModified] as const)))
+      const stamps = new Map([...types.files].map(([path, shadow]) => [path, Bun.hash(shadow.tsx)] as const))
 
       changes.push(
         ...[...files].flatMap((path): FileEvent[] => project.shadowFiles.has(path) ? stamps.get(path) !== project.shadowStamps.get(path) ? [{ uri: pathToFileURL(path).href, type: CHANGED }] : [] : [{ uri: pathToFileURL(path).href, type: CREATED }]),

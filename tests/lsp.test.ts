@@ -835,6 +835,60 @@ describe('kay lsp on a save', () => {
       await rm(dir, { recursive: true, force: true })
     }
   })
+
+  it('tells tsgo of a shadow file rewritten at the same size, and of nothing when a save changed none', async () => {
+    const dir = await scratchDir('lsp-stamp-')
+    const page = 'src/routes/a.kay'
+    const encoder = new TextEncoder()
+    const toServer = new TransformStream<Uint8Array>()
+    const toClient = new TransformStream<Uint8Array>()
+    const writeToServer = toServer.writable.getWriter()
+    const writeToClient = toClient.writable.getWriter()
+    const client = new Connection(toClient.readable, (data) => {
+      void writeToServer.write(encoder.encode(data))
+    })
+    const server = new KayLanguageServer(new Connection(toServer.readable, (data) => {
+      void writeToClient.write(encoder.encode(data))
+    }))
+
+    await Promise.all([Bun.write(join(dir, 'tsconfig.json'), await Bun.file(join(fixtures, 'site/tsconfig.json')).text()), Bun.write(join(dir, page), 'p x\n')])
+
+    try {
+      const uri = pathToFileURL(join(dir, page)).href
+      const shadow = pathToFileURL(join(dir, '.kay/types', `${page}.tsx`)).href
+
+      await client.request('initialize', { processId: process.pid, rootUri: pathToFileURL(dir).href, capabilities: {} })
+      client.notify('initialized', {})
+      client.notify('textDocument/didOpen', { textDocument: { uri, languageId: 'kay', version: 1, text: 'p x\n' } })
+      await Bun.sleep(300)
+
+      const tsgo = (server as unknown as { tsgo: { connection: Connection } }).tsgo.connection
+      const told: string[][] = []
+      const notify = spyOn(tsgo, 'notify').mockImplementation((method: string, params?: unknown) => {
+        if (method === 'workspace/didChangeWatchedFiles')
+          told.push((params as { changes: { uri: string }[] }).changes.map(change => change.uri).filter(changed => changed.endsWith('.kay.tsx')))
+      })
+      const save = async () => {
+        client.notify('textDocument/didSave', { textDocument: { uri } })
+        await Bun.sleep(300)
+      }
+
+      await Bun.write(join(dir, page), 'p y\n')
+      await save()
+      await save()
+      await Bun.write(join(dir, page), 'p x\n')
+      await save()
+      notify.mockRestore()
+
+      expect(told).toEqual([[shadow], [], [shadow]])
+    }
+    finally {
+      const { tsgo } = server as unknown as { tsgo?: { process: { kill: () => void } } }
+
+      tsgo?.process.kill()
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
 })
 
 describe('kay lsp with a slow tsgo', () => {
