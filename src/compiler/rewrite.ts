@@ -122,8 +122,12 @@ const TYPE_HOLDERS = new Set(['TSTypeAnnotation', 'TSTypeParameterInstantiation'
 
 // Whether an identifier names a type rather than reading a value; `typeof name` reads the value.
 function namesType(path: NodePath): boolean {
-  for (let parent = path.parentPath; parent; parent = parent.parentPath) {
+  for (let child = path, parent = path.parentPath; parent; child = parent, parent = parent.parentPath) {
     if (parent.isTSTypeQuery())
+      return false
+
+    // A computed key of a type literal holds an expression, read as a value.
+    if ((parent.isTSPropertySignature() || parent.isTSMethodSignature()) && parent.node.computed && parent.node.key === child.node)
       return false
 
     if (parent.isTSType() || TYPE_HOLDERS.has(parent.node.type))
@@ -136,16 +140,9 @@ function namesType(path: NodePath): boolean {
   return false
 }
 
-// Whether a reference is a name written inside a type, such as the parameter of a function type or the key of a type literal, which the scope analysis reads as the outer binding of the same name; a computed key reads a value.
-function namesInType(reference: NodePath): boolean {
-  const { parentPath } = reference
-
-  if (parentPath?.isTSPropertySignature() || parentPath?.isTSMethodSignature()) {
-    if (parentPath.node.computed && parentPath.node.key === reference.node)
-      return false
-  }
-
-  return namesType(reference)
+// The references to a binding that read its value, leaving out a name written in a type, such as a function type's parameter, which the scope analysis resolves to the binding of the same name.
+function valueReferences(binding: Binding): NodePath[] {
+  return binding.referencePaths.filter(reference => !namesType(reference))
 }
 
 // One walk over the analysis pass, each concern of it in a method of its own: signals, props, rows, template `const`s, `listen` targets and `load`'s reads.
@@ -224,12 +221,8 @@ class RewriteFinder {
 
     this.known.add(binding)
 
-    for (const reference of binding.referencePaths) {
+    for (const reference of valueReferences(binding)) {
       const node = reference.node
-
-      if (namesInType(reference))
-        continue
-
       const query = typeOf === undefined ? undefined : typeQueryOf(reference)
 
       if (query) {
@@ -406,10 +399,7 @@ class RewriteFinder {
   private signalBinding(binding: Binding, name: string, kind: SignalKind) {
     this.known.add(binding)
 
-    for (const reference of binding.referencePaths) {
-      if (namesInType(reference))
-        continue
-
+    for (const reference of valueReferences(binding)) {
       const values = this.input.values && !this.deferred(reference)
       const uncalled = this.uncalled(reference)
 
@@ -536,7 +526,7 @@ class RewriteFinder {
         this.signalWrite(violation, name, signal, access)
     }
 
-    if (binding?.referencePaths.length === 0)
+    if (binding && valueReferences(binding).length === 0)
       this.unread.add(prop.binding.local.start)
   }
 
@@ -575,7 +565,9 @@ class RewriteFinder {
       return
 
     for (const { binding } of this.input.sites.props.values()) {
-      if (path.scope.getBinding(binding.key)?.referencePaths.some(reference => reference.node.start! < handOver.start || reference.node.start! >= handOver.end))
+      const scoped = path.scope.getBinding(binding.key)
+
+      if (scoped && valueReferences(scoped).some(reference => reference.node.start! < handOver.start || reference.node.start! >= handOver.end))
         this.serverReads.add(binding.key)
     }
   }
@@ -637,7 +629,7 @@ export function importedFromKay(scope: Scope, callee: t.Node, module = 'kay'): s
 
 // Whether every use of the binding reads the signal, a call with no arguments or its name left uncalled in the template: a `.set`, or the signal handed on, may write it.
 function onlyRead(binding: Binding | undefined, uncalled: (reference: NodePath) => number | undefined): boolean {
-  return binding !== undefined && binding.constant && binding.referencePaths.length > 0 && binding.referencePaths.every(reference => (reference.parent.type === 'CallExpression' && reference.parent.callee === reference.node && reference.parent.arguments.length === 0) || uncalled(reference) !== undefined)
+  return binding !== undefined && binding.constant && valueReferences(binding).length > 0 && valueReferences(binding).every(reference => (reference.parent.type === 'CallExpression' && reference.parent.callee === reference.node && reference.parent.arguments.length === 0) || uncalled(reference) !== undefined)
 }
 
 // A helper the compiler wraps a template expression in, such as `KayIdentityKey`, which hands nothing on.

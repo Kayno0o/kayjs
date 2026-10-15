@@ -667,20 +667,30 @@ describe('component names', () => {
       })
 
       it(`is not read as a signal, in ${output} output`, () => {
-        const code = compile(output, 'const value = signal(\'a\')\nconst count = signal(1)\nconst onChange = signal<((value: string) => unknown) | undefined>(undefined)')
+        const code = compileKay('---\nconst value = signal(\'a\')\nconst count = signal(1)\n---\np {(count as unknown as (value: string) => string)(value)} {[count].map((x: { value: number }) => x)}', 'test.kay', { output }).tsx
 
-        expect(code).not.toContain('value():')
-        expect(code).not.toContain('value() in')
-        expect(code).not.toContain('count():')
-        expect(code).toContain('(cb: (value: string) => void)')
-        expect(code).toContain('{ [value in \'a\' | \'b\']: number }')
-        expect(code).toContain('Map<string, { value: number, count: number }>')
+        expect(code).toContain('(value: string) => string')
+        expect(code).toContain('{ value: number }')
+        expect(code).not.toContain('value(): string')
       })
     }
+
+    it('reads the value in a computed key of a type literal', () => {
+      const code = compileKay('---\nconst { value, obj } = props<{ value: string, obj: { key: string } }>()\n---\np {(1 as unknown as { [value]: string, [obj.key]: string, [obj.key](): void })}', 'test.kay', { output: 'html' }).tsx
+
+      expect(code).toContain('[__props.value]: string, [__props.obj.key]: string, [__props.obj.key](): void')
+    })
+
+    it('reports a prop only a type names as never read', () => {
+      const unread = compileKay('---\nconst { value } = props<{ value: string }>()\nconst f = (x: unknown) => x as (value: string) => void\n---\np hi', 'test.kay', { check: true }).diagnostics.filter(d => d.code === 'unread-name')
+
+      expect(unread.length).toBeGreaterThan(0)
+    })
 
     it('still reads `typeof` as the value', () => {
       const code = compileKay('---\nconst { value } = props<{ value: string }>()\nconst k = (x: unknown) => x as typeof value\n---\np {value}', 'test.kay', { output: 'html' }).tsx
 
+      expect(code).toContain('typeof __props.value')
       expect(code).not.toContain('typeof value')
     })
   })
