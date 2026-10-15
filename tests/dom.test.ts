@@ -1059,6 +1059,30 @@ describe('transitions', () => {
     }
   })
 
+  it('shows a range whole again when it was taken out with no node leaving', async () => {
+    const { insert, Range } = await import('../src/runtime/dom')
+    const { createSignal } = await import('../src/runtime/reactive')
+    const parent = document.createElement('div')
+    const first = document.createElement('p')
+    const middle = document.createElement('i')
+    const last = document.createElement('b')
+    const range = new Range(first, last)
+
+    parent.append(first, middle, last)
+    parent.remove()
+
+    const [list, setList] = createSignal<unknown[]>([range])
+
+    insert(parent, null, null, list)
+    expect([...parent.children].map(child => child.localName)).toEqual(['p', 'i', 'b'])
+    setList([])
+    await settle()
+    expect(parent.children.length).toBe(0)
+    setList([range])
+    await settle()
+    expect([...parent.children].map(child => child.localName)).toEqual(['p', 'i', 'b'])
+  })
+
   it('does work linear in the kept units with transitions when one is appended or the order changes', async () => {
     const { insert, playTransitions, Range } = await import('../src/runtime/dom')
     const { createSignal } = await import('../src/runtime/reactive')
