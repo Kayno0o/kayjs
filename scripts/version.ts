@@ -1,5 +1,6 @@
 import process from 'node:process'
 import { $, Glob } from 'bun'
+import { stampUnreleased, WHATS_NEW } from './whats-new'
 
 // `bun scripts/version.ts patch|minor|major`: kay and every library under packages/ move to one version, committed as `v<version>` and tagged, as `bun pm version` does for one package.
 const LEVELS = ['major', 'minor', 'patch'] as const
@@ -35,9 +36,11 @@ const tag = `v${version}`
 // The tree was clean, so a failure anywhere goes back to the commit it started from; the tag, made last, is never left behind.
 try {
   await Promise.all(texts.map(async ({ path, text }) => Bun.write(path, text.replace(VERSION, () => `"version": "${version}"`).replace(KAY_PEER, (_, head: string) => `${head}"${peer}"`))))
+  // What the release adds goes under its version, where the release notes read it.
+  await Promise.all(WHATS_NEW.map(async path => Bun.write(path, stampUnreleased(await Bun.file(path).text(), version))))
   // bun.lock records each workspace's version and ranges, which the CI's frozen install compares against.
   await $`bun install`.quiet()
-  await $`git add bun.lock ${manifests}`
+  await $`git add bun.lock ${manifests} ${WHATS_NEW}`
   await $`git commit -q -m ${tag}`
   await $`git tag ${tag}`
 }

@@ -28,6 +28,7 @@ Each session works alone, with no coordinator:
 
 - `llms/` and `docs/src/content/docs/` say what changed, in the same commit; `tests/llms.test.ts` and `tests/docs.test.ts` compile their `kay` blocks, check every lint is listed and keep `llms.txt` under 10,000 characters.
 - A new lint has its entry in `llms/checks.md` and `docs/src/content/docs/reference/checks.md`.
+- A feature an app sees adds its line, linking where it is documented, under `## Unreleased` in `llms/whats-new.md` and `docs/src/content/docs/guides/whats-new.md`, opening that section when it is the first; `just patch` and `just minor` name it after the version, and the release notes open with it.
 - A breaking change adds what an app changes under the next minor's section of `llms/upgrading.md` and `docs/src/content/docs/guides/upgrading.md`, opening that section when it is the first.
 - Breaking changes ship as minors; a major is a rewrite.
 
