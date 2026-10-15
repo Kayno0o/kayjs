@@ -97,10 +97,12 @@ export function browser(app: { handle: (request: Request) => Promise<Response> }
       return jar.send(async request => app.handle(request), new Request(`http://localhost${path}`, init))
     },
     // Calls `auth[method](...args)` in this browser and reads the answer.
+    // eslint-disable-next-line ts/no-explicit-any -- each method answers its own shape, which the tests read as they expect it
     async call(method: string, ...args: unknown[]): Promise<any> {
       return this.post(`/call/${method}`, args)
     },
     // Posts `body` as JSON and reads the answer.
+    // eslint-disable-next-line ts/no-explicit-any -- as `call`
     async post(path: string, body: unknown): Promise<any> {
       return this.json(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
     },

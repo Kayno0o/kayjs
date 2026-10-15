@@ -63,7 +63,7 @@ describe('admin', () => {
   test('an admin\'s bearer token manages no one, whatever it may do elsewhere', async () => {
     const { admin, ada, browser } = await setup()
     const { token } = await admin.browser.call('createToken', { password: PASSWORD }, 'CLI')
-    const withToken = (method: string, ...args: unknown[]) => browser().json(`/call/${method}`, {
+    const withToken = async (method: string, ...args: unknown[]) => browser().json(`/call/${method}`, {
       method: 'POST',
       headers: { 'authorization': `Bearer ${token}`, 'content-type': 'application/json' },
       body: JSON.stringify(args),

@@ -122,7 +122,7 @@ describe('emailed codes', () => {
     const { code } = await nextMail('magic-link')
     const results = await Promise.all([ada.call('signInWithEmailCode', code), ada.call('signInWithEmailCode', code)])
 
-    expect(results.filter(result => result.ok)).toHaveLength(1)
+    expect(results.filter(result => result.ok === true)).toHaveLength(1)
   })
 
   test('an address with no account waits for a code like any other, which never comes', async () => {
@@ -164,7 +164,7 @@ describe('emailed codes', () => {
     await bob.call('sendVerification')
     const second = await nextMail('verify-email')
 
-    expect(CODE.exec(second.text)?.[1]).toBe(second.code!)
+    expect(CODE.exec(second.text)?.[1]).toBe(second.code)
     expect(await bob.call('verifyEmailCode', first.code)).toEqual({ ok: false, error: 'invalid' })
     expect(await bob.call('verifyEmailCode', second.code)).toEqual({ ok: true, redirect: '/' })
   })

@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, mock, spyOn } from 'bun:test'
 const toastModule = join(dirname(Bun.resolveSync('@kaynooo/kayjs-ui/package.json', import.meta.dir)), 'src/toast.ts')
 const { toasts } = await import(toastModule) as typeof import('../../ui/src/toast')
 
-void mock.module('@kaynooo/kayjs-ui', async () => import(toastModule))
+void mock.module('@kaynooo/kayjs-ui', async () => import(toastModule) as Promise<Record<string, unknown>>)
 
 const { default: entriesApi } = await import('../src/api/entries')
 const { default: filesApi } = await import('../src/api/files')
@@ -52,7 +52,7 @@ afterEach(() => {
 
 describe('saveDraft', () => {
   it('waits for a save on its way rather than sending the same version again, then saves the edits typed meanwhile once', async () => {
-    const sent = server((body, count) => ({ saved: true, version: `v${count + 1}` }))
+    const sent = server((_body, count) => ({ saved: true, version: `v${count + 1}` }))
     const drafts = opened()
 
     drafts.set(post, 'title', 'First')

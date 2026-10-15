@@ -64,7 +64,7 @@ export async function listSessions(state: RequestState): Promise<UserSession[]> 
   }
 
   // Every lookup at once: the list waits on the slowest, not on their sum.
-  const places = await Promise.all(kept.map(found => locate(state.core, found.ip)))
+  const places = await Promise.all(kept.map(async found => locate(state.core, found.ip)))
 
   return kept.map((found, index) => ({
     id: found.id,

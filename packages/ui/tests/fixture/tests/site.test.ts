@@ -5,7 +5,7 @@ import { testSite } from 'kay/test'
 // An id kay draws for a page, which differs per render.
 const DRAWN_ID = /\b(id|data-kui-field|aria-describedby)="k\w+-\d+"/g
 
-// The fixture is an app installing the library, linked back to this repository by scripts/link-fixture.ts.
+// The fixture is an app installing the library, linked back to the library by the repository root's scripts/link-fixture.ts.
 const ROOT = join(import.meta.dir, '..')
 // kay check prints this line on success since kay 1.18, nothing before.
 const CLEAN = /^(?:checked with no problems in \d+ ms\n)?$/

@@ -94,7 +94,7 @@ export async function sendVerification(state: RequestState): Promise<MailRequest
   const held = record ? undefined : await state.session.get('authHeld')
   const email = record?.email ?? held
 
-  if (!email)
+  if (email == null || email === '')
     return { ok: false, error: 'signed-out' }
 
   if (record && record.emailVerifiedAt !== null)
@@ -148,7 +148,7 @@ export async function verifyEmail(state: RequestState, token: string, password?:
 
 // Counted as a sign-in attempt on the account, since it is one.
 async function holdsPassword(state: RequestState, record: UserRecord, password: string | undefined): Promise<true | 'confirm' | 'limited'> {
-  if (password === undefined || !record.passwordHash)
+  if (password === undefined || record.passwordHash === null || record.passwordHash === '')
     return 'confirm'
 
   if (await spend(state.core.store, `sign-in-account:${record.id}`, state.core.limits.signInAccount))
@@ -261,7 +261,7 @@ export async function confirmEmailChange(state: RequestState, token: string): Pr
 
 // On registering: the verification mail, when the app sends mail.
 export async function welcome(state: RequestState, record: UserRecord): Promise<void> {
-  if (state.core.email && record.email)
+  if (state.core.email && record.email !== null && record.email !== '')
     void issueQuietly(state, record, 'verify-email', record.email, null, await bindCode(state, 'verify-email', record.email))
 }
 
@@ -271,7 +271,7 @@ export async function warnHolder(state: RequestState, holder: UserRecord): Promi
   const mail = core.email
   const email = holder.email
 
-  if (!mail || !email)
+  if (!mail || email === null || email === '')
     return
 
   await bindCode(state, 'verify-email', email)
@@ -433,6 +433,8 @@ async function spendResend(state: RequestState, id: string, limit: 'resend' | 'e
 
   if (await spend(core.store, `${limit}:${state.client}`, core.limits[limit]) || await spend(core.store, `${limit}:${id}`, core.limits[`${limit}Account`]))
     return { ok: false, error: 'limited' }
+
+  return undefined
 }
 
 // One live link and code per kind and user: a new one replaces the last. A code goes only with the nonce of the session that asked for it.

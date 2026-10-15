@@ -66,7 +66,7 @@ export function createGate<P, G extends string, S extends string = string>(deps:
       const requirement = (ctx[ownRequirement] as Requirement<P, G> | false | undefined) ?? deps.defaultRequirement
 
       if (requirement === false)
-        return
+        return undefined
 
       // A route nested in two gated instances runs this once per gate: each holds it to its own requirement, and a requirement already met is not asked again.
       if (!ctx[DECIDED]?.has(requirement)) {
@@ -87,6 +87,8 @@ export function createGate<P, G extends string, S extends string = string>(deps:
 
         return 'Forbidden'
       }
+
+      return undefined
     })
 
     return gated

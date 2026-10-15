@@ -51,7 +51,7 @@ function lazily(guard: Guard | LazyGuard): Guard {
 
   async function load(): Promise<Guard> {
     // Forgetting a failure must come after `loaded` is set, even when the loader throws at once.
-    await null
+    await Promise.resolve()
 
     try {
       return await build()

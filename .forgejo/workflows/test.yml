@@ -142,7 +142,7 @@ jobs:
       - name: Tests
         run: bun run test --parallel=6
 
-      # The lint above already took each library with its own eslint.config.ts, the nearest one to every file.
+      # The lint above already ran each library's own, one process each, as one holding every library's type-aware program runs out of memory.
       - name: Check and test the libraries
         run: |
           for dir in packages/*/; do

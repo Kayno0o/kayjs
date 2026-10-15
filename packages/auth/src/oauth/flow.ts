@@ -96,7 +96,7 @@ export async function finishOAuth(state: RequestState, provider: string, query: 
   const { core } = state
   const flow = await state.session.get('authOAuth')
 
-  if (!flow || !query.state || !sameText(query.state, flow.state))
+  if (!flow || query.state === undefined || query.state === '' || !sameText(query.state, flow.state))
     return { error: 'oauth' }
 
   await state.session.unset('authOAuth')
@@ -106,7 +106,7 @@ export async function finishOAuth(state: RequestState, provider: string, query: 
   if (!entry || flow.provider !== provider || flow.expires < Date.now())
     return { error: 'oauth' }
 
-  if (query.error !== undefined || !query.code)
+  if (query.error !== undefined || query.code === undefined || query.code === '')
     return { error: query.error === 'access_denied' ? 'cancelled' : 'oauth' }
 
   let tokens: OAuthTokens
@@ -132,7 +132,7 @@ export async function finishOAuth(state: RequestState, provider: string, query: 
 
   const identity = await core.store.identities.find(provider, profile.providerId)
 
-  if (flow.link) {
+  if (flow.link !== null && flow.link !== '') {
     const current = await state.current()
 
     // The provider joins the account that asked for it, never one signed in since in the same browser.
@@ -216,7 +216,7 @@ export async function providerToken(state: RequestState, provider: string): Prom
 
   const identity = (await core.store.identities.listByUser(current.id)).find(entry => entry.provider === provider)
 
-  if (!identity?.accessToken)
+  if (identity === undefined || identity.accessToken === null || identity.accessToken === '')
     return null
 
   const context = identityContext(identity.provider, identity.providerId)
@@ -263,7 +263,7 @@ async function saveIdentity(core: Core, identity: IdentityRecord | undefined, us
 
 // A new user from a provider account, or `guest` made one: its verified email and its name are taken only when no other user has them, so no account is ever merged into another by email.
 async function signUp(core: Core, profile: Profile, locale: string | null, guest?: UserRecord): Promise<UserRecord> {
-  const email = profile.email ? normalizeEmail(profile.email) : undefined
+  const email = profile.email == null || profile.email === '' ? undefined : normalizeEmail(profile.email)
   const name = normalizeUsername(profile.username)
   const freeEmail = email !== undefined && !(await core.store.users.findByEmail(email)) ? email : null
   // A name these rules refuse is left out too: the user picks one later.
@@ -282,7 +282,7 @@ async function signUp(core: Core, profile: Profile, locale: string | null, guest
 
 // Gives a user without an email the provider's verified one, when no other user has it.
 async function adoptEmail(core: Core, record: UserRecord, profile: Profile): Promise<UserRecord> {
-  const email = profile.email ? normalizeEmail(profile.email) : undefined
+  const email = profile.email == null || profile.email === '' ? undefined : normalizeEmail(profile.email)
 
   if (record.email !== null || email === undefined || await core.store.users.findByEmail(email))
     return record

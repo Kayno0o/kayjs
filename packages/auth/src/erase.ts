@@ -14,7 +14,7 @@ export async function erase(state: RequestState, record: UserRecord, leaving?: {
   await store.users.delete(record.id)
 
   if (leaving) {
-    if (record.email && store.invitations) {
+    if (record.email !== null && record.email !== '' && store.invitations) {
       for (const invitation of await store.invitations.listByEmail(record.email))
         await store.invitations.delete(invitation.id)
     }

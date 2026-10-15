@@ -27,7 +27,7 @@ export function listContinuation(line: string): { next: string, clear: boolean }
   if (rest.trim() === '')
     return { next: '', clear: true }
 
-  if (number)
+  if (number !== undefined)
     return { next: `${indent}${Number(number) + 1}. `, clear: false }
 
   if (checkbox !== undefined)

@@ -21,7 +21,7 @@ if (reachable) {
     return pgStore(db)
   })
 }
-else if (process.env.KAYJS_AUTH_REQUIRE_DATABASE) {
+else if (process.env.KAYJS_AUTH_REQUIRE_DATABASE !== undefined && process.env.KAYJS_AUTH_REQUIRE_DATABASE !== '') {
   throw new Error(`pgStore: no Postgres at ${URL}, and KAYJS_AUTH_REQUIRE_DATABASE forbids skipping its tests`)
 }
 else {

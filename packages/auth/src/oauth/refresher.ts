@@ -33,7 +33,7 @@ export function createTokenRefresher<K, S>(deps: TokenRefresherDeps<K, S>) {
     async getValidToken(subject: S): Promise<string | null> {
       const stored = deps.load(subject)
 
-      if (!stored.accessToken)
+      if (stored.accessToken == null || stored.accessToken === '')
         return null
 
       if (stored.expiresAt === undefined || stored.expiresAt === null)
@@ -52,7 +52,7 @@ export function createTokenRefresher<K, S>(deps: TokenRefresherDeps<K, S>) {
       if (stored.expiresAt > now + margin)
         return stored.accessToken
 
-      if (!stored.refreshToken)
+      if (stored.refreshToken == null || stored.refreshToken === '')
         return null
 
       const existing = inFlight.get(key)
@@ -135,7 +135,7 @@ export function createOAuthTokenRefresher<K, S>(deps: OAuthTokenRefresherDeps<K,
     exchange: async (subject) => {
       const refreshToken = deps.load(subject).refreshToken
 
-      if (!refreshToken)
+      if (refreshToken == null || refreshToken === '')
         return null
 
       let tokens: OAuthTokens

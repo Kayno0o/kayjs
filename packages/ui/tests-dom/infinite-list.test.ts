@@ -43,7 +43,7 @@ afterEach(() => {
 async function list(props: Record<string, unknown> = {}) {
   mounted = await mount('src/components/infinite.kay', {
     size: 3,
-    onLoad: (offset: number) => {
+    onLoad: async (offset: number) => {
       asked.push(offset)
 
       return new Promise<{ id: number }[] | undefined>(resolve => release.push(resolve))

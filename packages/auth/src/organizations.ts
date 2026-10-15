@@ -58,7 +58,7 @@ export function organizationsCore<OrgRole extends string, Role extends string>(o
 
   return {
     roles: new Set(Object.keys(options.roles)),
-    isGranted: (required, held) => isGranted(required as OrgRole, held as OrgRole[]),
+    isGranted: (required, held) => isGranted(required, held),
     owner: options.owner,
     manage: options.manage ?? options.owner,
     defaultRoles: [...options.defaultRoles ?? []],
@@ -159,7 +159,7 @@ export async function createOrganization(state: RequestState, input: { name: str
     return { ok: false, error: 'forbidden' }
 
   const name = input.name.trim()
-  const slug = input.slug?.trim().toLowerCase() || null
+  const slug = slugOf(input.slug)
 
   if (!validName(name))
     return { ok: false, error: 'invalid-name' }
@@ -224,7 +224,7 @@ export async function updateOrganization(state: RequestState, ref: string, patch
     return found
 
   const name = patch.name?.trim()
-  const slug = patch.slug === undefined ? undefined : patch.slug?.trim().toLowerCase() || null
+  const slug = patch.slug === undefined ? undefined : slugOf(patch.slug)
 
   if (name !== undefined && !validName(name))
     return { ok: false, error: 'invalid-name' }
@@ -444,7 +444,7 @@ export async function myInvitations(state: RequestState): Promise<Invitation[]> 
   const { store } = organizationsOf(state.core)
   const record = await state.current()
 
-  if (!record?.email || record.emailVerifiedAt === null)
+  if (record?.email == null || record.email === '' || record.emailVerifiedAt === null)
     return []
 
   const invitations: Invitation[] = []
@@ -511,7 +511,7 @@ export async function declineInvitation(state: RequestState, invitationId: strin
   const record = await state.current()
   const invitation = await live(store, invitationId)
 
-  if (!record?.email || record.emailVerifiedAt === null || invitation?.email !== record.email)
+  if (record?.email == null || record.email === '' || record.emailVerifiedAt === null || invitation?.email !== record.email)
     return false
 
   return store.invitations.delete(invitation.id)
@@ -564,6 +564,13 @@ async function reportOn(state: RequestState, userId: string, event: 'member-role
 
   if (record)
     await report(state, record, event, detail, actor)
+}
+
+// A slug as typed, trimmed and lowercased; none when left blank.
+function slugOf(typed: string | null | undefined): string | null {
+  const slug = typed?.trim().toLowerCase()
+
+  return slug === undefined || slug === '' ? null : slug
 }
 
 // A name goes into the invitation mail's subject and lead, where a line break or a direction override would let it pass for something else.

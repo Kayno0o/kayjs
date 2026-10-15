@@ -18,13 +18,13 @@ export async function decide<P, G extends string>(
   level: Level,
   ctx: PolicyContext = {},
 ): Promise<boolean> {
-  if (!principal || !store.hasCredential(principal))
+  if (principal == null || !store.hasCredential(principal))
     return false
 
   return evaluate(store, principal, requirement, level, ctx)
 }
 
-function evaluate<P, G extends string>(
+async function evaluate<P, G extends string>(
   store: GrantStore<P, G>,
   principal: P,
   requirement: Requirement<P, G>,

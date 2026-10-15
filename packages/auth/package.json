@@ -39,7 +39,7 @@
     "types"
   ],
   "engines": {
-    "bun": ">=1.4.2"
+    "bun": ">=1.4.3"
   },
   "scripts": {
     "check": "$npm_execpath check",
@@ -68,10 +68,10 @@
     "reflect-metadata": "^0.2.2"
   },
   "devDependencies": {
-    "@kaynooo/eslint": "^6.0.1",
+    "@kaynooo/eslint": "^6.1.0",
     "@kaynooo/kayjs-mail": "workspace:~",
     "@kaynooo/kayjs-ui": "workspace:~",
-    "@kaynooo/pg-orm": "^7.0.1",
+    "@kaynooo/pg-orm": "^7.0.4",
     "@types/bun": "^1.4.2",
     "@typescript/native-preview": "^7.0.0-dev.20260707.2",
     "elysia": "^1.4.30",

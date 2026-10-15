@@ -94,7 +94,7 @@ test('a Checkbox whose change is under way is busy and ticks no further, and goe
     await settle()
 
     expect(state()).toEqual([true, null])
-    expect(logged.mock.calls.map(([, error]) => error)).toEqual([new Error('refused')])
+    expect(logged.mock.calls.map(([, error]) => error as unknown)).toEqual([new Error('refused')])
   }
   finally {
     logged.mockRestore()
@@ -139,7 +139,7 @@ test('a ChipGroup whose change is under way is busy and ticks nothing else, and 
     await settle()
 
     expect(state()).toEqual([['films'], null])
-    expect(logged.mock.calls.map(([, error]) => error)).toEqual([new Error('refused')])
+    expect(logged.mock.calls.map(([, error]) => error as unknown)).toEqual([new Error('refused')])
   }
   finally {
     logged.mockRestore()

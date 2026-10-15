@@ -21,7 +21,7 @@ function providers(accounts: Record<string, Account>, options: { tokenStatus?: n
     calls.push(url)
 
     if (url.endsWith('/oauth2/token') || url.endsWith('/access_token')) {
-      if (options.tokenStatus)
+      if (options.tokenStatus !== undefined)
         return new Response('down', { status: options.tokenStatus })
 
       if (body.get('grant_type') === 'refresh_token') {

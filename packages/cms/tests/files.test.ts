@@ -190,7 +190,7 @@ describe('forgejo timeout', () => {
 const dir = await scratchDir('files-')
 
 describe('workingTree', () => {
-  afterAll(() => rm(dir, { recursive: true, force: true }))
+  afterAll(async () => rm(dir, { recursive: true, force: true }))
 
   test('writes a file in folders it creates, then deletes it', async () => {
     const absolute = join(dir, 'content', 'posts', 'hello.md')

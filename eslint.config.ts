@@ -1,5 +1,7 @@
 import { defineConfig } from '@kaynooo/eslint'
+import { kayRules } from './eslint.base'
 
+// The libraries under packages/ lint with their own, each in a process of its own (`bun run lint`): one process holding every type-aware program runs out of memory.
 export default defineConfig({
   strict: true,
   // The fixtures are apps of their own, outside the tsconfig. The Astro, Next and Nuxt bench apps are type-checked by their own tools in `bench:check`: their programs loaded here too run eslint out of memory.
@@ -7,18 +9,4 @@ export default defineConfig({
 }, {
   // Emscripten's glue, as codecs/avif/build.ts writes it.
   ignores: ['src/server/codec/avif-enc.js'],
-}, {
-  rules: { 'ts/no-explicit-any': 'error' },
-}, {
-  files: ['**/tests/**/*.ts'],
-  rules: {
-    // Tests embed .kay sources, whose expressions hold JS template literals inside plain strings.
-    'no-template-curly-in-string': 'off',
-    // bun-types types the matchers of `expect(promise).rejects` as returning void, though they must be awaited.
-    'ts/await-thenable': 'off',
-    // Tests run the inline scripts kay writes into a page.
-    'ts/no-implied-eval': 'off',
-    // bun-types types the asymmetric matchers, `expect.stringContaining()` and the like, as any.
-    'ts/no-unsafe-argument': 'off',
-  },
-})
+}, kayRules)

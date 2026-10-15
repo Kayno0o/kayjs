@@ -21,7 +21,7 @@ interface DiscordRawUser {
 
 // Discord answers bare image hashes; a hash starting `a_` is animated, served as a gif.
 function discordImage(kind: 'avatars' | 'banners', userId: string, hash: string | null | undefined): string | null {
-  return hash ? `https://cdn.discordapp.com/${kind}/${userId}/${hash}.${hash.startsWith('a_') ? 'gif' : 'png'}` : null
+  return hash == null || hash === '' ? null : `https://cdn.discordapp.com/${kind}/${userId}/${hash}.${hash.startsWith('a_') ? 'gif' : 'png'}`
 }
 
 /** Discord OAuth2 provider preset, its avatar and banner as CDN URLs. */
@@ -297,16 +297,18 @@ function openIdUser(claims: OpenIdClaims): OAuthUser {
 }
 
 /** Maps a standard OAuth2 token payload (`access_token`, `expires_in`, ...) to `OAuthTokens`. */
-function parseStandardTokens(raw: any): OAuthTokens {
-  if (!raw?.access_token)
-    throw new Error(`OAuth token response missing access_token${raw?.error ? `: ${raw.error}` : ''}`)
+function parseStandardTokens(raw: unknown): OAuthTokens {
+  const answer = (raw ?? {}) as { access_token?: string | null, refresh_token?: string | null, expires_in?: unknown, scope?: string | null, token_type?: string | null, id_token?: unknown, error?: string | null }
+
+  if (answer.access_token == null || answer.access_token === '')
+    throw new Error(`OAuth token response missing access_token${answer.error == null || answer.error === '' ? '' : `: ${answer.error}`}`)
 
   return {
-    accessToken: raw.access_token,
-    refreshToken: raw.refresh_token ?? undefined,
-    expiresAt: typeof raw.expires_in === 'number' ? Date.now() + raw.expires_in * 1000 : undefined,
-    scope: raw.scope ?? undefined,
-    tokenType: raw.token_type ?? undefined,
-    idToken: typeof raw.id_token === 'string' ? raw.id_token : undefined,
+    accessToken: answer.access_token,
+    refreshToken: answer.refresh_token ?? undefined,
+    expiresAt: typeof answer.expires_in === 'number' ? Date.now() + answer.expires_in * 1000 : undefined,
+    scope: answer.scope ?? undefined,
+    tokenType: answer.token_type ?? undefined,
+    idToken: typeof answer.id_token === 'string' ? answer.id_token : undefined,
   }
 }

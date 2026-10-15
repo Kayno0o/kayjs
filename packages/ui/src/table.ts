@@ -99,7 +99,7 @@ function sortable(value: unknown): string | number | undefined {
 export function sortedRows<Row>(rows: Row[], columns: Column<Row>[], sort: SortState | undefined): Row[] {
   const column = sort && columns.find(item => item.key === sort.key)
 
-  if (!sort || !column?.sortValue)
+  if (!sort || column?.sortValue === undefined)
     return rows
 
   const { sortValue } = column

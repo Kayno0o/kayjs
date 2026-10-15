@@ -40,12 +40,12 @@ export function formatMarker(marker: FieldMarker): string {
 export function parseMarker(value: string, body = false): FieldMarker | undefined {
   const [collection, entry, path, ...extra] = value.split(':')
 
-  if (!collection || !entry || (body ? path !== undefined : path === undefined) || extra.length > 0)
+  if (collection === undefined || collection === '' || entry === undefined || entry === '' || (body ? path !== undefined : path === undefined) || extra.length > 0)
     return undefined
 
   const [slug, locale, ...more] = entry.split('@')
 
-  if (!slug || more.length > 0)
+  if (slug === undefined || slug === '' || more.length > 0)
     return undefined
 
   try {

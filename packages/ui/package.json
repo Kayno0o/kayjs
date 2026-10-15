@@ -33,10 +33,10 @@
     "src"
   ],
   "engines": {
-    "bun": ">=1.4.2"
+    "bun": ">=1.4.3"
   },
   "scripts": {
-    "prepare": "$npm_execpath scripts/link-fixture.ts",
+    "prepare": "$npm_execpath ../../scripts/link-fixture.ts",
     "check": "$npm_execpath check",
     "lint": "keslint --cache",
     "lint:fix": "keslint --fix --cache",
@@ -64,7 +64,7 @@
   "devDependencies": {
     "@happy-dom/global-registrator": "^20.14.5",
     "@iconify-json/tabler": "^1.2.41",
-    "@kaynooo/eslint": "^6.0.1",
+    "@kaynooo/eslint": "^6.1.0",
     "@types/bun": "^1.4.2",
     "chartist": "^1.5.0",
     "elysia": "^1.4.30",

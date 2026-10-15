@@ -7,7 +7,7 @@ async function loaded(mode: 'outbox' | 'smtp' | 'dev'): Promise<{ before: string
   if (!out.trim())
     throw new Error(err)
 
-  return JSON.parse(out.trim().split('\n').pop()!)
+  return JSON.parse(out.trim().split('\n').pop()!) as { before: string[], after: string[] }
 }
 
 // nodemailer's SMTP pool, which the address parser the mailer reads for every mail does not pull in.

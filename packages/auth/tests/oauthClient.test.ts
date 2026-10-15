@@ -11,7 +11,7 @@ const realFetch = globalThis.fetch
 function mockFetch(handler: (call: FetchCall) => Response): FetchCall[] {
   const calls: FetchCall[] = []
 
-  globalThis.fetch = (async (input: any, init?: RequestInit) => {
+  globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
     const call = { url: String(input), init }
 
     calls.push(call)
@@ -209,9 +209,9 @@ describe('a provider out of reach or answering nonsense', () => {
     const calls = mockFetch(timedOut)
     const client = createOAuthClient(discordProvider(), CONFIG)
 
-    expect((await failure(() => client.exchangeCode('c'))).status).toBe(502)
-    expect((await failure(() => client.refreshTokens('rt'))).status).toBe(502)
-    expect((await failure(() => client.fetchUser('tok'))).status).toBe(502)
+    expect((await failure(async () => client.exchangeCode('c'))).status).toBe(502)
+    expect((await failure(async () => client.refreshTokens('rt'))).status).toBe(502)
+    expect((await failure(async () => client.fetchUser('tok'))).status).toBe(502)
     expect(calls.map(call => call.init?.signal instanceof AbortSignal)).toEqual([true, true, true])
   })
 
@@ -219,7 +219,7 @@ describe('a provider out of reach or answering nonsense', () => {
     const calls = mockFetch(timedOut)
     const client = createOAuthClient(oidcProvider({ issuer: 'https://idp.test' }), CONFIG)
 
-    expect((await failure(() => client.authorizeUrl())).status).toBe(502)
+    expect((await failure(async () => client.authorizeUrl())).status).toBe(502)
     expect(calls[0]!.init?.signal).toBeInstanceOf(AbortSignal)
   })
 
@@ -227,10 +227,10 @@ describe('a provider out of reach or answering nonsense', () => {
     const client = createOAuthClient(discordProvider(), CONFIG)
 
     mockFetch(() => new Response('<html>maintenance</html>', { status: 200, headers: { 'content-type': 'application/json' } }))
-    expect((await failure(() => client.exchangeCode('c'))).status).toBe(502)
-    expect((await failure(() => client.fetchUser('tok'))).status).toBe(502)
+    expect((await failure(async () => client.exchangeCode('c'))).status).toBe(502)
+    expect((await failure(async () => client.fetchUser('tok'))).status).toBe(502)
 
     mockFetch(() => new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } }))
-    expect((await failure(() => client.exchangeCode('c'))).status).toBe(502)
+    expect((await failure(async () => client.exchangeCode('c'))).status).toBe(502)
   })
 })

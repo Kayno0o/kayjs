@@ -90,7 +90,7 @@ export function authPages<Server extends AnyElysia = AnyElysia>(options: AuthPag
 
 // The prefix and home `createAuth` reads off its `pages` option.
 export function pagesOf(pages: boolean | AuthPagesOptions | undefined): { prefix: string, home: string } | undefined {
-  if (!pages)
+  if (pages === undefined || pages === false)
     return undefined
 
   return { prefix: (pages === true ? undefined : pages.prefix) ?? DEFAULT_PREFIX, home: (pages === true ? undefined : pages.home) ?? '/' }

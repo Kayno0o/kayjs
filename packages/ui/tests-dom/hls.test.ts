@@ -32,7 +32,7 @@ class FakeHls {
   }
 }
 
-mock.module('hls.js', () => ({ default: FakeHls }))
+await mock.module('hls.js', () => ({ default: FakeHls }))
 
 const { playSource } = await import('../src/media')
 

@@ -108,7 +108,7 @@ export async function attempt<T, Data = unknown>(run: () => Promise<T>, failure:
     return (value === undefined ? true : value) as Attempted<T>
   }
   catch (error) {
-    toast.error(refusalOf(error, options.refused) || options.failure)
+    toast.error(refusalOf(error, options.refused) ?? options.failure)
 
     return undefined
   }
@@ -121,5 +121,5 @@ function refusalOf<Data>(error: unknown, refused: ((data: Data) => string | unde
   // A schema refusal carries no handler data for `refused` to read.
   const said = error.data === undefined ? undefined : refused?.(error.data as Data)
 
-  return said || error.errors['']
+  return [said, error.errors['']].find(message => message !== undefined && message !== '')
 }

@@ -78,7 +78,7 @@ test('a Toggle whose change is under way is busy and flips no further, and goes 
     await settle()
 
     expect([state(), calls]).toEqual([[true, null], [true, true, true]])
-    expect(logged.mock.calls.map(([, error]) => error)).toEqual([new Error('refused')])
+    expect(logged.mock.calls.map(([, error]) => error as unknown)).toEqual([new Error('refused')])
   }
   finally {
     logged.mockRestore()
@@ -99,7 +99,7 @@ test('a Toggle goes back when onChange throws, and waits on any promise-like it 
     click(input)
     await settle()
 
-    expect([input.checked, logged.mock.calls.map(([, error]) => error)]).toEqual([false, [new Error('offline')]])
+    expect([input.checked, logged.mock.calls.map(([, error]) => error as unknown)]).toEqual([false, [new Error('offline')]])
 
     // A promise-like of another library, not a \`Promise\`.
     answer = () => ({ then: (resolve: (value: boolean) => void) => resolve(false) })
@@ -172,7 +172,7 @@ test('a Segmented group whose change is under way is busy and picks nothing else
     await settle()
 
     expect([state(), calls]).toEqual([['public', null], ['link', 'public', 'public']])
-    expect(logged.mock.calls.map(([, error]) => error)).toEqual([new Error('refused')])
+    expect(logged.mock.calls.map(([, error]) => error as unknown)).toEqual([new Error('refused')])
     // Putting an option back touched this group only.
     expect(root.querySelector<HTMLInputElement>('input[name="range"][value="day"]')!.checked).toBe(true)
   }

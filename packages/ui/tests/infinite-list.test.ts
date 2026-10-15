@@ -144,7 +144,7 @@ describe('infiniteList', () => {
   test('calls load once while a page is on its way, whoever asks', async () => {
     let release: (page: Ban[]) => void = () => undefined
     let calls = 0
-    const list = infiniteList(bans(1, 3), { size: 3, load: () => {
+    const list = infiniteList(bans(1, 3), { size: 3, load: async () => {
       calls++
 
       return new Promise<Ban[]>(resolve => release = resolve)

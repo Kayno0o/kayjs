@@ -70,7 +70,7 @@ function provider(issuer: string, endpoints: Endpoints, accounts: Record<string,
   return mock
 }
 
-function setup(name: string, oauthProvider: OAuthProvider<any, any>, clientSecret: string | undefined = 'secret') {
+function setup(name: string, oauthProvider: OAuthProvider, clientSecret: string | undefined = 'secret') {
   const signUps: Profile[] = []
   const app = testApp({
     url: 'https://site.test',
@@ -317,7 +317,7 @@ describe('GitLab', () => {
 
 describe('the algorithms option of the Google, Microsoft and GitLab presets', () => {
   const GITLAB = 'https://git.example.test'
-  const presets: [string, (algorithms?: string[]) => OAuthProvider<any, any>, string, Endpoints, Record<string, unknown>][] = [
+  const presets: [string, (algorithms?: string[]) => OAuthProvider, string, Endpoints, Record<string, unknown>][] = [
     ['google', algorithms => googleProvider({ ...algorithms && { algorithms } }), 'https://accounts.google.com', { token: 'https://oauth2.googleapis.com/token', jwks: 'https://www.googleapis.com/oauth2/v3/certs' }, { email: 'ada@gmail.com', email_verified: true }],
     ['microsoft', algorithms => microsoftProvider({ ...algorithms && { algorithms } }), `https://login.microsoftonline.com/${WORK_TENANT}/v2.0`, { token: 'https://login.microsoftonline.com/common/oauth2/v2.0/token', jwks: 'https://login.microsoftonline.com/common/discovery/v2.0/keys' }, { tid: WORK_TENANT }],
     ['gitlab', algorithms => gitlabProvider({ url: GITLAB, ...algorithms && { algorithms } }), GITLAB, { token: `${GITLAB}/oauth/token`, jwks: `${GITLAB}/oauth/discovery/keys`, user: `${GITLAB}/oauth/userinfo` }, { preferred_username: 'ada' }],

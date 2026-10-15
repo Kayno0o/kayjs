@@ -153,7 +153,7 @@ export async function admit(state: RequestState, action: CaptchaAction, token: s
     return await verifyWork(token, workScope(action), { difficulty: workDifficulty(captcha, past), store: captcha.proofOfWork.store }) === undefined ? undefined : 'captcha'
 
   // A widget that never loaded posts nothing, which is no reason to call the provider.
-  if (!token)
+  if (token === undefined || token === '')
     return 'captcha'
 
   try {

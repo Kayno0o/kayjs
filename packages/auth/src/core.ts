@@ -44,6 +44,7 @@ export interface SignedIn {
 
 // An OAuth app registered at a provider: `{ provider: discordProvider(), clientId, clientSecret }`.
 export interface OAuthApp {
+  // eslint-disable-next-line ts/no-explicit-any -- an app's provider written inline reads its own user answer untyped
   provider: OAuthProvider<any, OAuthUser>
   clientId: string
   // Left out for Apple, whose preset signs its own, or a public client.
@@ -103,7 +104,7 @@ export interface Core {
   // Whether a new password is known from a breach.
   breached?: ((password: string) => boolean | Promise<boolean>) | undefined
   email?: EmailCore | undefined
-  oauth: Map<string, { app: OAuthApp, client: ReturnType<typeof createOAuthClient<any, OAuthUser>> }>
+  oauth: Map<string, { app: OAuthApp, client: ReturnType<typeof createOAuthClient<never, OAuthUser>> }>
   refreshers: Map<string, ReturnType<typeof createTokenRefresher<string, RefreshSubject>>>
   allow?: ((profile: Profile) => boolean | Promise<boolean>) | undefined
   // Whether visitors make their own accounts; `createUser` makes them otherwise.

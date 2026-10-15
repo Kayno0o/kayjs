@@ -126,7 +126,7 @@ describe('signInWithPassword', () => {
 
   test('counts a burst of parallel guesses before any password is checked', async () => {
     const { browser } = await registered({ limits: { signInAccount: { max: 2, window: 900 } } })
-    const answers = await Promise.all(Array.from({ length: 6 }, () => browser().post('/password', { identifier: 'ada@example.com', password: 'wrong password!' })))
+    const answers = await Promise.all(Array.from({ length: 6 }, async () => browser().post('/password', { identifier: 'ada@example.com', password: 'wrong password!' })))
 
     expect(answers.filter(answer => answer.error === 'invalid')).toHaveLength(2)
   })

@@ -209,14 +209,14 @@ function fromEnvironment(from: Address | undefined, fromName: string | undefined
     checkKey(dkimKey, 'SMTP_DKIM_PRIVATE_KEY')
 
   let transport: Transport | undefined
-  const sender = () => from ?? named(env.SMTP_FROM!, fromName)
+  const sender = () => from ?? named(env.SMTP_FROM, fromName)
   const missing = () => [...env.SMTP_HOST === undefined ? ['SMTP_HOST'] : [], ...from === undefined && env.SMTP_FROM === undefined ? ['SMTP_FROM'] : []]
 
   // Built on the first mail, as `kay build` runs without the server's environment and leaves a missing variable to throw where it is read.
   return {
     transport: {
       send: async (mail) => {
-        transport ??= smtp({ host: env.SMTP_HOST!, port: env.SMTP_PORT, insecure: env.SMTP_INSECURE, user: env.SMTP_USER, pass: env.SMTP_PASS, rateLimit: env.SMTP_RATE_LIMIT, name: domainOf(sender()), dkim: dkimKey === undefined ? undefined : { domain: env.SMTP_DKIM_DOMAIN ?? domainOf(sender())!, selector: env.SMTP_DKIM_SELECTOR!, privateKey: dkimKey } })
+        transport ??= smtp({ host: env.SMTP_HOST, port: env.SMTP_PORT, insecure: env.SMTP_INSECURE, user: env.SMTP_USER, pass: env.SMTP_PASS, rateLimit: env.SMTP_RATE_LIMIT, name: domainOf(sender()), dkim: dkimKey === undefined ? undefined : { domain: env.SMTP_DKIM_DOMAIN ?? domainOf(sender())!, selector: env.SMTP_DKIM_SELECTOR!, privateKey: dkimKey } })
 
         return transport.send(mail)
       },
@@ -244,7 +244,7 @@ function relay(options: MailerOptions): Relay {
     server: () => read().server,
     to: () => read().to,
     // The typed address alone: a sample never reaches the addresses it was rendered for.
-    send: (mail, to) => read().transport.send({ ...mail, to: [to], cc: [], bcc: [] }),
+    send: async (mail, to) => read().transport.send({ ...mail, to: [to], cc: [], bcc: [] }),
   }
 }
 
@@ -260,7 +260,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
   const whom = (addresses: string[]): string => options.logRecipients ? addresses.join(', ') : counted(addresses)
   const configured = options.transport === undefined && delivering() === 'smtp' ? fromEnvironment(options.from, options.fromName, options.optional === true) : undefined
   const transport = options.transport ?? configured?.transport ?? outbox
-  const sender = (): Address => configured?.from ?? options.from ?? named(process.env.SMTP_FROM || 'kay@localhost', options.fromName)
+  const sender = (): Address => configured?.from ?? options.from ?? named(process.env.SMTP_FROM === undefined || process.env.SMTP_FROM === '' ? 'kay@localhost' : process.env.SMTP_FROM, options.fromName)
 
   // The message's own, else the mailer's; undefined when it names none and the mailer has none to give.
   const recipients = (message: Envelope): Address[] | undefined => {
@@ -272,7 +272,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
 
     const fromEnv = configured === undefined ? process.env.MAIL_TO : configured.to
 
-    return fromEnv ? fromEnv.split(',').map(address => address.trim()) : undefined
+    return fromEnv !== undefined && fromEnv !== '' ? fromEnv.split(',').map(address => address.trim()) : undefined
   }
 
   // Before rendering, so a mail that cannot go is neither rendered nor queued to fail every retry.
@@ -336,7 +336,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
     const accepted = delivery.accepted.length > 0 || delivery.rejected.length > 0 ? delivery.accepted : recipientsOf(mail)
 
     if (accepted.length > 0)
-      log.info(`${quoted(mail.subject)} sent to ${whom(accepted)}${delivery.response ? `: ${delivery.response}` : ''}`)
+      log.info(`${quoted(mail.subject)} sent to ${whom(accepted)}${delivery.response === undefined || delivery.response === '' ? '' : `: ${delivery.response}`}`)
 
     // Logged rather than thrown: a retry would send the mail again to those who already have it.
     if (delivery.rejected.length > 0)
@@ -357,7 +357,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
 
   // The outbox page, which shows every mail with its links live, is served by `kay dev` alone, never by a server merely started with NODE_ENV=development.
   if (transport === outbox && underKayDev())
-    mountPreview(plugin, render as (message: Message) => Promise<Mail>, relay(options))
+    mountPreview(plugin, render, relay(options))
 
   const sending = Object.assign(plugin, {
     send: async <P extends object>(message: Message<P>) => {

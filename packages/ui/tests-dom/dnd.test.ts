@@ -53,7 +53,7 @@ function button(root: ParentNode, label: string): HTMLButtonElement {
 function listOf(answer: () => void | Promise<void> = () => undefined) {
   const moves: [from: number, to: number][] = []
   const sortable = new Sortable({
-    onReorder: (from, to) => {
+    onReorder: async (from, to) => {
       moves.push([from, to])
 
       return answer()
@@ -156,7 +156,7 @@ describe('Sortable, from the keyboard', () => {
 
 // happy-dom lays nothing out, so each element is given the box a browser would have drawn.
 function box(el: HTMLElement, left: number, top: number, width: number, height: number): void {
-  el.getBoundingClientRect = () => ({ left, top, width, height, right: left + width, bottom: top + height, x: left, y: top, toJSON: () => ({}) }) as DOMRect
+  el.getBoundingClientRect = () => ({ left, top, width, height, right: left + width, bottom: top + height, x: left, y: top, toJSON: () => ({}) })
 }
 
 function pointer(target: EventTarget, type: string, x: number, y: number, pointerType = 'mouse'): PointerEvent {
@@ -430,6 +430,7 @@ describe('DropTargets, by pointer', () => {
     targets.item('note')(area.querySelector<HTMLElement>('#note')!)
 
     // happy-dom lays nothing out: left of 100px the pointer is over the folder's inner row, right of it over the locked target.
+    // eslint-disable-next-line ts/unbound-method -- only put back on the document it was taken from
     const { elementFromPoint } = document
 
     document.elementFromPoint = (x: number) => area.querySelector(x < 100 ? '#inner' : '#locked')

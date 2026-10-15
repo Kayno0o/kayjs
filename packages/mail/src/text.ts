@@ -34,7 +34,7 @@ export function htmlToText(html: string): string {
   // A pre block's text, as written, kept out of the tidying until the end.
   const kept: string[] = []
 
-  for (const [, comment, closing, name, attributes, content] of html.matchAll(TOKEN)) {
+  for (const [, comment, slash, name, attributes, content] of html.matchAll(TOKEN)) {
     if (comment !== undefined)
       continue
 
@@ -46,6 +46,7 @@ export function htmlToText(html: string): string {
     }
 
     const tag = name!.toLowerCase()
+    const closing = slash === '/'
 
     if (skipping !== undefined) {
       if (tag === skipping.tag && !VOID.has(tag))
@@ -129,8 +130,8 @@ export function htmlToText(html: string): string {
 export function linksOf(html: string): string[] {
   const links = new Set<string>()
 
-  for (const [, , closing, name, attributes] of html.matchAll(TOKEN)) {
-    const href = name?.toLowerCase() === 'a' && !closing ? attribute(attributes!, 'href') : undefined
+  for (const [, , slash, name, attributes] of html.matchAll(TOKEN)) {
+    const href = name?.toLowerCase() === 'a' && slash !== '/' ? attribute(attributes!, 'href') : undefined
 
     if (href !== undefined)
       links.add(href)

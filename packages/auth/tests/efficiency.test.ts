@@ -122,8 +122,8 @@ describe('an authenticated request', () => {
     }
     const store: AuthStore = {
       ...base,
-      users: { ...base.users, get: async id => slow('user', () => base.users.get(id)) },
-      sessions: { ...base.sessions, get: async id => slow('session', () => base.sessions.get(id)) },
+      users: { ...base.users, get: async id => slow('user', async () => base.users.get(id)) },
+      sessions: { ...base.sessions, get: async id => slow('session', async () => base.sessions.get(id)) },
     }
     const { browser } = testApp({ store })
     const ada = browser()
@@ -301,7 +301,7 @@ describe('a TOTP check', () => {
     const original = crypto.subtle.importKey.bind(crypto.subtle)
     let imports = 0
 
-    crypto.subtle.importKey = ((...args: Parameters<typeof original>) => {
+    crypto.subtle.importKey = (async (...args: Parameters<typeof original>) => {
       imports++
 
       return original(...args)

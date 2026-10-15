@@ -24,7 +24,7 @@ async function form() {
   return mounted.root
 }
 
-const state = (root: HTMLElement) => JSON.parse(root.querySelector('#state')!.textContent!) as Record<string, unknown>
+const state = (root: HTMLElement) => JSON.parse(root.querySelector('#state')!.textContent) as Record<string, unknown>
 
 function type(root: HTMLElement, selector: string, value: string, event = 'input') {
   const field = root.querySelector<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>(selector)!
@@ -145,7 +145,7 @@ describe('a form reset during a change under way', () => {
         const told: string[] = []
 
         mounted = await mount('src/components/form-reset-busy.kay', {
-          answer: (control: string, value: unknown) => {
+          answer: async (control: string, value: unknown) => {
             told.push(`${control}=${String(value)}`)
 
             return told.length === 1 ? gate.promise : undefined
@@ -176,7 +176,7 @@ describe('a form reset during a change under way', () => {
     const told: string[] = []
 
     mounted = await mount('src/components/form-reset-busy.kay', {
-      answer: (control: string, value: unknown) => {
+      answer: async (control: string, value: unknown) => {
         told.push(`${control}=${String(value)}`)
 
         return told.length === 1 ? gate.promise : undefined

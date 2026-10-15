@@ -67,7 +67,8 @@ export function infiniteList<Row>(first: Row[], options: InfiniteListOptions<Row
       ended.set(page.length < size)
       failed.set(false)
 
-      const fresh = key === undefined ? page : page.filter(row => !shown.has(key(row)) && shown.add(key(row)))
+      // A row is fresh when adding its key grows the set of keys shown.
+      const fresh = key === undefined ? page : page.filter(row => shown.size < shown.add(key(row)).size)
 
       if (fresh.length > 0)
         rows.set(current => [...current, ...fresh])

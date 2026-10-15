@@ -1,6 +1,6 @@
 import type { AuthKind } from './auth'
 import type { SentMail } from './outbox'
-import type { Address, Attachment, Delivery, Mail, Message } from './types'
+import type { Address, Attachment, Delivery, Mail, Message, ViewContent } from './types'
 import { join } from 'node:path'
 import process from 'node:process'
 import { Elysia } from 'elysia'
@@ -147,7 +147,7 @@ async function attempt(relay: Relay, mail: Mail, to: string): Promise<string | u
   try {
     const { rejected, response } = await relay.send(mail, to)
 
-    return rejected.length > 0 ? `the server refused ${rejected.join(', ')}${response ? `: ${response}` : ''}` : undefined
+    return rejected.length > 0 ? `the server refused ${rejected.join(', ')}${response === undefined || response === '' ? '' : `: ${response}`}` : undefined
   }
   catch (error) {
     return messageOf(error)
@@ -203,11 +203,11 @@ async function sample(file: string, render: (message: Message) => Promise<Mail>)
     return { mail: await render(await authMessage(authSample(kind), authMailerOptions() ?? {}, undefined) as Message), props: 'a sample of kayjs-auth\'s, through authMailer' }
 
   const preview = join(process.cwd(), MAILS_DIR, previewOf(file))
-  const view = (await import(join(process.cwd(), MAILS_DIR, file))).default
+  const { default: view } = await import(join(process.cwd(), MAILS_DIR, file)) as { default: ViewContent<object>['view'] }
   const own = AUTH_VIEW.exec(file)?.[1]
 
   if (await Bun.file(preview).exists())
-    return { mail: await render({ to: SAMPLE_ADDRESS, subject: file, view, props: (await import(preview)).default }), props: escape(previewOf(file)) }
+    return { mail: await render({ to: SAMPLE_ADDRESS, subject: file, view, props: (await import(preview) as { default: object }).default }), props: escape(previewOf(file)) }
 
   if (own !== undefined && AUTH_SAMPLES.has(`kayjs-auth/${own}`))
     return { mail: await render({ to: SAMPLE_ADDRESS, subject: file, view, props: { mail: authSample(own as AuthKind) } }), props: `a sample of kayjs-auth's ${escape(own)}` }

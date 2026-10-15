@@ -49,11 +49,11 @@ describe('the actions that re-prove the user', () => {
   type Browser = ReturnType<ReturnType<typeof testApp>['browser']>
 
   // `codeOnly` is whether an account with a second factor refuses the password alone, as what adds a way in or moves where its reset links go does; changing the password is asked of whoever knows the password.
-  const actions: [string, boolean, (ada: Browser, proof: Proof) => Promise<any>][] = [
-    ['changing the password', false, (ada, proof) => ada.call('changePassword', proof, 'a first password')],
-    ['changing the email', true, (ada, proof) => ada.call('changeEmail', proof, 'ada@new.test')],
-    ['adding a passkey', true, (ada, proof) => ada.call('passkeyRegistrationOptions', proof)],
-    ['linking a provider', true, (ada, proof) => ada.call('linkProvider', 'github', proof)],
+  const actions: [string, boolean, (ada: Browser, proof: Proof) => Promise<unknown>][] = [
+    ['changing the password', false, async (ada, proof) => ada.call('changePassword', proof, 'a first password')],
+    ['changing the email', true, async (ada, proof) => ada.call('changeEmail', proof, 'ada@new.test')],
+    ['adding a passkey', true, async (ada, proof) => ada.call('passkeyRegistrationOptions', proof)],
+    ['linking a provider', true, async (ada, proof) => ada.call('linkProvider', 'github', proof)],
   ]
 
   // One account of each shape, signed in, with the action's own failures told apart from its refusals by `error`.

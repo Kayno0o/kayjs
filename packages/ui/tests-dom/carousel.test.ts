@@ -127,6 +127,7 @@ test('stops for good from its pause button, which a carousel without autoplay le
 })
 
 test('never turns on its own for a visitor asking for reduced motion', async () => {
+  // eslint-disable-next-line ts/unbound-method -- called back on the window below, and put back as it was
   const media = window.matchMedia
 
   window.matchMedia = (query: string) => ({ ...media.call(window, query), matches: query.includes('reduce') })

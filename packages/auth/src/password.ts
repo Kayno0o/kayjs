@@ -111,7 +111,7 @@ export async function register(state: RequestState, input: RegisterInput): Promi
     return { ok: false, errors: withoutUndefined(errors) }
 
   if (holder && !unclaimed)
-    return await answerHeld(state, holder, input.password)
+    return answerHeld(state, holder, input.password)
 
   if (holder)
     await erase(state, holder)
@@ -130,7 +130,7 @@ export async function register(state: RequestState, input: RegisterInput): Promi
     const taken = await store.users.findByEmail(email)
 
     if (taken && requireVerified)
-      return await answerHeld(state, taken, null)
+      return answerHeld(state, taken, null)
 
     if (taken)
       return { ok: false, errors: { email: 'taken' } }
@@ -171,7 +171,7 @@ export async function createUser(core: Core, input: CreateUserInput): Promise<Cr
 
   const undeclared = core.roles && input.roles?.find(role => !core.roles!.has(role))
 
-  if (undeclared)
+  if (undeclared !== undefined)
     throw new Error(`kayjs-auth: createUser was given the role '${undeclared}', which the \`roles\` option does not declare`)
 
   const errors: RegisterErrors = {
@@ -277,7 +277,7 @@ export async function signInWithPassword(state: RequestState, input: PasswordSig
 
 // Spends as long on an account without a password as on a wrong one, so the time taken tells nothing either.
 async function passwordMatches(record: UserRecord | undefined, password: string): Promise<boolean> {
-  if (record?.passwordHash)
+  if (record?.passwordHash != null && record.passwordHash !== '')
     return comparePasswords(password, record.passwordHash)
 
   decoy ??= hashPassword(randomToken())

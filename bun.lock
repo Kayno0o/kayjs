@@ -62,10 +62,10 @@
         "reflect-metadata": "^0.2.2",
       },
       "devDependencies": {
-        "@kaynooo/eslint": "^6.0.1",
+        "@kaynooo/eslint": "^6.1.0",
         "@kaynooo/kayjs-mail": "workspace:~",
         "@kaynooo/kayjs-ui": "workspace:~",
-        "@kaynooo/pg-orm": "^7.0.1",
+        "@kaynooo/pg-orm": "^7.0.4",
         "@types/bun": "^1.4.2",
         "@typescript/native-preview": "^7.0.0-dev.20260707.2",
         "elysia": "^1.4.30",
@@ -86,7 +86,7 @@
       "version": "1.44.0",
       "devDependencies": {
         "@happy-dom/global-registrator": "^20.14.5",
-        "@kaynooo/eslint": "^6.0.1",
+        "@kaynooo/eslint": "^6.1.0",
         "@kaynooo/kayjs-ui": "workspace:~",
         "@types/bun": "^1.4.2",
         "@typescript/native-preview": "^7.0.0-dev.20260707.2",
@@ -126,7 +126,7 @@
       "devDependencies": {
         "@happy-dom/global-registrator": "^20.14.5",
         "@iconify-json/tabler": "^1.2.41",
-        "@kaynooo/eslint": "^6.0.1",
+        "@kaynooo/eslint": "^6.1.0",
         "@types/bun": "^1.4.2",
         "chartist": "^1.5.0",
         "elysia": "^1.4.30",

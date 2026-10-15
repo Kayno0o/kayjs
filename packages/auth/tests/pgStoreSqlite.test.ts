@@ -6,7 +6,7 @@ import { storeContract } from './helpers/storeContract'
 const opened: Database[] = []
 
 afterAll(async () => {
-  await Promise.all(opened.map(db => db.close()))
+  await Promise.all(opened.map(async db => db.close()))
 })
 
 storeContract('pgStore on SQLite', async () => {

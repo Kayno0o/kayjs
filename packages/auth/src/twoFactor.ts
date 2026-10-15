@@ -121,14 +121,14 @@ export async function reprove(state: RequestState, proof: Proof, options: { seco
   if (await spend(state.core.store, `reprove:${record.id}`, state.core.limits.reprove))
     return { ok: false, error: 'limited' }
 
-  let proved: unknown
+  let proved: boolean
 
   if (proof.passkey !== undefined)
     proved = await provePasskey(state, record, proof.passkey)
   else if (record.passwordHash !== null && !(options.secondFactor && twoFactor))
     proved = await comparePasswords(proof.password ?? '', record.passwordHash)
   else
-    proved = await spendSecondFactor(state, record, proof.code ?? '')
+    proved = await spendSecondFactor(state, record, proof.code ?? '') !== undefined
 
   if (!proved)
     return { ok: false, error: 'proof' }

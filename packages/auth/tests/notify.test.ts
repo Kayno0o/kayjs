@@ -131,7 +131,7 @@ describe('a slow mailer', () => {
       site: 'Site',
       email: {
         mailer: {
-          send: (mail) => {
+          send: async (mail) => {
             sent.push(mail)
 
             if (!failing)
@@ -175,7 +175,7 @@ describe('sendAside', () => {
 
     try {
       let handed = 0
-      const silent = { mailer: { send: () => {
+      const silent = { mailer: { send: async () => {
         handed++
 
         return new Promise<void>(Function.prototype as () => void)

@@ -31,7 +31,7 @@ export class OAuthExchangeError extends Error {
 }
 
 /** A configured OAuth client bound to one provider and one app's credentials. */
-export function createOAuthClient<Raw = any, User = unknown>(provider: OAuthProvider<Raw, User>, config: OAuthClientConfig) {
+export function createOAuthClient<Raw = unknown, User = unknown>(provider: OAuthProvider<Raw, User>, config: OAuthClientConfig) {
   let discovered: Promise<OAuthEndpoints> | undefined
   const keySets = new Map<string, JWTVerifyGetKey>()
 
@@ -220,7 +220,7 @@ async function askProvider(name: string, what: string, url: string, init: Reques
 }
 
 // The body stays out of the error: a successful answer may hold tokens.
-function parseJson(name: string, what: string, text: string): any {
+function parseJson(name: string, what: string, text: string): unknown {
   try {
     return JSON.parse(text)
   }
@@ -230,7 +230,7 @@ function parseJson(name: string, what: string, text: string): any {
 }
 
 // A token answer the provider's parser cannot read, an app's own provider included, is the provider misbehaving rather than a server error.
-function tokensFrom(provider: OAuthProvider<any, any>, raw: unknown): OAuthTokens {
+function tokensFrom<Raw, User>(provider: OAuthProvider<Raw, User>, raw: unknown): OAuthTokens {
   try {
     return provider.parseTokens(raw)
   }
@@ -242,7 +242,7 @@ function tokensFrom(provider: OAuthProvider<any, any>, raw: unknown): OAuthToken
   }
 }
 
-async function postToken(name: string, accept: OAuthProvider['tokenAccept'], tokenUrl: string, body: URLSearchParams): Promise<any> {
+async function postToken(name: string, accept: OAuthProvider['tokenAccept'], tokenUrl: string, body: URLSearchParams): Promise<unknown> {
   const { res, text } = await askProvider(name, 'token request', tokenUrl, {
     method: 'POST',
     headers: {
@@ -258,7 +258,7 @@ async function postToken(name: string, accept: OAuthProvider['tokenAccept'], tok
   const isJson = accept === 'json'
     || (accept !== 'form' && (res.headers.get('content-type') ?? '').includes('json'))
 
-  const parsed = isJson ? parseJson(name, 'token request', text) : Object.fromEntries(new URLSearchParams(text))
+  const parsed = (isJson ? parseJson(name, 'token request', text) : Object.fromEntries(new URLSearchParams(text))) as { error?: unknown } | null
 
   // GitHub answers a refused grant with a 200 carrying `error`, where the spec answers a 400.
   if (typeof parsed?.error === 'string')

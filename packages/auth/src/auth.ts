@@ -208,9 +208,9 @@ export class Auth<Scope extends string = string, Role extends string = string, O
 
         return languages
       },
-      current: () => this.record(),
+      current: async () => this.record(),
       via: () => this.source,
-      complete: async (record, redirect, method) => completeSignIn(this[STATE], record, redirect, method, (signedIn, how) => this.establish(signedIn, how)),
+      complete: async (record, redirect, method) => completeSignIn(this[STATE], record, redirect, method, async (signedIn, how) => this.establish(signedIn, how)),
       renew: async (record) => {
         // Read off the session, not through `record()`: the version it holds is the one just raised past.
         const signedIn = await this.session.get('auth')
@@ -461,7 +461,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
 
   // Finishes a sign-in waiting for its second factor with an authenticator code or a recovery code.
   async verifyTwoFactor(code: string): Promise<TwoFactorResult> {
-    return verifyTwoFactor(this[STATE], code, (record, method) => this.establish(record, method))
+    return verifyTwoFactor(this[STATE], code, async (record, method) => this.establish(record, method))
   }
 
   // Whether this session signed in or re-proved its user in the last ten minutes, as `exportData()` and the admin methods ask, for a page to show a form for `reprove` first.
@@ -524,7 +524,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
 
   // Deletes the signed-in user, calling `onDelete` for the app's own records, and signs this session out; the last admin is refused.
   async deleteAccount(proof: Proof): Promise<{ ok: true } | { ok: false, error: ProofFailure | 'last-admin' }> {
-    return deleteAccount(this[STATE], proof, () => this.signOut())
+    return deleteAccount(this[STATE], proof, async () => this.signOut())
   }
 
   // A bearer token for a device or an API client of the signed-in user, shown this once; minted from a session only, never from another token.
@@ -597,7 +597,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
   async signInWithPasskey(response: AuthenticationResponseJSON, redirect?: string, options: { remember?: boolean | undefined } = {}): Promise<PasskeySignInResult> {
     await chooseRemember(this[STATE], options.remember)
 
-    return signInWithPasskey(this[STATE], response, redirect, (record, method) => this.establish(record, method))
+    return signInWithPasskey(this[STATE], response, redirect, async (record, method) => this.establish(record, method))
   }
 
   // The options for answering a pending sign-in's second factor with a passkey; `none` when the user has none.
@@ -606,7 +606,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
   }
 
   async verifyTwoFactorPasskey(response: AuthenticationResponseJSON): Promise<TwoFactorResult> {
-    return verifyTwoFactorPasskey(this[STATE], response, (record, method) => this.establish(record, method))
+    return verifyTwoFactorPasskey(this[STATE], response, async (record, method) => this.establish(record, method))
   }
 
   // The options for re-proving with a passkey, its answer then passed as `{ passkey }` wherever a proof is asked.
@@ -982,10 +982,10 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
 
   const evaluate = async (user: User, requirement: AuthRequirement<Role>, ctx: PolicyContext): Promise<boolean> => meetsRequirement(user, requirement, ctx, (grant) => {
     if (typeof grant === 'string')
-      return isGranted(grant, user.roles as Role[])
+      return isGranted(grant, user.roles)
 
     // A grant on one record needs the app's own `authorize`.
-    return grant.resourceId == null && isGranted(grant.type, user.roles as Role[])
+    return grant.resourceId == null && isGranted(grant.type, user.roles)
   })
 
   const authorize = options.authorize ?? (async (user, requirement, _level, ctx) => user !== null && evaluate(user, requirement, ctx))
@@ -1004,7 +1004,7 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
     // `.use(auth.plugin)` before kay's pages: it adds `auth` to the context and kayjs-auth's routes, and uses the session plugin itself.
     plugin,
     hasRole,
-    isGranted: (role: Role, user: User) => isGranted(role, user.roles as Role[]),
+    isGranted: (role: Role, user: User) => isGranted(role, user.roles),
 
     // A requirement met by a member of the organization the route's `param` names, by id or slug, holding `role` there when given: `auth: auth.memberOf('admin')`.
     memberOf(role?: OrgRole, memberOptions: { param?: string } = {}): Predicate<User> {
@@ -1083,7 +1083,7 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
     // Closes every route of the Elysia instance it is used on unless the user meets `require`, signed in by default. A route takes `auth: <requirement>` to ask for more and `auth: false` to stay open.
     gate(gateOptions: { require?: AuthRequirement<Role>, scope?: ScopeRequirement<Scope> } = {}) {
       const gate = createGate<User, Role, Scope>({
-        principal: ctx => authOf(ctx).user(),
+        principal: async ctx => authOf(ctx).user(),
         authorize,
         defaultRequirement: gateOptions.require ?? signedIn,
         scopes: async ctx => authOf(ctx).scopes(),
@@ -1125,7 +1125,7 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
   const oauth: Core['oauth'] = new Map()
   const oauthApps = Object.entries(options.oauth ?? {})
   const url = options.url?.replace(TRAILING_SLASH, '')
-  const locales = options.email?.locales?.length ? [...options.email.locales] : ['en']
+  const locales = options.email?.locales !== undefined && options.email.locales.length > 0 ? [...options.email.locales] : ['en']
   const pages = pagesOf(options.pages)
   const paths = pages && pagePaths(pages.prefix)
 
@@ -1156,7 +1156,7 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
       ? undefined
       : { id: options.passkeys?.rpId ?? new URL(url).hostname, name: options.site ?? new URL(url).host, origins: options.passkeys?.origins ?? [new URL(url).origin] },
     captcha: options.captcha === false ? undefined : options.captcha ?? proofOfWork(),
-    breached: options.breachedPasswords === true ? pwnedPassword : options.breachedPasswords || undefined,
+    breached: options.breachedPasswords === true ? pwnedPassword : typeof options.breachedPasswords === 'function' ? options.breachedPasswords : undefined,
     email: options.email && {
       ...options.email,
       links: emailLinks(options.email.links, paths?.links),
@@ -1178,7 +1178,7 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
     onEvent: options.onEvent,
     organizations: options.organizations && organizationsCore(options.organizations),
     pruned: { at: 0, running: Promise.resolve() },
-    audit: options.audit ? { maxAge: (options.audit === true ? undefined : options.audit.maxAge) ?? DEFAULT_AUDIT_MAX_AGE, prunedAt: 0 } : undefined,
+    audit: options.audit !== undefined && options.audit !== false ? { maxAge: (options.audit === true ? undefined : options.audit.maxAge) ?? DEFAULT_AUDIT_MAX_AGE, prunedAt: 0 } : undefined,
   }
 
   for (const [name, { client }] of oauth) {
@@ -1229,5 +1229,5 @@ function authOf(ctx: object): Auth {
   if (!(auth instanceof Auth))
     throw new Error('kayjs-auth: no `auth` in this context; `.use(auth.plugin)` before the routes and pages that read it')
 
-  return auth
+  return auth as Auth
 }

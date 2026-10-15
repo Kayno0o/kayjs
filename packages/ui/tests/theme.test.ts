@@ -48,7 +48,7 @@ for (const prefix of ['gap', 'p', 'px', 'py', 'pt', 'pb', 'pl', 'pr', 'm', 'mx',
 const theme = await Bun.file(`${ROOT}src/theme.css`).text()
 const paths = await Array.fromAsync(new Bun.Glob('src/**/*.kay').scan({ cwd: ROOT }))
 const components = await Promise.all(paths.map(async path => ({ path, source: await Bun.file(`${ROOT}${path}`).text() })))
-const scripts = await Promise.all((await Array.fromAsync(new Bun.Glob('src/**/*.ts').scan({ cwd: ROOT }))).map(path => Bun.file(`${ROOT}${path}`).text()))
+const scripts = await Promise.all((await Array.fromAsync(new Bun.Glob('src/**/*.ts').scan({ cwd: ROOT }))).map(async path => Bun.file(`${ROOT}${path}`).text()))
 
 const tokens = new Set([...theme.matchAll(DEFINED_TOKEN)].map(([, token]) => token))
 const classes = new Set([...theme.matchAll(DEFINED_CLASS)].map(([, name = '']) => name))
@@ -77,7 +77,7 @@ function colour(name: string, scheme: 0 | 1, ground?: number[]): number[] {
   if (HEX.test(side))
     return [1, 3, 5].map(at => Number.parseInt(side.slice(at, at + 2), 16))
 
-  const [, r, g, b, alpha] = RGB_ALPHA.exec(side)!.map(Number) as number[]
+  const [, r, g, b, alpha] = RGB_ALPHA.exec(side)!.map(Number)
 
   return [r!, g!, b!].map((channel, index) => channel * alpha! + ground![index]! * (1 - alpha!))
 }

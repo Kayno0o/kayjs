@@ -279,6 +279,7 @@ export function pgStore(db: Database): AuthStore {
       },
       findByDigest: async digest => toBearerToken(await bearerTokens.read.findOne({ digest })),
       async findByDigestWithUser(digest) {
+        // eslint-disable-next-line ts/no-unsafe-call, ts/no-unsafe-member-access, ts/no-unsafe-return -- joinedUser's query is untyped, as it says
         const [row] = await bearerTokens.read.findMany(q => joinedUser(q).where({ digest }).limit(1)) as unknown as (InferEntity<typeof AuthBearerTokens> & Record<string, unknown>)[]
 
         return row && { token: toBearerToken(row)!, user: toUser(userOf(row))! }
@@ -304,7 +305,7 @@ export function pgStore(db: Database): AuthStore {
         })
       },
       consume: async (userId, digest) => await recoveryCodes.write.deleteOne({ user_id: userId, digest }) !== null,
-      count: userId => recoveryCodes.read.count({ user_id: userId }),
+      count: async userId => recoveryCodes.read.count({ user_id: userId }),
     },
     attempts: {
       async count(key) {
@@ -347,10 +348,11 @@ export function pgStore(db: Database): AuthStore {
 // A bearer token's query with its user's columns joined on as `u.<column>`.
 const JOINED_COLUMNS = [...Object.keys(AuthBearerTokens.columns), ...Object.keys(AuthUsers.columns).map(column => `u.${column}`)]
 
-// Untyped because pg-orm types a `pick` by its column names, which these are built from at run time.
+/* eslint-disable ts/no-explicit-any, ts/no-unsafe-call, ts/no-unsafe-member-access, ts/no-unsafe-return -- untyped because pg-orm types a `pick` by its column names, which these are built from at run time */
 function joinedUser(q: any) {
   return q.join(AuthUsers, 'u', (e: any) => e.eq('user_id', e.ref('u.id'))).pick(...JOINED_COLUMNS)
 }
+/* eslint-enable ts/no-explicit-any, ts/no-unsafe-call, ts/no-unsafe-member-access, ts/no-unsafe-return */
 
 // The user columns holding a date.
 const DATE_COLUMNS = new Set(['email_verified_at', 'totp_enabled_at', 'banned_at', 'banned_until', 'created_at'])

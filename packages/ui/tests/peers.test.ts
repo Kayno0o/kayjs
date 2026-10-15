@@ -30,7 +30,7 @@ function peersOf(path: string, seen = new Set<string>()): string[] {
     const resolved = normalize(join(dirname(path), target))
     const file = [resolved, `${resolved}.ts`].find(candidate => sources.has(candidate))
 
-    return file ? peersOf(file, seen) : []
+    return file === undefined ? [] : peersOf(file, seen)
   })
 }
 

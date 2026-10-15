@@ -26,7 +26,7 @@ export function authenticator(options: { origin?: string, synced?: boolean } = {
     credentials,
     async create(request: PublicKeyCredentialCreationOptionsJSON, { userVerified = true } = {}): Promise<RegistrationResponseJSON> {
       const id = Buffer.from(crypto.getRandomValues(new Uint8Array(16))).toString('base64url')
-      const keys = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']) as CryptoKeyPair
+      const keys = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify'])
       const jwk = await crypto.subtle.exportKey('jwk', keys.publicKey)
       const rpId = request.rp.id!
       const cose = new Map<number, number | Uint8Array>([[1, 2], [3, -7], [-1, 1], [-2, Buffer.from(jwk.x!, 'base64url')], [-3, Buffer.from(jwk.y!, 'base64url')]])

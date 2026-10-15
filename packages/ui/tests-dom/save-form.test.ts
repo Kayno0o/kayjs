@@ -295,7 +295,7 @@ describe('SaveForm', () => {
     await settle()
 
     const root = mounted.root
-    const state = () => JSON.parse(root.querySelector('#state')!.textContent!) as Record<string, unknown>
+    const state = () => JSON.parse(root.querySelector('#state')!.textContent) as Record<string, unknown>
     const edit = async (deck: string, level: string, title: string) => {
       click(root.querySelector('input[name="agree"]'))
       click(root.querySelector('input[name="power"]'))

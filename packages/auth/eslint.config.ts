@@ -1,7 +1,9 @@
 import { defineConfig } from '@kaynooo/eslint'
+import { kayRules } from '../../eslint.base'
 
-export default defineConfig({}, {
-  // Tests embed .kay sources, whose expressions hold JS template literals inside plain strings.
-  files: ['**/tests/**/*.ts'],
-  rules: { 'no-template-curly-in-string': 'off' },
+// Lints as kay does, the fixture app left out of the type-aware rules as it is out of the tsconfig.
+export default defineConfig({ strict: true, filesTypeAware: ['src/**/*.ts', 'tests/*.ts', 'tests/{helpers,probes}/*.ts'] }, kayRules, {
+  files: ['tests/**/*.ts'],
+  // Unlike kay's: the test browser's `call` and `post` answer any, an action's answer as the test expects it, which these tests read unchecked.
+  rules: { 'ts/no-unsafe-call': 'off', 'ts/no-unsafe-member-access': 'off', 'ts/no-unsafe-return': 'off' },
 })

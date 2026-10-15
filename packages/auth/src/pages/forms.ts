@@ -68,7 +68,7 @@ export function captchaOf(input: { 'cf-turnstile-response'?: string | undefined,
 
 // An action's failure code, `captchaScript` for a CAPTCHA refused with no token posted, as a browser without JavaScript sends none: `refusal` tells it apart from a stale solution.
 export function refusedFor<Code extends string>(error: Code, input: Parameters<typeof captchaOf>[0]): Code | 'captchaScript' {
-  return error === 'captcha' && !captchaOf(input) ? 'captchaScript' : error
+  return error === 'captcha' && (captchaOf(input) ?? '') === '' ? 'captchaScript' : error
 }
 
 // Whether the page shows its CAPTCHA for `action`, with the proof of work's challenge, reading the client's attempts once.
@@ -111,7 +111,7 @@ export function refusal(failed: { errors: Partial<Record<string, string>>, data?
 export function issue(field: 'email' | 'password' | 'username', problem: string): string {
   const limits = field === 'password' ? { min: PASSWORD_MIN_LENGTH, max: PASSWORD_MAX_LENGTH } : { min: USERNAME_MIN_LENGTH, max: USERNAME_MAX_LENGTH }
 
-  return message(`auth.fields.${field}.${problem}` as never, limits as never)
+  return message(`auth.fields.${field}.${problem}` as never, limits)
 }
 
 // The message for the `?error=` a failed provider sign-in comes back with; undefined for none, or one kayjs-auth never sends.

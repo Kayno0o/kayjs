@@ -21,7 +21,7 @@ function setup(answer: (entries: DraftEntry[]) => Promise<DraftResult> = async (
   return { drafts, calls }
 }
 
-const settled = () => Bun.sleep(20)
+const settled = async () => Bun.sleep(20)
 
 describe('createDrafts', () => {
   it('renders the page once typing pauses, with every changed entry', async () => {

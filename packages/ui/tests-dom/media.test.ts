@@ -67,7 +67,7 @@ function pointer(target: Element, type: string, x: number, y: number, init: Poin
 // happy-dom lays nothing out, so an element is given the size a browser would have drawn it at.
 function sized(el: Element, width: number, height: number): void {
   Object.defineProperties(el, { clientWidth: { value: width }, clientHeight: { value: height } })
-  el.getBoundingClientRect = () => ({ left: 0, top: 0, width, height, right: width, bottom: height, x: 0, y: 0, toJSON: () => ({}) }) as DOMRect
+  el.getBoundingClientRect = () => ({ left: 0, top: 0, width, height, right: width, bottom: height, x: 0, y: 0, toJSON: () => ({}) })
 }
 
 describe('MediaGallery', () => {
@@ -349,7 +349,7 @@ describe('WhenVisible loading from a source', () => {
 
   async function feed() {
     loads.length = 0
-    mounted = await mount('src/components/feed.kay', { load: () => new Promise<number>(resolve => loads.push(resolve)) })
+    mounted = await mount('src/components/feed.kay', { load: async () => new Promise<number>(resolve => loads.push(resolve)) })
 
     const sentinel = mounted.root.querySelector('.kui-when-visible')!
 

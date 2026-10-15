@@ -17,7 +17,7 @@ async function tabs() {
 
   const { root } = mounted
   const shown = () => [...root.querySelectorAll('[role="tab"]')].filter(tab => tab.getAttribute('aria-selected') === 'true').map(tab => tab.textContent)
-  const visible = () => [...root.querySelectorAll<HTMLElement>('[role="tabpanel"]')].filter(panel => !panel.hidden).map(panel => panel.querySelector('input')?.name)
+  const visible = () => [...root.querySelectorAll<HTMLElement>('[role="tabpanel"]')].filter(panel => panel.hidden === false).map(panel => panel.querySelector('input')?.name)
 
   return { root, shown, visible }
 }

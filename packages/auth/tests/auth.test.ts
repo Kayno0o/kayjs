@@ -271,9 +271,9 @@ function guardContext({ locals, path = '/', method = 'GET' }: { locals: object, 
     request: new Request(url, { method }),
     url,
     locals,
-    redirect: ((location: string) => {
+    redirect: (location: string) => {
       throw new Error(`redirect ${location}`)
-    }) as GuardContext['redirect'],
+    },
     deny: (status = 403) => {
       throw new Error(`deny ${status}`)
     },

@@ -45,6 +45,8 @@ function tokenProblem(core: Core, name: string, options: TokenOptions): TokenPro
 
   if (options.expiresIn !== undefined && !(Number.isFinite(options.expiresIn) && options.expiresIn > 0))
     return 'expiry'
+
+  return undefined
 }
 
 async function storeToken(core: Core, userId: string, name: string, options: TokenOptions, token: string): Promise<string> {

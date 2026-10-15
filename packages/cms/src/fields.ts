@@ -83,6 +83,7 @@ export function fieldOf(key: string | number, schema: JsonSchema, required: bool
       return inner.items === undefined || Array.isArray(inner.items) ? { ...base, kind: 'json' } : { ...base, kind: 'list', item: fieldOf(0, inner.items, true), numbered: withoutNull(inner.items).schema.title === undefined }
     case 'object':
       return { ...base, kind: 'group', fields: fieldsOf(inner) }
+    case undefined:
     default:
       return { ...base, kind: 'json' }
   }
@@ -129,7 +130,14 @@ export function emptyValue(field: Field): unknown {
       return Object.fromEntries(field.fields.map(child => [child.key, emptyValue(child)]))
     case 'select':
       return field.required ? field.options[0]?.raw : undefined
-    default:
+    case 'text':
+    case 'textarea':
+    case 'markdown':
+    case 'date':
+    case 'datetime':
+    case 'reference':
+    case 'file':
+    case 'image':
       return ''
   }
 }

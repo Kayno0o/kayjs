@@ -5,7 +5,7 @@ import { authTables } from '../src/pg'
 const opened: Database[] = []
 
 afterAll(async () => {
-  await Promise.all(opened.map(db => db.close()))
+  await Promise.all(opened.map(async db => db.close()))
 })
 
 // What the hourly prune and `audit.forget` filter on, so none of them reads a whole table.

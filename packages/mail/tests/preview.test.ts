@@ -247,6 +247,7 @@ describe('the mail samples page', () => {
   it('lists every kind of kayjs-auth\'s mails once an app uses authMailer, through the app\'s own views, and gives an app\'s view of a kind a sample', async () => {
     const mail = mailer({ from: 'dev@example.com' })
 
+    // eslint-disable-next-line ts/no-unnecessary-type-assertion -- widened, the specifier is not resolved, as kay check types the fixture's .kay files for the fixture alone
     authMailer(mail.enqueue, { views: { 'reset-password': async () => await import('./fixture/src/mails/auth/reset-password.kay' as string) as { default: AuthView } } })
 
     const list = await (await get(mail, '/_kay/mail/samples')).text()
@@ -291,7 +292,7 @@ describe('sending a development mail for real', () => {
     delete process.env.SMTP_INSECURE
   })
 
-  function post(app: { handle: (request: Request) => Promise<Response> }, path: string, to: string, site = 'same-origin'): Promise<Response> {
+  async function post(app: { handle: (request: Request) => Promise<Response> }, path: string, to: string, site = 'same-origin'): Promise<Response> {
     return get(app, path, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded', 'sec-fetch-site': site }, body: new URLSearchParams({ to }) })
   }
 

@@ -69,7 +69,7 @@ async function saveOnce(drafts: Drafts, ref: EntryRef, { slug = ref.slug, locale
   // Edits kept over a file deleted meanwhile make it again, refused if one was made since rather than written over.
   create ||= drafts.recreating(ref)
 
-  const outcome = await attempt(() => call(entriesApi, '/:collection/:slug', {
+  const outcome = await attempt(async () => call(entriesApi, '/:collection/:slug', {
     method: 'post',
     params: { collection: ref.collection, slug },
     body: { data: entry.data, create, ...localeOf({ ...ref, locale }), ...(entry.body === undefined ? {} : { body: entry.body }), ...versionOf(drafts.version(ref)) },
@@ -130,7 +130,7 @@ export async function deleteUnusedUploadsInChunks(keys: string[]): Promise<boole
 
 // Deletes unused uploads and their variants in one request, so the server reads the content once for all, and says how it went; true once the rows are stale, deleted or not.
 export async function deleteUnusedUploads(keys: string[]): Promise<boolean> {
-  const result = await attempt(() => call(filesApi, '/unused/delete', { method: 'post', body: { keys } }), 'Could not delete')
+  const result = await attempt(async () => call(filesApi, '/unused/delete', { method: 'post', body: { keys } }), 'Could not delete')
 
   if (!result)
     return false
@@ -151,7 +151,7 @@ export async function deleteUnusedUploads(keys: string[]): Promise<boolean> {
 
 // Turns a draft entry public and says how it went; true once published.
 export async function publishSaved(ref: EntryRef): Promise<boolean> {
-  const outcome = await attempt(() => call(entriesApi, '/:collection/:slug/publish', {
+  const outcome = await attempt(async () => call(entriesApi, '/:collection/:slug/publish', {
     method: 'post',
     params: { collection: ref.collection, slug: ref.slug },
     query: localeOf(ref),
@@ -180,7 +180,7 @@ function settled(outcome: Outcome | undefined, done: string, refused: string): b
   }
 
   // A commit shows on the site once it has rebuilt from it.
-  toast.success(outcome.commit ? `${done}. The site shows it once it has rebuilt.` : done)
+  toast.success(outcome.commit === undefined ? done : `${done}. The site shows it once it has rebuilt.`)
 
   return true
 }

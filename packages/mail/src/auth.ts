@@ -51,7 +51,7 @@ export function authMailerOptions(): AuthMailerOptions | undefined {
 export function authMailer<R>(send: Send<R>, options: AuthMailerOptions = {}): { send: (mail: AuthMail) => Promise<R> } {
   authOptions = options
 
-  return { send: async mail => await send(await authMessage(mail, options, mail.locale)) }
+  return { send: async mail => send(await authMessage(mail, options, mail.locale)) }
 }
 
 // The message `authMailer` sends for a mail, rendered in `lang`, the site's default language when undefined. A kind it does not know goes as kayjs-auth wrote it.
@@ -61,7 +61,9 @@ export async function authMessage(mail: AuthMail, options: AuthMailerOptions, la
 
   const own = options.views?.[mail.kind as AuthKind]
   // Imported here, as the module loads with kay.config.ts before kay compiles any .kay file; typed by hand, as kay check types a package's .kay files for the apps importing them alone.
+  // eslint-disable-next-line ts/no-unnecessary-type-assertion -- widened, so the .kay specifier is not resolved
   const view = own === undefined ? (await (LINK_KINDS.has(mail.kind) ? import('./auth-link.kay' as string) : import('./auth-notice.kay' as string)) as { default: AuthView }).default : (await own()).default
+  // eslint-disable-next-line ts/no-unnecessary-type-assertion -- as above
   const subject = (await import('./auth-subject.kay' as string) as { default: AuthView }).default
   // The subject goes through the messages as the view does, in the same language.
   const written = await renderToString(subject, { mail }, { locale: lang })

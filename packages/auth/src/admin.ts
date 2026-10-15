@@ -91,7 +91,7 @@ export async function listUsers(state: RequestState, query: { search?: string | 
 
   const search = query.search?.trim()
   const found = await state.core.store.users.list({
-    ...search ? { search } : {},
+    ...search === undefined || search === '' ? {} : { search },
     offset: Math.max(Math.trunc(query.offset ?? 0), 0),
     limit: clamp(Math.trunc(query.limit ?? 50), 1, USER_PAGE_MAX),
   })
@@ -163,7 +163,8 @@ export async function banUser(state: RequestState, userId: string, options: { re
   if (await isAdmin(state, record))
     return { ok: false, error: 'admin' }
 
-  const reason = options.reason?.trim().slice(0, BAN_REASON_MAX_LENGTH) || null
+  const given = options.reason?.trim().slice(0, BAN_REASON_MAX_LENGTH)
+  const reason = given === undefined || given === '' ? null : given
   const patch = { bannedAt: new Date(), bannedUntil: options.until ?? null, banReason: reason, sessionVersion: record.sessionVersion + 1 }
   const updated = await state.core.store.users.update(record.id, patch) ?? { ...record, ...patch }
 

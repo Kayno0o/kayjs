@@ -32,7 +32,7 @@ function press(target: EventTarget, key: string, init: KeyboardEventInit = {}): 
 
 function paste(target: EventTarget, files: File[], html?: string): Event {
   const event = Object.assign(new Event('paste', { bubbles: true, cancelable: true }), {
-    clipboardData: { files, types: html ? ['text/html'] : [], getData: () => html ?? '' },
+    clipboardData: { files, types: html === undefined ? [] : ['text/html'], getData: () => html ?? '' },
   })
 
   target.dispatchEvent(event)

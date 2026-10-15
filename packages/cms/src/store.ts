@@ -110,7 +110,7 @@ export async function saveEntry(entry: DraftEntry, { create = false, version, re
   if (collection.kind === 'loaded') {
     const { issues } = await saveLoaded(collection.name, { slug: entry.slug, locale: entry.locale, data: entry.data, body: entry.body }, { create })
 
-    return issues?.length ? { issues } : { saved: true }
+    return issues !== undefined && issues.length > 0 ? { issues } : { saved: true }
   }
 
   if (required && !create && version === undefined && await versionOf(entry) !== undefined)
@@ -139,7 +139,7 @@ export async function deleteEntry(ref: EntryRef, author?: Identity, { version, r
   if (collection.kind === 'loaded') {
     const { issues } = await removeEntry(collection.name, ref.slug, ref.locale)
 
-    return issues?.length ? { issues } : { saved: true }
+    return issues !== undefined && issues.length > 0 ? { issues } : { saved: true }
   }
 
   if (collection.dir === undefined)

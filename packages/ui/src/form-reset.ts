@@ -15,7 +15,7 @@ export function startRef<Target extends Element>(first: (element: Target) => voi
       first(element)
 
       if (typeof app === 'function')
-        app(element)
+        (app as (element: Target) => void)(element)
     }
 
     every?.(element)

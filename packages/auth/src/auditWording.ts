@@ -12,7 +12,16 @@ const OAUTH_PREFIX = 'oauth:'
 function orgRoles(detail: string | null): string | null {
   const roles = detail?.split(' ').slice(1).join(', ')
 
-  return roles || null
+  return roles === undefined || roles === '' ? null : roles
+}
+
+// Names the detail, as `read` gives it, in the phrase when there is one, else says the plain phrase.
+function naming(named: (detail: string) => string, plain: string, read: (detail: string | null) => string | null = detail => detail === '' ? null : detail): AuditPhrase {
+  return (detail) => {
+    const shown = read(detail)
+
+    return shown === null ? plain : named(shown)
+  }
 }
 
 const ENGLISH_SIGN_INS: Record<string, string> = {
@@ -54,29 +63,29 @@ const english: AuditWording = {
   'sign-in-failed': detail => detail === 'two-factor' ? 'Failed sign-in: wrong code' : detail === 'passkey' ? 'Failed sign-in: passkey refused' : 'Failed sign-in: wrong password',
   'new-sign-in': 'Signed in from a new device or network',
   'password-changed': 'Password changed',
-  'email-changed': detail => detail ? `Email changed to ${detail}` : 'Email changed',
+  'email-changed': naming(detail => `Email changed to ${detail}`, 'Email changed'),
   'two-factor-enabled': 'Two-step verification turned on',
   'two-factor-disabled': 'Two-step verification turned off',
   'recovery-code-used': 'Recovery code used',
   'recovery-codes-regenerated': 'New recovery codes',
-  'provider-linked': detail => detail ? `${detail} account linked` : 'Account linked',
-  'provider-unlinked': detail => detail ? `${detail} account unlinked` : 'Account unlinked',
-  'passkey-added': detail => detail ? `Passkey “${detail}” added` : 'Passkey added',
-  'passkey-removed': detail => detail ? `Passkey “${detail}” removed` : 'Passkey removed',
-  'token-created': detail => detail ? `Access token “${detail}” created` : 'Access token created',
+  'provider-linked': naming(detail => `${detail} account linked`, 'Account linked'),
+  'provider-unlinked': naming(detail => `${detail} account unlinked`, 'Account unlinked'),
+  'passkey-added': naming(detail => `Passkey “${detail}” added`, 'Passkey added'),
+  'passkey-removed': naming(detail => `Passkey “${detail}” removed`, 'Passkey removed'),
+  'token-created': naming(detail => `Access token “${detail}” created`, 'Access token created'),
   'account-deleted': 'Account deleted',
-  'role-granted': detail => detail ? `Role ${detail} granted` : 'Role granted',
-  'role-revoked': detail => detail ? `Role ${detail} revoked` : 'Role revoked',
-  'banned': detail => detail ? `Suspended: ${detail}` : 'Suspended',
+  'role-granted': naming(detail => `Role ${detail} granted`, 'Role granted'),
+  'role-revoked': naming(detail => `Role ${detail} revoked`, 'Role revoked'),
+  'banned': naming(detail => `Suspended: ${detail}`, 'Suspended'),
   'unbanned': 'Suspension lifted',
   'impersonation-started': 'An admin started acting as the account',
   'impersonation-ended': 'An admin stopped acting as the account',
   'organization-created': 'Organization created',
   'organization-deleted': 'Organization deleted',
-  'member-joined': detail => orgRoles(detail) ? `Joined an organization as ${orgRoles(detail)}` : 'Joined an organization',
+  'member-joined': naming(roles => `Joined an organization as ${roles}`, 'Joined an organization', orgRoles),
   'member-left': 'Left an organization',
   'member-removed': 'Removed from an organization',
-  'member-roles-changed': detail => orgRoles(detail) ? `Organization roles changed to ${orgRoles(detail)}` : 'Organization roles changed',
+  'member-roles-changed': naming(roles => `Organization roles changed to ${roles}`, 'Organization roles changed', orgRoles),
 }
 
 const french: AuditWording = {
@@ -86,29 +95,29 @@ const french: AuditWording = {
   'sign-in-failed': detail => detail === 'two-factor' ? 'Échec de connexion : code incorrect' : detail === 'passkey' ? 'Échec de connexion : clé d’accès refusée' : 'Échec de connexion : mot de passe incorrect',
   'new-sign-in': 'Connexion depuis un nouvel appareil ou réseau',
   'password-changed': 'Mot de passe modifié',
-  'email-changed': detail => detail ? `Adresse changée pour ${detail}` : 'Adresse modifiée',
+  'email-changed': naming(detail => `Adresse changée pour ${detail}`, 'Adresse modifiée'),
   'two-factor-enabled': 'Validation en deux étapes activée',
   'two-factor-disabled': 'Validation en deux étapes désactivée',
   'recovery-code-used': 'Code de secours utilisé',
   'recovery-codes-regenerated': 'Nouveaux codes de secours',
-  'provider-linked': detail => detail ? `Compte ${detail} associé` : 'Compte associé',
-  'provider-unlinked': detail => detail ? `Compte ${detail} dissocié` : 'Compte dissocié',
-  'passkey-added': detail => detail ? `Clé d’accès « ${detail} » ajoutée` : 'Clé d’accès ajoutée',
-  'passkey-removed': detail => detail ? `Clé d’accès « ${detail} » supprimée` : 'Clé d’accès supprimée',
-  'token-created': detail => detail ? `Jeton d’accès « ${detail} » créé` : 'Jeton d’accès créé',
+  'provider-linked': naming(detail => `Compte ${detail} associé`, 'Compte associé'),
+  'provider-unlinked': naming(detail => `Compte ${detail} dissocié`, 'Compte dissocié'),
+  'passkey-added': naming(detail => `Clé d’accès « ${detail} » ajoutée`, 'Clé d’accès ajoutée'),
+  'passkey-removed': naming(detail => `Clé d’accès « ${detail} » supprimée`, 'Clé d’accès supprimée'),
+  'token-created': naming(detail => `Jeton d’accès « ${detail} » créé`, 'Jeton d’accès créé'),
   'account-deleted': 'Compte supprimé',
-  'role-granted': detail => detail ? `Rôle ${detail} accordé` : 'Rôle accordé',
-  'role-revoked': detail => detail ? `Rôle ${detail} retiré` : 'Rôle retiré',
-  'banned': detail => detail ? `Compte suspendu : ${detail}` : 'Compte suspendu',
+  'role-granted': naming(detail => `Rôle ${detail} accordé`, 'Rôle accordé'),
+  'role-revoked': naming(detail => `Rôle ${detail} retiré`, 'Rôle retiré'),
+  'banned': naming(detail => `Compte suspendu : ${detail}`, 'Compte suspendu'),
   'unbanned': 'Suspension levée',
   'impersonation-started': 'Un administrateur agit en tant que ce compte',
   'impersonation-ended': 'Un administrateur a cessé d’agir en tant que ce compte',
   'organization-created': 'Organisation créée',
   'organization-deleted': 'Organisation supprimée',
-  'member-joined': detail => orgRoles(detail) ? `Organisation rejointe en tant que ${orgRoles(detail)}` : 'Organisation rejointe',
+  'member-joined': naming(roles => `Organisation rejointe en tant que ${roles}`, 'Organisation rejointe', orgRoles),
   'member-left': 'Organisation quittée',
   'member-removed': 'Retiré d’une organisation',
-  'member-roles-changed': detail => orgRoles(detail) ? `Rôles dans l’organisation changés pour ${orgRoles(detail)}` : 'Rôles dans l’organisation changés',
+  'member-roles-changed': naming(roles => `Rôles dans l’organisation changés pour ${roles}`, 'Rôles dans l’organisation changés', orgRoles),
 }
 
 // kayjs-auth's wording of the audit log by language, the ones its pages ship.

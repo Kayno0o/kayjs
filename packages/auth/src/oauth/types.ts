@@ -38,6 +38,7 @@ export interface OAuthEndpoints {
 }
 
 /** A provider's OAuth endpoints plus how to parse its token/user responses. */
+// eslint-disable-next-line ts/no-explicit-any -- an app's own provider reads its user answer untyped unless it names its type
 export interface OAuthProvider<Raw = any, User = OAuthUser> extends OAuthEndpoints {
   name: string
   /** The provider's name as a sign-in button shows it, `GitHub`; `name` without it. */
@@ -55,6 +56,7 @@ export interface OAuthProvider<Raw = any, User = OAuthUser> extends OAuthEndpoin
   tokenAccept?: 'json' | 'form'
   /** Extra headers for the user-info request (e.g. GitHub's `User-Agent`/`Accept`). */
   authHeaders?: (accessToken: string) => Record<string, string>
+  // eslint-disable-next-line ts/no-explicit-any -- an app's own provider reads the token answer untyped
   parseTokens: (raw: any) => OAuthTokens
   /** `raw` is the user endpoint's answer or, for OpenID Connect, the ID token's claims with the user endpoint's over them; `callback` the parameters the provider came back with. */
   normalizeUser: (raw: Raw, callback?: Record<string, string>) => User

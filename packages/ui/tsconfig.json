@@ -1,33 +1,5 @@
 {
-  "compilerOptions": {
-    "target": "ESNext",
-    "lib": [
-      "ESNext",
-      "DOM"
-    ],
-    "moduleDetection": "force",
-    "module": "Preserve",
-    "moduleResolution": "bundler",
-    "types": [
-      "bun"
-    ],
-    "allowImportingTsExtensions": true,
-    "strict": true,
-    "exactOptionalPropertyTypes": true,
-    "noFallthroughCasesInSwitch": true,
-    "noImplicitOverride": true,
-    "noUncheckedIndexedAccess": true,
-    "noEmit": true,
-    "verbatimModuleSyntax": true,
-    "skipLibCheck": true
-  },
-  "include": [
-    "src",
-    "tests",
-    "tests-dom",
-    "env.d.ts"
-  ],
-  "exclude": [
-    "tests/fixture"
-  ]
+  "extends": "../../tsconfig.base.json",
+  "include": ["src", "tests", "tests-dom", "env.d.ts"],
+  "exclude": ["tests/fixture"]
 }

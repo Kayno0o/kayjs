@@ -1,6 +1,7 @@
 import { afterEach, expect, test } from 'bun:test'
 import { mount } from 'kay/test'
 
+// eslint-disable-next-line ts/unbound-method -- only put back on the prototype they were taken from
 const { getBoundingClientRect, scrollIntoView } = HTMLElement.prototype
 
 afterEach(() => {

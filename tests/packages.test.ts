@@ -9,6 +9,7 @@ interface Manifest {
   optionalDependencies?: Record<string, string>
   peerDependencies?: Record<string, string>
   devDependencies?: Record<string, string>
+  engines?: { bun?: string }
 }
 
 const root = await Bun.file('package.json').json() as Manifest
@@ -27,6 +28,22 @@ describe('kay\'s libraries', () => {
     const ranges = [manifest.dependencies, manifest.optionalDependencies, manifest.peerDependencies, manifest.devDependencies].flatMap(field => Object.entries(field ?? {})).filter(([name]) => names.has(name))
 
     expect(ranges.filter(([, range]) => range !== 'workspace:~')).toEqual([])
+  })
+
+  // One install serves the whole workspace: a tool kay and a library both develop with, at two ranges, would have one of them test against a version it does not name.
+  it('develop with the ranges kay and the other libraries name for the same dependency', () => {
+    const ranges = new Map<string, Set<string>>()
+
+    for (const field of [root.dependencies, root.devDependencies, ...libraries.map(({ manifest }) => manifest.devDependencies)]) {
+      for (const [name, range] of Object.entries(field ?? {}).filter(([name]) => !names.has(name)))
+        ranges.set(name, (ranges.get(name) ?? new Set()).add(range))
+    }
+
+    expect([...ranges].filter(([, named]) => named.size > 1).map(([name, named]) => [name, [...named]])).toEqual([])
+  })
+
+  it.each(libraries)('$path asks for the Bun kay asks for', ({ manifest }) => {
+    expect(manifest.engines?.bun).toBe(root.engines!.bun!)
   })
 })
 

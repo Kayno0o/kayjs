@@ -120,20 +120,24 @@ export function smtp(settings: SmtpSettings): Transport {
       }
       finally {
         if (--sending === 0) {
-          idle = setTimeout(async () => {
+          idle = setTimeout(() => {
             if (transporter === pending)
               transporter = undefined
 
-            try {
-              (await pending).close()
-            }
-            catch {
-              // nodemailer failed to load, so there is nothing to close.
-            }
+            void closeOpened(pending)
           }, IDLE_MS)
         }
       }
     },
+  }
+}
+
+async function closeOpened(pending: Promise<Awaited<ReturnType<typeof open>>>): Promise<void> {
+  try {
+    (await pending).close()
+  }
+  catch {
+    // nodemailer failed to load, so there is nothing to close.
   }
 }
 
