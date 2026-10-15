@@ -450,3 +450,37 @@ test('QrCode with inline draws the SVG in the page, so CSS colours resolve, and 
   expect(await element('/paging', 'qr-decor-inline')).toContain('aria-hidden="true"')
   expect(await element('/paging', 'qr-decor-inline')).not.toContain('role=')
 })
+
+// A path to a script, in a page's HTML or another script's imports, static or dynamic.
+const SCRIPT_PATH = /["'`]((?:\.{1,2}\/|\/)[^"'`\s]+\.js)["'`]/g
+const TURNDOWN = /turndown/i
+
+test('a page with CopyButtons and no MarkdownEditor ships no HTML to Markdown converter, loaded or lazy', async () => {
+  // Built for the browser, never opened in one.
+  const built = await testSite({ root: ROOT, browser: true })
+  const seen = new Set<string>()
+  const converting: string[] = []
+
+  try {
+    const pending = [...(await built.visit('/data')).html.matchAll(SCRIPT_PATH)].map(([, path = '']) => path)
+
+    for (let path = pending.pop(); path !== undefined; path = pending.pop()) {
+      if (seen.has(path))
+        continue
+
+      seen.add(path)
+      const script = await (await built.fetch(path)).text()
+
+      if (TURNDOWN.test(script))
+        converting.push(path)
+
+      pending.push(...[...script.matchAll(SCRIPT_PATH)].map(([, spec = '']) => new URL(spec, `http://site${path}`).pathname))
+    }
+  }
+  finally {
+    await built.close()
+  }
+
+  expect(seen.size).toBeGreaterThan(0)
+  expect(converting).toEqual([])
+})

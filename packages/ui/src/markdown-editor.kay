@@ -1,7 +1,7 @@
 ---
 import type { JSX } from 'kay'
 import type { TextEdit } from './markdown-edit'
-import { entriesFromDataTransfer, htmlToMarkdown } from '@kaynooo/utils/browser/clipboard'
+import { entriesFromDataTransfer } from '@kaynooo/utils/browser/clipboard'
 import { signal, untrack } from 'kay'
 import { controlledValue } from './controlled-value'
 import { startRef } from './form-reset'
@@ -173,11 +173,22 @@ function paste(event: ClipboardEvent) {
   const html = entriesFromDataTransfer(data).find(entry => entry.type === 'text/html')?.text
 
   if (html) {
-    const start = field.selectionStart
-    const text = htmlToMarkdown(html)
-
-    edit({ start, end: field.selectionEnd, text, selectionStart: start + text.length, selectionEnd: start + text.length }, event)
+    event.preventDefault()
+    void pasteMarkdown(field, html, data.getData('text/plain'))
   }
+}
+
+// The HTML to Markdown converter loads on the first paste of rich text rather than with the island; the plain text goes in if it cannot load.
+async function pasteMarkdown(field: HTMLTextAreaElement, html: string, plain: string): Promise<void> {
+  const { selectionStart: start, selectionEnd: end } = field
+  let text = plain
+
+  try {
+    text = (await import('@kaynooo/utils/browser/markdown')).htmlToMarkdown(html)
+  }
+  catch {}
+
+  applyEdit(field, { start, end, text, selectionStart: start + text.length, selectionEnd: start + text.length })
 }
 
 function drop(event: DragEvent) {
