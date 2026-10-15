@@ -4,10 +4,10 @@ import type { IconProps } from 'kay/icons'
 import type { IconSlot } from './defaults'
 import { effect, signal, uid, untrack } from 'kay'
 import { changeAccepted } from './change'
-import { onFormReset } from './form-reset'
+import { onFormReset, withRef } from './form-reset'
 import Icon from './icon.kay'
 
-const { options, value, label, name, onChange, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange' | 'ref'> & {
+const { options, value, label, name, onChange, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
   // `icon` sits before the label; `disabled` keeps that chip as it is.
   options: readonly { value: Value, label: string, icon?: IconSlot | IconProps | undefined, disabled?: boolean | undefined }[]
   // The options picked to start with, in any order; a group whose parent passes others follows them.
@@ -71,7 +71,7 @@ onFormReset(() => root, () => {
 })
 ---
 // Real checkboxes drawn as chips, so the group submits like any other field and Space toggles the focused chip. A click while a change is under way ticks nothing.
-.kui-chip-group({...rest} ref={element => root = element} role="group" aria-label={label} aria-busy={busy() ? 'true' : undefined} class={className})
+.kui-chip-group({...rest} ref={withRef(rest.ref, element => root = element)} role="group" aria-label={label} aria-busy={busy() ? 'true' : undefined} class={className})
   for option of options key={option.value}
     label.kui-chip
       input.kui-chip-input(ref={element => element.defaultChecked = untrack(() => value.includes(option.value))} type="checkbox" name={group} value={option.value} checked={picked().includes(option.value)} disabled={option.disabled} onClick={event => { if (busy()) event.preventDefault() }} onChange={event => toggle(event.currentTarget, option.value)})

@@ -42,8 +42,9 @@ onFormReset(() => box, () => {
     return
 
   seen = box.value
-  onInput?.(box.value)
-  onChange?.(box.value)
+  const tell = onInput ?? onChange
+
+  tell?.(box.value)
 })
 ---
 textarea.kui-field-input({...rest} ref={element => { if (box !== element) { box = element; held(element) } }} value={untrack(() => value)} class={className} onInput={event => { seen = event.currentTarget.value; onInput?.(seen) }} onChange={event => { seen = event.currentTarget.value; onChange?.(seen) }} onBlur={event => { sync(true); onBlur?.(event) }})

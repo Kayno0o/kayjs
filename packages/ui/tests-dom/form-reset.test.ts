@@ -50,11 +50,14 @@ async function edit(root: HTMLElement) {
   type(root, '#notes', '# Other')
   type(root, 'input[aria-label="Range from"]', '4', 'change')
   type(root, 'input[aria-label="Range to"]', '9', 'change')
-  click(root.querySelector('.kui-icon-grid-option[aria-label="moon"]'))
+  click(root.querySelector('#named .kui-icon-grid-option[aria-label="moon"]'))
+  click(root.querySelector('#bare .kui-icon-grid-option[aria-label="moon"]'))
+  type(root, '#fixed', 'a', 'change')
+  type(root, '#bare input[type="search"]', 'mo')
   await settle()
 }
 
-const START = { agree: true, power: false, free: false, decks: ['films'], size: 'm', level: 'b', tags: ['x', 'y'], title: 'Ada', bio: 'Hello', notes: '# Notes', range: [2, 8], icon: 'star' }
+const START = { agree: true, power: false, free: false, decks: ['films'], size: 'm', level: 'b', tags: ['x', 'y'], title: 'Ada', bio: 'Hello', notes: '# Notes', range: [2, 8], icon: 'star', bare: 'star', heard: 'b', refd: true }
 
 describe('a form reset', () => {
   test('puts every signal-driven control and the page signal behind it back on its start', async () => {
@@ -62,12 +65,13 @@ describe('a form reset', () => {
 
     expect(state(root)).toEqual(START)
     await edit(root)
-    expect(state(root)).toEqual({ agree: false, power: true, free: true, decks: ['games'], size: 'l', level: 'c', tags: ['y', 'z'], title: 'Grace', bio: 'Bye', notes: '# Other', range: [4, 9], icon: 'moon' })
+    expect(state(root)).toEqual({ agree: false, power: true, free: true, decks: ['games'], size: 'l', level: 'c', tags: ['y', 'z'], title: 'Grace', bio: 'Bye', notes: '# Other', range: [4, 9], icon: 'moon', bare: 'moon', heard: 'a', refd: true })
 
     click(root.querySelector('#reset'))
     await settle()
 
     expect(state(root)).toEqual(START)
+    expect(root.querySelector<HTMLInputElement>('#bare input[type="search"]')!.value).toBe('')
   })
 
   test('shows the start in the controls themselves, and submits it', async () => {

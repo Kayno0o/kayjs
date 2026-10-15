@@ -39,6 +39,7 @@ const pending = signal(true)
 // The last pick, whose icon the selection keeps drawing once a new search no longer finds it.
 const last = signal<IconChoice>()
 let hidden: HTMLInputElement | undefined
+let searchBox: HTMLInputElement | undefined
 // What a reset goes back to: the icon it started with, or the one last saved by a SaveForm.
 let initial = value
 let request = 0
@@ -90,13 +91,15 @@ function pick(next: string) {
   hidden.dispatchEvent(new Event('input', { bubbles: true }))
 }
 
-// The hidden input is no default of its own to reset to, so a reset sends the picker back to `initial`.
-onFormReset(() => hidden, () => {
+// The hidden input is no default of its own to reset to, so a reset sends the picker back to `initial`, and empties the search the browser emptied.
+onFormReset(() => searchBox, () => {
+  typed.set('')
+
   if (picked() !== initial)
     pick(initial)
 })
 
-onFormDefaults(() => hidden, () => {
+onFormDefaults(() => searchBox, () => {
   const held = picked()
 
   return () => {
@@ -118,7 +121,7 @@ function keepEnter(event: KeyboardEvent) {
 .kui-icon-picker({...rest} class={className})
   if name
     input(type="hidden" name={name} value={picked()} ref={element => hidden = element})
-  input.kui-field-input(type="search" placeholder={placeholder} aria-label={searchLabel} value={typed()} onInput={event => typed.set(event.currentTarget.value)} onKeyDown={keepEnter})
+  input.kui-field-input(ref={element => searchBox = element} type="search" placeholder={placeholder} aria-label={searchLabel} value={typed()} onInput={event => typed.set(event.currentTarget.value)} onKeyDown={keepEnter})
   ul.kui-icon-grid(aria-label={gridLabel} aria-busy={pending() ? 'true' : undefined})
     for choice of icons() key={choice.name}
       li

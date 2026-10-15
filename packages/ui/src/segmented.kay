@@ -2,9 +2,9 @@
 import type { JSX } from 'kay'
 import { effect, signal, uid, untrack } from 'kay'
 import { changeAccepted } from './change'
-import { onFormReset } from './form-reset'
+import { onFormReset, withRef } from './form-reset'
 
-const { options, value, label, name, onChange, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange' | 'ref'> & {
+const { options, value, label, name, onChange, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
   options: readonly { value: Value, label: string }[]
   // The option picked to start with, or `null` for none, such as while what shows matches no option; a group whose parent passes another follows it.
   value: Value | null
@@ -73,7 +73,7 @@ onFormReset(() => root, () => {
 })
 ---
 // Real radios, so the arrow keys move between options and the group submits like any other field.
-.kui-segmented({...rest} ref={element => root = element} role="radiogroup" aria-label={label} aria-busy={busy() ? 'true' : undefined} class={className})
+.kui-segmented({...rest} ref={withRef(rest.ref, element => root = element)} role="radiogroup" aria-label={label} aria-busy={busy() ? 'true' : undefined} class={className})
   for option of options key={option.value}
     label.kui-segmented-option
       input.kui-segmented-input(ref={element => element.defaultChecked = untrack(() => option.value === value)} type="radio" name={group} value={option.value} checked={picked() === option.value} onChange={() => pick(option.value)})

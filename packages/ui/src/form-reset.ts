@@ -2,7 +2,17 @@ import { onCleanup, onMount } from 'kay'
 
 const HOLD = 'kui-hold-defaults'
 
-const formOf = (element: Element) => 'form' in element ? element.form as HTMLFormElement | null : element.closest('form')
+const formOf = (element: Element) => element instanceof HTMLFormElement ? element : 'form' in element ? element.form as HTMLFormElement | null : element.closest('form')
+
+// The ref a control sets on its element, still handing it to the `ref` the app put on the control.
+export function withRef<Target extends Element>(app: unknown, own: (element: Target) => void): (element: Target) => void {
+  return (element) => {
+    own(element)
+
+    if (typeof app === 'function')
+      app(element)
+  }
+}
 
 // Runs `after` once the form holding the element has reset, when the controls hold their defaults again and a signal behind one can follow.
 // `last` waits for the other controls to have followed, for what reads them all.

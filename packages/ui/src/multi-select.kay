@@ -70,15 +70,16 @@ function set(next: Value[]) {
   onChange?.(next)
 }
 
-// A reset puts the boxes back on their defaults, which are not the picked values; the control goes back to `initial` and tells the app.
+// A reset puts the boxes back on their defaults, which are not the picked values; the control goes back to `initial` with an empty search and tells the app.
 onFormReset(() => root, () => {
-  const boxes = [...root?.querySelectorAll<HTMLInputElement>('.kui-multi-select-checkbox') ?? []]
   const same = initial.length === picked().length && initial.every(one => picked().includes(one))
+
+  query.set('')
 
   if (!same)
     set([...initial])
 
-  for (const [index, box] of boxes.entries())
+  for (const [index, box] of [...root?.querySelectorAll<HTMLInputElement>('.kui-multi-select-checkbox') ?? []].entries())
     box.checked = picked().some(one => one === shown()[index]?.value)
 })
 

@@ -64,8 +64,7 @@ onFormReset(() => box, () => {
   if (!box || box.value === seen)
     return
 
-  report(onInput, box)
-  report(onChange, box)
+  report(onInput ?? onChange, box)
 })
 
 // Whether the box already reads as `next`: a number box answers `2.` and `2.30` as 2 and 2.3, so a parent writing its own spelling of that figure back writes the same thing, and doing it would take the caret out of the word being typed. An empty side matches only another, `Number('')` being 0.

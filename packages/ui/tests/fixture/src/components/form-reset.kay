@@ -28,6 +28,9 @@ const notes = signal('# Notes')
 const range = signal<RangeValue>([2, 8])
 const icon = signal('star')
 const free = signal(false)
+const bare = signal('star')
+const heard = signal('b')
+const refd = signal(false)
 const options = [{ value: 'films', label: 'Films' }, { value: 'games', label: 'Games' }, { value: 'books', label: 'Books' }] as const
 const sizes = [{ value: 's', label: 'S' }, { value: 'm', label: 'M' }, { value: 'l', label: 'L' }] as const
 const levels = [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }, { value: 'c', label: 'C' }] as const
@@ -45,6 +48,8 @@ form#form
   Textarea#bio(name="bio" value={bio()} onInput={bio.set})
   MarkdownEditor#notes(value={notes()} onInput={notes.set})
   RangeInput(label="Range" value={range()} onChange={range.set})
-  IconPicker(name="icon" value={icon()} search={search} onChange={icon.set})
+  IconPicker#named(name="icon" value={icon()} search={search} onChange={icon.set})
+  IconPicker#bare(value={bare()} search={search} onChange={bare.set})
+  Select#fixed(options={levels} value="b" onChange={heard.set} ref={() => refd.set(true)})
   button#reset(type="reset") Reset
-p#state {JSON.stringify({ agree: agree(), power: power(), free: free(), decks: decks(), size: size(), level: level(), tags: tags(), title: title(), bio: bio(), notes: notes(), range: range(), icon: icon() })}
+p#state {JSON.stringify({ agree: agree(), power: power(), free: free(), decks: decks(), size: size(), level: level(), tags: tags(), title: title(), bio: bio(), notes: notes(), range: range(), icon: icon(), bare: bare(), heard: heard(), refd: refd() })}
