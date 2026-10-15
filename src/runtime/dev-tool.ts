@@ -1,6 +1,6 @@
 // Loaded by every page a dev server serves: a bar in a corner of the page opens a drawer whose tabs show what kay knows of the page, its problems first; under `kay dev` the inspector adds its own tab and buttons.
 // It runs in the browser from its own route, so it imports types only; its elements live in a shadow root on the root element, which a page swap keeps, styled by an adopted stylesheet, which a policy without inline styles allows.
-import type { DevRequest, DevRoute } from '../server/dev'
+import type { DevRequest, DevRoute, DevRoutes } from '../server/dev'
 import type { DevProblem, DevProblems } from './dev-boot'
 
 const HOST = 'kay-dev'
@@ -689,7 +689,7 @@ function requestTab(doc: Document, tool: DevTool): { stop: () => void } {
   return { stop: () => swaps.disconnect() }
 }
 
-const ROUTE_KINDS: Record<DevRoute['kind'], string> = { page: 'Pages', endpoint: 'Endpoints', api: 'API' }
+const ROUTE_KINDS: Record<DevRoute['kind'], string> = { page: 'Pages', endpoint: 'Endpoints', api: 'API', kay: 'Served by kay' }
 
 // Every route the server serves, filtered as typed, each opening its file, the GET paths no request fills in linking to themselves; fetched as the tab shows and again after each restart, so it lists what the running server serves.
 function routesTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
@@ -698,11 +698,12 @@ function routesTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
   const filter = tool.make('input', 'filter')
   const body = tool.make('div')
   let routes: DevRoute[] = []
+  let notes: string[] = []
   // A restart while a fetch is out asks again; the latest answer wins.
   let asked = 0
   const render = () => {
     const typed = filter.value.trim().toLowerCase()
-    const shown = routes.filter(route => typed === '' || route.path.toLowerCase().includes(typed) || route.file.toLowerCase().includes(typed))
+    const shown = routes.filter(route => typed === '' || route.path.toLowerCase().includes(typed) || route.file.toLowerCase().includes(typed) || (route.owner ?? '').toLowerCase().includes(typed))
     const sections = Object.entries(ROUTE_KINDS).flatMap(([kind, label]) => {
       const ofKind = shown.filter(route => route.kind === kind)
 
@@ -718,7 +719,7 @@ function routesTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
       return [section]
     })
 
-    body.replaceChildren(...sections.length > 0 ? sections : [tool.make('div', 'empty', routes.length === 0 ? 'No routes.' : 'No route matches the filter.')])
+    body.replaceChildren(...sections.length > 0 ? sections : [tool.make('div', 'empty', routes.length === 0 ? 'No routes.' : 'No route matches the filter.')], ...notes.map(note => tool.make('div', 'note', note)))
   }
   const list = async () => {
     const ask = ++asked
@@ -732,12 +733,13 @@ function routesTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
       if (!response.ok)
         throw new Error(`the server answered ${response.status}`)
 
-      const listed = await response.json() as DevRoute[]
+      const listed = await response.json() as DevRoutes
 
       if (ask !== asked)
         return
 
-      routes = listed
+      routes = listed.routes
+      notes = listed.notes
       render()
     }
     catch (error) {
@@ -772,7 +774,11 @@ function routeRow(tool: DevTool, route: DevRoute, current: string): HTMLElement 
   if (route.href !== undefined)
     link.href = route.href
 
-  file.append(positionButton(tool, route.file))
+  if (route.owner === undefined)
+    file.append(positionButton(tool, route.file))
+  else
+    file.textContent = route.owner
+
   row.append(tool.make('span', 'method', route.method), route.href === undefined ? tool.make('span', 'path', route.path) : link, tool.make('span', 'note', route.locale ?? ''), file)
 
   return row

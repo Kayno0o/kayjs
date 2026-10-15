@@ -7,6 +7,7 @@ import type { ClientBuild } from './client'
 import type { ServedRoute } from './guards'
 import type { MountedApi } from './openapi'
 import type { Endpoint } from './routes'
+import type { Claim } from './served-paths'
 import { readFileSync, statSync } from 'node:fs'
 import { isIP } from 'node:net'
 import { hostname } from 'node:os'
@@ -411,18 +412,33 @@ export interface DevRequest {
 
 // One line of the dev tool's Routes tab.
 export interface DevRoute {
-  kind: 'page' | 'endpoint' | 'api'
+  kind: 'page' | 'endpoint' | 'api' | 'kay'
   method: string
   path: string
-  // The file serving it, from the project's root.
+  // The file serving it, from the project's root; empty for what kay or a library serves.
   file: string
+  // What serves a `kay` path: the sitemap, a collection's feed, the extension mounting it.
+  owner?: string | undefined
   locale?: string | undefined
   // Where the tab links to, for a GET path no request fills in, served on this host.
   href?: string | undefined
 }
 
-// Every page, endpoint and API route the server serves, as `kay routes` lists them, each locale's copy of a page on its own line.
-export function devRoutes(root: string, pages: ServedRoute[], endpoints: Endpoint[], mounted: MountedApi[], settings: LocaleSettings | undefined, base: string): DevRoute[] {
+// What the Routes tab reads: the routes, and why something it would expect is missing.
+export interface DevRoutes {
+  routes: DevRoute[]
+  notes: string[]
+}
+
+// What serves itself besides the app's files: the claims of kind `kay` the server still holds, the GET routes the extensions mounted, and what to tell of what is missing.
+export interface OwnRoutes {
+  claims: Claim[]
+  extensions: { owner: string, path: string }[]
+  notes: string[]
+}
+
+// Every page, endpoint and API route the server serves, as `kay routes` lists them, each locale's copy of a page on its own line, then what kay and the extensions serve themselves.
+export function devRoutes(root: string, pages: ServedRoute[], endpoints: Endpoint[], mounted: MountedApi[], settings: LocaleSettings | undefined, base: string, own: OwnRoutes): DevRoutes {
   const shown = (file: string) => relative(root, file).replace(BACKSLASH, '/')
   const href = (path: string, host?: string) => host === undefined && !PATH_PARAM.test(path) ? base + path : undefined
   const listed: DevRoute[] = []
@@ -446,7 +462,21 @@ export function devRoutes(root: string, pages: ServedRoute[], endpoints: Endpoin
     }
   }
 
-  return listed
+  const seen = new Set<string>()
+  const itself = [
+    ...own.claims.map(claim => ({ method: claim.method ?? 'GET', path: claim.path, owner: claim.owner })),
+    ...own.extensions.map(({ owner, path }) => ({ method: 'GET', path, owner: `the extension ${owner}` })),
+  ]
+
+  for (const { method, path, owner } of itself) {
+    // A scoped claim, a locale's copy of a feed, names the same path.
+    if (!seen.has(`${method} ${path}`)) {
+      seen.add(`${method} ${path}`)
+      listed.push({ kind: 'kay', method: method.toUpperCase(), path, file: '', owner, href: method.toUpperCase() === 'GET' ? href(path) : undefined })
+    }
+  }
+
+  return { routes: listed, notes: own.notes }
 }
 
 // The data block the dev tool reads: a script of another type never runs, so the policy has nothing to allow.

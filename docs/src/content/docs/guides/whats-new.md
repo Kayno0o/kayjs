@@ -7,6 +7,7 @@ This page lists what each release adds, newest first, with a link to where each 
 
 ## Unreleased
 
+- **Routes tab shows what kay serves**: a "Served by kay" section lists the sitemap, robots.txt, feeds, manifest, favicons, service worker, health check and a library's dev pages such as `/_kay/mail`, each GET path linked, and says why there is no sitemap when `seo` is set without an origin. [kay dev](/reference/cli#kay-dev)
 - **`queue` `idlePoll`** makes an idle worker wait longer between empty looks at the store, 1 second by default, a job enqueued in the same process still running at once. [Background jobs](/guides/background-jobs)
 - **`kay dev` counts repeated lines**: on a terminal, a restart or stylesheet line the same as the one before is rewritten with a count, `(x3)`, instead of repeated. [kay dev](/reference/cli#kay-dev)
 - **`shortcut`** binds a keyboard shortcut such as `mod+s` for as long as an island lives, on the page or one element, Cmd on macOS and Ctrl elsewhere. [Islands](/essentials/islands#keyboard-shortcuts)

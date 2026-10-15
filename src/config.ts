@@ -291,8 +291,8 @@ export interface KayExtension<Server extends AnyElysia = AnyElysia> {
 }
 
 // The server plugins the extensions carry, in their order, those given as a function built now.
-export async function extensionServers(extensions: KayExtension[] | undefined): Promise<AnyElysia[]> {
-  return Promise.all((extensions ?? []).flatMap(({ server }) => server === undefined ? [] : [(async () => typeof server === 'function' ? server() : server)()]))
+export async function extensionServers(extensions: KayExtension[] | undefined): Promise<{ name: string, server: AnyElysia }[]> {
+  return Promise.all((extensions ?? []).flatMap(({ name, server }) => server === undefined ? [] : [(async () => ({ name, server: typeof server === 'function' ? await server() : server }))()]))
 }
 
 // The page hooks the extensions carry, in their order.

@@ -356,12 +356,13 @@ describe('the dev tool', () => {
     const fetching = spyOn(window, 'fetch').mockImplementation((async (url: string) => {
       fetched.push(url)
 
-      return new Response(JSON.stringify([
+      return new Response(JSON.stringify({ notes: ['`seo` is set but not the origin, so there is no sitemap or robots.txt.'], routes: [
         { kind: 'page', method: 'GET', path: '/broken', file: 'src/routes/broken.kay', href: '/broken' },
         { kind: 'page', method: 'GET', path: '/items/:id', file: 'src/routes/items/[id].kay' },
         { kind: 'page', method: 'GET', path: '/fr/a-propos', file: 'src/routes/about.kay', locale: 'fr', href: '/fr/a-propos' },
         { kind: 'api', method: 'POST', path: '/api/stock/:id', file: 'src/api/stock.ts' },
-      ]), { status })
+        { kind: 'kay', method: 'GET', path: '/manifest.webmanifest', file: '', owner: 'the web app manifest', href: '/manifest.webmanifest' },
+      ] }), { status })
     }) as unknown as typeof window.fetch)
 
     const rows = () => [...shadow().querySelectorAll('#kay-dev-routes .route')].map(row => [...row.children].map(cell => cell.textContent).join(' | '))
@@ -373,9 +374,10 @@ describe('the dev tool', () => {
       await Bun.sleep(0)
 
       expect(fetched).toEqual(['/_kay/dev/routes'])
-      expect(groups()).toEqual(['Pages (3)', 'API (1)'])
-      expect(rows()).toEqual(['GET | /broken |  | src/routes/broken.kay', 'GET | /items/:id |  | src/routes/items/[id].kay', 'GET | /fr/a-propos | fr | src/routes/about.kay', 'POST | /api/stock/:id |  | src/api/stock.ts'])
-      expect([...shadow().querySelectorAll<HTMLAnchorElement>('#kay-dev-routes a')].map(link => link.getAttribute('href'))).toEqual(['/broken', '/fr/a-propos'])
+      expect(groups()).toEqual(['Pages (3)', 'API (1)', 'Served by kay (1)'])
+      expect(rows()).toEqual(['GET | /broken |  | src/routes/broken.kay', 'GET | /items/:id |  | src/routes/items/[id].kay', 'GET | /fr/a-propos | fr | src/routes/about.kay', 'POST | /api/stock/:id |  | src/api/stock.ts', 'GET | /manifest.webmanifest |  | the web app manifest'])
+      expect([...shadow().querySelectorAll<HTMLAnchorElement>('#kay-dev-routes a')].map(link => link.getAttribute('href'))).toEqual(['/broken', '/fr/a-propos', '/manifest.webmanifest'])
+      expect(shadow().querySelector('#kay-dev-routes > div > .note')?.textContent).toContain('no sitemap or robots.txt')
       expect(shadow().querySelector('#kay-dev-routes [aria-current=page] .path')?.textContent).toBe('/broken')
 
       filter().value = 'ABOUT'

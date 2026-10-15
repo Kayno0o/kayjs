@@ -4,6 +4,7 @@ import type { Mode, Project } from '../project'
 import type { GuardContext } from '../runtime'
 import type { ActionOptions } from './actions'
 import type { ClientBuild } from './client'
+import type { OwnRoutes } from './dev'
 import type { ServedRoute } from './guards'
 import type { ImageRouteOptions } from './image'
 import type { ServedPage } from './render'
@@ -216,8 +217,10 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   if (base !== '')
     rebaseRedirects(app, base)
 
-  if (options.health !== false)
+  if (options.health !== false) {
+    served.claim({ path: options.health?.path ?? HEALTH_PATH, owner: 'the health check', kind: 'kay' })
     serveHealth(app, lifecycle, options.health)
+  }
 
   if (options.publicEnv)
     servePublicEnv(app, served, options.publicEnv)
@@ -229,8 +232,16 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
     stopOnSignal(app, lifecycle, options.shutdownTimeout)
 
   // After kay's own hooks, so their routes are logged and compressed as the pages are, and before the pages, actions and API modules whose context they derive.
-  for (const server of await extensionServers(options.extensions))
+  const mountedByExtensions: OwnRoutes['extensions'] = []
+
+  for (const { name, server } of await extensionServers(options.extensions)) {
+    const before = new Set(app.routes.map(route => `${route.method} ${route.path}`))
+
     app.use(server)
+
+    if (mode.dev)
+      mountedByExtensions.push(...app.routes.filter(route => route.method === 'GET' && !before.has(`${route.method} ${route.path}`)).map(route => ({ owner: name, path: route.path })))
+  }
 
   for (const path of await serveBuildFiles(app, client, { dev: mode.dev, security }))
     filePaths.add(path)
@@ -246,7 +257,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
 
   // The dev tool's Routes tab, once the endpoints and API modules are known.
   if (mode.dev)
-    app.get(DEV_ROUTES, () => Response.json(devRoutes(root, routes, endpoints, api.mounted, i18n?.settings, base)))
+    app.get(DEV_ROUTES, () => Response.json(devRoutes(root, routes, endpoints, api.mounted, i18n?.settings, base, { claims: served.kay(), extensions: mountedByExtensions, notes: options.seo !== undefined && site === undefined ? ['`seo` is set but not the origin the site is public at, so there is no sitemap or robots.txt: set `site` in kay.config.ts or SITE_URL.'] : [] })))
 
   // Claimed before kay's own files, which give way to them; registered last, before the pages.
   const redirects = readRedirects(options.redirects ?? {})

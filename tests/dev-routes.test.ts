@@ -1,7 +1,8 @@
-import type { DevRequest, DevRoute } from '../src/server/dev'
+import type { DevRequest, DevRoutes } from '../src/server/dev'
 import { join, relative } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it, spyOn } from 'bun:test'
+import { Elysia } from 'elysia'
 import { pages } from '../src/server'
 import { DEV_ROUTES } from '../src/server/dev'
 import { scratchDir } from './scratch'
@@ -50,9 +51,9 @@ describe('the dev tool\'s data', () => {
       expect(await request('/nowhere')).toMatchObject({ page: `${routes}/_error.kay`, status: 404, loads: [] })
       expect((await request('/nowhere')).route).toBeUndefined()
 
-      const listed = await (await dev.handle(new Request(`http://localhost${DEV_ROUTES}`))).json() as DevRoute[]
+      const listed = await (await dev.handle(new Request(`http://localhost${DEV_ROUTES}`))).json() as DevRoutes
 
-      expect(listed.map(route => `${route.kind} ${route.method} ${route.path} ${route.file} ${route.href ?? '-'}`).toSorted()).toEqual([
+      expect(listed.routes.filter(route => route.kind !== 'kay').map(route => `${route.kind} ${route.method} ${route.path} ${route.file} ${route.href ?? '-'}`).toSorted()).toEqual([
         `api GET /api/stock ${api}/stock.ts /api/stock`,
         `api POST /api/stock/:id ${api}/stock.ts -`,
         `endpoint GET /llms.txt ${routes}/llms.txt.ts /llms.txt`,
@@ -76,5 +77,68 @@ describe('the dev tool\'s data', () => {
     finally {
       logged.mockRestore()
     }
+  })
+})
+
+const CONTENT = 'tests/fixtures/content'
+const FAVICON = 'tests/fixtures/seo/src/favicon.png'
+
+async function listedBy(options: Parameters<typeof pages>[0]): Promise<DevRoutes> {
+  const dev = await pages({ prebuilt: false, security: false, dev: true, ...options })
+
+  return await (await dev.handle(new Request(`http://localhost${DEV_ROUTES}`))).json() as DevRoutes
+}
+
+describe('the dev tool\'s routes served by kay', () => {
+  it('lists the sitemap, robots.txt, a feed, the manifest and a library\'s pages, each GET path linked', async () => {
+    const library = new Elysia().get('/_kay/lib', () => 'lib').post('/_kay/lib/clear', () => 'cleared')
+    const { routes, notes } = await listedBy({
+      routes: `${CONTENT}/src/routes`,
+      content: `${CONTENT}/src/content.config.ts`,
+      site: 'https://blog.example',
+      favicon: FAVICON,
+      seo: { name: 'Blog' },
+      manifest: { shortName: 'Blog' },
+      extensions: [{ name: 'kayjs-lib', server: library }],
+    })
+    const kay = routes.filter(route => route.kind === 'kay')
+    const at = (path: string) => kay.find(route => route.path === path)
+
+    expect(notes).toEqual([])
+    expect(at('/sitemap.xml')).toMatchObject({ method: 'GET', file: '', owner: 'the sitemap', href: '/sitemap.xml' })
+    expect(at('/robots.txt')).toMatchObject({ owner: 'robots.txt', href: '/robots.txt' })
+    expect(at('/manifest.webmanifest')).toMatchObject({ owner: 'the web app manifest', href: '/manifest.webmanifest' })
+    expect(kay.filter(route => route.owner?.startsWith('the feed of the collection ')).length).toBeGreaterThan(0)
+    expect(at('/_kay/health')).toMatchObject({ owner: 'the health check' })
+    expect(at('/_kay/lib')).toMatchObject({ owner: 'the extension kayjs-lib', href: '/_kay/lib' })
+    expect(at('/_kay/lib/clear')).toBeUndefined()
+    expect(kay.every(route => route.method === 'GET' && route.href !== undefined)).toBe(true)
+  })
+
+  it('lists a path an app file took over as the app\'s, not kay\'s', async () => {
+    const dir = await scratchDir('dev-routes-own-')
+
+    await Bun.write(join(dir, 'routes/index.kay'), 'p Home\n')
+    await Bun.write(join(dir, 'routes/robots.txt.ts'), 'export function GET() {\n  return \'User-agent: *\'\n}\n')
+
+    const { routes } = await listedBy({ routes: relative(process.cwd(), join(dir, 'routes')), site: 'https://x.example' })
+
+    expect(routes.filter(route => route.path === '/robots.txt').map(route => route.kind)).toEqual(['endpoint'])
+    expect(routes.find(route => route.path === '/sitemap.xml')?.kind).toBe('kay')
+  })
+
+  it('says why there is no sitemap or robots.txt when `seo` is set with no origin, and nothing when there is one', async () => {
+    const dir = await scratchDir('dev-routes-origin-')
+    const routes = relative(process.cwd(), join(dir, 'routes'))
+
+    await Bun.write(join(dir, 'routes/index.kay'), 'p Home\n')
+
+    const without = await listedBy({ routes, seo: { name: 'Shop' } })
+
+    expect(without.notes).toHaveLength(1)
+    expect(without.notes[0]).toContain('no sitemap or robots.txt')
+    expect(without.routes.some(route => route.path === '/sitemap.xml')).toBe(false)
+    expect((await listedBy({ routes, seo: { name: 'Shop' }, site: 'https://shop.example' })).notes).toEqual([])
+    expect((await listedBy({ routes })).notes).toEqual([])
   })
 })

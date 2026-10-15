@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- The dev tool's Routes tab has a "Served by kay" section: the sitemap, robots.txt, feeds, manifest, favicons, service worker, health check and a library's dev pages such as `/_kay/mail`, each GET path linked, and with `seo` set but no origin it says why there is no sitemap or robots.txt ([Commands](project.md#commands)).
 - `queue(name, handler, { idlePoll: '30s' })` makes an idle worker wait longer between empty looks at the store, 1 second by default, a job enqueued in the same process still running at once ([Production](production.md#background-jobs)).
 - `kay dev` on a terminal rewrites an identical restart or stylesheet line with a count, `(x3)`, instead of repeating it ([Commands](project.md#commands)).
 - `shortcut('mod+s', save)` from `kay` binds a keyboard shortcut for as long as an island lives, Cmd on macOS and Ctrl elsewhere, on the page or one element with `on`, firing in a text field only with a modifier ([Islands](islands.md#bind-a-keyboard-shortcut)).

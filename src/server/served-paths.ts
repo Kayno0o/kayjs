@@ -90,6 +90,11 @@ export class ServedPaths {
     return this.#claims.get(routerKey(claim.path))?.includes(claim) === true
   }
 
+  // What kay serves itself, as it holds the paths now: a path an app file took over is no longer in it.
+  kay(): Claim[] {
+    return [...this.#claims.values()].flat().filter(claim => claim.kind === 'kay')
+  }
+
   // The GET paths a static export writes, in the order they were claimed.
   async exported(): Promise<string[]> {
     const paths: string[] = []
