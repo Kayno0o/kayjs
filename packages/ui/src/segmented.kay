@@ -1,4 +1,4 @@
---- <Value extends string>
+--- <Value extends string, Held extends Value | null = Value>
 import type { JSX } from 'kay'
 import { effect, signal, uid, untrack } from 'kay'
 import { changeAccepted } from './change'
@@ -7,20 +7,22 @@ import { onFormReset, resetWhenIdle, startRef } from './form-reset'
 const { options, value, label, name, onChange, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
   options: readonly { value: Value, label: string }[]
   // The option picked to start with, or `null` for none, such as while what shows matches no option; a group whose parent passes another follows it.
-  value: Value | null
+  value: Held
   // Names the group for screen readers.
   label: string
   // The radios' name, which the group submits under inside a form; one unique on the page is drawn when none is given.
   name?: string | undefined
   // A promise holds the group busy until it settles, and puts the previous option back when it resolves to false, rejects or throws (logged): a refused change never shows as made.
   // Typed `unknown`, so a callback answering something else, such as `list.push`, still fits.
-  onChange?: ((value: Value) => unknown) | undefined
+  // Hears `null` as well, for a reset to none, only when `value` is typed nullable.
+  onChange?: ((value: null extends Held ? Value | null : Value) => unknown) | undefined
   class?: string | undefined
 }>()
 
 // Held as a string: a signal cannot take a type parameter that might be a function.
 const group = name ?? uid()
 const picked = signal<string | null>(value)
+const answer = (next: string | null) => (onChange as ((picked: string | null) => unknown) | undefined)?.(next)
 const busy = signal(false)
 let root: HTMLElement | undefined
 // How often the parent's `value` reached the group, so a change under way knows whether the parent answered it.
@@ -39,7 +41,7 @@ function check(wanted: string | null) {
     radio.checked = radio.value === wanted
 }
 
-async function pick(next: Value) {
+async function pick(next: string) {
   // A pick while a change is under way takes nothing: the radio checked by the click, a key or a label, is put back, on the start when a reset is waiting.
   if (busy()) {
     check(resetting.waiting() ? started() : picked())
@@ -50,14 +52,14 @@ async function pick(next: Value) {
   await change(next)
 }
 
-async function change(next: Value) {
+async function change(next: string | null) {
   const before = picked()
   const syncedBefore = synced
 
   picked.set(next)
 
   // Put back unless the parent set `value` meanwhile, which has the last word.
-  if (!(await changeAccepted('Segmented', () => onChange?.(next), busy.set)) && synced === syncedBefore) {
+  if (!(await changeAccepted('Segmented', () => answer(next), busy.set)) && synced === syncedBefore) {
     picked.set(before)
     check(before)
   }
@@ -69,7 +71,7 @@ const ref = startRef<HTMLElement>(element => root = element, rest.ref)
 
 const started = () => radios().find(radio => radio.defaultChecked)?.value ?? null
 
-// A reset puts the radios back on their defaults, which the app's `onChange` then hears of; a group that started with none picked just shows none.
+// A reset puts the radios back on their defaults, which the app's `onChange` then hears of, `null` for a group that started with none picked.
 // One meeting a change under way waits for it.
 const resetting = resetWhenIdle(busy, () => {
   const next = started()
@@ -79,10 +81,7 @@ const resetting = resetWhenIdle(busy, () => {
   if (next === picked())
     return
 
-  if (next === null)
-    picked.set(null)
-  else
-    void change(next as Value)
+  void change(next)
 })
 
 onFormReset(() => root, resetting.reset)

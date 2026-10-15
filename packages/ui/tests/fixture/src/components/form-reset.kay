@@ -21,6 +21,7 @@ const agree = signal(true)
 const power = signal(false)
 const decks = signal(['films'])
 const size = signal<'s' | 'm' | 'l' | null>('m')
+const sort = signal<'s' | 'm' | 'l' | null>(null)
 const level = signal<'a' | 'b' | 'c'>('b')
 const tags = signal<('x' | 'y' | 'z')[]>(['x', 'y'])
 const title = signal('Ada')
@@ -44,7 +45,7 @@ form#form
   Checkbox#free(label="Free" onChange={free.set})
   ChipGroup(label="Decks" name="decks" options={options} value={decks()} onChange={decks.set})
   Segmented(label="Size" name="size" options={sizes} value={size()} onChange={size.set})
-  Segmented(label="Sort" name="sort" options={sizes} value={null})
+  Segmented(label="Sort" name="sort" options={sizes} value={sort()} onChange={sort.set})
   TextInput#formname(name="form" value={formName()} onInput={formName.set})
   Select#level(name="level" options={levels} value={level()} onChange={level.set})
   MultiSelect(label="Tags" name="tags" options={choices} value={tags()} onChange={tags.set})
@@ -56,4 +57,4 @@ form#form
   IconPicker#bare(value={bare()} search={search} onChange={bare.set})
   Select#fixed(options={levels} value="b" onChange={heard.set} ref={() => refd.set(true)})
   button#reset(type="reset") Reset
-p#state {JSON.stringify({ agree: agree(), power: power(), free: free(), decks: decks(), size: size(), level: level(), tags: tags(), title: title(), bio: bio(), notes: notes(), range: range(), icon: icon(), bare: bare(), heard: heard(), refd: refd(), form: formName() })}
+p#state {JSON.stringify({ agree: agree(), power: power(), free: free(), decks: decks(), size: size(), sort: sort(), level: level(), tags: tags(), title: title(), bio: bio(), notes: notes(), range: range(), icon: icon(), bare: bare(), heard: heard(), refd: refd(), form: formName() })}

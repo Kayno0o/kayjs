@@ -59,7 +59,7 @@ async function edit(root: HTMLElement) {
   await settle()
 }
 
-const START = { agree: true, power: false, free: false, decks: ['films'], size: 'm', level: 'b', tags: ['x', 'y'], title: 'Ada', bio: 'Hello', notes: '# Notes', range: [2, 8], icon: 'star', bare: 'star', heard: 'b', refd: true, form: 'x' }
+const START = { agree: true, power: false, free: false, decks: ['films'], size: 'm', sort: null, level: 'b', tags: ['x', 'y'], title: 'Ada', bio: 'Hello', notes: '# Notes', range: [2, 8], icon: 'star', bare: 'star', heard: 'b', refd: true, form: 'x' }
 
 describe('a form reset', () => {
   test('puts every signal-driven control and the page signal behind it back on its start', async () => {
@@ -67,7 +67,7 @@ describe('a form reset', () => {
 
     expect(state(root)).toEqual(START)
     await edit(root)
-    expect(state(root)).toEqual({ agree: false, power: true, free: true, decks: ['games'], size: 'l', level: 'c', tags: ['y', 'z'], title: 'Grace', bio: 'Bye', notes: '# Other', range: [4, 9], icon: 'moon', bare: 'moon', heard: 'a', refd: true, form: 'y' })
+    expect(state(root)).toEqual({ agree: false, power: true, free: true, decks: ['games'], size: 'l', sort: 'l', level: 'c', tags: ['y', 'z'], title: 'Grace', bio: 'Bye', notes: '# Other', range: [4, 9], icon: 'moon', bare: 'moon', heard: 'a', refd: true, form: 'y' })
 
     click(root.querySelector('#reset'))
     await settle()
@@ -135,6 +135,7 @@ describe('a form reset during a change under way', () => {
     { name: 'a Checkbox', selector: 'input[name="agree"]', changed: 'agree=false', restored: 'agree=true', shown: (root: HTMLElement) => checked(root, 'input[name="agree"]'), back: 'true' },
     { name: 'a Toggle', selector: 'input[name="power"]', changed: 'power=true', restored: 'power=false', shown: (root: HTMLElement) => checked(root, 'input[name="power"]'), back: 'false' },
     { name: 'a ChipGroup', selector: 'input[name="decks"][value="games"]', changed: 'decks=films,games', restored: 'decks=films', shown: (root: HTMLElement) => checked(root, 'input[name="decks"]'), back: 'true,false' },
+    { name: 'a Segmented started with none picked', selector: 'input[name="sort"][value="l"]', changed: 'sort=l', restored: 'sort=null', shown: (root: HTMLElement) => checked(root, 'input[name="sort"]'), back: 'false,false,false' },
     { name: 'a Segmented', selector: 'input[name="size"][value="l"]', changed: 'size=l', restored: 'size=m', shown: (root: HTMLElement) => checked(root, 'input[name="size"]'), back: 'false,true,false' },
   ]
 

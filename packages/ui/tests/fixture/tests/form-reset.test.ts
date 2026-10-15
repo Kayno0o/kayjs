@@ -5,7 +5,7 @@ import { browserPath, testSite } from 'kay/test'
 
 const ROOT = join(import.meta.dir, '..')
 const path = browserPath()
-const START = { agree: true, power: false, free: false, decks: ['films'], size: 'm', level: 'b', tags: ['x', 'y'], title: 'Ada', bio: 'Hello', notes: '# Notes', range: [2, 8], icon: 'star', bare: 'star', heard: 'b', refd: true, form: 'x' }
+const START = { agree: true, power: false, free: false, decks: ['films'], size: 'm', sort: null, level: 'b', tags: ['x', 'y'], title: 'Ada', bio: 'Hello', notes: '# Notes', range: [2, 8], icon: 'star', bare: 'star', heard: 'b', refd: true, form: 'x' }
 
 // CI installs Chromium: there, a missing browser fails rather than skipping.
 describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a form reset on a served page', () => {
@@ -50,7 +50,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a form res
       })
       await page.waitUntil(() => JSON.parse(document.querySelector('#state')!.textContent!).form === 'y')
 
-      expect(await state()).toMatchObject({ agree: false, power: true, free: true, decks: ['games'], size: 'l', level: 'c', title: 'Grace', form: 'y', icon: 'moon' })
+      expect(await state()).toMatchObject({ agree: false, power: true, free: true, decks: ['games'], size: 'l', sort: 'l', level: 'c', title: 'Grace', form: 'y', icon: 'moon' })
 
       await page.click('#reset')
       await page.waitUntil(() => JSON.parse(document.querySelector('#state')!.textContent!).form === 'x')
