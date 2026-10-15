@@ -380,9 +380,25 @@ export function admitCrossSite(request: Request): void {
   corsAdmitted.add(request)
 }
 
+// What `isCrossSite` answered for a request, as kayjs-auth asks again on every session read of one.
+const crossSiteAnswers = new WeakMap<Request, { site: string | undefined, crossSite: boolean }>()
+
 // Whether a browser's cross-site POST or websocket upgrade should be refused, for code on a plain Elysia app that kay's own actions and API do not reach; `site` is the app's public URL, whose host counts as the request's own.
 export function crossSiteRefused(request: Request, site?: string): boolean {
-  return (!SAFE_METHODS.has(request.method) || request.headers.get('upgrade')?.toLowerCase() === 'websocket') && isCrossSite(request, site) && !corsAdmitted.has(request)
+  return (!SAFE_METHODS.has(request.method) || request.headers.get('upgrade')?.toLowerCase() === 'websocket') && crossSiteOnce(request, site) && !corsAdmitted.has(request)
+}
+
+function crossSiteOnce(request: Request, site: string | undefined): boolean {
+  const known = crossSiteAnswers.get(request)
+
+  if (known !== undefined && known.site === site)
+    return known.crossSite
+
+  const crossSite = isCrossSite(request, site)
+
+  crossSiteAnswers.set(request, { site, crossSite })
+
+  return crossSite
 }
 
 // Over https, kay's cookies never travel in clear; behind a proxy, `X-Forwarded-Proto` says how the browser came, and without one, in production, an https `site` in kay.config.ts stands in, for a proxy that does not pass it on.

@@ -1,6 +1,6 @@
 import { rm } from 'node:fs/promises'
 import { join, relative } from 'node:path'
-import { afterAll, describe, expect, it } from 'bun:test'
+import { afterAll, describe, expect, it, spyOn } from 'bun:test'
 import { check } from '../src/check'
 import { admitCrossSite, crossSiteRefused } from '../src/server/actions'
 import { corsRule } from '../src/server/cors'
@@ -173,5 +173,26 @@ describe('crossSiteRefused', () => {
 
     admitCrossSite(request)
     expect(crossSiteRefused(request)).toBe(false)
+  })
+
+  it('parses a request\'s Origin once for a site, however many times it is asked, and still lets in a request cors admits later', () => {
+    const request = post({ origin: 'http://evil.example' })
+    const parse = spyOn(URL, 'canParse')
+
+    try {
+      expect(crossSiteRefused(request, APP)).toBe(true)
+      const once = parse.mock.calls.length
+
+      expect(crossSiteRefused(request, APP)).toBe(true)
+      expect(crossSiteRefused(request, APP)).toBe(true)
+      expect(parse.mock.calls.length).toBe(once)
+
+      expect(crossSiteRefused(request, 'http://evil.example')).toBe(false)
+      admitCrossSite(request)
+      expect(crossSiteRefused(request, APP)).toBe(false)
+    }
+    finally {
+      parse.mockRestore()
+    }
   })
 })

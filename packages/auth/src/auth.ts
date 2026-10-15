@@ -188,7 +188,8 @@ export class Auth<Scope extends string = string, Role extends string = string, O
   private readonly session: Session<AuthSessionData>
 
   constructor(session: Session<AuthSessionData>, private readonly core: Core, private readonly request: Request, client: string, address: string) {
-    const crossSite = () => !bearerRequest(request) && crossSiteRefused(request, core.url)
+    const bearer = bearerRequest(request)
+    const crossSite = () => !bearer && crossSiteRefused(request, core.url)
 
     this.session = guardSession(session, crossSite)
 
