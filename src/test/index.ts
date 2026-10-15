@@ -29,15 +29,20 @@ import { memoryFiles } from '../server/storage'
 import { servedThrough } from '../server/visit'
 import { proofOfWork, signWork } from '../server/work'
 import { browse } from './browser'
+import { cookieJar } from './cookies'
 import { NativeFormData, NativeHeaders, NativeRequest, NativeURL, NativeWebSocket, withNatives } from './natives'
 import { readPage, sitemapUrls } from './page'
 import { testRoot } from './root'
 
 export type { A11yViolation, BrowserOptions, TestPage, WaitForOptions, WaitOptions } from './browser'
 export { browse, browserPath } from './browser'
+export type { CookieJar } from './cookies'
+export { cookieJar } from './cookies'
 export type { Mounted } from './mount'
 export { mount, readPersisted, settle, writePersisted } from './mount'
 export type { Found, PageReading } from './page'
+export { scratchDir } from './scratch'
+export { solveWork }
 
 export interface TestOptions extends PagesOptions {
   // The plugins the server entry uses before the pages, in order, such as `session()`: their derives reach `ctx.locals` and their cookies the next request.
@@ -161,7 +166,7 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
   const locals = options.locals
   const before = [...options.use ?? [], ...locals ? [new Elysia().derive({ as: 'global' }, async ({ request }) => locals(request))] : []]
   const app = before.length === 0 ? pages : before.reduce<AnyElysia>((served, plugin) => served.use(plugin), new Elysia()).use(pages)
-  const cookies = new Bun.CookieMap()
+  const jar = cookieJar()
   let address = nextClient()
 
   // A site made at the top of a file or a describe posts as a new client in each test, so no test meets the rate limits another one's posts counted; one made inside a test, or outside bun test, keeps one.
@@ -172,15 +177,6 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
   }
   catch {}
 
-  const cookieHeader = (headers: Headers) => {
-    const sent = [...cookies].map(([name, value]) => `${name}=${value}`).join('; ')
-
-    if (sent !== '')
-      headers.set('cookie', sent)
-
-    return headers
-  }
-
   // What kay sends through the app on the visitor's behalf, as the page a refused post renders, goes through all of it, as a server would send it.
   const handle = async (request: Request): Promise<Response> => {
     servedThrough(request, handle)
@@ -189,24 +185,11 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
   }
 
   const send = async (path: string, init: Omit<RequestInit, 'headers'> & VisitInit): Promise<Response> => {
-    const headers = cookieHeader(new NativeHeaders(init.headers))
-
-    const request = new NativeRequest(new NativeURL(path, ORIGIN), { ...init, headers, redirect: 'manual' })
+    const request = new NativeRequest(new NativeURL(path, ORIGIN), { ...init, headers: new NativeHeaders(init.headers), redirect: 'manual' })
 
     sendFrom(request, address)
 
-    const response = await handle(request)
-
-    for (const header of response.headers.getSetCookie()) {
-      const cookie = Bun.Cookie.parse(header)
-
-      if (cookie.isExpired())
-        cookies.delete(cookie.name)
-      else
-        cookies.set(cookie)
-    }
-
-    return response
+    return jar.send(handle, request)
   }
 
   const follow = async (response: Response, url: string, headers?: Record<string, string>): Promise<Visit> => {
@@ -260,7 +243,7 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
   }
 
   return {
-    cookies,
+    cookies: jar.cookies,
     handle,
     runJobs: drainQueues,
     sitemap: async (path = SITEMAP) => {
@@ -274,7 +257,7 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
     fetch: async (path, init = {}) => send(path, init),
     socket: (module, path, ...[options]) => {
       const url = routeUrl(module, path, options as Parameters<typeof routeUrl>[2])
-      const client = openSocket(() => new BunWebSocket(`ws://localhost:${listening().port}${url}`, { headers: Object.fromEntries(cookieHeader(new NativeHeaders(options?.headers))) }))
+      const client = openSocket(() => new BunWebSocket(`ws://localhost:${listening().port}${url}`, { headers: { ...options?.headers, ...jar.cookies.size > 0 ? { cookie: jar.header() } : {} } }))
       const tested = Object.assign(client, inbox(client))
 
       client.start()

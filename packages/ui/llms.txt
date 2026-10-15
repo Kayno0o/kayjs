@@ -517,4 +517,4 @@ form.flex.flex-wrap.items-end.gap-3(method="get" role="search")
 
 ## Testing an app's use of it
 
-A page that uses the components renders them in `testSite()` like the app's own. To test what their handlers do, `mount(file, props)` from `kay/test` renders a component of the app, once a DOM is registered, such as with `GlobalRegistrator.register()` from `@happy-dom/global-registrator`. happy-dom has no popover API, so Toaster and Popover need a shim of `showPopover`, `hidePopover`, `togglePopover` and `:popover-open` there.
+A page that uses the components renders them in `testSite()` like the app's own. To test what their handlers do, `mount(file, props)` from `kay/test` renders a component of the app into the DOM `kay/test/dom` registers, listed after `kay/test/preload` under `[test] preload` in bunfig.toml with `@happy-dom/global-registrator` installed; it shims the popover API happy-dom lacks, which Toaster and Popover use.

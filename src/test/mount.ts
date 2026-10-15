@@ -44,7 +44,7 @@ export function readPersisted(key: string): unknown {
 // `file` is the `.kay` file relative to the project, since importing it through the preload gives its server build.
 export async function mount(file: string, props: Record<string, unknown> = {}): Promise<Mounted> {
   if (typeof document === 'undefined')
-    throw new Error('kay: mount renders into `document`; register a DOM first, such as `GlobalRegistrator.register()` from @happy-dom/global-registrator')
+    throw new Error('kay: mount renders into `document`; register a DOM first, such as `kay/test/dom` preloaded after `kay/test/preload` in bunfig.toml')
 
   const root = testRoot()
   const path = resolve(root, file)

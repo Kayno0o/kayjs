@@ -58,6 +58,34 @@ const admin = await testSite({
 })
 ```
 
+## One component
+
+`mount(file, props)` renders one component into `document`, for what its handlers and effects do. List `kay/test/dom` after the preload, with `@happy-dom/global-registrator` installed as a dev dependency. It registers happy-dom's DOM for every test file, and adds the popover API happy-dom lacks:
+
+```toml
+[test]
+preload = ["kay/test/preload", "kay/test/dom"]
+```
+
+```ts
+import { expect, it } from 'bun:test'
+import { mount, settle } from 'kay/test'
+
+it('opens its panel on a click', async () => {
+  const { root, unmount } = await mount('src/components/toggle.kay')
+
+  root.querySelector('button')!.click()
+  await settle()
+
+  expect(root.querySelector('.panel')?.textContent).toBe('Open')
+  unmount()
+})
+```
+
+## Smaller helpers
+
+A test that drives an Elysia app of its own, rather than `testSite`, keeps a browser's cookies with `cookieJar()`. `jar.send(handle, request)` sends the cookies kept so far and keeps the ones the response sets. `solveWork(challenge)` solves a proof-of-work challenge as kay's script does. `scratchDir(prefix)` makes a fresh directory under the project's `.kay/scratch`, which no build or check reads.
+
 ## In a browser
 
 For what only a browser does, `testSite({ browser: true })` builds the islands and `site.open(path)` loads the page in headless Chrome. The build goes to `.kay/client`, or `.kay/client-<n>` in each worker of `bun test --parallel`, so test files running at once never overwrite each other's; a worker's `pages({ prebuilt: true })` reads its own `.kay/client-<n>` too, not what a `kay build` run before the tests left:

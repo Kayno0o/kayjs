@@ -1,11 +1,11 @@
 import type { FileChange } from '../src/files'
 import type * as Content from '../src/kay/content'
 import type { CollectionInfo, SourceEntry } from '../src/kay/contract'
-import { mkdtemp, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { beforeEach, describe, expect, mock, test } from 'bun:test'
 import { bodyHtml, MarkdownError } from 'kay/content'
+import { scratchDir } from 'kay/test'
 import { fileVersion, ForgeError, SaveConflict } from '../src/files'
 import { configure } from '../src/settings'
 
@@ -150,7 +150,7 @@ describe('saveEntry', () => {
   })
 
   test('refuses a save or a delete naming no version of a file the server holds, when the editor must name one', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'kayjs-cms-store-'))
+    const dir = await scratchDir('store-')
     const path = join(dir, 'hello.md')
 
     try {
@@ -243,7 +243,7 @@ describe('entryOf', () => {
   })
 
   test('gives a folder entry\'s file version, which publishing names', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'kayjs-cms-store-'))
+    const dir = await scratchDir('store-')
     const path = join(dir, 'hello.md')
 
     try {

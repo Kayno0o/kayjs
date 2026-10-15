@@ -1,10 +1,10 @@
 import type * as Content from '../src/kay/content'
 import type { CollectionInfo, SourceEntry } from '../src/kay/contract'
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterEach, beforeEach, expect, mock, setSystemTime, test } from 'bun:test'
 import { files, memoryFiles } from 'kay/server'
+import { scratchDir } from 'kay/test'
 import { setupStorage } from '../../../src/server/storage'
 
 const shape = { schema: { type: 'object' }, components: [], localized: false } satisfies Omit<CollectionInfo, 'name' | 'kind'>
@@ -101,7 +101,7 @@ test('lists a loaded collection\'s uploads too, and the variants an unused one h
 })
 
 test('shows the variants an unused upload has, read from the variants directory once', async () => {
-  const variants = await mkdtemp(join(tmpdir(), 'kay-cms-variants-'))
+  const variants = await scratchDir('variants-')
 
   setupStorage(memoryFiles(), '/nonexistent', variants)
 

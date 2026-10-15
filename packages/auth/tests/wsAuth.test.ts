@@ -107,7 +107,7 @@ describe('socketUser', () => {
 
     await ada.fetch('/sign-in/u1', { method: 'POST' })
 
-    expect(await openedAs([...ada.cookies].map(([name, value]) => `${name}=${value}`).join('; '))).toMatchObject({ id: 'u1', email: 'ada@example.com' })
+    expect(await openedAs(ada.cookieHeader())).toMatchObject({ id: 'u1', email: 'ada@example.com' })
     expect(await openedAs(undefined)).toBeNull()
   })
 
@@ -140,14 +140,12 @@ describe('socketUser', () => {
     }
   }
 
-  const cookieOf = (browser: { cookies: Map<string, string> }) => [...browser.cookies].map(([name, value]) => `${name}=${value}`).join('; ')
-
   test('reads the user again past 30 seconds, and closes a socket whose session was signed out', async () => {
     await app.store.users.create(userRecord({ id: 'u2', email: 'bob@example.com' }))
     const bob = app.browser()
 
     await bob.fetch('/sign-in/u2', { method: 'POST' })
-    const socket = await socketAs(cookieOf(bob), 'socketUser')
+    const socket = await socketAs(bob.cookieHeader(), 'socketUser')
 
     try {
       expect(await socket.ask()).toMatchObject({ id: 'u2' })
@@ -169,7 +167,7 @@ describe('socketUser', () => {
     const cleo = app.browser()
 
     await cleo.fetch('/sign-in/u3', { method: 'POST' })
-    const socket = await socketAs(cookieOf(cleo), 'data')
+    const socket = await socketAs(cleo.cookieHeader(), 'data')
 
     try {
       expect(await socket.ask()).toMatchObject({ id: 'u3' })

@@ -108,16 +108,16 @@ room.close()
 
 ### Test a component's handlers
 
-`mount(file, props)` renders one component built for the browser into `document`, and `settle()` lets effects land before the DOM is read:
+`mount(file, props)` renders one component built for the browser into `document`, and `settle()` lets effects land before the DOM is read. `kay/test/dom` registers happy-dom's DOM, `@happy-dom/global-registrator` installed as a dev dependency:
+
+```toml
+[test]
+preload = ["kay/test/preload", "kay/test/dom"]
+```
 
 ```ts
-import { GlobalRegistrator } from '@happy-dom/global-registrator'
-import { beforeAll, expect, it } from 'bun:test'
+import { expect, it } from 'bun:test'
 import { mount, settle } from 'kay/test'
-
-beforeAll(() => {
-  GlobalRegistrator.register()
-})
 
 it('opens its panel on a click', async () => {
   const { root, unmount } = await mount('src/components/toggle.kay', { label: 'Menu' })
@@ -226,11 +226,32 @@ it('shows why a todo was refused', async () => {
 - Props may be functions, and the component runs on a kay of its own, so a signal of the test reaches it through a callback rather than as a prop.
 - A library's settings apply as `kay.config.ts` sets them.
 - Each mount runs the component's modules afresh, as a page load does, so module state, a persisted signal read from storage included, does not carry over from an earlier mount: set localStorage, then mount.
-- The test registers the DOM itself, such as `GlobalRegistrator.register()` from `@happy-dom/global-registrator`.
+- `kay/test/dom`, listed after `kay/test/preload` under `[test] preload`, registers happy-dom's DOM for every test file, with `@happy-dom/global-registrator` installed as a dev dependency.
+- It shims the popover API happy-dom lacks: `showPopover`, `hidePopover` and `togglePopover` fire `toggle` as a browser does, and `matches(':popover-open')` reads whether one is shown.
+- A test may register the DOM itself instead, such as `GlobalRegistrator.register({ url: 'http://localhost/' })` for a document whose cookies the page reads.
 - A DOM left registered for the rest of the run does not reach `testSite`, whose app runs on Bun's own `Request`, `Response` and the rest, so a file mounting components and one visiting pages share one `bun test` run, as long as `kay/test/preload` comes before any preload registering a DOM.
 - A function the test stubbed, such as `fetch`, stays its stub there, and a streamed page under a DOM is read through `visit`, `site.fetch` handing back a body read later.
 - A `persisted(key, initial, { storage: 'local' })` signal keeps its value encoded as island props are, not as JSON: `writePersisted(key, value)` and `readPersisted(key)` from `kay/test` set one before a mount and read one back, `undefined` when none was kept.
 - After an interaction, `await settle()` lets effects land before the DOM is read.
+
+### Helpers for a test of its own
+
+- `cookieJar()` from `kay/test` keeps a browser's cookies for a test driving an Elysia app or a handler of its own rather than `testSite`, which keeps its own as `site.cookies`.
+- `jar.send(handle, request)` sends the cookies kept so far through `handle`, such as `app.handle`, keeps those the response sets and drops those it expires; `jar.header()` is the `cookie` header it sends, `''` when it holds none, and `jar.cookies` the `Bun.CookieMap`.
+- `solveWork(challenge)` from `kay/test` solves a proof-of-work challenge, such as one `workChallenge()` signs, as kay's script does, for a test posting a form field by hand, or `undefined` for text that is no challenge.
+- `scratchDir(prefix)` from `kay/test` makes a fresh directory under the project's `.kay/scratch` and resolves with its absolute path: inside the project, so a file written there imports the project's packages, and under `.kay`, which no build or check reads, so another test file building beside it never meets it.
+- `scratchDir(prefix, root)` puts it under another project's `.kay/scratch`; the test removes the directory once done with it.
+
+```ts
+import { expect } from 'bun:test'
+import { cookieJar } from 'kay/test'
+import { app } from './app'
+
+const jar = cookieJar()
+
+await jar.send(app.handle, new Request('http://localhost/sign-in', { method: 'POST' }))
+expect(jar.cookies.has('session')).toBe(true)
+```
 
 ### Databases and setup
 

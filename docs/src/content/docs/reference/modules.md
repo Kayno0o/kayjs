@@ -85,8 +85,9 @@ Types include `BrowserError` and `CspViolation`, the browser errors and CSP viol
 | `kay/cache` | `cached`, `invalidate`, `sqliteCache`. See [Caching and streaming](/guides/caching-and-streaming) |
 | `kay/image` | `image`, `shareImage`, `shareCard` |
 | `kay/icons` | `iconProps`, `iconNames`, for icons known only at runtime |
-| `kay/test` | `testSite`, `mount`, `browse`, `browserPath`, `settle`, `readPersisted`, `writePersisted`. See [Testing](/guides/testing) |
+| `kay/test` | `testSite`, `mount`, `browse`, `browserPath`, `settle`, `readPersisted`, `writePersisted`, `cookieJar`, `solveWork`, `scratchDir`. See [Testing](/guides/testing) |
 | `kay/test/preload` | The preload a project's `bunfig.toml` lists for `bun test`, before any other registering a DOM |
+| `kay/test/dom` | The preload registering happy-dom's DOM, popover API included, for `mount`. See [Testing](/guides/testing#one-component) |
 | `kay/bun` | `kay`, the Bun plugin compiling `.kay` files for a page kay does not serve. See [Islands](/essentials/islands#a-page-kay-does-not-serve) |
 | `kay/mount` | `mount`, which renders a component into an element on a page kay does not serve. See [Islands](/essentials/islands#a-page-kay-does-not-serve) |
 | `kay/eslint` | The ESLint processor for `.kay` files. See [Checks](/reference/checks) |

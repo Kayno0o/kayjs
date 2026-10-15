@@ -1,7 +1,7 @@
-import { mkdtemp, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterAll, describe, expect, test } from 'bun:test'
+import { scratchDir } from 'kay/test'
 import { fileVersion, ForgeError, forgejo, SaveConflict, workingTree } from '../src/files'
 
 interface Sent {
@@ -187,7 +187,7 @@ describe('forgejo timeout', () => {
   })
 })
 
-const dir = await mkdtemp(join(tmpdir(), 'kayjs-cms-'))
+const dir = await scratchDir('files-')
 
 describe('workingTree', () => {
   afterAll(() => rm(dir, { recursive: true, force: true }))

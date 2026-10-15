@@ -2,6 +2,7 @@ import type { AuthOptions, AuthSessionData } from '../../src/auth'
 import type { AuthStore, UserRecord } from '../../src/store'
 import { Elysia } from 'elysia'
 import { session } from 'kay/server'
+import { cookieJar } from 'kay/test'
 import { createAuth } from '../../src/auth'
 import { memoryStore } from '../../src/memoryStore'
 
@@ -86,28 +87,14 @@ export function testApp<const Scope extends string = never, OrgRole extends stri
 }
 
 export function browser(app: { handle: (request: Request) => Promise<Response> }) {
-  const cookies = new Map<string, string>()
+  const jar = cookieJar()
 
   return {
-    cookies,
+    cookies: jar.cookies,
+    // The `cookie` header this browser sends.
+    cookieHeader: jar.header,
     async fetch(path: string, init: RequestInit = {}): Promise<Response> {
-      const headers = new Headers(init.headers)
-
-      if (cookies.size > 0)
-        headers.set('cookie', [...cookies].map(([name, value]) => `${name}=${value}`).join('; '))
-
-      const response = await app.handle(new Request(`http://localhost${path}`, { ...init, headers }))
-
-      for (const line of response.headers.getSetCookie()) {
-        const cookie = Bun.Cookie.parse(line)
-
-        if (cookie.isExpired() || cookie.value === '')
-          cookies.delete(cookie.name)
-        else
-          cookies.set(cookie.name, cookie.value)
-      }
-
-      return response
+      return jar.send(async request => app.handle(request), new Request(`http://localhost${path}`, init))
     },
     // Calls `auth[method](...args)` in this browser and reads the answer.
     async call(method: string, ...args: unknown[]): Promise<any> {

@@ -134,6 +134,10 @@
       "types": "./types/test/preload.d.ts",
       "default": "./src/test/preload.ts"
     },
+    "./test/dom": {
+      "types": "./types/test/dom.d.ts",
+      "default": "./src/test/dom.ts"
+    },
     "./tsconfig.json": "./src/tsconfig.app.json",
     "./kay.tmLanguage.json": "./editors/vscode/syntaxes/kay.tmLanguage.json"
   },
@@ -175,7 +179,13 @@
     "bench:check:apps": "tsgo --noEmit -p bench/apps/solid && tsgo --noEmit -p bench/apps/svelte && tsgo --noEmit -p bench/apps/next && $npm_execpath --cwd=bench/apps/nuxt --bun run check && $npm_execpath --cwd=bench/apps/astro --bun run check"
   },
   "peerDependencies": {
+    "@happy-dom/global-registrator": "^20.14.5",
     "@types/bun": "^1.4.2"
+  },
+  "peerDependenciesMeta": {
+    "@happy-dom/global-registrator": {
+      "optional": true
+    }
   },
   "dependencies": {
     "@babel/parser": "^7.29.7",

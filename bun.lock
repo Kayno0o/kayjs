@@ -38,8 +38,12 @@
         "typescript": "^6.0.3",
       },
       "peerDependencies": {
+        "@happy-dom/global-registrator": "^20.14.5",
         "@types/bun": "^1.4.2",
       },
+      "optionalPeers": [
+        "@happy-dom/global-registrator",
+      ],
     },
     "docs": {
       "name": "kay-docs",

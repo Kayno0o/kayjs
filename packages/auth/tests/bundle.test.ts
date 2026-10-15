@@ -1,11 +1,11 @@
-import { mkdtemp, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { expect, test } from 'bun:test'
+import { scratchDir } from 'kay/test'
 
 // Bun's bundler wraps what an `import()` reaches in lazy initialisers, which run a module's CommonJS imports after its ES ones: the polyfill tsyringe needs must still load first.
 test('passkeys load in a bundle reaching them through import()', async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'kayjs-auth-bundle-'))
+  const dir = await scratchDir('bundle-')
 
   try {
     const entry = join(dir, 'entry.ts')

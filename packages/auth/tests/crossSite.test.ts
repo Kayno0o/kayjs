@@ -90,7 +90,7 @@ describe('a plain Elysia app on auth.plugin', () => {
 
   test('socketUser answers nobody and closes a socket whose upgrade came from another origin, and the socket\'s own auth reads it as signed out', async () => {
     const { app, ada } = await signedIn()
-    const cookie = [...ada.cookies].map(([name, value]) => `${name}=${value}`).join('; ')
+    const cookie = ada.cookieHeader()
 
     const server = new Elysia()
       .use(app.app)
