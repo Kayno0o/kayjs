@@ -73,7 +73,7 @@ An island hydrates as soon as the page loads. Defer it with `hydrate` on its tag
 Comments(postId={post.id} hydrate="visible")
 ```
 
-`hydrate="visible"` waits until it scrolls near the viewport, `hydrate="idle"` until the browser is idle. A click on an island still loading is replayed once it hydrates, the first 50 events at most, a field's consecutive inputs counting as one.
+`hydrate="visible"` waits until it scrolls near the viewport, `hydrate="idle"` until the browser is idle. A click on an island still loading is replayed once it hydrates, an island that never hydrates keeping its last 50 events at most, a field's consecutive inputs or changes counting as one.
 
 ## Shared and persisted state
 

@@ -274,7 +274,7 @@ const dispose = mount(Panel, document.querySelector('#panel')!, { title: 'Ticket
 
 - An island hydrates as soon as the page loads, its chunks preloaded.
 - `hydrate="idle"` waits until the browser is idle and `hydrate="visible"` until it scrolls near the viewport, neither preloaded.
-- A click, input or change on an island still loading is replayed once it hydrated and its effects ran, an island that never hydrates holding its first 50 events at most and a field's consecutive inputs counting as one.
+- A click, input or change on an island still loading is replayed once it hydrated and its effects ran, an island that never hydrates holding its last 50 events at most and a field's consecutive inputs or changes counting as one.
 - Only an island takes `hydrate`, and only from a static parent.
 
 ### Shared and persisted state

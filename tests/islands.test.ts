@@ -171,7 +171,7 @@ describe('islands', () => {
     }
   })
 
-  it('queues at most 50 events for an island that has not hydrated, and one input event per run on the same field', () => {
+  it('keeps the last 50 events queued for an island that has not hydrated, and one input event per run on the same field', () => {
     // eslint-disable-next-line no-new-func -- runs the inline hydration script, which happy-dom does not execute from markup
     (new Function(HYDRATION_SCRIPT) as () => void)()
     document.body.innerHTML = '<slot data-component="a.kay" data-hydrate="visible"><button>A</button></slot><slot data-component="b.kay" data-hydrate="visible"><button>B</button></slot><slot data-component="c.kay" data-hydrate="visible"><input></slot>'
@@ -180,17 +180,27 @@ describe('islands', () => {
     const queue = (globalThis as { _$K?: Event[] })._$K!
 
     for (let i = 0; i < 500; i++)
-      button!.dispatchEvent(new Event('click', { bubbles: true }))
+      button!.dispatchEvent(Object.assign(new Event('click', { bubbles: true }), { n: i }))
 
     // The other island still queues, and typing queues its last input alone.
     other!.dispatchEvent(new Event('click', { bubbles: true }))
 
     for (let i = 0; i < 500; i++)
-      input!.dispatchEvent(new Event('input', { bubbles: true }))
+      input!.dispatchEvent(Object.assign(new Event('input', { bubbles: true }), { n: i }))
 
     expect(queue.filter(event => event.target === button)).toHaveLength(50)
     expect(queue.filter(event => event.target === other)).toHaveLength(1)
     expect(queue.filter(event => event.target === input)).toHaveLength(1)
+    expect((queue.find(event => event.target === input) as unknown as { n: number }).n).toBe(499)
+    expect(queue.filter(event => event.target === button).map(event => (event as unknown as { n: number }).n)).toEqual(Array.from({ length: 50 }, (_, i) => 450 + i))
+
+    // A click between two inputs keeps both, and changes merge as inputs do.
+    input!.dispatchEvent(new Event('click', { bubbles: true }))
+    input!.dispatchEvent(new Event('input', { bubbles: true }))
+    expect(queue.filter(event => event.target === input)).toHaveLength(3)
+    input!.dispatchEvent(new Event('change', { bubbles: true }))
+    input!.dispatchEvent(new Event('change', { bubbles: true }))
+    expect(queue.filter(event => event.target === input && event.type === 'change')).toHaveLength(1)
   })
 
   it('replays a click made before its island hydrated once its effects ran, as on an island already hydrated', async () => {
