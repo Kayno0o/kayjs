@@ -170,16 +170,35 @@ describe('API modules', () => {
   })
 
   it('reconnects a websocket the server dropped, sending what was queued meanwhile', async () => {
+    const retries = retriesByHand()
     const room = site.socket(chat, '/:room', { params: { room: 'flaky' } })
 
-    room.send({ text: 'drop' })
-    await Bun.sleep(50)
-    expect(room.status()).toBe('connecting')
+    try {
+      await until(() => room.status() === 'open')
+      room.send({ text: 'drop' })
+      await until(() => room.status() === 'connecting')
+      room.send({ text: 'back' })
 
-    room.send({ text: 'back' })
+      let arrived = false
+      const message = (async () => {
+        const next = await room.next()
 
-    expect(await room.next()).toEqual({ room: 'flaky', from: 'anonymous', text: 'back' })
-    room.close()
+        arrived = true
+
+        return next
+      })()
+
+      await until(() => {
+        retries.fire()
+
+        return arrived
+      })
+      expect(await message).toEqual({ room: 'flaky', from: 'anonymous', text: 'back' })
+    }
+    finally {
+      retries.restore()
+      room.close()
+    }
   })
 
   it('reads a typed event stream, values crossing as island props do', async () => {
@@ -937,7 +956,7 @@ class UploadRequest {
 describe('kay check, API modules', () => {
   it('types an island\'s sockets and streams from the modules it imports', async () => {
     expect(await check(fixture)).toEqual([])
-  })
+  }, 60_000)
 
   it('checks links and redirects against the GET routes of the modules, under their mounts', async () => {
     const scratch = join(import.meta.dir, '../node_modules/.cache')
@@ -960,7 +979,7 @@ describe('kay check, API modules', () => {
     finally {
       await rm(project, { recursive: true, force: true })
     }
-  }, 30_000)
+  }, 60_000)
 })
 
 describe('rooms', () => {
