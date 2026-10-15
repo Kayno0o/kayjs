@@ -1,5 +1,6 @@
 ---
 import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
+import FileDrop from '@kaynooo/kayjs-ui/file-drop.kay'
 import PageHeader from '@kaynooo/kayjs-ui/page-header.kay'
 ---
 EmptyState#missing(title="Not found" level={1})
@@ -11,3 +12,9 @@ PageHeader#moons(title="Moons" description="Every moon of Jupiter, by distance."
     a(href="/moons/new") New moon
   p Under the description.
 PageHeader#bare(title="Planets")
+FileDrop#slim(compact onFiles={() => undefined})
+  @content(zone)
+    button(type="button" onClick={zone.open}) Pick
+FileDrop#zone(onFiles={() => undefined})
+  @content(zone)
+    button(type="button" onClick={zone.open}) Pick

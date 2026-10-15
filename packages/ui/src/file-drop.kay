@@ -3,13 +3,15 @@ import type { JSX } from 'kay'
 import { listen, signal } from 'kay'
 import { acceptsFile } from './accept'
 
-const { accept, multiple = false, paste = false, disabled = false, onFiles, content, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role'> & {
+const { accept, multiple = false, paste = false, disabled = false, compact = false, onFiles, content, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role'> & {
   // The files the zone takes, as an `accept` attribute: the picker filters on it, and dropped or pasted files that miss it are ignored.
   accept?: string | undefined
   multiple?: boolean | undefined
   // Also takes files pasted anywhere on the page, unless the paste lands in a text field.
   paste?: boolean | undefined
   disabled?: boolean | undefined
+  // A slim row, its content from the left, to sit inline beside other fields rather than as a large target of its own.
+  compact?: boolean | undefined
   // The files picked, dropped or pasted: one unless `multiple`, and never an empty list.
   onFiles: (files: File[]) => void
   // What the zone shows: `@content(zone)`, where `zone.open()` opens the picker and `zone.dragging()` reads whether files hover the zone.
@@ -89,6 +91,6 @@ function pasted(event: ClipboardEvent) {
 
 listen(() => paste ? window : undefined, 'paste', pasted)
 ---
-.kui-file-drop({...rest} role="group" class={className} data-dragging={dragging() || undefined} data-disabled={disabled || undefined} onDragOver={dragOver} onDragLeave={dragLeave} onDrop={drop})
+.kui-file-drop({...rest} role="group" class={className} data-compact={compact || undefined} data-dragging={dragging() || undefined} data-disabled={disabled || undefined} onDragOver={dragOver} onDragLeave={dragLeave} onDrop={drop})
   input.kui-file-drop-input(ref={element => input = element} type="file" tabindex="-1" aria-hidden="true" accept={accept} multiple={multiple} disabled={disabled} onChange={picked})
   | {content(zone)}

@@ -33,3 +33,12 @@ describe('PageHeader', () => {
     expect(parts('#bare')).toEqual(['kui-page-header-head', 'kui-page-header-title'])
   })
 })
+
+describe('FileDrop', () => {
+  test('marks itself compact only when asked', async () => {
+    const root = await layout()
+
+    expect(root.querySelector('#slim')?.hasAttribute('data-compact')).toBe(true)
+    expect(root.querySelector('#zone')?.hasAttribute('data-compact')).toBe(false)
+  })
+})

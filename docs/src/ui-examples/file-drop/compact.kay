@@ -1,0 +1,14 @@
+---
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import FileDrop from '@kaynooo/kayjs-ui/file-drop.kay'
+
+const name = signal('')
+---
+FileDrop(
+  accept="image/*"
+  compact
+  onFiles={files => name.set(files[0]!.name)}
+)
+  @content(zone)
+    Button(label="Choose a favicon" onClick={zone.open})
+    span.text-kui-subtext0 {name() || 'or drop it here'}

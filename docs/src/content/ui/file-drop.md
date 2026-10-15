@@ -20,6 +20,12 @@ A dropped file is a `File`, so `URL.createObjectURL` turns it into an image sour
 
 <Demo name="file-drop/preview" />
 
+## Compact
+
+`compact` draws the zone as a slim row, its content from the left, to sit beside other fields in a form.
+
+<Demo name="file-drop/compact" />
+
 ## Pasting
 
 `paste` also takes files pasted anywhere on the page, unless the paste lands in a text field.
