@@ -9,6 +9,8 @@ const CHECK_PROBLEMS = 'kay-check-problems'
 const REQUEST = 'kay-dev-request'
 const ROUTES_URL = '/_kay/dev/routes'
 const HEAD_URL = '/_kay/dev/head'
+const ENV_URL = '/_kay/env.js'
+const MODULE_START = 'export default '
 const HEAD_HEADER = 'x-kay-dev'
 const REQUEST_URL = '/_kay/dev/request'
 // Shown first among the response headers.
@@ -106,6 +108,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .route .method { color: var(--muted); }
 .route .path { overflow-wrap: anywhere; }
 .route .file { grid-column: 2 / -1; color: var(--muted); }
+.secret { color: var(--warn); }
 .snippet { margin: 0 0 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
 .snippet .site { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
 .snippet .title { margin: 2px 0; color: var(--accent); font-size: 16px; }
@@ -457,6 +460,7 @@ export function startDevTool(doc: Document = document): DevTool {
   problems = problemsTab(doc, tool, state, save)
   request = requestTab(doc, tool)
   headTab(doc, tool, listening.signal)
+  envTab(doc, tool, listening.signal)
   routesTab(doc, tool, listening.signal)
   doc.addEventListener('click', (event) => {
     const target = event.target instanceof Element ? event.target.closest<HTMLButtonElement>('button[data-kay-open],button[data-kay-copy]') : null
@@ -908,6 +912,111 @@ function headTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
 
   swaps.observe(doc.head, { childList: true, subtree: true, characterData: true, attributes: true })
   signal.addEventListener('abort', () => swaps.disconnect())
+}
+
+// Names a variable of a secret goes by, and the shapes of the values of one: a URL carrying a password, a token with a well-known prefix, a long run of random-looking characters.
+const SECRET_NAME = /SECRET|PASSW(?:OR)?D|PRIVATE|TOKEN|CREDENTIAL|AUTH|API_?KEY|(?:^|_)KEY$/i
+const SECRET_PREFIX = /^(?:sk|rk)_(?:live|test)_|^gh[pousr]_|^github_pat_|^xox[abprs]-|^AKIA[0-9A-Z]{16}|^eyJ[\w-]+\.[\w-]+\.|^-----BEGIN /
+const URL_PASSWORD = /^[a-z][\w+.-]*:\/\/[^/\s:@]+:[^/\s@]+@/i
+const RANDOM_LIKE = /^[\w+/=.-]{24,}$/
+// Bits per character of a run of random base64 sits near 5; words and paths stay under 4.
+const RANDOM_ENTROPY = 4
+
+function entropy(value: string): number {
+  const counts = new Map<string, number>()
+
+  for (const character of value)
+    counts.set(character, (counts.get(character) ?? 0) + 1)
+
+  return -[...counts.values()].reduce((sum, count) => sum + count / value.length * Math.log2(count / value.length), 0)
+}
+
+// Why a public variable looks like a secret, if it does.
+function secretReason(name: string, value: unknown): string | undefined {
+  if (SECRET_NAME.test(name))
+    return 'its name looks like a secret'
+
+  if (typeof value !== 'string')
+    return undefined
+
+  if (URL_PASSWORD.test(value))
+    return 'its value is a URL with a password'
+
+  if (SECRET_PREFIX.test(value))
+    return 'its value looks like a token'
+
+  return RANDOM_LIKE.test(value) && !value.includes('/') && entropy(value) >= RANDOM_ENTROPY ? 'its value looks random, like a key' : undefined
+}
+
+// The variables `publicEnv` sends every visitor, read from the module the browser loads, so a secret declared public is seen; fetched as the tab shows and again after each restart.
+function envTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
+  const win = doc.defaultView!
+  const tab = tool.tab({ id: 'env', label: 'Env', shown: () => void read() })
+  let asked = 0
+  const read = async () => {
+    const ask = ++asked
+    const base = doc.querySelector('meta[name="kay-base"]')?.getAttribute('content') ?? ''
+    let values: Record<string, unknown> | undefined
+    let failure: string | undefined
+
+    try {
+      const response = await win.fetch(`${base}${ENV_URL}`, { cache: 'no-store' })
+      const text = response.ok && (response.headers.get('content-type') ?? '').includes('javascript') ? await response.text() : undefined
+
+      if (text !== undefined) {
+        if (!text.startsWith(MODULE_START))
+          throw new Error('the module is not the one kay sends')
+
+        values = JSON.parse(text.slice(MODULE_START.length)) as Record<string, unknown>
+      }
+    }
+    catch (error) {
+      failure = error instanceof Error ? error.message : String(error)
+    }
+
+    if (ask !== asked)
+      return
+
+    if (failure !== undefined) {
+      tab.count(0)
+      tab.panel.replaceChildren(tool.make('div', 'empty', `Could not read the public env: ${failure}`))
+
+      return
+    }
+
+    if (values === undefined) {
+      tab.count(0)
+      tab.panel.replaceChildren(tool.make('div', 'empty', 'This app sends no public env to the browser: kay.config.ts declares no `publicEnv`.'))
+
+      return
+    }
+
+    const entries = Object.entries(values)
+    const facts = tool.make('dl', 'facts')
+    let flagged = 0
+
+    for (const [name, value] of entries) {
+      const reason = secretReason(name, value)
+      const shown = tool.make('dd')
+
+      shown.append(tool.make('span', 'mono', typeof value === 'string' ? value : JSON.stringify(value)))
+
+      if (reason !== undefined) {
+        flagged++
+        shown.append(tool.make('div', 'secret', `Every visitor reads this: ${reason}. Keep a secret in defineEnv, read on the server alone.`))
+      }
+
+      facts.append(tool.make('dt', 'mono', name), shown)
+    }
+
+    tab.count(flagged, flagged > 0 ? 'error' : undefined)
+    tab.panel.replaceChildren(tool.make('div', 'note', `${entries.length} variable${entries.length === 1 ? '' : 's'} sent to every visitor at ${ENV_URL}.`), entries.length === 0 ? tool.make('div', 'empty', 'The app sends no public env: `publicEnv` declares no variable.') : facts)
+  }
+
+  win.addEventListener(BUILT_EVENT, () => {
+    if (tab.panel.hidden === false)
+      void read()
+  }, { signal })
 }
 
 const ROUTE_KINDS: Record<DevRoute['kind'], string> = { page: 'Pages', endpoint: 'Endpoints', api: 'API', kay: 'Served by kay' }

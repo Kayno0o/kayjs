@@ -1,10 +1,15 @@
 import type { DevTool } from '../src/runtime/dev-tool'
 import type { DevHead, DevResponse } from '../src/server/dev'
+import { join, relative } from 'node:path'
+import process from 'node:process'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, afterEach, beforeAll, describe, expect, it, spyOn } from 'bun:test'
+import { t } from 'elysia'
 import { startDevTool } from '../src/runtime/dev-tool'
 import { reportError } from '../src/runtime/reactive'
+import { pages } from '../src/server'
 import { DEV_BOOT, problemsBlock } from '../src/server/dev'
+import { scratchDir } from './scratch'
 
 const BOOT = (/<script>([\s\S]*)<\/script>/).exec(DEV_BOOT)![1]!
 
@@ -543,6 +548,61 @@ describe('the dev tool', () => {
     finally {
       fetching.mockRestore()
       happyDOM.setURL(href)
+    }
+  })
+
+  it('lists the env the browser receives, as the server sends it, flags what looks like a secret, and says when the app sends none', async () => {
+    const dir = await scratchDir('dev-tool-env-')
+    const routes = relative(process.cwd(), join(dir, 'routes'))
+    const names = ['KAY_TEST_ZOOM', 'KAY_TEST_MAP_STYLE', 'KAY_TEST_STRIPE_SECRET', 'KAY_TEST_SESSION', 'KAY_TEST_FEED', 'KAY_TEST_REGION'] as const
+    const given = { KAY_TEST_ZOOM: '12', KAY_TEST_MAP_STYLE: 'streets', KAY_TEST_STRIPE_SECRET: 'abc', KAY_TEST_SESSION: 'q8Zr3VxK1mT9yB2nWd5LpC7aHs4JfE6u', KAY_TEST_FEED: 'postgres://app:hunter2@db.internal/app', KAY_TEST_REGION: 'eu-west-1' }
+
+    await Bun.write(join(dir, 'routes/index.kay'), 'p Home\n')
+    Object.assign(process.env, given)
+
+    const publicEnv = t.Object({ KAY_TEST_ZOOM: t.Numeric(), KAY_TEST_MAP_STYLE: t.String(), KAY_TEST_STRIPE_SECRET: t.String(), KAY_TEST_SESSION: t.String(), KAY_TEST_FEED: t.String(), KAY_TEST_REGION: t.String() })
+    const { happyDOM } = window as unknown as { happyDOM: { setURL: (url: string) => void } }
+    const { href } = location
+    const asked: string[] = []
+    let app = await pages({ routes, dev: true, publicEnv })
+    const fetching = spyOn(window, 'fetch').mockImplementation((async (url: string) => {
+      asked.push(url)
+
+      return app.handle(new Request(`http://localhost${url}`))
+    }) as unknown as typeof window.fetch)
+    const rows = () => [...shadow().querySelectorAll('#kay-dev-env dt')].map(term => `${term.textContent} = ${term.nextElementSibling!.querySelector('.mono')!.textContent}${term.nextElementSibling!.querySelector('.secret') ? ' (flagged)' : ''}`)
+
+    try {
+      happyDOM.setURL('http://localhost/')
+      tool = startDevTool()
+      shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-env')!.click()
+      await Bun.sleep(20)
+
+      expect(asked).toEqual(['/_kay/env.js'])
+      expect(rows()).toEqual([
+        'KAY_TEST_ZOOM = 12',
+        'KAY_TEST_MAP_STYLE = streets',
+        'KAY_TEST_STRIPE_SECRET = abc (flagged)',
+        'KAY_TEST_SESSION = q8Zr3VxK1mT9yB2nWd5LpC7aHs4JfE6u (flagged)',
+        'KAY_TEST_FEED = postgres://app:hunter2@db.internal/app (flagged)',
+        'KAY_TEST_REGION = eu-west-1',
+      ])
+      expect(shadow().querySelector('#kay-dev-tab-env .count')?.textContent).toBe('3')
+
+      // No `publicEnv`: nothing reaches the browser, and the tab says so after the restart.
+      app = await pages({ routes, dev: true })
+      window.dispatchEvent(new CustomEvent('kay-dev-built', { detail: JSON.stringify({ id: 'b', at: 0, changed: 'kay.config.ts', ms: 1 }) }))
+      await Bun.sleep(20)
+
+      expect(shadow().querySelector('#kay-dev-env .empty')?.textContent).toContain('sends no public env')
+      expect(shadow().querySelector<HTMLElement>('#kay-dev-tab-env .count')!.hidden).toBe(true)
+    }
+    finally {
+      fetching.mockRestore()
+      happyDOM.setURL(href)
+
+      for (const name of names)
+        delete process.env[name]
     }
   })
 })
