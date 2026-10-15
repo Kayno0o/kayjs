@@ -1055,6 +1055,11 @@ function envTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
 // An image served more than this many times the pixels it is drawn with is flagged: the ladder's widths are at most 2 apart, so a variant picked for the size drawn is under 2 times as wide, 4 times the pixels, even at its worst.
 const OVERSIZED = 4
 const IMAGE_ROUTE = '/_kay/image'
+// The files `kay build` wrote for the variants.
+const IMAGE_FILES = '/_kay/images/'
+// How many formats are asked of the server at once, and how long one gets.
+const IMAGE_REQUESTS = 4
+const IMAGE_REQUEST_MS = 3000
 const VARIANT_FILE = /-(card|\d+)(?:-(\d+x\d+))?\.(?:webp|avif|jpg)$/
 // The accept header browsers send for an image, which the image route picks AVIF or WebP from.
 const IMAGE_ACCEPT = 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8'
@@ -1268,8 +1273,9 @@ function imagesTab(doc: Document, tool: DevTool, vitals: Vitals, signal: AbortSi
   let asked = 0
   let reread: () => void = () => undefined
   const tab = tool.tab({ id: 'images', label: 'Images', shown: () => reread() })
-  // What the server answered an image with, by address, until the next restart.
-  const answers = new Map<string, Promise<string>>()
+  // What the server answered an image with, by address, until the next restart; an answer that failed is asked again.
+  const answers = new Map<string, Promise<{ text: string, kept: boolean }>>()
+  const slots = limiter(IMAGE_REQUESTS)
   let scheduled = false
   const schedule = () => {
     if (tab.panel.hidden === true || scheduled)
@@ -1326,22 +1332,23 @@ function imagesTab(doc: Document, tool: DevTool, vitals: Vitals, signal: AbortSi
 
     tab.panel.replaceChildren(body, tool.make('div', 'note', 'Formats are those the server picks for a browser accepting AVIF and WebP.'))
 
-    // One at a time, so a page of many images does not ask the server for all of them at once.
-    for (const [index, info] of images.entries()) {
+    // A few at a time, so a page of many images does not ask the server for all of them at once, and one that hangs holds back one slot only.
+    await Promise.all(images.map(async (info, index) => {
       let answer = answers.get(info.src)
 
       if (answer === undefined) {
-        answer = imageFormat(win, info.src)
+        answer = slots(async () => imageFormat(win, info.image, info.src))
         answers.set(info.src, answer)
       }
 
-      const text = await answer
+      const { text, kept } = await answer
 
-      if (ask !== asked)
-        return
+      if (!kept && answers.get(info.src) === answer)
+        answers.delete(info.src)
 
-      formats[index]!.textContent = text
-    }
+      if (ask === asked)
+        formats[index]!.textContent = text
+    }))
   }
 
   reread = () => void read()
@@ -1358,32 +1365,66 @@ function imagesTab(doc: Document, tool: DevTool, vitals: Vitals, signal: AbortSi
   signal.addEventListener('abort', () => changes.disconnect())
 }
 
-// The format and size the server answers an image with, for a browser's accept header; read from a HEAD request, as the type is negotiated and the URL does not say it.
-async function imageFormat(win: Window & typeof globalThis, src: string): Promise<string> {
+// A limit on how many calls of a kind run at once; the rest wait their turn.
+function limiter(max: number): <T>(run: () => Promise<T>) => Promise<T> {
+  let running = 0
+  const waiting: (() => void)[] = []
+
+  return async (run) => {
+    if (running >= max)
+      await new Promise<void>(resolve => waiting.push(resolve))
+
+    running++
+
+    try {
+      return await run()
+    }
+    finally {
+      running--
+      waiting.shift()?.()
+    }
+  }
+}
+
+// The format and size of an image. Only an image of kay's own routes loaded by the page is asked of the server, with a HEAD request: the route's code is kay's, it writes no variant the page did not already draw, and the type is negotiated so the URL does not say it. Any other image could run the app's own handler, so its size comes from the browser's resource timing and its format is not looked up. `kept` is false for an answer worth asking for again.
+async function imageFormat(win: Window & typeof globalThis, image: HTMLImageElement, src: string): Promise<{ text: string, kept: boolean }> {
   try {
     // The page's policy lets it ask its own origin only.
-    const origin = parseUrl(src, win.location.href)?.origin
+    const url = parseUrl(src, win.location.href)
 
-    if (origin === undefined)
-      return 'format unknown'
+    if (url === undefined)
+      return { text: 'format unknown', kept: false }
 
-    if (origin !== win.location.origin)
-      return 'on another host'
+    if (url.origin !== win.location.origin)
+      return { text: 'on another host', kept: true }
 
-    const response = await win.fetch(src, { method: 'HEAD', headers: { accept: IMAGE_ACCEPT }, cache: 'no-store' })
+    if (url.pathname !== IMAGE_ROUTE && !url.pathname.startsWith(IMAGE_FILES))
+      return { text: `format not looked up, as kay does not serve it${transferred(win, url.href)}`, kept: true }
+
+    if (!image.complete || image.naturalWidth === 0)
+      return { text: 'not loaded', kept: false }
+
+    const response = await win.fetch(src, { method: 'HEAD', headers: { accept: IMAGE_ACCEPT }, cache: 'no-store', signal: AbortSignal.timeout(IMAGE_REQUEST_MS) })
     const type = response.headers.get('content-type') ?? ''
 
     if (!response.ok)
-      return `the server answered ${response.status}`
+      return { text: `the server answered ${response.status}`, kept: false }
 
     const format = type.startsWith('image/') ? type.slice('image/'.length) : 'not an image'
     const bytes = Number(response.headers.get('content-length'))
 
-    return bytes > 0 ? `${format}, ${formatBytes(bytes)}` : format
+    return { text: bytes > 0 ? `${format}, ${formatBytes(bytes)}` : format, kept: true }
   }
   catch {
-    return 'format unknown'
+    return { text: 'format unknown', kept: false }
   }
+}
+
+// What the browser says it downloaded for an address, as ` - 12.0 KB`; nothing when it did not report it.
+function transferred(win: Window & typeof globalThis, href: string): string {
+  const entry = win.performance.getEntriesByName(href, 'resource').at(-1) as PerformanceResourceTiming | undefined
+
+  return entry !== undefined && entry.encodedBodySize > 0 ? `, ${formatBytes(entry.encodedBodySize)}` : ''
 }
 
 function formatBytes(bytes: number): string {

@@ -659,17 +659,20 @@ describe('the dev tool', () => {
       '<img id="far" src="https://cdn.example/a.png" width="10" height="10" alt="">',
       '<img id="odd" src="/_kay/images/100%.webp" width="10" height="10" alt="">',
       '<img id="broken" src="http://" width="10" height="10" alt="">',
-      '<img id="gone" src="/gone.png" width="10" height="10" alt="">',
+      '<img id="gone" src="/_kay/images/gone.webp" width="10" height="10" alt="">',
+      '<img id="hung" src="/_kay/images/hung.webp" width="10" height="10" alt="">',
+      '<img id="unloaded" src="/_kay/images/unloaded.webp" loading="lazy" width="10" height="10" alt="">',
     ].join('')
 
     // The browser draws and loads: sizes are not computed here.
-    const sizes: Record<string, [number, number, number]> = { hero: [640, 360, 1280], plain: [300, 225, 4000], bare: [80, 80, 160], far: [10, 10, 10], odd: [10, 10, 10], broken: [10, 10, 10], gone: [10, 10, 10] }
+    const sizes: Record<string, [number, number, number]> = { hero: [640, 360, 1280], plain: [300, 225, 4000], bare: [80, 80, 160], far: [10, 10, 10], odd: [10, 10, 10], broken: [10, 10, 10], gone: [10, 10, 10], hung: [10, 10, 10], unloaded: [10, 10, 0] }
 
     for (const [id, [width, height, natural]] of Object.entries(sizes)) {
       const image = document.getElementById(id) as HTMLImageElement
 
       Object.defineProperty(image, 'naturalWidth', { value: natural })
       Object.defineProperty(image, 'naturalHeight', { value: natural })
+      Object.defineProperty(image, 'complete', { value: natural > 0 })
       image.getBoundingClientRect = () => ({ width, height, top: id === 'bare' ? 100 : 5000, bottom: 5100, left: 0, right: width, x: 0, y: 0, toJSON: () => ({}) })
     }
 
@@ -677,10 +680,17 @@ describe('the dev tool', () => {
 
     Object.defineProperty(window, 'devicePixelRatio', { value: 2, configurable: true })
     const asked: string[] = []
+    const signals: unknown[] = []
+    let missing = true
     const fetching = spyOn(window, 'fetch').mockImplementation((async (url: string, init: RequestInit) => {
       asked.push(`${init.method} ${url}`)
+      signals.push(init.signal)
 
-      if (url.includes('gone'))
+      // Never answers, until the request is given up on.
+      if (url.includes('hung'))
+        return new Promise((_, reject) => init.signal?.addEventListener('abort', () => reject(new Error('timeout'))))
+
+      if (url.includes('gone') && missing)
         return new Response('missing', { status: 404, headers: { 'content-type': 'text/plain' } })
 
       return new Response(null, { headers: { 'content-type': url.includes('logo') ? 'image/webp' : url.includes('photo') ? 'image/jpeg' : 'image/avif', 'content-length': url.includes('photo') ? '2500000' : '45000' } })
@@ -693,15 +703,19 @@ describe('the dev tool', () => {
       shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-images')!.click()
       await Bun.sleep(20)
 
-      expect(asked).toEqual(['HEAD http://localhost/_kay/image?src=%2F_kay%2Fassets%2Fhero.jpg&w=1280', 'HEAD http://localhost/photo.jpg', 'HEAD http://localhost/_kay/images/logo-320-1x1.webp', 'HEAD http://localhost/_kay/images/100%.webp', 'HEAD http://localhost/gone.png'])
+      // Only loaded images of kay's own routes are asked for: the app's handlers, an image not drawn yet and another host are not, and a request that hangs holds back none of the others.
+      expect(asked).toEqual(['HEAD http://localhost/_kay/image?src=%2F_kay%2Fassets%2Fhero.jpg&w=1280', 'HEAD http://localhost/_kay/images/logo-320-1x1.webp', 'HEAD http://localhost/_kay/images/100%.webp', 'HEAD http://localhost/_kay/images/gone.webp', 'HEAD http://localhost/_kay/images/hung.webp'])
+      expect(signals.every(signal => signal instanceof AbortSignal)).toBe(true)
       expect(rows()).toEqual([
         '/_kay/image?src=%2F_kay%2Fassets%2Fhero.jpg&w=1280 | 1280w, resized on request - avif, 43.9 KB - served 1280x1280, drawn 640x360 at 2x - largest contentful paint',
-        '/photo.jpg | not resized by kay - jpeg, 2441.4 KB - served 4000x4000, drawn 300x225 at 2x | served 59 times the pixels it is drawn with, give it a smaller width or `sizes`',
+        '/photo.jpg | not resized by kay - format not looked up, as kay does not serve it - served 4000x4000, drawn 300x225 at 2x | served 59 times the pixels it is drawn with, give it a smaller width or `sizes`',
         '/_kay/images/logo-320-1x1.webp | 320w, cut 1x1, written by kay build - webp, 43.9 KB - served 160x160, drawn 80x80 at 2x | no width and height, so the page shifts as it loads | lazy-loaded but in view, which delays it',
         'https://cdn.example/a.png | not resized by kay - on another host - served 10x10, drawn 10x10 at 2x',
         '/_kay/images/100%.webp | not resized by kay - avif, 43.9 KB - served 10x10, drawn 10x10 at 2x',
         'http:// | not resized by kay - format unknown - served 10x10, drawn 10x10 at 2x',
-        '/gone.png | not resized by kay - the server answered 404 - served 10x10, drawn 10x10 at 2x',
+        '/_kay/images/gone.webp | not resized by kay - the server answered 404 - served 10x10, drawn 10x10 at 2x',
+        '/_kay/images/hung.webp | not resized by kay - format... - served 10x10, drawn 10x10 at 2x',
+        '/_kay/images/unloaded.webp | not resized by kay - not loaded - served not loaded, drawn 10x10 at 2x',
       ])
       expect(shadow().querySelector('#kay-dev-tab-images .count')?.textContent).toBe('3')
 
@@ -709,8 +723,18 @@ describe('the dev tool', () => {
       document.body.insertAdjacentHTML('beforeend', '<img id="late" src="/late.png" width="10" height="10" alt="">')
       await Bun.sleep(20)
 
-      expect(rows()).toHaveLength(8)
+      expect(rows()).toHaveLength(10)
+
+      // The answers kept are not asked for again, the 404 is, and the request still pending is not asked twice.
       expect(asked).toHaveLength(6)
+      expect(asked.at(-1)).toBe('HEAD http://localhost/_kay/images/gone.webp')
+      expect(rows().at(-4)).toContain('the server answered 404')
+
+      missing = false
+      document.body.insertAdjacentHTML('beforeend', '<img id="later" src="/later.png" width="10" height="10" alt="">')
+      await Bun.sleep(20)
+
+      expect(rows().at(-5)).toContain('avif, 43.9 KB')
 
       const visible = () => [...shadow().querySelectorAll<HTMLElement>('.outline')].filter(outline => outline.hidden === false).length
 
