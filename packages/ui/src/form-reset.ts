@@ -9,11 +9,11 @@ function formOf(element: Element): HTMLFormElement | null {
   return 'form' in element ? element.form as HTMLFormElement | null : element.closest('form')
 }
 
-// A ref that runs `first`, if any, on the control's element, then hands the `ref` the app put on the control the element too, as it would on a plain element.
+// A ref that runs `first` on the control's element, then hands the `ref` the app put on the control the element too, as it would on a plain element.
 // Kay runs a ref on a spread element again only when its identity changes, and this one is a single function, so the app's ref, read once, runs once as it would on a plain element, however its attributes change.
-export function startRef<Target extends Element>(first: ((element: Target) => void) | undefined, app?: unknown): (element: Target) => void {
+export function startRef<Target extends Element>(first: (element: Target) => void, app?: unknown): (element: Target) => void {
   return (element) => {
-    first?.(element)
+    first(element)
 
     if (typeof app === 'function')
       (app as (element: Target) => void)(element)

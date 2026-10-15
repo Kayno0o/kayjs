@@ -3,6 +3,7 @@ import type { IconChoice } from '../src/icon-picker'
 import { afterEach, describe, expect, test } from 'bun:test'
 import { trustHtml } from 'kay'
 import { mount, settle } from 'kay/test'
+import { startRef } from '../src/form-reset'
 import { click } from './dom'
 
 let mounted: Mounted | undefined
@@ -220,11 +221,11 @@ describe('a form reset during a change under way', () => {
     expect(root.querySelector<HTMLInputElement>('input[name="size"]:checked')!.value).toBe('m')
   })
 
-  for (const [name, selector, changed, restored] of [
-    ['Checkbox', 'input[name="agree"]', 'agree=false', 'agree=true'],
-    ['Toggle', 'input[name="power"]', 'power=true', 'power=false'],
-    ['ChipGroup', 'input[name="decks"][value="games"]', 'decks=films,games', 'decks=films'],
-    ['Segmented', 'input[name="size"][value="l"]', 'size=l', 'size=m'],
+  for (const [name, selector, changed] of [
+    ['Checkbox', 'input[name="agree"]', 'agree=false'],
+    ['Toggle', 'input[name="power"]', 'power=true'],
+    ['ChipGroup', 'input[name="decks"][value="games"]', 'decks=films,games'],
+    ['Segmented', 'input[name="size"][value="l"]', 'size=l'],
   ] as const) {
     test(`is dropped once ${name} is gone`, async () => {
       const { gate, told, root } = await waiting()
@@ -237,12 +238,22 @@ describe('a form reset during a change under way', () => {
       await settle()
 
       expect(told).toEqual([changed])
-      expect(told).not.toContain(restored)
     })
   }
 })
 
 describe('the app\'s ref on a control', () => {
+  test('startRef runs the control\'s function, then the app\'s, on each call', () => {
+    const order: string[] = []
+    const ref = startRef<HTMLInputElement>(() => order.push('control'), () => order.push('app'))
+    const input = document.createElement('input')
+
+    ref(input)
+    ref(input)
+
+    expect(order).toEqual(['control', 'app', 'control', 'app'])
+  })
+
   test('gets the element once, however often the control\'s attributes change', async () => {
     const got: string[] = []
 
