@@ -1,9 +1,9 @@
 // What kay's own libraries share with kay, for their server code, not API: free to change with any minor, as every library peers on kay's exact minor.
 export { underKayDev } from '../build/assets'
 export { durationSeconds } from '../runtime/duration'
-export { escapeHtml } from '../runtime/escape'
 export { isUrlAttribute, UNSAFE_ATTRIBUTE, UNSAFE_TAGS } from '../runtime/sanitize'
 export { acceptedLocales, matchLocale, validLocale } from './accept-language'
 export { sourceHash } from './csp'
 export { RESTART_RELOAD } from './dev'
+export { escapeHtml } from './escape-html'
 export { GENERATE_SECRET, MIN_SECRET_LENGTH, openWith, sameText, sealWith, weakSecrets } from './seal'
