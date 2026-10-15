@@ -754,7 +754,7 @@ describe('signal writes', () => {
   })
 
   it('keep a parenthesized right side whole, in a plain, compound or logical assignment, on the server, in an island and when type checking', () => {
-    const source = '---\nimport { accent } from \'./theme\'\nimport type { Signal } from \'kay\'\nconst { open } = props<{ open: Signal<boolean> }>()\nconst count = signal(0)\nconst pair = signal(0)\nfunction f() {\n  count = (2)\n  count += (1 as number)\n  count = ((3))\n  pair = (count(), 4)\n  count ??= ( 5 )\n  count = /* six */ (6)\n  count = (7) + (8)\n  accent = (\'red\')\n  open = (false)\n}\n---\nbutton(onClick={() => count = (count() + 1)}) {count()} {pair()} {open()}'
+    const source = '---\nimport { accent } from \'./theme\'\nimport type { Signal } from \'kay\'\nconst { open } = props<{ open: Signal<boolean> }>()\nconst count = signal(0)\nconst pair = signal(0)\nfunction f() {\n  count = (2)\n  count += (1 as number)\n  count = ((3))\n  pair = (count(), 4)\n  count ??= ( 5 )\n  count ||= (9)\n  count &&= (10)\n  count = /* six */ (6)\n  count = (7) + (8)\n  accent = (\'red\')\n  open = (false)\n}\n---\nbutton(onClick={() => count = (count() + 1)}) {count()} {pair()} {open()}'
     const runs = compileKay(source, 'test.kay', { output: 'dom' })
     const served = compileKay(source, 'test.kay', { output: 'html' })
     const checked = compileKay(source, 'test.kay', { check: true })
@@ -765,7 +765,7 @@ describe('signal writes', () => {
     }
 
     for (const { tsx: code } of [runs, served]) {
-      expect(code).toContain('count.set((2))\n  count.set((KayCurrent) => KayCurrent + ((1 as number)))\n  count.set(((3)))\n  pair.set((count(), 4))\n  count.set((KayCurrent) => KayCurrent ?? (( 5 )))\n  count.set((6))\n  count.set((7) + (8))\n  accent.set((\'red\'))\n  __props.open.set((false))')
+      expect(code).toContain('count.set((2))\n  count.set((KayCurrent) => KayCurrent + ((1 as number)))\n  count.set(((3)))\n  pair.set((count(), 4))\n  count.set((KayCurrent) => KayCurrent ?? (( 5 )))\n  count.set((KayCurrent) => KayCurrent || ((9)))\n  count.set((KayCurrent) => KayCurrent && ((10)))\n  count.set((6))\n  count.set((7) + (8))\n  accent.set((\'red\'))\n  __props.open.set((false))')
     }
 
     expect(runs.tsx).toContain('count.set((count() + 1))')

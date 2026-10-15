@@ -306,8 +306,8 @@ class RewriteFinder {
     const right = node.type === 'AssignmentExpression' ? node.right : undefined
     const start = map.isExact(node.start!) ? map.toSource(node.start!) : undefined
     // Babel leaves a parenthesized right side's parentheses out of its span, so the span runs from the first one to the assignment's end, keeping them.
-    const rightFrom = (right?.extra?.parenStart as number | undefined) ?? right?.start
-    const rightStart = right && map.isExact(rightFrom!) ? map.toSource(rightFrom!) : undefined
+    const rightFrom = right && ((right.extra?.parenStart as number | undefined) ?? right.start!)
+    const rightStart = rightFrom !== undefined && map.isExact(rightFrom) ? map.toSource(rightFrom) : undefined
     const rightEnd = right && map.isExact(node.end! - 1) ? map.toSource(node.end! - 1) : undefined
 
     if (kind === 'memo') {
