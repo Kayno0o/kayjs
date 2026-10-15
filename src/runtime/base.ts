@@ -61,14 +61,18 @@ export function localPath<const Fallback extends string>(value: unknown, fallbac
 
   const cleaned = stripped(value)
 
-  if (!cleaned.startsWith('/') || cleaned.includes('\\') || CONTROL.test(cleaned))
+  if (!cleaned.startsWith('/') || SECOND_SLASH.test(cleaned) || cleaned.includes('\\') || CONTROL.test(cleaned))
     return fallback
 
   const path = resolved(cleaned)
-  // Checked decoded too, for an app or a proxy that decodes before it resolves: `/.%2f/evil.example` is `//evil.example` to it.
-  const decoded = path === undefined ? undefined : decodedPath(path)
 
-  return path === undefined || decoded === undefined || SECOND_SLASH.test(path) || leavesSite(decoded) ? fallback : path
+  if (path === undefined || SECOND_SLASH.test(path))
+    return fallback
+
+  // Checked decoded too, for an app or a proxy that decodes before it resolves: `/.%2f/evil.example` is `//evil.example` to it.
+  const decoded = decodedPath(path)
+
+  return decoded === undefined || leavesSite(decoded) ? fallback : path
 }
 
 // The tab and line break a browser drops only after decoding (`/%09/evil.example`) can leave a second slash or a backslash up front, so each layer of encoding (`/%2509/...`) is decoded leniently, as `unescape` would, until decoding changes nothing; a path still decoding past `MOST_LAYERS` is no real one.

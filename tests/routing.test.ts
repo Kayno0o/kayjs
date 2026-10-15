@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
 import { check } from '../src/check'
-import { localPath } from '../src/runtime/base'
+import { joinBase, localPath } from '../src/runtime/base'
 import { integer } from '../src/runtime/params'
 import { pages } from '../src/server'
 import { routerShapes, shapeParams } from '../src/server/params'
@@ -161,9 +161,30 @@ describe('localPath', () => {
       expect(localPath(next, '/home')).toBe('/home')
   })
 
+  // Hostile values that must fall back, as kayjs-auth relies on them, and the invariant for every answer: on the site both resolved raw and decoded once, under a mount point too.
+  const hostile = ['/%2F/evil.example', '/%2f/evil.example', '/%2F%2Fevil.example', '/%5Cevil.example', '/./%5Cevil.example', '/.%2f/evil.example', '/a/..%2f/evil.example', '/%2e%2e%2f%2e%2e%2f/evil.example', '/%09/evil.example', '/%0a/evil.example', '/%0d/evil.example', '/%0A/evil.example', '/%09%0a%0d/evil.example', '/%09%5cevil.example', '/%09/%2fevil.example', '/\t\\evil.example', '\t//evil.example', ' //evil.example', '//nowhere.invalid/x', '/\r/evil.example', '/%2509/evil.example', '/%250a/evil.example', '/%252F/evil.example', '/%255cevil.example', '/%252509/evil.example', '/%2509/evil.example?%25', '/%2509/evil.example/%25zz', '/%2509/evil.example#100%25', '/%250a/evil.example?q=%25', `/%${'25'.repeat(9)}09/evil.example`, '/%E0%A4%A', '/%E0%A4%A?x=1', '/a%3Fb%', '/%E0%A4%A#%', '/a%?x=1', '/%2F/evil.example?x=%', '/%2509/evil.example?x=%zz', '/%09/%E0%A4%A', 'http:evil.example', '/a\\b', '/a\0b', '/a\x7Fb']
+  const legit = ['/dashboard', '/a/b?x=1#top', '/a/%2F', '/a/%09b', '/a?next=%09//x', '/a?q=%0a', '/é?q=é', '/a b', '/a/%5Cb', '/%7Euser', '/a/..%2fb', '/.%09/evil.example', '/a/..%09/evil.example', '/ /evil.example', '/%2e%09/evil.example', '/a?q=100%25', '/%3F%2F/evil.example', '/%253F%252F/evil.example']
+
   it('falls back for a path that leaves the site once decoded, at any depth of encoding', () => {
-    for (const next of ['/%2F/evil.example', '/%2f/evil.example', '/%2F%2Fevil.example', '/%5Cevil.example', '/./%5Cevil.example', '/.%2f/evil.example', '/a/..%2f/evil.example', '/%2e%2e%2f%2e%2e%2f/evil.example', '/%09/evil.example', '/%0a/evil.example', '/%0d/evil.example', '/%252F/evil.example', '/%2509/evil.example', '/%E0%A4%A', '/a\\b', '/a\0b', '/a\x7Fb'])
+    for (const next of hostile)
       expect([next, localPath(next, '/home')]).toEqual([next, '/home'])
+  })
+
+  it('keeps a bare percent after the path, and reads only a literal question mark or hash as its end', () => {
+    const kept = ['/a?x=%25zz#%', '/a?x=%', '/a#%', '/a?x=%zz&y=%E0%A4%A#100%', '/a/b?next=%09//x%', '/%3F%2F/evil.example', '/%253F%252F/evil.example', '/a%23?%', '/a/%09b', '/a/%5Cb', '/a?q=100%25']
+
+    expect(kept.map(next => localPath(next, '/'))).toEqual(kept)
+  })
+
+  it('answers only paths that stay on the site, resolved raw or decoded once, under a mount point too', () => {
+    for (const next of [...hostile, ...legit]) {
+      const answer = localPath(next, '/')
+
+      for (const form of [answer, decodeURIComponent(answer), joinBase('/docs', answer)])
+        expect([next, new URL(form, 'http://site.test').origin]).toEqual([next, 'http://site.test'])
+
+      expect([next, joinBase('/docs', answer).startsWith('/docs/')]).toEqual([next, true])
+    }
   })
 
   it('answers a path of the site as a browser resolves it', () => {

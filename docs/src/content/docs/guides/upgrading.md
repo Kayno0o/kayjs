@@ -17,6 +17,10 @@ Rows of plain objects with no `id`, no `key` and no identity left in the new lis
 
 `CommandPalette` opens on Cmd and its `hotkey` on macOS, and on Ctrl and its `hotkey` elsewhere, where it took either one on every platform. If your app tells users to press Ctrl+K on a Mac, or Cmd+K on Windows, tell them the platform's key instead.
 
+### `localPath` falls back for more values
+
+`localPath` now returns the fallback for a path with a backslash, a control character or a malformed `%` escape, and for one that leaves your site once decoded, like `/%2F/evil.example`. kayjs-auth's `safeRedirect` is now the same function. A value with leading spaces is resolved instead of falling back. If your app passes such paths on purpose, encode them first.
+
 ## 1.44.0
 
 ### kayjs-auth asks for a proof of work

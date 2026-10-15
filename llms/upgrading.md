@@ -12,6 +12,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 - `CommandPalette` opens on Cmd+`hotkey` on macOS and Ctrl+`hotkey` elsewhere, where it took either on every platform: an app telling its users Ctrl+K on a Mac, or Cmd+K on Windows, tells them the platform's key instead.
 
+### `localPath` falls back for more values
+
+- `localPath` (and kayjs-auth's `safeRedirect`, now the same function) returns the fallback for a value with a backslash, a control character or a malformed `%` escape in its path, or one that leaves the site once decoded (`/%2F/evil.example`, `/%09/evil.example`), and resolves a value with leading spaces where it fell back. An app passing such paths on purpose encodes them first.
+
 ## 1.44.0
 
 ### kayjs-auth asks for a proof of work by default
