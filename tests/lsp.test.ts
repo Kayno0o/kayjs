@@ -1043,8 +1043,8 @@ describe('kay lsp with a slow tsgo', () => {
     await Promise.all([Bun.write(join(dir, 'tsconfig.json'), await Bun.file(join(fixtures, 'site/tsconfig.json')).text()), Bun.write(join(dir, page), 'p x\n')])
 
     const slow = spyOn(Connection.prototype, 'request').mockImplementation((async function (this: Connection, method: string, params?: unknown) {
-      // The project checks ask for other files.
-      if (method !== 'textDocument/diagnostic' || !(params as { textDocument: { uri: string } }).textDocument.uri.endsWith(`${page}.tsx`))
+      // The project checks ask for other files, and a server an earlier test left may still ask for its own page of the same name.
+      if (this !== (server as unknown as { tsgo?: { connection: Connection } }).tsgo?.connection || method !== 'textDocument/diagnostic' || !(params as { textDocument: { uri: string } }).textDocument.uri.endsWith(`${page}.tsx`))
         return request.call(this, method, params)
 
       counts.started++
@@ -1100,6 +1100,7 @@ describe('kay lsp with a slow tsgo', () => {
 
       expect(slow.counts.last).toBe(5)
       expect(slow.counts.most).toBe(1)
+      expect(slow.counts.started).toBeGreaterThan(0)
       expect(slow.counts.started).toBeLessThanOrEqual(3)
     }
     finally {
@@ -1128,6 +1129,7 @@ describe('kay lsp with a slow tsgo', () => {
 
       expect(slow.counts.last).toBe(2)
       expect(slow.counts.most).toBe(1)
+      expect(slow.counts.started).toBeGreaterThan(0)
     }
     finally {
       slow.stop()
