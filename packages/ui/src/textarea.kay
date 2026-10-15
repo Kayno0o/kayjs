@@ -27,14 +27,14 @@ function sync(left = false) {
 }
 
 // The box starts once: its default is what it was first drawn with.
-const ref = startRef<HTMLTextAreaElement>(rest.ref, (element) => {
+const ref = startRef<HTMLTextAreaElement>((element) => {
   const start = untrack(() => value)
 
   box = element
 
   if (start !== undefined)
     element.defaultValue = start
-})
+}, { app: rest.ref })
 
 effect(() => sync())
 

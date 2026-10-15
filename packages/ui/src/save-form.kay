@@ -43,8 +43,8 @@ function snapshot() {
 // What each control holds now, which becomes its default once saved, the library's signal-driven ones included: a Discard then goes back to the saved values, not to the ones first rendered.
 function values(): () => void {
   const held = [...form!.elements].map((control): (() => void) => {
-    // A control with no name is no part of what is saved, such as the search box of an IconPicker or a MultiSelect, which a reset empties.
-    if (!control.getAttribute('name'))
+    // The search box of an IconPicker or a MultiSelect is no saved value: a reset empties it.
+    if (control.hasAttribute('data-kui-search'))
       return () => undefined
 
     if (control instanceof HTMLInputElement || control instanceof HTMLTextAreaElement) {

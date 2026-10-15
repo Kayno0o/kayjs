@@ -65,4 +65,20 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a form res
       await site.close()
     }
   }, 120_000)
+
+  test('hands the app\'s ref the element of a hydrated control once, however often its attributes change', async () => {
+    const site = await testSite({ root: ROOT, browser: { path } })
+
+    try {
+      const page = await site.open('/form-reset-ref')
+
+      await page.click('#change')
+      await page.waitUntil(() => document.querySelector<HTMLInputElement>('input[name="title"]')!.placeholder === 'b')
+
+      expect(await page.evaluate(() => (window as unknown as { refs: string[] }).refs.sort())).toEqual(['markdown', 'select', 'text', 'textarea'])
+    }
+    finally {
+      await site.close()
+    }
+  }, 120_000)
 })

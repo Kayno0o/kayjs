@@ -27,10 +27,10 @@ effect(() => {
 })
 
 // The switch starts once: its default is what it was first drawn with, not what the parent holds now.
-const ref = startRef<HTMLInputElement>(rest.ref, (element) => {
+const ref = startRef<HTMLInputElement>((element) => {
   box = element
   element.defaultChecked = untrack(() => checked)
-})
+}, { app: rest.ref })
 
 // A reset puts the switch back on its default, which the app's `onChange` then hears of; one meeting a change under way waits for it.
 const resetting = resetWhenIdle(busy, () => {

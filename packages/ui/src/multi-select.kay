@@ -4,7 +4,7 @@ import type { MultiSelectOption } from './multi-select'
 import type { PopoverPlacement } from './popover'
 import { effect, signal } from 'kay'
 import { stepIndex } from './cycle'
-import { onFormDefaults, onFormReset } from './form-reset'
+import { onFormDefaults, onFormReset, startRef } from './form-reset'
 import Icon from './icon.kay'
 import { pickedLabels, pickedShown, selectionSummary, toggledValue } from './multi-select'
 import Popover from './popover.kay'
@@ -83,6 +83,8 @@ onFormReset(() => root, () => {
     box.checked = picked().some(one => one === shown()[index]?.value)
 })
 
+const ref = startRef<HTMLElement>(element => root = element, { app: rest.ref })
+
 onFormDefaults(() => root, () => {
   const held = picked()
 
@@ -121,7 +123,7 @@ function focusLeft(event: FocusEvent) {
     panel.hidePopover()
 }
 ---
-.kui-multi-select({...rest} ref={element => root = element} class={className})
+.kui-multi-select({...rest} ref={ref} class={className})
   Popover(id={id} placement={placement} class="kui-multi-select-panel" role="group" aria-label={label} onToggle={toggled} onKeyDown={keyDown} onFocusOut={focusLeft})
     @trigger(attributes)
       // Named by its label and what is picked, which a name of the label alone would hide; a count is described by the labels it stands for.
@@ -129,7 +131,7 @@ function focusLeft(event: FocusEvent) {
         span.kui-multi-select-summary {summary()}
         Icon(icon="chevron" class="kui-multi-select-chevron")
     if searchable()
-      input.kui-field-input.kui-multi-select-search(type="search" placeholder={searchLabel} aria-label={`${searchLabel} ${label}`} value={query()} onInput={event => query.set(event.currentTarget.value)})
+      input.kui-field-input.kui-multi-select-search(type="search" data-kui-search placeholder={searchLabel} aria-label={`${searchLabel} ${label}`} value={query()} onInput={event => query.set(event.currentTarget.value)})
     .kui-multi-select-bar
       // Under a search, All and None pick and drop only the options it shows.
       button.kui-multi-select-action(type="button" disabled={shown().every(option => picked().includes(option.value))} onClick={() => set(pickedShown(options, picked(), shown(), true))}) {allLabel}

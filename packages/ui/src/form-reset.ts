@@ -4,48 +4,48 @@ const HOLD = 'kui-hold-defaults'
 
 const formOf = (element: Element) => element instanceof HTMLFormElement ? element : 'form' in element ? element.form as HTMLFormElement | null : element.closest('form')
 
-// The ref a control sets on its element, still handing it to the `ref` the app put on the control.
-export function withRef<Target extends Element>(app: unknown, own: (element: Target) => void): (element: Target) => void {
-  return (element) => {
-    own(element)
-
-    if (typeof app === 'function')
-      app(element)
-  }
-}
-
-// A ref that runs `first` on the control's element once, and `every` each time kay runs the ref again on a spread element, whose attributes it follows; the app's own `ref` is still handed the element.
-export function startRef<Target extends Element>(app: unknown, first: (element: Target) => void, every?: (element: Target) => void): (element: Target) => void {
+// A ref that runs `first` on the control's element once, and `every` each time kay runs the ref again on a spread element, whose attributes it follows.
+// The `ref` the app put on the control gets the element once too, as it would on a plain element.
+export function startRef<Target extends Element>(first: (element: Target) => void, { app, every }: { app?: unknown, every?: (element: Target) => void } = {}): (element: Target) => void {
   let started: Target | undefined
 
-  return withRef(app, (element) => {
+  return (element) => {
     if (started !== element) {
       started = element
       first(element)
+
+      if (typeof app === 'function')
+        app(element)
     }
 
     every?.(element)
-  })
+  }
 }
 
 // For a control that holds itself busy while the app answers a change: a reset meeting it mid-change waits for that change to settle, then restores the defaults, so it is neither dropped nor lost under the change's own answer.
 // `reset` goes to onFormReset, `idle` to the end of the change.
-export function resetWhenIdle(busy: () => boolean, restore: () => void): { reset: () => void, idle: () => void } {
-  let waiting = false
+export function resetWhenIdle(busy: () => boolean, restore: () => void): { reset: () => void, idle: () => void, waiting: () => boolean } {
+  let pending = false
+
+  // A control gone by the time the change settles has nothing left to restore.
+  onCleanup(() => {
+    pending = false
+  })
 
   return {
     reset() {
       if (busy())
-        waiting = true
+        pending = true
       else
         restore()
     },
     idle() {
-      if (waiting && !busy()) {
-        waiting = false
+      if (pending && !busy()) {
+        pending = false
         restore()
       }
     },
+    waiting: () => pending,
   }
 }
 

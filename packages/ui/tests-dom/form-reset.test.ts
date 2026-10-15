@@ -170,4 +170,78 @@ describe('a form reset during a change under way', () => {
       })
     }
   }
+
+  async function waiting() {
+    const gate = Promise.withResolvers<boolean>()
+    const told: string[] = []
+
+    mounted = await mount('src/components/form-reset-busy.kay', {
+      answer: (control: string, value: unknown) => {
+        told.push(`${control}=${String(value)}`)
+
+        return told.length === 1 ? gate.promise : undefined
+      },
+    })
+    await settle()
+
+    return { gate, told, root: mounted.root }
+  }
+
+  test('twice in a row restores once', async () => {
+    const { gate, told, root } = await waiting()
+
+    click(root.querySelector('input[name="size"][value="l"]'))
+    click(root.querySelector('#reset'))
+    click(root.querySelector('#reset'))
+    await settle()
+    gate.resolve(true)
+    await settle()
+
+    expect(told).toEqual(['size=l', 'size=m'])
+  })
+
+  test('leaves a Segmented on its start when a click meets the wait', async () => {
+    const { gate, told, root } = await waiting()
+
+    click(root.querySelector('input[name="size"][value="l"]'))
+    click(root.querySelector('#reset'))
+    await settle()
+    click(root.querySelector('input[name="size"][value="s"]'))
+    await settle()
+
+    expect(told).toEqual(['size=l'])
+    expect(root.querySelector<HTMLInputElement>('input[name="size"]:checked')!.value).toBe('m')
+
+    gate.resolve(true)
+    await settle()
+
+    expect(told).toEqual(['size=l', 'size=m'])
+    expect(root.querySelector<HTMLInputElement>('input[name="size"]:checked')!.value).toBe('m')
+  })
+
+  test('is dropped once the control is gone', async () => {
+    const { gate, told, root } = await waiting()
+
+    click(root.querySelector('input[name="agree"]'))
+    click(root.querySelector('#reset'))
+    await settle()
+    mounted!.unmount()
+    gate.resolve(true)
+    await settle()
+
+    expect(told).toEqual(['agree=false'])
+  })
+})
+
+describe('the app\'s ref on a control', () => {
+  test('gets the element once, however often the control\'s attributes change', async () => {
+    const got: string[] = []
+
+    mounted = await mount('src/components/form-reset-ref.kay', { got: (name: string, element: Element) => got.push(`${name}:${element.tagName}`) })
+    await settle()
+    click(mounted.root.querySelector('#change'))
+    await settle()
+
+    expect(got.sort()).toEqual(['markdown:TEXTAREA', 'select:SELECT', 'text:INPUT', 'textarea:TEXTAREA'])
+  })
 })

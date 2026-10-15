@@ -36,14 +36,14 @@ const halfTyped = (input: HTMLInputElement) => input.validity.badInput
 const spelled = (next: number | string | null) => next === null ? '' : String(next)
 
 // The value it starts with is what a reset goes back to; a client-rendered box has only set it as a property, which no reset reads.
-const ref = startRef<HTMLInputElement>(rest.ref, (input) => {
+const ref = startRef<HTMLInputElement>((input) => {
   const start = untrack(() => value)
 
   box = input
 
   if (start !== undefined)
     input.defaultValue = spelled(start)
-})
+}, { app: rest.ref })
 
 function read(input: HTMLInputElement): string | number | null {
   if (type !== 'number')

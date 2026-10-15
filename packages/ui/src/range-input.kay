@@ -2,7 +2,7 @@
 import type { JSX } from 'kay'
 import type { RangeValue } from './range'
 import { effect, untrack } from 'kay'
-import { onFormReset } from './form-reset'
+import { onFormReset, startRef } from './form-reset'
 import { rangeFrom } from './range'
 
 const { value = [null, null], min, max, step, label, fromLabel, toLabel, unit, onChange, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
@@ -48,12 +48,21 @@ function commit() {
   last = next
   onChange?.(next)
 }
+const lowRef = startRef<HTMLInputElement>((element) => {
+  low = element
+  element.defaultValue = untrack(() => value[0]?.toString() ?? '')
+})
+const highRef = startRef<HTMLInputElement>((element) => {
+  high = element
+  element.defaultValue = untrack(() => value[1]?.toString() ?? '')
+})
+
 // A reset puts the boxes back on their defaults, which the app's `onChange` then hears of.
 onFormReset(() => low, commit)
 ---
 .kui-range-input({...rest} role="group" aria-label={label} class={className})
-  input.kui-field-input.kui-range-input-box(ref={element => { low = element; element.defaultValue = untrack(() => value[0]?.toString() ?? '') }} type="number" inputmode="decimal" aria-label={fromLabel ?? `${label} from`} placeholder={min?.toString()} min={min} max={max} step={step} value={value[0] ?? ''} onChange={commit})
+  input.kui-field-input.kui-range-input-box(ref={lowRef} type="number" inputmode="decimal" aria-label={fromLabel ?? `${label} from`} placeholder={min?.toString()} min={min} max={max} step={step} value={value[0] ?? ''} onChange={commit})
   span.kui-range-input-separator(aria-hidden="true") -
-  input.kui-field-input.kui-range-input-box(ref={element => { high = element; element.defaultValue = untrack(() => value[1]?.toString() ?? '') }} type="number" inputmode="decimal" aria-label={toLabel ?? `${label} to`} placeholder={max?.toString()} min={min} max={max} step={step} value={value[1] ?? ''} onChange={commit})
+  input.kui-field-input.kui-range-input-box(ref={highRef} type="number" inputmode="decimal" aria-label={toLabel ?? `${label} to`} placeholder={max?.toString()} min={min} max={max} step={step} value={value[1] ?? ''} onChange={commit})
   if unit
     span.kui-range-input-unit {unit}

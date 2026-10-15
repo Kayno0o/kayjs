@@ -25,10 +25,10 @@ const { value = '', onInput, onImage, uploadFailure = 'Could not upload the imag
 
 const uploading = signal(0)
 let area: HTMLTextAreaElement | undefined
-const ref = startRef<HTMLTextAreaElement>(rest.ref, (element) => {
+const ref = startRef<HTMLTextAreaElement>((element) => {
   area = element
   element.defaultValue = untrack(() => value)
-})
+}, { app: rest.ref })
 // What the parent was last told or handed, which a reset that changes the field has to tell it again.
 let seen = untrack(() => value)
 // Set by Escape, so the Tab after it moves on rather than indenting.

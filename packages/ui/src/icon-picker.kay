@@ -4,7 +4,7 @@ import type { IconChoice } from './icon-picker'
 import { batch, effect, flush, onCleanup, signal } from 'kay'
 import Icon from './icon.kay'
 import IconButton from './icon-button.kay'
-import { onFormDefaults, onFormReset } from './form-reset'
+import { onFormDefaults, onFormReset, startRef } from './form-reset'
 import { nameOf } from './icon-picker'
 
 const PAGE_SIZE = 50
@@ -91,6 +91,8 @@ function pick(next: string) {
   hidden.dispatchEvent(new Event('input', { bubbles: true }))
 }
 
+const ref = startRef<HTMLElement>(() => undefined, { app: rest.ref })
+
 // The hidden input is no default of its own to reset to, so a reset sends the picker back to `initial`, and empties the search the browser emptied.
 onFormReset(() => searchBox, () => {
   typed.set('')
@@ -118,10 +120,10 @@ function keepEnter(event: KeyboardEvent) {
     event.preventDefault()
 }
 ---
-.kui-icon-picker({...rest} class={className})
+.kui-icon-picker({...rest} ref={ref} class={className})
   if name
     input(type="hidden" name={name} value={picked()} ref={element => hidden = element})
-  input.kui-field-input(ref={element => searchBox = element} type="search" placeholder={placeholder} aria-label={searchLabel} value={typed()} onInput={event => typed.set(event.currentTarget.value)} onKeyDown={keepEnter})
+  input.kui-field-input(ref={element => searchBox = element} type="search" data-kui-search placeholder={placeholder} aria-label={searchLabel} value={typed()} onInput={event => typed.set(event.currentTarget.value)} onKeyDown={keepEnter})
   ul.kui-icon-grid(aria-label={gridLabel} aria-busy={pending() ? 'true' : undefined})
     for choice of icons() key={choice.name}
       li

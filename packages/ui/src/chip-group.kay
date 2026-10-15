@@ -4,7 +4,7 @@ import type { IconProps } from 'kay/icons'
 import type { IconSlot } from './defaults'
 import { effect, signal, uid, untrack } from 'kay'
 import { changeAccepted } from './change'
-import { onFormReset, resetWhenIdle, withRef } from './form-reset'
+import { onFormReset, resetWhenIdle, startRef } from './form-reset'
 import Icon from './icon.kay'
 
 const { options, value, label, name, onChange, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
@@ -63,6 +63,8 @@ function toggle(input: HTMLInputElement, option: Value) {
   void pick(options.map(one => one.value).filter(one => one === option ? input.checked : picked().includes(one)))
 }
 
+const ref = startRef<HTMLElement>(element => root = element, { app: rest.ref })
+
 // A reset puts the boxes back on their defaults, which the app's `onChange` then hears of; one meeting a change under way waits for it.
 const resetting = resetWhenIdle(busy, () => {
   const ticked = boxes().filter(box => box.defaultChecked).map(box => box.value)
@@ -77,7 +79,7 @@ const resetting = resetWhenIdle(busy, () => {
 onFormReset(() => root, resetting.reset)
 ---
 // Real checkboxes drawn as chips, so the group submits like any other field and Space toggles the focused chip. A click while a change is under way ticks nothing.
-.kui-chip-group({...rest} ref={withRef(rest.ref, element => root = element)} role="group" aria-label={label} aria-busy={busy() ? 'true' : undefined} class={className})
+.kui-chip-group({...rest} ref={ref} role="group" aria-label={label} aria-busy={busy() ? 'true' : undefined} class={className})
   for option of options key={option.value}
     label.kui-chip
       input.kui-chip-input(ref={element => element.defaultChecked = untrack(() => value.includes(option.value))} type="checkbox" name={group} value={option.value} checked={picked().includes(option.value)} disabled={option.disabled} onClick={event => { if (busy()) event.preventDefault() }} onChange={event => toggle(event.currentTarget, option.value)})

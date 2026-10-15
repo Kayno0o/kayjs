@@ -2,7 +2,7 @@
 import type { JSX } from 'kay'
 import { effect, signal, uid, untrack } from 'kay'
 import { changeAccepted } from './change'
-import { onFormReset, resetWhenIdle, withRef } from './form-reset'
+import { onFormReset, resetWhenIdle, startRef } from './form-reset'
 
 const { options, value, label, name, onChange, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
   options: readonly { value: Value, label: string }[]
@@ -40,9 +40,9 @@ function check(wanted: string | null) {
 }
 
 async function pick(next: Value) {
-  // A pick while a change is under way takes nothing: the radio checked by the click, a key or a label, is put back.
+  // A pick while a change is under way takes nothing: the radio checked by the click, a key or a label, is put back, on the start when a reset is waiting.
   if (busy()) {
-    check(picked())
+    check(resetting.waiting() ? started() : picked())
 
     return
   }
@@ -65,10 +65,14 @@ async function change(next: Value) {
   resetting.idle()
 }
 
+const ref = startRef<HTMLElement>(element => root = element, { app: rest.ref })
+
+const started = () => radios().find(radio => radio.defaultChecked)?.value ?? null
+
 // A reset puts the radios back on their defaults, which the app's `onChange` then hears of; a group that started with none picked just shows none.
 // One meeting a change under way waits for it.
 const resetting = resetWhenIdle(busy, () => {
-  const next = radios().find(radio => radio.defaultChecked)?.value ?? null
+  const next = started()
 
   check(next)
 
@@ -84,7 +88,7 @@ const resetting = resetWhenIdle(busy, () => {
 onFormReset(() => root, resetting.reset)
 ---
 // Real radios, so the arrow keys move between options and the group submits like any other field.
-.kui-segmented({...rest} ref={withRef(rest.ref, element => root = element)} role="radiogroup" aria-label={label} aria-busy={busy() ? 'true' : undefined} class={className})
+.kui-segmented({...rest} ref={ref} role="radiogroup" aria-label={label} aria-busy={busy() ? 'true' : undefined} class={className})
   for option of options key={option.value}
     label.kui-segmented-option
       input.kui-segmented-input(ref={element => element.defaultChecked = untrack(() => option.value === value)} type="radio" name={group} value={option.value} checked={picked() === option.value} onChange={() => pick(option.value)})

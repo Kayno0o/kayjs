@@ -1,0 +1,26 @@
+---
+import { signal } from 'kay'
+import MarkdownEditor from '@kaynooo/kayjs-ui/markdown-editor.kay'
+import Select from '@kaynooo/kayjs-ui/select.kay'
+import Textarea from '@kaynooo/kayjs-ui/textarea.kay'
+import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
+
+// The app's `ref` on each control, and a button changing the attributes they spread, which makes kay run a ref again.
+const { got } = props<{ got?: (name: string, element: Element) => void }>()
+
+function note(name: string, element: Element) {
+  if (got)
+    got(name, element)
+  else
+    ((window as unknown as { refs?: string[] }).refs ??= []).push(name)
+}
+
+const hint = signal('a')
+const levels = [{ value: 'a', label: 'A' }] as const
+---
+form
+  TextInput(name="title" placeholder={hint()} ref={element => note('text', element)})
+  Textarea(name="bio" placeholder={hint()} ref={element => note('textarea', element)})
+  MarkdownEditor(placeholder={hint()} ref={element => note('markdown', element)})
+  Select(name="level" options={levels} value="a" class={hint()} ref={element => note('select', element)})
+  button#change(type="button" onClick={() => hint.set('b')}) Change

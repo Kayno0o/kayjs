@@ -1,7 +1,7 @@
 --- <Value extends string | number, Empty extends string | boolean | undefined = undefined>
 import type { JSX } from 'kay'
 import { effect, untrack } from 'kay'
-import { onFormReset, withRef } from './form-reset'
+import { onFormReset, startRef } from './form-reset'
 
 const { value, options, onChange, submit = false, emptyOption, loading = false, loadingLabel = 'Loading…', class: className, ...rest } = props<Omit<JSX.IntrinsicElements['select'], 'value' | 'options' | 'class' | 'children' | 'onChange'> & {
   // One of the options' values, or the empty string once there is an `emptyOption`.
@@ -43,6 +43,8 @@ function picked(select: HTMLSelectElement) {
     select.form?.requestSubmit()
 }
 
+const ref = startRef<HTMLSelectElement>(element => box = element, { app: rest.ref })
+
 // A reset puts the select back on its default option, which the app's `onChange` then hears of, without submitting.
 onFormReset(() => box, () => {
   if (box && box.value !== seen)
@@ -50,7 +52,7 @@ onFormReset(() => box, () => {
 })
 ---
 // Each option says whether it is selected, so the right one stays chosen when the options arrive after the value.
-select.kui-field-input({...rest} ref={withRef(rest.ref, element => box = element)} class={className} onChange={event => picked(event.currentTarget)})
+select.kui-field-input({...rest} ref={ref} class={className} onChange={event => picked(event.currentTarget)})
   if emptyOption !== undefined && emptyOption !== false
     option(value="") {typeof emptyOption === 'string' ? emptyOption : ''}
   if loading

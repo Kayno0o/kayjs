@@ -31,12 +31,12 @@ effect(() => {
 })
 
 // The box starts once: its default is what it was first drawn with, not what the parent holds now.
-const ref = startRef<HTMLInputElement>(undefined, (element) => {
+const ref = startRef<HTMLInputElement>((element) => {
   box = element
   element.defaultChecked = untrack(() => checked)
-}, (element) => {
+}, { every: (element) => {
   element.indeterminate = indeterminate
-})
+} })
 
 // A reset puts the box back on its default, which the app's `onChange` then hears of; one meeting a change under way waits for it.
 const resetting = resetWhenIdle(busy, () => {

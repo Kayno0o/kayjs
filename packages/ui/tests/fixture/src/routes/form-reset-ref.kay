@@ -1,0 +1,5 @@
+---
+import FormResetRef from '../components/form-reset-ref.kay'
+---
+main
+  FormResetRef
