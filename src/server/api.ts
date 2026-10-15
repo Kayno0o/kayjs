@@ -155,7 +155,7 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
   return { limits, mounted }
 }
 
-// A Response of the route's own that carries everything the context held, which leaves Elysia nothing to copy it for; undefined when something stayed on the context, a cookie or a status, for Elysia to merge.
+// A Response of the route's own that carries everything the context held, which leaves Elysia nothing to copy it for; undefined when `carryContext` left something on the context, a cookie or a status, for Elysia to merge.
 function carriedOver(set: { status?: number | string, headers: Record<string, unknown>, cookie?: object }, response: Response): Response | undefined {
   // Nothing on the context: a page route's response, which carried it already and must not be stripped of it by a second pass.
   if (Object.keys(set.headers).length === 0)
@@ -163,9 +163,7 @@ function carriedOver(set: { status?: number | string, headers: Record<string, un
 
   carryContext(set as Context['set'], response)
 
-  const left = Object.keys(set.headers).length > 0 || (set.status !== undefined && set.status !== 200) || (set.cookie !== undefined && Object.keys(set.cookie).length > 0)
-
-  return left ? undefined : response
+  return Object.keys(set.headers).length > 0 ? undefined : response
 }
 
 // Logs an error a route threw and hands it to `onError`, keeping its message out of a production answer, where Elysia would send it.
