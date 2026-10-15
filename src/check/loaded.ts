@@ -1,15 +1,18 @@
 // What a checking script read, which the editor's language server keys the script's last result on: the script lists the files it loaded, the parent stamps them and runs it again only when a stamp moved.
 import { readdirSync, realpathSync, statSync } from 'node:fs'
 import { join, resolve, sep } from 'node:path'
-import { GLOBBED } from '../build/glob'
+import { GLOBBED } from '../build/globbed'
 
 // Starts the line a checking script lists the files it read on.
 export const FILES_MARKER = 'kay-probe-files:'
 // The files every probe leans on beside the modules it loads: the config naming its inputs, and what resolves the imports.
 // Bun reads the environment files and `bunfig.toml` into a script started in the project, and a lockfile changes what the installed packages are.
 const ROOT_FILES = ['kay.config.ts', 'tsconfig.json', 'package.json', 'bun.lock', 'bunfig.toml', '.env', '.env.local', '.env.development', '.env.production', '.env.test']
-// Folders a walk of a folder of entries has no reason to enter.
-const SKIPPED = new Set(['node_modules', '.kay'])
+// Folders a walk of a folder of entries has no reason to enter: dependencies, kay's and git's own, and the usual build output.
+const SKIPPED = new Set(['node_modules', '.kay', '.git', 'dist', '.output', '.next'])
+
+// Entries a stamp walks before it gives up, so a glob over a huge folder costs one bounded walk per save and the script is simply run again.
+export const MAX_ENTRIES = 20_000
 const QUERY = /\?.*$/
 const OWN_SOURCE = `${resolve(import.meta.dir, '..')}${sep}`
 
@@ -17,7 +20,13 @@ const OWN_SOURCE = `${resolve(import.meta.dir, '..')}${sep}`
 // A file a module reads by itself, with `readFileSync` or `Bun.file`, is not seen: `read` names what kay's own scripts read that way.
 export function loadedFiles(root: string, read: string[]): string[] {
   // What kay writes under the project's `.kay` is its own.
-  const generated = [join(root, '.kay', sep), join(realpathSync(root), '.kay', sep)]
+  const generated = [join(root, '.kay', sep)]
+
+  try {
+    generated.push(join(realpathSync(root), '.kay', sep))
+  }
+  catch {}
+
   // A module keyed with a query, such as a component loaded for its island, is the file before it.
   const modules = Object.keys(require.cache).map(path => path.replace(QUERY, '')).filter((path) => {
     return path.startsWith(sep) && !path.startsWith(OWN_SOURCE) && !path.split(sep).includes('node_modules') && !generated.some(folder => path.startsWith(folder))
@@ -27,12 +36,21 @@ export function loadedFiles(root: string, read: string[]): string[] {
 }
 
 // Where a file is on disk as far as a change can tell: its inode, modification time and size, a folder's entries each in turn; `-` for a path that is not there.
-// A path that cannot be read gives a stamp equal to no other and counts as newest, so its script runs again and is not remembered.
+// A path that cannot be read, or a walk past `MAX_ENTRIES`, gives a stamp equal to no other and counts as newest, so its script runs again and is not remembered.
 export function stampOf(paths: string[]): { stamp: string, newest: number } {
   let newest = 0
   const parts: string[] = []
   const seen = new Set<string>()
+  let entries = 0
   const add = (path: string) => {
+    if (entries++ === MAX_ENTRIES) {
+      newest = Number.POSITIVE_INFINITY
+      parts.push(`${path}\0too many entries ${performance.now()}`)
+    }
+
+    if (entries > MAX_ENTRIES)
+      return
+
     try {
       const stat = statSync(path, { throwIfNoEntry: false })
 

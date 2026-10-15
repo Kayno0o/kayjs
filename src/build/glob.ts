@@ -3,6 +3,7 @@ import { dirname, join, relative, resolve, sep } from 'node:path'
 import { parse } from '@babel/parser'
 import { KayError } from '../compiler/errors'
 import { loadTraverse } from '../compiler/rewrite'
+import { GLOBBED } from './globbed'
 
 interface GlobCall {
   start: number
@@ -18,8 +19,6 @@ const RELATIVE = /^\.\.?\//
 const NEGATED = /^!/
 const IDENTIFIER = /^[A-Z_$][\w$]*$/i
 
-// The folders the patterns of every call expanded in this process search, which a checking script lists as read: a file added or removed there changes what a module imports.
-export const GLOBBED = new Set<string>()
 const OPTIONS = new Set(['eager', 'import'])
 const USAGE = 'import.meta.glob(\'./demos/*.kay\', { eager: true, import: \'default\' })'
 
