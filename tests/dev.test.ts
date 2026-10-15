@@ -301,6 +301,27 @@ describe.concurrent('kay dev', () => {
     }
   })
 
+  it('writes the types from the config as a module it imports left it, not only when kay.config.ts itself changed', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
+    const lints = join(root, 'lints.ts')
+
+    await Bun.write(join(root, 'src/server.ts'), 'setInterval(() => undefined, 1000)\n')
+    await Bun.write(join(root, 'src/routes/index.kay'), 'p Home\n')
+    await Bun.write(join(root, 'kay.config.ts'), 'import { lints } from \'./lints\'\n\nexport default { lints }\n')
+    await Bun.write(lints, 'export const lints = { \'unread-name\': \'allow\' } as const\n')
+    const stop = await dev(root)
+
+    try {
+      await until(() => readShadowSettings(root).lints?.['unread-name'] === 'allow')
+      await Bun.write(lints, 'export const lints = { \'unread-name\': \'deny\' } as const\n')
+      await until(() => readShadowSettings(root).lints?.['unread-name'] === 'deny')
+    }
+    finally {
+      await stop()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('readies the next server once one on a Unix socket is up, as one on a port', async () => {
     const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
 

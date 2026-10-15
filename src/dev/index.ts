@@ -8,7 +8,6 @@ import { rm } from 'node:fs/promises'
 import { networkInterfaces } from 'node:os'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
-import { configCheckOptions, writeShadowTypes } from '../check'
 import { CONFIG_FILE, loadConfig } from '../config'
 import { projectPaths } from '../project'
 import { startClientBuilder } from './client'
@@ -26,7 +25,7 @@ export interface DevOptions {
   inspect?: string | undefined
   // Opens the address in the browser once the first server listens.
   open?: boolean | undefined
-  // The project's kay.config.ts, which `.kay/types` is written from as `kay check` writes it.
+  // The config the types are written from, in this process, instead of kay.config.ts as it is by a process of their own: for a test or a caller with a config of its own.
   config?: KayConfig | undefined
   // Called with each server process once it is spawned.
   onRestart?: ((child: Subprocess) => void) | undefined
@@ -46,6 +45,7 @@ const DEBOUNCE_MS = 10
 // How long a source an editor's save left missing is waited for, as saving by renaming it away and writing it anew leaves it, on a machine busy enough to stretch the save.
 const GONE_WAIT_MS = 200
 const SPARE = join(import.meta.dir, 'spare.ts')
+const TYPES = join(import.meta.dir, 'types.ts')
 // When a server never says it is up, as one that never serves, the next process starts anyway after this: a guess, which also starts it beside a server that takes longer to boot.
 const SPARE_FALLBACK_MS = 2000
 
@@ -559,9 +559,18 @@ async function reloadConfig(root: string, last: KayConfig): Promise<KayConfig> {
 }
 
 // Keeps editors and `tsgo` in step with the `.kay` sources; type errors themselves are `kay check`'s job.
+// Without a `config` it is written by a process of its own from kay.config.ts as it is now, which keeps the checker out of this one and reads again every module the config imports.
 async function regenerateTypes(root: string, { entry, config }: DevOptions) {
   try {
-    await writeShadowTypes(root, { ...configCheckOptions(config ?? {}), entry })
+    if (config === undefined) {
+      await Bun.spawn([process.execPath, TYPES, root, entry ?? ''], { stdin: 'ignore', stdout: 'ignore', stderr: 'inherit' }).exited
+
+      return
+    }
+
+    const { configCheckOptions, writeShadowTypes } = await import('../check')
+
+    await writeShadowTypes(root, { ...configCheckOptions(config), entry })
   }
   catch (error) {
     console.error(error)

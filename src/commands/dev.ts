@@ -55,16 +55,25 @@ export const dev: Command = {
     try {
       warnOtherKay('dev', root)
       const entry = typeof option === 'string' ? resolve(option) : inDir ? undefined : path
-      const config = await loadConfig(root)
+
+      // Read here to refuse a config that does not load, before anything starts; the types are written from it by a process of their own.
+      await loadConfig(root)
       const { promise, resolve: interrupted } = Promise.withResolvers<void>()
       // Keys only from a person at a terminal: a pipe, a CI log or an agent gets the lines alone, and its stdin is left unread.
       const keys = format === 'text' && process.stdin.isTTY && process.stdout.isTTY ? process.stdin : undefined
       let stop: () => Promise<void>
 
+      // Before the first types are written, which a signal may come during.
+      process.once('SIGINT', interrupted)
+      process.once('SIGTERM', interrupted)
+
       try {
-        stop = await startDev(root, { entry, port: typeof port === 'string' ? Number(port) : undefined, host, inspect: debuggerAt, open: open === true, format, keys, onQuit: interrupted, log: events?.write, quiet: values.quiet === true, config })
+        stop = await startDev(root, { entry, port: typeof port === 'string' ? Number(port) : undefined, host, inspect: debuggerAt, open: open === true, format, keys, onQuit: interrupted, log: events?.write, quiet: values.quiet === true })
       }
       catch (error) {
+        process.off('SIGINT', interrupted)
+        process.off('SIGTERM', interrupted)
+
         if (!(error instanceof InspectorAddressInUse))
           throw error
 
@@ -73,9 +82,9 @@ export const dev: Command = {
         return 1
       }
 
-      process.once('SIGINT', interrupted)
-      process.once('SIGTERM', interrupted)
       await promise
+      process.off('SIGINT', interrupted)
+      process.off('SIGTERM', interrupted)
       await stop()
 
       return 0
