@@ -24,7 +24,7 @@ export type Intent = 'visit' | 'query' | 'traverse' | 'refresh' | 'redirect' | '
 export interface Swap {
   intent: Intent
   // Takes the current history entry's place, as `navigate(href, { replace: true })` asks.
-  replace?: boolean
+  replace?: boolean | undefined
   // The position a traversal's entry saved.
   saved?: [number, number] | undefined
   // The element focused before, found again by id or name once swapped: a traversal sets it between entries of one path, which keep the focus.

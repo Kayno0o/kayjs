@@ -97,7 +97,7 @@ export async function navigate(to: string | { query: QueryChanges }, options: Na
 
   if (typeof to !== 'string') {
     for (const [name, value] of Object.entries(to.query)) {
-      if (value === null || value === undefined || value === '')
+      if (value == null || value === '')
         url.searchParams.delete(name)
       else
         url.searchParams.set(name, String(value))
@@ -113,9 +113,7 @@ export async function navigate(to: string | { query: QueryChanges }, options: Na
     return
   }
 
-  const replace = options.replace === true
-
-  await follow(url, typeof to === 'string' ? { intent: 'visit', replace } : { intent: 'query', replace, focused: document.activeElement })
+  await follow(url, typeof to === 'string' ? { intent: 'visit', replace: options.replace } : { intent: 'query', replace: options.replace, focused: document.activeElement })
 }
 
 // Runs the page's loads again and shows what they return, keeping scroll, focus and every island whose props did not change.
