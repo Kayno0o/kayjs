@@ -10,7 +10,7 @@ import { SUBJECT } from './names'
 import { bindEvent } from './validate'
 
 // The `kay/dom` helpers browser output calls, each imported under a `Kay` name.
-const DOM_HELPERS = ['append', 'attempt', 'attribute', 'awaited', 'branches', 'close', 'component', 'componentClass', 'dynamic', 'effect', 'errorParagraph', 'fragment', 'image', 'insert', 'listen', 'loop', 'markers', 'memo', 'merge', 'omit', 'property', 'ref', 'rowKey', 'setClass', 'setStyle', 'spread', 'spreadAttributes', 'template', 'text', 'transition', 'untrack']
+const DOM_HELPERS = ['append', 'attempt', 'attribute', 'awaited', 'branches', 'close', 'component', 'componentClass', 'dynamic', 'effect', 'errorParagraph', 'fragment', 'holdSubmits', 'image', 'insert', 'listen', 'listenSubmit', 'loop', 'markers', 'memo', 'merge', 'omit', 'property', 'ref', 'rowKey', 'setClass', 'setStyle', 'spread', 'spreadAttributes', 'template', 'text', 'transition', 'untrack']
 const TRANSITION_PART = 'transition:'
 
 export function domHelperImport(): string {
@@ -590,7 +590,8 @@ export class DomTemplate extends TemplateWriter {
 
     // Read at each event rather than once, so a handler a prop, a signal or a loop item holds stays current.
     return (variable) => {
-      b.add(`KayListen(${variable(node)}, ${JSON.stringify(name)}, `)
+      // A `submit` handler is held while it answers a promise, which only an island listening to one loads.
+      b.add(`${helperName(name.toLowerCase() === 'onsubmit' ? 'listenSubmit' : 'listen')}(${variable(node)}, ${JSON.stringify(name)}, `)
 
       if (isFunctionAt(this.src, expression, this.facts.functions))
         b.add('(').addSource(expression).add(')')
@@ -615,6 +616,9 @@ export class DomTemplate extends TemplateWriter {
 
   private spreadBinding(element: ElementNode, variable: string, content: boolean): void {
     const { b } = this
+
+    if (element.name === 'form')
+      b.add(`${helperName('holdSubmits')}(); `)
 
     b.add(`KaySpread(${variable}, () => [`)
     this.leadingImageDefaults(element)

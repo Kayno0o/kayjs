@@ -1364,4 +1364,48 @@ describe('a form submitted in the browser', () => {
       await dispose()
     }
   })
+
+  const mountSpread = site({
+    'main.kay': '---\nconst answers: (() => void)[] = []\nconst props = { onSubmit(event: SubmitEvent) { event.preventDefault(); return new Promise<void>(resolve => answers.push(resolve)) } }\n---\nform({...props})\n  button#go(type="submit") Send\nbutton#settle(type="button" onClick={() => answers.shift()?.()}) settle\n',
+  })
+
+  it('holds an onSubmit a spread on a form gives, as long as it is pending', async () => {
+    const { root, dispose } = await mountSpread()
+
+    try {
+      const form = root.querySelector('form')!
+
+      form.requestSubmit()
+      await settle()
+      expect([form, root.querySelector('#go')].map(element => element!.getAttribute('aria-busy'))).toEqual(['true', 'true'])
+
+      root.querySelector<HTMLElement>('#settle')!.click()
+      await settle()
+      expect([form, root.querySelector('#go')].map(element => element!.getAttribute('aria-busy'))).toEqual([null, null])
+    }
+    finally {
+      await dispose()
+    }
+  })
+
+  // bun test fails on any unhandled rejection whatever listens for it, so the rejection is observed in a process of its own.
+  it('still reports an onSubmit that rejects, and is no longer aria-busy once it settled', async () => {
+    const script = `
+      import { Window } from 'happy-dom'
+      const window = new Window()
+      Object.assign(globalThis, { HTMLFormElement: window.HTMLFormElement, HTMLButtonElement: window.HTMLButtonElement })
+      const { listenSubmit } = await import(${JSON.stringify(join(import.meta.dir, '../src/runtime/form-hold.ts'))})
+      const reasons = []
+      process.on('unhandledRejection', reason => reasons.push(reason.message))
+      window.document.body.innerHTML = '<form><button type="submit"></button></form>'
+      const form = window.document.querySelector('form')
+      listenSubmit(form, 'onSubmit', () => Promise.reject(new Error('refused')))
+      form.requestSubmit()
+      await Bun.sleep(20)
+      console.log(JSON.stringify({ reasons, busy: [form, form.querySelector('button')].map(element => element.getAttribute('aria-busy')) }))
+    `
+    const run = Bun.spawn([process.execPath, '-e', script], { stdout: 'pipe', stderr: 'pipe' })
+
+    expect(JSON.parse(await new Response(run.stdout).text())).toEqual({ reasons: ['refused'], busy: [null, null] })
+  })
 })

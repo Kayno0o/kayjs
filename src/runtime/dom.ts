@@ -9,6 +9,7 @@ import { freshPrefix, withIds } from './uid'
 import { safeUrl } from './url'
 import { attributeName, attributeValue, classText, eachChild, elementName, handlerName, merge, spreadAttributes, styleText } from './values'
 
+export { holdSubmits, listenSubmit } from './form-hold'
 export { renderEffect as effect, memo, untrack } from './reactive'
 export { transition } from './transition'
 export { componentClass, merge, omit, spreadAttributes } from './values'
@@ -1139,61 +1140,8 @@ export function setStyle(element: Element, value: unknown): void {
     element.setAttribute('style', styleText(value))
 }
 
-// A submit handler as it listens: while it answers a promise the form and its submit buttons are `aria-busy`, which kayjs-ui styles as a spinner.
-const held = new WeakMap<(event: Event) => void, (event: Event) => void>()
-const holds = new WeakMap<Element, number>()
-const marked = new WeakSet<Element>()
-
-function holding(handler: (event: Event) => void): (event: Event) => void {
-  let listener = held.get(handler)
-
-  if (!listener) {
-    listener = function (this: unknown, event) {
-      const answer: unknown = handler.call(this, event)
-
-      if (typeof answer === 'object' && answer !== null && typeof Reflect.get(answer, 'then') === 'function' && event.currentTarget instanceof HTMLFormElement)
-        void hold(event.currentTarget, answer as PromiseLike<unknown>)
-    }
-    held.set(handler, listener)
-  }
-
-  return listener
-}
-
-function setBusy(form: HTMLFormElement, busy: boolean): void {
-  for (const element of [form, ...form.elements]) {
-    if (element !== form && !(element instanceof HTMLButtonElement && element.type === 'submit'))
-      continue
-
-    // One the page marked busy itself is left as it is.
-    if (busy && !element.hasAttribute('aria-busy')) {
-      element.setAttribute('aria-busy', 'true')
-      marked.add(element)
-    }
-    else if (!busy && marked.delete(element)) {
-      element.removeAttribute('aria-busy')
-    }
-  }
-}
-
-async function hold(form: HTMLFormElement, answer: PromiseLike<unknown>): Promise<void> {
-  holds.set(form, (holds.get(form) ?? 0) + 1)
-  setBusy(form, true)
-
-  // The page's own handling of a rejection stands: this only waits for the answer to settle.
-  try {
-    await answer
-  }
-  catch {}
-  finally {
-    const left = holds.get(form)! - 1
-
-    holds.set(form, left)
-
-    if (left === 0)
-      setBusy(form, false)
-  }
-}
+// Set by form-hold when an island loads it, so a `submit` handler given through a spread is held too.
+export const submits: { listen?: typeof listen, unlisten?: typeof unlisten } = {}
 
 // `onClick` listens for `click`: through the document's one listener for the common events, on the element for the others.
 export function listen(element: Element, name: string, handler: (event: Event) => void, replaced?: (event: Event) => void): void {
@@ -1201,9 +1149,9 @@ export function listen(element: Element, name: string, handler: (event: Event) =
 
   if (!DELEGATED.has(type)) {
     if (replaced)
-      element.removeEventListener(type, type === 'submit' ? held.get(replaced) ?? replaced : replaced)
+      element.removeEventListener(type, replaced)
 
-    element.addEventListener(type, type === 'submit' ? holding(handler) : handler)
+    element.addEventListener(type, handler)
 
     return
   }
@@ -1218,13 +1166,13 @@ export function listen(element: Element, name: string, handler: (event: Event) =
   }
 }
 
-function unlisten(element: Element, name: string, handler: (event: Event) => void): void {
+export function unlisten(element: Element, name: string, handler: (event: Event) => void): void {
   const type = name.slice(2).toLowerCase()
 
   if (DELEGATED.has(type))
     (element as ElementRecord)[`$$${type}`] = undefined
   else
-    element.removeEventListener(type, type === 'submit' ? held.get(handler) ?? handler : handler)
+    element.removeEventListener(type, handler)
 }
 
 // Calls the handlers from the event's target up, each seeing its own element as `currentTarget`, until one stops propagation.
@@ -1284,7 +1232,7 @@ export function spread(element: Element, sources: () => readonly object[], conte
         ref(element, value)
       }
       else if (handlerName(name) && typeof value === 'function') {
-        listen(element, name, value as (event: Event) => void, previous as ((event: Event) => void) | undefined)
+        (submits.listen ?? listen)(element, name, value as (event: Event) => void, previous as ((event: Event) => void) | undefined)
       }
       // A handler given as text runs as script, which the server never writes either.
       else if (handlerName(name)) {
@@ -1312,7 +1260,7 @@ export function spread(element: Element, sources: () => readonly object[], conte
       set.delete(name)
 
       if (handlerName(name) && typeof previous === 'function')
-        unlisten(element, name, previous as (event: Event) => void)
+        (submits.unlisten ?? unlisten)(element, name, previous as (event: Event) => void)
       else if (name !== 'ref' && !handlerName(name))
         property(element, name, undefined)
     }
