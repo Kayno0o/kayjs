@@ -44,7 +44,8 @@ describe('the app template\'s db/roles.sh', () => {
     if (admin === undefined)
       return
 
-    await admin.unsafe(`DROP DATABASE IF EXISTS ${DATABASE}`)
+    // FORCE ends what a failed test left connected, which would refuse the drop.
+    await admin.unsafe(`DROP DATABASE IF EXISTS ${DATABASE} WITH (FORCE)`)
     await admin.unsafe('DROP ROLE IF EXISTS app_rw')
     await admin.close()
   })
@@ -71,7 +72,7 @@ describe('the app template\'s db/roles.sh', () => {
   }
 
   run('gives app_rw rows and sequences of the tables a later migration creates, and no schema change', async () => {
-    await admin!.unsafe(`DROP DATABASE IF EXISTS ${DATABASE}`)
+    await admin!.unsafe(`DROP DATABASE IF EXISTS ${DATABASE} WITH (FORCE)`)
     await admin!.unsafe('DROP ROLE IF EXISTS app_rw')
     await admin!.unsafe(`CREATE DATABASE ${DATABASE}`)
 
@@ -94,10 +95,19 @@ describe('the app template\'s db/roles.sh', () => {
     const app = connect('app_rw', `${PASSWORD}2`)
 
     try {
+      // A cluster trusting local connections (CI's) takes any password, so the old one is only refused where passwords are checked.
+      const wrong = connect(decodeURIComponent(url!.username), 'not the password')
+      const checksPasswords = await permission(wrong, 'SELECT 1') === '28P01'
       const stale = connect('app_rw', PASSWORD)
 
-      expect(await permission(stale, 'SELECT 1')).toBe('28P01')
-      await stale.close()
+      await wrong.close()
+
+      try {
+        expect(await permission(stale, 'SELECT 1')).toBe(checksPasswords ? '28P01' : 'allowed')
+      }
+      finally {
+        await stale.close()
+      }
 
       for (const table of ['"early"', '"late"', '"identity"']) {
         await app.unsafe(`INSERT INTO ${table} ("name") VALUES ('a')`)
