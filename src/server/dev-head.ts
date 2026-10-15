@@ -5,6 +5,7 @@ import type { DevHead } from './dev'
 import type { ServedRoute } from './guards'
 import { configSeoLints, DESCRIPTION_LENGTH, pageSeoLints } from '../check/seo'
 import { isCrossSite } from './actions'
+import { routerPath } from './base'
 import { withoutSlash } from './routes'
 import { sitemapXml } from './sitemap'
 
@@ -36,10 +37,23 @@ export async function devHead(request: Request, { config, routes, base, trailing
   if (typeof body.path !== 'string' || typeof body.head !== 'string')
     return new Response(null, { status: 400 })
 
-  const path = withoutSlash(body.path.startsWith(base) ? body.path.slice(base.length) || '/' : body.path)
-  const listed = config.site === undefined ? undefined : await listedPaths(routes, config.site, trailingSlash, locales)
-  const sitemap = listed === undefined ? 'none' : listed.has(path) ? 'listed' : 'unlisted'
-  const problems = pageSeoLints(config, [{ path, file: '', html: `<html>${body.head}</html>`, noindex: sitemap !== 'listed', sitemap: false, search: false }])
+  // The sitemap names pages as a browser does, under `base`; the lints name them as the router does.
+  const full = withoutSlash(body.path)
+  const path = routerPath(full, base)
+  let sitemap: DevHead['sitemap'] = 'none'
+  let sitemapError: string | undefined
+
+  if (config.site !== undefined) {
+    try {
+      sitemap = (await listedPaths(routes, config.site, trailingSlash, locales)).has(full) ? 'listed' : 'unlisted'
+    }
+    catch (error) {
+      sitemap = 'error'
+      sitemapError = error instanceof Error ? error.message : String(error)
+    }
+  }
+
+  const problems = pageSeoLints(config, [{ path, file: '', html: `<html>${body.head}</html>`, noindex: sitemap === 'unlisted', sitemap: false, search: false }])
 
   problems.unshift(...configSeoLints(config, '', [], true).filter(problem => problem.code === 'missing-site'))
 
@@ -47,6 +61,7 @@ export async function devHead(request: Request, { config, routes, base, trailing
     descriptionLength: DESCRIPTION_LENGTH,
     site: config.site,
     sitemap,
+    sitemapError,
     problems: problems.map(({ code, severity, message, note, help }) => ({ code, severity: severity ?? 'warning', message, note, help })),
   } satisfies DevHead)
 }

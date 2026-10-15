@@ -462,12 +462,13 @@ describe('the dev tool', () => {
 
       // A server that fails leaves the head readable.
       fetching.mockImplementation((async () => new Response(null, { status: 500 })) as unknown as typeof window.fetch)
-      document.head.innerHTML = '<title>Again</title>'
+      document.head.innerHTML = '<title>Again</title><meta property="og:image" content="http://">'
       await Bun.sleep(0)
       await Bun.sleep(0)
 
       expect(panel().querySelector('.empty')?.textContent).toBe('Could not check the head: the server answered 500')
       expect(text('.snippet div')[1]).toBe('Again')
+      expect(panel().querySelector('.error')?.textContent).toBe('The social card image is not a valid URL: http://')
     }
     finally {
       fetching.mockRestore()

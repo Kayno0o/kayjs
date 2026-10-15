@@ -22,10 +22,10 @@ async function site() {
   return relative(process.cwd(), join(dir, 'routes'))
 }
 
-async function askAbout(options: Parameters<typeof pages>[0], path: string, headers: Record<string, string> = { 'x-kay-dev': '1' }): Promise<{ status: number, head?: DevHead | undefined }> {
+async function askAbout(options: Parameters<typeof pages>[0], path: string, headers: Record<string, string> = { 'x-kay-dev': '1' }, mount = ''): Promise<{ status: number, head?: DevHead | undefined }> {
   const dev = await pages({ prebuilt: false, security: false, dev: true, ...options })
   const page = await (await dev.handle(new Request(`http://localhost${path}`))).text()
-  const response = await dev.handle(new Request(`http://localhost${DEV_HEAD}`, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify({ path, head: `<head>${HEAD.exec(page)![1]}</head>` }) }))
+  const response = await dev.handle(new Request(`http://localhost${DEV_HEAD}`, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify({ path: mount + path, head: `<head>${HEAD.exec(page)![1]}</head>` }) }))
 
   return { status: response.status, head: response.ok ? await response.json() as DevHead : undefined }
 }
@@ -55,6 +55,25 @@ describe('the dev tool\'s head check', () => {
     expect(head!.site).toBeUndefined()
     expect(head!.problems.map(problem => problem.code)).toContain('missing-site')
     expect((await askAbout({ routes }, '/')).head!.problems).toEqual([])
+  })
+
+  it('lists a page under a base, with a trailing slash or a locale, and answers for a sitemap that fails', async () => {
+    const routes = await site()
+    const based = { routes, site: 'https://shop.example', base: '/shop', seo: { name: 'Shop' } }
+
+    expect((await askAbout(based, '/', undefined, '/shop')).head).toMatchObject({ sitemap: 'listed' })
+    expect((await askAbout(based, '/hidden', undefined, '/shop')).head).toMatchObject({ sitemap: 'unlisted' })
+    expect((await askAbout({ ...based, trailingSlash: 'always' }, '/long/', undefined, '/shop')).head).toMatchObject({ sitemap: 'listed' })
+    expect((await askAbout({ ...based, i18n: { locales: ['en', 'fr'], defaultLocale: 'en', messages: 'tests/fixtures/layout-query/src/messages' } }, '/fr/long', undefined, '/shop')).head).toMatchObject({ sitemap: 'listed' })
+
+    const dir = await scratchDir('dev-head-broken-')
+
+    await Bun.write(join(dir, 'routes/index.kay'), '--- server\nexport const page = { sitemap: () => { throw new Error(\'no database\') } }\n---\nh1 Home\n')
+
+    const broken = (await askAbout({ routes: relative(process.cwd(), join(dir, 'routes')), site: 'https://shop.example' }, '/')).head!
+
+    expect(broken.sitemap).toBe('error')
+    expect(broken.sitemapError).toContain('no database')
   })
 
   it('refuses a request the dev tool did not make', async () => {

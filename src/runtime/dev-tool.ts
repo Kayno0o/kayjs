@@ -780,7 +780,7 @@ function headTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
     fact('Robots', metaContent(doc, 'robots') ?? tool.make('span', 'note', 'no tag, indexable'))
 
     if (server !== undefined)
-      fact('Sitemap', server.sitemap === 'none' ? tool.make('span', 'note', 'none, the site has no origin (set site in kay.config.ts or SITE_URL)') : server.sitemap === 'listed' ? 'listed' : 'not listed')
+      fact('Sitemap', server.sitemap === 'error' ? tool.make('span', 'error', `could not be read: ${server.sitemapError ?? 'unknown error'}`) : server.sitemap === 'none' ? tool.make('span', 'note', 'none, the site has no origin (set site in kay.config.ts or SITE_URL)') : server.sitemap === 'listed' ? 'listed' : 'not listed')
 
     children.push(facts)
 
@@ -803,13 +803,18 @@ function headTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
     const image = metaContent(doc, 'og:image') ?? metaContent(doc, 'twitter:image')
 
     if (image !== undefined) {
-      const url = new URL(image, win.location.href)
-      const card = tool.make('img', 'card')
+      try {
+        const url = new URL(image, win.location.href)
+        const card = tool.make('img', 'card')
 
-      // The site's own origin is not the dev server's, so the card is read from here.
-      card.src = server?.site !== undefined && url.origin === new URL(server.site).origin ? `${win.location.origin}${url.pathname}${url.search}` : url.href
-      card.alt = 'The social card image'
-      children.push(card)
+        // The site's own origin is not the dev server's, so the card is read from here.
+        card.src = server?.site !== undefined && url.origin === new URL(server.site).origin ? `${win.location.origin}${url.pathname}${url.search}` : url.href
+        card.alt = 'The social card image'
+        children.push(card)
+      }
+      catch {
+        children.push(tool.make('div', 'error', `The social card image is not a valid URL: ${image}`))
+      }
     }
 
     const blocks = [...doc.head.querySelectorAll('script[type="application/ld+json"]')]

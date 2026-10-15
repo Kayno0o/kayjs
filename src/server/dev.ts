@@ -420,8 +420,9 @@ export interface DevHead {
   descriptionLength: number
   // The origin the site is public at, none when `site` and `SITE_URL` are unset.
   site?: string | undefined
-  // `none` when there is no origin and so no sitemap.
-  sitemap: 'listed' | 'unlisted' | 'none'
+  // `none` when there is no origin and so no sitemap, `error` when building it failed, `sitemapError` saying why.
+  sitemap: 'listed' | 'unlisted' | 'none' | 'error'
+  sitemapError?: string | undefined
   problems: { code?: string | undefined, severity: string, message: string, note?: string | undefined, help?: string | undefined }[]
 }
 
