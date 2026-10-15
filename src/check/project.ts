@@ -100,7 +100,7 @@ async function moduleLints(root: string, levels: LintLevels | undefined): Promis
 
 // What a checking script printed on the lines it marked, whatever else the project's code logged, run in a process of its own so an edited file is read afresh; the reason it failed otherwise.
 // With a `memory`, the last result stands while the arguments and every file the script listed as read are as they were.
-export async function probe(root: string, script: string, args: string[], reading: string, timeout = PROBE_TIMEOUT, memory?: ProbeMemory): Promise<ProbeResult> {
+export async function probe(root: string, script: string, args: string[], reading: string, memory?: ProbeMemory, timeout = PROBE_TIMEOUT): Promise<ProbeResult> {
   const key = JSON.stringify(args)
   const remembered = memory?.get(script)
 
@@ -158,7 +158,7 @@ async function checkMessages(root: string, config: I18nConfig | undefined, exten
   if (!config)
     return []
 
-  const read = await probe(root, MESSAGE_PROBLEMS, [JSON.stringify(config), JSON.stringify(extensions.map(({ name, messages }) => ({ name, messages })))], 'reading the messages', undefined, memory)
+  const read = await probe(root, MESSAGE_PROBLEMS, [JSON.stringify(config), JSON.stringify(extensions.map(({ name, messages }) => ({ name, messages })))], 'reading the messages', memory)
 
   if ('failed' in read)
     return [{ file: join(root, CONFIG_FILE), line: 1, column: 1, message: read.failed }]
@@ -171,7 +171,7 @@ export async function checkContent(root: string, config: string | undefined, sit
   if (config === undefined && !existsSync(projectPaths(root).content))
     return { problems: [], uses: [], feeds: [] }
 
-  const read = await probe(root, CONTENT_PROBLEMS, [config ?? '', site ? 'site' : ''], 'reading the collections', undefined, memory)
+  const read = await probe(root, CONTENT_PROBLEMS, [config ?? '', site ? 'site' : ''], 'reading the collections', memory)
 
   if ('failed' in read)
     return { problems: [{ file: projectPaths(root, { content: config }).content, line: 1, column: 1, message: read.failed }], uses: [], feeds: [] }

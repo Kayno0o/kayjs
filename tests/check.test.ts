@@ -925,7 +925,7 @@ describe.concurrent('kay check, edge cases', () => {
 
     try {
       expect((await check(root)).filter(d => d.file.endsWith('a.md')).map(d => d.line)).toEqual([1])
-      expect(await probe(root, join(root, 'waits.ts'), [], 'reading it', 300)).toEqual({ failed: 'reading it did not finish within 0.3 s and was stopped: the code it runs waits on something that never comes' })
+      expect(await probe(root, join(root, 'waits.ts'), [], 'reading it', undefined, 300)).toEqual({ failed: 'reading it did not finish within 0.3 s and was stopped: the code it runs waits on something that never comes' })
     }
     finally {
       await rm(root, { recursive: true, force: true })

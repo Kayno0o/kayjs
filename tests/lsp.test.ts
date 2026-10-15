@@ -1144,42 +1144,73 @@ describe('kay lsp project checks after a save', () => {
 
     await Promise.all(Object.entries(files).map(async ([path, text]) => Bun.write(join(dir, path), text)))
 
+    // Waits until the counts stay as they are for a while, however slow the machine.
+    const quiet = async (atLeast = 1000) => {
+      await Bun.sleep(atLeast)
+
+      for (let seen = ''; seen !== JSON.stringify(ran);) {
+        seen = JSON.stringify(ran)
+        await Bun.sleep(700)
+      }
+
+      return { ...ran }
+    }
     // Writes a file, tells the server and waits for the project checks it makes.
     const save = async (path: string, text: string) => {
       await Bun.write(join(dir, path), text)
       client.notify('workspace/didChangeWatchedFiles', { changes: [{ uri: pathToFileURL(join(dir, path)).href, type: 2 }] })
-      await Bun.sleep(1500)
 
-      return { ...ran }
+      return quiet()
+    }
+    const removed = async (path: string) => {
+      await rm(join(dir, path))
+      client.notify('workspace/didChangeWatchedFiles', { changes: [{ uri: pathToFileURL(join(dir, path)).href, type: 3 }] })
+
+      return quiet()
     }
 
     try {
       await client.request('initialize', { processId: process.pid, rootUri: pathToFileURL(dir).href, capabilities: {} })
       client.notify('initialized', {})
-      await Bun.sleep(2500)
-      expect(ran).toEqual({ content: 1, messages: 1 })
+
+      while (ran.content === 0 || ran.messages === 0)
+        await Bun.sleep(100)
+
+      expect(await quiet()).toEqual({ content: 1, messages: 1 })
 
       // A component neither the collections nor the messages use.
       expect(await save(unrelated, 'p two\n')).toEqual({ content: 1, messages: 1 })
       expect(await save(page, 'h1 Other\n')).toEqual({ content: 1, messages: 1 })
 
-      // A module the content config imports, and a component its entries use.
-      expect(await save('src/helper.ts', 'export const shape = 2\n')).toEqual({ content: 2, messages: 1 })
-      expect(await save('src/callout.kay', 'aside.note\n  slot\n')).toEqual({ content: 3, messages: 1 })
-      expect(await save('src/content/notes/a.md', 'Other text\n')).toEqual({ content: 4, messages: 1 })
+      // The content config itself, a module it imports, a component its entries use, and an entry written, added and removed.
+      expect(await save('src/content.config.ts', `${files['src/content.config.ts']}\n`)).toEqual({ content: 2, messages: 1 })
+      expect(await save('src/helper.ts', 'export const shape = 2\n')).toEqual({ content: 3, messages: 1 })
+      expect(await save('src/callout.kay', 'aside.note\n  slot\n')).toEqual({ content: 4, messages: 1 })
+      expect(await save('src/content/notes/a.md', 'Other text\n')).toEqual({ content: 5, messages: 1 })
+      expect(await save('src/content/notes/b.md', 'New\n')).toEqual({ content: 6, messages: 1 })
+      expect(await removed('src/content/notes/b.md')).toEqual({ content: 7, messages: 1 })
+      // The result of a run stands for the next save.
+      expect(await save(unrelated, 'p three\n')).toEqual({ content: 7, messages: 1 })
 
-      // A messages file.
-      expect(await save('src/messages/en.ts', 'export default { hello: \'Hi\' }\n')).toEqual({ content: 4, messages: 2 })
+      // A messages file, written and deleted.
+      expect(await save('src/messages/en.ts', 'export default { hello: \'Hi\' }\n')).toEqual({ content: 7, messages: 2 })
+      expect(await removed('src/messages/en.ts')).toEqual({ content: 7, messages: 3 })
+      expect(await save('src/messages/en.ts', 'export default { hello: \'Hello\' }\n')).toEqual({ content: 7, messages: 4 })
 
       // The config both scripts run under, which also names a catalog the messages newly read.
-      expect(await save('kay.config.ts', 'export default { i18n: { locales: [\'fr\', \'en\', \'es\'], defaultLocale: \'fr\' } }\n')).toEqual({ content: 5, messages: 3 })
-      expect(await save('src/messages/es.ts', 'export default { hello: \'Hola\' }\n')).toEqual({ content: 5, messages: 4 })
-      expect(await save('src/messages/es.ts', 'export default { hello: \'Hola!\' }\n')).toEqual({ content: 5, messages: 5 })
+      expect(await save('kay.config.ts', 'export default { i18n: { locales: [\'fr\', \'en\', \'es\'], defaultLocale: \'fr\' } }\n')).toEqual({ content: 8, messages: 5 })
+      expect(await save('src/messages/es.ts', 'export default { hello: \'Hola\' }\n')).toEqual({ content: 8, messages: 6 })
+      expect(await save('src/messages/es.ts', 'export default { hello: \'Hola!\' }\n')).toEqual({ content: 8, messages: 7 })
 
       // A module the content config starts importing is tracked from then on.
       await Bun.write(join(dir, 'src/extra.ts'), 'export const extra = 1\n')
-      expect(await save('src/content.config.ts', files['src/content.config.ts'].replace('\n\nexport', '\nimport \'./extra\'\n\nexport'))).toEqual({ content: 6, messages: 5 })
-      expect(await save('src/extra.ts', 'export const extra = 2\n')).toEqual({ content: 7, messages: 5 })
+      expect(await save('src/content.config.ts', files['src/content.config.ts'].replace('\n\nexport', '\nimport \'./extra\'\n\nexport'))).toEqual({ content: 9, messages: 7 })
+      expect(await save('src/extra.ts', 'export const extra = 2\n')).toEqual({ content: 10, messages: 7 })
+
+      // A folder an `import.meta.glob` of the content config searches.
+      await Bun.write(join(dir, 'src/cards/a.ts'), 'export default 1\n')
+      expect(await save('src/content.config.ts', files['src/content.config.ts'].replace('\n\nexport', '\nexport const cards = import.meta.glob(\'./cards/*.ts\')\n\nexport'))).toEqual({ content: 11, messages: 7 })
+      expect(await save('src/cards/b.ts', 'export default 2\n')).toEqual({ content: 12, messages: 7 })
     }
     finally {
       counting.mockRestore()
@@ -1189,5 +1220,5 @@ describe('kay lsp project checks after a save', () => {
       tsgo?.process.kill()
       await rm(dir, { recursive: true, force: true })
     }
-  }, 60_000)
+  }, 180_000)
 })

@@ -16,6 +16,9 @@ const GLOB_MAGIC = /[*?[\]{}()!]/
 const RELATIVE = /^\.\.?\//
 const NEGATED = /^!/
 const IDENTIFIER = /^[A-Z_$][\w$]*$/i
+
+// The folders the patterns of every call expanded in this process search, which a checking script lists as read: a file added or removed there changes what a module imports.
+export const GLOBBED = new Set<string>()
 const OPTIONS = new Set(['eager', 'import'])
 const USAGE = 'import.meta.glob(\'./demos/*.kay\', { eager: true, import: \'default\' })'
 
@@ -32,6 +35,9 @@ export function globFiles(patterns: string[], importer: string, root: string): M
     const segments = full.split(sep)
     const magic = segments.findIndex(segment => GLOB_MAGIC.test(segment))
     const base = magic === -1 ? dirname(full) : segments.slice(0, magic).join(sep) || sep
+
+    GLOBBED.add(base)
+
     const searchesModules = pattern.includes('node_modules')
 
     for (const found of new Bun.Glob(relative(base, full)).scanSync({ cwd: base, absolute: true, onlyFiles: true })) {
