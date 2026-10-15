@@ -9,7 +9,7 @@ interface Job { id: number, name: string, status: string }
 const WORKFLOW = 'test.yml'
 const POLL = 15_000
 const GIVE_UP = 30 * 60_000
-// How long a commit may go without any run covering it before the wait is given up: a push runs nothing when it only touches .md files.
+// How long the wait goes on with no run covering the commit, since it started or last saw one: a push runs nothing when it only touches .md files, and a cancelled run's successor may take a poll to appear.
 const NO_RUN = 3 * 60_000
 const DONE = new Set(['success', 'failure', 'skipped'])
 const STAMP = /^\S+Z /
@@ -55,6 +55,7 @@ if (sha === '')
 
 const short = sha.slice(0, 7)
 const started = Date.now()
+let seen = started
 let followed: Run | undefined
 let finished: Run | undefined
 
@@ -92,6 +93,9 @@ while (finished === undefined) {
     continue
   }
 
+  if (run !== undefined)
+    seen = Date.now()
+
   if (run !== undefined && run.id !== followed?.id) {
     followed = run
     console.log(`following run ${run.id} on ${run.commit_sha.slice(0, 7)}${run.commit_sha === sha ? '' : `, which covers ${short}`}: ${run.html_url}`)
@@ -103,7 +107,7 @@ while (finished === undefined) {
     continue
   }
 
-  if (run === undefined && Date.now() - started > NO_RUN)
+  if (run === undefined && Date.now() - seen > NO_RUN)
     fail(`no Tests run covers ${short} yet: its own was cancelled by a later push or never started, as a push touching only .md files starts none, so the next landing's run will`, 2)
 
   await Bun.sleep(POLL)
