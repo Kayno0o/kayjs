@@ -497,7 +497,6 @@ export function insert(element: Node | null, start: Node | null, end: Node | nul
 
     const focused = process.env.NODE_ENV === 'production' ? undefined : focusedIn(current)
     const kept = new Set(next)
-    const placed = new Set(next.flatMap(nodesOf))
 
     for (const unit of current) {
       if (!kept.has(unit))
@@ -508,8 +507,8 @@ export function insert(element: Node | null, start: Node | null, end: Node | nul
     let at = region.start ? region.start.nextSibling : region.element!.firstChild
 
     for (const unit of next) {
-      // A node playing its leave phase stays between the kept units until it ends.
-      while (at && firstOf(unit) !== at && !placed.has(at) && transitions?.has(at))
+      // A node playing its leave phase, one that is no unit of `next`, stays between the kept units until it ends.
+      while (at && transitions?.has(at) && !next.some(placed => firstOf(placed) === at))
         at = at.nextSibling
 
       if (firstOf(unit) === at)
