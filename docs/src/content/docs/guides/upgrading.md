@@ -13,12 +13,14 @@ kay and its libraries share one version number, so one section covers them all. 
 
 A new app now connects as `app_rw`, which reads and writes rows but cannot drop, alter or create anything, and only the migrations run as the owner. An app scaffolded earlier keeps working as it is; to adopt the split:
 
-1. Copy `db/roles.sh` from a new app, and set `APP_DB_PASSWORD` in `.env.example`, in the production environment and in `compose.prod.yaml`'s `db` service. Use a secret other than `POSTGRES_PASSWORD`.
+1. Copy `db/roles.sh` from a new app, and set `APP_DB_PASSWORD` in `.env.example`, in the production environment and in `compose.prod.yaml`'s `db` service. Use a secret other than `POSTGRES_PASSWORD`, letters and digits only as it goes into the URL as it is. In `compose.dev.yaml`'s `db` service set `APP_DB_PASSWORD: app_rw`, the script refusing to run without it.
 2. Mount it in `db`, in `compose.prod.yaml` and `compose.dev.yaml`: `./db/roles.sh:/docker-entrypoint-initdb.d/roles.sh:ro`. The image runs it only when it creates a database, so a new one gets `app_rw` for free.
-3. Recreate the database container (`docker compose up -d db`, the data volume stays), then run the script once on the existing database. It is idempotent, so running it again only resets the password and regrants: `docker compose exec -T -e APP_DB_PASSWORD="$APP_DB_PASSWORD" db sh /docker-entrypoint-initdb.d/roles.sh`.
-4. In `compose.prod.yaml`, give `migrate` `MIGRATE_DATABASE_URL: postgres://app:${POSTGRES_PASSWORD}@db:5432/app` and `app` `DATABASE_URL: postgres://app_rw:${APP_DB_PASSWORD}@db:5432/app`. In `pg-orm.config.ts`, read `process.env.MIGRATE_DATABASE_URL ?? process.env.DATABASE_URL`. In `.env`, point `DATABASE_URL` at `app_rw` and add `MIGRATE_DATABASE_URL` for the owner.
+3. Recreate the database container (`docker compose up -d db`, the data volume stays), then run the script once on the existing database. It is idempotent, so running it again only resets the password and regrants: `docker compose exec -T db sh /docker-entrypoint-initdb.d/roles.sh`.
+4. In `compose.prod.yaml`, give `migrate` `MIGRATE_DATABASE_URL: postgres://app:${POSTGRES_PASSWORD}@db:5432/app` and `app` `DATABASE_URL: postgres://app_rw:${APP_DB_PASSWORD}@db:5432/app`. In `pg-orm.config.ts`, read `process.env.MIGRATE_DATABASE_URL ?? process.env.DATABASE_URL`. In `.env`, point `DATABASE_URL` at `postgres://app_rw:app_rw@127.0.0.1:5433/<database>` and add `MIGRATE_DATABASE_URL` for the owner.
 
-Tables in a schema other than `public` that exist already are not granted: run `GRANT USAGE ON SCHEMA <name> TO app_rw`, then `GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA <name> TO app_rw` and `GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA <name> TO app_rw`. Those the owner creates later are covered. Anything the app writes through a role other than the owner needs its own `ALTER DEFAULT PRIVILEGES FOR ROLE <it>`.
+Tables in a schema other than `public` that exist already are not granted: run `GRANT USAGE ON SCHEMA <name> TO app_rw`, then `GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA <name> TO app_rw` and `GRANT USAGE ON ALL SEQUENCES IN SCHEMA <name> TO app_rw`. Those the owner creates later are covered. A table created by a role other than the owner is not granted either.
+
+The script also revokes `CREATE` on `public` from `PUBLIC` (already the default from Postgres 15), and `app_rw` is a role of the cluster: two apps sharing one cluster share it, so give the second another name. pg-orm's migration history table, `_pgorm_migrations`, is writable by `app_rw` like any table the owner creates.
 
 ### kayjs-auth's two-factor setup no longer carries a server-drawn QR code
 

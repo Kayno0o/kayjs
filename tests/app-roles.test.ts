@@ -11,7 +11,8 @@ const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL ?? ''
 const url = TEST_DATABASE_URL === '' ? undefined : new URL(TEST_DATABASE_URL)
 const PASSWORD = 'rolepass0123'
 const DATABASE = 'kay_app_roles_test'
-const run = it.skipIf(url === undefined || Bun.which('psql') === null)
+// CI has psql, so a missing one fails there instead of skipping.
+const run = it.skipIf((url === undefined || Bun.which('psql') === null) && (process.env.CI ?? '') === '')
 
 function connect(user: string, password: string) {
   const target = new URL(url!.href)
@@ -89,7 +90,10 @@ describe('the app template\'s db/roles.sh', () => {
     const app = connect('app_rw', `${PASSWORD}2`)
 
     try {
-      expect(await permission(connect('app_rw', PASSWORD), 'SELECT 1')).not.toBe('allowed')
+      const stale = connect('app_rw', PASSWORD)
+
+      expect(await permission(stale, 'SELECT 1')).toBe('28P01')
+      await stale.close()
 
       for (const table of ['"early"', '"late"', '"identity"']) {
         await app.unsafe(`INSERT INTO ${table} ("name") VALUES ('a')`)
@@ -98,6 +102,8 @@ describe('the app template\'s db/roles.sh', () => {
         await app.unsafe(`DELETE FROM ${table}`)
       }
 
+      // USAGE draws ids; moving a sequence is not allowed.
+      expect(await permission(app, 'SELECT setval(\'late_id_seq\', 2000000000)')).toBe('42501')
       await app.unsafe('INSERT INTO "billing"."invoice" ("total") VALUES (3)')
       expect(await app.unsafe('SELECT "total" FROM "billing"."invoice"')).toHaveLength(1)
 

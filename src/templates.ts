@@ -379,6 +379,7 @@ ${WORKFLOW_SETUP}`,
 // Run by the database image once, as it creates the database: a second role that reads and writes rows but changes no schema, and the default privileges that hand it every table, sequence and schema the owner creates later.
 // It is idempotent, so an existing database adopts it by running this same file once (see the upgrading guide).
 export const APP_ROLES_SCRIPT = `#!/bin/sh
+# Run by the database image when it first creates the database, and by hand on an existing one: docker compose exec -T db sh /docker-entrypoint-initdb.d/roles.sh
 # The role the app connects with, so a SQL injection or a compromised app process cannot drop or alter a table; $POSTGRES_USER, the owner, stays with the migrations.
 # Tables, sequences and schemas the owner creates later reach it through default privileges, so a migration needs no GRANT.
 set -e
@@ -386,13 +387,13 @@ set -e
 
 psql -v ON_ERROR_STOP=1 -v owner="$POSTGRES_USER" -v password="$APP_DB_PASSWORD" --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<'SQL'
 SELECT 'CREATE ROLE app_rw LOGIN' WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'app_rw') \\gexec
-SELECT format('ALTER ROLE app_rw NOSUPERUSER NOCREATEDB NOCREATEROLE PASSWORD %L', :'password') \\gexec
+SELECT format('ALTER ROLE app_rw NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS PASSWORD %L', :'password') \\gexec
 REVOKE CREATE ON SCHEMA public FROM PUBLIC;
 GRANT USAGE ON SCHEMA public TO app_rw;
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO app_rw;
-GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public TO app_rw;
+GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO app_rw;
 ALTER DEFAULT PRIVILEGES FOR ROLE :"owner" GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO app_rw;
-ALTER DEFAULT PRIVILEGES FOR ROLE :"owner" GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO app_rw;
+ALTER DEFAULT PRIVILEGES FOR ROLE :"owner" GRANT USAGE ON SEQUENCES TO app_rw;
 ALTER DEFAULT PRIVILEGES FOR ROLE :"owner" GRANT USAGE ON SCHEMAS TO app_rw;
 SQL
 `
@@ -408,11 +409,11 @@ const APP_COMPOSE = `services:
       # Letters and digits only: it goes into DATABASE_URL below as it is.
       POSTGRES_PASSWORD: \${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
       POSTGRES_DB: app
-      # The password of app_rw, the role the app connects with: a different secret from the owner's.
+      # The password of app_rw, the role the app connects with: a different secret from the owner's, letters and digits only as well.
       APP_DB_PASSWORD: \${APP_DB_PASSWORD:?set APP_DB_PASSWORD}
     volumes:
       - db:/var/lib/postgresql
-      # Creates app_rw when the database is first created: see db/roles.sh for adopting it on an existing one.
+      # Creates app_rw when the database is first created; db/roles.sh says how to run it on an existing one.
       - ./db/roles.sh:/docker-entrypoint-initdb.d/roles.sh:ro
     healthcheck:
       test: [CMD-SHELL, pg_isready -h 127.0.0.1 -U app]
