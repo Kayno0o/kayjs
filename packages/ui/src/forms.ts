@@ -32,11 +32,11 @@ export function fieldLinks(group: boolean, hint: boolean, messages: () => readon
   }
 
   let marked = false
-  const markedFields = new Set<HTMLElement>()
+  const touchedFields = new Map<HTMLElement, boolean>()
 
   effect(() => {
     if (group) {
-      markGroup(links, messages().length > 0, markedFields)
+      markGroup(links, messages().length > 0, touchedFields)
 
       return
     }
@@ -69,29 +69,29 @@ export function fieldLinks(group: boolean, hint: boolean, messages: () => readon
   return links
 }
 
-function markGroup(links: FieldLinks, invalid: boolean, marked: Set<HTMLElement>): void {
-  const fields = invalid ? document.querySelectorAll<HTMLElement>(`[data-kui-field="${links.frame}"] :is(${FIELDS})`) : marked
+// The map tells whether the group set `aria-invalid` itself, so one the page marked is left as it is when the message clears.
+function markGroup(links: FieldLinks, shown: boolean, touched: Map<HTMLElement, boolean>): void {
+  const fields = shown ? [...document.querySelectorAll<HTMLElement>(`[data-kui-field="${links.frame}"] :is(${FIELDS})`)].filter(field => field.closest('[data-kui-field]')?.getAttribute('data-kui-field') === links.frame) : [...touched.keys()]
 
   for (const field of fields) {
     const own = (field.getAttribute('aria-describedby') ?? '').split(SPACES).filter(id => id !== '' && id !== links.issues)
 
-    if (invalid) {
-      own.push(links.issues)
+    if (shown) {
+      field.setAttribute('aria-describedby', [...own, links.issues].join(' '))
+      touched.set(field, touched.get(field) ?? field.getAttribute('aria-invalid') !== 'true')
+      field.setAttribute('aria-invalid', 'true')
+
+      continue
+    }
+
+    if (own.length > 0)
       field.setAttribute('aria-describedby', own.join(' '))
+    else
+      field.removeAttribute('aria-describedby')
 
-      if (field.getAttribute('aria-invalid') !== 'true') {
-        field.setAttribute('aria-invalid', 'true')
-        marked.add(field)
-      }
-    }
-    else {
-      if (own.length > 0)
-        field.setAttribute('aria-describedby', own.join(' '))
-      else
-        field.removeAttribute('aria-describedby')
-
+    if (touched.get(field))
       field.removeAttribute('aria-invalid')
-      marked.delete(field)
-    }
+
+    touched.delete(field)
   }
 }
