@@ -194,6 +194,12 @@ describe('islands', () => {
     expect((queue.find(event => event.target === input) as unknown as { n: number }).n).toBe(499)
     expect(queue.filter(event => event.target === button).map(event => (event as unknown as { n: number }).n)).toEqual(Array.from({ length: 50 }, (_, i) => 450 + i))
 
+    // The queue losing an island's events, as another island's hydration drops those of detached targets, never costs another island its own.
+    queue.splice(0, queue.length, ...queue.filter(event => event.target !== button))
+    other!.dispatchEvent(new Event('click', { bubbles: true }))
+    button!.dispatchEvent(new Event('click', { bubbles: true }))
+    expect(queue.filter(event => event.target === other)).toHaveLength(2)
+
     // A click between two inputs keeps both, and changes merge as inputs do.
     input!.dispatchEvent(new Event('click', { bubbles: true }))
     input!.dispatchEvent(new Event('input', { bubbles: true }))
