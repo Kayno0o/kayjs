@@ -12,7 +12,7 @@ await cp(join(import.meta.dir, '../tests/fixtures/answers'), root, { recursive: 
 const app = await pages({ root, api: join(root, 'src/api'), prebuilt: false, log: false, compress: true, storage: memoryFiles() })
 const key = await files.put(new File([new Uint8Array(2000)], 'a.png', { type: 'image/png' }))
 const html = await (await app.handle(new Request('http://localhost/'))).text()
-const asset = (/\/_kay\/assets\/[^"')\s]+\.png/).exec(html)?.[0]
+const asset = (/\/_kay\/entry-[^"]+\.js/).exec(html)?.[0]
 const form = (/<form[^>]*action="([^"]+)"/).exec(html)?.[1]?.replaceAll('&amp;', '&')
 
 const origin = 'http://localhost'
@@ -27,6 +27,8 @@ const cases: Record<string, () => Request> = {
 const rounds = Number(Bun.argv[2] ?? 5000)
 const only = Bun.argv[3]?.split(',')
 const repeats = Number(Bun.argv[4] ?? 5)
+// The body is left unread with a fifth argument, to see what an answer costs before its bytes are read.
+const read = async (response: Response) => Bun.argv[5] === 'nobody' ? response : response.arrayBuffer()
 
 for (const [name, make] of Object.entries(cases)) {
   if (only && !only.includes(name))
@@ -35,7 +37,7 @@ for (const [name, make] of Object.entries(cases)) {
   await app.handle(make())
 
   for (let i = 0; i < 300; i++)
-    await (await app.handle(make())).arrayBuffer()
+    await read(await app.handle(make()))
 
   // CPU time rather than wall time, which other processes on the machine stretch.
   const best: number[] = []
@@ -44,7 +46,7 @@ for (const [name, make] of Object.entries(cases)) {
     const start = process.cpuUsage()
 
     for (let i = 0; i < rounds; i++)
-      await (await app.handle(make())).arrayBuffer()
+      await read(await app.handle(make()))
 
     const used = process.cpuUsage(start)
 

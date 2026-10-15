@@ -91,7 +91,23 @@ describe('the headers of every kind of answer', () => {
   it('a build asset and a stored file carry them beside their caching', async () => {
     await expectAnswer(await get(asset), 200, { 'cache-control': IMMUTABLE, 'content-type': 'text/javascript;charset=utf-8', 'vary': 'accept-encoding' })
     await expectAnswer(await get(asset, { 'accept-encoding': 'br' }), 200, { 'cache-control': IMMUTABLE, 'content-encoding': 'br', 'content-type': 'text/javascript;charset=utf-8', 'vary': 'accept-encoding' })
+    // However the name is spelled, the file is the build's, and no other.
+    await expectAnswer(await get(asset.replace('entry', '%65ntry')), 200, { 'cache-control': IMMUTABLE, 'content-type': 'text/javascript;charset=utf-8', 'vary': 'accept-encoding' })
+    await expectAnswer(await get(asset.replace('/entry', '/%2e%2e/entry'), { 'accept-encoding': 'br' }), 404, {})
+    expect((await get('/_kay/..%2fpackage.json')).status).toBe(404)
+    expect((await get('/_kay/%00')).status).toBe(404)
     await expectAnswer(await get(files.url(key)), 200, { 'accept-ranges': 'bytes', 'cache-control': IMMUTABLE, 'content-disposition': 'inline', 'content-type': 'image/png' })
+  })
+
+  it('a file route carries them on a range, a missing file, a bad link and a refused method', async () => {
+    const ranged = await get(files.url(key), { range: 'bytes=0-9' })
+
+    await expectAnswer(ranged, 206, { 'accept-ranges': 'bytes', 'cache-control': IMMUTABLE, 'content-disposition': 'inline', 'content-range': 'bytes 0-9/2000', 'content-type': 'image/png' })
+    expect((await ranged.arrayBuffer()).byteLength).toBe(10)
+    await expectAnswer(await get('/_kay/files/0123456789abcdef0123.png'), 404, { 'content-type': 'text/plain; charset=utf-8', 'vary': 'accept-encoding' })
+    await expectAnswer(await get('/_kay/files/../x'), 404, {})
+    await expectAnswer(await get('/_kay/files/private/0123456789abcdef0123.png?until=1&sig=x'), 403, { 'content-type': 'text/plain; charset=utf-8', 'vary': 'accept-encoding' })
+    await expectAnswer(await get(files.url(key), {}, { method: 'POST' }), 404, {})
   })
 
   it('an action post carries them on its redirect, with its flash cookie, and on its refusal', async () => {
@@ -116,6 +132,7 @@ describe('the headers of every kind of answer', () => {
     const dir = await fixtureCopy('answers')
     let made: unknown
     const inner = await pages({ routes: `${dir}/src/routes`, api: `${dir}/src/api`, prebuilt: false, log: false, compress: false, storage: memoryFiles() })
+    const stored = await files.put(new File([new Uint8Array(2000)], 'b.png', { type: 'image/png' }))
     const outer = new Elysia().onAfterResponse({ as: 'global' }, ({ responseValue }) => {
       made = responseValue
     }).use(inner)
@@ -132,11 +149,25 @@ describe('the headers of every kind of answer', () => {
     expect((await sent('/api/items')).same).toBe(true)
     expect((await sent('/api/items/headed')).same).toBe(true)
     expect((await sent(asset)).same).toBe(true)
+    expect((await sent(files.url(stored))).same).toBe(true)
 
     const own = (/<form[^>]*action="([^"]+)"/).exec(await (await sent('/')).response.text())![1]!.replaceAll('&amp;', '&')
     const posted = await sent(own, { method: 'POST', body: new URLSearchParams({ title: 'x' }), headers: { origin: ORIGIN, referer: `${ORIGIN}/` } })
 
     expect(posted.response.status).toBe(303)
     expect(posted.same).toBe(true)
+  })
+
+  it('keeps them on a file route whose store throws', async () => {
+    const store = memoryFiles()
+    const broken = await pages({ routes: `${await fixtureCopy('answers')}/src/routes`, prebuilt: false, log: false, storage: { ...store, read: async () => {
+      throw new Error('store down')
+    } } })
+    const response = await broken.handle(new Request(`${ORIGIN}/_kay/files/0123456789abcdef0123.png`))
+
+    expect(response.status).toBe(500)
+    expect(response.headers.get('content-security-policy')).toBe(page)
+    expect(response.headers.get('x-content-type-options')).toBe('nosniff')
+    expect(response.headers.get('x-request-id')).toMatch(REQUEST_ID)
   })
 })

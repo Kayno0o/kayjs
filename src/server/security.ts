@@ -195,6 +195,27 @@ export function carryContext<T extends Response>(set: Context['set'], response: 
   return response
 }
 
+// The same for headers built per request: the security headers go under what the response sets, and the request id on the response when it is alone on the context.
+export function ownedHeaders(set: Context['set'], headers: Record<string, string>, security: [name: string, value: string][]): Record<string, string> {
+  const id = requestIdAlone(set.headers)
+
+  if (id === undefined && Object.keys(set.headers).length > 0) {
+    setSecurityHeaders(set, security)
+
+    return headers
+  }
+
+  if (id !== undefined) {
+    delete set.headers[REQUEST_ID_HEADER]
+    headers[REQUEST_ID_HEADER] = id
+  }
+
+  for (const [name, value] of security)
+    headers[name] ??= value
+
+  return headers
+}
+
 function requestIdAlone(headers: Context['set']['headers']): string | undefined {
   let id: string | undefined
 

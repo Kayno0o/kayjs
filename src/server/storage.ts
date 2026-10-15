@@ -8,6 +8,7 @@ import { FILES_ROUTE } from '../runtime/image'
 import { kayLog } from '../runtime/log'
 import { imageHeader } from './image-format'
 import { holdsImageMetadata, stripImageMetadata } from './image-metadata'
+import { headerCopies, ownedHeaders, ownHeaders, setSecurityHeaders } from './security'
 import { signedText, signText } from './stamp'
 
 // Where files are kept: `diskFiles`, `s3Files` and `memoryFiles` make one, an app may write its own. Keys are never written twice, so a store needs no locking.
@@ -314,23 +315,36 @@ export const files = {
 }
 
 // `/_kay/files/<key>` serves a public file to anyone, cached for good since a key never changes, and a private one to a link `files.url` signed.
-export function serveFiles(app: Elysia): void {
-  app.get(`${FILES_ROUTE}*`, async ({ params, request }) => {
+export function serveFiles(app: Elysia, security: Record<string, string> | undefined): void {
+  const text = headerCopies(TEXT, security)
+  const entries = Object.entries(security ?? {})
+
+  app.get(`${FILES_ROUTE}*`, async ({ params, request, set }) => {
     const key = params['*']
 
     if (!KEY.test(key))
-      return new Response('Not found', { status: 404, headers: TEXT })
+      return new Response('Not found', { status: 404, headers: ownHeaders(set, text) })
 
-    if (!PRIVATE_SEGMENT.test(key))
-      return fileResponse(key, request, IMMUTABLE)
+    const own = (headers: Record<string, string>) => ownedHeaders(set, headers, entries)
 
-    const query = new URL(request.url).searchParams
-    const until = Number(query.get('until'))
+    try {
+      if (!PRIVATE_SEGMENT.test(key))
+        return await fileResponse(key, request, IMMUTABLE, own)
 
-    if (!linkSigned(key, query))
-      return new Response('Not a valid link to this file', { status: 403, headers: TEXT })
+      const query = new URL(request.url).searchParams
+      const until = Number(query.get('until'))
 
-    return fileResponse(key, request, `private, max-age=${Math.max(0, Math.floor(until - Date.now() / 1000))}`)
+      if (!linkSigned(key, query))
+        return new Response('Not a valid link to this file', { status: 403, headers: ownHeaders(set, text) })
+
+      return await fileResponse(key, request, `private, max-age=${Math.max(0, Math.floor(until - Date.now() / 1000))}`, own)
+    }
+    catch (error) {
+      // A store that throws is answered by Elysia off the context, which holds the security headers this route would have sent itself.
+      setSecurityHeaders(set, entries)
+
+      throw error
+    }
   })
 }
 
@@ -381,11 +395,12 @@ function linkSigned(key: string, query: URLSearchParams): boolean {
   return Number(until) > Date.now() / 1000 && signedText(SIGNING_USE, `${key}\n${until}`, query.get('sig') ?? '')
 }
 
-async function fileResponse(key: string, request: Request | undefined, cacheControl: string): Promise<Response> {
+// `own` finishes the headers of an answer from a route, which carries the context's headers itself.
+async function fileResponse(key: string, request: Request | undefined, cacheControl: string, own: (headers: Record<string, string>) => Record<string, string> = headers => headers): Promise<Response> {
   const data = await (await activeStore()).read(key)
 
   if (!data)
-    return new Response('Not found', { status: 404, headers: TEXT })
+    return new Response('Not found', { status: 404, headers: own({ ...TEXT }) })
 
   const type = Bun.file(key).type
   const inline = INLINE.test(type)
@@ -404,23 +419,23 @@ async function fileResponse(key: string, request: Request | undefined, cacheCont
   const size = Number.isFinite(data.size) ? data.size : undefined
 
   if (size === undefined)
-    return new Response(data.stream(), { headers })
+    return new Response(data.stream(), { headers: own(headers) })
 
   headers['accept-ranges'] = 'bytes'
 
   const range = RANGE.exec(request?.headers.get('range') ?? '')
 
   if (!range)
-    return new Response(data, { headers })
+    return new Response(data, { headers: own(headers) })
 
   // `bytes=-500` asks for the last 500 bytes.
   const start = range[1] === '' ? Math.max(0, size - Number(range[2])) : Number(range[1])
   const end = range[1] === '' || range[2] === '' ? size - 1 : Math.min(Number(range[2]), size - 1)
 
   if (start > end || start >= size)
-    return new Response(null, { status: 416, headers: { ...headers, 'content-range': `bytes */${size}` } })
+    return new Response(null, { status: 416, headers: own({ ...headers, 'content-range': `bytes */${size}` }) })
 
-  return new Response(data.slice(start, end + 1), { status: 206, headers: { ...headers, 'content-range': `bytes ${start}-${end}/${size}` } })
+  return new Response(data.slice(start, end + 1), { status: 206, headers: own({ ...headers, 'content-range': `bytes ${start}-${end}/${size}` }) })
 }
 
 // The key's last segment says what the file is, so it is served with its type: the file's own extension, else its type's, else `bin`.

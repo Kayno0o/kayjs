@@ -18,7 +18,7 @@ import { clearEditSite, registerEditSite } from '../content/edit'
 import { clearContentMode } from '../content/load'
 import { serveFeeds } from '../content/server'
 import { offlineOf } from '../project'
-import { IMAGE_ROUTE } from '../runtime/image'
+import { FILES_ROUTE, IMAGE_ROUTE } from '../runtime/image'
 import { kayLog } from '../runtime/log'
 import { DRAFT_ROUTE } from '../runtime/swap'
 import { registerActionRoutes } from './actions'
@@ -92,13 +92,18 @@ async function servedRoutes({ routes, i18n, collections }: PageSetup, required: 
   return served
 }
 
+// The routes under `/_kay/files/` carry the security headers themselves, as the build's files and the image route do.
+function ownsHeaders(path: string, filePaths: ReadonlySet<string>): boolean {
+  return filePaths.has(path) || path.startsWith(FILES_ROUTE)
+}
+
 // onRequest runs for every route of the app, its own included; a header the app set before is kept.
 // A file route answers only GET and HEAD with its own: any other method gets Elysia's 404 or 405 off the context.
 function sendSecurityHeaders(app: App, security: Record<string, string>, filePaths: ReadonlySet<string>) {
   const headers = Object.entries(security)
 
   app.onRequest(({ request, set }) => {
-    if (!READS.has(request.method) || !filePaths.has(pathOf(request.url)))
+    if (!READS.has(request.method) || !ownsHeaders(pathOf(request.url), filePaths))
       setSecurityHeaders(set, headers)
   })
 }
@@ -310,7 +315,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
 
   const imageRoute = imageRouteOf(project, setup, security, actionOptions)
 
-  serveFiles(app)
+  serveFiles(app, security)
   serveImages(app, imageRoute)
   serveCards(app, cards, imageRoute)
   serveFeeds(app, served, collections, site, mode.dev, i18n)
