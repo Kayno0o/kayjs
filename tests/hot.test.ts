@@ -157,6 +157,30 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('kay dev in 
     expect(await page.textContent('.solo button.count')).toBe('Pressed 3')
   }, 60_000)
 
+  it('tries again when the page cannot reach the server as an edit lands, rather than reloading', async () => {
+    const color = async () => page.evaluate(() => getComputedStyle(document.querySelector('p.static')!).color)
+    let refused = 0
+
+    // The first two fetches of the page itself fail to connect, as a server announcing itself but not yet answering does.
+    await page.route(url => url.pathname === '/', async (route) => {
+      if (route.request().resourceType() === 'fetch' && refused++ < 2)
+        return route.abort('connectionrefused')
+
+      return route.fallback()
+    })
+
+    try {
+      await Bun.write(join(root, 'src/app.css'), 'p.static { color: rgb(0, 0, 200) }\n')
+      await until(async () => await color() === 'rgb(0, 0, 200)')
+
+      expect(refused).toBeGreaterThanOrEqual(2)
+      expect(await sameDocument()).toBe(true)
+    }
+    finally {
+      await page.unroute(() => true)
+    }
+  }, 60_000)
+
   // Chromium holds six connections to a host: a live reload connecting again on every swap would leave none for the page by the seventh edit, and a copy the policy refuses logs an error each time.
   it('keeps one live reload connection open through many server restarts, each edit shown without a reload', async () => {
     // The page opens a connection again each time its server goes away, closing the one that failed.
