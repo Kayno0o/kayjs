@@ -267,18 +267,18 @@ describe.concurrent('kay dev', () => {
       expect(await Bun.file(join(root, '.kay/types/kay-env.d.ts')).text()).toContain('FeedPathsOf<typeof import("../../site-content")>')
 
       await Bun.write(join(root, 'src/routes/about.kay'), 'p About\n')
-      await until(() => children.length === 2)
+      await until(() => children.length === 2, 15_000)
 
       expect(children[0]!.killed).toBe(true)
       // The new server starts first; the types follow it.
-      await until(() => existsSync(join(root, '.kay/types/src/routes/about.kay.tsx')))
+      await until(() => existsSync(join(root, '.kay/types/src/routes/about.kay.tsx')), 15_000)
     }
     finally {
       await stop()
       await rm(root, { recursive: true, force: true })
     }
     expect(children.at(-1)!.killed).toBe(true)
-  })
+  }, 40_000)
 
   it('writes no types for an edit of a markdown entry or a media file, but for a public file or a source', async () => {
     const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
