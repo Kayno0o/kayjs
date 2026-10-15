@@ -7,7 +7,7 @@ export const claim = action(t.Object({ handle: t.String({ minLength: 3, maxLengt
 import { signal } from 'kay'
 import FormField from '@kaynooo/kayjs-ui/form-field.kay'
 
-// A message of the page's own beside the action's, which the island shows and hides as a check of its own would.
+// A message of the page's own beside the action's, which the island shows and hides as a check of its own would; the second form shows it on a group.
 const issue = signal<string>()
 const bumped = signal(0)
 
@@ -27,6 +27,9 @@ main
     if claim.error('handle') as message
       p {message}
     button#post(formnovalidate) Claim
+  form#grouped(action={claim})
+    FormField(label="Handle again" group issue={issue()})
+      input(name="handle")
   button#bump(type="button" onClick={() => bumped.set(1)}) {bumped()}
   button#accept(type="button" onClick={() => void send('abcd')}) Accept
   button#refuse(type="button" onClick={() => void send('ab')}) Refuse

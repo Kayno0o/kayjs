@@ -334,7 +334,6 @@ const dispose = mount(Panel, document.querySelector('#panel')!, { title: 'Ticket
 - A `try` whose block fails on the server draws its `catch` block's ids apart, so the ids after it match the browser's, which keeps the server's markup there.
 - `describeField(ids)` from `kay`, called in a component's script, adds `ids` to the `aria-describedby` of the first `input`, `select` or `textarea` the component renders on the server, its slot included, after the field's own ids and a refused field's message, so a form field ties the control its parent writes to its hint and message; a field with a spread keeps it too, and a `hidden`, `submit`, `button`, `reset` or `image` input is skipped whether its `type` is written or an expression; in an island the ids stay as the field turns refused and valid again, kay adding and removing the message alone.
 - It acts on the server's markup alone: inside an island, the browser keeps such a link itself as the messages change. Importing it keeps a component static.
-- `markInvalid(element, by, invalid)` from `kay` marks a field `aria-invalid="true"` for `by`, any value naming the source, while `invalid`, and takes the mark off once no source holds it, kay's own mark of a refused field included, leaving one the page wrote before any source; a form field marking the control its parent writes calls it from an effect, so the field stays invalid while either it or the action refuses it.
 
 ### Browser-only components
 
@@ -406,6 +405,7 @@ const dispose = mount(Panel, document.querySelector('#panel')!, { title: 'Ticket
 - A refused post focusing its field reveals it as `focusInvalid` does.
 - An island calling an action moves no focus: what it shows on an `ActionError` is its own to focus.
 - `focusInvalid(root)` from `kay` does that once its writes rendered: it runs the effects they left pending, as `flush()` does, then focuses the first field marked `aria-invalid="true"` under `root`, the whole document without one, that takes focus, such as one on a tab the write just showed, and resolves to whether one did, so the island needs no `requestAnimationFrame`.
+- `markInvalid(element, by, invalid)` from `kay` marks a field `aria-invalid="true"` for `by`, any value naming the source, while `invalid`, and takes the mark off once no source holds it, kay's own mark of a refused field included, leaving one the page wrote before any source; a form field marking the control its parent writes calls it from an effect, so the field stays invalid while either it or the action refuses it.
 - A field inside `hidden="until-found"` or a closed `details` is revealed first, as find-in-page reveals it, unless it is disabled or inert: innermost first, each `details` opens and each such element gets a bubbling `beforematch`, where a tab list shows its panel, then loses `hidden`.
 - Revealing stops where a listener hides that element again, shows it itself, takes it out or opens a `details` above it, the rest left as it is.
 - While it posts, the form has `aria-busy="true"` and a second submit does nothing; it has it too while an `onSubmit` of the island's returns a promise.

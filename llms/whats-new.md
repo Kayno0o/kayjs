@@ -4,7 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
-- `markInvalid(element, by, invalid)` from `kay` marks a field `aria-invalid` for one source among several, so an island's refused field stays invalid while a kayjs-ui `FormField` still shows a message for it ([Islands](islands.md#unique-ids)).
+- `markInvalid(element, by, invalid)` from `kay` marks a field `aria-invalid` for one source among several, so an island's refused field stays invalid while a kayjs-ui `FormField` still shows a message for it ([Islands](islands.md#forms-posting-in-place)).
 
 ## 1.44.0
 

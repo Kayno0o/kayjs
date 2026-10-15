@@ -78,17 +78,17 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('FormField 
     }
   }, 120_000)
 
-  test('keeps a refused field invalid while its FormField shows a message, and drops the mark once neither the action nor the FormField refuses it', async () => {
+  test('keeps a refused field invalid while its FormField or group shows a message, and drops the mark once neither the action nor the FormField refuses it', async () => {
     const site = await testSite({ root: ROOT, browser: { path } })
 
     try {
       const page = await site.open('/invalid-form')
-      // Presses a button, then waits for the action's message and the FormField's to show as asked, answering the field's mark.
+      // Presses a button, then waits for the action's message and the FormField's to show as asked, answering the marks of the field and of the group's.
       const press = async (button: string, refused: boolean, issue: boolean) => {
         await page.click(button)
         await page.waitUntil((refused, issue) => (document.querySelector('#claim-handle-error') !== null) === refused && (document.querySelector('.kui-form-field-issue') !== null) === issue, {}, refused, issue)
 
-        return page.evaluate(() => document.querySelector('#claim input[name="handle"]')!.getAttribute('aria-invalid'))
+        return page.evaluate(() => ['#claim', '#grouped'].map(form => document.querySelector(`${form} input[name="handle"]`)!.getAttribute('aria-invalid')))
       }
 
       await page.fill('#claim input[name="handle"]', 'ab')
@@ -99,15 +99,15 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('FormField 
       await page.waitFor('#bump', { text: '1' })
 
       // The mark the server rendered for the refusal is the action's own, dropped once it is accepted.
-      expect(await press('#accept', false, false)).toBeNull()
-      expect(await press('#refuse', true, false)).toBe('true')
-      expect(await press('#show', true, true)).toBe('true')
-      expect(await press('#accept', false, true)).toBe('true')
-      expect(await press('#hide', false, false)).toBeNull()
-      expect(await press('#show', false, true)).toBe('true')
-      expect(await press('#refuse', true, true)).toBe('true')
-      expect(await press('#hide', true, false)).toBe('true')
-      expect(await press('#accept', false, false)).toBeNull()
+      expect(await press('#accept', false, false)).toEqual([null, null])
+      expect(await press('#refuse', true, false)).toEqual(['true', 'true'])
+      expect(await press('#show', true, true)).toEqual(['true', 'true'])
+      expect(await press('#accept', false, true)).toEqual(['true', 'true'])
+      expect(await press('#hide', false, false)).toEqual([null, null])
+      expect(await press('#show', false, true)).toEqual(['true', 'true'])
+      expect(await press('#refuse', true, true)).toEqual(['true', 'true'])
+      expect(await press('#hide', true, false)).toEqual(['true', 'true'])
+      expect(await press('#accept', false, false)).toEqual([null, null])
       expect(page.errors).toEqual([])
     }
     finally {

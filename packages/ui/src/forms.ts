@@ -31,15 +31,15 @@ export function fieldLinks(group: boolean, hint: boolean, messages: () => readon
     return links
   }
 
-  const marked = new Set<HTMLElement>()
+  if (group) {
+    const marked = new Set<HTMLElement>()
+
+    effect(() => markGroup(links, messages().length > 0, marked))
+
+    return links
+  }
 
   effect(() => {
-    if (group) {
-      markGroup(links, messages().length > 0, marked)
-
-      return
-    }
-
     const ours = links.described()
     const invalid = messages().length > 0
     const control = document.querySelector(`[data-kui-field="${links.frame}"] .kui-form-field-label`)?.querySelector<HTMLElement>(CONTROL)
