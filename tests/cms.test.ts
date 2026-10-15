@@ -260,6 +260,67 @@ describe('the collections a CMS edits', () => {
     })
   })
 
+  it('does not hand a read during a save the load that began before it', async () => {
+    let held = [{ slug: 'hello', data: { title: 'Old' } }]
+    const tales = collection({ name: 'tales', load: async () => {
+      const seen = structuredClone(held)
+
+      await Bun.sleep(30)
+
+      return seen
+    }, save: async (entry) => {
+      await Bun.sleep(10)
+      held = [{ slug: entry.slug, data: entry.data as { title: string } }]
+    } }, { schema: t.Object({ title: t.String() }) })
+
+    await exporting([['tales', tales]], async () => {
+      const slow = entries('tales')
+
+      await Bun.sleep(5)
+
+      const saving = saveEntry('tales', { slug: 'hello', data: { title: 'New' } })
+
+      await Bun.sleep(5)
+
+      const during = entries('tales')
+
+      await saving
+
+      expect((await during)[0]!.data).toEqual({ title: 'Old' })
+      expect((await entries('tales'))[0]!.data).toEqual({ title: 'New' })
+      expect((await slow)[0]!.data).toEqual({ title: 'Old' })
+    })
+  })
+
+  it('keeps sharing the load a save started after the older one it replaced ends', async () => {
+    let loads = 0
+    const tales = collection({ name: 'tales', load: async () => {
+      const mine = ++loads
+
+      await Bun.sleep(mine === 1 ? 20 : 60)
+
+      return [{ slug: 'hello', data: { title: 'Hello' } }]
+    }, save: () => undefined }, { schema: t.Object({ title: t.String() }) })
+
+    await exporting([['tales', tales]], async () => {
+      const first = entries('tales')
+
+      await Bun.sleep(2)
+      await saveEntry('tales', { slug: 'hello', data: { title: 'Hello' } })
+
+      const second = entries('tales')
+
+      await first
+      await Bun.sleep(1)
+
+      const third = entries('tales')
+
+      await Promise.all([second, third])
+
+      expect(loads).toBe(2)
+    })
+  })
+
   it('leaves a loader alone for the names and kinds of its collections when counts is false', async () => {
     let loads = 0
     const tales = collection({ name: 'tales', load: () => {

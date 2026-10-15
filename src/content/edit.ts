@@ -339,8 +339,9 @@ export async function saveEntry(name: string, entry: WrittenEntry, options: { cr
     if (options.create === true && (await loadedEntries(name, collection, { shared: false })).some(each => each.slug === place))
       return { issues: [existingIssue(name, entry.slug, entry.locale)] }
 
+    // A load that began before this write must not be joined by a read during or after it.
+    loading.delete(name)
     await save(options.create === true ? { ...entry, create: true } : entry)
-    // A load that began before this write must not be joined by a read after it.
     loading.delete(name)
     collection.invalidate()
 
@@ -391,6 +392,7 @@ export async function removeEntry(name: string, slug: string, locale?: string): 
     if (!(await loadedEntries(name, collection, { shared: false })).some(entry => entry.slug === place))
       return { issues: [{ ...at, path: '', key: 'slug', message: 'names no entry of the collection' }] }
 
+    loading.delete(name)
     await remove(at.locale === undefined ? { slug } : { slug, locale: at.locale })
     loading.delete(name)
     collection.invalidate()
@@ -552,7 +554,9 @@ async function loadedEntries(name: string, collection: Collection<unknown>, { sh
     return await run
   }
   finally {
-    loading.delete(name)
+    // Not a newer run that a save started in its place.
+    if (loading.get(name) === run)
+      loading.delete(name)
   }
 }
 
