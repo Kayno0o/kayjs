@@ -468,6 +468,8 @@ function openSqliteStore(path: string): { store: SqliteSessionStore, close: () =
   const db = openSqlite(path)
 
   db.run('CREATE TABLE IF NOT EXISTS kay_sessions (id TEXT PRIMARY KEY, data TEXT NOT NULL, expires INTEGER NOT NULL)')
+  // The sweep deletes by expiry, which would otherwise read every session.
+  db.run('CREATE INDEX IF NOT EXISTS kay_sessions_expires ON kay_sessions (expires)')
 
   const select = db.query<{ data: string }, [string, number]>('SELECT data FROM kay_sessions WHERE id = ? AND expires >= ?')
   const upsert = db.query('INSERT INTO kay_sessions (id, data, expires) VALUES (?, ?, ?) ON CONFLICT (id) DO UPDATE SET data = excluded.data, expires = excluded.expires')

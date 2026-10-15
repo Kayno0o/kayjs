@@ -509,6 +509,20 @@ describe('sessions', () => {
     }
   })
 
+  it('indexes expiry on a file made before the index, so the sweep reads no session it keeps', async () => {
+    const file = join(await scratchDir('sessions-'), 'sessions.sqlite')
+    const old = new Database(file)
+
+    old.run('CREATE TABLE kay_sessions (id TEXT PRIMARY KEY, data TEXT NOT NULL, expires INTEGER NOT NULL)')
+    old.close()
+    sqliteStore(file)
+
+    const db = new Database(file)
+
+    expect(db.query<{ detail: string }, []>('EXPLAIN QUERY PLAN DELETE FROM kay_sessions WHERE expires < 1').all().map(row => row.detail).join(' ')).toContain('kay_sessions_expires')
+    db.close()
+  })
+
   it('opens a sqlite file afresh once deleted and recreated at the same path, when the config is read again', async () => {
     const file = join(await scratchDir('sessions-'), 'sessions.sqlite')
     const store = sqliteStore(file)
