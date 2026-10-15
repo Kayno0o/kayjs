@@ -66,7 +66,28 @@ export async function devHead(request: Request, { config, routes, base, trailing
   } satisfies DevHead)
 }
 
+// The sitemap runs every route module and every app `sitemap` and `prerender` function, so a server's paths are listed once, on the first read, and kept until it restarts; a failed listing is tried again.
+const listings = new WeakMap<ServedRoute[], Promise<Set<string>>>()
+
 async function listedPaths(routes: ServedRoute[], site: string, trailingSlash: TrailingSlash | undefined, locales: LocaleSettings | undefined): Promise<Set<string>> {
+  let listing = listings.get(routes)
+
+  if (listing === undefined) {
+    listing = readListing(routes, site, trailingSlash, locales)
+    listings.set(routes, listing)
+  }
+
+  try {
+    return await listing
+  }
+  catch (error) {
+    listings.delete(routes)
+
+    throw error
+  }
+}
+
+async function readListing(routes: ServedRoute[], site: string, trailingSlash: TrailingSlash | undefined, locales: LocaleSettings | undefined): Promise<Set<string>> {
   const xml = await sitemapXml(routes, site, trailingSlash, locales)
 
   return new Set([...xml.matchAll(LOC)].map(([, loc]) => withoutSlash(new URL(loc!.replaceAll('&amp;', '&')).pathname)))

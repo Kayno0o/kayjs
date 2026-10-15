@@ -76,6 +76,33 @@ describe('the dev tool\'s head check', () => {
     expect(broken.sitemapError).toContain('no database')
   })
 
+  it('lists the sitemap once for a server, and again after a listing that failed', async () => {
+    const dir = await scratchDir('dev-head-once-')
+    const counter = join(dir, 'count.txt')
+
+    await Bun.write(counter, '')
+    await Bun.write(join(dir, 'routes/items/[id].kay'), `--- server\nimport { appendFileSync } from 'node:fs'\nexport const page = { sitemap: () => { appendFileSync(${JSON.stringify(counter)}, 'x'); return [{ id: '1' }] } }\n---\nh1 Home\n`)
+
+    const dev = await pages({ routes: relative(process.cwd(), join(dir, 'routes')), site: 'https://shop.example', prebuilt: false, security: false, dev: true })
+    const ask = async () => (await dev.handle(new Request(`http://localhost${DEV_HEAD}`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-kay-dev': '1' }, body: JSON.stringify({ path: '/items/1', head: '<head><title>Home</title></head>' }) }))).json() as Promise<DevHead>
+
+    expect((await ask()).sitemap).toBe('listed')
+    expect((await ask()).sitemap).toBe('listed')
+    expect((await Bun.file(counter).text()).length).toBe(1)
+
+    const broken = await scratchDir('dev-head-retry-')
+    const flag = join(broken, 'fail')
+
+    await Bun.write(flag, '')
+    await Bun.write(join(broken, 'routes/items/[id].kay'), `--- server\nimport { existsSync, rmSync } from 'node:fs'\nexport const page = { sitemap: () => { if (existsSync(${JSON.stringify(flag)})) { rmSync(${JSON.stringify(flag)}); throw new Error('once') } return [{ id: '1' }] } }\n---\nh1 Home\n`)
+
+    const retry = await pages({ routes: relative(process.cwd(), join(broken, 'routes')), site: 'https://shop.example', prebuilt: false, security: false, dev: true })
+    const again = async () => (await retry.handle(new Request(`http://localhost${DEV_HEAD}`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-kay-dev': '1' }, body: JSON.stringify({ path: '/items/1', head: '<head><title>Home</title></head>' }) }))).json() as Promise<DevHead>
+
+    expect((await again()).sitemap).toBe('error')
+    expect((await again()).sitemap).toBe('listed')
+  })
+
   it('refuses a request the dev tool did not make', async () => {
     const routes = await site()
 

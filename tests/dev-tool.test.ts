@@ -475,4 +475,44 @@ describe('the dev tool', () => {
       happyDOM.setURL(href)
     }
   })
+
+  it('shows one snapshot of the head when the page swaps while the server is asked', async () => {
+    const { happyDOM } = window as unknown as { happyDOM: { setURL: (url: string) => void } }
+    const { href } = location
+    let release!: () => void
+    const stalled = new Promise<void>((resolve) => {
+      release = resolve
+    })
+
+    happyDOM.setURL('http://localhost:3000/')
+    document.head.innerHTML = '<title>Home | Shop</title><meta name="description" content="The shop"><meta property="og:title" content="Home">'
+
+    const fetching = spyOn(window, 'fetch').mockImplementation((async () => {
+      await stalled
+
+      return new Response(JSON.stringify({ descriptionLength: 160, sitemap: 'none', problems: [] } satisfies DevHead))
+    }) as unknown as typeof window.fetch)
+    const panel = () => shadow().querySelector('#kay-dev-head')!
+
+    try {
+      tool = startDevTool()
+      shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-head')!.click()
+      await Bun.sleep(0)
+      // The tab is hidden when the page swaps, so no read follows the swap.
+      shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-request')!.click()
+      document.head.innerHTML = '<title>About</title><meta name="description" content="Other"><meta property="og:title" content="About">'
+      await Bun.sleep(0)
+      release()
+      await Bun.sleep(0)
+      await Bun.sleep(0)
+
+      expect(panel().textContent).toContain('Home | Shop')
+      expect(panel().textContent).not.toContain('About')
+      expect(panel().textContent).not.toContain('Other')
+    }
+    finally {
+      fetching.mockRestore()
+      happyDOM.setURL(href)
+    }
+  })
 })

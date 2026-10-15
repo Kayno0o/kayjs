@@ -699,8 +699,8 @@ function requestTab(doc: Document, tool: DevTool): { stop: () => void } {
 }
 
 // A tag of the page's head, by its `name` or `property`.
-function metaContent(doc: Document, key: string): string | undefined {
-  const content = doc.head.querySelector(`meta[name="${key}"],meta[property="${key}"]`)?.getAttribute('content')?.trim()
+function metaContent(head: HTMLHeadElement, key: string): string | undefined {
+  const content = head.querySelector(`meta[name="${key}"],meta[property="${key}"]`)?.getAttribute('content')?.trim()
 
   return content === '' ? undefined : content
 }
@@ -714,14 +714,18 @@ function headTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
   let asked = 0
   const read = async () => {
     const ask = ++asked
-    const title = doc.head.querySelector('title')?.textContent?.trim() ?? ''
-    const description = metaContent(doc, 'description')
-    const canonical = doc.head.querySelector('link[rel="canonical"]')?.getAttribute('href') ?? undefined
+    // One snapshot of the head, so a swap during the fetch cannot mix two heads in what is shown.
+    const head = doc.head.cloneNode(true) as HTMLHeadElement
+    const href = win.location.href
+    const path = win.location.pathname
+    const title = head.querySelector('title')?.textContent?.trim() ?? ''
+    const description = metaContent(head, 'description')
+    const canonical = head.querySelector('link[rel="canonical"]')?.getAttribute('href') ?? undefined
     let server: DevHead | undefined
     let failure: string | undefined
 
     try {
-      const response = await win.fetch(HEAD_URL, { method: 'POST', headers: { 'content-type': 'application/json', [HEAD_HEADER]: '1' }, body: JSON.stringify({ path: win.location.pathname, head: doc.head.outerHTML }), cache: 'no-store' })
+      const response = await win.fetch(HEAD_URL, { method: 'POST', headers: { 'content-type': 'application/json', [HEAD_HEADER]: '1' }, body: JSON.stringify({ path, head: head.outerHTML }), cache: 'no-store' })
 
       if (!response.ok)
         throw new Error(`the server answered ${response.status}`)
@@ -762,7 +766,7 @@ function headTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
     const snippet = tool.make('div', 'snippet')
 
     snippet.append(
-      tool.make('div', 'site', canonical ?? win.location.href),
+      tool.make('div', 'site', canonical ?? href),
       tool.make('div', 'title', title === '' ? 'No title' : title),
       tool.make('div', 'description', description === undefined ? 'No description' : limit !== undefined && description.length > limit ? `${description.slice(0, limit).trimEnd()}...` : description),
     )
@@ -774,10 +778,10 @@ function headTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
     fact('Description', description === undefined ? none() : `${description} (${description.length}${limit === undefined ? '' : ` of ${limit}`} characters${cut ? ', cut in results' : ''})`)
     fact('Canonical', canonical ?? none())
 
-    const alternates = [...doc.head.querySelectorAll('link[rel="alternate"][hreflang]')].map(link => `${link.getAttribute('hreflang')}: ${link.getAttribute('href')}`)
+    const alternates = [...head.querySelectorAll('link[rel="alternate"][hreflang]')].map(link => `${link.getAttribute('hreflang')}: ${link.getAttribute('href')}`)
 
     fact('Alternates', ...alternates.length === 0 ? [none()] : alternates.map(line => tool.make('div', 'mono', line)))
-    fact('Robots', metaContent(doc, 'robots') ?? tool.make('span', 'note', 'no tag, indexable'))
+    fact('Robots', metaContent(head, 'robots') ?? tool.make('span', 'note', 'no tag, indexable'))
 
     if (server !== undefined)
       fact('Sitemap', server.sitemap === 'error' ? tool.make('span', 'error', `could not be read: ${server.sitemapError ?? 'unknown error'}`) : server.sitemap === 'none' ? tool.make('span', 'note', 'none, the site has no origin (set site in kay.config.ts or SITE_URL)') : server.sitemap === 'listed' ? 'listed' : 'not listed')
@@ -785,7 +789,7 @@ function headTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
     children.push(facts)
 
     for (const [heading, prefix] of [['Open Graph', 'og:'], ['Twitter', 'twitter:']] as const) {
-      const tags = [...doc.head.querySelectorAll('meta')].flatMap((meta) => {
+      const tags = [...head.querySelectorAll('meta')].flatMap((meta) => {
         const key = meta.getAttribute('property') ?? meta.getAttribute('name') ?? ''
 
         return key.startsWith(prefix) ? [[key, meta.getAttribute('content') ?? ''] as const] : []
@@ -800,11 +804,11 @@ function headTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
       children.push(section)
     }
 
-    const image = metaContent(doc, 'og:image') ?? metaContent(doc, 'twitter:image')
+    const image = metaContent(head, 'og:image') ?? metaContent(head, 'twitter:image')
 
     if (image !== undefined) {
       try {
-        const url = new URL(image, win.location.href)
+        const url = new URL(image, href)
         const card = tool.make('img', 'card')
 
         // The site's own origin is not the dev server's, so the card is read from here.
@@ -817,7 +821,7 @@ function headTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
       }
     }
 
-    const blocks = [...doc.head.querySelectorAll('script[type="application/ld+json"]')]
+    const blocks = [...head.querySelectorAll('script[type="application/ld+json"]')]
     const ld = tool.make('section', 'group')
 
     ld.append(tool.make('h3', 'heading', `JSON-LD (${blocks.length})`))
