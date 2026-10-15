@@ -1,6 +1,8 @@
+import type { EmailCore } from '../src/email'
 import type { AuthEvent } from '../src/events'
 import type { Mail } from '../src/mail'
-import { describe, expect, test } from 'bun:test'
+import { describe, expect, jest, test } from 'bun:test'
+import { sendAside } from '../src/mail'
 import { totpCode, totpStep } from '../src/totp'
 import { testApp } from './helpers/app'
 
@@ -159,5 +161,40 @@ describe('a slow mailer', () => {
 
     expect(answer).not.toBe('timeout')
     expect(sent.map(mail => mail.kind)).toEqual(['new-sign-in'])
+  })
+})
+
+describe('sendAside', () => {
+  const mail = { to: 'ada@example.com', kind: 'new-sign-in', site: 'Site', locale: 'en', subject: 's', text: 't', html: 'h' } satisfies Mail
+
+  test('gives up on a mailer that stays silent, and frees its place', async () => {
+    jest.useFakeTimers()
+
+    try {
+      let handed = 0
+      const silent = { mailer: { send: () => {
+        handed++
+
+        return new Promise<void>(Function.prototype as () => void)
+      } } } as unknown as EmailCore
+
+      for (let i = 0; i < 250; i++)
+        sendAside(silent, () => mail, 'event')
+
+      expect(handed).toBeLessThanOrEqual(200)
+      expect(handed).toBeGreaterThan(150)
+
+      jest.advanceTimersByTime(31_000)
+      await Promise.resolve()
+      await Promise.resolve()
+
+      const before = handed
+
+      sendAside(silent, () => mail, 'event')
+      expect(handed).toBe(before + 1)
+    }
+    finally {
+      jest.useRealTimers()
+    }
   })
 })

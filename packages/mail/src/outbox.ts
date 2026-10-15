@@ -3,6 +3,9 @@ import type { Address, Delivery, Mail, Transport } from './types'
 import { milliseconds } from './duration'
 import { linksOf } from './text'
 
+// Where `kay dev` lists the outbox and serves the mail samples.
+export const PREVIEW_PATH = '/_kay/mail'
+
 export interface SentMail extends Mail {
   id: string
   sentAt: Date

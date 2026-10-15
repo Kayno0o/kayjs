@@ -35,4 +35,17 @@ describe('nodemailer', () => {
     expect(has(after, 'nodemailer/dist/esm/mail-composer')).toBe(false)
     expect(has(after, 'nodemailer/dist/esm/smtp-pool')).toBe(false)
   })
+
+  test('the dev pages read their module on the first request to one, and not in production', async () => {
+    const { before, after } = await loaded('dev')
+
+    expect(has(before, 'src/preview')).toBe(false)
+    expect(has(after, 'src/preview')).toBe(true)
+  })
+
+  test('a mailer outside kay dev never reads the dev pages', async () => {
+    const { after } = await loaded('outbox')
+
+    expect(has(after, 'src/preview')).toBe(false)
+  })
 })

@@ -192,14 +192,36 @@ export const frenchTemplates: Templates = {
 // kayjs-auth's own templates by language, English for any other.
 export const builtInTemplates: Record<string, Templates> = { en: defaultTemplates, fr: frenchTemplates }
 
-// Sends the mail `build` makes without making the request wait on the mailer: a slow or down relay costs the response nothing, and a failure, a sync throw included, is logged. The mail is handed to the mailer before the first await, so a mailer that answers at once has it by the time this returns.
+// How long a notice mail may stay with the mailer before it is given up on, and how many may be with it at once: a relay that hangs costs memory for at most this many mails, the rest being logged and dropped.
+const ASIDE_TIMEOUT_MS = 30_000
+const ASIDE_MAX = 200
+let aside = 0
+
+// Sends the mail `build` makes without making the request wait on the mailer: a slow or down relay costs the response nothing, and a failure, a sync throw included, is logged. The mail is handed to the mailer before the first await, so a mailer that answers at once has it by the time this returns. A mailer silent for 30 seconds is given up on, and with 200 mails waiting on it a new one is dropped.
 export function sendAside(email: EmailCore, build: () => Mail, what: string): void {
+  if (aside >= ASIDE_MAX) {
+    log.error(`mailing ${what} dropped: ${ASIDE_MAX} mails are waiting on the mailer`)
+
+    return
+  }
+
+  aside++
   void (async () => {
+    let timer: ReturnType<typeof setTimeout> | undefined
+
     try {
-      await email.mailer.send(build())
+      const timeout = new Promise<never>((_, reject) => {
+        timer = setTimeout(reject, ASIDE_TIMEOUT_MS, new Error(`no answer from the mailer in ${ASIDE_TIMEOUT_MS / 1000} s`))
+      })
+
+      await Promise.race([Promise.resolve(email.mailer.send(build())), timeout])
     }
     catch (error) {
       log.error(`mailing ${what} failed`, error)
+    }
+    finally {
+      clearTimeout(timer)
+      aside--
     }
   })()
 }

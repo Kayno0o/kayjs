@@ -8,10 +8,8 @@ import { Elysia } from 'elysia'
 import { authMailerOptions, authMessage } from './auth'
 import { AUTH_SAMPLES, authSample } from './auth-samples'
 import { escapeHtml as escape } from './escape'
-import { outbox } from './outbox'
+import { outbox, PREVIEW_PATH } from './outbox'
 import { nodemailerMessage } from './smtp'
-
-export const PREVIEW_PATH = '/_kay/mail'
 
 // The mail's own markup runs nothing and loads only images and fonts, so a link or a script in it never acts as the development site.
 const MAIL_POLICY = 'sandbox allow-popups allow-popups-to-escape-sandbox; default-src \'none\'; img-src * data: cid:; style-src \'unsafe-inline\' *; font-src * data:'

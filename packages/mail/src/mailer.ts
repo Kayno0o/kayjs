@@ -8,10 +8,26 @@ import { defineEnv, queue, renderToString } from 'kay/server'
 import parseAddresses from 'nodemailer/lib/addressparser'
 import { escapeHtml as escape } from './escape'
 import { log } from './log'
-import { addressOf, outbox } from './outbox'
-import { preview } from './preview'
+import { addressOf, outbox, PREVIEW_PATH } from './outbox'
 import { checkKey, smtp } from './smtp'
 import { htmlToText } from './text'
+
+// The development pages' routes, which read `./preview` on the first request to one: a plugin that registers routes at once, so it mounts as any other, with handlers that hand the request to the pages once they are loaded.
+function mountPreview(plugin: Elysia, render: (message: Message) => Promise<Mail>, relay: Relay): void {
+  let pages: ((request: Request) => Promise<Response>) | undefined
+
+  const handle = async ({ request }: { request: Request }) => {
+    if (!pages) {
+      const app = (await import('./preview')).preview(render, relay)
+
+      pages = request => app.handle(request)
+    }
+
+    return pages(request)
+  }
+
+  plugin.all(PREVIEW_PATH, handle).all(`${PREVIEW_PATH}.json`, handle).all(`${PREVIEW_PATH}/*`, handle)
+}
 
 export interface MailerOptions {
   // The address mails are sent from unless one says otherwise, `SMTP_FROM` when left out.
@@ -327,7 +343,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
   const plugin = new Elysia().use(jobs)
 
   if (transport === outbox && underKayDev())
-    plugin.use(preview(render as (message: Message) => Promise<Mail>, relay(options)))
+    mountPreview(plugin, render as (message: Message) => Promise<Mail>, relay(options))
 
   const sending = Object.assign(plugin, {
     send: async <P extends object>(message: Message<P>) => {
