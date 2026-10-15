@@ -1,7 +1,6 @@
 import type { Duration } from 'kay'
 import type { Delivery, Mail, Transport } from './types'
 import { createPrivateKey } from 'node:crypto'
-import { createTransport } from 'nodemailer'
 import { milliseconds } from './duration'
 
 // Signs each mail for a relay that does not, its public key published in DNS at `<selector>._domainkey.<domain>`.
@@ -81,7 +80,7 @@ export function smtp(settings: SmtpSettings): Transport {
 
   // Read now, so a timeout that is no duration fails where the transport is made rather than at its first mail.
   const wait = settings.timeout === undefined ? DEFAULT_TIMEOUT_MS : milliseconds(settings.timeout, 'smtp()\'s timeout')
-  let transporter: ReturnType<typeof open> | undefined
+  let transporter: Promise<Awaited<ReturnType<typeof open>>> | undefined
   let sending = 0
   let idle: ReturnType<typeof setTimeout> | undefined
 
@@ -90,11 +89,12 @@ export function smtp(settings: SmtpSettings): Transport {
       clearTimeout(idle)
       transporter ??= open(settings, wait)
 
-      const current = transporter
+      const pending = transporter
 
       sending++
 
       try {
+        const current = await pending
         const info = await current.sendMail(nodemailerMessage(mail))
 
         return { messageId: info.messageId, accepted: info.accepted, rejected: info.rejected, response: info.response }
@@ -108,11 +108,16 @@ export function smtp(settings: SmtpSettings): Transport {
       }
       finally {
         if (--sending === 0) {
-          idle = setTimeout(() => {
-            current.close()
-
-            if (transporter === current)
+          idle = setTimeout(async () => {
+            if (transporter === pending)
               transporter = undefined
+
+            try {
+              (await pending).close()
+            }
+            catch {
+              // nodemailer failed to load, so there is nothing to close.
+            }
           }, IDLE_MS)
         }
       }
@@ -120,8 +125,11 @@ export function smtp(settings: SmtpSettings): Transport {
   }
 }
 
-function open({ host, port = DEFAULT_PORT, insecure = false, user, pass, name, maxConnections, rateLimit, dkim }: SmtpSettings, wait: number) {
+async function open({ host, port = DEFAULT_PORT, insecure = false, user, pass, name, maxConnections, rateLimit, dkim }: SmtpSettings, wait: number) {
   const auth = user === undefined || pass === undefined ? undefined : { user, pass }
+
+  // nodemailer is read with the first mail, so an app that never sends over SMTP never loads it.
+  const { createTransport } = await import('nodemailer')
 
   return createTransport({
     pool: true,

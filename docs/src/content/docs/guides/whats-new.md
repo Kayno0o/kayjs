@@ -8,6 +8,7 @@ This page lists what each release adds, newest first, with a link to where each 
 ## Unreleased
 
 - **Head tab in the dev tool**: the page's search result, title and description with their lengths and limit, canonical, alternates, robots and sitemap membership, og and twitter tags with the social card, JSON-LD parsed or failing, and what `kay check` would flag in the head, read again after each page swap. [kay dev](/reference/cli#kay-dev)
+- **kayjs-mail loads nodemailer later**: with the first SMTP send, or the first `.eml` download of the dev preview, where it loaded with the module.
 - **kayjs-auth loads and waits less**: an app with no passkey and no OAuth provider no longer loads `@simplewebauthn/server` or `jose`, a sign-in answers without waiting on its security-notice mail whatever the `mailer` does, and the hourly prune and `audit.forget` read through indexes that `db.sync()` creates.
 - **Routes tab shows what kay serves**: a "Served by kay" section lists the sitemap, robots.txt, feeds, manifest, favicons, service worker, health check and a library's dev pages such as `/_kay/mail`, each GET path linked, and says why there is no sitemap when `seo` is set without an origin. [kay dev](/reference/cli#kay-dev)
 - **`localPath` is stricter**: it also refuses a path that leaves the site once decoded, such as `/%2F/evil.example`, and kayjs-auth's `safeRedirect` now calls it. [Data loading](/essentials/data-loading)

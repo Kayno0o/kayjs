@@ -5,7 +5,6 @@ import process from 'node:process'
 import { Elysia } from 'elysia'
 import { s } from 'kay'
 import { defineEnv, queue, renderToString } from 'kay/server'
-import parseAddresses from 'nodemailer/lib/addressparser'
 import { escapeHtml as escape } from './escape'
 import { log } from './log'
 import { addressOf, outbox } from './outbox'
@@ -91,8 +90,14 @@ function counted(addresses: string[]): string {
   return `${addresses.length} ${addresses.length === 1 ? 'recipient' : 'recipients'} at ${domains.join(', ')}`
 }
 
+// nodemailer's address parser, read with the first mail rather than with the module.
+let addressParser: Promise<typeof import('nodemailer/lib/addressparser')> | undefined
+
 // One mailbox as nodemailer reads the string: a comma, a semicolon or a group in an address a visitor typed would add recipients to the envelope.
-function oneAddress(address: Address): boolean {
+async function oneAddress(address: Address): Promise<boolean> {
+  addressParser ??= import('nodemailer/lib/addressparser')
+
+  const parseAddresses = (await addressParser).default
   const parsed = parseAddresses(typeof address === 'string' ? address : address.address, { flatten: true })
 
   return parsed.length === 1 && Boolean(parsed[0]!.address)
@@ -269,7 +274,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
       if (LINE_BREAK.test(addressOf(address)))
         throw new Error(`kayjs-mail: "${message.subject}" has an address holding a line break`)
 
-      if (!oneAddress(address))
+      if (!await oneAddress(address))
         throw new Error(`kayjs-mail: "${message.subject}" has an address holding no address or several: each takes one, and several recipients go as an array`)
     }
 

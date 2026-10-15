@@ -5,7 +5,6 @@ import { createHash } from 'node:crypto'
 import { join } from 'node:path'
 import process from 'node:process'
 import { Elysia } from 'elysia'
-import MailComposer from 'nodemailer/lib/mail-composer'
 import { authMailerOptions, authMessage } from './auth'
 import { AUTH_SAMPLES, authSample } from './auth-samples'
 import { escapeHtml as escape } from './escape'
@@ -283,6 +282,8 @@ function events(): Response {
 }
 
 async function eml(mail: SentMail): Promise<Response> {
+  // Read on the first download, so the page itself never loads nodemailer.
+  const { default: MailComposer } = await import('nodemailer/lib/mail-composer')
   const message = await new MailComposer(nodemailerMessage(mail)).compile().build()
 
   return new Response(new Uint8Array(message), { headers: { 'content-type': 'message/rfc822', 'content-disposition': `attachment; filename="mail-${mail.id}.eml"`, 'cache-control': 'no-store' } })

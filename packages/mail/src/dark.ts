@@ -125,8 +125,22 @@ const RULES: [className: string, declarations: (palette: Palette) => string[]][]
   ['km-quote', palette => [`border-color:${palette.accent}`]],
 ]
 
+// Built once per settings object, as every mail of an app carries the same.
+const styles = new WeakMap<Settings, JSX.Element>()
+
 // Dark colours for clients honouring `prefers-color-scheme`, such as Apple Mail, and for Outlook.com, which marks the elements it recolours with `data-ogsc` and `data-ogsb`. The mail's document moves it into its head.
 export function darkStyle(settings: Settings): JSX.Element {
+  let style = styles.get(settings)
+
+  if (style === undefined) {
+    style = darkStyleOf(settings)
+    styles.set(settings, style)
+  }
+
+  return style
+}
+
+function darkStyleOf(settings: Settings): JSX.Element {
   const palette = darkPalette(settings)
   const rules = (selector: (className: string) => string) => RULES.map(([className, declarations]) => `${selector(className)}{${declarations(palette).map(declaration => `${declaration}!important`).join(';')}}`).join('')
 
