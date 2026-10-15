@@ -2102,17 +2102,26 @@ describe('pruning the compile caches', () => {
     const stale = join(cacheDir, '1abc-ssr.json')
     const checks = join(cacheDir, '1abc-shadow.json')
 
+    // Other tests of this file analysed components in this process.
+    keepAnalyses(new Set())
+
     try {
       await Bun.write(stale, '{}')
       await Bun.write(checks, '{}')
       expect(await pruneCompileCache(cacheDir)).toBe(0)
       await transformKayCached('p A\n', file, { target: 'ssr', cacheDir, root: cacheDir })
       await analyzeKayCached('p A\n', file, cacheDir, cacheDir)
+
+      // A variant of a live component the build did not use stays.
+      const variant = `${Bun.hash(file).toString(36)}-ssr-inspect.json`
+
+      await Bun.write(join(cacheDir, variant), '{}')
       expect(await pruneCompileCache(cacheDir)).toBe(1)
+      expect(await Bun.file(join(cacheDir, variant)).exists()).toBe(true)
 
       const left = await readdir(cacheDir)
 
-      expect(left).toHaveLength(3)
+      expect(left).toHaveLength(4)
       expect(left).toContain('1abc-shadow.json')
       expect(left).not.toContain('1abc-ssr.json')
     }

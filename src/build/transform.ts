@@ -2,7 +2,7 @@ import type { Diagnostic, SourceMap } from '../compiler'
 import type { LintLevels } from '../compiler/lints'
 import type { ImportedSignals } from '../compiler/module-signals'
 import type { CacheSlot } from './cache'
-import { readdirSync, readFileSync } from 'node:fs'
+import { readdirSync, readFileSync, realpathSync } from 'node:fs'
 import { dirname, join, relative } from 'node:path'
 import process from 'node:process'
 import { compileKay, formatDiagnostic, ISLAND_TWIN, withoutTwin } from '../compiler'
@@ -148,17 +148,29 @@ export function keepAnalyses(files: ReadonlySet<string>): void {
 // What a build keeps in `.kay/cache`: a file's compiled output, analysis and probed packages, and a package's answer, not what `kay check` keeps there.
 const BUILD_ENTRY = /^[\da-z]+-(?:(?:ssr|dom)(?:-hydratable)?(?:-inspect)?|analysis|probed|browser-only)\.json$/
 
-// Drops the entries of the files a full build no longer has, and of the packages and variants it did not probe; the entries it read or wrote and those of the components it analysed stay, so a server booting from the build still finds the ones of the pages the build did not load.
+// Drops the entries of the files a full build no longer has, and the answers for packages it did not probe; the entries it read or wrote and every variant of the components it analysed stay, so a server booting from the build still finds the ones of the pages the build did not load.
 export async function pruneCompileCache(cacheDir: string): Promise<number> {
   if (analyzed.size === 0)
     return 0
 
   const live = new Set<string>()
 
-  for (const { file } of analyzed.values())
-    live.add(Bun.hash(file).toString(36)).add(Bun.hash(`${file}${ISLAND_TWIN}`).toString(36))
+  for (const { file } of analyzed.values()) {
+    // Bun hands the loader a real path, which differs from the one the build walked under a linked root.
+    for (const name of new Set([file, realpathOrSelf(file)]))
+      live.add(Bun.hash(name).toString(36)).add(Bun.hash(`${name}${ISLAND_TWIN}`).toString(36))
+  }
 
   return pruneCache(cacheDir, BUILD_ENTRY, name => live.has(name.slice(0, name.indexOf('-'))))
+}
+
+function realpathOrSelf(file: string): string {
+  try {
+    return realpathSync(file)
+  }
+  catch {
+    return file
+  }
 }
 
 // One slot per source file and kind of output, so an edit replaces its entry rather than adding one.

@@ -57,7 +57,12 @@ export async function pruneCache(dir: string, owned: RegExp, keep: (name: string
 
   const stale = names.filter(name => owned.test(name) && !touched.has(join(dir, name)) && !keep(name))
 
-  await Promise.all(stale.map(async name => rm(join(dir, name), { force: true })))
+  await Promise.all(stale.map(async (name) => {
+    try {
+      await rm(join(dir, name), { force: true })
+    }
+    catch {}
+  }))
 
   return stale.length
 }

@@ -46,6 +46,7 @@ interface CachedEntry {
 }
 const STAMP_SETTLED_MS = 2000
 const LEGACY_CACHE_FILE = /^[\da-z]+\.json$/
+const ENTRY_CACHE_FILE = /\.entry\.json$/
 const sweptCaches = new Set<string>()
 // The cache directories a collection was compiled into in this process, which a full build may prune.
 const compiledInto = new Set<string>()
@@ -212,7 +213,7 @@ async function readCached(file: string): Promise<CachedEntry | undefined> {
 export async function pruneContentCache(): Promise<number> {
   const cacheDir = projectCache(rootOf(), 'content')
 
-  return compiledInto.has(cacheDir) ? pruneCache(cacheDir, /\.entry\.json$/) : 0
+  return compiledInto.has(cacheDir) ? pruneCache(cacheDir, ENTRY_CACHE_FILE) : 0
 }
 
 // The files an earlier version named after their content, one more with every edit, are dropped once per process.

@@ -315,10 +315,10 @@ async function outputStage(project: Project, exported: boolean, client: ClientBu
     await writeSearchIndex(client.dir, rendered.flatMap(page => page.search === false ? [] : [{ path: slashedPath(page.path, config.trailingSlash), html: page.html, weight: page.search }]))
   }
 
-  // The heads are the check's to read, so a build without checking skips them with it.
   // Every page ran, so the compiled files of components since deleted can go.
   await pruneCompileCache(cacheDir(root))
 
+  // The heads are the check's to read, so a build without checking skips them with it.
   const linted = checking ? pageSeoLints(config, rendered, exported) : []
 
   // Remote originals are kept between builds, revalidated as the image route does.
