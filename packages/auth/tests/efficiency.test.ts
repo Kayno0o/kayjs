@@ -350,4 +350,24 @@ describe('attempt keys', () => {
     expect(keys.some(key => key.startsWith('sign-in-account:'))).toBe(true)
     expect(keys.filter(key => key.includes('nobody'))).toEqual([])
   })
+
+  test('sessions ended by raising the version are pruned, and the live ones stay', async () => {
+    const store = memoryStore()
+    const now = Date.now()
+
+    await store.users.create(userRecord({ id: 'u1', email: 'ada@example.com' }))
+
+    for (const id of ['a', 'b'])
+      await store.sessions.create({ id, userId: 'u1', version: 0, userAgent: 'ua', ip: '127.0.0.1', createdAt: new Date(now), lastSeenAt: new Date(now), maxAge: null })
+
+    await store.users.update('u1', { sessionVersion: 1 })
+    await store.sessions.create({ id: 'c', userId: 'u1', version: 1, userAgent: 'ua', ip: '127.0.0.1', createdAt: new Date(now), lastSeenAt: new Date(now), maxAge: null })
+
+    const { browser } = testApp({ store })
+
+    setSystemTime(now + 5000)
+    await browser().json('/me')
+
+    expect((await store.sessions.listByUser('u1')).map(found => found.id)).toEqual(['c'])
+  })
 })

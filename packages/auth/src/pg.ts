@@ -332,6 +332,8 @@ export function pgStore(db: Database): AuthStore {
         attempts.write.deleteMany({ reset_at: { lte: now } }),
         sessions.write.deleteMany({ last_seen_at: { lt: new Date(now.getTime() - sessionMaxAge * 1000) } }),
         sessions.write.deleteMany({ created_at: { lt: new Date(now.getTime() - sessionAbsoluteMaxAge * 1000) } }),
+        // A session the user's version moved past is already refused, so its row goes too.
+        db.raw`DELETE FROM "auth_session" WHERE "version" < (SELECT "session_version" FROM "auth_user" WHERE "auth_user"."id" = "auth_session"."user_id")`,
       ])
     },
   }

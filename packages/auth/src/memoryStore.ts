@@ -395,7 +395,7 @@ export function memoryStore(): AuthStore {
       }
 
       for (const [key, session] of sessions) {
-        if (session.lastSeenAt.getTime() < at - sessionMaxAge * 1000 || session.createdAt.getTime() < at - sessionAbsoluteMaxAge * 1000)
+        if (session.lastSeenAt.getTime() < at - sessionMaxAge * 1000 || session.createdAt.getTime() < at - sessionAbsoluteMaxAge * 1000 || session.version < (users.get(session.userId)?.sessionVersion ?? 0))
           sessions.delete(key)
       }
     },

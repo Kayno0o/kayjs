@@ -366,6 +366,11 @@ export function storeContract(name: string, fresh: () => Promise<AuthStore>) {
       for (const [id, lastSeenAt, createdAt] of [['idle', at(-31), at(-31)], ['aged', at(0), at(-400)], ['live', at(-1), at(-2)]] as const)
         await store.sessions.create({ id, userId: 'u1', version: 0, userAgent: 'ua', ip: '127.0.0.1', createdAt, lastSeenAt, maxAge: null })
 
+      await store.users.create(userRecord({ id: 'u2', email: 'bob@example.com', sessionVersion: 1 }))
+
+      for (const [id, version] of [['ended', 0], ['current', 1]] as const)
+        await store.sessions.create({ id, userId: 'u2', version, userAgent: 'ua', ip: '127.0.0.1', createdAt: at(-1), lastSeenAt: at(-1), maxAge: null })
+
       await store.attempts.hit('short', 60)
       await store.attempts.hit('long', 7 * 24 * 3600)
 
@@ -378,6 +383,7 @@ export function storeContract(name: string, fresh: () => Promise<AuthStore>) {
       expect(await store.invitations!.get('live-invite')).toBeDefined()
       expect((await store.bearerTokens.listByUser('u1')).map(token => token.id).sort()).toEqual(['just-expired', 'live', 'never'])
       expect((await store.sessions.listByUser('u1')).map(session => session.id)).toEqual(['live'])
+      expect((await store.sessions.listByUser('u2')).map(session => session.id)).toEqual(['current'])
       expect(await store.attempts.count('long')).toBe(1)
     })
 
