@@ -162,7 +162,7 @@ const CHECK_ENTRY = /^[\da-z]+-(?:shadow|renders-island|analysis-check)\.json$/
 
 // Drops the entries of the files a full build no longer has, and the answers for packages it did not probe; the entries it read or wrote and every variant of the components it analysed stay, so a server booting from the build still finds the ones of the pages the build did not load.
 export async function pruneCompileCache(cacheDir: string): Promise<number> {
-  return analyzed.size === 0 ? Promise.resolve(0) : pruneEntries(cacheDir, BUILD_ENTRY)
+  return analyzed.size === 0 ? 0 : pruneEntries(cacheDir, BUILD_ENTRY)
 }
 
 // As a full build does for its own, the entries of the components a full `kay check` no longer has; never the LSP's or a path-filtered run's, which did not reach every component.
