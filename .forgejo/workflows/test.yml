@@ -38,7 +38,8 @@ jobs:
           if [ "$GITHUB_EVENT_NAME" = push ]; then
             # An API that does not answer leaves the tests to run.
             head=$(curl -sf --max-time 10 -H "Authorization: token $TOKEN" "$API/repos/$GITHUB_REPOSITORY/branches/$GITHUB_REF_NAME" | jq -r '.commit.id // empty' || true)
-            if [ -n "$head" ] && [ "$head" != "$GITHUB_SHA" ]; then
+            # Only a head with a run of its own: a push touching only .md files moves the branch and starts none.
+            if [ -n "$head" ] && [ "$head" != "$GITHUB_SHA" ] && curl -sf --max-time 10 -H "Authorization: token $TOKEN" "$API/repos/$GITHUB_REPOSITORY/commits/$head/status" | jq -e '[.statuses[]? | select(.context | startswith("Tests / "))] | length > 0' >/dev/null; then
               echo "Main moved on to $head, whose run tests this commit too"
               current=false
             fi

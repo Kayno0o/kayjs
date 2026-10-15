@@ -14,6 +14,7 @@ const NO_RUN = 3 * 60_000
 const DONE = new Set(['success', 'failure', 'skipped'])
 const QUEUED = new Set(['waiting', 'blocked'])
 const TEST_JOB = 'test'
+const VERSION = /^v\d/
 // How long a run may wait while the runner runs nothing before the wait is given up: a hung run ends at its timeout, so this is a runner that is down.
 const STALLED = 3 * 60_000
 const STAMP = /^\S+Z /
@@ -45,13 +46,16 @@ async function runOf(commit: string): Promise<Run | undefined> {
   if (own === undefined || (!DONE.has(own.status) && own.status !== 'cancelled'))
     return own
 
-  if (own.status === 'cancelled' || (await api<Job[]>(`actions/runs/${own.id}/jobs`)).some(job => job.name === TEST_JOB && job.status === 'skipped')) {
-    passedOver.add(commit)
+  if (own.status !== 'cancelled' && !(await api<Job[]>(`actions/runs/${own.id}/jobs`)).some(job => job.name === TEST_JOB && job.status === 'skipped'))
+    return own
 
-    return undefined
-  }
+  // A release's version commit skips these tests for its tag's publish workflow, on the same tree.
+  if (own.status !== 'cancelled' && VERSION.test(await $`git log -1 --format=%s ${commit}`.text()))
+    return { ...own, status: 'skipped' }
 
-  return own
+  passedOver.add(commit)
+
+  return undefined
 }
 
 async function runnerBusy(): Promise<boolean> {
@@ -143,7 +147,7 @@ while (finished === undefined) {
 }
 
 if (finished.status !== 'failure') {
-  console.log(`CI ${finished.status === 'success' ? 'passed' : 'skipped its tests'} on ${short}: ${finished.html_url}`)
+  console.log(`CI ${finished.status === 'success' ? 'passed' : 'skipped its tests, a release\'s publish workflow testing it'} on ${short}: ${finished.html_url}`)
   process.exit(0)
 }
 
