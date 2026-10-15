@@ -1004,6 +1004,74 @@ describe('transitions', () => {
     }
   })
 
+  const mountKeptMoves = site({
+    'panel.kay': 'p.panel(transition="fade" style="transition-duration: 200ms") Hi\n',
+    'main.kay': '---\nimport { signal } from \'kay\'\nimport Panel from \'./panel.kay\'\n\nconst b = document.createElement(\'b\')\nconst u = document.createElement(\'u\')\nconst panel = Panel({})\nconst step = signal(0)\n;(globalThis as { step?: () => void }).step = () => step.set(step() + 1)\nconst steps = [[panel, b], [b, panel], [b, u]]\n---\ndiv\n  | {steps[step()]}\n',
+  })
+
+  const mountPair = site({
+    'pair.kay': 'p.panel(transition="fade" style="transition-duration: 200ms") Hi\ni.plain\n',
+    'main.kay': '---\nimport { signal } from \'kay\'\nimport Pair from \'./pair.kay\'\n\nconst b = document.createElement(\'b\')\nconst pair = Pair({})\nconst step = signal(0)\n;(globalThis as { step?: () => void }).step = () => step.set(step() + 1)\nconst steps = [[pair, b], [b, pair]]\n---\ndiv\n  | {steps[step()]}\n',
+  })
+
+  it('move a kept unit with a transition at most once when its part reorders', async () => {
+    const { root, dispose } = await mountKeptMoves()
+    const step = (globalThis as unknown as { step: () => void }).step
+    const names = () => [...root.querySelector('div')!.children].map(child => child.localName)
+    const panel = root.querySelector('.panel')!
+    const moves = spyOn(Node.prototype, 'insertBefore')
+
+    try {
+      expect(names()).toEqual(['p', 'b'])
+      step()
+      await updated()
+      expect(names()).toEqual(['b', 'p'])
+      expect(moves.mock.calls.filter(([node]) => node === panel).length).toBe(0)
+    }
+    finally {
+      moves.mockRestore()
+      await dispose()
+    }
+  })
+
+  it('leave every node of a kept unit in place when only some have a transition', async () => {
+    const { root, dispose } = await mountPair()
+    const step = (globalThis as unknown as { step: () => void }).step
+    const names = () => [...root.querySelector('div')!.children].map(child => child.localName)
+    const moves = spyOn(Node.prototype, 'insertBefore')
+
+    try {
+      expect(names()).toEqual(['p', 'i', 'b'])
+      step()
+      await updated()
+      expect(names()).toEqual(['b', 'p', 'i'])
+      expect(moves.mock.calls.filter(([node]) => node instanceof Element && node.localName !== 'b').length).toBe(0)
+    }
+    finally {
+      moves.mockRestore()
+      await dispose()
+    }
+  })
+
+  it('draw a unit after a leaving node at the end of the part', async () => {
+    const { root, dispose } = await mountKeptMoves()
+    const step = (globalThis as unknown as { step: () => void }).step
+    const names = () => [...root.querySelector('div')!.children].map(child => child.localName)
+
+    try {
+      step()
+      await updated()
+      step()
+      await updated()
+      expect(names()).toEqual(['b', 'p', 'u'])
+      await done()
+      expect(names()).toEqual(['b', 'u'])
+    }
+    finally {
+      await dispose()
+    }
+  })
+
   const mount21 = site({ 'main.kay': toggled(false, `p.panel(transition:enter="transition-opacity" transition:enter-from="opacity-0" transition:leave-to="opacity-0 scale-95" ${STYLE}) Hi`) })
 
   it('take the classes of each phase from its own attribute, as Tailwind writes them', async () => {
