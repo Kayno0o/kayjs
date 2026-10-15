@@ -61,6 +61,8 @@ import { serveViolationReports } from './violations'
 import { agreeOnWildcards } from './wildcards'
 
 const READS = new Set(['GET', 'HEAD'])
+// What the dev tool's Routes tab says when `seo` is set without the origin the site is public at.
+const NO_ORIGIN_NOTE = 'seo is set but not the origin the site is public at, so there is no sitemap or robots.txt: set site in kay.config.ts or SITE_URL.'
 
 // Options given here win over the project's `kay.config.ts`.
 export interface PagesOptions extends KayConfig {
@@ -218,7 +220,8 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
     rebaseRedirects(app, base)
 
   if (options.health !== false) {
-    served.claim({ path: options.health?.path ?? HEALTH_PATH, owner: 'the health check', kind: 'kay' })
+    // Offered, so an app file at the path keeps it as before.
+    served.offer({ path: options.health?.path ?? HEALTH_PATH, owner: 'the health check', kind: 'kay' })
     serveHealth(app, lifecycle, options.health)
   }
 
@@ -235,12 +238,16 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   const mountedByExtensions: OwnRoutes['extensions'] = []
 
   for (const { name, server } of await extensionServers(options.extensions)) {
+    if (!mode.dev) {
+      app.use(server)
+
+      continue
+    }
+
     const before = new Set(app.routes.map(route => `${route.method} ${route.path}`))
 
     app.use(server)
-
-    if (mode.dev)
-      mountedByExtensions.push(...app.routes.filter(route => route.method === 'GET' && !before.has(`${route.method} ${route.path}`)).map(route => ({ owner: name, path: route.path })))
+    mountedByExtensions.push(...app.routes.filter(route => route.method === 'GET' && !before.has(`${route.method} ${route.path}`)).map(route => ({ owner: name, path: route.path })))
   }
 
   for (const path of await serveBuildFiles(app, client, { dev: mode.dev, security }))
@@ -257,7 +264,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
 
   // The dev tool's Routes tab, once the endpoints and API modules are known.
   if (mode.dev)
-    app.get(DEV_ROUTES, () => Response.json(devRoutes(root, routes, endpoints, api.mounted, i18n?.settings, base, { claims: served.kay(), extensions: mountedByExtensions, notes: options.seo !== undefined && site === undefined ? ['`seo` is set but not the origin the site is public at, so there is no sitemap or robots.txt: set `site` in kay.config.ts or SITE_URL.'] : [] })))
+    app.get(DEV_ROUTES, () => Response.json(devRoutes(root, routes, endpoints, api.mounted, i18n?.settings, base, { claims: served.kay(), extensions: mountedByExtensions, notes: options.seo !== undefined && site === undefined ? [NO_ORIGIN_NOTE] : [] })))
 
   // Claimed before kay's own files, which give way to them; registered last, before the pages.
   const redirects = readRedirects(options.redirects ?? {})
