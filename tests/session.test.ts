@@ -4,7 +4,7 @@ import { rename, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { Database } from 'bun:sqlite'
-import { afterEach, describe, expect, it, setSystemTime, spyOn } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { stringify } from 'devalue'
 import { Elysia } from 'elysia'
 import { configuredSite, setSite } from '../src/runtime/site'
@@ -90,6 +90,11 @@ async function logsOf(run: () => Promise<unknown>): Promise<string[]> {
 }
 
 describe('sessions', () => {
+  // A cookie's lifetime counts whole seconds from when the session started, so a second ticking over between two requests would take one off what a test expects.
+  beforeEach(() => {
+    setSystemTime(Date.now())
+  })
+
   it('warns once in production that a sign-in on a session without a store cannot be revoked, and not with one', async () => {
     const SINK = Symbol.for('kay.log')
     const global = globalThis as { [SINK]?: unknown }
