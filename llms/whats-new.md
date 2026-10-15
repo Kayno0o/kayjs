@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- A static export writes its endpoint files, sitemap and feeds sixteen at a time, so an endpoint's `GET` no longer runs alone ([Endpoint files](routing.md#endpoint-files)).
 - `markInvalid(element, by, invalid)` from `kay` marks a field `aria-invalid` for one source among several, so an island's refused field stays invalid while a kayjs-ui `FormField` still shows a message for it ([Islands](islands.md#forms-posting-in-place)).
 
 ## 1.44.0

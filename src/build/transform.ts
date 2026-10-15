@@ -207,6 +207,7 @@ function compilerFingerprint(): string {
     const sources = [
       ...compilerModules(compilerDir),
       join(import.meta.dir, 'transform.ts'),
+      join(import.meta.dir, 'probe.ts'),
       join(import.meta.dir, '../check/shadow.ts'),
       join(import.meta.dir, '../../package.json'),
       ...COMPILER_PACKAGES.map(manifest => Bun.resolveSync(manifest, compilerDir)),
