@@ -45,7 +45,15 @@ export const start: Command = {
     const command = typeof option === 'string' ? [process.execPath, resolve(option)] : await serverCommand(root, output, built.mtimeMs)
     const env = await environmentWithoutDotenv()
     const forwarded = new Set<string>()
-    let server: Bun.Subprocess
+    let server: Bun.Subprocess | undefined
+
+    // Taken before the server starts: a Ctrl-C to the group landing as it boots would otherwise end `kay start` alone, leaving the server running.
+    for (const signal of FORWARDED) {
+      process.on(signal, () => {
+        forwarded.add(signal)
+        server?.kill(signal)
+      })
+    }
 
     try {
       server = Bun.spawn(command, { cwd: root, env: { ...env, NODE_ENV: 'production', [START_PARENT]: String(process.pid), ...typeof port === 'string' && { PORT: port } }, stdio: ['inherit', 'inherit', 'inherit'], detached: true })
@@ -54,13 +62,6 @@ export const start: Command = {
       console.error(`kay start: cannot run ${relative(process.cwd(), command.at(-1)!)}: ${error instanceof Error ? error.message : String(error)}`)
 
       return 1
-    }
-
-    for (const signal of FORWARDED) {
-      process.on(signal, () => {
-        forwarded.add(signal)
-        server.kill(signal)
-      })
     }
 
     const code = await server.exited

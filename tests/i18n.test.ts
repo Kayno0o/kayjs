@@ -529,14 +529,17 @@ describe('kay check', () => {
       const found = diagnostics.map(({ file, line, message }) => ({ file: file.slice(file.indexOf(fixture) + fixture.length + 1), line, message }))
       const lines = Object.fromEntries(Object.entries(Object.groupBy(found, ({ file }) => file)).map(([file, at]) => [file, at!.map(({ line }) => line).toSorted((a, b) => a - b)]))
 
-      // What the changes break and nothing else: the fixture's own pages pass, their unprefixed links included, as the server sends those on to the visitor's locale.
-      expect(lines).toEqual({
+      const expected = {
         'src/messages/en.ts': [1, 6, 7, 7, 8, 8, 8],
         'src/routes/typo.kay': [4, 5, 6, 7],
         'src/routes/rich.kay': [9, 12, 17, 19],
         'src/routes/links.kay': [2, 3],
         'src/routes': [1],
-      })
+      }
+
+      // What the changes break and nothing else: the fixture's own pages pass, their unprefixed links included, as the server sends those on to the visitor's locale. A file reported that should not be is shown with its messages.
+      expect(found.filter(({ file }) => !(file in expected))).toEqual([])
+      expect(lines).toEqual(expected)
       expect(found.filter(({ file }) => file === 'src/messages/en.ts').map(({ line, message }) => [line, message])).toEqual(expect.arrayContaining([
         [1, 'lacks greeting, which src/messages/fr.ts has'],
         [7, 'gives saved without {date}, which src/messages/fr.ts has'],

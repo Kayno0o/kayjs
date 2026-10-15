@@ -837,7 +837,7 @@ describe.concurrent('kay check, edge cases', () => {
     const root = await scratchProject({ 'src/routes/index.kay': page })
 
     try {
-      expect((await check(root)).map(d => [d.line, d.message.match(/kayError: "([^"]+)"/)?.[1]])).toEqual([
+      expect((await check(root)).map(d => [d.line, d.message.match(/kayError: "([^"]+)"/)?.[1] ?? d.message])).toEqual([
         [12, 'ctx.fail takes an error status, from 400 to 599, not 200'],
         [17, 'A redirect goes to a path or an http(s) URL, not to a javascript: URL'],
         [21, 'A duration is positive, seconds or a string such as \'5m\', not 0'],

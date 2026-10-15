@@ -918,8 +918,13 @@ describe('transitions', () => {
   // Past two frames of happy-dom's, at about 16 ms each, and short of the 200 ms the transitions below take.
   // Once the effects a click queued have run, before any frame.
   const updated = async () => new Promise<void>(resolve => queueMicrotask(resolve))
-  const twoFrames = async () => new Promise(resolve => setTimeout(resolve, 60))
-  const done = async () => new Promise(resolve => setTimeout(resolve, 260))
+  // happy-dom runs a frame as an immediate, so these, asked after the runtime's frames, run after them however late the process runs: fixed waits raced the runtime's timer under load.
+  const twoFrames = async () => new Promise(resolve => setImmediate(() => setImmediate(resolve)))
+  // Past the 200 ms the styles give a phase, on a timer set after the runtime's own.
+  const done = async () => {
+    await twoFrames()
+    await new Promise(resolve => setTimeout(resolve, 210))
+  }
   const STYLE = 'style="transition-duration: 200ms"'
   const toggled = (open: boolean, element: string) => `---\nimport { signal } from 'kay'\n\nconst open = signal(${open})\n---\nbutton(onClick={() => open.set(!open())}) Toggle\nif open()\n  ${element}\n`
 
