@@ -12,8 +12,9 @@ console.log(\`ready \${server.port}\`)
 process.on('SIGTERM', () => process.exit(0))
 `
 const CHROME = 'gzip, deflate, br, zstd'
-const SAFARI = 'gzip, deflate, br'
-const LOADS = [['/', 'identity'], ['/', CHROME], ['/', SAFARI], ['/table', 'identity'], ['/table', CHROME], ['/table', SAFARI]] as const
+const NO_ZSTD = 'gzip, deflate, br'
+const LABELS: Record<string, string> = { identity: 'uncompressed', [CHROME]: 'Chrome', [NO_ZSTD]: 'no zstd' }
+const LOADS = [['/', 'identity'], ['/', CHROME], ['/', NO_ZSTD], ['/table', 'identity'], ['/table', CHROME], ['/table', NO_ZSTD]] as const
 const WARM = 300
 const MEASURED = 4000
 const AT_ONCE = 16
@@ -99,7 +100,7 @@ for (let round = 0; round < rounds; round++) {
 
     for (const [path, encoding] of LOADS) {
       const { server: loaded, origin: at } = await started(executable)
-      const label = `${path} ${({ identity: 'uncompressed', [CHROME]: 'Chrome', [SAFARI]: 'Safari' } as Record<string, string>)[encoding]}`
+      const label = `${path} ${LABELS[encoding]}`
 
       await hammer(`${at}${path}`, encoding, WARM)
 

@@ -168,7 +168,7 @@ function brotliWindow(length: number): number {
   return Math.min(Math.max(Math.ceil(Math.log2(length)), constants.BROTLI_MIN_WINDOW_BITS), constants.BROTLI_MAX_WINDOW_BITS)
 }
 
-// Up to this size a body compresses on the main thread, within its request's tick: it costs about a quarter less CPU than on zlib's threads, gzip needs no node:zlib loaded, and its reply goes out corked with a length. Past it, the main thread would stall for more than about half a millisecond.
+// Up to this size a body compresses on the main thread, within its request's tick: it costs about a quarter less CPU than on zlib's threads, gzip needs no node:zlib loaded, and its reply goes out corked with a length. Past it, the main thread would stall for more than about half a millisecond on a typical page.
 const COMPRESS_HERE_BYTES = 128 * 1024
 
 function compressBytesHere(bytes: Uint8Array<ArrayBuffer>, encoding: Encoding): Uint8Array<ArrayBuffer> {

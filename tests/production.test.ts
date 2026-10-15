@@ -1607,7 +1607,7 @@ describe('compression', () => {
     expect(page.headers.get('content-security-policy')).toStartWith('default-src \'self\'')
     expect(Bun.zstdDecompressSync(await page.bytes()).toString()).toBe(await plain.text())
 
-    // Safari takes no zstd, and gets gzip: at the levels a request affords, brotli saves no bytes over it on a page.
+    // A browser taking no zstd gets gzip: at the levels a request affords, brotli saves no bytes over it on a page.
     const safari = await fetch('/contact', 'gzip, deflate, br')
 
     expect(safari.headers.get('content-encoding')).toBe('gzip')
@@ -1702,7 +1702,7 @@ describe('compression', () => {
     // Random bytes, which no compression shrinks enough to send compressed.
     let seed = 1
     const noise = Uint8Array.from({ length: 140_000 }, () => (seed = Math.imul(seed, 1664525) + 1013904223 | 0) >>> 24)
-    const pages: Record<string, string | Uint8Array<ArrayBuffer>> = { '/pool': `<p>${words(24000)}</p>`, '/spliced': `${style}<p>${words(12000)}</p>`, '/here': `${style}<p>${words(100)}</p>`, '/small': `<p>${words(1500)}</p>`, '/noise': noise }
+    const pages: Record<string, string | Uint8Array<ArrayBuffer>> = { '/middle': `<p>${words(12000)}</p>`, '/pool': `<p>${words(24000)}</p>`, '/spliced': `${style}<p>${words(12000)}</p>`, '/here': `${style}<p>${words(100)}</p>`, '/small': `<p>${words(1500)}</p>`, '/noise': noise }
     const server = Bun.serve({ port: 0, hostname: '127.0.0.1', fetch: async (request) => {
       const response = wholeResponse(pages[new URL(request.url).pathname]!, { headers: { 'content-type': 'text/html' } })
 
@@ -1710,7 +1710,7 @@ describe('compression', () => {
     } })
 
     try {
-      for (const [path, accept, encoding, stream] of [['/pool', 'br', 'br', true], ['/spliced', 'br, gzip', 'gzip', true], ['/noise', 'br', null, true], ['/here', 'br, gzip', 'gzip', false], ['/small', 'br', 'br', false]] as const) {
+      for (const [path, accept, encoding, stream] of [['/middle', 'gzip', 'gzip', false], ['/middle', 'zstd', 'zstd', false], ['/pool', 'br', 'br', true], ['/spliced', 'br, gzip', 'gzip', true], ['/noise', 'br', null, true], ['/here', 'br, gzip', 'gzip', false], ['/small', 'br', 'br', false]] as const) {
         const url = `http://127.0.0.1:${server.port}${path}`
         const sent = await (await fetch(url, { headers: { 'accept-encoding': accept }, decompress: false })).bytes()
         const response = await fetch(url, { headers: { 'accept-encoding': accept } })
@@ -1774,11 +1774,15 @@ describe('compression', () => {
     expect(await plain.text()).toBe(page)
   })
 
-  it('compresses a page for Chrome or Safari without loading node:zlib', async () => {
+  it('compresses a page for a browser taking zstd or gzip without loading node:zlib', async () => {
     const { compressResponse, wholeResponse } = await import('../src/server/compress')
+    const app = new Elysia().use(await pages({ routes, prebuilt: false, compress: true }))
     const loaded = spyOn(process, 'getBuiltinModule')
 
     try {
+      for (const accept of ['gzip, deflate, br, zstd', 'gzip, deflate, br'])
+        expect((await app.handle(new Request('http://localhost/contact', { headers: { 'accept-encoding': accept } }))).headers.get('content-encoding')).toBe(accept.includes('zstd') ? 'zstd' : 'gzip')
+
       for (const accept of ['gzip, deflate, br, zstd', 'gzip, deflate, br']) {
         for (const size of [300, 12000]) {
           const page = `<p>${Array.from({ length: size }, (_, i) => (i * 2654435761 % 1e9).toString(36)).join(' ')} ${accept}</p>`
