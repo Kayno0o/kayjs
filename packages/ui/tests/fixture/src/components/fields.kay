@@ -26,7 +26,7 @@ const roster = signal('Ada\nGrace')
 ---
 TextInput#name(value={name()} onInput={value => name.set(value)} onChange={onCommit} onBlur={event => onLeave?.(event.currentTarget.id)})
 p#echo {name()}
-TextInput#amount(type="number" value={amount()} onInput={amount.set})
+TextInput#amount(type="number" value={amount()} onInput={amount.set} onChange={next => onPicked?.(next)})
 p#figure {amount() === null ? 'none' : `${typeof amount()} ${amount()}`}
 button#reset(onClick={() => amount.set(null)}) Reset
 button#clear(onClick={() => name.set('')}) Clear

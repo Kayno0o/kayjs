@@ -45,7 +45,7 @@ function report(callback: ((value: never) => void) | undefined, input: HTMLInput
     callback?.(read(input) as never)
 }
 
-// Whether the box already reads as `next`: a number box answers `2.` and `2.30` as 2 and 2.3, so a parent writing its own spelling of that figure back writes the same thing, and doing it would take the caret out of the word being typed.
+// Whether the box already reads as `next`: a number box answers `2.` and `2.30` as 2 and 2.3, so a parent writing its own spelling of that figure back writes the same thing, and doing it would take the caret out of the word being typed. An empty side matches only another, `Number('')` being 0.
 function reads(input: HTMLInputElement, next: string): boolean {
   return input.value === next || (input.type === 'number' && (halfTyped(input) || (input.value !== '' && next !== '' && Number(input.value) === Number(next))))
 }

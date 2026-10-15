@@ -1,7 +1,7 @@
 ---
 import type { JSX } from 'kay'
 import { onMount } from 'kay'
-import { isCurrentTab, keptHref } from './tab-nav'
+import { currentTab, keptHref } from './tab-nav'
 
 const { links, current, keep = [], label, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['nav'], 'class' | 'children'> & {
   links: readonly { href: string, label: string }[]
@@ -15,6 +15,8 @@ const { links, current, keep = [], label, class: className, ...rest } = props<Om
 }>()
 
 let nav: HTMLElement | undefined
+
+const marked = () => currentTab(links.map(link => link.href), current)
 
 // A tab bar wider than a phone scrolls, so the current tab is centred in it rather than left off screen. Only the bar scrolls: `scrollIntoView` would also move the page to it.
 onMount(() => {
@@ -32,4 +34,4 @@ onMount(() => {
 // Links rather than buttons: each tab is a page of its own, which a reload, a new tab or a shared url opens.
 nav.kui-tab-nav({...rest} ref={element => nav = element} aria-label={label} class={className})
   for link of links key={link.href}
-    a.kui-tab-nav-link(href={keptHref(link.href, current, keep)} aria-current={isCurrentTab(link.href, current) ? 'page' : undefined}) {link.label}
+    a.kui-tab-nav-link(href={keptHref(link.href, current, keep)} aria-current={link.href === marked() ? 'page' : undefined}) {link.label}

@@ -1,8 +1,15 @@
 // Stands in for the origin while a relative `current` is read as a URL; nothing outside this file sees it.
 const ORIGIN = 'http://kay.invalid'
 
+// The link to the page `current` names, the one setting the most params when several match, so `/a?view=chart` wins over `/a` on that view.
+export function currentTab(hrefs: readonly string[], current: string | URL): string | undefined {
+  const set = (href: string) => [...new URL(href, ORIGIN).searchParams].length
+
+  return hrefs.filter(href => isCurrentTab(href, current)).reduce<string | undefined>((best, href) => best === undefined || set(href) > set(best) ? href : best, undefined)
+}
+
 // Whether `href` is the page `current` names: the same string, or, against a URL, the same path with every param the link sets matching.
-export function isCurrentTab(href: string, current: string | URL): boolean {
+function isCurrentTab(href: string, current: string | URL): boolean {
   if (typeof current === 'string')
     return href === current
 

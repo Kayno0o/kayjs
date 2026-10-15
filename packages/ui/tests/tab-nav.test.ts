@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { isCurrentTab, keptHref } from '../src/tab-nav'
+import { currentTab, keptHref } from '../src/tab-nav'
 
 describe('keptHref', () => {
   const current = new URL('https://example.com/traffic/bots?period=7d&site=a&site=b&page=3')
@@ -19,18 +19,17 @@ describe('keptHref', () => {
   })
 })
 
-describe('isCurrentTab', () => {
+describe('currentTab', () => {
   test('matches a string current as written', () => {
-    expect(isCurrentTab('/settings', '/settings')).toBe(true)
-    expect(isCurrentTab('/settings', '/settings?tab=1')).toBe(false)
+    expect(currentTab(['/settings', '/settings/keys'], '/settings')).toBe('/settings')
+    expect(currentTab(['/settings'], '/settings?tab=1')).toBeUndefined()
   })
 
-  test('matches a URL by its path and the params the link sets', () => {
+  test('matches a URL by its path and the params the link sets, the link setting the most winning', () => {
     const current = new URL('https://example.com/traffic?period=7d&view=table')
 
-    expect(isCurrentTab('/traffic', current)).toBe(true)
-    expect(isCurrentTab('/traffic?view=table', current)).toBe(true)
-    expect(isCurrentTab('/traffic?view=chart', current)).toBe(false)
-    expect(isCurrentTab('/traffic/sites', current)).toBe(false)
+    expect(currentTab(['/traffic', '/traffic/sites'], current)).toBe('/traffic')
+    expect(currentTab(['/traffic', '/traffic?view=table', '/traffic?view=chart'], current)).toBe('/traffic?view=table')
+    expect(currentTab(['/traffic?view=chart', '/traffic/sites'], current)).toBeUndefined()
   })
 })

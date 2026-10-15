@@ -88,6 +88,11 @@ describe('TextInput', () => {
 
     expect(root.querySelector('#figure')?.textContent).toBe('number 0')
 
+    type(input, '3', 'change')
+    type(input, '', 'change')
+
+    expect(picks).toEqual([3, null])
+
     click(root.querySelector('#reset'))
     await settle()
 

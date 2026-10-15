@@ -93,7 +93,8 @@ function declaredProps(checker: ts.TypeChecker, source: ts.SourceFile): Prop[] {
       prop.optional ||= optional
       prop.comment ??= commentOf(declaration)
 
-      prop.types.add(written.replace(UNDEFINED, ''))
+      for (const member of members(written.replace(UNDEFINED, '')))
+        prop.types.add(member)
 
       props.set(symbol.name, prop)
     }
@@ -104,6 +105,28 @@ function declaredProps(checker: ts.TypeChecker, source: ts.SourceFile): Prop[] {
 
     return { ...prop, type: shown.length === 1 ? unwrap(shown[0]!) : shown.join(' | ') }
   })
+}
+
+// The members of a union as printed, split at the top level only, so two shapes both taking `string` list it once.
+function members(type: string): string[] {
+  const parts: string[] = []
+  let depth = 0
+  let start = 0
+
+  for (const [index, char] of [...type].entries()) {
+    if ('([{<'.includes(char)) {
+      depth++
+    }
+    else if (')]}'.includes(char) || (char === '>' && type[index - 1] !== '=')) {
+      depth--
+    }
+    else if (char === '|' && depth === 0) {
+      parts.push(type.slice(start, index).trim())
+      start = index + 1
+    }
+  }
+
+  return [...parts, type.slice(start).trim()]
 }
 
 // `((value: string) => void)`, as an optional function prints once ` | undefined` is gone, loses its outer parens.
