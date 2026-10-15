@@ -14,7 +14,7 @@ const spinning = () => busy ?? pending()
 const look = () => lookOf(variant, className)
 
 async function press(event: MouseEvent) {
-  if (pending()) {
+  if (busy === undefined && pending()) {
     event.preventDefault()
 
     return
@@ -48,7 +48,7 @@ if linkOf(attributes) as link
     | {label}
     slot
 else if buttonOf(attributes) as button
-  button.kui-btn({...button} class={look()} disabled={button.disabled || (busy === undefined && pending())} aria-busy={spinning() ? 'true' : undefined} onClick={press})
+  button.kui-btn({...button} class={look()} disabled={button.disabled || (busy === undefined && pending() && button.type !== 'submit' && button.type !== 'reset')} aria-busy={spinning() ? 'true' : undefined} onClick={press})
     if spinning()
       Icon(icon="spinner" class="kui-spinner")
     else if icon

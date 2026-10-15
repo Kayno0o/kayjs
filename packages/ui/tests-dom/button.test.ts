@@ -99,8 +99,32 @@ test('an explicit busy prop wins, whether it is false or true', async () => {
 
   expect(state(root, 'forced')).toEqual([null, false])
 
+  click(root.querySelector('#forced'))
+  await settle()
+
+  expect(save.settles.length).toBe(2)
+
   mounted.unmount()
   mounted = await mount('src/components/buttons.kay', { onSave: save.run, onSubmit: () => undefined, busy: true })
 
   expect(state(mounted.root, 'forced')).toEqual(['true', false])
+})
+
+test('a submit Button whose onClick answers a promise still submits its form, busy but not disabled', async () => {
+  const save = later()
+  const submits: number[] = []
+
+  mounted = await mount('src/components/buttons.kay', { onSave: save.run, onSubmit: () => submits.push(1) })
+
+  const root = mounted.root
+
+  click(root.querySelector('#sendAsync'))
+  await settle()
+
+  expect([state(root, 'sendAsync'), submits, save.settles.length]).toEqual([['true', false], [1], 1])
+
+  click(root.querySelector('#sendAsync'))
+  await settle()
+
+  expect([submits, save.settles.length]).toEqual([[1], 1])
 })

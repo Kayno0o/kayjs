@@ -115,6 +115,8 @@ form(action={add} onSubmit={submit})
 
 In a `catch`, `add.refused(error)` tells a refusal from `ctx.fail` apart from any other error and types `error.data`. `focusInvalid()` from `kay` moves focus to the first field marked `aria-invalid`.
 
+While an island's `onSubmit` returns a promise, the form and its submit buttons are `aria-busy`.
+
 Once a call goes through, the page's loads run again, so the list it shows is up to date. `add({ title }, { refresh: false })` leaves the page as it is.
 
 ## File uploads

@@ -98,7 +98,7 @@ Each component spreads the other attributes it is given onto its root element, `
 - `Button(label="Save" variant="accent" icon="plus")`:
   - `variant` is `default`, `accent` or `danger`.
   - Its label stays on one line; a row of buttons wraps whole buttons, as the dialog and panel footers do.
-  - A promise returned by `onClick` holds that button alone busy (spinner in place of the icon, `aria-busy`) and disabled until it settles; a rejection is logged. A `type="submit"` button is busy the same way while its form's `onSubmit` returns a promise.
+  - A promise returned by `onClick` holds that button alone busy (spinner in place of the icon, `aria-busy`) and disabled until it settles; a rejection is logged. A `type="submit"` button is busy (spinner, `aria-busy`, clicks ignored) the same way, but not disabled, while its `onClick` or its form's `onSubmit` returns a promise.
   - An explicit `busy` shows a spinner and sets `aria-busy` and has the last word; it does not disable the button.
   - `expanded` sets `aria-expanded`, for a button that opens a panel.
   - `type` defaults to `button`, so a button inside a form never submits it by accident: pass `type="submit"` to submit. Children render after `label`.

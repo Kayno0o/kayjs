@@ -1334,3 +1334,34 @@ describe('a site under a base', () => {
     }
   })
 })
+
+describe('a form submitted in the browser', () => {
+  const mountForm = site({
+    'main.kay': '---\nimport { signal } from \'kay\'\n\nconst count = signal(0)\nconst answers: (() => void)[] = []\n\nfunction send(event: SubmitEvent) {\n  event.preventDefault()\n  count.set(count() + 1)\n\n  return new Promise<void>(resolve => answers.push(resolve))\n}\n---\nform(onSubmit={send})\n  button#go(type="submit") Send\n  button#other(type="button") Other\n  input(type="submit" value="Input")\nbutton#settle(type="button" onClick={() => answers.shift()?.()}) settle\n',
+  })
+
+  it('is aria-busy with its submit buttons while an onSubmit answers a promise, however many are pending', async () => {
+    const { root, dispose } = await mountForm()
+
+    try {
+      const form = root.querySelector('form')!
+      const busy = () => [form, root.querySelector('#go'), root.querySelector('#other')].map(element => element!.getAttribute('aria-busy'))
+
+      form.requestSubmit()
+      form.requestSubmit()
+      await settle()
+      expect(busy()).toEqual(['true', 'true', null])
+
+      root.querySelector<HTMLElement>('#settle')!.click()
+      await settle()
+      expect(busy()).toEqual(['true', 'true', null])
+
+      root.querySelector<HTMLElement>('#settle')!.click()
+      await settle()
+      expect(busy()).toEqual([null, null, null])
+    }
+    finally {
+      await dispose()
+    }
+  })
+})

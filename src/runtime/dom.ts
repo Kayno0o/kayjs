@@ -1151,7 +1151,7 @@ function holding(handler: (event: Event) => void): (event: Event) => void {
     listener = function (this: unknown, event) {
       const answer: unknown = handler.call(this, event)
 
-      if (typeof Reflect.get(new Object(answer), 'then') === 'function' && event.currentTarget instanceof HTMLFormElement)
+      if (typeof answer === 'object' && answer !== null && typeof Reflect.get(answer, 'then') === 'function' && event.currentTarget instanceof HTMLFormElement)
         void hold(event.currentTarget, answer as PromiseLike<unknown>)
     }
     held.set(handler, listener)
@@ -1180,9 +1180,11 @@ async function hold(form: HTMLFormElement, answer: PromiseLike<unknown>): Promis
   holds.set(form, (holds.get(form) ?? 0) + 1)
   setBusy(form, true)
 
+  // The page's own handling of a rejection stands: this only waits for the answer to settle.
   try {
     await answer
   }
+  catch {}
   finally {
     const left = holds.get(form)! - 1
 
@@ -1199,7 +1201,7 @@ export function listen(element: Element, name: string, handler: (event: Event) =
 
   if (!DELEGATED.has(type)) {
     if (replaced)
-      element.removeEventListener(type, held.get(replaced) ?? replaced)
+      element.removeEventListener(type, type === 'submit' ? held.get(replaced) ?? replaced : replaced)
 
     element.addEventListener(type, type === 'submit' ? holding(handler) : handler)
 
@@ -1222,7 +1224,7 @@ function unlisten(element: Element, name: string, handler: (event: Event) => voi
   if (DELEGATED.has(type))
     (element as ElementRecord)[`$$${type}`] = undefined
   else
-    element.removeEventListener(type, held.get(handler) ?? handler)
+    element.removeEventListener(type, type === 'submit' ? held.get(handler) ?? handler : handler)
 }
 
 // Calls the handlers from the event's target up, each seeing its own element as `currentTarget`, until one stops propagation.

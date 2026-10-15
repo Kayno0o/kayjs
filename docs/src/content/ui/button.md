@@ -18,7 +18,7 @@ description: A button or a link styled as one, with an optional icon and a busy 
 
 ## Busy
 
-Return a promise from `onClick` and the button swaps its icon for a spinner, marks itself `aria-busy` and disables itself until the promise settles. Only that button is held, however many share an action. A submit button does the same while its form's `onSubmit` returns a promise.
+Return a promise from `onClick` and the button swaps its icon for a spinner, marks itself `aria-busy` and disables itself until the promise settles. Only that button is held, however many share an action. A submit button shows the spinner and ignores clicks the same way, but is not disabled, so it still submits its form, while its `onClick` or its form's `onSubmit` returns a promise.
 
 Pass `busy` yourself to decide instead: it has the last word, and it only shows the spinner without disabling the button.
 
