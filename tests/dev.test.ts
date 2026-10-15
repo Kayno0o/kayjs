@@ -335,6 +335,42 @@ describe.concurrent('kay dev', () => {
     }
   }, 60_000)
 
+  it('keeps writing types through one process across edits of sources, and reads the config again once it or a module changes', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
+    const children: Subprocess[] = []
+    const shadow = join(root, '.kay/types/src/routes/index.kay.tsx')
+
+    await Bun.write(join(root, 'src/server.ts'), 'setInterval(() => undefined, 1000)\n')
+    await Bun.write(join(root, 'src/routes/index.kay'), 'p Home\n')
+    await Bun.write(join(root, 'kay.config.ts'), 'export default { publicDir: \'one\' }\n')
+    const stop = await dev(root, { onRestart: child => children.push(child) })
+
+    const restarted = async (edit: () => Promise<unknown>) => {
+      const count = children.length
+
+      await edit()
+      await until(() => children.length === count + 1, 20_000)
+    }
+
+    try {
+      await until(() => existsSync(shadow), 20_000)
+      expect(readShadowSettings(root).publicDir).toBe(join(root, 'one'))
+
+      for (const text of ['p Second\n', 'p Third\n']) {
+        await restarted(async () => Bun.write(join(root, 'src/routes/index.kay'), text))
+        await until(() => readFileSync(shadow, 'utf8').includes(text.slice(2, -1)), 20_000)
+      }
+
+      expect(readShadowSettings(root).publicDir).toBe(join(root, 'one'))
+      await restarted(async () => Bun.write(join(root, 'kay.config.ts'), 'export default { publicDir: \'two\' }\n'))
+      await until(() => readShadowSettings(root).publicDir === join(root, 'two'), 20_000)
+    }
+    finally {
+      await stop()
+      await rm(root, { recursive: true, force: true })
+    }
+  }, 60_000)
+
   it('stops without waiting on a types process stuck importing the config', async () => {
     const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
     const children: Subprocess[] = []

@@ -15,6 +15,7 @@ import { startClientBuilder } from './client'
 import { inspectorProxy } from './inspector'
 import { CONFIG_REFUSED, REFUSE } from './refuse'
 import { environmentWithoutDotenv, PAGES_ENTRY, stylesOnly, watchProject } from './sources'
+import { TypesProcess } from './types-process'
 
 export interface DevOptions {
   // The server entry, relative to the root, `src/server.ts` by default; with no file there, a server of kay's own serves the pages.
@@ -52,7 +53,6 @@ const DEBOUNCE_MS = 10
 // How long a source an editor's save left missing is waited for, as saving by renaming it away and writing it anew leaves it, on a machine busy enough to stretch the save.
 const GONE_WAIT_MS = 200
 const SPARE = join(import.meta.dir, 'spare.ts')
-const TYPES = join(import.meta.dir, 'types.ts')
 // When a server never says it is up, as one that never serves, the next process starts anyway after this: a guess, which also starts it beside a server that takes longer to boot.
 const SPARE_FALLBACK_MS = 2000
 // How long stopping waits for the types being written before it kills the process writing them.
@@ -109,7 +109,9 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   // The types are written beside the restarts, one run at a time and one more once it ends when changes came meanwhile.
   let typesWriting: Promise<void> | undefined
   let typesAgain = false
-  let typesChild: Subprocess | undefined
+  // The process writing them is kept between writes; only a change to something but `.kay` sources boots a new one, as the config or a module it imports may be what changed.
+  const typesProcess = new TypesProcess(root, options.entry)
+  let typesFresh = true
   let startedTypes = false
   // The shadow tree and the declarations read the project's sources, config and the names of its public files, so an edit of the contents of a stylesheet, a markdown entry or a media file leaves them as they are.
   const typesRead = (files: string[]) => {
@@ -126,9 +128,10 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     typesWriting ??= (async () => {
       while (typesAgain) {
         typesAgain = false
-        configRefused ||= await regenerateTypes(root, { ...options, config: typesConfig }, options.refuseConfig === true && !startedTypes, (child) => {
-          typesChild = child
-        })
+        const fresh = typesFresh
+
+        typesFresh = false
+        configRefused ||= await regenerateTypes(root, { ...options, config: typesConfig }, options.refuseConfig === true && !startedTypes, typesProcess, fresh)
         startedTypes = true
       }
 
@@ -464,8 +467,10 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     if (typesConfig !== undefined && files.includes(CONFIG_FILE))
       typesConfig = await reloadConfig(root, typesConfig)
 
-    if (typesRead(files))
+    if (typesRead(files)) {
+      typesFresh ||= files.some(file => !file.endsWith('.kay'))
       void writeTypes()
+    }
   }
   // Changes landing during a restart trigger one more, never two restarts at once.
   const drain = async () => {
@@ -591,7 +596,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
 
     // A types process stuck importing the config is killed rather than waited for.
     if (typesWriting !== undefined) {
-      const grace = setTimeout(() => typesChild?.kill(), TYPES_GRACE_MS)
+      const grace = setTimeout(() => typesProcess.stop(), TYPES_GRACE_MS)
 
       try {
         await typesWriting
@@ -601,6 +606,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
       }
     }
 
+    typesProcess.stop()
     await Promise.all([child?.exited, spare?.exited, builder?.stop()])
     await inspector?.stop()
   }
@@ -701,15 +707,10 @@ async function reloadConfig(root: string, last: KayConfig): Promise<KayConfig> {
 // Keeps editors and `tsgo` in step with the `.kay` sources; type errors themselves are `kay check`'s job.
 // Without a `config` it is written by a process of its own from kay.config.ts as it is now, which keeps the checker out of this one and reads again every module the config imports.
 // Whether, asked to `refuse`, the process found kay.config.ts does not load.
-async function regenerateTypes(root: string, { entry, config }: DevOptions, refuse: boolean, spawned: (child: Subprocess) => void): Promise<boolean> {
+async function regenerateTypes(root: string, { entry, config }: DevOptions, refuse: boolean, types: TypesProcess, fresh: boolean): Promise<boolean> {
   try {
-    if (config === undefined) {
-      const child = Bun.spawn([process.execPath, TYPES, root, entry ?? '', refuse ? REFUSE : ''], { stdin: 'ignore', stdout: 'ignore', stderr: 'inherit' })
-
-      spawned(child)
-
-      return await child.exited === CONFIG_REFUSED
-    }
+    if (config === undefined)
+      return await types.write(fresh, refuse ? REFUSE : '') === CONFIG_REFUSED
 
     const { configCheckOptions, writeShadowTypes } = await import('../check')
 
