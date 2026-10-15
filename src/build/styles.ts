@@ -5,7 +5,7 @@ import { dirname, sep } from 'node:path'
 import { withoutTwin } from '../compiler'
 import { parseKay } from '../compiler/parser'
 import { projectPaths } from '../project'
-import { ASSET_FILE, writeAsset } from './assets'
+import { ASSET_FILE, clientDir, writeAsset } from './assets'
 import { collectionComponents, importedNames, rendersContent } from './collection-components'
 import { CSS_FILE, KAY_FILE, resolveFrom, SCRIPT_FILE, scriptLoader, transpilerFor } from './files'
 import { globbedFiles } from './glob'
@@ -66,6 +66,8 @@ export function styleImports(root: string, libraries: KayLibrary[] = [], loaded?
   const project = root + sep
   // Tailwind reads the class names of every module the bundle parses, so importing the ones kay collected from the `.class` shorthand hands them over with no `@source` line.
   const classesFile = projectPaths(root).classes
+  // Bun runs the plugin's callbacks outside the scope `inOutput` set, so the folder is read here.
+  const dist = clientDir(root)
   const classes = `import ${JSON.stringify(classesFile)}\n`
   const inProject = (path: string) => path.startsWith(project) && !path.includes(`${sep}node_modules${sep}`)
   // A kay library's components and modules are followed as the app's own are.
@@ -74,7 +76,7 @@ export function styleImports(root: string, libraries: KayLibrary[] = [], loaded?
   const imports = async (code: string, importer: string, loader: Bun.JavaScriptLoader) => {
     const paths = scan(code, importer, loader)
 
-    await Promise.all(paths.filter(path => ASSET_FILE.test(path)).map(async path => writeAsset(path, root)))
+    await Promise.all(paths.filter(path => ASSET_FILE.test(path)).map(async path => writeAsset(path, root, dist)))
 
     return importing(paths.filter(followed))
   }
@@ -83,7 +85,7 @@ export function styleImports(root: string, libraries: KayLibrary[] = [], loaded?
   const serverAssets = async (code: string, importer: string, loader: Bun.JavaScriptLoader): Promise<void> => {
     await Promise.all(scan(code, importer, loader).map(async (path) => {
       if (ASSET_FILE.test(path)) {
-        await writeAsset(path, root)
+        await writeAsset(path, root, dist)
 
         return
       }

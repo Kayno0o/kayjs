@@ -3,13 +3,13 @@ import type { RouteMount } from '../server/routes'
 import type { Target } from './transform'
 import type { WorkerBundle } from './worker-bundle'
 import { readFileSync, realpathSync, statSync } from 'node:fs'
-import { dirname, join, resolve, sep } from 'node:path'
+import { basename, dirname, join, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { ISLAND_TWIN, withoutTwin } from '../compiler'
 import { KayError } from '../compiler/errors'
 import { RESIZABLE } from '../runtime/image'
 import { imageHeader } from '../server/image-format'
-import { ASSET_FILE, clientDir, writeAsset } from './assets'
+import { ASSET_FILE, clientDir, RENDER_OUTPUT, writeAsset } from './assets'
 import { scriptLoader } from './files'
 import { expandGlobs } from './glob'
 import { iconModule, iconNames, installedIconSets } from './icons'
@@ -92,10 +92,12 @@ export function kayPlugin(options: KayPluginOptions, workers: string[]): BunPlug
       const browser = build.config?.target === 'browser' && build.config.outdir !== undefined
       const config = build.config
       const bundled = new Map<string, Promise<string>>()
+      // Bun runs the plugin's callbacks outside the scope `inOutput` set, so the folder is read here.
+      const dist = clientDir(root)
 
       const bundleWorker = async (path: string): Promise<string> => {
-        const bundle: WorkerBundle = { entry: path, outdir: join(clientDir(root), 'assets'), minify: config.minify ?? false, define: config.define ?? {}, options: { ...options, root, anchor: undefined, anchored: undefined }, workers: [...workers, path] }
-        const child = Bun.spawn([process.execPath, WORKER_BUNDLE, JSON.stringify(bundle)], { cwd: root, stdout: 'pipe', stderr: 'pipe' })
+        const bundle: WorkerBundle = { entry: path, outdir: join(dist, 'assets'), minify: config.minify ?? false, define: config.define ?? {}, options: { ...options, root, anchor: undefined, anchored: undefined }, workers: [...workers, path] }
+        const child = Bun.spawn([process.execPath, WORKER_BUNDLE, JSON.stringify(bundle)], { cwd: root, env: { ...process.env, [RENDER_OUTPUT]: basename(dirname(dist)) }, stdout: 'pipe', stderr: 'pipe' })
         const [name, problems, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
 
         if (code !== 0)
@@ -126,7 +128,7 @@ export function kayPlugin(options: KayPluginOptions, workers: string[]): BunPlug
           name = await bundled.get(path)!
         }
         else {
-          const url = await writeAsset(path, root)
+          const url = await writeAsset(path, root, dist)
 
           name = url.slice(url.lastIndexOf('/') + 1)
         }
@@ -206,7 +208,7 @@ export function kayPlugin(options: KayPluginOptions, workers: string[]): BunPlug
         if (fileImports.has(path))
           return build.config === undefined ? { exports: { default: path }, loader: 'object' } : { contents: await Bun.file(path).bytes(), loader: 'file' }
 
-        return { contents: await assetModule(path, await writeAsset(path, root)), loader: 'js' }
+        return { contents: await assetModule(path, await writeAsset(path, root, dist)), loader: 'js' }
       })
 
       // Last, as it takes every module: the runtime loader hands a module without a call back as it is, where the bundler loads it itself.

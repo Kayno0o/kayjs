@@ -44,11 +44,12 @@ export function clientDir(root: string): string {
 }
 
 // Named after its content, so the server, the islands and every build agree on a file's URL without sharing anything; written once, when missing.
-export async function writeAsset(path: string, root: string): Promise<string> {
+// `dist` is the client folder of the build it belongs to, for a bundler callback to name when it runs outside the scope `inOutput` set.
+export async function writeAsset(path: string, root: string, dist = clientDir(root)): Promise<string> {
   const extension = extname(path)
   const bytes = await Bun.file(path).bytes()
   const name = `${basename(path, extension)}-${Bun.hash(bytes).toString(36)}${extension}`
-  const target = Bun.file(join(clientDir(root), ASSETS_DIR, name))
+  const target = Bun.file(join(dist, ASSETS_DIR, name))
 
   if (!await target.exists())
     await Bun.write(target, bytes)

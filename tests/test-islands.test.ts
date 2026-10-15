@@ -1,11 +1,11 @@
-import { readdirSync } from 'node:fs'
+import { existsSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { beforeAll, describe, expect, it } from 'bun:test'
 import { clientDir, inOutput, outputDir, testWorker } from '../src/build/assets'
 import { testSite } from '../src/test'
 import { scratchDir } from './scratch'
 
-const ISLAND = '---\nimport { hello } from \'./greeting\'\nconst count = signal(0)\n---\nbutton(onClick={() => count.set(count() + 1)}) {hello()} {count()}\n'
+const ISLAND = '---\nimport { hello } from \'./greeting\'\nimport logo from \'../logo.png\'\nconst count = signal(0)\nconst work = () => new Worker(new URL(\'../echo.ts\', import.meta.url), { type: \'module\' })\n---\nbutton(onClick={() => count.set(count() + 1)}) {hello()} {count()}\nimg(src={logo} onClick={work})\n'
 const BROWSERLESS = 'import { Database } from \'bun:sqlite\'\nexport const hello = () => String(Database.name)\n'
 const FINE = 'export const hello = () => \'hi\'\n'
 
@@ -18,6 +18,8 @@ const manifest = (): string => join(root, `.kay/test-client${testWorker()}/manif
 beforeAll(async () => {
   root = await scratchDir('test-islands-')
   greeting = join(root, 'src/greeting.ts')
+  await Bun.write(join(root, 'src/logo.png'), Bun.file(join(import.meta.dir, 'fixtures/site/src/logo.png')))
+  await Bun.write(join(root, 'src/echo.ts'), 'onmessage = event => postMessage(event.data)\n')
   await Bun.write(join(root, 'src/routes/index.kay'), ISLAND.replace('./greeting', '../greeting'))
 })
 
@@ -61,6 +63,11 @@ describe('testSite builds the islands', () => {
     await testSite({ root, base: '/other' })
 
     expect(listing()).toEqual(before)
+    // The server's own imports of an asset are written to `.kay/client` as before, the browser build's worker is not.
+    const assets = (dir: string): string[] => existsSync(dir) ? readdirSync(dir) : []
+
+    expect(assets(join(root, '.kay/client/dist/assets')).some(name => name.startsWith('echo-'))).toBe(false)
+    expect(assets(join(root, `.kay/test-client${testWorker()}/dist/assets`)).some(name => name.startsWith('echo-'))).toBe(true)
     expect(await Bun.file(manifest()).exists()).toBe(true)
     expect(await inOutput('elsewhere', async () => Promise.resolve(outputDir('/p')))).toBe('/p/.kay/elsewhere')
   })
