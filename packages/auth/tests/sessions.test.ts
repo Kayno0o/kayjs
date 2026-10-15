@@ -49,7 +49,7 @@ describe('sessions', () => {
     const { signedIn } = await setup()
     const laptop = await signedIn()
     const phone = await signedIn('10.0.0.2', IPHONE)
-    const [, other] = await laptop.call('sessions')
+    const other = (await laptop.call('sessions'))[1]!
 
     expect(await phone.json('/me')).toMatchObject({ id: 'u1' })
     expect(await laptop.call('endSession', other.id)).toBe(true)
@@ -61,7 +61,7 @@ describe('sessions', () => {
   test('ending this session signs out, and a session of someone else is not ended', async () => {
     const { signedIn, store, browser } = await setup()
     const laptop = await signedIn()
-    const [own] = await laptop.call('sessions')
+    const own = (await laptop.call('sessions'))[0]!
 
     await store.users.create(userRecord({ id: 'u2' }))
     const bob = browser()
@@ -174,9 +174,9 @@ describe('sessions', () => {
   test('a bearer token sees no sessions and ends none', async () => {
     const { signedIn, app } = await setup()
     const laptop = await signedIn()
-    const [own] = await laptop.call('sessions')
-    const { token } = await laptop.call('createToken', 'CLI')
-    const call = async (method: string, ...args: unknown[]) => (await app.handle(new Request(`http://localhost/call/${method}`, { method: 'POST', headers: { 'authorization': `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify(args) }))).json()
+    const own = (await laptop.call('sessions'))[0]!
+    const { token } = await laptop.callOk('createToken', {}, 'CLI')
+    const call = async (method: string, ...args: unknown[]): Promise<unknown> => (await app.handle(new Request(`http://localhost/call/${method}`, { method: 'POST', headers: { 'authorization': `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify(args) }))).json()
 
     expect(await call('sessions')).toEqual([])
     expect(await call('endSession', own.id)).toBe(false)
@@ -215,7 +215,7 @@ describe('sessions', () => {
     const bob = browser()
 
     await bob.call('register', { email: 'bob@example.com', password: PASSWORD })
-    await bob.call('verifyEmail', new URL(mails.at(-1)!.url!).searchParams.get('token'))
+    await bob.call('verifyEmail', new URL(mails.at(-1)!.url!).searchParams.get('token')!)
     await browser().json('/password', { ...from('10.0.0.7', IPHONE), body: JSON.stringify({ identifier: 'bob@example.com', password: PASSWORD }) })
 
     const notice = mails.find(mail => mail.kind === 'new-sign-in')!
@@ -241,7 +241,7 @@ describe('what ends the user\'s other sessions and bearer tokens', () => {
       const elsewhere = app.browser()
 
       await elsewhere.fetch(`/sign-in/${id}`, { method: 'POST' })
-      const minted = await ada.call('createToken', { password: PASSWORD }, 'phone')
+      const minted = await ada.callOk('createToken', { password: PASSWORD }, 'phone')
 
       expect(await elsewhere.json('/me')).toMatchObject({ id })
       expect(await app.browser().json('/me', { headers: { authorization: `Bearer ${minted.token}` } })).toMatchObject({ id })
@@ -263,9 +263,9 @@ describe('what ends the user\'s other sessions and bearer tokens', () => {
   type Account = Awaited<ReturnType<typeof account>>
 
   async function twoFactorSecret({ ada }: Account) {
-    const setup = await ada.call('setUpTwoFactor', { password: PASSWORD })
+    const setup = await ada.callOk('setUpTwoFactor', { password: PASSWORD })
 
-    return setup.setup.secret as string
+    return setup.setup.secret
   }
 
   const actions: [string, (app: Account) => Promise<void>][] = [
@@ -306,7 +306,7 @@ describe('what ends the user\'s other sessions and bearer tokens', () => {
     }],
     ['removing a passkey', async (app) => {
       const device = authenticator()
-      const { options } = await app.ada.call('passkeyRegistrationOptions', { password: PASSWORD })
+      const { options } = await app.ada.callOk('passkeyRegistrationOptions', { password: PASSWORD })
 
       await app.ada.call('registerPasskey', await device.create(options), 'Laptop')
       const ended = await app.otherWaysIn()
@@ -332,10 +332,10 @@ describe('what ends the user\'s other sessions and bearer tokens', () => {
     }],
     ['turning off the second factor', async (app) => {
       const secret = await twoFactorSecret(app)
-      const { recoveryCodes } = await app.ada.call('enableTwoFactor', await totpCode(secret, totpStep()))
+      const { recoveryCodes } = await app.ada.callOk('enableTwoFactor', await totpCode(secret, totpStep()))
       const ended = await app.otherWaysIn()
 
-      expect(await app.ada.call('disableTwoFactor', { code: recoveryCodes[0] })).toEqual({ ok: true })
+      expect(await app.ada.call('disableTwoFactor', { code: recoveryCodes[0]! })).toEqual({ ok: true })
       await ended()
     }],
   ]

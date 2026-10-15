@@ -54,7 +54,7 @@ describe('events', () => {
     const ada = browser()
 
     await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
-    const { setup: totp } = await ada.call('setUpTwoFactor', { password: PASSWORD })
+    const { setup: totp } = await ada.callOk('setUpTwoFactor', { password: PASSWORD })
 
     await ada.call('enableTwoFactor', await totpCode(totp.secret, totpStep()))
     await store.users.update((await store.users.findByEmail('ada@example.com'))!.id, { totpLastStep: 0 })
@@ -132,7 +132,7 @@ describe('the audit log', () => {
     setSystemTime(new Date(Date.now() + 1000))
     await ada.call('changePassword', { password: PASSWORD }, 'a brand new password')
 
-    const [first] = await ada.call('auditLog', { limit: 1 })
+    const first = (await ada.call('auditLog', { limit: 1 }))[0]!
     const next = await ada.call('auditLog', { limit: 1, before: JSON.parse(JSON.stringify(first)) })
 
     expect(first.event).toBe('password-changed')
@@ -148,7 +148,7 @@ describe('the audit log', () => {
     await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
 
     for (const before of [new Date(Number.NaN), null, 'soon', 12, { at: 'soon', id: 'x' }, { at: new Date().toISOString() }])
-      expect(await ada.call('auditLog', { before })).toEqual([])
+      expect(await ada.post('/call/auditLog', [{ before }])).toEqual([])
   })
 
   test('reads entries of one millisecond newest written first', async () => {
@@ -200,8 +200,8 @@ describe('impersonation', () => {
     const { browser, store, events } = setup({ admin: 'admin', audit: true, organizations: { roles: { owner: ['admin'], admin: ['member'], member: [] }, owner: 'owner', manage: 'admin' } })
     const ada = browser()
     const root = browser()
-    const { user } = await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
-    const { user: admin } = await root.call('register', { email: 'root@example.com', password: PASSWORD })
+    const { user } = await ada.callHas('user', 'register', { email: 'ada@example.com', password: PASSWORD })
+    const { user: admin } = await root.callHas('user', 'register', { email: 'root@example.com', password: PASSWORD })
 
     await store.users.update(admin.id, { roles: ['admin'] })
     await ada.call('createOrganization', { name: 'Acme' })
@@ -229,11 +229,11 @@ describe('impersonation', () => {
     const { browser, store } = setup({ admin: 'admin', organizations: { roles: { owner: ['admin'], admin: ['member'], member: [] }, owner: 'owner', manage: 'admin' } })
     const ada = browser()
     const root = browser()
-    const { user } = await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
-    const { user: admin } = await root.call('register', { email: 'root@example.com', password: PASSWORD })
+    const { user } = await ada.callHas('user', 'register', { email: 'ada@example.com', password: PASSWORD })
+    const { user: admin } = await root.callHas('user', 'register', { email: 'root@example.com', password: PASSWORD })
 
     await store.users.update(admin.id, { roles: ['admin'] })
-    const { membership } = await ada.call('createOrganization', { name: 'Acme' })
+    const { membership } = await ada.callOk('createOrganization', { name: 'Acme' })
 
     await root.call('impersonate', user.id)
 

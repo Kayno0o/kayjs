@@ -13,12 +13,12 @@ describe('exporting a user\'s data', () => {
   test('gives what kayjs-auth keeps about the user, no secret among it, with the app\'s own', async () => {
     const { browser, store } = testApp({ audit: true, onExport: user => ({ posts: [`by ${user.email}`] }) })
     const ada = browser()
-    const { user } = await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
+    const { user } = await ada.callHas('user', 'register', { email: 'ada@example.com', password: PASSWORD })
 
     await ada.call('createToken', { password: PASSWORD }, 'Phone')
     await store.identities.create({ provider: 'discord', providerId: '42', userId: user.id, accessToken: 'sealed-access', refreshToken: 'sealed-refresh', tokenExpiresAt: null, createdAt: new Date() })
 
-    const exported = await ada.call('exportData')
+    const exported = await ada.callOk('exportData')
     const text = JSON.stringify(exported)
 
     expect(exported).toMatchObject({
@@ -115,7 +115,7 @@ describe('exporting a user\'s data', () => {
 
       await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
 
-      const { setup } = await ada.call('setUpTwoFactor', { password: PASSWORD })
+      const { setup } = await ada.callOk('setUpTwoFactor', { password: PASSWORD })
 
       await ada.call('enableTwoFactor', await totpCode(setup.secret, totpStep()))
       setSystemTime(new Date(Date.now() + LATER))

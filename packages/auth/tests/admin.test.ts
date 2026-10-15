@@ -29,11 +29,11 @@ async function setup(options: Parameters<typeof testApp>[0] = {}) {
 
   const member = async (email: string, roles: string[] = []) => {
     const browser = app.browser()
-    const { user } = await browser.call('register', { email, password: PASSWORD })
+    const { user } = await browser.callHas('user', 'register', { email, password: PASSWORD })
 
     await app.store.users.update(user.id, { roles })
 
-    return { browser, id: user.id as string }
+    return { browser, id: user.id }
   }
   const admin = await member('root@example.com', ['admin'])
   const ada = await member('ada@example.com')
@@ -62,7 +62,7 @@ describe('admin', () => {
 
   test('an admin\'s bearer token manages no one, whatever it may do elsewhere', async () => {
     const { admin, ada, browser } = await setup()
-    const { token } = await admin.browser.call('createToken', { password: PASSWORD }, 'CLI')
+    const { token } = await admin.browser.callOk('createToken', { password: PASSWORD }, 'CLI')
     const withToken = async (method: string, ...args: unknown[]) => browser().json(`/call/${method}`, {
       method: 'POST',
       headers: { 'authorization': `Bearer ${token}`, 'content-type': 'application/json' },
@@ -100,19 +100,19 @@ describe('admin', () => {
     setSystemTime(new Date(Date.now() + 1000))
     await member('bob@example.com')
 
-    const all = await admin.browser.call('listUsers')
+    const all = await admin.browser.callOk('listUsers')
 
     expect(all.total).toBe(3)
     expect(all.users.map((user: User) => user.email)).toContain('bob@example.com')
     expect(all.users[0]).toMatchObject({ email: 'bob@example.com', roles: [], ban: null, hasPassword: true })
     expect(await admin.browser.call('listUsers', { search: 'BOB', limit: 1 })).toMatchObject({ ok: true, users: [{ email: 'bob@example.com' }], total: 1 })
-    expect((await admin.browser.call('listUsers', { offset: 2, limit: 5 })).users).toHaveLength(1)
+    expect((await admin.browser.callOk('listUsers', { offset: 2, limit: 5 })).users).toHaveLength(1)
   })
 
   test('a role granted or revoked counts on the user\'s next request; only declared roles are given', async () => {
     const { admin, ada, said } = await setup()
 
-    expect(await admin.browser.call('grantRole', ada.id, 'owner')).toEqual({ ok: false, error: 'unknown-role' })
+    expect(await admin.browser.post('/call/grantRole', [ada.id, 'owner'])).toEqual({ ok: false, error: 'unknown-role' })
     expect(await admin.browser.call('grantRole', 'missing', 'editor')).toEqual({ ok: false, error: 'not-found' })
     expect(await admin.browser.call('grantRole', ada.id, 'editor')).toMatchObject({ ok: true, user: { roles: ['editor'] } })
     expect(await ada.browser.json('/me')).toMatchObject({ roles: ['editor'] })
@@ -127,7 +127,7 @@ describe('admin', () => {
 
   test('a ban signs the user out everywhere, devices included, and refuses their sign-ins until lifted', async () => {
     const { admin, ada, browser, said, store } = await setup()
-    const { token } = await ada.browser.call('createToken', { password: PASSWORD }, 'Phone')
+    const { token } = await ada.browser.callOk('createToken', { password: PASSWORD }, 'Phone')
 
     expect(await admin.browser.post('/ban', { id: ada.id, reason: ' spam ' })).toMatchObject({ ok: true, user: { ban: { reason: 'spam', until: null } } })
     expect(await ada.browser.json('/me')).toBe('anonymous')
@@ -218,12 +218,12 @@ describe('admin', () => {
     expect(await browser().post('/password', { identifier: 'ada@example.com', password: PASSWORD })).toEqual({ ok: false, error: 'invalid' })
 
     // The entry stays, under a name that no longer leads to the user.
-    const log = await admin.browser.call('adminAuditLog', {})
+    const log = await admin.browser.callOk('adminAuditLog', {})
     const entry = log.entries.find((found: { event: string }) => found.event === 'account-deleted')
 
     expect(entry).toMatchObject({ actorId: admin.id })
-    expect(entry.userId).not.toBe(ada.id)
-    expect((await admin.browser.call('adminAuditLog', { userId: ada.id })).entries).toEqual([])
+    expect(entry!.userId).not.toBe(ada.id)
+    expect((await admin.browser.callOk('adminAuditLog', { userId: ada.id })).entries).toEqual([])
   })
 
   test('a deleted admin is no longer named in what they did to others', async () => {
@@ -302,8 +302,8 @@ describe('admin', () => {
     setSystemTime(new Date(Date.now() + 1000))
     await admin.browser.call('grantRole', ada.id, 'editor')
 
-    const everyone = await admin.browser.call('adminAuditLog')
-    const hers = await admin.browser.call('adminAuditLog', { userId: ada.id, limit: 1 })
+    const everyone = await admin.browser.callOk('adminAuditLog')
+    const hers = await admin.browser.callOk('adminAuditLog', { userId: ada.id, limit: 1 })
 
     expect(new Set(everyone.entries.map((entry: { userId: string }) => entry.userId))).toEqual(new Set([admin.id, ada.id]))
     expect(hers.entries).toEqual([expect.objectContaining({ event: 'role-granted', detail: 'editor', actorId: admin.id })])

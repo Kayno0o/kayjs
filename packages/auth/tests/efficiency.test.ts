@@ -21,7 +21,7 @@ function recorded(store: AuthStore = memoryStore()) {
       return [group, (...args: unknown[]) => {
         calls.push({ name: group, args })
 
-        return value(...args)
+        return (value as (...a: unknown[]) => unknown)(...args)
       }]
     }
 
@@ -150,11 +150,11 @@ describe('lists', () => {
   test('members cost one user query, memberships one organization query, invitations one list', async () => {
     const log = recorded()
     const { store, owner } = await organizations(log.store)
-    const first = await owner.call('createOrganization', { name: 'Acme' })
+    const first = await owner.callOk('createOrganization', { name: 'Acme' })
 
     await owner.call('createOrganization', { name: 'Beta' })
 
-    const orgId = first.membership.organization.id as string
+    const orgId = first.membership.organization.id
 
     for (const email of ['b@example.com', 'c@example.com', 'd@example.com']) {
       await store.users.create(userRecord({ id: email, email }))
@@ -164,7 +164,7 @@ describe('lists', () => {
 
     log.reset()
 
-    expect((await owner.call('members', orgId)).members).toHaveLength(4)
+    expect((await owner.callOk('members', orgId)).members).toHaveLength(4)
     expect(log.count('users.getMany')).toBe(1)
     expect(log.calls.filter(call => call.name === 'users.get').map(call => call.args[0])).not.toContain('b@example.com')
 
@@ -174,19 +174,19 @@ describe('lists', () => {
     expect(log.count('organizations.get')).toBe(0)
 
     log.reset()
-    expect((await owner.call('invitations', orgId)).invitations).toHaveLength(3)
+    expect((await owner.callOk('invitations', orgId)).invitations).toHaveLength(3)
     expect(log.count('invitations.listByOrganization')).toBe(1)
   })
 
   test('an expired invitation is left out of the list without a delete', async () => {
     const log = recorded()
     const { store, owner } = await organizations(log.store)
-    const { membership } = await owner.call('createOrganization', { name: 'Acme' })
+    const { membership } = await owner.callOk('createOrganization', { name: 'Acme' })
 
     await store.invitations!.create({ id: 'late', organizationId: membership.organization.id, email: 'late@example.com', roles: ['member'], invitedBy: null, createdAt: new Date(), expiresAt: new Date(Date.now() - 1000) })
     log.reset()
 
-    expect((await owner.call('invitations', membership.organization.id)).invitations).toEqual([])
+    expect((await owner.callOk('invitations', membership.organization.id)).invitations).toEqual([])
     expect(log.count('invitations.delete')).toBe(0)
   })
 
@@ -197,13 +197,13 @@ describe('lists', () => {
     delete base.organizations!.getMany
 
     const { store, owner } = await organizations(base)
-    const { membership } = await owner.call('createOrganization', { name: 'Acme' })
+    const { membership } = await owner.callOk('createOrganization', { name: 'Acme' })
     const organization = membership.organization
 
     await store.users.create(userRecord({ id: 'b', email: 'b@example.com' }))
     await store.members!.add({ organizationId: organization.id, userId: 'b', roles: ['member'], createdAt: new Date() })
 
-    expect((await owner.call('members', organization.id)).members).toHaveLength(2)
+    expect((await owner.callOk('members', organization.id)).members).toHaveLength(2)
     expect(await owner.call('organizations')).toHaveLength(1)
   })
 })
@@ -279,7 +279,7 @@ describe('the last admin', () => {
     const root = app.browser()
 
     for (const [who, email] of [[root, 'root@example.com'], [app.browser(), 'other@example.com']] as const) {
-      const { user } = await who.call('register', { email, password: PASSWORD })
+      const { user } = await who.callHas('user', 'register', { email, password: PASSWORD })
 
       await app.store.users.update(user.id, { roles: ['admin'] })
     }

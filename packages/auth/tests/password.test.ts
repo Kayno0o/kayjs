@@ -128,7 +128,7 @@ describe('signInWithPassword', () => {
     const { browser } = await registered({ limits: { signInAccount: { max: 2, window: 900 } } })
     const answers = await Promise.all(Array.from({ length: 6 }, async () => browser().post('/password', { identifier: 'ada@example.com', password: 'wrong password!' })))
 
-    expect(answers.filter(answer => answer.error === 'invalid')).toHaveLength(2)
+    expect(answers.filter(answer => typeof answer === 'object' && answer !== null && 'error' in answer && answer.error === 'invalid')).toHaveLength(2)
   })
 
   test('stops a client after its attempts, whichever accounts it tries', async () => {

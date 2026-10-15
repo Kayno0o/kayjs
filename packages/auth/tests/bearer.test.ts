@@ -9,12 +9,12 @@ afterEach(() => {
   setSystemTime()
 })
 
-async function withToken(options: { scopes?: string[], expiresIn?: number } = {}) {
+async function withToken(options: { scopes?: ('posts:read' | 'posts:write' | 'stats')[], expiresIn?: number } = {}) {
   const app = testApp({ scopes: ['posts:read', 'posts:write', 'stats'] })
   const ada = app.browser()
 
   await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
-  const minted = await ada.call('createToken', { password: PASSWORD }, 'Phone', options)
+  const minted = await ada.callOk('createToken', { password: PASSWORD }, 'Phone', options)
 
   return { ...app, ada, minted, bearer: { authorization: `Bearer ${minted.token}` } }
 }
@@ -153,7 +153,7 @@ describe('scoped and expiring tokens', () => {
   test('only declared scopes are given, and an expiry must lie ahead', async () => {
     const { ada } = await withToken()
 
-    expect(await ada.call('createToken', { password: PASSWORD }, 'Laptop', { scopes: ['admin'] })).toEqual({ ok: false, error: 'scope' })
+    expect(await ada.post('/call/createToken', [{ password: PASSWORD }, 'Laptop', { scopes: ['admin'] }])).toEqual({ ok: false, error: 'scope' })
     expect(await ada.call('createToken', { password: PASSWORD }, 'Laptop', { scopes: [] })).toEqual({ ok: false, error: 'scope' })
     expect(await ada.call('createToken', { password: PASSWORD }, 'Laptop', { expiresIn: 0 })).toEqual({ ok: false, error: 'expiry' })
   })
@@ -175,7 +175,7 @@ describe('issuing a token from the server', () => {
   test('mints one for a user with no proof and no mail or event, which a device then signs in with', async () => {
     const events: string[] = []
     const app = testApp({ onEvent: event => void events.push(event) })
-    const { user } = await app.browser().call('register', { email: 'ada@example.com', password: PASSWORD })
+    const { user } = await app.browser().callHas('user', 'register', { email: 'ada@example.com', password: PASSWORD })
 
     events.length = 0
     const issued = await app.auth.issueToken(user.id, 'Kitchen display', { expiresIn: 365 * 24 * 60 * 60 })
@@ -187,7 +187,7 @@ describe('issuing a token from the server', () => {
 
   test('adopts a token the app handed out before, so its devices keep working through a migration', async () => {
     const app = testApp()
-    const { user } = await app.browser().call('register', { email: 'ada@example.com', password: PASSWORD })
+    const { user } = await app.browser().callHas('user', 'register', { email: 'ada@example.com', password: PASSWORD })
     const legacy = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.legacy-signature'
 
     expect(await app.auth.issueToken(user.id, 'Old device', { token: legacy })).toMatchObject({ ok: true, token: legacy })
@@ -196,7 +196,7 @@ describe('issuing a token from the server', () => {
 
   test('refuses a missing or banned user, a token a header cannot carry, and what createToken refuses', async () => {
     const app = testApp()
-    const { user } = await app.browser().call('register', { email: 'ada@example.com', password: PASSWORD })
+    const { user } = await app.browser().callHas('user', 'register', { email: 'ada@example.com', password: PASSWORD })
 
     expect(await app.auth.issueToken('nobody', 'Phone')).toEqual({ ok: false, error: 'not-found' })
     expect(await app.auth.issueToken(user.id, 'Phone', { token: 'short' })).toEqual({ ok: false, error: 'token' })
@@ -260,5 +260,5 @@ async function withTokenIn(store: ReturnType<typeof memoryStore>) {
 
   await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
 
-  return { ...app, ada, minted: await ada.call('createToken', { password: PASSWORD }, 'Phone', {}) }
+  return { ...app, ada, minted: await ada.callOk('createToken', { password: PASSWORD }, 'Phone', {}) }
 }

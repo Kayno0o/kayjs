@@ -76,9 +76,9 @@ describe('the actions that re-prove the user', () => {
     }
 
     if (shape === 'twoFactor') {
-      const { setup } = await ada.call('setUpTwoFactor', { password: PASSWORD })
+      const { setup } = await ada.callOk('setUpTwoFactor', { password: PASSWORD })
 
-      recoveryCodes = (await ada.call('enableTwoFactor', await totpCode(setup.secret, totpStep()))).recoveryCodes
+      recoveryCodes = (await ada.callOk('enableTwoFactor', await totpCode(setup.secret, totpStep()))).recoveryCodes
     }
 
     return { ...app, ada, recoveryCodes }
@@ -145,11 +145,11 @@ describe('changing the email on an account with a second factor', () => {
       await ada.fetch('/sign-in/u1', POST)
     }
 
-    const { setup } = await ada.call('setUpTwoFactor', password ? { password: PASSWORD } : {})
+    const { setup } = await ada.callOk('setUpTwoFactor', password ? { password: PASSWORD } : {})
 
     await ada.call('enableTwoFactor', await totpCode(setup.secret, totpStep()))
 
-    return { ...app, ada, secret: setup.secret as string }
+    return { ...app, ada, secret: setup.secret }
   }
 
   test('refuses the password alone, takes an authenticator code once, and refuses it spent', async () => {
@@ -164,11 +164,11 @@ describe('changing the email on an account with a second factor', () => {
   test('takes a passkey', async () => {
     const { ada, secret } = await twoFactor()
     const device = authenticator()
-    const { options } = await ada.call('passkeyRegistrationOptions', { code: await totpCode(secret, totpStep() + 1) })
+    const { options } = await ada.callOk('passkeyRegistrationOptions', { code: await totpCode(secret, totpStep() + 1) })
 
     await ada.call('registerPasskey', await device.create(options))
 
-    const proof = await ada.call('passkeyProofOptions')
+    const proof = await ada.callOk('passkeyProofOptions')
 
     expect(await ada.call('changeEmail', { passkey: await device.get(proof.options) }, 'ada@new.test')).not.toHaveProperty('error')
   })
@@ -183,7 +183,7 @@ describe('changing the email on an account with a second factor', () => {
   test('refuses an admin acting as the user, code or not', async () => {
     const { ada, browser, store, secret } = await twoFactor()
     const root = browser()
-    const { user } = await root.call('register', { email: 'root@example.com', password: PASSWORD })
+    const { user } = await root.callHas('user', 'register', { email: 'root@example.com', password: PASSWORD })
     const adaId = (await store.users.findByEmail('ada@example.com'))!.id
 
     await store.users.update(user.id, { roles: ['admin'] })
@@ -240,7 +240,7 @@ describe('changing the username', () => {
 
   test('refuses a device\'s bearer token, which is no session', async () => {
     const { ada, browser } = await registered()
-    const { token } = await ada.call('createToken', { password: PASSWORD }, 'Phone')
+    const { token } = await ada.callOk('createToken', { password: PASSWORD }, 'Phone')
     const device = browser()
 
     expect(await device.json('/call/changeUsername', { method: 'POST', headers: { 'authorization': `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify(['carol']) })).toEqual({ ok: false, error: 'signed-out' })
@@ -347,7 +347,7 @@ describe('deleting the account', () => {
     expect(await ada.call('deleteAccount', { password: PASSWORD })).toEqual({ ok: false, error: 'last-admin' })
     expect(await store.users.get(adaRecord.id)).toBeTruthy()
 
-    const { user } = await browser().call('register', { email: 'grace@example.com', password: PASSWORD })
+    const { user } = await browser().callHas('user', 'register', { email: 'grace@example.com', password: PASSWORD })
 
     await store.users.update(user.id, { roles: ['admin'] })
 
@@ -361,7 +361,7 @@ describe('deleting the account', () => {
     const ada = app.browser()
 
     await ada.fetch('/sign-in/u1', POST)
-    const { setup } = await ada.call('setUpTwoFactor', {})
+    const { setup } = await ada.callOk('setUpTwoFactor', {})
     const { totpCode, totpStep } = await import('../src/totp')
 
     await ada.call('enableTwoFactor', await totpCode(setup.secret, totpStep()))

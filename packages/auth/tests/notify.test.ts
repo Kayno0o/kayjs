@@ -25,7 +25,7 @@ async function verified() {
   const ada = app.browser()
 
   await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
-  await ada.call('verifyEmail', new URL(mails.at(-1)!.url!).searchParams.get('token'))
+  await ada.call('verifyEmail', new URL(mails.at(-1)!.url!).searchParams.get('token')!)
   mails.length = 0
 
   const notices = () => mails.filter(mail => mail.url === undefined).map(mail => mail.kind)
@@ -68,7 +68,7 @@ describe('changes to what protects the account', () => {
     const { ada, mails } = await verified()
 
     await ada.call('changeEmail', { password: PASSWORD }, 'ada@new.test')
-    await ada.call('confirmEmailChange', new URL(mails.at(-1)!.url!).searchParams.get('token'))
+    await ada.call('confirmEmailChange', new URL(mails.at(-1)!.url!).searchParams.get('token')!)
 
     expect(mails.at(-1)).toMatchObject({ to: 'ada@example.com', kind: 'email-changed', site: 'Site', detail: 'ada@new.test' })
     expect(mails.at(-1)!.text).toContain('ada@new.test')
@@ -76,15 +76,15 @@ describe('changes to what protects the account', () => {
 
   test('the second factor going on and off, and a recovery code spent', async () => {
     const { ada, browser, notices } = await verified()
-    const { setup } = await ada.call('setUpTwoFactor', { password: PASSWORD })
-    const { recoveryCodes } = await ada.call('enableTwoFactor', await totpCode(setup.secret, totpStep()))
+    const { setup } = await ada.callOk('setUpTwoFactor', { password: PASSWORD })
+    const { recoveryCodes } = await ada.callOk('enableTwoFactor', await totpCode(setup.secret, totpStep()))
     const visitor = browser()
 
     await visitor.post('/password', { identifier: 'ada@example.com', password: PASSWORD })
-    await visitor.call('verifyTwoFactor', recoveryCodes[0])
-    const { recoveryCodes: fresh } = await ada.call('regenerateRecoveryCodes', { code: recoveryCodes[1] })
+    await visitor.call('verifyTwoFactor', recoveryCodes[0]!)
+    const { recoveryCodes: fresh } = await ada.callOk('regenerateRecoveryCodes', { code: recoveryCodes[1]! })
 
-    await ada.call('disableTwoFactor', { code: fresh[0] })
+    await ada.call('disableTwoFactor', { code: fresh[0]! })
 
     expect(notices()).toEqual(['two-factor-enabled', 'recovery-code-used', 'recovery-code-used', 'recovery-codes-regenerated', 'recovery-code-used', 'two-factor-disabled'])
   })
@@ -151,7 +151,7 @@ describe('a slow mailer', () => {
     const ada = app.browser()
 
     await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
-    await ada.call('verifyEmail', new URL(sent.at(-1)!.url!).searchParams.get('token'))
+    await ada.call('verifyEmail', new URL(sent.at(-1)!.url!).searchParams.get('token')!)
     failing = true
     sent.length = 0
 

@@ -418,7 +418,7 @@ describe('magic links', () => {
     const stranger = browser()
 
     await stranger.call('register', { email: 'ada@example.com', password: 'squatter password' })
-    const minted = await stranger.call('createToken', { password: 'squatter password' }, 'stranger')
+    const minted = await stranger.callOk('createToken', { password: 'squatter password' }, 'stranger')
     const ada = browser()
 
     await ada.call('requestMagicLink', 'ada@example.com')
@@ -436,7 +436,7 @@ describe('magic links', () => {
     const device = authenticator()
 
     await stranger.call('register', { email: 'ada@example.com', password: 'squatter password' })
-    const { options } = await stranger.call('passkeyRegistrationOptions', { password: 'squatter password' })
+    const { options } = await stranger.callOk('passkeyRegistrationOptions', { password: 'squatter password' })
 
     expect(await stranger.call('registerPasskey', await device.create(options))).toMatchObject({ ok: true })
 

@@ -253,7 +253,7 @@ describe('guard', () => {
     const ada = browser()
 
     await ada.call('register', { email: 'ada@example.com', password: 'correct horse battery' })
-    const { token } = await ada.call('createToken', { password: 'correct horse battery' }, 'Phone', { scopes: ['posts:read'] })
+    const { token } = await ada.callOk('createToken', { password: 'correct horse battery' }, 'Phone', { scopes: ['posts:read'] })
     const locals = await contextOf(auth.plugin, '', { authorization: `Bearer ${token}` })
     const session = await contextOf(auth.plugin, `session=${ada.cookies.get('session')}`)
 

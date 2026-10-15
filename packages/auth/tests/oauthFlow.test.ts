@@ -82,7 +82,7 @@ async function signInWith(visitor: Browser, provider: string, account: string, s
 
 // Leaves for the provider to link `account` to the visitor's user once `proof` re-proves them, and comes back with its code.
 async function linkWith(visitor: Browser, provider: string, account: string, proof: Proof = {}, redirect?: string) {
-  const started = await visitor.call('linkProvider', provider, proof, { redirect })
+  const started = await visitor.callOk('linkProvider', provider, proof, redirect === undefined ? {} : { redirect })
   const state = new URL(started.url).searchParams.get('state')!
 
   return { response: await visitor.fetch(`/auth/${provider}/callback?code=code-${account}&state=${state}`) }
@@ -190,7 +190,7 @@ describe('coming back from the provider', () => {
     await signInWith(ada, 'discord', '1')
     expect(await ada.json('/me')).toMatchObject({ id: heard[0] })
 
-    const { setup: { secret } } = await ada.call('setUpTwoFactor', {})
+    const { setup: { secret } } = await ada.callOk('setUpTwoFactor', {})
 
     await ada.call('enableTwoFactor', await totpCode(secret, totpStep()))
     const visitor = browser()
@@ -425,7 +425,7 @@ describe('linking a provider', () => {
     await browser().call('register', { email: 'bob@example.com', password: 'correct horse battery' })
     await signInWith(shared, 'discord', '1')
 
-    const leaving = await shared.call('linkProvider', 'github', {})
+    const leaving = await shared.callOk('linkProvider', 'github', {})
     const state = new URL(leaving.url).searchParams.get('state')!
 
     await shared.call('signInWithPassword', { identifier: 'bob@example.com', password: 'correct horse battery' })
@@ -440,7 +440,7 @@ describe('linking a provider', () => {
     const ada = browser()
 
     await signInWith(ada, 'discord', '1')
-    const started = await ada.call('linkProvider', 'github', {}, { redirect: undefined })
+    const started = await ada.callOk('linkProvider', 'github', {}, {})
     const state = new URL(started.url).searchParams.get('state')!
 
     expect((await ada.fetch('/auth/github/callback?code=code-7&state=forged')).headers.get('location')).toBe('/login?error=oauth')
@@ -451,7 +451,7 @@ describe('linking a provider', () => {
     providers({ 7: { id: '7', username: 'ada-gh' }, 8: { id: '8', username: 'other-gh' } })
     const { browser, store } = setup()
     const ada = browser()
-    const { user } = await ada.call('register', { email: 'ada@example.com', password: 'correct horse battery' })
+    const { user } = await ada.callHas('user', 'register', { email: 'ada@example.com', password: 'correct horse battery' })
 
     // The provider's own route only ever signs in.
     await signInWith(browser(), 'github', '8', '/auth/github?link=1')
@@ -552,7 +552,7 @@ describe('a guest signing in with a provider', () => {
 
     providers({ 1: { id: '1', username: 'ada', email: 'ada@example.com' }, 2: { id: '2', username: 'bob' } })
 
-    const { user } = await guest.call('signInAsGuest')
+    const { user } = await guest.callOk('signInAsGuest')
 
     await signInWith(guest, 'discord', '1')
 

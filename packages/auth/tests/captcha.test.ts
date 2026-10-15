@@ -1,4 +1,4 @@
-import type { CaptchaOptions } from '../src/captcha'
+import type { CaptchaAction, CaptchaOptions } from '../src/captcha'
 import { createHash } from 'node:crypto'
 import { afterEach, describe, expect, setSystemTime, test } from 'bun:test'
 import { solveWork } from 'kay/test'
@@ -30,6 +30,16 @@ function setup(options: Parameters<typeof testApp>[0] = {}) {
   })
 
   return { ...app, mails, take }
+}
+
+// The proof-of-work challenge the browser is handed, which a test reading it expects to exist.
+async function challengeOf(browser: ReturnType<ReturnType<typeof testApp>['browser']>, action: CaptchaAction) {
+  const challenge = await browser.call('captchaChallenge', action)
+
+  if (challenge === null)
+    throw new Error(`No ${action} challenge`)
+
+  return challenge
 }
 
 // A check passing only the token `human`, recording what it was asked.
@@ -125,10 +135,10 @@ describe('the proof-of-work CAPTCHA', () => {
     await store.users.create(userRecord({ id: 'u1', email: 'bob@example.com' }))
 
     expect(await ada.post('/register', { email: 'ada@example.com', password: PASSWORD })).toEqual({ ok: false, error: 'captcha' })
-    expect(await ada.post('/register', { email: 'ada@example.com', password: PASSWORD, captcha: solveWork(await ada.call('captchaChallenge', 'register')) })).toMatchObject({ ok: true })
+    expect(await ada.post('/register', { email: 'ada@example.com', password: PASSWORD, captcha: solveWork(await challengeOf(ada, 'register')) })).toMatchObject({ ok: true })
     expect(await ada.call('requestPasswordReset', 'bob@example.com')).toEqual({ ok: false, error: 'captcha' })
-    expect(await ada.call('requestPasswordReset', 'bob@example.com', { captcha: solveWork(await ada.call('captchaChallenge', 'reset')) })).toEqual({ ok: true })
-    expect(await ada.call('requestMagicLink', 'bob@example.com', '/', { captcha: solveWork(await ada.call('captchaChallenge', 'magic-link')) })).toEqual({ ok: true })
+    expect(await ada.call('requestPasswordReset', 'bob@example.com', { captcha: solveWork(await challengeOf(ada, 'reset')) })).toEqual({ ok: true })
+    expect(await ada.call('requestMagicLink', 'bob@example.com', '/', { captcha: solveWork(await challengeOf(ada, 'magic-link')) })).toEqual({ ok: true })
 
     // An app often signs a guest in with no form to carry a challenge.
     expect(await browser().call('signInAsGuest')).toMatchObject({ ok: true, user: { guest: true } })
@@ -141,19 +151,19 @@ describe('the proof-of-work CAPTCHA', () => {
     }
 
     expect(await grace.post('/password', { identifier: 'bob@example.com', password: 'wrong password' })).toEqual({ ok: false, error: 'captcha' })
-    expect(await grace.post('/password', { identifier: 'bob@example.com', password: 'wrong password', captcha: solveWork(await grace.call('captchaChallenge', 'sign-in')) })).toEqual({ ok: false, error: 'invalid' })
+    expect(await grace.post('/password', { identifier: 'bob@example.com', password: 'wrong password', captcha: solveWork(await challengeOf(grace, 'sign-in')) })).toEqual({ ok: false, error: 'invalid' })
   })
 
   test('doubles its difficulty with each attempt past the threshold, up to 16 times, an easier challenge then refused', async () => {
     const { browser } = setup({ captcha: proofOfWork({ difficulty: 20 }) })
     const ada = browser()
-    const first = await ada.call('captchaChallenge', 'register')
+    const first = await challengeOf(ada, 'register')
     const difficulties: number[] = []
 
     expect(await ada.post('/register', { email: 'ada@example.com', password: 'short', captcha: solveWork(first) })).toMatchObject({ ok: false, errors: { password: 'too-short' } })
 
     for (let attempt = 0; attempt < 5; attempt++) {
-      const challenge = await ada.call('captchaChallenge', 'register')
+      const challenge = await challengeOf(ada, 'register')
 
       difficulties.push(difficultyOf(challenge))
 
@@ -169,13 +179,13 @@ describe('the proof-of-work CAPTCHA', () => {
   test('refuses a solution replayed, past its maxAge or solving another action\'s challenge', async () => {
     const { browser } = setup({ captcha: proofOfWork({ difficulty: 20, maxAge: '10m', on: { 'sign-in': 'always' } }) })
     const ada = browser()
-    const solved = solveWork(await ada.call('captchaChallenge', 'sign-in'))
+    const solved = solveWork(await challengeOf(ada, 'sign-in'))
 
     expect(await ada.post('/register', { email: 'ada@example.com', password: PASSWORD, captcha: solved })).toEqual({ ok: false, error: 'captcha' })
     expect(await ada.post('/password', { identifier: 'nobody@example.com', password: PASSWORD, captcha: solved })).toEqual({ ok: false, error: 'invalid' })
     expect(await ada.post('/password', { identifier: 'nobody@example.com', password: PASSWORD, captcha: solved })).toEqual({ ok: false, error: 'captcha' })
 
-    const later = solveWork(await browser().call('captchaChallenge', 'sign-in'))
+    const later = solveWork(await challengeOf(browser(), 'sign-in'))
 
     setSystemTime(Date.now() + 11 * 60 * 1000)
 

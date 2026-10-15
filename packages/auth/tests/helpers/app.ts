@@ -1,4 +1,4 @@
-import type { AuthOptions, AuthSessionData } from '../../src/auth'
+import type { Auth, AuthOptions, AuthSessionData } from '../../src/auth'
 import type { AuthStore, UserRecord } from '../../src/store'
 import { Elysia } from 'elysia'
 import { session } from 'kay/server'
@@ -83,10 +83,20 @@ export function testApp<const Scope extends string = never, OrgRole extends stri
       return 'ok'
     })
 
-  return { auth, app, store, browser: () => browser(app) }
+  const browserOn = (on: { handle: (request: Request) => Promise<Response> }) => browser<Auth<Scope, 'admin' | 'editor', OrgRole>>(on)
+
+  // `browserOn` drives an app wrapping this one, such as one adding routes.
+  return { auth, app, store, browser: () => browserOn(app), browserOn }
 }
 
-export function browser(app: { handle: (request: Request) => Promise<Response> }) {
+type Method<A, M extends keyof A> = A[M] extends (...args: infer Args) => infer Answer ? { args: Args, answer: Awaited<Answer> } : never
+
+// What an answer is once it went through JSON: dates are strings, and a method answering nothing answers null.
+type Wire<T> = T extends undefined ? null : Shape<T>
+
+type Shape<T> = T extends Date ? string : T extends ArrayBufferLike | ArrayBufferView ? T : T extends readonly (infer Item)[] ? Shape<Item>[] : T extends object ? { [Key in keyof T]: Shape<T[Key]> } : T
+
+export function browser<A = Record<string, never>>(app: { handle: (request: Request) => Promise<Response> }) {
   const jar = cookieJar()
 
   return {
@@ -97,13 +107,31 @@ export function browser(app: { handle: (request: Request) => Promise<Response> }
       return jar.send(async request => app.handle(request), new Request(`http://localhost${path}`, init))
     },
     // Calls `auth[method](...args)` in this browser and reads the answer.
-    // eslint-disable-next-line ts/no-explicit-any -- each method answers its own shape, which the tests read as they expect it
-    async call(method: string, ...args: unknown[]): Promise<any> {
-      return this.post(`/call/${method}`, args)
+    async call<M extends keyof A & string>(method: M, ...args: Method<A, M>['args']): Promise<Wire<Method<A, M>['answer']>> {
+      return await this.post(`/call/${method}`, args) as Wire<Method<A, M>['answer']>
+    },
+    // As `call`, for a test that needs the answer of a call that must have worked: anything but `ok: true` fails it.
+    async callOk<M extends keyof A & string>(method: M, ...args: Method<A, M>['args']): Promise<Extract<Wire<Method<A, M>['answer']>, { ok: true }>> {
+      const answer = await this.call(method, ...args)
+
+      if (typeof answer !== 'object' || answer === null || !('ok' in answer) || answer.ok !== true) {
+        throw new Error(`${method} did not work: ${JSON.stringify(answer)}`)
+      }
+
+      return answer as Extract<Wire<Method<A, M>['answer']>, { ok: true }>
+    },
+    // As `callOk`, for an answer that has `key` only in some of its successes, such as a registration that signed the user in.
+    async callHas<Key extends string, M extends keyof A & string>(key: Key, method: M, ...args: Method<A, M>['args']): Promise<Extract<Wire<Method<A, M>['answer']>, { ok: true } & Record<Key, unknown>>> {
+      const answer = await this.callOk(method, ...args)
+
+      if (!(key in answer)) {
+        throw new Error(`${method} answered without ${key}: ${JSON.stringify(answer)}`)
+      }
+
+      return answer as Extract<Wire<Method<A, M>['answer']>, { ok: true } & Record<Key, unknown>>
     },
     // Posts `body` as JSON and reads the answer.
-    // eslint-disable-next-line ts/no-explicit-any -- as `call`
-    async post(path: string, body: unknown): Promise<any> {
+    async post(path: string, body: unknown): Promise<unknown> {
       return this.json(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
     },
     async json(path: string, init: RequestInit = {}): Promise<unknown> {
@@ -120,3 +148,5 @@ export function browser(app: { handle: (request: Request) => Promise<Response> }
     },
   }
 }
+
+export type TestBrowser = ReturnType<ReturnType<typeof testApp>['browser']>
