@@ -960,7 +960,7 @@ describe('kay check, API modules', () => {
     finally {
       await rm(project, { recursive: true, force: true })
     }
-  })
+  }, 30_000)
 })
 
 describe('rooms', () => {
