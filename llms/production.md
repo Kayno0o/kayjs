@@ -153,7 +153,7 @@ export default defineConfig({
 
 ### Compress responses
 
-In production kay compresses pages, action results and routes' responses with brotli or gzip on its own; `compress: false` turns it off behind a proxy or CDN that compresses already, and `compress: true` turns it on elsewhere:
+In production kay compresses pages, action results and routes' responses with zstd, brotli or gzip on its own; `compress: false` turns it off behind a proxy or CDN that compresses already, and `compress: true` turns it on elsewhere:
 
 ```ts
 export default defineConfig({
@@ -373,8 +373,8 @@ export default defineConfig({
 
 ### Compression
 
-- With NODE_ENV production, kay compresses responses itself unless kay.config.ts sets `compress: false`, as behind a proxy or CDN that compresses already (`compress: true` turns it on elsewhere): pages rendered per request, action results, and any `Response` the app's routes registered after `.use(await pages())` return go out with brotli or gzip, whichever the browser's `Accept-Encoding` prefers, and `Vary: Accept-Encoding`.
-- A response whose body is whole within a tick, as a rendered page is, is compressed in one go at brotli 4 or gzip 6, at most four at once, except a page carrying stylesheets `inlineStyles` wrote, which goes as gzip to a browser taking it, whatever weight it gives brotli, only what lies around them compressed (see [Styles](styles-and-assets.md#styles)).
+- With NODE_ENV production, kay compresses responses itself unless kay.config.ts sets `compress: false`, as behind a proxy or CDN that compresses already (`compress: true` turns it on elsewhere): pages rendered per request, action results, and any `Response` the app's routes registered after `.use(await pages())` return go out with zstd, brotli or gzip, whichever the browser's `Accept-Encoding` prefers (zstd on a tie), and `Vary: Accept-Encoding`.
+- A response whose body is whole within a tick, as a rendered page is, is compressed in one go at zstd 3, brotli 4 or gzip 6, within its request's tick up to 16 KB and at most four at once off the main thread past it, the copy of a body rendered alike a second time kept (2 MB in all) so later ones are not compressed again, except a page carrying stylesheets `inlineStyles` wrote, which goes as gzip to a browser taking it, whatever weight it gives brotli, only what lies around them compressed (see [Styles](styles-and-assets.md#styles)).
 - A streamed page is flushed chunk by chunk, so what it sends early still arrives early.
 - A strong ETag becomes weak.
 - Left alone: a response encoded already, such as the build's copies, one under 256 bytes, its length known or not, one with `Cache-Control: no-transform`, and anything but text, JSON, JavaScript, XML and SVG.

@@ -1,14 +1,18 @@
+import type { BrotliCompress, Gzip, ZstdCompress } from 'node:zlib'
 import { existsSync } from 'node:fs'
 import { readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { nodeZlib } from './builtins'
 import { limiter } from './limit'
 
-export type Encoding = 'br' | 'gzip'
+export type Encoding = 'zstd' | 'br' | 'gzip'
+// The encodings of the copies `kay build` writes beside a file, at levels too slow for a request.
+export type StoredEncoding = Exclude<Encoding, 'zstd'>
 
-// Best first: brotli is smaller, gzip what every browser takes.
-const SUFFIXES: Record<Encoding, string> = { br: '.br', gzip: '.gz' }
-const ENCODINGS = Object.keys(SUFFIXES) as Encoding[]
+// Best first among those at hand: zstd compresses a page while serving at about a quarter of brotli's CPU for 5 to 8% more bytes, brotli at its strongest is the smallest copy written once, gzip what every browser takes.
+const ENCODINGS: Encoding[] = ['zstd', 'br', 'gzip']
+const SUFFIXES: Record<StoredEncoding, string> = { br: '.br', gzip: '.gz' }
+const STORED: StoredEncoding[] = ['br', 'gzip']
 const ON_THE_FLY: ReadonlySet<Encoding> = new Set(ENCODINGS)
 const GZIP_ONLY: ReadonlySet<Encoding> = new Set(['gzip'])
 // A gzip member's header: deflate, no name or time, from an unknown system.
@@ -26,9 +30,10 @@ const ACCEPTED = /^\s*([\w*-]+)\s*(?:;\s*q\s*=\s*([\d.]+))?/i
 const KEPT_ACCEPTS = 64
 const KEPT_ACCEPT_LENGTH = 256
 const acceptedWeights = new Map<string, Record<Encoding, number>>()
-// Levels for what compresses while serving: brotli 4 costs a third less CPU than 5 on a 110 KB page for 6% more bytes, about what gzip 6 costs.
+// Levels for what compresses while serving: brotli 4 costs a third less CPU than 5 on a 110 KB page for 6% more bytes, about what gzip 6 costs; zstd 3 about a quarter of either.
 const BROTLI_QUALITY = 4
 const GZIP_LEVEL = 6
+const ZSTD_LEVEL = 3
 // Response types worth compressing: text, and the structured data and scripts sent as text.
 const COMPRESSIBLE_TYPE = /^(?:text\/|application\/(?:json|javascript|xml|manifest\+json|ld\+json|rss\+xml|atom\+xml|wasm)|image\/svg\+xml)/i
 // Statuses with no body to compress, or a partial one.
@@ -58,20 +63,20 @@ export async function compressPaths(paths: string[]): Promise<void> {
     if (bytes.length < MIN_SIZE)
       return
 
-    await Promise.all(Object.entries(await strongestCopies(bytes)).map(async ([encoding, copy]) => Bun.write(encodedPath(path, encoding as Encoding), copy)))
+    await Promise.all(Object.entries(await strongestCopies(bytes)).map(async ([encoding, copy]) => Bun.write(encodedPath(path, encoding as StoredEncoding), copy)))
   }))
 }
 
 // The copies `kay build` writes, for text rendered while serving but off any request's path, as a stale page rendered again.
-export async function compressTextStrongest(text: string): Promise<Partial<Record<Encoding, Uint8Array<ArrayBuffer>>>> {
+export async function compressTextStrongest(text: string): Promise<Partial<Record<StoredEncoding, Uint8Array<ArrayBuffer>>>> {
   const bytes = new TextEncoder().encode(text)
 
   return bytes.length < MIN_SIZE ? {} : strongestCopies(bytes)
 }
 
-async function strongestCopies(bytes: Uint8Array<ArrayBuffer>): Promise<Partial<Record<Encoding, Uint8Array<ArrayBuffer>>>> {
+async function strongestCopies(bytes: Uint8Array<ArrayBuffer>): Promise<Partial<Record<StoredEncoding, Uint8Array<ArrayBuffer>>>> {
   const { constants } = nodeZlib()
-  const copies: [Encoding, Uint8Array<ArrayBuffer>][] = [
+  const copies: [StoredEncoding, Uint8Array<ArrayBuffer>][] = [
     ['br', await compressBrotli(bytes, { [constants.BROTLI_PARAM_QUALITY]: constants.BROTLI_MAX_QUALITY, [constants.BROTLI_PARAM_SIZE_HINT]: bytes.length })],
     ['gzip', Bun.gzipSync(bytes, { level: 9 })],
   ]
@@ -80,14 +85,14 @@ async function strongestCopies(bytes: Uint8Array<ArrayBuffer>): Promise<Partial<
 }
 
 // A brotli and a gzip copy of text rendered while serving, at levels quick enough for a request path; none below the size worth it, nor one saving little.
-export async function compressText(text: string): Promise<Partial<Record<Encoding, Uint8Array<ArrayBuffer>>>> {
+export async function compressText(text: string): Promise<Partial<Record<StoredEncoding, Uint8Array<ArrayBuffer>>>> {
   const bytes = new TextEncoder().encode(text)
-  const copies: Partial<Record<Encoding, Uint8Array<ArrayBuffer>>> = {}
+  const copies: Partial<Record<StoredEncoding, Uint8Array<ArrayBuffer>>> = {}
 
   if (bytes.length < MIN_SIZE)
     return copies
 
-  for (const encoding of ENCODINGS) {
+  for (const encoding of STORED) {
     const copy = await compressBytes(bytes, encoding)
 
     if (copy.length < bytes.length * 0.9)
@@ -140,14 +145,107 @@ const compressing = limiter(4)
 // One body compressed whole, off the main thread, at the levels of the request path. Brotli's window is cut to the body, since a larger one only costs memory: 4 MB at its default.
 async function compressBytes(bytes: Uint8Array, encoding: Encoding): Promise<Uint8Array<ArrayBuffer>> {
   return compressing(async () => {
+    if (encoding === 'zstd')
+      return new Uint8Array(await Bun.zstdCompress(bytes, { level: ZSTD_LEVEL }))
+
     if (encoding === 'gzip')
       return compressGzip(bytes, GZIP_LEVEL)
 
     const { constants } = nodeZlib()
-    const window = Math.min(Math.max(Math.ceil(Math.log2(bytes.length)), constants.BROTLI_MIN_WINDOW_BITS), constants.BROTLI_MAX_WINDOW_BITS)
 
-    return compressBrotli(bytes, { [constants.BROTLI_PARAM_QUALITY]: BROTLI_QUALITY, [constants.BROTLI_PARAM_LGWIN]: window, [constants.BROTLI_PARAM_SIZE_HINT]: bytes.length })
+    return compressBrotli(bytes, { [constants.BROTLI_PARAM_QUALITY]: BROTLI_QUALITY, [constants.BROTLI_PARAM_LGWIN]: brotliWindow(bytes.length), [constants.BROTLI_PARAM_SIZE_HINT]: bytes.length })
   })
+}
+
+function brotliWindow(length: number): number {
+  const { constants } = nodeZlib()
+
+  return Math.min(Math.max(Math.ceil(Math.log2(length)), constants.BROTLI_MIN_WINDOW_BITS), constants.BROTLI_MAX_WINDOW_BITS)
+}
+
+// Up to this size a body compresses on the main thread, within its request's tick: handing it to zlib's threads costs more than compressing it, and its reply goes out corked with a length.
+const COMPRESS_HERE_BYTES = 16 * 1024
+
+function compressBytesHere(bytes: Uint8Array<ArrayBuffer>, encoding: Encoding): Uint8Array<ArrayBuffer> {
+  if (encoding === 'zstd')
+    return new Uint8Array(Bun.zstdCompressSync(bytes, { level: ZSTD_LEVEL }))
+
+  if (encoding === 'gzip')
+    return Bun.gzipSync(bytes, { level: GZIP_LEVEL })
+
+  const { brotliCompressSync, constants } = nodeZlib()
+
+  return new Uint8Array(brotliCompressSync(bytes, { params: { [constants.BROTLI_PARAM_QUALITY]: BROTLI_QUALITY, [constants.BROTLI_PARAM_LGWIN]: brotliWindow(bytes.length), [constants.BROTLI_PARAM_SIZE_HINT]: bytes.length } }))
+}
+
+// Compressed copies of whole bodies by encoding and content, so a page rendering the same bytes again, as most do for every visitor, is not compressed again: a body is kept from its second sighting on, so pages unique to one visitor never fill it.
+// The key's hash is seeded per process and checked against a second one, so no body can be made to collide with another's.
+const KEPT_COPY_BYTES = 2 * 1024 * 1024
+const SEEN_ONCE = 1024
+const HASH_SEED = crypto.getRandomValues(new BigUint64Array(1))[0]!
+const keptCopies = new Map<string, { check: bigint, copy: Uint8Array<ArrayBuffer> }>()
+const seenOnce = new Map<string, bigint>()
+let keptBytes = 0
+
+function copyKey(bytes: Uint8Array, encoding: Encoding): { key: string, check: bigint } {
+  return { key: `${encoding}${bytes.length}:${Bun.hash.xxHash3(bytes, HASH_SEED)}`, check: BigInt(Bun.hash.wyhash(bytes, HASH_SEED)) }
+}
+
+function keptCopy(key: string, check: bigint): Uint8Array<ArrayBuffer> | undefined {
+  const kept = keptCopies.get(key)
+
+  if (kept?.check !== check)
+    return undefined
+
+  // Taken again, it goes to the back of the line to drop.
+  keptCopies.delete(key)
+  keptCopies.set(key, kept)
+
+  return kept.copy
+}
+
+function keepCopy(key: string, check: bigint, copy: Uint8Array<ArrayBuffer>): void {
+  if (seenOnce.get(key) !== check) {
+    seenOnce.delete(key)
+    seenOnce.set(key, check)
+
+    if (seenOnce.size > SEEN_ONCE)
+      seenOnce.delete(seenOnce.keys().next().value!)
+
+    return
+  }
+
+  seenOnce.delete(key)
+
+  if (copy.length > KEPT_COPY_BYTES / 8 || keptCopies.has(key))
+    return
+
+  keptCopies.set(key, { check, copy })
+  keptBytes += copy.length
+
+  for (const [oldest, { copy: dropped }] of keptCopies) {
+    if (keptBytes <= KEPT_COPY_BYTES)
+      break
+
+    keptCopies.delete(oldest)
+    keptBytes -= dropped.length
+  }
+}
+
+// A whole body compressed at the levels of the request path, from the copies kept or within the tick when small, and whether it waited on zlib's threads.
+async function compressWhole(bytes: Uint8Array<ArrayBuffer>, encoding: Encoding): Promise<{ copy: Uint8Array<ArrayBuffer>, late: boolean }> {
+  const { key, check } = copyKey(bytes, encoding)
+  const kept = keptCopy(key, check)
+
+  if (kept)
+    return { copy: kept, late: false }
+
+  const late = bytes.length > COMPRESS_HERE_BYTES
+  const copy = late ? await compressBytes(bytes, encoding) : compressBytesHere(bytes, encoding)
+
+  keepCopy(key, check, copy)
+
+  return { copy, late }
 }
 
 // Text a page carries whole every time it carries it, as an inlined stylesheet.
@@ -452,8 +550,7 @@ async function compressBody({ headers, status, statusText }: Response, source: R
     return new Response(compressedStream(body.stream, encoding), { status, statusText, headers: compressedHeaders(encoding) })
 
   const spliced = fixed && await splicedGzip(body.bytes, fixed)
-  const copy = spliced?.gzip ?? await compressBytes(body.bytes, encoding)
-  const late = spliced?.late ?? true
+  const { copy, late } = spliced ? { copy: spliced.gzip, late: spliced.late } : await compressWhole(body.bytes, encoding)
   const reply = (bytes: Uint8Array<ArrayBuffer>) => late ? lateBody(bytes) : bytes
 
   return copy.length < body.bytes.length * 0.9 ? new Response(reply(copy), { status, statusText, headers: compressedHeaders(spliced ? 'gzip' : encoding) }) : new Response(reply(body.bytes), { status, statusText, headers })
@@ -523,9 +620,17 @@ async function readWithinTick(body: ReadableStream<Uint8Array>): Promise<ReadBod
 
 // The levels of the request path. Brotli's window is cut to 512 KB, more than a page needs, since its default 4 MB is memory held per open stream.
 // Each chunk is flushed and sent before the next is read, so at most one waits in zlib; a browser going away stops both the source and zlib.
+function streamEncoder(encoding: Encoding): BrotliCompress | Gzip | ZstdCompress {
+  const { constants, createBrotliCompress, createGzip, createZstdCompress } = nodeZlib()
+
+  if (encoding === 'zstd')
+    return createZstdCompress({ params: { [constants.ZSTD_c_compressionLevel]: ZSTD_LEVEL } })
+
+  return encoding === 'br' ? createBrotliCompress({ params: { [constants.BROTLI_PARAM_QUALITY]: BROTLI_QUALITY, [constants.BROTLI_PARAM_LGWIN]: 19 } }) : createGzip({ level: GZIP_LEVEL })
+}
+
 function compressedStream(body: ReadableStream<Uint8Array>, encoding: Encoding): ReadableStream<Uint8Array> {
-  const { constants, createBrotliCompress, createGzip } = nodeZlib()
-  const encoder = encoding === 'br' ? createBrotliCompress({ params: { [constants.BROTLI_PARAM_QUALITY]: BROTLI_QUALITY, [constants.BROTLI_PARAM_LGWIN]: 19 } }) : createGzip({ level: GZIP_LEVEL })
+  const encoder = streamEncoder(encoding)
   const reader = body.getReader()
   const output: Uint8Array[] = []
   let failure: Error | undefined
@@ -573,8 +678,8 @@ function compressedStream(body: ReadableStream<Uint8Array>, encoding: Encoding):
 }
 
 // The copies `compressFiles` wrote among the files, by the path of the file they copy.
-export function encodedCopies(files: string[]): Map<string, Set<Encoding>> {
-  const copies = new Map<string, Set<Encoding>>()
+export function encodedCopies(files: string[]): Map<string, Set<StoredEncoding>> {
+  const copies = new Map<string, Set<StoredEncoding>>()
 
   for (const path of files) {
     if (!ENCODED_COPY.test(path))
@@ -588,19 +693,19 @@ export function encodedCopies(files: string[]): Map<string, Set<Encoding>> {
   return copies
 }
 
-export function encodedPath(path: string, encoding: Encoding): string {
+export function encodedPath(path: string, encoding: StoredEncoding): string {
   return `${path}${SUFFIXES[encoding]}`
 }
 
 // The best of the encodings at hand the request accepts, read off `Accept-Encoding` with its `q` weights; `q=0` refuses one.
-export function preferredEncoding(accept: string | null, available: ReadonlySet<Encoding> | undefined): Encoding | undefined {
+export function preferredEncoding<E extends Encoding>(accept: string | null, available: ReadonlySet<E> | undefined): E | undefined {
   if (accept === null || accept === '' || !available || available.size === 0)
     return undefined
 
   const weights = encodingWeights(accept)
-  let best: Encoding | undefined
+  let best: E | undefined
 
-  for (const encoding of ENCODINGS) {
+  for (const encoding of ENCODINGS as E[]) {
     if (available.has(encoding) && weights[encoding] > 0 && (best === undefined || weights[encoding] > weights[best]))
       best = encoding
   }
@@ -625,7 +730,7 @@ function encodingWeights(accept: string): Record<Encoding, number> {
   }
 
   const weight = (encoding: Encoding) => weights.get(encoding) ?? weights.get('*') ?? 0
-  const parsed = { br: weight('br'), gzip: weight('gzip') }
+  const parsed = { zstd: weight('zstd'), br: weight('br'), gzip: weight('gzip') }
 
   if (accept.length <= KEPT_ACCEPT_LENGTH && acceptedWeights.size < KEPT_ACCEPTS)
     acceptedWeights.set(accept, parsed)

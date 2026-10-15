@@ -1,6 +1,6 @@
 import type { Elysia } from 'elysia'
 import type { ClientBuild } from './client'
-import type { Encoding } from './compress'
+import type { StoredEncoding } from './compress'
 import type { HeaderCopies } from './security'
 import { normalize, relative, resolve, sep } from 'node:path'
 import { ASSET_PREFIX } from '../build/assets'
@@ -18,9 +18,9 @@ interface ServedAsset {
   path: string
   file: Bun.BunFile
   map: boolean
-  copies: ReadonlySet<Encoding> | undefined
+  copies: ReadonlySet<StoredEncoding> | undefined
   plain: HeaderCopies
-  encoded: Map<Encoding, { file: Bun.BunFile, headers: HeaderCopies }>
+  encoded: Map<StoredEncoding, { file: Bun.BunFile, headers: HeaderCopies }>
 }
 
 // Whether the request spells a file as the build writes it, raw or percent-encoded as its URL in the build's list, which are the only spellings kept.

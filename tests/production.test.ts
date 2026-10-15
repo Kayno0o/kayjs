@@ -1588,7 +1588,7 @@ describe('a prerendered page posted to', () => {
 describe('compression', () => {
   const routes = 'tests/fixtures/production/src/routes'
 
-  it('compresses what renders per request for a browser taking brotli or gzip, headers and cookies kept', async () => {
+  it('compresses what renders per request for a browser taking zstd, brotli or gzip, headers and cookies kept', async () => {
     // Registered after the pages, as hooks only reach the routes that come after them.
     const app = new Elysia()
       .use(await pages({ routes, prebuilt: false, compress: true }))
@@ -1602,10 +1602,15 @@ describe('compression', () => {
     const page = await fetch('/contact', 'gzip, deflate, br, zstd')
     const plain = await fetch('/contact', 'identity')
 
-    expect(page.headers.get('content-encoding')).toBe('br')
+    expect(page.headers.get('content-encoding')).toBe('zstd')
     expect(page.headers.get('vary')).toContain('accept-encoding')
     expect(page.headers.get('content-security-policy')).toStartWith('default-src \'self\'')
-    expect(new TextDecoder().decode(brotliDecompressSync(await page.bytes()))).toBe(await plain.text())
+    expect(Bun.zstdDecompressSync(await page.bytes()).toString()).toBe(await plain.text())
+
+    const brotli = await fetch('/contact', 'gzip, deflate, br')
+
+    expect(brotli.headers.get('content-encoding')).toBe('br')
+    expect(new TextDecoder().decode(brotliDecompressSync(await brotli.bytes()))).toBe(await (await fetch('/contact', 'identity')).text())
     expect(plain.headers.get('content-encoding')).toBeNull()
     expect(plain.headers.get('vary')).toContain('accept-encoding')
 
@@ -1717,6 +1722,79 @@ describe('compression', () => {
       }
     }
     finally {
+      await server.stop(true)
+    }
+  })
+
+  it('compresses with zstd for a browser taking it, whole or streamed, and brotli or gzip for one that does not', async () => {
+    const { compressResponse, wholeResponse } = await import('../src/server/compress')
+    const page = `<p>${'zstd page '.repeat(300)}</p>`
+    const send = async (accept: string, body: string | ReadableStream<Uint8Array> = page) => (await compressResponse(new Request('http://localhost/', { headers: { 'accept-encoding': accept } }), typeof body === 'string' ? wholeResponse(body, { headers: { 'content-type': 'text/html' } }) : new Response(body, { headers: { 'content-type': 'text/html' } })))!
+
+    for (const [accept, encoding] of [['gzip, deflate, br, zstd', 'zstd'], ['zstd;q=0.5, br', 'br'], ['gzip, br, zstd;q=0', 'br'], ['gzip', 'gzip']] as const)
+      expect((await send(accept)).headers.get('content-encoding')).toBe(encoding)
+
+    expect(Bun.zstdDecompressSync(new Uint8Array(await (await send('zstd')).arrayBuffer())).toString()).toBe(page)
+
+    let close!: () => void
+    const parts: Uint8Array[] = []
+    const streamed = await send('zstd', new ReadableStream<Uint8Array>({
+      start(controller) {
+        // Two chunks a macrotask apart, so the body is read as a stream rather than whole.
+        controller.enqueue(new TextEncoder().encode(page))
+        close = () => {
+          controller.enqueue(new TextEncoder().encode('<p>later</p>'))
+          controller.close()
+        }
+      },
+    }))
+    const reader = streamed.body!.getReader()
+
+    parts.push((await reader.read()).value!)
+    close()
+
+    for (let read = await reader.read(); !read.done; read = await reader.read())
+      parts.push(read.value)
+
+    expect(streamed.headers.get('content-encoding')).toBe('zstd')
+    expect(Bun.zstdDecompressSync(Buffer.concat(parts)).toString()).toBe(`${page}<p>later</p>`)
+  })
+
+  it('compresses a body rendered again from its second time on only once, a reply from the copy kept going out with its length', async () => {
+    const { compressResponse, wholeResponse } = await import('../src/server/compress')
+    const words = (count: number, from: number) => Array.from({ length: count }, (_, i) => ((i + from) * 2654435761 % 1e9).toString(36)).join(' ')
+    const send = async (body: string) => (await compressResponse(new Request('http://localhost/', { headers: { 'accept-encoding': 'zstd' } }), wholeResponse(body, { headers: { 'content-type': 'text/html' } })))!
+    const small = `<p>${words(300, 7)}</p>`
+    const other = `<p>${words(300, 8)}</p>`
+    const large = `<p>${words(9000, 9)}</p>`
+    const here = spyOn(Bun, 'zstdCompressSync')
+    const pooled = spyOn(Bun, 'zstdCompress')
+    const server = Bun.serve({ port: 0, hostname: '127.0.0.1', fetch: async () => send(large) })
+
+    try {
+      for (let time = 0; time < 4; time++)
+        expect(Bun.zstdDecompressSync(new Uint8Array(await (await send(small)).arrayBuffer())).toString()).toBe(small)
+
+      // Seen once and once kept, then taken from the copy kept.
+      expect(here).toHaveBeenCalledTimes(2)
+      expect(Bun.zstdDecompressSync(new Uint8Array(await (await send(other)).arrayBuffer())).toString()).toBe(other)
+      expect(here).toHaveBeenCalledTimes(3)
+
+      // Past what Bun corks once a reply waited on zlib's threads, so only a copy taken within the tick goes out with its length.
+      const replies = []
+
+      for (let time = 0; time < 3; time++) {
+        const reply = await fetch(`http://127.0.0.1:${server.port}/`, { headers: { 'accept-encoding': 'zstd' }, decompress: false })
+
+        replies.push({ chunked: reply.headers.get('transfer-encoding') === 'chunked', text: Bun.zstdDecompressSync(await reply.bytes()).toString() })
+      }
+
+      expect(pooled).toHaveBeenCalledTimes(2)
+      expect(replies).toEqual([{ chunked: true, text: large }, { chunked: true, text: large }, { chunked: false, text: large }])
+    }
+    finally {
+      here.mockRestore()
+      pooled.mockRestore()
       await server.stop(true)
     }
   })

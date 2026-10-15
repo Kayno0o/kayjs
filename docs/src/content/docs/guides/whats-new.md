@@ -7,6 +7,7 @@ This page lists what each release adds, newest first, with a link to where each 
 
 ## Unreleased
 
+- **Cheaper compression**: a page rendered per request goes out as zstd to a browser that takes it, at about a quarter of brotli's CPU, and a page rendering the same bytes again is compressed only once. The server spends about half the CPU per compressed page it did. [Deployment](/guides/deployment)
 - **Library actions in tests**: `kay check` types the named exports of a library page, such as kayjs-auth's actions, as the file declares them, so a test imports one without a cast.
 - **Prove the executable starts**: `kay build --compile server --verify` starts it, waits for its health route and runs `--health`, failing the build with the server's own output when it crashes at startup. [Deployment](/guides/deployment#prove-the-executable-starts)
 - **Tests catch islands the browser cannot build**: `testSite()` builds them and throws the error, once per process, `islands: false` skips it. [Testing](/guides/testing#islands-that-fail-the-browser-build)
