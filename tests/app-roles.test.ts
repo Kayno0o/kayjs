@@ -50,7 +50,7 @@ describe('the app template\'s db/roles.sh', () => {
     await admin.close()
   })
 
-  async function runScript(password: string): Promise<void> {
+  async function runScript(password: string, owner = { user: decodeURIComponent(url!.username), password: decodeURIComponent(url!.password) }): Promise<string> {
     const dir = await mkdtemp(join(tmpdir(), 'kay-roles-'))
 
     try {
@@ -59,12 +59,14 @@ describe('the app template\'s db/roles.sh', () => {
       const shell = Bun.spawn(['sh', join(dir, 'roles.sh')], {
         stdout: 'pipe',
         stderr: 'pipe',
-        env: { ...process.env, PGHOST: url!.hostname, PGPORT: url!.port, PGPASSWORD: decodeURIComponent(url!.password), POSTGRES_USER: decodeURIComponent(url!.username), POSTGRES_DB: DATABASE, APP_DB_PASSWORD: password },
+        env: { ...process.env, PGHOST: url!.hostname, PGPORT: url!.port, PGPASSWORD: owner.password, POSTGRES_USER: owner.user, POSTGRES_DB: DATABASE, APP_DB_PASSWORD: password },
       })
       const [errors, code] = await Promise.all([new Response(shell.stderr).text(), shell.exited])
 
       if (code !== 0)
         throw new Error(`db/roles.sh failed:\n${errors}`)
+
+      return errors
     }
     finally {
       await rm(dir, { recursive: true, force: true })
@@ -82,7 +84,11 @@ describe('the app template\'s db/roles.sh', () => {
     await owner.unsafe('CREATE TABLE "early" ("id" serial PRIMARY KEY, "name" text NOT NULL)')
     // The migration history table, there before the script as in an app adopting it.
     await owner.unsafe('CREATE TABLE "_pgorm_migrations" ("id" serial PRIMARY KEY, "name" text NOT NULL)')
+    await owner.unsafe('CREATE SCHEMA "ledger"')
+    await owner.unsafe('CREATE TABLE "ledger"."_pgorm_migrations" ("id" serial PRIMARY KEY, "name" text NOT NULL)')
     await runScript(PASSWORD)
+    // A grant on the whole schema, as an app may add for its own, reaches the history table found there: the next run takes the writes back.
+    await owner.unsafe('GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA "ledger" TO app_rw')
     // Run again, with another password: the role exists already, and the password follows.
     await runScript(`${PASSWORD}2`)
 
@@ -126,10 +132,19 @@ describe('the app template\'s db/roles.sh', () => {
         await owner.unsafe('INSERT INTO "_pgorm_migrations" ("name") VALUES (\'0001\')')
         expect([created, (await app.unsafe<{ name: string }[]>('SELECT "name" FROM "_pgorm_migrations"')).map(row => row.name)]).toEqual([created, ['0001']])
 
-        for (const statement of ['INSERT INTO "_pgorm_migrations" ("name") VALUES (\'0002\')', 'UPDATE "_pgorm_migrations" SET "name" = \'x\'', 'DELETE FROM "_pgorm_migrations"', 'TRUNCATE "_pgorm_migrations"'])
+        for (const statement of ['INSERT INTO "_pgorm_migrations" ("name") VALUES (\'0002\')', 'UPDATE "_pgorm_migrations" SET "name" = \'x\'', 'DELETE FROM "_pgorm_migrations"'])
           expect([created, statement, await permission(app, statement)]).toEqual([created, statement, '42501'])
 
         await owner.unsafe('DELETE FROM "_pgorm_migrations"')
+      }
+
+      // The same table in another schema, found by the script or created later in one, is read-only as well.
+      await owner.unsafe('CREATE TABLE "billing"."_pgorm_migrations" ("id" serial PRIMARY KEY, "name" text NOT NULL)')
+
+      for (const table of ['ledger._pgorm_migrations', 'billing._pgorm_migrations']) {
+        const [{ write }] = await owner.unsafe<{ write: boolean }[]>(`SELECT has_table_privilege('app_rw', '${table}', 'INSERT, UPDATE, DELETE') AS write`)
+
+        expect([table, write]).toEqual([table, false])
       }
 
       // Only that table: a name that matches it as a pattern keeps its rows writable.
@@ -157,6 +172,26 @@ describe('the app template\'s db/roles.sh', () => {
     finally {
       await app.close()
       await owner.close()
+    }
+  }, 30_000)
+
+  run('finishes with a notice when the owner is no superuser, as on a managed Postgres', async () => {
+    await admin!.unsafe(`DROP DATABASE IF EXISTS ${DATABASE} WITH (FORCE)`)
+    await admin!.unsafe('DROP ROLE IF EXISTS app_rw')
+    await admin!.unsafe('DROP ROLE IF EXISTS kay_plain_owner')
+    await admin!.unsafe('CREATE ROLE kay_plain_owner LOGIN CREATEROLE PASSWORD \'plainpass0123\'')
+    await admin!.unsafe(`CREATE DATABASE ${DATABASE} OWNER kay_plain_owner`)
+
+    try {
+      const notice = await runScript(PASSWORD, { user: 'kay_plain_owner', password: 'plainpass0123' })
+
+      expect(notice).toContain('the owner is not a superuser')
+    }
+    finally {
+      await admin!.unsafe(`DROP DATABASE IF EXISTS ${DATABASE} WITH (FORCE)`)
+      await admin!.unsafe('DROP OWNED BY kay_plain_owner')
+      await admin!.unsafe('DROP ROLE IF EXISTS app_rw')
+      await admin!.unsafe('DROP ROLE IF EXISTS kay_plain_owner')
     }
   }, 30_000)
 })

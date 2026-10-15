@@ -387,7 +387,13 @@ set -e
 
 psql -v ON_ERROR_STOP=1 -v owner="$POSTGRES_USER" -v password="$APP_DB_PASSWORD" --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<'SQL'
 SELECT 'CREATE ROLE app_rw LOGIN' WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'app_rw') \\gexec
+-- Creating an event trigger and changing the SUPERUSER, REPLICATION and BYPASSRLS attributes take a superuser: on a managed Postgres the owner is not one, and the script finishes without them (a role it creates has none of them anyway).
+SELECT rolsuper AS is_super FROM pg_roles WHERE rolname = current_user \\gset
+\\if :is_super
 SELECT format('ALTER ROLE app_rw NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS PASSWORD %L', :'password') \\gexec
+\\else
+SELECT format('ALTER ROLE app_rw PASSWORD %L', :'password') \\gexec
+\\endif
 REVOKE CREATE ON SCHEMA public FROM PUBLIC;
 GRANT USAGE ON SCHEMA public TO app_rw;
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO app_rw;
@@ -397,8 +403,9 @@ ALTER DEFAULT PRIVILEGES FOR ROLE :"owner" GRANT USAGE ON SEQUENCES TO app_rw;
 ALTER DEFAULT PRIVILEGES FOR ROLE :"owner" GRANT USAGE ON SCHEMAS TO app_rw;
 
 -- pg-orm's migration history table is created after this script, so the default privileges reach it: the revoke below covers one that exists already, and an event trigger takes the writes back from one created later.
-SELECT format('REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON %s FROM app_rw', oid::regclass) FROM pg_class WHERE relname = '_pgorm_migrations' AND relkind = 'r' AND relnamespace = 'public'::regnamespace \\gexec
-CREATE OR REPLACE FUNCTION kay_protect_migrations() RETURNS event_trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog AS $$
+SELECT format('REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON %s FROM app_rw', oid::regclass) FROM pg_class WHERE relname = '_pgorm_migrations' AND relkind = 'r' \\gexec
+\\if :is_super
+CREATE OR REPLACE FUNCTION public.kay_protect_migrations() RETURNS event_trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog AS $$
 DECLARE created record;
 BEGIN
   FOR created IN SELECT object_identity FROM pg_event_trigger_ddl_commands() WHERE command_tag = 'CREATE TABLE' AND object_identity ~ '\\._pgorm_migrations$' AND EXISTS (SELECT FROM pg_roles WHERE rolname = 'app_rw') LOOP
@@ -407,7 +414,10 @@ BEGIN
 END
 $$;
 DROP EVENT TRIGGER IF EXISTS kay_protect_migrations;
-CREATE EVENT TRIGGER kay_protect_migrations ON ddl_command_end WHEN TAG IN ('CREATE TABLE') EXECUTE FUNCTION kay_protect_migrations();
+CREATE EVENT TRIGGER kay_protect_migrations ON ddl_command_end WHEN TAG IN ('CREATE TABLE') EXECUTE FUNCTION public.kay_protect_migrations();
+\\else
+\\warn 'db/roles.sh: the owner is not a superuser, so the event trigger that keeps app_rw from writing _pgorm_migrations is skipped: revoke INSERT, UPDATE, DELETE on it after the first migrate.'
+\\endif
 SQL
 `
 
