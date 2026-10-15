@@ -7,6 +7,7 @@ import process from 'node:process'
 import { pathToFileURL } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { check } from '../src/check'
+import * as shadowModule from '../src/check/shadow'
 import { Connection } from '../src/lsp/rpc'
 import { DIAGNOSTICS_DELAY, KayLanguageServer } from '../src/lsp/server'
 import { scratchDir } from './scratch'
@@ -904,12 +905,10 @@ describe('kay lsp on a save', () => {
     }
   })
 
-  it('compiles an open page again when a layout above it gains or drops a query', async () => {
-    const dir = await scratchDir('lsp-layout-query-')
-    const page = 'src/routes/a.kay'
-    const layout = 'src/routes/_layout.kay'
+  // The texts of the open page the server hands tsgo again as `saves` are made one after another, each as a change of `layout` on disk, a save of `sibling` first when it names one.
+  async function compiledAfter(dir: string, { page, layout, saves, files = {}, project = dir, sibling }: { page: string, layout: string, saves: string[], files?: Record<string, string>, project?: string, sibling?: string }): Promise<{ compiled: string[], layoutReads: number }> {
     const source = '--- server\nconst query = ctx.query\n---\np {String(query)}\n'
-    const withQuery = '--- server\nimport { s } from \'kay\'\n\nexport const page = { query: s.Object({ q: s.String() }) }\n---\nslot\n'
+    // The disk holds another text than the editor, so a read of the open page's text is the server's own.
     const encoder = new TextEncoder()
     const toServer = new TransformStream<Uint8Array>()
     const toClient = new TransformStream<Uint8Array>()
@@ -922,41 +921,100 @@ describe('kay lsp on a save', () => {
       void writeToClient.write(encoder.encode(data))
     }))
 
-    await Promise.all([Bun.write(join(dir, 'tsconfig.json'), await Bun.file(join(fixtures, 'site/tsconfig.json')).text()), Bun.write(join(dir, page), source), Bun.write(join(dir, layout), 'slot\n')])
+    await Promise.all([Bun.write(join(project, 'tsconfig.json'), await Bun.file(join(fixtures, 'site/tsconfig.json')).text()), Bun.write(join(project, page), `${source}p disk\n`), Bun.write(layout, 'slot\n'), ...Object.entries(files).map(async ([path, text]) => Bun.write(path, text))])
 
     try {
-      const uri = pathToFileURL(join(dir, page)).href
+      const uri = pathToFileURL(join(project, page)).href
 
-      await client.request('initialize', { processId: process.pid, rootUri: pathToFileURL(dir).href, capabilities: {} })
+      await client.request('initialize', { processId: process.pid, rootUri: pathToFileURL(project).href, capabilities: {} })
       client.notify('initialized', {})
       client.notify('textDocument/didOpen', { textDocument: { uri, languageId: 'kay', version: 1, text: source } })
       await Bun.sleep(300)
 
       const tsgo = (server as unknown as { tsgo: { connection: Connection } }).tsgo.connection
       const compiled: string[] = []
+      const queries = spyOn(shadowModule, 'layoutQueries')
       const notify = spyOn(tsgo, 'notify').mockImplementation((method: string, params?: unknown) => {
         if (method === 'textDocument/didChange')
           compiled.push((params as { contentChanges: { text: string }[] }).contentChanges[0]!.text)
       })
-      const save = async (text: string) => {
-        await Bun.write(join(dir, layout), text)
-        client.notify('workspace/didChangeWatchedFiles', { changes: [{ uri: pathToFileURL(join(dir, layout)).href, type: 2 }] })
+      const save = async (file: string, text: string) => {
+        await Bun.write(file, text)
+        client.notify('workspace/didChangeWatchedFiles', { changes: [{ uri: pathToFileURL(file).href, type: 2 }] })
         await Bun.sleep(400)
       }
 
-      await save(withQuery)
-      await save(withQuery.replace('q: s.String()', 'q: s.Integer()'))
-      await save('slot\n')
+      if (sibling !== undefined)
+        await save(join(project, sibling), 'p changed\n')
+
+      for (const text of saves)
+        await save(layout, text)
+
+      const layoutReads = queries.mock.calls.filter(([file, text]) => file === join(project, page) && !text.includes('p disk')).length
+
       notify.mockRestore()
+      queries.mockRestore()
+
+      return { compiled, layoutReads }
+    }
+    finally {
+      const { tsgo } = server as unknown as { tsgo?: { process: { kill: () => void } } }
+
+      tsgo?.process.kill()
+    }
+  }
+
+  const withQuery = '--- server\nimport { s } from \'kay\'\n\nexport const page = { query: s.Object({ q: s.String() }) }\n---\nslot\n'
+
+  it('compiles an open page again when a layout above it gains or drops a query', async () => {
+    const dir = await scratchDir('lsp-layout-query-')
+
+    try {
+      const { compiled } = await compiledAfter(dir, { page: 'src/routes/a.kay', layout: join(dir, 'src/routes/_layout.kay'), saves: [withQuery, withQuery.replace('q: s.String()', 'q: s.Integer()'), 'slot\n'] })
 
       expect(compiled).toHaveLength(2)
       expect(compiled[0]).toContain('_layout.kay')
       expect(compiled[1]).not.toContain('_layout.kay')
     }
     finally {
-      const { tsgo } = server as unknown as { tsgo?: { process: { kill: () => void } } }
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
 
-      tsgo?.process.kill()
+  it('compiles an open page again when a layout an extension mounts above it gains or drops a query', async () => {
+    const dir = await scratchDir('lsp-layout-mounted-')
+    const app = join(dir, 'app')
+
+    try {
+      const { compiled } = await compiledAfter(dir, {
+        project: app,
+        page: 'src/routes/lib/a.kay',
+        layout: join(dir, 'lib/routes/_layout.kay'),
+        files: { [join(app, 'kay.config.ts')]: 'export default { extensions: [{ name: \'lib\', routes: { dir: \'../lib/routes\', prefix: \'/lib\' } }] }\n', [join(dir, 'lib/routes/index.kay')]: 'p lib\n', [join(dir, 'lib/package.json')]: '{ "name": "lib" }\n' },
+        saves: [withQuery, 'slot\n'],
+      })
+
+      expect(compiled).toHaveLength(2)
+      expect(compiled[0]).toContain('_layout.kay')
+      expect(compiled[1]).not.toContain('_layout.kay')
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('reads no layout for the save of a file that is not one', async () => {
+    const dir = await scratchDir('lsp-layout-sibling-')
+
+    try {
+      await Bun.write(join(dir, 'src/routes/b.kay'), 'p b\n')
+
+      const layout = join(dir, 'src/routes/_layout.kay')
+
+      expect((await compiledAfter(dir, { page: 'src/routes/a.kay', layout, saves: [], sibling: 'src/routes/b.kay' })).layoutReads).toBe(0)
+      expect((await compiledAfter(dir, { page: 'src/routes/a.kay', layout, saves: [withQuery] })).layoutReads).toBeGreaterThan(0)
+    }
+    finally {
       await rm(dir, { recursive: true, force: true })
     }
   })

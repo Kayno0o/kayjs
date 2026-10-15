@@ -557,6 +557,8 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     stopWatching()
     await restarting
     typesAgain = false
+    child?.kill()
+    spare?.kill()
 
     // A types process stuck importing the config is killed rather than waited for.
     if (typesWriting !== undefined) {
@@ -570,8 +572,6 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
       }
     }
 
-    child?.kill()
-    spare?.kill()
     await Promise.all([child?.exited, spare?.exited, builder?.stop()])
     await inspector?.stop()
   }
