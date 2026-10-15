@@ -120,6 +120,10 @@ describe('the app template\'s db/roles.sh', () => {
         await owner.unsafe('DELETE FROM "_pgorm_migrations"')
       }
 
+      // Only that table: a name that matches it as a pattern keeps its rows writable.
+      await owner.unsafe('CREATE TABLE "xpgorm_migrations" ("id" serial PRIMARY KEY, "name" text NOT NULL)')
+      await app.unsafe('INSERT INTO "xpgorm_migrations" ("name") VALUES (\'a\')')
+
       // USAGE draws ids; moving a sequence is not allowed.
       expect(await permission(app, 'SELECT setval(\'late_id_seq\', 2000000000)')).toBe('42501')
       await app.unsafe('INSERT INTO "billing"."invoice" ("total") VALUES (3)')
