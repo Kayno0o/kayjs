@@ -56,7 +56,7 @@ kay check --fix
 
 ### Learn what a lint reports
 
-`kay explain` lists the lints with their group, and given a lint prints it with an example it reports and the same written right:
+`kay explain` lists the lints with their group and the errors kay raises (see [Errors](#errors)), and given a lint prints it with an example it reports and the same written right:
 
 ```sh
 kay explain
@@ -224,6 +224,59 @@ kay check && keslint --cache
 | `long-description` | warn | seo | A prerendered page whose description runs over 160 characters, which search results cut. |
 | `unsized-share-image` | warn | seo | A prerendered page whose `og:image` has no `og:image:width`, kay reading no size off it. |
 | `noindex-in-sitemap` | warn | seo | A prerendered page whose head says `noindex` while the sitemap lists it; `noindex: true` in `page` does both. |
+
+### Errors
+
+- A compile, build, content or export error that is no lint carries a code too, printed in brackets, `error[template-syntax]`, or after the failure, `kay explain <code> says where the fix is written`.
+- `kay check --format json`, `kay build --format json` and `kay explain --format json` carry it as `code`, which is `null` only for what kay did not raise itself, such as a type error TypeScript names by number.
+- `kay explain <code>` prints what raises it and the section that covers the fix; `kay explain compile`, `command`, `build`, `content` or `export` lists a group's.
+- The codes are stable names, one for a group of messages with one cause.
+- No level applies to them, and no `// kay-allow` comment reaches them: each stops the command raising it.
+
+| Error | Group | Raised for | Fix |
+| --- | --- | --- | --- |
+| `command-usage` | command | A command that could not run as asked: a path that does not exist or is no project, a flag it does not take, flags that do not go together. | [Commands](project.md#commands) |
+| `template-syntax` | compile | A template line kay cannot read: indentation, an unclosed `(` or string, a malformed `for`, `const`, `await` or `match`, an attribute that is neither a quoted string nor a `{expression}`. | [Template lines](templates.md#template-lines) |
+| `template-invalid` | compile | A template that reads but is not allowed: a `head` block in the wrong place, a duplicate id or class, an attribute that has no effect there, a `field`, `server` or `bind:` used wrongly, an event that is not camelCase. | [Elements](templates.md#elements) |
+| `fence-invalid` | compile | A script or server fence that breaks a rule of kay: props declared twice or read wrongly, a value exported from a component script, JSX in a fence, a page setting kay cannot read as written. | [File layout](components.md#file-layout) |
+| `fence-syntax` | compile | Code in a fence, or generated from the template, that TypeScript cannot parse. | [File layout](components.md#file-layout) |
+| `page-settings-invalid` | compile | A page setting kay cannot read where it is written: `page` must be an object literal of `key: value` settings. | [Page settings](routing.md#page-settings) |
+| `signal-misuse` | compile | A signal or memo written the wrong way: a memo assigned, a name declared twice, a `bind:` to a name holding no signal. | [Signals](components.md#signals) |
+| `client-route-fence` | compile | A page, layout or special page with a `--- client` fence: they render on the server. | [Islands](islands.md#islands) |
+| `browser-only-read` | compile | A browser-only name such as `window` read while a component renders on the server too; reported by the type check, so a page still runs. | [Browser globals on the server](islands.md#browser-globals-on-the-server) |
+| `unknown-lint` | compile | A `// kay-allow` comment naming something that is no lint. | [Allow a lint on one line](checks.md#allow-a-lint-on-one-line) |
+| `browser-builtin-import` | build | An island importing a module that reaches a Node built-in, which a browser does not have. | [Browser-only components](islands.md#browser-only-components) |
+| `server-only-in-island` | build | A chunk a page loads reading `process` or `Bun`, or an island importing the server's `s` schema builder, so the island dies as it loads. | [Browser globals on the server](islands.md#browser-globals-on-the-server) |
+| `inert-editor` | build | An editor component running nothing in the browser, where an editor edits the page. | [The editor](content.md#the-editor) |
+| `worker-build` | build | A worker that fails to build, or starts itself again through other workers. | [Wasm and workers](styles-and-assets.md#wasm-and-workers) |
+| `glob-import` | build | An `import.meta.glob` the build cannot read before the module runs. | [Glob imports](components.md#glob-imports) |
+| `icon-unresolved` | build | An icon of a set that is not installed, or a name the set does not have. | [Icons](styles-and-assets.md#icons) |
+| `library-settings` | build | `settings` naming a library that is not installed, declares no settings module, or whose module is missing. | [Using a component library](components.md#using-a-component-library) |
+| `executable-invalid` | build | `kay build --compile` without a server entry, or with a public directory named like the client assets. | [Build one executable](project.md#build-one-executable) |
+| `executable-missing-content` | build | A compiled executable holding no build of a collection. | [Build one executable](project.md#build-one-executable) |
+| `search-page-unreadable` | build | The search index could not read a prerendered page. | [Site search](head.md#site-search) |
+| `config-default-export` | build | kay.config.ts that does not export its config by default. | [Project setup](project.md#project-setup) |
+| `content-invalid` | content | Entries of a collection that do not compile or match its schema, a slug two entries share, or a component the collection does not name. | [Collections](content.md#collections) |
+| `markdown-invalid` | content | Markdown or data an entry holds that kay cannot read: a component never closed, an attribute kay cannot read, JSON or YAML that does not parse. | [Components in Markdown](content.md#components-in-markdown) |
+| `content-config-missing` | content | The content config the project names does not exist, or a collection is not exported from it. | [Collections](content.md#collections) |
+| `loader-result` | content | A collection's `load` that threw, did not give an array, or gave an entry with no slug. | [Loaded collections](content.md#loaded-collections) |
+| `loader-method` | content | An entry saved or removed through a loader that declares no `save` or `remove`. | [Loaded collections](content.md#loaded-collections) |
+| `feed-needs-site` | content | A feed on a site with no `site` URL to build its links from, or an entry with an invalid date. | [Feeds](content.md#feeds) |
+| `pagination-misuse` | content | A page size that is not a whole number from 1, or `page()` called when no page renders. | [Pagination](content.md#pagination) |
+| `content-api-misuse` | content | An editor helper asked for what the collection is not: a locale of a collection that is not localized, a folder collection's file from a loaded one, a folder outside the repository or missing. | [A CMS editing the collections](content.md#a-cms-editing-the-collections) |
+| `export-unsupported-config` | export | A config a static export cannot serve: locales by domain, or an image route resolving images per request. | [Static export](routing.md#static-export) |
+| `export-output-dir` | export | A static export into a directory that is the project itself, or holds files it did not write. | [Static export](routing.md#static-export) |
+| `export-page-error` | export | A page, endpoint or module that threw as it was imported or rendered for the export. | [Static export](routing.md#static-export) |
+| `export-page-status` | export | A page that answers 500, a redirect or a status other than 200 as it is prerendered. | [Static export](routing.md#static-export) |
+| `export-needs-params` | export | A page with params whose `prerender` lists none, or that sets `prerender: false`, or lists values its matchers refuse. | [Prerendering](routing.md#prerendering) |
+| `export-image-route` | export | A page linking an image only the image route resizes, which no file of the export holds. | [Static export](routing.md#static-export) |
+| `export-site-url` | export | A page reading the site's URL when neither `site` nor SITE_URL sets it. | [Site defaults and social cards](head.md#site-defaults-and-social-cards) |
+| `export-server-render` | export | A page with something only a server renders per request: a server island, a form stamp or work challenge, a deferred island with no browser entry. | [Server islands](routing.md#server-islands) |
+| `export-guard` | export | A page, endpoint or API module a guard covers, or that `requireGuards` leaves with no guard: only a server runs one per request. | [Guards](server.md#guards) |
+| `export-action` | export | A page exporting an action, which only a server can take. | [Static export](routing.md#static-export) |
+| `export-path-clash` | export | Two pages that would be prerendered to the same file. | [Prerendering](routing.md#prerendering) |
+| `export-api-module` | export | An API module, which answers requests only a server does. | [API modules](api-routes.md#api-modules) |
+| `export-no-client-build` | export | Prerendering run with no client build to add its pages to. | [Commands](project.md#commands) |
 
 ### SEO lints
 

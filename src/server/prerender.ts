@@ -1,4 +1,5 @@
 import type { RenderedPage } from '../check/seo'
+import type { ErrorName, ExportProblem } from '../compiler/errors'
 import type { Project } from '../project'
 import type { PageSettings } from '../runtime'
 import type { ClientBuild, PrerenderedPage } from './client'
@@ -7,6 +8,7 @@ import { mkdir } from 'node:fs/promises'
 import { join, relative } from 'node:path'
 import { resolveFrom } from '../build/files'
 import { elementsIn, serverIslandOf } from '../compiler/ast'
+import { exportProblem, KayError } from '../compiler/errors'
 import { parseKay } from '../compiler/parser'
 import { analyzeServer } from '../compiler/script'
 import { isAction } from '../runtime/action'
@@ -27,7 +29,6 @@ import { serverIslandModes } from './server-islands'
 import { setupPages } from './setup'
 import { STAMP_HOLE } from './stamp'
 
-const KAY_PREFIX = /^kay: /
 const PARTS = new Intl.ListFormat('en-GB')
 const KAY_IMPORT = /\bfrom\s+['"]([^'"]+\.kay)['"]/g
 
@@ -37,6 +38,15 @@ export const IMAGE_LINK = new RegExp(`="[^"]*${RegExp.escape(IMAGE_ROUTE)}\\?`)
 // The pages a static export cannot hold, each named: a message for the person building, with no stack to read past.
 export class ExportError extends Error {
   override name = 'ExportError'
+
+  // Each problem with its own code, the file it is in leading its message.
+  constructor(message: string, readonly problems: ExportProblem[]) {
+    super(message)
+  }
+
+  get code(): ErrorName {
+    return this.problems[0]?.code ?? 'export-page-error'
+  }
 }
 
 export interface PrerenderOptions {
@@ -54,7 +64,7 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
   const manifest = await readManifest(root, output)
 
   if (!manifest)
-    throw new Error('kay: no client build to add prerendered pages to; run buildClient first')
+    throw new KayError('export-no-client-build', 'kay: no client build to add prerendered pages to; run buildClient first')
 
   const dir = join(output, PRERENDERED_DIR)
   const { mounts, routes, matchers, i18n, locales, site, renderOptions } = await setupPages(project, async () => client, true)
@@ -74,14 +84,14 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
     const listed = (options.exportAll === true || marked) && prerender === undefined && route.params.length === 0 ? true : prerender
 
     if (options.exportAll && (listed === undefined || listed === false))
-      throw new Error(listed === false ? 'kay: its prerender is false' : `kay: it takes ${route.params.join(', ')}, so \`prerender\` lists the values to export: export const page = { prerender: [{ ${route.params.map(param => `${param}: '...'`).join(', ')} }] }`)
+      throw new KayError('export-needs-params', listed === false ? 'kay: its prerender is false' : `kay: it takes ${route.params.join(', ')}, so \`prerender\` lists the values to export: export const page = { prerender: [{ ${route.params.map(param => `${param}: '...'`).join(', ')} }] }`)
 
     for (const params of await listedParams(route, file, 'prerender', listed, i18n?.settings)) {
       const path = pathOf(route, params)
       const matched = matchedParams(route, params, matchers)
 
       if (!matched)
-        throw new Error(`kay: ${file} lists ${JSON.stringify(params)} in prerender, which its matchers refuse, so no request would reach it`)
+        throw new KayError('export-needs-params', `kay: ${file} lists ${JSON.stringify(params)} in prerender, which its matchers refuse, so no request would reach it`)
 
       // One page per locale, each rendered in it.
       for (const copy of localeCopies(i18n?.settings, path).filter(copy => listedIn(params, copy.locale, i18n?.settings))) {
@@ -93,38 +103,38 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
         const response = await runInLocale(stateFor(locales, copy.locale ?? locales.settings.defaultLocale, path, request), render)
 
         if (response.status >= 500)
-          throw new Error(`kay: prerendering ${copy.path} from ${file} failed with ${response.status}; the error is logged above`)
+          throw new KayError('export-page-status', `kay: prerendering ${copy.path} from ${file} failed with ${response.status}; the error is logged above`)
 
         // A static host answers every file with a 200, so a redirect or a 404 would go out as a page.
         if (options.exportAll && response.status !== 200)
-          throw new Error(response.headers.has('location') ? `kay: ${copy.path} redirects to ${response.headers.get('location')}, which no static host does` : `kay: ${copy.path} answers ${response.status}, where a static host answers 200`)
+          throw new KayError('export-page-status', response.headers.has('location') ? `kay: ${copy.path} redirects to ${response.headers.get('location')}, which no static host does` : `kay: ${copy.path} answers ${response.status}, where a static host answers 200`)
 
         const html = await response.text()
 
         if (options.exportAll && IMAGE_LINK.test(html))
-          throw new Error(`kay: ${copy.path} links an image only the image route resizes, such as one from images.dirs, and no file of it is exported`)
+          throw new KayError('export-image-route', `kay: ${copy.path} links an image only the image route resizes, such as one from images.dirs, and no file of it is exported`)
 
         const islands = serverIslandModes(html)
         const stamps = html.search(STAMP_HOLE) >= 0
         const readsSite = standInReads() > reads
 
         if (options.exportAll && readsSite)
-          throw new Error('kay: it reads the site, through siteUrl() or siteOrigin(), which neither `site` in kay.config.ts nor SITE_URL sets')
+          throw new KayError('export-site-url', 'kay: it reads the site, through siteUrl() or siteOrigin(), which neither `site` in kay.config.ts nor SITE_URL sets')
 
         if (options.exportAll && islands.length > 0)
-          throw new Error(`kay: it holds ${islands.length === 1 ? 'a server island' : `${islands.length} server islands`}, which only a server renders per request`)
+          throw new KayError('export-server-render', `kay: it holds ${islands.length === 1 ? 'a server island' : `${islands.length} server islands`}, which only a server renders per request`)
 
         if (options.exportAll && stamps)
-          throw new Error('kay: a form in it posts to an action with `minTime` or `proofOfWork`, or holds a `workChallenge`, whose stamp or challenge only a server signs per request')
+          throw new KayError('export-server-render', 'kay: a form in it posts to an action with `minTime` or `proofOfWork`, or holds a `workChallenge`, whose stamp or challenge only a server signs per request')
 
         if (islands.includes('defer') && client.entry === undefined)
-          throw new Error(`kay: it defers a server island, which kay's browser entry fetches, and with no island and \`navigation: false\` the build has none; mark it \`server\` to render it inline instead`)
+          throw new KayError('export-server-render', `kay: it defers a server island, which kay's browser entry fetches, and with no island and \`navigation: false\` the build has none; mark it \`server\` to render it inline instead`)
 
         const name = `${copy.key === '/' ? 'index' : copy.key.slice(1)}.html`
         const taken = paths.get(name)
 
         if (taken !== undefined)
-          throw new Error(`kay: ${taken} and ${copy.key} would both be prerendered to ${name}; leave one out of prerender`)
+          throw new KayError('export-path-clash', `kay: ${taken} and ${copy.key} would both be prerendered to ${name}; leave one out of prerender`)
 
         paths.set(name, copy.key)
         await mkdir(join(dir, name, '..'), { recursive: true })
@@ -143,7 +153,7 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
   }
 
   // What keeps a page from a static export, each named, so one build reports them all.
-  const problems: string[] = []
+  const problems: ExportProblem[] = []
 
   for (const [index, route] of routes.entries()) {
     options.onRoute?.(index, routes.length)
@@ -163,17 +173,17 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
       if (!options.exportAll)
         throw error
 
-      problems.push(`${file}: ${error instanceof Error ? error.message.replace(KAY_PREFIX, '') : String(error)}`)
+      problems.push(exportProblem(file, error))
     }
   }
 
   options.onRoute?.(routes.length, routes.length)
 
-  const apiProblems = options.exportAll ? (await projectApi(root, config)).map(module => `${relative(root, module.file)}: an API module answers requests, which only a server does; a file such as src/routes/llms.txt.ts exporting GET is written to a file`) : []
+  const apiProblems: ExportProblem[] = options.exportAll ? (await projectApi(root, config)).map(module => ({ code: 'export-api-module', message: `${relative(root, module.file)}: an API module answers requests, which only a server does; a file such as src/routes/llms.txt.ts exporting GET is written to a file` })) : []
   const endpointProblems = options.exportAll ? (await exportedEndpoints(root, await scanEndpoints(routesDir, mounts), config.requireGuards)).problems : []
 
   if (problems.length > 0 || apiProblems.length > 0 || endpointProblems.length > 0)
-    throw new ExportError(`kay: ${PARTS.format([count(problems.length, 'page'), count(endpointProblems.length, 'endpoint'), count(apiProblems.length, 'API module')].filter(part => part !== ''))} cannot be exported to static files, which no server answers for:\n${[...problems, ...endpointProblems, ...apiProblems].map(problem => `  ${problem}`).join('\n')}`)
+    throw new ExportError(`kay: ${PARTS.format([count(problems.length, 'page'), count(endpointProblems.length, 'endpoint'), count(apiProblems.length, 'API module')].filter(part => part !== ''))} cannot be exported to static files, which no server answers for:\n${[...problems, ...endpointProblems, ...apiProblems].map(problem => `  ${problem.message}`).join('\n')}`, [...problems, ...endpointProblems, ...apiProblems])
 
   await writeManifest(root, { ...manifest, pages, site }, output)
   client.pages = new Map(Object.entries(pages))
@@ -189,15 +199,15 @@ function guardedPage(route: Route, required: boolean | undefined): boolean {
 // What only a server can do: a guard decides per request, and an action takes a post.
 function refuseServerOnly(route: Route, module: Record<string, unknown>, required: boolean | undefined): void {
   if (route.guards.length > 0)
-    throw new Error('kay: a guard covers it, and only a server can run one per request')
+    throw new KayError('export-guard', 'kay: a guard covers it, and only a server can run one per request')
 
   if (required === true && route.open !== true)
-    throw new Error('kay: requireGuards is on and no guard covers it; set `guards: false` in its `page` to export it')
+    throw new KayError('export-guard', 'kay: requireGuards is on and no guard covers it; set `guards: false` in its `page` to export it')
 
   const action = Object.keys(module).find(name => isAction(module[name]))
 
   if (action !== undefined)
-    throw new Error(`kay: it exports the action ${action}, which only a server can take`)
+    throw new KayError('export-action', `kay: it exports the action ${action}, which only a server can take`)
 }
 
 function count(problems: number, what: string): string {

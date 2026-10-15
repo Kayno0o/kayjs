@@ -7,11 +7,12 @@ import { buildProject } from '../build/pipeline'
 import { formatSizeReport } from '../build/report'
 import { KayCompileError } from '../build/transform'
 import { fromCompile } from '../check/shadow-types'
+import { errorCodeOf } from '../compiler/errors'
 import { loadConfig } from '../config'
 import { ContentError } from '../content/validate'
 import { buildingWithoutEnv } from '../server/env-state'
 import { ExportError } from '../server/prerender'
-import { count, done, failureProblem, formatOption, printDocument, printedProblems, printFailure, printProblems, PROBLEM_FORMATS, problemCounts, projectRoot, withStdoutOnStderr, workflowCommand } from './command'
+import { count, done, explainHint, failureProblem, formatOption, printDocument, printedProblems, printFailure, printProblems, PROBLEM_FORMATS, problemCounts, projectRoot, withStdoutOnStderr, workflowCommand } from './command'
 import { progressLine } from './progress'
 import { USAGES } from './usages'
 
@@ -98,6 +99,11 @@ export const build: Command = {
     if (failed) {
       console.error(buildError(failed.error))
 
+      const hint = explainHint(failed.error)
+
+      if (hint !== undefined && format !== 'github')
+        console.error(hint)
+
       if (format === 'github') {
         for (const problem of await failureProblems(failed.error, format))
           console.log(workflowCommand(problem, 'build'))
@@ -143,7 +149,7 @@ async function buildToDocument(root: string, options: BuildOptions): Promise<num
   let found: FailureProblem[] = []
   let running: BuildStage = options.check === false ? 'bundle' : 'check'
   const ended = (code: number) => {
-    const problems = [...found, failureProblem(`the build ended with exit code ${code} before it was done`, 'json')]
+    const problems = [...found, failureProblem(`the build ended with exit code ${code} before it was done`, 'json', null)]
 
     writeSync(1, `${JSON.stringify({ ...problemCounts(problems), problems, failed: { stage: running } })}\n`)
 
@@ -198,7 +204,10 @@ async function failureProblems(error: unknown, format: ProblemFormat): Promise<F
   if (error instanceof KayCompileError)
     return printedProblems(error.diagnostics.map(diagnostic => fromCompile(diagnostic.file, diagnostic.source, diagnostic)), format)
 
-  return [failureProblem(buildError(error), format)]
+  if (error instanceof ExportError)
+    return error.problems.map(problem => failureProblem(problem.message, format, problem.code))
+
+  return [failureProblem(buildError(error), format, errorCodeOf(error) ?? null)]
 }
 
 function buildError(error: unknown): unknown {

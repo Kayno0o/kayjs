@@ -95,7 +95,7 @@ describe('requireGuards', () => {
   it('keeps an endpoint no guard covers out of a static export', async () => {
     const endpoints = await scanEndpoints(join(dir, 'routes'))
 
-    expect(await exportedEndpoints(dir, endpoints, true)).toEqual({ paths: ['/status.json'], problems: ['routes/feed.json.ts: requireGuards is on and no guard covers it; set `guards: false` in `export const page` to export it'] })
+    expect(await exportedEndpoints(dir, endpoints, true)).toEqual({ paths: ['/status.json'], problems: [{ code: 'export-guard', message: 'routes/feed.json.ts: requireGuards is on and no guard covers it; set `guards: false` in `export const page` to export it' }] })
     expect((await exportedEndpoints(dir, endpoints)).paths.sort()).toEqual(['/feed.json', '/status.json'])
   })
 

@@ -5,6 +5,7 @@ import { mkdir, readdir, rename, rm, stat } from 'node:fs/promises'
 import { join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { pruneCache, touchCacheFile } from '../build/cache'
+import { KayError } from '../compiler/errors'
 import { modeOf, cacheDir as projectCache } from '../project'
 import { projectSource } from '../server/source'
 import { compileMarkdown, MarkdownError, splitFrontmatter } from './markdown'
@@ -122,7 +123,7 @@ async function builtEntries(dir: string): Promise<RawEntry[] | undefined> {
     return await file.json() as RawEntry[]
 
   if (source.embedded)
-    throw new Error(`kay: this executable holds no build of the collection ${dir}; run \`kay build --compile\` again`)
+    throw new KayError('executable-missing-content', `kay: this executable holds no build of the collection ${dir}; run \`kay build --compile\` again`)
 
   return undefined
 }

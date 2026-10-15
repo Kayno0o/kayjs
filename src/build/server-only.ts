@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs'
 import { basename, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { parse } from '@babel/parser'
+import { KayError } from '../compiler/errors'
 import { parseKay } from '../compiler/parser'
 import { loadTraverse } from '../compiler/rewrite'
 import { readCacheEntry, writeCacheEntry } from './cache'
@@ -306,7 +307,7 @@ export async function refuseServerOnlyReads(root: string, dir: string, outputs: 
     refusals.push(`kay's \`s\` builds schemas on the server only, and an island imports ${[...schemaBuilders].sort().join(', ')}, which take${schemaBuilders.size === 1 ? 's' : ''} it from 'kay': its first \`s.Object(...)\` would throw as the island loads, and Elysia's own \`t\` reads \`Bun\`. Keep the schemas in a module only the server imports, and what an island needs of them, a length or a list of choices, in another.`)
 
   if (refusals.length > 0)
-    throw new Error(`kay: ${refusals.join(' And ')}`)
+    throw new KayError('server-only-in-island', `kay: ${refusals.join(' And ')}`)
 }
 
 // A chunk's server-only names, taken from the last build's scans when they hold its content, and recorded in this build's.

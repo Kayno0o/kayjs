@@ -15,6 +15,7 @@ export interface ContentProblem {
 // Every entry of a collection that does not compile or match its schema, reported together.
 export class ContentError extends Error {
   override name = 'ContentError'
+  readonly code = 'content-invalid'
 
   constructor(readonly problems: ContentProblem[]) {
     super(`kay: ${problems.length === 1 ? 'an entry does' : `${problems.length} entries do`} not match the collection\n${problems.map(problem => `  ${problem.file}:${problem.line} ${problem.message}`).join('\n')}`)

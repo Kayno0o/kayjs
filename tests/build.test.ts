@@ -913,7 +913,7 @@ describe('kay build checks the project first', () => {
 
       expect(code).toBe(1)
       expect(stderr).toBe('kay build: -p names the tsconfig the build checks with, so it does not go with --no-check\n')
-      expect(document).toEqual({ errors: 1, warnings: 0, problems: [{ severity: 'error', code: null, message: '-p names the tsconfig the build checks with, so it does not go with --no-check' }] })
+      expect(document).toEqual({ errors: 1, warnings: 0, problems: [{ severity: 'error', code: 'command-usage', message: '-p names the tsconfig the build checks with, so it does not go with --no-check' }] })
     })
 
     it('annotates a template that does not compile under --format github, at its place', async () => {
@@ -927,7 +927,7 @@ describe('kay build checks the project first', () => {
         const [stdout, code] = await Promise.all([new Response(child.stdout).text(), child.exited])
 
         expect(code).toBe(1)
-        expect(stdout).toBe(`::error file=${relative(process.cwd(), join(root, 'src/routes/index.kay'))},line=2,col=1,endLine=2,endColumn=5,title=kay build::\`each\` is pug syntax kay does not have%0Ahelp: kay loops with \`for item of list\`\n`)
+        expect(stdout).toBe(`::error file=${relative(process.cwd(), join(root, 'src/routes/index.kay'))},line=2,col=1,endLine=2,endColumn=5,title=template-syntax::\`each\` is pug syntax kay does not have%0Ahelp: kay loops with \`for item of list\`\n`)
       }
       finally {
         await rm(root, { recursive: true, force: true })

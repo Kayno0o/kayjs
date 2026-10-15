@@ -2,6 +2,7 @@ import type { IconProps, IconSet } from '../runtime/icons'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { KayError } from '../compiler/errors'
 import * as iconSet from '../runtime/icons'
 
 // `import home from '~icons/tabler/home'`: an icon of a set the project installs as `@iconify-json/<prefix>`.
@@ -64,12 +65,12 @@ export function iconModule(sets: Map<string, string>, specifier: string): string
   const file = prefix === undefined ? undefined : sets.get(prefix)
 
   if (file === undefined)
-    throw new Error(`kay: ${specifier} names no installed icon set; add it with \`bun add -d ${ICONIFY_PACKAGE}${prefix ?? '<prefix>'}\``)
+    throw new KayError('icon-unresolved', `kay: ${specifier} names no installed icon set; add it with \`bun add -d ${ICONIFY_PACKAGE}${prefix ?? '<prefix>'}\``)
 
   const props = iconProps(file, name!)
 
   if (!props)
-    throw new Error(`kay: ${ICONIFY_PACKAGE}${prefix} has no icon named ${name}`)
+    throw new KayError('icon-unresolved', `kay: ${ICONIFY_PACKAGE}${prefix} has no icon named ${name}`)
 
   return `import { vouch } from ${JSON.stringify(VOUCH_MODULE)}\nconst icon = ${JSON.stringify(props)}\nicon.innerHTML = vouch(icon.innerHTML, true)\nexport default icon\n`
 }

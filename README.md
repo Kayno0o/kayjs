@@ -48,7 +48,7 @@ In production the server serves what `kay build` wrote and bundles nothing at bo
 | `kay start [dir] [--entry <file>] [--port <port>]` | serve the last build as production does |
 | `kay render <url> [dir] [--method <method>] [--body <text>] [--header <name: value>] [--cookie <name=value>] [-i] [--entry <file>]` | print what the server answers for one URL, as `kay dev` serves it, without starting it on a port |
 | `kay routes [dir]` | list every route the project serves, and the file serving it |
-| `kay explain [lint\|group]` | list the lints, or a group's, or explain one with an example it reports and the same written right |
+| `kay explain [lint\|error\|group]` | list the lints and the errors, or a group's, or explain one: a lint with an example it reports and the same written right, an error with where its fix is written |
 | `kay fmt [paths...] [--check]` | format `.kay` files |
 | `kay migrate astro [dir] [--out <dir>]` | translate an Astro project into `.kay` files, listing what is left by hand |
 | `kay lsp --stdio` | language server for the editor extension in `editors/vscode` |

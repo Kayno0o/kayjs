@@ -1,6 +1,7 @@
 import type { LocaleSettings } from '../runtime/i18n'
 import type { Component } from '../runtime/jsx'
 import type { Collection, Entry } from './index'
+import { KayError } from '../compiler/errors'
 import { localize } from '../runtime/i18n.server'
 import { localeState, runInLocale } from '../runtime/locale-state'
 import { configuredSite } from '../runtime/site'
@@ -37,7 +38,7 @@ export function paginate<Data>(source: Collection<Data, Record<string, Component
 export function paginate<Item>(source: Items<Item>, size: number): Paginated<Item>
 export function paginate<Item>(source: Collection<unknown, Record<string, Component<never>>, string> | Items<Item>, size: number): Paginated<Item> {
   if (!Number.isSafeInteger(size) || size < 1)
-    throw new RangeError(`kay: paginate takes a whole number of items per page, from 1, not ${size}`)
+    throw new KayError('pagination-misuse', `kay: paginate takes a whole number of items per page, from 1, not ${size}`)
 
   const read = async (): Promise<readonly Item[]> => {
     if (typeof source === 'function')
@@ -91,7 +92,7 @@ function listPath(numbered: boolean): string {
   const state = localeState()
 
   if (!state)
-    throw new Error('kay: a paginated list reads the page it renders, so page() runs while a page does')
+    throw new KayError('pagination-misuse', 'kay: a paginated list reads the page it renders, so page() runs while a page does')
 
   const path = state.path.length > 1 && state.path.endsWith('/') ? state.path.slice(0, -1) : state.path
 

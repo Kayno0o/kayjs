@@ -69,6 +69,8 @@ const RAW_TEXT = new Set(['script', 'style', 'textarea', 'title'])
 const LINE_BREAK = /\n/g
 
 export class MarkdownError extends Error {
+  readonly code = 'markdown-invalid'
+
   constructor(message: string, readonly line: number) {
     super(message)
   }

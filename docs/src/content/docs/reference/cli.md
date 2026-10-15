@@ -23,7 +23,7 @@ bun run dev
 | `kay render <url> [dir]` | Print what the server answers for one URL, without starting it on a port |
 | `kay check [dir]` | Type-check the project, `.kay` files included |
 | `kay routes [dir]` | List every route the project serves, and the file serving it |
-| `kay explain [lint\|group]` | List the lints, or a group's, or explain one |
+| `kay explain [lint\|error\|group]` | List the lints and the errors, or a group's, or explain one |
 | `kay fmt [paths]` | Format `.kay` files |
 | `kay migrate astro [dir]` | Translate an Astro project into a kay one |
 | `kay lsp --stdio` | The language server behind the editor extension |
@@ -338,7 +338,7 @@ Colour only goes to a terminal, and not under `NO_COLOR` or `TERM=dumb`; `FORCE_
 | --- | --- |
 | `kay build` | `{ errors, warnings, problems }` as `kay check` prints them, a template that does not compile at its place and any other failure as one problem with `code: null`; `failed: { stage }` when a stage stopped it (`check`, `bundle`, `output`, `export` or `compile`); `built: { islands, stylesheets, prerendered, entries, ms, sizes }`, `sizes` holding the entry's and each island's `raw` and `gzip` bytes, with their heaviest `modules` under `--analyze`; `exported: { pages, files, dir, ms }` with `--static`; `compiled: { executable, ms }` with `--compile` |
 | `kay routes` | `{ routes, unlisted }`, each route with its `methods`, `path`, `kind`, `by` as the listing shows it, and `file`, `notes`, `layouts` and `guards` when it has them |
-| `kay explain` | `{ groups, lints }`, each lint's `name`, `group`, `level` and whole `summary`; for one lint, its `name`, `level`, `group`, `summary`, the `wrong` and `right` examples, and `typed`, `site` and `launch` when set |
+| `kay explain` | `{ groups, lints, errorGroups, errors }`, each lint's `name`, `group`, `level` and whole `summary`; for one lint, its `name`, `level`, `group`, `summary`, the `wrong` and `right` examples, and `typed`, `site` and `launch` when set; for an error, its `name`, `group`, `summary` and `fix`, the file and heading that cover it |
 | `kay fmt` | `{ errors, warnings, problems, written, changed }`: what does not parse as problems, and the files it formatted, or under `--check` would, `written` false |
 | `kay migrate` | `{ written, kept, copied, notes }`: the files written and those kept as they exist, how many other files it copied, and each item left to do by hand with its `file`, `line`, `target` and `message` |
 

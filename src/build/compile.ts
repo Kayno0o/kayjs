@@ -3,6 +3,7 @@ import type { Project } from '../project'
 import type { Route, SpecialPages } from '../server/routes'
 import { existsSync } from 'node:fs'
 import { basename, dirname, join, resolve } from 'node:path'
+import { KayError } from '../compiler/errors'
 import { CONFIG_FILE } from '../config'
 import { projectApi } from '../server/api-modules'
 import { AVIF_WORKER_SOURCE } from '../server/avif'
@@ -59,10 +60,10 @@ export async function compileServer(project: Project, options: CompileOptions): 
   const outfile = resolve(root, options.outfile)
 
   if (!existsSync(entry))
-    throw new Error(`kay: no server entry at ${entry}; pass --entry`)
+    throw new KayError('executable-invalid', `kay: no server entry at ${entry}; pass --entry`)
 
   if (basename(publicDir) === CLIENT_ASSETS)
-    throw new Error(`kay: an executable embeds its public files and the client build side by side, so the public directory cannot be named ${CLIENT_ASSETS}`)
+    throw new KayError('executable-invalid', `kay: an executable embeds its public files and the client build side by side, so the public directory cannot be named ${CLIENT_ASSETS}`)
 
   const mounts = routeMounts(root, config.extensions)
   const routes = await scanRoutes(routesDir, mounts)

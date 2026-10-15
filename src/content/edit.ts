@@ -5,6 +5,7 @@ import type { CompiledMarkdown } from './markdown'
 import { existsSync } from 'node:fs'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import { t } from 'elysia'
+import { KayError } from '../compiler/errors'
 import { kayLog } from '../runtime/log'
 import { isDraft } from './drafts'
 import { contentPlace, entryFiles, parseEntry, slugOf } from './load'
@@ -215,7 +216,7 @@ export async function entries(name: string, filter: EntryFilter = {}): Promise<S
   const { localized = false } = collection.options
 
   if (filter.locale !== undefined && !localized)
-    throw new Error(`kay: entries() was asked for the ${filter.locale} entries of ${name}, which is not localized`)
+    throw new KayError('content-api-misuse', `kay: entries() was asked for the ${filter.locale} entries of ${name}, which is not localized`)
 
   const found = collection.dir === undefined ? await loadedFound(name, collection, localized, filter) : await folderEntries(name, folderOf(collection.dir), localized, filter)
   const placed = found.map(({ slug, ...entry }) => ({ ...placeOf(slug, localized), ...entry }))
@@ -256,7 +257,7 @@ export async function entrySource(name: string, slug: string, data: unknown, opt
   const collection = collectionNamed(name)
 
   if (collection.dir === undefined)
-    throw new Error(`kay: entrySource() writes a folder collection's files, and ${name} is loaded: saveEntry() hands its entries to its loader's save`)
+    throw new KayError('content-api-misuse', `kay: entrySource() writes a folder collection's files, and ${name} is loaded: saveEntry() hands its entries to its loader's save`)
 
   const entry = { slug, data, ...options.locale !== undefined && { locale: options.locale }, ...options.body !== undefined && { body: options.body } }
   const { issues } = await entryIssues(name, collection, entry)
@@ -285,7 +286,7 @@ export async function entryFile(name: string, slug: string, options: { locale?: 
   const collection = collectionNamed(name)
 
   if (collection.dir === undefined)
-    throw new Error(`kay: entryFile() gives a folder collection's files, and ${name} is loaded: removeEntry() hands its entries to its loader's remove`)
+    throw new KayError('content-api-misuse', `kay: entryFile() gives a folder collection's files, and ${name} is loaded: removeEntry() hands its entries to its loader's remove`)
 
   const at = { collection: name, slug, ...options.locale !== undefined && { locale: options.locale } }
   const issues = placeIssues(collection, at)
@@ -315,7 +316,7 @@ function fileIn(name: string, dir: string, file: string): EntryPath {
   const inRepo = repoPath(repositoryRoot(), absolute)
 
   if (inRepo === undefined)
-    throw new Error(`kay: ${name}'s folder lies outside the repository holding the project, so a CMS cannot commit its files`)
+    throw new KayError('content-api-misuse', `kay: ${name}'s folder lies outside the repository holding the project, so a CMS cannot commit its files`)
 
   return { path: relative(contentPlace().root, absolute).split(sep).join('/'), absolute, repoPath: inRepo }
 }
@@ -463,7 +464,7 @@ function collectionNamed(name: string): Collection<unknown> {
   const found = registered.find(([exported]) => exported === name)?.[1]
 
   if (!found)
-    throw new Error(`kay: no collection is exported from the content config as ${name}${registered.length === 0 ? ', which the server has not read yet' : `; it exports ${registered.map(([exported]) => exported).join(', ')}`}`)
+    throw new KayError('content-config-missing', `kay: no collection is exported from the content config as ${name}${registered.length === 0 ? ', which the server has not read yet' : `; it exports ${registered.map(([exported]) => exported).join(', ')}`}`)
 
   return found
 }
@@ -495,7 +496,7 @@ function folderOf(dir: string): string {
 // A folder missing, as in an executable or a container holding the build alone, throws rather than read as empty, where a CMS would write a file clashing with one it cannot see.
 async function folderFiles(name: string, dir: string): Promise<string[]> {
   if (!existsSync(dir))
-    throw new Error(`kay: ${name}'s folder ${relative(contentPlace().root, dir)} is missing: a CMS edits a collection's entries where its source files are, not from a build`)
+    throw new KayError('content-api-misuse', `kay: ${name}'s folder ${relative(contentPlace().root, dir)} is missing: a CMS edits a collection's entries where its source files are, not from a build`)
 
   return entryFiles(dir)
 }
@@ -567,11 +568,11 @@ async function readLoaded(name: string, collection: Collection<unknown>): Promis
     loaded = await collection.loader!.load({ preview: true })
   }
   catch (error) {
-    throw new Error(`kay: ${name}'s load threw: ${error instanceof Error ? error.message : String(error)}`, { cause: error })
+    throw new KayError('loader-result', `kay: ${name}'s load threw: ${error instanceof Error ? error.message : String(error)}`, { cause: error })
   }
 
   if (!Array.isArray(loaded))
-    throw new Error(`kay: ${name}'s load gave ${typeof loaded}, not an array of entries`)
+    throw new KayError('loader-result', `kay: ${name}'s load gave ${typeof loaded}, not an array of entries`)
 
   return loaded.map(item => sourceOf(name, item))
 }
@@ -581,7 +582,7 @@ function sourceOf(name: string, item: unknown): Omit<SourceEntry, 'draft'> {
   const { slug, data, body } = (typeof item === 'object' && item !== null ? item : {}) as { slug?: unknown, data?: unknown, body?: unknown }
 
   if (typeof slug !== 'string')
-    throw new Error(`kay: ${name}'s load gave an entry with no slug: ${JSON.stringify(item)}`)
+    throw new KayError('loader-result', `kay: ${name}'s load gave an entry with no slug: ${JSON.stringify(item)}`)
 
   const fields = isFields(data) ? { data } : { data: undefined, problem: `kay: ${name}'s entry ${slug} holds ${valueKind(data)} as its data, not an object of fields` }
 
@@ -717,10 +718,10 @@ function writer<Name extends 'save' | 'remove'>(name: string, collection: Collec
   const write = collection.loader?.[method]
 
   if (collection.loader === undefined)
-    throw new Error(`kay: ${name} is a folder collection, whose files a CMS commits itself: entrySource() gives an entry's file`)
+    throw new KayError('content-api-misuse', `kay: ${name} is a folder collection, whose files a CMS commits itself: entrySource() gives an entry's file`)
 
   if (write === undefined)
-    throw new Error(`kay: ${name}'s loader declares no ${method}, which ${method === 'save' ? 'saveEntry' : 'removeEntry'}() hands the entry to`)
+    throw new KayError('loader-method', `kay: ${name}'s loader declares no ${method}, which ${method === 'save' ? 'saveEntry' : 'removeEntry'}() hands the entry to`)
 
   return write
 }

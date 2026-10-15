@@ -1,84 +1,139 @@
-import { mkdtemp, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import process from 'node:process'
+import { Glob } from 'bun'
 import { describe, expect, it } from 'bun:test'
-import { buildClient } from '../src/build/client'
-import { KayCompileError } from '../src/build/transform'
-import { formatDiagnostic } from '../src/compiler'
-import { codeFrame, formatReport } from '../src/compiler/frame'
-import { offsetAt } from '../src/compiler/mapping'
+import { KayCompileError, transformKay } from '../src/build/transform'
+import { failureProblem } from '../src/commands/command'
+import { compileKay } from '../src/compiler'
+import { ERROR_GROUPS, errorCodeOf, errorList, ERRORS, explainError, isErrorCode, KayError } from '../src/compiler/errors'
+import { LINTS } from '../src/compiler/lints'
+import { MarkdownError } from '../src/content/markdown'
+import { ContentError } from '../src/content/validate'
+import { ExportError } from '../src/server/prerender'
+
+const root = join(import.meta.dir, '..')
+const cli = join(root, 'src/cli.ts')
+const SLUG_PUNCTUATION = /[^\w\s-]/g
+const RAISED = /new KayError\(\s*'([\w-]+)'/g
+const LITERAL = /'([a-z]+(?:-[a-z]+)+|[a-z]+)'/g
+
+async function kay(args: string[]) {
+  const child = Bun.spawn([process.execPath, cli, ...args], { cwd: root, stdout: 'pipe', stderr: 'pipe' })
+  const [stdout, stderr, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+
+  return { stdout, stderr, code }
+}
+
+// The source the codes are raised in, without the registry itself.
+async function sources(): Promise<string> {
+  const files = [...new Glob('src/**/*.ts').scanSync({ cwd: root })].filter(file => file !== 'src/compiler/errors.ts' && !file.includes('/codec/'))
+
+  return (await Promise.all(files.map(async file => Bun.file(join(root, file)).text()))).join('\n')
+}
+
+describe('error codes', () => {
+  it('are named apart from the lints, in a group each', () => {
+    expect(Object.keys(ERRORS).filter(name => Object.hasOwn(LINTS, name))).toEqual([])
+    expect(Object.keys(ERRORS).filter(name => Object.hasOwn(ERROR_GROUPS, name))).toEqual([])
+    expect(Object.values(ERRORS).filter(error => !Object.hasOwn(ERROR_GROUPS, error.group))).toEqual([])
+  })
+
+  it('are all raised somewhere in the source, and every code raised is registered', async () => {
+    const source = await sources()
+    const raised = [...source.matchAll(RAISED)].map(match => match[1]!)
+    const written = new Set([...source.matchAll(LITERAL)].map(match => match[1]!))
+
+    expect(raised.filter(code => !isErrorCode(code))).toEqual([])
+    expect(Object.keys(ERRORS).filter(code => !written.has(code))).toEqual([])
+  })
+
+  it('point to a section of llms/ that exists', async () => {
+    const missing: string[] = []
+
+    for (const [name, error] of Object.entries(ERRORS)) {
+      const file = Bun.file(join(root, error.fix.file))
+      const text = await file.exists() ? await file.text() : ''
+
+      if (!new RegExp(`^#{2,4} ${RegExp.escape(error.fix.heading)}$`, 'm').test(text))
+        missing.push(name)
+    }
+
+    expect(missing).toEqual([])
+  })
+
+  it('are listed in llms/checks.md and the docs reference, with a link to the fix', async () => {
+    const llms = await Bun.file(join(root, 'llms/checks.md')).text()
+    const docs = await Bun.file(join(root, 'docs/src/content/docs/reference/checks.md')).text()
+
+    expect(Object.keys(ERRORS).filter(name => !llms.includes(`| \`${name}\` | ${ERRORS[name as keyof typeof ERRORS].group} |`))).toEqual([])
+    expect(Object.keys(ERRORS).filter(name => !docs.includes(`| \`${name}\` | ${ERRORS[name as keyof typeof ERRORS].group} |`))).toEqual([])
+
+    for (const error of Object.values(ERRORS)) {
+      const anchor = error.fix.heading.toLowerCase().replaceAll('`', '').replace(SLUG_PUNCTUATION, '').trim().replaceAll(' ', '-')
+
+      expect(llms).toContain(`[${error.fix.heading}](${error.fix.file.replace('llms/', '')}#${anchor})`)
+    }
+  })
+
+  it('are read off what was thrown, only when kay raised it', () => {
+    expect(errorCodeOf(new KayError('content-invalid', 'x'))).toBe('content-invalid')
+    expect(errorCodeOf(Object.assign(new Error('x'), { code: 'ENOENT' }))).toBeUndefined()
+    expect(errorCodeOf('text')).toBeUndefined()
+  })
+})
 
 describe('compile errors', () => {
-  it('frames the line at fault under the two before it, carets clipped to the line', () => {
-    const source = 'a\nb\nc\np {user.nam}\nd'
-    const start = source.indexOf('nam')
+  const codes = (source: string, filename = 'src/a.kay') => compileKay(source, filename).diagnostics.map(diagnostic => diagnostic.code)
 
-    expect(codeFrame(source, start, start + 3)).toBe('2 | b\n3 | c\n4 | p {user.nam}\n  |         ^^^')
-    expect(codeFrame(source, 0, source.length)).toBe('1 | a\n  | ^')
+  it('name the group of messages they belong to', () => {
+    expect(codes('div\n    p\n  span\n')).toContain('template-syntax')
+    expect(codes('head\n  title A\nhead\n  title B\n')).toContain('template-invalid')
+    expect(codes('---\nconst { a } = props<{ a: string }>()\nconst { b } = props<{ b: string }>()\n---\np {a}\n')).toContain('fence-invalid')
+    expect(codes('--- client\nconst n = 1\n---\np {n}\n', 'src/routes/_layout.kay')).toContain('client-route-fence')
   })
+})
 
-  it('prints a diagnostic as rustc does: heading, location, the lines its spans cover, each labelled, then its note and help', () => {
-    const source = 'Card\n  @a\n    p x\n  p y\n  p z\n  p w\n  @a\n    p v'
-    const second = source.lastIndexOf('@a') + 1
-    const first = source.indexOf('@a') + 1
-
-    expect(formatDiagnostic(source, 'card.kay', { start: second, end: second + 1, message: '`a` is passed twice', label: 'passed again here', related: [{ start: first, end: first + 1, label: 'passed by this `@a`' }], note: 'each prop is passed once', help: 'drop one of them' })).toBe([
-      'error: `a` is passed twice',
-      ' --> card.kay:7:4',
-      '  |',
-      '2 |   @a',
-      '  |    - passed by this `@a`',
-      '...',
-      '5 |   p z',
-      '6 |   p w',
-      '7 |   @a',
-      '  |    ^ passed again here',
-      '  |',
-      '  = note: each prop is passed once',
-      '  = help: drop one of them',
-    ].join('\n'))
-  })
-
-  it('names a lint in its heading, and prints only the location of a report with no source', () => {
-    expect(formatReport({ severity: 'warning', code: 'positional-key', message: 'm', file: 'a.kay', line: 12, column: 3 })).toBe('warning[positional-key]: m\n  --> a.kay:12:3')
-    expect(formatReport({ code: 'TS2322', message: 'm', file: 'a.ts', line: 1, column: 1, help: 'h' }, (styles, text) => `<${styles.join(' ')}>${text}`)).toBe('<bold red>error[TS2322]<bold>: m\n <bold blue>--> a.ts:1:1\n<bold blue>  |\n  <bold blue>= <bold>help: h')
-  })
-
-  it('reads a column past the end of its line as that end, line breaks of either kind', () => {
-    expect(offsetAt('ab\ncd', { line: 1, column: 9 })).toBe(2)
-    expect(offsetAt('ab\r\ncd', { line: 1, column: 9 })).toBe(2)
-    expect(offsetAt('ab\ncd', { line: 2, column: 9 })).toBe(5)
-    expect(offsetAt('ab\ncd', { line: 2, column: 2 })).toBe(4)
-  })
-
-  it('reports every broken component of a project at once, before bundling anything', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'kay-errors-'))
+describe('errors raised while building', () => {
+  it('carry the code of the group of their messages', async () => {
+    let compile: unknown
 
     try {
-      await Bun.write(join(root, 'src/a.kay'), 'for of list\n  li x\n')
-      await Bun.write(join(root, 'src/b.kay'), 'p ok\nelse\n  p no\n')
-      let error: unknown
-
-      try {
-        await buildClient(root)
-      }
-      catch (caught) {
-        error = caught
-      }
-
-      expect(error).toBeInstanceOf(KayCompileError)
-      const { diagnostics, message } = error as KayCompileError
-
-      expect(diagnostics.map(diagnostic => [diagnostic.file.slice(root.length + 1), diagnostic.message])).toEqual([
-        ['src/a.kay', 'Malformed `for`'],
-        ['src/b.kay', expect.stringContaining('must directly follow')],
-      ] as string[][])
-      expect(message).toContain('error: Malformed `for`\n --> ')
-      expect(message).toContain('src/a.kay:1:1\n  |\n1 | for of list\n  | ^^^^^^^^^^^\n  |\n')
-      expect(message).toContain('  = help: `for <item> of <list>`')
+      transformKay('div\n    p\n  span\n', 'src/a.kay', { target: 'ssr' })
     }
-    finally {
-      await rm(root, { recursive: true, force: true })
+    catch (error) {
+      compile = error
     }
+
+    expect(compile).toBeInstanceOf(KayCompileError)
+    expect(errorCodeOf(compile)).toBe('template-syntax')
+    expect(errorCodeOf(new ContentError([{ file: 'a.md', line: 1, message: 'x' }]))).toBe('content-invalid')
+    expect(errorCodeOf(new MarkdownError('x', 1))).toBe('markdown-invalid')
+    expect(errorCodeOf(new ExportError('x', [{ code: 'export-guard', message: 'x' }]))).toBe('export-guard')
+    expect(failureProblem('no such dir', 'json')).toEqual({ severity: 'error', code: 'command-usage', message: 'no such dir' })
+    expect(failureProblem(new KayError('export-action', 'kay: x'), 'json').code).toBe('export-action')
+    expect(failureProblem(new Error('x'), 'json').code).toBeNull()
+  })
+})
+
+describe('kay explain', () => {
+  it('lists the errors beside the lints, or a group\'s, and explains one with where its fix is written', async () => {
+    const all = await kay(['explain'])
+    const group = await kay(['explain', 'export'])
+    const one = await kay(['explain', 'template-syntax'])
+
+    expect(all.stdout).toContain('missing-alt')
+    expect(all.stdout).toContain('template-syntax')
+    expect(group.stdout).toBe(`${errorList('export')}\n`)
+    expect(one.stdout).toBe(`${explainError('template-syntax')}\n`)
+    expect(one.stdout).toContain('llms/templates.md')
+  })
+
+  it('gives the errors in its json', async () => {
+    const all = JSON.parse((await kay(['explain', '--format', 'json'])).stdout) as { errors: { name: string }[], errorGroups: object }
+    const one = JSON.parse((await kay(['explain', 'export-guard', '--format', 'json'])).stdout) as unknown
+
+    expect(all.errors.map(error => error.name)).toEqual(Object.keys(ERRORS))
+    expect(all.errorGroups).toEqual(ERROR_GROUPS)
+    expect(one).toEqual({ name: 'export-guard', ...ERRORS['export-guard'] })
   })
 })

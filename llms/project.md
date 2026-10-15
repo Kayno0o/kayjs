@@ -314,8 +314,8 @@ export default defineConfig({
   - Each action, endpoint, API module route with its method, `WS` and `OPTIONS` included, and a library's with the guards of its own directory (API modules are imported, as only they know their routes, so their top-level code runs: what it writes to stdout, through the console or `process.stdout`, goes to stderr, and one that fails to load or calls `process.exit()` is listed by its mount with why), the routes of an extension's `server` given as an Elysia instance, each redirect and collection feed;
   - And kay's own routes the config turns on, such as `/_kay/health`, the favicons and the sitemap.
   - What the server entry adds, as a `.use(auth.plugin)`, and an extension's `server` given as a function are only known as the server starts: a last line names them, unlisted.
-- `kay explain [lint|group] [--format text|json]`:
-  - List the lints with their groups and default levels, or a group's, or print one with an example it reports and the same written right.
+- `kay explain [lint|error|group] [--format text|json]`:
+  - List the lints with their groups and default levels and the errors with theirs, or a group's, or print one: a lint with an example it reports and the same written right, an error with where its fix is written.
 - `kay fmt [paths...] [--check] [--format text|json] [--quiet]`:
   - Format `.kay` files; `--check` lists unformatted files and fails.
 - `kay migrate astro [dir] [--out <dir>] [--format text|json] [--quiet]`:

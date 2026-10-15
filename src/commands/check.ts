@@ -128,7 +128,7 @@ async function watchChecks(root: string, args: string[], format: ProblemFormat):
 
       // A config or a module it imports calling `process.exit()`, or a crash, leaves no report of its own.
       if (code > 1)
-        printFailure('check', child.signalCode ? `the check died of ${child.signalCode} before reporting` : `the check stopped with exit code ${code} before reporting`, format)
+        printFailure('check', child.signalCode ? `the check died of ${child.signalCode} before reporting` : `the check stopped with exit code ${code} before reporting`, format, null)
     } while (changed)
 
     child = undefined

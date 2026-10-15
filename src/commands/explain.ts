@@ -1,10 +1,12 @@
+import type { ErrorCode, ErrorGroup } from '../compiler/errors'
 import type { Lint, LintGroup } from '../compiler/lints'
 import type { Command } from './command'
+import { ERROR_GROUPS, errorList, ERRORS, explainError, isErrorCode, isErrorGroup } from '../compiler/errors'
 import { explainLint, isLint, isLintGroup, LINT_GROUPS, lintList, LINTS } from '../compiler/lints'
 import { formatOption, printDocument, printFailure } from './command'
 import { USAGES } from './usages'
 
-// Lists the lints, or a group's, or explains the lint named.
+// Lists the lints and the errors, or a group's, or explains the lint or error named.
 export const explain: Command = {
   usage: USAGES.explain,
   options: { format: { type: 'string' } },
@@ -15,17 +17,26 @@ export const explain: Command = {
     if (format === undefined)
       return 1
 
-    if (name === undefined || isLintGroup(name)) {
+    if (name === undefined || isLintGroup(name) || isErrorGroup(name)) {
       if (format === 'json')
-        printDocument(lintDocument(name))
+        printDocument(isErrorGroup(name) ? errorDocument(name) : lintDocument(name))
       else
-        console.log(lintList(name))
+        console.log(isErrorGroup(name) ? errorList(name) : isLintGroup(name) ? lintList(name) : `${lintList()}\n\n${errorList()}`)
+
+      return 0
+    }
+
+    if (isErrorCode(name)) {
+      if (format === 'json')
+        printDocument({ name, ...ERRORS[name] as ErrorCode })
+      else
+        console.log(explainError(name))
 
       return 0
     }
 
     if (!isLint(name)) {
-      printFailure('explain', `\`${name}\` is no lint or group; \`kay explain\` lists them`, format)
+      printFailure('explain', `\`${name}\` is no lint, error or group; \`kay explain\` lists them`, format)
 
       return 1
     }
@@ -39,12 +50,23 @@ export const explain: Command = {
   },
 }
 
-// The groups, or the one named, and their lints with what each reports whole.
+// The groups, or the one named, and their lints with what each reports whole, then the errors.
 function lintDocument(group: LintGroup | undefined) {
   const lints = Object.entries(LINTS as Record<string, Lint>).filter(([, lint]) => group === undefined || lint.group === group)
 
   return {
     groups: group === undefined ? LINT_GROUPS : { [group]: LINT_GROUPS[group] },
     lints: lints.map(([name, lint]) => ({ name, group: lint.group, level: lint.level, summary: lint.summary })),
+    ...group === undefined && errorDocument(undefined),
+  }
+}
+
+// The error groups, or the one named, and their codes.
+function errorDocument(group: ErrorGroup | undefined) {
+  const errors = Object.entries(ERRORS as Record<string, ErrorCode>).filter(([, error]) => group === undefined || error.group === group)
+
+  return {
+    errorGroups: group === undefined ? ERROR_GROUPS : { [group]: ERROR_GROUPS[group] },
+    errors: errors.map(([name, error]) => ({ name, group: error.group, summary: error.summary, fix: error.fix })),
   }
 }

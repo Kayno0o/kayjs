@@ -6,6 +6,7 @@ import type { Collection } from './index'
 import type { Segment } from './markdown'
 import type { ContentProblem } from './validate'
 import { dirname, relative, resolve } from 'node:path'
+import { KayError } from '../compiler/errors'
 import { projectPaths } from '../project'
 import { nameCollection } from '../runtime/fields'
 import { localePath } from '../runtime/i18n'
@@ -50,7 +51,7 @@ async function namedCollections(root: string, config?: string): Promise<[string,
 
   if (!source.has(file)) {
     if (config !== undefined && !source.embedded)
-      throw new Error(`kay: kay.config.ts names ${config} as the content config, and there is no such file`)
+      throw new KayError('content-config-missing', `kay: kay.config.ts names ${config} as the content config, and there is no such file`)
 
     return []
   }
@@ -139,7 +140,7 @@ function componentUses(collection: string, components: object, file: string, seg
 }
 
 function feedNeedsSite(collection: Collection<unknown>): Error {
-  return new Error(`kay: the collection ${collection.name} has a feed, whose links need the site's URL: set \`site\` in kay.config.ts`)
+  return new KayError('feed-needs-site', `kay: the collection ${collection.name} has a feed, whose links need the site's URL: set \`site\` in kay.config.ts`)
 }
 
 function collectionFeed(collection: Collection<unknown>): CollectionFeed {

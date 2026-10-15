@@ -1,4 +1,5 @@
 import type { Diagnostic, Node, Span } from './ast'
+import type { ErrorName } from './errors'
 import type { LintLevels } from './lints'
 import type { ImportedSignals, SignalKind } from './module-signals'
 import type { NameFindings } from './rewrite'
@@ -119,15 +120,22 @@ export function compileKay(source: string, filename: string, options: CompileOpt
   const final = generate(file, script, server, { ...generateOptions, name, rewrites: found.plan.rewrites, translates: found.plan.translates, values: found.plan.values })
   // A fence that did not parse at all reaches the code unanalysed, so what the rewrites say of its names is only noise beside its syntax error.
   const unparsed = script.unparsed !== undefined || server?.unparsed !== undefined
-  const diagnostics = [...file.diagnostics, ...script.diagnostics, ...(server?.diagnostics ?? []), ...server ? separatePageSettings(source, server) : [], ...validate(file, script, server, generateOptions), ...unparsed ? [] : found.diagnostics]
+  const diagnostics = [
+    ...coded(file.diagnostics, 'template-syntax'),
+    ...coded(script.diagnostics, 'fence-invalid'),
+    ...coded(server?.diagnostics ?? [], 'fence-invalid'),
+    ...coded(server ? separatePageSettings(source, server) : [], 'page-settings-invalid'),
+    ...coded(validate(file, script, server, generateOptions), 'template-invalid'),
+    ...coded(unparsed ? [] : found.diagnostics, 'signal-misuse'),
+  ]
 
   // Code that does not parse usually already has a better diagnostic from the fence or the template; this one is what is left when nothing else explains it.
   if (found.syntaxError && diagnostics.length === 0)
-    diagnostics.push(found.syntaxError)
+    diagnostics.push(...coded([found.syntaxError], 'fence-syntax'))
 
   // Type checking only, so a page still runs while it is fixed, and fails there in development naming the same fixes.
   if (options.check && !client)
-    diagnostics.push(...browserReads(file, island !== undefined, server?.data.map(data => data.name) ?? [], routeFile))
+    diagnostics.push(...coded(browserReads(file, island !== undefined, server?.data.map(data => data.name) ?? [], routeFile), 'browser-only-read'))
 
   // Code that did not compile may have taken reads and writes with it, so a file with an error is not searched for unread names or unwritten signals.
   const broken = diagnostics.some(diagnostic => !diagnostic.checkOnly)
@@ -136,7 +144,7 @@ export function compileKay(source: string, filename: string, options: CompileOpt
     diagnostics.push(...unboundedFields(server), ...[script.fence, server?.fence].flatMap(fence => fence ? [...fenceSchemaNames(source, fence), ...cssImportsWithoutText(fence)] : []), ...broken ? [] : [...unreadNames(source, file.template, script, server, found.findings), ...constantSignals(source, file.script, found.findings)], ...templateLints(file))
 
   if (file.client && routeFile)
-    diagnostics.push({ ...file.client, message: 'A page, layout or special page cannot be `--- client`', note: 'it renders on the server', help: 'move what needs the browser to a component it renders, and make that one `--- client`' })
+    diagnostics.push({ ...file.client, code: 'client-route-fence', message: 'A page, layout or special page cannot be `--- client`', note: 'it renders on the server', help: 'move what needs the browser to a component it renders, and make that one `--- client`' })
 
   const reported = (options.check ? applyLints(diagnostics, source, options.lints) : diagnostics).sort((a, b) => a.start - b.start)
 
@@ -152,6 +160,11 @@ export function compileKay(source: string, filename: string, options: CompileOpt
     classes: templateFacts(file).classes,
     diagnostics: reported,
   }
+}
+
+// A compile error names the group of messages it belongs to, for `kay explain` to look up; a lint keeps its own name.
+function coded(diagnostics: Diagnostic[], code: ErrorName): Diagnostic[] {
+  return diagnostics.map(diagnostic => diagnostic.code === undefined ? { ...diagnostic, code } : diagnostic)
 }
 
 // Props and server data nothing reads: a prop beside a `...rest` is left out of it on purpose, and a name starting with `_` is unused on purpose, as TypeScript takes it.

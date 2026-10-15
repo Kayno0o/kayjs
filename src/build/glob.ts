@@ -1,6 +1,7 @@
 import type * as t from '@babel/types'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import { parse } from '@babel/parser'
+import { KayError } from '../compiler/errors'
 import { loadTraverse } from '../compiler/rewrite'
 
 interface GlobCall {
@@ -101,7 +102,7 @@ function globCalls(code: string, importer: string, loader: Bun.JavaScriptLoader)
       if (callee.type !== 'MemberExpression' || callee.object.type !== 'MetaProperty' || callee.object.meta.name !== 'import' || callee.property.type !== 'Identifier' || callee.property.name !== 'glob')
         return
 
-      const refuse = (what: string) => new Error(`kay: import.meta.glob in ${importer} ${what}, as the build reads them before the module runs: ${USAGE}`)
+      const refuse = (what: string) => new KayError('glob-import', `kay: import.meta.glob in ${importer} ${what}, as the build reads them before the module runs: ${USAGE}`)
       const [first, second] = args
       const patterns = first?.type === 'ArrayExpression' ? first.elements.map(element => element?.type === 'StringLiteral' ? element.value : undefined) : [first?.type === 'StringLiteral' ? first.value : undefined]
 

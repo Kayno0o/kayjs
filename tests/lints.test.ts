@@ -4,7 +4,7 @@ import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { compileKay } from '../src/compiler'
 import { moduleChecks } from '../src/compiler/fence-checks'
-import { explainLint, LINT_GROUPS, lintList, LINTS } from '../src/compiler/lints'
+import { explainLint, isLint, LINT_GROUPS, lintList, LINTS } from '../src/compiler/lints'
 
 function lints(source: string, options: CompileOptions = {}) {
   return compileKay(source, 'list.kay', { check: true, ...options }).diagnostics.map(d => ({ code: d.code, severity: d.severity, at: source.slice(d.start, d.end) }))
@@ -49,7 +49,7 @@ describe('lint levels', () => {
   it('reports a `// kay-allow` naming no lint, listing the ones there are', () => {
     const diagnostics = compileKay('// kay-allow missing-alt, missing-alts\nimg(src="/a.png")\n', 'list.kay', { check: true }).diagnostics
 
-    expect(diagnostics.map(d => [d.message, d.code])).toEqual([['Unknown lint `missing-alts`', undefined]])
+    expect(diagnostics.map(d => [d.message, d.code])).toEqual([['Unknown lint `missing-alts`', 'unknown-lint']])
     expect(diagnostics[0]!.help).toContain('`positional-key`')
   })
 
@@ -62,7 +62,7 @@ describe('unread names in a file that did not compile', () => {
   it('reports none, as the code the parser skipped may read them', () => {
     const source = '---\nconst { title, other } = props<{ title: string, other: string }>()\n---\nh1 {other}\neach x in y\n  p {title}\n'
 
-    expect(compileKay(source, 'list.kay', { check: true }).diagnostics.map(d => d.code ?? d.message)).toEqual(['`each` is pug syntax kay does not have'])
+    expect(compileKay(source, 'list.kay', { check: true }).diagnostics.map(d => isLint(d.code) ? d.code : d.message)).toEqual(['`each` is pug syntax kay does not have'])
   })
 })
 
@@ -106,7 +106,7 @@ describe('kay explain', () => {
   it('prints them from the command line, refusing a name that is no lint or group', async () => {
     expect(await explain('missing-alt')).toEqual({ code: 0, stdout: `${explainLint('missing-alt')}\n`, stderr: '' })
     expect(await explain('seo')).toEqual({ code: 0, stdout: `${lintList('seo')}\n`, stderr: '' })
-    expect(await explain('missing-alts')).toEqual({ code: 1, stdout: '', stderr: 'kay explain: `missing-alts` is no lint or group; `kay explain` lists them\n' })
+    expect(await explain('missing-alts')).toEqual({ code: 1, stdout: '', stderr: 'kay explain: `missing-alts` is no lint, error or group; `kay explain` lists them\n' })
   })
 })
 
@@ -137,7 +137,7 @@ describe('deprecated-schema-name', () => {
   it('leaves a fence or module declaring a name twice to the type check, which reports it', () => {
     const twice = 'import { t } from \'kay\'\nconst a = 1\nconst a = 2\n'
 
-    const duplicate = { code: undefined, severity: undefined, at: 'a' }
+    const duplicate = { code: 'fence-invalid', severity: undefined, at: 'a' }
     // The statement declaring it again is left out of the analysis, which still reads the rest.
     const deprecated = { code: 'deprecated-schema-name', severity: 'warning' as const, at: 't' }
 
@@ -153,7 +153,7 @@ describe('page settings', () => {
     const several = '--- server\nimport { s } from \'kay\'\n\n// The search\nexport const query = s.Object({\n  page: s.Integer(),\n})\nexport const revalidate = \'1h\'\n---\np x'
     const moved = '--- server\nimport { s } from \'kay\'\n\nexport const page = {\n  query: s.Object({\n    page: s.Integer(),\n  }),\n  revalidate: \'1h\',\n}\n---\np x'
 
-    expect(lints(one)).toEqual([{ code: undefined, severity: undefined, at: 'prerender' }])
+    expect(lints(one)).toEqual([{ code: 'page-settings-invalid', severity: undefined, at: 'prerender' }])
     expect(compileKay(one, 'list.kay').diagnostics.map(d => d.message)).toEqual(['`prerender` is a setting of `page`, not an export of its own'])
     expect(fixed(one)).toEqual(['--- server\nexport const page = { prerender: true }\n---\np x'])
     expect(fixed(several)).toEqual([moved, moved])
@@ -162,7 +162,7 @@ describe('page settings', () => {
   it('moves a setting declared as a function as an arrow, leaving a generator', () => {
     const declared = '--- server\nexport async function prerender(): Promise<{ slug: string }[]> {\n  return [{ slug: \'a\' }]\n}\n---\np x'
 
-    expect(lints(declared)).toEqual([{ code: undefined, severity: undefined, at: 'prerender' }])
+    expect(lints(declared)).toEqual([{ code: 'page-settings-invalid', severity: undefined, at: 'prerender' }])
     expect(fixed(declared)).toEqual(['--- server\nexport const page = {\n  prerender: async (): Promise<{ slug: string }[]> => {\n    return [{ slug: \'a\' }]\n  },\n}\n---\np x'])
     expect(fixed('--- server\nexport function sitemap(locale = \'en\') {\n  return [{ locale }]\n}\n---\np x')).toEqual(['--- server\nexport const page = {\n  sitemap: (locale = \'en\') => {\n    return [{ locale }]\n  },\n}\n---\np x'])
     expect(fixed('--- server\nexport function* prerender() {\n  yield { slug: \'a\' }\n}\n---\np x')).toEqual([])
@@ -443,7 +443,7 @@ describe('what a template gets reported for', () => {
   const click = 'onClick={() => undefined}'
   const props = (types: string, names: string) => `---\nconst { ${names} } = props<{ ${types} }>()\n---\n`
   // The code of each report (its message when it has none) and the text it points at.
-  const found = (source: string) => compileKay(source, 'list.kay', { check: true }).diagnostics.map(d => `${d.code ?? d.message} ${source.slice(d.start, d.end)}`)
+  const found = (source: string) => compileKay(source, 'list.kay', { check: true }).diagnostics.map(d => `${isLint(d.code) ? d.code : d.message} ${source.slice(d.start, d.end)}`)
   const rows: [string, string, string[]][] = [
     ['img and iframe', 'img(src="/a.png")\niframe(src="/map")', ['missing-alt img', 'missing-title iframe']],
     ['alt="" marking decoration', 'img(src="/a.png" alt="")\niframe(src="/map" title="Map")', []],

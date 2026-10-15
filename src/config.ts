@@ -17,6 +17,7 @@ import type { Tracer } from './server/trace'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import process from 'node:process'
+import { KayError } from './compiler/errors'
 
 // What `kay.config.ts` exports by default; `pages()`, `kay build`, `kay dev` and `kay check` all read it.
 export interface KayConfig {
@@ -322,7 +323,7 @@ async function importConfig(root: string, fresh = false): Promise<KayConfig> {
   const { default: config } = await import(fresh ? `${file}?${Date.now()}` : file) as { default?: KayConfig }
 
   if (typeof config !== 'object' || config === null)
-    throw new Error(`kay: ${CONFIG_FILE} must export its config by default: export default defineConfig({ ... })`)
+    throw new KayError('config-default-export', `kay: ${CONFIG_FILE} must export its config by default: export default defineConfig({ ... })`)
 
   return config
 }

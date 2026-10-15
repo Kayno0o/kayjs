@@ -56,7 +56,7 @@ describe('--format', () => {
 
       expect(code).toBe(1)
       expect(stderr).toBe(`kay ${command}: no-such-dir is not a directory\n`)
-      expect(document<unknown>(stdout)).toEqual({ errors: 1, warnings: 0, problems: [{ severity: 'error', code: null, message: 'no-such-dir is not a directory' }] })
+      expect(document<unknown>(stdout)).toEqual({ errors: 1, warnings: 0, problems: [{ severity: 'error', code: 'command-usage', message: 'no-such-dir is not a directory' }] })
     }
   })
 })
@@ -123,7 +123,7 @@ describe('kay build --format json', () => {
     expect(built.failed).toEqual({ stage: 'bundle' })
     expect(built.errors).toBe(1)
     expect(built.built).toBeUndefined()
-    expect(built.problems.map(({ file, line, column, code, message }) => ({ file, line, column, code, message }))).toEqual([{ file: relative(process.cwd(), join(root, 'src/routes/index.kay')), line: 2, column: 1, code: null, message: '`each` is pug syntax kay does not have' }])
+    expect(built.problems.map(({ file, line, column, code, message }) => ({ file, line, column, code, message }))).toEqual([{ file: relative(process.cwd(), join(root, 'src/routes/index.kay')), line: 2, column: 1, code: 'template-syntax', message: '`each` is pug syntax kay does not have' }])
   }, 30_000)
 
   it('gives a config that does not load as one error, and nothing built', async () => {
@@ -132,12 +132,26 @@ describe('kay build --format json', () => {
       'src/routes/index.kay': 'p Home\n',
     })
     const { stdout, code } = await kay(['build', root, '--no-check', '--format', 'json'])
-    const built = document<{ errors: number, problems: { message: string, code: null }[] }>(stdout)
+    const built = document<{ errors: number, problems: { message: string, code: string | null }[] }>(stdout)
 
     expect(code).toBe(1)
     expect(built.errors).toBe(1)
     expect(built.problems[0]!.message).toContain('no settings')
   }, 30_000)
+
+  it('gives an error kay raised its code, whether it stops the build before it starts or while it exports', async () => {
+    const config = await project({ 'kay.config.ts': 'export const config = {}\n', 'src/routes/index.kay': 'p Home\n' })
+    const guarded = await project({
+      'kay.config.ts': 'export default { favicon: false }\n',
+      'src/routes/index.kay': 'p Home\n',
+      'src/routes/team/[id].kay': '--- server\nexport const page = { prerender: false }\n---\np Team\n',
+    })
+    const unloaded = await kay(['build', config, '--no-check', '--format', 'json'])
+    const exported = await kay(['build', guarded, '--no-check', '--static', '--format', 'json'])
+
+    expect(document<{ problems: { code: string }[] }>(unloaded.stdout).problems.map(problem => problem.code)).toEqual(['config-default-export'])
+    expect(document<{ problems: { code: string }[] }>(exported.stdout).problems.map(problem => problem.code)).toEqual(['export-needs-params'])
+  }, 60_000)
 })
 
 describe('kay routes --format json', () => {
@@ -191,7 +205,7 @@ describe('kay explain --format json', () => {
 
     expect(document<unknown>(one.stdout)).toEqual({ name: 'constant-signal', ...LINTS['constant-signal'] })
     expect(none.code).toBe(1)
-    expect(document<unknown>(none.stdout)).toEqual({ errors: 1, warnings: 0, problems: [{ severity: 'error', code: null, message: '`nope` is no lint or group; `kay explain` lists them' }] })
+    expect(document<unknown>(none.stdout)).toEqual({ errors: 1, warnings: 0, problems: [{ severity: 'error', code: 'command-usage', message: '`nope` is no lint, error or group; `kay explain` lists them' }] })
   })
 })
 
@@ -226,7 +240,7 @@ describe('kay fmt --format json', () => {
 
     expect(code).toBe(1)
     expect(stderr).toBe('kay fmt: nowhere does not exist\n')
-    expect(document<unknown>(stdout)).toEqual({ errors: 1, warnings: 0, problems: [{ severity: 'error', code: null, message: 'nowhere does not exist' }] })
+    expect(document<unknown>(stdout)).toEqual({ errors: 1, warnings: 0, problems: [{ severity: 'error', code: 'command-usage', message: 'nowhere does not exist' }] })
   })
 })
 
@@ -255,6 +269,6 @@ describe('kay migrate --format json', () => {
     const { stdout, code } = await kay(['migrate', 'gatsby', '--format', 'json'])
 
     expect(code).toBe(1)
-    expect(document<unknown>(stdout)).toEqual({ errors: 1, warnings: 0, problems: [{ severity: 'error', code: null, message: 'gatsby is not something kay migrates from, as in `kay migrate astro`' }] })
+    expect(document<unknown>(stdout)).toEqual({ errors: 1, warnings: 0, problems: [{ severity: 'error', code: 'command-usage', message: 'gatsby is not something kay migrates from, as in `kay migrate astro`' }] })
   })
 })

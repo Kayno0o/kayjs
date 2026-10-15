@@ -1,9 +1,11 @@
 import type { Elysia } from 'elysia'
+import type { ExportProblem } from '../compiler/errors'
 import type { EndpointContext, Locals } from '../runtime'
 import type { ActionOptions } from './actions'
 import type { LoadedGuard } from './guards'
 import type { Endpoint } from './routes'
 import { basename, relative } from 'node:path'
+import { exportProblem, KayError } from '../compiler/errors'
 import { passGuards } from './actions'
 import { importModule } from './bundle'
 import { loadGuard, requiredGuards } from './guards'
@@ -24,7 +26,6 @@ interface ServedEndpoint extends Omit<Endpoint, 'guards'> {
 }
 
 const TEXT = 'text/plain; charset=utf-8'
-const KAY_PREFIX = /^kay: /
 
 // Each endpoint at its path; endpoints whose router paths only differ by the extension of their last param share one route, which picks the one whose extension the path ends in.
 export async function serveEndpoints(app: Elysia, endpoints: Endpoint[], options: ActionOptions): Promise<void> {
@@ -114,31 +115,31 @@ function responseOf(endpoint: ServedEndpoint, body: unknown): Response {
 }
 
 // The paths a static export writes each endpoint to: its own path without params, or each its `prerender` lists; what keeps one from it is a problem, named by file.
-export async function exportedEndpoints(root: string, endpoints: Endpoint[], required?: boolean): Promise<{ paths: string[], problems: string[] }> {
+export async function exportedEndpoints(root: string, endpoints: Endpoint[], required?: boolean): Promise<{ paths: string[], problems: ExportProblem[] }> {
   const paths: string[] = []
-  const problems: string[] = []
+  const problems: ExportProblem[] = []
 
   for (const endpoint of endpoints) {
     const file = relative(root, endpoint.file)
 
     try {
       if (endpoint.guards.length > 0)
-        throw new Error('a guard covers it, and only a server can run one per request')
+        throw new KayError('export-guard', 'a guard covers it, and only a server can run one per request')
 
       if (required === true && endpoint.open !== true)
-        throw new Error('requireGuards is on and no guard covers it; set `guards: false` in `export const page` to export it')
+        throw new KayError('export-guard', 'requireGuards is on and no guard covers it; set `guards: false` in `export const page` to export it')
 
       const prerender = pageSetting(await importModule(endpoint.file), 'prerender')
       const listed = prerender === undefined && endpoint.params.length === 0 ? true : prerender
 
       if (listed === undefined)
-        throw new Error(`it takes ${endpoint.params.join(', ')}, so \`prerender\` lists the values to export: export const page = { prerender: [{ ${endpoint.params.map(param => `${param}: '...'`).join(', ')} }] }`)
+        throw new KayError('export-needs-params', `it takes ${endpoint.params.join(', ')}, so \`prerender\` lists the values to export: export const page = { prerender: [{ ${endpoint.params.map(param => `${param}: '...'`).join(', ')} }] }`)
 
       for (const params of await listedParams(endpoint, file, 'prerender', listed))
         paths.push(`${pathOf(endpoint, params)}${endpoint.suffix ?? ''}`)
     }
     catch (error) {
-      problems.push(`${file}: ${error instanceof Error ? error.message.replace(KAY_PREFIX, '') : String(error)}`)
+      problems.push(exportProblem(file, error))
     }
   }
 

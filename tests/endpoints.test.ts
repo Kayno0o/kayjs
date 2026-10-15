@@ -70,7 +70,7 @@ describe('endpoint files', () => {
     const { paths, problems } = await exportedEndpoints(process.cwd(), endpoints)
 
     expect(paths.toSorted()).toEqual(['/feeds/first.json', '/feeds/first.xml', '/feeds/second.json', '/llms.txt'])
-    expect(problems).toEqual([`${FIXTURE}/src/routes/admin/export.csv.ts: a guard covers it, and only a server can run one per request`])
+    expect(problems).toEqual([{ code: 'export-guard', message: `${FIXTURE}/src/routes/admin/export.csv.ts: a guard covers it, and only a server can run one per request` }])
   })
 
   it('refuse a name the router cannot serve, a param it cannot fill, or a path a page or a public file serves', async () => {

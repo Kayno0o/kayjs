@@ -1,4 +1,5 @@
 import type { Diagnostic, SourceMap } from '../compiler'
+import type { ErrorName } from '../compiler/errors'
 import type { LintLevels } from '../compiler/lints'
 import type { ImportedSignals } from '../compiler/module-signals'
 import type { CacheSlot } from './cache'
@@ -7,6 +8,7 @@ import { dirname, join, relative } from 'node:path'
 import process from 'node:process'
 import { compileKay, formatDiagnostic, ISLAND_TWIN, withoutTwin } from '../compiler'
 import { isInteractive } from '../compiler/codegen'
+import { isErrorCode } from '../compiler/errors'
 import { parseKay } from '../compiler/parser'
 import { analyzeScript } from '../compiler/script'
 import { pruneCache, readCacheEntry, writeCacheEntry } from './cache'
@@ -58,9 +60,12 @@ export interface FileDiagnostic extends Diagnostic {
 
 export class KayCompileError extends Error {
   override name = 'KayCompileError'
+  // The first problem's group of messages.
+  readonly code: ErrorName
 
   constructor(readonly diagnostics: FileDiagnostic[]) {
     super(`\n${diagnostics.map(diagnostic => formatDiagnostic(diagnostic.source, relative(process.cwd(), diagnostic.file), diagnostic)).join('\n\n')}`)
+    this.code = diagnostics.map(diagnostic => diagnostic.code).find(isErrorCode) ?? 'template-invalid'
   }
 }
 

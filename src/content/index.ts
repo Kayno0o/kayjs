@@ -7,6 +7,7 @@ import type { FeedOptions } from './feed'
 import type { RawEntry } from './load'
 import type { Heading, Highlighter, Segment } from './markdown'
 import type { ContentProblem } from './validate'
+import { KayError } from '../compiler/errors'
 import { cached, invalidate } from '../runtime/cache'
 import { durationSeconds } from '../runtime/duration'
 import { editableEntries } from '../runtime/fields'
@@ -299,7 +300,7 @@ async function compileLoaded(loader: ContentLoader, preview: boolean, highlight:
   const given: unknown = await loader.load({ preview })
 
   if (!Array.isArray(given))
-    throw new Error(`kay: the collection ${loader.name}'s load gave ${given === null ? 'null' : typeof given}, where it gives an array of entries`)
+    throw new KayError('loader-result', `kay: the collection ${loader.name}'s load gave ${given === null ? 'null' : typeof given}, where it gives an array of entries`)
 
   const problems: ContentProblem[] = []
   const slugs = new Set<string>()
@@ -375,7 +376,7 @@ function render(segments: Segment[], components: Record<string, Component<never>
     const component = components[segment.component] as ((props: Record<string, unknown>) => unknown) | undefined
 
     if (!component)
-      throw new Error(`kay: ${file} uses <${segment.component}>, which its collection's components do not name`)
+      throw new KayError('content-invalid', `kay: ${file} uses <${segment.component}>, which its collection's components do not name`)
 
     const { children } = segment
     // A self-closing tag passes no children.

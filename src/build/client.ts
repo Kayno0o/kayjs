@@ -10,6 +10,7 @@ import { mkdir, rm } from 'node:fs/promises'
 import { builtinModules } from 'node:module'
 import { join, relative, resolve, sep } from 'node:path'
 import { formatDiagnostic } from '../compiler'
+import { KayError } from '../compiler/errors'
 import { projectPaths } from '../project'
 import { apiStubs, apiTrees } from '../server/api-modules'
 import { rebaseCss } from '../server/base'
@@ -180,7 +181,7 @@ export async function readClientSources(root: string, options: ClientOptions = {
     if (compiled.island !== undefined)
       islands.set(compiled.island, file)
     else if (file === editor)
-      throw new Error(`kay: the editor ${relative(root, file)} runs nothing in the browser, where an editor edits the page: give it a script reading signals, or a \`--- client\` fence`)
+      throw new KayError('inert-editor', `kay: the editor ${relative(root, file)} runs nothing in the browser, where an editor edits the page: give it a script reading signals, or a \`--- client\` fence`)
 
     for (const name of compiled.classes)
       classes.add(name)
@@ -378,7 +379,7 @@ async function refuseBuiltinImports(root: string, logs: Bun.BuildOutput['logs'],
   const chains = probe.success ? builtinChains(root, probe.metafile!.inputs, islands.values(), builtins) : []
 
   if (chains.length > 0)
-    throw new Error(`kay: a browser has no ${builtins.join(', ')}, and islands import modules reaching ${builtins.length === 1 ? 'it' : 'them'}: ${chains.join('; ')}. An island bundles every module it imports, the database or environment one opens as it loads included: move what the island needs to a module importing none of it, or pass it as a prop.`)
+    throw new KayError('browser-builtin-import', `kay: a browser has no ${builtins.join(', ')}, and islands import modules reaching ${builtins.length === 1 ? 'it' : 'them'}: ${chains.join('; ')}. An island bundles every module it imports, the database or environment one opens as it loads included: move what the island needs to a module importing none of it, or pass it as a prop.`)
 }
 
 // Each page and layout is an entry whose code shrinks to its imports, so what comes out is the stylesheet of everything it renders: each one's URL by the file relative to the root, and every module the build read, `followed` adding the ones it shrank to their imports, which the bundler's list of inputs leaves out.

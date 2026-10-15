@@ -88,7 +88,7 @@ describe('the errors kay dev lists for a reader without a browser', () => {
 
     await Bun.write(join(root, 'src/routes/broken.kay'), 'p ok\nelse\n  p no\n')
     await pages({ root, dev: true, prebuilt: false })
-    expect(listed(root, 'boot')).toEqual([{ kind: 'compile', time: expect.any(String), message: '1 compile error', problems: [{ file: 'src/routes/broken.kay', line: 2, column: 1, message: expect.stringContaining('`else` must directly follow') }], report: expect.stringMatching(/^error: `else` must directly follow[^\n]*\n --> \S*src\/routes\/broken\.kay:2:1\n/) }])
+    expect(listed(root, 'boot')).toEqual([{ kind: 'compile', time: expect.any(String), message: '1 compile error', problems: [{ file: 'src/routes/broken.kay', line: 2, column: 1, code: 'template-syntax', message: expect.stringContaining('`else` must directly follow') }], report: expect.stringMatching(/^error\[template-syntax\]: `else` must directly follow[^\n]*\n --> \S*src\/routes\/broken\.kay:2:1\n/) }])
     expect(listed(root, '/fails')).toHaveLength(1)
 
     rmSync(join(root, 'src/routes/broken.kay'))

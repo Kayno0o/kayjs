@@ -453,7 +453,7 @@ function unknownLints(source: string): Diagnostic[] {
       if (!isLint(name[0])) {
         const start = listStart + name.index
 
-        unknown.push({ start, end: start + name[0].length, message: `Unknown lint \`${name[0]}\``, help: `the lints are ${Object.keys(LINTS).map(lint => `\`${lint}\``).join(', ')}`, checkOnly: true })
+        unknown.push({ start, end: start + name[0].length, code: 'unknown-lint', message: `Unknown lint \`${name[0]}\``, help: `the lints are ${Object.keys(LINTS).map(lint => `\`${lint}\``).join(', ')}`, checkOnly: true })
       }
     }
   }

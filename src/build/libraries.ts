@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, realpathSync } from 'node:fs'
 import { isBuiltin } from 'node:module'
 import { dirname, join, relative, resolve, sep } from 'node:path'
+import { KayError } from '../compiler/errors'
 import { parseKay } from '../compiler/parser'
 import { findKayFiles, readSource, scriptLoader, transpilerFor } from './files'
 import { GLOB_CALL, globbedFiles } from './glob'
@@ -87,10 +88,10 @@ export function settingsReplacements(root: string, settings: Record<string, stri
     const declared = dir === undefined ? undefined : readManifest(dir)?.kay?.settings
 
     if (dir === undefined)
-      throw new Error(`kay: settings name ${name}, which is not installed`)
+      throw new KayError('library-settings', `kay: settings name ${name}, which is not installed`)
 
     if (declared === undefined)
-      throw new Error(`kay: settings name ${name}, whose package.json declares no "kay": { "settings": ... } module to replace`)
+      throw new KayError('library-settings', `kay: settings name ${name}, whose package.json declares no "kay": { "settings": ... } module to replace`)
 
     // Resolved as an import would be, so `./src/settings` names the file the bundler loads.
     let defaults: string
@@ -99,7 +100,7 @@ export function settingsReplacements(root: string, settings: Record<string, stri
       defaults = Bun.resolveSync(declared.startsWith('.') ? declared : `./${declared}`, dir)
     }
     catch {
-      throw new Error(`kay: settings name ${name}, whose settings module ${declared} does not exist`)
+      throw new KayError('library-settings', `kay: settings name ${name}, whose settings module ${declared} does not exist`)
     }
 
     return { library: name, defaults, paths: [...new Set([defaults, realpathSync(defaults)])], replacement: resolve(root, module) }

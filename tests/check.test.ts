@@ -11,6 +11,7 @@ import { probe } from '../src/check/project'
 import { compileShadow, shadowPath, shadowSource } from '../src/check/shadow'
 import { warnOtherKay } from '../src/commands/command'
 import { compileKay } from '../src/compiler'
+import { isErrorCode } from '../src/compiler/errors'
 import { SHADOW_DIR } from '../src/project'
 import { limiter } from '../src/server/limit'
 import { fixtureCopy, scratchDir } from './scratch'
@@ -524,7 +525,7 @@ describe.concurrent('kay check, edge cases', () => {
     const root = await scratchProject({ 'src/a.kay': '---\nconst a = \n---\np {a}\n', 'src/b.kay': 'p {1 +}\n' })
 
     try {
-      expect((await check(root)).map(d => [basename(d.file), d.line, d.code])).toEqual([['a.kay', 3, undefined], ['b.kay', 1, undefined]])
+      expect((await check(root)).map(d => [basename(d.file), d.line, d.code])).toEqual([['a.kay', 3, 'fence-invalid'], ['b.kay', 1, 'fence-syntax']])
     }
     finally {
       await rm(root, { recursive: true, force: true })
@@ -538,7 +539,7 @@ describe.concurrent('kay check, edge cases', () => {
     })
 
     try {
-      expect((await check(root)).map(d => [basename(d.file), d.line, d.code ?? firstLine(d.message)])).toEqual([
+      expect((await check(root)).map(d => [basename(d.file), d.line, named(d)])).toEqual([
         ['old.kay', 4, '`query` is a setting of `page`, not an export of its own'],
         ['index.kay', 2, 'TS2561'],
       ])
@@ -554,7 +555,7 @@ describe.concurrent('kay check, edge cases', () => {
     const root = await scratchProject({ 'src/routes/index.kay': page, 'src/routes/_layout.kay': layout })
 
     try {
-      expect((await check(root)).map(d => [basename(d.file), d.line, d.code ?? firstLine(d.message)])).toEqual([
+      expect((await check(root)).map(d => [basename(d.file), d.line, named(d)])).toEqual([
         ['_layout.kay', 7, 'TS2339'],
         ['index.kay', 6, 'TS2322'],
         ['index.kay', 7, 'TS2551'],
@@ -572,7 +573,7 @@ describe.concurrent('kay check, edge cases', () => {
     const root = await scratchProject({ 'src/routes/index.kay': 'p home\n', 'src/routes/auth/_layout.kay': layout, 'lib/routes/login.kay': page })
 
     try {
-      expect((await check(root, { extensions: [{ name: 'lib', routes: { dir: join(root, 'lib/routes'), prefix: '/auth' } }] })).map(d => [basename(d.file), d.line, d.code ?? firstLine(d.message)])).toEqual([['login.kay', 2, 'TS2322']])
+      expect((await check(root, { extensions: [{ name: 'lib', routes: { dir: join(root, 'lib/routes'), prefix: '/auth' } }] })).map(d => [basename(d.file), d.line, named(d)])).toEqual([['login.kay', 2, 'TS2322']])
     }
     finally {
       await rm(root, { recursive: true, force: true })
@@ -591,7 +592,7 @@ describe.concurrent('kay check, edge cases', () => {
     try {
       const found = await check(root)
 
-      expect(found.map(d => [basename(d.file), d.line, d.code ?? firstLine(d.message)])).toEqual([
+      expect(found.map(d => [basename(d.file), d.line, named(d)])).toEqual([
         ['_error.kay', 4, 'Only a page or a layout declares its query'],
         ['clash.kay', 4, expect.stringContaining('`period` is declared by the `query` of')],
       ])
@@ -709,7 +710,7 @@ describe.concurrent('kay check, edge cases', () => {
     const root = await scratchProject({ 'src/routes/index.kay': page })
 
     try {
-      expect((await check(root)).map(d => [d.line, d.code ?? firstLine(d.message)])).toEqual([[19, 'TS2322']])
+      expect((await check(root)).map(d => [d.line, named(d)])).toEqual([[19, 'TS2322']])
     }
     finally {
       await rm(root, { recursive: true, force: true })
@@ -736,7 +737,7 @@ describe.concurrent('kay check, edge cases', () => {
     const root = await scratchProject({ 'src/routes/index.kay': page })
 
     try {
-      expect((await check(root)).map(d => [d.line, d.code ?? firstLine(d.message)])).toEqual([[12, 'TS2345'], [13, 'TS2339']])
+      expect((await check(root)).map(d => [d.line, named(d)])).toEqual([[12, 'TS2345'], [13, 'TS2339']])
     }
     finally {
       await rm(root, { recursive: true, force: true })
@@ -764,7 +765,7 @@ describe.concurrent('kay check, edge cases', () => {
     const root = await scratchProject({ 'src/routes/index.kay': page, 'src/routes/other.kay': 'p\n  error code\n' })
 
     try {
-      expect((await check(root)).map(d => [d.file.split('/').at(-1), d.line, d.code ?? firstLine(d.message)])).toEqual([
+      expect((await check(root)).map(d => [d.file.split('/').at(-1), d.line, named(d)])).toEqual([
         ['other.kay', 2, '`error` shows the message of a form posting to an action, so it sits inside one'],
         ['index.kay', 12, 'TS2345'],
         ['index.kay', 14, 'TS2345'],
@@ -1194,6 +1195,11 @@ describe.concurrent('kay check, edge cases', () => {
     }
   })
 })
+
+// What names a problem: a lint's or TypeScript's code, or the first line of the message of a compile error, whose code names a group of them.
+function named(diagnostic: { code?: string | undefined, message: string }): string {
+  return diagnostic.code === undefined || isErrorCode(diagnostic.code) ? firstLine(diagnostic.message) : diagnostic.code
+}
 
 function firstLine(text: string): string {
   const end = text.indexOf('\n')
@@ -1745,7 +1751,7 @@ describe.concurrent('kay check, unused code', () => {
 
       const missing = await runCheck(root, '--format', 'github', join(root, 'src/nope.kay'))
 
-      expect(missing).toEqual({ code: 1, output: `kay check: ${join(root, 'src/nope.kay')} does not exist\n`, report: `::error title=kay check::${join(root, 'src/nope.kay')} does not exist\n` })
+      expect(missing).toEqual({ code: 1, output: `kay check: ${join(root, 'src/nope.kay')} does not exist\n`, report: `::error title=command-usage::${join(root, 'src/nope.kay')} does not exist\n` })
 
       await Bun.write(config, 'export default {}\n')
 

@@ -1,6 +1,7 @@
 import type { SearchLanguage, SearchManifest, SearchSection } from '../runtime/search'
 import { mkdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
+import { KayError } from '../compiler/errors'
 import { INVISIBLE, MIN_WORD, SEARCH_CHUNK, SEARCH_DIR, SEARCH_MANIFEST, searchShard, searchWords } from '../runtime/search'
 import { ASSET_PREFIX } from './assets'
 
@@ -291,7 +292,7 @@ function readPage(page: SearchPage): ReadPage {
     rewriter.transform(page.html)
   }
   catch (error) {
-    throw new Error(`kay: the search index could not read ${page.path}: ${error instanceof Error ? error.message : String(error)}`, { cause: error })
+    throw new KayError('search-page-unreadable', `kay: the search index could not read ${page.path}: ${error instanceof Error ? error.message : String(error)}`, { cause: error })
   }
 
   const name = plain(h1) || plain(title)

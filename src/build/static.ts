@@ -7,6 +7,7 @@ import { cp, mkdir, readdir, rm } from 'node:fs/promises'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { Elysia } from 'elysia'
+import { KayError } from '../compiler/errors'
 import { pageHooks } from '../config'
 import { resolveProject } from '../project'
 import { joinBase } from '../runtime/base'
@@ -46,10 +47,10 @@ export interface StaticExport {
 // What a static export cannot do, checked before anything is built.
 export function refuseStaticConfig(config: KayConfig): void {
   if (config.i18n?.domains)
-    throw new Error('kay: a static export is one directory for one host, so it cannot serve locales by domain; drop i18n.domains or deploy a server')
+    throw new KayError('export-unsupported-config', 'kay: a static export is one directory for one host, so it cannot serve locales by domain; drop i18n.domains or deploy a server')
 
   if (config.images?.resolve)
-    throw new Error('kay: a static export has no image route to resize what images.resolve looks up on each request; drop images.resolve or deploy a server')
+    throw new KayError('export-unsupported-config', 'kay: a static export has no image route to resize what images.resolve looks up on each request; drop images.resolve or deploy a server')
 }
 
 // Writes the whole site to `outdir`, as any static host serves it: every prerendered page, the browser build under `/_kay/`, the public files, the sitemap, feeds and favicons, `404.html`, and a page for each redirect.
@@ -110,7 +111,7 @@ export async function exportStatic(project: Project, client: ClientBuild, outdir
     const response = await app.handle(new Request(`http://localhost${path}`))
 
     if (!response.ok)
-      throw new Error(`kay: ${path} answered ${response.status} while exporting it; the error is logged above`)
+      throw new KayError('export-page-status', `kay: ${path} answered ${response.status} while exporting it; the error is logged above`)
 
     const file = join(out, decodeURIComponent(path))
 
@@ -196,10 +197,10 @@ async function localeRedirect(app: App, source: string, base: string): Promise<s
 // A directory kay may write to: never the project or what holds it, and one with files in it only when an export wrote them.
 async function clear(root: string, out: string): Promise<void> {
   if (out === root || root.startsWith(out + sep) || out.startsWith(join(root, 'src') + sep) || out === join(root, 'src'))
-    throw new Error(`kay: a static export into ${relative(process.cwd(), out) || '.'} would write over the project; give it a directory of its own, such as dist`)
+    throw new KayError('export-output-dir', `kay: a static export into ${relative(process.cwd(), out) || '.'} would write over the project; give it a directory of its own, such as dist`)
 
   if (existsSync(out) && (await readdir(out)).length > 0 && !existsSync(join(out, MARKER)))
-    throw new Error(`kay: ${relative(process.cwd(), out)} holds files a static export did not write; empty it or give another directory`)
+    throw new KayError('export-output-dir', `kay: ${relative(process.cwd(), out)} holds files a static export did not write; empty it or give another directory`)
 
   await rm(out, { recursive: true, force: true })
   await mkdir(out, { recursive: true })

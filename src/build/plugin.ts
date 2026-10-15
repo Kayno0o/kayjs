@@ -6,6 +6,7 @@ import { readFileSync, realpathSync, statSync } from 'node:fs'
 import { dirname, join, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { ISLAND_TWIN, withoutTwin } from '../compiler'
+import { KayError } from '../compiler/errors'
 import { RESIZABLE } from '../runtime/image'
 import { imageHeader } from '../server/image-format'
 import { ASSET_FILE, clientDir, writeAsset } from './assets'
@@ -98,7 +99,7 @@ export function kayPlugin(options: KayPluginOptions, workers: string[]): BunPlug
         const [name, problems, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
 
         if (code !== 0)
-          throw new Error(`kay: the worker ${path} failed to build:\n${problems.trim()}`)
+          throw new KayError('worker-build', `kay: the worker ${path} failed to build:\n${problems.trim()}`)
 
         return name
       }
@@ -114,7 +115,7 @@ export function kayPlugin(options: KayPluginOptions, workers: string[]): BunPlug
           return 'import.meta.url'
 
         if (workers.includes(path))
-          throw new Error(`kay: the worker ${path} starts itself again through ${workers.slice(workers.indexOf(path) + 1).join(', ')}`)
+          throw new KayError('worker-build', `kay: the worker ${path} starts itself again through ${workers.slice(workers.indexOf(path) + 1).join(', ')}`)
 
         let name: string
 

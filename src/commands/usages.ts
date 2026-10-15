@@ -7,7 +7,7 @@ export const USAGES = {
   render: 'render <url> [dir] [--entry <file>] [--method <method>] [--body <text>] [--header <name: value>]... [--cookie <name=value>]... [-i|--include]',
   check: 'check [dir] [paths...] [-p tsconfig.json] [--entry <file>] [--deny-warnings] [--fix] [--only <group>] [--format text|github|json] [--watch] [--quiet]',
   routes: 'routes [dir] [--format text|json]',
-  explain: 'explain [lint|group] [--format text|json]',
+  explain: 'explain [lint|error|group] [--format text|json]',
   fmt: 'fmt [paths...] [--check] [--format text|json] [--quiet]',
   migrate: 'migrate astro [dir] [--out <dir>] [--format text|json] [--quiet]',
   lsp: 'lsp --stdio',

@@ -8,6 +8,7 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { parseArgs } from 'node:util'
 import { colors, createColors } from '@kaynooo/utils/tools/colors'
+import { errorCodeOf } from '../compiler/errors'
 import { offsetAt, positionAt } from '../compiler/mapping'
 
 const SHELL_SAFE = /^[\w@%+=:,./-]+$/
@@ -219,20 +220,37 @@ export async function printProblems(diagnostics: CheckDiagnostic[], denyWarnings
 }
 
 // A command that could not run, on a missing path or a config that does not load: on stderr as always, and as one error in JSON or an Actions annotation, which a tool reading stdout would otherwise get nothing from.
-export function printFailure(command: string, failure: unknown, format: ProblemFormat): void {
+// A failure given as text is a usage problem, `command-usage`, unless `code` says otherwise: null for a child that died.
+export function printFailure(command: string, failure: unknown, format: ProblemFormat, code?: string | null): void {
   console.error(typeof failure === 'string' ? `kay ${command}: ${failure}` : failure)
 
+  const hint = explainHint(failure)
+
+  if (hint !== undefined)
+    console.error(hint)
+
   if (format === 'json')
-    printDocument({ errors: 1, warnings: 0, problems: [failureProblem(failure, format)] })
+    printDocument({ errors: 1, warnings: 0, problems: [failureProblem(failure, format, code)] })
   else if (format === 'github')
-    console.log(workflowCommand(failureProblem(failure, format), command))
+    console.log(workflowCommand(failureProblem(failure, format, code), command))
 }
 
-// What stopped a command as a problem with no code, placed where Bun's error for a module that does not parse tells.
-export function failureProblem(failure: unknown, format: ProblemFormat): FailureProblem {
+// What stopped a command as a problem, with the code of the error kay raised if it did, placed where Bun's error for a module that does not parse tells.
+export function failureProblem(failure: unknown, format: ProblemFormat, code: string | null = failureCode(failure)): FailureProblem {
   const { message, position } = (typeof failure === 'object' && failure !== null ? failure : {}) as { message?: unknown, position?: { file: string, line: number, column: number } | null }
 
-  return { ...position && { file: shownPath(position.file, format), line: position.line, column: position.column }, severity: 'error', code: null, message: typeof failure === 'string' ? failure : typeof message === 'string' ? message.trim() : String(failure) }
+  return { ...position && { file: shownPath(position.file, format), line: position.line, column: position.column }, severity: 'error', code, message: typeof failure === 'string' ? failure : typeof message === 'string' ? message.trim() : String(failure) }
+}
+
+function failureCode(failure: unknown): string | null {
+  return typeof failure === 'string' ? 'command-usage' : errorCodeOf(failure) ?? null
+}
+
+// The line telling where an error kay raised is explained.
+export function explainHint(failure: unknown): string | undefined {
+  const code = errorCodeOf(failure)
+
+  return code === undefined ? undefined : `kay explain ${code} says where the fix is written`
 }
 
 // Runs `run` with what it and the code it loads print to stdout sent to stderr, so stdout keeps the one document a format gives it.

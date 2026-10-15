@@ -80,13 +80,65 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `unsized-share-image` | warn | seo | A share image of unknown size |
 | `noindex-in-sitemap` | warn | seo | A `noindex` page the sitemap lists |
 
+## Errors
+
+A template that does not compile, a build that stops, a collection that does not load and a page a static export cannot hold carry a code too, printed in brackets as `error[template-syntax]` or after the failure as `kay explain <code> says where the fix is written`. `kay check --format json`, `kay build --format json` and `kay explain --format json` carry it as `code`, which is `null` only for what kay did not raise itself, such as a type error TypeScript names by number.
+
+`kay explain <code>` prints what raises it and the section that covers the fix, and `kay explain compile`, `command`, `build`, `content` or `export` lists a group's. The codes are stable names, one for a group of messages with one cause. No level applies to them and no `// kay-allow` comment reaches them: each stops the command raising it.
+
+| Error | Group | Raised for | Fix |
+| --- | --- | --- | --- |
+| `command-usage` | command | A command that could not run as asked: a path that does not exist or is no project, a flag it does not take, flags that do not go together. | [Commands](/reference/cli) |
+| `template-syntax` | compile | A template line kay cannot read: indentation, an unclosed `(` or string, a malformed `for`, `const`, `await` or `match`, an attribute that is neither a quoted string nor a `{expression}`. | [Template lines](/essentials/templates) |
+| `template-invalid` | compile | A template that reads but is not allowed: a `head` block in the wrong place, a duplicate id or class, an attribute that has no effect there, a `field`, `server` or `bind:` used wrongly, an event that is not camelCase. | [Elements](/essentials/templates) |
+| `fence-invalid` | compile | A script or server fence that breaks a rule of kay: props declared twice or read wrongly, a value exported from a component script, JSX in a fence, a page setting kay cannot read as written. | [File layout](/essentials/components) |
+| `fence-syntax` | compile | Code in a fence, or generated from the template, that TypeScript cannot parse. | [File layout](/essentials/components) |
+| `page-settings-invalid` | compile | A page setting kay cannot read where it is written: `page` must be an object literal of `key: value` settings. | [Page settings](/essentials/routing) |
+| `signal-misuse` | compile | A signal or memo written the wrong way: a memo assigned, a name declared twice, a `bind:` to a name holding no signal. | [Signals](/essentials/components) |
+| `client-route-fence` | compile | A page, layout or special page with a `--- client` fence: they render on the server. | [Islands](/essentials/islands) |
+| `browser-only-read` | compile | A browser-only name such as `window` read while a component renders on the server too; reported by the type check, so a page still runs. | [Browser globals on the server](/essentials/islands) |
+| `unknown-lint` | compile | A `// kay-allow` comment naming something that is no lint. | [Allow a lint on one line](/reference/checks) |
+| `browser-builtin-import` | build | An island importing a module that reaches a Node built-in, which a browser does not have. | [Browser-only components](/essentials/islands) |
+| `server-only-in-island` | build | A chunk a page loads reading `process` or `Bun`, or an island importing the server's `s` schema builder, so the island dies as it loads. | [Browser globals on the server](/essentials/islands) |
+| `inert-editor` | build | An editor component running nothing in the browser, where an editor edits the page. | [The editor](/guides/content) |
+| `worker-build` | build | A worker that fails to build, or starts itself again through other workers. | [Wasm and workers](/essentials/styling-and-assets) |
+| `glob-import` | build | An `import.meta.glob` the build cannot read before the module runs. | [Glob imports](/essentials/components) |
+| `icon-unresolved` | build | An icon of a set that is not installed, or a name the set does not have. | [Icons](/essentials/styling-and-assets) |
+| `library-settings` | build | `settings` naming a library that is not installed, declares no settings module, or whose module is missing. | [Using a component library](/essentials/components) |
+| `executable-invalid` | build | `kay build --compile` without a server entry, or with a public directory named like the client assets. | [Build one executable](/reference/cli) |
+| `executable-missing-content` | build | A compiled executable holding no build of a collection. | [Build one executable](/reference/cli) |
+| `search-page-unreadable` | build | The search index could not read a prerendered page. | [Site search](/essentials/head-and-seo) |
+| `config-default-export` | build | kay.config.ts that does not export its config by default. | [Project setup](/reference/cli) |
+| `content-invalid` | content | Entries of a collection that do not compile or match its schema, a slug two entries share, or a component the collection does not name. | [Collections](/guides/content) |
+| `markdown-invalid` | content | Markdown or data an entry holds that kay cannot read: a component never closed, an attribute kay cannot read, JSON or YAML that does not parse. | [Components in Markdown](/guides/content) |
+| `content-config-missing` | content | The content config the project names does not exist, or a collection is not exported from it. | [Collections](/guides/content) |
+| `loader-result` | content | A collection's `load` that threw, did not give an array, or gave an entry with no slug. | [Loaded collections](/guides/content) |
+| `loader-method` | content | An entry saved or removed through a loader that declares no `save` or `remove`. | [Loaded collections](/guides/content) |
+| `feed-needs-site` | content | A feed on a site with no `site` URL to build its links from, or an entry with an invalid date. | [Feeds](/guides/content) |
+| `pagination-misuse` | content | A page size that is not a whole number from 1, or `page()` called when no page renders. | [Pagination](/guides/content) |
+| `content-api-misuse` | content | An editor helper asked for what the collection is not: a locale of a collection that is not localized, a folder collection's file from a loaded one, a folder outside the repository or missing. | [A CMS editing the collections](/guides/content) |
+| `export-unsupported-config` | export | A config a static export cannot serve: locales by domain, or an image route resolving images per request. | [Static export](/essentials/routing) |
+| `export-output-dir` | export | A static export into a directory that is the project itself, or holds files it did not write. | [Static export](/essentials/routing) |
+| `export-page-error` | export | A page, endpoint or module that threw as it was imported or rendered for the export. | [Static export](/essentials/routing) |
+| `export-page-status` | export | A page that answers 500, a redirect or a status other than 200 as it is prerendered. | [Static export](/essentials/routing) |
+| `export-needs-params` | export | A page with params whose `prerender` lists none, or that sets `prerender: false`, or lists values its matchers refuse. | [Prerendering](/essentials/routing) |
+| `export-image-route` | export | A page linking an image only the image route resizes, which no file of the export holds. | [Static export](/essentials/routing) |
+| `export-site-url` | export | A page reading the site's URL when neither `site` nor SITE_URL sets it. | [Site defaults and social cards](/essentials/head-and-seo) |
+| `export-server-render` | export | A page with something only a server renders per request: a server island, a form stamp or work challenge, a deferred island with no browser entry. | [Server islands](/essentials/routing) |
+| `export-guard` | export | A page, endpoint or API module a guard covers, or that `requireGuards` leaves with no guard: only a server runs one per request. | [Guards](/guides/sessions-and-guards) |
+| `export-action` | export | A page exporting an action, which only a server can take. | [Static export](/essentials/routing) |
+| `export-path-clash` | export | Two pages that would be prerendered to the same file. | [Prerendering](/essentials/routing) |
+| `export-api-module` | export | An API module, which answers requests only a server does. | [API modules](/guides/api-routes) |
+| `export-no-client-build` | export | Prerendering run with no client build to add its pages to. | [Commands](/reference/cli) |
+
 ## Fixing
 
 ```sh
 kay check --fix        # applies the safe fixes, such as removing unread props
-kay explain            # lists the lints
+kay explain            # lists the lints and the errors
 kay explain seo        # lists a group's
 kay explain missing-alt
+kay explain template-syntax   # an error: where its fix is written
 kay check --only seo   # one group's lints alone, as an audit
 ```
 
