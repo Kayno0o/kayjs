@@ -171,15 +171,15 @@ async function drawLogo(file: string): Promise<Uint8Array> {
 
   try {
     size = await new Bun.Image(file).metadata()
+
+    if (size.width === size.height)
+      return await new Bun.Image(file).resize(LOGO_SIZE, LOGO_SIZE).png().bytes()
   }
   catch {
     throw new Error(`kay: images.card.logo names ${file}, which is no SVG, PNG, JPEG or WebP kay can draw`)
   }
 
-  if (size.width !== size.height)
-    throw new Error(`kay: images.card.logo, ${file}, is ${size.width}x${size.height}; it has to be square`)
-
-  return new Bun.Image(file).resize(LOGO_SIZE, LOGO_SIZE).png().bytes()
+  throw new Error(`kay: images.card.logo, ${file}, is ${size.width}x${size.height}; it has to be square`)
 }
 
 function cardColor(setting: string, value: string): Color {
