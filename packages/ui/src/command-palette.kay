@@ -113,8 +113,7 @@ function closed() {
   setShown(false)
 }
 
-if (hotkey)
-  shortcut(`mod+${hotkey}`, () => setShown(!(dialog?.open ?? shown())))
+shortcut(() => hotkey ? `mod+${hotkey}` : null, () => setShown(!(dialog?.open ?? shown())))
 
 // A section the site search found is not kept as recent: the list only shows the entries' own links.
 function followed(link: PaletteLink, found: boolean) {

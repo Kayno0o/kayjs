@@ -1760,7 +1760,7 @@ describe('a form submitted in the browser', () => {
 })
 
 describe('shortcut', () => {
-  const mountShortcuts = site({ 'main.kay': '---\nimport { shortcut, signal } from \'kay\'\n\nconst log = signal<string[]>([])\nlet form: HTMLElement | undefined\nconst note = (name: string) => () => log.set([...log(), name])\n\nshortcut(\'mod+s\', note(\'save\'))\nshortcut(\'/\', note(\'slash\'))\nshortcut(\'escape\', note(\'escape\'))\nshortcut(\'alt+s\', note(\'alt-s\'), { preventDefault: false })\nshortcut(\'mod+e\', note(\'page-e\'))\nshortcut(\'mod+e\', note(\'form-e\'), { on: () => form })\nshortcut(\'mod+r\', note(\'repeat\'), { repeat: true })\nshortcut(\'?\', note(\'help\'), { inputs: true })\n---\nform.editor(ref={element => form = element})\n  input.field\n  div.rich(contenteditable="true")\np.log {log().join(\',\')}\n' })
+  const mountShortcuts = site({ 'main.kay': '---\nimport { shortcut, signal } from \'kay\'\n\nconst log = signal<string[]>([])\nlet form: HTMLElement | undefined\n\nlet missing: HTMLElement | undefined\nconst armed = signal(false)\nconst note = (name: string) => () => log.set([...log(), name])\n\nshortcut(\'mod+s\', note(\'save\'))\nshortcut(\'/\', note(\'slash\'))\nshortcut(\'escape\', note(\'escape\'))\nshortcut(\'alt+s\', note(\'alt-s\'), { preventDefault: false })\nshortcut(\'mod+e\', note(\'page-e\'))\nshortcut(\'mod+e\', note(\'form-e\'), { on: () => form })\nshortcut(\'mod+r\', note(\'repeat\'), { repeat: true })\nshortcut(\'?\', note(\'help\'), { inputs: true })\nshortcut(\'arrowdown\', note(\'down\'))\nshortcut(\'enter\', note(\'enter\'))\nshortcut(() => armed() ? \'mod+g\' : null, note(\'signal\'))\nshortcut(\'mod+u\', note(\'unbound\'), { on: () => missing })\n---\nform.editor(ref={element => form = element})\n  input.field\n  div.rich(contenteditable="true")\nbutton.arm(type="button" onClick={() => armed.set(true)}) arm\np.log {log().join(\',\')}\n' })
 
   function press(target: EventTarget, key: string, init: KeyboardEventInit = {}): KeyboardEvent {
     const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...init })
@@ -1827,6 +1827,30 @@ describe('shortcut', () => {
       press(field, 'Escape')
       press(field, '?', { shiftKey: true })
       expect(await logged(root)).toBe('slash,save,escape,help')
+    }
+    finally {
+      await dispose()
+    }
+  })
+
+  it('leaves named keys to a field or a button, and follows a signal in its keys', async () => {
+    const { root, dispose } = await mountShortcuts()
+
+    try {
+      const field = root.querySelector('.field')!
+      const arm = root.querySelector<HTMLElement>('.arm')!
+
+      expect(press(field, 'ArrowDown').defaultPrevented).toBe(false)
+      press(field, 'Enter')
+      press(arm, 'Enter')
+      press(document.body, 'u', { ctrlKey: true })
+      press(document.body, 'g', { ctrlKey: true })
+      expect(await logged(root)).toBe('')
+      arm.click()
+      await settle()
+      press(document.body, 'g', { ctrlKey: true })
+      press(document.body, 'ArrowDown')
+      expect(await logged(root)).toBe('signal,down')
     }
     finally {
       await dispose()

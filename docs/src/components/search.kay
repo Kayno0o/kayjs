@@ -2,7 +2,7 @@
 import type { PaletteEntry } from '@kaynooo/kayjs-ui'
 import type { Navigation } from '../pages'
 import CommandPalette from '@kaynooo/kayjs-ui/command-palette.kay'
-import { onCleanup, onMount, signal } from 'kay'
+import { onMount, shortcut, signal } from 'kay'
 import SearchIcon from '~icons/tabler/search'
 
 const { nav } = props<{ nav: Navigation }>()
@@ -15,28 +15,18 @@ const entries: PaletteEntry[] = [
 ]
 
 const open = signal(false)
-const shortcut = signal('Ctrl K')
-
-const typing = (target: EventTarget | null) => target instanceof HTMLElement && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
+const hint = signal('Ctrl K')
 
 // The palette opens on Ctrl or Cmd K itself; / opens it too, as on most docs sites.
-function onSlash(event: KeyboardEvent) {
-  if (event.key === '/' && !typing(event.target)) {
-    event.preventDefault()
-    open.set(true)
-  }
-}
+shortcut('/', () => open.set(true))
 
 onMount(() => {
   if (navigator.platform.startsWith('Mac'))
-    shortcut.set('Cmd K')
-  window.addEventListener('keydown', onSlash)
+    hint.set('Cmd K')
 })
-
-onCleanup(() => window.removeEventListener('keydown', onSlash))
 ---
 button.search-trigger(type="button" aria-haspopup="dialog" onClick={() => open.set(true)})
   SearchIcon
   span Search
-  kbd {shortcut()}
+  kbd {hint()}
 CommandPalette(entries={entries} open={open()} onOpenChange={open.set} siteSearch={{ limit: 40 }} label="Search the documentation" placeholder="Search the docs")

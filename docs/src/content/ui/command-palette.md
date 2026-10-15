@@ -20,7 +20,7 @@ With `search: true` in `kay.config.ts`, `siteSearch` searches the text of your p
 
 ## Opening it
 
-Ctrl or Cmd with `hotkey` (`k` by default) opens and closes the palette from anywhere. Pass `open` and `onOpenChange` to drive it from a button as above, or `hotkey={null}` to leave opening to your app.
+Cmd on macOS and Ctrl elsewhere with `hotkey` (`k` by default) opens and closes the palette from anywhere. Pass `open` and `onOpenChange` to drive it from a button as above, or `hotkey={null}` to leave opening to your app.
 
 <Demo name="command-palette/hotkey" />
 

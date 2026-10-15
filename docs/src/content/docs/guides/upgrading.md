@@ -13,6 +13,10 @@ kay and its libraries share one version number, so one section covers them all. 
 
 Rows of plain objects with no `id`, no `key` and no identity left in the new list are now matched, between the rows that did match, to the unmatched rows in their place, where each used to be a new row. A list of fresh objects (results fetched again) reuses its rows by position, so row-local state and enter transitions carry over. Give such items an `id` or a `key` when each must start afresh.
 
+### CommandPalette's hotkey follows the platform
+
+`CommandPalette` opens on Cmd and its `hotkey` on macOS, and on Ctrl and its `hotkey` elsewhere, where it took either one on every platform. If your app tells users to press Ctrl+K on a Mac, or Cmd+K on Windows, tell them the platform's key instead.
+
 ## 1.44.0
 
 ### kayjs-auth asks for a proof of work
