@@ -187,6 +187,26 @@ describe('kay build --static', () => {
     expect(total, `${total} bytes of gzipped JS load up front, over the ${EAGER_JS_BUDGET} budget: ${[...loaded].map(([url, size]) => `${url} ${size}`).join(', ')}`).toBeLessThanOrEqual(EAGER_JS_BUDGET)
   })
 
+  it('builds the same JS every time, so the budget above measures the source and not the run', async () => {
+    const again = await mkdtemp(join(tmpdir(), 'kay-static-'))
+
+    try {
+      const { code, errors } = await exportSite(again)
+
+      expect(errors).toBe('')
+      expect(code).toBe(0)
+
+      const scripts = async (dir: string): Promise<Record<string, string>> => Object.fromEntries(await Promise.all([...new Bun.Glob('_kay/**/*.js').scanSync(dir)].sort().map(async file => [file, await Bun.file(join(dir, file)).text()] as const)))
+      const first = await scripts(out)
+
+      expect(Object.keys(first).length).toBeGreaterThan(3)
+      expect(await scripts(again)).toEqual(first)
+    }
+    finally {
+      await rm(again, { recursive: true, force: true })
+    }
+  })
+
   it('writes the public files, the sitemap, robots.txt and kay\'s mark under the mount point, and 404.html', async () => {
     expect((await get('/humans.txt')).text).toBe('User-agent: test\n')
     // A static host's own dotfile goes along, a backup or another dotfile left behind does not.

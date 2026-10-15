@@ -1,4 +1,4 @@
-import { cp, mkdir, mkdtemp } from 'node:fs/promises'
+import { cp, mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { join, relative } from 'node:path'
 import process from 'node:process'
 
@@ -13,8 +13,15 @@ export async function scratchDir(prefix: string): Promise<string> {
 }
 
 // A copy of `tests/fixtures/<name>`, for a test that changes its files, by its path from the working directory as fixtures are named.
-export async function fixtureCopy(name: string): Promise<string> {
-  const dir = await scratchDir(`${name}-`)
+// `stable` puts it at the same path every run, for a test measuring a build: Bun hashes chunk names from their sources' paths, so a random directory name moves the gzip size by several bytes.
+// Only one test file may take a stable name, as two running together would share the directory.
+export async function fixtureCopy(name: string, stable = false): Promise<string> {
+  const dir = stable ? join(SCRATCH, `${name}-stable`) : await scratchDir(`${name}-`)
+
+  if (stable) {
+    await rm(dir, { recursive: true, force: true })
+    await mkdir(dir, { recursive: true })
+  }
 
   await cp(join(import.meta.dir, 'fixtures', name), dir, { recursive: true, filter: source => !source.endsWith('/.kay') })
 
