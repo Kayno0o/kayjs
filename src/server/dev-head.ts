@@ -81,7 +81,8 @@ async function listedPaths(routes: ServedRoute[], site: string, trailingSlash: T
     return await listing
   }
   catch (error) {
-    listings.delete(routes)
+    if (listings.get(routes) === listing)
+      listings.delete(routes)
 
     throw error
   }
