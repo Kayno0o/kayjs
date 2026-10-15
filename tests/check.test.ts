@@ -1255,8 +1255,16 @@ function firstLine(text: string): string {
 }
 
 describe('kay check on compiler output', () => {
+  // On a copy of the fixture, as the app fixture's tests are, so no shadow tree or tsgo state an earlier run or branch left in its `.kay` reaches the check.
   it('types annotated server declarations, duplicate imports, prop defaults, script types, component tags and merged classes', async () => {
-    expect(await check(join(fixtures, 'compiler'))).toEqual([])
+    const root = await fixtureCopy('compiler')
+
+    try {
+      expect(await check(root)).toEqual([])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
   })
 })
 
