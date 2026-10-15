@@ -1227,6 +1227,36 @@ describe.concurrent('kay dev', () => {
     }
   })
 
+  it('reports the app\'s output to kay dev only when told it collapses', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
+
+    await Bun.write(join(root, 'server.ts'), 'const server = Bun.serve({ port: 0, fetch: () => new Response() })\nconsole.log(\'a\')\nprocess.stderr.write(\'b\\n\')\nawait server.stop()\n')
+
+    const run = async (env: Record<string, string>) => {
+      const messages: unknown[] = []
+      const child = Bun.spawn([process.execPath, '--preload', join(import.meta.dir, '../src/dev/spare.ts'), join(root, 'server.ts')], { cwd: root, env: { ...process.env, ...env }, stdin: 'pipe', stdout: 'ignore', stderr: 'ignore', ipc: message => messages.push(message) })
+
+      try {
+        void child.stdin.write('start 0\n')
+        void child.stdin.flush()
+        await child.exited
+
+        return messages.filter(message => typeof message === 'object' && message !== null && 'output' in message)
+      }
+      finally {
+        child.kill()
+      }
+    }
+
+    try {
+      expect(await run({})).toHaveLength(0)
+      expect((await run({ KAY_DEV_REPORTS_OUTPUT: '1' })).length).toBeGreaterThan(0)
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('marks its pages for the inspector, serves it, opens the file it names in KAY_EDITOR, telling when that fails, and answers 421 to a host not its own', async () => {
     // Inside the repository, where the browser build resolves `kay`.
     const scratch = join(import.meta.dir, '../node_modules/.cache')

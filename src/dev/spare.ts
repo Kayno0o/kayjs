@@ -70,6 +70,11 @@ Bun.serve = ((given: Parameters<typeof Bun.serve>[0]) => {
 }) as typeof Bun.serve
 
 const log = console.log.bind(console)
+// Set by `kay dev` only where it collapses repeated lines, so a piped, json or custom-log run leaves the app's console and streams untouched.
+const reportsOutput = process.env.KAY_DEV_REPORTS_OUTPUT !== undefined
+
+delete process.env.KAY_DEV_REPORTS_OUTPUT
+
 let reported = -OUTPUT_THROTTLE_MS
 
 // `kay dev` hears of the app's output, so it never rewrites a line the app printed after.
@@ -84,27 +89,31 @@ function noteOutput() {
 
 console.log = (...data: unknown[]) => {
   if (data.length !== 1 || typeof data[0] !== 'string' || LISTENING_LINE.exec(data[0])?.[1] !== String(port)) {
-    noteOutput()
+    if (reportsOutput)
+      noteOutput()
+
     log(...data)
   }
 }
 
-for (const method of ['info', 'warn', 'error', 'debug'] as const) {
-  const print = console[method].bind(console)
+if (reportsOutput) {
+  for (const method of ['info', 'warn', 'error', 'debug'] as const) {
+    const print = console[method].bind(console)
 
-  console[method] = (...data: unknown[]) => {
-    noteOutput()
-    print(...data)
+    console[method] = (...data: unknown[]) => {
+      noteOutput()
+      print(...data)
+    }
   }
-}
 
-for (const stream of [process.stdout, process.stderr]) {
-  const write = stream.write.bind(stream) as (...args: unknown[]) => boolean
+  for (const stream of [process.stdout, process.stderr]) {
+    const write = stream.write.bind(stream) as (...args: unknown[]) => boolean
 
-  stream.write = (...args: unknown[]) => {
-    noteOutput()
+    stream.write = (...args: unknown[]) => {
+      noteOutput()
 
-    return write(...args)
+      return write(...args)
+    }
   }
 }
 
