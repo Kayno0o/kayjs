@@ -177,7 +177,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('kay dev in 
       expect(await sameDocument()).toBe(true)
     }
     finally {
-      await page.unroute(() => true)
+      await page.unrouteAll({ behavior: 'ignoreErrors' })
     }
   }, 60_000)
 
