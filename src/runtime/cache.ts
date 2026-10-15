@@ -172,7 +172,10 @@ async function firstLoad<T>(key: string, ttl: number, pending: Entry, load: () =
 }
 
 async function refresh(key: string, ttl: number, entry: Entry, load: () => unknown, store: CacheStore | undefined): Promise<void> {
-  const loading = Promise.try(load)
+  // Promise.try, which a browser past kay's floor alone has: a load that throws at once becomes a rejection.
+  const loading = new Promise((resolve) => {
+    resolve(load())
+  })
 
   entry.loading = loading
 
