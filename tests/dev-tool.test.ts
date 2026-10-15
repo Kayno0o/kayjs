@@ -633,10 +633,13 @@ describe('the dev tool', () => {
       '<img id="plain" src="/photo.jpg" width="4000" height="3000" alt="">',
       '<img id="bare" src="/_kay/images/logo-320-1x1.webp" loading="lazy" alt="">',
       '<img id="far" src="https://cdn.example/a.png" width="10" height="10" alt="">',
+      '<img id="odd" src="/_kay/images/100%.webp" width="10" height="10" alt="">',
+      '<img id="broken" src="http://" width="10" height="10" alt="">',
+      '<img id="gone" src="/gone.png" width="10" height="10" alt="">',
     ].join('')
 
     // The browser draws and loads: sizes are not computed here.
-    const sizes: Record<string, [number, number, number]> = { hero: [640, 360, 1280], plain: [300, 225, 4000], bare: [80, 80, 160], far: [10, 10, 10] }
+    const sizes: Record<string, [number, number, number]> = { hero: [640, 360, 1280], plain: [300, 225, 4000], bare: [80, 80, 160], far: [10, 10, 10], odd: [10, 10, 10], broken: [10, 10, 10], gone: [10, 10, 10] }
 
     for (const [id, [width, height, natural]] of Object.entries(sizes)) {
       const image = document.getElementById(id) as HTMLImageElement
@@ -645,6 +648,8 @@ describe('the dev tool', () => {
       Object.defineProperty(image, 'naturalHeight', { value: natural })
       image.getBoundingClientRect = () => ({ width, height, top: id === 'bare' ? 100 : 5000, bottom: 5100, left: 0, right: width, x: 0, y: 0, toJSON: () => ({}) })
     }
+
+    const { devicePixelRatio } = window
 
     Object.defineProperty(window, 'devicePixelRatio', { value: 2, configurable: true })
     ;(window as unknown as { PerformanceObserver: unknown }).PerformanceObserver = class {
@@ -660,6 +665,9 @@ describe('the dev tool', () => {
     const fetching = spyOn(window, 'fetch').mockImplementation((async (url: string, init: RequestInit) => {
       asked.push(`${init.method} ${url}`)
 
+      if (url.includes('gone'))
+        return new Response('missing', { status: 404, headers: { 'content-type': 'text/plain' } })
+
       return new Response(null, { headers: { 'content-type': url.includes('logo') ? 'image/webp' : url.includes('photo') ? 'image/jpeg' : 'image/avif', 'content-length': url.includes('photo') ? '2500000' : '45000' } })
     }) as unknown as typeof window.fetch)
     const rows = () => [...shadow().querySelectorAll('#kay-dev-images .image')].map(row => [...row.children].map(child => child.textContent).join(' | '))
@@ -670,14 +678,24 @@ describe('the dev tool', () => {
       shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-images')!.click()
       await Bun.sleep(20)
 
-      expect(asked).toEqual(['HEAD http://localhost/_kay/image?src=%2F_kay%2Fassets%2Fhero.jpg&w=1280', 'HEAD http://localhost/photo.jpg', 'HEAD http://localhost/_kay/images/logo-320-1x1.webp'])
+      expect(asked).toEqual(['HEAD http://localhost/_kay/image?src=%2F_kay%2Fassets%2Fhero.jpg&w=1280', 'HEAD http://localhost/photo.jpg', 'HEAD http://localhost/_kay/images/logo-320-1x1.webp', 'HEAD http://localhost/_kay/images/100%.webp', 'HEAD http://localhost/gone.png'])
       expect(rows()).toEqual([
         '/_kay/image?src=%2F_kay%2Fassets%2Fhero.jpg&w=1280 | 1280w, resized on request - avif, 43.9 KB - served 1280x1280, drawn 640x360 at 2x - largest contentful paint',
-        '/photo.jpg | not resized by kay - jpeg, 2441.4 KB - served 4000x4000, drawn 300x225 at 2x | served 667% of the pixels it is drawn with, pick a smaller width or give it `sizes`',
-        '/_kay/images/logo-320-1x1.webp | 320w, cut 1x1, written by kay build - webp, 43.9 KB - served 160x160, drawn 80x80 at 2x | no width and height, so the page shifts as it loads | lazy-loaded but in view on load, which delays it',
+        '/photo.jpg | not resized by kay - jpeg, 2441.4 KB - served 4000x4000, drawn 300x225 at 2x | served 59 times the pixels it is drawn with, give it a smaller width or `sizes`',
+        '/_kay/images/logo-320-1x1.webp | 320w, cut 1x1, written by kay build - webp, 43.9 KB - served 160x160, drawn 80x80 at 2x | no width and height, so the page shifts as it loads | lazy-loaded but in view, which delays it',
         'https://cdn.example/a.png | not resized by kay - on another host - served 10x10, drawn 10x10 at 2x',
+        '/_kay/images/100%.webp | not resized by kay - avif, 43.9 KB - served 10x10, drawn 10x10 at 2x',
+        'http:// | not resized by kay - format unknown - served 10x10, drawn 10x10 at 2x',
+        '/gone.png | not resized by kay - the server answered 404 - served 10x10, drawn 10x10 at 2x',
       ])
       expect(shadow().querySelector('#kay-dev-tab-images .count')?.textContent).toBe('3')
+
+      // The page changes under the open tab: an image added is listed, and the answers already read are not asked for again.
+      document.body.insertAdjacentHTML('beforeend', '<img id="late" src="/late.png" width="10" height="10" alt="">')
+      await Bun.sleep(20)
+
+      expect(rows()).toHaveLength(8)
+      expect(asked).toHaveLength(6)
 
       const visible = () => [...shadow().querySelectorAll<HTMLElement>('.outline')].filter(outline => outline.hidden === false).length
 
@@ -689,6 +707,7 @@ describe('the dev tool', () => {
     finally {
       fetching.mockRestore()
       delete (window as { PerformanceObserver?: unknown }).PerformanceObserver
+      Object.defineProperty(window, 'devicePixelRatio', { value: devicePixelRatio, configurable: true })
       document.body.innerHTML = ''
       happyDOM.setURL(href)
     }
