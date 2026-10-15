@@ -503,8 +503,17 @@ export function insert(element: Node | null, start: Node | null, end: Node | nul
         removeUnit(unit)
     }
 
-    for (const unit of next)
-      region.insert(unit)
+    // From the end, so a kept unit already followed by its place stays where it is, its nodes not moved.
+    let before = region.end
+
+    for (let index = next.length - 1; index >= 0; index--) {
+      const unit = next[index]!
+
+      if (lastOf(unit).nextSibling !== before || firstOf(unit).parentNode !== region.parent)
+        region.insert(unit, before)
+
+      before = firstOf(unit)
+    }
 
     current = next
 

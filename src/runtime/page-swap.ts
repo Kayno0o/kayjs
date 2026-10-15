@@ -2,6 +2,7 @@ import type { FetchedPage, HeadElement, Intent, Swap } from './navigation'
 import { focusInvalid } from './focus'
 import { ISLAND } from './markers'
 import { historyState, leave, navigation, pageKey, prefetched, restoreScroll, saveScroll, takeFormChecks } from './navigation'
+import { forgetPageData } from './page-data'
 import { ROOT_ATTRIBUTES } from './root'
 import { NAVIGATE_HEADER, RELOAD_HEADER } from './swap'
 import { decodeServerValue } from './wire'
@@ -248,6 +249,7 @@ export async function show(page: FetchedPage, hash: string, swap: Swap, isCurren
     root()
     head.commit()
     swapBody(next, policy)
+    forgetPageData()
     writeHistory(policy, target)
 
     if (pageKey(target) !== navigation.shown)

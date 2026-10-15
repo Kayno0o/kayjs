@@ -624,6 +624,30 @@ describe('loops', () => {
       await dispose()
     }
   })
+
+  const mount17b = site({
+    'main.kay': '---\nimport { signal } from \'kay\'\n\nconst kept = document.createElement(\'b\')\nconst n = signal(1)\n;(globalThis as { bump?: () => void }).bump = () => n.set(n() + 1)\n---\np\n  | {[kept, \'x\' + n()]}\n',
+  })
+
+  it('leave a kept unit of a dynamic part in place when the part is drawn again', async () => {
+    const { root, dispose } = await mount17b()
+    const bump = (globalThis as unknown as { bump: () => void }).bump
+    const kept = root.querySelector('b')!
+    const moves = spyOn(Node.prototype, 'insertBefore')
+
+    try {
+      bump()
+      await settle()
+
+      expect(root.querySelector('p')!.textContent).toBe('x2')
+      expect(root.querySelector('b')).toBe(kept)
+      expect(moves.mock.calls.filter(([node]) => node === kept).length).toBe(0)
+    }
+    finally {
+      moves.mockRestore()
+      await dispose()
+    }
+  })
 })
 
 describe('blocks', () => {

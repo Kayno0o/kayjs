@@ -474,7 +474,7 @@ export function formError(target: unknown, field: string): string | undefined {
 const refusedAt = new WeakMap<ActionError, string>()
 
 function pageOutcome(): Outcome | undefined {
-  return typeof document === 'undefined' ? undefined : pageData<Outcome>(`script[${OUTCOME_SCRIPT}]`, decodeServerValue)[0]
+  return typeof document === 'undefined' ? undefined : pageData<Outcome>(`script[${OUTCOME_SCRIPT}]`, decodeServerValue, true)[0]
 }
 
 // Posts a call, counting the ones in flight; a call that redirects never settles, so the action stays pending while the page goes, unless the visitor stays or already went elsewhere.

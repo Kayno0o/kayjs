@@ -88,7 +88,7 @@ function found<T>(value: unknown): Stored<T> {
 }
 
 function pageRules(): QueryRules | undefined {
-  return pageData<QueryRules>(QUERY_SCRIPT)[0]
+  return pageData<QueryRules>(QUERY_SCRIPT, JSON.parse, true)[0]
 }
 
 // Takes the current history entry's place, keeping its state, which holds kay's place in history: writing as the visitor types adds no entry to go back through.

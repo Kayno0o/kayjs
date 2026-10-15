@@ -4,10 +4,27 @@ const MALFORMED = Symbol('malformed')
 // The text of each script that did not parse, read again once it changed, as one read before the stream ended it would.
 const failed = new WeakMap<Element, string>()
 
-export function pageData<T>(selector: string, parse: (text: string) => unknown = JSON.parse): T[] {
-  const data: T[] = []
+// The scripts each selector found once the page was parsed, until a swap changes the page: a read that finds nothing, the usual one, then searches the page once.
+const found = new Map<string, Element[]>()
 
-  for (const script of document.querySelectorAll(selector)) {
+// Called where a swap changes the page's elements, so the next read searches the page again.
+export function forgetPageData(): void {
+  found.clear()
+}
+
+// `once` keeps the scripts found for the reads that follow, for a script that is there or not from the page's start, never one a stream brings later.
+export function pageData<T>(selector: string, parse: (text: string) => unknown = JSON.parse, once = false): T[] {
+  const data: T[] = []
+  let scripts = once ? found.get(selector) : undefined
+
+  if (!scripts) {
+    scripts = [...document.querySelectorAll(selector)]
+
+    if (once && document.readyState !== 'loading')
+      found.set(selector, scripts)
+  }
+
+  for (const script of scripts) {
     if (!parsed.has(script) || (failed.has(script) && failed.get(script) !== script.textContent))
       parsed.set(script, parseOnce(script, parse))
 
