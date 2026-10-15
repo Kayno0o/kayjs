@@ -2,7 +2,7 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
-## Unreleased
+## 1.44.0
 
 - kayjs-ui: a `Button` whose `onClick` returns a promise is busy and disabled until it settles, alone among the buttons on one action, and a submit `Button` is busy while its form's async `onSubmit` runs, which marks the form `aria-busy`.
 - kayjs-ui: a `FormField` `group` with a message marks its fields `aria-invalid` and described by it, so `focusInvalid` reveals the group's tab and focuses its first field.

@@ -5,7 +5,7 @@ description: What each release of kay and its libraries adds, with a link to whe
 ---
 This page lists what each release adds, newest first, with a link to where each feature is documented. kay and its libraries share one version number, so one section covers them all. What a release breaks, and what to change in your app, is in [Upgrading](/guides/upgrading).
 
-## Unreleased
+## 1.44.0
 
 - **`Button`** is busy and disabled until the promise its `onClick` returned settles, alone among the buttons on one action, and a submit button is busy while its form's async `onSubmit` runs. [Button](/ui/button#busy)
 - **`FormField`** `group` with a message marks its fields invalid and described by it, so `focusInvalid` shows the group's tab and focuses its first field. [FormField](/ui/form-field)
