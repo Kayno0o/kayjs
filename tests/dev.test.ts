@@ -621,6 +621,47 @@ describe.concurrent('kay dev', () => {
     expect(lines).toHaveLength(3)
   })
 
+  it.serial('says no restart when quiet, the address and a server exiting on its own still said', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
+    const lines: string[] = []
+    const free = Bun.serve({ port: 0, fetch: () => new Response() })
+    const port = free.port!
+    const answer = async () => {
+      try {
+        return await (await fetch(`http://localhost:${port}`)).text()
+      }
+      catch {
+        return ''
+      }
+    }
+
+    await free.stop()
+    await Bun.write(join(root, 'src/version.ts'), 'export default \'a\'\n')
+    await Bun.write(join(root, 'src/server.ts'), `import version from './version'\n\nif (await Bun.file('src/exit.ts').exists()) process.exit(3)\nBun.serve({ port: ${port}, fetch: () => new Response(version) })\n`)
+    const stop = await dev(root, { log: line => lines.push(line), quiet: true })
+
+    try {
+      await until(() => lines.length === 1)
+      expect(lines[0]).toMatch(new RegExp(`^kay dev: http://localhost:${port} \\(ready in \\d+ ms\\)$`))
+
+      // The restarted server answers with the new version, the restart said nowhere.
+      await Bun.write(join(root, 'src/version.ts'), 'export default \'b\'\n')
+      for (let tries = 0; await answer() !== 'b'; tries++) {
+        expect(tries).toBeLessThan(100)
+        await Bun.sleep(50)
+      }
+      expect(lines).toHaveLength(1)
+
+      await Bun.write(join(root, 'src/exit.ts'), '')
+      await until(() => lines.length === 2)
+      expect(lines[1]).toMatch(/^\d\d:\d\d:\d\d the server exited with code 3, waiting for a change$/)
+    }
+    finally {
+      await stop()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it.serial('moves off a busy port, saying which was in use, and stays on the port it moved to after a restart', async () => {
     const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
     const lines: string[] = []

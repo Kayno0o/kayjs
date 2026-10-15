@@ -13,8 +13,8 @@ const PORT_FIRST = /^\d+(?:\/|$)/
 
 // Restarts the server on every change until interrupted.
 export const dev: Command = {
-  usage: 'dev [dir] [--entry <file>] [--port <port>] [--host[=<address>]] [--inspect[=<address>]] [--open] [--format text|json]',
-  options: { entry: { type: 'string' }, port: { type: 'string' }, host: { type: 'string' }, inspect: { type: 'string' }, open: { type: 'boolean' }, format: { type: 'string' } },
+  usage: 'dev [dir] [--entry <file>] [--port <port>] [--host[=<address>]] [--inspect[=<address>]] [--open] [--format text|json] [--quiet]',
+  options: { entry: { type: 'string' }, port: { type: 'string' }, host: { type: 'string' }, inspect: { type: 'string' }, open: { type: 'boolean' }, format: { type: 'string' }, quiet: { type: 'boolean' } },
   positionals: 1,
   // A bare `--inspect` or `--host` takes the default address, as Bun's does, rather than the next argument.
   normalize: args => args.map(arg => arg === '--inspect' || arg === '--host' ? `${arg}=` : arg),
@@ -60,7 +60,7 @@ export const dev: Command = {
     let stop: () => Promise<void>
 
     try {
-      stop = await startDev(root, { entry, port: typeof port === 'string' ? Number(port) : undefined, host, inspect: debuggerAt, open: open === true, format, keys, onQuit: interrupted, log: events, config })
+      stop = await startDev(root, { entry, port: typeof port === 'string' ? Number(port) : undefined, host, inspect: debuggerAt, open: open === true, format, keys, onQuit: interrupted, log: events, quiet: values.quiet === true, config })
     }
     catch (error) {
       if (!(error instanceof InspectorAddressInUse))

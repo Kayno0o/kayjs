@@ -79,6 +79,7 @@ kay: accents needs tailwind: add --with tailwind, or drop it with --without acce
 | `--host[=<address>]` | Listens past this machine: `0.0.0.0` alone, or the address given, and answers to this machine's own name and `<name>.local` too. Without it, a server naming no `hostname` listens on `localhost` only, so `kay dev` in a container publishing its port needs `--host` |
 | `--inspect[=<address>]` | Opens Bun's debugger in the server, at `ws://localhost:6499/kay` or the port, host and port, or address given, port 0 taking a free one, the same address after every restart: `kay dev` listens there and passes each connection on to the server running, and a debugger's connection closes when the server restarts, for it to connect again; an address another process holds, at `localhost` on either loopback address, stops `kay dev`, and one past this machine needs `--host` too, as whoever reaches the debugger runs code on the machine. A page reaches it only from the dev server's own `localhost` address or `debug.bun.sh` |
 | `--open` | Opens the address in the browser (the command `BROWSER` names, else the system's) once the server is ready |
+| `--quiet` | Leaves out the line per restart and stylesheet swap, and the keys under the address: the ready line, the addresses, a restart that moved the address and the errors stay |
 | `--format text\|json` | `json` prints each line below as one JSON object on stdout, `{ "event": "ready", "time": "...", "url": "http://localhost:3000", "ms": 412 }`, with `network` under `--host`, then `restart`, `styles`, `exit`, `debugger`, `no-browser`, `builder-exit` and an `error` event for each error the server meets, the server's own output going to stderr |
 
 When another process holds the port, the server moves to the next free one, and the ready line names the port it found in use: `kay dev: http://localhost:3001 (ready in 412 ms, 3000 was in use)`. It works however the server picks its port, and restarts keep the port it moved to, so open pages stay connected.
@@ -316,7 +317,7 @@ kay explain --format json    # every lint, for a tool to read
 
 ## Quiet and plain output
 
-`kay build`, `kay check`, `kay fmt`, `kay migrate` and `kay new` take `--quiet`: they print the problems and one summary line, without the size report, the files one by one or the next step to run. `kay build` keeps one line per step it ran, `--static` and `--compile` adding theirs, and `kay fmt --check` names the unformatted files alone. Every other command refuses it.
+`kay build`, `kay check`, `kay dev`, `kay fmt`, `kay migrate` and `kay new` take `--quiet`: they print the problems and one summary line, without the size report, the files one by one or the next step to run. `kay build` keeps one line per step it ran, `--static` and `--compile` adding theirs, and `kay fmt --check` names the unformatted files alone. `kay dev --quiet` prints its ready line and the errors, no line per restart or stylesheet swap. Every other command refuses it.
 
 ```sh
 kay fmt src --quiet   # formatted 3 files

@@ -9,7 +9,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `kay render <url>` prints what the server answers for one URL, as `kay dev` serves it, without starting it on a port: [Check what a page renders](project.md#check-what-a-page-renders).
 - `--format json` on `kay build`, `kay routes`, `kay explain`, `kay fmt` and `kay migrate` prints one JSON document on stdout, as `kay check` does; `kay routes --format json` lists each route with its file, layouts and guards: [Commands](project.md#commands).
 - `kay build` in a terminal redraws one line with its step, the step's time and a bar over the routes prerendered and images encoded; piped, it prints the lines it printed before: [Commands](project.md#commands).
-- `--quiet` on `kay build`, `kay check`, `kay fmt`, `kay migrate` and `kay new` prints the problems and one summary line: [Commands](project.md#commands).
+- `--quiet` on `kay build`, `kay check`, `kay fmt`, `kay migrate` and `kay new` prints the problems and one summary line, and on `kay dev` the ready line and errors alone: [Commands](project.md#commands).
 - `kay dev` lists the errors its servers meet in `.kay/dev/errors.json`, for a reader without a browser, and `kay dev --format json` prints its events as JSON lines: [Commands](project.md#commands).
 - `kay dev` in a terminal reads `o` (open), `r` (restart), `c` (clear) and `q` (quit), and under `--host` names its address on the network: [Commands](project.md#commands).
 - `watch` and `debounced` from `kay`: `watch` runs on a change only, handed the value before, and `debounced` gives a value once it stops changing: [React to a change, or to typing once it pauses](components.md#react-to-a-change-or-to-typing-once-it-pauses).

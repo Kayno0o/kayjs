@@ -37,6 +37,8 @@ export interface DevOptions {
   format?: 'text' | 'json' | undefined
   // The terminal's keys, read once the first server listens: `o` opens the address, `r` restarts, `c` clears the screen, `q` or Ctrl+C calls `onQuit`.
   keys?: Readable | undefined
+  // Leaves out the line per restart and stylesheet swap, and the keys' hint: the ready line, the addresses, a restart moving the address and the errors stay.
+  quiet?: boolean | undefined
   onQuit?: (() => void) | undefined
 }
 
@@ -180,14 +182,19 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
         openBrowser(url, command => say('no-browser', { command }, `kay dev: no browser to open ${url} with: ${command} is not installed`))
 
       if (options.keys !== undefined) {
-        log(`kay dev: ${dim('press o to open it in the browser, r to restart, c to clear the screen, q to quit')}`)
+        if (options.quiet !== true)
+          log(`kay dev: ${dim('press o to open it in the browser, r to restart, c to clear the screen, q to quit')}`)
+
         readKeys(options.keys)
       }
     }
     else {
       const changed = restartAsked ? 'r pressed' : describe(restartedFor)
 
-      say('restart', { changed: restartedFor, ms, url }, `${stamp()} ${changed}: restarted in ${took}${url === address ? '' : `, now on ${url}`}`)
+      // Quiet, a restart is said only when it moved the address.
+      if (options.quiet !== true || url !== address)
+        say('restart', { changed: restartedFor, ms, url }, `${stamp()} ${changed}: restarted in ${took}${url === address ? '' : `, now on ${url}`}`)
+
       tell(server, { built: { changed, ms } })
     }
 
@@ -308,7 +315,9 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     const ms = Math.round(performance.now() - started)
 
     tell(server, { ...outcome.styles && { styles: outcome.styles }, built: { changed, ms, styles: true } })
-    say('styles', { changed: named, ms }, `${stamp()} ${changed}: stylesheets swapped in ${ms} ms`)
+
+    if (options.quiet !== true)
+      say('styles', { changed: named, ms }, `${stamp()} ${changed}: stylesheets swapped in ${ms} ms`)
 
     return true
   }
