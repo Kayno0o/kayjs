@@ -68,24 +68,27 @@ export const dev: Command = {
       process.once('SIGTERM', interrupted)
 
       try {
-        stop = await startDev(root, { entry, port: typeof port === 'string' ? Number(port) : undefined, host, inspect: debuggerAt, open: open === true, format, keys, onQuit: interrupted, log: events?.write, quiet: values.quiet === true })
+        try {
+          stop = await startDev(root, { entry, port: typeof port === 'string' ? Number(port) : undefined, host, inspect: debuggerAt, open: open === true, format, keys, onQuit: interrupted, log: events?.write, quiet: values.quiet === true })
+        }
+        catch (error) {
+          if (!(error instanceof InspectorAddressInUse))
+            throw error
+
+          console.error(error.message)
+
+          return 1
+        }
+
+        await promise
+        await stop()
+
+        return 0
       }
-      catch (error) {
+      finally {
         process.off('SIGINT', interrupted)
         process.off('SIGTERM', interrupted)
-
-        if (!(error instanceof InspectorAddressInUse))
-          throw error
-
-        console.error(error.message)
-
-        return 1
       }
-
-      await promise
-      await stop()
-
-      return 0
     }
     // Called in-process, as a test does, what follows prints to stdout again.
     finally {

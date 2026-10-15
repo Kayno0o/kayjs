@@ -259,6 +259,32 @@ describe('kay dev --format json', () => {
     }
   })
 
+  it('leaves no signal listener behind after a quit or a refused start, run in-process', async () => {
+    const project = await scratchDir('dev-errors-')
+    const held = Bun.listen({ hostname: '127.0.0.1', port: 0, socket: { data: () => undefined } })
+    const signals = () => [process.listenerCount('SIGINT'), process.listenerCount('SIGTERM')]
+    const before = signals()
+    const said = spyOn(console, 'error').mockImplementation(() => undefined)
+
+    await Bun.write(join(project, 'src/routes/index.kay'), 'p Home\n')
+
+    try {
+      expect(await runCommand(devCommand, [project, '--format', 'json', `--inspect=127.0.0.1:${held.port}`], 'usage')).toBe(1)
+      expect(signals()).toEqual(before)
+
+      const running = runCommand(devCommand, [project, '--port', '0', '--format', 'json'], 'usage')
+
+      await until(() => process.listenerCount('SIGTERM') > before[1]!, 20_000)
+      process.emit('SIGTERM')
+      expect(await running).toBe(0)
+      expect(signals()).toEqual(before)
+    }
+    finally {
+      said.mockRestore()
+      held.stop(true)
+    }
+  }, 40_000)
+
   it('refuses another format', async () => {
     const child = Bun.spawn([process.execPath, CLI, 'dev', '--format', 'yaml'], { stdout: 'ignore', stderr: 'pipe' })
 

@@ -280,6 +280,30 @@ describe.concurrent('kay dev', () => {
     expect(children.at(-1)!.killed).toBe(true)
   })
 
+  it('stops without waiting on a types process stuck importing the config', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
+    const children: Subprocess[] = []
+
+    await Bun.write(join(root, 'src/server.ts'), 'setInterval(() => undefined, 1000)\n')
+    await Bun.write(join(root, 'kay.config.ts'), 'export default {}\n')
+    const stop = await dev(root, { onRestart: child => children.push(child) })
+
+    try {
+      // The restart this change makes writes the types again, from a config that never loads.
+      await Bun.write(join(root, 'kay.config.ts'), 'await new Promise(() => undefined)\n')
+      await until(() => children.length === 2, 20_000)
+      await Bun.sleep(500)
+
+      const started = performance.now()
+
+      await stop()
+      expect(performance.now() - started).toBeLessThan(10_000)
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  }, 40_000)
+
   it('writes the types from kay.config.ts as it is once it changed, without a restart of kay dev', async () => {
     const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
     const config = join(root, 'kay.config.ts')
