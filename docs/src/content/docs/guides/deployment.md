@@ -26,6 +26,18 @@ PORT=8080 ./server
 
 It reads a `.env` and a `bunfig.toml` where it runs, but nothing else of the project: a file a page reads by path at runtime is not in it.
 
+### Prove the executable starts
+
+The executable is bundled apart from what `kay dev` runs, so a module it cannot load only shows when it starts. `--verify` starts it as part of the build:
+
+```sh
+kay build --compile server --verify
+```
+
+The build starts the executable on a free port, waits until its health route answers, runs `./server --health` once as a container would, and stops it. If the server exits first, or does not answer within 30 seconds, the build fails with the last 40 lines it wrote.
+
+It waits for the health route rather than sleeping, so it takes the time the server needs to start, usually well under a second. It runs your server entry, so whatever that needs at startup, such as a database URL, has to be in the environment of the build. That is why it is off by default: add it to the CI step that builds your image. With `health: false` any answer on the port counts, and `--health` is not run.
+
 ## Static export
 
 For a host with no server, `--static` writes the whole site to `dist`:

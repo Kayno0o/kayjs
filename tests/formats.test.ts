@@ -111,6 +111,28 @@ describe('kay build --format json', () => {
     expect(built.compiled.ms).toBeGreaterThan(0)
   }, 60_000)
 
+  it('starts the executable it compiled under --verify, and fails the build with the server\'s own error when it cannot start', async () => {
+    const serving = 'import { Elysia } from \'elysia\'\nimport { pages } from \'kay/server\'\n\nnew Elysia().use(await pages()).listen(Number(process.env.PORT))\n'
+    const files = { 'kay.config.ts': 'export default { favicon: false }\n', 'src/routes/index.kay': 'p Home\n' }
+    const working = await project({ ...files, 'src/server.ts': serving })
+    const verified = await kay(['build', working, '--no-check', '--compile', join(working, 'server'), '--verify', '--format', 'json'])
+
+    expect(verified.code, verified.stderr).toBe(0)
+    expect(document<{ compiled: { verifiedMs: number } }>(verified.stdout).compiled.verifiedMs).toBeGreaterThan(0)
+
+    const broken = await project({ ...files, 'src/server.ts': `${serving}\nthrow new Error('boom at startup')\n` })
+    const failed = await kay(['build', broken, '--no-check', '--compile', join(broken, 'server'), '--verify'])
+
+    expect(failed.code).toBe(1)
+    expect(failed.stderr).toContain('the executable exited with code')
+    expect(failed.stderr).toContain('boom at startup')
+
+    const alone = await kay(['build', working, '--no-check', '--verify'])
+
+    expect(alone.code).toBe(1)
+    expect(alone.stderr).toContain('--verify starts the executable --compile writes')
+  }, 120_000)
+
   it('gives a template that does not compile as a problem at its place, and the stage it stopped', async () => {
     const root = await project({
       'kay.config.ts': 'export default { favicon: false }\n',

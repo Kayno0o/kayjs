@@ -109,6 +109,11 @@ export const ERRORS = {
     summary: '`kay build --compile` without a server entry, or with a public directory named like the client assets.',
     fix: { file: 'llms/project.md', heading: 'Build one executable' },
   },
+  'executable-failed': {
+    group: 'build',
+    summary: 'A compiled executable that `kay build --compile --verify` started and that exited, or never answered its health route, with the server\'s own output.',
+    fix: { file: 'llms/production.md', heading: 'Check the executable starts' },
+  },
   'executable-incomplete': {
     group: 'build',
     summary: 'A compiled executable that lacks a part of what it needs: the build of a collection, the client build, its fonts or a share card key.',

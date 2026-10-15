@@ -19,7 +19,7 @@ import { USAGES } from './usages'
 // With `--compile`, also bundles the server and all of it into one executable; with `--static`, writes the whole site to `--outdir`, `dist` by default, for a host with no server. `--no-check` builds without checking.
 export const build: Command = {
   usage: USAGES.build,
-  options: { 'compile': { type: 'string' }, 'entry': { type: 'string' }, 'static': { type: 'boolean' }, 'outdir': { type: 'string' }, 'no-check': { type: 'boolean' }, 'analyze': { type: 'boolean' }, 'project': { type: 'string', short: 'p' }, 'format': { type: 'string' }, 'quiet': { type: 'boolean' } },
+  options: { 'compile': { type: 'string' }, 'verify': { type: 'boolean' }, 'entry': { type: 'string' }, 'static': { type: 'boolean' }, 'outdir': { type: 'string' }, 'no-check': { type: 'boolean' }, 'analyze': { type: 'boolean' }, 'project': { type: 'string', short: 'p' }, 'format': { type: 'string' }, 'quiet': { type: 'boolean' } },
   positionals: 1,
   run: async ({ values, positionals }, refuseUsage) => {
     const { compile, outdir, project: tsconfig } = values
@@ -47,6 +47,9 @@ export const build: Command = {
     if (entry !== undefined && typeof compile !== 'string')
       return refuse('--entry names the server an executable runs, so it goes with --compile')
 
+    if (values.verify === true && typeof compile !== 'string')
+      return refuse('--verify starts the executable --compile writes, so it goes with --compile')
+
     if (exported && typeof compile === 'string')
       return refuse('--static writes files for a host with no server, and --compile a server; pick one')
 
@@ -63,7 +66,7 @@ export const build: Command = {
     const options: BuildOptions = {
       check: checking && { tsconfig: typeof tsconfig === 'string' ? tsconfig : undefined, entry },
       exportTo: exported ? resolve(typeof outdir === 'string' ? outdir : join(root, 'dist')) : undefined,
-      compile: typeof compile === 'string' ? { outfile: resolve(compile), entry } : undefined,
+      compile: typeof compile === 'string' ? { outfile: resolve(compile), entry, verify: values.verify === true } : undefined,
       analyze: values.analyze === true,
     }
 
@@ -140,6 +143,9 @@ async function printStage(stage: BuildStage, result: BuildResult, format: Proble
 
   if (stage === 'compile' && result.compiled)
     done('compiled', shown(result.compiled.executable), result.compiled.ms)
+
+  if (stage === 'compile' && result.compiled?.verifiedMs !== undefined)
+    done('verified', 'the executable started and answered its health route', result.compiled.verifiedMs)
 }
 
 // The whole build as one document once it ends, `kay check`'s problems and counts first, then what each stage made and the stage that stopped it; what the app prints meanwhile goes to stderr.
@@ -193,7 +199,7 @@ async function buildToDocument(root: string, options: BuildOptions): Promise<num
     ...failed && { failed: { stage: failed.stage } },
     ...built && { built: { islands: built.islands, stylesheets: built.stylesheets, prerendered: built.prerendered, entries: built.entries, ms: Math.round(built.ms), sizes: built.report, routes: built.summary.routes, stages: built.summary.stages.map(stage => ({ name: stage.name, ms: Math.round(stage.ms) })), caches: built.summary.caches } },
     ...exported && { exported: { pages: exported.pages, files: exported.files, dir: shown(exported.dir), ms: Math.round(exported.ms) } },
-    ...compiled && { compiled: { executable: shown(compiled.executable), ms: Math.round(compiled.ms) } },
+    ...compiled && { compiled: { executable: shown(compiled.executable), ms: Math.round(compiled.ms), ...compiled.verifiedMs !== undefined && { verifiedMs: Math.round(compiled.verifiedMs) } } },
   })
 
   return failed ? 1 : 0

@@ -61,6 +61,21 @@ An executable made by `kay build --compile` checks the health route itself when 
 HEALTHCHECK CMD ["./server", "--health"]
 ```
 
+`kay build --compile server --verify` runs it once at build time, see [Check the executable starts](#check-the-executable-starts).
+
+### Check the executable starts
+
+`kay build --compile server --verify` starts the executable it wrote on a free port, as `NODE_ENV=production` with the project as its working directory, so a `.env` there is read, waits until the health route answers 200, then runs it again as `--health` and stops it. A crash at startup, such as a module of the app the executable could not load, fails the build with the server's own output instead of showing at the deploy's health check:
+
+```sh
+kay build --compile server --verify
+```
+
+- It waits on the health route, polled every 50 ms, not a fixed sleep: a server that exits first fails at once, one that never answers fails after 30 s, each printing the last 40 lines of what it wrote (`executable-failed`).
+- It runs the app's server entry, so what the entry needs at startup, a database or a secret, must be in the build's environment. It is off by default for that reason; add it to the CI step that builds the image.
+- It costs the server's startup, usually well under a second, and `--format json` carries it as `compiled.verifiedMs`.
+- `health: false` leaves no route to ask, so any answer on the port counts and `--health` is not run.
+
 ### Run a job on a schedule
 
 `schedule` from `kay/server` is an Elysia plugin taking a cron or a length, and runs in the server's process:

@@ -75,6 +75,7 @@ kay: accents needs tailwind: add --with tailwind, or drop it with --without acce
 
 | Option | Effect |
 | --- | --- |
+| `--verify` | With `--compile`, starts the executable, waits for its health route and runs `--health`, failing the build with the server's output, see [Prove the executable starts](/guides/deployment#prove-the-executable-starts) |
 | `--entry <file>` | The server entry, when it is not `src/server.ts` |
 | `--port <port>` | Sets `PORT` for the server, over the shell's and the `.env`'s |
 | `--host[=<address>]` | Listens past this machine: `0.0.0.0` alone, or the address given, and answers to this machine's own name and `<name>.local` too. Without it, a server naming no `hostname` listens on `localhost` only, so `kay dev` in a container publishing its port needs `--host` |
@@ -370,7 +371,7 @@ Colour only goes to a terminal, and not under `NO_COLOR` or `TERM=dumb`; `FORCE_
 
 | Command | Document |
 | --- | --- |
-| `kay build` | `{ errors, warnings, problems }` as `kay check` prints them, a template that does not compile at its place and any other failure as one problem with `code: null`; `failed: { stage }` when a stage stopped it (`check`, `bundle`, `output`, `export` or `compile`); `built: { islands, stylesheets, prerendered, entries, ms, sizes, routes, stages, caches }`, `sizes` holding the entry's and each island's `raw` and `gzip` bytes, with their heaviest `modules` under `--analyze`, `routes` each route's `js` and `css` gzip bytes with its `pages` prerendered and whether its scripts are an `estimated` reach, `stages` the `ms` of each stage and `caches` how many entries each cache gave (`cached`) and had made (`made`); `exported: { pages, files, dir, ms }` with `--static`; `compiled: { executable, ms }` with `--compile` |
+| `kay build` | `{ errors, warnings, problems }` as `kay check` prints them, a template that does not compile at its place and any other failure as one problem with `code: null`; `failed: { stage }` when a stage stopped it (`check`, `bundle`, `output`, `export` or `compile`); `built: { islands, stylesheets, prerendered, entries, ms, sizes, routes, stages, caches }`, `sizes` holding the entry's and each island's `raw` and `gzip` bytes, with their heaviest `modules` under `--analyze`, `routes` each route's `js` and `css` gzip bytes with its `pages` prerendered and whether its scripts are an `estimated` reach, `stages` the `ms` of each stage and `caches` how many entries each cache gave (`cached`) and had made (`made`); `exported: { pages, files, dir, ms }` with `--static`; `compiled: { executable, ms, verifiedMs }` with `--compile`, `verifiedMs` with `--verify` |
 | `kay routes` | `{ routes, unlisted }`, each route with its `methods`, `path`, `kind`, `by` as the listing shows it, and `file`, `notes`, `layouts` and `guards` when it has them |
 | `kay explain` | `{ groups, lints, errorGroups, errors }`, each lint's `name`, `group`, `level` and whole `summary`; for one lint, its `name`, `level`, `group`, `summary`, the `wrong` and `right` examples, and `typed`, `site` and `launch` when set; for an error, its `name`, `group`, `summary` and `fix`, the file and heading that cover it |
 | `kay fmt` | `{ errors, warnings, problems, written, changed }`: what does not parse as problems, and the files it formatted, or under `--check` would, `written` false |

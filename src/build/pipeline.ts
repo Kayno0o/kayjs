@@ -39,6 +39,7 @@ import { writeSearchIndex } from './search'
 import { inSignalsScope } from './signals'
 import { exportStatic, refuseStaticConfig } from './static'
 import { pruneCompileCache } from './transform'
+import { verifyExecutable } from './verify'
 
 export type BuildStage = 'check' | 'bundle' | 'output' | 'export' | 'compile'
 
@@ -59,7 +60,8 @@ export interface BuildOptions {
   // Writes the whole site there, for a host with no server.
   exportTo?: string | undefined
   // Bundles the server, `entry` or the project's own, and all of it into one executable.
-  compile?: { outfile: string, entry?: string | undefined } | undefined
+  // `verify` then starts it as a deploy would and waits for its health route, failing the stage with the server's own output.
+  compile?: { outfile: string, entry?: string | undefined, verify?: boolean | undefined } | undefined
   // Breaks the size report down by module.
   analyze?: boolean | undefined
   // Called with the result so far once each stage that answers something is done, for the command line to print it as it comes rather than after a later stage's own output: the check, the output, the export and the compile.
@@ -77,7 +79,7 @@ export interface BuildResult {
   // `summary` holds what each route loads, the time of each stage and what the caches answered; `previous` the sizes of the last successful build of the same kind, which the sizes are compared to.
   built?: { islands: number, stylesheets: number, prerendered: number, entries: number, report: SizeReport | undefined, summary: BuildSummary, previous: StoredReport | undefined, ms: number }
   exported?: { pages: number, files: number, dir: string, ms: number }
-  compiled?: { executable: string, ms: number }
+  compiled?: { executable: string, ms: number, verifiedMs?: number | undefined }
 }
 
 // Bundles the browser code for production, minified unless kay.config.ts says otherwise, and renders the pages marked `prerender`; the server then boots without bundling.
@@ -247,6 +249,9 @@ async function runBuild(root: string, config: KayConfig, options: BuildOptions):
       await Bun.write(join(output, EXECUTABLE_RECORD), relative(root, executable))
 
       result.compiled = { executable, ms: performance.now() - stage }
+
+      if (options.compile.verify)
+        result.compiled.verifiedMs = await verifyExecutable(executable, root, project.config.health)
     }
     catch (error) {
       return { ...result, failed: { stage: 'compile', error } }
