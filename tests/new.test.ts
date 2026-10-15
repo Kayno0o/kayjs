@@ -19,6 +19,8 @@ const LISTENING = /localhost:(\d+)/
 const EAGER_BUILTINS = [...['zlib', 'crypto', 'http'].flatMap(name => [`from "${name}"`, `from "node:${name}"`]), 'from "bun:sqlite"']
 // A Postgres whose user may create databases, for the scaffolded app's tests: CI sets it, as pg-orm's own tests have one.
 const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL
+// A scaffold installed, checked, linted, tested and built: about 30 s in CI, and past 60 s there under a loaded parallel run.
+const SCAFFOLD_MS = 120_000
 const ACCENT_TEST = `import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { expect, it } from 'bun:test'
 import { mount, settle, testSite } from 'kay/test'
@@ -379,7 +381,6 @@ describe('kay command line', () => {
 })
 
 describe('kay new', () => {
-  // Installing, checking, linting, testing and building the app takes about 30 s in CI, so it is given twice that.
   it('scaffolds a project that type-checks against the declarations of kay, is formatted and builds as it is', async () => {
     const { dir, files } = await scaffoldServerPreset()
     const manifest = await Bun.file(join(dir, 'package.json')).json() as { dependencies: Record<string, string>, devDependencies: Record<string, string>, scripts: Record<string, string> }
@@ -446,7 +447,7 @@ describe('kay new', () => {
     finally {
       await Promise.all([rm(join(dir, 'src/routes/later.kay'), { force: true }), rm(join(dir, 'tests/accent.test.ts'), { force: true }), rm(clientDir(dir), { recursive: true, force: true })])
     }
-  }, 60_000)
+  }, SCAFFOLD_MS)
 
   it('scaffolds a static site that type-checks and exports to dist, with a Pages workflow and a container beside it', async () => {
     const dir = join(await mkdtemp(join(tmpdir(), 'kay-new-')), 'my-site')
@@ -502,7 +503,7 @@ describe('kay new', () => {
     finally {
       await rm(join(dir, '..'), { recursive: true, force: true })
     }
-  }, 60_000)
+  }, SCAFFOLD_MS)
 
   it('scaffolds an app with sessions, members in Postgres, a guarded section and a websocket island, which checks, tests and builds as it is', async () => {
     const dir = join(await mkdtemp(join(tmpdir(), 'kay-new-')), 'my-app')
@@ -559,7 +560,7 @@ describe('kay new', () => {
     finally {
       await rm(join(dir, '..'), { recursive: true, force: true })
     }
-  }, 30_000)
+  }, SCAFFOLD_MS)
 
   it('scaffolds a blank project of one bare page, which checks and builds as a static site', async () => {
     const dir = join(await mkdtemp(join(tmpdir(), 'kay-new-')), 'my-app')
@@ -643,7 +644,7 @@ describe('kay new', () => {
       finally {
         await rm(join(dir, '..'), { recursive: true, force: true })
       }
-    }, 120_000)
+    }, SCAFFOLD_MS)
   }
 
   it('checks what a feature needs along with it, and unchecks what needs it along with it', () => {

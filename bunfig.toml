@@ -1,8 +1,9 @@
 [test]
 root = "./tests"
-# One run at a time in a checkout, as its runs build into the same .kay and fixtures; the browser of kay/test pages closes once the tests ran, as kay/test/preload has it.
+# One run at a time in a checkout, as its runs build into the same .kay and fixtures; the browser of kay/test pages closes once the tests ran, as kay/test/preload has it; every run takes the suite's timeout.
 preload = [
   "./tests/one-run.ts",
+  "./tests/timeout.ts",
   "./src/test/browser.ts"
 ]
 
