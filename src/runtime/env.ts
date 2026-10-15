@@ -2,7 +2,7 @@ import type { Static, TSchema } from 'elysia'
 import type { Register } from './checks'
 
 // Where the server, as it boots, and the island entry, as it loads, keep the values `publicEnv` reads.
-export const PUBLIC_ENV = Symbol.for('kay.publicEnv')
+export const PUBLIC_ENV = /* @__PURE__ */ Symbol.for('kay.publicEnv')
 
 // What a config's `publicEnv` holds once read.
 export type PublicEnvOf<Config> = Config extends { publicEnv: infer Schema extends TSchema } ? Static<Schema> : Record<never, never>
@@ -20,7 +20,7 @@ function values(): Record<string, unknown> {
 }
 
 // The variables kay.config.ts declares public, read from the server's environment as it boots: the one way an island reads the environment, on the server and in the browser alike.
-export const publicEnv = new Proxy({}, {
+export const publicEnv = /* @__PURE__ */ new Proxy({}, {
   get: (_target, name) => typeof name === 'string' ? values()[name] : undefined,
   has: (_target, name) => name in values(),
   ownKeys: () => Reflect.ownKeys(values()),

@@ -1,7 +1,7 @@
 import { provideContext, readContext } from './reactive'
 
 // What a component hands the first field it renders, read by the server's markup.
-const DESCRIBED = Symbol('kay.described')
+const DESCRIBED = /* @__PURE__ */ Symbol('kay.described')
 
 interface Description {
   ids: string
