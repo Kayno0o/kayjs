@@ -1,0 +1,18 @@
+---
+import Checkbox from '@kaynooo/kayjs-ui/checkbox.kay'
+import ChipGroup from '@kaynooo/kayjs-ui/chip-group.kay'
+import Segmented from '@kaynooo/kayjs-ui/segmented.kay'
+import Toggle from '@kaynooo/kayjs-ui/toggle.kay'
+
+// Controls whose `onChange` the test answers, kept off the page's signals so a refused change is put back by the control itself.
+const { answer } = props<{ answer: (name: string, value: unknown) => unknown }>()
+
+const decks = [{ value: 'films', label: 'Films' }, { value: 'games', label: 'Games' }] as const
+const sizes = [{ value: 's', label: 'S' }, { value: 'm', label: 'M' }, { value: 'l', label: 'L' }] as const
+---
+form#form
+  Checkbox(name="agree" label="Agree" checked onChange={value => answer('agree', value)})
+  Toggle(name="power" label="Power" onChange={value => answer('power', value)})
+  ChipGroup(label="Decks" name="decks" options={decks} value={['films']} onChange={value => answer('decks', value)})
+  Segmented(label="Size" name="size" options={sizes} value="m" onChange={value => answer('size', value)})
+  button#reset(type="reset") Reset

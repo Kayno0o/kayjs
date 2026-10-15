@@ -43,6 +43,10 @@ function snapshot() {
 // What each control holds now, which becomes its default once saved, the library's signal-driven ones included: a Discard then goes back to the saved values, not to the ones first rendered.
 function values(): () => void {
   const held = [...form!.elements].map((control): (() => void) => {
+    // A control with no name is no part of what is saved, such as the search box of an IconPicker or a MultiSelect, which a reset empties.
+    if (!control.getAttribute('name'))
+      return () => undefined
+
     if (control instanceof HTMLInputElement || control instanceof HTMLTextAreaElement) {
       const { value } = control
       const checked = control instanceof HTMLInputElement && control.checked

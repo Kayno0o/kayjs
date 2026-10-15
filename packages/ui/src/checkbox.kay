@@ -2,7 +2,7 @@
 import type { JSX } from 'kay'
 import { effect, signal, untrack } from 'kay'
 import { changeAccepted } from './change'
-import { onFormReset } from './form-reset'
+import { onFormReset, resetWhenIdle, startRef } from './form-reset'
 
 const { checked = false, indeterminate = false, label, hint, onChange, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'type' | 'checked' | 'class' | 'children' | 'onChange' | 'ref'> & {
   // Whether it starts ticked; a box whose parent passes another value follows it.
@@ -30,20 +30,26 @@ effect(() => {
   synced++
 })
 
-// The ref runs again whenever the box's attributes do, but the box starts only once: its default is what it was first drawn with, not what the parent holds now.
-function start(element: HTMLInputElement) {
-  if (box === element)
-    return
-
+// The box starts once: its default is what it was first drawn with, not what the parent holds now.
+const ref = startRef<HTMLInputElement>(undefined, (element) => {
   box = element
   element.defaultChecked = untrack(() => checked)
-}
+}, (element) => {
+  element.indeterminate = indeterminate
+})
 
-// A reset puts the box back on its default, which the app's `onChange` then hears of.
-onFormReset(() => box, () => {
-  if (box && box.checked !== on())
+// A reset puts the box back on its default, which the app's `onChange` then hears of; one meeting a change under way waits for it.
+const resetting = resetWhenIdle(busy, () => {
+  if (!box)
+    return
+
+  box.checked = box.defaultChecked
+
+  if (box.checked !== on())
     void change(box)
 })
+
+onFormReset(() => box, resetting.reset)
 
 // A property only, which no attribute sets.
 effect(() => {
@@ -68,11 +74,12 @@ async function change(input: HTMLInputElement) {
 
   // The click cleared it, whatever the parent still says.
   input.indeterminate = indeterminate
+  resetting.idle()
 }
 ---
 // A native checkbox, so it submits inside a form and the keyboard and screen readers know it. A click while a change is under way ticks nothing.
 label.kui-checkbox(class={className})
-  input.kui-checkbox-input({...rest} ref={element => { start(element); element.indeterminate = indeterminate }} type="checkbox" checked={on()} aria-busy={busy() ? 'true' : undefined} onClick={event => { if (busy()) event.preventDefault() }} onChange={event => change(event.currentTarget)})
+  input.kui-checkbox-input({...rest} ref={ref} type="checkbox" checked={on()} aria-busy={busy() ? 'true' : undefined} onClick={event => { if (busy()) event.preventDefault() }} onChange={event => change(event.currentTarget)})
   if label
     span.kui-checkbox-label {label}
   if hint !== undefined

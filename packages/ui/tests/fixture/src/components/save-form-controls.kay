@@ -1,8 +1,10 @@
 ---
+import type { IconChoice } from '@kaynooo/kayjs-ui'
 import type { Action, Failure } from 'kay'
 import { signal } from 'kay'
 import Checkbox from '@kaynooo/kayjs-ui/checkbox.kay'
 import ChipGroup from '@kaynooo/kayjs-ui/chip-group.kay'
+import IconPicker from '@kaynooo/kayjs-ui/icon-picker.kay'
 import MultiSelect from '@kaynooo/kayjs-ui/multi-select.kay'
 import SaveForm from '@kaynooo/kayjs-ui/save-form.kay'
 import Select from '@kaynooo/kayjs-ui/select.kay'
@@ -10,6 +12,8 @@ import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
 import Toggle from '@kaynooo/kayjs-ui/toggle.kay'
 
 // The library's signal-driven controls in a SaveForm, with no `onDiscard`: the page's signals follow a Discard on their own.
+const { find } = props<{ find: (query: string, limit: number) => Promise<IconChoice[]> }>()
+
 const agree = signal(false)
 const power = signal(false)
 const decks = signal<string[]>([])
@@ -27,6 +31,7 @@ SaveForm(action={save} failure="Could not save")
   Toggle(name="power" label="Power" checked={power()} onChange={power.set})
   ChipGroup(label="Decks" name="decks" options={options} value={decks()} onChange={decks.set})
   Select#level(name="level" options={levels} value={level()} onChange={level.set})
-  MultiSelect(label="Tags" name="tags" options={choices} value={tags()} onChange={tags.set})
+  MultiSelect(label="Tags" name="tags" options={choices} value={tags()} search onChange={tags.set})
+  IconPicker(name="icon" value="star" search={find})
   TextInput#title(name="title" value={title()} onInput={title.set})
 p#state {JSON.stringify({ agree: agree(), power: power(), decks: decks(), level: level(), tags: tags(), title: title() })}

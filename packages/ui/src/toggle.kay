@@ -2,7 +2,7 @@
 import type { JSX } from 'kay'
 import { effect, signal, untrack } from 'kay'
 import { changeAccepted } from './change'
-import { onFormReset, withRef } from './form-reset'
+import { onFormReset, resetWhenIdle, startRef } from './form-reset'
 
 const { checked = false, label, onChange, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'type' | 'role' | 'checked' | 'class' | 'children' | 'onChange'> & {
   // Whether it starts on; a switch whose parent passes another value follows it.
@@ -26,20 +26,24 @@ effect(() => {
   synced++
 })
 
-// The ref runs again whenever the switch's attributes do, but the switch starts only once: its default is what it was first drawn with, not what the parent holds now.
-function start(element: HTMLInputElement) {
-  if (box === element)
-    return
-
+// The switch starts once: its default is what it was first drawn with, not what the parent holds now.
+const ref = startRef<HTMLInputElement>(rest.ref, (element) => {
   box = element
   element.defaultChecked = untrack(() => checked)
-}
+})
 
-// A reset puts the switch back on its default, which the app's `onChange` then hears of.
-onFormReset(() => box, () => {
-  if (box && box.checked !== on())
+// A reset puts the switch back on its default, which the app's `onChange` then hears of; one meeting a change under way waits for it.
+const resetting = resetWhenIdle(busy, () => {
+  if (!box)
+    return
+
+  box.checked = box.defaultChecked
+
+  if (box.checked !== on())
     void change(box)
 })
+
+onFormReset(() => box, resetting.reset)
 
 async function change(input: HTMLInputElement) {
   const next = input.checked
@@ -54,11 +58,13 @@ async function change(input: HTMLInputElement) {
     on.set(before)
     input.checked = before
   }
+
+  resetting.idle()
 }
 ---
 // A real checkbox, so it submits inside a form like any other. A click while a change is under way flips nothing.
 label.kui-toggle(class={className})
-  input.kui-toggle-input({...rest} ref={withRef(rest.ref, start)} type="checkbox" role="switch" checked={on()} aria-busy={busy() ? 'true' : undefined} onClick={event => { if (busy()) event.preventDefault() }} onChange={event => change(event.currentTarget)})
+  input.kui-toggle-input({...rest} ref={ref} type="checkbox" role="switch" checked={on()} aria-busy={busy() ? 'true' : undefined} onClick={event => { if (busy()) event.preventDefault() }} onChange={event => change(event.currentTarget)})
   span.kui-toggle-track
   if label
     span.kui-toggle-label {label}

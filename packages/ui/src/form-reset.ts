@@ -14,6 +14,41 @@ export function withRef<Target extends Element>(app: unknown, own: (element: Tar
   }
 }
 
+// A ref that runs `first` on the control's element once, and `every` each time kay runs the ref again on a spread element, whose attributes it follows; the app's own `ref` is still handed the element.
+export function startRef<Target extends Element>(app: unknown, first: (element: Target) => void, every?: (element: Target) => void): (element: Target) => void {
+  let started: Target | undefined
+
+  return withRef(app, (element) => {
+    if (started !== element) {
+      started = element
+      first(element)
+    }
+
+    every?.(element)
+  })
+}
+
+// For a control that holds itself busy while the app answers a change: a reset meeting it mid-change waits for that change to settle, then restores the defaults, so it is neither dropped nor lost under the change's own answer.
+// `reset` goes to onFormReset, `idle` to the end of the change.
+export function resetWhenIdle(busy: () => boolean, restore: () => void): { reset: () => void, idle: () => void } {
+  let waiting = false
+
+  return {
+    reset() {
+      if (busy())
+        waiting = true
+      else
+        restore()
+    },
+    idle() {
+      if (waiting && !busy()) {
+        waiting = false
+        restore()
+      }
+    },
+  }
+}
+
 // Runs `after` once the form holding the element has reset, when the controls hold their defaults again and a signal behind one can follow.
 // `last` waits for the other controls to have followed, for what reads them all.
 export function onFormReset(element: () => Element | undefined, after: () => void, last = false): void {

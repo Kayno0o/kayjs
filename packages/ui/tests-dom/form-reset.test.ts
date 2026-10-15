@@ -41,6 +41,8 @@ async function edit(root: HTMLElement) {
   click(root.querySelector('input[name="decks"][value="games"]'))
   click(root.querySelector('input[name="decks"][value="films"]'))
   click(root.querySelector('input[name="size"][value="l"]'))
+  click(root.querySelector('input[name="sort"][value="l"]'))
+  type(root, '#formname', 'y')
   type(root, '#level', 'c', 'change')
   click(root.querySelector('.kui-multi-select-trigger'))
   click(root.querySelectorAll('.kui-multi-select-checkbox')[0] ?? null)
@@ -57,7 +59,7 @@ async function edit(root: HTMLElement) {
   await settle()
 }
 
-const START = { agree: true, power: false, free: false, decks: ['films'], size: 'm', level: 'b', tags: ['x', 'y'], title: 'Ada', bio: 'Hello', notes: '# Notes', range: [2, 8], icon: 'star', bare: 'star', heard: 'b', refd: true }
+const START = { agree: true, power: false, free: false, decks: ['films'], size: 'm', level: 'b', tags: ['x', 'y'], title: 'Ada', bio: 'Hello', notes: '# Notes', range: [2, 8], icon: 'star', bare: 'star', heard: 'b', refd: true, form: 'x' }
 
 describe('a form reset', () => {
   test('puts every signal-driven control and the page signal behind it back on its start', async () => {
@@ -65,13 +67,14 @@ describe('a form reset', () => {
 
     expect(state(root)).toEqual(START)
     await edit(root)
-    expect(state(root)).toEqual({ agree: false, power: true, free: true, decks: ['games'], size: 'l', level: 'c', tags: ['y', 'z'], title: 'Grace', bio: 'Bye', notes: '# Other', range: [4, 9], icon: 'moon', bare: 'moon', heard: 'a', refd: true })
+    expect(state(root)).toEqual({ agree: false, power: true, free: true, decks: ['games'], size: 'l', level: 'c', tags: ['y', 'z'], title: 'Grace', bio: 'Bye', notes: '# Other', range: [4, 9], icon: 'moon', bare: 'moon', heard: 'a', refd: true, form: 'y' })
 
     click(root.querySelector('#reset'))
     await settle()
 
     expect(state(root)).toEqual(START)
     expect(root.querySelector<HTMLInputElement>('#bare input[type="search"]')!.value).toBe('')
+    expect(root.querySelector('input[name="sort"]:checked')).toBeNull()
   })
 
   test('shows the start in the controls themselves, and submits it', async () => {
@@ -83,7 +86,7 @@ describe('a form reset', () => {
 
     const data = new FormData(root.querySelector('form')!)
 
-    expect([...data].map(([name, value]) => `${name}=${String(value)}`).sort()).toEqual(['agree=on', 'decks=films', 'icon=star', 'level=b', 'size=m', 'tags=x', 'tags=y', 'title=Ada', 'bio=Hello'].sort())
+    expect([...data].map(([name, value]) => `${name}=${String(value)}`).sort()).toEqual(['agree=on', 'decks=films', 'icon=star', 'level=b', 'size=m', 'tags=x', 'tags=y', 'title=Ada', 'bio=Hello', 'form=x'].sort())
     expect(root.querySelector<HTMLInputElement>('input[name="agree"]')!.checked).toBe(true)
     expect(root.querySelector<HTMLInputElement>('input[name="power"]')!.checked).toBe(false)
     expect([...root.querySelectorAll<HTMLInputElement>('.kui-multi-select-checkbox')].map(box => box.checked)).toEqual([true, true, false])
@@ -123,4 +126,48 @@ describe('a form reset', () => {
 
     expect(state(root)).toEqual(START)
   })
+})
+
+// A change the app is still answering when the form resets.
+describe('a form reset during a change under way', () => {
+  const checked = (root: HTMLElement, selector: string) => [...root.querySelectorAll<HTMLInputElement>(selector)].map(one => one.checked).join()
+  const CASES = [
+    { name: 'a Checkbox', selector: 'input[name="agree"]', changed: 'agree=false', restored: 'agree=true', shown: (root: HTMLElement) => checked(root, 'input[name="agree"]'), back: 'true' },
+    { name: 'a Toggle', selector: 'input[name="power"]', changed: 'power=true', restored: 'power=false', shown: (root: HTMLElement) => checked(root, 'input[name="power"]'), back: 'false' },
+    { name: 'a ChipGroup', selector: 'input[name="decks"][value="games"]', changed: 'decks=films,games', restored: 'decks=films', shown: (root: HTMLElement) => checked(root, 'input[name="decks"]'), back: 'true,false' },
+    { name: 'a Segmented', selector: 'input[name="size"][value="l"]', changed: 'size=l', restored: 'size=m', shown: (root: HTMLElement) => checked(root, 'input[name="size"]'), back: 'false,true,false' },
+  ]
+
+  for (const { name, selector, changed, restored, shown, back } of CASES) {
+    for (const answer of [true, false]) {
+      test(`waits for ${name}'s change to ${answer ? 'be accepted' : 'be refused'}, then has its start back, told to the app unless the refusal already did`, async () => {
+        const gate = Promise.withResolvers<boolean>()
+        const told: string[] = []
+
+        mounted = await mount('src/components/form-reset-busy.kay', {
+          answer: (control: string, value: unknown) => {
+            told.push(`${control}=${String(value)}`)
+
+            return told.length === 1 ? gate.promise : undefined
+          },
+        })
+        await settle()
+
+        const root = mounted.root
+
+        click(root.querySelector(selector))
+        click(root.querySelector('#reset'))
+        await settle()
+
+        expect(told).toEqual([changed])
+
+        gate.resolve(answer)
+        await settle()
+
+        expect(told).toEqual(answer ? [changed, restored] : [changed])
+        expect(shown(root)).toBe(back)
+        expect(root.querySelector('[aria-busy="true"]')).toBeNull()
+      })
+    }
+  }
 })

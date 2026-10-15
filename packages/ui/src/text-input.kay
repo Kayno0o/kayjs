@@ -1,7 +1,7 @@
 ---
 import type { JSX } from 'kay'
 import { effect, untrack } from 'kay'
-import { onFormReset } from './form-reset'
+import { onFormReset, startRef } from './form-reset'
 
 type Field = Omit<JSX.IntrinsicElements['input'], 'value' | 'type' | 'class' | 'children' | 'onInput' | 'onChange'> & {
   class?: string | undefined
@@ -36,12 +36,14 @@ const halfTyped = (input: HTMLInputElement) => input.validity.badInput
 const spelled = (next: number | string | null) => next === null ? '' : String(next)
 
 // The value it starts with is what a reset goes back to; a client-rendered box has only set it as a property, which no reset reads.
-function held(input: HTMLInputElement) {
+const ref = startRef<HTMLInputElement>(rest.ref, (input) => {
   const start = untrack(() => value)
+
+  box = input
 
   if (start !== undefined)
     input.defaultValue = spelled(start)
-}
+})
 
 function read(input: HTMLInputElement): string | number | null {
   if (type !== 'number')
@@ -90,4 +92,4 @@ function left(event: FocusEvent & { currentTarget: HTMLInputElement, target: Ele
   onBlur?.(event)
 }
 ---
-input.kui-field-input({...rest} ref={element => { if (box !== element) { box = element; held(element) } }} type={type} value={untrack(() => value === undefined ? undefined : spelled(value))} class={className} onInput={event => report(onInput, event.currentTarget)} onChange={event => report(onChange, event.currentTarget)} onBlur={left})
+input.kui-field-input({...rest} ref={ref} type={type} value={untrack(() => value === undefined ? undefined : spelled(value))} class={className} onInput={event => report(onInput, event.currentTarget)} onChange={event => report(onChange, event.currentTarget)} onBlur={left})

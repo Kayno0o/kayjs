@@ -4,7 +4,7 @@ import type { IconProps } from 'kay/icons'
 import type { IconSlot } from './defaults'
 import { effect, signal, uid, untrack } from 'kay'
 import { changeAccepted } from './change'
-import { onFormReset, withRef } from './form-reset'
+import { onFormReset, resetWhenIdle, withRef } from './form-reset'
 import Icon from './icon.kay'
 
 const { options, value, label, name, onChange, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
@@ -55,20 +55,26 @@ async function pick(next: Value[]) {
     picked.set(before)
     check(before)
   }
+
+  resetting.idle()
 }
 
 function toggle(input: HTMLInputElement, option: Value) {
   void pick(options.map(one => one.value).filter(one => one === option ? input.checked : picked().includes(one)))
 }
 
-// A reset puts the boxes back on their defaults, which the app's `onChange` then hears of.
-onFormReset(() => root, () => {
-  const ticked = boxes().filter(box => box.checked).map(box => box.value)
+// A reset puts the boxes back on their defaults, which the app's `onChange` then hears of; one meeting a change under way waits for it.
+const resetting = resetWhenIdle(busy, () => {
+  const ticked = boxes().filter(box => box.defaultChecked).map(box => box.value)
   const next = options.map(one => one.value).filter(one => ticked.includes(one))
+
+  check(next)
 
   if (next.length !== picked().length || next.some(one => !picked().includes(one)))
     void pick(next)
 })
+
+onFormReset(() => root, resetting.reset)
 ---
 // Real checkboxes drawn as chips, so the group submits like any other field and Space toggles the focused chip. A click while a change is under way ticks nothing.
 .kui-chip-group({...rest} ref={withRef(rest.ref, element => root = element)} role="group" aria-label={label} aria-busy={busy() ? 'true' : undefined} class={className})

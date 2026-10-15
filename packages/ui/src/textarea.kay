@@ -1,7 +1,7 @@
 ---
 import type { JSX } from 'kay'
 import { effect, untrack } from 'kay'
-import { onFormReset } from './form-reset'
+import { onFormReset, startRef } from './form-reset'
 
 const { value, onInput, onChange, onBlur, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['textarea'], 'value' | 'class' | 'children' | 'onInput' | 'onChange'> & {
   // Without it, the box starts empty and keeps what is typed, for a form posting it by its `name`.
@@ -26,13 +26,15 @@ function sync(left = false) {
   }
 }
 
-// The ref runs again whenever the box's attributes do, but the box starts only once: its default is what it was first drawn with.
-function held(element: HTMLTextAreaElement) {
+// The box starts once: its default is what it was first drawn with.
+const ref = startRef<HTMLTextAreaElement>(rest.ref, (element) => {
   const start = untrack(() => value)
+
+  box = element
 
   if (start !== undefined)
     element.defaultValue = start
-}
+})
 
 effect(() => sync())
 
@@ -47,4 +49,4 @@ onFormReset(() => box, () => {
   tell?.(box.value)
 })
 ---
-textarea.kui-field-input({...rest} ref={element => { if (box !== element) { box = element; held(element) } }} value={untrack(() => value)} class={className} onInput={event => { seen = event.currentTarget.value; onInput?.(seen) }} onChange={event => { seen = event.currentTarget.value; onChange?.(seen) }} onBlur={event => { sync(true); onBlur?.(event) }})
+textarea.kui-field-input({...rest} ref={ref} value={untrack(() => value)} class={className} onInput={event => { seen = event.currentTarget.value; onInput?.(seen) }} onChange={event => { seen = event.currentTarget.value; onChange?.(seen) }} onBlur={event => { sync(true); onBlur?.(event) }})

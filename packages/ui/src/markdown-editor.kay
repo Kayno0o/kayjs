@@ -3,7 +3,7 @@ import type { JSX } from 'kay'
 import type { TextEdit } from './markdown-edit'
 import { entriesFromDataTransfer, htmlToMarkdown } from '@kaynooo/utils/browser/clipboard'
 import { effect, signal, untrack } from 'kay'
-import { onFormReset } from './form-reset'
+import { onFormReset, startRef } from './form-reset'
 import { enterEdit, indentEdit, linkEdit, wrapEdit } from './markdown-edit'
 import { attempt } from './toast'
 
@@ -25,6 +25,10 @@ const { value = '', onInput, onImage, uploadFailure = 'Could not upload the imag
 
 const uploading = signal(0)
 let area: HTMLTextAreaElement | undefined
+const ref = startRef<HTMLTextAreaElement>(rest.ref, (element) => {
+  area = element
+  element.defaultValue = untrack(() => value)
+})
 // What the parent was last told or handed, which a reset that changes the field has to tell it again.
 let seen = untrack(() => value)
 // Set by Escape, so the Tab after it moves on rather than indenting.
@@ -197,4 +201,4 @@ function drop(event: DragEvent) {
 }
 ---
 // A markdown field that writes like an editor: Ctrl+B, Ctrl+I and Ctrl+K wrap the selection, Enter continues a list and Tab indents one, Escape then Tab leaving the field, a pasted page turns into markdown, and pasted or dropped images upload behind a placeholder.
-textarea.kui-field-input.kui-markdown-editor({...rest} ref={element => { if (area !== element) { area = element; element.defaultValue = untrack(() => value) } }} value={untrack(() => value)} placeholder={placeholder} aria-description={keysHint} aria-busy={uploading() > 0 ? 'true' : 'false'} class={className} onInput={event => { seen = event.currentTarget.value; onInput?.(seen) }} onKeyDown={keyDown} onPaste={paste} onDrop={drop})
+textarea.kui-field-input.kui-markdown-editor({...rest} ref={ref} value={untrack(() => value)} placeholder={placeholder} aria-description={keysHint} aria-busy={uploading() > 0 ? 'true' : 'false'} class={className} onInput={event => { seen = event.currentTarget.value; onInput?.(seen) }} onKeyDown={keyDown} onPaste={paste} onDrop={drop})

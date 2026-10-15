@@ -266,7 +266,7 @@ describe('SaveForm', () => {
   })
 
   test('Discard puts the library\'s signal-driven controls back on the saved values, and the page signals with them', async () => {
-    mounted = await mount('src/components/save-form-controls.kay', {})
+    mounted = await mount('src/components/save-form-controls.kay', { find: async () => [] })
     await settle()
 
     const root = mounted.root
@@ -298,5 +298,30 @@ describe('SaveForm', () => {
 
     expect(state()).toEqual({ agree: true, power: true, decks: ['films'], level: 'b', tags: ['x', 'y'], title: 'Grace' })
     expect(status(root)).toBe('No unsaved change.')
+  })
+
+  test('Discard after a save empties the search boxes of an IconPicker and a MultiSelect, which are no saved values', async () => {
+    mounted = await mount('src/components/save-form-controls.kay', { find: async () => [] })
+    await settle()
+
+    const root = mounted.root
+    const searches = () => [...root.querySelectorAll<HTMLInputElement>('input[type="search"]')].map(box => box.value)
+
+    type(root, 'mo', '.kui-multi-select-search')
+    type(root, 'sta', '.kui-icon-picker input[type="search"]')
+    type(root, 'Grace', '#title')
+    await settle()
+    root.querySelector('form')!.requestSubmit()
+    await settle()
+    // Emptied again before the discard, so the page's signal for it has nothing to change on the reset.
+    type(root, '', '.kui-multi-select-search')
+    type(root, '', '.kui-icon-picker input[type="search"]')
+    click(root.querySelector('input[name="agree"]'))
+    await settle()
+    click(buttons(root)[0]!)
+    await settle()
+    await settle()
+
+    expect(searches()).toEqual(['', ''])
   })
 })

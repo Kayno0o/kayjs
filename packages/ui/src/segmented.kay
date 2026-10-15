@@ -2,7 +2,7 @@
 import type { JSX } from 'kay'
 import { effect, signal, uid, untrack } from 'kay'
 import { changeAccepted } from './change'
-import { onFormReset, withRef } from './form-reset'
+import { onFormReset, resetWhenIdle, withRef } from './form-reset'
 
 const { options, value, label, name, onChange, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
   options: readonly { value: Value, label: string }[]
@@ -47,6 +47,10 @@ async function pick(next: Value) {
     return
   }
 
+  await change(next)
+}
+
+async function change(next: Value) {
   const before = picked()
   const syncedBefore = synced
 
@@ -57,11 +61,16 @@ async function pick(next: Value) {
     picked.set(before)
     check(before)
   }
+
+  resetting.idle()
 }
 
 // A reset puts the radios back on their defaults, which the app's `onChange` then hears of; a group that started with none picked just shows none.
-onFormReset(() => root, () => {
-  const next = radios().find(radio => radio.checked)?.value ?? null
+// One meeting a change under way waits for it.
+const resetting = resetWhenIdle(busy, () => {
+  const next = radios().find(radio => radio.defaultChecked)?.value ?? null
+
+  check(next)
 
   if (next === picked())
     return
@@ -69,8 +78,10 @@ onFormReset(() => root, () => {
   if (next === null)
     picked.set(null)
   else
-    void pick(next as Value)
+    void change(next as Value)
 })
+
+onFormReset(() => root, resetting.reset)
 ---
 // Real radios, so the arrow keys move between options and the group submits like any other field.
 .kui-segmented({...rest} ref={withRef(rest.ref, element => root = element)} role="radiogroup" aria-label={label} aria-busy={busy() ? 'true' : undefined} class={className})
