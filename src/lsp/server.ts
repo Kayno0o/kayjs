@@ -349,6 +349,7 @@ export class KayLanguageServer {
 
       const types = await writeShadowTypes(root, project.options)
       const files = new Set(types.files.keys())
+      // Hashing the text the lsp wrote still catches another process's write: `writeShadowTypes` rewrites the file whenever it differs.
       const stamps = new Map([...types.files].map(([path, shadow]) => [path, Bun.hash.wyhash(shadow.tsx)] as const))
 
       changes.push(
