@@ -315,7 +315,7 @@ export async function gzipParts(parts: SplicePart[], between: string[]): Promise
   const { crc32, deflateRawSync } = nodeZlib()
   const markups = parts.map((_, index) => index < parts.length - 1 ? Buffer.from(between[index] ?? '') : Buffer.alloc(0))
   const late = markups.reduce((total, markup) => total + markup.length, 0) > SPLICE_HERE_BYTES
-  const chunks: Uint8Array[] = [GZIP_HEADER]
+  const chunks: Uint8Array[] = []
   let crc = 0
   let length = 0
 
@@ -335,48 +335,45 @@ export async function gzipParts(parts: SplicePart[], between: string[]): Promise
     }
   }
 
-  const trailer = new Uint8Array(8)
-  const view = new DataView(trailer.buffer)
-
-  view.setUint32(0, crc, true)
-  view.setUint32(4, length % 2 ** 32, true)
   // An empty final block, which ends the member after the last full flush.
-  chunks.push(deflateRawSync(Buffer.alloc(0), runOptions(true)), trailer)
+  chunks.push(deflateRawSync(Buffer.alloc(0), runOptions(true)))
 
-  const gzip = new Uint8Array(chunks.reduce((total, chunk) => total + chunk.length, 0))
+  const gzip = gzipMember(chunks, crc, length)
+
+  return late ? lateBody(gzip) : gzip
+}
+
+async function gzipAround(body: Buffer, found: Found[], deflate: Deflate): Promise<Uint8Array<ArrayBuffer>> {
+  const chunks: Uint8Array[] = []
+  let cursor = 0
+
+  for (const { text, at } of found) {
+    chunks.push(await deflate(body.subarray(cursor, at), false), text.deflated)
+    cursor = at + text.bytes.length
+  }
+
+  chunks.push(await deflate(body.subarray(cursor), true))
+
+  return gzipMember(chunks, nodeZlib().crc32(body), body.length)
+}
+
+// One gzip member of deflate runs that already end the stream: the header before them, the crc-32 and the length after.
+function gzipMember(chunks: Uint8Array[], crc: number, length: number): Uint8Array<ArrayBuffer> {
+  const gzip = new Uint8Array(GZIP_HEADER.length + chunks.reduce((total, chunk) => total + chunk.length, 0) + 8)
   let written = 0
+
+  gzip.set(GZIP_HEADER, written)
+  written += GZIP_HEADER.length
 
   for (const chunk of chunks) {
     gzip.set(chunk, written)
     written += chunk.length
   }
 
-  return late ? lateBody(gzip) : gzip
-}
+  const view = new DataView(gzip.buffer)
 
-async function gzipAround(body: Buffer, found: Found[], deflate: Deflate): Promise<Uint8Array<ArrayBuffer>> {
-  const parts: Uint8Array[] = [GZIP_HEADER]
-  let cursor = 0
-
-  for (const { text, at } of found) {
-    parts.push(await deflate(body.subarray(cursor, at), false), text.deflated)
-    cursor = at + text.bytes.length
-  }
-
-  const trailer = new Uint8Array(8)
-  const view = new DataView(trailer.buffer)
-
-  parts.push(await deflate(body.subarray(cursor), true), trailer)
-  view.setUint32(0, nodeZlib().crc32(body), true)
-  view.setUint32(4, body.length % 2 ** 32, true)
-
-  const gzip = new Uint8Array(parts.reduce((total, part) => total + part.length, 0))
-  let written = 0
-
-  for (const part of parts) {
-    gzip.set(part, written)
-    written += part.length
-  }
+  view.setUint32(written, crc, true)
+  view.setUint32(written + 4, length % 2 ** 32, true)
 
   return gzip
 }
