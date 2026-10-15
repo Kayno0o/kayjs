@@ -23,7 +23,7 @@ import { fileWords, findKayLibraries, reachableLibraryFiles, reachesAny } from '
 import { packagesOf } from './licenses'
 import { throughLinks } from './links'
 import { kay } from './plugin'
-import { pruneClasses, unusedLibraryClasses } from './prune'
+import { pruneNodes, unusedLibraryClasses } from './prune'
 import { sizeReport } from './report'
 import { ANCHOR, runtimeAnchor, runtimeChunk } from './runtime-chunk'
 import { builtinChains, refusedBuiltins, refuseServerOnlyReads } from './server-only'
@@ -390,17 +390,18 @@ export async function bundleStyles(root: string, { pages, libraries, classes }: 
     return { styles: {}, inputs: [], followed: [], unused: new Set() }
 
   const shrunk = new Set<string>()
-  const unused = await unusedLibraryClasses(root, libraries, classes)
+  // Read while Bun.build parses and bundles: a stylesheet waits for it only once it is loaded.
+  const unusedClasses = unusedLibraryClasses(root, libraries, classes)
   const since = raisedMark()
-  const build = await Bun.build({
+  const [build, unused] = await Promise.all([Bun.build({
     entrypoints: pages,
     outdir: clientDir(root),
     target: 'browser',
     minify: options.minify ?? false,
     metafile: true,
     naming: { entry: '[name]-[hash].[ext]', chunk: '[name]-[hash].[ext]', asset: '[name]-[hash].[ext]' },
-    plugins: [styleImports(root, libraries, shrunk), ...mergingSupports(options.plugins ?? [], css => pruneClasses(css, unused))],
-  })
+    plugins: [styleImports(root, libraries, shrunk), ...mergingSupports(options.plugins ?? [], async nodes => pruneNodes(nodes, await unusedClasses))],
+  }), unusedClasses])
 
   if (!build.success)
     throw buildFailure(build.logs, 'kay: stylesheet build failed', since)

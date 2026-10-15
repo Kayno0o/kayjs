@@ -136,6 +136,11 @@ export function pruneClasses(css: string, unused: ReadonlySet<string>): string {
   return unused.size === 0 || !css.includes('{') ? css : print(prune(parse(css), unused))
 }
 
+// The same on a parsed stylesheet, for a build parsing each output once.
+export function pruneNodes(nodes: Node[], unused: ReadonlySet<string>): Node[] {
+  return unused.size === 0 ? nodes : prune(nodes, unused)
+}
+
 function addRuleClasses(nodes: Node[], into: Set<string>): void {
   for (const node of nodes) {
     if ('text' in node)

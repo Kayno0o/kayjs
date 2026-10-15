@@ -6,7 +6,8 @@ import { afterAll, describe, expect, it } from 'bun:test'
 import { clientDir } from '../src/build/assets'
 import { buildClient } from '../src/build/client'
 import { findKayLibraries } from '../src/build/libraries'
-import { pruneClasses, unusedLibraryClasses } from '../src/build/prune'
+import { pruneClasses, pruneNodes, unusedLibraryClasses } from '../src/build/prune'
+import { mergeSupports, mergingSupports, parse, print } from '../src/build/supports'
 import { devBuilder } from '../src/dev/builder'
 import { scratchDir } from './scratch'
 
@@ -54,6 +55,30 @@ describe('pruneClasses', () => {
 
   it('leaves a stylesheet alone when nothing is unused', () => {
     expect(pruneClasses('.gone{a:b}', new Set())).toBe('.gone{a:b}')
+  })
+
+  it('prunes a parsed stylesheet the way the text is, so one parse serves the pruning and the merge', () => {
+    const css = '@supports (display:grid){.a{--x:1}}.gone{c:d}@supports (display:grid){.b{--y:1}}.kept{e:f}'
+
+    expect(print(pruneNodes(parse(css), unused))).toBe(pruneClasses(css, unused))
+    expect(pruneNodes(parse(css), new Set())).toEqual(parse(css))
+  })
+
+  it('merges the blocks pruning leaves one after the other, in one pass over the output', async () => {
+    const dir = await scratchDir('prune-merge-')
+    const css = '@supports (display:grid){.a{--x:1}}\n.gone{c:d}\n@supports (display:grid){.b{--y:1}}\n'
+
+    projects.push(dir)
+    await Bun.write(join(dir, 'in.css'), css)
+
+    const build = await Bun.build({ entrypoints: [join(dir, 'in.css')], plugins: mergingSupports([], async nodes => pruneNodes(nodes, await Promise.resolve(unused))) })
+    const out = await build.outputs[0]!.text()
+
+    expect(out).not.toContain('gone')
+    expect(out.match(/@supports/g)).toHaveLength(1)
+    expect(out).toContain('--x')
+    expect(out).toContain('--y')
+    expect(mergeSupports(pruneClasses(css, unused)).match(/@supports/g)).toHaveLength(1)
   })
 })
 
