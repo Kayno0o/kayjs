@@ -45,7 +45,7 @@ watch-runs after:
 	echo "the runs did not finish in 15 minutes: $runs" >&2
 	exit 1
 
-# land this branch on main: rebased on origin's, checked, the tests its changes reach, pushed; one landing at a time, a second one waiting for the first
+# land this branch on main: rebased on origin's, checked, the tests its changes reach, pushed; one landing at a time, a second one waiting for the first; one line per step, their output in the git folder's land.log
 land:
 	#!/usr/bin/env bash
 	set -euo pipefail
@@ -53,6 +53,10 @@ land:
 	flock -n 9 || { echo "waiting for another landing to finish"; flock 9; }
 	# Only this shell holds the lock: a process the landing leaves running must not keep it.
 	bun scripts/land.ts 9>&-
+
+# wait for the CI run covering a commit on main, origin's tip by default, printing what failed
+ci sha="":
+	bun scripts/ci.ts {{sha}}
 
 worktree name: # a worktree at HEAD in .claude/worktrees/<name>, its dependencies installed, as Claude Code's own are made
 	bun .claude/hooks/worktree.ts create {{name}}
