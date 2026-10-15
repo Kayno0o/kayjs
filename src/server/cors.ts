@@ -110,6 +110,21 @@ function dropGrant(headers: Record<string, unknown> | Headers): void {
   }
 }
 
+// The responses kay made with the module's grant on them, a preflight or a refusal, which are no route's own and keep it.
+export const grantedByKay = new WeakSet<Response>()
+
+// The grant headers a response of the route's own carries, off its headers: false when they are immutable.
+export function dropOwnGrant(headers: Headers): boolean {
+  try {
+    dropGrant(headers)
+
+    return true
+  }
+  catch {
+    return false
+  }
+}
+
 // A response of the route's own without the grant headers it carries itself, the module's rule alone granting: the same response, or a mutable copy when its headers are immutable, a `fetch()` result's in some runtimes, which takes the context's Vary since the copy is Elysia's to merge no more.
 export function withoutOwnGrant(response: Response, contextVary: unknown): Response {
   try {
@@ -148,6 +163,7 @@ export function varyByOrigin(rule: CorsRule, headers: Headers, context: Record<s
 // A response built before the route ran, such as a body over the limit, with the headers the module's answers carry.
 export function corsResponse(rule: CorsRule, request: Request, response: Response): Response {
   withCors(rule, request, response.headers)
+  grantedByKay.add(response)
 
   return response
 }
@@ -193,5 +209,9 @@ export function preflight(rule: CorsRule, methods: readonly string[], request: R
     }
   }
 
-  return new Response(null, { status: 204, headers })
+  const answer = new Response(null, { status: 204, headers })
+
+  grantedByKay.add(answer)
+
+  return answer
 }

@@ -16,7 +16,7 @@ import { kayLog } from '../runtime/log'
 import { encodeValue, unsendable } from '../runtime/wire'
 import { admitCrossSite, crossSiteRefused, guardsFirst, inLocale, passGuards } from './actions'
 import { importModule } from './bundle'
-import { corsAdmits, corsResponse, corsRule, preflight, varyByOrigin, withCors, withoutOwnGrant } from './cors'
+import { corsAdmits, corsResponse, corsRule, dropOwnGrant, grantedByKay, preflight, varyByOrigin, withCors, withoutOwnGrant } from './cors'
 import { loadGuard, requiredGuards } from './guards'
 import { answeringRequest, statusOf } from './log'
 import { requestId } from './protection'
@@ -110,12 +110,14 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
         })
         // Elysia runs the `mapResponse` of every module registered before the one matched, so only the matched module's, which knows its cors rule, acts.
         .mapResponse(({ request, responseValue, set }) => {
-          if (owners.get(request) !== undefined && owners.get(request) !== instance)
+          const owner = owners.get(request)
+
+          if (owner !== undefined && owner !== instance)
             return undefined
 
           const value = sendable(responseValue)
 
-          return value instanceof Response ? carriedOver(set, value, cors !== undefined) : jsonReply(value, set)
+          return value instanceof Response ? carriedOver(set, value, cors !== undefined && owner === instance) : jsonReply(value, set)
         })
         .onError(({ request, error, set }) => {
           const span = spans.get(request)
@@ -135,18 +137,21 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
 
           const refusal = await answeringRequest(context.request, async () => inLocale(context.request, options, async () => guardsFirst(guards, sharedContext(context.request, () => ({ ...context })), (context as { params?: Record<string, unknown> }).params ?? {}, undefined, options)))
 
-          if (refusal && cors)
+          if (refusal && cors) {
             withCors(cors, context.request, refusal.headers)
+            grantedByKay.add(refusal)
+          }
 
           return refusal
         })
         .onAfterHandle(({ request, responseValue, set }) => {
           // A Vary the route set itself keeps Origin; a Response of the route's own gets only that, as the grant is on the context, which `mapResponse` carries over.
           if (cors) {
+            // Over what the route put on the context, so its own grant never reaches a Response it returns.
+            withCors(cors, request, set.headers)
+
             if (responseValue instanceof Response)
               varyByOrigin(cors, responseValue.headers, set.headers)
-            else
-              withCors(cors, request, set.headers)
           }
 
           const reporter = responseValue instanceof Response ? streamReporters.get(responseValue) : undefined
@@ -183,8 +188,8 @@ function carriedOver(set: { status?: number | string, headers: Record<string, un
       for (const name of carriedNames(given))
         given.headers.delete(name)
 
-      if (underCors)
-        withoutOwnGrant(given, undefined)
+      if (underCors && !grantedByKay.has(given))
+        dropOwnGrant(given.headers)
 
       return undefined
     }
@@ -197,7 +202,7 @@ function carriedOver(set: { status?: number | string, headers: Record<string, un
   }
 
   // The module's rule grants alone: the route's own grant headers would win over the context's, the caller's origin included.
-  if (underCors)
+  if (underCors && !grantedByKay.has(response))
     response = withoutOwnGrant(response, set.headers.vary)
 
   carryContext(set as Context['set'], response)

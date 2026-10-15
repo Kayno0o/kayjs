@@ -39,6 +39,12 @@ export default api({ cors: { origins: ['https://app.example.com', 'https://*.par
 
     return { own: true }
   })
+  .get('/context-grant', ({ set }) => {
+    set.headers['access-control-allow-origin'] = '*'
+    set.headers['access-control-allow-credentials'] = 'true'
+
+    return new Response('context')
+  })
   .get('/frozen', () => frozen())
   .get('/redirect', () => Response.redirect('https://elsewhere.example/', 302))
   .get('/upstream', async () => fetch('data:text/plain,upstream'))

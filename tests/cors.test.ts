@@ -182,7 +182,7 @@ describe('an API module opening its routes to other sites', () => {
 
 describe('answers of a route\'s own under a cors rule', () => {
   it('lets the module\'s rule alone grant: a route\'s own Access-Control-Allow-Origin, -Credentials and -Expose-Headers are replaced, or dropped for a caller the rule does not list', async () => {
-    for (const path of ['own-grant', 'own-header', 'frozen']) {
+    for (const path of ['own-grant', 'own-header', 'context-grant', 'frozen']) {
       const listed = await site.fetch(`/api/shared/${path}`, { headers: { origin: APP } })
 
       expect([path, listed.status, listed.headers.get('access-control-allow-origin'), listed.headers.get('access-control-allow-credentials'), listed.headers.get('access-control-expose-headers')]).toEqual([path, 200, APP, 'true', 'x-total'])
@@ -195,6 +195,17 @@ describe('answers of a route\'s own under a cors rule', () => {
         expect(refused.headers.get('vary')).toContain('Origin')
       }
     }
+  })
+
+  it('keeps the grant of a preflight a route answering every method leaves to kay, whichever module comes first', async () => {
+    const open = await asked('/api/open/any', 'https://anyone.example', 'PUT')
+
+    expect([open.status, open.headers.get('access-control-allow-origin')]).toEqual([204, '*'])
+
+    const first = await asked('/api/a-first/any', 'https://first.example', 'PUT')
+
+    expect([first.status, first.headers.get('access-control-allow-origin'), first.headers.get('access-control-allow-credentials')]).toEqual([204, 'https://first.example', 'true'])
+    expect((await asked('/api/shared/items', APP, 'POST')).headers.get('access-control-allow-origin')).toBe(APP)
   })
 
   it('applies the same rule to a module opened to any origin', async () => {
