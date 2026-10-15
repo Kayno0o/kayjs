@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import { afterEach, describe, expect, setSystemTime, test } from 'bun:test'
+import { afterEach, describe, expect, setSystemTime, spyOn, test } from 'bun:test'
 import { testSite } from 'kay/test'
 import { totpCode, totpStep } from '../../../src/totp'
 import { mails, store } from '../src/auth'
@@ -233,6 +233,22 @@ describe('the prebuilt pages', () => {
     expect(text(await visitor.submit(reset, { token: link.searchParams.get('token')!, password: 'short' }, { from: form }), '.kui-form-field-issue')).toBe('Use at least 10 characters.')
     expect(await visitor.submit(reset, { token: link.searchParams.get('token')!, password: 'a brand new passphrase' }, { from: link.pathname + link.search })).toMatchObject({ url: '/' })
     expect(text(await visitor.visit('/'), '#who')).toBe('Signed in as reset@example.com')
+  })
+
+  test('the new-password form reads no attempts from the store, as it shows no captcha, where the request form does', async () => {
+    const count = spyOn(store.attempts, 'count')
+
+    try {
+      const visitor = await browser()
+
+      expect(text(await visitor.visit('/auth/reset-password?token=mailed'), 'h1')).toBe('Choose a new password')
+      expect(count).not.toHaveBeenCalled()
+      await visitor.visit('/auth/reset-password')
+      expect(count).toHaveBeenCalled()
+    }
+    finally {
+      count.mockRestore()
+    }
   })
 
   test('the address is verified through the mailed link, and changed through a confirmation sent to the new one', async () => {
