@@ -1,5 +1,6 @@
 import type { LocaleSettings } from '../runtime/i18n'
 import type { Route } from './routes'
+import { KayError } from '../compiler/errors'
 import { isCollection, isPaginated } from '../content'
 
 // The locales holding a localized collection's entry, which a page listing it is served in, with every other one when the default locale holds it.
@@ -32,7 +33,7 @@ export async function listedParams(route: Pick<Route, 'params' | 'optional' | 'c
     const param = route.params[0]
 
     if (route.params.length !== 1 || !route.optional?.includes(param!))
-      throw new Error(`kay: ${file} lists the pages of a paginated list, so it takes one optional param, their number, as blog/[[page=integer]].kay does`)
+      throw new KayError('export-needs-params', `kay: ${file} lists the pages of a paginated list, so it takes one optional param, their number, as blog/[[page=integer]].kay does`)
 
     const counts = await value.pageCounts(settings)
     const pages = Math.max(...counts.values())
@@ -47,14 +48,14 @@ export async function listedParams(route: Pick<Route, 'params' | 'optional' | 'c
 
   if (isCollection(value)) {
     if (route.params.length !== 1)
-      throw new Error(`kay: ${file} takes ${route.params.length === 0 ? 'no params' : route.params.join(', ')}, so a collection cannot fill them: its entries give one slug each, for a route with one param`)
+      throw new KayError('export-needs-params', `kay: ${file} takes ${route.params.length === 0 ? 'no params' : route.params.join(', ')}, so a collection cannot fill them: its entries give one slug each, for a route with one param`)
 
     const param = route.params[0]!
     const entries = await value.all()
     const nested = entries.find(entry => entry.slug.includes('/') && param !== route.catchAll)
 
     if (nested)
-      throw new Error(`kay: ${file} takes one segment as ${param}, but the entry ${nested.file} has the slug ${nested.slug}; name the page [...${param}].kay for nested entries`)
+      throw new KayError('export-needs-params', `kay: ${file} takes one segment as ${param}, but the entry ${nested.file} has the slug ${nested.slug}; name the page [...${param}].kay for nested entries`)
 
     // A localized collection lists a slug once, each locale's copy of the page following from it.
     const locales = new Map<string, string[]>()
@@ -67,7 +68,7 @@ export async function listedParams(route: Pick<Route, 'params' | 'optional' | 'c
 
   if (value === true) {
     if (route.params.length > 0)
-      throw new Error(`kay: ${file} takes params, so \`${name}\` lists them: export const page = { ${name}: [{ ${route.params.map(param => `${param}: '...'`).join(', ')} }] }`)
+      throw new KayError('export-needs-params', `kay: ${file} takes params, so \`${name}\` lists them: export const page = { ${name}: [{ ${route.params.map(param => `${param}: '...'`).join(', ')} }] }`)
 
     return [{}]
   }
@@ -78,11 +79,11 @@ export async function listedParams(route: Pick<Route, 'params' | 'optional' | 'c
   const list: unknown = typeof value === 'function' ? await (value as () => unknown)() : value
 
   if (!Array.isArray(list))
-    throw new Error(`kay: ${file} exports a ${name} that is neither true, false, a list of params, a function returning one, a collection, nor a paginate() list`)
+    throw new KayError('export-needs-params', `kay: ${file} exports a ${name} that is neither true, false, a list of params, a function returning one, a collection, nor a paginate() list`)
 
   for (const params of list) {
     if (typeof params !== 'object' || params === null || route.params.some(param => !isPathPart(route, param, (params as Record<string, unknown>)[param])))
-      throw new Error(`kay: ${file} lists ${JSON.stringify(params)} in ${name}, which needs a string for each of ${route.params.join(', ')}, with no empty, . or .. segment${route.optional ? `; ${route.optional.join(', ')} may be left out` : ''}`)
+      throw new KayError('export-needs-params', `kay: ${file} lists ${JSON.stringify(params)} in ${name}, which needs a string for each of ${route.params.join(', ')}, with no empty, . or .. segment${route.optional ? `; ${route.optional.join(', ')} may be left out` : ''}`)
   }
 
   return list as Record<string, string>[]

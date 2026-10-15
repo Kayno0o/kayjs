@@ -4,6 +4,7 @@ import { resolve } from 'node:path'
 import process from 'node:process'
 import { parse, stringify } from 'devalue'
 import { Elysia } from 'elysia'
+import { KayError } from '../compiler/errors'
 import { durationSeconds } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
 import { openSqlite } from '../runtime/sqlite.server'
@@ -98,10 +99,10 @@ export function session<Data extends object = SessionData>(options: SessionOptio
   const secrets = [options.secret].flat()
 
   if (secrets.length === 0 || secrets.some(secret => secret.length < MIN_SECRET_LENGTH))
-    throw new Error(`kay: a session secret is at least ${MIN_SECRET_LENGTH} characters; generate one with \`bun -e "console.log(crypto.randomUUID() + crypto.randomUUID())"\``)
+    throw new KayError('config-invalid', `kay: a session secret is at least ${MIN_SECRET_LENGTH} characters; generate one with \`bun -e "console.log(crypto.randomUUID() + crypto.randomUUID())"\``)
 
   if (secrets.some(secret => PUBLISHED_SECRETS.has(secret)))
-    throw new Error('kay: the session secret is the placeholder an older `kay new` wrote to .env.example, which anyone can read; generate one with `bun -e "console.log(crypto.randomUUID() + crypto.randomUUID())"`')
+    throw new KayError('config-invalid', 'kay: the session secret is the placeholder an older `kay new` wrote to .env.example, which anyone can read; generate one with `bun -e "console.log(crypto.randomUUID() + crypto.randomUUID())"`')
 
   const keys = secrets.map(secret => nodeCrypto().createHash('sha256').update(secret).digest())
 
@@ -109,7 +110,7 @@ export function session<Data extends object = SessionData>(options: SessionOptio
   const domain = options.domain?.trim().toLowerCase().replace(LEADING_DOT, '')
 
   if (domain !== undefined && !COOKIE_DOMAIN.test(domain))
-    throw new Error(`kay: the session domain is ${JSON.stringify(options.domain)}, which is no host name such as example.com`)
+    throw new KayError('config-invalid', `kay: the session domain is ${JSON.stringify(options.domain)}, which is no host name such as example.com`)
 
   const config = { name: options.cookie ?? 'session', maxAge: options.maxAge === undefined ? DEFAULT_MAX_AGE : durationSeconds(options.maxAge, 'the session maxAge'), absoluteMaxAge: options.absoluteMaxAge === undefined ? DEFAULT_ABSOLUTE_MAX_AGE : durationSeconds(options.absoluteMaxAge, 'the session absoluteMaxAge'), browserMaxAge: options.browserMaxAge === undefined ? DEFAULT_BROWSER_MAX_AGE : durationSeconds(options.browserMaxAge, 'the session browserMaxAge'), domain, store: options.store, keys }
 

@@ -1,4 +1,5 @@
 import type { Duration } from '../runtime/duration'
+import { KayError } from '../compiler/errors'
 import { durationSeconds } from '../runtime/duration'
 
 interface CorsCommon {
@@ -30,7 +31,7 @@ const ANY_METHOD = ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE']
 
 export function corsRule(options: CorsOptions): CorsRule {
   if (options.origins === '*' && options.credentials)
-    throw new Error('kay: cors sends cookies to the origins it lists only, so `credentials: true` takes `origins: [\'https://...\']`, never \'*\'')
+    throw new KayError('config-invalid', 'kay: cors sends cookies to the origins it lists only, so `credentials: true` takes `origins: [\'https://...\']`, never \'*\'')
 
   const exact = new Set<string>()
   const subdomains: RegExp[] = []
@@ -40,7 +41,7 @@ export function corsRule(options: CorsOptions): CorsRule {
     const concrete = wildcard ? `${wildcard[1]}://x.${wildcard[2]}` : origin.toLowerCase()
 
     if (!isOrigin(concrete))
-      throw new Error(`kay: cors lists ${JSON.stringify(origin)}, which is no origin: a scheme and a host, with a port if any and no path, as https://app.example.com, or https://*.example.com for its subdomains`)
+      throw new KayError('config-invalid', `kay: cors lists ${JSON.stringify(origin)}, which is no origin: a scheme and a host, with a port if any and no path, as https://app.example.com, or https://*.example.com for its subdomains`)
 
     if (wildcard)
       subdomains.push(new RegExp(`^${wildcard[1]}://[a-z0-9-]+(?:\\.[a-z0-9-]+)*\\.${wildcard[2]!.replace(SPECIAL, '\\$&')}$`))

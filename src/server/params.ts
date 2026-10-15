@@ -1,6 +1,7 @@
 import type { TrailingSlash } from '../config'
 import type { Route } from './routes'
 import { join } from 'node:path'
+import { KayError } from '../compiler/errors'
 import * as builtIn from '../runtime/params'
 import { importModule } from './bundle'
 import { decodePath, guardUrl, patternShapes, withoutSlash } from './routes'
@@ -39,7 +40,7 @@ export async function loadMatchers(routesDir: string, routes: Route[]): Promise<
         const matcher = (await importModule<{ default?: unknown }>(file)).default
 
         if (typeof matcher !== 'function')
-          throw new TypeError(`kay: ${file} must export a matcher by default: export default (value: string) => value or undefined`)
+          throw new KayError('route-invalid', `kay: ${file} must export a matcher by default: export default (value: string) => value or undefined`)
 
         matchers.set(name, matcher as Matcher)
 
@@ -47,7 +48,7 @@ export async function loadMatchers(routesDir: string, routes: Route[]): Promise<
       }
 
       if (!Object.hasOwn(builtIn, name))
-        throw new Error(`kay: ${route.file} names the matcher ${name}, which is neither ${file} nor one kay ships: ${Object.keys(builtIn).join(', ')}`)
+        throw new KayError('route-invalid', `kay: ${route.file} names the matcher ${name}, which is neither ${file} nor one kay ships: ${Object.keys(builtIn).join(', ')}`)
 
       matchers.set(name, builtIn[name as keyof typeof builtIn])
     }

@@ -10,6 +10,7 @@ import { existsSync, linkSync, mkdirSync, readFileSync, rmSync, writeFileSync } 
 import { readdir, rename, rm, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { ASSET_PREFIX } from '../build/assets'
+import { KayError } from '../compiler/errors'
 import { CARD, CARD_ROUTE, IMPORTED, setCardMaker, variantFilesLinked, VARIANTS } from '../runtime/image'
 import { nodeCrypto } from './builtins'
 import { drawCard, LOGO_SIZE } from './card-draw'
@@ -115,7 +116,7 @@ export async function setupCards(setup: CardSetup): Promise<Cards> {
 // The upright face of the family asked for, or the first one listed, at the weight nearest the one asked for.
 function cardFont(clientDir: string, faces: FontAssets['faces'], wanted: CardConfig['font']): Cards['font'] {
   if (!faces || faces.length === 0)
-    return new Error('kay: shareCard() draws the title in a face of `fonts` in kay.config.ts, which lists none')
+    return new KayError('share-card-invalid', 'kay: shareCard() draws the title in a face of `fonts` in kay.config.ts, which lists none')
 
   const family = wanted?.family ?? faces[0]!.family
   const weight = wanted?.weight ?? DEFAULT_WEIGHT
@@ -127,7 +128,7 @@ function cardFont(clientDir: string, faces: FontAssets['faces'], wanted: CardCon
   const chosen = faces.filter(face => face.family === family && face.style === 'normal').toSorted((a, b) => distance(a) - distance(b))[0]
 
   if (!chosen)
-    return new Error(`kay: images.card.font names ${family}, of which \`fonts\` in kay.config.ts lists no upright face`)
+    return new KayError('share-card-invalid', `kay: images.card.font names ${family}, of which \`fonts\` in kay.config.ts lists no upright face`)
 
   return { family, path: join(clientDir, decodeURIComponent(chosen.url.slice(ASSET_PREFIX.length))) }
 }
@@ -145,7 +146,7 @@ async function cardLogo(setup: CardSetup): Promise<Uint8Array | undefined> {
 
   if (setup.bundled) {
     if (!await Bun.file(built).exists())
-      throw new Error('kay: this executable holds no drawing of images.card.logo; build it again with kay build --compile')
+      throw new KayError('executable-incomplete', 'kay: this executable holds no drawing of images.card.logo; build it again with kay build --compile')
 
     return Bun.file(built).bytes()
   }
@@ -177,7 +178,7 @@ export async function cardLogoProblems(file: string): Promise<{ file: string, me
 
 async function drawLogo(file: string, warn?: (message: string) => void): Promise<Uint8Array> {
   if (!await Bun.file(file).exists())
-    throw new Error(`kay: images.card.logo names ${file}, which does not exist`)
+    throw new KayError('share-card-invalid', `kay: images.card.logo names ${file}, which does not exist`)
 
   if (SVG_FILE.test(file)) {
     // Imported here alone, as an executable leaves the module out.
@@ -195,15 +196,15 @@ async function drawLogo(file: string, warn?: (message: string) => void): Promise
       return await new Bun.Image(file).resize(LOGO_SIZE, LOGO_SIZE).png().bytes()
   }
   catch {
-    throw new Error(`kay: images.card.logo names ${file}, which is no SVG, PNG, JPEG or WebP kay can draw`)
+    throw new KayError('share-card-invalid', `kay: images.card.logo names ${file}, which is no SVG, PNG, JPEG or WebP kay can draw`)
   }
 
-  throw new Error(`kay: images.card.logo, ${file}, is ${size.width}x${size.height}; it has to be square`)
+  throw new KayError('share-card-invalid', `kay: images.card.logo, ${file}, is ${size.width}x${size.height}; it has to be square`)
 }
 
 function cardColor(setting: string, value: string): Color {
   if (!COLOR.test(value))
-    throw new Error(`kay: images.card.${setting} is ${value}, which is no #rrggbb colour`)
+    throw new KayError('share-card-invalid', `kay: images.card.${setting} is ${value}, which is no #rrggbb colour`)
 
   const hex = value.length === 4 ? [...value.slice(1)].map(digit => digit + digit).join('') : value.slice(1)
 
@@ -221,7 +222,7 @@ async function cardFace(cards: Cards): Promise<Face> {
       return readFace(await Bun.file(font.path).bytes())
     }
     catch (error) {
-      throw new Error(`kay: shareCard() cannot draw in ${font.family}: ${error instanceof Error ? error.message : String(error)}`)
+      throw new KayError('share-card-invalid', `kay: shareCard() cannot draw in ${font.family}: ${error instanceof Error ? error.message : String(error)}`)
     }
   })()
 
@@ -236,7 +237,7 @@ function signingKey(cards: Cards): Uint8Array {
     return cards.key
 
   if (cards.bundled)
-    throw new Error('kay: this executable holds no key to sign share cards with; build it again with kay build --compile')
+    throw new KayError('executable-incomplete', 'kay: this executable holds no key to sign share cards with; build it again with kay build --compile')
 
   // Written under a name of its own and linked into place, so another process starting from the same project reads either no key or the whole of the one that won.
   const file = join(cards.dir, KEY_FILE)
@@ -273,12 +274,12 @@ function cardUrl(cards: Cards, title: unknown, image: string | undefined): strin
     throw cards.font
 
   if (typeof title !== 'string')
-    throw new TypeError(`kay: shareCard() takes its title as a string, and was given ${title === null ? 'null' : typeof title}`)
+    throw new KayError('share-card-invalid', `kay: shareCard() takes its title as a string, and was given ${title === null ? 'null' : typeof title}`)
 
   const text = cardTitle(title)
 
   if (text === '')
-    throw new Error('kay: shareCard() was given an empty title')
+    throw new KayError('share-card-invalid', 'kay: shareCard() was given an empty title')
 
   const spec = cardSpec(text, image)
   const linked = variantFilesLinked()
@@ -286,7 +287,7 @@ function cardUrl(cards: Cards, title: unknown, image: string | undefined): strin
   // A static export downloads a remote image to draw its card; a server draws it on request, from the copy the image route keeps fresh.
   if (image !== undefined && !image.startsWith(IMPORTED) && !(linked && REMOTE.test(image))) {
     if (linked)
-      throw new Error(`kay: shareCard() was given ${image}, which a static export holds no file of: only the card of an imported image, or one images.remote lists, is written at build`)
+      throw new KayError('share-card-invalid', `kay: shareCard() was given ${image}, which a static export holds no file of: only the card of an imported image, or one images.remote lists, is written at build`)
   }
   else if (cards.collect) {
     requested.set(cardFile(cards, spec), { title: text, image })
@@ -417,7 +418,7 @@ export async function writeCards(clientDir: string, cacheDir?: string, remote?: 
       const source = card.image === undefined ? undefined : await findSource(card.image, { clientDir, cacheDir: '', remote })
 
       if (source && 'status' in source)
-        throw new Error(`kay: a page's share card is drawn on ${card.image}, which the build could not download: ${source.message}`)
+        throw new KayError('share-card-invalid', `kay: a page's share card is drawn on ${card.image}, which the build could not download: ${source.message}`)
 
       await writeCard(current!, cached ?? target, card.title, source && { path: source.path, maxPixels: source.immutable ? undefined : MAX_UPLOAD_PIXELS })
       drawn++

@@ -8,6 +8,7 @@ import type { LoadedGuard } from './guards'
 import type { MountedApi } from './openapi'
 import type { Span } from './trace'
 import { Cookie, Elysia, ElysiaCustomStatusResponse, ElysiaFile } from 'elysia'
+import { KayError } from '../compiler/errors'
 import { API_MOUNT, END_EVENT, ERROR_EVENT } from '../runtime/live'
 import { kayLog } from '../runtime/log'
 import { encodeValue, unsendable } from '../runtime/wire'
@@ -65,7 +66,7 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
     const instance = (await importModule<{ default?: unknown }>(module.file)).default
 
     if (!(instance instanceof Elysia))
-      throw new TypeError(`kay: ${module.file} must export an Elysia instance by default: export default new Elysia().get('/', () => ...)`)
+      throw new KayError('route-invalid', `kay: ${module.file} must export an Elysia instance by default: export default new Elysia().get('/', () => ...)`)
 
     Object.defineProperty(instance, API_MOUNT, { value: module.mount, configurable: true })
     mounted.push({ ...module, instance })

@@ -36,17 +36,17 @@ export const ERRORS = {
   },
   'fence-invalid': {
     group: 'compile',
-    summary: 'A script or server fence that breaks a rule of kay: props declared twice or read wrongly, a value exported from a component script, JSX in a fence, a page setting kay cannot read as written.',
+    summary: 'A fence that breaks a rule of kay: a fence never closed or declared twice, props declared twice or read wrongly, a value exported from a component script, JSX in a fence, `page` not written as an object literal of `key: value` settings.',
     fix: { file: 'llms/components.md', heading: 'File layout' },
   },
   'fence-syntax': {
     group: 'compile',
-    summary: 'Code in a fence, or generated from the template, that TypeScript cannot parse.',
+    summary: 'Code in a fence that does not parse, or code the template generates that does not.',
     fix: { file: 'llms/components.md', heading: 'File layout' },
   },
   'page-settings-invalid': {
     group: 'compile',
-    summary: 'A page setting kay cannot read where it is written: `page` must be an object literal of `key: value` settings.',
+    summary: 'A page setting exported under its own name instead of inside `page`, such as `export const prerender = true`.',
     fix: { file: 'llms/routing.md', heading: 'Page settings' },
   },
   'signal-misuse': {
@@ -109,10 +109,60 @@ export const ERRORS = {
     summary: '`kay build --compile` without a server entry, or with a public directory named like the client assets.',
     fix: { file: 'llms/project.md', heading: 'Build one executable' },
   },
-  'executable-missing-content': {
+  'executable-incomplete': {
     group: 'build',
-    summary: 'A compiled executable holding no build of a collection.',
+    summary: 'A compiled executable that lacks a part of what it needs: the build of a collection, the client build, its fonts or a share card key.',
     fix: { file: 'llms/project.md', heading: 'Build one executable' },
+  },
+  'route-invalid': {
+    group: 'build',
+    summary: 'A route file the router cannot serve: a name with characters it cannot mount, a matcher, guard, endpoint or API module that exports the wrong thing, two files exporting the same action, or two extensions each giving an editor.',
+    fix: { file: 'llms/routing.md', heading: 'Pages and routing' },
+  },
+  'redirect-invalid': {
+    group: 'build',
+    summary: 'A redirect in `redirects` that does not start with `/`, holds something other than a `:param` or a final `*`, or goes to a path using a part its source lacks.',
+    fix: { file: 'llms/routing.md', heading: 'Redirects' },
+  },
+  'locales-invalid': {
+    group: 'build',
+    summary: 'An `i18n` config that does not hold together: no locales, a tag that is none, a default outside the locales, domains and `prefixDefault` together, `paths` naming a page that does not exist, or a catalog that exports no messages.',
+    fix: { file: 'llms/locales.md', heading: 'Configuring locales' },
+  },
+  'font-invalid': {
+    group: 'build',
+    summary: 'A font in `fonts` that is no font file, no installed Fontsource package, or lacks the weight, style or subset asked for.',
+    fix: { file: 'llms/head.md', heading: 'Fonts' },
+  },
+  'favicon-invalid': {
+    group: 'build',
+    summary: 'A favicon, manifest icon or SVG that is no SVG kay can draw, has no size, is not square, or a manifest path outside its scope.',
+    fix: { file: 'llms/head.md', heading: 'Favicon and web manifest' },
+  },
+  'share-card-invalid': {
+    group: 'build',
+    summary: 'A share card drawn with no font, a logo that is missing, not square or not an image kay draws, a colour that is no #rrggbb, or an empty title.',
+    fix: { file: 'llms/styles-and-assets.md', heading: 'Draw a share card for a page' },
+  },
+  'image-invalid': {
+    group: 'build',
+    summary: 'An image the build cannot fetch, or `images` settings that do not go together: `guard` with no `resolve`, a box given both a width and a height.',
+    fix: { file: 'llms/styles-and-assets.md', heading: 'Responsive images' },
+  },
+  'env-invalid': {
+    group: 'build',
+    summary: 'The environment does not match its schema.',
+    fix: { file: 'llms/server.md', heading: 'Environment' },
+  },
+  'config-invalid': {
+    group: 'build',
+    summary: 'A setting in kay.config.ts or a call that configures the server that kay refuses: `base`, `site`, `cors`, `preview`, `session`, `proxy`, `rateLimit`, a queue, a schedule, a size, or a file store asked for what it does not hold.',
+    fix: { file: 'llms/project.md', heading: 'Project setup' },
+  },
+  'export-private-file': {
+    group: 'export',
+    summary: 'A static export linking a private or stored file, which only a server can serve.',
+    fix: { file: 'llms/routing.md', heading: 'Static export' },
   },
   'search-page-unreadable': {
     group: 'build',
@@ -126,7 +176,7 @@ export const ERRORS = {
   },
   'content-invalid': {
     group: 'content',
-    summary: 'Entries of a collection that do not compile or match its schema, a slug two entries share, or a component the collection does not name.',
+    summary: 'Entries of a collection that do not compile or match its schema, a slug two entries share, a component the collection does not name, or a feed entry with an invalid date.',
     fix: { file: 'llms/content.md', heading: 'Collections' },
   },
   'markdown-invalid': {
@@ -151,7 +201,7 @@ export const ERRORS = {
   },
   'feed-needs-site': {
     group: 'content',
-    summary: 'A feed on a site with no `site` URL to build its links from, or an entry with an invalid date.',
+    summary: 'A feed on a site with no `site` URL to build its links from.',
     fix: { file: 'llms/content.md', heading: 'Feeds' },
   },
   'pagination-misuse': {
@@ -206,7 +256,7 @@ export const ERRORS = {
   },
   'export-guard': {
     group: 'export',
-    summary: 'A page, endpoint or API module a guard covers, or that `requireGuards` leaves with no guard: only a server runs one per request.',
+    summary: 'A page or endpoint a guard covers, or that `requireGuards` leaves with no guard: only a server runs one per request.',
     fix: { file: 'llms/server.md', heading: 'Guards' },
   },
   'export-action': {
@@ -241,13 +291,28 @@ export function isErrorGroup(name: string | undefined): name is ErrorGroup {
   return name !== undefined && Object.hasOwn(ERROR_GROUPS, name)
 }
 
+// The last errors raised, which a bundler's plugin hands on as log messages, its thrown error's code gone.
+const RAISED_KEPT = 64
+const raised: KayError[] = []
+
 // An error kay raised itself, its code the one `kay explain` documents.
 export class KayError extends Error {
   override name = 'KayError'
 
   constructor(readonly code: ErrorName, message: string, options?: ErrorOptions) {
     super(message, options)
+    raised.push(this)
+
+    if (raised.length > RAISED_KEPT)
+      raised.shift()
   }
+}
+
+// A failed `Bun.build`, keeping the code of the error a plugin threw in it.
+export function buildFailure(logs: readonly { message?: string }[], message: string): AggregateError {
+  const cause = raised.findLast(error => logs.some(log => log.message !== undefined && (log.message.includes(error.message) || error.message.includes(log.message))))
+
+  return Object.assign(new AggregateError(logs, message), cause && { code: cause.code })
 }
 
 // A problem a static export names, its code leading and the file it is in leading its message.
@@ -284,7 +349,7 @@ export function explainError(name: ErrorName): string {
   const error: ErrorCode = ERRORS[name]
 
   return [
-    `${name}: an error of ${error.group}, which stops the command raising it`,
+    `${name}: an error of ${error.group}`,
     error.summary,
     `The fix is written in ${error.fix.file}, in the section "${error.fix.heading}".`,
   ].join('\n\n')

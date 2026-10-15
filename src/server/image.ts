@@ -9,6 +9,7 @@ import { existsSync } from 'node:fs'
 import { readdir, rename, rm, stat } from 'node:fs/promises'
 import { basename, extname, join, normalize, resolve, sep } from 'node:path'
 import { ASSET_PREFIX } from '../build/assets'
+import { KayError } from '../compiler/errors'
 import { aspectKey, CARD, croppedSize, cutOrBelow, DEFAULT_ASPECTS, DEFAULT_MAX_DENSITY, FILES_ROUTE, IMAGE_ROUTE, IMAGE_WIDTHS, parseAspect, recordVariants, requestedRemoteVariants, requestedVariants, RESIZABLE, setAspects, setMaxDensity, setRemoteImages, setResolvedImages, SMALL_STEP, variantHeight, variantSuffix } from '../runtime/image'
 import { inLocale, passGuards } from './actions'
 import { AVIF_ENCODER, AVIF_SPEED, DEFAULT_AVIF_QUALITY, encodeAvif } from './avif'
@@ -504,7 +505,7 @@ export function applyImageConfig(images: { maxDensity?: number | undefined, aspe
   const maxDensity = images?.maxDensity ?? DEFAULT_MAX_DENSITY
 
   if (images?.guard !== undefined && images.resolve === undefined)
-    throw new Error('kay: images.guard admits the images images.resolve looks up, and images.resolve is not set')
+    throw new KayError('image-invalid', 'kay: images.guard admits the images images.resolve looks up, and images.resolve is not set')
 
   if (!(maxDensity >= 1))
     throw new Error(`images.maxDensity is ${maxDensity}: it is at least 1, or Infinity to leave the browser's choice`)
@@ -533,7 +534,7 @@ export async function writeRemoteVariants(clientDir: string, remote: RemoteImage
     const original = await remote(src)
 
     if ('status' in original)
-      throw new Error(`kay: a page links ${src}, which the build could not download: ${original.message}`)
+      throw new KayError('image-invalid', `kay: a page links ${src}, which the build could not download: ${original.message}`)
 
     await imageSize(Bun.file(original.path))
     await writeVariant(original.path, variant, target, quality)
@@ -574,7 +575,7 @@ export async function processImage(input: Blob | Uint8Array | ArrayBuffer, optio
 
   if (options.fit === 'cover') {
     if (options.width === undefined || options.height === undefined)
-      throw new Error('kay: processImage() covers a box given both its width and its height')
+      throw new KayError('image-invalid', 'kay: processImage() covers a box given both its width and its height')
 
     image = new Bun.Image(await coverImage(source, options.width, options.height, maxPixels))
   }

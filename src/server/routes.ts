@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import { findKayFiles, findProjectFiles } from '../build/files'
 import { throughLinks } from '../build/links'
+import { KayError } from '../compiler/errors'
 
 const chains = new WeakMap<string[], { file: string, files: string[], key: string }>()
 
@@ -271,10 +272,10 @@ function endpointOf(routesDir: string, file: string, prefix: string): Omit<Endpo
     return undefined
 
   if (route.catchAll !== undefined || route.optional || route.matchers)
-    throw new Error(`kay: ${file} answers one path per set of params, so each of its params is a plain [name] segment, with no ..., [[ ]] or matcher`)
+    throw new KayError('route-invalid', `kay: ${file} answers one path per set of params, so each of its params is a plain [name] segment, with no ..., [[ ]] or matcher`)
 
   if (route.pattern.split('/').some(segment => !segment.startsWith(':') && (BRACKETS.test(segment) || ROUTER_SYNTAX.test(segment))))
-    throw new Error(`kay: ${file} has a [, ], :, * or ' in its name outside a [name] param, which the router cannot serve; rename it`)
+    throw new KayError('route-invalid', `kay: ${file} has a [, ], :, * or ' in its name outside a [name] param, which the router cannot serve; rename it`)
 
   return { pattern: route.pattern, file, params: route.params, ...suffixed && { suffix: suffixed[2] } }
 }
@@ -298,7 +299,7 @@ export function endpointKey(endpoint: Pick<Endpoint, 'pattern' | 'suffix'>): str
 export function refuseRouteNames(routesDir: string, routes: Route[]): void {
   for (const route of routes) {
     if (relative(routesDir, route.file).replace(KAY_EXTENSION, '').split(sep).some(segment => !DYNAMIC_SEGMENT.test(segment) && !OPTIONAL_SEGMENT.test(segment) && !GROUP_SEGMENT.test(segment) && ROUTER_SYNTAX.test(segment)))
-      throw new Error(`kay: ${route.file} has a :, * or ' in its name, which the router cannot serve; rename it`)
+      throw new KayError('route-invalid', `kay: ${route.file} has a :, * or ' in its name, which the router cannot serve; rename it`)
   }
 }
 
@@ -555,7 +556,7 @@ export function extensionEditor(root: string, extensions: KayExtension[] = []): 
   const giving = extensions.filter(extension => extension.editor !== undefined)
 
   if (giving.length > 1)
-    throw new Error(`kay: the extensions ${giving.map(extension => extension.name).join(' and ')} each give an editor, and a page shows one: list one of them in extensions`)
+    throw new KayError('route-invalid', `kay: the extensions ${giving.map(extension => extension.name).join(' and ')} each give an editor, and a page shows one: list one of them in extensions`)
 
   return giving[0] && throughLinks(root, resolve(root, giving[0].editor!))
 }

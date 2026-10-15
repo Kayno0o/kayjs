@@ -123,7 +123,7 @@ async function builtEntries(dir: string): Promise<RawEntry[] | undefined> {
     return await file.json() as RawEntry[]
 
   if (source.embedded)
-    throw new KayError('executable-missing-content', `kay: this executable holds no build of the collection ${dir}; run \`kay build --compile\` again`)
+    throw new KayError('executable-incomplete', `kay: this executable holds no build of the collection ${dir}; run \`kay build --compile\` again`)
 
   return undefined
 }

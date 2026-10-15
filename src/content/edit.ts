@@ -602,7 +602,7 @@ async function loadedFound(name: string, collection: Collection<unknown>, locali
     one = await get(filter.locale === undefined ? filter.slug : `${filter.locale}/${filter.slug}`, { preview: true })
   }
   catch (error) {
-    throw new Error(`kay: ${name}'s get threw: ${error instanceof Error ? error.message : String(error)}`, { cause: error })
+    throw new KayError('loader-result', `kay: ${name}'s get threw: ${error instanceof Error ? error.message : String(error)}`, { cause: error })
   }
 
   return kept(one === undefined ? [] : [sourceOf(name, one)], localized, filter)

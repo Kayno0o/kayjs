@@ -37,7 +37,7 @@ export function feedXml<Data>(entries: Entry<Data>[], options: FeedOptions<Data>
     const item = options.item(entry)
 
     if (item && Number.isNaN(item.date.getTime()))
-      throw new KayError('feed-needs-site', `kay: the feed at ${options.path} gives ${entry.file} an invalid date`)
+      throw new KayError('content-invalid', `kay: the feed at ${options.path} gives ${entry.file} an invalid date`)
 
     return item ? [item] : []
   }).sort((a, b) => b.date.getTime() - a.date.getTime()).slice(0, options.limit ?? DEFAULT_LIMIT)

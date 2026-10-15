@@ -1,6 +1,7 @@
 import type { PagesOptions } from './app'
 import process from 'node:process'
 import { bunProblem } from '../bun'
+import { KayError } from '../compiler/errors'
 import { resolveProject } from '../project'
 import { kayLog } from '../runtime/log'
 import { servePages } from './app'
@@ -53,7 +54,7 @@ export async function pages(options: PagesOptions = {}) {
   const problem = bunProblem()
 
   if (problem !== undefined)
-    throw new Error(`kay: ${problem}`)
+    throw new KayError('config-invalid', `kay: ${problem}`)
 
   const source = projectSource()
   const mode = source.mode(options)

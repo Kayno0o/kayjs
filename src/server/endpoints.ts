@@ -64,7 +64,7 @@ async function loadEndpoint(endpoint: Endpoint, required: boolean | undefined): 
   const get = (await importModule<{ GET?: unknown }>(endpoint.file)).GET
 
   if (typeof get !== 'function')
-    throw new TypeError(`kay: ${endpoint.file} must export a GET handler: export function GET(ctx) { return 'text' }`)
+    throw new KayError('route-invalid', `kay: ${endpoint.file} must export a GET handler: export function GET(ctx) { return 'text' }`)
 
   return { ...endpoint, get: get as Handler, guards: requiredGuards(await Promise.all(endpoint.guards.map(loadGuard)), endpoint, {}, required), type: Bun.file(`file${endpoint.suffix ?? basename(endpoint.pattern).slice(basename(endpoint.pattern).indexOf('.'))}`).type }
 }
@@ -111,7 +111,7 @@ function responseOf(endpoint: ServedEndpoint, body: unknown): Response {
   if (body instanceof Blob)
     return new Response(body, { headers: { 'content-type': body.type || endpoint.type } })
 
-  throw new TypeError(`kay: ${endpoint.file}'s GET returned ${body === null ? 'null' : typeof body}, where it returns a string, a Blob or a Response`)
+  throw new KayError('route-invalid', `kay: ${endpoint.file}'s GET returned ${body === null ? 'null' : typeof body}, where it returns a string, a Blob or a Response`)
 }
 
 // The paths a static export writes each endpoint to: its own path without params, or each its `prerender` lists; what keeps one from it is a problem, named by file.

@@ -1,4 +1,5 @@
 import type { Elysia } from 'elysia'
+import { KayError } from '../compiler/errors'
 import { joinBase, rebaseSrcset } from '../runtime/base'
 import { URL_ATTRIBUTES } from '../runtime/url-attributes'
 
@@ -19,7 +20,7 @@ export function basePath(value: string | undefined): string {
   const trimmed = value.endsWith('/') ? value.slice(0, -1) : value
 
   if (!BASE_PATH.test(trimmed))
-    throw new Error(`kay: base is ${value}, which is no path such as /docs`)
+    throw new KayError('config-invalid', `kay: base is ${value}, which is no path such as /docs`)
 
   return trimmed
 }

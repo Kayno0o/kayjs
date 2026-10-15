@@ -1,6 +1,7 @@
 import type { KayConfig } from '../config'
 import type { ApiModule } from './api-modules'
 import type { Endpoint, Route, SpecialPages } from './routes'
+import { KayError } from '../compiler/errors'
 
 // What `kay build --compile` bakes into an executable: the routes as the build scanned them, every module they name, and where the embedded client build and public files sit.
 export interface Bundle {
@@ -41,7 +42,7 @@ const imported = new Map<string, unknown>()
 export async function importModule<Module>(file: string): Promise<Module> {
   if (bundle) {
     if (!(file in bundle.modules))
-      throw new Error(`kay: this executable holds no ${file}; run \`kay build --compile\` again`)
+      throw new KayError('executable-incomplete', `kay: this executable holds no ${file}; run \`kay build --compile\` again`)
 
     return bundle.modules[file] as Module
   }

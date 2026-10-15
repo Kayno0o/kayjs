@@ -2,6 +2,7 @@ import type { CronSchedule, PositiveDuration } from '../runtime/checks'
 import type { Duration } from '../runtime/duration'
 import type { JobStore } from './queue'
 import { Elysia } from 'elysia'
+import { KayError } from '../compiler/errors'
 import { DURATION_TEXT, durationSeconds } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
 import { defaultJobStore } from './queue'
@@ -34,7 +35,7 @@ function scheduleCron(cron: string, job: () => unknown, options: ScheduleOptions
 
   // A typo fails the boot rather than never running.
   if (Bun.cron.parse(cron, Date.now(), zone) === null)
-    throw new Error(`kay: the schedule ${cron} never comes`)
+    throw new KayError('config-invalid', `kay: the schedule ${cron} never comes`)
 
   let handle: Bun.CronJob | undefined
   let running: Promise<void> | undefined
@@ -61,7 +62,7 @@ function scheduleEvery(every: Duration, job: () => unknown, options: ScheduleOpt
   const ms = durationSeconds(every, `the schedule ${String(every)}`) * 1000
 
   if (options.tz !== undefined)
-    throw new Error(`kay: the schedule ${String(every)} takes no tz, it runs every ${String(every)} from the epoch`)
+    throw new KayError('config-invalid', `kay: the schedule ${String(every)} takes no tz, it runs every ${String(every)} from the epoch`)
 
   let timer: Timer | undefined
   let running: Promise<void> | undefined

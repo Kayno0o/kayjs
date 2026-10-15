@@ -96,19 +96,19 @@ export function parseKay(source: string): KayFile {
     templateStart = closing ? closing.end : source.length
 
     if (!closing)
-      diagnostics.push({ start: fence.index, end: fence.index + 3, message: 'This fence is never closed with a `---` line' })
+      diagnostics.push({ start: fence.index, end: fence.index + 3, code: 'fence-invalid', message: 'This fence is never closed with a `---` line' })
 
     if (!spaced || (kind !== 'script' && kind !== 'server'))
-      diagnostics.push({ start: fence.index, end: bodyStart - 1, message: `Unknown fence \`${fence[0].trim()}\``, help: 'use `---` or `--- script` for the component script, `--- client` for one rendering in the browser only, or `--- server` for server code' })
+      diagnostics.push({ start: fence.index, end: bodyStart - 1, code: 'fence-invalid', message: `Unknown fence \`${fence[0].trim()}\``, help: 'use `---` or `--- script` for the component script, `--- client` for one rendering in the browser only, or `--- server` for server code' })
     else if (fences[kind])
-      diagnostics.push({ start: fence.index, end: bodyStart - 1, message: `A file has one ${kind === 'server' ? '`--- server`' : 'script'} fence` })
+      diagnostics.push({ start: fence.index, end: bodyStart - 1, code: 'fence-invalid', message: `A file has one ${kind === 'server' ? '`--- server`' : 'script'} fence` })
     else
       fences[kind] = span
 
     const parameters = fence.indices?.[3] ?? fence.indices?.[4]
 
     if (kind === 'server' && parameters)
-      diagnostics.push({ start: parameters[0], end: parameters[1], message: 'Type parameters go on the component script fence', help: '`--- <T>`' })
+      diagnostics.push({ start: parameters[0], end: parameters[1], code: 'fence-invalid', message: 'Type parameters go on the component script fence', help: '`--- <T>`' })
 
     if (kind === 'script' && fences.script === span) {
       if (parameters)

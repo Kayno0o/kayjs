@@ -82,18 +82,18 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 
 ## Errors
 
-A template that does not compile, a build that stops, a collection that does not load and a page a static export cannot hold carry a code too, printed in brackets as `error[template-syntax]` or after the failure as `kay explain <code> says where the fix is written`. `kay check --format json`, `kay build --format json` and `kay explain --format json` carry it as `code`, which is `null` only for what kay did not raise itself, such as a type error TypeScript names by number.
+A template that does not compile, a build that stops, a collection that does not load and a page a static export cannot hold carry a code too, printed in brackets as `error[template-syntax]` or after the failure as `kay explain <code> says where the fix is written`. `kay check --format json`, `kay build --format json` and `kay explain --format json` carry it as `code`, which is `null` for what kay did not raise at compile, build, content or export time, such as a type error TypeScript names by number.
 
-`kay explain <code>` prints what raises it and the section that covers the fix, and `kay explain compile`, `command`, `build`, `content` or `export` lists a group's. The codes are stable names, one for a group of messages with one cause. No level applies to them and no `// kay-allow` comment reaches them: each stops the command raising it.
+`kay explain <code>` prints what raises it and the section that covers the fix, and `kay explain compile`, `command`, `build`, `content` or `export` lists a group's. The codes are stable names, one for a group of messages with one cause. No level applies to them and no `// kay-allow` comment reaches them. Errors kay raises while serving a request, and the app's own code, carry none.
 
 | Error | Group | Raised for | Fix |
 | --- | --- | --- | --- |
 | `command-usage` | command | A command that could not run as asked: a path that does not exist or is no project, a flag it does not take, flags that do not go together. | [Commands](/reference/cli) |
 | `template-syntax` | compile | A template line kay cannot read: indentation, an unclosed `(` or string, a malformed `for`, `const`, `await` or `match`, an attribute that is neither a quoted string nor a `{expression}`. | [Template lines](/essentials/templates) |
 | `template-invalid` | compile | A template that reads but is not allowed: a `head` block in the wrong place, a duplicate id or class, an attribute that has no effect there, a `field`, `server` or `bind:` used wrongly, an event that is not camelCase. | [Elements](/essentials/templates) |
-| `fence-invalid` | compile | A script or server fence that breaks a rule of kay: props declared twice or read wrongly, a value exported from a component script, JSX in a fence, a page setting kay cannot read as written. | [File layout](/essentials/components) |
-| `fence-syntax` | compile | Code in a fence, or generated from the template, that TypeScript cannot parse. | [File layout](/essentials/components) |
-| `page-settings-invalid` | compile | A page setting kay cannot read where it is written: `page` must be an object literal of `key: value` settings. | [Page settings](/essentials/routing) |
+| `fence-invalid` | compile | A fence that breaks a rule of kay: a fence never closed or declared twice, props declared twice or read wrongly, a value exported from a component script, JSX in a fence, `page` not written as an object literal of `key: value` settings. | [File layout](/essentials/components) |
+| `fence-syntax` | compile | Code in a fence that does not parse, or code the template generates that does not. | [File layout](/essentials/components) |
+| `page-settings-invalid` | compile | A page setting exported under its own name instead of inside `page`, such as `export const prerender = true`. | [Page settings](/essentials/routing) |
 | `signal-misuse` | compile | A signal or memo written the wrong way: a memo assigned, a name declared twice, a `bind:` to a name holding no signal. | [Signals](/essentials/components) |
 | `client-route-fence` | compile | A page, layout or special page with a `--- client` fence: they render on the server. | [Islands](/essentials/islands) |
 | `browser-only-read` | compile | A browser-only name such as `window` read while a component renders on the server too; reported by the type check, so a page still runs. | [Browser globals on the server](/essentials/islands) |
@@ -106,15 +106,25 @@ A template that does not compile, a build that stops, a collection that does not
 | `icon-unresolved` | build | An icon of a set that is not installed, or a name the set does not have. | [Icons](/essentials/styling-and-assets) |
 | `library-settings` | build | `settings` naming a library that is not installed, declares no settings module, or whose module is missing. | [Using a component library](/essentials/components) |
 | `executable-invalid` | build | `kay build --compile` without a server entry, or with a public directory named like the client assets. | [Build one executable](/reference/cli) |
-| `executable-missing-content` | build | A compiled executable holding no build of a collection. | [Build one executable](/reference/cli) |
+| `executable-incomplete` | build | A compiled executable that lacks a part of what it needs: the build of a collection, the client build, its fonts or a share card key. | [Build one executable](/reference/cli) |
+| `route-invalid` | build | A route file the router cannot serve: a name with characters it cannot mount, a matcher, guard, endpoint or API module that exports the wrong thing, two files exporting the same action, or two extensions each giving an editor. | [Pages and routing](/essentials/routing) |
+| `redirect-invalid` | build | A redirect in `redirects` that does not start with `/`, holds something other than a `:param` or a final `*`, or goes to a path using a part its source lacks. | [Redirects](/essentials/routing) |
+| `locales-invalid` | build | An `i18n` config that does not hold together: no locales, a tag that is none, a default outside the locales, domains and `prefixDefault` together, `paths` naming a page that does not exist, or a catalog that exports no messages. | [Configuring locales](undefined) |
+| `font-invalid` | build | A font in `fonts` that is no font file, no installed Fontsource package, or lacks the weight, style or subset asked for. | [Fonts](/essentials/head-and-seo) |
+| `favicon-invalid` | build | A favicon, manifest icon or SVG that is no SVG kay can draw, has no size, is not square, or a manifest path outside its scope. | [Favicon and web manifest](/essentials/head-and-seo) |
+| `share-card-invalid` | build | A share card drawn with no font, a logo that is missing, not square or not an image kay draws, a colour that is no #rrggbb, or an empty title. | [Draw a share card for a page](/essentials/styling-and-assets) |
+| `image-invalid` | build | An image the build cannot fetch, or `images` settings that do not go together: `guard` with no `resolve`, a box given both a width and a height. | [Responsive images](/essentials/styling-and-assets) |
+| `env-invalid` | build | The environment does not match its schema. | [Environment](/guides/sessions-and-guards) |
+| `config-invalid` | build | A setting in kay.config.ts or a call that configures the server that kay refuses: `base`, `site`, `cors`, `preview`, `session`, `proxy`, `rateLimit`, a queue, a schedule, a size, or a file store asked for what it does not hold. | [Project setup](/reference/cli) |
+| `export-private-file` | export | A static export linking a private or stored file, which only a server can serve. | [Static export](/essentials/routing) |
 | `search-page-unreadable` | build | The search index could not read a prerendered page. | [Site search](/essentials/head-and-seo) |
 | `config-default-export` | build | kay.config.ts that does not export its config by default. | [Project setup](/reference/cli) |
-| `content-invalid` | content | Entries of a collection that do not compile or match its schema, a slug two entries share, or a component the collection does not name. | [Collections](/guides/content) |
+| `content-invalid` | content | Entries of a collection that do not compile or match its schema, a slug two entries share, a component the collection does not name, or a feed entry with an invalid date. | [Collections](/guides/content) |
 | `markdown-invalid` | content | Markdown or data an entry holds that kay cannot read: a component never closed, an attribute kay cannot read, JSON or YAML that does not parse. | [Components in Markdown](/guides/content) |
 | `content-config-missing` | content | The content config the project names does not exist, or a collection is not exported from it. | [Collections](/guides/content) |
 | `loader-result` | content | A collection's `load` that threw, did not give an array, or gave an entry with no slug. | [Loaded collections](/guides/content) |
 | `loader-method` | content | An entry saved or removed through a loader that declares no `save` or `remove`. | [Loaded collections](/guides/content) |
-| `feed-needs-site` | content | A feed on a site with no `site` URL to build its links from, or an entry with an invalid date. | [Feeds](/guides/content) |
+| `feed-needs-site` | content | A feed on a site with no `site` URL to build its links from. | [Feeds](/guides/content) |
 | `pagination-misuse` | content | A page size that is not a whole number from 1, or `page()` called when no page renders. | [Pagination](/guides/content) |
 | `content-api-misuse` | content | An editor helper asked for what the collection is not: a locale of a collection that is not localized, a folder collection's file from a loaded one, a folder outside the repository or missing. | [A CMS editing the collections](/guides/content) |
 | `export-unsupported-config` | export | A config a static export cannot serve: locales by domain, or an image route resolving images per request. | [Static export](/essentials/routing) |
@@ -125,7 +135,7 @@ A template that does not compile, a build that stops, a collection that does not
 | `export-image-route` | export | A page linking an image only the image route resizes, which no file of the export holds. | [Static export](/essentials/routing) |
 | `export-site-url` | export | A page reading the site's URL when neither `site` nor SITE_URL sets it. | [Site defaults and social cards](/essentials/head-and-seo) |
 | `export-server-render` | export | A page with something only a server renders per request: a server island, a form stamp or work challenge, a deferred island with no browser entry. | [Server islands](/essentials/routing) |
-| `export-guard` | export | A page, endpoint or API module a guard covers, or that `requireGuards` leaves with no guard: only a server runs one per request. | [Guards](/guides/sessions-and-guards) |
+| `export-guard` | export | A page or endpoint a guard covers, or that `requireGuards` leaves with no guard: only a server runs one per request. | [Guards](/guides/sessions-and-guards) |
 | `export-action` | export | A page exporting an action, which only a server can take. | [Static export](/essentials/routing) |
 | `export-path-clash` | export | Two pages that would be prerendered to the same file. | [Prerendering](/essentials/routing) |
 | `export-api-module` | export | An API module, which answers requests only a server does. | [API modules](/guides/api-routes) |

@@ -3,6 +3,7 @@ import type { KayConfig } from '../config'
 import type { RouteMount } from './routes'
 import { existsSync, realpathSync } from 'node:fs'
 import { basename, dirname, join, relative, sep } from 'node:path'
+import { KayError } from '../compiler/errors'
 import { projectPaths } from '../project'
 import { apiMounts, directoriesUp, falseKeys, fileAt } from './routes'
 
@@ -71,7 +72,7 @@ export async function scanApi(apiDir: string, mounts: RouteMount[] = []): Promis
         continue
 
       if (ROUTER_SYNTAX.test(name))
-        throw new Error(`kay: ${join(dir, path)} has a :, * or ' in its path, which the router cannot mount; rename it`)
+        throw new KayError('route-invalid', `kay: ${join(dir, path)} has a :, * or ' in its path, which the router cannot mount; rename it`)
 
       const mount = mountOf(prefix, name)
       const at = `${prefix}/${dirname(name)}`.replace(CURRENT_DIR, '')
@@ -134,7 +135,7 @@ export function apiStubs(trees: RouteMount[]): BunPlugin {
         const name = relative(dir, path).split(sep).join('/')
 
         if (NOT_A_MODULE.test(name))
-          throw new Error(`kay: an island imports ${name}, which is no module under ${basename(dir)}: only a module's default export reaches the browser, as where its routes are served`)
+          throw new KayError('route-invalid', `kay: an island imports ${name}, which is no module under ${basename(dir)}: only a module's default export reaches the browser, as where its routes are served`)
 
         return { contents: `export default { [Symbol.for('kay.api')]: ${JSON.stringify(mountOf(prefix, name))} }`, loader: 'js' }
       })

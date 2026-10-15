@@ -14,6 +14,7 @@ import { ExportError } from '../src/server/prerender'
 const root = join(import.meta.dir, '..')
 const cli = join(root, 'src/cli.ts')
 const SLUG_PUNCTUATION = /[^\w\s-]/g
+const PLAIN_KAY_ERROR = /new (?:Range|Type)?Error\((?:`|')kay/
 const RAISED = /new KayError\(\s*'([\w-]+)'/g
 const LITERAL = /'([a-z]+(?:-[a-z]+)+|[a-z]+)'/g
 
@@ -45,6 +46,22 @@ describe('error codes', () => {
 
     expect(raised.filter(code => !isErrorCode(code))).toEqual([])
     expect(Object.keys(ERRORS).filter(code => !written.has(code))).toEqual([])
+  })
+
+  it('leave no error of build, config, content or export time without one, but in the files that serve a request, scaffold or test', async () => {
+    // Raised while serving a request, in the dev tool, the editor, `kay new` or the test helpers: no code, as docs say.
+    const uncoded = new Set(['src/dev/inspector.ts', 'src/dev/tailwind.ts', 'src/lsp/server.ts', 'src/new.ts', 'src/server/actions.ts', 'src/server/api.ts', 'src/server/avif.ts', 'src/server/card-draw.ts', 'src/server/crop.ts', 'src/server/i18n.ts', 'src/server/image-format.ts', 'src/server/lifecycle.ts', 'src/server/loader.ts', 'src/server/queue.ts', 'src/server/session.ts', 'src/server/signals.ts'])
+    const found: string[] = []
+
+    for (const file of new Glob('src/**/*.ts').scanSync({ cwd: root })) {
+      if (file.startsWith('src/runtime/') || file.startsWith('src/test/') || uncoded.has(file))
+        continue
+
+      if (PLAIN_KAY_ERROR.test(await Bun.file(join(root, file)).text()))
+        found.push(file)
+    }
+
+    expect(found).toEqual([])
   })
 
   it('point to a section of llms/ that exists', async () => {

@@ -137,7 +137,7 @@ describe('deprecated-schema-name', () => {
   it('leaves a fence or module declaring a name twice to the type check, which reports it', () => {
     const twice = 'import { t } from \'kay\'\nconst a = 1\nconst a = 2\n'
 
-    const duplicate = { code: 'fence-invalid', severity: undefined, at: 'a' }
+    const duplicate = { code: 'fence-syntax', severity: undefined, at: 'a' }
     // The statement declaring it again is left out of the analysis, which still reads the rest.
     const deprecated = { code: 'deprecated-schema-name', severity: 'warning' as const, at: 't' }
 

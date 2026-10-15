@@ -3,6 +3,7 @@ import type { HeadTag } from '../runtime/head'
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, extname, isAbsolute, join, resolve } from 'node:path'
 import { writeAsset } from '../build/assets'
+import { KayError } from '../compiler/errors'
 
 // What every page carries for the fonts: their `@font-face` rules and the files to preload.
 export interface FontAssets {
@@ -32,7 +33,7 @@ export async function prepareFonts(root: string, fonts: (FontConfig | Fontsource
     const format = FORMATS[extname(file).toLowerCase()]
 
     if (format === undefined)
-      throw new Error(`kay: the font ${font.src} is no .woff2, .woff, .ttf or .otf file`)
+      throw new KayError('font-invalid', `kay: the font ${font.src} is no .woff2, .woff, .ttf or .otf file`)
 
     const url = await writeAsset(file, root)
     const declarations = [
@@ -102,7 +103,7 @@ function fontsourceFaces(root: string, font: FontsourceConfig): FontConfig[] {
     file = Bun.resolveSync(`${fontsource}/metadata.json`, root)
   }
   catch {
-    throw new Error(`kay: the fonts name ${fontsource}, which is no installed Fontsource package; bun add ${fontsource}`)
+    throw new KayError('font-invalid', `kay: the fonts name ${fontsource}, which is no installed Fontsource package; bun add ${fontsource}`)
   }
 
   const metadata = JSON.parse(readFileSync(file, 'utf8')) as FontsourceMetadata
@@ -111,13 +112,13 @@ function fontsourceFaces(root: string, font: FontsourceConfig): FontConfig[] {
   const variable = fontsource.startsWith(VARIABLE_SCOPE) ? metadata.variable !== undefined && metadata.variable !== false ? metadata.variable.wght : undefined : undefined
 
   if (fontsource.startsWith(VARIABLE_SCOPE) && !variable)
-    throw new Error(`kay: ${fontsource} has no weight axis to declare`)
+    throw new KayError('font-invalid', `kay: ${fontsource} has no weight axis to declare`)
 
   const faces: FontConfig[] = []
 
   for (const subset of subsets) {
     if (!metadata.subsets.includes(subset))
-      throw new Error(`kay: ${fontsource} has no subset ${subset}; it has ${metadata.subsets.join(', ')}`)
+      throw new KayError('font-invalid', `kay: ${fontsource} has no subset ${subset}; it has ${metadata.subsets.join(', ')}`)
   }
 
   // One subset needs no range, its file holding every character the site uses.
@@ -131,11 +132,11 @@ function fontsourceFaces(root: string, font: FontsourceConfig): FontConfig[] {
 
   for (const style of styles) {
     if (!metadata.styles.includes(style))
-      throw new Error(`kay: ${fontsource} has no ${style} faces`)
+      throw new KayError('font-invalid', `kay: ${fontsource} has no ${style} faces`)
 
     if (variable) {
       if (weights !== undefined)
-        throw new Error(`kay: ${fontsource} is variable, one face spanning weights ${variable.min} to ${variable.max}, so its entry lists no weights`)
+        throw new KayError('font-invalid', `kay: ${fontsource} is variable, one face spanning weights ${variable.min} to ${variable.max}, so its entry lists no weights`)
 
       faces.push(...facesOf(`wght-${style}`, { weight: `${variable.min} ${variable.max}`, style, display }))
 
@@ -143,11 +144,11 @@ function fontsourceFaces(root: string, font: FontsourceConfig): FontConfig[] {
     }
 
     if (weights === undefined || weights.length === 0)
-      throw new Error(`kay: ${fontsource} holds a face per weight, so its entry lists the weights the site uses, among ${metadata.weights.join(', ')}`)
+      throw new KayError('font-invalid', `kay: ${fontsource} holds a face per weight, so its entry lists the weights the site uses, among ${metadata.weights.join(', ')}`)
 
     for (const weight of weights) {
       if (!metadata.weights.includes(weight))
-        throw new Error(`kay: ${fontsource} has no weight ${weight}; it has ${metadata.weights.join(', ')}`)
+        throw new KayError('font-invalid', `kay: ${fontsource} has no weight ${weight}; it has ${metadata.weights.join(', ')}`)
 
       faces.push(...facesOf(`${weight}-${style}`, { weight, style, display }))
     }
@@ -172,7 +173,7 @@ function subsetRange(metadataFile: string, metadata: FontsourceMetadata, subset:
       return range!.trim()
   }
 
-  throw new Error(`kay: the package of ${metadata.family} names no unicode-range for its ${subset} subset, which a face of several subsets needs`)
+  throw new KayError('font-invalid', `kay: the package of ${metadata.family} names no unicode-range for its ${subset} subset, which a face of several subsets needs`)
 }
 
 // A path relative to the root, or a file of an installed package such as `@fontsource-variable/inter/files/inter-latin-wght-normal.woff2`.
@@ -184,6 +185,6 @@ function fontFile(root: string, src: string): string {
     return Bun.resolveSync(src, root)
   }
   catch {
-    throw new Error(`kay: the font ${src} is neither a file under the project nor one of an installed package`)
+    throw new KayError('font-invalid', `kay: the font ${src} is neither a file under the project nor one of an installed package`)
   }
 }

@@ -3,6 +3,7 @@ import type { HeadOptions, HeadTag, ImageSize } from '../runtime/head'
 import type { FontAssets } from './fonts'
 import type { LocaleCopy } from './i18n'
 import { join } from 'node:path'
+import { KayError } from '../compiler/errors'
 import { projectPaths } from '../project'
 import { inlineText } from '../runtime/head'
 import { CARD, CARD_ROUTE, IMAGE_ROUTE, importedSize, RESIZABLE, VARIANTS } from '../runtime/image'
@@ -35,7 +36,7 @@ export async function configHead(root: string, config: KayConfig, clientDir: str
     fonts = bundled ? await builtFonts(dir) : await prepareFonts(root, config.fonts, dir)
 
     if (!fonts)
-      throw new Error('kay: this executable holds no fonts; build it again with kay build --compile')
+      throw new KayError('executable-incomplete', 'kay: this executable holds no fonts; build it again with kay build --compile')
 
     extra.push(...fontTags(fonts))
     styles.push(fonts.css)
@@ -158,7 +159,7 @@ export function siteOrigin(site: string): string {
   catch {}
 
   if (!url || (url.protocol !== 'https:' && url.protocol !== 'http:') || url.pathname !== '/' || url.search !== '' || url.hash !== '')
-    throw new Error(`kay: site is the origin the site is public at, such as https://example.com, not ${JSON.stringify(site)}`)
+    throw new KayError('config-invalid', `kay: site is the origin the site is public at, such as https://example.com, not ${JSON.stringify(site)}`)
 
   return url.origin
 }

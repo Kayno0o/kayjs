@@ -1,4 +1,5 @@
 import { Resvg } from '@resvg/resvg-js'
+import { KayError } from '../compiler/errors'
 import { kayLog } from '../runtime/log'
 
 // The root `svg` tag, read once comments are gone, a `>` inside a quoted value included, and the attributes giving it a size.
@@ -19,7 +20,7 @@ export async function svgIcon(file: string, what: string, warn = (message: strin
     parsed = new Resvg(svg, OPTIONS)
   }
   catch (error) {
-    throw new Error(`kay: the ${what} ${file} is not an SVG kay can draw: ${error instanceof Error ? error.message : String(error)}`)
+    throw new KayError('favicon-invalid', `kay: the ${what} ${file} is not an SVG kay can draw: ${error instanceof Error ? error.message : String(error)}`)
   }
 
   const markup = svg.replace(COMMENT, '')
@@ -27,10 +28,10 @@ export async function svgIcon(file: string, what: string, warn = (message: strin
   const sized = (name: string) => attributes.has(name) && !PERCENT.test(attributes.get(name)!)
 
   if (!attributes.has('viewbox') && !(sized('width') && sized('height')))
-    throw new Error(`kay: the ${what} ${file} has no viewBox, nor a width and height, so it has no size to draw at; give its svg tag a viewBox`)
+    throw new KayError('favicon-invalid', `kay: the ${what} ${file} has no viewBox, nor a width and height, so it has no size to draw at; give its svg tag a viewBox`)
 
   if (parsed.width !== parsed.height)
-    throw new Error(`kay: the ${what} ${file} is ${parsed.width}x${parsed.height}; it has to be square`)
+    throw new KayError('favicon-invalid', `kay: the ${what} ${file} is ${parsed.width}x${parsed.height}; it has to be square`)
 
   if (TEXT.test(markup))
     warn(`the ${what} ${file} has text, which kay draws without fonts, so as nothing; turn the text into paths`)
@@ -42,7 +43,7 @@ async function readSvg(file: string, what: string): Promise<string> {
   const source = Bun.file(file)
 
   if (!await source.exists())
-    throw new Error(`kay: no ${what} at ${file}`)
+    throw new KayError('favicon-invalid', `kay: no ${what} at ${file}`)
 
   return source.text()
 }

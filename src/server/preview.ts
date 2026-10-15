@@ -7,6 +7,7 @@ import type { DraftEntry, DraftIssue } from '../runtime/edit'
 import type { EntryDraft, PreviewMode, PreviewState } from '../runtime/preview'
 import type { BodyLimit } from './body'
 import { AsyncLocalStorage } from 'node:async_hooks'
+import { KayError } from '../compiler/errors'
 import { entryIssues } from '../content/edit'
 import { durationSeconds } from '../runtime/duration'
 import { exportNameOf } from '../runtime/fields'
@@ -56,7 +57,7 @@ export function setupPreview(config: PreviewConfig | undefined, base: string): v
   }
 
   if (typeof config.secret !== 'string' || config.secret.length < MIN_SECRET_LENGTH)
-    throw new Error(`kay: preview.secret in kay.config.ts is ${typeof config.secret === 'string' ? `${config.secret.length} characters long` : 'missing'}: it signs preview links and cookies, so it is at least ${MIN_SECRET_LENGTH} random characters, read from the environment`)
+    throw new KayError('config-invalid', `kay: preview.secret in kay.config.ts is ${typeof config.secret === 'string' ? `${config.secret.length} characters long` : 'missing'}: it signs preview links and cookies, so it is at least ${MIN_SECRET_LENGTH} random characters, read from the environment`)
 
   useStampSecret(config.secret, 'preview')
   settings = { secret: config.secret, maxAge: durationSeconds(config.maxAge ?? DEFAULT_MAX_AGE, 'preview.maxAge'), base }
@@ -185,7 +186,7 @@ export function previewUrl(path: string, options: { ttl?: Duration, edit?: boole
   const current = settingsFor('previewUrl()')
 
   if (!SITE_PATH.test(path))
-    throw new Error(`kay: previewUrl() was given ${path}, which is no path of the site such as /blog/draft`)
+    throw new KayError('config-invalid', `kay: previewUrl() was given ${path}, which is no path of the site such as /blog/draft`)
 
   const until = Math.floor(Date.now() / 1000) + durationSeconds(options.ttl ?? DEFAULT_LINK_TTL, 'previewUrl()\'s ttl')
 
@@ -240,7 +241,7 @@ function linkText(path: string, until: string, edit: boolean): string {
 
 function settingsFor(caller: string): PreviewSettings {
   if (!settings)
-    throw new Error(`kay: ${caller} needs preview in kay.config.ts, whose secret signs what it gives`)
+    throw new KayError('config-invalid', `kay: ${caller} needs preview in kay.config.ts, whose secret signs what it gives`)
 
   return settings
 }

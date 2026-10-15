@@ -525,7 +525,7 @@ describe.concurrent('kay check, edge cases', () => {
     const root = await scratchProject({ 'src/a.kay': '---\nconst a = \n---\np {a}\n', 'src/b.kay': 'p {1 +}\n' })
 
     try {
-      expect((await check(root)).map(d => [basename(d.file), d.line, d.code])).toEqual([['a.kay', 3, 'fence-invalid'], ['b.kay', 1, 'fence-syntax']])
+      expect((await check(root)).map(d => [basename(d.file), d.line, d.code])).toEqual([['a.kay', 3, 'fence-syntax'], ['b.kay', 1, 'fence-syntax']])
     }
     finally {
       await rm(root, { recursive: true, force: true })
@@ -1751,7 +1751,7 @@ describe.concurrent('kay check, unused code', () => {
 
       const missing = await runCheck(root, '--format', 'github', join(root, 'src/nope.kay'))
 
-      expect(missing).toEqual({ code: 1, output: `kay check: ${join(root, 'src/nope.kay')} does not exist\n`, report: `::error title=command-usage::${join(root, 'src/nope.kay')} does not exist\n` })
+      expect(missing).toEqual({ code: 1, output: `kay check: ${join(root, 'src/nope.kay')} does not exist\n`, report: `::error title=kay check::${join(root, 'src/nope.kay')} does not exist\n` })
 
       await Bun.write(config, 'export default {}\n')
 

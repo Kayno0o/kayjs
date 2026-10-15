@@ -4,6 +4,7 @@ import { existsSync } from 'node:fs'
 import process from 'node:process'
 import { parse, stringify } from 'devalue'
 import { Elysia } from 'elysia'
+import { KayError } from '../compiler/errors'
 import { durationSeconds } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
 import { openSqlite } from '../runtime/sqlite.server'
@@ -244,13 +245,13 @@ export function queue<Payload>(name: string, handler: (payload: Payload) => unkn
   const keepFailed = options.keepFailed === false ? undefined : durationSeconds(options.keepFailed ?? DEFAULT_KEEP_FAILED, `queue('${name}')'s keepFailed`) * 1000
 
   if (!Number.isInteger(attempts) || attempts < 1)
-    throw new Error(`kay: queue('${name}')'s attempts is ${attempts}; it takes a whole number of at least 1`)
+    throw new KayError('config-invalid', `kay: queue('${name}')'s attempts is ${attempts}; it takes a whole number of at least 1`)
 
   if (idlePoll < POLL_MS)
-    throw new Error(`kay: queue('${name}')'s idlePoll is ${options.idlePoll}; it takes a duration of at least 1 second, the poll it backs off from`)
+    throw new KayError('config-invalid', `kay: queue('${name}')'s idlePoll is ${options.idlePoll}; it takes a duration of at least 1 second, the poll it backs off from`)
 
   if (!Number.isInteger(concurrency) || concurrency < 1)
-    throw new Error(`kay: queue('${name}')'s concurrency is ${concurrency}; it takes a whole number of at least 1`)
+    throw new KayError('config-invalid', `kay: queue('${name}')'s concurrency is ${concurrency}; it takes a whole number of at least 1`)
 
   const store = () => options.store ?? defaultJobStore()
   let controller: AbortController | undefined

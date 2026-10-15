@@ -1,5 +1,6 @@
 import type { Guard, GuardContext } from '../runtime'
 import type { GuardFile, LayoutAccess, Route, SpecialPages } from './routes'
+import { KayError } from '../compiler/errors'
 import { importModule } from './bundle'
 
 export interface LoadedGuard extends GuardFile {
@@ -36,7 +37,7 @@ export async function loadGuard(guard: GuardFile): Promise<LoadedGuard> {
   const check = (await importModule<{ default?: unknown }>(guard.file)).default
 
   if (typeof check !== 'function')
-    throw new TypeError(`kay: ${guard.file} must export a guard by default: export default guard(ctx => ...)`)
+    throw new KayError('route-invalid', `kay: ${guard.file} must export a guard by default: export default guard(ctx => ...)`)
 
   return { ...guard, check: check as Guard }
 }

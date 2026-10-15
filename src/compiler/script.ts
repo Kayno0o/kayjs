@@ -672,7 +672,7 @@ export function parseFence(source: string, span: Span, diagnostics: Diagnostic[]
         return undefined
 
       for (const { pos, message } of errors)
-        diagnostics.push({ start: span.start + pos, end: span.start + pos + 1, message: message.replace(POSITION_SUFFIX, '') })
+        diagnostics.push({ start: span.start + pos, end: span.start + pos + 1, code: 'fence-syntax', message: message.replace(POSITION_SUFFIX, '') })
     }
 
     const statements = broken.length < MAX_BROKEN ? new Map(errors.flatMap(({ pos }) => brokenStatement(code, pos)).map(statement => [statement.start, statement])) : new Map<number, { start: number, end: number }>()

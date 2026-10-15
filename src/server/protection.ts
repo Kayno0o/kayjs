@@ -4,6 +4,7 @@ import type { ProxyConfig } from '../config'
 import type { ActionRateLimit, RateLimit, RateStore, RateWindow, ServerAction } from '../runtime/action'
 import type { Duration } from '../runtime/duration'
 import { BlockList, isIP } from 'node:net'
+import { KayError } from '../compiler/errors'
 import { honeypotField, minTimeOf, STAMP_FIELD } from '../runtime/action'
 import { durationSeconds } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
@@ -161,7 +162,7 @@ export function sqliteRates(path: string): RateStore {
 // A limit for a guard, an API route or a library, counted as an action's `rateLimit` is: `max` attempts from one client every `window`, under `name`, which limits sharing it count together.
 export function rateLimit(name: string, limit: RateLimit): RateLimiter {
   if (!Number.isInteger(limit.max) || limit.max < 1)
-    throw new Error(`kay: rateLimit('${name}')'s max is ${limit.max}; it takes a whole number of at least 1`)
+    throw new KayError('config-invalid', `kay: rateLimit('${name}')'s max is ${limit.max}; it takes a whole number of at least 1`)
 
   const ms = durationSeconds(limit.window, `rateLimit('${name}')'s window`) * 1000
 
@@ -342,13 +343,13 @@ export function trustProxy(app: Elysia, proxy: ProxyConfig | undefined): void {
     const { hops, header } = proxy
 
     if ((hops === undefined) === (header === undefined))
-      throw new Error('kay: proxy takes either hops, the number of proxies in front, or header, the one a proxy sets to the client\'s address')
+      throw new KayError('config-invalid', 'kay: proxy takes either hops, the number of proxies in front, or header, the one a proxy sets to the client\'s address')
 
     if (hops !== undefined && (!Number.isInteger(hops) || hops < 1))
-      throw new Error(`kay: proxy.hops is the number of proxies in front, a whole number from 1; got ${hops}`)
+      throw new KayError('config-invalid', `kay: proxy.hops is the number of proxies in front, a whole number from 1; got ${hops}`)
 
     if (header !== undefined && header.trim() === '')
-      throw new Error('kay: proxy.header names the header a proxy sets to the client\'s address, such as cf-connecting-ip')
+      throw new KayError('config-invalid', 'kay: proxy.header names the header a proxy sets to the client\'s address, such as cf-connecting-ip')
 
     rangesOf(proxy)
   }
@@ -453,7 +454,7 @@ function rangesOf(proxy: ProxyConfig): BlockList | undefined {
       const prefix = bits === undefined ? family?.bits : Number(bits)
 
       if (family === undefined || prefix === undefined || prefix > family.bits)
-        throw new Error(`kay: proxy.trusted takes address ranges such as 173.245.48.0/20 or 2400:cb00::/32; got ${JSON.stringify(range)}`)
+        throw new KayError('config-invalid', `kay: proxy.trusted takes address ranges such as 173.245.48.0/20 or 2400:cb00::/32; got ${JSON.stringify(range)}`)
 
       ranges.addSubnet(address, prefix, family.name)
     }

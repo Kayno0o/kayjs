@@ -5,6 +5,7 @@ import type { Route } from './routes'
 import { join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { throughLinks } from '../build/links'
+import { KayError } from '../compiler/errors'
 import { flattenMessages, localePath, pathSegment, splitLocale, translatedPath } from '../runtime/i18n'
 import { localeState } from '../runtime/locale-state'
 import { importModule } from './bundle'
@@ -44,28 +45,28 @@ export function extensionMessageFiles(root: string, extensions: KayExtension[] |
 // The settings the config gives, refused when they cannot serve a page: a default outside the locales, a tag no browser sends, a domain for no locale.
 export function localeSettings(config: I18nConfig): LocaleSettings {
   if (config.locales.length === 0)
-    throw new Error('kay: i18n lists no locales')
+    throw new KayError('locales-invalid', 'kay: i18n lists no locales')
 
   for (const locale of config.locales) {
     if (!LOCALE_TAG.test(locale))
-      throw new Error(`kay: i18n lists ${locale}, which is no BCP 47 tag such as fr or en-GB`)
+      throw new KayError('locales-invalid', `kay: i18n lists ${locale}, which is no BCP 47 tag such as fr or en-GB`)
   }
 
   if (!config.locales.includes(config.defaultLocale))
-    throw new Error(`kay: i18n's defaultLocale ${config.defaultLocale} is not one of its locales: ${config.locales.join(', ')}`)
+    throw new KayError('locales-invalid', `kay: i18n's defaultLocale ${config.defaultLocale} is not one of its locales: ${config.locales.join(', ')}`)
 
   for (const locale of Object.keys(config.domains ?? {})) {
     if (!config.locales.includes(locale))
-      throw new Error(`kay: i18n gives a domain to ${locale}, which is not one of its locales: ${config.locales.join(', ')}`)
+      throw new KayError('locales-invalid', `kay: i18n gives a domain to ${locale}, which is not one of its locales: ${config.locales.join(', ')}`)
   }
 
   if (config.domains && config.prefixDefault)
-    throw new Error('kay: i18n gives domains or prefixDefault, not both: with domains a locale has no prefix')
+    throw new KayError('locales-invalid', 'kay: i18n gives domains or prefixDefault, not both: with domains a locale has no prefix')
 
   const homeless = config.domains && config.locales.find(locale => config.domains![locale] === undefined)
 
   if (homeless !== undefined)
-    throw new Error(`kay: i18n gives domains, but none to ${homeless}, which no request could then reach`)
+    throw new KayError('locales-invalid', `kay: i18n gives domains, but none to ${homeless}, which no request could then reach`)
 
   return { locales: config.locales, defaultLocale: config.defaultLocale, prefixDefault: config.prefixDefault === true, ...config.domains && { hosts: config.domains }, ...config.paths && { paths: translatedPaths(config) } }
 }
@@ -74,22 +75,22 @@ export function localeSettings(config: I18nConfig): LocaleSettings {
 function translatedPaths(config: I18nConfig): Record<string, Record<string, string>> {
   return Object.fromEntries(Object.entries(config.paths ?? {}).map(([pattern, translations]) => {
     if (!pattern.startsWith('/'))
-      throw new Error(`kay: i18n.paths names ${pattern}, which is no path: write the page's as kay serves it, /blog/:slug`)
+      throw new KayError('locales-invalid', `kay: i18n.paths names ${pattern}, which is no path: write the page's as kay serves it, /blog/:slug`)
 
     const params = paramsOf(pattern)
 
     return [pattern, Object.fromEntries(Object.entries(translations).map(([locale, path]) => {
       if (!config.locales.includes(locale))
-        throw new Error(`kay: i18n.paths translates ${pattern} for ${locale}, which is not one of its locales: ${config.locales.join(', ')}`)
+        throw new KayError('locales-invalid', `kay: i18n.paths translates ${pattern} for ${locale}, which is not one of its locales: ${config.locales.join(', ')}`)
 
       if (!path.startsWith('/'))
-        throw new Error(`kay: i18n.paths translates ${pattern} for ${locale} as ${path}, which does not start with /`)
+        throw new KayError('locales-invalid', `kay: i18n.paths translates ${pattern} for ${locale} as ${path}, which does not start with /`)
 
       if (path.slice(1).split('/').slice(0, -1).includes('') || path.startsWith('//'))
-        throw new Error(`kay: i18n.paths translates ${pattern} for ${locale} as ${path}, which has an empty segment`)
+        throw new KayError('locales-invalid', `kay: i18n.paths translates ${pattern} for ${locale} as ${path}, which has an empty segment`)
 
       if (paramsOf(path) !== params)
-        throw new Error(`kay: i18n.paths translates ${pattern} for ${locale} as ${path}, whose params are not the page's: each translation names the same :params, and a * as the last segment when the page has one`)
+        throw new KayError('locales-invalid', `kay: i18n.paths translates ${pattern} for ${locale} as ${path}, whose params are not the page's: each translation names the same :params, and a * as the last segment when the page has one`)
 
       // A trailing slash is the router's to add, as `trailingSlash` says.
       const trimmed = path.length > 1 && path.endsWith('/') ? path.slice(0, -1) : path
@@ -117,20 +118,20 @@ export function refuseLocaleClashes(settings: LocaleSettings, routes: Pick<Route
   const clash = routes.find(route => prefixes.has(firstSegment(route.pattern)))
 
   if (clash)
-    throw new Error(`kay: ${clash.file} serves ${clash.pattern}, under the prefix of the locale ${firstSegment(clash.pattern)}; kay serves every page there already`)
+    throw new KayError('locales-invalid', `kay: ${clash.file} serves ${clash.pattern}, under the prefix of the locale ${firstSegment(clash.pattern)}; kay serves every page there already`)
 
   const patterns = new Set(routes.map(route => route.pattern))
   const unknown = Object.keys(settings.paths ?? {}).find(pattern => !patterns.has(pattern))
 
   if (unknown !== undefined)
-    throw new Error(`kay: i18n.paths translates ${unknown}, which no page serves; name a page by the pattern it is served under, /blog/:slug for src/routes/blog/[slug].kay`)
+    throw new KayError('locales-invalid', `kay: i18n.paths translates ${unknown}, which no page serves; name a page by the pattern it is served under, /blog/:slug for src/routes/blog/[slug].kay`)
 
   for (const locale of settings.locales.filter(locale => !settings.hosts && !prefixes.has(locale))) {
     for (const route of routes) {
       const pattern = localePattern(settings, route.pattern, locale)
 
       if (pattern !== route.pattern && prefixes.has(firstSegment(pattern)))
-        throw new Error(`kay: i18n.paths translates ${route.pattern} for ${locale} as ${pattern}, under the prefix of the locale ${firstSegment(pattern)}`)
+        throw new KayError('locales-invalid', `kay: i18n.paths translates ${route.pattern} for ${locale} as ${pattern}, under the prefix of the locale ${firstSegment(pattern)}`)
     }
   }
 }
@@ -175,7 +176,7 @@ export async function loadI18n(root: string, config: I18nConfig, extensions?: Ka
 
     // An extension's catalog stands in for an app with no text of its own in that locale.
     if (catalogs.length === 0)
-      throw new Error(`kay: i18n lists ${locale}, so its messages go in ${relative(process.cwd(), file)}: export default defineMessages({ ... })`)
+      throw new KayError('locales-invalid', `kay: i18n lists ${locale}, so its messages go in ${relative(process.cwd(), file)}: export default defineMessages({ ... })`)
 
     flat.set(locale, await mergedCatalogs(catalogs))
   }
@@ -210,7 +211,7 @@ async function mergedCatalogs(catalogs: string[]): Promise<Map<string, Message>>
     const tree = (await importModule<{ default?: unknown }>(catalog)).default
 
     if (typeof tree !== 'object' || tree === null)
-      throw new Error(`kay: ${relative(process.cwd(), catalog)} must export its messages by default: export default defineMessages({ ... })`)
+      throw new KayError('locales-invalid', `kay: ${relative(process.cwd(), catalog)} must export its messages by default: export default defineMessages({ ... })`)
 
     for (const [key, message] of flattenMessages(tree as MessageTree))
       messages.set(key, message)

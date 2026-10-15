@@ -9,6 +9,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { outputDir, testWorker } from '../build/assets'
+import { KayError } from '../compiler/errors'
 import { mergeConfig, withConfig } from '../config'
 import { cacheDir, clientOptionsOf, modeOf, PRODUCTION } from '../project'
 import { kayLog } from '../runtime/log'
@@ -99,7 +100,7 @@ function embeddedSource(bundle: Bundle): ProjectSource {
       const client = await readClient(bundle.root, bundle.clientDir)
 
       if (!client)
-        throw new Error(`kay: this executable holds no client build at ${bundle.clientDir}`)
+        throw new KayError('executable-incomplete', `kay: this executable holds no client build at ${bundle.clientDir}`)
 
       return client
     },

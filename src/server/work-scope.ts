@@ -1,5 +1,6 @@
 import type { ProofOfWorkRefusal, RateStore } from '../runtime/action'
 import type { Duration } from '../runtime/duration'
+import { KayError } from '../compiler/errors'
 import { durationSeconds } from '../runtime/duration'
 import { prerendering } from '../runtime/html'
 import { memoryRates } from './protection'
@@ -30,7 +31,7 @@ function difficultyOf(difficulty: number | undefined): number {
   const value = difficulty ?? DEFAULT_DIFFICULTY
 
   if (!Number.isInteger(value) || value < 1 || value > 1e9)
-    throw new Error(`kay: a proof of work's difficulty is ${value}; it takes a whole number from 1 to 1,000,000,000`)
+    throw new KayError('config-invalid', `kay: a proof of work's difficulty is ${value}; it takes a whole number from 1 to 1,000,000,000`)
 
   return value
 }

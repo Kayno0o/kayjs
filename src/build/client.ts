@@ -10,7 +10,7 @@ import { mkdir, rm } from 'node:fs/promises'
 import { builtinModules } from 'node:module'
 import { join, relative, resolve, sep } from 'node:path'
 import { formatDiagnostic } from '../compiler'
-import { KayError } from '../compiler/errors'
+import { buildFailure, errorCodeOf, KayError } from '../compiler/errors'
 import { projectPaths } from '../project'
 import { apiStubs, apiTrees } from '../server/api-modules'
 import { rebaseCss } from '../server/base'
@@ -127,7 +127,7 @@ export async function bothBundles<Islands extends Promise<unknown> | undefined, 
   const [scripts, sheets] = await Promise.allSettled([islands, styles])
 
   if (scripts.status === 'rejected' && sheets.status === 'rejected')
-    throw new AggregateError([scripts.reason, sheets.reason].flatMap((reason: unknown): unknown[] => reason instanceof AggregateError ? reason.errors as unknown[] : [reason]), scripts.reason instanceof Error ? scripts.reason.message : String(scripts.reason))
+    throw Object.assign(new AggregateError([scripts.reason, sheets.reason].flatMap((reason: unknown): unknown[] => reason instanceof AggregateError ? reason.errors as unknown[] : [reason]), scripts.reason instanceof Error ? scripts.reason.message : String(scripts.reason)), { code: errorCodeOf(scripts.reason) ?? errorCodeOf(sheets.reason) })
 
   if (scripts.status === 'rejected')
     throw scripts.reason
@@ -316,7 +316,7 @@ export async function bundleIslands(root: string, islands: Map<string, string>, 
   if (!build.success) {
     await refuseBuiltinImports(root, build.logs, islands, config)
 
-    throw new AggregateError(build.logs, 'kay: client build failed')
+    throw buildFailure(build.logs, 'kay: client build failed')
   }
 
   await refuseServerOnlyReads(root, clientDir(root), build.metafile!.outputs, projectPaths(root).cache)
@@ -399,7 +399,7 @@ export async function bundleStyles(root: string, { pages, libraries }: Pick<Clie
   })
 
   if (!build.success)
-    throw new AggregateError(build.logs, 'kay: stylesheet build failed')
+    throw buildFailure(build.logs, 'kay: stylesheet build failed')
 
   const pageFiles = new Set(pages)
   const styles: Record<string, string> = {}

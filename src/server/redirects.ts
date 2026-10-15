@@ -1,5 +1,6 @@
 import type { Elysia } from 'elysia'
 import type { ServedPaths } from './served-paths'
+import { KayError } from '../compiler/errors'
 import { noteRedirect } from './dev-notes'
 
 // A path moved elsewhere, by its old path: `'/blog/:slug': '/posts/:slug'`, a `*` carrying the rest of the path. Permanent, a 308, unless it says otherwise.
@@ -27,7 +28,7 @@ export function readRedirects(redirects: Redirects): Redirect[] {
     const { to, permanent = true } = typeof target === 'string' ? { to: target } : target
 
     if (!from.startsWith('/'))
-      throw new Error(`kay: the redirect from ${from} needs a path starting with /`)
+      throw new KayError('redirect-invalid', `kay: the redirect from ${from} needs a path starting with /`)
 
     const names = new Map<string, string>()
     const segments = from.split('/')
@@ -44,14 +45,14 @@ export function readRedirects(redirects: Redirects): Redirect[] {
         return segment
 
       if (segment.includes(':') || segment.includes('*'))
-        throw new Error(`kay: the redirect from ${from} has ${segment}, neither a :param nor a final *`)
+        throw new KayError('redirect-invalid', `kay: the redirect from ${from} has ${segment}, neither a :param nor a final *`)
 
       return segment
     }).join('/')
 
     for (const [part, name] of to.matchAll(TARGET_PART)) {
       if (name === undefined ? !path.endsWith('/*') : !names.has(name))
-        throw new Error(`kay: the redirect from ${from} goes to ${to}, whose ${part} its path has none of`)
+        throw new KayError('redirect-invalid', `kay: the redirect from ${from} goes to ${to}, whose ${part} its path has none of`)
     }
 
     return { path, names, to, status: permanent ? 308 : 307 }

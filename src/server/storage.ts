@@ -2,6 +2,7 @@ import type { Elysia } from 'elysia'
 import type { Duration } from '../runtime/duration'
 import { readdir, rename, rm, stat } from 'node:fs/promises'
 import { basename, join, relative, resolve, sep } from 'node:path'
+import { KayError } from '../compiler/errors'
 import { durationSeconds } from '../runtime/duration'
 import { FILES_ROUTE } from '../runtime/image'
 import { kayLog } from '../runtime/log'
@@ -204,7 +205,7 @@ export const files = {
   // Stores a file under a new key and gives it back, for the app to save; an image's key holds its size.
   async put(data: Blob, options: PutOptions = {}): Promise<string> {
     if (options.folder !== undefined && (!FOLDER.test(options.folder) || PRIVATE_SEGMENT.test(options.folder)))
-      throw new Error(`kay: files.put() was given the folder ${JSON.stringify(options.folder)}: a folder is letters, digits, - and _ in segments split by /, and starts with no \`private\` segment`)
+      throw new KayError('config-invalid', `kay: files.put() was given the folder ${JSON.stringify(options.folder)}: a folder is letters, digits, - and _ in segments split by /, and starts with no \`private\` segment`)
 
     const extension = fileExtension(data)
 
@@ -250,12 +251,12 @@ export const files = {
     const { folder } = options
 
     if (folder !== undefined && (!FOLDER.test(folder) || PRIVATE_SEGMENT.test(folder)))
-      throw new Error(`kay: files.list() was given the folder ${JSON.stringify(folder)}: a folder is letters, digits, - and _ in segments split by /, and starts with no \`private\` segment`)
+      throw new KayError('config-invalid', `kay: files.list() was given the folder ${JSON.stringify(folder)}: a folder is letters, digits, - and _ in segments split by /, and starts with no \`private\` segment`)
 
     const store = await activeStore()
 
     if (!store.list)
-      throw new Error('kay: files.list() needs a store with a list method; the one `storage` names has none')
+      throw new KayError('config-invalid', 'kay: files.list() needs a store with a list method; the one `storage` names has none')
 
     const prefix = folder === undefined ? undefined : `${folder}/`
 
@@ -288,10 +289,10 @@ export const files = {
 
     if (current.exported) {
       if (PRIVATE_SEGMENT.test(key))
-        throw new Error(`kay: a static export links private file ${key}, which only a server can serve once it checked the link`)
+        throw new KayError('export-private-file', `kay: a static export links private file ${key}, which only a server can serve once it checked the link`)
 
       if (current.store?.publicUrl === undefined)
-        throw new Error(`kay: a static export links stored file ${key}, which has no server to serve it: give the store a publicUrl, s3Files({ publicUrl: 'https://...' }), or deploy a server`)
+        throw new KayError('export-private-file', `kay: a static export links stored file ${key}, which has no server to serve it: give the store a publicUrl, s3Files({ publicUrl: 'https://...' }), or deploy a server`)
 
       return `${current.store.publicUrl.replace(TRAILING_SLASH, '')}/${key}`
     }
@@ -442,7 +443,7 @@ async function imageSize(data: Blob): Promise<{ width: number, height: number } 
 
 function checkedKey(key: string, caller: string): string {
   if (!KEY.test(key))
-    throw new Error(`kay: ${caller} was given ${JSON.stringify(key)}, which is no key files.put() gives`)
+    throw new KayError('config-invalid', `kay: ${caller} was given ${JSON.stringify(key)}, which is no key files.put() gives`)
 
   return key
 }

@@ -1,5 +1,6 @@
 import type { Elysia } from 'elysia'
 import type { Server } from 'elysia/universal'
+import { KayError } from '../compiler/errors'
 import { requestUrl } from './request-url'
 import { withoutSlash } from './routes'
 
@@ -74,7 +75,7 @@ async function exceeds(request: Request, bytes: number): Promise<boolean> {
 
 function checkLimit(bytes: number, name: string): void {
   if (!Number.isInteger(bytes) || bytes < 1)
-    throw new Error(`kay: ${name} is a number of bytes, a whole number from 1; got ${bytes}`)
+    throw new KayError('config-invalid', `kay: ${name} is a number of bytes, a whole number from 1; got ${bytes}`)
 }
 
 // `1 MB`, `512 KB`: how a refusal tells the visitor the most they may send.

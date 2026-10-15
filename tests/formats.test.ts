@@ -149,6 +149,10 @@ describe('kay build --format json', () => {
     const unloaded = await kay(['build', config, '--no-check', '--format', 'json'])
     const exported = await kay(['build', guarded, '--no-check', '--static', '--format', 'json'])
 
+    const globbed = await project({ 'kay.config.ts': 'export default { favicon: false }\n', 'src/routes/index.kay': '---\nimport { signal } from \'kay\'\n\nconst pattern = \'./*.ts\'\nconst files = import.meta.glob(pattern)\nconst n = signal(Object.keys(files).length)\n---\nbutton(type="button" onClick={() => n.set(n() + 1)}) {n()}\n' })
+    const bundled = await kay(['build', globbed, '--no-check', '--format', 'json'])
+
+    expect(document<{ problems: { code: string }[] }>(bundled.stdout).problems.map(problem => problem.code)).toEqual(['glob-import'])
     expect(document<{ problems: { code: string }[] }>(unloaded.stdout).problems.map(problem => problem.code)).toEqual(['config-default-export'])
     expect(document<{ problems: { code: string }[] }>(exported.stdout).problems.map(problem => problem.code)).toEqual(['export-needs-params'])
   }, 60_000)

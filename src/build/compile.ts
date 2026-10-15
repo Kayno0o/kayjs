@@ -3,7 +3,7 @@ import type { Project } from '../project'
 import type { Route, SpecialPages } from '../server/routes'
 import { existsSync } from 'node:fs'
 import { basename, dirname, join, resolve } from 'node:path'
-import { KayError } from '../compiler/errors'
+import { buildFailure, KayError } from '../compiler/errors'
 import { CONFIG_FILE } from '../config'
 import { projectApi } from '../server/api-modules'
 import { AVIF_WORKER_SOURCE } from '../server/avif'
@@ -153,7 +153,7 @@ export async function compileServer(project: Project, options: CompileOptions): 
   })
 
   if (!build.success)
-    throw new AggregateError(build.logs, 'kay: compiling the server failed')
+    throw buildFailure(build.logs, 'kay: compiling the server failed')
 
   return outfile
 }

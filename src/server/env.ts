@@ -2,6 +2,7 @@ import type { Elysia, Static, TSchema } from 'elysia'
 import type { ServedPaths } from './served-paths'
 import process from 'node:process'
 import { t } from 'elysia'
+import { KayError } from '../compiler/errors'
 import { PUBLIC_ENV } from '../runtime/env'
 import { kayLog } from '../runtime/log'
 import { fixedReply } from './compress'
@@ -30,7 +31,7 @@ export function defineEnv<Schema extends EnvSchema>(schema: Schema, source: Reco
     return read.value
 
   if (!building())
-    throw new Error(`kay: the environment does not match its schema\n${[...read.refused].map(([name, message]) => `  ${name}: ${message}`).join('\n')}`)
+    throw new KayError('env-invalid', `kay: the environment does not match its schema\n${[...read.refused].map(([name, message]) => `  ${name}: ${message}`).join('\n')}`)
 
   // The variables the build has, read on their own; a refusal of the whole object, named '', is left to the server.
   const valid = t.Object(Object.fromEntries(Object.entries(schema.properties).filter(([name]) => !read.refused.has(name))))
@@ -43,7 +44,7 @@ export function defineEnv<Schema extends EnvSchema>(schema: Schema, source: Reco
     Object.defineProperty(env, name, {
       enumerable: true,
       get: () => {
-        throw new Error(`kay: ${name} does not match the environment's schema (${message}), and kay build runs without the server's environment; read it where the server runs, such as in an action, or leave the page reading it out of the build`)
+        throw new KayError('env-invalid', `kay: ${name} does not match the environment's schema (${message}), and kay build runs without the server's environment; read it where the server runs, such as in an action, or leave the page reading it out of the build`)
       },
     })
   }

@@ -4,6 +4,7 @@ import type { HeadTag } from '../runtime/head'
 import type { ServedPaths } from './served-paths'
 import { mkdir } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
+import { KayError } from '../compiler/errors'
 import { kayLog } from '../runtime/log'
 import { revalidated } from './public'
 
@@ -135,7 +136,7 @@ async function checkSquare(source: string, what: string): Promise<void> {
   const { width, height } = await new Bun.Image(source).metadata()
 
   if (width !== height)
-    throw new Error(`kay: the ${what} ${source} is ${width}x${height}; it has to be square`)
+    throw new KayError('favicon-invalid', `kay: the ${what} ${source} is ${width}x${height}; it has to be square`)
 
   // Enlarged to the sizes it lacks, so the manifest keeps the 192 and 512 icons a browser asks for before it offers to install the site.
   if (width < LARGEST)
@@ -191,7 +192,7 @@ export function manifestJson(name: string | undefined, description: string | und
   // A browser ignores the scope when the start page lies outside it, and a shortcut outside it.
   const page = (path: string, what: string) => {
     if (scope !== undefined && !sitePath(path, what).startsWith(scope))
-      throw new Error(`kay: the manifest's ${what}, ${path}, lies outside its scope ${scope}, so browsers would ignore it`)
+      throw new KayError('favicon-invalid', `kay: the manifest's ${what}, ${path}, lies outside its scope ${scope}, so browsers would ignore it`)
 
     return base + sitePath(path, what)
   }
@@ -214,7 +215,7 @@ export function manifestJson(name: string | undefined, description: string | und
 
 function sitePath(path: string, what: string): string {
   if (!SITE_PATH.test(path))
-    throw new Error(`kay: the manifest's ${what} is a path of the site, starting with a single /, not ${path}`)
+    throw new KayError('favicon-invalid', `kay: the manifest's ${what} is a path of the site, starting with a single /, not ${path}`)
 
   return path
 }
