@@ -91,38 +91,32 @@ function pageRules(): QueryRules | undefined {
   return pageData<QueryRules>(QUERY_SCRIPT, JSON.parse, true)[0]
 }
 
-// WebKit throws a SecurityError past 100 history writes in 30 s, Firefox past 200 in 10 s, which a slider dragged for long enough reaches.
-// Writes under the budget land at once; past it only each param's last value is kept and written once the window has room, and a refused write never throws out of `set()`.
-const WRITE_WINDOW = 30_000
-const WRITE_BUDGET = 50
-const writes: number[] = []
+// WebKit throws a SecurityError past 100 history writes in 10 s, which a slider dragged fast reaches.
+// A write goes through at once when the last one is 200 ms old, else only each param's latest value is written 200 ms after it; a refused write never throws out of `set()`.
+const WRITE_GAP = 200
+let lastWrite = Number.NEGATIVE_INFINITY
+// The address after kay's last write: a deferred write finding another one was navigated to, a swap or a link, is dropped.
+let lastAddress = ''
 const deferred = new Map<string, ReturnType<typeof setTimeout>>()
 
 function saveParam(name: string, value: unknown, fallback: unknown): void {
   clearTimeout(deferred.get(name))
   deferred.delete(name)
 
-  const now = Date.now()
+  const wait = lastWrite + WRITE_GAP - Date.now()
 
-  while (writes.length > 0 && now - writes[0]! >= WRITE_WINDOW)
-    writes.shift()
-
-  if (writes.length < WRITE_BUDGET) {
-    writes.push(now)
+  if (wait <= 0) {
     writeParam(name, value, fallback)
 
     return
   }
 
-  const path = location.pathname
-
   deferred.set(name, setTimeout(() => {
     deferred.delete(name)
 
-    // A swap to another page since: the value is no longer this URL's to write.
-    if (location.pathname === path)
-      saveParam(name, value, fallback)
-  }, WRITE_WINDOW - (now - writes[0]!)))
+    if (location.pathname + location.search === lastAddress)
+      writeParam(name, value, fallback)
+  }, wait))
 }
 
 // Takes the current history entry's place, keeping its state, which holds kay's place in history: writing as the visitor types adds no entry to go back through.
@@ -145,4 +139,7 @@ function writeParam(name: string, value: unknown, fallback: unknown): void {
   catch {
     // Refused by the browser's limit: the address stays behind the signal until the next write.
   }
+
+  lastWrite = Date.now()
+  lastAddress = location.pathname + location.search
 }

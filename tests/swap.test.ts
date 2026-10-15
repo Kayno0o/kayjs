@@ -268,9 +268,12 @@ describe('page swap, checking a form in the browser', () => {
     expect(signal('x', { storage: 'local' })()).toBe('x')
   })
 
-  it('keeps a persisted query param as queryParam does, leaving out its value and the schema\'s default', () => {
-    const setURL = (url: string) => (window as unknown as { happyDOM: { setURL: (url: string) => void } }).happyDOM.setURL(url)
+  const setURL = (url: string) => (window as unknown as { happyDOM: { setURL: (url: string) => void } }).happyDOM.setURL(url)
+  // The query write throttle reads the clock, which only ever moves forward here so one test's writes never throttle the next.
+  let clock = Date.now() + 1_000_000
+  const tick = (ms: number) => setSystemTime(clock += ms)
 
+  it('keeps a persisted query param as queryParam does, leaving out its value and the schema\'s default', () => {
     document.head.innerHTML = '<script type="application/json" data-kay-query>{"page":{"type":"integer","default":1}}</script>'
     setURL('http://localhost/list?q=kay&page=3')
 
@@ -279,17 +282,23 @@ describe('page swap, checking a form in the browser', () => {
 
     expect<unknown[]>([query(), page()]).toEqual(['kay', 3])
 
+    tick(200)
     query.set('all')
+    tick(200)
     page.set(5)
     expect(location.search).toBe('?page=5')
 
+    tick(200)
     page.set(1)
     expect(location.search).toBe('')
 
+    tick(200)
     page.set(5)
+    tick(200)
     page.set(2)
     expect(location.search).toBe('')
 
+    tick(200)
     query.set('bun')
     expect(location.search).toBe('?q=bun')
 
@@ -298,23 +307,47 @@ describe('page swap, checking a form in the browser', () => {
     expect(persisted<number>('page', 2, { storage: 'query' })()).toBe(1)
     expect(persisted('q', 'all', { storage: 'query' })()).toBe('all')
     document.head.innerHTML = ''
+    setSystemTime()
   })
 
-  it('keeps a fast-changing query param under the browser\'s history limit, the last value written once the window has room, the signal always current', () => {
-    const setURL = (url: string) => (window as unknown as { happyDOM: { setURL: (url: string) => void } }).happyDOM.setURL(url)
-    const replace = spyOn(history, 'replaceState')
-    const timers: (() => void)[] = []
-    const later = spyOn(globalThis, 'setTimeout').mockImplementation(((run: () => void) => {
-      timers.push(run)
+  // Captures the timers a deferred query write sets, so a test runs them when it moves the clock.
+  function captureTimers() {
+    const timers = new Map<number, () => void>()
+    let next = 1
+    const set = spyOn(globalThis, 'setTimeout').mockImplementation(((run: () => void) => {
+      timers.set(next, run)
 
-      return 0
+      return next++
     }) as unknown as typeof setTimeout)
+    const clear = spyOn(globalThis, 'clearTimeout').mockImplementation(((id: number) => {
+      timers.delete(id)
+    }) as unknown as typeof clearTimeout)
+
+    return {
+      fire: () => {
+        const runs = [...timers.values()]
+
+        timers.clear()
+
+        for (const run of runs)
+          run()
+      },
+      pending: () => timers.size,
+      restore: () => {
+        set.mockRestore()
+        clear.mockRestore()
+      },
+    }
+  }
+
+  it('writes a fast-changing query param at most once per 200 ms, the latest value 200 ms after the last write, the signal always current', () => {
+    const replace = spyOn(history, 'replaceState')
+    const timers = captureTimers()
 
     try {
       document.head.innerHTML = ''
       setURL('http://localhost/slider')
-      // A window of its own, whatever the tests before it wrote.
-      setSystemTime(Date.now() + 60_000)
+      tick(60_000)
 
       const level = persisted<number>('level', 0, { storage: 'query' })
 
@@ -323,29 +356,60 @@ describe('page swap, checking a form in the browser', () => {
         expect(level()).toBe(value)
       }
 
-      expect(replace).toHaveBeenCalledTimes(50)
-      expect(location.search).toBe('?level=50')
-      expect(timers.length).toBeGreaterThan(0)
+      expect(replace).toHaveBeenCalledTimes(1)
+      expect(location.search).toBe('?level=1')
+      expect(timers.pending()).toBe(1)
 
-      setSystemTime(Date.now() + 31_000)
-      timers.at(-1)!()
+      tick(200)
+      timers.fire()
+      expect(replace).toHaveBeenCalledTimes(2)
       expect(location.search).toBe('?level=80')
-      expect(level()).toBe(80)
+
+      tick(200)
+      level.set(5)
+      expect(location.search).toBe('?level=5')
     }
     finally {
       setSystemTime()
-      later.mockRestore()
+      timers.restore()
       replace.mockRestore()
+    }
+  })
+
+  it('writes two params set in the same burst both into the address', () => {
+    const timers = captureTimers()
+
+    try {
+      setURL('http://localhost/both')
+      tick(60_000)
+
+      const first = persisted('first', '', { storage: 'query' })
+      const second = persisted('second', '', { storage: 'query' })
+
+      first.set('a')
+      second.set('b')
+      first.set('c')
+      second.set('d')
+      expect(location.search).toBe('?first=a')
+
+      tick(200)
+      timers.fire()
+      expect(new URLSearchParams(location.search).get('first')).toBe('c')
+      expect(new URLSearchParams(location.search).get('second')).toBe('d')
+    }
+    finally {
+      setSystemTime()
+      timers.restore()
     }
   })
 
   it('never throws out of set() when the browser refuses a history write, the signal kept', () => {
     const refuse = spyOn(history, 'replaceState').mockImplementation(() => {
-      throw new DOMException('Attempt to use history.replaceState() more than 100 times per 30 seconds', 'SecurityError')
+      throw new DOMException('Attempt to use history.replaceState() more than 100 times per 10 seconds', 'SecurityError')
     })
 
     try {
-      setSystemTime(Date.now() + 60_000)
+      tick(60_000)
 
       const refused = persisted('refused', 'a', { storage: 'query' })
 
@@ -358,32 +422,28 @@ describe('page swap, checking a form in the browser', () => {
     }
   })
 
-  it('drops a deferred query write once the page has swapped to another path', () => {
-    const setURL = (url: string) => (window as unknown as { happyDOM: { setURL: (url: string) => void } }).happyDOM.setURL(url)
-    const timers: (() => void)[] = []
-    const later = spyOn(globalThis, 'setTimeout').mockImplementation(((run: () => void) => {
-      timers.push(run)
-
-      return 0
-    }) as unknown as typeof setTimeout)
+  it('drops a deferred query write once the page has swapped to another path or query', () => {
+    const timers = captureTimers()
 
     try {
-      setURL('http://localhost/one')
-      setSystemTime(Date.now() + 60_000)
+      for (const next of ['http://localhost/two', 'http://localhost/one?other=1']) {
+        setURL('http://localhost/one')
+        tick(60_000)
 
-      const moved = persisted<number>('moved', 0, { storage: 'query' })
+        const moved = persisted<number>('moved', 0, { storage: 'query' })
 
-      for (let value = 1; value <= 55; value++)
-        moved.set(value)
-
-      expect(timers.length).toBeGreaterThan(0)
-      setURL('http://localhost/two')
-      timers.at(-1)!()
-      expect(location.search).toBe('')
+        moved.set(1)
+        moved.set(2)
+        expect(timers.pending()).toBe(1)
+        setURL(next)
+        tick(200)
+        timers.fire()
+        expect(location.search).toBe(next.includes('?') ? '?other=1' : '')
+      }
     }
     finally {
       setSystemTime()
-      later.mockRestore()
+      timers.restore()
     }
   })
 
