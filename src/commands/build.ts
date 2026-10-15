@@ -1,4 +1,4 @@
-import type { BuildOptions, BuildResult, BuildStage } from '../build/pipeline'
+import type { BuildOptions, BuildProgress, BuildResult, BuildStage } from '../build/pipeline'
 import type { Command, FailureProblem, ProblemFormat } from './command'
 import { writeSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
@@ -136,15 +136,23 @@ async function printStage(stage: BuildStage, result: BuildResult, format: Proble
 }
 
 // The whole build as one document once it ends, `kay check`'s problems and counts first, then what each stage made and the stage that stopped it; what the app prints meanwhile goes to stderr.
-// Code the build runs that ends the process leaves the problems found so far, and the stage it ended in, written at once as the process goes.
+// Code the build runs that ends the process leaves the problems found so far, and the stage it ended in, written at once as the process goes, and fails it even on exit code 0, as the build never finished.
 async function buildToDocument(root: string, options: BuildOptions): Promise<number> {
   let result: BuildResult
   let found: FailureProblem[] = []
-  let running: BuildStage = 'check'
+  let running: BuildStage = options.check === false ? 'bundle' : 'check'
   const ended = (code: number) => {
     const problems = [...found, failureProblem(`the build ended with exit code ${code} before it was done`, 'json')]
 
     writeSync(1, `${JSON.stringify({ ...problemCounts(problems), problems, failed: { stage: running } })}\n`)
+
+    if (code === 0)
+      process.exitCode = 1
+  }
+  // The check ending first leaves the browser bundle running alone.
+  const onProgress = ({ step }: BuildProgress) => {
+    if (step === 'bundling' && running === 'check')
+      running = 'bundle'
   }
   const onStage = async (stage: BuildStage, sofar: BuildResult) => {
     found = await printedProblems([...sofar.checked, ...sofar.linted])
@@ -154,7 +162,7 @@ async function buildToDocument(root: string, options: BuildOptions): Promise<num
   process.on('exit', ended)
 
   try {
-    result = await withStdoutOnStderr(async () => buildProject(root, await loadConfig(root), { ...options, onStage }))
+    result = await withStdoutOnStderr(async () => buildProject(root, await loadConfig(root), { ...options, onStage, onProgress }))
   }
   catch (error) {
     process.off('exit', ended)

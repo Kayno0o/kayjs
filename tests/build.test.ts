@@ -828,6 +828,25 @@ describe('kay build checks the project first', () => {
       }
     }, 60_000)
 
+    it('names the bundle as the stage a browser build plugin ended the process in under --no-check, failing an exit code 0', async () => {
+      const root = await scratchProject({
+        'tsconfig.json': tsconfig,
+        'kay.config.ts': 'import process from \'node:process\'\n\nexport default { favicon: false, plugins: [{ name: \'quit\', setup() { process.exit(0) } }] }\n',
+        'src/routes/index.kay': 'h1 Home\n',
+      })
+
+      try {
+        const { document, code } = await documented(root, '--no-check', '--format', 'json')
+
+        expect(code).toBe(1)
+        expect(document.failed).toEqual({ stage: 'bundle' })
+        expect(document.problems.map(problem => problem.message)).toEqual(['the build ended with exit code 0 before it was done'])
+      }
+      finally {
+        await rm(root, { recursive: true, force: true })
+      }
+    }, 60_000)
+
     it('answers options that do not go together with an error document', async () => {
       const { document, stderr, code } = await documented('.', '--no-check', '-p', 'tsconfig.json', '--format', 'json')
 
