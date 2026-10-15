@@ -38,9 +38,12 @@ const CACHE_VERSION = 3
 interface CachedEntry {
   salt: string
   stamp: string
+  // When it was cached: a stamp is trusted only once its file had been still for a while before, as an edit in the same instant keeps the size and the time.
+  at: number
   hash: string
   entry: RawEntry
 }
+const STAMP_SETTLED_MS = 2000
 const LEGACY_CACHE_FILE = /^[\da-z]+\.json$/
 const sweptCaches = new Set<string>()
 
@@ -143,7 +146,7 @@ async function compileDirectory(dir: string, highlight?: Highlighter): Promise<R
       const stamp = `${mtimeMs}:${size}`
 
       // Neither read nor hashed again while its file is as the cache saw it.
-      if (cached?.salt === salt && cached.stamp === stamp && cached.entry.file === file)
+      if (cached?.salt === salt && cached.stamp === stamp && cached.entry.file === file && cached.at - mtimeMs > STAMP_SETTLED_MS)
         return cached.entry
 
       const source = await Bun.file(path).text()
@@ -151,7 +154,7 @@ async function compileDirectory(dir: string, highlight?: Highlighter): Promise<R
 
       // A file touched with its content as it was keeps its compile, and the stamp that stands in for reading it.
       if (cached?.salt === salt && cached.hash === hash && cached.entry.file === file) {
-        await writeAtomically(cacheFile, JSON.stringify({ ...cached, stamp } satisfies CachedEntry))
+        await writeAtomically(cacheFile, JSON.stringify({ ...cached, stamp, at: Date.now() } satisfies CachedEntry))
 
         return cached.entry
       }
@@ -159,7 +162,7 @@ async function compileDirectory(dir: string, highlight?: Highlighter): Promise<R
       try {
         const entry = await compileEntry(name, file, source, highlight)
 
-        await writeAtomically(cacheFile, JSON.stringify({ salt, stamp, hash, entry } satisfies CachedEntry))
+        await writeAtomically(cacheFile, JSON.stringify({ salt, stamp, at: Date.now(), hash, entry } satisfies CachedEntry))
 
         return entry
       }

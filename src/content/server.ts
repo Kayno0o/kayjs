@@ -181,7 +181,7 @@ export function serveFeeds(app: Elysia, served: ServedPaths, collections: Collec
 
     for (const { path, locale } of claimFeed(served, collectionFeed(collection), i18n?.settings)) {
       const built = new Map<string, { entries: unknown[], xml: string }>()
-      // The XML built from these very entries is served again; a collection that read its entries afresh, or a request that sees others, builds it anew.
+      // The XML built from these very entries is served again, so `item` is taken to depend on the entry alone; a collection that read its entries afresh, or a request that sees others, builds it anew.
       const once = <Entry>(key: string, entries: Entry[], build: () => string) => {
         const last = built.get(key)
 

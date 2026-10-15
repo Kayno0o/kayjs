@@ -322,6 +322,23 @@ describe.concurrent('kay dev', () => {
     }
   })
 
+  it('writes the types with the defaults while kay.config.ts does not load', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
+
+    await Bun.write(join(root, 'src/server.ts'), 'setInterval(() => undefined, 1000)\n')
+    await Bun.write(join(root, 'src/routes/index.kay'), 'p Home\n')
+    await Bun.write(join(root, 'kay.config.ts'), 'export default {\n')
+    const stop = await dev(root)
+
+    try {
+      expect(await Bun.file(join(root, '.kay/types/src/routes/index.kay.tsx')).exists()).toBe(true)
+    }
+    finally {
+      await stop()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('readies the next server once one on a Unix socket is up, as one on a port', async () => {
     const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
 

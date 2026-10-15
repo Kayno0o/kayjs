@@ -2,7 +2,7 @@ import process from 'node:process'
 
 // Preloaded into the server `kay render` runs: each server the entry starts listens on a Unix socket rather than a port, so nothing on the network reaches it and no port is taken, and the first tells `kay render` it is up.
 const SOCKET = process.env.KAY_RENDER_SOCKET!
-// `PARENT_WATCHED` in `src/server/lifecycle.ts`, which this preload does not import, to load nothing before the entry.
+// `PARENT_WATCHED` in `src/server/parent.ts`, which this preload does not import, to load nothing before the entry.
 const PARENT_WATCHED = Symbol.for('kay.parentWatched')
 const PARENT_POLL_MS = 1000
 const serve = Bun.serve.bind(Bun)

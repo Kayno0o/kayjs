@@ -94,6 +94,22 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   let touched = new Set<string>()
   // The config the types are written from, read again once kay.config.ts changes.
   let typesConfig = options.config
+  // The types are written beside the restarts, one run at a time and one more once it ends when changes came meanwhile.
+  let typesWriting: Promise<void> | undefined
+  let typesAgain = false
+  const writeTypes = async () => {
+    typesAgain = true
+    typesWriting ??= (async () => {
+      while (typesAgain) {
+        typesAgain = false
+        await regenerateTypes(root, { ...options, config: typesConfig })
+      }
+
+      typesWriting = undefined
+    })()
+
+    return typesWriting
+  }
   // What the last restart came from and when it began, for its report, `r` pressed when nothing changed.
   let restartedFor: string[] = []
   let restartAsked = false
@@ -377,7 +393,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     if (typesConfig !== undefined && files.includes(CONFIG_FILE))
       typesConfig = await reloadConfig(root, typesConfig)
 
-    await regenerateTypes(root, { ...options, config: typesConfig })
+    void writeTypes()
   }
   // Changes landing during a restart trigger one more, never two restarts at once.
   const drain = async () => {
@@ -479,7 +495,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   }
 
   start()
-  await regenerateTypes(root, options)
+  await writeTypes()
 
   return async () => {
     stopping = true
@@ -494,6 +510,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     clearTimeout(timer)
     stopWatching()
     await restarting
+    await typesWriting
     child?.kill()
     spare?.kill()
     await Promise.all([child?.exited, spare?.exited, builder?.stop()])

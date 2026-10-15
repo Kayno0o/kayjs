@@ -134,12 +134,12 @@ async function readable(dir: string): Promise<Dirent[]> {
   }
 }
 
-// Leaves an unchanged file alone, so watchers and editors reading it see no change, and moves a changed one into place whole, so a build reading it beside another process writing it never reads half of it. Says whether it wrote.
-export async function writeIfChanged(path: string, content: string): Promise<boolean> {
+// Leaves an unchanged file alone, so watchers and editors reading it see no change, and moves a changed one into place whole, so a build reading it beside another process writing it never reads half of it.
+export async function writeIfChanged(path: string, content: string) {
   const file = Bun.file(path)
 
   if (await file.exists() && await file.text() === content)
-    return false
+    return
 
   const draft = `${path}.${crypto.randomUUID()}.tmp`
 
@@ -148,8 +148,6 @@ export async function writeIfChanged(path: string, content: string): Promise<boo
   try {
     await Bun.write(draft, content)
     await rename(draft, path)
-
-    return true
   }
   catch (error) {
     await rm(draft, { force: true })

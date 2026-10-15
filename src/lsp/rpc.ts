@@ -93,7 +93,8 @@ export class Connection {
 
       chunks = buffer.length === 0 ? [] : [buffer]
       size = buffer.length
-      needed = messageEnd(buffer) ?? 0
+      // Nothing is known to wait for until the header is in.
+      needed = frame(buffer)?.end ?? 0
     }
 
     for (const { reject } of this.pending.values())
@@ -168,10 +169,6 @@ function frame(buffer: Buffer): { start: number, end: number } | undefined {
   const start = headerEnd + HEADER_END.length
 
   return { start, end: start + length }
-}
-
-function messageEnd(buffer: Buffer): number | undefined {
-  return frame(buffer)?.end
 }
 
 function takeMessage(buffer: Buffer): { body: string, rest: Buffer } | undefined {

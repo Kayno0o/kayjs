@@ -46,6 +46,8 @@ interface Project {
   locales: string[]
   shadowTree: string
   shadowFiles: Set<string>
+  // The time of each, as the last write left it.
+  shadowStamps: Map<string, number>
   // As of the last shadow write: the static components only islands render, the library components the app never imports, whose errors are the library's, and the libraries.
   islandOnly: Set<string>
   unreached: Set<string>
@@ -334,13 +336,16 @@ export class KayLanguageServer {
 
       const types = await writeShadowTypes(root, project.options)
       const files = new Set(types.files.keys())
+      // By the file as it is on disk, which another process, `kay dev` or `kay check`, may have written first.
+      const stamps = new Map(await Promise.all([...files].map(async path => [path, Bun.file(path).lastModified] as const)))
 
       changes.push(
-        ...[...files].flatMap((path): FileEvent[] => project.shadowFiles.has(path) ? types.written.has(path) ? [{ uri: pathToFileURL(path).href, type: CHANGED }] : [] : [{ uri: pathToFileURL(path).href, type: CREATED }]),
+        ...[...files].flatMap((path): FileEvent[] => project.shadowFiles.has(path) ? stamps.get(path) !== project.shadowStamps.get(path) ? [{ uri: pathToFileURL(path).href, type: CHANGED }] : [] : [{ uri: pathToFileURL(path).href, type: CREATED }]),
         ...[...project.shadowFiles].filter(path => !files.has(path)).map((path): FileEvent => ({ uri: pathToFileURL(path).href, type: DELETED })),
         { uri: pathToFileURL(join(project.shadowTree, 'kay-env.d.ts')).href, type: CHANGED },
       )
       project.shadowFiles = files
+      project.shadowStamps = stamps
       project.islandOnly = types.islandOnly
       project.unreached = types.unreached
       project.libraries = types.libraries
@@ -375,7 +380,7 @@ export class KayLanguageServer {
     let project = this.projects.get(root)
 
     if (!project)
-      this.projects.set(root, project = { root, options: {}, routesDir: projectPaths(root).routes, mounts: [], mountDirs: [], locales: [], shadowTree: `${projectPaths(root).types}/`, shadowFiles: new Set(), islandOnly: new Set(), unreached: new Set(), libraries: [], configured: false })
+      this.projects.set(root, project = { root, options: {}, routesDir: projectPaths(root).routes, mounts: [], mountDirs: [], locales: [], shadowTree: `${projectPaths(root).types}/`, shadowFiles: new Set(), shadowStamps: new Map(), islandOnly: new Set(), unreached: new Set(), libraries: [], configured: false })
 
     return project
   }

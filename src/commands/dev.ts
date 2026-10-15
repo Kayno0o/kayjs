@@ -83,8 +83,6 @@ export const dev: Command = {
       }
 
       await promise
-      process.off('SIGINT', interrupted)
-      process.off('SIGTERM', interrupted)
       await stop()
 
       return 0

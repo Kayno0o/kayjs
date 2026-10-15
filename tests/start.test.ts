@@ -1,4 +1,5 @@
 import type { Subprocess } from 'bun'
+import { existsSync } from 'node:fs'
 import { chmod, mkdir, rename, rm, utimes } from 'node:fs/promises'
 import { join, relative } from 'node:path'
 import process from 'node:process'
@@ -196,8 +197,9 @@ describe('kay start', () => {
     try {
       const child = start(dir)
       let anon = 0
+      // Read from /proc, where there is one.
       const served = await listening(child, async () => {
-        anon = Number((/RssAnon:\s+(\d+)/).exec(await Bun.file(`/proc/${child.pid}/status`).text())?.[1])
+        anon = !existsSync('/proc/self/status') ? 0 : Number((/RssAnon:\s+(\d+)/).exec(await Bun.file(`/proc/${child.pid}/status`).text())?.[1])
       })
 
       expect(served).toMatchObject({ code: 0 })
@@ -208,6 +210,16 @@ describe('kay start', () => {
     finally {
       await rm(join(dir, 'kay.config.ts'))
     }
+  }, 60_000)
+
+  it('reads the config for the entry once the build recorded none', async () => {
+    await build()
+    await rm(join(outputDir(dir), 'executable'), { force: true })
+    await rm(join(outputDir(dir), 'entry'))
+
+    const started = await listening(start(dir))
+
+    expect(started.code).toBe(0)
   }, 60_000)
 
   it('runs the executable the last build compiled, relative to the root, warning when the build is newer, and the entry once it is gone', async () => {
