@@ -2,7 +2,7 @@ import type { Core } from './core'
 import { log } from './log'
 
 // What expired is deleted at most this often.
-const PRUNE_EVERY_MS = 60 * 60 * 1000
+export const PRUNE_EVERY_MS = 60 * 60 * 1000
 const BEARER_EXPIRED_KEPT_MS = 30 * 24 * 60 * 60 * 1000
 
 // Starts the store's pruning when it is due, without making the request wait for it; `core.pruned.running` is the run while it lasts. A failure is logged, and the next try is an hour away.

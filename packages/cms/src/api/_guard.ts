@@ -1,9 +1,9 @@
 import { guard } from 'kay'
+import { READ_METHODS } from 'kay/library'
 import { editRequested } from 'kay/server'
 import { authors } from '../authors'
 import { settings } from '../settings'
 
-const READS = new Set(['GET', 'HEAD'])
 // Leaving edit mode writes nothing, so an edit link alone may do it; `/entries/preview/exit` is a save to a collection named preview.
 const LEAVING = /\/api\/cms\/preview\/exit$/
 
@@ -11,7 +11,7 @@ const LEAVING = /\/api\/cms\/preview\/exit$/
 export default guard(async (ctx) => {
   const { guard: admits, author } = settings()
 
-  if (editRequested(ctx.request) && (!admits || READS.has(ctx.request.method) || (ctx.request.method === 'POST' && LEAVING.test(ctx.url.pathname))))
+  if (editRequested(ctx.request) && (!admits || READ_METHODS.has(ctx.request.method) || (ctx.request.method === 'POST' && LEAVING.test(ctx.url.pathname))))
     return
 
   if (!admits)

@@ -25,6 +25,7 @@ import type { AuthStore, LinkType, SessionRecord, UserRecord } from './store'
 import type { Proof, ProofFailure, TwoFactorResult, TwoFactorSetup } from './twoFactor'
 import type { Level, PolicyContext, Predicate, Requirement } from './types'
 import { Elysia } from 'elysia'
+import { READ_METHODS } from 'kay/library'
 import { clientAddress, crossSiteRefused, rateKey } from 'kay/server'
 import { changePassword, changeUsername, deleteAccount, unlink } from './account'
 import { actingAdmin, adminAuditLog, banUser, changeRole, deleteUser, getUser, isAdmin, listUsers, unbanUser } from './admin'
@@ -57,7 +58,6 @@ import { challenged, completeSignIn, disableTwoFactor, enableTwoFactor, provedLa
 
 export type { AuthSessionData, OAuthApp, Profile, User } from './core'
 
-const READ_METHODS = new Set(['GET', 'HEAD'])
 const STATE = Symbol('kayjs-auth.state')
 // How long a user read stays good. A request is over long before; a websocket, which keeps its `Auth` for its life, reads its user again past it, so a sign-out, a revoked token or a ban reaches it.
 const USER_FRESH_MS = 30 * 1000

@@ -55,6 +55,7 @@ import { remoteImages, remotePatterns } from './remote'
 import { trackPrerendered } from './revalidate'
 import { rewriteRequests } from './rewrite'
 import { routeMatch, routeTable } from './route-table'
+import { READ_METHODS } from './routes'
 import { securityHeaders, setSecurityHeaders } from './security'
 import { ServedPaths } from './served-paths'
 import { setupPages } from './setup'
@@ -63,7 +64,6 @@ import { serveFiles } from './storage'
 import { serveViolationReports } from './violations'
 import { agreeOnWildcards } from './wildcards'
 
-const READS = new Set(['GET', 'HEAD'])
 // What the dev tool's Routes tab says when `seo` is set without the origin the site is public at.
 const NO_ORIGIN_NOTE = 'seo is set but not the origin the site is public at, so there is no sitemap or robots.txt: set site in kay.config.ts or SITE_URL.'
 
@@ -103,7 +103,7 @@ function sendSecurityHeaders(app: App, security: Record<string, string>, filePat
   const headers = Object.entries(security)
 
   app.onRequest(({ request, set }) => {
-    if (!READS.has(request.method) || !ownsHeaders(pathOf(request.url), filePaths))
+    if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), filePaths))
       setSecurityHeaders(set, headers)
   })
 }

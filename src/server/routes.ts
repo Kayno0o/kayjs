@@ -112,6 +112,8 @@ const NOT_ENDPOINT = /\.(?:test|spec|d)\.ts$/
 const SUFFIXED_PARAM = /^(\[\[?[^[\]]+\]\]?)(\.[\w.-]+)$/
 
 // The methods of an Elysia instance's routes that answer requests, as `kay routes` and the dev tool list them.
+// The methods that read, which a route answering GET answers too.
+export const READ_METHODS = new Set(['GET', 'HEAD'])
 export const ROUTE_METHODS = /^(?:get|post|put|patch|delete|head|options|all|ws)$/i
 const BRACKETS = /[[\]]/
 const PARAM_NAME = /:[^/]+/g

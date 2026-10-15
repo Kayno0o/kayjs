@@ -1,7 +1,7 @@
 import type { DefinitionBase, Elysia, EphemeralType, MetadataBase, RouteBase, SingletonBase } from 'elysia'
 import type { Level, PolicyContext, Requirement } from './types'
+import { READ_METHODS } from 'kay/library'
 
-const READ_METHODS = new Set(['GET', 'HEAD'])
 const DECIDED = Symbol('auth.decided')
 
 // The scope a route asks of a scoped bearer token, any one of a list, or false to let every token through.

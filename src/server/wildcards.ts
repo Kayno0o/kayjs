@@ -1,9 +1,9 @@
 import type { Elysia } from 'elysia'
+import { READ_METHODS } from './routes'
 
 type Handle = (request: Request) => Response | Promise<Response>
 
 const METHODS = ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']
-const READS = new Set(['GET', 'HEAD'])
 
 // Elysia hands Bun's router every route but those ending in `*`, which Bun's router then sends a path to before Elysia's own router sees it: a page at `/:p1/:p2` takes `/_kay/x.js` from `/_kay/*`, a redirect from `/old/*` or an API module's `/api/files/*`, which `app.handle()` would serve. So once the server listens, each path of Bun's table such a route would win hands its requests to Elysia's router, which runs the route with its own hooks, as `app.handle()` does.
 export function agreeOnWildcards(app: Elysia): void {
@@ -50,7 +50,7 @@ function fallingThrough(root: Elysia): Record<string, Record<string, Handle>> {
 }
 
 function sameMethod(wildcard: string, route: string): boolean {
-  return wildcard === route || wildcard === 'ALL' || route === 'ALL' || (READS.has(wildcard) && READS.has(route))
+  return wildcard === route || wildcard === 'ALL' || route === 'ALL' || (READ_METHODS.has(wildcard) && READ_METHODS.has(route))
 }
 
 // Whether a path both a wildcard route's start and a param route serve goes to the wildcard in Elysia's router: the first segment telling them apart is static in the wildcard and a param in the other.

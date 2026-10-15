@@ -5,9 +5,9 @@ import type { AuditCursor, UserRecord } from './store'
 import { clamp } from '@kaynooo/utils'
 import { publicUser } from './core'
 import { log } from './log'
+import { PRUNE_EVERY_MS } from './prune'
 
 // The audit log is pruned of what outlived its age at most this often.
-const PRUNE_EVERY_MS = 60 * 60 * 1000
 const AUDIT_PAGE_MAX = 200
 
 // What happens to an account without changing what protects it, handed to `onEvent` but never mailed. An admin's doing, a role or a ban, or a manager's in an organization, names them in the context's `actor`.

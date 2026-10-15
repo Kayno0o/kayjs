@@ -1,3 +1,7 @@
 [test]
 root = "./tests"
-preload = [ "./tests/preload.ts" ]
+# kay's own 20 s, as Bun's 5 s fails tests that build or type-check whenever the machine is busy.
+preload = [
+  "../../tests/timeout.ts",
+  "./tests/preload.ts"
+]
