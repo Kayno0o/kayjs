@@ -14,6 +14,19 @@ describe('sortedRows', () => {
     expect(sortedRows(planets, [name, moons], { key: 'moons', direction: 'desc' }).map(planet => planet.name)).toEqual(['Mars', 'Earth', 'Venus'])
   })
 
+  test('reads each row\'s sort value once', () => {
+    let reads = 0
+    const counted: Column<Planet> = { key: 'moons', header: 'Moons', sortValue: (planet) => {
+      reads++
+
+      return planet.moons ?? -1
+    } }
+
+    sortedRows(planets, [counted], { key: 'moons', direction: 'asc' })
+
+    expect(reads).toBe(planets.length)
+  })
+
   test('leaves the rows as they came for no sort, or a column that cannot sort', () => {
     expect(sortedRows(planets, [name], undefined)).toBe(planets)
     expect(sortedRows(planets, [{ key: 'id', header: 'Id' }], { key: 'id', direction: 'asc' })).toBe(planets)

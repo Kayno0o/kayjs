@@ -1,7 +1,8 @@
 ---
 import type { JSX } from 'kay'
-import { effect, untrack } from 'kay'
-import { onFormReset, startRef } from './form-reset'
+import { untrack } from 'kay'
+import { controlledValue } from './controlled-value'
+import { startRef } from './form-reset'
 
 const { value, onInput, onChange, onBlur, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['textarea'], 'value' | 'class' | 'children' | 'onInput' | 'onChange'> & {
   // Without it, the box starts empty and keeps what is typed, for a form posting it by its `name`.
@@ -13,18 +14,17 @@ const { value, onInput, onChange, onBlur, class: className, ...rest } = props<Om
 }>()
 
 let box: HTMLTextAreaElement | undefined
-// What the parent was last told or handed, which a reset that changes the box has to tell it again.
-let seen = untrack(() => value ?? '')
 
 // The parent may write back its own reading of the text, such as without the blank line just typed: the box takes it once left, never while focused, which would throw the caret to the end.
-function sync(left = false) {
-  const next = value
-
-  if (box && next !== undefined && box.value !== next && (left || document.activeElement !== box)) {
-    box.value = next
-    seen = next
-  }
-}
+const { heard, sync } = controlledValue({
+  box: () => box,
+  value: () => value,
+  writable: element => document.activeElement !== element,
+  report: (element) => {
+    heard(element.value)
+    ;(onInput ?? onChange)?.(element.value)
+  },
+})
 
 // The box starts once: its default is what it was first drawn with.
 const ref = startRef<HTMLTextAreaElement>((element) => {
@@ -36,17 +36,5 @@ const ref = startRef<HTMLTextAreaElement>((element) => {
     element.defaultValue = start
 }, { app: rest.ref })
 
-effect(() => sync())
-
-// A reset puts the box back on its default, which the parent is then told of as if typed.
-onFormReset(() => box, () => {
-  if (!box || box.value === seen)
-    return
-
-  seen = box.value
-  const tell = onInput ?? onChange
-
-  tell?.(box.value)
-})
 ---
-textarea.kui-field-input({...rest} ref={ref} value={untrack(() => value)} class={className} onInput={event => { seen = event.currentTarget.value; onInput?.(seen) }} onChange={event => { seen = event.currentTarget.value; onChange?.(seen) }} onBlur={event => { sync(true); onBlur?.(event) }})
+textarea.kui-field-input({...rest} ref={ref} value={untrack(() => value)} class={className} onInput={event => { heard(event.currentTarget.value); onInput?.(event.currentTarget.value) }} onChange={event => { heard(event.currentTarget.value); onChange?.(event.currentTarget.value) }} onBlur={event => { sync(true); onBlur?.(event) }})

@@ -34,10 +34,10 @@ function peersOf(path: string, seen = new Set<string>()): string[] {
   })
 }
 
-test('only LineChart needs an optional peer installed, chartist', () => {
+test('no component imports an optional peer statically: chartist and hls.js load once a chart or a playlist is shown', () => {
   const reaching = [...sources.keys()].filter(path => path.endsWith('.kay')).flatMap(path => [...new Set(peersOf(path))].map(peer => `${path} ${peer}`))
 
-  expect(reaching).toEqual(['src/line-chart.kay chartist'])
+  expect(reaching).toEqual([])
 })
 
 test('MediaGallery\'s player builds without hls.js installed, and says to install it once a playlist needs it', async () => {

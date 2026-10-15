@@ -1,7 +1,8 @@
 --- <Value extends string | number, Empty extends string | boolean | undefined = undefined>
 import type { JSX } from 'kay'
-import { effect, untrack } from 'kay'
-import { onFormReset, startRef } from './form-reset'
+import { untrack } from 'kay'
+import { controlledValue } from './controlled-value'
+import { startRef } from './form-reset'
 
 const { value, options, onChange, submit = false, emptyOption, loading = false, loadingLabel = 'Loading…', class: className, ...rest } = props<Omit<JSX.IntrinsicElements['select'], 'value' | 'options' | 'class' | 'children' | 'onChange'> & {
   // One of the options' values, or the empty string once there is an `emptyOption`.
@@ -20,15 +21,12 @@ const { value, options, onChange, submit = false, emptyOption, loading = false, 
 }>()
 
 let box: HTMLSelectElement | undefined
-// What the app was last told or handed, which a reset that changes the select has to tell it again.
-let seen = untrack(() => String(value))
 
-effect(() => {
-  seen = String(value)
-})
+// The options carry the value to the select, so only what the app last handed is kept; a reset that changes the select has the app's `onChange` told, without submitting.
+const { heard } = controlledValue({ box: () => box, value: () => String(value), write: false, report: select => report(select) })
 
 function report(select: HTMLSelectElement) {
-  seen = select.value
+  heard(select.value)
 
   const choice = options.find(option => String(option.value) === select.value)
 
@@ -44,12 +42,6 @@ function picked(select: HTMLSelectElement) {
 }
 
 const ref = startRef<HTMLSelectElement>(element => box = element, { app: rest.ref })
-
-// A reset puts the select back on its default option, which the app's `onChange` then hears of, without submitting.
-onFormReset(() => box, () => {
-  if (box && box.value !== seen)
-    report(box)
-})
 ---
 // Each option says whether it is selected, so the right one stays chosen when the options arrive after the value.
 select.kui-field-input({...rest} ref={ref} class={className} onChange={event => picked(event.currentTarget)})

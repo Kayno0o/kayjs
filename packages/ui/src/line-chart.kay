@@ -1,8 +1,7 @@
 ---
-import type { Axis, ChartRect, LineChartOptions } from 'chartist'
+import type { Axis, ChartRect, FixedScaleAxis, LineChart as LineChartClass, LineChartOptions } from 'chartist'
 import type { JSX } from 'kay'
 import type { ChartSeries } from './plot'
-import { LineChart } from 'chartist'
 import { effect, memo, onCleanup, onMount, signal, uid } from 'kay'
 import { chartData, indexAt, labelTimes, positionOf, xAxisOptions } from './chart-axis'
 import { dashSample, SERIES_DASHES, steppedPoint } from './plot'
@@ -37,7 +36,7 @@ const times = memo(() => labelTimes(labels))
 const colors = memo(() => series.map((item, index) => item.color ?? PALETTE[index % PALETTE.length]!))
 const dashes = memo(() => series.map((_, index) => SERIES_DASHES[index % SERIES_DASHES.length]!))
 
-const settings = (): LineChartOptions => {
+const settings = (fixedScale: typeof FixedScaleAxis): LineChartOptions => {
   const padding = typeof options?.chartPadding === 'object' ? options.chartPadding : {}
 
   return {
@@ -46,7 +45,7 @@ const settings = (): LineChartOptions => {
     showPoint: false,
     ...options,
     chartPadding: { top: 8, right: xLabels ? 24 : 8, bottom: 0, left: 0, ...padding },
-    axisX: { ...xAxisOptions(labels, times(), xLabels), ...options?.axisX },
+    axisX: { ...xAxisOptions(labels, times(), xLabels, fixedScale), ...options?.axisX },
     axisY: { showLabel: true, showGrid: true, labelInterpolationFnc: (value: string | number) => formatValue(Number(value)), ...options?.axisY },
   }
 }
@@ -99,27 +98,41 @@ const announced = () => {
   return `${labels[index] ?? ''}: ${readings}${picked}`
 }
 
-// Drawn in the browser alone: chartist measures the box it draws into.
+// Drawn in the browser alone: chartist measures the box it draws into. It is read once the chart is on the page, so the page's own code loads and runs first.
 onMount(() => {
-  const chart = new LineChart(canvas!, { series: [] }, {})
+  const drawing = signal<{ chart: InstanceType<typeof LineChartClass>, fixedScale: typeof FixedScaleAxis } | null>(null)
+  let gone = false
+  let chart: InstanceType<typeof LineChartClass> | undefined
 
-  chart.on('created', (event) => {
-    plot.set({ rect: event.chartRect, axisY: event.axisY })
-  })
-  // Colours and dashes go on each drawn part, so any number of series takes any colour with no stylesheet per chart.
-  chart.on('draw', (event) => {
-    const paint = PAINT[event.type]
+  void (async () => {
+    const { LineChart, FixedScaleAxis: fixedScale } = await import('chartist')
 
-    if (!paint || !('seriesIndex' in event))
+    if (gone)
       return
 
-    const dash = event.type === 'line' ? dashes()[event.seriesIndex] : ''
+    chart = new LineChart(canvas!, { series: [] }, {})
+    chart.on('created', (event) => {
+      plot.set({ rect: event.chartRect, axisY: event.axisY })
+    })
+    // Colours and dashes go on each drawn part, so any number of series takes any colour with no stylesheet per chart.
+    chart.on('draw', (event) => {
+      const paint = PAINT[event.type]
 
-    event.element.attr({ style: `${paint}: ${colors()[event.seriesIndex]}${dash ? `; stroke-dasharray: ${dash}` : ''}` })
-  })
+      if (!paint || !('seriesIndex' in event))
+        return
+
+      const dash = event.type === 'line' ? dashes()[event.seriesIndex] : ''
+
+      event.element.attr({ style: `${paint}: ${colors()[event.seriesIndex]}${dash ? `; stroke-dasharray: ${dash}` : ''}` })
+    })
+    drawing.set({ chart, fixedScale })
+  })()
 
   effect(() => {
-    chart.update(chartData(labels, series.map(item => item.values), times()), settings(), true)
+    const ready = drawing()
+
+    if (ready)
+      ready.chart.update(chartData(labels, series.map(item => item.values), times()), settings(ready.fixedScale), true)
   })
 
   // New points, such as a span the app zoomed in on, leave nothing picked on the old ones, whose indices may not exist any more.
@@ -134,7 +147,10 @@ onMount(() => {
     dragged.set(null)
   })
 
-  onCleanup(() => chart.detach())
+  onCleanup(() => {
+    gone = true
+    chart?.detach()
+  })
 })
 
 // The point under the pointer, or none before the plot is drawn.

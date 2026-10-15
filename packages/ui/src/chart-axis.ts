@@ -1,6 +1,5 @@
-import type { AxisOptions, LineChartData } from 'chartist'
+import type { AxisOptions, FixedScaleAxis, LineChartData } from 'chartist'
 import { formatDayMonth, parseDateLabel } from '@kaynooo/utils/date'
-import { FixedScaleAxis } from 'chartist'
 
 // The most x-axis labels drawn, first and last always among them.
 const MAX_TICKS = 5
@@ -36,7 +35,8 @@ export function chartData(labels: string[], series: (number | null)[][], times: 
   return { labels, series: times ? series.map(values => values.map((value, index) => ({ x: times[index]!, y: value }))) : series }
 }
 
-export function xAxisOptions(labels: string[], times: number[] | null, showLabels: boolean): AxisOptions {
+// `fixedScale` is chartist's `FixedScaleAxis`, handed in so this file loads no chartist: the chart reads it with the rest of chartist once it is drawn.
+export function xAxisOptions(labels: string[], times: number[] | null, showLabels: boolean, fixedScale: typeof FixedScaleAxis): AxisOptions {
   if (!showLabels)
     return { showLabel: false, showGrid: false }
 
@@ -44,7 +44,7 @@ export function xAxisOptions(labels: string[], times: number[] | null, showLabel
 
   if (times) {
     return {
-      type: FixedScaleAxis,
+      type: fixedScale,
       ...times.length > 0 ? { low: times[0]!, high: times.at(-1)! } : {},
       ticks: ticks.map(index => times[index]!),
       showLabel: true,

@@ -85,6 +85,20 @@ function check() {
   dirty.set(snapshot() !== baseline)
 }
 
+let queued = false
+
+// What an input, a change and a mutation of the same keystroke each ask for, read once after them: the snapshot serializes every control of the form.
+function checkSoon() {
+  if (queued)
+    return
+
+  queued = true
+  queueMicrotask(() => {
+    queued = false
+    check()
+  })
+}
+
 // A reset the bar did not start, from a reset button among the fields, leaves the form clean too, once the controls driven by signals have followed.
 onFormReset(() => form, check, true)
 
@@ -95,7 +109,7 @@ guardLeave(() => dirty() && !action.pending())
 onMount(() => {
   baseline = snapshot()
 
-  const observer = new MutationObserver(check)
+  const observer = new MutationObserver(checkSoon)
 
   observer.observe(form!, { childList: true, subtree: true, attributes: true, attributeFilter: ['value', 'checked', 'selected', 'disabled'] })
   onCleanup(() => observer.disconnect())
@@ -139,7 +153,7 @@ function discard() {
 // Ctrl or Cmd with S saves, the browser's own save dialog kept away even when there is nothing to save.
 shortcut('mod+s', () => form?.requestSubmit(), { on: () => form })
 ---
-form.kui-save-form(class={className} ref={element => form = element} onSubmit={submit} onInput={check} onChange={check})
+form.kui-save-form(class={className} ref={element => form = element} onSubmit={submit} onInput={checkSoon} onChange={checkSoon})
   .kui-form-grid
     slot
   .kui-save-bar

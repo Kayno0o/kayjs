@@ -2,8 +2,9 @@
 import type { JSX } from 'kay'
 import type { TextEdit } from './markdown-edit'
 import { entriesFromDataTransfer, htmlToMarkdown } from '@kaynooo/utils/browser/clipboard'
-import { effect, signal, untrack } from 'kay'
-import { onFormReset, startRef } from './form-reset'
+import { signal, untrack } from 'kay'
+import { controlledValue } from './controlled-value'
+import { startRef } from './form-reset'
 import { enterEdit, indentEdit, linkEdit, wrapEdit } from './markdown-edit'
 import { attempt } from './toast'
 
@@ -29,8 +30,6 @@ const ref = startRef<HTMLTextAreaElement>((element) => {
   area = element
   element.defaultValue = untrack(() => value)
 }, { app: rest.ref })
-// What the parent was last told or handed, which a reset that changes the field has to tell it again.
-let seen = untrack(() => value)
 // Set by Escape, so the Tab after it moves on rather than indenting.
 let leaving = false
 
@@ -38,23 +37,14 @@ function isImage(file: File): boolean {
   return file.type.startsWith('image/')
 }
 
-// The attribute fills the field on the server and as it hydrates; afterwards the text lands on it only when it differs, since writing it moves the caret to the end.
-effect(() => {
-  const next = value
-
-  if (area && area.value !== next) {
-    area.value = next
-    seen = next
-  }
-})
-
-// A reset puts the field back on its default, which the parent is then told of as if typed.
-onFormReset(() => area, () => {
-  if (!area || area.value === seen)
-    return
-
-  seen = area.value
-  onInput?.(area.value)
+// The attribute fills the field on the server and as it hydrates; afterwards the text lands on it only when it differs, since writing it moves the caret to the end. A reset is reported as if typed.
+const { heard } = controlledValue({
+  box: () => area,
+  value: () => value,
+  report: (element) => {
+    heard(element.value)
+    onInput?.(element.value)
+  },
 })
 
 // Applies an edit through the browser's own editing, so Ctrl+Z undoes it like typing, else sets the text and reports it with an `input` event.
@@ -201,4 +191,4 @@ function drop(event: DragEvent) {
 }
 ---
 // A markdown field that writes like an editor: Ctrl+B, Ctrl+I and Ctrl+K wrap the selection, Enter continues a list and Tab indents one, Escape then Tab leaving the field, a pasted page turns into markdown, and pasted or dropped images upload behind a placeholder.
-textarea.kui-field-input.kui-markdown-editor({...rest} ref={ref} value={untrack(() => value)} placeholder={placeholder} aria-description={keysHint} aria-busy={uploading() > 0 ? 'true' : 'false'} class={className} onInput={event => { seen = event.currentTarget.value; onInput?.(seen) }} onKeyDown={keyDown} onPaste={paste} onDrop={drop})
+textarea.kui-field-input.kui-markdown-editor({...rest} ref={ref} value={untrack(() => value)} placeholder={placeholder} aria-description={keysHint} aria-busy={uploading() > 0 ? 'true' : 'false'} class={className} onInput={event => { heard(event.currentTarget.value); onInput?.(event.currentTarget.value) }} onKeyDown={keyDown} onPaste={paste} onDrop={drop})

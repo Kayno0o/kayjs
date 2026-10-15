@@ -40,6 +40,31 @@ function leaves() {
 }
 
 describe('SaveForm', () => {
+  test('reads the form once for the input and the change of one edit', async () => {
+    const root = await saveForm(async name => name.name)
+    const Original = globalThis.FormData
+    let reads = 0
+
+    globalThis.FormData = class extends Original {
+      constructor(form?: HTMLFormElement) {
+        super(form)
+        reads++
+      }
+    }
+
+    try {
+      type(root, 'Grace')
+      type(root, 'Grace', '#name', 'change')
+      await settle()
+    }
+    finally {
+      globalThis.FormData = Original
+    }
+
+    expect(reads).toBe(1)
+    expect(status(root)).toBe('Unsaved changes.')
+  })
+
   test('is clean at first, dirty once a field changes and clean again once it is typed back', async () => {
     const root = await saveForm(async name => name.name)
     const [discard, save] = buttons(root)

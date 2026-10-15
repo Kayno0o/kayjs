@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+import { FixedScaleAxis } from 'chartist'
 import { chartData, indexAt, labelTimes, positionOf, tickIndices, xAxisOptions } from '../src/chart-axis'
 
 const DAYS = ['2026-01-01', '2026-01-02', '2026-01-11']
@@ -43,15 +44,15 @@ describe('chart axis', () => {
   })
 
   test('labels only the ticks, as dates on a time axis and as written otherwise', () => {
-    expect(xAxisOptions(DAYS, labelTimes(DAYS), false)).toEqual({ showLabel: false, showGrid: false })
+    expect(xAxisOptions(DAYS, labelTimes(DAYS), false, FixedScaleAxis)).toEqual({ showLabel: false, showGrid: false })
 
-    const timed = xAxisOptions(DAYS, labelTimes(DAYS), true)
+    const timed = xAxisOptions(DAYS, labelTimes(DAYS), true, FixedScaleAxis)
 
     expect(timed.ticks).toEqual(labelTimes(DAYS)!)
     expect(timed.labelInterpolationFnc?.(labelTimes(DAYS)![2]!, 2)).toBe('11 Jan')
 
     const labels = ['10:00', '10:05', '10:10', '10:15', '10:20', '10:25']
-    const plain = xAxisOptions(labels, null, true)
+    const plain = xAxisOptions(labels, null, true, FixedScaleAxis)
 
     expect(labels.map((label, index) => plain.labelInterpolationFnc?.(label, index))).toEqual(['10:00', '10:05', null, '10:15', '10:20', '10:25'])
   })

@@ -1,7 +1,8 @@
 ---
 import type { JSX } from 'kay'
-import { effect, untrack } from 'kay'
-import { onFormReset, startRef } from './form-reset'
+import { untrack } from 'kay'
+import { controlledValue } from './controlled-value'
+import { startRef } from './form-reset'
 
 type Field = Omit<JSX.IntrinsicElements['input'], 'value' | 'type' | 'class' | 'children' | 'onInput' | 'onChange'> & {
   class?: string | undefined
@@ -27,8 +28,6 @@ type AsNumber = Field & {
 const { value, onInput, onChange, onBlur, type = 'text', class: className, ...rest } = props<AsText | AsNumber>()
 
 let box: HTMLInputElement | undefined
-// What the parent was last told or handed, which a reset that changes the box has to tell it again.
-let seen = untrack(() => String(value ?? ''))
 
 // A number box mid-word, `1,` before its last digit, reports the empty string, which would read as a cleared field: nothing is taken off it until it parses.
 const halfTyped = (input: HTMLInputElement) => input.validity.badInput
@@ -57,32 +56,17 @@ function report(callback: ((value: never) => void) | undefined, input: HTMLInput
   if (halfTyped(input))
     return
 
-  seen = input.value
+  controlled.heard(input.value)
   callback?.(read(input) as never)
 }
-
-// A reset puts the box back on its default, which the parent is then told of as if typed.
-onFormReset(() => box, () => {
-  if (!box || box.value === seen)
-    return
-
-  report(onInput ?? onChange, box)
-})
 
 // Whether the box already reads as `next`: a number box answers `2.` and `2.30` as 2 and 2.3, so a parent writing its own spelling of that figure back writes the same thing, and doing it would take the caret out of the word being typed. An empty side matches only another, `Number('')` being 0.
 function reads(input: HTMLInputElement, next: string): boolean {
   return input.value === next || (input.type === 'number' && (halfTyped(input) || (input.value !== '' && next !== '' && Number(input.value) === Number(next))))
 }
 
-// The attribute fills the box on the server and as it hydrates; afterwards the value lands on it only where it says something the box does not already say.
-effect(() => {
-  const next = value
-
-  if (box && next !== undefined && !reads(box, spelled(next))) {
-    box.value = spelled(next)
-    seen = box.value
-  }
-})
+// The attribute fills the box on the server and as it hydrates; afterwards the value lands on it only where it says something the box does not already say, and a reset is reported as if typed.
+const controlled = controlledValue({ box: () => box, value: () => value === undefined ? undefined : spelled(value), reads, report: input => report(onInput ?? onChange, input) })
 
 // A number box shows the figure its parent holds once left, the spelling typed going with the focus.
 function left(event: FocusEvent & { currentTarget: HTMLInputElement, target: Element }) {

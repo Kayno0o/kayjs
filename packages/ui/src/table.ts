@@ -106,15 +106,13 @@ export function sortedRows<Row>(rows: Row[], columns: Column<Row>[], sort: SortS
   const value = sortValue === true ? (row: Row) => sortable(valueAt(row, column.key)) : sortValue
   const factor = sort.direction === 'asc' ? 1 : -1
 
-  return [...rows].sort((a, b) => {
-    const first = value(a)
-    const second = value(b)
+  // Each row's key is read once, where a comparison would read two per step of the sort.
+  return rows.map(row => ({ row, key: value(row) })).sort((a, b) => {
+    if (a.key === undefined || b.key === undefined)
+      return Number(a.key === undefined) - Number(b.key === undefined)
 
-    if (first === undefined || second === undefined)
-      return Number(first === undefined) - Number(second === undefined)
-
-    return factor * compareValues(first, second)
-  })
+    return factor * compareValues(a.key, b.key)
+  }).map(({ row }) => row)
 }
 
 // The sort a click on `column`'s header leads to: its other direction when it already sorts the table, its default one otherwise.
