@@ -851,6 +851,117 @@ describe.concurrent('kay dev', () => {
     }
   })
 
+  it.serial('collapses identical rebuild lines into one with a count on a terminal, and leaves every line elsewhere', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
+    const lines: string[] = []
+    const keys = new PassThrough()
+    const printed = spyOn(console, 'log').mockImplementation((line: string) => void lines.push(line))
+    const written = spyOn(process.stdout, 'write').mockImplementation(() => true)
+    const tty = process.stdout.isTTY
+    const noColor = process.env.NO_COLOR
+    let stop: (() => Promise<void>) | undefined
+
+    const free = Bun.serve({ port: 0, fetch: () => new Response() })
+    const port = free.port!
+
+    await free.stop()
+    await Bun.write(join(root, 'src/server.ts'), `Bun.serve({ port: ${port}, fetch: () => new Response() })\n`)
+    process.stdout.isTTY = true
+    process.env.NO_COLOR = '1'
+
+    try {
+      stop = await dev(root, { keys })
+      await until(() => lines.length === 2)
+
+      keys.write('r')
+      await until(() => lines.length === 3)
+      expect(lines[2]).toMatch(/^\d\d:\d\d:\d\d r pressed: restarted in \d+ ms$/)
+
+      keys.write('r')
+      await until(() => lines.length === 4)
+      expect(lines[3]).toMatch(/^\d\d:\d\d:\d\d r pressed: restarted in \d+ ms \(x2\)$/)
+      // The first line is rewritten: the cursor goes up one row and the rest clears.
+      expect(written).toHaveBeenCalledWith('\x1B[1A\x1B[J')
+
+      keys.write('r')
+      await until(() => lines.length === 5)
+      expect(lines[4]).toEndWith('(x3)')
+
+      // Another line between ends the run.
+      keys.write('c')
+      keys.write('r')
+      await until(() => lines.length === 6)
+      expect(lines[5]).not.toContain('(x')
+    }
+    finally {
+      await stop?.()
+      process.stdout.isTTY = tty
+      printed.mockRestore()
+      written.mockRestore()
+
+      if (noColor === undefined)
+        delete process.env.NO_COLOR
+      else
+        process.env.NO_COLOR = noColor
+    }
+
+    const plain: string[] = []
+    const piped = new PassThrough()
+
+    process.stdout.isTTY = false
+    const quiet = await dev(root, { keys: piped, log: line => plain.push(line) })
+
+    try {
+      await until(() => plain.length === 2)
+      piped.write('r')
+      await until(() => plain.length === 3)
+      piped.write('r')
+      await until(() => plain.length === 4)
+      expect(plain.join('\n')).not.toContain('(x')
+    }
+    finally {
+      await quiet()
+      process.stdout.isTTY = tty
+      await rm(root, { recursive: true, force: true })
+    }
+  }, 30_000)
+
+  it.serial('keeps a rebuild line the app printed after, so it never rewrites the app\'s output', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
+    const lines: string[] = []
+    const keys = new PassThrough()
+    const printed = spyOn(console, 'log').mockImplementation((line: string) => void lines.push(line))
+    const written = spyOn(process.stdout, 'write').mockImplementation(() => true)
+    const tty = process.stdout.isTTY
+    const free = Bun.serve({ port: 0, fetch: () => new Response() })
+    const port = free.port!
+    let stop: (() => Promise<void>) | undefined
+
+    await free.stop()
+    await Bun.write(join(root, 'src/server.ts'), `Bun.serve({ port: ${port}, fetch: () => new Response() })\nsetTimeout(() => process.stderr.write('app output\\n'), 300)\n`)
+    process.stdout.isTTY = true
+
+    try {
+      stop = await dev(root, { keys })
+      await until(() => lines.length === 2)
+      keys.write('r')
+      await until(() => lines.length === 3)
+      // Past the app's own line.
+      await Bun.sleep(1000)
+      keys.write('r')
+      await until(() => lines.length === 4)
+      expect(lines[3]).not.toContain('(x')
+      expect(written).not.toHaveBeenCalledWith(expect.stringContaining('\x1B[1A'))
+    }
+    finally {
+      await stop?.()
+      process.stdout.isTTY = tty
+      printed.mockRestore()
+      written.mockRestore()
+      await rm(root, { recursive: true, force: true })
+    }
+  }, 30_000)
+
   it.serial('takes keys from the terminal it is given: o opens the address, r restarts, q quits, listed once under the ready line', async () => {
     const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
     const lines: string[] = []

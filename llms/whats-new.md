@@ -5,6 +5,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 ## Unreleased
 
 - `queue(name, handler, { idlePoll: '30s' })` makes an idle worker wait longer between empty looks at the store, 1 second by default, a job enqueued in the same process still running at once ([Production](production.md#background-jobs)).
+- `kay dev` on a terminal rewrites an identical restart or stylesheet line with a count, `(x3)`, instead of repeating it ([Commands](project.md#commands)).
 - `shortcut('mod+s', save)` from `kay` binds a keyboard shortcut for as long as an island lives, Cmd on macOS and Ctrl elsewhere, on the page or one element with `on`, firing in a text field only with a modifier ([Islands](islands.md#bind-a-keyboard-shortcut)).
 - kayjs-ui: a `Table` takes `selectable`: a checkbox per row, a tri-state select-all with `N selected`, keys of rows that left `rows` dropped, and a `@bulk(keys, clear)` block for the bulk actions beside the count, in stacked cards too ([kayjs-ui](../packages/ui/llms.txt)).
 - kayjs-ui: `SaveForm` is a form calling a page's action with a sticky bar of unsaved changes, the save under way, Discard and Save, its dirty state read from the form's own controls, leaving with unsaved changes asking and Ctrl+S saving ([kayjs-ui](../packages/ui/llms.txt)).

@@ -70,6 +70,8 @@ const ESCAPE = '\x1B'
 // The interfaces of containers, bridges and VPNs, whose address a phone on the network does not reach.
 const VIRTUAL_INTERFACE = /^(?:docker|br-|bridge|veth|virbr|vmnet|vboxnet|tun|utun|tap|wg|tailscale|zt|lxc|lxd|cni|flannel)/
 const STDERR = 2
+// eslint-disable-next-line no-control-regex -- escape sequences are what it strips
+const ANSI_STYLE = /\x1B\[[\d;]*m/g
 
 // Runs the server entry in development and restarts it on every change; a fresh process is the only way to drop modules Bun has loaded.
 // The client is built beside it, by a process kept from one change to the next, which a stylesheet edit alone needs no restart for.
@@ -140,7 +142,13 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   let unbuilt: Set<string> | null = null
   // The server swapping in the stylesheets of a stylesheet edit, once it said it reads the build.
   let follower: Subprocess | undefined
-  const log = options.log ?? console.log
+  const print = options.log ?? console.log
+  // The last rebuild line, kept to be rewritten when the next is the same; anything printed after it, by kay dev or the app, ends it.
+  let repeatable: { key: string, count: number, rows: number } | undefined
+  const log = (line: string) => {
+    repeatable = undefined
+    print(line)
+  }
   // The inspector socket of each server process.
   const sockets = new Map<Subprocess, string>()
   // The port the running server's pages are on, the one origin besides debug.bun.sh a page may reach the debugger from.
@@ -157,6 +165,24 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   const say = (event: string, fields: object, line: string) => log(json ? JSON.stringify({ event, time: new Date().toISOString(), ...fields }) : line)
   const color = options.log === undefined && !json && process.stdout.isTTY && process.env.NO_COLOR === undefined
   const dim = (text: string) => color ? `\x1B[2m${text}\x1B[22m` : text
+  const collapses = options.log === undefined && !json && process.stdout.isTTY
+  // A rebuild line the one before said already is rewritten with a count, on a terminal only: elsewhere every line stays.
+  const sayRebuild = (event: string, fields: object, key: string, line: string) => {
+    if (!collapses) {
+      say(event, fields, line)
+
+      return
+    }
+
+    const count = repeatable?.key === key ? repeatable.count + 1 : 1
+    const shown = count > 1 ? `${line} (x${count})` : line
+
+    if (repeatable !== undefined && count > 1)
+      process.stdout.write(`\x1B[${repeatable.rows}A\x1B[J`)
+
+    print(shown)
+    repeatable = { key, count, rows: Math.max(1, Math.ceil(shown.replace(ANSI_STYLE, '').length / (process.stdout.columns || 80))) }
+  }
   const stamp = () => dim(new Date().toLocaleTimeString('en-GB'))
   // A server reports its address over IPC from the preload; only the one running counts, and only the first time it listens.
   const listened = (server: Subprocess, message: unknown) => {
@@ -198,7 +224,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
 
       // Quiet, a restart is said only when it moved the address.
       if (options.quiet !== true || url !== address)
-        say('restart', { changed: restartedFor, ms, url }, `${stamp()} ${changed}: restarted in ${took}${url === address ? '' : `, now on ${url}`}`)
+        sayRebuild('restart', { changed: restartedFor, ms, url }, `${changed}: restarted${url === address ? '' : `, now on ${url}`}`, `${stamp()} ${changed}: restarted in ${took}${url === address ? '' : `, now on ${url}`}`)
 
       tell(server, { built: { changed, ms } })
     }
@@ -291,6 +317,9 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
       builder = undefined
     }
 
+    if ('output' in message)
+      repeatable = undefined
+
     if ('followsStyles' in message)
       follower = server
 
@@ -322,7 +351,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     tell(server, { ...outcome.styles && { styles: outcome.styles }, built: { changed, ms, styles: true } })
 
     if (options.quiet !== true)
-      say('styles', { changed: named, ms }, `${stamp()} ${changed}: stylesheets swapped in ${ms} ms`)
+      sayRebuild('styles', { changed: named, ms }, `${changed}: stylesheets swapped`, `${stamp()} ${changed}: stylesheets swapped in ${ms} ms`)
 
     return true
   }
@@ -465,14 +494,19 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
       return
 
     for (const key of keys) {
-      if (key === 'o' && address !== undefined)
+      if (key === 'o' && address !== undefined) {
         openBrowser(address, command => log(`kay dev: no browser to open ${address} with: ${command} is not installed`))
-      else if (key === 'r')
+      }
+      else if (key === 'r') {
         restartNow()
-      else if (key === 'c')
+      }
+      else if (key === 'c') {
+        repeatable = undefined
         process.stdout.write(CLEAR_SCREEN)
-      else if (key === 'q' || key === CTRL_C)
+      }
+      else if (key === 'q' || key === CTRL_C) {
         options.onQuit?.()
+      }
     }
   }
   const rawMode = (on: boolean) => {

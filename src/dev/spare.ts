@@ -17,6 +17,9 @@ const START_LINE = /^start (\d+)(?: (?:(\d+):(\d+)|-) (\d+) ([^\n]*))?/
 // The line an entry prints once it listens, as apps scaffolded before kay printed its own did: `kay dev` prints the address itself, once for every restart.
 const LISTENING_LINE = /^Listening on https?:\/\/[^/\s]+:(\d+)\/?$/
 
+// Output within this of a report is part of the same burst, which `kay dev` already knows of.
+const OUTPUT_THROTTLE_MS = 20
+
 // How many ports past a busy one a server tries before giving up.
 const PORTS_TRIED = 100
 // Where a server listens when the app names no hostname: this machine alone, unless `kay dev --host` opens it to the network.
@@ -67,10 +70,42 @@ Bun.serve = ((given: Parameters<typeof Bun.serve>[0]) => {
 }) as typeof Bun.serve
 
 const log = console.log.bind(console)
+let reported = -OUTPUT_THROTTLE_MS
+
+// `kay dev` hears of the app's output, so it never rewrites a line the app printed after.
+function noteOutput() {
+  const now = performance.now()
+
+  if (now - reported >= OUTPUT_THROTTLE_MS) {
+    reported = now
+    process.send?.({ output: true })
+  }
+}
 
 console.log = (...data: unknown[]) => {
-  if (data.length !== 1 || typeof data[0] !== 'string' || LISTENING_LINE.exec(data[0])?.[1] !== String(port))
+  if (data.length !== 1 || typeof data[0] !== 'string' || LISTENING_LINE.exec(data[0])?.[1] !== String(port)) {
+    noteOutput()
     log(...data)
+  }
+}
+
+for (const method of ['info', 'warn', 'error', 'debug'] as const) {
+  const print = console[method].bind(console)
+
+  console[method] = (...data: unknown[]) => {
+    noteOutput()
+    print(...data)
+  }
+}
+
+for (const stream of [process.stdout, process.stderr]) {
+  const write = stream.write.bind(stream) as (...args: unknown[]) => boolean
+
+  stream.write = (...args: unknown[]) => {
+    noteOutput()
+
+    return write(...args)
+  }
 }
 
 const reader = Bun.stdin.stream().getReader()
