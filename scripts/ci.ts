@@ -58,19 +58,38 @@ const started = Date.now()
 let followed: Run | undefined
 let finished: Run | undefined
 
-while (finished === undefined) {
-  await $`git fetch -q origin main`
+// The first run at or after the commit that was not cancelled, as each push's run tests every commit since the last one passed.
+async function coveringRun(): Promise<Run | undefined> {
+  await $`git fetch -q origin main`.quiet()
 
   if ((await $`git merge-base --is-ancestor ${sha} origin/main`.nothrow()).exitCode !== 0)
     fail(`${short} is not on origin's main: land it first`, 2)
 
-  let run: Run | undefined
-
   for (const commit of [sha, ...(await $`git rev-list --reverse --first-parent ${sha}..origin/main`.text()).split('\n').filter(Boolean)]) {
-    run = await runOf(commit)
+    const run = await runOf(commit)
 
     if (run !== undefined)
-      break
+      return run
+  }
+
+  return undefined
+}
+
+while (finished === undefined) {
+  if (Date.now() - started > GIVE_UP)
+    fail(`CI has not finished on ${short} in ${GIVE_UP / 60_000} minutes${followed === undefined ? '' : `: ${followed.html_url}`}`, 2)
+
+  let run: Run | undefined
+
+  // Forgejo or origin missing one poll leaves the wait to the next.
+  try {
+    run = await coveringRun()
+  }
+  catch (error) {
+    console.warn(`ci: ${error instanceof Error ? error.message : String(error)}, polling again`)
+    await Bun.sleep(POLL)
+
+    continue
   }
 
   if (run !== undefined && run.id !== followed?.id) {
@@ -85,10 +104,7 @@ while (finished === undefined) {
   }
 
   if (run === undefined && Date.now() - started > NO_RUN)
-    fail(`no Tests run covers ${short}: a push touching only .md files starts none, so the next landing's run will`, 2)
-
-  if (Date.now() - started > GIVE_UP)
-    fail(`CI has not finished on ${short} in ${GIVE_UP / 60_000} minutes${followed === undefined ? '' : `: ${followed.html_url}`}`, 2)
+    fail(`no Tests run covers ${short} yet: its own was cancelled by a later push or never started, as a push touching only .md files starts none, so the next landing's run will`, 2)
 
   await Bun.sleep(POLL)
 }
