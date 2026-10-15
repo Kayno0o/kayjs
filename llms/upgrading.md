@@ -45,6 +45,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 - Behind a proxy that does not pass the browser's `Host` on, set `url` in `createAuth` to the site's public address, whose host then counts as the request's own; without it, every form post touching the session answers a 403.
 - Only an `Authorization: Bearer` header skips the check: a request with Basic credentials, which a browser sends on its own, is checked like any other.
 
+### kayjs-ui
+
+- `TextInput(type="number")` hands `onInput` and `onChange` a `number | null`, no longer a string: `onInput={value => count.set(Number(value))}` becomes `onInput={count.set}` over a `signal<number | null>`, and `value` takes that number as well as a string.
+
 ## 1.43.0
 
 ### Markup reaches innerHTML only once vouched for

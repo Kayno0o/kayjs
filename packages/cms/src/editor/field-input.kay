@@ -29,10 +29,6 @@ function set(next: unknown): void {
   drafts.set(entry, path, next)
 }
 
-function setNumber(next: string): void {
-  set(next === '' ? undefined : Number(next))
-}
-
 function setJson(next: string): void {
   try {
     set(next.trim() === '' ? undefined : JSON.parse(next))
@@ -67,7 +63,7 @@ function setJson(next: string): void {
         MarkdownEditor(value={text()} onInput={set})
     when 'number', 'integer'
       FormField(label={current.label} hint={current.hint} issue={issue()} required={current.required})
-        TextInput(type="number" step={current.kind === 'integer' ? '1' : 'any'} value={text()} onInput={setNumber})
+        TextInput(type="number" step={current.kind === 'integer' ? '1' : 'any'} value={text()} onInput={next => set(next ?? undefined)})
     when 'date'
       FormField(label={current.label} hint={current.hint} issue={issue()} required={current.required})
         TextInput(type="date" value={text().slice(0, 10)} onInput={set})

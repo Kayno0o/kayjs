@@ -66,9 +66,32 @@ describe('TextInput', () => {
     type(input, '2.50')
     await settle()
 
-    expect(root.querySelector('#figure')?.textContent).toBe('2.5')
+    expect(root.querySelector('#figure')?.textContent).toBe('number 2.5')
     expect(input.value).toBe('2.50')
   })
+
+  test('hands a number box back as a number, or null once emptied, and empties it when its parent writes null', async () => {
+    const root = await fields()
+    const input = root.querySelector<HTMLInputElement>('#amount')!
+
+    expect(input.value).toBe('2')
+
+    type(input, '')
+    await settle()
+
+    expect(root.querySelector('#figure')?.textContent).toBe('none')
+
+    type(input, '0')
+    await settle()
+
+    expect(root.querySelector('#figure')?.textContent).toBe('number 0')
+
+    click(root.querySelector('#reset'))
+    await settle()
+
+    expect(input.value).toBe('')
+  })
+
   test('keeps what is typed with no value nor onInput, as a plain field of a form', async () => {
     const root = await fields()
     const input = root.querySelector<HTMLInputElement>('#plain')!

@@ -2,40 +2,68 @@
 import type { JSX } from 'kay'
 import { effect, untrack } from 'kay'
 
-const { value, onInput, onChange, onBlur, type = 'text', class: className, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'value' | 'type' | 'class' | 'children' | 'onInput' | 'onChange'> & {
+type Field = Omit<JSX.IntrinsicElements['input'], 'value' | 'type' | 'class' | 'children' | 'onInput' | 'onChange'> & {
+  class?: string | undefined
+}
+
+type AsText = Field & {
   // Without it, the box starts empty and keeps what is typed, for a form posting it by its `name`.
   value?: string | undefined
   onInput?: ((value: string) => void) | undefined
   // Called once the value is committed, on blur or Enter, after `onInput`.
   onChange?: ((value: string) => void) | undefined
-  type?: 'text' | 'email' | 'password' | 'search' | 'tel' | 'url' | 'number' | 'date' | 'datetime-local' | 'time' | 'month' | 'week' | undefined
-  class?: string | undefined
-}>()
+  type?: 'text' | 'email' | 'password' | 'search' | 'tel' | 'url' | 'date' | 'datetime-local' | 'time' | 'month' | 'week' | undefined
+}
+
+// A number box hands back its figure, or null once emptied; it also takes a string, such as the one a refused post sent.
+type AsNumber = Field & {
+  type: 'number'
+  value?: number | string | null | undefined
+  onInput?: ((value: number | null) => void) | undefined
+  onChange?: ((value: number | null) => void) | undefined
+}
+
+const { value, onInput, onChange, onBlur, type = 'text', class: className, ...rest } = props<AsText | AsNumber>()
 
 let box: HTMLInputElement | undefined
 
 // A number box mid-word, `1,` before its last digit, reports the empty string, which would read as a cleared field: nothing is taken off it until it parses.
 const halfTyped = (input: HTMLInputElement) => input.validity.badInput
 
+const spelled = (next: number | string | null) => next === null ? '' : String(next)
+
+function read(input: HTMLInputElement): string | number | null {
+  if (type !== 'number')
+    return input.value
+
+  return input.value === '' ? null : Number(input.value)
+}
+
+// Each shape's callback takes what its own box reads, so either is handed `read`.
+function report(callback: ((value: never) => void) | undefined, input: HTMLInputElement) {
+  if (!halfTyped(input))
+    callback?.(read(input) as never)
+}
+
 // Whether the box already reads as `next`: a number box answers `2.` and `2.30` as 2 and 2.3, so a parent writing its own spelling of that figure back writes the same thing, and doing it would take the caret out of the word being typed.
 function reads(input: HTMLInputElement, next: string): boolean {
-  return input.value === next || (input.type === 'number' && (halfTyped(input) || Number(input.value) === Number(next)))
+  return input.value === next || (input.type === 'number' && (halfTyped(input) || (input.value !== '' && next !== '' && Number(input.value) === Number(next))))
 }
 
 // The attribute fills the box on the server and as it hydrates; afterwards the value lands on it only where it says something the box does not already say.
 effect(() => {
   const next = value
 
-  if (box && next !== undefined && !reads(box, next))
-    box.value = next
+  if (box && next !== undefined && !reads(box, spelled(next)))
+    box.value = spelled(next)
 })
 
 // A number box shows the figure its parent holds once left, the spelling typed going with the focus.
 function left(event: FocusEvent & { currentTarget: HTMLInputElement, target: Element }) {
-  if (event.currentTarget.type === 'number' && value !== undefined)
-    event.currentTarget.value = value
+  if (type === 'number' && value !== undefined)
+    event.currentTarget.value = spelled(value)
 
   onBlur?.(event)
 }
 ---
-input.kui-field-input({...rest} ref={element => box = element} type={type} value={untrack(() => value)} class={className} onInput={event => halfTyped(event.currentTarget) || onInput?.(event.currentTarget.value)} onChange={event => halfTyped(event.currentTarget) || onChange?.(event.currentTarget.value)} onBlur={left})
+input.kui-field-input({...rest} ref={element => box = element} type={type} value={untrack(() => value === undefined ? undefined : spelled(value))} class={className} onInput={event => report(onInput, event.currentTarget)} onChange={event => report(onChange, event.currentTarget)} onBlur={left})

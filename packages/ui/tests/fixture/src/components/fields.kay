@@ -8,15 +8,15 @@ import Textarea from '@kaynooo/kayjs-ui/textarea.kay'
 const { onPlanet, onCommit, onFilter, onLeave } = props<{ onPlanet: (value: string) => void, onCommit: (value: string) => void, onFilter?: (query: string) => void, onLeave?: (id: string) => void }>()
 
 const name = signal('Ada')
-// Kept as the figure the box spells, as a parent parsing what is typed would.
-const amount = signal('2')
+const amount = signal<number | null>(2)
 // Kept as the names it reads, one per line, as a roster would.
 const roster = signal('Ada\nGrace')
 ---
 TextInput#name(value={name()} onInput={value => name.set(value)} onChange={onCommit} onBlur={event => onLeave?.(event.currentTarget.id)})
 p#echo {name()}
-TextInput#amount(type="number" value={amount()} onInput={value => amount.set(String(Number(value)))})
-p#figure {amount()}
+TextInput#amount(type="number" value={amount()} onInput={amount.set})
+p#figure {amount() === null ? 'none' : `${typeof amount()} ${amount()}`}
+button#reset(onClick={() => amount.set(null)}) Reset
 button#clear(onClick={() => name.set('')}) Clear
 Select#planet(value="mars" loading options={[{ value: 'mars', label: 'Mars' }, { value: 'earth', label: 'Earth' }]} onChange={onPlanet})
 TextInput#plain(name="email" aria-label="Email")

@@ -63,6 +63,10 @@ Behind a proxy that does not pass the browser's `Host` on, set `url` in `createA
 
 Only an `Authorization: Bearer` header skips the check. Basic credentials, which a browser sends on its own, are checked like any other request.
 
+### kayjs-ui
+
+A number `TextInput` hands `onInput` and `onChange` a number, or `null` once emptied, no longer a string. Hold the value in a `signal<number | null>` and drop the `Number(...)` around it. Its `value` still takes a string too.
+
 ## 1.43.0
 
 ### Markup reaches `innerHTML` only once vouched for

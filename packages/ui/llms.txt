@@ -227,7 +227,7 @@ Tabs(tabs={[{ value: 'details', label: 'Details' }, { value: 'reviews', label: '
 
 - `TextInput(value={title()} onInput={title.set} onChange={save})`:
   - `onInput(value)` runs on each keystroke, and `onChange(value)` once the value is committed, on blur or Enter. `onBlur(event)` gets the box's own blur, as on an `input`.
-  - A number box partway through a number, such as `1,`, reports nothing until it parses. A parent writing back its own spelling of the same number leaves the caret alone.
+  - `type="number"` hands back a number, or `null` once emptied, to both callbacks, and takes a number, `null` or a string as `value`: `TextInput(type="number" value={count()} onInput={count.set})` with `signal<number | null>(1)`. A box partway through a number, such as `1,`, reports nothing until it parses. A parent writing back its own spelling of the same number leaves the caret alone.
   - Without `value` and `onInput` it is a plain field keeping what is typed, for a form posting to an action without JavaScript: `TextInput(name="email" type="email" required autocomplete="email")`, with `value` to start it filled. kay refills only the fields a form's own template writes, so pass `value={failure?.values.email}` to keep what a refused post sent.
 - `Textarea(value={notes()} onInput={notes.set})`: the multi-line TextInput, taking the same props, `rows` among the rest, and working as a plain field without `value` and `onInput`. While focused it keeps the text as typed, and takes the parent's reading of it, such as without a blank line, once left.
 - `Select(value={kind()} options={[{ value: 'post', label: 'Post' }]} onChange={kind.set} emptyOption="Any")`:
