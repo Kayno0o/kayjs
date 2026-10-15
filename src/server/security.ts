@@ -2,7 +2,6 @@ import type { Context } from 'elysia'
 import type { KayConfig, SecurityConfig } from '../config'
 import type { PageSecurity } from '../runtime'
 import type { Prefetch } from './speculation'
-import { isNotEmpty } from 'elysia/utils'
 import { offlineOf } from '../project'
 import { basePath } from './base'
 import { inlineScriptHashes, sourceHash } from './csp'
@@ -148,7 +147,7 @@ export function ownHeaders(set: Context['set'], copies: HeaderCopies): Record<st
     return { ...copies.secured, [REQUEST_ID_HEADER]: id }
   }
 
-  if (!isNotEmpty(set.headers))
+  if (Object.keys(set.headers).length === 0)
     return copies.secured
 
   setSecurityHeaders(set, copies.security)

@@ -11,7 +11,7 @@ import { applySafeFixes, check as checkTypes, configCheckOptions } from '../chec
 import { isLint, isLintGroup, LINT_GROUPS, LINTS } from '../compiler/lints'
 import { CONFIG_FILE, loadConfig } from '../config'
 import { watchProject } from '../dev/sources'
-import { buildingWithoutEnv } from '../server/env'
+import { buildingWithoutEnv } from '../server/env-state'
 import { count, done, formatOption, printFailure, printProblems, PROBLEM_FORMATS, projectRoot, takesControlCodes } from './command'
 import { USAGES } from './usages'
 

@@ -1,18 +1,13 @@
-import type { BunPlugin } from 'bun'
-import type { KayConfig } from '../config'
 import type { Locals } from '../runtime'
 import type { EventStream } from '../runtime/live'
 import type { ActionOptions } from './actions'
+import type { ApiModule } from './api-modules'
 import type { BodyLimit } from './body'
 import type { CorsOptions, CorsRule } from './cors'
 import type { LoadedGuard } from './guards'
 import type { MountedApi } from './openapi'
-import type { RouteMount } from './routes'
 import type { Span } from './trace'
-import { existsSync, realpathSync } from 'node:fs'
-import { basename, dirname, join, relative, sep } from 'node:path'
 import { Cookie, Elysia, ElysiaCustomStatusResponse, ElysiaFile } from 'elysia'
-import { projectPaths } from '../project'
 import { API_MOUNT, END_EVENT, ERROR_EVENT } from '../runtime/live'
 import { kayLog } from '../runtime/log'
 import { encodeValue, unsendable } from '../runtime/wire'
@@ -25,44 +20,14 @@ import { requestId } from './protection'
 import { sharedContext } from './render'
 import { reportServerError } from './report'
 import { requestUrl } from './request-url'
-import { apiMounts, directoriesUp, falseKeys, fileAt } from './routes'
 import { answered, failed, SERVER_SPAN, startSpan } from './trace'
 
-// A module under the API directory or an extension's, as `pages()` mounts it.
-export interface ApiModule {
-  file: string
-  // Where its routes are served: `/api/chat` for `src/api/chat.ts`, `/api` for `src/api/index.ts`.
-  mount: string
-  // The `_guard.ts` files of its directory and above, outermost first.
-  guards: ApiGuard[]
-  // No guard is asked of it on a site with `requireGuards`: it sets `api({ guards: false })`, or a library serves it.
-  open?: true | undefined
-}
-
-export interface ApiGuard {
-  file: string
-  // Where it sits as the API directory and the extensions' laid over it read, whatever machine built the server: `admin/_guard.ts`.
-  path: string
-}
-
-export const API_PREFIX = '/api'
-const GUARD = '_guard.ts'
-const API_OPTIONS = /\bapi\s*\(\s*\{/
-// Tests, declarations, and files or directories starting with `_`, guards and helpers, are no modules.
-const NOT_A_MODULE = /(?:^|\/)_|\.(?:test|spec|d)\.ts$/
-// What a body Elysia streams, awaits or asks for its response has: a generator, a thenable, an object with `toResponse()`.
-const STREAMED = ['next', 'then', 'toResponse']
-const TS_FILE = /\.ts$/
-const INDEX = /(?:^|\/)index$/
-const TRAILING_SLASH = /\/$/
-// What `dirname` gives a file at the top of its directory, as the prefix ends the path.
-const CURRENT_DIR = /\/\.$/
-// What Elysia reads as a parameter or a wildcard, or breaks the code it generates on, in a mount path.
-const ROUTER_SYNTAX = /[:*']/
 // Bun closes a connection idle for 10 s by default, and proxies after a minute or so: a comment line now and then keeps a quiet stream open.
 const HEARTBEAT_MS = 5000
 const HEARTBEAT = new TextEncoder().encode(':\n\n')
-const REGEX_SYNTAX = /[.*+?^${}()|[\]\\]/g
+// What a body Elysia streams, awaits or asks for its response has: a generator, a thenable, an object with `toResponse()`.
+const STREAMED = ['next', 'then', 'toResponse']
+const TRAILING_SLASH = /\/$/
 const TEXT = { 'content-type': 'text/plain; charset=utf-8' }
 // Where `api({ bodyLimit })` keeps its limit on the instance it makes.
 const BODY_LIMIT = Symbol.for('kay.bodyLimit')
@@ -74,85 +39,6 @@ const admitted = new WeakSet<Request>()
 
 // Where a failing event stream reports its error: logged, and handed to `onError` once the route answering with it is known.
 const streamReporters = new WeakMap<Response, { report: (error: unknown) => void }>()
-
-// The app's API modules and its extensions', as `pages()` serves them.
-export async function projectApi(root: string, config: Pick<KayConfig, 'api' | 'extensions'>): Promise<ApiModule[]> {
-  const [app, ...mounts] = apiTrees(root, config)
-
-  return scanApi(app!.dir, mounts)
-}
-
-// The app's API directory at the root of the API tree, then each extension's under its prefix.
-export function apiTrees(root: string, config: Pick<KayConfig, 'api' | 'extensions'>): RouteMount[] {
-  return [{ dir: projectPaths(root, config).api, prefix: '' }, ...apiMounts(root, config.extensions)]
-}
-
-// Every module under `apiDir`, mounted at `/api` plus its path there, then each mounted library's under its prefix that no module before it is served at.
-export async function scanApi(apiDir: string, mounts: RouteMount[] = []): Promise<ApiModule[]> {
-  const trees = [{ dir: apiDir, prefix: '' }, ...mounts]
-  const modules: ApiModule[] = []
-
-  for (const [index, { dir, prefix }] of trees.entries()) {
-    if (!existsSync(dir))
-      continue
-
-    const taken = new Set(modules.map(module => module.mount))
-
-    for await (const path of new Bun.Glob('**/*.ts').scan({ cwd: dir })) {
-      const name = path.split(sep).join('/')
-
-      if (NOT_A_MODULE.test(name))
-        continue
-
-      if (ROUTER_SYNTAX.test(name))
-        throw new Error(`kay: ${join(dir, path)} has a :, * or ' in its path, which the router cannot mount; rename it`)
-
-      const mount = mountOf(prefix, name)
-      const at = `${prefix}/${dirname(name)}`.replace(CURRENT_DIR, '')
-
-      // The app's module, or an earlier library's, at the same path replaces a library's.
-      if (index > 0 && taken.has(mount))
-        continue
-
-      const file = join(dir, path)
-      const open = falseKeys(await Bun.file(file).text(), API_OPTIONS).has('guards')
-
-      modules.push({ file, mount, guards: open ? [] : guardsAt(trees, at), ...(open || index > 0) && { open: true } })
-    }
-  }
-
-  // By UTF-16 code unit, as every machine orders them alike.
-  return modules.sort((a, b) => a.file < b.file ? -1 : Number(a.file > b.file))
-}
-
-// The guards every module runs, the API directory's own first; with none of its own, those of a directory holding every module. A module setting `guards: false` runs none and leaves them as they are.
-export function sharedGuards(modules: ApiModule[]): string[] {
-  const [first, ...rest] = modules.filter(module => module.open !== true || module.guards.length > 0)
-  const shared: string[] = []
-
-  for (const [index, guard] of first?.guards.entries() ?? []) {
-    if (!rest.every(module => module.guards[index]?.file === guard.file))
-      break
-
-    shared.push(guard.file)
-  }
-
-  return shared
-}
-
-// Where a module at `name` in a tree mounted at `prefix` is served: `/api/auth/session` for `session.ts` under `/auth`.
-function mountOf(prefix: string, name: string): string {
-  return `${API_PREFIX}${`${prefix}/${name.replace(TS_FILE, '').replace(INDEX, '')}`.replace(TRAILING_SLASH, '')}`
-}
-
-// The guards of a directory of the API tree and above, `''` for its root, outermost first: the app's at each level, else a library's.
-function guardsAt(trees: RouteMount[], at: string): ApiGuard[] {
-  return directoriesUp(at).flatMap((dir) => {
-    const file = fileAt(trees, dir, GUARD)
-
-    return file === undefined ? [] : [{ file, path: `${dir}/${GUARD}`.slice(1) }]
-  }).reverse()
-}
 
 // The span of each API request in flight.
 const spans = new WeakMap<Request, Span>()
@@ -491,27 +377,5 @@ function encodeEvent(value: unknown): string {
     const reason = unsendable(error)
 
     throw reason === undefined ? error : new TypeError(`kay: a value the event stream sent cannot reach the browser: ${reason}`)
-  }
-}
-
-// In the browser build an island imports a module of one of the API `trees` for its routes' types only: it gets where they are served, and none of the server code.
-// A library module the app replaced gives the app's mount, which is the same path, so a library island importing it still builds.
-export function apiStubs(trees: RouteMount[]): BunPlugin {
-  // A tree reached through a link, a library linked into the app, is matched by its real path too, which Bun hands for a module imported from the real side.
-  const reached = trees.flatMap(tree => [...new Set([tree.dir, existsSync(tree.dir) ? realpathSync(tree.dir) : tree.dir])].map(dir => ({ dir, prefix: tree.prefix })))
-
-  return {
-    name: 'kay-api',
-    setup(build) {
-      build.onLoad({ filter: new RegExp(`^(?:${reached.map(({ dir }) => (dir + sep).replace(REGEX_SYNTAX, '\\$&')).join('|')}).*\\.ts$`) }, ({ path }) => {
-        const { dir, prefix } = reached.find(tree => path.startsWith(tree.dir + sep))!
-        const name = relative(dir, path).split(sep).join('/')
-
-        if (NOT_A_MODULE.test(name))
-          throw new Error(`kay: an island imports ${name}, which is no module under ${basename(dir)}: only a module's default export reaches the browser, as where its routes are served`)
-
-        return { contents: `export default { [Symbol.for('kay.api')]: ${JSON.stringify(mountOf(prefix, name))} }`, loader: 'js' }
-      })
-    },
   }
 }

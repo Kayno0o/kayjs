@@ -2,7 +2,7 @@
 import type { CheckDiagnostic } from '.'
 import type { SettingsReplacement } from '../build/libraries'
 import type { ComponentUse } from '../content/server'
-import type { ApiModule } from '../server/api'
+import type { ApiModule } from '../server/api-modules'
 import type { Endpoint, Route } from '../server/routes'
 import type { ContentChecks } from './project'
 import type { ShadowTypes } from './shadow-types'

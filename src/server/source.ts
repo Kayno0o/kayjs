@@ -1,6 +1,6 @@
 import type { KayConfig } from '../config'
 import type { Mode, Project } from '../project'
-import type { ApiModule } from './api'
+import type { ApiModule } from './api-modules'
 import type { Bundle } from './bundle'
 import type { ClientBuild } from './client'
 import type { Endpoint, Route, RouteMount, SpecialPages } from './routes'
@@ -79,7 +79,7 @@ const DISK: ProjectSource = {
   routes: async (routesDir, mounts) => scanRoutes(routesDir, mounts),
   fallback: (routesDir, mounts) => specialPagesOf(routeTrees(routesDir, mounts), ''),
   // Imported as it is asked for, as the API modules' actions read the locales, which read this.
-  api: async (root, config) => (await import('./api')).projectApi(root, config),
+  api: async (root, config) => (await import('./api-modules')).projectApi(root, config),
   endpoints: async (routesDir, mounts) => scanEndpoints(routesDir, mounts),
   extensionCatalogs: (_, files) => files.filter(file => existsSync(file)),
   editor: (root, config) => extensionEditor(root, config.extensions),

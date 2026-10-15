@@ -11,7 +11,7 @@ import { readShadowSettings } from '../src/check/shadow'
 import { writeShadowTypes } from '../src/check/shadow-types'
 import { mergeConfig } from '../src/config'
 import { UNSERVED_MESSAGE } from '../src/runtime/checks'
-import { apiStubs } from '../src/server/api'
+import { apiStubs } from '../src/server/api-modules'
 import { routeMounts, scanRoutes } from '../src/server/routes'
 import { scratchDir } from './scratch'
 

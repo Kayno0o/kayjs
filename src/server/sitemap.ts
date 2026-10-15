@@ -14,9 +14,8 @@ import { pageSetting } from './page-settings'
 import { listedIn, listedParams, pathOf } from './prerendered'
 import { reportServerError } from './report'
 import { slashedPath } from './routes'
+import { ROBOTS, SITEMAP } from './site-paths'
 
-export const SITEMAP = '/sitemap.xml'
-export const ROBOTS = '/robots.txt'
 // Long enough for crawlers, short enough that a new post shows up the same hour without a restart.
 const CACHE_MS = 60 * 60 * 1000
 

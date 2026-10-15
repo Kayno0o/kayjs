@@ -18,6 +18,7 @@ import { kayLog } from '../runtime/log'
 import { configuredSite } from '../runtime/site'
 import { FAILURE_HEADER, NAVIGATE_HEADER, PAGE_HEADER, REDIRECT_HEADER } from '../runtime/swap'
 import { encodeValue, unsendable } from '../runtime/wire'
+import { actionClash } from './action-clash'
 import { routerPath } from './base'
 import { sizeText } from './body'
 import { importModule } from './bundle'
@@ -204,11 +205,6 @@ async function tooLarge(action: ServerAction<TSchema, unknown>, request: Request
   const message = action.protection?.messages?.bodyLimit ?? (most => `Too large to send; ${sizeText(most)} at most`)
 
   return failed(request, new Headers(), cookieJar(request).cookies, { action: action.url, status: 413, values: {}, errors: { '': typeof message === 'string' ? message : message(bytes) } }, server, back)
-}
-
-// Two files whose paths differ only where a URL keeps neither, `a b.kay` and `a_b.kay`, serve their actions at one URL.
-export function actionClash(first: string, second: string, url: string): Error {
-  return new Error(`kay: ${first} and ${second} both export an action served at ${url}; rename one of the files`)
 }
 
 // What an action file is posted from: a page of `routes`, read for the `params` they all name.

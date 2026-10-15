@@ -1,17 +1,16 @@
 import type { CheckDiagnostic, CheckOptions } from '.'
-import type { CollectionFeed } from '../content/server'
+import type { CollectionFeed } from '../content/claims'
 import type { LocaleSettings } from '../runtime/i18n'
 import { join, resolve } from 'node:path'
 import { islandId } from '../compiler'
 import { CONFIG_FILE } from '../config'
-import { claimFeed } from '../content/server'
+import { claimFeed } from '../content/claims'
 import { projectPaths } from '../project'
 import { actionUrl } from '../runtime/action'
-import { actionClash } from '../server/actions'
+import { actionClash } from '../server/action-clash'
 import { basePath } from '../server/base'
-import { cardLogoProblems } from '../server/card'
-import { claimEndpoints } from '../server/endpoints'
-import { PUBLIC_ENV_PATH } from '../server/env'
+import { claimEndpoints } from '../server/endpoint-claims'
+import { PUBLIC_ENV_PATH } from '../server/env-state'
 import { faviconSource, svgFaviconProblems } from '../server/favicon'
 import { localeSettings, refuseLocaleClashes } from '../server/i18n'
 import { shutdownSeconds } from '../server/lifecycle'
@@ -59,6 +58,9 @@ export async function bootProblems(root: string, options: CheckOptions, feeds: C
   const logo = options.images?.card?.logo
 
   if (logo !== undefined) {
+    // Loaded here alone: drawing the logo takes the image server, which no other check needs.
+    const { cardLogoProblems } = await import('../server/card')
+
     for (const problem of await cardLogoProblems(resolve(root, logo)))
       diagnostics.push({ line: 1, column: 1, ...problem })
   }

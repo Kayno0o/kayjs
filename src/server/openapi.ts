@@ -1,11 +1,11 @@
 import type { Elysia } from 'elysia'
 import type { ActionOptions } from './actions'
-import type { ApiGuard } from './api'
+import type { ApiGuard } from './api-modules'
 import type { LoadedGuard } from './guards'
 import type { ServedPaths } from './served-paths'
 import { escape } from '../runtime/escape'
 import { inLocale, passGuards } from './actions'
-import { API_PREFIX } from './api'
+import { API_PREFIX, OPENAPI_PATH, REFERENCE_PATH } from './api-modules'
 import { sharedContext } from './render'
 import { apiRoutePath } from './routes'
 
@@ -46,9 +46,6 @@ export function openApiSettings(value: boolean | OpenApiConfig | undefined): Ope
 
   return value === false ? undefined : value
 }
-
-export const OPENAPI_PATH = `${API_PREFIX}/openapi.json`
-export const REFERENCE_PATH = `${API_PREFIX}/reference`
 
 const METHODS = new Set(['GET', 'PUT', 'POST', 'DELETE', 'OPTIONS', 'HEAD', 'PATCH', 'TRACE'])
 // What a route answering every method, `.all()`, is listed under.

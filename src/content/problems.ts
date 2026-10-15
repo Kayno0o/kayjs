@@ -1,8 +1,9 @@
 import { resolve } from 'node:path'
 import process from 'node:process'
 import { FILES_MARKER, loadedFiles } from '../check/loaded'
-import { buildingWithoutEnv } from '../server/env'
-import { contentProblems, FEEDS_MARKER, PROBLEMS_MARKER, USES_MARKER } from './server'
+import { buildingWithoutEnv } from '../server/env-state'
+import { FEEDS_MARKER, PROBLEMS_MARKER, USES_MARKER } from './claims'
+import { contentProblems } from './server'
 
 // Run by `kay check` in a process of its own, so the project's `.kay` loader never meets the checking process's: prints the content problems as JSON on a marked line, whatever else the content config logs.
 const [root, config, site] = process.argv.slice(2)

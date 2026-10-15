@@ -1,7 +1,7 @@
 import type { Command } from './command'
 import process from 'node:process'
 import { startServer } from '../lsp/server'
-import { buildingWithoutEnv } from '../server/env'
+import { buildingWithoutEnv } from '../server/env-state'
 import { USAGES } from './usages'
 
 export const lsp: Command = {

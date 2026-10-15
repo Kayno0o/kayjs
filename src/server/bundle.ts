@@ -1,5 +1,5 @@
 import type { KayConfig } from '../config'
-import type { ApiModule } from './api'
+import type { ApiModule } from './api-modules'
 import type { Endpoint, Route, SpecialPages } from './routes'
 
 // What `kay build --compile` bakes into an executable: the routes as the build scanned them, every module they name, and where the embedded client build and public files sit.

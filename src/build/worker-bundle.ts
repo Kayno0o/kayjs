@@ -1,7 +1,7 @@
 import type { KayPluginOptions } from './plugin'
 import { basename } from 'node:path'
 import process from 'node:process'
-import { apiStubs } from '../server/api'
+import { apiStubs } from '../server/api-modules'
 import { kayPlugin } from './plugin'
 import { withoutStyles } from './styles'
 

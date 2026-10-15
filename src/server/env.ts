@@ -5,22 +5,11 @@ import { t } from 'elysia'
 import { PUBLIC_ENV } from '../runtime/env'
 import { kayLog } from '../runtime/log'
 import { fixedReply } from './compress'
+import { building, PUBLIC_ENV_PATH } from './env-state'
 import { readFields } from './query'
 
 // A `s.Object` of the variables, each read on its own.
 export type EnvSchema = TSchema & { properties: Record<string, TSchema> }
-
-// On the global object, so a copy of kay the app loads beside the CLI's sees it too.
-const BUILDING = Symbol.for('kay.building')
-
-// `kay build` renders pages, and `kay check` reads content and messages, without the server's environment: from then on a variable missing or refused fails the page reading it rather than the module declaring it.
-export function buildingWithoutEnv(): void {
-  (globalThis as { [BUILDING]?: boolean })[BUILDING] = true
-}
-
-function building(): boolean {
-  return (globalThis as { [BUILDING]?: boolean })[BUILDING] === true
-}
 
 // The environment read once against `schema`, as the server boots: numbers and booleans from their text, defaults filled in, and every variable missing or refused named in the error that stops it.
 // Holds the declared names only, so logging it never shows the rest of the environment.
@@ -64,9 +53,6 @@ export function defineEnv<Schema extends EnvSchema>(schema: Schema, source: Reco
 
 // Names a variable meant for the server alone goes by, which no visitor should read: a map or analytics key is public by design, a secret or a database address never is.
 const SERVER_ONLY = /SECRET|PASSWORD|PASSWD|PRIVATE|(?:^|_)(?:DATABASE|DB|POSTGRES|PG|MYSQL|REDIS|MONGO(?:DB)?)_URL$/i
-
-// The module the island entry imports the public variables from, served from the environment the server runs in, so an executable or a prerendered page reads today's values rather than those of the build.
-export const PUBLIC_ENV_PATH = '/_kay/env.js'
 
 // Reads the public variables as `defineEnv` reads the server's, for `publicEnv` on the server and the module the browser loads.
 export function servePublicEnv(app: Elysia, served: ServedPaths, schema: EnvSchema): void {

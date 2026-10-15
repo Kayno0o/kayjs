@@ -10,7 +10,7 @@ import { escapeAttribute } from '../runtime/escape'
 import { textDirection } from '../runtime/i18n'
 import { kayLog } from '../runtime/log'
 import { fixedReply } from './compress'
-import { PUBLIC_ENV_PATH } from './env'
+import { PUBLIC_ENV_PATH } from './env-state'
 import { DEFAULT_LANG } from './i18n'
 
 export const SERVICE_WORKER = '/sw.js'

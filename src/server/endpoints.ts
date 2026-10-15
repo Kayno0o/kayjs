@@ -3,7 +3,6 @@ import type { EndpointContext, Locals } from '../runtime'
 import type { ActionOptions } from './actions'
 import type { LoadedGuard } from './guards'
 import type { Endpoint } from './routes'
-import type { ServedPaths } from './served-paths'
 import { basename, relative } from 'node:path'
 import { passGuards } from './actions'
 import { importModule } from './bundle'
@@ -112,21 +111,6 @@ function responseOf(endpoint: ServedEndpoint, body: unknown): Response {
     return new Response(body, { headers: { 'content-type': body.type || endpoint.type } })
 
   throw new TypeError(`kay: ${endpoint.file}'s GET returned ${body === null ? 'null' : typeof body}, where it returns a string, a Blob or a Response`)
-}
-
-// Two endpoints serving the same paths, or one taking a path a page or a public file serves, stop the server, as two pages do; each is exported as `exportedEndpoints` says.
-export function claimEndpoints(served: ServedPaths, endpoints: Endpoint[], root: string): void {
-  for (const endpoint of endpoints) {
-    const { pattern, suffix, file } = endpoint
-    const path = `${pattern}${suffix ?? ''}`
-
-    served.claim({ path: pattern, owner: file, kind: 'endpoint', suffix, exported: async () => (await exportedEndpoints(root, [endpoint])).paths }, (taken) => {
-      if (taken.kind === 'page')
-        return `kay: ${taken.owner} and ${file} both serve ${pattern}${suffix === undefined ? '' : `, which ${file} takes for its paths ending in ${suffix}`}; move one`
-
-      return taken.kind === 'public' ? `kay: ${file} and the public file ${taken.path} both serve ${path}; drop one` : `kay: ${taken.owner} and ${file} both serve ${path}`
-    })
-  }
 }
 
 // The paths a static export writes each endpoint to: its own path without params, or each its `prerender` lists; what keeps one from it is a problem, named by file.
