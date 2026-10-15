@@ -19,7 +19,11 @@ env:
   BUN_INSTALL_CACHE_DIR: /tmp/bun-cache
   CI: 'true'
 
-# No `concurrency` group: on Forgejo 16, a run queued behind another with cancel-in-progress false was seen waiting for a runner long after that run ended, with the runner idle.
+# A group of the commit alone: Forgejo then neither cancels a run on a newer push (its default without a block) nor queues it behind the others, so each waits for the runner alone and the latest job ends a stale one in seconds. One group for the branch queued every run behind any older one left pending, and on Forgejo 16 that held runs waiting with the runner idle.
+concurrency:
+  group: tests-${{ github.sha }}
+  cancel-in-progress: false
+
 jobs:
   # A push's run tests every commit since the last one passed, so a run whose commit is no longer the branch's head leaves its tests to the newer push's.
   latest:
