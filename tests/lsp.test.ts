@@ -1021,9 +1021,10 @@ describe('kay lsp on a save', () => {
 })
 
 describe('kay lsp with a slow tsgo', () => {
-  it('keeps one publish running at a time, and one more once it ends, however many changes come meanwhile', async () => {
-    const dir = await scratchDir('lsp-slow-')
-    const page = 'src/routes/a.kay'
+  const page = 'src/routes/a.kay'
+
+  // A server whose tsgo takes SLOW * 2 to answer for the page, counting how many of those questions run at once.
+  async function slowServer(dir: string) {
     const encoder = new TextEncoder()
     const toServer = new TransformStream<Uint8Array>()
     const toClient = new TransformStream<Uint8Array>()
@@ -1037,9 +1038,7 @@ describe('kay lsp with a slow tsgo', () => {
     }))
     // eslint-disable-next-line ts/unbound-method -- called back with the connection it was taken from
     const request = Connection.prototype.request as (this: Connection, method: string, params?: unknown) => Promise<unknown>
-    let running = 0
-    let started = 0
-    let most = 0
+    const counts = { running: 0, started: 0, most: 0, last: undefined as number | undefined }
 
     await Promise.all([Bun.write(join(dir, 'tsconfig.json'), await Bun.file(join(fixtures, 'site/tsconfig.json')).text()), Bun.write(join(dir, page), 'p x\n')])
 
@@ -1048,45 +1047,90 @@ describe('kay lsp with a slow tsgo', () => {
       if (method !== 'textDocument/diagnostic' || !(params as { textDocument: { uri: string } }).textDocument.uri.endsWith(`${page}.tsx`))
         return request.call(this, method, params)
 
-      started++
-      most = Math.max(most, ++running)
+      counts.started++
+      counts.most = Math.max(counts.most, ++counts.running)
       await Bun.sleep(SLOW * 2)
-      running--
+      counts.running--
 
       return request.call(this, method, params)
     }) as Connection['request'])
+    const uri = pathToFileURL(join(dir, page)).href
+
+    client.onNotification<{ version?: number }>('textDocument/publishDiagnostics', ({ version }) => {
+      counts.last = version
+    })
+
+    return {
+      client,
+      server,
+      uri,
+      counts,
+      async start() {
+        await client.request('initialize', { processId: process.pid, rootUri: pathToFileURL(dir).href, capabilities: {} })
+        client.notify('initialized', {})
+        client.notify('textDocument/didOpen', { textDocument: { uri, languageId: 'kay', version: 1, text: 'p x\n' } })
+      },
+      // Until the given version is published, as a real tsgo starting under load takes longer than any fixed wait.
+      async published(version: number) {
+        for (const limit = Date.now() + 15_000; counts.last !== version && Date.now() < limit;)
+          await Bun.sleep(20)
+      },
+      stop() {
+        slow.mockRestore()
+        // `exit` would end the test run too.
+        const { tsgo } = server as unknown as { tsgo?: { process: { kill: () => void } } }
+
+        tsgo?.process.kill()
+      },
+    }
+  }
+
+  it('keeps one publish running at a time, and one more once it ends, however many changes come meanwhile', async () => {
+    const dir = await scratchDir('lsp-slow-')
+    const slow = await slowServer(dir)
 
     try {
-      const uri = pathToFileURL(join(dir, page)).href
-      let last: number | undefined
-
-      client.onNotification<{ version?: number }>('textDocument/publishDiagnostics', ({ version }) => {
-        last = version
-      })
-      await client.request('initialize', { processId: process.pid, rootUri: pathToFileURL(dir).href, capabilities: {} })
-      client.notify('initialized', {})
-      client.notify('textDocument/didOpen', { textDocument: { uri, languageId: 'kay', version: 1, text: 'p x\n' } })
+      await slow.start()
 
       for (let version = 2; version <= 5; version++) {
         await Bun.sleep(DIAGNOSTICS_DELAY + 50)
-        client.notify('textDocument/didChange', { textDocument: { uri, version }, contentChanges: [{ text: `p {${version}}\n` }] })
+        slow.client.notify('textDocument/didChange', { textDocument: { uri: slow.uri, version }, contentChanges: [{ text: `p {${version}}\n` }] })
       }
-      // Until the last change is published, as a real tsgo starting under load takes longer than any fixed wait.
-      const published = () => last === 5
+      await slow.published(5)
 
-      for (const limit = Date.now() + 15_000; !published() && Date.now() < limit;)
-        await Bun.sleep(20)
-
-      expect(last).toBe(5)
-      expect(most).toBe(1)
-      expect(started).toBeLessThanOrEqual(3)
+      expect(slow.counts.last).toBe(5)
+      expect(slow.counts.most).toBe(1)
+      expect(slow.counts.started).toBeLessThanOrEqual(3)
     }
     finally {
-      slow.mockRestore()
-      // `exit` would end the test run too.
-      const { tsgo } = server as unknown as { tsgo?: { process: { kill: () => void } } }
+      slow.stop()
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
 
-      tsgo?.process.kill()
+  it('publishes an open file whose project problems changed after the publish running, not beside it', async () => {
+    const dir = await scratchDir('lsp-slow-problems-')
+    const slow = await slowServer(dir)
+    const internals = slow.server as unknown as { problems: Map<string, Diagnostic[]>, publishProblems: () => Promise<void> }
+
+    try {
+      await slow.start()
+      await slow.published(1)
+      slow.client.notify('textDocument/didChange', { textDocument: { uri: slow.uri, version: 2 }, contentChanges: [{ text: 'p {2}\n' }] })
+
+      for (const limit = Date.now() + 15_000; slow.counts.running === 0 && Date.now() < limit;)
+        await Bun.sleep(5)
+
+      // A problem the last project check found in the page, which the next one no longer finds.
+      internals.problems = new Map([[join(dir, page), [{ range: { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } }, message: 'gone' }]]])
+      await internals.publishProblems()
+      await slow.published(2)
+
+      expect(slow.counts.last).toBe(2)
+      expect(slow.counts.most).toBe(1)
+    }
+    finally {
+      slow.stop()
       await rm(dir, { recursive: true, force: true })
     }
   })

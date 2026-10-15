@@ -479,17 +479,21 @@ export class KayLanguageServer {
 
     this.problems = found
 
-    await Promise.all([...new Set([...previous.keys(), ...found.keys()])].map(async (file) => {
+    let openChanged = false
+
+    for (const file of new Set([...previous.keys(), ...found.keys()])) {
       if (Bun.deepEquals(previous.get(file), found.get(file)))
-        return
+        continue
 
-      const document = [...this.documents.values()].find(open => open.file === file)
-
-      if (document)
-        await this.publishDiagnostics(document)
+      if ([...this.documents.values()].some(open => open.file === file))
+        openChanged = true
       else
         this.client.notify('textDocument/publishDiagnostics', { uri: this.clientUri(file), diagnostics: found.get(file) ?? [] })
-    }))
+    }
+
+    // An open file goes through the one publish at a time, which reads the problems just stored.
+    if (openChanged)
+      await this.publishAllDiagnostics()
   }
 
   private async problemsOf(project: Project): Promise<CheckDiagnostic[]> {
