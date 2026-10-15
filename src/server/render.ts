@@ -49,7 +49,7 @@ import { pageSetting } from './page-settings'
 import { matchesEtag } from './public'
 import { queryRules, queryScript, readQuery } from './query'
 import { reportServerError } from './report'
-import { guardUrl } from './routes'
+import { guardUrl, routeChain } from './routes'
 import { inServerScope, readPersonally, wasReadPersonally, withOutcome } from './scope'
 import { Denied, NotFound, Redirect } from './signals'
 import { speculationRules } from './speculation'
@@ -216,7 +216,7 @@ async function loadRoute(route: ServedRoute, rendering: Rendering, client: Clien
   if (refusal)
     return refusal
 
-  const files = [...route.layouts, route.file]
+  const { files } = routeChain(route)
   const loaded = new Map<string, Loaded>()
 
   try {

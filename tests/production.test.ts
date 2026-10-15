@@ -941,6 +941,39 @@ export default api()
   })
 })
 
+describe('API routes without guards or cors', () => {
+  it('refuse a cross-site post, answer a same-site one, and answer a bigint as digits and a cycle as a 500', async () => {
+    const copy = await fixtureCopy('production')
+
+    try {
+      await Bun.write(join(copy, 'src/api/open.ts'), `import { api } from 'kay/server'
+
+const loop: Record<string, unknown> = {}
+
+loop.self = loop
+
+export default api()
+  .get('/', () => ({ ok: true, big: 1n }))
+  .post('/', () => ({ posted: true }))
+  .get('/loop', () => loop)
+`)
+
+      const entries: LogEntry[] = []
+      const app = await pages({ routes: join(copy, 'src/routes'), api: join(copy, 'src/api'), prebuilt: false, log: entry => entries.push(entry) })
+      const post = async (headers: Record<string, string>) => app.handle(new Request('http://localhost/api/open', { method: 'POST', headers }))
+
+      expect((await post({ 'sec-fetch-site': 'cross-site' })).status).toBe(403)
+      expect(await (await post({ 'sec-fetch-site': 'same-origin' })).json()).toEqual({ posted: true })
+      expect(await (await app.handle(new Request('http://localhost/api/open'))).json()).toEqual({ ok: true, big: '1' })
+      expect((await app.handle(new Request('http://localhost/api/open/loop'))).status).toBe(500)
+      expect(entries.some(entry => 'error' in entry && (/cyclic/i).test(entry.error?.message ?? ''))).toBe(true)
+    }
+    finally {
+      await rm(copy, { recursive: true, force: true })
+    }
+  })
+})
+
 describe('SQLite stores', () => {
   it('create the directory of their file, as data/ is missing on a fresh checkout', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'kay-stores-'))

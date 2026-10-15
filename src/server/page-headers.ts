@@ -6,6 +6,7 @@ import type { SecurityOptions } from './security'
 import { RELOAD_HEADER } from '../runtime/swap'
 import { importModule } from './bundle'
 import { pageSetting } from './page-settings'
+import { routeChain } from './routes'
 import { securityHeaders } from './security'
 
 interface RouteHeaders {
@@ -19,7 +20,7 @@ export function withPageHeaders(respond: PageResponder, options: SecurityOptions
   const byRoute = new Map<string, Promise<RouteHeaders | undefined>>()
 
   return async (route, params, context, url) => {
-    const key = [...route.layouts, route.file].join('\0')
+    const { key } = routeChain(route)
     let own = byRoute.get(key)
 
     if (!own)
@@ -47,7 +48,7 @@ export function withPageHeaders(respond: PageResponder, options: SecurityOptions
 }
 
 async function routeHeaders(route: ServedRoute, options: SecurityOptions, site: Record<string, string> | undefined): Promise<RouteHeaders | undefined> {
-  const modules = await Promise.all([...route.layouts, route.file].map(async file => importModule<object>(file)))
+  const modules = await Promise.all(routeChain(route).files.map(async file => importModule<object>(file)))
   const security = modules.flatMap(module => (pageSetting(module, 'security') as PageSecurity | undefined) ?? [])
   const reload = modules.some(module => pageSetting(module, 'reload') === true)
 

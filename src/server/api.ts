@@ -208,7 +208,13 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
         // A route of the module's own answering OPTIONS, `.all()` included, leaves a browser's preflight to kay.
         .onBeforeHandle(({ request }) => cors && request.method === 'OPTIONS' && request.headers.has('access-control-request-method') ? preflight(cors, methods, request) : undefined)
         // The guards are kay's call, so what they log carries the request; the handler runs in Elysia's.
-        .onBeforeHandle(async context => answeringRequest(context.request, async () => inLocale(context.request, options, async () => admit(guards, sharedContext(context.request, () => ({ ...context })), options, cors))))
+        // With no guard and no cors rule nothing runs in the request's scope, so only the cross-site check is left.
+        .onBeforeHandle(async (context) => {
+          if (guards.length === 0 && !cors)
+            return crossSiteRefused(context.request) ? new Response('Cross-site request refused', { status: 403 }) : undefined
+
+          return answeringRequest(context.request, async () => inLocale(context.request, options, async () => admit(guards, sharedContext(context.request, () => ({ ...context })), options, cors)))
+        })
         .mapResponse(({ responseValue, set }) => withBigints(sendable(responseValue), set))
         .onError(({ request, error, set }) => {
           const span = spans.get(request)
@@ -296,7 +302,7 @@ function sentAsIs(value: object): boolean {
 
 // JSON has no bigint, which JSON.stringify throws on: a plain object or array holding one is answered with each written as its digits, as a database's bigint ids usually are.
 function withBigints(value: unknown, set: { status?: number | string, headers: Record<string, unknown> }): Response | undefined {
-  if (typeof value !== 'object' || value === null || (Object.getPrototypeOf(value) !== Object.prototype && !Array.isArray(value)) || !holdsBigint(value))
+  if (typeof value !== 'object' || value === null || (Object.getPrototypeOf(value) !== Object.prototype && !Array.isArray(value)) || stringifies(value) || !holdsBigint(value))
     return undefined
 
   const headers = new Headers()
@@ -310,6 +316,18 @@ function withBigints(value: unknown, set: { status?: number | string, headers: R
   headers.set('content-type', 'application/json')
 
   return new Response(JSON.stringify(value, (_key, item: unknown) => typeof item === 'bigint' ? item.toString() : item), { status: typeof set.status === 'number' ? set.status : 200, headers })
+}
+
+// Whether JSON.stringify takes the value as it is, which is how nearly every reply goes: cheaper than walking it for a bigint, and what throws, a bigint or a cycle, is walked after.
+function stringifies(value: object): boolean {
+  try {
+    JSON.stringify(value)
+
+    return true
+  }
+  catch {
+    return false
+  }
 }
 
 // A value met twice is walked once, so a cycle reaches JSON.stringify, which names it.

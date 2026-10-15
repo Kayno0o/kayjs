@@ -4,6 +4,23 @@ import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import { findKayFiles, findProjectFiles } from '../build/files'
 import { throughLinks } from '../build/links'
 
+const chains = new WeakMap<string[], { file: string, files: string[], key: string }>()
+
+// A route's layouts then its page, built once for the route instead of on every request it serves, with the one string telling the chain apart from another.
+export function routeChain(route: { layouts: string[], file: string }): { files: string[], key: string } {
+  const known = chains.get(route.layouts)
+
+  if (known?.file === route.file)
+    return known
+
+  const files = [...route.layouts, route.file]
+  const chain = { file: route.file, files, key: files.join('\0') }
+
+  chains.set(route.layouts, chain)
+
+  return chain
+}
+
 export interface Route {
   // Path pattern: `/todos/:id`, `/docs/*`, an optional param as `/blog/:page?`.
   pattern: string
