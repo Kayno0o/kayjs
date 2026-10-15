@@ -1204,7 +1204,19 @@ describe('revalidation', () => {
       return paths.filter(path => path === '/news').length
     }
 
-    const before = reached()
+    // An app an earlier test left unreachable may still be collected, which would lower the count under this one: wait until three collections in a row leave it unchanged.
+    let before = reached()
+
+    for (let stable = 0, attempt = 0; stable < 3 && attempt < 40; attempt++) {
+      Bun.gc(true)
+      await Bun.sleep(50)
+
+      const now = reached()
+
+      stable = now === before ? stable + 1 : 0
+      before = now
+    }
+
     const dropped = await (async () => {
       const app = await build.serve({ routes, prebuilt: true, security: false, log: false })
 
