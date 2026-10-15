@@ -97,6 +97,25 @@ describe('the headers of every kind of answer', () => {
     await expectAnswer(await get('/api/items/response'), 200, { 'content-type': 'text/plain', 'vary': 'accept-encoding', 'x-own': 'mine' })
   })
 
+  it('an API route answering a constant or a reused Response carries them, each answer with its own request id', async () => {
+    const seen = new Set<string>()
+
+    for (const path of ['/api/items/constant', '/api/items/reused', '/api/items/constant', '/api/items/reused']) {
+      const response = await get(path)
+      const id = response.headers.get('x-request-id')!
+
+      // Compression varies a small body's answer only once the response has been through it, which is not what is under test.
+      expect(Object.keys(shape(response)).filter(name => name !== 'vary')).toEqual(Object.keys({ ...SECURITY, 'content-security-policy': 0, 'content-type': 0 }).toSorted())
+      expect(seen.has(id)).toBe(false)
+      seen.add(id)
+    }
+  })
+
+  it('an API route answering a Response keeps its status, and the cookie it sets', async () => {
+    await expectAnswer(await get('/api/items/created'), 201, { 'content-type': 'text/plain', 'vary': 'accept-encoding' })
+    await expectAnswer(await get('/api/items/cookied'), 200, { 'content-type': 'text/plain', 'vary': 'accept-encoding', 'set-cookie': 'a=<value>; Path=<value>' })
+  })
+
   it('a build asset and a stored file carry them beside their caching', async () => {
     await expectAnswer(await get(asset), 200, { 'cache-control': IMMUTABLE, 'content-type': 'text/javascript;charset=utf-8', 'vary': 'accept-encoding' })
     await expectAnswer(await get(asset, { 'accept-encoding': 'br' }), 200, { 'cache-control': IMMUTABLE, 'content-encoding': 'br', 'content-type': 'text/javascript;charset=utf-8', 'vary': 'accept-encoding' })
@@ -159,6 +178,8 @@ describe('the headers of every kind of answer', () => {
     expect((await sent('/')).same).toBe(true)
     expect((await sent('/api/items')).same).toBe(true)
     expect((await sent('/api/items/headed')).same).toBe(true)
+    expect((await sent('/api/items/response')).same).toBe(true)
+    expect((await sent('/api/items/reused')).same).toBe(true)
     expect((await sent(asset)).same).toBe(true)
     expect((await sent(files.url(stored))).same).toBe(true)
 

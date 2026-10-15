@@ -86,6 +86,20 @@ describe('an API module opening its routes to other sites', () => {
     expect((await site.fetch('/api/shared/built', { headers: { origin: APP } })).headers.get('vary')).toContain('Accept-Encoding, Origin')
   })
 
+  it('keeps Origin in the Vary of a Response reused across requests, each answer naming its own caller', async () => {
+    // The route hands back one Response object, so what an answer carries is read before the next request.
+    const grants: (string | null)[] = []
+
+    for (const headers of [{ origin: APP }, { origin: 'capacitor://localhost' }, {}]) {
+      const response = await site.fetch('/api/shared/reused', { headers })
+
+      grants.push(response.headers.get('access-control-allow-origin'))
+      expect(response.headers.get('vary')).toBe('Accept-Encoding, Origin')
+    }
+
+    expect(grants).toEqual([APP, 'capacitor://localhost', null])
+  })
+
   it('opens its websockets to the origins it lists only', async () => {
     expect((await site.handle(upgrade('/api/shared/live', { origin: APP }))).status).not.toBe(403)
     expect((await site.handle(upgrade('/api/shared/live', { origin: 'https://evil.example' }))).status).toBe(403)

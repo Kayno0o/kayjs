@@ -90,6 +90,12 @@ export function withCors(rule: CorsRule, request: Request, headers: Record<strin
     set('vary', varyOrigin(headers instanceof Headers ? headers.get('vary') : headers.vary as string | undefined))
 }
 
+// Origin kept in the Vary of a response the route made: the grant itself rides on the context, which carries it onto this response for the one request, so a response answered twice never keeps another caller's.
+export function varyByOrigin(rule: CorsRule, headers: Headers): void {
+  if (!rule.any)
+    headers.set('vary', varyOrigin(headers.get('vary')))
+}
+
 // A response built before the route ran, such as a body over the limit, with the headers the module's answers carry.
 export function corsResponse(rule: CorsRule, request: Request, response: Response): Response {
   withCors(rule, request, response.headers)

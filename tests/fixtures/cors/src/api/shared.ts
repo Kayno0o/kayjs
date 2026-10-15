@@ -1,6 +1,8 @@
 import { t } from 'elysia'
 import { api } from 'kay/server'
 
+const reused = new Response('reused', { headers: { vary: 'Accept-Encoding' } })
+
 export default api({ cors: { origins: ['https://app.example.com', 'https://*.partner.example', 'capacitor://localhost'], credentials: true, expose: ['x-total'] }, bodyLimit: 256 })
   .get('/items', ({ set }) => {
     set.headers['x-total'] = '1'
@@ -15,4 +17,5 @@ export default api({ cors: { origins: ['https://app.example.com', 'https://*.par
     return 'hello'
   })
   .get('/built', () => new Response('built', { headers: { vary: 'Accept-Encoding' } }))
+  .get('/reused', () => reused)
   .ws('/live', { message: (ws, message) => ws.send(message) })

@@ -1,3 +1,4 @@
+import type { Context } from 'elysia'
 import type { Locals } from '../runtime'
 import type { EventStream } from '../runtime/live'
 import type { ActionOptions } from './actions'
@@ -15,13 +16,14 @@ import { kayLog } from '../runtime/log'
 import { encodeValue, unsendable } from '../runtime/wire'
 import { admitCrossSite, crossSiteRefused, guardsFirst, inLocale, passGuards } from './actions'
 import { importModule } from './bundle'
-import { corsAdmits, corsResponse, corsRule, preflight, withCors } from './cors'
+import { corsAdmits, corsResponse, corsRule, preflight, varyByOrigin, withCors } from './cors'
 import { loadGuard, requiredGuards } from './guards'
 import { answeringRequest, statusOf } from './log'
 import { requestId } from './protection'
 import { sharedContext } from './render'
 import { reportServerError } from './report'
 import { requestUrl } from './request-url'
+import { carryContext } from './security'
 import { answered, failed, SERVER_SPAN, startSpan } from './trace'
 
 // Bun closes a connection idle for 10 s by default, and proxies after a minute or so: a comment line now and then keeps a quiet stream open.
@@ -102,7 +104,11 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
 
           return answeringRequest(context.request, async () => inLocale(context.request, options, async () => admit(guards, sharedContext(context.request, () => ({ ...context })), options, cors)))
         })
-        .mapResponse(({ responseValue, set }) => jsonReply(sendable(responseValue), set))
+        .mapResponse(({ responseValue, set }) => {
+          const value = sendable(responseValue)
+
+          return value instanceof Response ? carriedOver(set, value) : jsonReply(value, set)
+        })
         .onError(({ request, error, set }) => {
           const span = spans.get(request)
 
@@ -127,9 +133,13 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
           return refusal
         })
         .onAfterHandle(({ request, responseValue, set }) => {
-          // A Vary the route set itself keeps Origin.
-          if (cors)
-            withCors(cors, request, responseValue instanceof Response ? responseValue.headers : set.headers)
+          // A Vary the route set itself keeps Origin; a Response of the route's own gets only that, as the grant is on the context, which `mapResponse` carries over.
+          if (cors) {
+            if (responseValue instanceof Response)
+              varyByOrigin(cors, responseValue.headers)
+            else
+              withCors(cors, request, set.headers)
+          }
 
           const reporter = responseValue instanceof Response ? streamReporters.get(responseValue) : undefined
 
@@ -143,6 +153,19 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
   }
 
   return { limits, mounted }
+}
+
+// A Response of the route's own that carries everything the context held, which leaves Elysia nothing to copy it for; undefined when something stayed on the context, a cookie or a status, for Elysia to merge.
+function carriedOver(set: { status?: number | string, headers: Record<string, unknown>, cookie?: object }, response: Response): Response | undefined {
+  // Nothing on the context: a page route's response, which carried it already and must not be stripped of it by a second pass.
+  if (Object.keys(set.headers).length === 0)
+    return undefined
+
+  carryContext(set as Context['set'], response)
+
+  const left = Object.keys(set.headers).length > 0 || (set.status !== undefined && set.status !== 200) || (set.cookie !== undefined && Object.keys(set.cookie).length > 0)
+
+  return left ? undefined : response
 }
 
 // Logs an error a route threw and hands it to `onError`, keeping its message out of a production answer, where Elysia would send it.
