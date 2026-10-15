@@ -293,7 +293,16 @@ export function isErrorGroup(name: string | undefined): name is ErrorGroup {
 
 // The last errors raised, which a bundler's plugin hands on as log messages, its thrown error's code gone.
 const RAISED_KEPT = 64
-const raised: KayError[] = []
+const raised: { error: KayError, order: number }[] = []
+let raisedCount = 0
+
+// Where the errors raised stand now, which a build takes before it starts so its failure ignores what was raised earlier.
+export function raisedMark(): number {
+  return raisedCount
+}
+
+// A message shorter than this says too little to tell which error a log is about.
+const MATCH_MIN = 16
 
 // An error kay raised itself, its code the one `kay explain` documents.
 export class KayError extends Error {
@@ -301,7 +310,7 @@ export class KayError extends Error {
 
   constructor(readonly code: ErrorName, message: string, options?: ErrorOptions) {
     super(message, options)
-    raised.push(this)
+    raised.push({ error: this, order: ++raisedCount })
 
     if (raised.length > RAISED_KEPT)
       raised.shift()
@@ -309,8 +318,8 @@ export class KayError extends Error {
 }
 
 // A failed `Bun.build`, keeping the code of the error a plugin threw in it.
-export function buildFailure(logs: readonly { message?: string }[], message: string): AggregateError {
-  const cause = raised.findLast(error => logs.some(log => log.message !== undefined && (log.message.includes(error.message) || error.message.includes(log.message))))
+export function buildFailure(logs: readonly { message?: string }[], message: string, since: number): AggregateError {
+  const cause = raised.findLast(({ error, order }) => order > since && error.message.length >= MATCH_MIN && logs.some(log => log.message !== undefined && log.message.length >= MATCH_MIN && (log.message.includes(error.message) || error.message.includes(log.message))))?.error
 
   return Object.assign(new AggregateError(logs, message), cause && { code: cause.code })
 }

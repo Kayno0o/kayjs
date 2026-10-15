@@ -1,3 +1,4 @@
+import type { ErrorName } from '../src/compiler/errors'
 import { join } from 'node:path'
 import process from 'node:process'
 import { Glob } from 'bun'
@@ -5,7 +6,7 @@ import { describe, expect, it } from 'bun:test'
 import { KayCompileError, transformKay } from '../src/build/transform'
 import { failureProblem } from '../src/commands/command'
 import { compileKay } from '../src/compiler'
-import { ERROR_GROUPS, errorCodeOf, errorList, ERRORS, explainError, isErrorCode, KayError } from '../src/compiler/errors'
+import { buildFailure, ERROR_GROUPS, errorCodeOf, errorList, ERRORS, explainError, isErrorCode, KayError, raisedMark } from '../src/compiler/errors'
 import { LINTS } from '../src/compiler/lints'
 import { MarkdownError } from '../src/content/markdown'
 import { ContentError } from '../src/content/validate'
@@ -129,6 +130,35 @@ describe('errors raised while building', () => {
     expect(failureProblem('no such dir', 'json')).toEqual({ severity: 'error', code: 'command-usage', message: 'no such dir' })
     expect(failureProblem(new KayError('export-action', 'kay: x'), 'json').code).toBe('export-action')
     expect(failureProblem(new Error('x'), 'json').code).toBeNull()
+  })
+})
+
+describe('a failed build', () => {
+  const raise = (code: ErrorName, message: string) => void new KayError(code, message)
+  const text = 'kay: the editor src/a.kay runs nothing in the browser'
+
+  it('takes the code of the error a log tells of', () => {
+    const since = raisedMark()
+
+    raise('inert-editor', text)
+
+    expect(errorCodeOf(buildFailure([{ message: `error: ${text}` }], 'failed', since))).toBe('inert-editor')
+  })
+
+  it('picks no code for an empty or a short log message', () => {
+    const since = raisedMark()
+
+    raise('inert-editor', text)
+    raise('config-default-export', 'x')
+
+    expect(errorCodeOf(buildFailure([{ message: '' }], 'failed', since))).toBeUndefined()
+    expect(errorCodeOf(buildFailure([{ message: 'x' }, { message: 'kay' }, {}], 'failed', since))).toBeUndefined()
+  })
+
+  it('ignores an error raised before the build started', () => {
+    raise('inert-editor', text)
+
+    expect(errorCodeOf(buildFailure([{ message: text }], 'failed', raisedMark()))).toBeUndefined()
   })
 })
 

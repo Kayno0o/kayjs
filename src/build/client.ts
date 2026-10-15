@@ -10,7 +10,7 @@ import { mkdir, rm } from 'node:fs/promises'
 import { builtinModules } from 'node:module'
 import { join, relative, resolve, sep } from 'node:path'
 import { formatDiagnostic } from '../compiler'
-import { buildFailure, errorCodeOf, KayError } from '../compiler/errors'
+import { buildFailure, errorCodeOf, KayError, raisedMark } from '../compiler/errors'
 import { projectPaths } from '../project'
 import { apiStubs, apiTrees } from '../server/api-modules'
 import { rebaseCss } from '../server/base'
@@ -311,12 +311,13 @@ export async function bundleIslands(root: string, islands: Map<string, string>, 
     plugins: chunk ? [runtimeAnchor(chunk, options.hot ? undefined : bootFile), ...await plugins(ANCHOR, chunk.lazy)] : await plugins(),
     throw: false,
   } satisfies Bun.BuildConfig
+  const since = raisedMark()
   const build = await Bun.build({ ...config, outdir: clientDir(root) })
 
   if (!build.success) {
     await refuseBuiltinImports(root, build.logs, islands, config)
 
-    throw buildFailure(build.logs, 'kay: client build failed')
+    throw buildFailure(build.logs, 'kay: client build failed', since)
   }
 
   await refuseServerOnlyReads(root, clientDir(root), build.metafile!.outputs, projectPaths(root).cache)
@@ -388,6 +389,7 @@ export async function bundleStyles(root: string, { pages, libraries }: Pick<Clie
     return { styles: {}, inputs: [], followed: [] }
 
   const shrunk = new Set<string>()
+  const since = raisedMark()
   const build = await Bun.build({
     entrypoints: pages,
     outdir: clientDir(root),
@@ -399,7 +401,7 @@ export async function bundleStyles(root: string, { pages, libraries }: Pick<Clie
   })
 
   if (!build.success)
-    throw buildFailure(build.logs, 'kay: stylesheet build failed')
+    throw buildFailure(build.logs, 'kay: stylesheet build failed', since)
 
   const pageFiles = new Set(pages)
   const styles: Record<string, string> = {}

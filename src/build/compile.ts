@@ -3,7 +3,7 @@ import type { Project } from '../project'
 import type { Route, SpecialPages } from '../server/routes'
 import { existsSync } from 'node:fs'
 import { basename, dirname, join, resolve } from 'node:path'
-import { buildFailure, KayError } from '../compiler/errors'
+import { buildFailure, KayError, raisedMark } from '../compiler/errors'
 import { CONFIG_FILE } from '../config'
 import { projectApi } from '../server/api-modules'
 import { AVIF_WORKER_SOURCE } from '../server/avif'
@@ -137,6 +137,7 @@ export async function compileServer(project: Project, options: CompileOptions): 
     console.warn(`kay: the plugins in ${CONFIG_FILE} cannot be told apart from the rest of the config, which they can as a property of the object it exports by default with no spread beside them, so the executable carries them; one loading a native addon, as Tailwind does, fails where the project's node_modules is not`)
 
   const configPlugins = runtime === undefined ? [] : [runtimeConfig(configFile, runtime)]
+  const since = raisedMark()
   const build = await Bun.build({
     // The AVIF encoder's worker too, which the executable starts from `/$bunfs/root/avif-worker.js`.
     entrypoints: [generated, AVIF_WORKER_SOURCE],
@@ -153,7 +154,7 @@ export async function compileServer(project: Project, options: CompileOptions): 
   })
 
   if (!build.success)
-    throw buildFailure(build.logs, 'kay: compiling the server failed')
+    throw buildFailure(build.logs, 'kay: compiling the server failed', since)
 
   return outfile
 }
