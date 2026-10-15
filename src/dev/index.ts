@@ -14,6 +14,7 @@ import { CONFIG_FILE, loadConfig } from '../config'
 import { projectPaths } from '../project'
 import { startClientBuilder } from './client'
 import { inspectorProxy } from './inspector'
+import { CONFIG_REFUSED, REFUSE } from './refuse'
 import { environmentWithoutDotenv, PAGES_ENTRY, watchProject } from './sources'
 
 export interface DevOptions {
@@ -40,7 +41,12 @@ export interface DevOptions {
   // Leaves out the line per restart and stylesheet swap, and the keys' hint: the ready line, the addresses, a restart moving the address and the errors stay.
   quiet?: boolean | undefined
   onQuit?: (() => void) | undefined
+  // Stops the start with `ConfigRefused` when kay.config.ts does not load, as the process writing the first types finds out, rather than going on with the defaults as it does after an edit.
+  refuseConfig?: boolean | undefined
 }
+
+// kay.config.ts does not load; the process that found out has printed why.
+export class ConfigRefused extends Error {}
 
 // Long enough to gather the few events one save makes, which come within a millisecond.
 const DEBOUNCE_MS = 10
@@ -106,16 +112,19 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   let typesWriting: Promise<void> | undefined
   let typesAgain = false
   let typesChild: Subprocess | undefined
+  let startedTypes = false
   // The shadow tree and the declarations read the project's sources, config and the names of its public files, so an edit of the contents of a stylesheet, a markdown entry or a media file leaves them as they are.
   const typesRead = (files: string[]) => files.length === 0 || files.some(file => !TYPE_FREE.test(file) || join(root, file).startsWith(readShadowSettings(root).publicDir + sep))
+  let configRefused = false
   const writeTypes = async () => {
     typesAgain = true
     typesWriting ??= (async () => {
       while (typesAgain) {
         typesAgain = false
-        await regenerateTypes(root, { ...options, config: typesConfig }, (child) => {
+        configRefused ||= await regenerateTypes(root, { ...options, config: typesConfig }, options.refuseConfig === true && !startedTypes, (child) => {
           typesChild = child
         })
+        startedTypes = true
       }
 
       typesWriting = undefined
@@ -541,9 +550,8 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   }
 
   start()
-  await writeTypes()
 
-  return async () => {
+  const stop = async () => {
     stopping = true
 
     if (options.keys !== undefined) {
@@ -575,6 +583,16 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     await Promise.all([child?.exited, spare?.exited, builder?.stop()])
     await inspector?.stop()
   }
+
+  await writeTypes()
+
+  if (configRefused) {
+    await stop()
+
+    throw new ConfigRefused()
+  }
+
+  return stop
 }
 
 // The files a change left in place, which leaves out the directories holding them and an editor's temporary files; a deletion names what is gone.
@@ -636,15 +654,15 @@ async function reloadConfig(root: string, last: KayConfig): Promise<KayConfig> {
 
 // Keeps editors and `tsgo` in step with the `.kay` sources; type errors themselves are `kay check`'s job.
 // Without a `config` it is written by a process of its own from kay.config.ts as it is now, which keeps the checker out of this one and reads again every module the config imports.
-async function regenerateTypes(root: string, { entry, config }: DevOptions, spawned: (child: Subprocess) => void) {
+// Whether, asked to `refuse`, the process found kay.config.ts does not load.
+async function regenerateTypes(root: string, { entry, config }: DevOptions, refuse: boolean, spawned: (child: Subprocess) => void): Promise<boolean> {
   try {
     if (config === undefined) {
-      const child = Bun.spawn([process.execPath, TYPES, root, entry ?? ''], { stdin: 'ignore', stdout: 'ignore', stderr: 'inherit' })
+      const child = Bun.spawn([process.execPath, TYPES, root, entry ?? '', refuse ? REFUSE : ''], { stdin: 'ignore', stdout: 'ignore', stderr: 'inherit' })
 
       spawned(child)
-      await child.exited
 
-      return
+      return await child.exited === CONFIG_REFUSED
     }
 
     const { configCheckOptions, writeShadowTypes } = await import('../check')
@@ -654,6 +672,8 @@ async function regenerateTypes(root: string, { entry, config }: DevOptions, spaw
   catch (error) {
     console.error(error)
   }
+
+  return false
 }
 
 export { environmentWithoutDotenv, PAGES_ENTRY, serverSources, watchProject } from './sources'

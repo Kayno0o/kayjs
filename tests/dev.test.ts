@@ -11,7 +11,7 @@ import { buildClient } from '../src/build/client'
 import { KayCompileError } from '../src/build/transform'
 import { readShadowSettings } from '../src/check/shadow'
 import { loadConfig } from '../src/config'
-import { dev, networkAddress, watchProject } from '../src/dev'
+import { ConfigRefused, dev, networkAddress, watchProject } from '../src/dev'
 import { startClientBuilder } from '../src/dev/client'
 import { InspectorAddressInUse, inspectorProxy } from '../src/dev/inspector'
 import { bootFailure, hotSwap } from '../src/server/dev'
@@ -388,6 +388,34 @@ describe.concurrent('kay dev', () => {
       await rm(root, { recursive: true, force: true })
     }
   })
+
+  it('refuses to start on a kay.config.ts that does not load when asked, and loads none itself otherwise', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
+    const children: Subprocess[] = []
+    const said = spyOn(console, 'error').mockImplementation(() => undefined)
+
+    await Bun.write(join(root, 'src/server.ts'), 'setInterval(() => undefined, 1000)\n')
+    await Bun.write(join(root, 'src/routes/index.kay'), 'p Home\n')
+    await Bun.write(join(root, 'kay.config.ts'), 'throw new Error(\'config broke\')\n')
+
+    try {
+      await expect(dev(root, { refuseConfig: true, onRestart: child => children.push(child) })).rejects.toBeInstanceOf(ConfigRefused)
+      expect(children).toHaveLength(1)
+      expect(children[0]!.killed).toBe(true)
+
+      await Bun.write(join(root, 'kay.config.ts'), 'export default {}\n')
+
+      const stop = await dev(root, { refuseConfig: true })
+
+      // The config is read by the processes writing the types and serving, not by this one.
+      expect(Object.keys(require.cache).some(path => path.startsWith(join(root, 'kay.config')))).toBe(false)
+      await stop()
+    }
+    finally {
+      said.mockRestore()
+      await rm(root, { recursive: true, force: true })
+    }
+  }, 40_000)
 
   it('writes the types with the defaults while kay.config.ts does not load', async () => {
     const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))

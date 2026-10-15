@@ -2,8 +2,7 @@ import type { Command } from './command'
 import { existsSync, statSync } from 'node:fs'
 import { resolve } from 'node:path'
 import process from 'node:process'
-import { loadConfig } from '../config'
-import { dev as startDev } from '../dev'
+import { ConfigRefused, dev as startDev } from '../dev'
 import { InspectorAddressInUse } from '../dev/inspector'
 import { isLoopback } from '../dev/loopback'
 import { isPort, warnOtherKay } from './command'
@@ -56,8 +55,6 @@ export const dev: Command = {
       warnOtherKay('dev', root)
       const entry = typeof option === 'string' ? resolve(option) : inDir ? undefined : path
 
-      // Read here to refuse a config that does not load, before anything starts; the types are written from it by a process of their own.
-      await loadConfig(root)
       const { promise, resolve: interrupted } = Promise.withResolvers<void>()
       // Keys only from a person at a terminal: a pipe, a CI log or an agent gets the lines alone, and its stdin is left unread.
       const keys = format === 'text' && process.stdin.isTTY && process.stdout.isTTY ? process.stdin : undefined
@@ -69,9 +66,13 @@ export const dev: Command = {
 
       try {
         try {
-          stop = await startDev(root, { entry, port: typeof port === 'string' ? Number(port) : undefined, host, inspect: debuggerAt, open: open === true, format, keys, onQuit: interrupted, log: events?.write, quiet: values.quiet === true })
+          stop = await startDev(root, { entry, port: typeof port === 'string' ? Number(port) : undefined, host, inspect: debuggerAt, open: open === true, format, keys, onQuit: interrupted, log: events?.write, quiet: values.quiet === true, refuseConfig: true })
         }
         catch (error) {
+          // The process that found the config does not load printed why.
+          if (error instanceof ConfigRefused)
+            return 1
+
           if (!(error instanceof InspectorAddressInUse))
             throw error
 
