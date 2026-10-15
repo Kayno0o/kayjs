@@ -2,7 +2,7 @@ import type { ClientOptions } from './build/client'
 import type { KayConfig } from './config'
 import type { RenderOptions } from './server/render'
 import type { SeoHead } from './server/seo'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { clientDir, KAY_DIR, outputDir, testWorker, underKayDev } from './build/assets'
@@ -14,6 +14,21 @@ export const CONTENT_CONFIG = 'src/content.config.ts'
 
 // The shadow tree `kay check`, `kay dev`, the LSP and eslint type the `.kay` files through, under the root.
 export const SHADOW_DIR = join(KAY_DIR, 'types')
+
+// What the shadow tree was last compiled with, for tools that compile one file at a time without reading kay.config.ts.
+export const SHADOW_SETTINGS = 'kay-shadow.json'
+
+// The directory the public files are served from, as the shadow tree was last written with it, read without loading the checker.
+export function savedPublicDir(root: string): string {
+  try {
+    const { public: saved } = JSON.parse(readFileSync(join(projectPaths(root).types, SHADOW_SETTINGS), 'utf8')) as { public?: string }
+
+    return resolve(root, saved ?? projectPaths(root).public)
+  }
+  catch {
+    return projectPaths(root).public
+  }
+}
 
 // Where a project keeps each of its parts, as absolute paths: kay's defaults are written here alone.
 export interface ProjectPaths {

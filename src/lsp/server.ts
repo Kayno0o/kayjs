@@ -351,7 +351,7 @@ export class KayLanguageServer {
 
       const types = await writeShadowTypes(root, project.options)
       const files = new Set(types.files.keys())
-      // Hashing the text the lsp wrote is enough: `writeShadowTypes` rewrites a file whenever its text differs from disk, so what tsgo holds is on disk whoever wrote there meanwhile.
+      // Hashing the text the lsp wrote is enough: `writeShadowTypes` rewrites a file whenever its text differs from disk, so what tsgo reads at the notification is the text stamped, whoever wrote there meanwhile.
       const stamps = new Map([...types.files].map(([path, shadow]) => [path, Bun.hash.wyhash(shadow.tsx)] as const))
 
       changes.push(

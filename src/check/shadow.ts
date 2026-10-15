@@ -9,14 +9,13 @@ import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import { importedSignals } from '../build/signals'
 import { compileKay } from '../compiler'
 import { parseKay } from '../compiler/parser'
-import { projectPaths } from '../project'
+import { projectPaths, SHADOW_SETTINGS } from '../project'
 import * as builtInMatchers from '../runtime/params'
 import { matcherFile } from '../server/params'
 import { directoriesUp, falseKeys, fileAt, routeOf, routeTrees, virtualDir } from '../server/routes'
 import { serverFacts } from './layout-facts'
 
-// What the shadow tree was last compiled with, for tools that compile one file at a time without reading kay.config.ts, such as the ESLint processor.
-export const SHADOW_SETTINGS = 'kay-shadow.json'
+export { SHADOW_SETTINGS }
 const TS_EXTENSION = /\.ts$/
 const KAY_EXTENSION = /\.kay$/
 const LAYOUT = '_layout.kay'

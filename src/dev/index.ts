@@ -9,9 +9,8 @@ import { networkInterfaces } from 'node:os'
 import { join, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { ASSET_EXTENSIONS } from '../build/assets'
-import { readShadowSettings } from '../check/shadow'
 import { CONFIG_FILE, loadConfig } from '../config'
-import { projectPaths } from '../project'
+import { projectPaths, savedPublicDir } from '../project'
 import { startClientBuilder } from './client'
 import { inspectorProxy } from './inspector'
 import { CONFIG_REFUSED, REFUSE } from './refuse'
@@ -114,7 +113,14 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   let typesChild: Subprocess | undefined
   let startedTypes = false
   // The shadow tree and the declarations read the project's sources, config and the names of its public files, so an edit of the contents of a stylesheet, a markdown entry or a media file leaves them as they are.
-  const typesRead = (files: string[]) => files.length === 0 || files.some(file => !TYPE_FREE.test(file) || join(root, file).startsWith(readShadowSettings(root).publicDir + sep))
+  const typesRead = (files: string[]) => {
+    if (files.length === 0 || files.some(file => !TYPE_FREE.test(file)))
+      return true
+
+    const publicDir = savedPublicDir(root) + sep
+
+    return files.some(file => join(root, file).startsWith(publicDir))
+  }
   let configRefused = false
   const writeTypes = async () => {
     typesAgain = true
@@ -248,9 +254,14 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     readySpare()
   }
 
+  // Settled once the first types write, which tells a config that does not load, is over.
+  const verified = Promise.withResolvers<void>()
   // A server killed for a restart or by `kay dev` stopping exits as expected, as does one the terminal interrupted along with `kay dev`; one exiting on its own leaves nothing serving until the next change.
   const reportExit = async (server: Subprocess) => {
     const code = await server.exited
+
+    // A server dying with a config that does not load is the refusal's to report, once the first types say so.
+    await verified.promise
 
     if (server === child && !stopping && !STOP_SIGNALS.has(server.signalCode ?? '')) {
       say('exit', { code }, `${stamp()} the server exited with code ${code}, waiting for a change`)
@@ -585,6 +596,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   }
 
   await writeTypes()
+  verified.resolve()
 
   if (configRefused) {
     await stop()

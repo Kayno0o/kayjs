@@ -338,8 +338,11 @@ describe.concurrent('kay dev', () => {
       await Bun.sleep(500)
 
       const started = performance.now()
+      const stopping = stop()
 
-      await stop()
+      // The servers are killed at once, not after the types process is.
+      await until(() => children.every(child => child.killed), 1000)
+      await stopping
       expect(performance.now() - started).toBeLessThan(10_000)
     }
     finally {

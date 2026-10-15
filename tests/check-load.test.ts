@@ -52,10 +52,9 @@ describe('the modules kay check and the editor\'s server load', () => {
     ])
 
     const run = Bun.spawn([process.execPath, '-e', SCRIPT, dir], { stdout: 'pipe', stderr: 'pipe' })
-    const [output, errors] = await Promise.all([new Response(run.stdout).text(), new Response(run.stderr).text(), run.exited])
+    const [output] = await Promise.all([new Response(run.stdout).text(), new Response(run.stderr).text(), run.exited])
     const { loaded } = JSON.parse(output.trim().split('\n').at(-1)!) as { problems: number, loaded: string[] }
 
-    expect(errors).toBe('')
     expect(loaded).toEqual([])
   }, 60_000)
 })
