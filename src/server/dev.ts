@@ -38,9 +38,10 @@ export const DEV_AXE = '/_kay/dev/axe.js'
 export const DEV_ROUTES = '/_kay/dev/routes'
 export const DEV_HEAD = '/_kay/dev/head'
 export const DEV_REQUEST = '/_kay/dev/request'
+export const DEV_SIZES = '/_kay/dev/sizes'
+
 // Reloads a page kay does not render, such as a library's own, once `kay dev` restarts the server for a changed file: its stream names the server it comes from first.
 export const RESTART_RELOAD = `let b;new EventSource(${JSON.stringify(DEV_EVENTS)}).addEventListener('boot',e=>{const i=e.data.split(' ')[0];if(b&&i!==b)location.reload();b=i})`
-export const DEV_SIZES = '/_kay/dev/sizes'
 const PATCH_SOURCE = resolve(import.meta.dir, '../runtime/dev-patch.ts')
 const TOOL_SOURCE = resolve(import.meta.dir, '../runtime/dev-tool.ts')
 const INSPECTOR_SOURCE = resolve(import.meta.dir, '../runtime/dev-inspector.ts')

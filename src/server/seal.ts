@@ -33,9 +33,11 @@ export function openWith(keys: Uint8Array[], value: string, context?: string): {
   if (bytes.length <= IV_BYTES + TAG_BYTES)
     return undefined
 
+  const { createDecipheriv } = nodeCrypto()
+
   for (const [index, key] of keys.entries()) {
     try {
-      const decipher = nodeCrypto().createDecipheriv('aes-256-gcm', key, bytes.subarray(0, IV_BYTES))
+      const decipher = createDecipheriv('aes-256-gcm', key, bytes.subarray(0, IV_BYTES))
 
       if (context !== undefined)
         decipher.setAAD(Buffer.from(context))

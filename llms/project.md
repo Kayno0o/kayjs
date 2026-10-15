@@ -201,7 +201,7 @@ export default defineConfig({
 - A project adds its own `compilerOptions` beside `extends`, and an `include` of its own replaces kay's, so it lists `.kay/types` again; one setting up its tsconfig by hand needs `"jsx": "preserve"`, `"jsxImportSource": "kay"`, `"module": "Preserve"`, `"moduleResolution": "bundler"` and `"rootDirs": [".", ".kay/types"]`.
 
 - `kay/html`, `kay/dom`, `kay/island`, `kay/await`, `kay/client`, `kay/internal` and `kay/internal/server` are what compiled `.kay` files and kay's generated entries import: the compiler's output contract rather than API, free to change in any release, never imported by an app.
-- `kay/library` is what kay's own libraries (kayjs-auth, kayjs-ui, kayjs-mail, kayjs-cms) share with kay, such as the sanitizer's lists, so neither keeps a copy: not API either, free to change with any minor, never imported by an app.
+- `kay/library` is what kay's own libraries (kayjs-auth, kayjs-ui, kayjs-mail, kayjs-cms) share with kay for their server code, such as the sanitizer's lists, sealing, locale matching and escaping, so neither keeps a copy: not API either, free to change with any minor, never imported by an app.
 
 ### Commands
 
