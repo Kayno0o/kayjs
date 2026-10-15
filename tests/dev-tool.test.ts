@@ -1,4 +1,5 @@
 import type { DevTool } from '../src/runtime/dev-tool'
+import type { DevHead } from '../src/server/dev'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, afterEach, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { startDevTool } from '../src/runtime/dev-tool'
@@ -394,6 +395,79 @@ describe('the dev tool', () => {
 
       expect(fetched).toHaveLength(2)
       expect(shadow().querySelector('#kay-dev-routes .empty')?.textContent).toBe('Could not list the routes: the server answered 500')
+    }
+    finally {
+      fetching.mockRestore()
+      happyDOM.setURL(href)
+    }
+  })
+
+  it('shows the head of the page: its search result, title and description with their lengths, canonical, alternates, robots, social tags and card, JSON-LD parsed or failing, and what the server flags, again after a page swap', async () => {
+    const asked: { path: string, head: string }[] = []
+    const { happyDOM } = window as unknown as { happyDOM: { setURL: (url: string) => void } }
+    const { href } = location
+    let answer: DevHead = { descriptionLength: 160, site: 'https://shop.example', sitemap: 'listed', problems: [{ code: 'long-description', severity: 'warning', message: 'The description of `/` runs 200 characters', help: 'shorten it' }] }
+
+    happyDOM.setURL('http://localhost:3000/')
+    document.head.innerHTML = [
+      '<title>Home | Shop</title>',
+      '<meta name="description" content="The shop">',
+      '<link rel="canonical" href="https://shop.example/">',
+      '<link rel="alternate" hreflang="fr" href="https://shop.example/fr">',
+      '<meta name="robots" content="noindex">',
+      '<meta property="og:title" content="Home">',
+      '<meta property="og:image" content="https://shop.example/_kay/card?title=Home">',
+      '<meta name="twitter:card" content="summary_large_image">',
+      '<script type="application/ld+json">{"@type":"WebSite"}</script>',
+      '<script type="application/ld+json">{"@type": </script>',
+    ].join('')
+
+    const fetching = spyOn(window, 'fetch').mockImplementation((async (_url: string, init: RequestInit) => {
+      asked.push(JSON.parse(init.body as string) as { path: string, head: string })
+
+      return new Response(JSON.stringify(answer))
+    }) as unknown as typeof window.fetch)
+    const panel = () => shadow().querySelector('#kay-dev-head')!
+    const text = (selector: string) => [...panel().querySelectorAll(selector)].map(element => element.textContent)
+
+    try {
+      tool = startDevTool()
+      shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-head')!.click()
+      await Bun.sleep(0)
+
+      expect(asked).toHaveLength(1)
+      expect(asked[0]!.path).toBe('/')
+      expect(asked[0]!.head).toContain('Home | Shop')
+      expect(text('.problem pre')).toEqual(['The description of `/` runs 200 characters\nhelp: shorten it'])
+      expect(text('.snippet div')).toEqual(['https://shop.example/', 'Home | Shop', 'The shop'])
+      expect(panel().querySelector('.facts')!.textContent).toBe('TitleHome | Shop (11 characters)DescriptionThe shop (8 of 160 characters)Canonicalhttps://shop.example/Alternatesfr: https://shop.example/frRobotsnoindexSitemaplisted')
+      expect(text('h3')).toEqual(['Open Graph (2)', 'Twitter (1)', 'JSON-LD (2)'])
+      expect(panel().querySelector<HTMLImageElement>('img.card')!.src).toBe('http://localhost:3000/_kay/card?title=Home')
+      expect(text('.json')).toEqual(['{\n  "@type": "WebSite"\n}'])
+      expect(panel().querySelector('.error')?.textContent).toContain('Not valid JSON')
+      expect(shadow().querySelector('#kay-dev-tab-head .count')?.textContent).toBe('1')
+
+      // A swap brings the next page's head, with no origin to list it in.
+      answer = { descriptionLength: 160, sitemap: 'none', problems: [] }
+      document.head.innerHTML = '<title>About</title>'
+      await Bun.sleep(0)
+      await Bun.sleep(0)
+
+      expect(asked).toHaveLength(2)
+      expect(text('.snippet div')).toEqual(['http://localhost:3000/', 'About', 'No description'])
+      expect(panel().querySelector('.facts')!.textContent).toContain('Sitemapnone, the site has no origin')
+      expect(panel().querySelector('img.card')).toBeNull()
+      expect(text('.problem')).toEqual([])
+      expect(shadow().querySelector<HTMLElement>('#kay-dev-tab-head .count')!.hidden).toBe(true)
+
+      // A server that fails leaves the head readable.
+      fetching.mockImplementation((async () => new Response(null, { status: 500 })) as unknown as typeof window.fetch)
+      document.head.innerHTML = '<title>Again</title>'
+      await Bun.sleep(0)
+      await Bun.sleep(0)
+
+      expect(panel().querySelector('.empty')?.textContent).toBe('Could not check the head: the server answered 500')
+      expect(text('.snippet div')[1]).toBe('Again')
     }
     finally {
       fetching.mockRestore()

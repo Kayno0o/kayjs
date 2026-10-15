@@ -4,7 +4,7 @@ import type { CheckDiagnostic } from './index'
 import { lintLevel } from '../compiler/lints'
 
 // What search results show of a description before cutting it.
-const DESCRIPTION_LENGTH = 160
+export const DESCRIPTION_LENGTH = 160
 const ENTITY = /&(?:amp|lt|gt|quot|#39|#x27);/g
 const ENTITIES: Record<string, string> = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': '\'', '&#x27;': '\'' }
 const NOINDEX = /(?:^|,)\s*noindex\s*(?:,|$)/i

@@ -1,6 +1,6 @@
 // Loaded by every page a dev server serves: a bar in a corner of the page opens a drawer whose tabs show what kay knows of the page, its problems first; under `kay dev` the inspector adds its own tab and buttons.
 // It runs in the browser from its own route, so it imports types only; its elements live in a shadow root on the root element, which a page swap keeps, styled by an adopted stylesheet, which a policy without inline styles allows.
-import type { DevRequest, DevRoute, DevRoutes } from '../server/dev'
+import type { DevHead, DevRequest, DevRoute, DevRoutes } from '../server/dev'
 import type { DevProblem, DevProblems } from './dev-boot'
 
 const HOST = 'kay-dev'
@@ -8,6 +8,8 @@ const STATE_KEY = 'kay-dev'
 const CHECK_PROBLEMS = 'kay-check-problems'
 const REQUEST = 'kay-dev-request'
 const ROUTES_URL = '/_kay/dev/routes'
+const HEAD_URL = '/_kay/dev/head'
+const HEAD_HEADER = 'x-kay-dev'
 // The most problem texts a tab remembers as dismissed.
 const MAX_DISMISSED = 200
 // How long an error page's copy button says it copied.
@@ -100,6 +102,12 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .route .method { color: var(--muted); }
 .route .path { overflow-wrap: anywhere; }
 .route .file { grid-column: 2 / -1; color: var(--muted); }
+.snippet { margin: 0 0 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+.snippet .site { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.snippet .title { margin: 2px 0; color: var(--accent); font-size: 16px; }
+.snippet .description { color: var(--muted); }
+.card { display: block; max-width: 100%; margin-top: 6px; border: 1px solid var(--border); border-radius: 6px; }
+.json { margin: 4px 0 0; white-space: pre-wrap; word-break: break-word; }
 .label { position: fixed; z-index: 2147483647; pointer-events: none; padding: 2px 6px; border-radius: 4px; background: var(--accent); color: var(--on-accent); white-space: nowrap; }
 @media (max-width: 480px) {
   .drawer, .right .drawer { left: 8px; right: 8px; width: auto; max-height: 55vh; }
@@ -444,6 +452,7 @@ export function startDevTool(doc: Document = document): DevTool {
 
   problems = problemsTab(doc, tool, state, save)
   request = requestTab(doc, tool)
+  headTab(doc, tool, listening.signal)
   routesTab(doc, tool, listening.signal)
   doc.addEventListener('click', (event) => {
     const target = event.target instanceof Element ? event.target.closest<HTMLButtonElement>('button[data-kay-open],button[data-kay-copy]') : null
@@ -687,6 +696,159 @@ function requestTab(doc: Document, tool: DevTool): { stop: () => void } {
   swaps.observe(doc.head, { childList: true })
 
   return { stop: () => swaps.disconnect() }
+}
+
+// A tag of the page's head, by its `name` or `property`.
+function metaContent(doc: Document, key: string): string | undefined {
+  const content = doc.head.querySelector(`meta[name="${key}"],meta[property="${key}"]`)?.getAttribute('content')?.trim()
+
+  return content === '' ? undefined : content
+}
+
+// The page's head as it is now: the search result it makes, its title, description, canonical link, alternates and robots tag, its og and twitter tags with the card image, and its JSON-LD blocks, each parsed or with its error; what `kay check` would flag in it comes from the server, which also says whether the sitemap lists the page. Read as the tab shows and again after each page swap.
+function headTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
+  const win = doc.defaultView!
+  let reread: () => void = () => undefined
+  const tab = tool.tab({ id: 'head', label: 'Head', shown: () => reread() })
+  // A swap while a fetch is out asks again; the latest answer wins.
+  let asked = 0
+  const read = async () => {
+    const ask = ++asked
+    const title = doc.head.querySelector('title')?.textContent?.trim() ?? ''
+    const description = metaContent(doc, 'description')
+    const canonical = doc.head.querySelector('link[rel="canonical"]')?.getAttribute('href') ?? undefined
+    let server: DevHead | undefined
+    let failure: string | undefined
+
+    try {
+      const response = await win.fetch(HEAD_URL, { method: 'POST', headers: { 'content-type': 'application/json', [HEAD_HEADER]: '1' }, body: JSON.stringify({ path: win.location.pathname, head: doc.head.outerHTML }), cache: 'no-store' })
+
+      if (!response.ok)
+        throw new Error(`the server answered ${response.status}`)
+
+      server = await response.json() as DevHead
+    }
+    catch (error) {
+      failure = error instanceof Error ? error.message : String(error)
+    }
+
+    if (ask !== asked)
+      return
+
+    const limit = server?.descriptionLength
+    const children: Node[] = []
+    const facts = tool.make('dl', 'facts')
+    const fact = (term: string, ...values: (Node | string)[]) => {
+      const value = tool.make('dd')
+
+      value.append(...values)
+      facts.append(tool.make('dt', '', term), value)
+    }
+    const none = () => tool.make('span', 'note', 'none')
+    const problems = server?.problems ?? []
+
+    tab.count(problems.length, problems.some(problem => problem.severity === 'error') ? 'error' : undefined)
+
+    if (failure !== undefined)
+      children.push(tool.make('div', 'empty', `Could not check the head: ${failure}`))
+
+    for (const problem of problems) {
+      const element = tool.make('div', `problem ${problem.severity === 'error' ? 'error' : 'warn'}`)
+
+      element.append(tool.make('pre', '', [problem.message, problem.note, problem.help === undefined ? undefined : `help: ${problem.help}`].filter(Boolean).join('\n')))
+      children.push(element)
+    }
+
+    const snippet = tool.make('div', 'snippet')
+
+    snippet.append(
+      tool.make('div', 'site', canonical ?? win.location.href),
+      tool.make('div', 'title', title === '' ? 'No title' : title),
+      tool.make('div', 'description', description === undefined ? 'No description' : limit !== undefined && description.length > limit ? `${description.slice(0, limit).trimEnd()}...` : description),
+    )
+    children.push(snippet)
+
+    const cut = limit !== undefined && description !== undefined && description.length > limit
+
+    fact('Title', title === '' ? none() : `${title} (${title.length} characters)`)
+    fact('Description', description === undefined ? none() : `${description} (${description.length}${limit === undefined ? '' : ` of ${limit}`} characters${cut ? ', cut in results' : ''})`)
+    fact('Canonical', canonical ?? none())
+
+    const alternates = [...doc.head.querySelectorAll('link[rel="alternate"][hreflang]')].map(link => `${link.getAttribute('hreflang')}: ${link.getAttribute('href')}`)
+
+    fact('Alternates', ...alternates.length === 0 ? [none()] : alternates.map(line => tool.make('div', 'mono', line)))
+    fact('Robots', metaContent(doc, 'robots') ?? tool.make('span', 'note', 'no tag, indexable'))
+
+    if (server !== undefined)
+      fact('Sitemap', server.sitemap === 'none' ? tool.make('span', 'note', 'none, the site has no origin (set site in kay.config.ts or SITE_URL)') : server.sitemap === 'listed' ? 'listed' : 'not listed')
+
+    children.push(facts)
+
+    for (const [heading, prefix] of [['Open Graph', 'og:'], ['Twitter', 'twitter:']] as const) {
+      const tags = [...doc.head.querySelectorAll('meta')].flatMap((meta) => {
+        const key = meta.getAttribute('property') ?? meta.getAttribute('name') ?? ''
+
+        return key.startsWith(prefix) ? [[key, meta.getAttribute('content') ?? ''] as const] : []
+      })
+      const section = tool.make('section', 'group')
+      const list = tool.make('dl', 'facts')
+
+      for (const [key, content] of tags)
+        list.append(tool.make('dt', 'mono', key), tool.make('dd', 'mono', content))
+
+      section.append(tool.make('h3', 'heading', `${heading} (${tags.length})`), tags.length === 0 ? tool.make('div', 'note', 'No tags.') : list)
+      children.push(section)
+    }
+
+    const image = metaContent(doc, 'og:image') ?? metaContent(doc, 'twitter:image')
+
+    if (image !== undefined) {
+      const url = new URL(image, win.location.href)
+      const card = tool.make('img', 'card')
+
+      // The site's own origin is not the dev server's, so the card is read from here.
+      card.src = server?.site !== undefined && url.origin === new URL(server.site).origin ? `${win.location.origin}${url.pathname}${url.search}` : url.href
+      card.alt = 'The social card image'
+      children.push(card)
+    }
+
+    const blocks = [...doc.head.querySelectorAll('script[type="application/ld+json"]')]
+    const ld = tool.make('section', 'group')
+
+    ld.append(tool.make('h3', 'heading', `JSON-LD (${blocks.length})`))
+
+    for (const block of blocks) {
+      try {
+        ld.append(tool.make('pre', 'json mono', JSON.stringify(JSON.parse(block.textContent ?? ''), null, 2)))
+      }
+      catch (error) {
+        ld.append(tool.make('div', 'error', `Not valid JSON: ${error instanceof Error ? error.message : String(error)}`))
+      }
+    }
+
+    if (blocks.length === 0)
+      ld.append(tool.make('div', 'note', 'None.'))
+
+    children.push(ld)
+    tab.panel.replaceChildren(...children)
+  }
+
+  reread = () => void read()
+  let scheduled = false
+  // A page swap patches the head in place, in many small changes: one read follows them.
+  const swaps = new MutationObserver(() => {
+    if (tab.panel.hidden === true || scheduled)
+      return
+
+    scheduled = true
+    queueMicrotask(() => {
+      scheduled = false
+      void read()
+    })
+  })
+
+  swaps.observe(doc.head, { childList: true, subtree: true, characterData: true, attributes: true })
+  signal.addEventListener('abort', () => swaps.disconnect())
 }
 
 const ROUTE_KINDS: Record<DevRoute['kind'], string> = { page: 'Pages', endpoint: 'Endpoints', api: 'API', kay: 'Served by kay' }

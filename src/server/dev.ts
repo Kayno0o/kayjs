@@ -33,6 +33,7 @@ export const DEV_OPEN = '/_kay/dev/open'
 export const DEV_A11Y = '/_kay/dev/a11y.js'
 export const DEV_AXE = '/_kay/dev/axe.js'
 export const DEV_ROUTES = '/_kay/dev/routes'
+export const DEV_HEAD = '/_kay/dev/head'
 const PATCH_SOURCE = resolve(import.meta.dir, '../runtime/dev-patch.ts')
 const TOOL_SOURCE = resolve(import.meta.dir, '../runtime/dev-tool.ts')
 const INSPECTOR_SOURCE = resolve(import.meta.dir, '../runtime/dev-inspector.ts')
@@ -411,6 +412,17 @@ export interface DevRequest {
   status: number
   error?: string | undefined
   loads: { file: string, ms?: number | undefined }[]
+}
+
+// What the dev tool's Head tab asks of the server about the page in view: what `kay check` would flag in its head, and whether the sitemap lists it.
+export interface DevHead {
+  // What a search result shows of a description before cutting it.
+  descriptionLength: number
+  // The origin the site is public at, none when `site` and `SITE_URL` are unset.
+  site?: string | undefined
+  // `none` when there is no origin and so no sitemap.
+  sitemap: 'listed' | 'unlisted' | 'none'
+  problems: { code?: string | undefined, severity: string, message: string, note?: string | undefined, help?: string | undefined }[]
 }
 
 // One line of the dev tool's Routes tab.
