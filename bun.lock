@@ -117,7 +117,7 @@
       "name": "@kaynooo/kayjs-ui",
       "version": "1.44.0",
       "dependencies": {
-        "@kaynooo/utils": "^2.24.1",
+        "@kaynooo/utils": "^2.30.1",
       },
       "devDependencies": {
         "@happy-dom/global-registrator": "^20.14.5",
@@ -276,7 +276,7 @@
 
     "@kaynooo/pg-orm": ["@kaynooo/pg-orm@7.0.4", "https://git.kaynooo.fr/api/packages/kaynooo/npm/%40kaynooo%2Fpg-orm/-/7.0.4/pg-orm-7.0.4.tgz", { "dependencies": { "@kaynooo/utils": "^2.24.1" }, "peerDependencies": { "bun-types": "1.3.14" }, "bin": { "pg-orm": "dist/cli.js" } }, "sha512-OcKvTm9U+rlNiSBX2EWiZ8zoyn4Ilm6UvH0qhn4K62HiwYujsAxQjgc6pjJxMGriOF+rRmzc0rmKx6JnfwUfwg=="],
 
-    "@kaynooo/utils": ["@kaynooo/utils@2.29.0", "https://git.kaynooo.fr/api/packages/kaynooo/npm/%40kaynooo%2Futils/-/2.29.0/utils-2.29.0.tgz", { "dependencies": { "uqr": "^0.1.3" }, "peerDependencies": { "@joplin/turndown-plugin-gfm": "^1.0.68", "turndown": "^7.2.4", "typescript": "^6.0.3" } }, "sha512-bnrj2Qs9okMtJn/v9aGSkg44Y1pgVf1VsHiUtEaF0p5muETZY2j+G4mQxka5F87knz+TTYSOKg9lqkYwy2OpzQ=="],
+    "@kaynooo/utils": ["@kaynooo/utils@2.30.1", "https://git.kaynooo.fr/api/packages/kaynooo/npm/%40kaynooo%2Futils/-/2.30.1/utils-2.30.1.tgz", { "dependencies": { "uqr": "^0.1.3" }, "peerDependencies": { "@joplin/turndown-plugin-gfm": "^1.0.68", "turndown": "^7.2.4", "typescript": "^6.0.3" } }, "sha512-VXhQtYtYDTBDB6antullkOAGLyAnqXxblkaRVLV3rrj2Lpa1cNsyVBqAiqWSRZyF27XjZkTf7j41K5HrGdQMxQ=="],
 
     "@keyv/bigmap": ["@keyv/bigmap@1.3.1", "", { "dependencies": { "hashery": "^1.4.0", "hookified": "^1.15.0" }, "peerDependencies": { "keyv": "^5.6.0" } }, "sha512-WbzE9sdmQtKy8vrNPa9BRnwZh5UF4s1KTmSK0KUVLo3eff5BlQNNWDnFOouNpKfPKDnms9xynJjsMYjMaT/aFQ=="],
 

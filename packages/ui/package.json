@@ -59,7 +59,7 @@
     }
   },
   "dependencies": {
-    "@kaynooo/utils": "^2.24.1"
+    "@kaynooo/utils": "^2.30.1"
   },
   "devDependencies": {
     "@happy-dom/global-registrator": "^20.14.5",
