@@ -284,7 +284,7 @@ export async function bundleIslands(root: string, islands: Map<string, string>, 
 
   await Bun.write(entryFile, `import ${JSON.stringify(bootFile)}\n`)
 
-  const chunk = await runtimeChunk(entryFile, { plugins: await plugins(), define, external })
+  const chunk = await runtimeChunk(entryFile, { plugins: await plugins(), define, external, cache: { file: join(projectPaths(root).cache, `runtime-search-${options.hot ? 'dev' : 'build'}.json`), key: `${JSON.stringify([options.settings, options.inspect, options.navigation, trees])}\0${await Bun.file(bootFile).text()}` } })
 
   // In development the entry keeps its own code, the islands it imports by their hashed names included: the runtime's chunk then stays as it was through an edit of an island, which swaps in alone.
   // A second entry point importing the runtime alone has Bun give it that chunk of its own, which it would otherwise merge into the entry's.

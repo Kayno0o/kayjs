@@ -1,6 +1,9 @@
 import type { BunPlugin } from 'bun'
-import { statSync } from 'node:fs'
-import { dirname, resolve } from 'node:path'
+import { readdirSync, statSync } from 'node:fs'
+import { dirname, join, resolve, sep } from 'node:path'
+import { readCacheEntry, writeCacheEntry } from './cache'
+import { fileStamp } from './files'
+import { compilerFingerprint } from './transform'
 
 // Bun's code splitting gives each set of entry points sharing code a chunk of its own: an entry, islands and the page swap reaching kay's runtime each in their own way leave a page loading it in four or five small files.
 // Every one of them importing one module, which reaches all of the runtime any of them uses, puts that runtime in a single chunk, the entry's own code included: a page loads it, then its islands.
@@ -127,11 +130,51 @@ async function reach(files: string[]): Promise<{ eager: Set<string>, lazy: Set<s
   return { eager, lazy }
 }
 
+interface Remembered {
+  // The stamp of every file the search read, which must all be as they were for the answer to stand.
+  inputs: Record<string, string>
+  anchor: string
+  lazy: string[]
+}
+
+// The search is kept in `cache.file` while its inputs stay as they were: every module its bundle read, kay's own runtime, and what `cache.key` says of the rest, such as the islands the entry imports.
+// A module an edit adds or a file shadowing one is not looked for; the chunk is then only split a little differently until another input changes, and nothing breaks.
+export interface RuntimeSearchCache {
+  file: string
+  key: string
+}
+
 // Bundles `entry` with kay's runtime left out, then each lazy runtime module with its siblings left out, to learn what of the runtime the client build uses where.
 // Undefined when the build fails, which the real one then reports.
-export async function runtimeChunk(entry: string, options: { plugins: BunPlugin[], define: Record<string, string>, external: string[] }): Promise<RuntimeChunk | undefined> {
+export async function runtimeChunk(entry: string, options: { plugins: BunPlugin[], define: Record<string, string>, external: string[], cache?: RuntimeSearchCache | undefined }): Promise<RuntimeChunk | undefined> {
+  const slot = options.cache && { file: options.cache.file, key: Bun.hash([compilerFingerprint(), JSON.stringify(options.define), options.external.join(), options.plugins.map(plugin => plugin.name).join(), options.cache.key].join('\0')).toString(36) }
+  const known = slot && await readCacheEntry<Remembered>(slot)
+
+  if (known && Object.entries(known.inputs).every(([file, stamp]) => fileStamp(file) === stamp))
+    return { dir: dirname(entry), anchor: known.anchor, lazy: new Set(known.lazy) }
+
+  const found = await searchRuntime(entry, options)
+
+  if (found && slot) {
+    const runtime = (readdirSync(RUNTIME_DIR, { recursive: true }) as string[]).map(file => join(RUNTIME_DIR, file))
+    const inputs: Record<string, string> = {}
+
+    for (const file of [PACKAGE, ...runtime, ...found.inputs]) {
+      const stamp = fileStamp(file)
+
+      if (stamp !== undefined)
+        inputs[file] = stamp
+    }
+
+    await writeCacheEntry(slot, { inputs, anchor: found.chunk.anchor, lazy: [...found.chunk.lazy] } satisfies Remembered)
+  }
+
+  return found?.chunk
+}
+
+async function searchRuntime(entry: string, options: { plugins: BunPlugin[], define: Record<string, string>, external: string[] }): Promise<{ chunk: RuntimeChunk, inputs: string[] } | undefined> {
   const used = new Map<string, Set<string>>()
-  const outer = await Bun.build({ entrypoints: [entry], target: 'browser', splitting: true, define: options.define, external: ['kay', 'kay/*', ...options.external], plugins: options.plugins, throw: false })
+  const outer = await Bun.build({ entrypoints: [entry], target: 'browser', splitting: true, define: options.define, external: ['kay', 'kay/*', ...options.external], plugins: options.plugins, metafile: true, throw: false })
 
   if (!outer.success)
     return undefined
@@ -169,7 +212,10 @@ export async function runtimeChunk(entry: string, options: { plugins: BunPlugin[
       importedNames(await output.text(), used, specifier => eager.has(specifier))
   }
 
-  return { dir: dirname(entry), anchor: anchorModule(used), lazy }
+  // The files of the output directory, the entry's and its boot module, are written again by every build: the key holds what they say.
+  const inputs = Object.keys(outer.metafile!.inputs).map(input => resolve(input)).filter(file => !file.startsWith(dirname(entry) + sep))
+
+  return { chunk: { dir: dirname(entry), anchor: anchorModule(used), lazy }, inputs }
 }
 
 // Held where nothing can tree-shake it away, so every entry point reaches each of them through this module; behind a function, as a module importing this one may not have run yet.

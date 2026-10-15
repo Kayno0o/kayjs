@@ -198,7 +198,7 @@ function probedPackages(source: string): string[] {
   return isInteractive(file, script) ? packagesToProbe(source, script) : []
 }
 
-function compilerFingerprint(): string {
+export function compilerFingerprint(): string {
   if (fingerprint === undefined) {
     const hasher = new Bun.CryptoHasher('sha256')
 

@@ -16,7 +16,7 @@ import { forgetSources, readSource, realPath, writeIfChanged } from '../src/buil
 import { fileWords, reachesAny } from '../src/build/libraries'
 import { BUNDLED_LICENCES, codecWarnings, thirdPartyNotices, unknownCodecVersions } from '../src/build/licenses'
 import { formatSizeReport } from '../src/build/report'
-import { anchorModule } from '../src/build/runtime-chunk'
+import { anchorModule, runtimeChunk } from '../src/build/runtime-chunk'
 import { runtimeConfig, withoutPlugins } from '../src/build/runtime-config'
 import { importedSignals, inSignalsScope } from '../src/build/signals'
 import { describeThrown, mapBundleToKay, mapStack } from '../src/build/sourcemap'
@@ -1340,6 +1340,52 @@ describe('what a build keeps in memory', () => {
     }
     finally {
       await rm(project, { recursive: true, force: true })
+    }
+  })
+
+  it('finds the runtime chunk once while the modules it was found in, and what the key says, stay as they were', async () => {
+    const dir = resolve(await scratchDir('kay-runtime-'))
+    const entry = join(dir, 'out/entry.ts')
+    const island = join(dir, 'island.ts')
+    const file = join(dir, 'cache/runtime.json')
+    let searches = 0
+    const counting = { name: 'counting', setup: () => void searches++ }
+    const find = async (key = 'registry') => runtimeChunk(entry, { plugins: [counting], define: {}, external: [], cache: { file, key } })
+
+    try {
+      await Bun.write(entry, 'import \'../island\'\n')
+      await Bun.write(island, 'import { signal } from \'kay\'\n\nexport const count = signal(0)\n')
+      const first = await find()
+
+      expect(first?.anchor).toContain('signal as k')
+      expect(first?.anchor).not.toContain('effect as k')
+      expect(searches).toBe(1)
+
+      // Asked again, it answers from the file without bundling.
+      expect(await find()).toEqual(first)
+      expect(searches).toBe(1)
+
+      // A module it read now imports more of the runtime, with the same size and nothing telling the cache.
+      await Bun.write(island, 'import { effect } from \'kay\'\n\nexport const count = effect\n')
+      const second = await find()
+
+      expect(searches).toBe(2)
+      expect(second?.anchor).toContain('effect as k')
+      expect(second?.anchor).not.toContain('signal as k')
+      await find()
+      expect(searches).toBe(2)
+
+      // What the key says changed: the islands registered, the options.
+      await find('another registry')
+      expect(searches).toBe(3)
+
+      // A module it read is gone: the search fails, which the real build reports.
+      await rm(island)
+      expect(await find()).toBeUndefined()
+      expect(searches).toBe(4)
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
     }
   })
 

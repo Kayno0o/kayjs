@@ -42,11 +42,21 @@ interface SourceRead {
 
 const reads = new Map<string, SourceRead & { stamp: string }>()
 
+// What tells a file changed: its inode, times and size.
+export function fileStamp(file: string): string | undefined {
+  const stats = statSync(file, { throwIfNoEntry: false })
+
+  return stats?.isFile() === true ? `${stats.ino}-${stats.mtimeMs}-${stats.ctimeMs}-${stats.size}` : undefined
+}
+
 // A source file's text and hash, read again only when the file changed: its inode, times and size are the stamp, so an edit, a link retargeted or a file replaced by a rename all read afresh, and nothing has to tell the cache.
 // Throws as reading a missing file does.
 export function readSource(file: string): SourceRead {
-  const stats = statSync(file)
-  const stamp = `${stats.ino}-${stats.mtimeMs}-${stats.ctimeMs}-${stats.size}`
+  const stamp = fileStamp(file)
+
+  if (stamp === undefined)
+    throw new Error(`ENOENT: no such file, read '${file}'`)
+
   const known = reads.get(file)
 
   if (known?.stamp === stamp)
