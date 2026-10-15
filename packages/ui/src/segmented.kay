@@ -22,8 +22,7 @@ const { options, value, label, name, onChange, class: className, ...rest } = pro
 // Held as a string: a signal cannot take a type parameter that might be a function.
 const group = name ?? uid()
 const picked = signal<string | null>(value)
-// The parameter is not called `value`, which the compiler would read as the prop even in a type.
-const answer = (next: string | null) => (onChange as ((picked: string | null) => unknown) | undefined)?.(next)
+const answer = (next: string | null) => (onChange as ((value: string | null) => unknown) | undefined)?.(next)
 const busy = signal(false)
 let root: HTMLElement | undefined
 // How often the parent's `value` reached the group, so a change under way knows whether the parent answered it.

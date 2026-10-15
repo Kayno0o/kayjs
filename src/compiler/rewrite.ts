@@ -136,6 +136,18 @@ function namesType(path: NodePath): boolean {
   return false
 }
 
+// Whether a reference is a name written inside a type, such as the parameter of a function type or the key of a type literal, which the scope analysis reads as the outer binding of the same name; a computed key reads a value.
+function namesInType(reference: NodePath): boolean {
+  const { parentPath } = reference
+
+  if (parentPath?.isTSPropertySignature() || parentPath?.isTSMethodSignature()) {
+    if (parentPath.node.computed && parentPath.node.key === reference.node)
+      return false
+  }
+
+  return namesType(reference)
+}
+
 // One walk over the analysis pass, each concern of it in a method of its own: signals, props, rows, template `const`s, `listen` targets and `load`'s reads.
 class RewriteFinder {
   private readonly rewrites: Rewrites = new Map()
@@ -214,6 +226,10 @@ class RewriteFinder {
 
     for (const reference of binding.referencePaths) {
       const node = reference.node
+
+      if (namesInType(reference))
+        continue
+
       const query = typeOf === undefined ? undefined : typeQueryOf(reference)
 
       if (query) {
@@ -391,6 +407,9 @@ class RewriteFinder {
     this.known.add(binding)
 
     for (const reference of binding.referencePaths) {
+      if (namesInType(reference))
+        continue
+
       const values = this.input.values && !this.deferred(reference)
       const uncalled = this.uncalled(reference)
 

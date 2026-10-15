@@ -637,6 +637,54 @@ describe('component names', () => {
     expect(compileKay('---\nconst { ts } = props<{ ts: number }>()\n---\nif ts > 0\n  Date(ts={0})\np {String(ts as unknown as Date)}', 'date.kay').tsx).toContain('export default function Date(')
   })
 
+  describe('a name inside a type', () => {
+    const fence = [
+      'type Fn = (cb: (value: string) => void) => void',
+      'const fn = (next: string | null) => (onChange as ((value: string | null) => unknown) | undefined)?.(next)',
+      'const literal = (x: unknown) => x as { value: string, [value: string]: unknown }',
+      'const mapped = (x: unknown) => x as { [value in \'a\' | \'b\']: number }',
+      'const generic = (x: unknown) => x as Map<string, { value: number, count: number }>',
+      'const method = (x: unknown) => x as { value(value: string): void }',
+    ].join('\n')
+    const compile = (output: 'html' | 'dom', head: string) => compileKay(`---\n${head}\n${fence}\n---\ndiv(onClick={() => fn(null)}) {value}`, 'test.kay', { output }).tsx
+
+    for (const output of ['html', 'dom'] as const) {
+      it(`is never read as a prop, in ${output} output`, () => {
+        const code = compile(output, 'const { value, count, onChange } = props<{ value: string, count: number, onChange?: ((value: string) => unknown) | undefined }>()')
+
+        expect(code).not.toContain('__props.value:')
+        expect(code).not.toContain('__props.value in')
+        expect(code).not.toContain('__props.value(')
+        expect(code).not.toContain('__props.count:')
+        expect(code).toContain('(cb: (value: string) => void)')
+        expect(code).toContain('as ((value: string | null) => unknown) | undefined)?.(next)')
+        expect(code).toContain('{ value: string, [value: string]: unknown }')
+        expect(code).toContain('{ [value in \'a\' | \'b\']: number }')
+        expect(code).toContain('Map<string, { value: number, count: number }>')
+        expect(code).toContain('{ value(value: string): void }')
+        expect(code).toContain('__props.value')
+        expect(code).toContain('__props.onChange as')
+      })
+
+      it(`is not read as a signal, in ${output} output`, () => {
+        const code = compile(output, 'const value = signal(\'a\')\nconst count = signal(1)\nconst onChange = signal<((value: string) => unknown) | undefined>(undefined)')
+
+        expect(code).not.toContain('value():')
+        expect(code).not.toContain('value() in')
+        expect(code).not.toContain('count():')
+        expect(code).toContain('(cb: (value: string) => void)')
+        expect(code).toContain('{ [value in \'a\' | \'b\']: number }')
+        expect(code).toContain('Map<string, { value: number, count: number }>')
+      })
+    }
+
+    it('still reads `typeof` as the value', () => {
+      const code = compileKay('---\nconst { value } = props<{ value: string }>()\nconst k = (x: unknown) => x as typeof value\n---\np {value}', 'test.kay', { output: 'html' }).tsx
+
+      expect(code).not.toContain('typeof value')
+    })
+  })
+
   it('reports a template `const` named like the component, which its tags after it would render', () => {
     expect(compileKay('const Card = 1\np {Card}', 'card.kay', { check: true }).diagnostics.map(d => d.message)).toEqual(['`Card` is already declared'])
   })
