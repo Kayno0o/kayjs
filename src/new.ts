@@ -159,9 +159,9 @@ export async function projectFiles(dir: string, features: ReadonlySet<Feature>, 
     'tsconfig.json': `${JSON.stringify({ extends: 'kay/tsconfig.json' }, null, 2)}\n`,
   }
 
-  // The app's session secret and development database, never committed; COMPOSE_FILE makes a bare `docker compose` start that database.
+  // The app's session secret and development database, never committed: the app connects as app_rw, which cannot change the schema, and the migrations as the owner. COMPOSE_FILE makes a bare `docker compose` start that database.
   if (has('auth'))
-    files['.env'] = `SESSION_SECRET=${randomBytes(32).toString('hex')}\nDATABASE_URL=postgres://app:app@127.0.0.1:5433/app\nCOMPOSE_FILE=compose.dev.yaml\n`
+    files['.env'] = `SESSION_SECRET=${randomBytes(32).toString('hex')}\nDATABASE_URL=postgres://app_rw:app_rw@127.0.0.1:5433/app\nMIGRATE_DATABASE_URL=postgres://app:app@127.0.0.1:5433/app\nCOMPOSE_FILE=compose.dev.yaml\n`
 
   return Object.fromEntries(Object.entries(files).map(([path, content]) => [path, content.replaceAll('__NAME__', name)]))
 }

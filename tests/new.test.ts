@@ -511,9 +511,9 @@ describe('kay new', () => {
     try {
       const files = await createProject(dir, { kay: '^1.0.0', features: PRESETS.app.features })
 
-      expect(files).toEqual(expect.arrayContaining(['.env', '.env.example', '.env.test', 'compose.dev.yaml', 'migrations/0001_member.sql', 'pg-orm.config.ts', 'src/db/index.ts', 'src/routes/account/_guard.ts', 'src/api/online.ts', 'tests/account.test.ts', 'tests/database.ts', 'tests/members.test.ts', 'tests/online.test.ts']))
+      expect(files).toEqual(expect.arrayContaining(['.env', '.env.example', '.env.test', 'compose.dev.yaml', 'db/roles.sh', 'migrations/0001_member.sql', 'pg-orm.config.ts', 'src/db/index.ts', 'src/routes/account/_guard.ts', 'src/api/online.ts', 'tests/account.test.ts', 'tests/database.ts', 'tests/members.test.ts', 'tests/online.test.ts']))
       expect((await stat(join(dir, '.env'))).mode & 0o777).toBe(0o600)
-      expect(await Bun.file(join(dir, '.env')).text()).toMatch(/^SESSION_SECRET=[0-9a-f]{64}\nDATABASE_URL=postgres:\/\/app:app@127\.0\.0\.1:5433\/app\nCOMPOSE_FILE=compose\.dev\.yaml\n$/)
+      expect(await Bun.file(join(dir, '.env')).text()).toMatch(/^SESSION_SECRET=[0-9a-f]{64}\nDATABASE_URL=postgres:\/\/app_rw:app_rw@127\.0\.0\.1:5433\/app\nMIGRATE_DATABASE_URL=postgres:\/\/app:app@127\.0\.0\.1:5433\/app\nCOMPOSE_FILE=compose\.dev\.yaml\n$/)
       // Every env file but the example and the tests' own stays out of git, and all of them out of the image.
       expect((await Bun.file(join(dir, '.gitignore')).text()).split('\n')).toEqual(expect.arrayContaining(['.env', '.env.*', '!.env.example', '!.env.test']))
       expect((await Bun.file(join(dir, '.dockerignore')).text()).split('\n')).toEqual(expect.arrayContaining(['.git', '.env', '.env.*']))
@@ -523,10 +523,17 @@ describe('kay new', () => {
       // Reached through the reverse proxy on this machine alone.
       expect(compose).toContain('- 127.0.0.1:3000:3000')
       expect(compose).not.toContain('- 3000:3000')
+      // The app reads and writes rows as app_rw, the migrations change the schema as the owner, and the database image creates app_rw from db/roles.sh.
+      expect(compose).toContain('DATABASE_URL: postgres://app_rw:${APP_DB_PASSWORD}@db:5432/app')
+      expect(compose).toContain('MIGRATE_DATABASE_URL: postgres://app:${POSTGRES_PASSWORD}@db:5432/app')
+      expect(compose).toContain('./db/roles.sh:/docker-entrypoint-initdb.d/roles.sh:ro')
+      expect(await Bun.file(join(dir, 'compose.dev.yaml')).text()).toContain('./db/roles.sh:/docker-entrypoint-initdb.d/roles.sh:ro')
+      expect(await Bun.file(join(dir, 'db/roles.sh')).text()).toContain('ALTER DEFAULT PRIVILEGES FOR ROLE')
+      expect(await Bun.file(join(dir, 'pg-orm.config.ts')).text()).toContain('process.env.MIGRATE_DATABASE_URL ?? process.env.DATABASE_URL')
       // On the Bun that scaffolded it, rather than whatever is latest when it builds.
       expect(await Bun.file(join(dir, 'Dockerfile')).text()).toStartWith(`FROM oven/bun:${Bun.version} AS build\n`)
       expect(await Bun.file(join(dir, '.forgejo/workflows/test.yml')).text()).toContain(`bun-version: ${Bun.version}\n`)
-      expect(await Bun.file(join(dir, '.env.example')).text()).toMatch(/\nSESSION_SECRET=\nPOSTGRES_PASSWORD=\n# true keeps the demo sign-in[^\n]*\nDEMO_SIGN_IN=\n$/)
+      expect(await Bun.file(join(dir, '.env.example')).text()).toMatch(/\nSESSION_SECRET=\nPOSTGRES_PASSWORD=\nAPP_DB_PASSWORD=\n# true keeps the demo sign-in[^\n]*\nDEMO_SIGN_IN=\n$/)
       // The demo sign-in refuses before it reaches the database, in production unless DEMO_SIGN_IN says the site is a demo.
       expect(await Bun.file(join(dir, 'src/routes/login.kay')).text()).toMatch(/=> \{\n {2}if \(!demoSignIn\)\n {4}return ctx\.fail\(403, [^\n]+\n\n {2}await db\.repo/)
 

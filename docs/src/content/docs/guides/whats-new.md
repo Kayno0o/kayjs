@@ -8,6 +8,8 @@ This page lists what each release adds, newest first, with a link to where each 
 ## Unreleased
 
 - **kayjs-auth reads a bearer token and its user together**: one query instead of two with the built-in stores; a custom store may add `bearerTokens.findByDigestWithUser`. [kayjs-auth](/libraries/kayjs-auth)
+||||||| parent of 224267c (feat(new): the app preset runs the app as a database role that cannot change the schema)
+- **The app preset runs the app as a role that cannot change the schema**: `app_rw` reads and writes rows, the migrations run as the owner, and default privileges cover the tables a later migration creates. [Database roles](/guides/deployment#database-roles), [Upgrading](/guides/upgrading)
 - **IconPicker pages its search**: "Show more" asks `search(query, limit, offset)` for the next page and adds it, where it asked again for every icon shown. [Upgrading](/guides/upgrading)
 - **Request tab shows how the page was answered**: the response headers with the CSP and cache-control first, whether `kay build` prerenders the page, the guards that ran and their outcome, the redirects the request went through before the page and what made them, and the server's time to answer. [kay dev](/reference/cli#kay-dev)
 - **Error codes**: a compile, build, content or export error carries a stable code, which `kay explain <code>` documents with the section that covers the fix, and `kay check`, `kay build` and `kay explain` carry as `code` in their `--format json` ([Checks](/reference/checks#errors)); `kay build --static --format json` reports each page it cannot export as its own problem.

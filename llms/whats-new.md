@@ -5,6 +5,8 @@ What each release of kay and its libraries adds, newest first, each feature with
 ## Unreleased
 
 - kayjs-auth: a request sending a bearer token reads the token and its user in one query with the built-in stores, and a custom store may add `bearerTokens.findByDigestWithUser` for the same ([kayjs-auth](../packages/auth/llms.txt)).
+||||||| parent of 224267c (feat(new): the app preset runs the app as a database role that cannot change the schema)
+- The `app` preset connects the app as `app_rw`, a Postgres role that reads and writes rows but cannot change the schema, and runs the migrations as the owner; `db/roles.sh` creates it and sets default privileges, so a later migration needs no `GRANT` ([Commands](project.md), adopting it in [1.45.0](upgrading.md)).
 - kayjs-ui: IconPicker's `Show more` asks `search(query, limit, offset)` for the next page and adds it, where it asked again for every icon shown ([kayjs-ui](../packages/ui/llms.txt), in [1.45.0](upgrading.md#1450)).
 - The dev tool's Request tab also shows the response headers (CSP and cache-control first), whether `kay build` prerenders the page, the guards that ran and their outcome, the redirects the request went through before the page and what made them, and the server's time to answer ([Commands](project.md#commands)).
 - Every error a compile, build, content load or static export raises carries a stable code, which `kay explain <code>` documents with the section that covers the fix, and `--format json` carries as `code` ([Errors](checks.md#errors)); `kay build --static --format json` reports each page it cannot export as its own problem.

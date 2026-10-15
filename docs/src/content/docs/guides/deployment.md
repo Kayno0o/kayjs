@@ -65,6 +65,19 @@ CMD ["./server"]
 
 Its `compose.prod.yaml` publishes the app on `127.0.0.1:3000` alone, for the reverse proxy serving it over HTTPS. The image has no curl, so `./server --health` checks the health route and exits with 0 or 1. If you keep SQLite files, mount a volume the `nobody` user can write.
 
+### Database roles
+
+The `app` preset's `compose.prod.yaml` runs the app and the migrations under two Postgres roles, so a SQL injection or a compromised app process can read and write rows but cannot drop or alter a table.
+
+| Role | Connects | Can |
+| --- | --- | --- |
+| The owner, `app` (`POSTGRES_USER`, password `POSTGRES_PASSWORD`) | the `migrate` service, as `MIGRATE_DATABASE_URL` | change the schema |
+| `app_rw` (password `APP_DB_PASSWORD`, another secret than the owner's) | the `app` service, as `DATABASE_URL` | select, insert, update and delete rows, and use sequences |
+
+`db/roles.sh` creates `app_rw`: the database image runs it once, when it first creates the database. It also sets default privileges for the owner, so the tables, sequences and schemas a later migration creates are reachable by `app_rw` with no `GRANT` in the migration. `pg-orm.config.ts` reads `MIGRATE_DATABASE_URL` before `DATABASE_URL`, so `bun run db:migrate` and `db:generate` run as the owner wherever it is set. Development does the same with `app_rw:app_rw` in `.env`.
+
+An existing app adopts the roles with [the upgrading steps](/guides/upgrading).
+
 ## Health check and shutdown
 
 `/_kay/health` answers `200 ok` while the server takes requests. Move it and add a check in `kay.config.ts`:

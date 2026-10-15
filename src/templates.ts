@@ -376,7 +376,29 @@ ${WORKFLOW_SETUP}`,
   )
 }
 
+// Run by the database image once, as it creates the database: a second role that reads and writes rows but changes no schema, and the default privileges that hand it every table, sequence and schema the owner creates later.
+// It is idempotent, so an existing database adopts it by running this same file once (see the upgrading guide).
+export const APP_ROLES_SCRIPT = `#!/bin/sh
+# The role the app connects with, so a SQL injection or a compromised app process cannot drop or alter a table; $POSTGRES_USER, the owner, stays with the migrations.
+# Tables, sequences and schemas the owner creates later reach it through default privileges, so a migration needs no GRANT.
+set -e
+[ -n "$APP_DB_PASSWORD" ] || { echo 'set APP_DB_PASSWORD, the password of the app_rw role' >&2; exit 1; }
+
+psql -v ON_ERROR_STOP=1 -v owner="$POSTGRES_USER" -v password="$APP_DB_PASSWORD" --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<'SQL'
+SELECT 'CREATE ROLE app_rw LOGIN' WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'app_rw') \\gexec
+SELECT format('ALTER ROLE app_rw NOSUPERUSER NOCREATEDB NOCREATEROLE PASSWORD %L', :'password') \\gexec
+REVOKE CREATE ON SCHEMA public FROM PUBLIC;
+GRANT USAGE ON SCHEMA public TO app_rw;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO app_rw;
+GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public TO app_rw;
+ALTER DEFAULT PRIVILEGES FOR ROLE :"owner" GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO app_rw;
+ALTER DEFAULT PRIVILEGES FOR ROLE :"owner" GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO app_rw;
+ALTER DEFAULT PRIVILEGES FOR ROLE :"owner" GRANT USAGE ON SCHEMAS TO app_rw;
+SQL
+`
+
 // An app's database, and a one-shot service applying the migrations before the app starts.
+// The app connects as app_rw, which reads and writes rows; the owner role stays with the migrations.
 const APP_COMPOSE = `services:
   db:
     image: postgres:18-alpine
@@ -386,8 +408,12 @@ const APP_COMPOSE = `services:
       # Letters and digits only: it goes into DATABASE_URL below as it is.
       POSTGRES_PASSWORD: \${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
       POSTGRES_DB: app
+      # The password of app_rw, the role the app connects with: a different secret from the owner's.
+      APP_DB_PASSWORD: \${APP_DB_PASSWORD:?set APP_DB_PASSWORD}
     volumes:
       - db:/var/lib/postgresql
+      # Creates app_rw when the database is first created: see db/roles.sh for adopting it on an existing one.
+      - ./db/roles.sh:/docker-entrypoint-initdb.d/roles.sh:ro
     healthcheck:
       test: [CMD-SHELL, pg_isready -h 127.0.0.1 -U app]
       interval: 5s
@@ -400,7 +426,8 @@ const APP_COMPOSE = `services:
       target: build
     command: [bun, run, db:migrate]
     environment:
-      DATABASE_URL: postgres://app:\${POSTGRES_PASSWORD}@db:5432/app
+      # The owner: only the migrations change the schema.
+      MIGRATE_DATABASE_URL: postgres://app:\${POSTGRES_PASSWORD}@db:5432/app
     depends_on:
       db:
         condition: service_healthy
@@ -414,7 +441,7 @@ const APP_COMPOSE = `services:
     environment:
       # At least 32 characters, kept out of the repository.
       SESSION_SECRET: \${SESSION_SECRET:?set SESSION_SECRET}
-      DATABASE_URL: postgres://app:\${POSTGRES_PASSWORD}@db:5432/app
+      DATABASE_URL: postgres://app_rw:\${APP_DB_PASSWORD}@db:5432/app
       # \`true\` keeps the demo sign-in, which lets anyone in under any name, for a site that is only a demo.
       DEMO_SIGN_IN: \${DEMO_SIGN_IN:-}
     depends_on:
@@ -494,7 +521,7 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 function authFiles({ tw }: Setup): Record<string, string> {
   return {
     // What production sets, for compose.prod.yaml; development's own settings are in the .env `kay new` wrote.
-    '.env.example': `# Each one generated and kept out of the repository: \`bun -e "console.log((crypto.randomUUID() + crypto.randomUUID()).replaceAll('-', ''))"\`.\nSESSION_SECRET=\nPOSTGRES_PASSWORD=\n# true keeps the demo sign-in, which lets anyone in under any name, for a site that is only a demo.\nDEMO_SIGN_IN=\n`,
+    '.env.example': `# Each one generated and kept out of the repository: \`bun -e "console.log((crypto.randomUUID() + crypto.randomUUID()).replaceAll('-', ''))"\`.\nSESSION_SECRET=\nPOSTGRES_PASSWORD=\nAPP_DB_PASSWORD=\n# true keeps the demo sign-in, which lets anyone in under any name, for a site that is only a demo.\nDEMO_SIGN_IN=\n`,
     'src/env.ts': `import process from 'node:process'
 import { s } from 'kay'
 import { defineEnv } from 'kay/server'
@@ -537,7 +564,8 @@ import { Member } from './src/db/member'
 
 // For the \`pg-orm\` command: \`bun run db:generate\` writes a migration from what the tables declare, \`bun run db:migrate\` applies the pending ones.
 export default defineConfig({
-  db: new Database({ url: process.env.DATABASE_URL, tables: [Member] }),
+  // The owner, which changes the schema; the app itself connects as app_rw through DATABASE_URL.
+  db: new Database({ url: process.env.MIGRATE_DATABASE_URL ?? process.env.DATABASE_URL, tables: [Member] }),
   migrationsDir: 'migrations',
 })
 `,
@@ -553,6 +581,7 @@ CREATE TABLE "member" (
 -- migrate:down
 DROP TABLE IF EXISTS "member";
 `,
+    'db/roles.sh': APP_ROLES_SCRIPT,
     'compose.dev.yaml': `# The database for development and tests: \`docker compose up -d --wait\`, which .env points at this file. Tests copy a database per test file on it.
 services:
   db:
@@ -562,10 +591,12 @@ services:
       POSTGRES_USER: app
       POSTGRES_PASSWORD: app
       POSTGRES_DB: app
+      APP_DB_PASSWORD: app_rw
     ports:
       - 127.0.0.1:5433:5432
     volumes:
       - db:/var/lib/postgresql
+      - ./db/roles.sh:/docker-entrypoint-initdb.d/roles.sh:ro
     # What --wait waits for, so the migrations run on a database that answers, over TCP: on its first start the image's server listens on its socket only.
     healthcheck:
       test: [CMD-SHELL, pg_isready -h 127.0.0.1 -U app]
