@@ -7,6 +7,7 @@ This page lists what each release adds, newest first, with a link to where each 
 
 ## Unreleased
 
+- **`queue` `idlePoll`** makes an idle worker wait longer between empty looks at the store, 1 second by default, a job enqueued in the same process still running at once. [Background jobs](/guides/background-jobs)
 - **`shortcut`** binds a keyboard shortcut such as `mod+s` for as long as an island lives, on the page or one element, Cmd on macOS and Ctrl elsewhere. [Islands](/essentials/islands#keyboard-shortcuts)
 - **kayjs-ui `Table` `selectable`** adds a checkbox per row, a tri-state select-all with `N selected`, keys of rows that left `rows` dropped, and a `@bulk(keys, clear)` block for bulk actions beside the count, in stacked cards too. [Table](/ui/table)
 - **kayjs-ui `SaveForm`** is a form calling a page's action with a sticky bar of unsaved changes, the save under way, Discard and Save, its dirty state read from the form's own controls, leaving with unsaved changes asking and Ctrl+S saving. [SaveForm](/ui/save-form)

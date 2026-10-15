@@ -53,6 +53,9 @@ export interface QueueOptions<Payload> {
   concurrency?: number | undefined
   // How long a run may take: past it, the run counts as failed and frees its worker, and another process takes a job its dead process held as lost. 10 minutes by default.
   lostAfter?: Duration | undefined
+  // The longest an idle worker waits between looks at the store, 1 second by default, the poll itself.
+  // Longer, it waits 1 second, then twice as long after each empty look up to this, and starts over once a job runs, so a job another process enqueued is noticed within this at worst; one enqueued in this process, or due at a time the store knows, still runs at once.
+  idlePoll?: Duration | undefined
   // How long a failed job is kept, its payload included, from when its last attempt was due: 30 days by default, `false` until removed.
   keepFailed?: Duration | false | undefined
   // Gets a job that failed its last attempt, once it is kept as failed.
@@ -237,10 +240,14 @@ export function queue<Payload>(name: string, handler: (payload: Payload) => unkn
   const backoff = durationSeconds(options.backoff ?? DEFAULT_BACKOFF, `queue('${name}')'s backoff`) * 1000
   const lostAfter = durationSeconds(options.lostAfter ?? DEFAULT_LOST_AFTER, `queue('${name}')'s lostAfter`) * 1000
   const concurrency = options.concurrency ?? 1
+  const idlePoll = options.idlePoll === undefined ? POLL_MS : durationSeconds(options.idlePoll, `queue('${name}')'s idlePoll`) * 1000
   const keepFailed = options.keepFailed === false ? undefined : durationSeconds(options.keepFailed ?? DEFAULT_KEEP_FAILED, `queue('${name}')'s keepFailed`) * 1000
 
   if (!Number.isInteger(attempts) || attempts < 1)
     throw new Error(`kay: queue('${name}')'s attempts is ${attempts}; it takes a whole number of at least 1`)
+
+  if (idlePoll < POLL_MS)
+    throw new Error(`kay: queue('${name}')'s idlePoll is ${options.idlePoll}; it takes a duration of at least 1 second, the poll it backs off from`)
 
   if (!Number.isInteger(concurrency) || concurrency < 1)
     throw new Error(`kay: queue('${name}')'s concurrency is ${concurrency}; it takes a whole number of at least 1`)
@@ -341,6 +348,8 @@ export function queue<Payload>(name: string, handler: (payload: Payload) => unkn
 
   const work = async (signal: AbortSignal) => {
     let outageWait = 0
+    // The wait of the next empty look: the poll, doubling up to `idlePoll` while no job is found.
+    let idleWait = POLL_MS
 
     while (!signal.aborted) {
       try {
@@ -355,12 +364,16 @@ export function queue<Payload>(name: string, handler: (payload: Payload) => unkn
 
         outageWait = 0
 
-        if (ran)
+        if (ran) {
+          idleWait = POLL_MS
+
           continue
+        }
 
         const next = await store().nextRunAt(name)
-        const wait = next === undefined ? POLL_MS : Math.min(POLL_MS, Math.max(0, next - Date.now()))
+        const wait = next === undefined ? idleWait : Math.min(idleWait, Math.max(0, next - Date.now()))
 
+        idleWait = Math.min(idleWait * 2, idlePoll)
         await sleep(wait, signal, sleepers)
       }
       // A store that failed, locked past its timeout say, is asked again later and later, up to a minute apart.

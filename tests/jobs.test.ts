@@ -563,4 +563,122 @@ describe('queue', () => {
     expect(() => queue('x', () => undefined, { concurrency: 1.5 })).toThrow('concurrency is 1.5')
     expect(() => queue('x', () => undefined, { backoff: '0s' })).toThrow('backoff')
   })
+
+  it('refuses an idlePoll that is no positive duration or shorter than the 1 s poll', () => {
+    expect(() => queue('x', () => undefined, { idlePoll: 0 })).toThrow('idlePoll')
+    expect(() => queue('x', () => undefined, { idlePoll: '500ms' as never })).toThrow('idlePoll')
+    expect(() => queue('x', () => undefined, { idlePoll: 0.5 })).toThrow('idlePoll is 0.5; it takes a duration of at least 1 second')
+    expect(() => queue('x', () => undefined, { idlePoll: '1s' })).not.toThrow()
+  })
+
+  describe('while idle', () => {
+    // Fake timers never wait for a store's promises, so each step flushes them.
+    const flush = async () => {
+      for (let tick = 0; tick < 20; tick++)
+        await Promise.resolve()
+    }
+
+    // Starts a worker over a store counting its claims, and returns how many looks each second of fake time brings.
+    const watch = async (options: { idlePoll?: number }) => {
+      const store = memoryJobs()
+      const claim = store.claim.bind(store)
+      const claims: number[] = []
+      const ran: string[] = []
+
+      store.claim = async (name, now, until) => {
+        claims.push(Date.now())
+
+        return claim(name, now, until)
+      }
+
+      const work = queue('idle', (payload: string) => ran.push(payload), { store, ...options })
+      const app = new Elysia().use(work).listen(0)
+
+      await flush()
+
+      return {
+        work,
+        app,
+        claims,
+        ran,
+        async advance(ms: number) {
+          for (let elapsed = 0; elapsed < ms; elapsed += 100) {
+            jest.advanceTimersByTime(100)
+            await flush()
+          }
+        },
+      }
+    }
+
+    it('looks every second by default', async () => {
+      jest.useFakeTimers({ now: 0 })
+
+      const idle = await watch({})
+
+      try {
+        await idle.advance(10_000)
+        expect(idle.claims).toEqual([0, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10_000])
+      }
+      finally {
+        jest.useRealTimers()
+        await shutdown(idle.app)
+      }
+    })
+
+    it('doubles its wait up to idlePoll, and starts over once a job runs', async () => {
+      jest.useFakeTimers({ now: 0 })
+
+      const idle = await watch({ idlePoll: 5 })
+
+      try {
+        await idle.advance(20_000)
+        expect(idle.claims).toEqual([0, 1000, 3000, 7000, 12_000, 17_000])
+        await idle.work.enqueue('now')
+        await flush()
+        expect(idle.ran).toEqual(['now'])
+        await idle.advance(5000)
+        expect(idle.claims.slice(6)).toEqual([20_000, 20_000, 21_000, 23_000])
+      }
+      finally {
+        jest.useRealTimers()
+        await shutdown(idle.app)
+      }
+    })
+
+    it('runs a job enqueued in the process at once, however long the wait', async () => {
+      jest.useFakeTimers({ now: 0 })
+
+      const idle = await watch({ idlePoll: 60 })
+
+      try {
+        await idle.advance(30_000)
+        await idle.work.enqueue('a')
+        await flush()
+        expect(idle.ran).toEqual(['a'])
+      }
+      finally {
+        jest.useRealTimers()
+        await shutdown(idle.app)
+      }
+    })
+
+    it('still wakes for a delayed job when it is due', async () => {
+      jest.useFakeTimers({ now: 0 })
+
+      const idle = await watch({ idlePoll: 60 })
+
+      try {
+        await idle.advance(30_000)
+        await idle.work.enqueue('later', { delay: 10 })
+        await idle.advance(9900)
+        expect(idle.ran).toEqual([])
+        await idle.advance(200)
+        expect(idle.ran).toEqual(['later'])
+      }
+      finally {
+        jest.useRealTimers()
+        await shutdown(idle.app)
+      }
+    })
+  })
 })
