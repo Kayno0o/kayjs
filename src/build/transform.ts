@@ -5,11 +5,11 @@ import type { CacheSlot } from './cache'
 import { readdirSync, readFileSync } from 'node:fs'
 import { dirname, join, relative } from 'node:path'
 import process from 'node:process'
-import { compileKay, formatDiagnostic, withoutTwin } from '../compiler'
+import { compileKay, formatDiagnostic, ISLAND_TWIN, withoutTwin } from '../compiler'
 import { isInteractive } from '../compiler/codegen'
 import { parseKay } from '../compiler/parser'
 import { analyzeScript } from '../compiler/script'
-import { readCacheEntry, writeCacheEntry } from './cache'
+import { pruneCache, readCacheEntry, writeCacheEntry } from './cache'
 import { throughLinks } from './links'
 import { anyBrowserOnly, mayImportPackage, packagesToProbe } from './probe'
 import { importedSignals, keepImportedSignals } from './signals'
@@ -143,6 +143,22 @@ export function keepAnalyses(files: ReadonlySet<string>): void {
   }
 
   keepImportedSignals(files)
+}
+
+// What a build keeps in `.kay/cache`: a file's compiled output, analysis and probed packages, and a package's answer, not what `kay check` keeps there.
+const BUILD_ENTRY = /^[\da-z]+-(?:(?:ssr|dom)(?:-hydratable)?(?:-inspect)?|analysis|probed|browser-only)\.json$/
+
+// Drops the entries of the files a full build no longer has, and of the packages and variants it did not probe; the entries it read or wrote and those of the components it analysed stay, so a server booting from the build still finds the ones of the pages the build did not load.
+export async function pruneCompileCache(cacheDir: string): Promise<number> {
+  if (analyzed.size === 0)
+    return 0
+
+  const live = new Set<string>()
+
+  for (const { file } of analyzed.values())
+    live.add(Bun.hash(file).toString(36)).add(Bun.hash(`${file}${ISLAND_TWIN}`).toString(36))
+
+  return pruneCache(cacheDir, BUILD_ENTRY, name => live.has(name.slice(0, name.indexOf('-'))))
 }
 
 // One slot per source file and kind of output, so an edit replaces its entry rather than adding one.

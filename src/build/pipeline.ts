@@ -34,6 +34,7 @@ import { codecWarnings, iconSetPackages, iconSetWarnings, NOTICES_FILE, packages
 import { writeSearchIndex } from './search'
 import { inSignalsScope } from './signals'
 import { exportStatic, refuseStaticConfig } from './static'
+import { pruneCompileCache } from './transform'
 
 export type BuildStage = 'check' | 'bundle' | 'output' | 'export' | 'compile'
 
@@ -315,6 +316,9 @@ async function outputStage(project: Project, exported: boolean, client: ClientBu
   }
 
   // The heads are the check's to read, so a build without checking skips them with it.
+  // Every page ran, so the compiled files of components since deleted can go.
+  await pruneCompileCache(cacheDir(root))
+
   const linted = checking ? pageSeoLints(config, rendered, exported) : []
 
   // Remote originals are kept between builds, revalidated as the image route does.

@@ -20,7 +20,7 @@ import { anchorModule, runtimeChunk } from '../src/build/runtime-chunk'
 import { runtimeConfig, withoutPlugins } from '../src/build/runtime-config'
 import { importedSignals, inSignalsScope } from '../src/build/signals'
 import { describeThrown, mapBundleToKay, mapStack } from '../src/build/sourcemap'
-import { analyzeKayCached, compilerModules, keepAnalyses, transformKayCached } from '../src/build/transform'
+import { analyzeKayCached, compilerModules, keepAnalyses, pruneCompileCache, transformKayCached } from '../src/build/transform'
 import { loadConfig, withConfig } from '../src/config'
 import { devBuilder } from '../src/dev/builder'
 import { projectPaths } from '../src/project'
@@ -2055,6 +2055,69 @@ describe('codec licences', () => {
     }
     finally {
       await rm(root, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('pruning the compile caches', () => {
+  it('drops the entries of a deleted component and entry file after a full build, and keeps the others', async () => {
+    const root = resolve(await fixtureCopy('content'))
+    const cache = join(root, '.kay/cache')
+    const build = async () => {
+      const script = `import { buildProject } from ${JSON.stringify(join(import.meta.dir, '../src/build/pipeline'))}\n\nawait buildProject(${JSON.stringify(root)}, {}, { check: false })\n`
+      const child = Bun.spawn([process.execPath, '-e', script], { cwd: root, stdout: 'pipe', stderr: 'pipe' })
+      const [errors, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
+
+      expect({ code, errors }).toEqual({ code: 0, errors: '' })
+    }
+    const listing = async () => ({ compiled: (await readdir(cache)).filter(name => name.endsWith('.json') && !name.startsWith('runtime-search')).sort(), content: (await readdir(join(cache, 'content'))).sort() })
+
+    try {
+      await build()
+
+      const baseline = await listing()
+
+      await Bun.write(join(root, 'src/components/gone.kay'), 'p Gone\n')
+      await Bun.write(join(root, 'src/content/posts/gone.md'), '---\ntitle: Gone\ndate: 2020-01-01\n---\nGone\n')
+      await build()
+
+      const grown = await listing()
+
+      expect(grown.compiled.length).toBeGreaterThan(baseline.compiled.length)
+      expect(grown.content.length).toBe(baseline.content.length + 1)
+
+      await rm(join(root, 'src/components/gone.kay'))
+      await rm(join(root, 'src/content/posts/gone.md'))
+      await build()
+      expect(await listing()).toEqual(baseline)
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  }, 120_000)
+
+  it('prunes nothing before a build analysed the components, and never what it read or wrote', async () => {
+    const cacheDir = await scratchDir('prune-')
+    const file = join(cacheDir, 'a.kay')
+    const stale = join(cacheDir, '1abc-ssr.json')
+    const checks = join(cacheDir, '1abc-shadow.json')
+
+    try {
+      await Bun.write(stale, '{}')
+      await Bun.write(checks, '{}')
+      expect(await pruneCompileCache(cacheDir)).toBe(0)
+      await transformKayCached('p A\n', file, { target: 'ssr', cacheDir, root: cacheDir })
+      await analyzeKayCached('p A\n', file, cacheDir, cacheDir)
+      expect(await pruneCompileCache(cacheDir)).toBe(1)
+
+      const left = await readdir(cacheDir)
+
+      expect(left).toHaveLength(3)
+      expect(left).toContain('1abc-shadow.json')
+      expect(left).not.toContain('1abc-ssr.json')
+    }
+    finally {
+      await rm(cacheDir, { recursive: true, force: true })
     }
   })
 })

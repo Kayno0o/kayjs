@@ -4,6 +4,7 @@ import type { ContentProblem } from './validate'
 import { mkdir, readdir, rename, rm, stat } from 'node:fs/promises'
 import { join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
+import { pruneCache, touchCacheFile } from '../build/cache'
 import { modeOf, cacheDir as projectCache } from '../project'
 import { projectSource } from '../server/source'
 import { compileMarkdown, MarkdownError, splitFrontmatter } from './markdown'
@@ -46,6 +47,8 @@ interface CachedEntry {
 const STAMP_SETTLED_MS = 2000
 const LEGACY_CACHE_FILE = /^[\da-z]+\.json$/
 const sweptCaches = new Set<string>()
+// The cache directories a collection was compiled into in this process, which a full build may prune.
+const compiledInto = new Set<string>()
 
 let place: { root: string, base: string } | undefined
 
@@ -135,6 +138,7 @@ async function compileDirectory(dir: string, highlight?: Highlighter): Promise<R
 
   await mkdir(cacheDir, { recursive: true })
   await sweepLegacy(cacheDir)
+  compiledInto.add(cacheDir)
 
   // A few files at a time, so a large collection never opens them all at once.
   for (let start = 0; start < files.length; start += READ_BATCH) {
@@ -142,6 +146,9 @@ async function compileDirectory(dir: string, highlight?: Highlighter): Promise<R
       const path = join(absolute, name)
       const file = relative(root, path).split(sep).join('/')
       const cacheFile = join(cacheDir, `${Bun.hash(file).toString(36)}.entry.json`)
+
+      touchCacheFile(cacheFile)
+
       const [cached, { mtimeMs, size }] = await Promise.all([readCached(cacheFile), stat(path)])
       const stamp = `${mtimeMs}:${size}`
 
@@ -199,6 +206,13 @@ async function readCached(file: string): Promise<CachedEntry | undefined> {
   catch {
     return undefined
   }
+}
+
+// Drops the cache entries of the entry files no collection compiled in this process holds any more, which only a build that compiled every collection may ask for.
+export async function pruneContentCache(): Promise<number> {
+  const cacheDir = projectCache(rootOf(), 'content')
+
+  return compiledInto.has(cacheDir) ? pruneCache(cacheDir, /\.entry\.json$/) : 0
 }
 
 // The files an earlier version named after their content, one more with every edit, are dropped once per process.

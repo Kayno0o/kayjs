@@ -16,7 +16,7 @@ import { projectSource } from '../server/source'
 import { registerCollections } from './edit'
 import { feedXml } from './feed'
 import { isCollection } from './index'
-import { loadEntries, manifestFile, setContentPlace } from './load'
+import { loadEntries, manifestFile, pruneContentCache, setContentPlace } from './load'
 import { ContentError, decodeEntries } from './validate'
 
 // The module declaring a project's collections, which `kay build`, `kay check` and the server read them from.
@@ -97,6 +97,9 @@ export async function writeContentManifests(root: string, clientBase: string, co
     await Bun.write(manifestFile(clientBase, collection.dir), JSON.stringify(entries))
     count += entries.length
   }
+
+  // Every collection was compiled, so what no entry file owns any more can go.
+  await pruneContentCache()
 
   return count
 }
