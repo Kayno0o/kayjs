@@ -7,8 +7,8 @@
   --color-kui-overlay1: light-dark(#5d6879, #929dae);
   --color-kui-subtext0: light-dark(#566173, #9ba6b5);
   --color-kui-text: light-dark(#17202e, #eef2f7);
-  --color-kui-accent: light-dark(#8a5700, #f5b83d);
-  --color-kui-accent-hi: light-dark(#6e4500, #f8ca6b);
+  --color-kui-accent: light-dark(#1565a0, #4cb3ea);
+  --color-kui-accent-hi: light-dark(#0f4c7a, #8fd0f5);
   --color-kui-on-accent: light-dark(#ffffff, #17202e);
   --color-kui-success: light-dark(#2f6b3a, #8fd19e);
   --color-kui-warning: light-dark(#8a5a12, #e8b46a);
@@ -18,7 +18,7 @@
   --color-kui-fill-danger: light-dark(#f1e7e7, #3a333d);
   --color-kui-field-border: light-dark(#838589, #737a84);
   --color-kui-chart-3: light-dark(#2459b8, #7aa8f0);
-  --color-kui-chart-4: light-dark(#b0620e, #f0a35e);
+  --color-kui-chart-4: light-dark(#9c4a0a, #f0954a);
   --color-kui-chart-5: light-dark(#6346a0, #b9a3de);
   --color-kui-chart-6: light-dark(#24735f, #7fc8b8);
   --shiki-token-comment: light-dark(#57606a, #8a96a8);

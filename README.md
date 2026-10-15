@@ -1,3 +1,5 @@
+<img src="src/server/favicon.svg" alt="kay's kingfisher" width="96" height="96">
+
 # kay
 
 A Bun web framework. A `.kay` file is one component: TypeScript fences, then a pug-like indented template. Pages render to plain HTML strings on the server, islands run on kay's own signals and DOM runtime, and an Elysia plugin serves it all, with typed form actions and type checking down to the `.kay` line.

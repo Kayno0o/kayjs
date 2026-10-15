@@ -305,8 +305,16 @@ main {
 }
 
 .hero h1 {
+  display: flex;
+  gap: 0.35em;
+  align-items: center;
   font-family: var(--mono);
   font-size: clamp(2.5rem, 7vw, 3.4rem);
+}
+
+.hero h1 img {
+  width: 1.3em;
+  height: 1.3em;
 }
 
 .lede {

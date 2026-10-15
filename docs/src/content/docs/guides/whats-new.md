@@ -7,6 +7,7 @@ This page lists what each release adds, newest first, with a link to where each 
 
 ## Unreleased
 
+- **A kingfisher is kay's default favicon**, shown by a site that names none of its own. [Favicon](/essentials/head-and-seo#favicon)
 - **`kay render <url>`** prints the HTML a page renders without starting a server, so a script or a coding agent can check a page in one command. [kay render](/reference/cli#kay-render)
 - **`--format json`** on `kay build`, `kay routes`, `kay explain`, `kay fmt` and `kay migrate` prints one JSON document, as `kay check` already did. `kay routes --format json` gives a tool every route with its layouts and guards. [Output for tools](/reference/cli#output-for-tools)
 - **`kay build` shows its progress** in a terminal: one line redrawn in place, with the step, its time and a bar over the routes it prerenders and the images it encodes. Piped or in CI, it prints the same lines as before. [kay build](/reference/cli#kay-build)

@@ -1,4 +1,4 @@
-// Each theme's colours as [light, dark]: kayjs-ui's colour tokens, then the syntax colours code blocks take. kay's is the docs' own, from its favicon: navy, white and yellow; the others start from each family's published colours, darkened or lightened where one read under 4.5:1.
+// Each theme's colours as [light, dark]: kayjs-ui's colour tokens, then the syntax colours code blocks take. kay's is the docs' own, from its kingfisher: navy and paper, its blue for the accent and its orange for a chart colour; the others start from each family's published colours, darkened or lightened where one read under 4.5:1.
 export type Pair = readonly [light: string, dark: string]
 
 export const PALETTES: { value: string, colours: Record<string, Pair> }[] = [
@@ -10,8 +10,8 @@ export const PALETTES: { value: string, colours: Record<string, Pair> }[] = [
     'overlay1': ['#5d6879', '#929dae'],
     'subtext0': ['#566173', '#9ba6b5'],
     'text': ['#17202e', '#eef2f7'],
-    'accent': ['#8a5700', '#f5b83d'],
-    'accent-hi': ['#6e4500', '#f8ca6b'],
+    'accent': ['#1565a0', '#4cb3ea'],
+    'accent-hi': ['#0f4c7a', '#8fd0f5'],
     'on-accent': ['#ffffff', '#17202e'],
     'success': ['#2f6b3a', '#8fd19e'],
     'warning': ['#8a5a12', '#e8b46a'],
@@ -21,7 +21,7 @@ export const PALETTES: { value: string, colours: Record<string, Pair> }[] = [
     'fill-danger': ['#f1e7e7', '#3a333d'],
     'field-border': ['#838589', '#737a84'],
     'chart-3': ['#2459b8', '#7aa8f0'],
-    'chart-4': ['#b0620e', '#f0a35e'],
+    'chart-4': ['#9c4a0a', '#f0954a'],
     'chart-5': ['#6346a0', '#b9a3de'],
     'chart-6': ['#24735f', '#7fc8b8'],
     'syntax-comment': ['#57606a', '#8a96a8'],

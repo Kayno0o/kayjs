@@ -101,7 +101,7 @@ export const page = {
 
 ## Favicon
 
-`favicon` names a square image of 512 pixels or more, or a square SVG (`favicon: 'src/favicon.svg'`), from which kay draws every icon. Turn any text in an SVG into paths. kay serves the sizes browsers ask for and a web manifest, and links them from every page. The manifest also takes the installed app's `startUrl`, `scope`, `orientation`, `shortcuts` and a `maskable` image for launchers that crop icons.
+`favicon` names a square image of 512 pixels or more, or a square SVG (`favicon: 'src/favicon.svg'`), from which kay draws every icon. Turn any text in an SVG into paths. kay serves the sizes browsers ask for and a web manifest, and links them from every page. A site that names none shows kay's kingfisher on a navy tile. The manifest also takes the installed app's `startUrl`, `scope`, `orientation`, `shortcuts` and a `maskable` image for launchers that crop icons.
 
 ```ts
 export default defineConfig({

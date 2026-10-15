@@ -287,7 +287,7 @@ In production the sitemap is built on the first request and kept for an hour; de
 - One with no size, not square or not an SVG fails `kay build` and `kay check`, naming the file.
 - An executable made with `kay build --compile` serves the icons the build drew and carries nothing for drawing SVG.
 - `manifest.maskable` can be an SVG too.
-- A project that names none gets kay's own mark, its SVG included.
+- A project that names none gets kay's own mark, a kingfisher on a navy tile, its SVG included.
 - `favicon: false` turns the favicon, its links and the manifest off.
 
 ```ts
