@@ -1,6 +1,6 @@
 import type { Duration } from 'kay'
 import type { Address, Delivery, Mail, Transport } from './types'
-import { milliseconds } from './duration'
+import { durationSeconds } from 'kay/library'
 import { linksOf } from './text'
 
 // Where `kay dev` lists the outbox and serves the mail samples.
@@ -95,7 +95,7 @@ function createOutbox(): Outbox {
     waitFor: async (address, options = {}) => {
       const wanted = address.toLowerCase()
       const found = mails.findLast(mail => sentTo(mail, wanted))
-      const wait = options.timeout === undefined ? DEFAULT_WAIT_MS : milliseconds(options.timeout, 'outbox.waitFor()\'s timeout')
+      const wait = options.timeout === undefined ? DEFAULT_WAIT_MS : durationSeconds(options.timeout, 'outbox.waitFor()\'s timeout', 'kayjs-mail') * 1000
 
       if (found)
         return found

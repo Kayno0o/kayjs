@@ -12,6 +12,7 @@ import { overHttps } from './actions'
 import { nodeCrypto } from './builtins'
 import { requestCookies } from './cookies'
 import { readPersonally } from './scope'
+import { GENERATE_SECRET, MIN_SECRET_LENGTH, openWith, sealWith, weakSecrets } from './seal'
 import { useStampSecret } from './stamp'
 
 export type SessionData = Record<string, unknown>
@@ -71,7 +72,6 @@ interface Sealed {
 const DEFAULT_MAX_AGE = 60 * 60 * 24 * 30
 const DEFAULT_ABSOLUTE_MAX_AGE = 60 * 60 * 24 * 90
 const DEFAULT_BROWSER_MAX_AGE = 60 * 60 * 24
-const MIN_SECRET_LENGTH = 32
 // Secrets published in kay's own templates, which anyone can read: an app copying one would let anyone forge its sessions.
 const PUBLISHED_SECRETS = new Set(['at-least-32-characters-kept-out-of-the-repository'])
 // A host name, the form a cookie's Domain takes once trimmed, lowercased and its leading dot dropped.
@@ -79,8 +79,6 @@ const COOKIE_DOMAIN = /^[a-z\d-]+(?:\.[a-z\d-]+)*$/
 const LEADING_DOT = /^\./
 // What a browser keeps of one cookie, name and attributes included, is about 4 KB.
 const MAX_COOKIE_LENGTH = 3800
-const IV_BYTES = 12
-const TAG_BYTES = 16
 // A store drops expired sessions once every so many writes.
 const SWEEP_EVERY = 1000
 // The most sessions the memory store holds: past it the oldest go, so a flood of visitors cannot fill the process.
@@ -98,11 +96,11 @@ const sqliteStores = new Map<string, { store: SqliteSessionStore, reopen: () => 
 export function session<Data extends object = SessionData>(options: SessionOptions) {
   const secrets = [options.secret].flat()
 
-  if (secrets.length === 0 || secrets.some(secret => secret.length < MIN_SECRET_LENGTH))
-    throw new KayError('config-invalid', `kay: a session secret is at least ${MIN_SECRET_LENGTH} characters; generate one with \`bun -e "console.log(crypto.randomUUID() + crypto.randomUUID())"\``)
+  if (weakSecrets(secrets))
+    throw new KayError('config-invalid', `kay: a session secret is at least ${MIN_SECRET_LENGTH} characters; generate one with ${GENERATE_SECRET}`)
 
   if (secrets.some(secret => PUBLISHED_SECRETS.has(secret)))
-    throw new KayError('config-invalid', 'kay: the session secret is the placeholder an older `kay new` wrote to .env.example, which anyone can read; generate one with `bun -e "console.log(crypto.randomUUID() + crypto.randomUUID())"`')
+    throw new KayError('config-invalid', `kay: the session secret is the placeholder an older \`kay new\` wrote to .env.example, which anyone can read; generate one with ${GENERATE_SECRET}`)
 
   const keys = secrets.map(secret => nodeCrypto().createHash('sha256').update(secret).digest())
 
@@ -254,7 +252,7 @@ class RequestSession<Data extends object> implements Session<Data> {
       sealed = { id: this.id, issued: now, started, ...this.own }
     }
 
-    const cookie = this.cookie(seal(stringify(sealed), this.config.keys[0]!, name), this.own.browser ? undefined : maxAge)
+    const cookie = this.cookie(sealWith(this.config.keys[0]!, stringify(sealed), name), this.own.browser ? undefined : maxAge)
 
     if (cookie.length > MAX_COOKIE_LENGTH)
       throw new Error(`kay: the session cookie ${name} would take ${cookie.length} bytes, more than a browser keeps; hold less in it, or give session() a store`)
@@ -307,39 +305,19 @@ class RequestSession<Data extends object> implements Session<Data> {
   }
 }
 
-// AES-256-GCM: the cookie can be neither read nor altered without the secret, nor passed off under another cookie's name.
-export function seal(text: string, key: Buffer, name: string): string {
-  const { createCipheriv, randomBytes } = nodeCrypto()
-  const iv = randomBytes(IV_BYTES)
-  const cipher = createCipheriv('aes-256-gcm', key, iv)
-
-  cipher.setAAD(Buffer.from(name))
-  const encrypted = Buffer.concat([cipher.update(text, 'utf8'), cipher.final()])
-
-  return Buffer.concat([iv, encrypted, cipher.getAuthTag()]).toString('base64url')
-}
-
-// What the cookie holds, and whether a secret other than the first sealed it.
+// What the cookie holds, and whether a secret other than the first sealed it; sealed under its name, so no other cookie passes for it.
 function opened(value: string, keys: Buffer[], name: string): { sealed: Sealed, oldKey: boolean } | undefined {
-  const bytes = Buffer.from(value, 'base64url')
+  const found = openWith(keys, value, name)
 
-  if (bytes.length <= IV_BYTES + TAG_BYTES)
+  if (found === undefined)
     return undefined
 
-  for (const [index, key] of keys.entries()) {
-    try {
-      const decipher = nodeCrypto().createDecipheriv('aes-256-gcm', key, bytes.subarray(0, IV_BYTES))
-
-      decipher.setAAD(Buffer.from(name))
-      decipher.setAuthTag(bytes.subarray(-TAG_BYTES))
-
-      return { sealed: parse(Buffer.concat([decipher.update(bytes.subarray(IV_BYTES, -TAG_BYTES)), decipher.final()]).toString('utf8')) as Sealed, oldKey: index > 0 }
-    }
-    // Sealed with another key, or not by kay at all.
-    catch {}
+  try {
+    return { sealed: parse(found.text) as Sealed, oldKey: found.key > 0 }
   }
-
-  return undefined
+  catch {
+    return undefined
+  }
 }
 
 // Sessions in this process's memory: gone on restart, and each process keeps its own. Fine for development and one-process sites that can sign everyone out on deploy.

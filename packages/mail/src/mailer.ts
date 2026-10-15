@@ -4,9 +4,9 @@ import type { Address, Delivery, Envelope, Mail, Message, Transport } from './ty
 import process from 'node:process'
 import { Elysia } from 'elysia'
 import { s } from 'kay'
+import { escapeHtml as escape, underKayDev } from 'kay/library'
 import { defineEnv, queue, renderToString } from 'kay/server'
 import parseAddresses from 'nodemailer/lib/addressparser'
-import { escapeHtml as escape } from './escape'
 import { log } from './log'
 import { addressOf, outbox, PREVIEW_ROUTES } from './outbox'
 import { checkKey, smtp } from './smtp'
@@ -355,6 +355,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
   })
   const plugin = new Elysia().use(jobs)
 
+  // The outbox page, which shows every mail with its links live, is served by `kay dev` alone, never by a server merely started with NODE_ENV=development.
   if (transport === outbox && underKayDev())
     mountPreview(plugin, render as (message: Message) => Promise<Mail>, relay(options))
 
@@ -394,9 +395,4 @@ export function mailer(options: MailerOptions = {}): Mailer {
 
   // A getter, since `kay build` leaves a missing variable to throw where it is read.
   return Object.defineProperty(sending, 'configured', { get: () => (configured?.missing() ?? []).length === 0 }) as Mailer
-}
-
-// The outbox page, which shows every mail with its links live, is served by `kay dev` alone, never by a server merely started with NODE_ENV=development.
-function underKayDev(): boolean {
-  return process.env.KAY_DEV_CODE !== undefined
 }

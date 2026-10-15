@@ -3,6 +3,7 @@ import { prerendering } from '../runtime/html'
 import { kayLog } from '../runtime/log'
 import { WORK_SCRIPT } from '../runtime/swap'
 import { nodeCrypto } from './builtins'
+import { openWith, sameText, sealWith } from './seal'
 
 const KEY_BYTES = 32
 
@@ -51,14 +52,8 @@ export function signText(use: string, text: string): string {
 }
 
 export function signedText(use: string, text: string, given: string): boolean {
-  const a = Buffer.from(given)
-  const b = Buffer.from(signText(use, text))
-
-  return a.length === b.length && nodeCrypto().timingSafeEqual(a, b)
+  return sameText(given, signText(use, text))
 }
-
-const IV_BYTES = 12
-const TAG_BYTES = 16
 
 function sealKey(use: string): Buffer {
   return nodeCrypto().createHmac('sha256', stampKey()).update(`kay-seal\0${use}`).digest()
@@ -66,31 +61,12 @@ function sealKey(use: string): Buffer {
 
 // AES-256-GCM under a key of its own per `use`: what it seals can be neither read nor altered without the secret.
 export function sealText(use: string, text: string): string {
-  const { createCipheriv, randomBytes } = nodeCrypto()
-  const iv = randomBytes(IV_BYTES)
-  const cipher = createCipheriv('aes-256-gcm', sealKey(use), iv)
-  const encrypted = Buffer.concat([cipher.update(text, 'utf8'), cipher.final()])
-
-  return Buffer.concat([iv, encrypted, cipher.getAuthTag()]).toString('base64url')
+  return sealWith(sealKey(use), text)
 }
 
 // The text `sealText` sealed for that `use`, or undefined for anything else, such as a value sealed before a restart changed the process's secret.
 export function openText(use: string, sealed: string): string | undefined {
-  const bytes = Buffer.from(sealed, 'base64url')
-
-  if (bytes.length <= IV_BYTES + TAG_BYTES)
-    return undefined
-
-  try {
-    const decipher = nodeCrypto().createDecipheriv('aes-256-gcm', sealKey(use), bytes.subarray(0, IV_BYTES))
-
-    decipher.setAuthTag(bytes.subarray(-TAG_BYTES))
-
-    return Buffer.concat([decipher.update(bytes.subarray(IV_BYTES, -TAG_BYTES)), decipher.final()]).toString('utf8')
-  }
-  catch {
-    return undefined
-  }
+  return openWith([sealKey(use)], sealed)?.text
 }
 
 function signature(action: string, at: string): string {

@@ -21,6 +21,7 @@ import { readFace } from './face'
 import { DEFAULT_QUALITY, drawing, findSource, MAX_UPLOAD_PIXELS, VARIANTS_DIR } from './image'
 import { revalidated } from './public'
 import { requestUrl } from './request-url'
+import { sameText } from './seal'
 
 export interface CardSetup {
   // `.kay/client`, where the key cards are signed with is kept.
@@ -319,10 +320,7 @@ function signature(key: Uint8Array, spec: string): string {
 }
 
 function signed(key: Uint8Array, spec: string, given: string): boolean {
-  const expected = Buffer.from(signature(key, spec))
-  const actual = Buffer.from(given)
-
-  return actual.length === expected.length && nodeCrypto().timingSafeEqual(actual, expected)
+  return sameText(given, signature(key, spec))
 }
 
 // `/_kay/card?title=...&src=...&sig=...` answers the JPEG card a page linked, drawn on its first request and kept in the cache directory; a title or image the server did not sign is not found.

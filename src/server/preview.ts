@@ -17,6 +17,7 @@ import { isCrossSite, overHttps } from './actions'
 import { nodeCrypto } from './builtins'
 import { requestCookies } from './cookies'
 import { requestUrl } from './request-url'
+import { MIN_SECRET_LENGTH, sameText } from './seal'
 import { useStampSecret } from './stamp'
 import { visitAs } from './visit'
 
@@ -26,7 +27,6 @@ export const PREVIEW_COOKIE = 'kay_preview'
 const EDIT = 'edit'
 const DEFAULT_MAX_AGE = 3600
 const DEFAULT_LINK_TTL = 3600
-const MIN_SECRET_LENGTH = 32
 // A path of the site, never `//host` nor `/\host`, which a browser reads as another site.
 const SITE_PATH = /^\/(?![/\\])\S*$/
 const TEXT = { 'content-type': 'text/plain; charset=utf-8' }
@@ -249,11 +249,4 @@ function settingsFor(caller: string): PreviewSettings {
 
 function sign(current: PreviewSettings, text: string): string {
   return nodeCrypto().createHmac('sha256', current.secret).update(text).digest('base64url')
-}
-
-function sameText(given: string, expected: string): boolean {
-  const a = Buffer.from(given)
-  const b = Buffer.from(expected)
-
-  return a.length === b.length && nodeCrypto().timingSafeEqual(a, b)
 }

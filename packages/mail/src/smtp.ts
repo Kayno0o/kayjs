@@ -1,7 +1,7 @@
 import type { Duration } from 'kay'
 import type { Delivery, Mail, Transport } from './types'
 import { createPrivateKey } from 'node:crypto'
-import { milliseconds } from './duration'
+import { durationSeconds } from 'kay/library'
 
 // Signs each mail for a relay that does not, its public key published in DNS at `<selector>._domainkey.<domain>`.
 export interface DkimSettings {
@@ -79,7 +79,7 @@ export function smtp(settings: SmtpSettings): Transport {
     checkKey(settings.dkim.privateKey, 'smtp()\'s dkim.privateKey')
 
   // Read now, so a timeout that is no duration fails where the transport is made rather than at its first mail.
-  const wait = settings.timeout === undefined ? DEFAULT_TIMEOUT_MS : milliseconds(settings.timeout, 'smtp()\'s timeout')
+  const wait = settings.timeout === undefined ? DEFAULT_TIMEOUT_MS : durationSeconds(settings.timeout, 'smtp()\'s timeout', 'kayjs-mail') * 1000
   let transporter: Promise<Awaited<ReturnType<typeof open>>> | undefined
   let sending = 0
   let idle: ReturnType<typeof setTimeout> | undefined

@@ -11,8 +11,6 @@ import type { OrganizationsCore } from './organizations'
 import type { PasskeyChallenge, Relying } from './passkeys'
 import type { AuthStore, IdentityRecord, UserRecord } from './store'
 import type { Challenge } from './twoFactor'
-import { Buffer } from 'node:buffer'
-import { timingSafeEqual } from 'node:crypto'
 
 // A visit or a token use is recorded at most this often, so a busy browser or device does not write on every request.
 export const TOUCH_EVERY_MS = 5 * 60 * 1000
@@ -175,9 +173,4 @@ export function banned(record: UserRecord, now = Date.now()): boolean {
   return record.bannedAt !== null && (record.bannedUntil === null || record.bannedUntil.getTime() > now)
 }
 
-export function sameText(a: string, b: string): boolean {
-  const left = Buffer.from(a)
-  const right = Buffer.from(b)
-
-  return left.length === right.length && timingSafeEqual(left, right)
-}
+export { sameText } from 'kay/library'

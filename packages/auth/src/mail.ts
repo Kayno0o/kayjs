@@ -1,5 +1,6 @@
 import type { EmailCore } from './email'
 import type { LinkType } from './store'
+import { escapeHtml as escape } from 'kay/library'
 import { language, pickLocale } from './locale'
 import { log } from './log'
 
@@ -83,13 +84,6 @@ const FRENCH: Wording = {
   onSite: (subject, site) => `${subject} sur ${site}`,
   notYou: 'Si ce n\'était pas vous, réinitialisez votre mot de passe et vérifiez votre compte sans attendre.',
   contactSite: 'Si ce n\'était pas vous, contactez le site sans attendre.',
-}
-
-const HTML_ESCAPES: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', '\'': '&#39;' }
-const HTML_SPECIAL = /[&<>"']/g
-
-function escape(text: string): string {
-  return text.replace(HTML_SPECIAL, char => HTML_ESCAPES[char]!)
 }
 
 // Both parts always: a mail with text only trips spam filters, and one with HTML only is unreadable where HTML is refused. Inline styles only, since mail clients drop stylesheets.

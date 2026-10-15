@@ -1,13 +1,12 @@
 import type { AuthKind } from './auth'
 import type { SentMail } from './outbox'
 import type { Address, Attachment, Delivery, Mail, Message } from './types'
-import { createHash } from 'node:crypto'
 import { join } from 'node:path'
 import process from 'node:process'
 import { Elysia } from 'elysia'
+import { escapeHtml as escape, RESTART_RELOAD, sourceHash } from 'kay/library'
 import { authMailerOptions, authMessage } from './auth'
 import { AUTH_SAMPLES, authSample } from './auth-samples'
-import { escapeHtml as escape } from './escape'
 import { outbox, PREVIEW_PATH } from './outbox'
 import { nodemailerMessage } from './smtp'
 
@@ -44,13 +43,9 @@ interface Outcome {
 
 // Reloads the list as each mail arrives.
 const LIVE = `new EventSource('${PREVIEW_PATH}/events').onmessage=()=>location.reload()`
-// Reloads a sample once `kay dev` restarts the server for a changed file: its stream names the server it comes from first.
-const RESTARTED = `let b;new EventSource('/_kay/dev/events').addEventListener('boot',e=>{const i=e.data.split(' ')[0];if(b&&i!==b)location.reload();b=i})`
-
-const hashOf = (script: string): string => `'sha256-${createHash('sha256').update(script).digest('base64')}'`
 
 // The pages' own policy, which a site's narrower one, such as a `frame-src` naming only a map provider, would otherwise replace and leave the mail's frame blank.
-const PAGE_POLICY = `default-src 'none'; style-src 'unsafe-inline'; script-src ${hashOf(LIVE)} ${hashOf(RESTARTED)}; connect-src 'self'; frame-src 'self'; base-uri 'none'; form-action 'self'`
+const PAGE_POLICY = `default-src 'none'; style-src 'unsafe-inline'; script-src ${sourceHash(LIVE)} ${sourceHash(RESTART_RELOAD)}; connect-src 'self'; frame-src 'self'; base-uri 'none'; form-action 'self'`
 
 // Gmail cuts a mail whose html passes this, behind a "View entire message" link.
 const GMAIL_CLIP_BYTES = 102 * 1024
@@ -221,7 +216,7 @@ async function sample(file: string, render: (message: Message) => Promise<Mail>)
 }
 
 function samplesPage(files: string[]): Response {
-  const live = `<script>${RESTARTED}</script>`
+  const live = `<script>${RESTART_RELOAD}</script>`
   const back = `<div class="bar"><a href="${PREVIEW_PATH}">Outbox</a></div>`
 
   if (files.length === 0)
@@ -233,7 +228,7 @@ function samplesPage(files: string[]): Response {
 }
 
 async function samplePage(file: string, phone: boolean, render: (message: Message) => Promise<Mail>, relay: Relay, outcome?: Outcome, status = 200): Promise<Response> {
-  const live = `<script>${RESTARTED}</script>`
+  const live = `<script>${RESTART_RELOAD}</script>`
   const self = `${SAMPLES_PATH}?mail=${encodeURIComponent(file)}`
   const back = `<div class="bar"><a href="${SAMPLES_PATH}">Mail samples</a></div>`
 

@@ -12,7 +12,7 @@ import { memoryStore, pages, session, sqliteStore } from '../src/server'
 import { readClient } from '../src/server/client'
 import { renderPage } from '../src/server/render'
 import { scanRoutes } from '../src/server/routes'
-import { seal } from '../src/server/session'
+import { sealWith } from '../src/server/seal'
 import { scratchDir } from './scratch'
 
 const SECRET = 'a test secret that is long enough to seal'
@@ -353,7 +353,7 @@ describe('sessions', () => {
   it('reads a cookie from before kay counted a session\'s start, counting it from when it was written', async () => {
     const key = new Bun.CryptoHasher('sha256').update(SECRET).digest()
     const now = Math.floor(Date.now() / 1000)
-    const legacy = (issued: number) => `session=${seal(stringify({ data: { count: 1 }, issued }), key, 'session')}`
+    const legacy = (issued: number) => `session=${sealWith(key, stringify({ data: { count: 1 }, issued }), 'session')}`
     const app = counter({ maxAge: 200, absoluteMaxAge: 150 })
     const peek = async (cookie: string) => (await app.handle(new Request('http://localhost/peek', { headers: { cookie } }))).text()
 

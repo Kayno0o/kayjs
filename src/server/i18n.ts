@@ -8,6 +8,7 @@ import { throughLinks } from '../build/links'
 import { KayError } from '../compiler/errors'
 import { flattenMessages, localePath, pathSegment, splitLocale, translatedPath } from '../runtime/i18n'
 import { localeState } from '../runtime/locale-state'
+import { acceptedLocales, LOCALE_TAG, matchLocale } from './accept-language'
 import { importModule } from './bundle'
 import { requestCookies } from './cookies'
 import { requestUrl } from './request-url'
@@ -21,8 +22,6 @@ const MESSAGES_DIR = 'src/messages'
 export const DEFAULT_LANG = 'en'
 // A year: a choice of language is no session's.
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 365
-const LOCALE_TAG = /^[a-z]{2,3}(?:-[a-z\d]{2,8})*$/i
-const QUALITY = /;\s*q=([\d.]+)/
 
 // The project's locales, read and checked once at boot.
 export interface I18n {
@@ -300,27 +299,7 @@ export function requestLocale(settings: LocaleSettings, request: Request, refere
 
 // The best of the locales for an `Accept-Language` header: an exact tag first, then one of the same language, `fr` for `fr-CA` and the other way.
 export function acceptedLocale(locales: readonly string[], header: string | null): string | undefined {
-  const wanted = (header ?? '').split(',').map((part, index) => {
-    const quality = QUALITY.exec(part)
-
-    return { tag: before(part, ';').trim().toLowerCase(), quality: quality ? Number(quality[1]) : 1, index }
-  }).filter(range => range.tag !== '' && range.tag !== '*' && range.quality > 0).sort((a, b) => b.quality - a.quality || a.index - b.index)
-
-  for (const { tag } of wanted) {
-    const language = before(tag, '-')
-    const match = locales.find(locale => locale.toLowerCase() === tag) ?? locales.find(locale => before(locale.toLowerCase(), '-') === language)
-
-    if (match !== undefined)
-      return match
-  }
-
-  return undefined
-}
-
-function before(text: string, separator: string): string {
-  const end = text.indexOf(separator)
-
-  return end === -1 ? text : text.slice(0, end)
+  return matchLocale(locales, acceptedLocales(header ?? ''))
 }
 
 // Remembers the locale a visitor went to, so an unprefixed path takes them back to it.

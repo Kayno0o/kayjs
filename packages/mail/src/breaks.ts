@@ -1,5 +1,5 @@
 import type { JSX } from 'kay'
-import { escapeHtml } from './escape'
+import { escapeHtml } from 'kay/library'
 
 const LINE_BREAK = /\r\n|\r|\n/
 
