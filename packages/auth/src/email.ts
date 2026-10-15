@@ -5,6 +5,7 @@ import type { RequestState } from './state'
 import type { CodeType, LinkType, TokenType, UserRecord } from './store'
 import type { Proof, ProofFailure } from './twoFactor'
 import { comparePasswords, hashPassword, nanoid } from '@kaynooo/utils'
+import { localPath } from 'kay'
 import { newPasswordProblem } from './breached'
 import { admit } from './captcha'
 import { banned } from './core'
@@ -13,7 +14,6 @@ import { spend, typedKey } from './limits'
 import { log } from './log'
 import { writing } from './mail'
 import { notify } from './notify'
-import { safeRedirect } from './oauth/redirect'
 import { emailProblem, normalizeEmail } from './rules'
 import { endOtherSessions, removeIdentities, revokeBearerTokens } from './sessions'
 import { reprove } from './twoFactor'
@@ -196,7 +196,7 @@ export async function resetPassword(state: RequestState, token: string, password
 }
 
 export async function requestMagicLink(state: RequestState, email: string, redirect?: string, captcha?: string): Promise<MailRequestResult> {
-  return mailByAddress(state, email, 'magic-link', safeRedirect(redirect), captcha)
+  return mailByAddress(state, email, 'magic-link', localPath(redirect, '/'), captcha)
 }
 
 export async function signInWithMagicLink(state: RequestState, token: string): Promise<LinkResult> {

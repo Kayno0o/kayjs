@@ -4,12 +4,12 @@ import type { RequestState } from './state'
 import type { PasskeyRecord, UserRecord } from './store'
 import type { Proof, ProofFailure, TwoFactorResult } from './twoFactor'
 import { Buffer } from 'node:buffer'
+import { localPath } from 'kay'
 import { banned } from './core'
 import { readDevice } from './device'
 import { report } from './events'
 import { spend } from './limits'
 import { notify } from './notify'
-import { safeRedirect } from './oauth/redirect'
 import { endOtherSessions } from './sessions'
 import { reprove } from './twoFactor'
 import { generateAuthenticationOptions, generateRegistrationOptions, verifyAuthenticationResponse, verifyRegistrationResponse } from './webauthn'
@@ -219,7 +219,7 @@ export async function signInWithPasskey(state: RequestState, response: Authentic
 
   await signIn(record, 'passkey')
 
-  return { ok: true, redirect: safeRedirect(redirect) }
+  return { ok: true, redirect: localPath(redirect, '/') }
 }
 
 // The options for answering a pending sign-in's second factor with one of that user's passkeys.

@@ -3,6 +3,7 @@ import type { EmailProblem, PasswordProblem, UsernameProblem } from './rules'
 import type { RequestState } from './state'
 import type { UserRecord } from './store'
 import { comparePasswords, hashPassword, passwordNeedsRehash } from '@kaynooo/utils'
+import { localPath } from 'kay'
 import { newPasswordProblem } from './breached'
 import { admit } from './captcha'
 import { newUserRecord, publicUser } from './core'
@@ -12,7 +13,6 @@ import { report } from './events'
 import { randomToken } from './keys'
 import { spend, typedKey } from './limits'
 import { validLocale } from './locale'
-import { safeRedirect } from './oauth/redirect'
 import { emailProblem, normalizeEmail, normalizeUsername, PASSWORD_MAX_LENGTH, usernameProblem } from './rules'
 
 export interface RegisterInput {
@@ -272,7 +272,7 @@ export async function signInWithPassword(state: RequestState, input: PasswordSig
   if (passwordNeedsRehash(record!.passwordHash!))
     await store.users.update(record!.id, { passwordHash: await hashPassword(input.password) })
 
-  return state.complete(record!, safeRedirect(input.redirect), 'password')
+  return state.complete(record!, localPath(input.redirect, '/'), 'password')
 }
 
 // Spends as long on an account without a password as on a wrong one, so the time taken tells nothing either.

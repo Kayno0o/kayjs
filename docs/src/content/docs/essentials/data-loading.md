@@ -98,7 +98,7 @@ h1 {post.title}
 
 <Callout type="warning">
 
-`ctx.redirect` goes to any URL, `//other.example/` included, so a `?next=` param goes through `localPath(value, fallback)` from `kay`: `ctx.redirect(localPath(ctx.query.next, '/account'))`.
+`ctx.redirect` goes to any URL, `//other.example/` included, so a `?next=` param goes through `localPath(value, fallback)` from `kay`: `ctx.redirect(localPath(ctx.query.next, '/account'))`. It gives `fallback` for anything that would leave the site, even once decoded, such as `/%2F/evil.example`.
 
 </Callout>
 

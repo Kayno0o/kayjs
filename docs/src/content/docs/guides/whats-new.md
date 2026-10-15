@@ -9,6 +9,7 @@ This page lists what each release adds, newest first, with a link to where each 
 
 - **Head tab in the dev tool**: the page's search result, title and description with their lengths and limit, canonical, alternates, robots and sitemap membership, og and twitter tags with the social card, JSON-LD parsed or failing, and what `kay check` would flag in the head, read again after each page swap. [kay dev](/reference/cli#kay-dev)
 - **Routes tab shows what kay serves**: a "Served by kay" section lists the sitemap, robots.txt, feeds, manifest, favicons, service worker, health check and a library's dev pages such as `/_kay/mail`, each GET path linked, and says why there is no sitemap when `seo` is set without an origin. [kay dev](/reference/cli#kay-dev)
+- **`localPath` is stricter**: it also refuses a path that leaves the site once decoded, such as `/%2F/evil.example`, and kayjs-auth's `safeRedirect` now calls it. [Data loading](/essentials/data-loading)
 - **`queue` `idlePoll`** makes an idle worker wait longer between empty looks at the store, 1 second by default, a job enqueued in the same process still running at once. [Background jobs](/guides/background-jobs)
 - **`kay dev` counts repeated lines**: on a terminal, a restart or stylesheet line the same as the one before is rewritten with a count, `(x3)`, instead of repeated. [kay dev](/reference/cli#kay-dev)
 - **`shortcut`** binds a keyboard shortcut such as `mod+s` for as long as an island lives, on the page or one element, Cmd on macOS and Ctrl elsewhere. [Islands](/essentials/islands#keyboard-shortcuts)

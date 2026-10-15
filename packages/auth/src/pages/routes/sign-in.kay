@@ -1,7 +1,6 @@
 --- server
-import { action } from 'kay'
+import { action, localPath } from 'kay'
 import { localize, t } from 'kay/i18n'
-import { safeRedirect } from '../../oauth/redirect'
 import Captcha from '../components/captcha.kay'
 import Message from '../components/message.kay'
 import Panel from '../components/panel.kay'
@@ -52,7 +51,7 @@ export const passkey = action(schemas.passkey, async (input, ctx) => {
 const auth = ctx.locals.auth
 const features = auth.features()
 const prefix = features.pages?.prefix ?? features.prefix
-const redirect = safeRedirect(ctx.url.searchParams.get('redirect'), localize(features.pages?.home ?? '/'))
+const redirect = localPath(ctx.url.searchParams.get('redirect'), localize(features.pages?.home ?? '/'))
 const user = await auth.user()
 
 // A guest signs in to keep what they did; anyone else is signed in already.

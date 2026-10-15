@@ -1,7 +1,6 @@
 --- server
-import { action } from 'kay'
+import { action, localPath } from 'kay'
 import { localize, t } from 'kay/i18n'
-import { safeRedirect } from '../../oauth/redirect'
 import { PASSWORD_MIN_LENGTH } from '../../rules'
 import Captcha from '../components/captcha.kay'
 import Message from '../components/message.kay'
@@ -23,7 +22,7 @@ export const register = action(schemas.register, async (input, ctx) => {
   if (!result.signedIn)
     return 'verify'
 
-  return ctx.redirect(safeRedirect(input.redirect, localize(ctx.locals.auth.features().pages?.home ?? '/')))
+  return ctx.redirect(localPath(input.redirect, localize(ctx.locals.auth.features().pages?.home ?? '/')))
 }, guarded)
 
 const auth = ctx.locals.auth
@@ -33,7 +32,7 @@ if (!features.signUp)
   ctx.notFound()
 
 const prefix = features.pages?.prefix ?? features.prefix
-const redirect = safeRedirect(ctx.url.searchParams.get('redirect'), localize(features.pages?.home ?? '/'))
+const redirect = localPath(ctx.url.searchParams.get('redirect'), localize(features.pages?.home ?? '/'))
 const user = await auth.user()
 
 if (user && !user.guest)

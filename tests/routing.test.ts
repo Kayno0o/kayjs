@@ -161,6 +161,20 @@ describe('localPath', () => {
       expect(localPath(next, '/home')).toBe('/home')
   })
 
+  it('falls back for a path that leaves the site once decoded, at any depth of encoding', () => {
+    for (const next of ['/%2F/evil.example', '/%2f/evil.example', '/%2F%2Fevil.example', '/%5Cevil.example', '/./%5Cevil.example', '/.%2f/evil.example', '/a/..%2f/evil.example', '/%2e%2e%2f%2e%2e%2f/evil.example', '/%09/evil.example', '/%0a/evil.example', '/%0d/evil.example', '/%252F/evil.example', '/%2509/evil.example', '/%E0%A4%A', '/a\\b', '/a\0b', '/a\x7Fb'])
+      expect([next, localPath(next, '/home')]).toEqual([next, '/home'])
+  })
+
+  it('answers a path of the site as a browser resolves it', () => {
+    expect(localPath('/a/./b/../c?next=//x#top', '/')).toBe('/a/c?next=//x#top')
+    expect(localPath('/a/%2F', '/')).toBe('/a/%2F')
+    expect(localPath('/search?q=100%', '/')).toBe('/search?q=100%')
+    expect(localPath(' /account', '/')).toBe('/account')
+    expect(['/../x', '/a?', '/a b'].map(next => localPath(next, '/'))).toEqual(['/x', '/a', '/a%20b'])
+    expect(localPath(localPath('/a/./é', '/'), '/')).toBe(localPath('/a/./é', '/'))
+  })
+
   it('leaves no control character a redirect would refuse', () => {
     expect(localPath('/a\tb', '/')).toBe('/ab')
   })
