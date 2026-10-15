@@ -72,15 +72,28 @@ export class Connection {
   }
 
   private async listen(input: ReadableStream<Uint8Array>) {
-    let buffer: Buffer = Buffer.alloc(0)
+    // Chunks wait until they hold the whole message, joined once rather than each time one comes.
+    let chunks: Uint8Array[] = []
+    let size = 0
+    let needed = 0
 
     for await (const chunk of input) {
-      buffer = Buffer.concat([buffer, chunk])
+      chunks.push(chunk)
+      size += chunk.length
+
+      if (size < needed)
+        continue
+
+      let buffer: Buffer = Buffer.concat(chunks)
 
       for (let message = takeMessage(buffer); message; message = takeMessage(buffer)) {
         buffer = message.rest
         this.receive(message.body)
       }
+
+      chunks = buffer.length === 0 ? [] : [buffer]
+      size = buffer.length
+      needed = messageEnd(buffer) ?? 0
     }
 
     for (const { reject } of this.pending.values())
@@ -144,7 +157,8 @@ export class Connection {
   }
 }
 
-function takeMessage(buffer: Buffer): { body: string, rest: Buffer } | undefined {
+// Where the message at the start of the buffer ends, and where its body starts, once its header is in.
+function frame(buffer: Buffer): { start: number, end: number } | undefined {
   const headerEnd = buffer.indexOf(HEADER_END)
 
   if (headerEnd === -1)
@@ -153,8 +167,18 @@ function takeMessage(buffer: Buffer): { body: string, rest: Buffer } | undefined
   const length = Number(CONTENT_LENGTH.exec(buffer.subarray(0, headerEnd).toString('ascii'))?.[1] ?? 0)
   const start = headerEnd + HEADER_END.length
 
-  if (buffer.length < start + length)
+  return { start, end: start + length }
+}
+
+function messageEnd(buffer: Buffer): number | undefined {
+  return frame(buffer)?.end
+}
+
+function takeMessage(buffer: Buffer): { body: string, rest: Buffer } | undefined {
+  const framed = frame(buffer)
+
+  if (!framed || buffer.length < framed.end)
     return undefined
 
-  return { body: buffer.subarray(start, start + length).toString('utf8'), rest: buffer.subarray(start + length) }
+  return { body: buffer.subarray(framed.start, framed.end).toString('utf8'), rest: buffer.subarray(framed.end) }
 }

@@ -86,6 +86,8 @@ const WATCHED = '**/*.{kay,ts,tsx,js,jsx,json,md,yaml,yml}'
 export const DIAGNOSTICS_DELAY = 150
 // How long the project-wide checks wait after a save for the next, as saving every file at once makes.
 const PROJECT_CHECKS_DELAY = 300
+// How long the events of one save, the editor's save notice and its file watcher's, are waited for before the shadow tree is written once for them all; short of the diagnostics' delay.
+const SAVE_EVENTS_DELAY = 25
 const QUICK_FIX = 'quickfix'
 const PACKAGE_TYPES = join(SHADOW_DIR, 'kay-packages.d.ts')
 const DEFAULT_MEMBER = '.default'
@@ -116,6 +118,10 @@ export class KayLanguageServer {
   // The run of the project-wide checks in flight, and whether a save came during it.
   private projectChecks: Promise<void> | undefined
   private projectChecksStale = false
+  // The save waiting for its other events to come, whether any of them changed a module, and the shadow tree's write in flight.
+  private savePending: Promise<void> | undefined
+  private saveModulesChanged = false
+  private saveWriting: Promise<void> = Promise.resolve()
   // What the project-wide checks found, by file.
   private problems = new Map<string, Diagnostic[]>()
 
@@ -263,6 +269,36 @@ export class KayLanguageServer {
   // Rewrites the shadow tree on disk, so closed .kay files and the editor's own TypeScript server see the saved code; tsgo hears which shadow files came and went, so imports of them resolve again.
   // `modulesChanged` is true when a file other than a .kay file changed on disk, whose signals the open components may take on or lose.
   private async saved(modulesChanged = false) {
+    this.saveModulesChanged ||= modulesChanged
+    this.savePending ??= this.writeSaved()
+
+    return this.savePending
+  }
+
+  // One write for the events one save makes, after the one before ended.
+  private async writeSaved() {
+    await Bun.sleep(SAVE_EVENTS_DELAY)
+
+    const modulesChanged = this.saveModulesChanged
+    const previous = this.saveWriting
+
+    this.saveModulesChanged = false
+    this.savePending = undefined
+    this.saveWriting = (async () => {
+      try {
+        await previous
+      }
+      catch {
+        // Its own caller heard of it.
+      }
+
+      await this.writeAfterSave(modulesChanged)
+    })()
+
+    return this.saveWriting
+  }
+
+  private async writeAfterSave(modulesChanged: boolean) {
     const options = new Map([...this.projects].map(([root, project]) => [root, project.options]))
 
     this.server.notify('workspace/didChangeWatchedFiles', { changes: await this.writeShadows() })
@@ -300,7 +336,7 @@ export class KayLanguageServer {
       const files = new Set(types.files.keys())
 
       changes.push(
-        ...[...files].map((path): FileEvent => ({ uri: pathToFileURL(path).href, type: project.shadowFiles.has(path) ? CHANGED : CREATED })),
+        ...[...files].flatMap((path): FileEvent[] => project.shadowFiles.has(path) ? types.written.has(path) ? [{ uri: pathToFileURL(path).href, type: CHANGED }] : [] : [{ uri: pathToFileURL(path).href, type: CREATED }]),
         ...[...project.shadowFiles].filter(path => !files.has(path)).map((path): FileEvent => ({ uri: pathToFileURL(path).href, type: DELETED })),
         { uri: pathToFileURL(join(project.shadowTree, 'kay-env.d.ts')).href, type: CHANGED },
       )

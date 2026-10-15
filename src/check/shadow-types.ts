@@ -38,6 +38,8 @@ const EXTENSION_PAGES = 'kay-extension-pages.ts'
 
 export interface ShadowTypes {
   files: Map<string, ShadowFile>
+  // The files of the tree this run wrote, the others being as it left them.
+  written: Set<string>
   // Each component's compile errors.
   diagnostics: CheckDiagnostic[]
   // What the config, the API modules and the redirects get wrong.
@@ -69,6 +71,7 @@ export interface ServedProject {
 // The shadow tree as one run writes it: what it did not write is left from an earlier one.
 interface ShadowTree {
   shadows: Map<string, ShadowFile>
+  changed: Set<string>
   // At a path, or a name in the tree.
   write: (path: string, text: string) => Promise<void>
   shadow: (shadow: ShadowFile, path: string) => Promise<void>
@@ -108,21 +111,25 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
   // `contentChecks` writes the props check once it read the collections.
   await tree.removeStale([CONTENT_CHECK])
 
-  return { files: tree.shadows, diagnostics: [...own.diagnostics, ...libraries.diagnostics], problems, unreached: libraries.unreached, libraries: libraries.followed, settings: replaced.lines, exports: exported.lines, islandOnly: own.islandOnly, mounts, locales: served.settings ? localePrefixes(served.settings) : [] }
+  return { files: tree.shadows, written: tree.changed, diagnostics: [...own.diagnostics, ...libraries.diagnostics], problems, unreached: libraries.unreached, libraries: libraries.followed, settings: replaced.lines, exports: exported.lines, islandOnly: own.islandOnly, mounts, locales: served.settings ? localePrefixes(served.settings) : [] }
 }
 
 function shadowTree(dir: string): ShadowTree {
   const shadows = new Map<string, ShadowFile>()
   const written = new Set<string>()
+  const changed = new Set<string>()
   const write = async (path: string, text: string) => {
     const file = resolve(dir, path)
 
     written.add(file)
-    await writeIfChanged(file, text)
+
+    if (await writeIfChanged(file, text))
+      changed.add(file)
   }
 
   return {
     shadows,
+    changed,
     write,
     shadow: async (shadow, path) => {
       shadows.set(path, shadow)

@@ -652,6 +652,41 @@ describe('kay lsp for a client that supports diagnostic refreshes', () => {
 })
 
 // In process, holding the debounce's timer, so the test ends each quiet spell itself and no publish has a clock to beat.
+describe('kay lsp framing', () => {
+  it('reads a message that comes in many small chunks, and several in one, whole', async () => {
+    const encoder = new TextEncoder()
+    const big = JSON.stringify({ jsonrpc: '2.0', method: 'big', params: { text: 'é'.repeat(4_000_000) } })
+    const small = JSON.stringify({ jsonrpc: '2.0', method: 'small', params: { n: 1 } })
+    const frame = (body: string) => `Content-Length: ${Buffer.byteLength(body)}\r\n\r\n${body}`
+    const bytes = encoder.encode(frame(big) + frame(small) + frame(small))
+    const received: string[] = []
+    const { promise, resolve } = Promise.withResolvers<void>()
+    const connection = new Connection(new ReadableStream<Uint8Array>({
+      start(controller) {
+        // Cut anywhere, inside a character and a header too.
+        for (let at = 0; at < bytes.length; at += 997)
+          controller.enqueue(bytes.slice(at, at + 997))
+        controller.close()
+      },
+    }), () => undefined)
+
+    connection.onNotification<{ text?: string }>('big', ({ text }) => received.push(`big ${text?.length}`))
+    connection.onNotification('small', () => {
+      received.push('small')
+
+      if (received.length === 3)
+        resolve()
+    })
+
+    const started = performance.now()
+
+    await promise
+    expect(received).toEqual(['big 4000000', 'small', 'small'])
+    // Joining the chunks again with each one took seconds at this size.
+    expect(performance.now() - started).toBeLessThan(2000)
+  })
+})
+
 describe('kay lsp debouncing its diagnostics', () => {
   it('publishes the first change after a quiet spell at once, and a burst once its spell ends, without the versions between', async () => {
     const dir = await scratchDir('lsp-debounce-')
@@ -737,6 +772,62 @@ describe('kay lsp debouncing its diagnostics', () => {
     }
     finally {
       timers.mockRestore()
+      // `exit` would end the test run too.
+      const { tsgo } = server as unknown as { tsgo?: { process: { kill: () => void } } }
+
+      tsgo?.process.kill()
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('kay lsp on a save', () => {
+  it('writes the shadow tree once for the save notice and the watcher event, and tells tsgo of the shadow files that changed alone', async () => {
+    const dir = await scratchDir('lsp-save-')
+    const page = 'src/routes/a.kay'
+    const other = 'src/routes/b.kay'
+    const encoder = new TextEncoder()
+    const toServer = new TransformStream<Uint8Array>()
+    const toClient = new TransformStream<Uint8Array>()
+    const writeToServer = toServer.writable.getWriter()
+    const writeToClient = toClient.writable.getWriter()
+    const client = new Connection(toClient.readable, (data) => {
+      void writeToServer.write(encoder.encode(data))
+    })
+    const server = new KayLanguageServer(new Connection(toServer.readable, (data) => {
+      void writeToClient.write(encoder.encode(data))
+    }))
+    const writes = spyOn(server as unknown as { writeShadows: () => Promise<unknown[]> }, 'writeShadows')
+
+    await Promise.all([Bun.write(join(dir, 'tsconfig.json'), await Bun.file(join(fixtures, 'site/tsconfig.json')).text()), Bun.write(join(dir, page), 'p x\n'), Bun.write(join(dir, other), 'p y\n')])
+
+    try {
+      const uri = pathToFileURL(join(dir, page)).href
+
+      await client.request('initialize', { processId: process.pid, rootUri: pathToFileURL(dir).href, capabilities: {} })
+      client.notify('initialized', {})
+      client.notify('textDocument/didOpen', { textDocument: { uri, languageId: 'kay', version: 1, text: 'p x\n' } })
+      await Bun.sleep(300)
+      writes.mockClear()
+
+      const tsgo = (server as unknown as { tsgo: { connection: Connection } }).tsgo.connection
+      const told: string[][] = []
+      const notify = spyOn(tsgo, 'notify').mockImplementation((method: string, params?: unknown) => {
+        if (method === 'workspace/didChangeWatchedFiles')
+          told.push((params as { changes: { uri: string }[] }).changes.map(change => change.uri))
+      })
+
+      await Bun.write(join(dir, page), 'p changed\n')
+      client.notify('textDocument/didSave', { textDocument: { uri } })
+      client.notify('workspace/didChangeWatchedFiles', { changes: [{ uri, type: 2 }] })
+      await Bun.sleep(500)
+      notify.mockRestore()
+
+      expect(writes).toHaveBeenCalledTimes(1)
+      expect(told).toHaveLength(1)
+      expect(told[0]!.filter(changed => changed.endsWith('.kay.tsx'))).toEqual([pathToFileURL(join(dir, '.kay/types', `${page}.tsx`)).href])
+    }
+    finally {
       // `exit` would end the test run too.
       const { tsgo } = server as unknown as { tsgo?: { process: { kill: () => void } } }
 
