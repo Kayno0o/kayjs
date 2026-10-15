@@ -17,6 +17,21 @@ describe('signals', () => {
     expect(count()).toBe(20)
   })
 
+  it('are tracked once by a memo reading them more than once, whatever their number', () => {
+    const all = Array.from({ length: 500 }, (_, index) => signal(index))
+    let runs = 0
+    const total = memo(() => {
+      runs++
+
+      return all.reduce((sum, one) => sum + one() + one(), 0)
+    })
+
+    expect(total()).toBe(2 * (499 * 500 / 2))
+    all[3]!.set(10)
+    expect(total()).toBe(2 * (499 * 500 / 2) + 14)
+    expect(runs).toBe(2)
+  })
+
   it('skip a write of the same value, unless equals is false', () => {
     const plain = signal(1)
     const always = signal(1, { equals: false })

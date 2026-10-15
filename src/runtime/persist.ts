@@ -5,6 +5,9 @@ import { createSignal, currentServerScope, isHydrating, untrack, whenHydrated } 
 import { sendValue } from './send'
 import { decodeValue } from './wire'
 
+// Defined by the browser build, which never renders on the server: tested where it is read, so the bundler drops the server's code.
+declare const KAY_BROWSER: true | undefined
+
 export type PersistStorage = 'cookie' | 'local' | 'query'
 
 export interface Persisted<T> {
@@ -45,7 +48,7 @@ export function keepValue<T>(key: string, storage: Exclude<PersistStorage, 'quer
 
 // A signal kept in `store`, around its own `read` and `write`: the browser writes what the store holds into it as it starts, or on its first read once hydrated, then keeps each value written.
 export function keep<T>(store: Store<T>, read: () => T, write: (value: T) => void): Persisted<T> {
-  if (typeof document === 'undefined')
+  if (typeof KAY_BROWSER === 'undefined' && typeof document === 'undefined')
     return serverSide(store.request, read)
 
   const load = () => {

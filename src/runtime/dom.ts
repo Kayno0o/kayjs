@@ -503,16 +503,14 @@ export function insert(element: Node | null, start: Node | null, end: Node | nul
         removeUnit(unit)
     }
 
-    // From the end, so a kept unit already followed by its place stays where it is, its nodes not moved.
-    let before = region.end
+    // Each unit goes before the first node not yet placed, unless already there, so a kept unit is not moved.
+    let at = region.start ? region.start.nextSibling : region.element!.firstChild
 
-    for (let index = next.length - 1; index >= 0; index--) {
-      const unit = next[index]!
-
-      if (lastOf(unit).nextSibling !== before || firstOf(unit).parentNode !== region.parent)
-        region.insert(unit, before)
-
-      before = firstOf(unit)
+    for (const unit of next) {
+      if (firstOf(unit) === at)
+        at = lastOf(unit).nextSibling
+      else
+        region.insert(unit, at)
     }
 
     current = next
@@ -662,12 +660,11 @@ export function loop<T>(element: Node | null, start: Node | null, end: Node | nu
 
       // Made on the first read, as most rows never read their index.
       if (key !== false) {
-        let latest = index
         let signal: ReturnType<typeof createSignal<number>> | undefined
 
-        readIndex = () => (signal ??= createSignal(latest))[0]()
+        readIndex = () => (signal ??= createSignal(index))[0]()
         setIndex = (next) => {
-          latest = next
+          index = next
           signal?.[1](next)
         }
       }
@@ -1194,18 +1191,12 @@ export function dispatch(event: Event): void {
   const key = `$$${event.type}`
   let node = (event.composedPath?.()[0] ?? event.target) as Node | null
 
-  let defined = false
-
   while (node) {
     const handler = (node as unknown as Record<string, unknown>)[key] as ((event: Event) => void) | undefined
 
     if (handler && !(node as unknown as { disabled?: boolean }).disabled) {
-      // Only once a handler runs, as most events on a page reach none.
-      if (!defined) {
-        defined = true
-        Object.defineProperty(event, 'currentTarget', { configurable: true, get: () => node ?? document })
-      }
-
+      // Defined only where a handler runs, as most events on a page reach none.
+      Object.defineProperty(event, 'currentTarget', { configurable: true, get: () => node ?? document })
       handler.call(node, event)
 
       if (event.cancelBubble)

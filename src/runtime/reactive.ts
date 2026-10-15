@@ -80,6 +80,9 @@ interface Interceptor {
   undone?: ((node: SignalNode<unknown>, from: unknown, to: unknown) => void) | undefined
 }
 
+// Defined by the browser build, which never renders on the server: tested where it is read, so the bundler drops the server's code.
+declare const KAY_BROWSER: true | undefined
+
 let owner: Owner | undefined
 let listener: Computation | undefined
 let renderQueue: Computation[] = []
@@ -99,7 +102,7 @@ let afterHydration: (() => void)[] = []
 const defaultEquals = <T>(previous: T, next: T) => previous === next
 
 export function createSignal<T>(value: T, options?: InternalSignalOptions<T>): [read: () => T, write: (next: T) => void] {
-  const node: SignalNode<T> = { value, observers: undefined, equals: options?.equals ?? defaultEquals, shared: serverRendering === 0 }
+  const node: SignalNode<T> = { value, observers: undefined, equals: options?.equals ?? defaultEquals, shared: typeof KAY_BROWSER === 'undefined' && serverRendering === 0 }
 
   if (interceptor?.created)
     node.value = interceptor.created(node as SignalNode<unknown>) as T
@@ -107,18 +110,25 @@ export function createSignal<T>(value: T, options?: InternalSignalOptions<T>): [
   const read = () => {
     track(node)
 
-    const values = scopedValues(node)
+    if (typeof KAY_BROWSER === 'undefined') {
+      const values = scopedValues(node)
 
-    return values?.has(node) ? values.get(node) as T : node.value
+      if (values?.has(node))
+        return values.get(node) as T
+    }
+
+    return node.value
   }
 
   const write = (next: T) => {
-    const values = scopedValues(node)
+    if (typeof KAY_BROWSER === 'undefined') {
+      const values = scopedValues(node)
 
-    if (values) {
-      values.set(node, next)
+      if (values) {
+        values.set(node, next)
 
-      return
+        return
+      }
     }
 
     if (node.equals !== false && node.equals(node.value, next))
@@ -384,7 +394,7 @@ export function hydrationEnded(): void {
 // A derived value, computed when read and cached until what it read changes.
 export function memo<T>(fn: () => T, options?: SignalOptions<T>): () => T {
   const node = computation(fn, undefined, options?.equals ?? defaultEquals)
-  const shared = serverRendering === 0
+  const shared = typeof KAY_BROWSER === 'undefined' && serverRendering === 0
 
   node.state = DIRTY
 
@@ -404,7 +414,7 @@ export function memo<T>(fn: () => T, options?: SignalOptions<T>): () => T {
 
 // Runs `fn` once the current render is done, then again whenever what it read changes; never on the server.
 export function effect(fn: () => void): void {
-  if (serverRendering > 0)
+  if (typeof KAY_BROWSER === 'undefined' && serverRendering > 0)
     return
 
   const node = computation(fn, 'user', false)
@@ -525,13 +535,11 @@ function track(source: Source): void {
   if (!listener)
     return
 
-  const sources = listener.sources
-
-  // A source read again in the same run is already there, most often as the last one read.
-  if (sources[sources.length - 1] === source || sources.includes(source))
+  // A source read again in the same run already has the listener among its observers, which every run starts afresh.
+  if (source.observers?.has(listener))
     return
 
-  sources.push(source)
+  listener.sources.push(source)
   ;(source.observers ??= new Set()).add(listener)
 }
 

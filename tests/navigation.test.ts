@@ -385,7 +385,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
       Object.defineProperty(Element.prototype, 'outerHTML', { ...original, get(this: Element) {
         counts.html++
 
-        return original.get!.call(this)
+        return original.get!.call(this) as string
       } })
       ;(window as { counts?: typeof counts }).counts = counts
     })

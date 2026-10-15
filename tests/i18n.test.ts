@@ -701,6 +701,39 @@ describe('in the browser', () => {
       await GlobalRegistrator.unregister()
     }
   })
+
+  it('shares one timer between the relative times of a pace', async () => {
+    GlobalRegistrator.register({ url: 'http://localhost/en' })
+    jest.useFakeTimers({ now: 1_010_000 })
+    const { flush, root } = await import('../src/runtime')
+
+    try {
+      const { relativeTime } = await import('../src/runtime/i18n.client')
+
+      document.body.innerHTML = '<script type="application/json" data-kay-i18n>{"locale":"en","messages":{},"now":1000000}</script>'
+
+      const counts: number[] = []
+      const [stopFirst, stopSecond] = [0, 1].map(() => root((dispose) => {
+        relativeTime(() => 970_000)()
+        flush()
+
+        return dispose
+      }))
+
+      counts.push(jest.getTimerCount())
+      jest.advanceTimersByTime(1000)
+      stopFirst!()
+      counts.push(jest.getTimerCount())
+      stopSecond!()
+      counts.push(jest.getTimerCount())
+      expect(counts).toEqual([1, 1, 0])
+    }
+    finally {
+      flush()
+      jest.useRealTimers()
+      await GlobalRegistrator.unregister()
+    }
+  })
 })
 
 // CI installs Chromium for this: there, a missing browser fails rather than skipping.

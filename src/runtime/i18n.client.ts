@@ -136,12 +136,40 @@ export function relativeTime(value: () => Date | number, options?: Intl.Relative
     if (!tabVisible())
       return
 
-    const timer = setInterval(() => setNow(Date.now()), pace())
-
-    onCleanup(() => clearInterval(timer))
+    onCleanup(onTick(pace(), () => setNow(Date.now())))
   })
 
   return memo(() => formatRelativeTime(value(), { ...options, now: now() }))
+}
+
+const tickers = new Map<number, { listeners: Set<() => void>, timer: ReturnType<typeof setInterval> }>()
+
+// Calls `run` every `pace` milliseconds on a timer the relative times of that pace share; gives what stops it.
+function onTick(pace: number, run: () => void): () => void {
+  let ticker = tickers.get(pace)
+
+  if (!ticker) {
+    const listeners = new Set<() => void>()
+
+    ticker = { listeners, timer: setInterval(() => {
+      for (const listener of listeners)
+        listener()
+    }, pace) }
+    tickers.set(pace, ticker)
+  }
+
+  const { listeners, timer } = ticker
+
+  listeners.add(run)
+
+  return () => {
+    listeners.delete(run)
+
+    if (listeners.size === 0) {
+      clearInterval(timer)
+      tickers.delete(pace)
+    }
+  }
 }
 
 function tickPace(seconds: number): number {

@@ -792,6 +792,8 @@ function announce(text: string): void {
   }, 50)
 }
 
+const transitionSheets = new WeakMap<CSSStyleSheet, { length: number, names: boolean }>()
+
 // The page's stylesheets opt in with `@view-transition { navigation: auto; }`, as for full loads. A visitor asking for less motion gets none.
 function viewTransitions(): boolean {
   if (!('startViewTransition' in document) || matchMedia(REDUCED_MOTION).matches)
@@ -821,8 +823,6 @@ function viewTransitions(): boolean {
 
   return false
 }
-
-const transitionSheets = new WeakMap<CSSStyleSheet, { length: number, names: boolean }>()
 
 function namesTransition(rules: CSSRuleList): boolean {
   for (const rule of rules) {
