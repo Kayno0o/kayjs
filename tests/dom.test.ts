@@ -1760,7 +1760,7 @@ describe('a form submitted in the browser', () => {
 })
 
 describe('shortcut', () => {
-  const mountShortcuts = site({ 'main.kay': '---\nimport { shortcut, signal } from \'kay\'\n\nconst log = signal<string[]>([])\nlet form: HTMLElement | undefined\n\nlet missing: HTMLElement | undefined\nconst armed = signal(false)\nconst note = (name: string) => () => log.set([...log(), name])\n\nshortcut(\'mod+s\', note(\'save\'))\nshortcut(\'/\', note(\'slash\'))\nshortcut(\'escape\', note(\'escape\'))\nshortcut(\'alt+s\', note(\'alt-s\'), { preventDefault: false })\nshortcut(\'mod+e\', note(\'page-e\'))\nshortcut(\'mod+e\', note(\'form-e\'), { on: () => form })\nshortcut(\'mod+r\', note(\'repeat\'), { repeat: true })\nshortcut(\'?\', note(\'help\'), { inputs: true })\nshortcut(\'arrowdown\', note(\'down\'))\nshortcut(\'enter\', note(\'enter\'))\nshortcut(() => armed() ? \'mod+g\' : null, note(\'signal\'))\nshortcut(\'mod+u\', note(\'unbound\'), { on: () => missing })\n---\nform.editor(ref={element => form = element})\n  input.field\n  div.rich(contenteditable="true")\nbutton.arm(type="button" onClick={() => armed.set(true)}) arm\np.log {log().join(\',\')}\n' })
+  const mountShortcuts = site({ 'main.kay': '---\nimport { shortcut, signal } from \'kay\'\n\nconst log = signal<string[]>([])\nlet form: HTMLElement | undefined\n\nlet missing: HTMLElement | undefined\nlet panel: HTMLElement | undefined\nconst armed = signal(false)\nconst note = (name: string) => () => log.set([...log(), name])\n\nshortcut(\'mod+s\', note(\'save\'))\nshortcut(\'/\', note(\'slash\'))\nshortcut(\'escape\', note(\'escape\'))\nshortcut(\'alt+s\', note(\'alt-s\'), { preventDefault: false })\nshortcut(\'mod+e\', note(\'page-e\'))\nshortcut(\'mod+e\', note(\'form-e\'), { on: () => form })\nshortcut(\'mod+r\', note(\'repeat\'), { repeat: true })\nshortcut(\'?\', note(\'help\'), { inputs: true })\nshortcut(\'arrowdown\', note(\'down\'))\nshortcut(\'enter\', note(\'enter\'))\nshortcut(() => armed() ? \'mod+g\' : null, note(\'signal\'))\nshortcut(\'mod+u\', note(\'unbound\'), { on: () => missing })\nshortcut(() => armed() ? \'mod+k\' : null, note(\'scoped\'), { on: () => panel })\nshortcut(\'@\', note(\'at\'))\nshortcut(\'space\', note(\'space\'))\nshortcut(\'1\', note(\'one\'))\n---\nform.editor(ref={element => form = element})\n  input.field\n  div.rich(contenteditable="true")\nbutton.arm(type="button" onClick={() => armed.set(true)}) arm\nbutton.disarm(type="button" onClick={() => armed.set(false)}) disarm\naside.panel(ref={element => panel = element})\na.link(href="/x") link\np.log {log().join(\',\')}\n' })
 
   function press(target: EventTarget, key: string, init: KeyboardEventInit = {}): KeyboardEvent {
     const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...init })
@@ -1885,6 +1885,68 @@ describe('shortcut', () => {
       press(document.body, 'e', { ctrlKey: true })
       expect(press(document.body, 's', { altKey: true, code: 'KeyS', key: 'ß' }).defaultPrevented).toBe(false)
       expect(await logged(root)).toBe('form-e,page-e,alt-s')
+    }
+    finally {
+      await dispose()
+    }
+  })
+
+  it('keeps aria-keyshortcuts and the listener in step with a keys function that flips back to null', async () => {
+    const { root, dispose } = await mountShortcuts()
+
+    try {
+      const panel = root.querySelector('.panel')!
+
+      expect(panel.hasAttribute('aria-keyshortcuts')).toBe(false)
+      root.querySelector<HTMLElement>('.arm')!.click()
+      await settle()
+      expect(panel.getAttribute('aria-keyshortcuts')).toBe('Control+K')
+      press(panel, 'k', { ctrlKey: true })
+      root.querySelector<HTMLElement>('.disarm')!.click()
+      await settle()
+      expect(panel.hasAttribute('aria-keyshortcuts')).toBe(false)
+      press(panel, 'k', { ctrlKey: true })
+      expect(await logged(root)).toBe('scoped')
+    }
+    finally {
+      await dispose()
+    }
+  })
+
+  it('leaves a bare Space to a button or a link, and matches symbols and digits on another layout', async () => {
+    const { root, dispose } = await mountShortcuts()
+
+    try {
+      press(root.querySelector('.arm')!, ' ')
+      press(root.querySelector('.link')!, ' ')
+      press(document.body, ' ')
+      press(document.body, ' ', { shiftKey: true })
+      press(document.body, '/', { code: 'BracketLeft' })
+      press(document.body, '&', { code: 'Digit1' })
+      press(document.body, '1', { code: 'Numpad1' })
+      expect(await logged(root)).toBe('space,space,slash,one,one')
+    }
+    finally {
+      await dispose()
+    }
+  })
+
+  it('matches a symbol typed with AltGr, which reports Ctrl and Alt', async () => {
+    const { root, dispose } = await mountShortcuts()
+
+    try {
+      const altGraph = (init: KeyboardEventInit): KeyboardEvent => {
+        const event = new KeyboardEvent('keydown', { key: '@', bubbles: true, cancelable: true, ...init })
+
+        event.getModifierState = name => name === 'AltGraph'
+        document.body.dispatchEvent(event)
+
+        return event
+      }
+
+      altGraph({ ctrlKey: true, altKey: true })
+      altGraph({ altKey: false })
+      expect(await logged(root)).toBe('at,at')
     }
     finally {
       await dispose()

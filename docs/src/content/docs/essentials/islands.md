@@ -173,7 +173,7 @@ form(ref={element => form = element} onSubmit={event => event.preventDefault()})
   input(aria-label="Title")
 ```
 
-Without `on` the shortcut binds the whole page. It cancels the browser's own action for the key, ignores IME composition and a held key, and does nothing on the server. A shortcut with `mod`, `ctrl`, `meta` or `alt` fires in a text field too, a bare key such as `/` or `arrowdown` only with `{ inputs: true }`, `escape` and the function keys aside. Of two bindings on one key the innermost wins. An element-scoped shortcut sets `aria-keyshortcuts` on its element.
+Without `on` the shortcut binds the whole page. It cancels the browser's own action for the key, ignores IME composition and a held key, and does nothing on the server. A shortcut with `mod`, `ctrl`, `meta` or `alt` fires in a text field too, a bare key such as `/` or `arrowdown` only with `{ inputs: true }`, `escape` and the function keys aside. Of two bindings on one key the innermost wins. An element-scoped shortcut sets `aria-keyshortcuts` on its element. Shift does not tell a symbol key apart (`shift+?` and `?` are one binding, and so are `space` and `shift+space`), and a symbol typed with AltGr, such as `@` on some layouts, matches without `ctrl` or `alt`.
 
 ## A page kay does not serve
 

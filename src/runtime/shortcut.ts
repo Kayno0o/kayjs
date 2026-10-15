@@ -124,7 +124,10 @@ function bind(parsed: Parsed, target: EventTarget, scope: Element | undefined, h
     if (press.defaultPrevented || press.isComposing || press.keyCode === 229 || (press.repeat && !options.repeat))
       return
 
-    if (press.ctrlKey !== parsed.ctrl || press.metaKey !== parsed.meta || press.altKey !== parsed.alt || (!parsed.symbol && press.shiftKey !== parsed.shift) || !pressed(press, parsed.key))
+    // AltGr is reported as Ctrl+Alt on Windows and Linux, so a symbol typed with it counts as no modifier.
+    const altGr = parsed.symbol && !parsed.ctrl && !parsed.alt && press.getModifierState?.('AltGraph') === true
+
+    if ((press.ctrlKey && !altGr) !== parsed.ctrl || press.metaKey !== parsed.meta || (press.altKey && !altGr) !== parsed.alt || (!parsed.symbol && press.shiftKey !== parsed.shift) || !pressed(press, parsed.key))
       return
 
     if (options.inputs !== true && !parsed.ctrl && !parsed.meta && !parsed.alt && !PASSES.test(parsed.key) && editable(press, parsed.key))
