@@ -395,12 +395,12 @@ export function errorMessages(nodes: Node[], source: string): ErrorMessages {
   return found
 }
 
-// The id of the error a refused field, or the form for `''`, is described by, and the template's own static `aria-describedby`, which then renders through this alone; nothing for a value the template binds.
+// The id of the error a refused field, or the form for `''`, is described by, and the template's own static `aria-describedby`, which then renders through this alone; nothing for a value the template binds, or one already naming the error.
 export function describedByOf(element: ElementNode, source: string, errors: ErrorMessages | undefined, action: Span, field: string): { id: string, own?: string } | undefined {
   const id = errors?.describing.get(errorKey(source.slice(action.start, action.end), field))
   const own = element.attributes.find((attribute): attribute is NamedAttribute => attribute.kind !== 'spread' && source.slice(attribute.name.start, attribute.name.end) === 'aria-describedby')
 
-  if (id === undefined || (own !== undefined && own.kind !== 'static'))
+  if (id === undefined || (own !== undefined && (own.kind !== 'static' || own.text.split(WHITESPACE).includes(id))))
     return undefined
 
   return own ? { id, own: own.text } : { id }

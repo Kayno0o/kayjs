@@ -39,4 +39,42 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('FormField 
       await site.close()
     }
   }, 120_000)
+
+  test('keeps its hint beside the message of a refused post once the island hydrates, and as the field turns valid and refused again', async () => {
+    const site = await testSite({ root: ROOT, browser: { path } })
+
+    try {
+      const page = await site.open('/described-form')
+      const read = async () => page.evaluate(() => {
+        const input = document.querySelector('#claim input[name="handle"]')!
+
+        return { described: input.getAttribute('aria-describedby'), hint: document.querySelector('.kui-form-field-hint')!.id }
+      })
+
+      await page.fill('#claim input[name="handle"]', 'ab')
+      await page.click('#post')
+      await page.waitFor('#claim-handle-error')
+      // A click the island answers tells it hydrated.
+      await page.click('#bump')
+      await page.waitFor('#bump', { text: '1' })
+
+      const refused = await read()
+
+      expect(refused.described?.split(' ').toSorted()).toEqual(['claim-handle-error', refused.hint].toSorted())
+
+      await page.click('#accept')
+      await page.waitUntil(() => document.querySelector('#claim-handle-error') === null)
+
+      expect((await read()).described).toBe(refused.hint)
+
+      await page.click('#refuse')
+      await page.waitUntil(() => document.querySelector('#claim-handle-error') !== null)
+
+      expect((await read()).described).toBe(`${refused.hint} claim-handle-error`)
+      expect(page.errors).toEqual([])
+    }
+    finally {
+      await site.close()
+    }
+  }, 120_000)
 })

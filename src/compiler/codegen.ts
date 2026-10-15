@@ -1,4 +1,4 @@
-import type { ConstNode, ElementNode, KayFile, Node, Span, TemplateFacts, TemplateHelper } from './ast'
+import type { ConstNode, ElementNode, ErrorMessages, KayFile, Node, Span, TemplateFacts, TemplateHelper } from './ast'
 import type { Rewrite } from './mapping'
 import type { PageSettingName } from './page-settings'
 import type { Sites } from './rewrite'
@@ -144,8 +144,9 @@ class ModuleShell {
 
   run(): Generated {
     const { head, hoisted, template } = this.splitHead(this.file.template)
+    const errors = this.runs ? errorMessages(template, this.src) : undefined
 
-    this.imports(head !== undefined)
+    this.imports(head !== undefined, errors)
 
     if (this.fence)
       this.emitLoad(this.fence)
@@ -164,13 +165,13 @@ class ModuleShell {
       this.emitHead(head)
 
     this.b.add('\nreturn ')
-    this.template(template)
+    this.template(template, errors)
     this.exports()
 
     return { builder: this.b, sites: this.sites }
   }
 
-  private imports(head: boolean): void {
+  private imports(head: boolean, errors: ErrorMessages | undefined): void {
     const { b, script, server, fence, facts, mode } = this
     // What the fences use from `kay` unimported, as they use `props<T>()`; a name the other fence of the same module imports needs no import.
     const imported = new Set([...script.imports, ...fence?.imports ?? []].map(binding => binding.local))
@@ -213,7 +214,7 @@ class ModuleShell {
       kayHelpers.push('formValue', 'formChecked', 'formInvalid', 'formError')
 
     // An island toggles a refused field's message in its description, beside the ids a component wrote there.
-    if (mode === 'dom' && facts.actionForm)
+    if (mode === 'dom' && errors !== undefined && errors.describing.size > 0)
       kayHelpers.push('formDescribed')
 
     if (mode === 'html' && facts.actionForm)
@@ -312,10 +313,9 @@ class ModuleShell {
   }
 
   // What the component returns, through the writer of the mode, closing its function.
-  private template(nodes: Node[]): void {
+  private template(nodes: Node[], errors: ErrorMessages | undefined): void {
     const { b, src, mode } = this
     const visible = nodes.filter(node => node.kind !== 'slot')
-    const errors = this.runs ? errorMessages(nodes, src) : undefined
     const located = this.options.inspect === true ? sourceLocator(src, this.options.moduleId) : undefined
 
     if (mode === 'html') {

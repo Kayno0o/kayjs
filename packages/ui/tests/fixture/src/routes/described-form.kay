@@ -1,0 +1,31 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+export const claim = action(t.Object({ handle: t.String({ minLength: 3, maxLength: 40, error: 'Three letters at least' }) }), () => undefined)
+--- script
+import { signal } from 'kay'
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+
+// A signal makes the page an island, which hydrates over the ids the server wrote.
+const bumped = signal(0)
+
+async function send(handle: string) {
+  try {
+    await claim({ handle }, { refresh: false })
+  }
+  catch {
+    // What the call was refused for shows through claim.error.
+  }
+}
+---
+main
+  form#claim(action={claim})
+    FormField(label="Handle" hint="As it shows on your profile")
+      input(name="handle")
+    if claim.error('handle') as message
+      p {message}
+    button#post(formnovalidate) Claim
+  button#bump(type="button" onClick={() => bumped.set(1)}) {bumped()}
+  button#accept(type="button" onClick={() => void send('abcd')}) Accept
+  button#refuse(type="button" onClick={() => void send('ab')}) Refuse

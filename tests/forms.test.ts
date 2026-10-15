@@ -5,6 +5,7 @@ import process from 'node:process'
 import { describe, expect, it, spyOn } from 'bun:test'
 import { chromium } from 'playwright-core'
 import { compileKay } from '../src/compiler'
+import { formDescribed } from '../src/runtime/action'
 import { browserPath, testSite } from '../src/test'
 
 // The islands built for the island form's tests, which load pages in Chromium only once they open one.
@@ -172,6 +173,57 @@ describe('the messages a refused form is described by', () => {
     expect(tsx).toMatch(/KayFormDescribed\(\w+, \(add\), "", "own-form"\)/)
     expect(tsx).toContain('<p id=\\"add-tag-error\\">')
     expect(tsx).not.toContain('KayFormInvalid((add), "slug") ?')
+  })
+
+  it('leaves a description of the field\'s own already naming the message as written, on the server and in an island', () => {
+    const source = 'form(action={add})\n  input(name="title" aria-describedby="note title-problem")\n  if add.error(\'title\')\n    p#title-problem {add.error(\'title\')}\n'
+    const html = compileKay(source, 'page.kay', { output: 'html' }).tsx
+    const dom = compileKay(source, 'page.kay', { output: 'dom' }).tsx
+
+    expect(html).not.toContain('title-problem title-problem')
+    expect(html).not.toContain('KayFormInvalid((add), "title") ?')
+    expect(dom).toContain('aria-describedby=\\"note title-problem\\"')
+    expect(dom).not.toContain('KayFormDescribed(')
+  })
+
+  it('imports the island\'s description helper only for a form whose messages describe its fields', () => {
+    expect(compileKay('form(action={add})\n  input(name="title")\n', 'page.kay', { output: 'dom' }).tsx).not.toContain('formDescribed')
+    expect(compileKay('form(action={add})\n  input(name="title")\n  p {add.error(\'title\')}\n', 'page.kay', { output: 'dom' }).tsx).toContain('formDescribed as KayFormDescribed')
+  })
+
+  it('adds and removes the message\'s id alone, keeping the other ids in their order', () => {
+    const attributes = new Map<string, string>()
+    const element = {
+      getAttribute: (name: string) => attributes.get(name) ?? null,
+      setAttribute: (name: string, value: string) => void attributes.set(name, value),
+      removeAttribute: (name: string) => void attributes.delete(name),
+    } as unknown as Element
+    let errors: Record<string, string> = {}
+    const target = Object.assign(() => undefined, { [Symbol.for('kay.action')]: true, error: (field: string) => errors[field] })
+
+    formDescribed(element, target, 'title', 'title-error')
+    expect(attributes.has('aria-describedby')).toBe(false)
+
+    errors = { title: 'Too short' }
+    formDescribed(element, target, 'title', 'title-error')
+    expect(attributes.get('aria-describedby')).toBe('title-error')
+
+    attributes.set('aria-describedby', 'note  title-error hint')
+    formDescribed(element, target, 'title', 'title-error')
+    expect(attributes.get('aria-describedby')).toBe('note  title-error hint')
+
+    errors = {}
+    formDescribed(element, target, 'title', 'title-error')
+    expect(attributes.get('aria-describedby')).toBe('note hint')
+
+    attributes.set('aria-describedby', 'title-error title-error')
+    formDescribed(element, target, 'title', 'title-error')
+    expect(attributes.has('aria-describedby')).toBe(false)
+
+    errors = { title: 'Too short' }
+    attributes.set('aria-describedby', 'hint')
+    formDescribed(element, target, 'title', 'title-error')
+    expect(attributes.get('aria-describedby')).toBe('hint title-error')
   })
 })
 
