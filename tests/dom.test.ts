@@ -577,6 +577,117 @@ describe('loops', () => {
     }
   })
 
+  const mountPlain = site({
+    'main.kay': `---
+import { signal } from 'kay'
+
+interface Row { text: string }
+
+const rows = signal<Row[]>([{ text: 'a' }, { text: 'b' }, { text: 'c' }, { text: 'b' }])
+;(globalThis as { rows?: typeof rows }).rows = rows
+---
+ul
+  for row, at of rows()
+    li
+      input(value={row.text} onInput={event => rows.set(rows().map((other, index) => index === at ? { ...other, text: event.currentTarget.value } : other))})
+`,
+  })
+
+  const plainRows = async () => {
+    const mounted = await mountPlain()
+    const rows = (globalThis as unknown as { rows: { (): { text: string }[], set: (next: { text: string }[]) => void } }).rows
+    const inputs = () => [...mounted.root.querySelectorAll('input')]
+
+    return { ...mounted, rows, inputs, values: () => inputs().map(input => input.value) }
+  }
+
+  it('keep the nodes and the focus of rows of plain objects edited immutably, whether one is edited, removed or inserted', async () => {
+    const { rows, inputs, values, dispose } = await plainRows()
+
+    try {
+      const [a, b, c, d] = inputs()
+
+      // A row typed in is a copy, and stays the same input, focused.
+      a!.focus()
+      a!.value = 'aa'
+      a!.dispatchEvent(new Event('input', { bubbles: true }))
+      await settle()
+      expect(inputs()).toEqual([a!, b!, c!, d!])
+      expect(document.activeElement).toBe(a!)
+      expect(values()).toEqual(['aa', 'b', 'c', 'b'])
+
+      // The same for the last row, and one in the middle.
+      for (const input of [d!, c!]) {
+        input.value += '!'
+        input.dispatchEvent(new Event('input', { bubbles: true }))
+        await settle()
+      }
+
+      expect(inputs()).toEqual([a!, b!, c!, d!])
+      expect(values()).toEqual(['aa', 'b', 'c!', 'b!'])
+
+      // A middle row removed, the focused one after it keeps its caret.
+      c!.focus()
+      c!.setSelectionRange(1, 1)
+      rows.set(rows().filter((_, index) => index !== 1))
+      await settle()
+      expect(inputs()).toEqual([a!, c!, d!])
+      expect(document.activeElement).toBe(c!)
+      expect(c!.selectionStart).toBe(1)
+
+      // Removing the first and the last in one update.
+      rows.set(rows().slice(1, -1))
+      await settle()
+      expect(inputs()).toEqual([c!])
+
+      // Inserted in the middle and at both ends, equal rows included.
+      rows.set([{ text: 'x' }, rows()[0]!, { text: 'x' }, { text: 'x' }])
+      await settle()
+      expect(inputs()).toHaveLength(4)
+      expect(inputs()[1]).toBe(c)
+      expect(values()).toEqual(['x', 'c!', 'x', 'x'])
+    }
+    finally {
+      await dispose()
+    }
+  })
+
+  it('pair copies with the rows left in their place, one edit and one removal at once, a reorder, and a list copied whole', async () => {
+    const { rows, inputs, values, dispose } = await plainRows()
+
+    try {
+      const [a, , c, d] = inputs()
+
+      // Row 1 removed and row 3 edited in the same update: each in its own gap.
+      rows.set([rows()[0]!, rows()[2]!, { text: 'D' }])
+      await settle()
+      expect(inputs()).toEqual([a!, c!, d!])
+      expect(values()).toEqual(['a', 'c', 'D'])
+
+      // Reordered rows are still matched by themselves.
+      const [first, second, third] = rows()
+
+      rows.set([third!, first!, second!])
+      await settle()
+      expect(inputs()).toEqual([d!, a!, c!])
+
+      // Every row a copy: matched by position.
+      rows.set(rows().map(row => ({ ...row, text: `${row.text}!` })))
+      await settle()
+      expect(inputs()).toEqual([d!, a!, c!])
+      expect(values()).toEqual(['D!', 'a!', 'c!'])
+
+      // The first row replaced by a new object.
+      rows.set([{ text: 'new' }, ...rows().slice(1)])
+      await settle()
+      expect(inputs()).toEqual([d!, a!, c!])
+      expect(values()).toEqual(['new', 'a!', 'c!'])
+    }
+    finally {
+      await dispose()
+    }
+  })
+
   const mount16 = site({
     'rows.kay': '---\nimport type { JSX } from \'kay\'\n\nconst { items, row } = props<{ items: { id: number, label: string }[], row: (label: string) => JSX.Element }>()\n---\nfor item of items key={item.id}\n  | {row(item.label)}\n',
     'main.kay': '---\nimport { signal } from \'kay\'\nimport Rows from \'./rows.kay\'\n\nconst list = signal([{ id: 1, label: \'a\' }])\n;(globalThis as { relabel?: () => void }).relabel = () => list.set([{ id: 1, label: \'b\' }])\n---\nRows(items={list()})\n  @row(label)\n    input(name={label})\n',

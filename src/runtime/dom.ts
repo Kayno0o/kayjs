@@ -778,6 +778,7 @@ function keyedRows<T>(region: Region, previous: Row[], list: readonly T[], key: 
 
   const after = firstNode(previous, oldEnd) ?? region.end
   const byKey = new Map<unknown, Row>()
+  const oldAt = new Map<Row, number>()
 
   for (let index = start; index < oldEnd; index++) {
     const row = previous[index]!
@@ -788,16 +789,36 @@ function keyedRows<T>(region: Region, previous: Row[], list: readonly T[], key: 
       removeRow(twin)
 
     byKey.set(row.key, row)
+    oldAt.set(row, index)
   }
 
-  const middle: Row[] = []
-  let added = 0
+  const matched: (Row | undefined)[] = []
+  // The old index of the last row matched up to each position.
+  const before: number[] = []
+  let lastAt = start - 1
 
   for (let index = start; index < newEnd; index++) {
     const row = byKey.get(keys[index])
 
     if (row) {
       byKey.delete(keys[index])
+      lastAt = oldAt.get(row)!
+    }
+
+    matched.push(row)
+    before.push(lastAt)
+  }
+
+  // A row of plain objects edited immutably comes back as copies no key matches: a copy takes the row left unmatched in its place between the rows around it, so an edit, a removal or an insertion keeps the other rows' nodes, fields and focus.
+  const replaced = key === rowKey && byKey.size > 0 ? pairCopies(keys, matched, before, byKey, oldAt, start, oldEnd) : undefined
+  const middle: Row[] = []
+  let added = 0
+
+  for (let index = start; index < newEnd; index++) {
+    const row = matched[index - start] ?? replaced?.get(index)
+
+    if (row) {
+      row.key = keys[index]
       update(row, index)
       middle.push(row)
     }
@@ -827,6 +848,43 @@ function keyedRows<T>(region: Region, previous: Row[], list: readonly T[], key: 
   }
 
   return [...previous.slice(0, start), ...middle, ...previous.slice(oldEnd)]
+}
+
+// Gives each unmatched object key a row left in `byKey` that sits, in the old order, between the old rows matched around it, and takes those rows out of `byKey`.
+function pairCopies(keys: unknown[], matched: (Row | undefined)[], before: number[], byKey: Map<unknown, Row>, oldAt: Map<Row, number>, start: number, oldEnd: number): Map<number, Row> {
+  const left = [...byKey.values()]
+  const paired = new Map<number, Row>()
+  // The old index of the next matched row after each position.
+  const next: number[] = []
+  let following = oldEnd
+  let cursor = 0
+
+  for (let at = matched.length - 1; at >= 0; at--) {
+    if (matched[at])
+      following = oldAt.get(matched[at]!)!
+
+    next[at] = following
+  }
+
+  for (let at = 0; at < matched.length; at++) {
+    const key = keys[start + at]
+
+    if (matched[at] || typeof key !== 'object' || key === null)
+      continue
+
+    while (cursor < left.length && oldAt.get(left[cursor]!)! <= before[at]!)
+      cursor++
+
+    const row = left[cursor]
+
+    if (row && oldAt.get(row)! < next[at]! && typeof row.key === 'object' && row.key !== null) {
+      paired.set(start + at, row)
+      byKey.delete(row.key)
+      cursor++
+    }
+  }
+
+  return paired
 }
 
 // Takes rows out; when they are all the region holds, its whole content is cleared at once, unless a row plays its leave phase, which that would cut.
