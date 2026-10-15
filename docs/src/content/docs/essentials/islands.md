@@ -88,7 +88,7 @@ export const theme = persisted('theme', 'light')
 
 `persisted` keeps its value across pages and visits in a cookie the server reads too, so the first paint is right. `persisted('q', '', { storage: 'query' })` keeps a string in the page's URL instead, as `?q=...`, so a filter survives a reload and a shared link. `{ storage: 'local' }` keeps it in localStorage, which the server never sees: every island reading it renders the default as it hydrates, then shows the kept value. Derive from it inside the island: a memo made outside one hands an island hydrating later the kept value, which its server markup does not hold.
 
-`const current = queryParam<number>('page')` holds one param of the page's [query](/essentials/data-loading), typed as the page's `query` schema types it: `current.set(n => n + 1)` writes `?page=3`.
+`const current = queryParam<number>('page')` holds one param of the page's [query](/essentials/data-loading), typed as the page's `query` schema types it: `current.set(n => n + 1)` writes `?page=3`. The address may trail the signal by up to 200 ms while a param changes fast, such as one bound to a slider, since browsers refuse too many history writes; it is brought up to date before the page is left or navigated.
 
 <Callout type="note">
 

@@ -1,4 +1,5 @@
 import type { Persisted, Stored } from './persist'
+import { navigation } from './navigation'
 import { pageData } from './page-data'
 import { keep } from './persist'
 
@@ -92,54 +93,72 @@ function pageRules(): QueryRules | undefined {
 }
 
 // WebKit throws a SecurityError past 100 history writes in 10 s, which a slider dragged fast reaches.
-// A write goes through at once when the last one is 200 ms old, else only each param's latest value is written 200 ms after it; a refused write never throws out of `set()`.
+// Every param shares one gap: a write goes through at once when the last is 200 ms old, else the latest values wait and land in one `replaceState`. The page flushes them before it is left or navigated, and a refused write never throws out of `set()`.
 const WRITE_GAP = 200
-let lastWrite = Number.NEGATIVE_INFINITY
-// The address after kay's last write: a deferred write finding another one was navigated to, a swap or a link, is dropped.
-let lastAddress = ''
-const deferred = new Map<string, ReturnType<typeof setTimeout>>()
+const pending = new Map<string, [value: unknown, fallback: unknown]>()
+let timer: ReturnType<typeof setTimeout> | undefined
+let lastWrite = 0
+let retrying = false
 
 function saveParam(name: string, value: unknown, fallback: unknown): void {
-  clearTimeout(deferred.get(name))
-  deferred.delete(name)
+  pending.set(name, [value, fallback])
 
-  const wait = lastWrite + WRITE_GAP - Date.now()
-
-  if (wait <= 0) {
-    writeParam(name, value, fallback)
-
-    return
+  if (!navigation.flush) {
+    navigation.flush = flush
+    addEventListener('pagehide', flush)
+    addEventListener('visibilitychange', flush)
   }
 
-  deferred.set(name, setTimeout(() => {
-    deferred.delete(name)
+  if (timer === undefined) {
+    // A monotonic clock, which no change of the system's time holds a write back by.
+    const wait = lastWrite + WRITE_GAP - performance.now()
 
-    if (location.pathname + location.search === lastAddress)
-      writeParam(name, value, fallback)
-  }, wait))
+    if (wait <= 0)
+      flush()
+    else
+      timer = setTimeout(flush, wait)
+  }
 }
 
 // Takes the current history entry's place, keeping its state, which holds kay's place in history: writing as the visitor types adds no entry to go back through.
 // A list as the param repeated; nothing, blank text or the default leaves it out, so a page left as it was keeps its plain address.
-function writeParam(name: string, value: unknown, fallback: unknown): void {
+function flush(): void {
+  clearTimeout(timer)
+  timer = undefined
+
+  if (pending.size === 0)
+    return
+
   const url = new URL(location.href)
   const rules = pageRules()
-  const defaults = [rules && Object.hasOwn(rules, name) ? rules[name]!.default : undefined, fallback].filter(given => given !== undefined).map(given => JSON.stringify(given))
 
-  url.searchParams.delete(name)
+  for (const [name, [value, fallback]] of pending) {
+    const defaults = [rules && Object.hasOwn(rules, name) ? rules[name]!.default : undefined, fallback].filter(given => given !== undefined).map(given => JSON.stringify(given))
 
-  if (value != null && value !== '' && !defaults.includes(JSON.stringify(value))) {
-    for (const item of Array.isArray(value) ? value as unknown[] : [value])
-      url.searchParams.append(name, String(item))
+    url.searchParams.delete(name)
+
+    if (value != null && value !== '' && !defaults.includes(JSON.stringify(value))) {
+      for (const item of Array.isArray(value) ? value as unknown[] : [value])
+        url.searchParams.append(name, String(item))
+    }
   }
 
   try {
     history.replaceState(history.state, '', url)
+    pending.clear()
+    retrying = false
   }
   catch {
-    // Refused by the browser's limit: the address stays behind the signal until the next write.
+    // Refused by the browser's limit: tried once more after the gap, the address behind the signals until then.
+    if (retrying) {
+      pending.clear()
+      retrying = false
+    }
+    else {
+      retrying = true
+      timer = setTimeout(flush, WRITE_GAP)
+    }
   }
 
-  lastWrite = Date.now()
-  lastAddress = location.pathname + location.search
+  lastWrite = performance.now()
 }

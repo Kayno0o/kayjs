@@ -163,6 +163,8 @@ function policyOf(swap: Swap): Policy {
 }
 
 export async function go(url: URL, swap: Swap): Promise<void> {
+  navigation.flush?.()
+
   const token = ++navigation.current
 
   // Another page only: the same one with another query, or a form sending it back to itself, is not left.

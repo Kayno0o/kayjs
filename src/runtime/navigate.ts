@@ -88,6 +88,8 @@ export async function navigate(to: string | { query: QueryChanges }, options: Na
   if (typeof document === 'undefined')
     return
 
+  navigation.flush?.()
+
   // A query change keeps the path and the other params, and leaves the hash out.
   const url = new URL(typeof to === 'string' ? withBase(to) : location.pathname + location.search, location.href)
 

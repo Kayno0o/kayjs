@@ -53,6 +53,7 @@ export interface HistoryState {
 
 const SKIPPED_PATHS = /^\/(?:_kay|api)(?:\/|$)/
 const ACTION_PATH = /^\/_kay\/action\//
+const HASH = /#.*/
 const SCROLL_SAVE_MS = 150
 const LEAVE_MESSAGE = 'This page has unsaved changes. Leave it anyway?'
 
@@ -69,6 +70,8 @@ export const navigation: {
   current: number
   visits?: number
   released: boolean
+  // Lands the query param writes held back to be spaced out, which run before the address is read to leave or change it.
+  flush?: () => void
 } = { shown: '', at: 0, page: 0, current: 0, released: false }
 
 // Pages fetched ahead of a click, by URL; an action may change what they show, so each post forgets them.
@@ -107,10 +110,7 @@ function askLeave(): boolean {
 export function leave(target: URL, replace = false): void {
   navigation.released = true
 
-  if (replace)
-    location.replace(target)
-  else
-    location.assign(target)
+  location[replace ? 'replace' : 'assign'](target)
 }
 
 export function historyState(): HistoryState {
@@ -160,9 +160,7 @@ function fragment(hash: string): string {
 }
 
 export function pageKey(url: URL): string {
-  const hash = url.href.indexOf('#')
-
-  return hash === -1 ? url.href : url.href.slice(0, hash)
+  return url.href.replace(HASH, '')
 }
 
 // A page of this app: same origin, under its mount point, and none of kay's own routes or the API's.
