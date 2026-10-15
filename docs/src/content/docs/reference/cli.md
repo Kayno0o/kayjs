@@ -334,7 +334,7 @@ It speaks the revision that opens with `initialize` (`2025-11-25` and earlier) a
 
 | Tool | Does |
 | --- | --- |
-| `check` | `kay check --format json`: `{ errors, warnings, problems }`. `paths` narrows the report to files or directories of the project, `only` to a group of lints, `denyWarnings` counts warnings as failures. A problem found is a result, not an error |
+| `check` | `kay check --format json`: `{ errors, warnings, problems }`. `paths` narrows the report to files or directories of the project (`.` is all of it, and a directory holding a `package.json` is a path to report on, not a new project), `only` to a group of lints, `denyWarnings` counts warnings as failures. A problem found is a result, not an error |
 | `routes` | `kay routes --format json`: every route with its file, layouts and guards |
 | `explain` | The lints and error codes, or with `name` a lint, an error code or a group, as `kay explain --format json` |
 | `render` | `kay render` on `url`, with `method`, `body`, `headers` and `cookies`: the body, then the status line, headers and server log. A status of 400 or above is an error result that keeps the body |
