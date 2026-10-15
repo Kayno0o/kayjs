@@ -1,5 +1,5 @@
 import type { CheckOptions } from '../src/check'
-import { chmod, mkdtemp, readdir, rm, symlink, utimes } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, readdir, rm, symlink, utimes } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, join, relative, resolve } from 'node:path'
 import process from 'node:process'
@@ -1206,6 +1206,24 @@ describe.concurrent('kay check, edge cases', () => {
     }
     finally {
       await chmod(join(root, 'data-dev/postgres'), 0o700)
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('walks past a directory removed after its parent was listed, as a tool clearing its output does', async () => {
+    const root = await scratchProject({ 'src/a.kay': 'p hi\n' })
+
+    try {
+      // The walk lists every directory at once, so removing the tree as it starts catches some listed and gone.
+      for (let round = 0; round < 10; round++) {
+        await Promise.all(Array.from({ length: 50 }, async (_, index) => mkdir(join(root, 'types', `d${index}`, 'deep'), { recursive: true })))
+
+        const [found] = await Promise.all([findKayFiles(root, { project: true }), rm(join(root, 'types'), { recursive: true, force: true })])
+
+        expect(found.map(file => file.slice(root.length + 1))).toEqual(['src/a.kay'])
+      }
+    }
+    finally {
       await rm(root, { recursive: true, force: true })
     }
   })

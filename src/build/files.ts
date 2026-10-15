@@ -172,7 +172,7 @@ export async function findKayFiles(root: string, options: FindOptions = {}): Pro
 export async function findProjectFiles(root: string, matches: RegExp, { project = false, ownOnly = false, ownKayOnly = false }: FindOptions = {}): Promise<string[]> {
   const files: string[] = []
   const walk = async (dir: string) => {
-    const entries = await readable(dir)
+    const entries = await readable(dir, dir !== root)
 
     if (dir !== root && (entries.some(entry => entry.isFile() && ((ownOnly && entry.name === TSCONFIG) || (ownKayOnly && (entry.name === KAY_CONFIG || entry.name === PACKAGE)))) || await isWorktree(dir, entries)))
       return
@@ -208,13 +208,15 @@ async function isWorktree(dir: string, entries: Dirent[]): Promise<boolean> {
   }
 }
 
-// A directory the user cannot read holds nothing the project could compile: a container writes one into a repository when a service bind-mounts its data there.
-async function readable(dir: string): Promise<Dirent[]> {
+// A directory the user cannot read holds nothing the project could compile: a container writes one into a repository when a service bind-mounts its data there. Below the root, one removed since its parent was listed, as a tool clearing its output does, holds nothing either.
+async function readable(dir: string, below: boolean): Promise<Dirent[]> {
   try {
     return await readdir(dir, { withFileTypes: true })
   }
   catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== 'EACCES' && (error as NodeJS.ErrnoException).code !== 'EPERM')
+    const { code } = error as NodeJS.ErrnoException
+
+    if (code !== 'EACCES' && code !== 'EPERM' && !(below && (code === 'ENOENT' || code === 'ENOTDIR')))
       throw error
 
     return []
