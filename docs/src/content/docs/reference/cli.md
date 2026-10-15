@@ -323,7 +323,7 @@ The [Astro guide](/guides/migrating-from-astro) shows what it translates and how
 claude mcp add kay -- bunx kay mcp
 ```
 
-Serves the project in the current directory to an agent as an [MCP](https://modelcontextprotocol.io) server over stdio, so it calls kay's commands as typed tools instead of running them in a shell. Nothing is set up in the app: the agent's client starts `kay mcp` from the project's root. Another client takes the same command in its JSON config:
+Serves the project in the current directory to an agent as an [MCP](https://modelcontextprotocol.io) server over stdio, so it calls kay's commands as typed tools instead of running them in a shell. Nothing is set up in the app: the agent's client starts `kay mcp` from the project's root, where kay is installed. Another client takes the same command in its MCP config, such as `.mcp.json` at the project's root for Claude Code (a client may name the key `servers`):
 
 ```json
 { "mcpServers": { "kay": { "command": "bunx", "args": ["kay", "mcp"] } } }

@@ -36,6 +36,10 @@ class Agent {
     return reply
   }
 
+  async reply(id: number | string | null): Promise<Reply> {
+    return new Promise<Reply>(resolve => this.replies.set(id, resolve))
+  }
+
   send(message: object | string): void {
     void this.process.stdin.write(`${typeof message === 'string' ? message : JSON.stringify(message)}\n`)
     void this.process.stdin.flush()
@@ -110,6 +114,16 @@ describe.concurrent('kay mcp', () => {
     expect(refused.error?.data?.supported).toContain('2026-07-28')
   })
 
+  it('calls a tool in the revision without a handshake too, and narrows a check to a group of lints', async () => {
+    const meta = { 'io.modelcontextprotocol/protocolVersion': '2026-07-28', 'io.modelcontextprotocol/clientCapabilities': {} }
+    const { result } = await agent.request('tools/call', { name: 'check', arguments: { only: 'a11y', denyWarnings: true }, _meta: meta })
+
+    expect(result?.resultType).toBe('complete')
+    const { problems } = result?.structuredContent as { problems: { code: string }[] }
+
+    expect(problems.map(problem => problem.code)).toContain('missing-alt')
+  })
+
   it('lists its tools with a schema each', async () => {
     const { result } = await agent.request('tools/list')
     const tools = result?.tools as { name: string, inputSchema: { type: string }, annotations: object }[]
@@ -132,8 +146,15 @@ describe.concurrent('kay mcp', () => {
   })
 
   it('refuses a path outside the project or one that is no file, and an argument of the wrong kind', async () => {
-    for (const paths of [['../outside'], ['missing.kay'], ['/etc'], [3], 'src'])
-      expect((await agent.request('tools/call', { name: 'check', arguments: { paths } })).error?.code).toBe(-32602)
+    // An argument the model got wrong is a result it can read and retry, not a protocol error.
+    for (const paths of [['../outside'], ['missing.kay'], ['/etc'], [3], 'src']) {
+      const reply = await agent.request('tools/call', { name: 'check', arguments: { paths } })
+
+      expect(reply.error).toBeUndefined()
+      expect(reply.result?.isError).toBe(true)
+    }
+
+    expect((await agent.request('tools/call', { name: 'check', arguments: { only: '--help' } })).result?.isError).toBe(true)
 
     // A name that looks like a flag is a name, not an option.
     const flag = await agent.request('tools/call', { name: 'explain', arguments: { name: '--help' } })
@@ -196,7 +217,7 @@ describe.concurrent('kay mcp', () => {
   it('refuses to render what is no path or URL', async () => {
     const reply = await agent.request('tools/call', { name: 'render', arguments: { url: '--help' } })
 
-    expect(reply.error?.code).toBe(-32602)
+    expect(reply.result?.isError).toBe(true)
   })
 
   it('serves the llms files as resources, the index first', async () => {
@@ -224,7 +245,10 @@ describe.concurrent('kay mcp', () => {
     const own = new Agent(root)
 
     try {
+      const parseError = own.reply(null)
+
       own.send('{ not json')
+      expect((await parseError).error?.code).toBe(-32700)
       expect((await own.request('ping')).result).toEqual({})
     }
     finally {

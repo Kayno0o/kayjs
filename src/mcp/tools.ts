@@ -4,20 +4,25 @@ import { readdir } from 'node:fs/promises'
 import { isAbsolute, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { KAY_DIR } from '../build/assets'
-import { LINT_GROUPS } from '../compiler/lints'
-import { INVALID_PARAMS, RpcError } from './protocol'
+import { isLintGroup, LINT_GROUPS } from '../compiler/lints'
+import { DEV_ERRORS_FILE } from '../server/dev-errors'
 
 const CLI = join(import.meta.dir, '..', 'cli.ts')
 const KAY_ROOT = join(import.meta.dir, '..', '..')
 const LLMS_DIR = join(KAY_ROOT, 'llms')
-const DEV_ERRORS = join(KAY_DIR, 'dev', 'errors.json')
+const DEV_ERRORS = join(KAY_DIR, 'dev', DEV_ERRORS_FILE)
 // A page or a check running longer is cut short, as a model waiting on it would be.
 const CALL_TIMEOUT_MS = 5 * 60_000
 // What a result keeps of a stream, so that a huge page does not fill the model's context.
 const MAX_OUTPUT = 512 * 1024
+// How long a child gets to stop on SIGTERM before it is killed.
+const STOP_WAIT_MS = 2000
 const SCHEME = /^https?:\/\//
 const HEADING = /^(#{1,2}) (.+)$/gm
 const READ_ONLY = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
+
+// The commands running for a call.
+const children = new Set<Bun.Subprocess>()
 
 interface Run {
   code: number
@@ -53,7 +58,10 @@ function tools(root: string): Tool[] {
         const paths = stringList(args.paths, 'paths').map(path => insideProject(root, path))
         const only = optionalString(args.only, 'only')
 
-        return document(['check', ...only === undefined ? [] : ['--only', only], ...args.denyWarnings === true ? ['--deny-warnings'] : [], '--format', 'json', ...paths.length === 0 ? [] : ['--', ...paths]])
+        if (only !== undefined && !isLintGroup(only))
+          throw new Error(`only takes a group of lints, ${Object.keys(LINT_GROUPS).join(', ')}`)
+
+        return document(['check', ...only === undefined ? [] : [`--only=${only}`], ...args.denyWarnings === true ? ['--deny-warnings'] : [], '--format', 'json', ...paths.length === 0 ? [] : ['--', ...paths]])
       },
     },
     {
@@ -100,7 +108,7 @@ function tools(root: string): Tool[] {
 
         // A value that began with `-` would be read as an option.
         if (typeof url !== 'string' || !(url.startsWith('/') || SCHEME.test(url)))
-          throw new RpcError(INVALID_PARAMS, 'url takes a path such as /about or an http URL')
+          throw new Error('url takes a path such as /about or an http URL')
 
         const result = await kay(['render', url, '--include', ...method === undefined ? [] : [`--method=${method}`], ...body === undefined ? [] : [`--body=${body}`], ...stringList(args.headers, 'headers').map(header => `--header=${header}`), ...stringList(args.cookies, 'cookies').map(cookie => `--cookie=${cookie}`)])
 
@@ -126,7 +134,12 @@ function tools(root: string): Tool[] {
           return jsonText({ errors: [], note: `${DEV_ERRORS} does not exist: \`kay dev\` has not run in this project, or has met no error since.` })
 
         try {
-          return jsonText(await file.json() as object)
+          const document: unknown = await file.json()
+
+          if (typeof document !== 'object' || document === null || Array.isArray(document))
+            throw new Error('Not a JSON object')
+
+          return jsonText(document)
         }
         catch {
           return { content: [{ type: 'text', text: `${DEV_ERRORS} is not valid JSON; \`kay dev\` may be writing it, call again.` }], isError: true }
@@ -168,16 +181,36 @@ async function resources(): Promise<Resource[]> {
 // Runs `kay` with `args` in `root`, as a child so that what a command prints, exits with or throws cannot reach the protocol on this process's stdout.
 async function run(root: string, args: string[]): Promise<Run> {
   const child = Bun.spawn([process.execPath, CLI, ...args], { cwd: root, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe', env: process.env })
-  const timer = setTimeout(() => child.kill(), CALL_TIMEOUT_MS)
+  let timedOut = false
+  const timer = setTimeout(() => {
+    timedOut = true
+    stop(child)
+  }, CALL_TIMEOUT_MS)
+
+  children.add(child)
 
   try {
     const [stdout, stderr] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text()])
+    const code = await child.exited
 
-    return { code: await child.exited, stdout: truncate(stdout), stderr: truncate(stderr) }
+    return { code, stdout: timedOut ? '' : truncate(stdout), stderr: timedOut ? `kay ${args[0]} was stopped after ${CALL_TIMEOUT_MS / 1000} s` : truncate(stderr) }
   }
   finally {
     clearTimeout(timer)
+    children.delete(child)
   }
+}
+
+// Stops every command still running, as the client going away or a call abandoned leaves no one to read its answer.
+export function stopChildren(): void {
+  for (const child of children)
+    stop(child)
+}
+
+// SIGTERM first, so the command stops what it started, then SIGKILL for one that does not.
+function stop(child: Bun.Subprocess): void {
+  child.kill()
+  setTimeout(() => child.kill('SIGKILL'), STOP_WAIT_MS).unref()
 }
 
 function truncate(text: string): string {
@@ -197,7 +230,14 @@ function jsonResult({ code, stdout, stderr }: Run): ToolResult {
 
   const result = jsonText(document)
 
-  return code !== 0 && stderr.trim() !== '' ? { ...result, content: [...result.content, { type: 'text', text: stderr.trim() }], isError: true } : result
+  if (stderr.trim() === '')
+    return result
+
+  // What the command says besides its document, such as a warning, goes beside it; a command that could not run says why on stderr and prints that as its document's problem, which a check finding is never.
+  const { problems } = document as { problems?: { message?: unknown }[] }
+  const failed = code !== 0 && (!Array.isArray(problems) || problems.length === 0 || problems.some(problem => typeof problem.message === 'string' && stderr.includes(problem.message)))
+
+  return { ...result, content: [...result.content, { type: 'text', text: stderr.trim() }], ...failed && { isError: true } }
 }
 
 function jsonText(document: object): ToolResult {
@@ -209,7 +249,7 @@ function optionalString(value: unknown, name: string): string | undefined {
     return undefined
 
   if (typeof value !== 'string')
-    throw new RpcError(INVALID_PARAMS, `${name} takes a string`)
+    throw new Error(`${name} takes a string`)
 
   return value
 }
@@ -219,7 +259,7 @@ function stringList(value: unknown, name: string): string[] {
     return []
 
   if (!Array.isArray(value) || value.some(item => typeof item !== 'string'))
-    throw new RpcError(INVALID_PARAMS, `${name} takes a list of strings`)
+    throw new Error(`${name} takes a list of strings`)
 
   return value as string[]
 }
@@ -230,10 +270,10 @@ function insideProject(root: string, path: string): string {
   const inside = relative(root, absolute)
 
   if (inside === '' || isAbsolute(inside) || inside.split(sep)[0] === '..')
-    throw new RpcError(INVALID_PARAMS, `${path} is not a file or directory inside the project`)
+    throw new Error(`${path} is not a file or directory inside the project`)
 
   if (!existsSync(absolute))
-    throw new RpcError(INVALID_PARAMS, `${path} does not exist`)
+    throw new Error(`${path} does not exist`)
 
   return inside
 }

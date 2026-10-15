@@ -1,7 +1,7 @@
 import type { Command } from './command'
 import process from 'node:process'
 import { McpServer } from '../mcp/protocol'
-import { projectCapabilities } from '../mcp/tools'
+import { projectCapabilities, stopChildren } from '../mcp/tools'
 import { USAGES } from './usages'
 
 // Serves the project at the current directory to an agent as MCP tools and resources, over stdio: the agent's client starts it, from the project's root.
@@ -12,7 +12,15 @@ export const mcp: Command = {
   run: async () => {
     const { tools, resources } = await projectCapabilities(process.cwd())
 
-    await new McpServer(tools, resources).serve(Bun.stdin.stream(), line => void process.stdout.write(`${line}\n`))
+    // Stopped by its client, it takes the commands it started along.
+    for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) {
+      process.once(signal, () => {
+        stopChildren()
+        process.exit(0)
+      })
+    }
+
+    await new McpServer(tools, resources, stopChildren).serve(Bun.stdin.stream(), line => void process.stdout.write(`${line}\n`))
 
     return 0
   },

@@ -103,13 +103,13 @@ kay render /account --cookie session=…
 
 ### Give an agent kay's tools
 
-`kay mcp` serves the project in the current directory as an MCP server over stdio, for an agent to call instead of running `kay` in a shell. It needs nothing in the app: the agent's client starts it from the project's root.
+`kay mcp` serves the project in the current directory as an MCP server over stdio, for an agent to call instead of running `kay` in a shell. It needs nothing in the app: the agent's client starts it from the project's root, where kay is installed.
 
 ```sh
 claude mcp add kay -- bunx kay mcp
 ```
 
-Another client takes the same command in its JSON config, `mcp.json` or `.mcp.json` at the project's root:
+Another client takes the same command in its MCP config, such as `.mcp.json` at the project's root for Claude Code (a client may name the key `servers`):
 
 ```json
 { "mcpServers": { "kay": { "command": "bunx", "args": ["kay", "mcp"] } } }
