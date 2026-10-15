@@ -764,12 +764,13 @@ describe('the dev tool', () => {
       '/_kay/page-swap-aa11bb22.js': 'export const swap = () => 3\n'.repeat(30),
       '/_kay/dev/tool.js': 'the tool itself, left out',
       '/_kay/env.js': 'export default {}\n',
+      '/_kay/search-tbghfygg.js': 'export const search = () => 6\n'.repeat(40),
       '/_kay/lib-calendar.js': 'export const calendar = () => 4\n'.repeat(20),
       '/_kay/lib-original.js': 'export const original = () => 5\n'.repeat(25),
       '/_kay/old-1.css': 'a { color: red }\n',
     }
     // What the browser loaded over the page's life: the island rebuilt since, a stylesheet swapped with a query, and one the page no longer links.
-    const loaded = ['/_kay/_layout-1.css', '/_kay/_layout-1.css?kay-dev=2', '/_kay/entry-abc12345.js', '/_kay/counter-00000000.js', '/_kay/counter-def45678.js', '/_kay/page-swap-aa11bb22.js', '/_kay/lib-calendar.js', '/_kay/lib-original.js', '/_kay/dev/tool.js', '/_kay/env.js', '/_kay/old-1.css']
+    const loaded = ['/_kay/_layout-1.css', '/_kay/_layout-1.css?kay-dev=2', '/_kay/entry-abc12345.js', '/_kay/counter-00000000.js', '/_kay/counter-def45678.js', '/_kay/page-swap-aa11bb22.js', '/_kay/search-tbghfygg.js', '/_kay/lib-calendar.js', '/_kay/lib-original.js', '/_kay/dev/tool.js', '/_kay/env.js', '/_kay/old-1.css']
     const fetched: string[] = []
 
     happyDOM.setURL('http://localhost/')
@@ -778,7 +779,7 @@ describe('the dev tool', () => {
 
     Object.assign(settings, { disableCSSFileLoading: true, handleDisabledFileLoadingAsSuccess: true })
     document.head.insertAdjacentHTML('beforeend', '<link rel="stylesheet" href="/_kay/_layout-1.css?kay-dev=2">')
-    document.body.innerHTML = '<slot data-component="src/components/counter.kay"></slot>'
+    document.body.innerHTML = '<slot data-component="src/components/counter.kay"></slot><slot data-component="src/components/search.kay"></slot>'
 
     const performance = spyOn(window.performance, 'getEntriesByType').mockImplementation(((type: string) => type === 'resource' ? loaded.map(path => ({ name: `http://localhost${path}` })) : []) as unknown as typeof window.performance.getEntriesByType)
     const fetching = spyOn(window, 'fetch').mockImplementation((async (url: string) => {
@@ -809,14 +810,14 @@ describe('the dev tool', () => {
       expect(facts()[2]).toBe('INP: 240 ms - needs improvement')
       expect(shadow().querySelector('#kay-dev-tab-performance .count')?.textContent).toBe('3')
 
-      // The HTML is sized from the document the browser holds, not fetched again; two unhashed files whose names end in 8 letters stay two.
-      expect(fetched.sort()).toEqual(['/_kay/_layout-1.css', '/_kay/counter-def45678.js', '/_kay/entry-abc12345.js', '/_kay/lib-calendar.js', '/_kay/lib-original.js', '/_kay/page-swap-aa11bb22.js'])
+      // The HTML is sized from the document the browser holds, not fetched again; two unhashed files whose names end in 8 letters stay two, and an island hashed in letters only is still one.
+      expect(fetched.sort()).toEqual(['/_kay/_layout-1.css', '/_kay/counter-def45678.js', '/_kay/entry-abc12345.js', '/_kay/lib-calendar.js', '/_kay/lib-original.js', '/_kay/page-swap-aa11bb22.js', '/_kay/search-tbghfygg.js'])
       expect(facts().slice(3)).toEqual([
         expect.stringMatching(/^HTML: \d/),
         `CSS: ${size(files['/_kay/_layout-1.css']!)}`,
-        `JS: ${size(files['/_kay/entry-abc12345.js']!, files['/_kay/counter-def45678.js']!, files['/_kay/page-swap-aa11bb22.js']!, files['/_kay/lib-calendar.js']!, files['/_kay/lib-original.js']!)}`,
+        `JS: ${size(files['/_kay/entry-abc12345.js']!, files['/_kay/counter-def45678.js']!, files['/_kay/page-swap-aa11bb22.js']!, files['/_kay/search-tbghfygg.js']!, files['/_kay/lib-calendar.js']!, files['/_kay/lib-original.js']!)}`,
         `Entry: ${size(files['/_kay/entry-abc12345.js']!)}`,
-        `Island chunks: ${size(files['/_kay/counter-def45678.js']!)}`,
+        `Island chunks: ${size(files['/_kay/counter-def45678.js']!, files['/_kay/search-tbghfygg.js']!)}`,
         `Other chunks: ${size(files['/_kay/page-swap-aa11bb22.js']!, files['/_kay/lib-calendar.js']!, files['/_kay/lib-original.js']!)}`,
       ])
       expect(shadow().querySelector('#kay-dev-performance')!.textContent).toContain('Dev sizes: not minified')

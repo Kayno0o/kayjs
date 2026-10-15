@@ -1459,8 +1459,7 @@ interface Weight {
 }
 
 // A built file's name without its hash, `counter` of `counter-48rr5xzz.js`.
-// The hash holds a digit, which a name ending in 8 letters, `chart-calendar.js`, does not.
-const HASHED_NAME = /^(.*)-(?=[a-z]*\d)[a-z\d]{8}\.(?:js|css)$/
+const HASHED_NAME = /^(.*)-[a-z\d]{8}\.(?:js|css)$/
 
 // The page's HTML (the document the browser holds), the stylesheets and scripts it loaded gzipped, as sent in development: not minified, with the dev-only code, so larger than `kay build` makes them. The dev tool's own scripts, the live reload and the public env stay out; a file rebuilt since it first loaded counts once, in its latest form, and a stylesheet only while the page links it.
 async function pageWeight(doc: Document): Promise<Weight> {
@@ -1468,6 +1467,7 @@ async function pageWeight(doc: Document): Promise<Weight> {
   const here = win.location.origin
   const linked = new Set([...doc.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]')].map(link => new URL(link.href, here).pathname))
   const latest = new Map<string, string>()
+  const components = new Set([...doc.querySelectorAll('[data-component]')].map(element => (element.getAttribute('data-component') ?? '').replace(/^.*\//, '').replace(/\.kay$/, '')))
 
   for (const entry of win.performance.getEntriesByType('resource')) {
     const url = parseUrl(entry.name, here)
@@ -1481,8 +1481,8 @@ async function pageWeight(doc: Document): Promise<Weight> {
     const file = url.pathname.slice(url.pathname.lastIndexOf('/') + 1)
     const name = HASHED_NAME.exec(file)?.[1]
 
-    // Later entries are later loads: the hash of an island rebuilt since replaces the one before.
-    latest.set(name === undefined ? url.pathname : `${url.pathname.slice(0, url.pathname.length - file.length)}${name}.${file.slice(file.lastIndexOf('.') + 1)}`, url.pathname)
+    // Later entries are later loads: the hash of the entry or an island rebuilt since replaces the one before. Any other file keeps its address, as a name ending in 8 letters, `chart-calendar.js`, may not be hashed at all.
+    latest.set(name === undefined || !(name === 'entry' || components.has(name)) ? url.pathname : `${url.pathname.slice(0, url.pathname.length - file.length)}${name}.${file.slice(file.lastIndexOf('.') + 1)}`, url.pathname)
   }
 
   const sized = async (url: string, accept = '*/*') => {
@@ -1495,7 +1495,6 @@ async function pageWeight(doc: Document): Promise<Weight> {
   }
   const settled = await Promise.allSettled([...latest.values()].map(async url => ({ url, bytes: await sized(url) })))
   const files = settled.flatMap(result => result.status === 'fulfilled' ? [result.value] : [])
-  const components = new Set([...doc.querySelectorAll('[data-component]')].map(element => (element.getAttribute('data-component') ?? '').replace(/^.*\//, '').replace(/\.kay$/, '')))
   const isEntry = (url: string) => url.slice(url.lastIndexOf('/') + 1).startsWith('entry-')
   const isIsland = (url: string) => components.has(HASHED_NAME.exec(url.slice(url.lastIndexOf('/') + 1))?.[1] ?? '')
   const scripts = files.filter(file => file.url.endsWith('.js'))
