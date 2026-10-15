@@ -157,11 +157,20 @@ export function keepAnalyses(files: ReadonlySet<string>): void {
 // What a build keeps in `.kay/cache`: a file's compiled output, analysis and probed packages, and a package's answer, not what `kay check` keeps there.
 const BUILD_ENTRY = /^[\da-z]+-(?:(?:ssr|dom)(?:-hydratable)?(?:-inspect)?|analysis|probed|browser-only)\.json$/
 
+// What `kay check` keeps there, each a file's own entry.
+const CHECK_ENTRY = /^[\da-z]+-(?:shadow|renders-island|analysis-check)\.json$/
+
 // Drops the entries of the files a full build no longer has, and the answers for packages it did not probe; the entries it read or wrote and every variant of the components it analysed stay, so a server booting from the build still finds the ones of the pages the build did not load.
 export async function pruneCompileCache(cacheDir: string): Promise<number> {
-  if (analyzed.size === 0)
-    return 0
+  return analyzed.size === 0 ? Promise.resolve(0) : pruneEntries(cacheDir, BUILD_ENTRY)
+}
 
+// As a full build does for its own, the entries of the components a full `kay check` no longer has; never the LSP's or a path-filtered run's, which did not reach every component.
+export async function pruneCheckCache(cacheDir: string): Promise<number> {
+  return pruneEntries(cacheDir, CHECK_ENTRY)
+}
+
+async function pruneEntries(cacheDir: string, entries: RegExp): Promise<number> {
   const live = new Set<string>()
 
   for (const { file } of analyzed.values()) {
@@ -170,7 +179,7 @@ export async function pruneCompileCache(cacheDir: string): Promise<number> {
       live.add(Bun.hash(name).toString(36)).add(Bun.hash(`${name}${ISLAND_TWIN}`).toString(36))
   }
 
-  return pruneCache(cacheDir, BUILD_ENTRY, name => live.has(name.slice(0, name.indexOf('-'))))
+  return pruneCache(cacheDir, entries, name => live.has(name.slice(0, name.indexOf('-'))))
 }
 
 function realpathOrSelf(file: string): string {

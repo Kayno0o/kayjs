@@ -1,5 +1,5 @@
 import type { CheckOptions } from '../src/check'
-import { chmod, mkdtemp, rm, symlink, utimes } from 'node:fs/promises'
+import { chmod, mkdtemp, readdir, rm, symlink, utimes } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, join, relative, resolve } from 'node:path'
 import process from 'node:process'
@@ -43,6 +43,35 @@ describe('kay check', () => {
 
     try {
       expect(await check(root)).toEqual([])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('drops the cache entries of a deleted component after a whole check, never after a path-filtered one', async () => {
+    const root = await fixtureCopy('app')
+    const cache = join(root, '.kay/cache')
+    const entries = async () => (await readdir(cache)).filter(name => (/-(?:shadow|renders-island|analysis-check)\.json$/).test(name)).toSorted()
+
+    try {
+      expect((await runCheck(root)).code).toBe(0)
+
+      const live = await entries()
+
+      await Bun.write(join(root, 'src/gone.kay'), 'p Gone\n')
+      expect((await runCheck(root)).code).toBe(0)
+
+      const both = await entries()
+
+      expect(both.length).toBeGreaterThan(live.length)
+
+      await rm(join(root, 'src/gone.kay'))
+      expect((await runCheck(root, join(root, 'src/todo-item.kay'))).code).toBe(0)
+      expect(await entries()).toEqual(both)
+
+      expect((await runCheck(root)).code).toBe(0)
+      expect(await entries()).toEqual(live)
     }
     finally {
       await rm(root, { recursive: true, force: true })

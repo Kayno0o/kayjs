@@ -7,10 +7,12 @@ import { existsSync, realpathSync, statSync } from 'node:fs'
 import { isAbsolute, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { realPath } from '../build/files'
+import { pruneCheckCache } from '../build/transform'
 import { applySafeFixes, check as checkTypes, configCheckOptions } from '../check'
 import { isLint, isLintGroup, LINT_GROUPS, LINTS } from '../compiler/lints'
 import { CONFIG_FILE, loadConfig } from '../config'
 import { watchProject } from '../dev/sources'
+import { cacheDir } from '../project'
 import { buildingWithoutEnv } from '../server/env-state'
 import { count, done, formatOption, printFailure, printProblems, PROBLEM_FORMATS, projectRoot, takesControlCodes } from './command'
 import { USAGES } from './usages'
@@ -223,6 +225,11 @@ async function checkProject(root: string, config: KayConfig, tsconfig: string, e
   const options = { ...configCheckOptions(config), tsconfig, entry, launch }
   const checkScope = async () => (await checkTypes(root, options)).filter(diagnostic => inScope(diagnostic, scope))
   let diagnostics = await checkScope()
+
+  // A path filter only narrows what is reported, but a run asked for one is not the whole check the entries of deleted components can be judged against.
+  if (scope.length === 0)
+    await pruneCheckCache(cacheDir(root))
+
   const fixed = fix ? await applySafeFixes(root, diagnostics) : 0
 
   if (fixed > 0) {
