@@ -1660,6 +1660,10 @@
     @apply w-0;
   }
 
+  .kui-table-selected {
+    @apply m-0;
+  }
+
   .kui-table-select-text {
     @apply sr-only;
   }
@@ -1769,6 +1773,10 @@
     /* Every value starts after its label, whatever its column aligns to in a wide table. */
     .kui-table-cell {
       @apply col-span-full grid grid-cols-subgrid items-baseline px-0 py-1 text-left;
+    }
+
+    .kui-table-select-cell {
+      @apply w-auto;
     }
 
     .kui-table-cell-label {

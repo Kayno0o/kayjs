@@ -41,9 +41,9 @@ const { columns: given, rows, rowKey, sort, serverSort = false, onSort, cell, em
   onSelect?: ((keys: unknown[]) => void) | undefined
   // Drawn beside the count while something is picked, with the keys and a function emptying the selection: the page's bulk actions.
   bulk?: ((keys: unknown[], clear: () => void) => JSX.Element) | undefined
-  // Names the select-all box while nothing is picked, and the column's header for screen readers.
+  // Names the select-all box, and the column's header for screen readers.
   selectAllLabel?: string | undefined
-  // Names the select-all box once rows are picked, as its visible text: `N selected`.
+  // The count of rows picked, read out as it changes: `N selected`.
   selectedLabel?: ((count: number) => string) | undefined
   // Names a row's box: `Select <first column's text>`.
   selectRowLabel?: ((row: Row) => string) | undefined
@@ -59,16 +59,17 @@ effect(() => current.set(sort))
 // The rows the filter keeps, all of them without one.
 const kept = memo(() => filter === undefined ? rows : rowsMatching(rows, filter, typed()))
 const counted = countLabel ?? ((count: number) => count === 1 ? '1 row' : `${count} rows`)
-const picked = signal(selected ?? [])
+const none: unknown[] = []
+const picked = signal(selected ?? none)
 
-effect(() => picked.set(selected ?? []))
+effect(() => picked.set(selected ?? none))
 
 const keyed = memo(() => rows.map(row => rowKeyOf(row, rowKey)))
 const chosen = memo(() => {
   const set = new Set(picked())
 
   return keyed().filter(key => set.has(key))
-})
+}, { equals: (a, b) => a.length === b.length && a.every((key, index) => key === b[index]) })
 const chosenSet = memo(() => new Set(chosen()))
 const visible = memo(() => kept().map(row => rowKeyOf(row, rowKey)))
 const allChosen = memo(() => visible().length > 0 && visible().every(key => chosenSet().has(key)))
@@ -89,7 +90,7 @@ function commit(keys: unknown[]) {
 }
 
 function pick(key: unknown, on: boolean) {
-  commit(on ? [...chosen(), key] : chosen().filter(other => other !== key))
+  commit(on ? keyed().filter(other => other === key || chosenSet().has(other)) : chosen().filter(other => other !== key))
 }
 
 // Only the rows the filter shows are picked or dropped, so a row it hides keeps its state.
@@ -124,7 +125,8 @@ function ariaSort(column: Column<Row>): 'ascending' | 'descending' | undefined {
     p.kui-table-count(role="status") {typed() ? counted(kept().length) : ''}
   if selectable
     .kui-table-selection
-      Checkbox(label={chosen().length === 0 ? selectAllLabel : countChosen(chosen().length)} checked={allChosen()} indeterminate={someChosen() && !allChosen()} disabled={visible().length === 0} onChange={pickAll})
+      Checkbox(label={selectAllLabel} checked={allChosen()} indeterminate={someChosen() && !allChosen()} disabled={visible().length === 0} onChange={pickAll})
+      p.kui-table-selected(role="status") {chosen().length > 0 ? countChosen(chosen().length) : ''}
       if chosen().length > 0 && bulk
         .kui-table-bulk
           | {bulk(chosen(), () => commit([]))}

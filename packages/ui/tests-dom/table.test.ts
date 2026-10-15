@@ -190,6 +190,30 @@ describe('Table with a selection', () => {
     expect(seen.at(-1)).toEqual([1, 2, 3])
   })
 
+  test('hands the keys in the rows\' order whatever the order they were picked in', async () => {
+    const seen: unknown[][] = []
+
+    mounted = await mount('src/components/selectable-table.kay', { rows: MOONS, onSelect: (keys: unknown[]) => seen.push(keys) })
+    toggle(boxes(mounted.root)[2]!)
+    await settle()
+    toggle(boxes(mounted.root)[0]!)
+    await settle()
+
+    expect(seen).toEqual([[3], [1, 3]])
+  })
+
+  test('keeps the bulk block mounted when the rows are replaced by others with the same keys', async () => {
+    mounted = await mount('src/components/selectable-table.kay', { rows: MOONS, selected: [1] })
+    await settle()
+
+    const action = mounted.root.querySelector('.bulk-action')
+
+    click(mounted.root.querySelector('.same'))
+    await settle()
+
+    expect(mounted.root.querySelector('.bulk-action')).toBe(action)
+  })
+
   test('selects every row from select-all, and clears them from it once all are picked, and from the indeterminate state selects all', async () => {
     mounted = await mount('src/components/selectable-table.kay', { rows: MOONS })
 

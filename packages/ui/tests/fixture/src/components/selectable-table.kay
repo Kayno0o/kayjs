@@ -29,6 +29,7 @@ const columns: Column<Moon>[] = [
 ]
 ---
 button.drop(type="button" onClick={() => current.set(rows.filter(row => row.id !== 2))}) Drop
+button.same(type="button" onClick={() => current.set(rows.map(row => ({ ...row })))}) Same
 button.restore(type="button" onClick={() => current.set(rows)}) Restore
 Table(columns={columns} rows={current()} rowKey="id" selectable selected={selected} onSelect={onSelect} filter={filter ? ['name'] as const : undefined} narrow={narrow} selectAllLabel={selectAllLabel} selectedLabel={selectedLabel} selectRowLabel={selectRowLabel})
   @bulk(keys, clear)
