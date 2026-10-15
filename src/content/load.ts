@@ -1,7 +1,7 @@
 import type { Mode } from '../project'
 import type { Heading, Highlighter, Segment } from './markdown'
 import type { ContentProblem } from './validate'
-import { mkdir, rename } from 'node:fs/promises'
+import { mkdir, readdir, rename, rm, stat } from 'node:fs/promises'
 import { join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { modeOf, cacheDir as projectCache } from '../project'
@@ -32,7 +32,17 @@ const INDEX = /(?:^|\/)index$/
 const BACKSLASH = /\\/g
 const TOP_LEVEL_FIELD = /^["']?([\w$-]+)["']?\s*:/
 // Bumped whenever what an entry compiles to changes shape, so no cache from before is read.
-const CACHE_VERSION = 2
+const CACHE_VERSION = 3
+
+// What the cache holds for one entry, in a file named after the entry's path: the compile it is the result of, the file's size and time when it was read, and its content's hash, which stands in for reading it while the stamp holds.
+interface CachedEntry {
+  salt: string
+  stamp: string
+  hash: string
+  entry: RawEntry
+}
+const LEGACY_CACHE_FILE = /^[\da-z]+\.json$/
+const sweptCaches = new Set<string>()
 
 let place: { root: string, base: string } | undefined
 
@@ -115,29 +125,41 @@ async function compileDirectory(dir: string, highlight?: Highlighter): Promise<R
   const absolute = resolve(baseOf(), dir)
   const cacheDir = projectCache(root, 'content')
   // Bun's Markdown output and the highlighter's source are part of every key; a highlighter whose output changes with no change to its source, such as a new theme passed in, needs the cache cleared.
-  const salt = `${CACHE_VERSION}:${Bun.version}:${highlight?.toString() ?? ''}`
+  const salt = Bun.hash(`${CACHE_VERSION}:${Bun.version}:${highlight?.toString() ?? ''}`).toString(36)
   const files = await entryFiles(absolute)
   const problems: ContentProblem[] = []
   const entries: RawEntry[] = []
 
   await mkdir(cacheDir, { recursive: true })
+  await sweepLegacy(cacheDir)
 
   // A few files at a time, so a large collection never opens them all at once.
   for (let start = 0; start < files.length; start += READ_BATCH) {
     entries.push(...(await Promise.all(files.slice(start, start + READ_BATCH).map(async (name) => {
       const path = join(absolute, name)
       const file = relative(root, path).split(sep).join('/')
-      const source = await Bun.file(path).text()
-      const cacheFile = join(cacheDir, `${Bun.hash(`${salt}:${file}:${source}`).toString(36)}.json`)
-      const cached = await readCached(cacheFile)
+      const cacheFile = join(cacheDir, `${Bun.hash(file).toString(36)}.entry.json`)
+      const [cached, { mtimeMs, size }] = await Promise.all([readCached(cacheFile), stat(path)])
+      const stamp = `${mtimeMs}:${size}`
 
-      if (cached)
-        return cached
+      // Neither read nor hashed again while its file is as the cache saw it.
+      if (cached?.salt === salt && cached.stamp === stamp && cached.entry.file === file)
+        return cached.entry
+
+      const source = await Bun.file(path).text()
+      const hash = Bun.hash(source).toString(36)
+
+      // A file touched with its content as it was keeps its compile, and the stamp that stands in for reading it.
+      if (cached?.salt === salt && cached.hash === hash && cached.entry.file === file) {
+        await writeAtomically(cacheFile, JSON.stringify({ ...cached, stamp } satisfies CachedEntry))
+
+        return cached.entry
+      }
 
       try {
         const entry = await compileEntry(name, file, source, highlight)
 
-        await writeAtomically(cacheFile, JSON.stringify(entry))
+        await writeAtomically(cacheFile, JSON.stringify({ salt, stamp, hash, entry } satisfies CachedEntry))
 
         return entry
       }
@@ -167,13 +189,22 @@ async function compileDirectory(dir: string, highlight?: Highlighter): Promise<R
 }
 
 // A cache file that is missing or unreadable, such as one a crash left half written, is a miss.
-async function readCached(file: string): Promise<RawEntry | undefined> {
+async function readCached(file: string): Promise<CachedEntry | undefined> {
   try {
-    return await Bun.file(file).json() as RawEntry
+    return await Bun.file(file).json() as CachedEntry
   }
   catch {
     return undefined
   }
+}
+
+// The files an earlier version named after their content, one more with every edit, are dropped once per process.
+async function sweepLegacy(cacheDir: string): Promise<void> {
+  if (sweptCaches.has(cacheDir))
+    return
+
+  sweptCaches.add(cacheDir)
+  await Promise.all((await readdir(cacheDir)).filter(name => LEGACY_CACHE_FILE.test(name)).map(async name => rm(join(cacheDir, name), { force: true })))
 }
 
 async function writeAtomically(file: string, text: string): Promise<void> {

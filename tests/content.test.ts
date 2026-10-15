@@ -1,5 +1,5 @@
 import type { Collection } from '../src/content'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, readdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
@@ -9,11 +9,12 @@ import { outputDir } from '../src/build/assets'
 import { check } from '../src/check'
 import { bodyHtml, collection, highlightCode, renderMarkdown } from '../src/content'
 import { feedXml } from '../src/content/feed'
-import { contentMode, manifestFile, setContentMode, setContentPlace } from '../src/content/load'
+import { contentMode, contentPlace, loadEntries, manifestFile, setContentMode, setContentPlace } from '../src/content/load'
 import { compileMarkdown, MarkdownError } from '../src/content/markdown'
-import { writeContentManifests } from '../src/content/server'
+import { serveFeeds, writeContentManifests } from '../src/content/server'
 import { sanitizeHtml } from '../src/runtime'
 import { pages, shutdown } from '../src/server'
+import { ServedPaths } from '../src/server/served-paths'
 import { scratchBuild } from './prerendered'
 import { fixtureCopy } from './scratch'
 
@@ -123,6 +124,39 @@ describe('the content mode', () => {
   })
 })
 
+describe('the compile cache of entries', () => {
+  it('keeps one file per entry however often it changes, drops the files of earlier versions, and compiles again only what changed', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'kay-content-cache-'))
+    const cache = join(root, '.kay/cache/content')
+    const before = contentPlace()
+
+    try {
+      await Bun.write(join(root, 'posts/a.md'), '---\ntitle: A\n---\n\nbody\n')
+      await Bun.write(join(root, 'posts/b.md'), '---\ntitle: B\n---\n\nbody\n')
+      await Bun.write(join(cache, 'abc123.json'), '{}')
+      setContentPlace(root, root)
+
+      const titles = async () => (await loadEntries('posts', undefined, true)).map(entry => (entry.data as { title: string }).title)
+
+      expect(await titles()).toEqual(['A', 'B'])
+
+      for (const title of ['A2', 'A3', 'A4']) {
+        await Bun.write(join(root, 'posts/a.md'), `---\ntitle: ${title}\n---\n\nbody\n`)
+        expect(await titles()).toEqual([title, 'B'])
+      }
+
+      const files = await readdir(cache)
+
+      expect(files).toHaveLength(2)
+      expect(files.every(name => name.endsWith('.entry.json'))).toBe(true)
+    }
+    finally {
+      setContentPlace(before.root, before.base)
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+})
+
 describe('feeds', () => {
   it('serve a collection as RSS, newest first, drafts left out, links absolute', async () => {
     const { status, html, type } = await get('/blog/rss.xml')
@@ -133,6 +167,29 @@ describe('feeds', () => {
     expect(html.indexOf('<title>Second post</title>')).toBeLessThan(html.indexOf('<title>Hello world</title>'))
     expect(html).toContain('<link>https://blog.example/blog/hello</link>')
     expect(html).not.toContain('Not yet')
+  })
+
+  it('build a collection\'s XML once until its entries are read afresh', async () => {
+    let titles = ['First']
+    let items = 0
+    const posts = collection({ name: 'feed-once', load: () => titles.map(title => ({ slug: title.toLowerCase(), data: { title } })) }, { schema: t.Object({ title: t.String() }), feed: { path: '/once.xml', title: 'Once', item: (entry) => {
+      items++
+
+      return { title: entry.data.title, path: `/${entry.slug}`, date: new Date('2026-01-01') }
+    } } })
+    const feeds = new Elysia()
+
+    serveFeeds(feeds, new ServedPaths(), [posts], 'https://x.example')
+
+    const xml = async () => (await feeds.handle(new Request('http://localhost/once.xml'))).text()
+    const first = await xml()
+
+    expect(await xml()).toBe(first)
+    expect(items).toBe(1)
+    titles = ['First', 'Second']
+    posts.invalidate()
+    expect(await xml()).toContain('<title>Second</title>')
+    expect(items).toBe(3)
   })
 
   it('write Atom, escaping what they carry', () => {

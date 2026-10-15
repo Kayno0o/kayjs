@@ -180,9 +180,27 @@ export function serveFeeds(app: Elysia, served: ServedPaths, collections: Collec
     const headers = { 'content-type': `${feed.format === 'atom' ? 'application/atom+xml' : 'application/rss+xml'}; charset=utf-8`, 'cache-control': dev ? 'no-cache' : 'public, max-age=3600' }
 
     for (const { path, locale } of claimFeed(served, collectionFeed(collection), i18n?.settings)) {
+      const built = new Map<string, { entries: unknown[], xml: string }>()
+      // The XML built from these very entries is served again; a collection that read its entries afresh, or a request that sees others, builds it anew.
+      const once = <Entry>(key: string, entries: Entry[], build: () => string) => {
+        const last = built.get(key)
+
+        if (last && last.entries.length === entries.length && last.entries.every((entry, index) => entry === entries[index]))
+          return last.xml
+
+        const xml = build()
+
+        built.set(key, { entries, xml })
+
+        return xml
+      }
+
       app.get(path, async ({ request }) => {
-        if (!i18n || collection.options.localized !== true)
-          return new Response(feedXml(await collection.all(), feed, origin), { headers })
+        if (!i18n || collection.options.localized !== true) {
+          const entries = await collection.all()
+
+          return new Response(once('', entries, () => feedXml(entries, feed, origin)), { headers })
+        }
 
         const { settings } = i18n
         const written = locale ?? hostLocale(settings, request)
@@ -196,7 +214,7 @@ export function serveFeeds(app: Elysia, served: ServedPaths, collections: Collec
             return item && { ...item, path: localePath(settings, item.path, written, host) }
           } }
 
-          return new Response(feedXml(entries, localized, host === undefined ? origin : onHost(origin, host), localePath(settings, '/', written, host)), { headers })
+          return new Response(once(written, entries, () => feedXml(entries, localized, host === undefined ? origin : onHost(origin, host), localePath(settings, '/', written, host))), { headers })
         })
       })
     }
