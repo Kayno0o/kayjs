@@ -14,4 +14,6 @@ When `value` is typed to allow `null`, `onChange` is typed to hear `null` too, w
 
 Return a promise from `onChange` to hold the group busy until it settles. If the promise rejects or resolves to `false`, the previous option is put back, so a refused change never shows as made.
 
+While the group is busy, a pick takes nothing: the radio is put back, and keyboard focus moves to the checked one with it, so focus and the check never disagree for a screen reader.
+
 <Demo name="segmented/busy" />

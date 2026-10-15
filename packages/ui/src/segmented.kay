@@ -37,9 +37,16 @@ effect(() => {
 const radios = () => [...root?.querySelectorAll<HTMLInputElement>('.kui-segmented-input') ?? []]
 
 // Checks the radio of `wanted` again, in this group only: the binding may never have seen the radio that took the check.
+// Focus follows the check, as it does for a radio moved by an arrow key: one left on a radio that snapped back would read as unchecked to a screen reader while the group holds another.
 function check(wanted: string | null) {
-  for (const radio of radios())
+  const all = radios()
+  const focused = all.find(radio => radio === root?.ownerDocument.activeElement)
+
+  for (const radio of all)
     radio.checked = radio.value === wanted
+
+  if (focused && !focused.checked)
+    all.find(radio => radio.checked)?.focus()
 }
 
 async function pick(next: string) {

@@ -1,0 +1,5 @@
+---
+import SegmentedBusy from '../components/segmented-busy.kay'
+---
+main
+  SegmentedBusy

@@ -1,0 +1,17 @@
+---
+import Segmented from '@kaynooo/kayjs-ui/segmented.kay'
+
+// A Segmented whose change stays busy until the test releases it, to see where focus lands when a pick is taken back.
+const sizes = [{ value: 's', label: 'S' }, { value: 'm', label: 'M' }, { value: 'l', label: 'L' }] as const
+let release: () => void = () => {}
+
+function hold(value: 's' | 'm' | 'l') {
+  return new Promise<boolean>((resolve) => {
+    release = () => resolve(false)
+    ;(window as unknown as { held: string }).held = value
+  })
+}
+---
+form
+  Segmented(label="Size" name="size" options={sizes} value="m" onChange={hold})
+  button#release(type="button" onClick={() => release()}) Release
