@@ -1,7 +1,8 @@
 import type { EmailCore } from '../src/email'
 import type { AuthEvent } from '../src/events'
 import type { Mail } from '../src/mail'
-import { describe, expect, jest, test } from 'bun:test'
+import { describe, expect, jest, spyOn, test } from 'bun:test'
+import { log } from '../src/log'
 import { sendAside } from '../src/mail'
 import { totpCode, totpStep } from '../src/totp'
 import { testApp } from './helpers/app'
@@ -178,11 +179,16 @@ describe('sendAside', () => {
         return new Promise<void>(Function.prototype as () => void)
       } } } as unknown as EmailCore
 
+      const logged = spyOn(log, 'error').mockImplementation(() => undefined)
+
       for (let i = 0; i < 250; i++)
         sendAside(silent, () => mail, 'event')
 
       expect(handed).toBeLessThanOrEqual(200)
       expect(handed).toBeGreaterThan(150)
+      // The burst is said once, not once per dropped mail.
+      expect(logged.mock.calls.filter(([message]) => String(message).includes('dropped'))).toHaveLength(1)
+      logged.mockRestore()
 
       jest.advanceTimersByTime(31_000)
       await Promise.resolve()

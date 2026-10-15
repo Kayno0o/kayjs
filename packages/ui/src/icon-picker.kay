@@ -11,8 +11,8 @@ const PAGE_SIZE = 50
 const DEBOUNCE_MS = 200
 
 const { search, value = '', name, onChange, searchLabel = 'Search icons', placeholder = 'Search icons…', gridLabel = 'Icons', searchingLabel = 'Searching…', emptyLabel = 'No icons found.', clearLabel = 'Clear icon selection', moreLabel = 'Show more', class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onChange'> & {
-  // The icons matching `query`, at most `limit` of them: typically an action, since a whole icon set is too large to ship. A rejection goes unhandled and leaves the last grid on screen.
-  search: (query: string, limit: number) => Promise<IconChoice[]>
+  // The icons matching `query` from the `offset`th on, at most `limit` of them: typically an action, since a whole icon set is too large to ship. A page of fewer than `limit` is the last. A rejection goes unhandled and leaves the last grid on screen.
+  search: (query: string, limit: number, offset: number) => Promise<IconChoice[]>
   // The chosen icon's name, or an empty string for none; a picker whose parent passes another follows it.
   value?: string | undefined
   // Submits the chosen icon's name under this name, for a picker inside a form.
@@ -33,8 +33,9 @@ const { search, value = '', name, onChange, searchLabel = 'Search icons', placeh
 const picked = signal(value)
 const typed = signal('')
 const query = signal('')
-const limit = signal(PAGE_SIZE)
 const icons = signal<IconChoice[]>([])
+// Whether the last page came back full, so another may follow.
+const more = signal(false)
 const pending = signal(true)
 // The last pick, whose icon the selection keeps drawing once a new search no longer finds it.
 const last = signal<IconChoice>()
@@ -49,27 +50,33 @@ effect(() => picked.set(value))
 effect(() => {
   const next = typed()
   // A new search starts back on its first page; the same one, such as on the first run, keeps the pages shown.
-  const timer = setTimeout(() => next !== query() && batch(() => {
-    query.set(next)
-    limit.set(PAGE_SIZE)
-  }), DEBOUNCE_MS)
+  const timer = setTimeout(() => next !== query() && query.set(next), DEBOUNCE_MS)
 
   onCleanup(() => clearTimeout(timer))
 })
 
-effect(() => void load(query(), limit()))
+effect(() => void load(query(), 0))
 
-// The last grid stays on screen while the next search is in flight, and only the latest search lands.
-async function load(needle: string, count: number) {
+// The last grid stays on screen while the next search is in flight, and only the latest search lands. A page after the first is added to the grid, the icons it shares with it left out.
+async function load(needle: string, offset: number) {
   const mine = ++request
 
   pending.set(true)
 
   try {
-    const found = await search(needle, count)
+    const found = await search(needle, PAGE_SIZE, offset)
 
-    if (mine === request)
-      icons.set(found)
+    if (mine !== request)
+      return
+
+    const shown = offset === 0 ? new Set<string>() : new Set(icons().map(choice => choice.name))
+    const fresh = found.filter(choice => !shown.has(choice.name))
+
+    batch(() => {
+      icons.set(offset === 0 ? found : [...icons(), ...fresh])
+      // An app that ignores the offset gives the same page again: nothing new ends the paging.
+      more.set(found.length >= PAGE_SIZE && fresh.length > 0)
+    })
   }
   finally {
     if (mine === request)
@@ -138,5 +145,5 @@ function keepEnter(event: KeyboardEvent) {
           Icon(icon={icon})
         | {nameOf(picked())}
         IconButton(icon="close" label={clearLabel} size="xs" variant="inline" class="kui-icon-grid-clear" onClick={() => pick('')})
-    if icons().length >= limit()
-      button.kui-icon-grid-more(type="button" onClick={() => limit.set(limit() + PAGE_SIZE)}) {moreLabel}
+    if more()
+      button.kui-icon-grid-more(type="button" onClick={() => void load(query(), icons().length)}) {moreLabel}

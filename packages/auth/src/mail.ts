@@ -196,15 +196,21 @@ export const builtInTemplates: Record<string, Templates> = { en: defaultTemplate
 const ASIDE_TIMEOUT_MS = 30_000
 const ASIDE_MAX = 200
 let aside = 0
+// Whether the drop in the current burst is logged already: one line says it, and the next burst, once room is back, says it again.
+let dropping = false
 
 // Sends the mail `build` makes without making the request wait on the mailer: a slow or down relay costs the response nothing, and a failure, a sync throw included, is logged. The mail is handed to the mailer before the first await, so a mailer that answers at once has it by the time this returns. A mailer silent for 30 seconds is given up on, and with 200 mails waiting on it a new one is dropped.
 export function sendAside(email: EmailCore, build: () => Mail, what: string): void {
   if (aside >= ASIDE_MAX) {
-    log.error(`mailing ${what} dropped: ${ASIDE_MAX} mails are waiting on the mailer`)
+    if (!dropping)
+      log.error(`mailing ${what} dropped, and the notice mails after it while ${ASIDE_MAX} are waiting on the mailer`)
+
+    dropping = true
 
     return
   }
 
+  dropping = false
   aside++
   void (async () => {
     let timer: ReturnType<typeof setTimeout> | undefined

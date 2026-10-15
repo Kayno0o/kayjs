@@ -322,17 +322,17 @@ PageSection(title="Moons")
   - Opening focuses the first enabled entry; the arrows, Home and End move between enabled entries, an accent bar marking the one the keyboard is on, and Tab closes it.
   - An entry's `onSelect` runs once the menu has closed and focus is back on the trigger, so a dialog it opens takes focus from there.
 - `IconPicker(search={findIcons} value={post.icon} name="icon" onChange={icon.set})`:
-  - A search box over a grid of the icons `search(query, limit)` returns as `IconChoice`s, `{ name, icon }` with `icon` the IconProps to draw: typically an action, since a whole icon set is too large to ship, as `search={(query, limit) => findIcons({ query, limit })}`. The app's action builds them on the server with kay's `iconNames` and `iconProps` over the set's JSON, so the set never ships to the browser:
+  - A search box over a grid of the icons `search(query, limit, offset)` returns, from the `offset`th on, as `IconChoice`s, `{ name, icon }` with `icon` the IconProps to draw: typically an action, since a whole icon set is too large to ship, as `search={(query, limit, offset) => findIcons({ query, limit, offset })}`. The app's action builds them on the server with kay's `iconNames` and `iconProps` over the set's JSON, so the set never ships to the browser:
 
     ```ts
     import tabler from '@iconify-json/tabler/icons.json'
     import { iconNames, iconProps } from 'kay/icons'
 
-    export const findIcons = action(t.Object({ query: t.String({ maxLength: 200 }), limit: t.Number() }), async ({ query, limit }) =>
-      iconNames(tabler).filter(name => name.includes(query)).slice(0, limit).map(name => ({ name: `tabler:${name}`, icon: iconProps(tabler, name)! })))
+    export const findIcons = action(t.Object({ query: t.String({ maxLength: 200 }), limit: t.Number(), offset: t.Number() }), async ({ query, limit, offset }) =>
+      iconNames(tabler).filter(name => name.includes(query)).slice(offset, offset + limit).map(name => ({ name: `tabler:${name}`, icon: iconProps(tabler, name)! })))
     ```
 
-  - The search runs 200ms after the typing pauses, from 50 icons; `Show more` asks for 50 more once a page comes back full. The last grid stays while a search is in flight, and a search a later one overtook is dropped.
+  - The search runs 200ms after the typing pauses, from 50 icons; `Show more` asks for the next 50, at `offset` 50, 100 and so on, once a page comes back full, and adds them to the grid. A page with no icon the grid lacks, as an app ignoring `offset` gives, ends the paging. The last grid stays while a search is in flight, and a search a later one overtook is dropped.
   - Picking the chosen icon again, or the selection's clear button, clears it: `onChange` gets the name, or an empty string. The tooltip and label read the name without its `prefix:`.
   - `name` submits the chosen name as a hidden field, which fires a bubbling `input` event on each pick. Enter in the search box never submits the form.
   - The selection draws the chosen icon once a search found it; a `value` no search returned yet shows its name alone.

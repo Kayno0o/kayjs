@@ -7,6 +7,7 @@ This page lists what each release adds, newest first, with a link to where each 
 
 ## Unreleased
 
+- **IconPicker pages its search**: "Show more" asks `search(query, limit, offset)` for the next page and adds it, where it asked again for every icon shown. [Upgrading](/guides/upgrading)
 - **Request tab shows how the page was answered**: the response headers with the CSP and cache-control first, whether `kay build` prerenders the page, the guards that ran and their outcome, the redirects the request went through before the page and what made them, and the server's time to answer. [kay dev](/reference/cli#kay-dev)
 - **Head tab in the dev tool**: the page's search result, title and description with their lengths and limit, canonical, alternates, robots and sitemap membership, og and twitter tags with the social card, JSON-LD parsed or failing, and what `kay check` would flag in the head, read again after each page swap. [kay dev](/reference/cli#kay-dev)
 - **kayjs-ui loads and sorts less**: `LineChart` reads chartist once it is on the page, so an island showing one runs before chartist loads, and a `Table` reads each row's sort value once per sort.

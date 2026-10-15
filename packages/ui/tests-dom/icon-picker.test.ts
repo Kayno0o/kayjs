@@ -10,8 +10,8 @@ const TYPED_MS = 250
 
 let mounted: Mounted | undefined
 const changes: string[] = []
-// Each search the picker ran, as [query, limit].
-const searches: [string, number][] = []
+// Each search the picker ran, as [query, limit, offset].
+const searches: [string, number, number][] = []
 const inputs: string[] = []
 // The searches a test holds back, each answered once it calls `release`.
 const held: { query: string, release: () => void }[] = []
@@ -30,21 +30,21 @@ function choice(name: string): IconChoice {
 
 const SET = ['tabler:home', 'tabler:house', ...Array.from({ length: 70 }, (_, index) => `tabler:shape-${index}`)].map(choice)
 
-function found(query: string, limit: number): IconChoice[] {
-  return SET.filter(entry => entry.name.includes(query)).slice(0, limit)
+function found(query: string, limit: number, offset: number): IconChoice[] {
+  return SET.filter(entry => entry.name.includes(query)).slice(offset, offset + limit)
 }
 
-async function picker(options: { value?: string, hold?: (query: string) => boolean } = {}) {
+async function picker(options: { value?: string, hold?: (query: string) => boolean, ignoreOffset?: boolean } = {}) {
   mounted = await mount('src/components/icon-picker.kay', {
     value: options.value,
     onChange: (name: string) => changes.push(name),
-    search: async (query: string, limit: number) => {
-      searches.push([query, limit])
+    search: async (query: string, limit: number, offset: number) => {
+      searches.push([query, limit, offset])
 
       if (options.hold?.(query))
         await new Promise<void>(release => held.push({ query, release }))
 
-      return found(query, limit)
+      return found(query, limit, options.ignoreOffset ? 0 : offset)
     },
   })
 
@@ -81,7 +81,7 @@ function type(input: HTMLInputElement, text: string) {
 test('picks an icon into the form, and picking it again or clearing it empties the field', async () => {
   const view = await picker()
 
-  expect(searches).toEqual([['', 50]])
+  expect(searches).toEqual([['', 50, 0]])
   expect(view.names()).toHaveLength(50)
   expect(view.selection()).toBeNull()
 
@@ -113,7 +113,7 @@ test('searches once the typing pauses, from the first page again', async () => {
   click(view.more())
   await settle()
 
-  expect(searches.at(-1)).toEqual(['', 100])
+  expect(searches.at(-1)).toEqual(['', 50, 50])
   expect(view.names()).toHaveLength(72)
   expect(view.more()).toBeNull()
 
@@ -131,7 +131,7 @@ test('searches once the typing pauses, from the first page again', async () => {
 
   await Bun.sleep(TYPED_MS)
 
-  expect(searches.slice(2)).toEqual([['hou', 50]])
+  expect(searches.slice(2)).toEqual([['hou', 50, 0]])
   expect(view.names()).toEqual(['house'])
 
   type(view.search, 'nothing')
@@ -209,4 +209,26 @@ test('keeps Enter in the search box from submitting the form', async () => {
   view.search.dispatchEvent(other)
 
   expect([enter.defaultPrevented, other.defaultPrevented]).toEqual([true, false])
+})
+
+test('asks for each page after the one shown, and adds it to the grid', async () => {
+  const view = await picker()
+
+  expect(view.names()).toHaveLength(50)
+  click(view.more())
+  await settle()
+
+  expect(searches).toEqual([['', 50, 0], ['', 50, 50]])
+  expect(view.names()).toEqual(SET.map(entry => entry.name.replace('tabler:', '')))
+})
+
+test('ends the paging when a page brings nothing the grid lacks, as an app ignoring the offset gives', async () => {
+  const view = await picker({ ignoreOffset: true })
+
+  click(view.more())
+  await settle()
+
+  expect(view.names()).toHaveLength(50)
+  expect(new Set(view.names()).size).toBe(50)
+  expect(view.more()).toBeNull()
 })

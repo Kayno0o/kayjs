@@ -6,7 +6,7 @@ description: A search box over a grid of icons, for picking one by name.
 
 ## Searching
 
-`search(query, limit)` returns the matching icons as `{ name, icon }` choices, where `icon` is what to draw. An app usually makes it an action reading an icon set on the server, so the set never ships to the browser. Typing is debounced, and the grid asks for more when "Show more" is pressed.
+`search(query, limit, offset)` returns the matching icons from the `offset`th on as `{ name, icon }` choices, where `icon` is what to draw. An app usually makes it an action reading an icon set on the server, so the set never ships to the browser. Typing is debounced, and "Show more" asks for the next page, `offset` further, and adds it to the grid.
 
 <Demo name="icon-picker/more" />
 

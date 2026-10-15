@@ -23,11 +23,11 @@ const all: IconChoice[] = [
 const calls = signal<string[]>([])
 
 // Stands in for an action reading an icon set on the server.
-async function search(query: string, limit: number) {
-  calls.set(list => [...list, `"${query}" up to ${limit}`].slice(-3))
+async function search(query: string, limit: number, offset: number) {
+  calls.set(list => [...list, `"${query}" from ${offset}, ${limit} at most`].slice(-3))
   await new Promise(resolve => setTimeout(resolve, 400))
 
-  return all.filter(choice => choice.name.includes(query)).slice(0, limit)
+  return all.filter(choice => choice.name.includes(query)).slice(offset, offset + limit)
 }
 ---
 .flex.flex-col.items-start.gap-2
