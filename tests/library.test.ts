@@ -314,16 +314,15 @@ describe('kay libraries', () => {
     }))
   })
 
-  it('types the named exports a library\'s module declares, an action imported by a test taking its input as the file declares it', async () => {
+  it('types the named exports a library\'s module declares, an action imported by a test typed as the server action the file declares', async () => {
     const project = await newProject()
 
     await write(join(project, 'node_modules/kay-lib'), { 'src/signup.kay': '--- server\nimport { action } from \'kay\'\n\nexport const page = { guards: false }\n\nexport const signup = action((input: { email: string }) => input, input => input.email)\n---\np signup\n' })
-    await write(project, { 'src/signup.test.ts': 'import { signup } from \'kay-lib/signup.kay\'\n\nexport const ok = signup\nexport const missing = (await import(\'kay-lib/signup.kay\')).missing\n' })
+    await write(project, { 'src/signup.test.ts': 'import { signup } from \'kay-lib/signup.kay\'\n\nexport const ok = signup\nexport const wrong: number = signup\n' })
 
     const { code, output } = await run('check', project)
 
-    expect(output).toContain('Property \'missing\' does not exist')
-    expect(output).not.toContain('TS2614')
+    expect(reported(output)).toEqual([`${relative(process.cwd(), join(project, 'src/signup.test.ts'))}:4:14 error[TS2322]: Type 'ServerAction<TSchema, unknown, never>' is not assignable to type 'number'.`])
     expect(code).toBe(1)
   })
 
