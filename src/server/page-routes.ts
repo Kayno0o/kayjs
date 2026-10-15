@@ -208,7 +208,7 @@ export function servePageRoutes(app: Elysia, { table, served: claims, matchers, 
       const redirect = slashRedirect(url, (own ?? served.values().next().value!).candidates[0]!.shape, trailingSlash)
 
       if (redirect) {
-        noteRedirect(context.request, 'the trailing slash setting')
+        noteRedirect(renderOptions.dev, context.request, 'the trailing slash setting')
 
         return redirect
       }
@@ -218,7 +218,7 @@ export function servePageRoutes(app: Elysia, { table, served: claims, matchers, 
 
       // With every locale prefixed, a path without one goes to the visitor's.
       if (locale === undefined) {
-        noteRedirect(context.request, 'the visitor\'s locale')
+        noteRedirect(renderOptions.dev, context.request, 'the visitor\'s locale')
 
         return localeRedirect(settings, context.request, url)
       }

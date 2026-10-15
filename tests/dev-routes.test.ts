@@ -5,6 +5,7 @@ import { describe, expect, it, spyOn } from 'bun:test'
 import { Elysia } from 'elysia'
 import { pages } from '../src/server'
 import { DEV_REQUEST, DEV_ROUTES } from '../src/server/dev'
+import { redirectedBy } from '../src/server/dev-notes'
 import { scratchDir } from './scratch'
 
 const REQUEST_BLOCK = /<script type="application\/json" id="kay-dev-request">(.*?)<\/script>/
@@ -243,5 +244,41 @@ describe('the dev tool\'s routes served by kay', () => {
     finally {
       logged.mockRestore()
     }
+  })
+
+  it('notes no redirect in a production server, and answers the health check past an extension\'s global hooks', async () => {
+    const dir = await scratchDir('dev-routes-production-')
+    const routes = relative(process.cwd(), join(dir, 'routes'))
+    const guarded = 'import { guard } from \'kay\'\n\nexport default guard(({ redirect }) => {\n  redirect(\'/login\')\n})\n'
+
+    await Promise.all([
+      Bun.write(join(dir, 'routes/index.kay'), 'p Home\n'),
+      Bun.write(join(dir, 'routes/login.kay'), 'p Login\n'),
+      Bun.write(join(dir, 'routes/members/_guard.ts'), guarded),
+      Bun.write(join(dir, 'routes/members/index.kay'), 'p Members\n'),
+    ])
+
+    // A global hook refusing a request to the health route, as an auth extension's would the routes after it.
+    const closed = new Elysia().onBeforeHandle({ as: 'global' }, ({ request }) => new URL(request.url).pathname === '/_kay/health' ? new Response('closed', { status: 401 }) : undefined)
+    const settings = { routes, redirects: { '/old': '/login' }, trailingSlash: 'never' as const }
+    const outcomes = async (dev: boolean, extensions: NonNullable<Parameters<typeof pages>[0]>['extensions'] = []) => {
+      const app = await pages({ ...settings, dev, extensions })
+      const noted: (string | undefined)[] = []
+
+      for (const path of ['/old', '/login/', '/members']) {
+        const request = new Request(`http://localhost${path}`, { redirect: 'manual' })
+
+        await app.handle(request)
+        noted.push(redirectedBy(request))
+      }
+
+      return { noted, health: (await app.handle(new Request('http://localhost/_kay/health'))).status }
+    }
+
+    expect((await outcomes(false)).noted).toEqual([undefined, undefined, undefined])
+    expect((await outcomes(true)).noted[0]).toBe('the redirect from /old')
+    expect((await outcomes(true)).noted[2]).toBe(`the guard ${routes}/members/_guard.ts`)
+    expect((await outcomes(false, [{ name: 'closed', server: closed }])).health).toBe(200)
+    expect((await outcomes(true, [{ name: 'closed', server: closed }])).health).toBe(200)
   })
 })

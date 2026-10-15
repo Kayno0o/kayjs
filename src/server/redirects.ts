@@ -100,7 +100,7 @@ export function claimRedirects(served: ServedPaths, redirects: Redirect[]): void
 }
 
 // Registered before the pages, the query carried over unless the target gives its own.
-export function serveRedirects(app: Elysia, redirects: Redirect[]): void {
+export function serveRedirects(app: Elysia, redirects: Redirect[], dev?: boolean): void {
   for (const redirect of redirects) {
     app.get(redirect.path, ({ params, request }) => {
       const values = params as Record<string, string>
@@ -110,7 +110,7 @@ export function serveRedirects(app: Elysia, redirects: Redirect[]): void {
       const path = target.startsWith('/') ? target.replace(LEADING_SLASHES, '/') : target
       const location = search !== '' && !path.includes('?') ? `${path}${search}` : path
 
-      noteRedirect(request, `the redirect from ${redirect.path}`)
+      noteRedirect(dev, request, `the redirect from ${redirect.path}`)
 
       return new Response(null, { status: redirect.status, headers: { location } })
     })

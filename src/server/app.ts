@@ -224,8 +224,11 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   // Offered, so an app file at the path keeps it; the check is served once every claim is in, and only where it still holds the path.
   const health: Claim | undefined = options.health === false ? undefined : { path: options.health?.path ?? HEALTH_PATH, owner: 'the health check', kind: 'kay' }
 
-  if (health)
+  if (health) {
     served.offer(health)
+    // Before the extension servers, whose hooks it answers ahead of; it answers only where the claims, known once all are in, leave it the path.
+    serveHealth(app, lifecycle, () => served.holds(health), options.health === false ? undefined : options.health)
+  }
 
   if (options.publicEnv)
     servePublicEnv(app, served, options.publicEnv)
@@ -280,9 +283,6 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
 
   claimRedirects(served, redirects)
   claimApi(served, api.mounted, servesOpenApi ? openapi : undefined)
-
-  if (health && served.holds(health))
-    serveHealth(app, lifecycle, options.health === false ? undefined : options.health)
 
   limitBodies(app, options.bodyLimit ?? DEFAULT_BODY_LIMIT, options.preview ? new Map([...actionLimits, [DRAFT_ROUTE, DRAFT_BODY_LIMIT]]) : actionLimits, api.limits)
 
@@ -341,7 +341,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
     announceStart(app, log, [...prerendered.values()].reduce((count, pages) => count + pages.size, 0))
 
   await servePublic(app, served, publicServed)
-  serveRedirects(app, redirects)
+  serveRedirects(app, redirects, mode.dev)
 
   const respond = withPageHeaders(pageResponder({ client, renderOptions, prerendered, settings: i18n?.settings, transforms: pageHooks(options.extensions), pageFile: assetFiles({ clientDir: client.dir, publicDir: paths.public, base, aspects: options.images?.aspects }) }), securityOptions, security)
 

@@ -213,7 +213,7 @@ async function refused(route: ServedRoute, rendering: Rendering, client: ClientB
     rendering.guards = guardRuns(route.guards, refusal)
 
     if (refusal?.error instanceof Redirect)
-      noteRedirect(rendering.ctx.request, `the guard ${projectPath(refusal.guard.file)}`)
+      noteRedirect(options.dev, rendering.ctx.request, `the guard ${projectPath(refusal.guard.file)}`)
   }
 
   return refusal && renderFailure(refusal.error, refusal.guard.special, rendering, new Map(), client, options)

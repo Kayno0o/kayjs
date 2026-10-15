@@ -714,7 +714,10 @@ function requestTab(doc: Document, tool: DevTool): { stop: () => void } {
     fact('Params', ...lines(params.map(([name, value]) => tool.make('span', 'mono', `${name} = ${JSON.stringify(value)}`)), 'none'))
 
     fact('Locale', request.locale)
-    fact('Rendered', request.prerender === undefined ? 'on request' : `on request here, ${PRERENDER[request.prerender]}`)
+    // Read off the page once the guards pass, so a request one refused says nothing of it.
+    const refusedByGuard = request.guards.some(guard => guard.outcome !== 'passed' && guard.outcome !== 'did not run')
+
+    fact('Rendered', refusedByGuard ? 'not known, a guard refused the request' : request.prerender === undefined ? 'on request' : `on request here, ${PRERENDER[request.prerender]}`)
     fact('Guards', ...lines(request.guards.map((guard) => {
       const line = tool.make('span')
 

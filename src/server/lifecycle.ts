@@ -26,10 +26,15 @@ interface Lifecycle {
 let signalsTaken = false
 
 // Answers 200 while the server takes requests and its check passes, 503 otherwise, for a load balancer or a container's health check.
-export function serveHealth(app: Elysia, lifecycle: Lifecycle, config: HealthConfig = {}): void {
+// Answered as the request arrives, before routing, so no global hook of an extension (an auth check, say) stands between a probe and the answer; `holds` is asked per request, as an app's own route at the path wins.
+export function serveHealth(app: Elysia, lifecycle: Lifecycle, holds: () => boolean, config: HealthConfig = {}): void {
   const headers = { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' }
+  const path = config.path ?? HEALTH_PATH
 
-  app.get(config.path ?? HEALTH_PATH, async ({ request }) => {
+  app.onRequest(async ({ request }) => {
+    if ((request.method !== 'GET' && request.method !== 'HEAD') || new URL(request.url).pathname !== path || !holds())
+      return undefined
+
     if (lifecycle.draining)
       return wholeResponse('stopping', { status: 503, headers })
 
