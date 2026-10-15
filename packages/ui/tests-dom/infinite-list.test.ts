@@ -86,7 +86,7 @@ describe('LoadMore', () => {
     await settle()
 
     expect(ids(root)).toEqual(['1', '2', '3', '4', '5'])
-    expect(root.querySelector('.kui-load-more-loading')).toBeNull()
+    expect(root.querySelector('.kui-load-more-loading')?.textContent).toBe('')
   })
 
   test('a sentinel firing twice at once loads one page', async () => {
@@ -127,6 +127,7 @@ describe('LoadMore', () => {
     await settle()
 
     expect(asked).toEqual([3, 3])
+    expect(root.querySelector('.kui-load-more-failed button')?.getAttribute('aria-busy')).toBe('true')
 
     release[1]!([{ id: 4 }, { id: 5 }, { id: 6 }])
     await settle()
@@ -156,9 +157,11 @@ describe('LoadMore', () => {
 
     reach(root)
     mounted!.unmount()
+    mounted = undefined
     release[0]!([{ id: 4 }])
     await settle()
 
     expect(asked).toEqual([3])
+    expect(root.querySelector('.row')).toBeNull()
   })
 })

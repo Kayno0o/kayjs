@@ -1,4 +1,4 @@
-import type { Page } from '../src/infinite-list'
+import type { InfinitePage } from '../src/infinite-list'
 import { describe, expect, test } from 'bun:test'
 import { infiniteList } from '../src/infinite-list'
 
@@ -11,7 +11,7 @@ const bans = (from: number, count: number): Ban[] => Array.from({ length: count 
 // A source answering from a queue, remembering where each call asked.
 function source(...answers: (Ban[] | undefined | Error)[]) {
   const asked: { offset: number, last: Ban | undefined }[] = []
-  const load = async (at: { offset: number, last: Ban | undefined }): Promise<Page<Ban>> => {
+  const load = async (at: { offset: number, last: Ban | undefined }): Promise<InfinitePage<Ban>> => {
     asked.push(at)
 
     const answer = answers.shift()
@@ -32,6 +32,15 @@ describe('infiniteList', () => {
     expect(infiniteList(bans(1, 2), { size: 3, load }).ended()).toBe(true)
     expect(infiniteList([], { size: 3, load }).ended()).toBe(true)
     expect(infiniteList(bans(1, 3), { size: 3, load }).ended()).toBe(false)
+  })
+
+  test('retry loads nothing when no page failed', async () => {
+    const { asked, load } = source(bans(4, 3))
+    const list = infiniteList(bans(1, 3), { size: 3, load })
+
+    await list.retry()
+
+    expect(asked).toEqual([])
   })
 
   test('an ended list never calls load', async () => {
@@ -119,6 +128,17 @@ describe('infiniteList', () => {
     await list.more()
 
     expect(asked.map(at => at.offset)).toEqual([3, 6])
+  })
+
+  test('a cursor source continues after the last row fetched, so a page of duplicates moves it on', async () => {
+    const { asked, load } = source([{ id: 3 }, { id: 2 }, { id: 1 }], bans(4, 3))
+    const list = infiniteList(bans(1, 3), { size: 3, key: ban => ban.id, load })
+
+    await list.more()
+    await list.more()
+
+    expect(asked.map(at => at.last?.id)).toEqual([3, 1])
+    expect(list.rows().map(row => row.id)).toEqual([1, 2, 3, 4, 5, 6])
   })
 
   test('calls load once while a page is on its way, whoever asks', async () => {

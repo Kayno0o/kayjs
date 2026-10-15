@@ -1,13 +1,13 @@
 import { signal } from 'kay'
 
 // What a source resolves to: the rows of the next page, or `undefined` for a page that failed, such as the result of an `attempt` that toasted. A throw fails the page too.
-export type Page<Row> = Row[] | undefined
+export type InfinitePage<Row> = Row[] | undefined
 
 // Where the next page starts, for a source paging by offset or by cursor.
 export interface PageAt<Row> {
   // How many rows were fetched so far, duplicates included, which is what an offset source skips.
   offset: number
-  // The last row shown, which a cursor source continues after; undefined for a list that began empty.
+  // The last row fetched, duplicates included, which a cursor source continues after; undefined for a list that began empty.
   last: Row | undefined
 }
 
@@ -16,7 +16,7 @@ export interface InfiniteListOptions<Row> {
   size: number
   // Tells a row from another, so one already shown is dropped when the list shifts between two pages.
   key?: ((row: Row) => unknown) | undefined
-  load: (at: PageAt<Row>) => Promise<Page<Row>> | Page<Row>
+  load: (at: PageAt<Row>) => Promise<InfinitePage<Row>> | InfinitePage<Row>
 }
 
 export interface InfiniteList<Row> {
@@ -30,7 +30,7 @@ export interface InfiniteList<Row> {
   pending: () => boolean
   // Loads the next page; nothing while a page is on its way, the list is ended or a failure waits for `retry`.
   more: () => Promise<void>
-  // Loads again the page that failed.
+  // Loads again the page that failed; nothing when no page failed.
   retry: () => Promise<void>
 }
 
@@ -41,15 +41,10 @@ export function infiniteList<Row>(first: Row[], options: InfiniteListOptions<Row
   const ended = signal(first.length < size)
   const failed = signal(false)
   const pending = signal(false)
+  const shown = new Set(key === undefined ? [] : first.map(key))
   let fetched = first.length
+  let lastFetched = first.at(-1)
   let running = false
-
-  async function next(): Promise<void> {
-    if (running || ended() || failed())
-      return
-
-    await loadPage()
-  }
 
   async function loadPage(): Promise<void> {
     if (running || ended())
@@ -57,10 +52,9 @@ export function infiniteList<Row>(first: Row[], options: InfiniteListOptions<Row
 
     running = true
     pending.set(true)
-    failed.set(false)
 
     try {
-      const page = await load({ offset: fetched, last: rows().at(-1) })
+      const page = await load({ offset: fetched, last: lastFetched })
 
       if (page === undefined) {
         failed.set(true)
@@ -69,8 +63,14 @@ export function infiniteList<Row>(first: Row[], options: InfiniteListOptions<Row
       }
 
       fetched += page.length
+      lastFetched = page.at(-1) ?? lastFetched
       ended.set(page.length < size)
-      rows.set(current => key === undefined ? [...current, ...page] : withoutShown(current, page, key))
+      failed.set(false)
+      rows.set((current) => {
+        const fresh = key === undefined ? page : page.filter(row => !shown.has(key(row)) && shown.add(key(row)))
+
+        return fresh.length === 0 ? current : [...current, ...fresh]
+      })
     }
     catch {
       failed.set(true)
@@ -81,21 +81,8 @@ export function infiniteList<Row>(first: Row[], options: InfiniteListOptions<Row
     }
   }
 
-  return { rows, ended, failed, pending, more: next, retry: loadPage }
-}
+  const more = async () => failed() ? undefined : loadPage()
+  const retry = async () => failed() ? loadPage() : undefined
 
-function withoutShown<Row>(current: Row[], page: Row[], key: (row: Row) => unknown): Row[] {
-  const shown = new Set(current.map(key))
-  const fresh = page.filter((row) => {
-    const id = key(row)
-
-    if (shown.has(id))
-      return false
-
-    shown.add(id)
-
-    return true
-  })
-
-  return fresh.length === 0 ? current : [...current, ...fresh]
+  return { rows, ended, failed, pending, more, retry }
 }

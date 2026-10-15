@@ -22,5 +22,7 @@ const { list, margin, loadingLabel = 'Loading more…', failureLabel = 'Could no
         Button(label={retryLabel} busy={list.pending()} disabled={list.pending()} onClick={list.retry})
     else
       WhenVisible(onVisible={list.more} margin={margin})
-      if list.pending()
-        p.kui-load-more-loading(role="status") {loadingLabel}
+      // An always-present status, so a screen reader hears the text appear; the text's element coming and going is also what makes WhenVisible look again where the list stands, as it watches its parent's children.
+      p.kui-load-more-loading(role="status")
+        if list.pending()
+          span {loadingLabel}
