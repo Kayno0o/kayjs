@@ -30,7 +30,16 @@ export function rowsOf(collection: CollectionInfo, entries: SourceEntry[]): Entr
 export function searchRows(rows: EntryRow[], search: string): EntryRow[] {
   const words = search.toLowerCase().split(/\s+/).filter(Boolean)
 
-  return words.length === 0 ? rows : rows.filter(row => words.every(word => row.title.toLowerCase().includes(word) || row.slug.toLowerCase().includes(word)))
+  if (words.length === 0)
+    return rows
+
+  return rows.filter((row) => {
+    // Both folded once, not once per word.
+    const title = row.title.toLowerCase()
+    const slug = row.slug.toLowerCase()
+
+    return words.every(word => title.includes(word) || slug.includes(word))
+  })
 }
 
 export function pageOf<T>(rows: T[], page: number, size = PAGE_SIZE): { rows: T[], page: number, pages: number } {

@@ -102,6 +102,19 @@ export async function deleteSaved(ref: EntryRef, version?: string | undefined): 
   return settled(outcome, 'Deleted', 'Not deleted')
 }
 
+// The most keys one request deletes, which the API caps.
+const DELETE_CHUNK = 100
+
+// Deletes unused uploads in requests of at most 100 keys, stopping at the first that fails; true once all went through. The rows are stale either way, the caller refreshing them.
+export async function deleteUnusedUploadsInChunks(keys: string[]): Promise<boolean> {
+  for (let at = 0; at < keys.length; at += DELETE_CHUNK) {
+    if (!await deleteUnusedUploads(keys.slice(at, at + DELETE_CHUNK)))
+      return false
+  }
+
+  return true
+}
+
 // Deletes unused uploads and their variants in one request, so the server reads the content once for all, and says how it went; true once the rows are stale, deleted or not.
 export async function deleteUnusedUploads(keys: string[]): Promise<boolean> {
   const result = await attempt(() => call(filesApi, '/unused/delete', { method: 'post', body: { keys } }), 'Could not delete')

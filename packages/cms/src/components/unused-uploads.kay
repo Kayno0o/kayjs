@@ -5,7 +5,7 @@ import ConfirmDelete from '@kaynooo/kayjs-ui/confirm-delete.kay'
 import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
 import Table from '@kaynooo/kayjs-ui/table.kay'
 import { refresh } from 'kay'
-import { deleteUnusedUploads } from '../editor/save'
+import { deleteUnusedUploadsInChunks } from '../editor/save'
 
 const { uploads } = props<{ uploads: UnusedUpload[] }>()
 
@@ -15,21 +15,13 @@ const columns: Column<UnusedUpload>[] = [
   { key: 'actions', header: 'Actions', align: 'end', cell: true },
 ]
 
-// The most keys one request deletes, which the server caps.
-const CHUNK = 100
-
 async function remove(keys: string[]): Promise<boolean> {
-  for (let at = 0; at < keys.length; at += CHUNK) {
-    if (!await deleteUnusedUploads(keys.slice(at, at + CHUNK))) {
-      await refresh()
+  const done = await deleteUnusedUploadsInChunks(keys)
 
-      return false
-    }
-  }
-
+  // Rows already deleted leave the table's selection with `uploads`.
   await refresh()
 
-  return true
+  return done
 }
 ---
 Table.kcms-uploads(columns={columns} rows={uploads} rowKey={upload => upload.key} selectable)

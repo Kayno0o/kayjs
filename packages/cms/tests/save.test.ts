@@ -9,11 +9,13 @@ const { toasts } = await import(toastModule) as typeof import('../../ui/src/toas
 void mock.module('@kaynooo/kayjs-ui', async () => import(toastModule))
 
 const { default: entriesApi } = await import('../src/api/entries')
+const { default: filesApi } = await import('../src/api/files')
 const { createDrafts } = await import('../src/drafts')
-const { saveDraft } = await import('../src/editor/save')
+const { deleteUnusedUploadsInChunks, saveDraft } = await import('../src/editor/save')
 
 // What kay's build gives an API module's default export in the browser: where it is served.
 Object.assign(entriesApi, { [Symbol.for('kay.api')]: '/api/cms/entries' })
+Object.assign(filesApi, { [Symbol.for('kay.api')]: '/api/cms/files' })
 
 const post: DraftEntry = { collection: 'posts', slug: 'hello', data: { title: 'Hello' } }
 
@@ -93,5 +95,35 @@ describe('saveDraft', () => {
     expect(await saveDraft(drafts, post)).toBe(false)
     expect(drafts.issues(post, 'title').map(issue => issue.message)).toEqual(['Required'])
     expect(toasts().at(-1)?.message).toBe('Not saved: some fields need fixing')
+  })
+})
+
+describe('deleting unused uploads', () => {
+  function deleting(failOn?: number) {
+    const sent: string[][] = []
+
+    spyOn(globalThis, 'fetch').mockImplementation((async (_input: string | URL | Request, init?: RequestInit) => {
+      const { keys } = JSON.parse(String(init?.body)) as { keys: string[] }
+
+      sent.push(keys)
+
+      return sent.length === failOn ? new Response('down', { status: 500 }) : Response.json({ deleted: keys, kept: [] })
+    }) as typeof fetch)
+
+    return sent
+  }
+
+  it('sends 250 keys as requests of 100, 100 and 50', async () => {
+    const sent = deleting()
+
+    expect(await deleteUnusedUploadsInChunks(Array.from({ length: 250 }, (_, index) => `k${index}`))).toBe(true)
+    expect(sent.map(keys => keys.length)).toEqual([100, 100, 50])
+  })
+
+  it('stops at the first request that fails', async () => {
+    const sent = deleting(2)
+
+    expect(await deleteUnusedUploadsInChunks(Array.from({ length: 250 }, (_, index) => `k${index}`))).toBe(false)
+    expect(sent.map(keys => keys.length)).toEqual([100, 100])
   })
 })
