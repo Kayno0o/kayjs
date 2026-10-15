@@ -1760,7 +1760,7 @@ describe('a form submitted in the browser', () => {
 })
 
 describe('shortcut', () => {
-  const mountShortcuts = site({ 'main.kay': '---\nimport { shortcut, signal } from \'kay\'\n\nconst log = signal<string[]>([])\nlet form: HTMLElement | undefined\n\nlet missing: HTMLElement | undefined\nlet panel: HTMLElement | undefined\nconst armed = signal(false)\nconst note = (name: string) => () => log.set([...log(), name])\n\nshortcut(\'mod+s\', note(\'save\'))\nshortcut(\'/\', note(\'slash\'))\nshortcut(\'escape\', note(\'escape\'))\nshortcut(\'alt+s\', note(\'alt-s\'), { preventDefault: false })\nshortcut(\'mod+e\', note(\'page-e\'))\nshortcut(\'mod+e\', note(\'form-e\'), { on: () => form })\nshortcut(\'mod+r\', note(\'repeat\'), { repeat: true })\nshortcut(\'?\', note(\'help\'), { inputs: true })\nshortcut(\'arrowdown\', note(\'down\'))\nshortcut(\'enter\', note(\'enter\'))\nshortcut(() => armed() ? \'mod+g\' : null, note(\'signal\'))\nshortcut(\'mod+u\', note(\'unbound\'), { on: () => missing })\nshortcut(() => armed() ? \'mod+k\' : null, note(\'scoped\'), { on: () => panel })\nshortcut(\'@\', note(\'at\'))\nshortcut(\'space\', note(\'space\'))\nshortcut(\'1\', note(\'one\'))\n---\nform.editor(ref={element => form = element})\n  input.field\n  div.rich(contenteditable="true")\nbutton.arm(type="button" onClick={() => armed.set(true)}) arm\nbutton.disarm(type="button" onClick={() => armed.set(false)}) disarm\naside.panel(ref={element => panel = element})\na.link(href="/x") link\np.log {log().join(\',\')}\n' })
+  const mountShortcuts = site({ 'main.kay': '---\nimport { shortcut, signal } from \'kay\'\n\nconst log = signal<string[]>([])\nlet form: HTMLElement | undefined\n\nlet missing: HTMLElement | undefined\nlet panel: HTMLElement | undefined\nconst armed = signal(false)\nconst note = (name: string) => () => log.set([...log(), name])\n\nshortcut(\'mod+s\', note(\'save\'))\nshortcut(\'/\', note(\'slash\'))\nshortcut(\'escape\', note(\'escape\'))\nshortcut(\'alt+s\', note(\'alt-s\'), { preventDefault: false })\nshortcut(\'mod+e\', note(\'page-e\'))\nshortcut(\'mod+e\', note(\'form-e\'), { on: () => form })\nshortcut(\'mod+r\', note(\'repeat\'), { repeat: true })\nshortcut(\'?\', note(\'help\'), { inputs: true })\nshortcut(\'arrowdown\', note(\'down\'))\nshortcut(\'enter\', note(\'enter\'))\nshortcut(() => armed() ? \'mod+g\' : null, note(\'signal\'))\nshortcut(\'mod+u\', note(\'unbound\'), { on: () => missing })\nshortcut(() => armed() ? \'mod+k\' : null, note(\'scoped\'), { on: () => panel })\nshortcut(\'@\', note(\'at\'))\nshortcut(\'space\', note(\'space\'))\nshortcut(\'shift+space\', note(\'shift-space\'))\nshortcut(\'1\', note(\'one\'))\n---\nform.editor(ref={element => form = element})\n  input.field\n  div.rich(contenteditable="true")\nbutton.arm(type="button" onClick={() => armed.set(true)}) arm\nbutton.disarm(type="button" onClick={() => armed.set(false)}) disarm\naside.panel(ref={element => panel = element})\na.link(href="/x") link\np.log {log().join(\',\')}\n' })
 
   function press(target: EventTarget, key: string, init: KeyboardEventInit = {}): KeyboardEvent {
     const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...init })
@@ -1924,7 +1924,7 @@ describe('shortcut', () => {
       press(document.body, '/', { code: 'BracketLeft' })
       press(document.body, '&', { code: 'Digit1' })
       press(document.body, '1', { code: 'Numpad1' })
-      expect(await logged(root)).toBe('space,space,slash,one,one')
+      expect(await logged(root)).toBe('space,shift-space,slash,one,one')
     }
     finally {
       await dispose()
@@ -1935,17 +1935,17 @@ describe('shortcut', () => {
     const { root, dispose } = await mountShortcuts()
 
     try {
-      const altGraph = (init: KeyboardEventInit): KeyboardEvent => {
+      const type = (init: KeyboardEventInit, altGraph: boolean): void => {
         const event = new KeyboardEvent('keydown', { key: '@', bubbles: true, cancelable: true, ...init })
 
-        event.getModifierState = name => name === 'AltGraph'
+        event.getModifierState = name => altGraph && name === 'AltGraph'
         document.body.dispatchEvent(event)
-
-        return event
       }
 
-      altGraph({ ctrlKey: true, altKey: true })
-      altGraph({ altKey: false })
+      type({ ctrlKey: true, altKey: true }, true)
+      type({}, true)
+      type({ ctrlKey: true, altKey: true }, false)
+      type({ altKey: true }, false)
       expect(await logged(root)).toBe('at,at')
     }
     finally {

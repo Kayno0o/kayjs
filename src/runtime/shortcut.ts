@@ -52,7 +52,7 @@ function parse(spec: string, apple: boolean): Parsed {
       throw new Error(`shortcut('${spec}') has an unknown modifier '${modifier}': use mod, ctrl, meta, alt or shift`)
   }
 
-  parsed.symbol = parsed.key.length === 1 && !(/[a-z0-9]/).test(parsed.key)
+  parsed.symbol = parsed.key.length === 1 && parsed.key !== ' ' && !(/[a-z0-9]/).test(parsed.key)
 
   return parsed
 }
@@ -118,14 +118,16 @@ export function shortcut(keys: string | (() => string | null | undefined), handl
 
 // Listens for the shortcut on `target` until the computation it runs in is cleaned up.
 function bind(parsed: Parsed, target: EventTarget, scope: Element | undefined, handler: (event: KeyboardEvent) => void, options: ShortcutOptions): void {
+  // AltGr is reported as Ctrl+Alt on Windows and Linux, so a symbol typed with it counts as no modifier, a real Ctrl held with it included.
+  const altGrSymbol = parsed.symbol && !parsed.ctrl && !parsed.alt
+
   const listener = (event: Event): void => {
     const press = event as KeyboardEvent
 
     if (press.defaultPrevented || press.isComposing || press.keyCode === 229 || (press.repeat && !options.repeat))
       return
 
-    // AltGr is reported as Ctrl+Alt on Windows and Linux, so a symbol typed with it counts as no modifier.
-    const altGr = parsed.symbol && !parsed.ctrl && !parsed.alt && press.getModifierState?.('AltGraph') === true
+    const altGr = altGrSymbol && press.getModifierState?.('AltGraph') === true
 
     if ((press.ctrlKey && !altGr) !== parsed.ctrl || press.metaKey !== parsed.meta || (press.altKey && !altGr) !== parsed.alt || (!parsed.symbol && press.shiftKey !== parsed.shift) || !pressed(press, parsed.key))
       return
