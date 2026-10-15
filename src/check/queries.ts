@@ -1,8 +1,7 @@
 import type { CheckDiagnostic } from '.'
 import type { Route } from '../server/routes'
 import { parseExpression } from '@babel/parser'
-import { parseKay } from '../compiler/parser'
-import { analyzeServer } from '../compiler/script'
+import { serverFacts } from './layout-facts'
 
 interface Field {
   file: string
@@ -59,7 +58,7 @@ export async function queryClashes(routes: Route[]): Promise<CheckDiagnostic[]> 
 
 async function fieldsOf(file: string): Promise<Map<string, Field> | undefined> {
   const source = await Bun.file(file).text()
-  const query = analyzeServer(source, parseKay(source).server)?.page?.settings.get('query')
+  const query = serverFacts(file, source).server?.page?.settings.get('query')
 
   if (!query)
     return undefined

@@ -3,16 +3,17 @@ import type { Span } from '../compiler/ast'
 import type { LintLevels } from '../compiler/lints'
 import type { ImportedSignals } from '../compiler/module-signals'
 import type { Route, RouteMount } from '../server/routes'
+import type { ServerFacts } from './layout-facts'
 import { existsSync, readFileSync } from 'node:fs'
 import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import { importedSignals } from '../build/signals'
 import { compileKay } from '../compiler'
 import { parseKay } from '../compiler/parser'
-import { analyzeServer } from '../compiler/script'
 import { projectPaths } from '../project'
 import * as builtInMatchers from '../runtime/params'
 import { matcherFile } from '../server/params'
 import { directoriesUp, falseKeys, fileAt, routeOf, routeTrees, virtualDir } from '../server/routes'
+import { serverFacts } from './layout-facts'
 
 // What the shadow tree was last compiled with, for tools that compile one file at a time without reading kay.config.ts, such as the ESLint processor.
 export const SHADOW_SETTINGS = 'kay-shadow.json'
@@ -115,19 +116,19 @@ export function outerQueries(file: string, source: string, trees: RouteMount[]):
   if (!trees.some(({ dir }) => file.startsWith(dir + sep)) || falseKeys(source).has('layouts'))
     return []
 
-  const above: { layout: string, text: string }[] = []
+  const above: { layout: string, facts: ServerFacts }[] = []
 
   for (const dir of directoriesUp(virtualDir(trees, dirname(file)))) {
     const layout = fileAt(trees, dir, LAYOUT)
 
     if (layout !== undefined && layout !== file)
-      above.push({ layout, text: readFileSync(layout, 'utf8') })
+      above.push({ layout, facts: serverFacts(layout, readFileSync(layout, 'utf8')) })
   }
 
   // The innermost layout that leaves its parents out starts the chain.
-  const reset = above.findIndex(({ text }) => falseKeys(text).has('layouts'))
+  const reset = above.findIndex(({ facts }) => facts.leavesLayoutsOut)
 
-  return (reset === -1 ? above : above.slice(0, reset + 1)).reverse().filter(({ text }) => analyzeServer(text, parseKay(text).server)?.page?.settings.has('query')).map(({ layout }) => {
+  return (reset === -1 ? above : above.slice(0, reset + 1)).reverse().filter(({ facts }) => facts.server?.page?.settings.has('query')).map(({ layout }) => {
     const path = relative(dirname(file), layout).split(sep).join('/')
 
     return `(typeof import(${JSON.stringify(path.startsWith('.') ? path : `./${path}`)}))["page"]["query"]`

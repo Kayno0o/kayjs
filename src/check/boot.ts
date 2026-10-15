@@ -3,8 +3,6 @@ import type { CollectionFeed } from '../content/server'
 import type { LocaleSettings } from '../runtime/i18n'
 import { join, resolve } from 'node:path'
 import { islandId } from '../compiler'
-import { parseKay } from '../compiler/parser'
-import { analyzeServer } from '../compiler/script'
 import { CONFIG_FILE } from '../config'
 import { claimFeed } from '../content/server'
 import { projectPaths } from '../project'
@@ -23,6 +21,7 @@ import { refuseClashes } from '../server/route-table'
 import { routeMounts, scanEndpoints, scanRoutes } from '../server/routes'
 import { siteOrigin } from '../server/seo'
 import { ServedPaths } from '../server/served-paths'
+import { serverFacts } from './layout-facts'
 import { queryClashes } from './queries'
 
 // What the server refuses when it boots, found by the functions it calls then, so `kay check` and the boot cannot disagree; the collections' feeds come from the process that read them.
@@ -107,14 +106,14 @@ export async function bootProblems(root: string, options: CheckOptions, feeds: C
 
 // The URL each action of the pages and layouts is served at, as the server registers it, reported where a second file takes one.
 // Only an export declared as an `action(...)` call counts: the server registers actions only, so another export two such files share clashes nowhere.
-async function actionClashes(root: string, files: string[]): Promise<CheckDiagnostic[]> {
+export async function actionClashes(root: string, files: string[]): Promise<CheckDiagnostic[]> {
   const diagnostics: CheckDiagnostic[] = []
   const served = new Map<string, string>()
 
   for (const file of files) {
     const source = await Bun.file(file).text()
 
-    for (const name of analyzeServer(source, parseKay(source).server)?.actionNames ?? []) {
+    for (const name of serverFacts(file, source).server?.actionNames ?? []) {
       const url = actionUrl(islandId(file, root), name)
       const taken = served.get(url)
 
