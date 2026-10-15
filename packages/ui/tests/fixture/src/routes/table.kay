@@ -11,3 +11,5 @@ main
     Table(columns={columns} rows={planets} rowKey="id" filter={['name'] as const} filterParam="q")
   #scrolling
     Table(columns={[{ key: 'name', header: 'Name' }]} rows={planets} rowKey="id" narrow="scroll")
+  #selectable
+    Table(columns={columns} rows={planets} rowKey="id" selectable selected={[2]})

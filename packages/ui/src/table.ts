@@ -59,6 +59,18 @@ export function rowKeyOf<Row>(row: Row, key: RowKey<Row>): unknown {
   return typeof key === 'function' ? key(row) : row[key]
 }
 
+// What names a row to a screen reader: the text of its first column that has any, or its key.
+export function rowLabel<Row>(row: Row, columns: Column<Row>[], key: RowKey<Row>): string {
+  for (const column of columns) {
+    const text = cellText(row, column)
+
+    if (text !== '')
+      return text
+  }
+
+  return String(rowKeyOf(row, key))
+}
+
 function valueAt<Row>(row: Row, key: string): unknown {
   return (row as Record<string, unknown>)[key]
 }

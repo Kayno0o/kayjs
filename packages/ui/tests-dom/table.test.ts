@@ -142,3 +142,216 @@ describe('Table with a filter', () => {
     expect(mounted.root.querySelector('.kui-table-empty-cell .nothing')?.textContent).toBe('No moons')
   })
 })
+
+describe('Table with a selection', () => {
+  const MOONS = [{ id: 1, name: 'Io', radius: 1822 }, { id: 2, name: 'Europa', radius: 1561 }, { id: 3, name: 'Amalthea', radius: 84 }]
+  const boxes = (root: HTMLElement) => [...root.querySelectorAll<HTMLInputElement>('tbody .kui-checkbox-input')]
+  const all = (root: HTMLElement) => root.querySelector<HTMLInputElement>('.kui-table-selection .kui-checkbox-input')!
+  const toolbar = (root: HTMLElement) => root.querySelector('.kui-table-selection')!.textContent
+  const ticked = (root: HTMLElement) => boxes(root).map(box => box.checked)
+
+  function toggle(box: HTMLInputElement) {
+    box.checked = !box.checked
+    box.dispatchEvent(new Event('change', { bubbles: true }))
+  }
+
+  test('draws no box without `selectable`', async () => {
+    mounted = await mount('src/components/table.kay', { rows: PLANETS })
+
+    expect(mounted.root.querySelector('.kui-checkbox, .kui-table-selection')).toBeNull()
+  })
+
+  test('picks rows, counts them, and shows the select-all box unticked, indeterminate for some and ticked for all', async () => {
+    const seen: unknown[][] = []
+
+    mounted = await mount('src/components/selectable-table.kay', { rows: MOONS, onSelect: (keys: unknown[]) => seen.push(keys) })
+
+    const { root } = mounted
+
+    expect(toolbar(root)).toBe('Select all')
+    expect(all(root).indeterminate).toBe(false)
+    expect(root.querySelector('.kui-table-bulk')).toBeNull()
+
+    toggle(boxes(root)[1]!)
+    await settle()
+
+    expect(toolbar(root)).toContain('1 selected')
+    expect(ticked(root)).toEqual([false, true, false])
+    expect(all(root).indeterminate).toBe(true)
+    expect(all(root).checked).toBe(false)
+
+    toggle(boxes(root)[0]!)
+    toggle(boxes(root)[2]!)
+    await settle()
+
+    expect(toolbar(root)).toContain('3 selected')
+    expect(all(root).checked).toBe(true)
+    expect(all(root).indeterminate).toBe(false)
+    expect(seen.at(-1)).toEqual([1, 2, 3])
+  })
+
+  test('selects every row from select-all, and clears them from it once all are picked, and from the indeterminate state selects all', async () => {
+    mounted = await mount('src/components/selectable-table.kay', { rows: MOONS })
+
+    const { root } = mounted
+
+    toggle(boxes(root)[0]!)
+    await settle()
+    toggle(all(root))
+    await settle()
+
+    expect(ticked(root)).toEqual([true, true, true])
+
+    toggle(all(root))
+    await settle()
+
+    expect(ticked(root)).toEqual([false, false, false])
+    expect(toolbar(root)).toBe('Select all')
+  })
+
+  test('shows the bulk block beside the count with the keys in row order, and its clear function empties the selection', async () => {
+    const acted: unknown[][] = []
+
+    mounted = await mount('src/components/selectable-table.kay', { rows: MOONS, onBulk: (keys: unknown[]) => acted.push(keys) })
+
+    const { root } = mounted
+
+    toggle(boxes(root)[2]!)
+    toggle(boxes(root)[0]!)
+    await settle()
+    click(root.querySelector('.kui-table-selection .bulk-action'))
+    await settle()
+
+    expect(acted).toEqual([[1, 3]])
+    expect(ticked(root)).toEqual([false, false, false])
+    expect(root.querySelector('.kui-table-bulk')).toBeNull()
+  })
+
+  test('labels each row box by its row, the select-all box and the column header, and takes the texts from the page', async () => {
+    mounted = await mount('src/components/selectable-table.kay', { rows: MOONS })
+
+    const { root } = mounted
+
+    expect(boxes(root).map(box => box.getAttribute('aria-label'))).toEqual(['Select Io', 'Select Europa', 'Select Amalthea'])
+    expect(header(root, 0).textContent).toBe('Select all')
+    mounted.unmount()
+
+    mounted = await mount('src/components/selectable-table.kay', { rows: MOONS, selected: [1, 2], selectAllLabel: 'Tout', selectedLabel: (count: number) => `${count} choisis`, selectRowLabel: (row: { name: string }) => `Choisir ${row.name}` })
+
+    expect(toolbar(mounted.root)).toContain('2 choisis')
+    expect(header(mounted.root, 0).textContent).toBe('Tout')
+    expect(boxes(mounted.root).map(box => box.getAttribute('aria-label'))).toEqual(['Choisir Io', 'Choisir Europa', 'Choisir Amalthea'])
+  })
+
+  test('starts from `selected` and drops keys of rows that are not there, telling the page', async () => {
+    const seen: unknown[][] = []
+
+    mounted = await mount('src/components/selectable-table.kay', { rows: MOONS, selected: [3, 9, 1], onSelect: (keys: unknown[]) => seen.push(keys) })
+    await settle()
+
+    expect(ticked(mounted.root)).toEqual([true, false, true])
+    expect(toolbar(mounted.root)).toContain('2 selected')
+    expect(seen).toEqual([[1, 3]])
+  })
+
+  test('prunes the keys of rows no longer in `rows`, and a row coming back is not picked again', async () => {
+    const seen: unknown[][] = []
+
+    mounted = await mount('src/components/selectable-table.kay', { rows: MOONS, selected: [1, 2, 3], onSelect: (keys: unknown[]) => seen.push(keys) })
+    await settle()
+    click(mounted.root.querySelector('.drop'))
+    await settle()
+
+    expect(toolbar(mounted.root)).toContain('2 selected')
+    expect(seen.at(-1)).toEqual([1, 3])
+
+    click(mounted.root.querySelector('.restore'))
+    await settle()
+
+    expect(ticked(mounted.root)).toEqual([true, false, true])
+  })
+
+  test('keeps the selection through a sort', async () => {
+    mounted = await mount('src/components/selectable-table.kay', { rows: MOONS })
+
+    const { root } = mounted
+
+    toggle(boxes(root)[0]!)
+    await settle()
+    click(header(root, 1).querySelector('button'))
+    await settle()
+
+    expect(boxes(root).map(box => box.getAttribute('aria-label'))).toEqual(['Select Amalthea', 'Select Europa', 'Select Io'])
+    expect(ticked(root)).toEqual([false, false, true])
+  })
+
+  test('select-all acts on the rows the filter shows, leaving the ones it hides as they are', async () => {
+    mounted = await mount('src/components/selectable-table.kay', { rows: MOONS, filter: true, selected: [3] })
+
+    const { root } = mounted
+    const input = root.querySelector<HTMLInputElement>('.kui-table-filter-input')!
+
+    input.value = 'eur'
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    await settle()
+
+    expect(boxes(root)).toHaveLength(1)
+    expect(all(root).indeterminate).toBe(false)
+    expect(all(root).checked).toBe(false)
+
+    toggle(all(root))
+    await settle()
+
+    expect(toolbar(root)).toContain('2 selected')
+    expect(all(root).checked).toBe(true)
+
+    toggle(all(root))
+    await settle()
+
+    expect(toolbar(root)).toContain('1 selected')
+
+    input.value = ''
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    await settle()
+
+    expect(ticked(root)).toEqual([false, false, true])
+  })
+
+  test('disables select-all for an empty table and gives the empty cell the extra column', async () => {
+    mounted = await mount('src/components/selectable-table.kay', { rows: [] })
+
+    expect(all(mounted.root).disabled).toBe(true)
+    expect(mounted.root.querySelector('.kui-table-empty-cell')?.getAttribute('colspan')).toBe('3')
+  })
+
+  test('keeps the select-all box outside the table, so stacked cards have it too, and a box in each card without a label', async () => {
+    mounted = await mount('src/components/selectable-table.kay', { rows: MOONS, narrow: 'stack' })
+
+    const { root } = mounted
+
+    expect(root.querySelector('table .kui-table-selection')).toBeNull()
+    expect(root.querySelector('tbody tr td.kui-table-select-cell .kui-table-cell-label')).toBeNull()
+  })
+
+  test('works with the rows of an infinite list: a page loaded later joins select-all and the picked rows stay picked', async () => {
+    const seen: unknown[][] = []
+
+    mounted = await mount('src/components/selectable-feed.kay', { onLoad: async () => [{ id: 3, name: 'Amalthea' }], onSelect: (keys: unknown[]) => seen.push(keys) })
+
+    const { root } = mounted
+
+    toggle(boxes(root)[0]!)
+    await settle()
+    click(root.querySelector('.more'))
+    await settle()
+
+    expect(boxes(root)).toHaveLength(3)
+    expect(ticked(root)).toEqual([true, false, false])
+
+    toggle(all(root))
+    await settle()
+
+    expect(toolbar(root)).toContain('3 selected')
+    expect(seen.at(-1)).toEqual([1, 2, 3])
+  })
+})

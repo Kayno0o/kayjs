@@ -1,6 +1,6 @@
 import type { Column } from '../src/table'
 import { describe, expect, test } from 'bun:test'
-import { cellText, drawnByBlock, nextSort, resolvedColumn, rowKeyOf, rowsMatching, sortedRows } from '../src/table'
+import { cellText, drawnByBlock, nextSort, resolvedColumn, rowKeyOf, rowLabel, rowsMatching, sortedRows } from '../src/table'
 
 interface Planet { id: number, name: string, moons: number | null }
 
@@ -69,4 +69,10 @@ test('a filter keeps a row whose fields or function values hold the text, its ca
   expect(rowsMatching(planets, ['name'], ' AR ').map(planet => planet.name)).toEqual(['Mars', 'Earth'])
   expect(rowsMatching(planets, row => [row.name, row.moons], '2').map(planet => planet.name)).toEqual(['Mars'])
   expect(rowsMatching(planets, ['moons'], '')).toBe(planets)
+})
+
+test('rowLabel names a row by its first column with any text, or its key', () => {
+  expect(rowLabel(planets[0]!, [name, moons], 'id')).toBe('Mars')
+  expect(rowLabel({ id: 4, name: '', moons: null }, [name, moons], 'id')).toBe('4')
+  expect(rowLabel({ id: 4, name: '', moons: 7 }, [name, moons], row => `p${row.id}`)).toBe('7')
 })

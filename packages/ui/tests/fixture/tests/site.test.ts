@@ -102,6 +102,15 @@ test('Table stacks when narrow, its cells labelled by their headers, unless it s
   expect(scrolling).toContain('<td class="kui-table-cell" data-align="start"><div class="kui-table-cell-body">Earth</div></td>')
 })
 
+test('Table renders its selection on the server: a box per row labelled by it, the picked ones ticked, and the count over the select-all box', async () => {
+  const table = (await element('/table', 'selectable')).replaceAll(/<!--[^>]*-->/g, '')
+
+  expect(table).toContain('1 selected')
+  expect(table).toContain('<th class="kui-table-head-cell kui-table-select-cell" scope="col"><span class="kui-table-select-text">Select all</span></th>')
+  expect([...table.matchAll(/aria-label="([^"]*)"/g)].map(([, label]) => label)).toEqual(['Select Mars', 'Select Earth', 'Select Venus'])
+  expect(table.match(/<tr class="kui-table-row" data-selected="">/g)).toHaveLength(1)
+})
+
 test('Table filters on the server by the text its query param holds, shown in its search box', async () => {
   const table = (await element('/table?q=EAR', 'filtered')).replaceAll(/<!--[^>]*-->/g, '')
 

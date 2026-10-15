@@ -1,0 +1,15 @@
+---
+import { infiniteList } from '@kaynooo/kayjs-ui'
+import LoadMore from '@kaynooo/kayjs-ui/load-more.kay'
+import Table from '@kaynooo/kayjs-ui/table.kay'
+
+const { onLoad, onSelect } = props<{
+  onLoad: (offset: number) => Promise<{ id: number, name: string }[] | undefined>
+  onSelect: (keys: unknown[]) => void
+}>()
+
+const feed = infiniteList([{ id: 1, name: 'Io' }, { id: 2, name: 'Europa' }], { size: 2, key: row => row.id, load: ({ offset }) => onLoad(offset) })
+---
+button.more(type="button" onClick={feed.more}) More
+Table(columns={[{ key: 'name', header: 'Name' }]} rows={feed.rows()} rowKey="id" selectable onSelect={onSelect})
+LoadMore(list={feed})

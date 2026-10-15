@@ -1646,6 +1646,24 @@
     @apply sr-only;
   }
 
+  /* Sticky like the filter; the bulk actions sit beside the count. */
+  .kui-table-selection {
+    @apply sticky left-0 flex flex-wrap items-center gap-3 border-b border-kui-surface2 px-3 py-2 text-sm;
+  }
+
+  .kui-table-bulk {
+    @apply flex flex-wrap items-center gap-2;
+  }
+
+  /* Just wide enough for its box. */
+  .kui-table-select-cell {
+    @apply w-0;
+  }
+
+  .kui-table-select-text {
+    @apply sr-only;
+  }
+
   .kui-table {
     @apply w-full border-collapse text-sm;
   }
@@ -1681,7 +1699,8 @@
   .kui-table-row {
     @apply border-b border-kui-surface2;
 
-    &:hover {
+    &:hover,
+    &:where([data-selected]) {
       @apply bg-kui-row-hover;
     }
   }
