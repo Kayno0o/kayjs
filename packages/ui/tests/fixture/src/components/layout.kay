@@ -9,7 +9,7 @@ PageHeader#moons(title="Moons" description="Every moon of Jupiter, by distance."
   @meta
     span 95
   @actions
-    a(href="/moons/new") New moon
+    a(href="/") Home
   p Under the description.
 PageHeader#bare(title="Planets")
 FileDrop#slim(compact onFiles={() => undefined})
