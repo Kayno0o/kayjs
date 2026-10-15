@@ -171,6 +171,28 @@ describe('islands', () => {
     }
   })
 
+  it('queues at most 50 events for an island that has not hydrated, and one input event per run on the same field', () => {
+    // eslint-disable-next-line no-new-func -- runs the inline hydration script, which happy-dom does not execute from markup
+    (new Function(HYDRATION_SCRIPT) as () => void)()
+    document.body.innerHTML = '<slot data-component="a.kay" data-hydrate="visible"><button>A</button></slot><slot data-component="b.kay" data-hydrate="visible"><button>B</button></slot><slot data-component="c.kay" data-hydrate="visible"><input></slot>'
+
+    const [button, other, input] = [...document.querySelectorAll('button, input')]
+    const queue = (globalThis as { _$K?: Event[] })._$K!
+
+    for (let i = 0; i < 500; i++)
+      button!.dispatchEvent(new Event('click', { bubbles: true }))
+
+    // The other island still queues, and typing queues its last input alone.
+    other!.dispatchEvent(new Event('click', { bubbles: true }))
+
+    for (let i = 0; i < 500; i++)
+      input!.dispatchEvent(new Event('input', { bubbles: true }))
+
+    expect(queue.filter(event => event.target === button)).toHaveLength(50)
+    expect(queue.filter(event => event.target === other)).toHaveLength(1)
+    expect(queue.filter(event => event.target === input)).toHaveLength(1)
+  })
+
   it('replays a click made before its island hydrated once its effects ran, as on an island already hydrated', async () => {
     const { default: Mounted } = await import(join(fixtures, 'mounted.kay')) as { default: (props: object) => unknown }
 
