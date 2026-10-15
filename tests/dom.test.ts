@@ -1108,7 +1108,7 @@ describe('transitions', () => {
       await twoFrames()
       expect(panel.className).toBe('fade-leave-active fade-leave-to')
       setOpen(true)
-      await settle()
+      await updated()
       expect([panel.isConnected, panel.className]).toEqual([true, 'fade-enter-from fade-enter-active'])
       await done()
       expect([panel.isConnected, panel.className]).toEqual([true, ''])
@@ -1127,7 +1127,7 @@ describe('transitions', () => {
       await twoFrames()
       Object.defineProperty(document, 'hidden', { value: true, configurable: true })
       setOpen(true)
-      await settle()
+      await updated()
       await done()
       expect([panel.isConnected, panel.className]).toEqual([true, ''])
     }
