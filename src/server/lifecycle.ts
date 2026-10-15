@@ -17,7 +17,7 @@ export const START_PARENT = 'KAY_START_PID'
 // Which of the two it is, for the line the server logs as it stops.
 export const START_COMMAND = 'KAY_START_COMMAND'
 // Set on `globalThis` while a server watches its parent, so the watch `kay render` preloads, for a server nothing else stops, leaves it the stop.
-export const PARENT_WATCHED = Symbol.for('kay.parentWatched')
+const PARENT_WATCHED = Symbol.for('kay.parentWatched')
 const PARENT_POLL_MS = 1000
 
 interface Lifecycle {

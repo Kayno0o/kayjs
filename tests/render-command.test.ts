@@ -248,10 +248,16 @@ p {user} via {via}
   ])('stops %s once kay render is killed alone', async (_, server) => {
     const { pid } = await killedRender(await project(undefined, announced(server)), '/', () => true)
 
-    for (let tries = 0; alive(pid) && tries < 100; tries++)
-      await Bun.sleep(50)
+    try {
+      for (let tries = 0; alive(pid) && tries < 100; tries++)
+        await Bun.sleep(50)
 
-    expect(alive(pid)).toBe(false)
+      expect(alive(pid)).toBe(false)
+    }
+    finally {
+      if (alive(pid))
+        process.kill(pid, 'SIGKILL')
+    }
   }, 15_000)
 
   it('names kay render as the process gone when a production server drains', async () => {

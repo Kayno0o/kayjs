@@ -6,13 +6,25 @@ const SOCKET = process.env.KAY_RENDER_SOCKET!
 const PARENT_WATCHED = Symbol.for('kay.parentWatched')
 const PARENT_POLL_MS = 1000
 const serve = Bun.serve.bind(Bun)
-const parent = process.ppid
+// `START_PARENT` in `src/server/lifecycle.ts`, read rather than `process.ppid`, which already names the reaper when `kay render` died before this preload ran.
+const parent = Number(process.env.KAY_START_PID) || process.ppid
 let started = 0
 
 delete process.env.KAY_RENDER_SOCKET
 
-// A server `kay render` outlived stops: through `pages()`, which drains it, or here for an entry serving without it.
-setInterval(() => process.ppid !== parent && Reflect.get(globalThis, PARENT_WATCHED) !== true && process.exit(), PARENT_POLL_MS).unref()
+let asked = false
+
+// A server `kay render` outlived stops: through `pages()`, which drains it, or here for an entry serving without it, by SIGTERM so its own handlers run, then for good a poll later.
+setInterval(() => {
+  if (process.ppid === parent || Reflect.get(globalThis, PARENT_WATCHED) === true)
+    return
+
+  if (asked)
+    process.exit()
+
+  asked = true
+  process.kill(process.pid, 'SIGTERM')
+}, PARENT_POLL_MS).unref()
 
 Bun.serve = ((options: Parameters<typeof Bun.serve>[0]) => {
   const onSocket: Record<string, unknown> = { ...options, unix: started === 0 ? SOCKET : `${SOCKET}.${started}` }
