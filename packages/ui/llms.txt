@@ -489,7 +489,7 @@ SaveForm is the form of an editor page: `SaveForm(action={rename} failure="Could
 - The form is dirty while its controls differ from what they held when it was last clean, so typing a change back cleans it, and a control added or removed counts. A control set from code needs an `input` event dispatched on it.
 - Save calls `action` like FormDialog, with `refused` and `failure` working the same, and does nothing while the form is clean or a save runs. A failure keeps the bar dirty, a refused field takes the focus, and edits made during the save stay unsaved. A save toasts `saved` when given, calls `onSaved(result)` and leaves the form clean.
 - Discard resets the controls to their initial values, or to the saved ones once a save has run, clears the messages and calls `onDiscard`, for state the page keeps beyond the controls. The signal-driven controls (Checkbox, Toggle, ChipGroup, Segmented, Select, MultiSelect, IconPicker, TextInput, Textarea, MarkdownEditor, RangeInput) follow any `form.reset()`, a `<button type="reset">` included, and tell their `onChange` or `onInput` what they went back to.
-- Leaving with unsaved changes asks as `guardLeave` does, except while a save runs. Ctrl+S and Cmd+S save from any field.
+- Leaving with unsaved changes asks as `guardLeave` does, except while a save runs. Cmd+S on macOS and Ctrl+S elsewhere save from any field, on the key that types an S whatever the layout (`shortcut('mod+s')`).
 - The status line is a live region; the buttons use `aria-disabled`, so the focus stays on the one pressed as the form turns clean. `dirtyLabel`, `cleanLabel`, `savingLabel`, `saveLabel` and `discardLabel` replace the texts.
 
 FormField also works outside a dialog, in a plain form posting to an action:

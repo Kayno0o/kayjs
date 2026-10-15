@@ -1,6 +1,6 @@
 --- <Output>
 import type { Action, Failure, FailureData } from 'kay'
-import { guardLeave, onCleanup, onMount, signal } from 'kay'
+import { guardLeave, onCleanup, onMount, shortcut, signal } from 'kay'
 import Button from './button.kay'
 import { callAction, formIssues } from './forms'
 import { holdDefaults, onFormReset } from './form-reset'
@@ -133,15 +133,9 @@ function discard() {
 }
 
 // Ctrl or Cmd with S saves, the browser's own save dialog kept away even when there is nothing to save.
-function saveOnShortcut(event: KeyboardEvent) {
-  if ((event.code !== 'KeyS' && event.key.toLowerCase() !== 's') || !(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey)
-    return
-
-  event.preventDefault()
-  form?.requestSubmit()
-}
+shortcut('mod+s', () => form?.requestSubmit(), { on: () => form })
 ---
-form.kui-save-form(class={className} ref={element => form = element} onSubmit={submit} onInput={check} onChange={check} onKeyDown={saveOnShortcut})
+form.kui-save-form(class={className} ref={element => form = element} onSubmit={submit} onInput={check} onChange={check})
   .kui-form-grid
     slot
   .kui-save-bar

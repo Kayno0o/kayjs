@@ -25,7 +25,7 @@ The form is dirty when what its controls hold differs from what they held when i
 - **Save** calls the action, and does nothing while the form is clean or a save is under way. A failure keeps the bar dirty: a refused field shows its message on its [FormField](/ui/form-field) and takes the focus, any other message is toasted, as in a FormDialog, with `refused` for a handler's refusals. Edits made while the save runs stay unsaved. A save toasts `saved` when given, calls `onSaved` with what the action returned and leaves the form clean.
 - **Discard** puts the controls back to their initial values, or to the saved ones once a save has run, and clears the messages. The library's controls follow it and tell their `onChange` or `onInput` what they went back to, so the page needs nothing in `onDiscard`, which is for state it keeps beyond the controls.
 - **Leaving** with unsaved changes asks, as `guardLeave` does: a link of the app, going back, a reload or closing the tab, but not while a save is under way.
-- **Ctrl+S** and Cmd+S save from any field of the form.
+- **Ctrl+S**, or Cmd+S on macOS, saves from any field of the form, on the key that types an S whatever the layout.
 - The bar's status is a live region, so a screen reader hears the changes pile up, the save start and the form come back clean. The buttons stay focusable as the form turns clean, so the focus stays on the one pressed.
 - `dirtyLabel`, `cleanLabel`, `savingLabel`, `saveLabel` and `discardLabel` replace the texts.
 

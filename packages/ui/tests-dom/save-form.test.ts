@@ -227,7 +227,7 @@ describe('SaveForm', () => {
     expect(leaves()).toBe(false)
   })
 
-  test('Ctrl+S and Cmd+S save, and the browser\'s own save is kept away', async () => {
+  test('Ctrl+S saves, and the browser\'s own save is kept away', async () => {
     const root = await saveForm(async input => input.name)
 
     type(root, 'Grace')
@@ -243,10 +243,26 @@ describe('SaveForm', () => {
 
     type(root, 'Hopper')
     await settle()
-    root.querySelector('#name')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'S', metaKey: true, bubbles: true, cancelable: true }))
+    root.querySelector('#name')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'S', ctrlKey: true, bubbles: true, cancelable: true }))
     await settle()
 
     expect(saved).toEqual(['Grace', 'Hopper'])
+  })
+
+  test('Ctrl on the physical S key of a layout typing another letter saves nothing', async () => {
+    const root = await saveForm(async input => input.name)
+
+    type(root, 'Grace')
+    await settle()
+
+    // Dvorak: the key at QWERTY\'s S types o, so Ctrl+O is not a save.
+    const event = new KeyboardEvent('keydown', { key: 'o', code: 'KeyS', ctrlKey: true, bubbles: true, cancelable: true })
+
+    root.querySelector('#name')!.dispatchEvent(event)
+    await settle()
+
+    expect(event.defaultPrevented).toBe(false)
+    expect(saved).toEqual([])
   })
 
   test('Discard puts the library\'s signal-driven controls back on the saved values, and the page signals with them', async () => {
