@@ -23,6 +23,13 @@ interface ServedAsset {
   encoded: Map<Encoding, { file: Bun.BunFile, headers: HeaderCopies }>
 }
 
+// Whether the request spells a file as the build writes it, raw or percent-encoded as its URL in the build's list, which are the only spellings kept.
+function isBuildSpelling(dir: string, path: string, spelled: string): boolean {
+  const name = relative(dir, path)
+
+  return spelled === name || spelled === name.split(sep).map(encodeURIComponent).join('/')
+}
+
 // Serves the browser build under `/_kay/`, each file with its compressed copy when the browser takes it, and gives the path of each, whose responses carry the security headers themselves.
 export async function serveBuildFiles(app: Elysia, client: ClientBuild, { dev, security }: { dev: boolean, security: Record<string, string> | undefined }): Promise<string[]> {
   const clientFiles = await filesUnder(client.dir)
@@ -34,7 +41,7 @@ export async function serveBuildFiles(app: Elysia, client: ClientBuild, { dev, s
   // The notices file keeps its name from one build to the next, as the search manifest does.
   const notices = resolve(client.dir, NOTICES_FILE)
   // Outside development the build's files never change, so each is looked up once, by the name the request spells it with, and its headers built once: a lookup costs more than sending the file, in an executable most of all.
-  // Only a name spelled as the build writes it is kept, so requests cannot grow the map past the build's files.
+  // Only a name spelled as the build writes it or lists its URL is kept, so requests cannot grow the map past the build's files.
   const served = new Map<string, ServedAsset>()
 
   function prepare(path: string, file: Bun.BunFile): ServedAsset {
@@ -67,7 +74,7 @@ export async function serveBuildFiles(app: Elysia, client: ClientBuild, { dev, s
 
       known = prepare(path, file)
 
-      if (!dev && relative(client.dir, path) === spelled)
+      if (!dev && isBuildSpelling(client.dir, path, spelled))
         served.set(spelled, known)
     }
 

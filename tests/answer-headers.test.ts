@@ -1,7 +1,11 @@
+import type { ClientBuild } from '../src/server/client'
+import { rm } from 'node:fs/promises'
+import { join, resolve } from 'node:path'
 import { beforeAll, describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
 import { files, memoryFiles, pages } from '../src/server'
-import { fixtureCopy } from './scratch'
+import { serveBuildFiles } from '../src/server/build-files'
+import { fixtureCopy, scratchDir } from './scratch'
 
 const ORIGIN = 'http://localhost'
 const REQUEST_ID = /^[\w-]{22}$/
@@ -173,5 +177,73 @@ describe('the headers of every kind of answer', () => {
     expect(response.headers.get('content-security-policy')).toBe(page)
     expect(response.headers.get('x-content-type-options')).toBe('nosniff')
     expect(response.headers.get('x-request-id')).toMatch(REQUEST_ID)
+  })
+})
+
+describe('the asset route\'s cache of build files', () => {
+  const serve = async (dev: boolean) => {
+    const dir = resolve(await scratchDir('asset-names-'))
+    const app = new Elysia()
+
+    await Bun.write(join(dir, 'plain.js'), 'plain')
+    await Bun.write(join(dir, 'a b.js'), 'spaced')
+    await Bun.write(join(dir, 'dir name', 'é.js'), 'nested')
+    await serveBuildFiles(app, { dir } as ClientBuild, { dev, security: undefined })
+
+    return { dir, get: async (path: string) => app.handle(new Request(`${ORIGIN}/_kay${path}`)) }
+  }
+
+  // A file taken off the disk after its first answer is still answered only when its spelling was kept, which tells what the route cached.
+  async function cached(dev: boolean, first: string, second: string, gone: string) {
+    const { dir, get } = await serve(dev)
+
+    try {
+      expect((await get(first)).status).toBe(200)
+      await rm(join(dir, gone))
+
+      return (await get(second)).status
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  }
+
+  it('keeps a file whose name needs encoding under the spelling the build lists', async () => {
+    expect(await cached(false, '/a%20b.js', '/a%20b.js', 'a b.js')).toBe(200)
+    expect(await cached(false, '/dir%20name/%C3%A9.js', '/dir%20name/%C3%A9.js', 'dir name/é.js')).toBe(200)
+    expect(await cached(false, '/plain.js', '/plain.js', 'plain.js')).toBe(200)
+  })
+
+  it('keeps no other spelling of it, so requests cannot grow the map', async () => {
+    expect(await cached(false, '/a%20b.js', '/a%20b%2ejs', 'a b.js')).toBe(404)
+    expect(await cached(false, '/a%20b%2ejs', '/a%20b%2ejs', 'a b.js')).toBe(404)
+    expect(await cached(false, '/a%20b.js', '/a%2520b.js', 'a b.js')).toBe(404)
+    expect(await cached(false, '/plain.js', '/%70lain.js', 'plain.js')).toBe(404)
+    expect(await cached(false, '/dir%20name/%C3%A9.js', '/dir%20name/%c3%a9.js', 'dir name/é.js')).toBe(404)
+    expect(await cached(false, '/plain.js', '/plain.js/', 'plain.js')).toBe(404)
+  })
+
+  it('keeps nothing in development', async () => {
+    expect(await cached(true, '/a%20b.js', '/a%20b.js', 'a b.js')).toBe(404)
+    expect(await cached(true, '/plain.js', '/plain.js', 'plain.js')).toBe(404)
+  })
+
+  it('answers a spelling of the file in the same way, and refuses a name outside the build or an unsafe one', async () => {
+    const { dir, get } = await serve(false)
+
+    try {
+      for (const spelled of ['/a%20b.js', '/a%20b%2ejs', '/%61%20b.js'])
+        expect(await (await get(spelled)).text()).toBe('spaced')
+
+      for (const hostile of ['/..%2fpackage.json', '/%2e%2e/plain.js', '/dir%20name/..%2f..%2fplain.js', '/a%20b.js%00', '/%00', '/a%2520b.js', '/dir%20name', '/missing%20name.js'])
+        expect((await get(hostile)).status).toBe(404)
+
+      // A refused name is not kept either.
+      await rm(join(dir, 'plain.js'))
+      expect((await get('/plain.js')).status).toBe(404)
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
   })
 })
