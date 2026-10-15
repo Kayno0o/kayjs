@@ -1,4 +1,4 @@
-import { mkdirSync, rmSync, statSync } from 'node:fs'
+import { mkdirSync, renameSync, rmSync, statSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import process from 'node:process'
 import { $ } from 'bun'
@@ -28,9 +28,14 @@ async function withLock<T>(root: string, run: () => Promise<T>): Promise<T> {
       if ((error as NodeJS.ErrnoException).code !== 'EEXIST')
         throw error
 
-      // A lock left by a killed process is taken over.
-      if (Date.now() - (statSync(lock, { throwIfNoEntry: false })?.mtimeMs ?? Date.now()) > LOCK_STALE_MS)
-        rmSync(lock, { recursive: true, force: true })
+      // A lock left by a killed process is taken over; the rename succeeds for one waiter only, so none removes a lock another just took.
+      if (Date.now() - (statSync(lock, { throwIfNoEntry: false })?.mtimeMs ?? Date.now()) > LOCK_STALE_MS) {
+        try {
+          renameSync(lock, `${lock}.stale-${process.pid}`)
+          rmSync(`${lock}.stale-${process.pid}`, { recursive: true, force: true })
+        }
+        catch {}
+      }
 
       await Bun.sleep(50)
     }
