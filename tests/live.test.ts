@@ -1261,6 +1261,35 @@ describe('rooms', () => {
         store.close()
       }
     })
+
+    it('prunes old messages and silent processes when a process only publishes, at most once per heartbeat', () => {
+      const path = join(dir, 'publish-only.sqlite')
+      const store = sqliteRooms(path, { poll: 5 })
+      const file = new Database(path)
+      const count = (table: string) => file.query<{ n: number }, []>(`SELECT count(*) AS n FROM ${table}`).get()!.n
+      const old = () => {
+        file.run('INSERT INTO kay_room_messages (room, text, process, at) VALUES (\'hall\', \'old\', \'gone\', 1)')
+        file.run('INSERT OR REPLACE INTO kay_room_processes (process, seen) VALUES (\'gone\', 1)')
+        file.run('INSERT OR REPLACE INTO kay_room_members (room, connection, process, member) VALUES (\'hall\', \'c\', \'gone\', \'\')')
+      }
+
+      try {
+        old()
+        store.publish('hall', 'one', {})
+        expect(count('kay_room_messages')).toBe(1)
+        expect(count('kay_room_processes')).toBe(0)
+        expect(count('kay_room_members')).toBe(0)
+
+        // A second publish within the heartbeat leaves pruning for later.
+        old()
+        store.publish('hall', 'two', {})
+        expect(count('kay_room_messages')).toBe(3)
+      }
+      finally {
+        file.close()
+        store.close()
+      }
+    })
   })
 
   it('calls the handler a message\'s type names, and refuses a type none names', () => {

@@ -222,6 +222,14 @@ export function sqliteRooms(path: string, { poll = POLL }: { poll?: number } = {
   let reading: ReturnType<typeof setInterval> | undefined
   let closed = false
   let beating: ReturnType<typeof setInterval> | undefined
+  let pruned = 0
+
+  // Drops the members of processes gone quiet and the messages past `KEPT`.
+  const prune = (now: number) => {
+    db.run('DELETE FROM kay_room_members WHERE process IN (SELECT process FROM kay_room_processes WHERE seen <= ?)', [now - EXPIRY])
+    db.run('DELETE FROM kay_room_processes WHERE seen <= ?', [now - EXPIRY])
+    db.run('DELETE FROM kay_room_messages WHERE at <= ?', [now - KEPT])
+  }
 
   const beat = () => {
     const now = Date.now()
@@ -236,9 +244,7 @@ export function sqliteRooms(path: string, { poll = POLL }: { poll?: number } = {
           add.run(room, connection, self, member)
       }
 
-      db.run('DELETE FROM kay_room_members WHERE process IN (SELECT process FROM kay_room_processes WHERE seen <= ?)', [now - EXPIRY])
-      db.run('DELETE FROM kay_room_processes WHERE seen <= ?', [now - EXPIRY])
-      db.run('DELETE FROM kay_room_messages WHERE at <= ?', [now - KEPT])
+      prune(now)
     })()
   }
 
@@ -290,7 +296,15 @@ export function sqliteRooms(path: string, { poll = POLL }: { poll?: number } = {
     },
     members: room => members.all(room, Date.now() - EXPIRY).map(row => row.member),
     publish(room, text, recipients) {
-      insert.run(room, text, self, recipients.except ?? null, recipients.to ?? null, Date.now())
+      const now = Date.now()
+
+      insert.run(room, text, self, recipients.except ?? null, recipients.to ?? null, now)
+
+      // A process only publishing has no beat, so its publishes prune, as often as a beat would.
+      if (!beating && now - pruned >= HEARTBEAT) {
+        pruned = now
+        prune(now)
+      }
 
       for (const listener of listeners)
         listener(room, text, recipients)
