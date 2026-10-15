@@ -171,6 +171,8 @@ describe('sendAside', () => {
   test('gives up on a mailer that stays silent, and frees its place', async () => {
     jest.useFakeTimers()
 
+    const logged = spyOn(log, 'error').mockImplementation(() => undefined)
+
     try {
       let handed = 0
       const silent = { mailer: { send: () => {
@@ -179,8 +181,6 @@ describe('sendAside', () => {
         return new Promise<void>(Function.prototype as () => void)
       } } } as unknown as EmailCore
 
-      const logged = spyOn(log, 'error').mockImplementation(() => undefined)
-
       for (let i = 0; i < 250; i++)
         sendAside(silent, () => mail, 'event')
 
@@ -188,7 +188,6 @@ describe('sendAside', () => {
       expect(handed).toBeGreaterThan(150)
       // The burst is said once, not once per dropped mail.
       expect(logged.mock.calls.filter(([message]) => String(message).includes('dropped'))).toHaveLength(1)
-      logged.mockRestore()
 
       jest.advanceTimersByTime(31_000)
       await Promise.resolve()
@@ -200,6 +199,7 @@ describe('sendAside', () => {
       expect(handed).toBe(before + 1)
     }
     finally {
+      logged.mockRestore()
       jest.useRealTimers()
     }
   })

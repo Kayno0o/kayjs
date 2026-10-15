@@ -44,6 +44,9 @@ let searchBox: HTMLInputElement | undefined
 // What a reset goes back to: the icon it started with, or the one last saved by a SaveForm.
 let initial = value
 let request = 0
+// The search the grid shows, and where its next page starts: a Show more asks for these, whatever has been typed since.
+let shownQuery = ''
+let nextOffset = 0
 
 effect(() => picked.set(value))
 
@@ -72,6 +75,9 @@ async function load(needle: string, offset: number) {
     const shown = offset === 0 ? new Set<string>() : new Set(icons().map(choice => choice.name))
     const fresh = found.filter(choice => !shown.has(choice.name))
 
+    shownQuery = needle
+    nextOffset = offset + found.length
+
     batch(() => {
       icons.set(offset === 0 ? found : [...icons(), ...fresh])
       // An app that ignores the offset gives the same page again: nothing new ends the paging.
@@ -82,6 +88,12 @@ async function load(needle: string, offset: number) {
     if (mine === request)
       pending.set(false)
   }
+}
+
+// A click while a page is on its way asks for nothing more.
+function showMore() {
+  if (!pending())
+    void load(shownQuery, nextOffset)
 }
 
 const chosen = () => icons().find(choice => choice.name === picked())?.icon ?? (last()?.name === picked() ? last()?.icon : undefined)
@@ -146,4 +158,4 @@ function keepEnter(event: KeyboardEvent) {
         | {nameOf(picked())}
         IconButton(icon="close" label={clearLabel} size="xs" variant="inline" class="kui-icon-grid-clear" onClick={() => pick('')})
     if more()
-      button.kui-icon-grid-more(type="button" onClick={() => void load(query(), icons().length)}) {moreLabel}
+      button.kui-icon-grid-more(type="button" onClick={showMore}) {moreLabel}

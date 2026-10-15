@@ -232,3 +232,28 @@ test('ends the paging when a page brings nothing the grid lacks, as an app ignor
   expect(new Set(view.names()).size).toBe(50)
   expect(view.more()).toBeNull()
 })
+
+test('asks for one page on a double click of Show more', async () => {
+  const view = await picker()
+
+  click(view.more())
+  click(view.more())
+  await settle()
+
+  expect(searches).toEqual([['', 50, 0], ['', 50, 50]])
+})
+
+test('a Show more pressed while a new search loads asks for nothing, and the grid is that search\'s first page', async () => {
+  const view = await picker({ hold: query => query === 'ho' })
+
+  type(view.search, 'ho')
+  await Bun.sleep(TYPED_MS)
+  click(view.more())
+
+  expect(searches).toEqual([['', 50, 0], ['ho', 50, 0]])
+
+  held.shift()!.release()
+  await settle()
+
+  expect(view.names()).toEqual(['home', 'house'])
+})

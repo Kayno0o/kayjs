@@ -203,7 +203,7 @@ let dropping = false
 export function sendAside(email: EmailCore, build: () => Mail, what: string): void {
   if (aside >= ASIDE_MAX) {
     if (!dropping)
-      log.error(`mailing ${what} dropped, and the notice mails after it while ${ASIDE_MAX} are waiting on the mailer`)
+      log.error(`mailing ${what} dropped, and the mails sent aside after it while ${ASIDE_MAX} are waiting on the mailer`)
 
     dropping = true
 
