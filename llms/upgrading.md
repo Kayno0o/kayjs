@@ -48,6 +48,7 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 ### kayjs-ui
 
 - `TextInput(type="number")` hands `onInput` and `onChange` a `number | null`, no longer a string: `onInput={value => count.set(Number(value))}` becomes `onInput={count.set}` over a `signal<number | null>`, and `value` takes that number as well as a string.
+- `Select` takes the type of its options' values: a number option hands `onChange` a number, no longer its string, and `value` holds that number, `value={String(id)}` becoming `value={id}`. With `emptyOption`, `onChange` is typed `Value | ''`, so a parent holding the options' union alone widens it to `Kind | ''`.
 
 ## 1.43.0
 

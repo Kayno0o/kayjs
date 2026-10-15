@@ -5,10 +5,22 @@ import Select from '@kaynooo/kayjs-ui/select.kay'
 import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
 import Textarea from '@kaynooo/kayjs-ui/textarea.kay'
 
-const { onPlanet, onCommit, onFilter, onLeave } = props<{ onPlanet: (value: string) => void, onCommit: (value: string) => void, onFilter?: (query: string) => void, onLeave?: (id: string) => void }>()
+const { onPlanet, onCommit, onFilter, onLeave, onPicked } = props<{ onPlanet: (value: string) => void, onCommit: (value: string) => void, onFilter?: (query: string) => void, onLeave?: (id: string) => void, onPicked?: (picked: unknown) => void }>()
 
 const name = signal('Ada')
 const amount = signal<number | null>(2)
+const LEVELS = [{ value: 1, label: 'One' }, { value: 2, label: 'Two' }]
+const KINDS: { value: 'post' | 'page', label: string }[] = [{ value: 'post', label: 'Post' }, { value: 'page', label: 'Page' }]
+const kind = signal<'post' | 'page' | ''>('')
+
+function level(next: number) {
+  onPicked?.(next)
+}
+
+function pickKind(next: 'post' | 'page' | '') {
+  kind.set(next)
+  onPicked?.(next)
+}
 // Kept as the names it reads, one per line, as a roster would.
 const roster = signal('Ada\nGrace')
 ---
@@ -19,6 +31,8 @@ p#figure {amount() === null ? 'none' : `${typeof amount()} ${amount()}`}
 button#reset(onClick={() => amount.set(null)}) Reset
 button#clear(onClick={() => name.set('')}) Clear
 Select#planet(value="mars" loading options={[{ value: 'mars', label: 'Mars' }, { value: 'earth', label: 'Earth' }]} onChange={onPlanet})
+Select#level(value={1} options={LEVELS} onChange={level})
+Select#kind(value={kind()} options={KINDS} emptyOption="Any" onChange={pickKind})
 TextInput#plain(name="email" aria-label="Email")
 Textarea#roster(aria-label="Roster" onBlur={event => onLeave?.(event.currentTarget.id)} value={roster()} onInput={value => roster.set(value.split('\n').map(line => line.trim()).filter(Boolean).join('\n'))})
 p#names {roster()}

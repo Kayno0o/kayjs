@@ -233,7 +233,8 @@ Tabs(tabs={[{ value: 'details', label: 'Details' }, { value: 'reviews', label: '
   - Without `value` and `onInput` it is a plain field keeping what is typed, for a form posting to an action without JavaScript: `TextInput(name="email" type="email" required autocomplete="email")`, with `value` to start it filled. kay refills only the fields a form's own template writes, so pass `value={failure?.values.email}` to keep what a refused post sent.
 - `Textarea(value={notes()} onInput={notes.set})`: the multi-line TextInput, taking the same props, `rows` among the rest, and working as a plain field without `value` and `onInput`. While focused it keeps the text as typed, and takes the parent's reading of it, such as without a blank line, once left.
 - `Select(value={kind()} options={[{ value: 'post', label: 'Post' }]} onChange={kind.set} emptyOption="Any")`:
-  - `emptyOption` adds a first option worth `''`, labelled by the string, or blank with `true`.
+  - `value` and `onChange` take the type of the options' values, so a union stays a union and a number option hands back a number: `const kind = signal<'post' | 'page'>('post')` passes `kind.set` with no cast.
+  - `emptyOption` adds a first option worth `''`, labelled by the string, or blank with `true`; `value` and `onChange` then take `''` too, so hold a `signal<Kind | ''>`.
   - `loading` shows a disabled row saying `loadingLabel` while the options are on their way.
   - The right option stays chosen when the options arrive after the value.
   - `submit` submits the form holding it once an option is picked, after `onChange`, for a GET filter form (see Forms).
@@ -309,7 +310,7 @@ PageSection(title="Moons")
 - `MultiSelect(label="Planets" options={planets} value={['mars']} name="planet" onChange={picked.set})`:
   - A trigger summing up what is picked (`placeholder`, `Any` by default, the one label, or "2 selected", worded by `selectedLabel(count)`) opens a popover of checkboxes with All and None, a group named by `label`. Screen readers hear the trigger as `{label}: {summary}`, a count described by the labels it stands for, and `emptyLabel` from a status region once the search hides every option.
   - Past eight options, or with `search`, the panel opens on a search box filtering the options, focused; otherwise the first checkbox takes focus. ArrowDown reaches the options, where the arrows, Home and End move between them, a tint and an accent bar marking the one the keyboard is on; Tab past the last control closes the panel, and Escape closes it with focus back on the trigger.
-  - What is picked stays in the options' order. `name` posts each picked value as a hidden field, so the control submits inside a plain form.
+  - What is picked stays in the options' order, an array of the options' own value type, so a union-typed list needs no cast. `name` posts each picked value as a hidden field, so the control submits inside a plain form.
 - `FileDrop(accept="image/*" multiple paste onFiles={upload})` with a `@content(zone)` block:
   - Files dropped on the zone, picked through `zone.open()` or, with `paste`, pasted anywhere on the page outside a text field, reach `onFiles(files)`: those `accept` allows, one unless `multiple`, never an empty list.
   - `zone.dragging()` reads whether files hover the zone, which also carries `data-dragging`.

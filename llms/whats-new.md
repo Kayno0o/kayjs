@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- kayjs-ui: `Select` and `MultiSelect` take the type of their options' values, a number option handing back a number, a breaking change in [1.44.0](upgrading.md#1440).
 - kayjs-ui: `ConfirmDelete` takes `success`, toasted once through, and `tone="neutral"` for a confirm that is not a deletion.
 - kayjs-ui: `FileDrop` takes `compact`, a slim row to sit inline in a form.
 - kayjs-ui: `TabNav` takes `current={ctx.url}` and `keep`, carrying the named query params onto each tab.

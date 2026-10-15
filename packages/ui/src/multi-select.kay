@@ -1,4 +1,4 @@
----
+--- <Value extends string>
 import type { JSX } from 'kay'
 import type { MultiSelectOption } from './multi-select'
 import type { PopoverPlacement } from './popover'
@@ -22,9 +22,9 @@ const MOVES: Partial<Record<string, (index: number, count: number) => number>> =
 const { id, options, value = [], label, placeholder = 'Any', searchLabel = 'Search', allLabel = 'All', noneLabel = 'None', emptyLabel = 'No match', selectedLabel, name, search, disabled = false, placement = 'bottom-start', onChange, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'id' | 'class' | 'children' | 'onChange'> & {
   // The panel's id, unique on the page; one is drawn when none is given.
   id?: string | undefined
-  options: readonly MultiSelectOption[]
+  options: readonly MultiSelectOption<Value>[]
   // The values picked to start with; a control whose parent passes others follows them.
-  value?: string[] | undefined
+  value?: readonly Value[] | undefined
   // Names the control for screen readers.
   label: string
   // What the trigger reads while nothing is picked.
@@ -43,11 +43,11 @@ const { id, options, value = [], label, placeholder = 'Any', searchLabel = 'Sear
   search?: boolean | undefined
   disabled?: boolean | undefined
   placement?: PopoverPlacement | undefined
-  onChange?: ((value: string[]) => void) | undefined
+  onChange?: ((value: Value[]) => void) | undefined
   class?: string | undefined
 }>()
 
-const picked = signal<string[]>(value)
+const picked = signal<readonly Value[]>(value)
 const query = signal('')
 let root: HTMLElement | undefined
 
@@ -62,7 +62,7 @@ const shown = () => {
   return needle ? options.filter(option => option.label.toLowerCase().includes(needle)) : options
 }
 
-function set(next: string[]) {
+function set(next: Value[]) {
   picked.set(next)
   onChange?.(next)
 }

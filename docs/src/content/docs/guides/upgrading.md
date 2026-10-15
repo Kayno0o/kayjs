@@ -67,6 +67,8 @@ Only an `Authorization: Bearer` header skips the check. Basic credentials, which
 
 A number `TextInput` hands `onInput` and `onChange` a number, or `null` once emptied, no longer a string. Hold the value in a `signal<number | null>` and drop the `Number(...)` around it. Its `value` still takes a string too.
 
+A `Select` takes the type of its options' values. A number option hands `onChange` a number, no longer a string, and `value` takes that number: `value={String(id)}` becomes `value={id}`. With `emptyOption`, `onChange` can hand back the empty string, so a value held as `Kind` becomes `Kind | ''`.
+
 ## 1.43.0
 
 ### Markup reaches `innerHTML` only once vouched for

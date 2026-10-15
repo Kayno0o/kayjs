@@ -8,6 +8,7 @@ const planets: string[] = []
 const commits: string[] = []
 const filters: string[] = []
 const left: string[] = []
+const picks: unknown[] = []
 
 afterEach(() => {
   mounted?.unmount()
@@ -15,10 +16,11 @@ afterEach(() => {
   commits.length = 0
   filters.length = 0
   left.length = 0
+  picks.length = 0
 })
 
 async function fields() {
-  mounted = await mount('src/components/fields.kay', { onPlanet: (value: string) => planets.push(value), onCommit: (value: string) => commits.push(value), onFilter: (query: string) => filters.push(query), onLeave: (id: string) => left.push(id) })
+  mounted = await mount('src/components/fields.kay', { onPlanet: (value: string) => planets.push(value), onCommit: (value: string) => commits.push(value), onFilter: (query: string) => filters.push(query), onLeave: (id: string) => left.push(id), onPicked: (picked: unknown) => picks.push(picked) })
 
   return mounted.root
 }
@@ -142,6 +144,25 @@ describe('Select', () => {
     await settle()
 
     expect(planets).toEqual(['earth'])
+  })
+
+  test('hands back the option\'s own value, a number for a number option, and the empty string for the empty option', async () => {
+    const root = await fields()
+    const pick = (id: string, value: string) => {
+      const select = root.querySelector<HTMLSelectElement>(id)!
+
+      select.value = value
+      select.dispatchEvent(new Event('change', { bubbles: true }))
+    }
+
+    expect(root.querySelector<HTMLSelectElement>('#level')!.value).toBe('1')
+
+    pick('#level', '2')
+    pick('#kind', 'page')
+    pick('#kind', '')
+    await settle()
+
+    expect(picks).toEqual([2, 'page', ''])
   })
 
   test('submits the form holding it once an option is picked, when asked', async () => {
