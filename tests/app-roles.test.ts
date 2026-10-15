@@ -142,9 +142,9 @@ describe('the app template\'s db/roles.sh', () => {
       await owner.unsafe('CREATE TABLE "billing"."_pgorm_migrations" ("id" serial PRIMARY KEY, "name" text NOT NULL)')
 
       for (const table of ['ledger._pgorm_migrations', 'billing._pgorm_migrations']) {
-        const [{ write }] = await owner.unsafe<{ write: boolean }[]>(`SELECT has_table_privilege('app_rw', '${table}', 'INSERT, UPDATE, DELETE') AS write`)
+        const [row] = await owner.unsafe<{ write: boolean }[]>(`SELECT has_table_privilege('app_rw', '${table}', 'INSERT, UPDATE, DELETE') AS write`)
 
-        expect([table, write]).toEqual([table, false])
+        expect([table, row?.write]).toEqual([table, false])
       }
 
       // Only that table: a name that matches it as a pattern keeps its rows writable.
