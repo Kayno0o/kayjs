@@ -951,7 +951,8 @@ function secretReason(name: string, value: unknown): string | undefined {
 // The variables `publicEnv` sends every visitor, read from the module the browser loads, so a secret declared public is seen; fetched as the tab shows and again after each restart.
 function envTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
   const win = doc.defaultView!
-  const tab = tool.tab({ id: 'env', label: 'Env', shown: () => void read() })
+  let reread: () => void = () => undefined
+  const tab = tool.tab({ id: 'env', label: 'Env', shown: () => reread() })
   let asked = 0
   const read = async () => {
     const ask = ++asked
@@ -1013,9 +1014,10 @@ function envTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
     tab.panel.replaceChildren(tool.make('div', 'note', `${entries.length} variable${entries.length === 1 ? '' : 's'} sent to every visitor at ${ENV_URL}.`), entries.length === 0 ? tool.make('div', 'empty', 'The app sends no public env: `publicEnv` declares no variable.') : facts)
   }
 
+  reread = () => void read()
   win.addEventListener(BUILT_EVENT, () => {
     if (tab.panel.hidden === false)
-      void read()
+      reread()
   }, { signal })
 }
 
