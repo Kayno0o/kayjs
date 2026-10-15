@@ -178,17 +178,19 @@ function splitFence(source: string, fence: Span, globals: string[], names: strin
   const local = bodyTypes(ast.program.body, names, shift, analysis.diagnostics)
   const statements: FenceStatement[] = []
   let cursor = fence.start
+  // Broken statements written before a statement that leaves the body, kept for the next one that stays.
+  let carried: Span[] = []
 
   analysis.fence = parsed
 
   for (const span of parsed.broken) {
-    if ((/^\s*import\b/).test(source.slice(span.start, span.end)))
+    if ((/^(?:\s*\/\/.*\n)*\s*import\b(?!\s*\()/).test(source.slice(span.start, span.end)))
       analysis.brokenModule.push(span)
     else
       analysis.broken.push(span)
   }
 
-  analysis.implicit = undeclared(ast, parsed.code, globals)
+  analysis.implicit = undeclared(ast, parsed.code, globals, parsed.broken.map(text => source.slice(text.start, text.end)).join('\n'))
 
   for (const statement of ast.program.body) {
     const span = withLeadingComments(statement, shift)
@@ -197,15 +199,17 @@ function splitFence(source: string, fence: Span, globals: string[], names: strin
       analysis.hoisted.push(span)
       analysis.imports.push(...importBindings(statement, shift))
       analysis.specifiers.push(...moduleSpecifier(statement, shift))
+      carried.push(...textAround(cursor, span.start, parsed.broken, analysis.brokenModule).filter(text => analysis.broken.includes(text)))
     }
     else {
-      statements.push({ statement, span, gap: textAround(cursor, span.start, parsed.broken, analysis.brokenModule) })
+      statements.push({ statement, span, gap: [...carried, ...textAround(cursor, span.start, parsed.broken, analysis.brokenModule)] })
+      carried = []
     }
 
     cursor = span.end
   }
 
-  return { ...parsed, statements, tail: textAround(cursor, fence.end, parsed.broken, analysis.brokenModule) }
+  return { ...parsed, statements, tail: [...carried, ...textAround(cursor, fence.end, parsed.broken, analysis.brokenModule)] }
 }
 
 // What a body declaration may hold a function or an instance of a class by: writing one, or a call returning one.
@@ -310,7 +314,11 @@ export function analyzeServer(source: string, server: Span | undefined): ServerA
   const shared = sharedWithExports(ast, exported, kept.filter(statement => !isExport(statement)), shift, analysis.diagnostics)
 
   for (const { statement, span, gap } of split.statements) {
+    // A statement being typed keeps its place in `load` whatever follows it.
+    const typing = gap.filter(text => analysis.broken.includes(text))
+
     if (statement.type === 'ExportNamedDeclaration' && statement.declaration) {
+      analysis.body.push(...typing)
       analysis.exports.push(span)
       for (const identifier of declaredIdentifiers(statement.declaration)) {
         analysis.exportNames.push(identifier.name)
@@ -329,11 +337,13 @@ export function analyzeServer(source: string, server: Span | undefined): ServerA
       }
     }
     else if (isExport(statement)) {
+      analysis.body.push(...typing)
       analysis.diagnostics.push({ ...span, message: 'A server fence exports declarations only', help: '`export const add = action(...)`' })
     }
     else {
       // What an export reads is declared at module level, next to it, and the template still reads it.
       if (shared.has(statement)) {
+        analysis.body.push(...typing)
         analysis.exports.push(span)
       }
       else {
@@ -346,6 +356,8 @@ export function analyzeServer(source: string, server: Span | undefined): ServerA
       }
     }
   }
+
+  analysis.body.push(...split.tail.filter(text => analysis.broken.includes(text)))
 
   return analysis
 }
@@ -629,6 +641,8 @@ function declaredIdentifiers(statement: t.Statement): t.Identifier[] {
 
 // A fence being typed breaks a handful of statements at most; more than this is not recovered.
 const MAX_BROKEN = 20
+// What a statement that goes on over the next line ends with.
+const UNFINISHED = /[.,([{=+\-*/&|?:<>!~^%]/
 // A line of a fence that begins a statement: written from its first column, and not closing or continuing the one before it.
 const STATEMENT_START = /^(?![\s})\]]|else\b|catch\b|finally\b)/
 
@@ -667,6 +681,8 @@ export function parseFence(source: string, span: Span, diagnostics: Diagnostic[]
       return ast && { code, offset: span.start, ast, broken, shift: node => ({ start: span.start + node.start!, end: span.start + node.end! }) }
 
     for (const { start, end } of statements.values()) {
+      // A statement that swallows an earlier blank one replaces it.
+      broken.splice(0, broken.length, ...broken.filter(known => known.start < span.start + start || known.end > span.start + end))
       broken.push({ start: span.start + start, end: span.start + end })
       code = code.slice(0, start) + code.slice(start, end).replaceAll(/\S/g, ' ') + code.slice(end)
     }
@@ -676,7 +692,7 @@ export function parseFence(source: string, span: Span, diagnostics: Diagnostic[]
 }
 
 // The top-level statement a parse error falls in, found by indentation: from the line at the first column before it, to the next one.
-// Blank lines and comments just above are part of it, so a comment does not stay behind and attach to the next statement.
+// The `//` comment lines just above are part of it, so a comment does not stay behind and attach to the next statement.
 function brokenStatement(code: string, pos: number): { start: number, end: number }[] {
   const lines = code.split('\n')
   const starts: number[] = []
@@ -688,15 +704,18 @@ function brokenStatement(code: string, pos: number): { start: number, end: numbe
   }
 
   let probe = Math.min(pos, code.length)
-  const lineAtProbe = starts.findLastIndex(start => start <= probe)
-  const atStatement = starts[lineAtProbe] === probe && STATEMENT_START.test(lines[lineAtProbe]!)
+  const row = Math.max(0, starts.findLastIndex(start => start <= probe))
+  const firstToken = (/^[\w$]*/).exec(lines[row]!)![0].length
+  const inFirstToken = STATEMENT_START.test(lines[row]!) && probe <= starts[row]! + firstToken
+  let before = inFirstToken ? starts[row]! : probe
 
-  // An error at a statement's first column, in blank text or at the end is the fault of the text before it.
-  if (probe >= code.length || (/\s/).test(code[probe]!) || atStatement) {
-    while (probe > 0 && (/\s/).test(code[probe - 1]!))
-      probe--
+  while (before > 0 && (/\s/).test(code[before - 1]!))
+    before--
 
-    probe = Math.max(0, probe - 1)
+  // An error at the end or in blank text is the fault of the text before it, and so is one in the first word of a statement when the text before it is unfinished: `count.` then `const` reads as `count.const`.
+  if (probe >= code.length || (/\s/).test(code[probe]!) || inFirstToken) {
+    if (!inFirstToken || (before > 0 && UNFINISHED.test(code[before - 1]!)))
+      probe = Math.max(0, before - 1)
   }
 
   let line = starts.findLastIndex(start => start <= probe)
@@ -763,9 +782,9 @@ function findJsx(node: unknown): t.Node | undefined {
   return undefined
 }
 
-// Which of `names` the fence reads with nothing in it declaring or importing them.
-function undeclared(ast: ParseResult<t.File>, code: string, names: string[]): string[] {
-  const mentioned = names.filter(name => GLOBAL_NAME.get(name)!.test(code))
+// Which of `names` the fence reads with nothing in it declaring or importing them, `typed` being the text of the statements that did not parse, where a mention counts as a read.
+function undeclared(ast: ParseResult<t.File>, code: string, names: string[], typed: string): string[] {
+  const mentioned = names.filter(name => GLOBAL_NAME.get(name)!.test(code) || GLOBAL_NAME.get(name)!.test(typed))
   const found: string[] = []
 
   if (mentioned.length === 0)
@@ -773,7 +792,7 @@ function undeclared(ast: ParseResult<t.File>, code: string, names: string[]): st
 
   loadTraverse()(ast, {
     Program(path) {
-      found.push(...mentioned.filter(name => name in path.scope.globals && !path.scope.hasBinding(name)))
+      found.push(...mentioned.filter(name => (name in path.scope.globals || GLOBAL_NAME.get(name)!.test(typed)) && !path.scope.hasBinding(name)))
       path.stop()
     },
   })

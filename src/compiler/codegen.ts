@@ -195,7 +195,7 @@ class ModuleShell {
         this.emitHoisted(span, fence.specifiers, fence.imports, duplicates)
     }
 
-    // Text that did not parse stays out of the analysis pass, which the rewrites are planned from by parsing its code.
+    // The rewrites are planned by parsing the analysis pass, so an import that did not parse is written in the final pass only.
     const unparsed = [script.unparsed, fence?.unparsed, ...this.options.rewrites ? [...script.brokenModule, ...fence?.brokenModule ?? []] : []]
 
     for (const span of unparsed) {
@@ -526,7 +526,7 @@ class ModuleShell {
       this.emitProps()
   }
 
-  // A statement that did not parse is written in the final pass only.
+  // A statement that did not parse is written in the final pass only, as the analysis pass has to parse.
   private leftOut(analysis: { broken: Span[] }, span: Span) {
     return !this.options.rewrites && analysis.broken.includes(span)
   }

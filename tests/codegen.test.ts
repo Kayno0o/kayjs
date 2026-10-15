@@ -341,6 +341,28 @@ describe('fences', () => {
     expect(withBroken.diagnostics.map(d => d.message)).toEqual(['Missing semicolon.', '`items` is a signal, read by calling it'])
   })
 
+  it('blame the statement left unfinished, not the good one that follows it', () => {
+    const imports = compileKay('---\nconst b = items.\n\nconst count = signal(1)\n---\np {count()}\n', 'test.kay', { check: true })
+    const rewritten = compileKay('---\nconst items = signal([1])\nconst b = items.\nconst count = signal(1)\n---\np {count}\n', 'test.kay', { check: true })
+    const opened = compileKay('---\nconst count = signal(\nconst other = 1\n---\np {other}\n', 'test.kay', { check: true })
+    const server = compileKay('--- server\nconst todos = load.\nconst a = 1\n---\np {a}\n', 'test.kay', { check: true })
+
+    expect(imports.tsx).toContain('import { signal } from \'kay\'')
+    expect(rewritten.tsx).toContain('count()')
+    expect(rewritten.diagnostics.map(d => d.message)).toContain('`count` is a signal, read by calling it')
+    expect(opened.tsx).toContain('import { signal } from \'kay\'')
+    expect(server.tsx).toContain('return { a }')
+  })
+
+  it('write the statement being typed in a server fence wherever it stands', () => {
+    const tail = compileKay('--- server\nconst a = 1\nconst todos = load.\n---\np {a}\n', 'test.kay', { check: true })
+    const beforeExport = compileKay('--- server\nconst todos = load.\nexport const add = action(() => 1)\n---\np x\n', 'test.kay', { check: true })
+    const beforeImport = compileKay('--- server\nconst todos = load.\nimport { b } from \'./b\'\n---\np x\n', 'test.kay', { check: true })
+
+    for (const { tsx } of [tail, beforeExport, beforeImport])
+      expect(tsx).toContain('const todos = load.')
+  })
+
   it('import the names kay provides to a fence with a statement that does not parse, the server\'s included', () => {
     const script = compileKay('---\nconst { label } = props<{ label: string }>()\nconst count = signal(1)\nconst b = \'x\n---\np {label}\n', 'test.kay', { check: true })
     const server = compileKay('--- server\nexport const add = action(() => 1)\nconst todos = load.\n---\np x\n', 'test.kay', { check: true })
