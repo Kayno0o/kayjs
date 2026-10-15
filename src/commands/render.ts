@@ -1,7 +1,7 @@
 import type { KayConfig } from '../config'
 import type { Command } from './command'
 import { existsSync, rmSync } from 'node:fs'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, readdir, rm } from 'node:fs/promises'
 import { constants, tmpdir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
 import process from 'node:process'
@@ -10,7 +10,7 @@ import { loadConfig } from '../config'
 import { environmentWithoutDotenv, PAGES_ENTRY } from '../dev'
 import { projectPaths } from '../project'
 import { basePath, routerPath } from '../server/base'
-import { START_COMMAND, START_PARENT } from '../server/lifecycle'
+import { alive, START_COMMAND, START_PARENT } from '../server/lifecycle'
 import { projectRoot } from './command'
 
 const SOCKET_PRELOAD = join(import.meta.dir, '..', 'dev', 'render-socket.ts')
@@ -23,6 +23,8 @@ const BODILESS = new Set(['GET', 'HEAD'])
 const SERVE_TIMEOUT_MS = 60_000
 const STOP_WAIT_MS = 5000
 const REDIRECT_STATUS = new Set([301, 302, 303, 307, 308])
+const OWN_BUILD = /^render-(\d+)$/
+const OWN_SOCKET = /^kay-render-(\d+)-/
 
 // Answers one request as `kay dev` would serve it, the server entry and its plugins included, and prints the body: a server listening on a Unix socket of its own, gone once it answered.
 export const render: Command = {
@@ -75,7 +77,10 @@ export const render: Command = {
 
     const config = await configOf(root)
     const { entry } = projectPaths(root, config)
-    const dir = await mkdtemp(join(tmpdir(), 'kay-render-'))
+
+    await Promise.all([removeLeftovers(join(root, KAY_DIR), OWN_BUILD), removeLeftovers(tmpdir(), OWN_SOCKET)])
+
+    const dir = await mkdtemp(join(tmpdir(), `kay-render-${process.pid}-`))
     const socket = join(dir, 'server.sock')
     const output = join(root, KAY_DIR, `render-${process.pid}`)
     const env = await environmentWithoutDotenv()
@@ -143,6 +148,32 @@ export const render: Command = {
       await Promise.all([rm(dir, { recursive: true, force: true }), rm(output, { recursive: true, force: true })])
     }
   },
+}
+
+// What a SIGKILLed kay render left, named after its pid; a running one's own is left alone.
+async function removeLeftovers(dir: string, own: RegExp): Promise<void> {
+  let names: string[]
+
+  try {
+    names = await readdir(dir)
+  }
+  // No `.kay` yet, as before a project's first build.
+  catch {
+    return
+  }
+
+  await Promise.all(names.map(async (name) => {
+    const pid = own.exec(name)?.[1]
+
+    if (pid === undefined || alive(Number(pid)))
+      return
+
+    try {
+      await rm(join(dir, name), { recursive: true, force: true })
+    }
+    // Another user's, in a shared temp directory.
+    catch {}
+  }))
 }
 
 // A config that does not load is the server's to report, as it boots.

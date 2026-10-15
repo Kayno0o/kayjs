@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs'
 import { mkdir, readdir, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
 import { beforeAll, describe, expect, it } from 'bun:test'
@@ -16,8 +17,8 @@ async function render(...args: string[]): Promise<{ out: string, err: string, co
   return { out, err, code }
 }
 
-// Kills `kay render` alone once its server printed `pid N` and `ready`, then answers what the server printed until `printed` holds, and its pid.
-async function killedRender(dir: string, url: string, printed: (err: string) => boolean): Promise<{ err: string, pid: number }> {
+// Kills `kay render` alone once its server printed `pid N` and `ready`, then answers what the server printed until `printed` holds, its pid and kay render's.
+async function killedRender(dir: string, url: string, printed: (err: string) => boolean): Promise<{ err: string, pid: number, render: number }> {
   const child = Bun.spawn([process.execPath, cli, 'render', url, dir], { stdin: 'ignore', stdout: 'ignore', stderr: 'pipe' })
   const reader = child.stderr.getReader()
   const decoder = new TextDecoder()
@@ -40,7 +41,7 @@ async function killedRender(dir: string, url: string, printed: (err: string) => 
 
   void reader.cancel()
 
-  return { err, pid: Number((/pid (\d+)/).exec(err)![1]) }
+  return { err, pid: Number((/pid (\d+)/).exec(err)![1]), render: child.pid }
 }
 
 function alive(pid: number): boolean {
@@ -258,6 +259,20 @@ p {user} via {via}
       if (alive(pid))
         process.kill(pid, 'SIGKILL')
     }
+  }, 15_000)
+
+  it('removes what a SIGKILLed kay render left, as the next one starts', async () => {
+    const dir = await project(undefined, announced(SERVER))
+    const { pid, render: killed } = await killedRender(dir, '/', () => true)
+
+    for (let tries = 0; alive(pid) && tries < 100; tries++)
+      await Bun.sleep(50)
+
+    const left = async () => [...(await readdir(join(dir, '.kay'))).filter(name => name === `render-${killed}`), ...(await readdir(tmpdir())).filter(name => name.startsWith(`kay-render-${killed}-`))]
+
+    expect(await left()).toHaveLength(2)
+    expect((await render('/', dir)).code).toBe(0)
+    expect(await left()).toEqual([])
   }, 15_000)
 
   it('names kay render as the process gone when a production server drains', async () => {

@@ -7,6 +7,7 @@ import { outputDir, underKayDev } from '../build/assets'
 import { describeThrown } from '../build/sourcemap'
 import { codeFrame } from '../compiler/frame'
 import { offsetAt, positionAt } from '../compiler/mapping'
+import { alive } from './lifecycle'
 import { pathOf } from './log'
 import { firstOwnFrame } from './overlay'
 
@@ -215,24 +216,12 @@ function removeStalePartials(dir: string): void {
     for (const name of readdirSync(dir)) {
       const pid = PARTIAL.exec(name)?.[1]
 
-      if (pid !== undefined && !running(Number(pid)))
+      if (pid !== undefined && !alive(Number(pid)))
         rmSync(join(dir, name), { force: true })
     }
   }
   // No directory yet, as for a project's first server.
   catch {}
-}
-
-function running(pid: number): boolean {
-  try {
-    process.kill(pid, 0)
-
-    return true
-  }
-  catch (error) {
-    // Another user's process, running still.
-    return (error as NodeJS.ErrnoException).code === 'EPERM'
-  }
 }
 
 // Written whole and renamed into place, so a reader never meets half a file.
