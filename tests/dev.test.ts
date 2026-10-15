@@ -280,6 +280,49 @@ describe.concurrent('kay dev', () => {
     expect(children.at(-1)!.killed).toBe(true)
   })
 
+  it('writes no types for an edit of a markdown entry or a media file, but for a public file or a source', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
+    const children: Subprocess[] = []
+    const settings = join(root, '.kay/types/kay-shadow.json')
+
+    await Bun.write(join(root, 'src/server.ts'), 'setInterval(() => undefined, 1000)\n')
+    await Bun.write(join(root, 'src/routes/index.kay'), 'p Home\n')
+    await Bun.write(join(root, 'kay.config.ts'), 'export default { publicDir: \'static\' }\n')
+    await Bun.write(join(root, 'src/posts/one.md'), 'one\n')
+    await Bun.write(join(root, 'src/logo.png'), 'a')
+    const stop = await dev(root, { onRestart: child => children.push(child) })
+
+    // The restart the edit made, and a moment more for a types process it would have started.
+    const restarted = async (edit: () => Promise<unknown>) => {
+      const count = children.length
+
+      await edit()
+      await until(() => children.length === count + 1, 20_000)
+      await Bun.sleep(1500)
+    }
+
+    try {
+      await until(() => existsSync(settings), 20_000)
+      expect(readShadowSettings(root).publicDir).toBe(join(root, 'static'))
+
+      for (const edit of [async () => Bun.write(join(root, 'src/posts/one.md'), 'two\n'), async () => Bun.write(join(root, 'src/logo.png'), 'b')]) {
+        await rm(settings, { force: true })
+        await restarted(edit)
+        expect(existsSync(settings)).toBe(false)
+      }
+
+      for (const edit of [async () => Bun.write(join(root, 'static/logo.png'), 'c'), async () => Bun.write(join(root, 'src/routes/about.kay'), 'p About\n')]) {
+        await rm(settings, { force: true })
+        await restarted(edit)
+        await until(() => existsSync(settings), 20_000)
+      }
+    }
+    finally {
+      await stop()
+      await rm(root, { recursive: true, force: true })
+    }
+  }, 60_000)
+
   it('stops without waiting on a types process stuck importing the config', async () => {
     const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
     const children: Subprocess[] = []

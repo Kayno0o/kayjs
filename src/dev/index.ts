@@ -6,8 +6,10 @@ import type { ClientBuilder } from './client'
 import { existsSync, statSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { networkInterfaces } from 'node:os'
-import { join, resolve } from 'node:path'
+import { join, resolve, sep } from 'node:path'
 import process from 'node:process'
+import { ASSET_EXTENSIONS } from '../build/assets'
+import { readShadowSettings } from '../check/shadow'
 import { CONFIG_FILE, loadConfig } from '../config'
 import { projectPaths } from '../project'
 import { startClientBuilder } from './client'
@@ -54,6 +56,8 @@ const TYPES_GRACE_MS = 2000
 // The root files Bun reads as a process starts.
 const STARTUP_FILE = /^(?:\.env.*|package\.json|bunfig\.toml|tsconfig\.json)$/
 const STYLESHEET = /\.css$/
+// The files no type reads the contents of: a stylesheet, a markdown entry of a collection, an image, a font or any media an import takes the URL of.
+const TYPE_FREE = new RegExp(`\\.(?:css|mdx?|${ASSET_EXTENSIONS.join('|')})$`, 'i')
 // The backups Vim, Emacs and JetBrains IDEs move a source to while they write it anew.
 const SAVE_BACKUPS = ['~', '___jb_old___', '___jb_tmp___']
 // Past this, as after a checkout, the files changed are not passed on, and open pages reload.
@@ -102,6 +106,8 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   let typesWriting: Promise<void> | undefined
   let typesAgain = false
   let typesChild: Subprocess | undefined
+  // The shadow tree and the declarations read the project's sources, config and the names of its public files, so an edit of the contents of a stylesheet, a markdown entry or a media file leaves them as they are.
+  const typesRead = (files: string[]) => files.length === 0 || files.some(file => !TYPE_FREE.test(file) || join(root, file).startsWith(readShadowSettings(root).publicDir + sep))
   const writeTypes = async () => {
     typesAgain = true
     typesWriting ??= (async () => {
@@ -427,7 +433,8 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     if (typesConfig !== undefined && files.includes(CONFIG_FILE))
       typesConfig = await reloadConfig(root, typesConfig)
 
-    void writeTypes()
+    if (typesRead(files))
+      void writeTypes()
   }
   // Changes landing during a restart trigger one more, never two restarts at once.
   const drain = async () => {

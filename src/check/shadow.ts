@@ -42,6 +42,8 @@ export interface ShadowSettings {
   // The routes directories the app's extensions mount, whose pages' params are read from their own paths.
   mounts: RouteMount[]
   islandOnly: Set<string>
+  // The directory the public files are served from, which `kay dev` reads to tell an edit of a file there from one elsewhere.
+  publicDir?: string | undefined
   // The levels kay.config.ts gives the lints, which the compiler reports by.
   lints?: LintLevels | undefined
 }
@@ -57,15 +59,15 @@ export function shadowSource(root: string, shadow: string): string {
 }
 
 export function serializeShadowSettings(root: string, settings: ShadowSettings): string {
-  return `${JSON.stringify({ routes: relative(root, settings.routesDir), mounts: settings.mounts.map(({ dir, prefix }) => ({ dir: relative(root, dir), prefix })), islandOnly: [...settings.islandOnly].map(file => relative(root, file)).sort(), ...settings.lints && { lints: settings.lints } }, null, 2)}\n`
+  return `${JSON.stringify({ routes: relative(root, settings.routesDir), mounts: settings.mounts.map(({ dir, prefix }) => ({ dir: relative(root, dir), prefix })), islandOnly: [...settings.islandOnly].map(file => relative(root, file)).sort(), ...settings.publicDir !== undefined && { public: relative(root, settings.publicDir) }, ...settings.lints && { lints: settings.lints } }, null, 2)}\n`
 }
 
 // The settings the shadow tree was written with, or the defaults when no `kay check`, `kay dev` or LSP has written it yet.
 export function readShadowSettings(root: string): ShadowSettings {
   try {
-    const saved = JSON.parse(readFileSync(join(projectPaths(root).types, SHADOW_SETTINGS), 'utf8')) as { routes: string, mounts?: (string | RouteMount)[], islandOnly: string[], lints?: LintLevels }
+    const saved = JSON.parse(readFileSync(join(projectPaths(root).types, SHADOW_SETTINGS), 'utf8')) as { routes: string, mounts?: (string | RouteMount)[], islandOnly: string[], public?: string, lints?: LintLevels }
 
-    return { routesDir: resolve(root, saved.routes), mounts: (saved.mounts ?? []).map(mount => typeof mount === 'string' ? { dir: resolve(root, mount), prefix: '' } : { ...mount, dir: resolve(root, mount.dir) }), islandOnly: new Set(saved.islandOnly.map(file => resolve(root, file))), lints: saved.lints }
+    return { routesDir: resolve(root, saved.routes), mounts: (saved.mounts ?? []).map(mount => typeof mount === 'string' ? { dir: resolve(root, mount), prefix: '' } : { ...mount, dir: resolve(root, mount.dir) }), islandOnly: new Set(saved.islandOnly.map(file => resolve(root, file))), publicDir: resolve(root, saved.public ?? projectPaths(root).public), lints: saved.lints }
   }
   catch {
     return { routesDir: projectPaths(root).routes, mounts: [], islandOnly: new Set() }

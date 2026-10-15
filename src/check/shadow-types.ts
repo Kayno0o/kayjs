@@ -104,7 +104,7 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
   if (libraries.pages.length > 0)
     await tree.write(EXTENSION_PAGES, libraries.pages.map(file => `import ${JSON.stringify(`./${relative(projectPaths(root).types, shadowPath(root, file)).slice(0, -'.tsx'.length)}`)}\n`).join(''))
 
-  await tree.write(SHADOW_SETTINGS, serializeShadowSettings(root, { routesDir, mounts, islandOnly: own.islandOnly, lints: options.lints }))
+  await tree.write(SHADOW_SETTINGS, serializeShadowSettings(root, { routesDir, mounts, islandOnly: own.islandOnly, publicDir: projectPaths(root, options).public, lints: options.lints }))
   // `contentChecks` writes the props check once it read the collections.
   await tree.removeStale([CONTENT_CHECK])
 
