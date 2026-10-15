@@ -8,6 +8,7 @@ This page lists what each release adds, newest first, with a link to where each 
 ## Unreleased
 
 - **Prove the executable starts**: `kay build --compile server --verify` starts it, waits for its health route and runs `--health`, failing the build with the server's own output when it crashes at startup. [Deployment](/guides/deployment#prove-the-executable-starts)
+- **Tests catch islands the browser cannot build**: `testSite()` builds them and throws the error, once per process, `islands: false` skips it. [Testing](/guides/testing#in-a-browser)
 - **A DOM preload and smaller test helpers**: `kay/test/dom` registers happy-dom's DOM, popover API included, for `mount()` in every test file, and `kay/test` exports `cookieJar()`, `solveWork()` and `scratchDir()`. [Testing](/guides/testing#one-component)
 - **Test the prebuilt auth pages**: their actions import as `@kaynooo/kayjs-auth/pages/<page>.kay`, for a test to submit them ([kayjs-auth](/llms/kayjs-auth)).
 - **Library stylesheets ship only the classes the app uses**: kayjs-ui's theme keeps the rules of the components the app renders and drops the rest. [app.css](/structure/app-css)

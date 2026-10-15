@@ -1,4 +1,5 @@
 import type { AnyElysia } from 'elysia'
+import type { ClientOptions } from '../build/client'
 import type { Action, ActionError, ActionProtection, FailureData, ResultOf, Success } from '../runtime/action'
 import type { Duration } from '../runtime/duration'
 import type { EventReader, NodeAt, Optional, SocketOf, SocketOptions, SocketPath, StreamMethod, StreamOf, StreamOptions, StreamPath } from '../runtime/live'
@@ -6,7 +7,8 @@ import type { PagesOptions } from '../server/app'
 import type { ClientBuild } from '../server/client'
 import type { BrowserOptions, TestPage } from './browser'
 import type { PageReading } from './page'
-import { join } from 'node:path'
+import { existsSync } from 'node:fs'
+import { join, resolve } from 'node:path'
 import { beforeEach } from 'bun:test'
 import { Elysia } from 'elysia'
 import { outputDir } from '../build/assets'
@@ -49,8 +51,10 @@ export interface TestOptions extends PagesOptions {
   use?: AnyElysia[] | undefined
   // What the app's Elysia `derive` would add for a request, such as the signed-in user, read by pages, guards and actions as `ctx.locals`.
   locals?: ((request: Request) => Record<string, unknown> | Promise<Record<string, unknown>>) | undefined
-  // Builds the islands for the browser, into `.kay/client` as `kay build` does, for `open()` to load pages in a headless Chrome.
+  // Loads pages in a headless Chrome with `open()`, served from the islands built for the browser.
   browser?: boolean | BrowserOptions | undefined
+  // Builds the islands for the browser as `kay build` does, into `.kay/client`, so one a browser cannot build, such as a server module reaching it, fails `testSite()` here and not only under `kay dev`; no browser needed. On unless `false`, built once per process for as long as the sources are unchanged.
+  islands?: boolean | undefined
 }
 
 // The page, with its head and its elements read from `html`.
@@ -151,16 +155,49 @@ function workHeaders(action: Action<never, unknown>): Record<string, string> {
   return work ? { [WORK_HEADER]: solveWork(signWork(action.url, work.difficulty, work.maxAge))! } : {}
 }
 
-// The project's pages and actions without a server, and without a browser build unless `browser` is set: pages then render their islands' markup and no scripts.
+const builds = new Map<string, Promise<ClientBuild>>()
+
+// The newest edit under the project's sources and pages, which tells a build still current from one the test's own edits outdated.
+async function editedAt(root: string, options: ClientOptions): Promise<number> {
+  let newest = 0
+
+  for (const dir of new Set(['src', options.routes ?? 'src/routes', options.api ?? 'src/api'])) {
+    const cwd = resolve(root, dir)
+
+    if (!existsSync(cwd))
+      continue
+
+    for await (const file of new Bun.Glob('**').scan({ cwd, absolute: true, onlyFiles: true }))
+      newest = Math.max(newest, Bun.file(file).lastModified)
+  }
+
+  return newest
+}
+
+// One build per root and options for as long as the sources stand, shared by the sites of a process, which would otherwise each clear and rewrite the output another one serves.
+async function islandsBuilt(root: string, options: ClientOptions): Promise<ClientBuild> {
+  const key = `${root}\0${JSON.stringify(options)}\0${await editedAt(root, options)}`
+  let build = builds.get(key)
+
+  if (!build) {
+    build = buildClient(root, options)
+    builds.set(key, build)
+  }
+
+  return build
+}
+
+// The project's pages and actions without a server, their islands built for the browser as a check: pages then render their islands' markup and no scripts.
 export async function testSite(options: TestOptions = {}): Promise<TestSite> {
   const root = testRoot(options.root)
   const loaded = await withConfig(root, options)
   // A site setting none is served where the visits go, so pages reading siteUrl() or siteOrigin() render as in production; files go to memory, fresh for each site, rather than to the store kay.config.ts names.
   const config = { ...loaded, site: loaded.site ?? ORIGIN, storage: options.storage ?? memoryFiles() }
   const project = resolveProject(root, config, { dev: config.dev === true, prebuilt: false, underKayDev: false })
-  const client: ClientBuild = options.browser !== undefined && options.browser !== false
-    ? await buildClient(root, clientOptionsOf(config, PRODUCTION))
-    : { entryImports: [], islands: {}, styles: new Map(), pages: new Map(), dir: join(outputDir(root), 'dist') }
+  const inBrowser = options.browser !== undefined && options.browser !== false
+  const built = inBrowser || options.islands !== false ? await islandsBuilt(root, clientOptionsOf(config, PRODUCTION)) : undefined
+  // Without a browser the pages render their islands' markup and load no script, so the build only had to succeed.
+  const client: ClientBuild = inBrowser ? built! : { entryImports: [], islands: {}, styles: new Map(), pages: new Map(), dir: join(outputDir(root), 'dist') }
   const browser = typeof options.browser === 'object' ? options.browser : {}
   const pages = await servePages(project, async () => client)
   const locals = options.locals

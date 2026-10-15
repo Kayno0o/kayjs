@@ -5,6 +5,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 ## Unreleased
 
 - `kay build --compile server --verify` starts the executable it wrote, waits for its health route and runs `--health`, failing the build with the server's own output when it crashes at startup ([Check the executable starts](production.md#check-the-executable-starts)).
+- `testSite()` builds the islands for the browser and throws when one fails, such as an island reaching a Bun builtin, once per process; `islands: false` skips it ([Testing](testing.md#browser-tests)).
 - `kay/test/dom` is a preload registering happy-dom's DOM with the popover API it lacks, for `mount()` in every test file, and `kay/test` exports `cookieJar()`, `solveWork()` and `scratchDir()` for a test of its own ([Testing](testing.md#helpers-for-a-test-of-its-own)).
 - kayjs-auth: the prebuilt pages' actions import as `@kaynooo/kayjs-auth/pages/<page>.kay`, for a test to submit them ([kayjs-auth](../packages/auth/llms.txt)).
 - The app's stylesheets leave out the rules of a library's stylesheets for the classes no file of the app or library component it reaches writes, so kayjs-ui's theme ships only the components the app renders ([Using a component library](components.md#using-a-component-library)).

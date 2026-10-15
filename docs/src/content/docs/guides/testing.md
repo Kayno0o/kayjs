@@ -4,7 +4,7 @@ order: 8
 description: Test pages and actions in-process with kay/test, and drive a real browser when you need one.
 ---
 
-`kay/test` serves your pages and actions inside the test process, with no server and no browser build. `kay new` writes the `bunfig.toml` preload and a first test; run them with `bun test`.
+`kay/test` serves your pages and actions inside the test process, with no server and no browser. It does build your islands for the browser, so a test fails when one cannot be built. `kay new` writes the `bunfig.toml` preload and a first test; run them with `bun test`.
 
 ## Rendering a page
 
@@ -87,6 +87,8 @@ it('opens its panel on a click', async () => {
 A test that drives an Elysia app of its own, rather than `testSite`, keeps a browser's cookies with `cookieJar()`. `jar.send(handle, request)` sends the cookies kept so far and keeps the ones the response sets. `solveWork(challenge)` solves a proof-of-work challenge as kay's script does. `scratchDir(prefix)` makes a fresh directory under the project's `.kay/scratch`, which no build or check reads.
 
 ## In a browser
+
+Every `testSite()` call builds the islands as `kay build` does, and throws that build's error when one fails, such as an island importing a module that reaches `bun:sqlite` or the database. Pages still render without scripts, and no browser is needed. The build runs once per process while the files under `src`, your routes and your API are unchanged, and costs a fraction of a second on a small app. `testSite({ islands: false })` skips it.
 
 For what only a browser does, `testSite({ browser: true })` builds the islands and `site.open(path)` loads the page in headless Chrome. The build goes to `.kay/client`, or `.kay/client-<n>` in each worker of `bun test --parallel`, so test files running at once never overwrite each other's; a worker's `pages({ prebuilt: true })` reads its own `.kay/client-<n>` too, not what a `kay build` run before the tests left:
 
