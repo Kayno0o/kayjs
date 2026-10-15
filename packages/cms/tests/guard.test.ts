@@ -2,7 +2,7 @@ import type { GuardContext } from 'kay'
 import { describe, expect, mock, test } from 'bun:test'
 import * as server from 'kay/server'
 import { authors } from '../src/authors'
-import { configure } from '../src/settings'
+import { configure, settings } from '../src/settings'
 
 class Refused extends Error {}
 
@@ -69,5 +69,45 @@ describe('the API guard', () => {
 
     expect(await admitted(ctx)).toBe(true)
     expect(authors.get(ctx.request)).toEqual(ada)
+  })
+})
+
+describe('a guard loaded lazily', () => {
+  test('loads nothing as cms() is set up, once on the first request, and keeps what it loaded', async () => {
+    let loads = 0
+
+    configure({ guard: { load: async () => {
+      loads++
+
+      return ({ request, deny }) => request.headers.has('x-editor') ? undefined : deny(403, 'Editors only')
+    } } })
+    expect(loads).toBe(0)
+    expect(settings().guard).toBeTypeOf('function')
+
+    expect(await admitted(context('POST', '/entries/posts/hello', false))).toBe(false)
+
+    const signedIn = context('POST', '/entries/posts/hello', false)
+
+    signedIn.request.headers.set('x-editor', '1')
+    expect(await admitted(signedIn)).toBe(true)
+    expect(loads).toBe(1)
+  })
+
+  test('tries to load again after a load that failed, and not after a guard that refused', async () => {
+    let loads = 0
+
+    configure({ guard: { load: () => {
+      loads++
+
+      if (loads === 1)
+        throw new Error('database down')
+
+      return () => undefined
+    } } })
+
+    await expect(apiGuard(context('POST', '/entries/posts/hello', false))).rejects.toThrow('database down')
+    expect(await admitted(context('POST', '/entries/posts/hello', false))).toBe(true)
+    expect(await admitted(context('POST', '/entries/posts/hello', false))).toBe(true)
+    expect(loads).toBe(2)
   })
 })

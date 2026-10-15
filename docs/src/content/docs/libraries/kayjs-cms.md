@@ -20,12 +20,11 @@ The `@kaynooo` scope must point at the Forgejo registry in your `.npmrc` (a proj
 ```ts
 import { cms, forgejo } from '@kaynooo/kayjs-cms'
 import { defineConfig } from 'kay/server'
-import { auth } from './src/auth'
 
 export default defineConfig({
   extensions: [cms({
-    // Who may use the screens and save; edit mode alone only reads.
-    guard: auth.guard({ require: 'editor' }),
+    // Who may use the screens and save; edit mode alone only reads. Loaded on the first request, so this file imports nothing of the app's auth or database.
+    guard: { load: async () => (await import('./src/auth')).auth.guard({ require: 'editor' }) },
     // Left out, a file entry is written in the working tree, for `kay dev`: a production server refuses to boot so.
     files: process.env.FORGEJO_TOKEN ? forgejo({ url: 'https://git.example.com', repo: 'me/site', token: process.env.FORGEJO_TOKEN }) : undefined,
   })],
@@ -34,7 +33,7 @@ export default defineConfig({
 })
 ```
 
-The screens live at `/admin` (`prefix` moves them) and stay closed without a `guard`. In edit mode, kay renders the editor at the end of every page, with the entries the page read; "Edit on page" links on the screens put an editor the guard admitted in edit mode, and the editor's "Stop editing" button leaves it. Once there is a guard, every save needs it, edit mode included: an edit cookie or link is tied to no user. With a guard, `author` names who a save is committed as, such as the signed-in user.
+The screens live at `/admin` (`prefix` moves them) and stay closed without a `guard`. `guard` also takes the built guard itself, `auth.guard({ require: 'editor' })`, which makes `kay.config.ts` import `./src/auth`, and with it the app's database, for every `kay build` and `kay check`. In edit mode, kay renders the editor at the end of every page, with the entries the page read; "Edit on page" links on the screens put an editor the guard admitted in edit mode, and the editor's "Stop editing" button leaves it. Once there is a guard, every save needs it, edit mode included: an edit cookie or link is tied to no user. With a guard, `author` names who a save is committed as, such as the signed-in user.
 
 A file field takes PNG, JPEG, WebP, GIF, AVIF and PDF files unless `uploads` lists others (`['image/*', 'application/pdf']`). A body whose Markdown renders HTML that would run as the site or cover it, anything kay's sanitizer drops, such as a `<script>`, an `onclick` or a `style`, a `javascript:` link, or a tag left open for the page around it to close, is refused on save unless `rawHtml` lists the collection; the collection's own components and HTML shown in a code block are fine.
 

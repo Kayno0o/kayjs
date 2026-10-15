@@ -9,4 +9,4 @@ export type { CollectionInfo, DraftEntry, DraftResult, EntryRef, Issue, JsonSche
 export { BODY, entryKey, fieldsAt, formatMarker, parseMarker } from './markers'
 export type { FieldMarker, FieldPath, MarkedField } from './markers'
 export { joinPath, valueAt, withValueAt } from './paths'
-export type { CmsOptions } from './settings'
+export type { CmsOptions, LazyGuard } from './settings'

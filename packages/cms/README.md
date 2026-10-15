@@ -21,14 +21,13 @@ kay is a peer. It is released with kay, at kay's own version, and peers on kay's
 
 ```ts
 // kay.config.ts
-import { auth } from './src/auth'
 import { cms, forgejo } from '@kaynooo/kayjs-cms'
 import { defineConfig } from 'kay/server'
 
 export default defineConfig({
   extensions: [cms({
-    // Who may use the screens, and the API outside edit mode.
-    guard: auth.guard({ require: 'editor' }),
+    // Who may use the screens, and the API outside edit mode: loaded on the first request, so this file imports nothing of the app's auth or database.
+    guard: { load: async () => (await import('./src/auth')).auth.guard({ require: 'editor' }) },
     // Left out, a file entry is written in the working tree, for `kay dev`: a production server refuses to boot without it.
     files: process.env.FORGEJO_TOKEN ? forgejo({ url: 'https://git.example.com', repo: 'me/site', token: process.env.FORGEJO_TOKEN }) : undefined,
   })],
@@ -37,7 +36,7 @@ export default defineConfig({
 })
 ```
 
-The screens live at `/admin` (`prefix` moves them) and stay closed without a `guard`. In edit mode, kay renders the editor at the end of every page, with the entries the page read. The CMS's API answers requests kay let into edit mode, and those the guard admits. Their "Edit on page" links go through `/admin/page?path=`, which puts the editor the guard admitted in edit mode with kay's `enterPreview(ctx, { edit: true })`. The editor's "Stop editing" button leaves it, through kay's `exitPreview`.
+The screens live at `/admin` (`prefix` moves them) and stay closed without a `guard`. `guard` also takes the built guard itself, `auth.guard({ require: 'editor' })`, which makes `kay.config.ts` import `./src/auth`, and with it the app's database, for every `kay build` and `kay check`. In edit mode, kay renders the editor at the end of every page, with the entries the page read. The CMS's API answers requests kay let into edit mode, and those the guard admits. Their "Edit on page" links go through `/admin/page?path=`, which puts the editor the guard admitted in edit mode with kay's `enterPreview(ctx, { edit: true })`. The editor's "Stop editing" button leaves it, through kay's `exitPreview`.
 
 A commit shows on the site once it has rebuilt from it. The Forgejo token needs write access to the repository's contents; the commit is the token's user's. A save fails with the forge's reason when it takes over 15 seconds (`timeout`) or the forge cannot be reached, saying so when the commit may still have gone through.
 
