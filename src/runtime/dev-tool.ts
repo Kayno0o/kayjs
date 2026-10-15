@@ -1292,8 +1292,8 @@ function imagesTab(doc: Document, tool: DevTool, vitals: Vitals, signal: AbortSi
   let asked = 0
   let reread: () => void = () => undefined
   const tab = tool.tab({ id: 'images', label: 'Images', shown: () => reread() })
-  // What the server answered an image with, by address, until the next restart; an answer that failed is asked again.
-  const answers = new Map<string, Promise<{ text: string, kept: boolean }>>()
+  // What the server answered an image with, by address, until the next rebuild; a failed lookup is kept too, so a reread does not send one more request per failing image.
+  const answers = new Map<string, Promise<string>>()
   const slots = limiter(IMAGE_REQUESTS)
   let scheduled = false
   const schedule = () => {
@@ -1351,19 +1351,20 @@ function imagesTab(doc: Document, tool: DevTool, vitals: Vitals, signal: AbortSi
 
     tab.panel.replaceChildren(body, tool.make('div', 'note', 'Formats are those the server picks for a browser accepting AVIF and WebP.'))
 
-    // A few at a time, so a page of many images does not ask the server for all of them at once, and one that hangs holds back one slot only.
+    // An image the server is not asked about answers at once; the others go a few at a time, so a page of many images does not ask the server for all of them at once, and one that hangs holds back one slot only.
     await Promise.all(images.map(async (info, index) => {
-      let answer = answers.get(info.src)
+      let text = unaskedFormat(win, info.image, info.src)
 
-      if (answer === undefined) {
-        answer = slots(async () => imageFormat(win, info.image, info.src))
-        answers.set(info.src, answer)
+      if (text === undefined) {
+        let answer = answers.get(info.src)
+
+        if (answer === undefined) {
+          answer = slots(async () => askedFormat(win, info.src))
+          answers.set(info.src, answer)
+        }
+
+        text = await answer
       }
-
-      const { text, kept } = await answer
-
-      if (!kept && answers.get(info.src) === answer)
-        answers.delete(info.src)
 
       if (ask === asked)
         formats[index]!.textContent = text
@@ -1405,37 +1406,39 @@ function limiter(max: number): <T>(run: () => Promise<T>) => Promise<T> {
   }
 }
 
-// The format and size of an image. Only an image of kay's own routes loaded by the page is asked of the server, with a HEAD request: the route's code is kay's, it writes no variant the page did not already draw, and the type is negotiated so the URL does not say it. Any other image could run the app's own handler, so its size comes from the browser's resource timing and its format is not looked up. `kept` is false for an answer worth asking for again.
-async function imageFormat(win: Window & typeof globalThis, image: HTMLImageElement, src: string): Promise<{ text: string, kept: boolean }> {
+// The format of an image the server is not asked about, or undefined for one that is. Only an image of kay's own routes loaded by the page is asked, with a HEAD request: the route's code is kay's, it writes no variant the page did not already draw, and the type is negotiated so the URL does not say it. Any other image could run the app's own handler, so its size comes from the browser's resource timing and its format is not looked up.
+function unaskedFormat(win: Window & typeof globalThis, image: HTMLImageElement, src: string): string | undefined {
+  // The page's policy lets it ask its own origin only.
+  const url = parseUrl(src, win.location.href)
+
+  if (url === undefined)
+    return 'format unknown'
+
+  if (url.origin !== win.location.origin)
+    return 'on another host'
+
+  if (url.pathname !== IMAGE_ROUTE && !url.pathname.startsWith(IMAGE_FILES))
+    return `format not looked up, as kay does not serve it${transferred(win, url.href)}`
+
+  return !image.complete || image.naturalWidth === 0 ? 'not loaded' : undefined
+}
+
+// The format and size the server gives an image of kay's routes.
+async function askedFormat(win: Window & typeof globalThis, src: string): Promise<string> {
   try {
-    // The page's policy lets it ask its own origin only.
-    const url = parseUrl(src, win.location.href)
-
-    if (url === undefined)
-      return { text: 'format unknown', kept: false }
-
-    if (url.origin !== win.location.origin)
-      return { text: 'on another host', kept: true }
-
-    if (url.pathname !== IMAGE_ROUTE && !url.pathname.startsWith(IMAGE_FILES))
-      return { text: `format not looked up, as kay does not serve it${transferred(win, url.href)}`, kept: true }
-
-    if (!image.complete || image.naturalWidth === 0)
-      return { text: 'not loaded', kept: false }
-
     const response = await win.fetch(src, { method: 'HEAD', headers: { accept: IMAGE_ACCEPT }, cache: 'no-store', signal: AbortSignal.timeout(IMAGE_REQUEST_MS) })
     const type = response.headers.get('content-type') ?? ''
 
     if (!response.ok)
-      return { text: `the server answered ${response.status}`, kept: false }
+      return `the server answered ${response.status}`
 
     const format = type.startsWith('image/') ? type.slice('image/'.length) : 'not an image'
     const bytes = Number(response.headers.get('content-length'))
 
-    return { text: bytes > 0 ? `${format}, ${formatBytes(bytes)}` : format, kept: true }
+    return bytes > 0 ? `${format}, ${formatBytes(bytes)}` : format
   }
   catch {
-    return { text: 'format unknown', kept: false }
+    return 'format unknown'
   }
 }
 

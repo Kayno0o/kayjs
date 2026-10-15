@@ -734,15 +734,18 @@ describe('the dev tool', () => {
 
       expect(rows()).toHaveLength(10)
 
-      // The answers kept are not asked for again, the 404 is, and the request still pending is not asked twice.
-      expect(asked).toHaveLength(6)
-      expect(asked.at(-1)).toBe('HEAD http://localhost/_kay/images/gone.webp')
-      expect(rows().at(-4)).toContain('the server answered 404')
-
+      // No answer is asked for again, the 404 and the request still pending included, until the next rebuild.
       missing = false
       document.body.insertAdjacentHTML('beforeend', '<img id="later" src="/later.png" width="10" height="10" alt="">')
       await Bun.sleep(20)
 
+      expect(asked).toHaveLength(5)
+      expect(rows().at(-5)).toContain('the server answered 404')
+
+      window.dispatchEvent(new CustomEvent('kay-dev-built', { detail: JSON.stringify({ id: 'b', at: 0, changed: 'src/routes/x.kay', ms: 1 }) }))
+      await Bun.sleep(20)
+
+      expect(asked.filter(request => request.includes('gone'))).toHaveLength(2)
       expect(rows().at(-5)).toContain('avif, 43.9 KB')
 
       const visible = () => [...shadow().querySelectorAll<HTMLElement>('.outline')].filter(outline => outline.hidden === false).length
@@ -756,6 +759,53 @@ describe('the dev tool', () => {
       fetching.mockRestore()
       delete (window as { PerformanceObserver?: unknown }).PerformanceObserver
       Object.defineProperty(window, 'devicePixelRatio', { value: devicePixelRatio, configurable: true })
+      document.body.innerHTML = ''
+      happyDOM.setURL(href)
+    }
+  })
+
+  it('answers an image the server is not asked about at once, even while every request slot is held by one that hangs', async () => {
+    const { happyDOM } = window as unknown as { happyDOM: { setURL: (url: string) => void } }
+    const { href } = location
+    const observed = fakeObserver()
+
+    happyDOM.setURL('http://localhost/')
+    document.body.innerHTML = [
+      ...Array.from({ length: 4 }, (_, index) => `<img id="hung${index}" src="/_kay/images/hung${index}.webp" width="10" height="10" alt="">`),
+      '<img id="far" src="https://cdn.example/a.png" width="10" height="10" alt="">',
+      '<img id="plain" src="/photo.jpg" width="10" height="10" alt="">',
+      '<img id="broken" src="http://" width="10" height="10" alt="">',
+      '<img id="unloaded" src="/_kay/images/unloaded.webp" width="10" height="10" alt="">',
+    ].join('')
+
+    for (const image of document.querySelectorAll('img')) {
+      const loaded = image.id !== 'unloaded'
+
+      Object.defineProperty(image, 'naturalWidth', { value: loaded ? 10 : 0 })
+      Object.defineProperty(image, 'naturalHeight', { value: loaded ? 10 : 0 })
+      Object.defineProperty(image, 'complete', { value: loaded })
+    }
+
+    const fetching = spyOn(window, 'fetch').mockImplementation((async (_url: string, init: RequestInit) => new Promise((_, reject) => init.signal?.addEventListener('abort', () => reject(new Error('timeout'))))) as unknown as typeof window.fetch)
+
+    try {
+      tool = startDevTool()
+      observed.report('largest-contentful-paint', [])
+      shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-images')!.click()
+      await Bun.sleep(20)
+
+      const formats = [...shadow().querySelectorAll('#kay-dev-images .image .facts-line')].map(line => line.textContent)
+
+      expect(fetching).toHaveBeenCalledTimes(4)
+      expect(formats.slice(0, 4).every(text => text?.includes('format...'))).toBe(true)
+      expect(formats[4]).toContain('on another host')
+      expect(formats[5]).toContain('format not looked up')
+      expect(formats[6]).toContain('format unknown')
+      expect(formats[7]).toContain('not loaded')
+    }
+    finally {
+      fetching.mockRestore()
+      delete (window as { PerformanceObserver?: unknown }).PerformanceObserver
       document.body.innerHTML = ''
       happyDOM.setURL(href)
     }
