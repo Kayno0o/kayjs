@@ -1,4 +1,4 @@
-import { SANITIZED_URL_ATTRIBUTES, UNSAFE_ATTRIBUTE, UNSAFE_TAGS } from 'kay/library'
+import { isUrlAttribute, UNSAFE_ATTRIBUTE, UNSAFE_TAGS } from 'kay/library'
 import { bodyHtml, MarkdownError } from './kay/content'
 
 // What Markdown's own task list gives a checkbox.
@@ -85,7 +85,7 @@ function unsafeElement(tag: string, attributes: [string, string][]): string | un
     if (UNSAFE_ATTRIBUTE.test(key))
       return `the attribute ${key}`
 
-    if (SANITIZED_URL_ATTRIBUTES.has(key) && SCRIPT_URL.test(decoded(value)))
+    if (isUrlAttribute(key) && SCRIPT_URL.test(decoded(value)))
       return `a ${key} running script`
   }
 

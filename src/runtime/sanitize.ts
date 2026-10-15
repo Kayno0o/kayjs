@@ -18,8 +18,8 @@ const VOID = new Set(['area', 'br', 'col', 'hr', 'img', 'param', 'source', 'trac
 export const UNSAFE_TAGS: ReadonlySet<string> = new Set(['applet', 'base', 'bgsound', 'button', 'embed', 'fencedframe', 'form', 'frame', 'frameset', 'iframe', 'input', 'keygen', 'link', 'math', 'meta', 'noembed', 'noframes', 'noscript', 'object', 'plaintext', 'portal', 'script', 'select', 'style', 'svg', 'template', 'textarea', 'title', 'xmp'])
 // Handlers and styles, which run code or cover the page.
 export const UNSAFE_ATTRIBUTE = /^(?:on|style$|srcdoc$|formaction$)/i
-// Every attribute holding a URL in a user's markup: the shared ones, and those no page of the app sets but such markup may.
-export const SANITIZED_URL_ATTRIBUTES: ReadonlySet<string> = new Set([...URL_ATTRIBUTES, 'background', 'cite', 'longdesc', 'ping'])
+// The URL attributes besides the shared ones, which no page of the app sets but a user's markup may.
+const MARKUP_ONLY_URL = /^(?:background|cite|longdesc|ping)$/
 const SRCSET_CANDIDATE = /\s*,\s*/
 const DESCRIPTOR = /\s+\S+$/
 const ATTRIBUTE = /([a-z][\w:-]*)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/gi
@@ -54,7 +54,12 @@ function safeValue(attribute: string, value: string): boolean {
   if (attribute === 'srcset')
     return value.trim().split(SRCSET_CANDIDATE).every(candidate => isSafeUrl(candidate.replace(DESCRIPTOR, '')))
 
-  return attribute === 'data' || !SANITIZED_URL_ATTRIBUTES.has(attribute) || isSafeUrl(value)
+  return attribute === 'data' || !isUrlAttribute(attribute) || isSafeUrl(value)
+}
+
+// Whether an attribute of a user's markup holds a URL, its name lowercased: a function rather than a set, so a build reaching `trustHtml` alone leaves it out.
+export function isUrlAttribute(name: string): boolean {
+  return URL_ATTRIBUTES.includes(name) || MARKUP_ONLY_URL.test(name)
 }
 
 // The opening tag with the attributes kept for it, a URL only when safe, and a link marked as the user's.
