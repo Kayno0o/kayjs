@@ -128,7 +128,7 @@ describe('deprecated-schema-name', () => {
     const taken = '--- server\nimport { t } from \'kay\'\n\nconst s = 1\nexport const page = { query: t.Object({}) }\n---\np x'
     const aliased = '--- server\nimport { t as schema } from \'kay\'\n\nexport const page = { query: schema.Object({}) }\n---\np x'
 
-    expect(lints(renamed)).toEqual([{ code: 'deprecated-schema-name', severity: 'warning', at: 't' }])
+    expect(lints(renamed)).toEqual([{ code: 'deprecated-schema-name', severity: 'warning' as const, at: 't' }])
     expect(fixed(renamed)).toEqual([renamed.replaceAll('t }', 's }').replaceAll('typeof t', 'typeof s').replaceAll('t.', 's.')])
     expect(fixed(taken)).toEqual([taken.replace('{ t }', '{ s as t }')])
     expect(fixed(aliased)).toEqual([aliased.replace('t as schema', 's as schema')])
@@ -139,7 +139,7 @@ describe('deprecated-schema-name', () => {
 
     const duplicate = { code: undefined, severity: undefined, at: 'a' }
     // The statement declaring it again is left out of the analysis, which still reads the rest.
-    const deprecated = { code: 'deprecated-schema-name', severity: 'warning', at: 't' }
+    const deprecated = { code: 'deprecated-schema-name', severity: 'warning' as const, at: 't' }
 
     expect(lints(`---\n${twice}---\ndiv {a}`)).toEqual([deprecated, duplicate])
     expect(lints(`--- server\n${twice}---\ndiv x`)).toEqual([deprecated, duplicate])
