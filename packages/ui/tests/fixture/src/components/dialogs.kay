@@ -26,4 +26,5 @@ ConfirmDelete(message="Rotating breaks every link." failure="Could not rotate" o
 ConfirmDelete(message="Its verdicts go with it." failure="Could not remove" onConfirm={onDelete} ask="inline" label="Remove")
 ConfirmDelete(message="Unshare it?" failure="Could not unshare" onConfirm={onDelete} ask="inline" trigger="button" label="Unshare" class="unshare")
 ConfirmDelete(message="Forget it?" failure="Could not forget" onConfirm={onDelete} ask="inline" trigger="link" label="Forget" class="forget")
+ConfirmDelete(message="Save without your own IP?" failure="Could not save" success="Saved" onConfirm={onDelete} tone="neutral" trigger="button" label="Save" class="save")
 Toaster

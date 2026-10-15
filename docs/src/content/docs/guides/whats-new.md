@@ -7,6 +7,7 @@ This page lists what each release adds, newest first, with a link to where each 
 
 ## Unreleased
 
+- **`ConfirmDelete`** toasts a `success` message once through, and `tone="neutral"` words it for a confirm that deletes nothing. [ConfirmDelete](/ui/confirm-delete#a-confirm-that-is-not-a-deletion)
 - **`FileDrop`** takes `compact`, a slim row that sits inline in a form. [FileDrop](/ui/file-drop#compact)
 - **`TabNav`** carries the query params named in `keep` from tab to tab, such as a period the tabs share. [TabNav](/ui/tab-nav#params-the-tabs-share)
 - **`PageHeader`** takes a `@meta` block beside its title and a `description` under it. [PageHeader](/ui/page-header#meta-and-description)

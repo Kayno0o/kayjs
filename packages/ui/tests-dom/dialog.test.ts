@@ -145,6 +145,25 @@ describe('ConfirmDelete', () => {
     expect([dialog.open, dialog.querySelector('.kui-dialog-title')?.textContent, dialog.querySelector('.kui-btn-danger')?.textContent]).toEqual([true, 'Rotate link', 'Rotate'])
   })
 
+  test('reads neutrally for a confirm that is not a deletion, worded by its label, and toasts its success once through', async () => {
+    const root = await dialogs()
+    const trigger = root.querySelector('.save')!
+
+    expect([trigger.className, trigger.textContent]).toEqual(['kui-btn kui-btn-accent save', 'Save'])
+
+    click(trigger)
+    await settle()
+
+    const dialog = root.querySelectorAll<HTMLDialogElement>('dialog')[5]!
+
+    expect([dialog.querySelector('.kui-dialog-title')?.textContent, dialog.querySelector('.kui-btn-accent')?.textContent, dialog.querySelector('.kui-btn-danger')]).toEqual(['Save', 'Save', null])
+
+    click(dialog.querySelector('.kui-btn-accent'))
+    await settle()
+
+    expect([dialog.open, root.querySelector('.kui-toast-message')?.textContent]).toEqual([false, 'Saved'])
+  })
+
   test('asks inline when told to: armed by a click, it deletes or cancels in place, and hands the focus back', async () => {
     const { promise, resolve: finish } = Promise.withResolvers<void>()
     const root = await dialogs(async () => promise)
@@ -152,7 +171,7 @@ describe('ConfirmDelete', () => {
     const armed = () => root.querySelector('.kui-confirm-delete-armed')
     const buttons = () => [...armed()?.querySelectorAll('button') ?? []].map(button => [button.textContent || button.getAttribute('aria-label'), button.disabled])
 
-    expect(root.querySelectorAll('dialog')).toHaveLength(5)
+    expect(root.querySelectorAll('dialog')).toHaveLength(6)
 
     click(trigger)
     await settle()

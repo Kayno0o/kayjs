@@ -16,7 +16,15 @@ description: A delete trigger that asks for confirmation in a dialog before runn
 
 If `onConfirm` throws, the dialog stays open and `failure` is toasted.
 
+`success` is toasted once `onConfirm` went through.
+
 <Demo name="confirm-delete/failure" />
+
+## A confirm that is not a deletion
+
+`tone="neutral"` asks before an action that deletes nothing, such as a save with a consequence. Its buttons take the accent look, and the dialog's title and confirm button say the `label`. `title`, `confirmLabel` and `pendingLabel` still replace any of them.
+
+<Demo name="confirm-delete/neutral" />
 
 ## Inline
 
