@@ -305,8 +305,10 @@ class RewriteFinder {
     const target = node.type === 'AssignmentExpression' ? node.left : node.type === 'UpdateExpression' ? node.argument : undefined
     const right = node.type === 'AssignmentExpression' ? node.right : undefined
     const start = map.isExact(node.start!) ? map.toSource(node.start!) : undefined
-    const rightStart = right && map.isExact(right.start!) ? map.toSource(right.start!) : undefined
-    const rightEnd = right && map.isExact(right.end! - 1) ? map.toSource(right.end! - 1) : undefined
+    // Babel leaves a parenthesized right side's parentheses out of its span, so the span runs from the first one to the assignment's end, keeping them.
+    const rightFrom = (right?.extra?.parenStart as number | undefined) ?? right?.start
+    const rightStart = right && map.isExact(rightFrom!) ? map.toSource(rightFrom!) : undefined
+    const rightEnd = right && map.isExact(node.end! - 1) ? map.toSource(node.end! - 1) : undefined
 
     if (kind === 'memo') {
       this.diagnostics.push({ ...span, message: `\`${name}\` is a memo, which cannot be written`, help: 'write the signals it is derived from' })

@@ -752,6 +752,26 @@ describe('signal writes', () => {
     expect(checked.tsx).toContain('KayWritable(accent).set(\'red\')\n  KayWritable(theme).set((KayCurrent) => KayCurrent ?? (\'dark\'))\n  KayWritable(sel).set((KayCurrent) => KayCurrent + (1))\n  KayWritable(sel).set((KayCurrent) => KayCurrent + 1)\n  for (const each of [sel]) KayWritable(each).set(0)\n  let shadow = 1\n  shadow = 2')
     expect(checked.tsx).toContain('KayWritable(open).set(!open())')
   })
+
+  it('keep a parenthesized right side whole, in a plain, compound or logical assignment, on the server, in an island and when type checking', () => {
+    const source = '---\nimport { accent } from \'./theme\'\nimport type { Signal } from \'kay\'\nconst { open } = props<{ open: Signal<boolean> }>()\nconst count = signal(0)\nconst pair = signal(0)\nfunction f() {\n  count = (2)\n  count += (1 as number)\n  count = ((3))\n  pair = (count(), 4)\n  count ??= ( 5 )\n  count = /* six */ (6)\n  count = (7) + (8)\n  accent = (\'red\')\n  open = (false)\n}\n---\nbutton(onClick={() => count = (count() + 1)}) {count()} {pair()} {open()}'
+    const runs = compileKay(source, 'test.kay', { output: 'dom' })
+    const served = compileKay(source, 'test.kay', { output: 'html' })
+    const checked = compileKay(source, 'test.kay', { check: true })
+
+    for (const { tsx: code, diagnostics } of [runs, served, checked]) {
+      expect(diagnostics.map(d => d.message)).toEqual([])
+      expect(() => parser.parse(code, { sourceType: 'module', plugins: ['typescript', 'jsx'] })).not.toThrow()
+    }
+
+    for (const { tsx: code } of [runs, served]) {
+      expect(code).toContain('count.set((2))\n  count.set((KayCurrent) => KayCurrent + ((1 as number)))\n  count.set(((3)))\n  pair.set((count(), 4))\n  count.set((KayCurrent) => KayCurrent ?? (( 5 )))\n  count.set((6))\n  count.set((7) + (8))\n  accent.set((\'red\'))\n  __props.open.set((false))')
+    }
+
+    expect(runs.tsx).toContain('count.set((count() + 1))')
+    expect(checked.tsx).toContain('KayWritable(accent).set((\'red\'))')
+    expect(checked.tsx).toContain('onClick={() => count.set((count() + 1))}')
+  })
 })
 
 describe('module signals', () => {
