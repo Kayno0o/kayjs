@@ -260,8 +260,10 @@ expect(jar.cookies.has('session')).toBe(true)
 - `bun test --isolate` runs each file in modules of its own, so each reads its own copy, and files never see each other's rows; the app's `bun run test` passes it, while a plain `bun test` runs the preload once and every file shares one copy.
 - The test database in `.env.test` need not exist, its server's user only needs `CREATEDB`.
 - Without `browser`, pages render their islands' markup without scripts.
-- `testSite()` still builds the islands for the browser, into `.kay/client` as `kay build` does, and throws that build's error when one fails, such as an island reaching a Bun builtin or a server module (`browser-builtin-import`), which no server-side render meets.
-- The build runs once per process for as long as the files under `src`, the routes and the API stay unchanged, and `browser: true` shares it; `testSite({ islands: false })` skips it, for a test that never needs it.
+- `testSite()` still builds the islands for the browser, unminified, into `.kay/client` (or `.kay/client-<n>` in a `bun test --parallel` worker) and throws that build's error when one fails, such as an island reaching a Bun builtin or a server module (`browser-builtin-import`), which no server-side render meets.
+- The build clears what `kay build` left in that folder, prerendered pages included, so run `kay build` after the tests, not before.
+- It runs once per process (once per file under `bun test --isolate`) for as long as the files under `src`, the routes and the API stay unchanged, one at a time, and `browser: true` shares it; `kay.config.ts`, `public` and library sources are not watched.
+- On a large app the build may outlast a hook's 5 second timeout: pass `testSite({ islands: false })` there, or a longer timeout to `beforeAll`.
 - Test files import `.kay` files directly, `import { add } from '../src/routes/index.kay'`, through `[test] preload = ["kay/test/preload"]` in `bunfig.toml`, which `kay new` writes along with a first test.
 - They are typed through `.kay/types` as any `.ts` file's imports are, so `kay check` passes them, and a bare `tsgo` resolves them only once `kay check` has written that tree, which a check script runs first.
 - `bun test` loads the project's `.env` as well as `.env.test` and `.env.test.local`, whatever `NODE_ENV` says.
@@ -270,7 +272,7 @@ expect(jar.cookies.has('session')).toBe(true)
 
 ### Browser tests
 
-- `testSite({ browser: true })` serves the islands that `testSite()` builds anyway, into `.kay/client` as `kay build` does.
+- `testSite({ browser: true })` serves the islands that `testSite()` builds anyway.
 - In each worker of `bun test --parallel`, the processes its tests start included, the build goes into `.kay/client-<n>`, so files running at once keep their builds apart, and a worker's `pages({ prebuilt: true })` reads its own, not what a `kay build` before the tests left.
 - `site.open(path)` loads a page in a headless Chrome over a server the site starts on a free port, resolving with a page once it loaded and its islands hydrating on load are done.
 - `browse(url, options)` from `kay/test` is the same for a server already running, such as one the test started itself, rather than one `testSite` serves.

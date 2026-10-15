@@ -8,10 +8,10 @@ import type { ClientBuild } from '../server/client'
 import type { BrowserOptions, TestPage } from './browser'
 import type { PageReading } from './page'
 import { existsSync } from 'node:fs'
-import { join, resolve } from 'node:path'
+import { resolve } from 'node:path'
 import { beforeEach } from 'bun:test'
 import { Elysia } from 'elysia'
-import { outputDir } from '../build/assets'
+import { clientDir } from '../build/assets'
 import { buildClient } from '../build/client'
 import { withConfig } from '../config'
 import { clientOptionsOf, PRODUCTION, resolveProject } from '../project'
@@ -53,7 +53,7 @@ export interface TestOptions extends PagesOptions {
   locals?: ((request: Request) => Record<string, unknown> | Promise<Record<string, unknown>>) | undefined
   // Loads pages in a headless Chrome with `open()`, served from the islands built for the browser.
   browser?: boolean | BrowserOptions | undefined
-  // Builds the islands for the browser as `kay build` does, into `.kay/client`, so one a browser cannot build, such as a server module reaching it, fails `testSite()` here and not only under `kay dev`; no browser needed. On unless `false`, built once per process for as long as the sources are unchanged.
+  // Builds the islands for the browser, unminified, into `.kay/client` (clearing what a `kay build` left there), so one a browser cannot build, such as a server module reaching it, fails `testSite()` here and not only under `kay dev`; no browser needed. On unless `false`, built again only when the files under `src`, the routes or the API change.
   islands?: boolean | undefined
 }
 
@@ -155,11 +155,12 @@ function workHeaders(action: Action<never, unknown>): Record<string, string> {
   return work ? { [WORK_HEADER]: solveWork(signWork(action.url, work.difficulty, work.maxAge))! } : {}
 }
 
-const builds = new Map<string, Promise<ClientBuild>>()
+const builds = new Map<string, { key: string, build: Promise<ClientBuild> }>()
 
-// The newest edit under the project's sources and pages, which tells a build still current from one the test's own edits outdated.
-async function editedAt(root: string, options: ClientOptions): Promise<number> {
+// The newest edit and the count of files under the project's sources and pages, which tell a build still current from one the test's own edits outdated.
+async function editedAt(root: string, options: ClientOptions): Promise<string> {
   let newest = 0
+  let count = 0
 
   for (const dir of new Set(['src', options.routes ?? 'src/routes', options.api ?? 'src/api'])) {
     const cwd = resolve(root, dir)
@@ -167,22 +168,38 @@ async function editedAt(root: string, options: ClientOptions): Promise<number> {
     if (!existsSync(cwd))
       continue
 
-    for await (const file of new Bun.Glob('**').scan({ cwd, absolute: true, onlyFiles: true }))
+    for await (const file of new Bun.Glob('**').scan({ cwd, absolute: true, onlyFiles: true })) {
       newest = Math.max(newest, Bun.file(file).lastModified)
+      count++
+    }
   }
 
-  return newest
+  return `${newest}:${count}`
 }
 
-// One build per root and options for as long as the sources stand, shared by the sites of a process, which would otherwise each clear and rewrite the output another one serves.
-async function islandsBuilt(root: string, options: ClientOptions): Promise<ClientBuild> {
-  const key = `${root}\0${JSON.stringify(options)}\0${await editedAt(root, options)}`
-  let build = builds.get(key)
+// The options that tell two builds apart, as far as they can be written down.
+function optionsKey(options: ClientOptions): string {
+  return JSON.stringify(options, (_, value: unknown) => typeof value === 'bigint' ? String(value) : value)
+}
 
-  if (!build) {
-    build = buildClient(root, options)
-    builds.set(key, build)
-  }
+// One build per root, rebuilt when its options or sources changed, and one at a time: every build clears and rewrites the root's output, which the sites of a process share.
+async function islandsBuilt(root: string, options: ClientOptions): Promise<ClientBuild> {
+  const key = `${optionsKey(options)}\0${await editedAt(root, options)}`
+  const held = builds.get(root)
+
+  if (held?.key === key)
+    return held.build
+
+  const build = (async () => {
+    try {
+      await held?.build
+    }
+    catch {}
+
+    return buildClient(root, options)
+  })()
+
+  builds.set(root, { key, build })
 
   return build
 }
@@ -195,9 +212,9 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
   const config = { ...loaded, site: loaded.site ?? ORIGIN, storage: options.storage ?? memoryFiles() }
   const project = resolveProject(root, config, { dev: config.dev === true, prebuilt: false, underKayDev: false })
   const inBrowser = options.browser !== undefined && options.browser !== false
-  const built = inBrowser || options.islands !== false ? await islandsBuilt(root, clientOptionsOf(config, PRODUCTION)) : undefined
+  const wanted = inBrowser || options.islands !== false ? await islandsBuilt(root, clientOptionsOf(config, PRODUCTION)) : undefined
   // Without a browser the pages render their islands' markup and load no script, so the build only had to succeed.
-  const client: ClientBuild = inBrowser ? built! : { entryImports: [], islands: {}, styles: new Map(), pages: new Map(), dir: join(outputDir(root), 'dist') }
+  const client: ClientBuild = inBrowser && wanted ? wanted : { entryImports: [], islands: {}, styles: new Map(), pages: new Map(), dir: clientDir(root) }
   const browser = typeof options.browser === 'object' ? options.browser : {}
   const pages = await servePages(project, async () => client)
   const locals = options.locals

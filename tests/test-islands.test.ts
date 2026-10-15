@@ -15,6 +15,8 @@ beforeAll(async () => {
   await Bun.write(join(root, 'src/routes/index.kay'), ISLAND)
 })
 
+const manifest = (): string => join(root, '.kay/client/manifest.json')
+
 describe('testSite builds the islands', () => {
   it('fails when an island reaches a module a browser cannot build', async () => {
     await Bun.write(join(root, 'src/greeting.ts'), BROWSERLESS)
@@ -37,5 +39,23 @@ describe('testSite builds the islands', () => {
 
     await expect(testSite({ root })).rejects.toThrow('browser has no bun:sqlite')
     await expect(testSite({ root, islands: false })).resolves.toBeDefined()
+  })
+
+  it('builds once for sources that did not change, and again for other options', async () => {
+    await Bun.write(join(root, 'src/greeting.ts'), FINE)
+    await testSite({ root })
+
+    const first = Bun.file(manifest()).lastModified
+
+    await Bun.sleep(20)
+    await testSite({ root })
+    await testSite({ root, browser: false })
+
+    expect(Bun.file(manifest()).lastModified).toBe(first)
+
+    await Bun.sleep(20)
+    await testSite({ root, base: '/app' })
+
+    expect(Bun.file(manifest()).lastModified).toBeGreaterThan(first)
   })
 })
