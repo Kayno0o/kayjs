@@ -481,7 +481,7 @@ FormField also works outside a dialog, in a plain form posting to an action:
 - Inside an island, as in a FormDialog, the control's `aria-describedby` gains the hint and, while one shows, the messages, beside the ids it had, and the control is `aria-invalid` while a message shows. A FormDialog refusing a field focuses the first one marked so. On a static page, kay marks the fields of a refused plain post `aria-invalid` itself.
 - `group` makes it a `fieldset` with a `legend`, for a control made of several inputs.
 - Its messages sit in an `aria-live` region, so a screen reader reads them as they appear.
-- `compact` sizes it by its control rather than the row, for a filter bar of fields side by side. It holds no message region then unless given a `name` or an `issue`.
+- `compact` sizes it by its control rather than the row, for a filter bar of fields side by side, a Select inside as wide as its options with no class. It holds no message region then unless given a `name` or an `issue`.
 
 A GET filter form, whose every pick lands in the URL, submits as soon as a Select changes with `submit`, no ref to the form needed:
 

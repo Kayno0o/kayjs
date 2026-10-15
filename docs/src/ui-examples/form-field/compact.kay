@@ -1,0 +1,18 @@
+---
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+import Select from '@kaynooo/kayjs-ui/select.kay'
+
+const PERIODS = [
+  { value: '24h', label: 'Last 24 hours' },
+  { value: '30d', label: 'Last 30 days' },
+]
+const STATUSES = [
+  { value: 'ok', label: 'OK' },
+  { value: 'error', label: 'Error' },
+]
+---
+form.flex.flex-wrap.items-end.gap-3(method="get" role="search")
+  FormField(label="Period" compact)
+    Select(name="period" value="" options={PERIODS} emptyOption="Last 7 days")
+  FormField(label="Status" compact)
+    Select(name="status" value="" options={STATUSES} emptyOption="Any")

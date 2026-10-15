@@ -6,6 +6,12 @@ description: Frames a form control with its label, hint and error message.
 
 The control goes inside as the child. `label` names it, `hint` explains it below, and `required` marks the label with a `*`. Pass `name` to match the field's name in an action, and `group` for a control made of several inputs, which becomes a labelled `fieldset`.
 
+## In a filter bar
+
+`compact` sizes the field by its control rather than the row, so several fit side by side. A Select inside is as wide as its options. A compact field holds no message unless given a `name` or an `issue`.
+
+<Demo name="form-field/compact" />
+
 ## Messages
 
 `issue` shows a message of the page's own, such as `ctx.failed(rename)?.errors.title` after a plain form post. Inside a FormDialog, the message the action refused that field with shows here by itself.

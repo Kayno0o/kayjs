@@ -646,6 +646,11 @@
     @apply w-full;
   }
 
+  /* A compact field is as wide as its select, which then fits its options, as in a filter bar. */
+  .kui-form-field:where([data-compact]) :where(select) {
+    @apply w-auto;
+  }
+
   /* A control made of several inputs is a fieldset, its label the legend: neither draws a frame of its own. */
   .kui-form-field-group {
     @apply m-0 min-w-0 border-0 p-0;

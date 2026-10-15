@@ -106,6 +106,14 @@ function failing(names: string[], least: number): string[] {
   }))
 }
 
+// The theme as Tailwind compiles it, after a skin's own CSS.
+async function built(skin: string): Promise<string> {
+  const tailwind = Bun.resolveSync('tailwindcss/theme.css', ROOT)
+  const compiler = await compile(`@import 'tailwindcss/theme.css' layer(theme);\n${theme}\n${skin}`, { base: ROOT, loadStylesheet: async (_, base) => ({ path: tailwind, base, content: await Bun.file(tailwind).text() }) })
+
+  return compiler.build([])
+}
+
 describe('theme.css', () => {
   test('reads at 4.5:1 for text and 3:1 for field borders and focus, on every ground in both schemes', () => {
     expect(failing(TEXT, 4.5)).toEqual([])
@@ -179,14 +187,19 @@ describe('theme.css', () => {
     expect(theme).toMatch(new RegExp(String.raw`\.kui-command-palette-option \{[^}]*&:where\(\[aria-selected='true'\]\) ${bar}`))
   })
 
-  test('draws no offset shadow nor press-down unless a skin sets their tokens alone', async () => {
-    const tailwind = Bun.resolveSync('tailwindcss/theme.css', ROOT)
-    const build = async (skin: string) => {
-      const compiler = await compile(`@import 'tailwindcss/theme.css' layer(theme);\n${theme}\n${skin}`, { base: ROOT, loadStylesheet: async (_, base) => ({ path: tailwind, base, content: await Bun.file(tailwind).text() }) })
-      const css = compiler.build([])
+  test('sizes a select by its options inside a compact field, and by the row inside any other', async () => {
+    const css = await built('')
+    const rule = (selector: string) => css.search(new RegExp(String.raw`${selector} \{\s*width: (?:100%|auto);`))
+    const full = rule(String.raw`\.kui-form-field :where\([^{]*select,\s*textarea\s*\)`)
+    const compact = rule(String.raw`\.kui-form-field:where\(\[data-compact\]\) :where\(select\)`)
 
-      return [...css.matchAll(PRESS_TOKEN)].map(([, token, value]) => `${token} ${value}`)
-    }
+    expect(full).toBeGreaterThan(-1)
+    expect(compact).toBeGreaterThan(full)
+    expect(css.slice(compact)).toMatch(/^[^}]*width: auto;/)
+  })
+
+  test('draws no offset shadow nor press-down unless a skin sets their tokens alone', async () => {
+    const build = async (skin: string) => [...(await built(skin)).matchAll(PRESS_TOKEN)].map(([, token, value]) => `${token} ${value}`)
 
     expect(await build('')).toEqual(['--kui-shadow-raised none', '--kui-shadow-press none', '--kui-press-travel 0px'])
     expect(await build('@theme { --kui-shadow-raised: 4px 4px 0 black; --kui-shadow-press: 3px 3px 0 black; --kui-press-travel: 3px; }')).toEqual(['--kui-shadow-raised 4px 4px 0 black', '--kui-shadow-press 3px 3px 0 black', '--kui-press-travel 3px'])
