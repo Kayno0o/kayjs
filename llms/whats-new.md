@@ -6,6 +6,8 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 - kayjs-ui: a `Button` whose `onClick` returns a promise is busy and disabled until it settles, alone among the buttons on one action, and a submit `Button` is busy while its form's async `onSubmit` runs, which marks the form `aria-busy`.
 - kayjs-ui: a `FormField` `group` with a message marks its fields `aria-invalid` and described by it, so `focusInvalid` reveals the group's tab and focuses its first field.
+- kayjs-auth: an hourly `prune` deletes expired links, codes, invitations and sessions, a session ended by sign-out everywhere or a password change included, and its stores batch reads and deletes into fewer round trips; a custom store implements `prune`, in [1.44.0](upgrading.md#1440).
+- kayjs-auth: a data export asks for a sign-in or proof under ten minutes old, an email change on a two-factor account its code, ID tokens need an asymmetric signature and an issuer `https:` in production, and a plain Elysia app refuses cross-site session writes, breaking changes in [1.44.0](upgrading.md#1440).
 - kayjs-ui: `Select` and `MultiSelect` take the type of their options' values, a number option handing back a number, a breaking change in [1.44.0](upgrading.md#1440).
 - kayjs-ui: `ConfirmDelete` takes `success`, toasted once through, and `tone="neutral"` for a confirm that is not a deletion.
 - kayjs-ui: `FileDrop` takes `compact`, a slim row to sit inline in a form.
@@ -14,7 +16,8 @@ What each release of kay and its libraries adds, newest first, each feature with
 - kayjs-ui: `EmptyState` takes `level` to make its title a heading, `level={1}` for an error page.
 - kayjs-ui: `Segmented` takes `value={null}` to show no option picked.
 - kayjs-ui: a number `TextInput` hands back a number, or `null` once emptied, a breaking change in [1.44.0](upgrading.md#1440).
-- `images.card.logo` draws a square image, an SVG or a raster, at the top left of every share card: [Draw a share card for a page](styles-and-assets.md#draw-a-share-card-for-a-page).
+- AVIF variants encode twice as fast, on kay's own SIMD build of libavif and libaom: [Responsive images](styles-and-assets.md#responsive-images).
+- `images.card.logo` draws a square image, an SVG or a raster, at the top left of every share card, `kay check` reporting one the boot would refuse: [Draw a share card for a page](styles-and-assets.md#draw-a-share-card-for-a-page).
 - kay's default favicon is a kingfisher on a navy tile, for a site that names none: [Set a favicon and make the site installable](head.md#set-a-favicon-and-make-the-site-installable).
 - `kay render <url>` prints what the server answers for one URL, as `kay dev` serves it, without starting it on a port: [Check what a page renders](project.md#check-what-a-page-renders).
 - `--format json` on `kay build`, `kay routes`, `kay explain`, `kay fmt` and `kay migrate` prints one JSON document on stdout, as `kay check` does; `kay routes --format json` lists each route with its file, layouts and guards: [Commands](project.md#commands).

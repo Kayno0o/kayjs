@@ -9,6 +9,8 @@ This page lists what each release adds, newest first, with a link to where each 
 
 - **`Button`** is busy and disabled until the promise its `onClick` returned settles, alone among the buttons on one action, and a submit button is busy while its form's async `onSubmit` runs. [Button](/ui/button#busy)
 - **`FormField`** `group` with a message marks its fields invalid and described by it, so `focusInvalid` shows the group's tab and focuses its first field. [FormField](/ui/form-field)
+- **kayjs-auth cleans up after itself**: once an hour it deletes expired links, codes, invitations and sessions, including sessions ended by a sign-out everywhere or a password change. Its stores also batch reads and deletes into fewer database round trips. A custom store implements `prune`, as [Upgrading](/guides/upgrading#kayjs-auth-stores) covers.
+- **kayjs-auth guards sensitive actions harder**. A data export needs a recent sign-in. An email change on a two-factor account needs its code. OpenID Connect providers are checked harder, and a plain Elysia app refuses cross-site session writes. [Upgrading](/guides/upgrading#1440) lists what to change.
 - **`Select` and `MultiSelect`** take the type of their options' values, so a union needs no cast and a number option hands back a number. [Select](/ui/select#typed-values)
 - **`ConfirmDelete`** toasts a `success` message once through, and `tone="neutral"` words it for a confirm that deletes nothing. [ConfirmDelete](/ui/confirm-delete#a-confirm-that-is-not-a-deletion)
 - **`FileDrop`** takes `compact`, a slim row that sits inline in a form. [FileDrop](/ui/file-drop#compact)
@@ -17,7 +19,8 @@ This page lists what each release adds, newest first, with a link to where each 
 - **`EmptyState`** takes `level` to make its title a heading, the page's `h1` on an error page. [EmptyState](/ui/empty-state#as-the-whole-page)
 - **`Segmented`** shows no option picked while its `value` is `null`. [Segmented](/ui/segmented#none-picked)
 - **A number `TextInput`** hands back a number, or `null` once emptied, rather than a string. [TextInput](/ui/text-input)
-- **`images.card.logo`** puts the site's logo at the top left of every share card, an SVG or an image. [Social card](/essentials/head-and-seo#social-card)
+- **AVIF images encode twice as fast**, on kay's own build of the AVIF encoder. [Responsive images](/essentials/styling-and-assets#responsive-images)
+- **`images.card.logo`** puts the site's logo at the top left of every share card, an SVG or an image. `kay check` reports a logo the server would refuse. [Social card](/essentials/head-and-seo#social-card)
 - **A kingfisher is kay's default favicon**, shown by a site that names none of its own. [Favicon](/essentials/head-and-seo#favicon)
 - **`kay render <url>`** prints the HTML a page renders without starting a server, so a script or a coding agent can check a page in one command. [kay render](/reference/cli#kay-render)
 - **`--format json`** on `kay build`, `kay routes`, `kay explain`, `kay fmt` and `kay migrate` prints one JSON document, as `kay check` already did. `kay routes --format json` gives a tool every route with its layouts and guards. [Output for tools](/reference/cli#output-for-tools)

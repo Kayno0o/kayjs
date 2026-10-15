@@ -48,12 +48,15 @@ If you wrote your own `AuthStore`:
 
 `pgStore` adds an index on `auth_attempts.reset_at`. `db.sync()` creates it. If you write your own migrations, add it there.
 
+The rate-limit counters keyed by a typed email reset once on the upgrade, as they now key a digest of the address.
+
 ### Rendering and tests
 
-- `xlink:href` is now rebased under `base`, like `href`. Drop any prefix you added by hand.
+- `xlink:href` is now rebased under `base` and checked for unsafe URLs, like `href`. Drop any prefix you added by hand.
 - `mount()` from `kay/mount` leaves two empty comments around what it renders. Disposing it removes only what it rendered, no longer emptying the element. `innerHTML` snapshots change.
 - `page.a11y()` now reports text the same colour as its background. Fix the colours, or clip text meant only for screen readers.
 - An extension typed as a bare `KayExtension` no longer makes `ctx.locals` untyped. Type it `KayExtension<typeof plugin>`.
+- kayjs-cms problem ids now spell a `-` in a collection or key as `_2d_`.
 
 ### kayjs-auth refuses cross-site requests on a plain Elysia app
 
