@@ -328,6 +328,44 @@ describe('fences', () => {
     }
   })
 
+  it('analyse the rest of a fence while one statement of it does not parse, as the editor sees it typed', () => {
+    const broken = ['---\nconst count = signal(1)\nconst items = signal([1])\nconst b = count.\nconst c = 1\n---\nfor item of items\n  p {item} {count()}\n', 'const b = count.\n']
+    const parsed = broken[0]!.replace(broken[1]!, '')
+    const withBroken = compileKay(broken[0]!, 'test.kay', { check: true })
+    const without = compileKay(parsed, 'test.kay', { check: true })
+
+    // The same shadow as a fence that parses, the typed statement beside it.
+    expect(withBroken.tsx.replace(broken[1]!, '')).toBe(without.tsx)
+    expect(withBroken.tsx).toContain('const b = count.\n')
+    expect(withBroken.tsx).toContain('import { signal } from \'kay\'')
+    expect(withBroken.diagnostics.map(d => d.message)).toEqual(['Missing semicolon.', '`items` is a signal, read by calling it'])
+  })
+
+  it('import the names kay provides to a fence with a statement that does not parse, the server\'s included', () => {
+    const script = compileKay('---\nconst { label } = props<{ label: string }>()\nconst count = signal(1)\nconst b = \'x\n---\np {label}\n', 'test.kay', { check: true })
+    const server = compileKay('--- server\nexport const add = action(() => 1)\nconst todos = load.\n---\np x\n', 'test.kay', { check: true })
+    const translated = compileKay('---\nconst b = \'x\n---\np {t(\'hello\')}\n', 'test.kay', { check: true })
+
+    expect(script.tsx).toContain('import { signal } from \'kay\'')
+    expect(script.tsx).toContain('__props.label')
+    expect(server.tsx).toContain('import { action } from \'kay\'')
+    expect(translated.tsx).toContain('import { t } from \'kay/i18n\'')
+  })
+
+  it('relocate a relative import beside a statement that does not parse', () => {
+    const { tsx } = compileKay('---\nimport { a } from \'../../outside/a\'\nconst b = a.\n---\np x\n', 'test.kay', { check: true, relocateImport: specifier => specifier === '../../outside/a' ? '../../../outside/a' : undefined })
+
+    expect(tsx).toContain('import { a } from "../../../outside/a"')
+  })
+
+  it('keep the lints of the rewrites for the template and the other fence while one fence does not parse', () => {
+    const { diagnostics } = compileKay('--- server\nconst todos = [1]\n---\n---\nconst count = signal(1)\nconst b = count.\n---\np {count}\nbutton(onClick={() => todos = []}) x\n', 'test.kay', { check: true })
+    const messages = diagnostics.map(d => d.message)
+
+    expect(messages).toContain('Unexpected token')
+    expect(messages).toContain('`count` is a signal, read by calling it')
+  })
+
   it('parse each fence and each handler once a compile, however many passes and checks read it', () => {
     const script = 'const a = signal(true)\nconst f = () => 1\nconst g = () => 2\n'
     const server = 'import { t } from \'kay\'\n\nexport const page = { query: t.Object({}) }\n'

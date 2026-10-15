@@ -195,9 +195,12 @@ class ModuleShell {
         this.emitHoisted(span, fence.specifiers, fence.imports, duplicates)
     }
 
-    for (const unparsed of [script.unparsed, fence?.unparsed]) {
-      if (unparsed)
-        this.emitHoisted(unparsed, [], [], [])
+    // Text that did not parse stays out of the analysis pass, which the rewrites are planned from by parsing its code.
+    const unparsed = [script.unparsed, fence?.unparsed, ...this.options.rewrites ? [...script.brokenModule, ...fence?.brokenModule ?? []] : []]
+
+    for (const span of unparsed) {
+      if (span)
+        this.emitHoisted(span, [], [], [])
     }
 
     if (server)
@@ -468,6 +471,9 @@ class ModuleShell {
 
     b.add(`\nexport async function ${LOAD}(${ctx}: ${prerender !== undefined ? `KayPrerenderedContext<${prerender}, ${context}>` : context}) {\n`)
     for (const span of server.body) {
+      if (this.leftOut(server, span))
+        continue
+
       b.addSource(span)
 
       this.deferDeclared(server, span)
@@ -505,6 +511,9 @@ class ModuleShell {
     let propsDone = !props
 
     for (const span of this.script.body) {
+      if (this.leftOut(this.script, span))
+        continue
+
       if (!propsDone && props!.statement.start < span.start) {
         this.emitProps()
         propsDone = true
@@ -515,6 +524,11 @@ class ModuleShell {
 
     if (!propsDone)
       this.emitProps()
+  }
+
+  // A statement that did not parse is written in the final pass only.
+  private leftOut(analysis: { broken: Span[] }, span: Span) {
+    return !this.options.rewrites && analysis.broken.includes(span)
   }
 
   private emitProps() {

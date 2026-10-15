@@ -68,8 +68,11 @@ export interface ScriptAnalysis {
   functions: string[]
   diagnostics: Diagnostic[]
   fence?: ParsedFence | undefined
-  // A fence Babel cannot parse, as one being typed with a quote not closed yet, emitted whole at module level so the editor completes in it through TypeScript's own recovery.
+  // A fence Babel cannot parse and nothing could be recovered of, emitted whole at module level so the editor completes in it through TypeScript's own recovery.
   unparsed?: Span | undefined
+  // The top-level statements of a fence being typed that Babel cannot parse, left out of the analysis: kept in `body` where they are written, or in `brokenModule` when an import, so the editor still completes in them while the rest of the fence is analysed.
+  broken: Span[]
+  brokenModule: Span[]
 }
 
 // A fence parsed once, which every analysis and check of it reads: `shift` maps a node to its span in the file.
@@ -78,12 +81,14 @@ export interface ParsedFence {
   offset: number
   ast: ParseResult<t.File>
   shift: (node: t.Node | t.Comment) => Span
+  // The statements that failed to parse, blanked in `code` and `ast`.
+  broken: Span[]
 }
 
 // Splits a component script into module-level code (imports, types) and the component body, and finds the props macro.
 // `serverNames` are the names the `--- server` fence hands the script, which a type may take the type of.
 export function analyzeScript(source: string, script: Span | undefined, serverNames: string[] = []): ScriptAnalysis {
-  const analysis: ScriptAnalysis = { hoisted: [], imports: [], specifiers: [], body: [], reactive: false, implicit: [], functions: [], diagnostics: [] }
+  const analysis: ScriptAnalysis = { hoisted: [], imports: [], specifiers: [], body: [], broken: [], brokenModule: [], reactive: false, implicit: [], functions: [], diagnostics: [] }
 
   if (!script)
     return analysis
@@ -98,8 +103,7 @@ export function analyzeScript(source: string, script: Span | undefined, serverNa
   analysis.reactive = analysis.implicit.length > 0 || analysis.imports.some(importsReactiveValue)
 
   for (const { statement, span, gap } of split.statements) {
-    if (gap)
-      analysis.body.push(gap)
+    analysis.body.push(...gap)
 
     const props = propsDeclaration(statement, ast.program.body, shift, analysis.diagnostics)
 
@@ -118,8 +122,7 @@ export function analyzeScript(source: string, script: Span | undefined, serverNa
     }
   }
 
-  if (split.tail)
-    analysis.body.push(split.tail)
+  analysis.body.push(...split.tail)
 
   reportMisplacedProps(ast, analysis, shift)
 
@@ -130,14 +133,39 @@ export function analyzeScript(source: string, script: Span | undefined, serverNa
 interface FenceStatement {
   statement: t.Statement
   span: Span
-  gap: Span | undefined
+  // Text kept as written, the statements that failed to parse among it.
+  gap: Span[]
 }
 
-type FenceAnalysis = Pick<ScriptAnalysis, 'hoisted' | 'imports' | 'specifiers' | 'implicit' | 'diagnostics' | 'fence' | 'unparsed'>
+type FenceAnalysis = Pick<ScriptAnalysis, 'hoisted' | 'imports' | 'specifiers' | 'implicit' | 'diagnostics' | 'fence' | 'unparsed' | 'broken' | 'brokenModule'>
+
+// The text from `start` to `end` as spans, with each broken statement in it as the very span `broken` holds.
+function textAround(start: number, end: number, parsed: Span[], moduleLevel: Span[]): Span[] {
+  const spans: Span[] = []
+  let cursor = start
+
+  for (const span of parsed) {
+    if (span.start < cursor || span.end > end)
+      continue
+
+    if (span.start > cursor)
+      spans.push({ start: cursor, end: span.start })
+
+    if (!moduleLevel.includes(span))
+      spans.push(span)
+
+    cursor = span.end
+  }
+
+  if (cursor < end)
+    spans.push({ start: cursor, end })
+
+  return spans
+}
 
 // Parses a fence once, moves its imports and types to module level and finds which of `globals` it reads undeclared; the other statements are left in order, then what follows the last.
 // `names` are values from elsewhere that a type of the fence may take the type of, which keeps it out of module level too.
-function splitFence(source: string, fence: Span, globals: string[], names: string[], analysis: FenceAnalysis): (ParsedFence & { statements: FenceStatement[], tail: Span | undefined }) | undefined {
+function splitFence(source: string, fence: Span, globals: string[], names: string[], analysis: FenceAnalysis): (ParsedFence & { statements: FenceStatement[], tail: Span[] }) | undefined {
   const parsed = parseFence(source, fence, analysis.diagnostics)
 
   if (!parsed) {
@@ -152,6 +180,14 @@ function splitFence(source: string, fence: Span, globals: string[], names: strin
   let cursor = fence.start
 
   analysis.fence = parsed
+
+  for (const span of parsed.broken) {
+    if ((/^\s*import\b/).test(source.slice(span.start, span.end)))
+      analysis.brokenModule.push(span)
+    else
+      analysis.broken.push(span)
+  }
+
   analysis.implicit = undeclared(ast, parsed.code, globals)
 
   for (const statement of ast.program.body) {
@@ -163,13 +199,13 @@ function splitFence(source: string, fence: Span, globals: string[], names: strin
       analysis.specifiers.push(...moduleSpecifier(statement, shift))
     }
     else {
-      statements.push({ statement, span, gap: span.start > cursor ? { start: cursor, end: span.start } : undefined })
+      statements.push({ statement, span, gap: textAround(cursor, span.start, parsed.broken, analysis.brokenModule) })
     }
 
     cursor = span.end
   }
 
-  return { ...parsed, statements, tail: cursor < fence.end ? { start: cursor, end: fence.end } : undefined }
+  return { ...parsed, statements, tail: textAround(cursor, fence.end, parsed.broken, analysis.brokenModule) }
 }
 
 // What a body declaration may hold a function or an instance of a class by: writing one, or a call returning one.
@@ -252,6 +288,8 @@ export interface ServerAnalysis {
   diagnostics: Diagnostic[]
   fence?: ParsedFence | undefined
   unparsed?: Span | undefined
+  broken: Span[]
+  brokenModule: Span[]
 }
 
 // Splits a `--- server` fence into module-level code and the body of `load(ctx)`, and lists the names the page receives.
@@ -259,7 +297,7 @@ export function analyzeServer(source: string, server: Span | undefined): ServerA
   if (!server)
     return undefined
 
-  const analysis: ServerAnalysis = { hoisted: [], imports: [], specifiers: [], exports: [], exportNames: [], actionNames: [], body: [], implicit: [], data: [], separate: [], diagnostics: [] }
+  const analysis: ServerAnalysis = { hoisted: [], imports: [], specifiers: [], exports: [], exportNames: [], actionNames: [], body: [], broken: [], brokenModule: [], implicit: [], data: [], separate: [], diagnostics: [] }
   const split = splitFence(source, server, SERVER_GLOBALS, [], analysis)
 
   if (!split)
@@ -299,10 +337,7 @@ export function analyzeServer(source: string, server: Span | undefined): ServerA
         analysis.exports.push(span)
       }
       else {
-        if (gap)
-          analysis.body.push(gap)
-
-        analysis.body.push(span)
+        analysis.body.push(...gap, span)
       }
 
       for (const identifier of declaredIdentifiers(statement)) {
@@ -592,33 +627,95 @@ function declaredIdentifiers(statement: t.Statement): t.Identifier[] {
   return found
 }
 
+// A fence being typed breaks a handful of statements at most; more than this is not recovered.
+const MAX_BROKEN = 20
+// A line of a fence that begins a statement: written from its first column, and not closing or continuing the one before it.
+const STATEMENT_START = /^(?![\s})\]]|else\b|catch\b|finally\b)/
+
 export function parseFence(source: string, span: Span, diagnostics: Diagnostic[]): ParsedFence | undefined {
-  const code = source.slice(span.start, span.end)
-  let ast: ParseResult<t.File>
+  const original = source.slice(span.start, span.end)
+  const broken: Span[] = []
+  let code = original
+  let reported = false
 
-  try {
-    ast = parse(code, { sourceType: 'module', plugins: ['typescript'], errorRecovery: true })
-  }
-  catch (error) {
-    if (!reportJsx(code, span, diagnostics)) {
-      const at = span.start + ((error as { pos?: number }).pos ?? 0)
+  // A statement Babel cannot parse, or recovers from only with an error the shadow code would not survive, is blanked and the rest parsed again: one being typed costs the editor only its own analysis.
+  while (true) {
+    let ast: ParseResult<t.File> | undefined
+    let errors: { pos: number, message: string }[]
 
-      diagnostics.push({ start: at, end: at + 1, message: (error as Error).message.replace(POSITION_SUFFIX, '') })
+    try {
+      ast = parse(code, { sourceType: 'module', plugins: ['typescript'], errorRecovery: true })
+      errors = (ast.errors ?? []).map(error => ({ pos: (error as unknown as { pos?: number }).pos ?? 0, message: error.message }))
+    }
+    catch (error) {
+      errors = [{ pos: (error as { pos?: number }).pos ?? 0, message: (error as Error).message }]
     }
 
-    return undefined
+    if (!reported) {
+      reported = true
+
+      if (errors.length > 0 && reportJsx(original, span, diagnostics))
+        return undefined
+
+      for (const { pos, message } of errors)
+        diagnostics.push({ start: span.start + pos, end: span.start + pos + 1, message: message.replace(POSITION_SUFFIX, '') })
+    }
+
+    const statements = broken.length < MAX_BROKEN ? new Map(errors.flatMap(({ pos }) => brokenStatement(code, pos)).map(statement => [statement.start, statement])) : new Map<number, { start: number, end: number }>()
+
+    if (errors.length === 0 || statements.size === 0)
+      return ast && { code, offset: span.start, ast, broken, shift: node => ({ start: span.start + node.start!, end: span.start + node.end! }) }
+
+    for (const { start, end } of statements.values()) {
+      broken.push({ start: span.start + start, end: span.start + end })
+      code = code.slice(0, start) + code.slice(start, end).replaceAll(/\S/g, ' ') + code.slice(end)
+    }
+
+    broken.sort((a, b) => a.start - b.start)
+  }
+}
+
+// The top-level statement a parse error falls in, found by indentation: from the line at the first column before it, to the next one.
+// Blank lines and comments just above are part of it, so a comment does not stay behind and attach to the next statement.
+function brokenStatement(code: string, pos: number): { start: number, end: number }[] {
+  const lines = code.split('\n')
+  const starts: number[] = []
+  let at = 0
+
+  for (const line of lines) {
+    starts.push(at)
+    at += line.length + 1
   }
 
-  if ((ast.errors?.length ?? 0) > 0 && reportJsx(code, span, diagnostics))
-    return undefined
+  let probe = Math.min(pos, code.length)
+  const lineAtProbe = starts.findLastIndex(start => start <= probe)
+  const atStatement = starts[lineAtProbe] === probe && STATEMENT_START.test(lines[lineAtProbe]!)
 
-  for (const error of ast.errors ?? []) {
-    const at = span.start + ((error as unknown as { pos?: number }).pos ?? 0)
+  // An error at a statement's first column, in blank text or at the end is the fault of the text before it.
+  if (probe >= code.length || (/\s/).test(code[probe]!) || atStatement) {
+    while (probe > 0 && (/\s/).test(code[probe - 1]!))
+      probe--
 
-    diagnostics.push({ start: at, end: at + 1, message: error.message.replace(POSITION_SUFFIX, '') })
+    probe = Math.max(0, probe - 1)
   }
 
-  return { code, offset: span.start, ast, shift: node => ({ start: span.start + node.start!, end: span.start + node.end! }) }
+  let line = starts.findLastIndex(start => start <= probe)
+
+  while (line > 0 && !STATEMENT_START.test(lines[line]!))
+    line--
+
+  while (line > 0 && lines[line - 1]!.startsWith('//'))
+    line--
+
+  let next = line + 1
+
+  while (next < lines.length && (!STATEMENT_START.test(lines[next]!) || starts[next]! <= probe))
+    next++
+
+  const start = starts[line]!
+  const end = next < lines.length ? starts[next]! : code.length
+
+  return code.slice(start, end).trim() === '' ? [] : [{ start, end }]
 }
 
 // Markup in a fence reads as JSX, which kay never compiles: the template is the only place for it.

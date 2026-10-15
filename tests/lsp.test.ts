@@ -435,6 +435,20 @@ describe('kay lsp imports', () => {
     expect(applyEdits(typing, item.additionalTextEdits ?? [])).toBe('---\nimport { listTodos } from \'../data\'\nimport BrandGithub from \'~icons/tabler/brand\nconst todos = listTo\n---\np {todos.length}\n')
   })
 
+  it('types a template read of a signal as with a fence that parses, while a statement of the fence is being typed', async () => {
+    const hoverOf = async (source: string) => {
+      await editor.change(page, source, 20)
+
+      return JSON.stringify((await editor.request<Hover>('textDocument/hover', page, 5, 5)).contents)
+    }
+
+    const parsed = await hoverOf('---\nconst items = signal([1, 2])\nconst total = items.length\n---\nfor row of items\n  p {row}\n')
+    const typing = await hoverOf('---\nconst items = signal([1, 2])\nconst total = items.\n---\nfor row of items\n  p {row}\n')
+
+    expect(parsed).toContain('number')
+    expect(typing).toBe(parsed)
+  })
+
   it('types a library component, goes to its .kay source and imports it as a quick fix', async () => {
     const source = '---\nimport TagPill from \'kay-lib/tag-pill.kay\'\n---\nTagPill(label={1})\n'
     const diagnostics = await editor.change(page, source, 7)

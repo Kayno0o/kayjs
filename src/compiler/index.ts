@@ -117,7 +117,7 @@ export function compileKay(source: string, filename: string, options: CompileOpt
   const fences = [file.script, file.server].map(span => span ? source.slice(span.start, span.end) : '').join('\n')
   const name = freeName(componentName(filename), fences, found.findings.globalReads)
   const final = generate(file, script, server, { ...generateOptions, name, rewrites: found.plan.rewrites, translates: found.plan.translates, values: found.plan.values })
-  // A fence that did not parse reaches the code unanalysed, so what the rewrites say of its names is only noise beside its syntax error.
+  // A fence that did not parse at all reaches the code unanalysed, so what the rewrites say of its names is only noise beside its syntax error.
   const unparsed = script.unparsed !== undefined || server?.unparsed !== undefined
   const diagnostics = [...file.diagnostics, ...script.diagnostics, ...(server?.diagnostics ?? []), ...server ? separatePageSettings(source, server) : [], ...validate(file, script, server, generateOptions), ...unparsed ? [] : found.diagnostics]
 
