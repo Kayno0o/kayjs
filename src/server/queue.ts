@@ -34,6 +34,8 @@ export interface JobStore {
   retry: (id: string, runAt: number, error: string) => Maybe<void>
   // Keeps it as failed, out of the queue.
   fail: (id: string, error: string) => Maybe<void>
+  // Removes the failed jobs of the queue whose time came before `before`, and resolves with how many went; a store without it has them listed with `failed` and removed one by one.
+  purge?: ((queue: string, before: number) => Maybe<number>) | undefined
   failed: (queue: string) => Maybe<StoredJob[]>
   // Every job of the queue, waiting or failed, which `remove` looks through for a payload; a store without it removes jobs by id alone.
   jobs?: ((queue: string) => Maybe<StoredJob[]>) | undefined
@@ -54,8 +56,9 @@ export interface QueueOptions<Payload> {
   concurrency?: number | undefined
   // How long a run may take: past it, the run counts as failed and frees its worker, and another process takes a job its dead process held as lost. 10 minutes by default.
   lostAfter?: Duration | undefined
-  // The longest an idle worker waits between looks at the store, 1 second by default, the poll itself.
-  // Longer, it waits 1 second, then twice as long after each empty look up to this, and starts over once a job runs, so a job another process enqueued is noticed within this at worst; one enqueued in this process, or due at a time the store knows, still runs at once.
+  // The longest an idle queue waits between looks at the store, 10 seconds by default.
+  // After a job it looks again within 1 second, then waits twice as long after each empty look up to this, and starts over once a job runs, so a job another process enqueued is noticed within this at worst; one enqueued in this process, or due at a time the store knows, still runs at once. One worker of a queue looks for all of them.
+  // `'1s'` is the poll every second the queue made before.
   idlePoll?: Duration | undefined
   // How long a failed job is kept, its payload included, from when its last attempt was due: 30 days by default, `false` until removed.
   keepFailed?: Duration | false | undefined
@@ -91,8 +94,10 @@ const DEFAULT_LOST_AFTER = 600
 const DEFAULT_KEEP_FAILED = 30 * 24 * 60 * 60
 // How often a process's workers drop the failed jobs past `keepFailed`.
 const PURGE_MS = 60 * 60 * 1000
-// How often an idle worker looks for jobs another process enqueued.
+// How soon an idle queue looks again after a job, the first wait of its backoff.
 const POLL_MS = 1000
+// The longest an idle queue waits between looks unless `idlePoll` says otherwise: a job another process enqueued waits this at worst.
+const IDLE_POLL_S = 10
 // The longest a timer waits: past it, setTimeout fires at once.
 const MAX_TIMER_MS = 2 ** 31 - 1
 // The longest a worker waits between looks at a store that keeps failing.
@@ -127,6 +132,9 @@ export function sqliteJobs(path: string): JobStore {
     },
     fail(id, error) {
       open(true)!.fail.run(error, id)
+    },
+    purge(queue, before) {
+      return open(false)?.purge.run(queue, before).changes ?? 0
     },
     failed(queue) {
       return open(false)?.failed.all(queue).map(toJob) ?? []
@@ -165,6 +173,7 @@ function prepareJobs(db: Database) {
   const remove = db.query('DELETE FROM kay_jobs WHERE id = ?')
   const retry = db.query('UPDATE kay_jobs SET run_at = ?, held_until = NULL, error = ? WHERE id = ?')
   const fail = db.query('UPDATE kay_jobs SET failed = 1, held_until = NULL, error = ? WHERE id = ?')
+  const purge = db.query('DELETE FROM kay_jobs WHERE queue = ? AND failed = 1 AND run_at < ?')
   const failed = db.query<JobRow, [string]>('SELECT id, queue, payload, attempts, run_at, error FROM kay_jobs WHERE queue = ? AND failed = 1 ORDER BY run_at')
   const all = db.query<JobRow, [string]>('SELECT id, queue, payload, attempts, run_at, error FROM kay_jobs WHERE queue = ? ORDER BY run_at')
   // A held job counts from when its hold ends, as it runs again then if its process died.
@@ -172,7 +181,7 @@ function prepareJobs(db: Database) {
   const lock = db.query('INSERT OR IGNORE INTO kay_locks (name, slot) VALUES (?, ?)')
   const pruneLocks = db.query('DELETE FROM kay_locks WHERE name = ? AND slot < ?')
 
-  return { insert, claim, remove, retry, fail, failed, all, next, lock, pruneLocks }
+  return { insert, claim, remove, retry, fail, purge, failed, all, next, lock, pruneLocks }
 }
 
 // Jobs kept in this process's memory, gone with it: what tests run on.
@@ -204,6 +213,14 @@ export function memoryJobs(): JobStore {
     },
     fail(id, error) {
       Object.assign(jobs.get(id) ?? {}, { failed: true, error, heldUntil: undefined })
+    },
+    purge(queue, before) {
+      const purged = [...jobs.values()].filter(job => job.queue === queue && job.failed && job.runAt < before)
+
+      for (const job of purged)
+        jobs.delete(job.id)
+
+      return purged.length
     },
     failed(queue) {
       return [...jobs.values()].filter(job => job.queue === queue && job.failed).map(({ heldUntil: _, failed: __, ...job }) => job)
@@ -241,7 +258,7 @@ export function queue<Payload>(name: string, handler: (payload: Payload) => unkn
   const backoff = durationSeconds(options.backoff ?? DEFAULT_BACKOFF, `queue('${name}')'s backoff`) * 1000
   const lostAfter = durationSeconds(options.lostAfter ?? DEFAULT_LOST_AFTER, `queue('${name}')'s lostAfter`) * 1000
   const concurrency = options.concurrency ?? 1
-  const idlePoll = options.idlePoll === undefined ? POLL_MS : durationSeconds(options.idlePoll, `queue('${name}')'s idlePoll`) * 1000
+  const idlePoll = durationSeconds(options.idlePoll ?? IDLE_POLL_S, `queue('${name}')'s idlePoll`) * 1000
   const keepFailed = options.keepFailed === false ? undefined : durationSeconds(options.keepFailed ?? DEFAULT_KEEP_FAILED, `queue('${name}')'s keepFailed`) * 1000
 
   if (!Number.isInteger(attempts) || attempts < 1)
@@ -256,8 +273,16 @@ export function queue<Payload>(name: string, handler: (payload: Payload) => unkn
   const store = () => options.store ?? defaultJobStore()
   let controller: AbortController | undefined
   let workers: Promise<void>[] = []
-  // The workers sleeping until their next look, woken when this process enqueues a job to run now.
+  // The workers sleeping until their next look, woken when this process enqueues a job or retries one, or claims one.
   const sleepers = new Set<() => void>()
+  // Whether a worker is the one looking for jobs while the queue is idle: the others sleep until something wakes them.
+  let polling = false
+  // The wait of the next empty look: the poll, doubling up to `idlePoll` while no job is found, shared by the workers as one looks at a time.
+  let idleWait = POLL_MS
+  const wake = () => {
+    for (const sleeper of sleepers)
+      sleeper()
+  }
 
   const reportFailed = async (job: StoredJob, error: unknown) => {
     try {
@@ -292,6 +317,10 @@ export function queue<Payload>(name: string, handler: (payload: Payload) => unkn
     if (!job)
       return false
 
+    // The workers asleep wake, one of them to look for the next job while this one runs.
+    idleWait = POLL_MS
+    wake()
+
     // Only runs whose process died never mark how they went: a job that kills its process stops here rather than crash every next one.
     if (job.attempts > attempts) {
       const message = `it was taken ${job.attempts - 1} times, as many as its ${attempts} attempts, its last run never finishing`
@@ -314,6 +343,8 @@ export function queue<Payload>(name: string, handler: (payload: Payload) => unkn
         const wait = backoff * 2 ** (job.attempts - 1)
 
         await store().retry(job.id, Date.now() + wait, message)
+        // The worker looking for jobs may sleep past the time this one is due.
+        wake()
         kayLog('warn', `a job of queue('${name}') failed, attempt ${job.attempts} of ${attempts}, and runs again in ${Math.round(wait / 1000)} s: ${message}`)
 
         return true
@@ -338,6 +369,14 @@ export function queue<Payload>(name: string, handler: (payload: Payload) => unkn
 
     purged = now
 
+    const { purge } = store()
+
+    if (purge) {
+      await purge.call(store(), name, now - keepFailed)
+
+      return
+    }
+
     for (const job of await store().failed(name)) {
       if (job.runAt < now - keepFailed)
         await store().complete(job.id)
@@ -349,8 +388,6 @@ export function queue<Payload>(name: string, handler: (payload: Payload) => unkn
 
   const work = async (signal: AbortSignal) => {
     let outageWait = 0
-    // The wait of the next empty look: the poll, doubling up to `idlePoll` while no job is found.
-    let idleWait = POLL_MS
 
     while (!signal.aborted) {
       try {
@@ -365,17 +402,28 @@ export function queue<Payload>(name: string, handler: (payload: Payload) => unkn
 
         outageWait = 0
 
-        if (ran) {
-          idleWait = POLL_MS
+        if (ran)
+          continue
+
+        // One worker looks at the store; the others sleep until a job is claimed, enqueued or retried.
+        if (polling) {
+          await sleep(MAX_TIMER_MS, signal, sleepers)
 
           continue
         }
 
-        const next = await store().nextRunAt(name)
-        const wait = next === undefined ? idleWait : Math.min(idleWait, Math.max(0, next - Date.now()))
+        polling = true
 
-        idleWait = Math.min(idleWait * 2, idlePoll)
-        await sleep(wait, signal, sleepers)
+        try {
+          const next = await store().nextRunAt(name)
+          const wait = next === undefined ? idleWait : Math.min(idleWait, Math.max(0, next - Date.now()))
+
+          idleWait = Math.min(idleWait * 2, idlePoll)
+          await sleep(wait, signal, sleepers)
+        }
+        finally {
+          polling = false
+        }
       }
       // A store that failed, locked past its timeout say, is asked again later and later, up to a minute apart.
       catch (error) {
@@ -415,10 +463,8 @@ export function queue<Payload>(name: string, handler: (payload: Payload) => unkn
 
       await store().add({ id, queue: name, payload: stringify(payload), attempts: 0, runAt: Date.now() + delay })
 
-      if (delay === 0) {
-        for (const sleeper of sleepers)
-          sleeper()
-      }
+      // A delayed job too: the worker looking for jobs sleeps until the next one is due, which this may precede.
+      wake()
 
       return id
     },

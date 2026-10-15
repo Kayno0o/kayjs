@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, it, jest, setSystemTime, spyOn } from 'bun:test'
+import { stringify } from 'devalue'
 import { Elysia } from 'elysia'
 import { background, memoryJobs, queue, schedule, shutdown, sqliteJobs } from '../src/server'
 import { drainQueues } from '../src/server/queue'
@@ -382,12 +383,19 @@ describe('queue', () => {
     }
   })
 
-  it('drops a failed job once keepFailed has passed since its last attempt, and keeps it for good on false', async () => {
-    const failing = (keepFailed?: false) => queue('failing', () => {
-      throw new Error('no such mailbox')
-    }, { store: memoryJobs(), attempts: 1, keepFailed, onFailed: () => undefined })
-    const kept = failing()
-    const forever = failing(false)
+  it.each(['memory', 'sqlite', 'without purge'])('drops a failed job once keepFailed has passed since its last attempt, and keeps it for good on false, in a %s store', async (kind) => {
+    const failing = async (keepFailed?: false) => {
+      const store = kind === 'sqlite' ? sqliteJobs(await jobsPath()) : memoryJobs()
+
+      if (kind === 'without purge')
+        store.purge = undefined
+
+      return queue('failing', () => {
+        throw new Error('no such mailbox')
+      }, { store, attempts: 1, keepFailed, onFailed: () => undefined })
+    }
+    const kept = await failing()
+    const forever = await failing(false)
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
 
     try {
@@ -579,7 +587,7 @@ describe('queue', () => {
     }
 
     // Starts a worker over a store counting its claims, and returns how many looks each second of fake time brings.
-    const watch = async (options: { idlePoll?: number }) => {
+    const watch = async (options: { idlePoll?: number, concurrency?: number, backoff?: number, handler?: (payload: string) => unknown }) => {
       const store = memoryJobs()
       const claim = store.claim.bind(store)
       const claims: number[] = []
@@ -591,7 +599,11 @@ describe('queue', () => {
         return claim(name, now, until)
       }
 
-      const work = queue('idle', (payload: string) => ran.push(payload), { store, ...options })
+      const { handler, ...rest } = options
+      const work = queue('idle', async (payload: string) => {
+        ran.push(payload)
+        await handler?.(payload)
+      }, { store, ...rest })
       const app = new Elysia().use(work).listen(0)
 
       await flush()
@@ -599,6 +611,7 @@ describe('queue', () => {
       return {
         work,
         app,
+        store,
         claims,
         ran,
         async advance(ms: number) {
@@ -610,14 +623,83 @@ describe('queue', () => {
       }
     }
 
-    it('looks every second by default', async () => {
+    it('backs off to 10 seconds by default, and idlePoll 1s keeps the poll every second', async () => {
       jest.useFakeTimers({ now: 0 })
 
       const idle = await watch({})
+      const steady = await watch({ idlePoll: 1 })
+
+      try {
+        // One clock runs both queues.
+        await idle.advance(30_000)
+        expect(idle.claims).toEqual([0, 1000, 3000, 7000, 15_000, 25_000])
+        expect(steady.claims.filter(at => at <= 5000)).toEqual([0, 1000, 2000, 3000, 4000, 5000])
+      }
+      finally {
+        jest.useRealTimers()
+        await shutdown(idle.app)
+        await shutdown(steady.app)
+      }
+    })
+
+    it('has one worker of a queue look at the store while idle', async () => {
+      jest.useFakeTimers({ now: 0 })
+
+      const idle = await watch({ concurrency: 4 })
 
       try {
         await idle.advance(10_000)
-        expect(idle.claims).toEqual([0, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10_000])
+        // The four workers' first looks, then one poller.
+        expect(idle.claims.filter(at => at > 0)).toEqual([1000, 3000, 7000])
+      }
+      finally {
+        jest.useRealTimers()
+        await shutdown(idle.app)
+      }
+    })
+
+    it('notices a job another process enqueued within idlePoll, and with a job running another worker takes over the look', async () => {
+      jest.useFakeTimers({ now: 0 })
+
+      const release = Promise.withResolvers<void>()
+      const idle = await watch({ concurrency: 2, handler: async (payload: string) => {
+        if (payload === 'slow')
+          await release.promise
+      } })
+
+      try {
+        await idle.advance(20_000)
+        await idle.store.add({ id: 'a', queue: 'idle', payload: stringify('slow'), attempts: 0, runAt: Date.now() })
+        await idle.advance(10_000)
+        expect(idle.ran).toEqual(['slow'])
+        // The slow job is running; one worker still looks, so the next job is found.
+        await idle.store.add({ id: 'b', queue: 'idle', payload: stringify('quick'), attempts: 0, runAt: Date.now() })
+        await idle.advance(10_000)
+        expect(idle.ran).toEqual(['slow', 'quick'])
+        release.resolve()
+      }
+      finally {
+        jest.useRealTimers()
+        await shutdown(idle.app)
+      }
+    })
+
+    it('wakes for a job its own retry puts at a time before the wait ends', async () => {
+      jest.useFakeTimers({ now: 0 })
+
+      let runs = 0
+      const idle = await watch({ backoff: 2, handler: () => {
+        if (++runs === 1)
+          throw new Error('once')
+      } })
+
+      try {
+        await idle.advance(20_000)
+        await idle.work.enqueue('x')
+        await idle.advance(1900)
+        expect(runs).toBe(1)
+        await idle.advance(300)
+        expect(runs).toBe(2)
       }
       finally {
         jest.useRealTimers()

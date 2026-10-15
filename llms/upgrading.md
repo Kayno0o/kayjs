@@ -4,6 +4,11 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ## 1.45.0
 
+### An idle queue looks at its store every 10 seconds at most
+
+- A `queue` backs off while idle, looking from one worker 1 second after a job, then twice as long after each empty look up to `idlePoll`, 10 seconds by default, where it looked every second. A job enqueued in the same process, or a retry, still runs at once; one enqueued by another process, a script or a second server, waits 10 seconds at worst. An app relying on a pickup within a second from another process sets `idlePoll: '1s'`.
+- A custom `JobStore` may add `purge(queue, before)`, removing the expired failed jobs in one call; without it they are removed one by one as before.
+
 ### The app preset's database runs the app as a role that cannot change the schema
 
 A new app now connects as `app_rw`, which reads and writes rows but cannot drop, alter or create anything, and only the migrations run as the owner. An app scaffolded earlier keeps working as it is; to adopt the split:
