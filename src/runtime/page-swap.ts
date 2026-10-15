@@ -387,7 +387,13 @@ function mergeHead(next: Document): { loaded: Promise<unknown>, commit: () => vo
   const incoming = [...next.head.children].filter(element => !element.matches(UNMERGED))
   // Each element serialized once, as every `take` compares against all that are left.
   const markup = new Map<Element, string>()
-  const html = (element: Element) => markup.get(element) ?? (markup.set(element, element.outerHTML), markup.get(element)!)
+  const html = (element: Element) => {
+    const known = markup.get(element) ?? element.outerHTML
+
+    markup.set(element, known)
+
+    return known
+  }
   const take = (key: string | undefined, of: (element: Element) => string | undefined = html) => {
     const at = key === undefined ? -1 : incoming.findIndex(element => of(element) === key)
 

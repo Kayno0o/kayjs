@@ -104,7 +104,8 @@ const defaultEquals = <T>(previous: T, next: T) => previous === next
 export function createSignal<T>(value: T, options?: InternalSignalOptions<T>): [read: () => T, write: (next: T) => void] {
   const node: SignalNode<T> = { value, observers: undefined, equals: options?.equals ?? defaultEquals, shared: typeof KAY_BROWSER === 'undefined' && serverRendering === 0 }
 
-  if (interceptor?.created)
+  // Only `kay dev`'s hot swap records signals.
+  if (process.env.NODE_ENV !== 'production' && interceptor?.created)
     node.value = interceptor.created(node as SignalNode<unknown>) as T
 
   const read = () => {
@@ -325,7 +326,7 @@ export function recordSignals<T>(fn: () => T, values?: unknown[]): { result: T, 
 export function unrecorded<T>(fn: () => T): T {
   const created = interceptor?.created
 
-  if (!created)
+  if (process.env.NODE_ENV === 'production' || !created)
     return fn()
 
   interceptor!.created = undefined

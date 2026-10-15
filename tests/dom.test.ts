@@ -785,6 +785,54 @@ describe('transitions', () => {
     }
   })
 
+  const mountReorder = site({
+    'main.kay': '---\nimport { signal } from \'kay\'\n\nconst [a, b, c] = [\'i\', \'b\', \'u\'].map(tag => document.createElement(tag))\nconst order = signal(0)\nconst orders = [[a, b], [b, a], [b, c, a], [a, c]]\n;(globalThis as { step?: () => void }).step = () => order.set(order() + 1)\n---\ndiv\n  | {orders[order()]}\n',
+  })
+
+  it('keep the order of a dynamic part\'s units through reorders, insertions and removals', async () => {
+    const { root, dispose } = await mountReorder()
+    const step = (globalThis as unknown as { step: () => void }).step
+    const names = () => [...root.querySelector('div')!.children].map(child => child.localName)
+
+    try {
+      expect(names()).toEqual(['i', 'b'])
+
+      for (const expected of [['b', 'i'], ['b', 'u', 'i'], ['i', 'u']]) {
+        step()
+        await settle()
+        expect(names()).toEqual(expected)
+      }
+    }
+    finally {
+      await dispose()
+    }
+  })
+
+  const mountLeaving = site({
+    'panel.kay': 'p.panel(transition="fade" style="transition-duration: 200ms") Hi\n',
+    'main.kay': '---\nimport { signal } from \'kay\'\nimport Panel from \'./panel.kay\'\n\nconst a = document.createElement(\'i\')\nconst b = document.createElement(\'b\')\nconst open = signal(true)\n;(globalThis as { shut?: () => void }).shut = () => open.set(false)\n---\ndiv\n  | {[a, open() ? Panel({}) : null, b]}\n',
+  })
+
+  it('leave a kept unit where it is while a unit between them plays its leave phase', async () => {
+    const { root, dispose } = await mountLeaving()
+    const shut = (globalThis as unknown as { shut: () => void }).shut
+    const kept = root.querySelector('b')!
+    const moves = spyOn(Node.prototype, 'insertBefore')
+
+    try {
+      shut()
+      await updated()
+      expect(moves.mock.calls.filter(([node]) => node === kept).length).toBe(0)
+      expect([...root.querySelector('div')!.children].map(child => child.localName)).toEqual(['i', 'p', 'b'])
+      await done()
+      expect([...root.querySelector('div')!.children].map(child => child.localName)).toEqual(['i', 'b'])
+    }
+    finally {
+      moves.mockRestore()
+      await dispose()
+    }
+  })
+
   const mount21 = site({ 'main.kay': toggled(false, `p.panel(transition:enter="transition-opacity" transition:enter-from="opacity-0" transition:leave-to="opacity-0 scale-95" ${STYLE}) Hi`) })
 
   it('take the classes of each phase from its own attribute, as Tailwind writes them', async () => {

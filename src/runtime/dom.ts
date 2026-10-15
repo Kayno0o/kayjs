@@ -507,10 +507,14 @@ export function insert(element: Node | null, start: Node | null, end: Node | nul
     let at = region.start ? region.start.nextSibling : region.element!.firstChild
 
     for (const unit of next) {
+      // A node playing its leave phase stays between the kept units until it ends.
+      while (at && firstOf(unit) !== at && transitions?.has(at))
+        at = at.nextSibling
+
       if (firstOf(unit) === at)
         at = lastOf(unit).nextSibling
       else
-        region.insert(unit, at)
+        region.insert(unit, at ?? region.end)
     }
 
     current = next
