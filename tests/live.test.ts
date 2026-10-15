@@ -1163,16 +1163,7 @@ describe('rooms', () => {
 
         return realInterval(() => undefined, 3_600_000)
       }) as typeof setInterval)
-      let opened: ReturnType<typeof processes>
-
-      try {
-        opened = processes('expiry')
-      }
-      finally {
-        intervals.mockRestore()
-      }
-
-      const { first, second, close } = opened
+      const { first, second, close } = processes('expiry')
 
       const [ada, bob] = [connection(), connection()]
       const file = new Database(join(dir, 'expiry.sqlite'))
@@ -1196,8 +1187,70 @@ describe('rooms', () => {
         expect(first.members('hall')).toEqual(['ada', 'bob'])
       }
       finally {
+        intervals.mockRestore()
         file.close()
         close()
+      }
+    })
+
+    it('beats and polls only while a connection of the process is joined, and indexes what the beat deletes by', async () => {
+      const timers: number[] = []
+      const realInterval = setInterval
+      const cleared = spyOn(globalThis, 'clearInterval')
+      const intervals = spyOn(globalThis, 'setInterval').mockImplementation(((run: () => void, delay?: number) => {
+        timers.push(delay ?? 0)
+
+        return realInterval(run, delay)
+      }) as typeof setInterval)
+      const path = join(dir, 'idle.sqlite')
+      const old = new Database(path)
+
+      // A file from before the indexes: opening it adds them.
+      old.run('CREATE TABLE kay_room_members (room TEXT NOT NULL, connection TEXT NOT NULL, process TEXT NOT NULL, member TEXT NOT NULL, PRIMARY KEY (room, connection))')
+      old.run('CREATE TABLE kay_room_messages (id INTEGER PRIMARY KEY AUTOINCREMENT, room TEXT NOT NULL, text TEXT NOT NULL, process TEXT NOT NULL, skipped TEXT, recipient TEXT, at INTEGER NOT NULL)')
+      old.close()
+
+      const store = sqliteRooms(path, { poll: 5 })
+      const room = rooms<{ text: string }, string>({ store })
+      const ada = connection()
+      const file = new Database(path)
+      const processesNow = () => {
+        const reader = new Database(path)
+
+        try {
+          return reader.query('SELECT process FROM kay_room_processes').all()
+        }
+        finally {
+          reader.close()
+        }
+      }
+
+      try {
+        const plans = (sql: string) => file.query<{ detail: string }, []>(`EXPLAIN QUERY PLAN ${sql}`).all().map(row => row.detail).join(' ')
+
+        expect(plans('DELETE FROM kay_room_messages WHERE at <= 1')).toContain('kay_room_messages_at')
+        expect(plans('DELETE FROM kay_room_members WHERE process IN (SELECT process FROM kay_room_processes WHERE seen <= 1)')).toContain('kay_room_members_process')
+
+        // No connection, nothing running and no process listed.
+        room.publish('hall', { text: 'alone' })
+        expect(timers).toEqual([])
+        expect(processesNow()).toEqual([])
+
+        room.join(ada, 'hall', 'ada')
+        expect(timers.toSorted((a, b) => a - b)).toEqual([5, 2000])
+        expect(processesNow()).toHaveLength(1)
+
+        room.leave(ada)
+        expect(cleared).toHaveBeenCalledTimes(2)
+        timers.length = 0
+        room.join(ada, 'hall', 'ada')
+        expect(timers.toSorted((a, b) => a - b)).toEqual([5, 2000])
+      }
+      finally {
+        intervals.mockRestore()
+        cleared.mockRestore()
+        file.close()
+        store.close()
       }
     })
   })

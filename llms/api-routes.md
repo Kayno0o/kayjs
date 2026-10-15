@@ -366,6 +366,6 @@ export default api()
 - Rooms live in the process's memory by default.
 - `rooms({ store: sqliteRooms('data/rooms.sqlite') })` shares them between every process of the machine opening the file, as `sqliteJobs` does: `members` lists those connected to any of them, and a message published in one reaches the others within `poll` milliseconds, 25 by default.
 - A process listens from its first `join` on, never handed what was published before.
-- A process that stops without its connections leaving, such as one that crashed, has its members dropped once it has not been heard from for 10 seconds; one only stalled that long writes them back on its next heartbeat.
+- A process that stops without its connections leaving, such as one that crashed, has its members dropped once it has not been heard from for 10 seconds; one only stalled that long writes them back on its next heartbeat. A process with no connection joined neither beats nor polls, so an idle one costs the file nothing.
 - `close()` on the store stops its timers and lets go of the file.
 - Rooms do not reach other machines.

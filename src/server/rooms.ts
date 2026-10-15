@@ -202,6 +202,9 @@ export function sqliteRooms(path: string, { poll = POLL }: { poll?: number } = {
   db.run('CREATE TABLE IF NOT EXISTS kay_room_members (room TEXT NOT NULL, connection TEXT NOT NULL, process TEXT NOT NULL, member TEXT NOT NULL, PRIMARY KEY (room, connection))')
   db.run('CREATE TABLE IF NOT EXISTS kay_room_processes (process TEXT PRIMARY KEY, seen INTEGER NOT NULL)')
   db.run('CREATE TABLE IF NOT EXISTS kay_room_messages (id INTEGER PRIMARY KEY AUTOINCREMENT, room TEXT NOT NULL, text TEXT NOT NULL, process TEXT NOT NULL, skipped TEXT, recipient TEXT, at INTEGER NOT NULL)')
+  // The beat deletes the dead processes' members and the old messages by these.
+  db.run('CREATE INDEX IF NOT EXISTS kay_room_members_process ON kay_room_members (process)')
+  db.run('CREATE INDEX IF NOT EXISTS kay_room_messages_at ON kay_room_messages (at)')
 
   // An upsert, so a member joining again keeps its place in the list, as it does in memory.
   const add = db.query('INSERT INTO kay_room_members (room, connection, process, member) VALUES (?, ?, ?, ?) ON CONFLICT (room, connection) DO UPDATE SET member = excluded.member')
@@ -217,6 +220,7 @@ export function sqliteRooms(path: string, { poll = POLL }: { poll?: number } = {
   const own = new Map<string, { room: string, connection: string, member: string }>()
   let last = 0
   let reading: ReturnType<typeof setInterval> | undefined
+  let beating: ReturnType<typeof setInterval> | undefined
 
   const beat = () => {
     const now = Date.now()
@@ -246,20 +250,42 @@ export function sqliteRooms(path: string, { poll = POLL }: { poll?: number } = {
     }
   }
 
-  beat()
+  // The process says it is alive, and reads what others publish, only while it holds a connection: one with none has no member to keep or to deliver to.
+  const sync = () => {
+    const held = own.size > 0
 
-  const beating = setInterval(guarded('marking this process alive in the rooms store', beat), HEARTBEAT)
+    if (held && !beating) {
+      beat()
+      beating = setInterval(guarded('marking this process alive in the rooms store', beat), HEARTBEAT)
+      beating.unref()
+    }
+    else if (!held && beating) {
+      clearInterval(beating)
+      beating = undefined
+    }
 
-  beating.unref()
+    if (held && listeners.size > 0 && !reading) {
+      // Read from now on: what others published before anyone here listened is for the members they had then.
+      last = latest.get()?.id ?? 0
+      reading = setInterval(guarded('reading what other processes published to rooms', read), poll)
+      reading.unref()
+    }
+    else if (!(held && listeners.size > 0) && reading) {
+      clearInterval(reading)
+      reading = undefined
+    }
+  }
 
   return {
     add(room, connection, member) {
       own.set(`${room}\n${connection}`, { room, connection, member })
+      sync()
       add.run(room, connection, self, member)
     },
     remove(room, connection) {
       own.delete(`${room}\n${connection}`)
       remove.run(room, connection)
+      sync()
     },
     members: room => members.all(room, Date.now() - EXPIRY).map(row => row.member),
     publish(room, text, recipients) {
@@ -270,26 +296,17 @@ export function sqliteRooms(path: string, { poll = POLL }: { poll?: number } = {
     },
     subscribe(listener) {
       listeners.add(listener)
-
-      // Read from now on: what others published before anyone here listened is for the members they had then.
-      if (!reading) {
-        last = latest.get()?.id ?? 0
-        reading = setInterval(guarded('reading what other processes published to rooms', read), poll)
-        reading.unref()
-      }
+      sync()
 
       return () => {
         listeners.delete(listener)
-
-        if (listeners.size === 0) {
-          clearInterval(reading)
-          reading = undefined
-        }
+        sync()
       }
     },
     close() {
       clearInterval(beating)
       clearInterval(reading)
+      beating = undefined
       reading = undefined
       listeners.clear()
       db.close()
