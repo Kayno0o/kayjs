@@ -1,0 +1,20 @@
+---
+import { signal } from 'kay'
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+import Tabs from '@kaynooo/kayjs-ui/tabs.kay'
+import Toggle from '@kaynooo/kayjs-ui/toggle.kay'
+
+// The access group sits on a tab other than the one shown, and its message arrives from outside as a refused post would.
+const issue = signal<string>()
+const tabs = [{ value: 'profile', label: 'Profile' }, { value: 'access', label: 'Access' }] as const
+---
+button#refuse(type="button" onClick={() => issue.set('Pick at least one')}) Refuse
+button#clear(type="button" onClick={() => issue.set(undefined)}) Clear
+Tabs#tabs(tabs={tabs} value="profile" label="Settings")
+  @panel(tab)
+    if tab === 'access'
+      FormField(label="Access" group issue={issue()})
+        Toggle#login(name="login" label="Login")
+        Toggle#admin(name="admin" label="Admin")
+    else
+      input#nick(name="nick")

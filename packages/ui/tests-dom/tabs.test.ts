@@ -126,3 +126,33 @@ test('shows the tab of a hidden panel when kay\'s focusInvalid reaches an invali
   expect([shown(), visible(), changes]).toEqual([['Earth'], ['earth'], ['earth']])
   expect(document.activeElement).toBe(input)
 })
+
+test('focusInvalid reaches a FormField group with an issue, showing its tab and focusing its first field, and a group without one is left alone', async () => {
+  mounted = await mount('src/components/grouped-tabs.kay', {})
+
+  const { root } = mounted
+  const login = root.querySelector<HTMLInputElement>('#login')!
+  const admin = root.querySelector<HTMLInputElement>('#admin')!
+  const group = root.querySelector<HTMLElement>('fieldset')!
+  const marks = () => [login, admin].map(field => [field.getAttribute('aria-invalid'), field.getAttribute('aria-describedby')])
+
+  expect(await focusInvalid(root)).toBe(false)
+  expect(marks()).toEqual([[null, null], [null, null]])
+
+  click(root.querySelector('#refuse'))
+  await settle()
+
+  const issues = group.querySelector('.kui-form-field-issues')!.id
+
+  expect(marks()).toEqual([['true', issues], ['true', issues]])
+  expect(await focusInvalid(root)).toBe(true)
+  await settle()
+
+  expect(document.activeElement).toBe(login)
+  expect(root.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe('Access')
+
+  click(root.querySelector('#clear'))
+  await settle()
+
+  expect(marks()).toEqual([[null, null], [null, null]])
+})
