@@ -46,4 +46,7 @@ FormDialog(open={open()} title="Rename" action={rename} submitLabel="Rename" fai
     input#name(name="name" value="Ada" aria-describedby="name-note")
   p#name-note Public
   textarea#notes(name="notes")
+  FormField(label="Access" name="access" group)
+    input#login(type="checkbox" name="access" value="login")
+    input#admin(type="checkbox" name="access" value="admin")
 Toaster

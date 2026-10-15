@@ -81,6 +81,32 @@ describe('FormDialog', () => {
     expect(root.querySelector('#name')?.getAttribute('aria-describedby')).toBe(`name-note ${root.querySelector('.kui-form-field-hint')!.id}`)
   })
 
+  test('marks every field of a group refused through its name, focusing the first, and clears them once refused for another field', async () => {
+    let answer: Answer = { errors: { access: 'Pick one' } }
+    const root = await formDialog(async () => answer)
+    const marks = () => ['#login', '#admin'].map((id) => {
+      const field = root.querySelector(id)!
+
+      return [field.getAttribute('aria-invalid'), field.getAttribute('aria-describedby')]
+    })
+
+    submit(root)
+    await settle()
+
+    const issues = root.querySelector('fieldset > .kui-form-field-issues')!.id
+
+    expect(marks()).toEqual([['true', issues], ['true', issues]])
+    expect(root.querySelector('fieldset .kui-form-field-issue')?.textContent).toBe('Pick one')
+    expect(document.activeElement).toBe(root.querySelector('#login'))
+    expect(root.querySelector('.kui-toast')).toBeNull()
+
+    answer = { errors: { name: 'Taken' } }
+    submit(root)
+    await settle()
+
+    expect(marks()).toEqual([[null, null], [null, null]])
+  })
+
   test('toasts a message no FormField shows, the whole form\'s included, and clears every message however it closed', async () => {
     const root = await formDialog(async () => ({ errors: { 'name': 'Taken', 'notes': 'Too long', '': 'Slow down' } }))
 

@@ -1,0 +1,15 @@
+---
+import { signal } from 'kay'
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+
+// The group's message arrives from outside as a refused post would; its first field is one the page already marked, its last one belongs to a FormField of its own.
+const issue = signal<string>()
+---
+button#refuse(type="button" onClick={() => issue.set('Fill in the access')}) Refuse
+button#clear(type="button" onClick={() => issue.set(undefined)}) Clear
+FormField(label="Access" group issue={issue()})
+  input#marked(name="marked" aria-invalid="true" aria-describedby="marked-note")
+  input#plain(name="plain")
+  FormField(label="Code")
+    input#code(name="code")
+p#marked-note Checked by the page
