@@ -621,4 +621,76 @@ describe('the dev tool', () => {
       delete (globalThis as { [PUBLIC_ENV]?: unknown })[PUBLIC_ENV]
     }
   })
+
+  it('lists the images of the page with the variant and format each got, the size served against the size drawn, the largest paint and what is wrong with each, and outlines one on hover', async () => {
+    const { happyDOM } = window as unknown as { happyDOM: { setURL: (url: string) => void } }
+    const { href } = location
+    const observed: ((list: { getEntries: () => { element: Element }[] }) => void)[] = []
+
+    happyDOM.setURL('http://localhost/')
+    document.body.innerHTML = [
+      '<img id="hero" src="/_kay/image?src=%2F_kay%2Fassets%2Fhero.jpg&w=1280" width="1280" height="720" alt="">',
+      '<img id="plain" src="/photo.jpg" width="4000" height="3000" alt="">',
+      '<img id="bare" src="/_kay/images/logo-320-1x1.webp" loading="lazy" alt="">',
+      '<img id="far" src="https://cdn.example/a.png" width="10" height="10" alt="">',
+    ].join('')
+
+    // The browser draws and loads: sizes are not computed here.
+    const sizes: Record<string, [number, number, number]> = { hero: [640, 360, 1280], plain: [300, 225, 4000], bare: [80, 80, 160], far: [10, 10, 10] }
+
+    for (const [id, [width, height, natural]] of Object.entries(sizes)) {
+      const image = document.getElementById(id) as HTMLImageElement
+
+      Object.defineProperty(image, 'naturalWidth', { value: natural })
+      Object.defineProperty(image, 'naturalHeight', { value: natural })
+      image.getBoundingClientRect = () => ({ width, height, top: id === 'bare' ? 100 : 5000, bottom: 5100, left: 0, right: width, x: 0, y: 0, toJSON: () => ({}) })
+    }
+
+    Object.defineProperty(window, 'devicePixelRatio', { value: 2, configurable: true })
+    ;(window as unknown as { PerformanceObserver: unknown }).PerformanceObserver = class {
+      constructor(callback: (typeof observed)[number]) {
+        observed.push(callback)
+      }
+
+      observe(): void { return undefined }
+      disconnect(): void { return undefined }
+    }
+
+    const asked: string[] = []
+    const fetching = spyOn(window, 'fetch').mockImplementation((async (url: string, init: RequestInit) => {
+      asked.push(`${init.method} ${url}`)
+
+      return new Response(null, { headers: { 'content-type': url.includes('logo') ? 'image/webp' : url.includes('photo') ? 'image/jpeg' : 'image/avif', 'content-length': url.includes('photo') ? '2500000' : '45000' } })
+    }) as unknown as typeof window.fetch)
+    const rows = () => [...shadow().querySelectorAll('#kay-dev-images .image')].map(row => [...row.children].map(child => child.textContent).join(' | '))
+
+    try {
+      tool = startDevTool()
+      observed[0]!({ getEntries: () => [{ element: document.getElementById('hero')! }] })
+      shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-images')!.click()
+      await Bun.sleep(20)
+
+      expect(asked).toEqual(['HEAD http://localhost/_kay/image?src=%2F_kay%2Fassets%2Fhero.jpg&w=1280', 'HEAD http://localhost/photo.jpg', 'HEAD http://localhost/_kay/images/logo-320-1x1.webp'])
+      expect(rows()).toEqual([
+        '/_kay/image?src=%2F_kay%2Fassets%2Fhero.jpg&w=1280 | 1280w, resized on request - avif, 43.9 KB - served 1280x1280, drawn 640x360 at 2x - largest contentful paint',
+        '/photo.jpg | not resized by kay - jpeg, 2441.4 KB - served 4000x4000, drawn 300x225 at 2x | served 667% of the pixels it is drawn with, pick a smaller width or give it `sizes`',
+        '/_kay/images/logo-320-1x1.webp | 320w, cut 1x1, written by kay build - webp, 43.9 KB - served 160x160, drawn 80x80 at 2x | no width and height, so the page shifts as it loads | lazy-loaded but in view on load, which delays it',
+        'https://cdn.example/a.png | not resized by kay - on another host - served 10x10, drawn 10x10 at 2x',
+      ])
+      expect(shadow().querySelector('#kay-dev-tab-images .count')?.textContent).toBe('3')
+
+      const visible = () => [...shadow().querySelectorAll<HTMLElement>('.outline')].filter(outline => outline.hidden === false).length
+
+      shadow().querySelector('#kay-dev-images .image')!.dispatchEvent(new PointerEvent('pointerenter'))
+      expect(visible()).toBe(1)
+      shadow().querySelector('#kay-dev-images .image')!.dispatchEvent(new PointerEvent('pointerleave'))
+      expect(visible()).toBe(0)
+    }
+    finally {
+      fetching.mockRestore()
+      delete (window as { PerformanceObserver?: unknown }).PerformanceObserver
+      document.body.innerHTML = ''
+      happyDOM.setURL(href)
+    }
+  })
 })

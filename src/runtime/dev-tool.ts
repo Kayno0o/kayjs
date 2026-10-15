@@ -109,6 +109,12 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .route .path { overflow-wrap: anywhere; }
 .route .file { grid-column: 2 / -1; color: var(--muted); }
 .secret { color: var(--warn); }
+.image { padding: 6px 4px; border-bottom: 1px solid var(--border); }
+.image:last-child { border-bottom: 0; }
+.image:hover { background: var(--accent-soft); border-radius: 4px; }
+.image .src { overflow-wrap: anywhere; }
+.image .facts-line { color: var(--muted); }
+.image .flag { color: var(--warn); }
 .snippet { margin: 0 0 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
 .snippet .site { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
 .snippet .title { margin: 2px 0; color: var(--accent); font-size: 16px; }
@@ -461,6 +467,7 @@ export function startDevTool(doc: Document = document): DevTool {
   request = requestTab(doc, tool)
   headTab(doc, tool, listening.signal)
   envTab(doc, tool, listening.signal)
+  imagesTab(doc, tool, listening.signal)
   routesTab(doc, tool, listening.signal)
   doc.addEventListener('click', (event) => {
     const target = event.target instanceof Element ? event.target.closest<HTMLButtonElement>('button[data-kay-open],button[data-kay-copy]') : null
@@ -1036,6 +1043,165 @@ function envTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
     if (tab.panel.hidden === false)
       reread()
   }, { signal })
+}
+
+// An image served more than this many times the pixels it is drawn with is flagged: the ladder steps are at most 2 apart, so a variant is never this far above what it was picked for.
+const OVERSIZED = 1.5
+const IMAGE_ROUTE = '/_kay/image'
+const VARIANT_FILE = /-(card|\d+)(?:-(\d+x\d+))?\.(webp|avif|jpg)$/
+// The accept header browsers send for an image, which the image route picks AVIF or WebP from.
+const IMAGE_ACCEPT = 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8'
+
+interface ImageInfo {
+  image: HTMLImageElement
+  // The URL in use, shortened to its path and the `src` of the image route.
+  url: string
+  // The address the browser loaded, as the page's origin sees it.
+  src: string
+  variant: string
+  natural: string
+  drawn: string
+  // What is wrong with it, one sentence each.
+  flags: string[]
+  lcp: boolean
+}
+
+// What kay's URL for an image says it is: a width of the ladder, a crop, the share card, a file `kay build` wrote, or an image kay did not resize.
+function imageVariant(src: string): string {
+  const url = new URL(src, 'http://kay.local')
+
+  if (url.pathname === IMAGE_ROUTE) {
+    const crop = url.searchParams.get('crop')
+
+    return url.searchParams.has('card') ? 'share card, 1200x630, resized on request' : `${url.searchParams.get('w') ?? 'original'}w${crop === null ? '' : `, cut ${crop}`}, resized on request`
+  }
+
+  const file = VARIANT_FILE.exec(decodeURIComponent(url.pathname))
+
+  if (url.pathname.startsWith('/_kay/images/') && file)
+    return `${file[1] === 'card' ? 'share card' : `${file[1]}w`}${file[2] === undefined ? '' : `, cut ${file[2]}`}, written by kay build`
+
+  return 'not resized by kay'
+}
+
+// Every image of the page with what it is, what it is drawn at and what is wrong with it; `lcp` is the element the browser reported as the largest paint.
+function pageImages(doc: Document, lcp: Element | undefined): ImageInfo[] {
+  const win = doc.defaultView!
+  const density = win.devicePixelRatio || 1
+
+  return [...doc.querySelectorAll('img')].flatMap((image) => {
+    const src = image.currentSrc === '' ? image.getAttribute('src') : image.currentSrc
+
+    if (src === null || src === '' || src.startsWith('data:'))
+      return []
+
+    const box = image.getBoundingClientRect()
+    const flags: string[] = []
+    const wide = image.naturalWidth > 0 && box.width > 0 && image.naturalWidth > box.width * density * OVERSIZED
+
+    if (wide)
+      flags.push(`served ${Math.round(image.naturalWidth / (box.width * density) * 100)}% of the pixels it is drawn with, pick a smaller width or give it \`sizes\``)
+
+    if (!image.hasAttribute('width') || !image.hasAttribute('height'))
+      flags.push('no width and height, so the page shifts as it loads')
+
+    if (image.loading === 'lazy' && box.bottom > 0 && box.top < win.innerHeight)
+      flags.push('lazy-loaded but in view on load, which delays it')
+
+    return [{
+      image,
+      url: src.replace(win.location.origin, ''),
+      src,
+      variant: imageVariant(src),
+      natural: image.naturalWidth > 0 ? `${image.naturalWidth}x${image.naturalHeight}` : 'not loaded',
+      drawn: `${Math.round(box.width)}x${Math.round(box.height)}${density === 1 ? '' : ` at ${density}x`}`,
+      flags,
+      lcp: image === lcp,
+    }]
+  })
+}
+
+// The images of the page: the variant and format each got, the size served against the size drawn, which one is the largest paint, and what is wrong with it; hovering a row outlines the image, and the list is read again as the tab shows.
+function imagesTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
+  const win = doc.defaultView!
+  let lcp: Element | undefined
+  let asked = 0
+  let reread: () => void = () => undefined
+  const tab = tool.tab({ id: 'images', label: 'Images', shown: () => reread() })
+
+  try {
+    const observer = new win.PerformanceObserver((list) => {
+      lcp = (list.getEntries().at(-1) as (PerformanceEntry & { element?: Element | null }) | undefined)?.element ?? lcp
+    })
+
+    observer.observe({ type: 'largest-contentful-paint', buffered: true })
+    signal.addEventListener('abort', () => observer.disconnect())
+  }
+  catch {
+    // A browser without the entry type shows no largest paint.
+  }
+
+  const read = () => {
+    const ask = ++asked
+    const images = pageImages(doc, lcp)
+    const body = tool.make('div')
+
+    tab.count(images.reduce((sum, info) => sum + info.flags.length, 0), images.some(info => info.flags.length > 0) ? 'error' : undefined)
+    tool.hideOutline()
+
+    if (images.length === 0) {
+      tab.panel.replaceChildren(tool.make('div', 'empty', 'No images on this page.'))
+
+      return
+    }
+
+    for (const info of images) {
+      const row = tool.make('div', 'image')
+      const format = tool.make('span', '', '')
+      const detail = tool.make('div', 'facts-line')
+      const label = info.lcp ? 'largest paint' : 'image'
+
+      row.tabIndex = 0
+      row.append(tool.make('div', 'src mono', info.url))
+      detail.append(info.variant, ' - ', format, ` - served ${info.natural}, drawn ${info.drawn}`, ...info.lcp ? [' - ', tool.make('strong', '', 'largest contentful paint')] : [])
+      row.append(detail)
+
+      for (const flag of info.flags)
+        row.append(tool.make('div', 'flag', flag))
+
+      row.onpointerenter = row.onfocus = () => tool.outline([info.image], label)
+      row.onpointerleave = row.onblur = () => tool.hideOutline()
+      body.append(row)
+      void (async () => {
+        const text = await imageFormat(win, info.src)
+
+        if (ask === asked)
+          format.textContent = text
+      })()
+    }
+
+    tab.panel.replaceChildren(body)
+  }
+
+  reread = read
+}
+
+// The format and size the server answers an image with, for a browser's accept header; read from a HEAD request, as the type is negotiated and the URL does not say it.
+async function imageFormat(win: Window & typeof globalThis, src: string): Promise<string> {
+  // The page's policy lets it ask its own origin only.
+  if (new URL(src, win.location.href).origin !== win.location.origin)
+    return 'on another host'
+
+  try {
+    const response = await win.fetch(src, { method: 'HEAD', headers: { accept: IMAGE_ACCEPT }, cache: 'no-store' })
+    const type = response.headers.get('content-type')?.replace('image/', '') ?? 'unknown format'
+    const bytes = Number(response.headers.get('content-length'))
+
+    return bytes > 0 ? `${type}, ${bytes < 1024 ? `${bytes} B` : `${(bytes / 1024).toFixed(1)} KB`}` : type
+  }
+  catch {
+    return 'format unknown'
+  }
 }
 
 const ROUTE_KINDS: Record<DevRoute['kind'], string> = { page: 'Pages', endpoint: 'Endpoints', api: 'API', kay: 'Served by kay' }
