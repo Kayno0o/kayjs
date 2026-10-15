@@ -16,9 +16,15 @@ const KAY_CONFIG = 'kay.config.ts'
 const PACKAGE = 'package.json'
 
 const TYPESCRIPT = /\.[cm]?ts$/
-const TSX = /\.tsx$/
 const JSX = /\.jsx$/
-const KAY_FILE = /\.kay$/
+
+export const KAY_FILE = /\.kay$/
+export const CSS_FILE = /\.css$/
+export const SCRIPT_FILE = /\.[cm]?[jt]sx?$/
+export const TS_FILE = /\.ts$/
+export const TSX_FILE = /\.tsx$/
+export const JSON_FILE = /\.json$/
+export const SVG_FILE = /\.svg$/i
 // The `.git` file of a linked worktree, another checkout of the repository; a submodule's points under `.git/modules`.
 const WORKTREE_GIT = /^gitdir:.*[\\/]worktrees[\\/]/
 const transpilers = new Map<Bun.JavaScriptLoader, Bun.Transpiler>()
@@ -140,7 +146,7 @@ export function scriptLoader(path: string): Bun.JavaScriptLoader {
   if (TYPESCRIPT.test(path))
     return 'ts'
 
-  if (TSX.test(path))
+  if (TSX_FILE.test(path))
     return 'tsx'
 
   return JSX.test(path) ? 'jsx' : 'js'
@@ -222,17 +228,29 @@ export async function writeIfChanged(path: string, content: string) {
   if (await file.exists() && await file.text() === content)
     return
 
-  const draft = `${path}.${crypto.randomUUID()}.tmp`
-
   await mkdir(dirname(path), { recursive: true })
+  await writeAtomically(path, content)
+}
+
+// Written under a temporary name and moved into place, so a reader never sees `path` half written, nor one a crash cut short; the temporary file goes whenever it is not moved.
+// `content` is the data, or a function writing the temporary file it is given, which returns false to leave `path` as it was.
+export async function writeAtomically(path: string, content: string | Uint8Array | Blob | ((draft: string) => Promise<boolean | void>)): Promise<boolean> {
+  const draft = `${path}.${crypto.randomUUID()}.tmp`
+  let moved = false
 
   try {
-    await Bun.write(draft, content)
-    await rename(draft, path)
-  }
-  catch (error) {
-    await rm(draft, { force: true })
+    if (typeof content !== 'function')
+      await Bun.write(draft, content)
+    else if (await content(draft) === false)
+      return false
 
-    throw error
+    await rename(draft, path)
+    moved = true
+
+    return true
+  }
+  finally {
+    if (!moved)
+      await rm(draft, { force: true })
   }
 }

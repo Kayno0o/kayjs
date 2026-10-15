@@ -8,6 +8,7 @@ import type { ContentProblem } from './validate'
 import { dirname, relative, resolve } from 'node:path'
 import { KayError } from '../compiler/errors'
 import { projectPaths } from '../project'
+import { TRAILING_SLASH } from '../runtime/base'
 import { nameCollection } from '../runtime/fields'
 import { localePath } from '../runtime/i18n'
 import { runInLocale } from '../runtime/locale-state'
@@ -20,9 +21,6 @@ import { feedXml } from './feed'
 import { isCollection } from './index'
 import { loadEntries, manifestFile, pruneContentCache, setContentPlace } from './load'
 import { ContentError, decodeEntries } from './validate'
-
-// The module declaring a project's collections, which `kay build`, `kay check` and the server read them from.
-const TRAILING_SLASH = /\/$/
 
 // A component a Markdown entry writes, with the props it gives, for `kay check` to type them.
 export interface ComponentUse {

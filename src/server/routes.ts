@@ -1,9 +1,10 @@
 import type { KayExtension } from '../config'
 import { existsSync, readFileSync } from 'node:fs'
 import { basename, dirname, join, relative, resolve, sep } from 'node:path'
-import { findKayFiles, findProjectFiles } from '../build/files'
+import { findKayFiles, findProjectFiles, KAY_FILE, TS_FILE } from '../build/files'
 import { throughLinks } from '../build/links'
 import { KayError } from '../compiler/errors'
+import { TRAILING_SLASH } from '../runtime/base'
 
 const chains = new WeakMap<string[], { file: string, files: string[], key: string }>()
 
@@ -99,7 +100,6 @@ const GROUP_SEGMENT = /^\(.+\)$/
 const PAGE_EXPORT = /^export\s+const\s+page\s*=\s*\{/m
 const FALSE_KEY = /(?:([A-Za-z_$][\w$]*)|'([^'\n]*)'|"([^"\n]*)")\s*:\s*false(?![\w$])/y
 const SPACE = /\s/
-const KAY_EXTENSION = /\.kay$/
 const LAYOUT = '_layout.kay'
 const NOT_FOUND = '_404.kay'
 const ERROR = '_error.kay'
@@ -113,10 +113,8 @@ const SUFFIXED_PARAM = /^(\[\[?[^[\]]+\]\]?)(\.[\w.-]+)$/
 
 // The methods of an Elysia instance's routes that answer requests, as `kay routes` and the dev tool list them.
 export const ROUTE_METHODS = /^(?:get|post|put|patch|delete|head|options|all|ws)$/i
-const TS_EXTENSION = /\.ts$/
 const BRACKETS = /[[\]]/
 const PARAM_NAME = /:[^/]+/g
-const TRAILING_SLASH = /\/$/
 const EDGE_SLASHES = /^\/+|\/+$/g
 const LEADING_SLASHES = /^\/+/
 // What a decoded segment must escape before the URL parser reads it as one segment, tab and line breaks included, which it would drop: the rest it encodes itself where a browser would.
@@ -127,7 +125,7 @@ export function routeOf(routesDir: string, file: string, prefix = ''): Omit<Rout
   if (basename(file).startsWith('_'))
     return undefined
 
-  const segments = [...prefix.split('/').slice(1), ...relative(routesDir, file).replace(KAY_EXTENSION, '').split(sep)].filter(segment => !GROUP_SEGMENT.test(segment))
+  const segments = [...prefix.split('/').slice(1), ...relative(routesDir, file).replace(KAY_FILE, '').split(sep)].filter(segment => !GROUP_SEGMENT.test(segment))
 
   if (segments.at(-1) === 'index')
     segments.pop()
@@ -264,7 +262,7 @@ function endpointOf(routesDir: string, file: string, prefix: string): Omit<Endpo
   if (basename(file).startsWith('_') || NOT_ENDPOINT.test(file))
     return undefined
 
-  const name = file.replace(TS_EXTENSION, '')
+  const name = file.replace(TS_FILE, '')
   const suffixed = SUFFIXED_PARAM.exec(basename(name))
   const route = routeOf(routesDir, suffixed ? join(dirname(name), suffixed[1]!) : name, prefix)
 
@@ -298,7 +296,7 @@ export function endpointKey(endpoint: Pick<Endpoint, 'pattern' | 'suffix'>): str
 // A page whose file name holds what the router reads as syntax stops the server.
 export function refuseRouteNames(routesDir: string, routes: Route[]): void {
   for (const route of routes) {
-    if (relative(routesDir, route.file).replace(KAY_EXTENSION, '').split(sep).some(segment => !DYNAMIC_SEGMENT.test(segment) && !OPTIONAL_SEGMENT.test(segment) && !GROUP_SEGMENT.test(segment) && ROUTER_SYNTAX.test(segment)))
+    if (relative(routesDir, route.file).replace(KAY_FILE, '').split(sep).some(segment => !DYNAMIC_SEGMENT.test(segment) && !OPTIONAL_SEGMENT.test(segment) && !GROUP_SEGMENT.test(segment) && ROUTER_SYNTAX.test(segment)))
       throw new KayError('route-invalid', `kay: ${route.file} has a :, * or ' in its name, which the router cannot serve; rename it`)
   }
 }

@@ -1,5 +1,5 @@
 import type { ServerScope } from './reactive'
-import { withBase } from './base'
+import { TRAILING_SLASH, withBase } from './base'
 import { kayLog } from './log'
 import { createSignal, currentServerScope, isHydrating, untrack, whenHydrated } from './reactive'
 import { sendValue } from './send'
@@ -31,7 +31,6 @@ const YEAR_SECONDS = 365 * 24 * 60 * 60
 // Browsers drop a cookie past about 4 KB, its name and attributes included.
 const MAX_COOKIE_BYTES = 3800
 const COOKIE_NAME = /^[\w!#$%&'*+.^`|~-]+$/
-const TRAILING_SLASH = /\/$/
 
 // What a persisted signal reads and keeps, around the signal's own `read`: a cookie the server reads too, so a page renders with it, or localStorage, read once the page has hydrated.
 // A signal kept in the query goes through `keepParam` in `./query-param` instead.

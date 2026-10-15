@@ -1,10 +1,11 @@
 import type { Mode } from '../project'
 import type { Heading, Highlighter, Segment } from './markdown'
 import type { ContentProblem } from './validate'
-import { mkdir, readdir, rename, rm, stat } from 'node:fs/promises'
+import { mkdir, readdir, rm, stat } from 'node:fs/promises'
 import { join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { pruneCache, touchCacheFile } from '../build/cache'
+import { writeAtomically } from '../build/files'
 import { KayError } from '../compiler/errors'
 import { modeOf, cacheDir as projectCache } from '../project'
 import { projectSource } from '../server/source'
@@ -224,13 +225,6 @@ async function sweepLegacy(cacheDir: string): Promise<void> {
 
   sweptCaches.add(cacheDir)
   await Promise.all((await readdir(cacheDir)).filter(name => LEGACY_CACHE_FILE.test(name)).map(async name => rm(join(cacheDir, name), { force: true })))
-}
-
-async function writeAtomically(file: string, text: string): Promise<void> {
-  const temporary = `${file}.${crypto.randomUUID()}.tmp`
-
-  await Bun.write(temporary, text)
-  await rename(temporary, file)
 }
 
 // A folder's entry files, by their path in it written with `/`, sorted.

@@ -4,6 +4,7 @@ import type { HeadTag } from '../runtime/head'
 import type { ServedPaths } from './served-paths'
 import { mkdir } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
+import { SVG_FILE } from '../build/files'
 import { KayError } from '../compiler/errors'
 import { kayLog } from '../runtime/log'
 import { revalidated } from './public'
@@ -24,7 +25,6 @@ const ICO_SIZES = [16, 32, 48]
 // The widest icon kay writes, which the source must reach so none is upscaled.
 const LARGEST = 512
 const ICO = '/favicon.ico'
-const SVG_FILE = /\.svg$/i
 
 // Every path the favicon serves, an SVG one adding its SVG and a maskable manifest icon its own icons.
 export const FAVICON_PATHS = [ICO, ...Object.keys(PNG_FILES), MANIFEST, SVG, ...Object.keys(MASKABLE_FILES)]

@@ -3,6 +3,7 @@ import type { ActionOptions } from './actions'
 import type { ApiGuard } from './api-modules'
 import type { LoadedGuard } from './guards'
 import type { ServedPaths } from './served-paths'
+import { NON_ROOT_TRAILING_SLASH } from '../runtime/base'
 import { escape } from '../runtime/escape'
 import { inLocale, passGuards } from './actions'
 import { API_PREFIX, OPENAPI_PATH, REFERENCE_PATH } from './api-modules'
@@ -55,7 +56,6 @@ const PATH_PARAM = /:(\w+)\??/g
 const OPTIONAL_SEGMENT = /\/:\w+\?/g
 const WILDCARD = /\*$/
 const BRACED_PARAM = /\{(\w+)\}/g
-const TRAILING_SLASH = /(?<=.)\/$/
 // What JSON Schema has no type for: a Date object beside its text is left out of a union, raw bytes are binary text.
 const DATE = 'Date'
 const BYTES = 'Uint8Array'
@@ -65,7 +65,7 @@ type Route = MountedApi['instance']['routes'][number]
 
 // The paths a route answers, as the router reads them: one without each optional param and one with it.
 function routerPaths(module: MountedApi, route: Route): string[] {
-  const path = apiRoutePath(module.mount, route.path).replace(TRAILING_SLASH, '')
+  const path = apiRoutePath(module.mount, route.path).replace(NON_ROOT_TRAILING_SLASH, '')
   const bare = path.replace(OPTIONAL_SEGMENT, '')
 
   return bare === path ? [path] : [bare || API_PREFIX, path.replaceAll('?', '')]

@@ -3,8 +3,10 @@ import type { KayConfig } from '../config'
 import type { RouteMount } from './routes'
 import { existsSync, realpathSync } from 'node:fs'
 import { basename, dirname, join, relative, sep } from 'node:path'
+import { TS_FILE } from '../build/files'
 import { KayError } from '../compiler/errors'
 import { projectPaths } from '../project'
+import { TRAILING_SLASH } from '../runtime/base'
 import { apiMounts, directoriesUp, falseKeys, fileAt } from './routes'
 
 // The API modules of a project and where they are served, apart from `./api` so `kay check` and the editor, which only list them, load no Elysia.
@@ -32,9 +34,7 @@ const GUARD = '_guard.ts'
 const API_OPTIONS = /\bapi\s*\(\s*\{/
 // Tests, declarations, and files or directories starting with `_`, guards and helpers, are no modules.
 const NOT_A_MODULE = /(?:^|\/)_|\.(?:test|spec|d)\.ts$/
-const TS_FILE = /\.ts$/
 const INDEX = /(?:^|\/)index$/
-const TRAILING_SLASH = /\/$/
 // What `dirname` gives a file at the top of its directory, as the prefix ends the path.
 const CURRENT_DIR = /\/\.$/
 

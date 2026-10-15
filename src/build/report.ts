@@ -1,8 +1,7 @@
 import type { ClientManifest } from '../server/client'
-import { rename } from 'node:fs/promises'
 import { join, relative, resolve } from 'node:path'
-import process from 'node:process'
 import { ASSET_PREFIX } from './assets'
+import { writeAtomically } from './files'
 
 export interface Size {
   raw: number
@@ -185,11 +184,8 @@ export async function readStoredReport(file: string, exported: boolean): Promise
 
 // Written aside and renamed, so a build interrupted while writing keeps the report before it.
 export async function writeStoredReport(file: string, stored: StoredReport): Promise<void> {
-  const written = `${file}.${process.pid}.tmp`
-
   try {
-    await Bun.write(written, JSON.stringify(stored))
-    await rename(written, file)
+    await writeAtomically(file, JSON.stringify(stored))
   }
   catch {}
 }

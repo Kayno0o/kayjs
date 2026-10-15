@@ -1,6 +1,6 @@
 import { nodeZlib } from './builtins'
 
-const PNG_SIGNATURE = [137, 80, 78, 71, 13, 10, 26, 10]
+export const PNG_SIGNATURE = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])
 
 // The pixels of a non-interlaced 8-bit RGBA PNG, Bun.Image giving no raw output.
 export function decodePng(png: Uint8Array): { pixels: Uint8Array, width: number, height: number } {
@@ -88,10 +88,11 @@ export function encodePng(pixels: Uint8Array, width: number, height: number): Ui
   view.setUint32(4, height)
   header.set([8, 6, 0, 0, 0], 8)
 
-  return Buffer.concat([Uint8Array.from(PNG_SIGNATURE), chunk('IHDR', header), chunk('IDAT', nodeZlib().deflateSync(filtered, { level: 1 })), chunk('IEND', new Uint8Array(0))])
+  return Buffer.concat([PNG_SIGNATURE, pngChunk('IHDR', header), pngChunk('IDAT', nodeZlib().deflateSync(filtered, { level: 1 })), pngChunk('IEND', new Uint8Array(0))])
 }
 
-function chunk(type: string, data: Uint8Array): Uint8Array {
+// One chunk of a PNG: its length, its type, its data and the CRC of the type and data.
+export function pngChunk(type: string, data: Uint8Array): Uint8Array {
   const out = new Uint8Array(12 + data.length)
   const view = new DataView(out.buffer)
 

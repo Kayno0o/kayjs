@@ -3,7 +3,7 @@ import { isBuiltin } from 'node:module'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import { KayError } from '../compiler/errors'
 import { parseKay } from '../compiler/parser'
-import { findKayFiles, readSource, scriptLoader, transpilerFor } from './files'
+import { findKayFiles, KAY_FILE, readSource, SCRIPT_FILE, scriptLoader, transpilerFor } from './files'
 import { GLOB_CALL, globbedFiles } from './glob'
 
 // A package shipping `.kay` components, which the consuming project compiles as its own.
@@ -240,8 +240,6 @@ function exportTargets(exports: unknown): [string, string][] | undefined {
   })
 }
 
-export const SCRIPT_FILE = /\.[cm]?[jt]sx?$/
-const KAY_FILE = /\.kay$/
 // What separates candidate class names in a template: whitespace, quotes, braces, parentheses, commas and the dots of the shorthand.
 const NOT_IN_CLASS = /[\s'"`{}(),=.]+/
 

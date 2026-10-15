@@ -1,7 +1,7 @@
 import type { CacheCount } from './report'
-import { mkdir, readdir, rename, rm } from 'node:fs/promises'
+import { mkdir, readdir, rm } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
-import process from 'node:process'
+import { writeAtomically } from './files'
 
 // A file under `.kay/cache` holding one value, valid while its key matches.
 export interface CacheSlot {
@@ -50,14 +50,11 @@ export async function readCacheEntry<Value>(slot: CacheSlot): Promise<Value | un
 
 // Written aside, then renamed over the entry, so another process never reads half of it; a read-only disk only loses the cache.
 export async function writeCacheEntry(slot: CacheSlot, value: unknown): Promise<void> {
-  const written = `${slot.file}.${process.pid}.tmp`
-
   touched.add(slot.file)
 
   try {
     await mkdir(dirname(slot.file), { recursive: true })
-    await Bun.write(written, JSON.stringify({ key: slot.key, value }))
-    await rename(written, slot.file)
+    await writeAtomically(slot.file, JSON.stringify({ key: slot.key, value }))
   }
   catch {}
 }

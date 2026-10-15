@@ -2,8 +2,8 @@ import type { ImportedSignals, SignalKind } from '../compiler/module-signals'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { readFileSync, statSync } from 'node:fs'
 import { moduleSignals } from '../compiler/module-signals'
-import { resolveFrom, scriptLoader, transpilerFor } from './files'
-import { fences, SCRIPT_FILE } from './libraries'
+import { resolveFrom, SCRIPT_FILE, scriptLoader, transpilerFor } from './files'
+import { fences } from './libraries'
 
 const KAY_MODULE = /^kay(?:\/|$)/
 const scanned = new Map<string, { stamp: string, signals: Record<string, SignalKind> }>()

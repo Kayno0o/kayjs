@@ -1,5 +1,5 @@
 import type { BunPlugin, PluginBuilder } from 'bun'
-import { CSS_FILE } from './styles'
+import { CSS_FILE } from './files'
 
 const SUPPORTS_PRELUDE = /^@supports\b/i
 const SPACES = /\s+/g

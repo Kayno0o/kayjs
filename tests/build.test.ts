@@ -14,11 +14,12 @@ import tailwind from 'bun-plugin-tailwind'
 import { describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
 import { ASSET_FILE, clientDir, outputDir, writeAsset } from '../src/build/assets'
+import { writeCacheEntry } from '../src/build/cache'
 import { buildClient, readClientSources } from '../src/build/client'
-import { forgetSources, keepSources, readSource, realPath, writeIfChanged } from '../src/build/files'
+import { forgetSources, keepSources, readSource, realPath, writeAtomically, writeIfChanged } from '../src/build/files'
 import { fileWords, reachesAny } from '../src/build/libraries'
 import { BUNDLED_LICENCES, codecWarnings, thirdPartyNotices, unknownCodecVersions } from '../src/build/licenses'
-import { formatBuildReport, formatRemoved, formatRouteTable, formatSizeReport, gzipSize, shorten } from '../src/build/report'
+import { formatBuildReport, formatRemoved, formatRouteTable, formatSizeReport, gzipSize, shorten, writeStoredReport } from '../src/build/report'
 import { routeSizes } from '../src/build/route-sizes'
 import { anchorModule, runtimeChunk } from '../src/build/runtime-chunk'
 import { runtimeConfig, withoutPlugins } from '../src/build/runtime-config'
@@ -1946,6 +1947,38 @@ describe('the files a build writes', () => {
       await mkdir(join(dir, 'taken'))
       await expect(writeIfChanged(join(dir, 'taken'), 'c')).rejects.toThrow()
       expect((await readdir(dir)).sort()).toEqual(['deep', 'taken'])
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('leaves no draft behind an atomic write that failed, was given up, or was swallowed by a cache or report writer', async () => {
+    const dir = await scratchDir('atomic-')
+    const file = join(dir, 'kept.txt')
+
+    try {
+      await Bun.write(file, 'before')
+      await expect(writeAtomically(file, async (draft) => {
+        await Bun.write(draft, 'half')
+
+        throw new Error('cut short')
+      })).rejects.toThrow('cut short')
+      expect(await writeAtomically(file, async (draft) => {
+        await Bun.write(draft, 'over the cap')
+
+        return false
+      })).toBe(false)
+      expect(await Bun.file(file).text()).toBe('before')
+      expect(await writeAtomically(file, 'after')).toBe(true)
+      expect(await Bun.file(file).text()).toBe('after')
+
+      // A directory where the file goes, which no rename replaces; the cache and the report swallow the failure.
+      await mkdir(join(dir, 'taken'))
+      await expect(writeAtomically(join(dir, 'taken'), 'x')).rejects.toThrow()
+      await writeCacheEntry({ file: join(dir, 'taken'), key: 'k' }, 1)
+      await writeStoredReport(join(dir, 'taken'), {} as StoredReport)
+      expect((await readdir(dir)).sort()).toEqual(['kept.txt', 'taken'])
     }
     finally {
       await rm(dir, { recursive: true, force: true })

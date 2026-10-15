@@ -1,6 +1,7 @@
 import type * as t from '@babel/types'
 import { parse, parseExpression } from '@babel/parser'
 import { formatKay } from '../compiler/format'
+import { eachNode } from '../compiler/script'
 
 // `kay migrate astro`: an `.astro` file's frontmatter becomes a fence, its markup the indented template. What has no kay counterpart, or is not written the usual way, stays in the output commented out under a `// kay migrate:` line and is listed, never dropped.
 
@@ -192,7 +193,7 @@ function migrateFrontmatter(code: string, options: MigrateOptions, imports: Impo
   const aliased = new Set<string>()
 
   for (const statement of statements) {
-    walk(statement, (node) => {
+    eachNode(statement, (node) => {
       if (imageMetadata !== undefined && node.type === 'Identifier' && node.name === imageMetadata)
         edits.push({ start: node.start!, end: node.end!, text: 'string' })
 
@@ -241,7 +242,7 @@ function migrateFrontmatter(code: string, options: MigrateOptions, imports: Impo
 
     // Astro awaits in any component, kay in the server fence of a page or a layout only.
     if (options.role === 'component') {
-      walk(statement, (node) => {
+      eachNode(statement, (node) => {
         if (node.type === 'AwaitExpression' || (node.type === 'ForOfStatement' && node.await))
           note(lineOf(node), 'a component renders synchronously: load this in the page\'s server fence and pass it as a prop')
 
@@ -259,7 +260,7 @@ function astroEdits(node: t.Node, code: string, offset: number, role: Role, prop
   const at = (inner: t.Node, text: string) => edits.push({ start: inner.start! - offset, end: inner.end! - offset, text })
   const page = role === 'page'
 
-  walk(node, (inner) => {
+  eachNode(node, (inner) => {
     // `return Astro.redirect('/login')` ends the frontmatter; `ctx.redirect` stops the render by itself.
     if (inner.type === 'ReturnStatement' && inner.argument?.type === 'CallExpression' && isAstro(inner.argument.callee, 'redirect') && page) {
       at(inner, code.slice(inner.argument.start! - offset, inner.argument.end! - offset).replace('Astro.redirect', 'ctx.redirect'))
@@ -300,24 +301,6 @@ function astroEdits(node: t.Node, code: string, offset: number, role: Role, prop
 
 function isAstro(node: t.Node, name: string): boolean {
   return node.type === 'MemberExpression' && node.object.type === 'Identifier' && node.object.name === 'Astro' && node.property.type === 'Identifier' && node.property.name === name
-}
-
-const SKIPPED_KEYS = new Set(['loc', 'start', 'end', 'extra', 'leadingComments', 'trailingComments', 'innerComments'])
-
-// Visits every node under `node`, parents first; the visitor returns false to skip what is under one.
-function walk(node: t.Node, visit: (node: t.Node, parent: t.Node | undefined) => boolean | void, parent?: t.Node): void {
-  if (visit(node, parent) === false)
-    return
-
-  for (const [key, value] of Object.entries(node)) {
-    if (SKIPPED_KEYS.has(key))
-      continue
-
-    for (const child of Array.isArray(value) ? value : [value]) {
-      if (child !== null && typeof child === 'object' && typeof (child as t.Node).type === 'string')
-        walk(child as t.Node, visit, node)
-    }
-  }
 }
 
 function migrateTemplate(markup: string, options: MigrateOptions, imports: Imports, note: (line: number, message: string) => void, lang: (line: number, value: string) => void): string {
@@ -791,7 +774,7 @@ function text(value: string): string {
 function containsJsx(node: t.Node): boolean {
   let found = false
 
-  walk(node, (inner) => {
+  eachNode(node, (inner) => {
     if (inner.type === 'JSXElement' || inner.type === 'JSXFragment')
       found = true
 

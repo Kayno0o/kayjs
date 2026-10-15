@@ -2,8 +2,8 @@ import type * as t from '@babel/types'
 import type { Node } from '../compiler/ast'
 import { parse } from '@babel/parser'
 import { elementsIn } from '../compiler/ast'
+import { KAY_FILE } from './files'
 
-const KAY_FILE = /\.kay$/
 // `Content`, or `post.Content`: an entry's body, rendering the components of its collection.
 const CONTENT_TAG = /(?:^|\.)Content$/
 

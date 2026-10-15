@@ -1,6 +1,6 @@
 import type { KayLibrary } from './libraries'
 import type { Node } from './supports'
-import { findProjectFiles, readSource } from './files'
+import { CSS_FILE, findProjectFiles, readSource } from './files'
 import { exportsFile } from './libraries'
 import { COMMENTS, parse, print } from './supports'
 
@@ -14,7 +14,6 @@ const TOKEN = /[\w-]+/g
 
 // The files of an app a class may be written in: those Tailwind reads, stylesheets restyling one and data files.
 export const NAMING_FILE = /\.(?:kay|[cm]?[jt]sx?|html?|mdx?|css|json|ya?ml|txt)$/
-const CSS_FILE = /\.css$/
 
 interface Selector {
   text: string

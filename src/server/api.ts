@@ -9,6 +9,7 @@ import type { MountedApi } from './openapi'
 import type { Span } from './trace'
 import { Cookie, Elysia, ElysiaCustomStatusResponse, ElysiaFile } from 'elysia'
 import { KayError } from '../compiler/errors'
+import { TRAILING_SLASH } from '../runtime/base'
 import { API_MOUNT, END_EVENT, ERROR_EVENT } from '../runtime/live'
 import { kayLog } from '../runtime/log'
 import { encodeValue, unsendable } from '../runtime/wire'
@@ -28,7 +29,6 @@ const HEARTBEAT_MS = 5000
 const HEARTBEAT = new TextEncoder().encode(':\n\n')
 // What a body Elysia streams, awaits or asks for its response has: a generator, a thenable, an object with `toResponse()`.
 const STREAMED = ['next', 'then', 'toResponse']
-const TRAILING_SLASH = /\/$/
 const TEXT = { 'content-type': 'text/plain; charset=utf-8' }
 // Where `api({ bodyLimit })` keeps its limit on the instance it makes.
 const BODY_LIMIT = Symbol.for('kay.bodyLimit')

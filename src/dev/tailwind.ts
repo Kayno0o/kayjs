@@ -1,4 +1,5 @@
 import { dirname, join, resolve } from 'node:path'
+import { CSS_FILE } from '../build/files'
 import { sourceWords } from '../build/libraries'
 
 // Whether the words an edit brought into a file, given its text, may be Tailwind classes, which only building the stylesheets again puts in.
@@ -8,7 +9,6 @@ interface Compiler {
   build: (candidates: string[]) => string
 }
 
-const CSS_FILE = /\.css$/
 const TAILWIND_IMPORT = /@import\s+(?:url\(\s*)?['"]tailwindcss['"]/
 // A word cut out of an arbitrary value, which only the stylesheet build reads whole.
 const ARBITRARY = /[[\]\\]/

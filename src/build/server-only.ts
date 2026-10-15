@@ -8,12 +8,12 @@ import { KayError } from '../compiler/errors'
 import { parseKay } from '../compiler/parser'
 import { loadTraverse } from '../compiler/rewrite'
 import { readCacheEntry, writeCacheEntry } from './cache'
+import { KAY_FILE } from './files'
 
 // Globals a server has and a browser has not: reading one in a chunk the page loads throws as the chunk evaluates, before anything of it runs.
 const SERVER_ONLY = new Set(['process', 'Bun'])
 // Worth parsing a source for at all.
 const MENTIONED = /\b(?:process|Bun)\b/
-const KAY_FILE = /\.kay$/
 // The one read the client build replaces with a literal, so it reaches no chunk.
 const DEFINED = 'NODE_ENV'
 // Part of the message of the browser's stand-in for kay's `s`, which survives minifying: a chunk holding it builds a schema where Elysia is not.

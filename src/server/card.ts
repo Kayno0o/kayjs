@@ -7,10 +7,11 @@ import type { ImageRouteOptions } from './image'
 import type { Color } from './raster'
 import type { RemoteImages } from './remote'
 import { existsSync, linkSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { readdir, rename, rm, stat } from 'node:fs/promises'
+import { readdir, rm, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { ASSET_PREFIX } from '../build/assets'
 import { countCache } from '../build/cache'
+import { SVG_FILE, writeAtomically } from '../build/files'
 import { KayError } from '../compiler/errors'
 import { CARD, CARD_ROUTE, IMPORTED, setCardMaker, variantFilesLinked, VARIANTS } from '../runtime/image'
 import { nodeCrypto } from './builtins'
@@ -71,7 +72,6 @@ const DEFAULT_WEIGHT = 700
 // Past this many characters a title is cut before it is signed: three lines of the smallest size hold far fewer.
 const MAX_TITLE = 200
 const REMOTE = /^https?:\/\//i
-const SVG_FILE = /\.svg$/i
 
 // The setup pages link cards with, and the cards prerendered pages asked for, by file name, for `kay build` to write.
 let current: Cards | undefined
@@ -440,11 +440,8 @@ export async function writeCards(clientDir: string, cacheDir?: string, remote?: 
   return drawn
 }
 
-// Written under a temporary name and moved into place, so a reader never sees a card half written.
 async function writeCard(cards: Cards, target: string, title: string, image?: { path: string, maxPixels?: number | undefined }): Promise<void> {
-  const partial = `${target}.${crypto.randomUUID()}.tmp`
   const look: CardLook = { face: await cardFace(cards), background: cards.background, color: cards.color, name: cards.name, logo: cards.logo, quality: cards.quality }
 
-  await Bun.write(partial, await drawCard(look, title, image && await coverImage(Bun.file(image.path), CARD.width, CARD.height, image.maxPixels)))
-  await rename(partial, target)
+  await writeAtomically(target, await drawCard(look, title, image && await coverImage(Bun.file(image.path), CARD.width, CARD.height, image.maxPixels)))
 }

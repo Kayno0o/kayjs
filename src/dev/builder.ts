@@ -8,7 +8,7 @@ import { join, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { outputDir } from '../build/assets'
 import { bothBundles, bundleIslands, bundleStyles, clearClientOutput, readClientSources, writeClasses } from '../build/client'
-import { forgetSources, keepSources, readSource } from '../build/files'
+import { CSS_FILE, forgetSources, keepSources, readSource } from '../build/files'
 import { fileWords, sourceWords } from '../build/libraries'
 import { classTokens, NAMING_FILE } from '../build/prune'
 import { inSignalsScope } from '../build/signals'
@@ -57,7 +57,6 @@ interface Built {
   manifest: string
 }
 
-const CSS_FILE = /\.css$/
 const SCRIPT_OR_COMPONENT = /\.(?:kay|[cm]?[jt]sx?)$/
 // The files Tailwind reads classes from.
 const SCANNED_FILE = /\.(?:kay|[cm]?[jt]sx?|html|mdx?)$/

@@ -7,13 +7,10 @@ import { parseKay } from '../compiler/parser'
 import { projectPaths } from '../project'
 import { ASSET_FILE, writeAsset } from './assets'
 import { collectionComponents, importedNames, rendersContent } from './collection-components'
-import { resolveFrom, scriptLoader, transpilerFor } from './files'
+import { CSS_FILE, KAY_FILE, resolveFrom, SCRIPT_FILE, scriptLoader, transpilerFor } from './files'
 import { globbedFiles } from './glob'
-import { importsOf, libraryOf, SCRIPT_FILE } from './libraries'
+import { importsOf, libraryOf } from './libraries'
 
-const KAY_FILE = /\.kay$/
-
-export const CSS_FILE = /\.css$/
 const ABSOLUTE_URL = /^\//
 // `import css from './x.css' with { type: 'text' }` and its dynamic form: the file's text, read by the module, which no stylesheet build follows.
 const TEXT_IMPORT = /\bfrom\s*(['"])([^'"\n]+)\1\s*(?:with|assert)\s*\{[^}]*\btype\s*:\s*(['"])text\3[^}]*\}|\bimport\(\s*(['"])([^'"\n]+)\4\s*,\s*\{\s*with\s*:\s*\{[^}]*\btype\s*:\s*(['"])text\6[^}]*\}\s*(?:,\s*)?\}\s*\)/g

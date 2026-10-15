@@ -1,10 +1,10 @@
 import type { SourceMap } from '../compiler'
-import { rename } from 'node:fs/promises'
 import { dirname, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { browserGlobalMissing } from '../compiler/globals'
 import { offsetAt, positionAt } from '../compiler/mapping'
 import { withoutTwin } from '../compiler/twin'
+import { writeAtomically } from './files'
 
 // What a `.kay` file compiled to, run as it is: a position in it maps straight back through kay's own map.
 interface Compiled {
@@ -95,8 +95,7 @@ async function rewriteBundleMap(mapFile: string): Promise<void> {
   bundle.sourcesContent = bundle.sources.map((_source, index) => entries[index]?.source ?? bundle.sourcesContent?.[index] ?? null)
   bundle.mappings = encodeBundleMappings(lines)
   // `kay dev` points the maps at their `.kay` sources while its server may be sending them.
-  await Bun.write(`${mapFile}.kay`, JSON.stringify(bundle))
-  await rename(`${mapFile}.kay`, mapFile)
+  await writeAtomically(mapFile, JSON.stringify(bundle))
 }
 
 export function decodeBundleMappings(mappings: string): BundleSegment[][] {

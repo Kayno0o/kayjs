@@ -18,7 +18,7 @@ import { fromManifest, MANIFEST, PRERENDERED_DIR, writeManifest } from '../serve
 import { PUBLIC_ENV_PATH } from '../server/env-state'
 import { extensionEditor, routeMounts } from '../server/routes'
 import { ASSET_PREFIX, clientDir, outputDir } from './assets'
-import { findKayFiles, readSource, writeIfChanged } from './files'
+import { CSS_FILE, findKayFiles, readSource, writeIfChanged } from './files'
 import { fileWords, findKayLibraries, reachableLibraryFiles, reachesAny } from './libraries'
 import { packagesOf } from './licenses'
 import { throughLinks } from './links'
@@ -77,7 +77,6 @@ type Outputs = Record<string, MetafileOutput>
 
 const LEADING_DOT_SLASH = /^\.\//
 const JS_OUTPUT = /\.js$/
-const CSS_OUTPUT = /\.css$/
 const COMPILES_WASM = /\bWebAssembly\./
 const STARTS_WORKER = /\bnew\s+(?:Shared)?Worker\(/
 const OBJECT_URL = /\bcreateObjectURL\(/
@@ -422,7 +421,7 @@ export async function bundleStyles(root: string, { pages, libraries, classes }: 
   if (options.base !== undefined && options.base !== '') {
     const base = options.base
 
-    await Promise.all(build.outputs.filter(output => CSS_OUTPUT.test(output.path)).map(async output => Bun.write(output.path, rebaseCss(await Bun.file(output.path).text(), base))))
+    await Promise.all(build.outputs.filter(output => CSS_FILE.test(output.path)).map(async output => Bun.write(output.path, rebaseCss(await Bun.file(output.path).text(), base))))
   }
 
   return { styles, inputs: Object.keys(build.metafile!.inputs).map(input => resolve(input)), followed: [...shrunk], unused }

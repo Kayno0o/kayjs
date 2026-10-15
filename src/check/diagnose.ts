@@ -7,6 +7,7 @@ import type { RouteMount } from '../server/routes'
 import type { ShadowFile } from './shadow'
 import { existsSync, realpathSync } from 'node:fs'
 import { dirname, relative, resolve, sep } from 'node:path'
+import { KAY_FILE } from '../build/files'
 import { libraryOf, packageRoot } from '../build/libraries'
 import { typeLint } from '../compiler/lints'
 import { WRITABLE } from '../compiler/names'
@@ -23,7 +24,6 @@ const ALWAYS_DEFINED = 2774
 const MISSING_PROPERTY = 2339
 const LEADING_NAME = /^[a-z_$][\w$]*/i
 const MEMBER_OF = /([a-z_$][\w$]*)\??\.$/i
-const KAY_FILE = /\.kay$/
 // The error `CheckedHref` gives a site-relative path nothing serves.
 const UNSERVED = new RegExp(`${UNSERVED_MESSAGE} (/[^"'\`;\\s]*)`)
 

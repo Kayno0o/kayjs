@@ -1,8 +1,8 @@
 import { nodeZlib } from './builtins'
 import { decodable } from './image-format'
+import { PNG_SIGNATURE, pngChunk } from './png'
 
 // Bun.Image resizes but cannot cut: an image is written as a PNG this reads back row by row, and the middle of it written again.
-const SIGNATURE = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])
 const CHANNELS: Record<number, number> = { 0: 1, 2: 3, 3: 1, 4: 2, 6: 4 }
 // Chunks a cut image keeps as they are: the palette and its transparency.
 const KEPT_CHUNKS = new Set(['PLTE', 'tRNS'])
@@ -39,7 +39,7 @@ export async function coverImage(input: Blob | Uint8Array, width: number, height
 }
 
 export function decodePng(bytes: Uint8Array): Png {
-  if (!SIGNATURE.every((byte, index) => bytes[index] === byte))
+  if (!PNG_SIGNATURE.every((byte, index) => bytes[index] === byte))
     throw new Error('kay: not a PNG')
 
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
@@ -47,7 +47,7 @@ export function decodePng(bytes: Uint8Array): Png {
   const kept: Png['kept'] = []
   let header: { width: number, height: number, depth: number, colorType: number } | undefined
 
-  for (let offset = SIGNATURE.length; offset < bytes.length;) {
+  for (let offset = PNG_SIGNATURE.length; offset < bytes.length;) {
     const length = view.getUint32(offset)
     const type = String.fromCharCode(...bytes.subarray(offset + 4, offset + 8))
     const chunk = bytes.subarray(offset + 8, offset + 8 + length)
@@ -147,20 +147,7 @@ export function encodePng(png: Png): Uint8Array<ArrayBuffer> {
   for (const [y, row] of png.rows.entries())
     raw.set(row, y * (row.length + 1) + 1)
 
-  const chunks = [chunk('IHDR', header), ...png.kept.map(({ type, data }) => chunk(type, data)), chunk('IDAT', nodeZlib().deflateSync(raw)), chunk('IEND', new Uint8Array())]
+  const chunks = [pngChunk('IHDR', header), ...png.kept.map(({ type, data }) => pngChunk(type, data)), pngChunk('IDAT', nodeZlib().deflateSync(raw)), pngChunk('IEND', new Uint8Array())]
 
-  return new Uint8Array(Buffer.concat([SIGNATURE, ...chunks]))
-}
-
-function chunk(type: string, data: Uint8Array): Uint8Array {
-  const out = new Uint8Array(12 + data.length)
-  const view = new DataView(out.buffer)
-  const typed = new TextEncoder().encode(type)
-
-  view.setUint32(0, data.length)
-  out.set(typed, 4)
-  out.set(data, 8)
-  view.setUint32(8 + data.length, Bun.hash.crc32(out.subarray(4, 8 + data.length)))
-
-  return out
+  return new Uint8Array(Buffer.concat([PNG_SIGNATURE, ...chunks]))
 }

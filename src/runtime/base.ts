@@ -17,6 +17,10 @@ const ASCII_ESCAPE = /%([0-7][\da-f])/gi
 // A path whose first segment is empty, or decodes to empty, reads as a host once something decodes or resolves it again: `//evil.example`, `/%2F/evil.example`.
 const SECOND_SLASH = /^\/(?:[/\\]|%2f|%5c)/i
 const QUERY_OR_HASH = /[?#]/
+
+// The slash ending a path, and the one ending any path but `/`.
+export const TRAILING_SLASH = /\/$/
+export const NON_ROOT_TRAILING_SLASH = /(?<=.)\/$/
 const MOST_LAYERS = 8
 
 // Each URL of a `srcset`, after the start or a comma.

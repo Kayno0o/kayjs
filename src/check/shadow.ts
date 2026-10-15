@@ -6,6 +6,7 @@ import type { Route, RouteMount } from '../server/routes'
 import type { ServerFacts } from './layout-facts'
 import { existsSync, readFileSync } from 'node:fs'
 import { basename, dirname, join, relative, resolve, sep } from 'node:path'
+import { KAY_FILE, TS_FILE } from '../build/files'
 import { importedSignals } from '../build/signals'
 import { compileKay } from '../compiler'
 import { parseKay } from '../compiler/parser'
@@ -16,8 +17,6 @@ import { directoriesUp, falseKeys, fileAt, routeOf, routeTrees, virtualDir } fro
 import { serverFacts } from './layout-facts'
 
 export { SHADOW_SETTINGS }
-const TS_EXTENSION = /\.ts$/
-const KAY_EXTENSION = /\.kay$/
 const LAYOUT = '_layout.kay'
 const PARENT = '..'
 const OUTSIDE = '__'
@@ -94,7 +93,7 @@ export function compileShadow(root: string, file: string, source: string, { rout
     const target = resolve(dirname(file), specifier)
 
     // A component beside a file outside the project has its shadow beside this one.
-    if (target.startsWith(root + sep) || (KAY_EXTENSION.test(target) && !file.startsWith(root + sep)))
+    if (target.startsWith(root + sep) || (KAY_FILE.test(target) && !file.startsWith(root + sep)))
       return undefined
 
     return relative(shadowDir, target)
@@ -202,7 +201,7 @@ function paramTypesOf(routesDir: string, shadowDir: string, route: Pick<Route, '
   return Object.fromEntries(route.params.map((name) => {
     const matcher = route.matchers?.[name]
     const source = matcher === undefined ? undefined : matcherSource(routesDir, matcher)
-    const module = source === 'kay' ? `'kay/params').${matcher}` : `${JSON.stringify(relative(shadowDir, source ?? '').replace(TS_EXTENSION, ''))}).default`
+    const module = source === 'kay' ? `'kay/params').${matcher}` : `${JSON.stringify(relative(shadowDir, source ?? '').replace(TS_FILE, ''))}).default`
     const type = matcher === undefined ? 'string' : source === undefined ? 'unknown' : `Exclude<ReturnType<typeof import(${module}>, undefined>`
 
     return [name, route.optional?.includes(name) ? `${type} | undefined` : type]

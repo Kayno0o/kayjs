@@ -1,5 +1,6 @@
-import { mkdir, readdir, rename, rm, stat } from 'node:fs/promises'
+import { mkdir, readdir, rm, stat } from 'node:fs/promises'
 import { join } from 'node:path'
+import { JSON_FILE, writeAtomically } from '../build/files'
 import { overLimit } from './protection'
 
 // One entry of `images.remote`: the origin, a `*.` subdomain wildcard allowed, and the path every URL starts with.
@@ -42,7 +43,6 @@ const MAX_ORIGINALS = 500
 const DOWNLOADS_PER_MINUTE = 30
 const MINUTE_MS = 60_000
 const DOWNLOADS = 'kay:remote-images'
-const JSON_FILE = /\.json$/
 
 // `images.remote`, read once as the server boots, each entry refused with what is wrong with it.
 export function remotePatterns(entries: readonly string[] = []): RemotePattern[] {
@@ -252,39 +252,37 @@ export function remoteImages(dir: string, patterns: readonly RemotePattern[], va
   }
 }
 
-// Written under a temporary name and moved into place, so a reader never sees an original half downloaded; false once the body passed the cap.
+// False once the body passed the cap, leaving no file behind.
 async function saveCapped(response: Response, path: string): Promise<boolean> {
-  const partial = `${path}.${crypto.randomUUID()}.tmp`
-  const writer = Bun.file(partial).writer()
-  let size = 0
-  let saved = false
+  return writeAtomically(path, async (partial) => {
+    const writer = Bun.file(partial).writer()
+    let size = 0
+    let ended = false
 
-  try {
-    for await (const chunk of response.body ?? []) {
-      size += chunk.byteLength
+    try {
+      for await (const chunk of response.body ?? []) {
+        size += chunk.byteLength
 
-      if (size > MAX_REMOTE_BYTES)
-        return false
+        if (size > MAX_REMOTE_BYTES)
+          return false
 
-      void writer.write(chunk)
-    }
-
-    await writer.end()
-    await rename(partial, path)
-    saved = true
-
-    return true
-  }
-  finally {
-    if (!saved) {
-      try {
-        await writer.end()
+        void writer.write(chunk)
       }
-      catch {}
 
-      await rm(partial, { force: true })
+      ended = true
+      await writer.end()
+
+      return true
     }
-  }
+    finally {
+      if (!ended) {
+        try {
+          await writer.end()
+        }
+        catch {}
+      }
+    }
+  })
 }
 
 function freshUntil(headers: Headers): number {

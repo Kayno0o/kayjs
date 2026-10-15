@@ -6,10 +6,11 @@ import type { LoadedGuard } from './guards'
 import type { RemoteImages } from './remote'
 import type { HeaderCopies } from './security'
 import { existsSync } from 'node:fs'
-import { readdir, rename, rm, stat } from 'node:fs/promises'
+import { readdir, rm, stat } from 'node:fs/promises'
 import { basename, extname, join, normalize, resolve, sep } from 'node:path'
 import { ASSET_PREFIX } from '../build/assets'
 import { countCache } from '../build/cache'
+import { writeAtomically } from '../build/files'
 import { KayError } from '../compiler/errors'
 import { aspectKey, CARD, croppedSize, cutOrBelow, DEFAULT_ASPECTS, DEFAULT_MAX_DENSITY, FILES_ROUTE, IMAGE_ROUTE, IMAGE_WIDTHS, parseAspect, recordVariants, requestedRemoteVariants, requestedVariants, RESIZABLE, setAspects, setMaxDensity, setRemoteImages, setResolvedImages, SMALL_STEP, variantHeight, variantSuffix } from '../runtime/image'
 import { inLocale, passGuards } from './actions'
@@ -90,32 +91,23 @@ function acceptsAvif(accept: string | null): boolean {
   }) ?? false
 }
 
-// Written under a temporary name and moved into place, so a reader never sees a variant half written, nor one a crash cut short.
 // `source` is a path, or an image already decoded, such as to an uncompressed PNG.
 export async function writeVariant(source: string | Blob | Uint8Array, variant: number | ImageVariant, target: string, quality = DEFAULT_QUALITY, format: VariantFormat = 'webp'): Promise<void> {
-  const partial = `${target}.${crypto.randomUUID()}.tmp`
-
   // Read through Bun.file, which also reaches the files an executable embeds, where Bun.Image given a path does not.
   const file = typeof source === 'string' ? await decodable(Bun.file(source)) : source
   const shape = typeof variant === 'number' ? { width: variant } : variant
 
-  try {
+  await writeAtomically(target, async (partial) => {
     if (shape === 'card') {
       await new Bun.Image(await coverImage(file, CARD.width, CARD.height)).jpeg({ quality }).write(partial)
-    }
-    else {
-      const image = shape.aspect ? new Bun.Image(await coverImage(file, shape.width, variantHeight(shape.width, shape.aspect))) : new Bun.Image(file).resize(shape.width, undefined, { withoutEnlargement: true })
 
-      await (format === 'avif' ? Bun.write(partial, await encodeAvif(image, quality)) : image.webp({ quality }).write(partial))
+      return
     }
 
-    await rename(partial, target)
-  }
-  catch (error) {
-    await rm(partial, { force: true })
+    const image = shape.aspect ? new Bun.Image(await coverImage(file, shape.width, variantHeight(shape.width, shape.aspect))) : new Bun.Image(file).resize(shape.width, undefined, { withoutEnlargement: true })
 
-    throw error
-  }
+    await (format === 'avif' ? Bun.write(partial, await encodeAvif(image, quality)) : image.webp({ quality }).write(partial))
+  })
 }
 
 // Every width of the ladder below an imported image's own, and its own, written next to the build for the route to serve as files, with the crops and share cards pages asked for, each in AVIF too given its quality; returns how many were encoded.

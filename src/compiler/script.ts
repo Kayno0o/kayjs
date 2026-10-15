@@ -10,6 +10,8 @@ import { PAGE, PAGE_SETTINGS } from './page-settings'
 import { loadTraverse, POSITION_SUFFIX } from './rewrite'
 
 // What `kay` exports that a static component may use and stay static.
+// The keys of a Babel node that say where it is written, or hold its comments, rather than its children.
+const NOT_CHILDREN = new Set(['loc', 'start', 'end', 'extra', 'leadingComments', 'trailingComments', 'innerComments'])
 const STATIC_EXPORTS = new Set(['uid', 'describeField', 'sanitizeHtml', 'trustHtml', 'defer'])
 // What `kay/i18n` exports that makes a component an island; the rest of it reads the locale alike on both sides.
 const REACTIVE_I18N = new Set(['relativeTime'])
@@ -500,8 +502,12 @@ function sharedWithExports(ast: ParseResult<t.File>, exported: t.Statement[], pe
 
   const named = new Set<string>()
 
-  for (const statement of exported)
-    eachNode(statement, node => node.type === 'Identifier' && named.add(node.name))
+  for (const statement of exported) {
+    eachNode(statement, (node) => {
+      if (node.type === 'Identifier')
+        named.add(node.name)
+    })
+  }
 
   // Most fences have no export reading their names, and Babel's scope analysis is worth loading only when one may.
   if (![...named].some(name => declaredBy.has(name)))
@@ -758,28 +764,17 @@ function reportJsx(code: string, span: Span, diagnostics: Diagnostic[]): boolean
   return true
 }
 
-function findJsx(node: unknown): t.Node | undefined {
-  if (typeof node !== 'object' || node === null)
-    return undefined
+function findJsx(node: t.Node): t.Node | undefined {
+  let jsx: t.Node | undefined
 
-  if (Array.isArray(node))
-    return node.reduce<t.Node | undefined>((found, child) => found ?? findJsx(child), undefined)
+  eachNode(node, (inner) => {
+    if (inner.type === 'JSXElement' || inner.type === 'JSXFragment')
+      jsx ??= inner
 
-  const { type } = node as { type?: unknown }
+    return jsx === undefined
+  })
 
-  if (type === 'JSXElement' || type === 'JSXFragment')
-    return node as t.Node
-
-  for (const [key, value] of Object.entries(node)) {
-    if (key !== 'loc' && key !== 'leadingComments' && key !== 'trailingComments' && key !== 'innerComments') {
-      const found = findJsx(value)
-
-      if (found)
-        return found
-    }
-  }
-
-  return undefined
+  return jsx
 }
 
 // Which of `names` the fence reads with nothing in it declaring or importing them, `typed` being the text of the statements that did not parse, where a mention counts as a read.
@@ -875,24 +870,23 @@ function leftmost(name: t.Node): string | undefined {
   return name.type === 'Identifier' ? name.name : undefined
 }
 
-export function eachNode(node: t.Node | null | undefined, visit: (node: t.Node) => void) {
-  if (!node || typeof node.type !== 'string')
+// Visits every node under `node`, parents first, its comments left out; the visitor returns false to skip what is under one.
+export function eachNode(node: t.Node | null | undefined, visit: (node: t.Node, parent: t.Node | undefined) => boolean | void, parent?: t.Node): void {
+  if (!node || typeof node.type !== 'string' || visit(node, parent) === false)
     return
 
-  visit(node)
-
-  for (const key of Object.keys(node) as (keyof t.Node)[]) {
-    if (key === 'leadingComments' || key === 'trailingComments' || key === 'innerComments' || key === 'loc')
+  for (const key of Object.keys(node)) {
+    if (NOT_CHILDREN.has(key))
       continue
 
-    const value = node[key] as unknown
+    const value = node[key as keyof t.Node] as unknown
 
     if (Array.isArray(value)) {
       for (const child of value)
-        eachNode(child as t.Node, visit)
+        eachNode(child as t.Node, visit, node)
     }
     else if (value !== null && typeof value === 'object') {
-      eachNode(value as t.Node, visit)
+      eachNode(value as t.Node, visit, node)
     }
   }
 }
@@ -1064,34 +1058,16 @@ function signalProps(type: t.TSType | undefined, body: t.Statement[]): Map<strin
 
 function reportMisplacedProps(ast: t.File, analysis: ScriptAnalysis, shift: (node: t.Node) => Span) {
   const declared = analysis.props?.statement
-  const visit = (node: t.Node | null | undefined) => {
-    if (!node || typeof node.type !== 'string')
+
+  eachNode(ast.program, (node) => {
+    if (!isPropsCall(node))
       return
 
-    if (isPropsCall(node)) {
-      const span = shift(node)
+    const span = shift(node)
 
-      if (!declared || span.start < declared.start || span.end > declared.end)
-        analysis.diagnostics.push({ ...span, message: '`props<T>()` is only valid as `const ... = props<T>()` at the top of the script' })
+    if (!declared || span.start < declared.start || span.end > declared.end)
+      analysis.diagnostics.push({ ...span, message: '`props<T>()` is only valid as `const ... = props<T>()` at the top of the script' })
 
-      return
-    }
-
-    for (const key of Object.keys(node) as (keyof t.Node)[]) {
-      if (key === 'leadingComments' || key === 'trailingComments' || key === 'innerComments' || key === 'loc')
-        continue
-
-      const value = node[key] as unknown
-
-      if (Array.isArray(value)) {
-        for (const child of value)
-          visit(child as t.Node)
-      }
-      else if (value !== null && typeof value === 'object') {
-        visit(value as t.Node)
-      }
-    }
-  }
-
-  visit(ast.program)
+    return false
+  })
 }

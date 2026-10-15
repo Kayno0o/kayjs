@@ -6,14 +6,13 @@ import { join, relative } from 'node:path'
 import { actionOf, elementsIn, serverIslandOf } from '../compiler/ast'
 import { parseKay } from '../compiler/parser'
 import { ASSET_PREFIX } from './assets'
-import { resolveFrom } from './files'
+import { resolveFrom, SCRIPT_FILE } from './files'
 import { gzipSize } from './report'
 
 // A script a page loads from the build, whatever the mount point puts before it.
 const SCRIPT_URL = /(?:src|href)="[^"]*?(\/_kay\/[^"?#]+\.js)[?#"]/g
 // Every specifier a module names, static or dynamic, `from 'x'`, `import 'x'` or `import('x')`; one in a comment or a string only adds a file the estimate may overcount.
 const IMPORT = /\b(?:from|import)\s*(?:\(\s*)?['"]([^'"]+)['"]/g
-const SCRIPT = /\.[cm]?[jt]sx?$/
 
 // What each route loads, gzip: the stylesheets of its layouts and page, and the scripts its prerendered pages link, the heaviest page of them.
 // A route none of whose pages was prerendered has no page to read, so its scripts are the entry and every island its components can reach, through helpers, dynamic imports and aliases too, which is at most what a request loads.
@@ -148,5 +147,5 @@ function followed(file: string | undefined, root: string): string | undefined {
 
   const path = relative(root, file)
 
-  return SCRIPT.test(file) && !path.startsWith('..') && !path.split(/[/\\]/).includes('node_modules') ? file : undefined
+  return SCRIPT_FILE.test(file) && !path.startsWith('..') && !path.split(/[/\\]/).includes('node_modules') ? file : undefined
 }

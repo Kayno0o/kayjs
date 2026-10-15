@@ -9,6 +9,7 @@ import { networkInterfaces } from 'node:os'
 import { join, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { ASSET_EXTENSIONS } from '../build/assets'
+import { CSS_FILE } from '../build/files'
 import { CONFIG_FILE, loadConfig } from '../config'
 import { projectPaths, savedPublicDir } from '../project'
 import { startClientBuilder } from './client'
@@ -60,7 +61,6 @@ const TYPES_GRACE_MS = 2000
 
 // The root files Bun reads as a process starts.
 const STARTUP_FILE = /^(?:\.env.*|package\.json|bunfig\.toml|tsconfig\.json)$/
-const STYLESHEET = /\.css$/
 // The files no type reads the contents of: a stylesheet, a markdown entry of a collection, an image, a font or any media an import takes the URL of.
 const TYPE_FREE = new RegExp(`\\.(?:css|mdx?|${ASSET_EXTENSIONS.join('|')})$`, 'i')
 // The backups Vim, Emacs and JetBrains IDEs move a source to while they write it anew.
@@ -360,7 +360,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   }
   // A running server that reads the build takes the stylesheets of an edit to stylesheets alone; false when it needs a restart instead, as when the build failed.
   const swapStylesheets = async (files: string[]) => {
-    if (files.length === 0 || !files.every(file => STYLESHEET.test(file)) || child === undefined || follower !== child || builder === undefined || builderStale)
+    if (files.length === 0 || !files.every(file => CSS_FILE.test(file)) || child === undefined || follower !== child || builder === undefined || builderStale)
       return false
 
     const server = child
@@ -501,7 +501,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
 
     unbuilt?.add(file)
 
-    if (!STYLESHEET.test(file)) {
+    if (!CSS_FILE.test(file)) {
       codeVersion++
       changedFiles.add(file)
     }

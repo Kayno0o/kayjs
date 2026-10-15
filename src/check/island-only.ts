@@ -1,6 +1,6 @@
 import { sep } from 'node:path'
-import { findProjectFiles, resolveFrom } from '../build/files'
-import { importsOf, SCRIPT_FILE } from '../build/libraries'
+import { findProjectFiles, resolveFrom, SCRIPT_FILE } from '../build/files'
+import { importsOf } from '../build/libraries'
 import { rendersAsIsland } from '../compiler'
 
 // The static components of a project that only islands render, directly or through other such components: their children render inline with the island, so the props they pass are not serialized.

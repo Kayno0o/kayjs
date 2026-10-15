@@ -5,6 +5,7 @@ import type { CompiledMarkdown } from './markdown'
 import { existsSync } from 'node:fs'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import { t } from 'elysia'
+import { JSON_FILE } from '../build/files'
 import { KayError } from '../compiler/errors'
 import { kayLog } from '../runtime/log'
 import { isDraft } from './drafts'
@@ -113,7 +114,6 @@ export interface EditSite {
 }
 
 const MARKDOWN = /\.md$/
-const JSON_FILE = /\.json$/
 const YAML_FILE = /\.ya?ml$/
 const SLASHES = /[\\/]/
 const CRLF = /\r\n/g

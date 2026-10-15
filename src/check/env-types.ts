@@ -6,6 +6,7 @@ import type { ServedProject } from './shadow-types'
 import { existsSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { ASSET_EXTENSIONS } from '../build/assets'
+import { TS_FILE, TSX_FILE } from '../build/files'
 import { componentName } from '../compiler'
 import { CONFIG_FILE } from '../config'
 import { projectPaths } from '../project'
@@ -17,8 +18,6 @@ import { patternShapes } from '../server/routes'
 import { ROBOTS, SITEMAP } from '../server/site-paths'
 import { matcherSource, shadowPath } from './shadow'
 
-const TSX_EXTENSION = /\.tsx$/
-const TS_EXTENSION = /\.ts$/
 const PARAM_SEGMENT = /:([^/]+)/g
 
 // What kay serves itself, whether or not the project turns it on.
@@ -35,7 +34,7 @@ export function packageTypes(root: string, libraries: KayLibrary[]): string {
   const shadowDir = projectPaths(root).types
 
   return libraries.flatMap(library => [...library.specifiers].map(([specifier, file]) => {
-    const shadow = relative(shadowDir, shadowPath(root, file)).replace(TSX_EXTENSION, '')
+    const shadow = relative(shadowDir, shadowPath(root, file)).replace(TSX_FILE, '')
 
     const name = componentName(file)
 
@@ -63,7 +62,7 @@ export async function environmentTypes(root: string, options: CheckOptions, serv
       ...settings.locales.flatMap(locale => routes.flatMap(route => shapesOf(route, localePattern(settings, route.pattern, locale)).map(shape => prefixes.includes(locale) ? `/${locale}${shape === '/' ? '' : shape}` : shape))),
     ])]
     : routes.flatMap(route => shapesOf(route, route.pattern))
-  const modulePath = (file: string) => relative(shadowDir, file).replace(TS_EXTENSION, '')
+  const modulePath = (file: string) => relative(shadowDir, file).replace(TS_FILE, '')
   const apiMounts = apiModules.map(module => ({ mount: module.mount, module: modulePath(module.file) }))
   const config = existsSync(join(root, CONFIG_FILE)) ? modulePath(join(root, CONFIG_FILE)) : undefined
   const app = await exportsApp(paths.entry) ? modulePath(paths.entry) : undefined

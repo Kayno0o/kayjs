@@ -3,13 +3,13 @@ import { readdirSync, readFileSync, statSync, watch } from 'node:fs'
 import { join, relative, sep } from 'node:path'
 import process from 'node:process'
 import { findProjectFiles, IGNORED_DIRS } from '../build/files'
+import { TRAILING_SLASH } from '../runtime/base'
 
 // What the project's sources are and how they are watched, apart from `./index` so `kay start` and `kay render` need none of the dev loop.
 // The server of a project with no entry of its own, as a static site is.
 export const PAGES_ENTRY = join(import.meta.dir, 'pages.ts')
 const NEWLINE = /\r?\n/
 const LEADING_SLASH = /^\//
-const TRAILING_SLASH = /\/$/
 // A pattern naming anything but one plain directory at the root.
 const GLOB_OR_DEEPER = /[*?[\]/]/
 // The root files a server reads: what Bun reads as it starts, the lockfile, and what a module can import. A README, a licence or a justfile is none of them.

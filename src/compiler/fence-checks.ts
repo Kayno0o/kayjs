@@ -192,29 +192,15 @@ export function cssImportsWithoutText(fence: ParsedFence): Diagnostic[] {
 
 // Every `s.String(...)` call in a schema, with the name of the field it types, the nearest property holding it.
 function schemaStrings(node: t.Node | null | undefined, field: string | undefined, found: (call: t.CallExpression, field: string | undefined) => void): void {
-  if (!node || typeof node.type !== 'string')
-    return
+  eachNode(node, (inner) => {
+    if (inner.type === 'ObjectProperty')
+      schemaStrings(inner.value, propertyKey(inner) ?? field, found)
+    else if (inner.type === 'CallExpression' && inner.callee.type === 'MemberExpression' && inner.callee.property.type === 'Identifier' && inner.callee.property.name === 'String')
+      found(inner, field)
 
-  if (node.type === 'ObjectProperty') {
-    schemaStrings(node.value, propertyKey(node) ?? field, found)
-
-    return
-  }
-
-  if (node.type === 'CallExpression' && node.callee.type === 'MemberExpression' && node.callee.property.type === 'Identifier' && node.callee.property.name === 'String')
-    found(node, field)
-
-  for (const key of Object.keys(node) as (keyof t.Node)[]) {
-    if (key === 'leadingComments' || key === 'trailingComments' || key === 'innerComments' || key === 'loc')
-      continue
-
-    const value = node[key] as unknown
-
-    for (const child of Array.isArray(value) ? value : [value]) {
-      if (child !== null && typeof child === 'object')
-        schemaStrings(child as t.Node, field, found)
-    }
-  }
+    // A property's value is walked above, under the property's own name.
+    return inner.type !== 'ObjectProperty'
+  })
 }
 
 function propertyKey(property: t.ObjectProperty | t.ObjectMethod): string | undefined {

@@ -1,7 +1,8 @@
 import type { Elysia } from 'elysia'
 import type { Duration } from '../runtime/duration'
-import { readdir, rename, rm, stat } from 'node:fs/promises'
+import { readdir, rm, stat } from 'node:fs/promises'
 import { basename, join, relative, resolve, sep } from 'node:path'
+import { writeAtomically } from '../build/files'
 import { KayError } from '../compiler/errors'
 import { durationSeconds } from '../runtime/duration'
 import { FILES_ROUTE } from '../runtime/image'
@@ -63,7 +64,7 @@ const INLINE = /^(?:image\/(?:png|jpeg|webp|gif|avif)|video\/|audio\/|applicatio
 // An image keeps its type, so an SVG still shows in an `img`; any other downloaded file goes as bytes of no type, so a script or stylesheet never loads into one of the site's pages.
 const IMAGE = /^image\//
 const RANGE = /^bytes=(\d*)-(\d*)$/
-const TRAILING_SLASH = /\/+$/
+const TRAILING_SLASHES = /\/+$/
 const IMMUTABLE = 'public, max-age=31536000, immutable'
 const DEFAULT_EXPIRES = 3600
 // Links to private files expire on a multiple of this, at most.
@@ -296,7 +297,7 @@ export const files = {
       if (current.store?.publicUrl === undefined)
         throw new KayError('export-private-file', `kay: a static export links stored file ${key}, which has no server to serve it: give the store a publicUrl, s3Files({ publicUrl: 'https://...' }), or deploy a server`)
 
-      return `${current.store.publicUrl.replace(TRAILING_SLASH, '')}/${key}`
+      return `${current.store.publicUrl.replace(TRAILING_SLASHES, '')}/${key}`
     }
 
     if (!PRIVATE_SEGMENT.test(key))
@@ -376,10 +377,7 @@ export async function storedImage(src: string): Promise<{ path: string, immutabl
     if (!data)
       return undefined
 
-    const partial = `${copy}.${crypto.randomUUID()}.tmp`
-
-    await Bun.write(partial, data)
-    await rename(partial, copy)
+    await writeAtomically(copy, data)
   }
 
   return { path: copy, immutable: false, prefix: storedVariants(key), private: locked }

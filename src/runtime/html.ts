@@ -4,6 +4,7 @@
 import type { Truthy } from './checks'
 import type { FieldSchema } from './form'
 import { isAction } from './action'
+import { NON_ROOT_TRAILING_SLASH } from './base'
 import { fieldDescription } from './described'
 import { escape, escapeAttribute } from './escape'
 import { fieldMarks, markedAttribute, markedList, markedText, withFieldMarks } from './fields'
@@ -42,7 +43,6 @@ const SELECTED_ALL = /\sselected(?:="[^"]*")?(?=[\s>]|$)/g
 const TAGS = /<[^>]*>/g
 const SPACES = /\s+/g
 const HTML_ENTITY = /&(?:amp|lt|gt|quot|#39);/g
-const TRAILING_SLASH = /(?<=.)\/$/
 // Characters the URL parser leaves in a path as they are; a dot segment, `/.` or `/..`, it resolves.
 const PLAIN_PATH = /^[\w/.~-]*$/
 const DECODED: Record<string, string> = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': '\'' }
@@ -121,7 +121,7 @@ export function currentPage(href: unknown): string {
 
   const linked = PLAIN_PATH.test(href) && !href.includes('/.') ? href : new URL(href, 'http://localhost').pathname
 
-  return linked.replace(TRAILING_SLASH, '') === path.replace(TRAILING_SLASH, '') ? ' aria-current="page"' : ''
+  return linked.replace(NON_ROOT_TRAILING_SLASH, '') === path.replace(NON_ROOT_TRAILING_SLASH, '') ? ' aria-current="page"' : ''
 }
 
 // A `class` value: a string, or an array or object of classes, an object's keys kept when their value is truthy.
