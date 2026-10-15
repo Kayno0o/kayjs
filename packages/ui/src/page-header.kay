@@ -1,19 +1,28 @@
 ---
 import type { JSX } from 'kay'
 
-const { title, actions, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['header'], 'class' | 'title'> & {
+const { title, meta, description, actions, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['header'], 'class' | 'title'> & {
   // The page's one `h1`.
   title: string
+  // Beside the title: a badge, a count, a link back.
+  meta?: JSX.Element
+  // Under the title's line: a sentence saying what the page holds.
+  description?: string | undefined
   // After the title, past a divider: a `+` Button, a link, a row of controls.
   actions?: JSX.Element
   class?: string | undefined
 }>()
 ---
-// The head of a page: its title, the actions on the whole page, and under them what the children add, such as a line saying what the page holds.
+// The head of a page: its title, the actions on the whole page, and under them its description and what the children add.
 header.kui-page-header({...rest} class={className})
   .kui-page-header-head
     h1.kui-page-header-title {title}
+    if meta
+      .kui-page-header-meta
+        | {meta}
     if actions
       .kui-page-header-actions
         | {actions}
+  if description
+    p.kui-page-header-description {description}
   slot

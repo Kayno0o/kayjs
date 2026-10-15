@@ -279,7 +279,7 @@ PageSection(title="Moons")
         | {moon.name}
 ```
 
-- `PageHeader(title)`: the head of a page, its one `h1`. `@actions` sits after the title, past a divider, and the children under the title line.
+- `PageHeader(title)`: the head of a page, its one `h1`. `@meta` sits beside the title, for a badge, a count or a link back, `@actions` after it, past a divider, `description` is a quieter line under the title's, and the children come under that.
 - `PageSection(title)`: a titled `section` of a page, its `h2` one level under the page's own, or the heading `level` given, `1` for a section holding a whole page. `@actions` sits at the end of the head line.
 - `CollapsibleSection(title)`: a native `details`, so it folds without script and a static page can hold it. `open` is whether it starts unfolded, `true` by default. `boxed` draws it as a card whose title is a band over a padded body. `@meta` sits in the band before the chevron, for a count the folded section would hide.
 - `Widget(title icon)`: a dashboard tile, a framed body under a head line of icon, title and `@actions`. `isEmpty` swaps the body for the `@empty` block, keeping the frame; with no `@empty` block, an empty widget renders nothing.

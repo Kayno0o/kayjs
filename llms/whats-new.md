@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- kayjs-ui: `PageHeader` takes a `@meta` block beside its title and a `description` under it.
 - kayjs-ui: `EmptyState` takes `level` to make its title a heading, `level={1}` for an error page.
 - kayjs-ui: `Segmented` takes `value={null}` to show no option picked.
 - kayjs-ui: a number `TextInput` hands back a number, or `null` once emptied, a breaking change in [1.44.0](upgrading.md#1440).

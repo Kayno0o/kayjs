@@ -7,6 +7,7 @@ This page lists what each release adds, newest first, with a link to where each 
 
 ## Unreleased
 
+- **`PageHeader`** takes a `@meta` block beside its title and a `description` under it. [PageHeader](/ui/page-header#meta-and-description)
 - **`EmptyState`** takes `level` to make its title a heading, the page's `h1` on an error page. [EmptyState](/ui/empty-state#as-the-whole-page)
 - **`Segmented`** shows no option picked while its `value` is `null`. [Segmented](/ui/segmented#none-picked)
 - **A number `TextInput`** hands back a number, or `null` once emptied, rather than a string. [TextInput](/ui/text-input)

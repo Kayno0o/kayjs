@@ -1,0 +1,7 @@
+---
+import Badge from '@kaynooo/kayjs-ui/badge.kay'
+import PageHeader from '@kaynooo/kayjs-ui/page-header.kay'
+---
+PageHeader(title="Moons" description="Every moon of Jupiter, by distance.")
+  @meta
+    Badge(label="95")

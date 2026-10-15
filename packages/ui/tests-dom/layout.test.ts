@@ -22,3 +22,14 @@ describe('EmptyState', () => {
     expect(root.querySelector('#empty .kui-empty-state-title')?.tagName).toBe('P')
   })
 })
+
+describe('PageHeader', () => {
+  test('sets its meta beside the title, before the actions, and its description under the title\'s line, before the children', async () => {
+    const root = await layout()
+    const parts = (selector: string) => [...root.querySelectorAll(`${selector} > *, ${selector} > .kui-page-header-head > *`)].map(part => part.className || part.tagName)
+
+    expect(parts('#moons')).toEqual(['kui-page-header-head', 'kui-page-header-title', 'kui-page-header-meta', 'kui-page-header-actions', 'kui-page-header-description', 'P'])
+    expect(root.querySelector('#moons .kui-page-header-description')?.textContent).toBe('Every moon of Jupiter, by distance.')
+    expect(parts('#bare')).toEqual(['kui-page-header-head', 'kui-page-header-title'])
+  })
+})

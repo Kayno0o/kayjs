@@ -1,5 +1,13 @@
 ---
 import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
+import PageHeader from '@kaynooo/kayjs-ui/page-header.kay'
 ---
 EmptyState#missing(title="Not found" level={1})
 EmptyState#empty(title="No posts yet")
+PageHeader#moons(title="Moons" description="Every moon of Jupiter, by distance.")
+  @meta
+    span 95
+  @actions
+    a(href="/moons/new") New moon
+  p Under the description.
+PageHeader#bare(title="Planets")

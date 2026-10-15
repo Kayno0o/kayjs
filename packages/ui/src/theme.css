@@ -1155,8 +1155,16 @@
     @apply m-0 text-xl font-kui-heading tracking-kui-label text-kui-text uppercase;
   }
 
+  .kui-page-header-meta {
+    @apply flex flex-wrap items-center gap-2 text-sm text-kui-subtext0;
+  }
+
   .kui-page-header-actions {
     @apply flex flex-wrap items-center gap-2 border-l border-kui-surface2 pl-4;
+  }
+
+  .kui-page-header-description {
+    @apply m-0 text-sm text-kui-subtext0;
   }
 
   .kui-page-section {
