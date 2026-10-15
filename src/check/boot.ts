@@ -1,7 +1,7 @@
 import type { CheckDiagnostic, CheckOptions } from '.'
 import type { CollectionFeed } from '../content/server'
 import type { LocaleSettings } from '../runtime/i18n'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { islandId } from '../compiler'
 import { parseKay } from '../compiler/parser'
 import { analyzeServer } from '../compiler/script'
@@ -11,6 +11,7 @@ import { projectPaths } from '../project'
 import { actionUrl } from '../runtime/action'
 import { actionClash } from '../server/actions'
 import { basePath } from '../server/base'
+import { cardLogoProblems } from '../server/card'
 import { claimEndpoints } from '../server/endpoints'
 import { PUBLIC_ENV_PATH } from '../server/env'
 import { faviconSource, svgFaviconProblems } from '../server/favicon'
@@ -53,6 +54,14 @@ export async function bootProblems(root: string, options: CheckOptions, feeds: C
   // An SVG favicon is drawn by `kay build`, which it would fail.
   for (const problem of await svgFaviconProblems(faviconSource(root, options.favicon, options.manifest)))
     diagnostics.push({ line: 1, column: 1, ...problem })
+
+  // So is the share cards' logo, which the boot draws and refuses.
+  const logo = options.images?.card?.logo
+
+  if (logo !== undefined) {
+    for (const problem of await cardLogoProblems(resolve(root, logo)))
+      diagnostics.push({ line: 1, column: 1, ...problem })
+  }
 
   let settings: LocaleSettings | undefined
 

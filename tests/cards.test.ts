@@ -5,6 +5,7 @@ import process from 'node:process'
 import { inflateSync } from 'node:zlib'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { clientDir } from '../src/build/assets'
+import { bootProblems } from '../src/check/boot'
 import { registerImage, setCardMaker, shareCard } from '../src/runtime/image'
 import { pages } from '../src/server'
 import { setupCards, writeCards } from '../src/server/card'
@@ -249,6 +250,33 @@ describe('share cards', () => {
     await expect(pages({ ...config, images: { card: { logo: 'tests/fixtures/cards/src/fonts/archivo-black-latin-400-normal.woff' } } })).rejects.toThrow('which is no SVG, PNG, JPEG or WebP kay can draw')
   })
 
+  it('reports in kay check a logo the boot refuses, and warns of one with text, which it draws as nothing', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kay-card-logo-check-'))
+    const logos: Record<string, [string, string, 'warning'?]> = {
+      'none.svg': ['', `kay: images.card.logo names ${join(dir, 'none.svg')}, which does not exist`],
+      'wide.svg': ['<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 32"/>', `kay: the images.card.logo ${join(dir, 'wide.svg')} is 64x32; it has to be square`],
+      'wide.png': ['', `kay: images.card.logo, ${join(dir, 'wide.png')}, is 1000x600; it has to be square`],
+      'broken.png': ['not an image', `kay: images.card.logo names ${join(dir, 'broken.png')}, which is no SVG, PNG, JPEG or WebP kay can draw`],
+      'lettered.svg': ['<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><text x="4" y="24">K</text></svg>', `kay: the images.card.logo ${join(dir, 'lettered.svg')} has text, which kay draws without fonts, so as nothing; turn the text into paths`, 'warning'],
+    }
+
+    try {
+      await Bun.write(join(dir, 'wide.png'), Bun.file(join(FIXTURE, 'src/hero.png')))
+
+      for (const [name, [source, message, severity]] of Object.entries(logos)) {
+        if (source !== '')
+          await Bun.write(join(dir, name), source)
+
+        expect((await bootProblems(dir, { images: { card: { logo: name } } })).filter(problem => problem.file === join(dir, name))).toEqual([{ file: join(dir, name), line: 1, column: 1, message, ...severity && { severity } }])
+      }
+
+      expect(await bootProblems(FIXTURE, { images: { card: { logo: 'src/logo.svg' } } })).toEqual([])
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
   it('keeps the logo\'s drawing at build time for an executable, which draws with it, and drops it once no logo is named', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'kay-card-logo-'))
     const client = clientDir(process.cwd())
@@ -265,6 +293,11 @@ describe('share cards', () => {
 
       expect(executable.look).toBe(build.look)
 
+      // So does a server on the build, which draws the logo only when the build kept none.
+      const prebuilt = await setupCards({ dir, clientDir: client, fonts, logo: join(dir, 'gone.svg'), prebuilt: true })
+
+      expect(prebuilt.look).toBe(build.look)
+
       // A card's file name changes with its logo, so a site's cards are drawn again when it changes.
       const png = await setupCards({ dir, clientDir: client, fonts, logo: join(FIXTURE, 'src/logo.png') })
       const none = await setupCards({ dir, clientDir: client, fonts })
@@ -274,6 +307,7 @@ describe('share cards', () => {
       await setupCards({ dir, clientDir: client, fonts, collect: true })
 
       expect(await Bun.file(built).exists()).toBe(false)
+      expect((await setupCards({ dir, clientDir: client, fonts, logo: join(FIXTURE, 'src/logo.png'), prebuilt: true })).look).toBe(png.look)
       await expect(setupCards({ dir, clientDir: client, fonts, logo: join(dir, 'gone.svg'), bundled: true })).rejects.toThrow('this executable holds no drawing of images.card.logo')
     }
     finally {

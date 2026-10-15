@@ -1,7 +1,7 @@
 import type { Diagnostic } from '../compiler/ast'
 import type { Paint } from '../compiler/frame'
 import type { LintLevels } from '../compiler/lints'
-import type { FaviconConfig, I18nConfig, KayConfig, KayExtension, ManifestConfig, SeoConfig } from '../config'
+import type { FaviconConfig, I18nConfig, ImagesConfig, KayConfig, KayExtension, ManifestConfig, SeoConfig } from '../config'
 import type { Duration } from '../runtime/duration'
 import type { EnvSchema } from '../server/env'
 import type { Redirects } from '../server/redirects'
@@ -59,6 +59,8 @@ export interface CheckOptions {
   favicon?: string | FaviconConfig | false | undefined
   // Its maskable icon, checked with the favicon.
   manifest?: ManifestConfig | undefined
+  // Where `images.card.logo` is checked as the boot draws it.
+  images?: ImagesConfig | undefined
   publicEnv?: EnvSchema | undefined
   // Reports each route of the app no guard covers, which the server refuses.
   requireGuards?: boolean | undefined
@@ -81,9 +83,9 @@ export interface CheckDiagnostic extends Pick<Diagnostic, 'label' | 'related' | 
 }
 
 export function configCheckOptions(config: KayConfig): CheckOptions {
-  const { routes, publicDir, api, content, redirects, i18n, lang, settings, base, site, shutdownTimeout, lints, extensions, seo, favicon, manifest, publicEnv, requireGuards } = config
+  const { routes, publicDir, api, content, redirects, i18n, lang, settings, base, site, shutdownTimeout, lints, extensions, seo, favicon, manifest, images, publicEnv, requireGuards } = config
 
-  return { routes, publicDir, api, content, redirects, i18n, lang, settings, base, site, shutdownTimeout, lints, extensions, seo, favicon, manifest, publicEnv, requireGuards }
+  return { routes, publicDir, api, content, redirects, i18n, lang, settings, base, site, shutdownTimeout, lints, extensions, seo, favicon, manifest, images, publicEnv, requireGuards }
 }
 
 // Type-checks a project, .kay components included, and reports every error at the line and column the user wrote.

@@ -81,7 +81,7 @@ head
   meta(property="og:image" content={shareCard({ title: post.title })})
 ```
 
-`shareCard` needs a font listed in `fonts`. `images.card` in `kay.config.ts` sets the card's `background`, text `color` and `font`, and a square `logo`, an SVG or an image, drawn at its top left: `images: { card: { logo: 'src/logo.svg' } }`.
+`shareCard` needs a font listed in `fonts`. `images.card` in `kay.config.ts` sets the card's `background`, text `color` and `font`, and a square `logo`, an SVG or an image, drawn at its top left: `images: { card: { logo: 'src/logo.svg' } }`. `kay check` reports a logo that is missing, not square or not an image it can draw.
 
 ## Sitemap and robots.txt
 

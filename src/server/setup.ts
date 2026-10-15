@@ -91,7 +91,7 @@ export async function setupPages(project: Project, loadClient: () => Promise<Cli
   const headAndCards = async () => {
     const { fonts, ...head } = await configHead(root, config, client.dir, source.embedded)
 
-    return { ...head, cards: await setupCards({ dir: join(client.dir, '..'), clientDir: client.dir, fonts, config: config.images?.card, logo: config.images?.card?.logo === undefined ? undefined : resolve(root, config.images.card.logo), name: config.seo?.name, quality: config.images?.quality, bundled: source.embedded, collect: prerendering }) }
+    return { ...head, cards: await setupCards({ dir: join(client.dir, '..'), clientDir: client.dir, fonts, config: config.images?.card, logo: config.images?.card?.logo === undefined ? undefined : resolve(root, config.images.card.logo), name: config.seo?.name, quality: config.images?.quality, bundled: source.embedded, prebuilt: mode.prebuilt, collect: prerendering }) }
   }
   const [{ head, scripts, styles, cards }, collections] = await Promise.all([headAndCards(), projectCollections(root, config.content)])
 

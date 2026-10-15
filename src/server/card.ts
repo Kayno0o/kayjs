@@ -33,6 +33,8 @@ export interface CardSetup {
   quality?: number | undefined
   // An executable, which only reads what its build wrote.
   bundled?: boolean | undefined
+  // A server on a build, which reads the logo the build drew, so a resvg or Bun.Image of its own still finds the cards prerendered under their names.
+  prebuilt?: boolean | undefined
   // Keeps the cards pages ask for, for `kay build` to write: on while prerendering.
   collect?: boolean | undefined
 }
@@ -130,7 +132,7 @@ function cardFont(clientDir: string, faces: FontAssets['faces'], wanted: CardCon
   return { family, path: join(clientDir, decodeURIComponent(chosen.url.slice(ASSET_PREFIX.length))) }
 }
 
-// The logo drawn at the size a card shows it. A build keeps that drawing beside the key, as an executable carries no SVG drawer and reads it instead, and drops one the config no longer names.
+// The logo drawn at the size a card shows it. A build keeps that drawing beside the key, as an executable carries no SVG drawer and reads it instead, as does a server on that build, and drops one the config no longer names.
 async function cardLogo(setup: CardSetup): Promise<Uint8Array | undefined> {
   const built = join(setup.dir, LOGO_FILE)
 
@@ -148,6 +150,9 @@ async function cardLogo(setup: CardSetup): Promise<Uint8Array | undefined> {
     return Bun.file(built).bytes()
   }
 
+  if (setup.prebuilt && !setup.collect && await Bun.file(built).exists())
+    return Bun.file(built).bytes()
+
   const logo = await drawLogo(setup.logo)
 
   if (setup.collect)
@@ -156,7 +161,21 @@ async function cardLogo(setup: CardSetup): Promise<Uint8Array | undefined> {
   return logo
 }
 
-async function drawLogo(file: string): Promise<Uint8Array> {
+// What `kay check` reports of `images.card.logo`, as the boot would refuse it, and a warning for an SVG with text.
+export async function cardLogoProblems(file: string): Promise<{ file: string, message: string, severity?: 'warning' }[]> {
+  const warnings: string[] = []
+
+  try {
+    await drawLogo(file, message => warnings.push(message))
+  }
+  catch (error) {
+    return [{ file, message: error instanceof Error ? error.message : String(error) }]
+  }
+
+  return warnings.map(message => ({ file, message: `kay: ${message}`, severity: 'warning' as const }))
+}
+
+async function drawLogo(file: string, warn?: (message: string) => void): Promise<Uint8Array> {
   if (!await Bun.file(file).exists())
     throw new Error(`kay: images.card.logo names ${file}, which does not exist`)
 
@@ -164,7 +183,7 @@ async function drawLogo(file: string): Promise<Uint8Array> {
     // Imported here alone, as an executable leaves the module out.
     const { svgIcon } = await import('./svg-icon')
 
-    return (await svgIcon(file, 'images.card.logo'))(LOGO_SIZE)
+    return (await svgIcon(file, 'images.card.logo', warn))(LOGO_SIZE)
   }
 
   let size: { width: number, height: number }
