@@ -1,0 +1,6 @@
+# Sessions land in parallel and each appends to the same heading of these files: keep both sides' lines instead of conflicting, which `git rebase` in `just land` applies too.
+# Limits: two sides editing the same existing line both stay, and a heading, table row or code fence both sides add is duplicated, which review catches.
+llms/whats-new.md merge=union
+llms/upgrading.md merge=union
+docs/src/content/docs/guides/whats-new.md merge=union
+docs/src/content/docs/guides/upgrading.md merge=union

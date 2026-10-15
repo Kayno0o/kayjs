@@ -2,6 +2,7 @@ import { appendFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import process from 'node:process'
 import { $, Glob } from 'bun'
+import { addedMarkers } from './merge-markers'
 import { failedTests } from './test-failures'
 
 // `just land`, which holds the landing lock: this branch rebased on origin's main, linted, checked and run through the tests its changes reach, then pushed as main, and the main checkout moved to it. The full suite is CI's, on every push, which `just ci` follows.
@@ -75,6 +76,12 @@ const changed = (await $`git diff --name-only origin/main HEAD`.text()).split('\
 
 if (changed.length === 0)
   fail('nothing to land: the branch is main', EXIT.unlandable)
+
+// A rebase resolved by hand can leave a conflict marker in a file no check reads.
+const markers = addedMarkers(await $`git diff --unified=0 --no-color origin/main HEAD`.text())
+
+if (markers.length > 0)
+  fail(`the branch adds merge markers: ${markers.map(({ file, line, text }) => `${file}:${line} (${text})`).join(', ')}`, EXIT.unlandable)
 
 // Main may have moved the lockfile under this branch.
 await step('bun install', $`bun install --silent --frozen-lockfile 2>&1`)
