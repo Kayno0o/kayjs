@@ -1161,7 +1161,7 @@ describe('transitions', () => {
     'main.kay': `---\nimport { signal } from 'kay'\n\nconst items = signal(['a', 'b', 'c'])\n---\nbutton.drop(onClick={() => items.set(['a', 'c'])}) Drop\nbutton.add(onClick={() => items.set(['a', 'c', 'd'])}) Add\nul\n  for item of items()\n    li(transition="row" ${STYLE}) {item}\n`,
   })
 
-  it('keep an if branch shown again during its leave phase once, and in its place', async () => {
+  it('keep a single element when an if branch shows again during its leave phase', async () => {
     const { root, dispose } = await mount20()
 
     try {
@@ -1181,7 +1181,7 @@ describe('transitions', () => {
     }
   })
 
-  it('keep a for row dropped and added again by key during its leave phase once, and in its place', async () => {
+  it('keep the rows in order when a for row is dropped and added again by key during its leave phase', async () => {
     const { root, dispose } = await mount23()
 
     try {
@@ -1226,6 +1226,9 @@ describe('transitions', () => {
       await updated()
       await done()
       expect(names()).toEqual(['b'])
+      flip()
+      await updated()
+      expect(names()).toEqual(['p', 'i', 'b'])
     }
     finally {
       await dispose()
