@@ -1776,7 +1776,7 @@ describe('the build report', () => {
 
       expect(components.cached).toBeGreaterThan(0)
       expect(components.made).toBe(0)
-      expect(second.previous!.routes['/']).toEqual({ js: byRoute['/']!.js, css: byRoute['/']!.css })
+      expect(second.previous!.routes['/']).toEqual({ js: byRoute['/']!.js, css: byRoute['/']!.css, estimated: false })
       expect(formatBuildReport(second.report, second.summary, { previous: second.previous })).not.toContain('[')
 
       // A failed build, the check refusing it, leaves the sizes of the last good one for the next to compare to.

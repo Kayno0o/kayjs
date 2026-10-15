@@ -32,8 +32,8 @@ const rooted = (async () => {
 async function site(reports: { server?: StoredReport, exported?: StoredReport } = {}, age = 0) {
   const root = await rooted
 
-  for (const [name, stored] of [['report', reports.server], ['report-static', reports.exported]] as const) {
-    const file = join(root, '.kay', `${name}${testWorker()}.json`)
+  for (const [name, stored] of [['', reports.server], ['-static', reports.exported]] as const) {
+    const file = join(root, '.kay', `report${testWorker()}${name}.json`)
 
     await rm(file, { force: true })
 
@@ -80,7 +80,7 @@ describe('the dev tool\'s production sizes', () => {
 
     expect((await ask(root, '/shop/about', undefined, { base: '/shop' })).sizes).toMatchObject({ route: '/about' })
     // Written after the server build's, so the export's sizes are the last made.
-    await utimes(join(root, '.kay', `report-static${testWorker()}.json`), new Date(), new Date(Date.now() + 5000))
+    await utimes(join(root, '.kay', `report${testWorker()}-static.json`), new Date(), new Date(Date.now() + 5000))
     expect((await ask(root, '/about')).sizes).toMatchObject({ js: 2, exported: true })
     expect((await ask(await site({ server: report(false, {}) }), '/about')).sizes).toBeUndefined()
     expect((await ask(await site(), '/about')).sizes).toBeUndefined()
