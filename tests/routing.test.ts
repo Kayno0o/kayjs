@@ -8,7 +8,7 @@ import { integer } from '../src/runtime/params'
 import { pages } from '../src/server'
 import { routerShapes, shapeParams } from '../src/server/params'
 import { readRedirects, redirectProblems } from '../src/server/redirects'
-import { routeOf } from '../src/server/routes'
+import { routeChain, routeOf } from '../src/server/routes'
 import { prerendered } from './prerendered'
 import { fixtureCopy } from './scratch'
 
@@ -220,5 +220,18 @@ describe('kay check', () => {
     finally {
       await rm(copy, { recursive: true, force: true })
     }
+  })
+})
+
+describe('routeChain', () => {
+  it('lists a route\'s layouts then its page once, rebuilt when the route\'s file or layouts change', () => {
+    const layouts = ['/a/_layout.kay', '/a/b/_layout.kay']
+    const chain = routeChain({ layouts, file: '/a/b/page.kay' })
+
+    expect(chain.files).toEqual(['/a/_layout.kay', '/a/b/_layout.kay', '/a/b/page.kay'])
+    expect(chain.key).toBe(chain.files.join('\0'))
+    expect(routeChain({ layouts, file: '/a/b/page.kay' })).toBe(chain)
+    expect(routeChain({ layouts, file: '/a/b/other.kay' }).files.at(-1)).toBe('/a/b/other.kay')
+    expect(routeChain({ layouts: [...layouts], file: '/a/b/page.kay' }).files).toEqual(chain.files)
   })
 })

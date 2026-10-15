@@ -236,6 +236,10 @@ describe('sitemap and robots', () => {
     expect(new TextDecoder().decode(Bun.gunzipSync(bytes))).toBe(plain)
     expect(Buffer.from(await second.bytes()).equals(Buffer.from(bytes))).toBe(true)
     expect(brotli.headers.get('content-encoding')).toBe('br')
+
+    const head = await app.handle(new Request('http://localhost/sitemap.xml', { method: 'HEAD', headers: { 'accept-encoding': 'gzip' } }))
+
+    expect([head.status, head.headers.get('content-encoding'), await head.text()]).toEqual([200, 'gzip', ''])
   })
 
   it('points crawlers at the sitemap', async () => {

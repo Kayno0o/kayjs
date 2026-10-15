@@ -113,7 +113,15 @@ export function fixedReply(body: string | Promise<string>, headers: Record<strin
     if (!copy)
       copies.set(encoding, copy = shrunk(new TextEncoder().encode(text), encoding))
 
-    const bytes = await copy
+    let bytes: Uint8Array<ArrayBuffer> | undefined
+
+    try {
+      bytes = await copy
+    }
+    // A failed run is tried again by the next request, this one going out whole.
+    catch {
+      copies.delete(encoding)
+    }
 
     return bytes ? new Response(bytes, { headers: { ...headers, 'content-encoding': encoding, 'vary': 'accept-encoding' } }) : wholeResponse(text, { headers })
   }
@@ -161,11 +169,11 @@ export function fixedText(text: string): FixedText {
   return { bytes, head: bytes.subarray(0, HEAD_BYTES), deflated: deflateRawSync(bytes, { level: 9, finishFlush: constants.Z_FULL_FLUSH }) }
 }
 
-// The same off the event loop, for a text cut from a page while serving it.
+// The same off the event loop, for a text cut from a page while serving it, a few at a time.
 export async function fixedTextAsync(text: string): Promise<FixedText> {
-  const { constants } = nodeZlib()
+  const { constants, deflateRaw } = nodeZlib()
   const bytes = Buffer.from(text)
-  const deflated = await new Promise<Buffer>((resolve, reject) => nodeZlib().deflateRaw(bytes, { level: 9, finishFlush: constants.Z_FULL_FLUSH }, (error, result) => error ? reject(error) : resolve(result)))
+  const deflated = await compressing(async () => new Promise<Buffer>((resolve, reject) => deflateRaw(bytes, { level: 9, finishFlush: constants.Z_FULL_FLUSH }, (error, result) => error ? reject(error) : resolve(result))))
 
   return { bytes, head: bytes.subarray(0, HEAD_BYTES), deflated }
 }

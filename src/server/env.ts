@@ -80,9 +80,9 @@ export function servePublicEnv(app: Elysia, served: ServedPaths, schema: EnvSche
 
   ;(globalThis as { [PUBLIC_ENV]?: unknown })[PUBLIC_ENV] = values
 
-  const reply = fixedReply(publicEnvModule(values), { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-cache' })
+  let reply: ReturnType<typeof fixedReply> | undefined
 
-  app.get(PUBLIC_ENV_PATH, async ({ request }) => reply(request))
+  app.get(PUBLIC_ENV_PATH, async ({ request }) => (reply ??= fixedReply(publicEnvModule(values), { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-cache' }))(request))
 }
 
 export function publicEnvModule(values: Record<string, unknown>): string {

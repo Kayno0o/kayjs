@@ -30,17 +30,13 @@ export function limitBodies(app: Elysia, bytes: number, actions: Map<string, Bod
     if (NO_BODY.has(request.method))
       return undefined
 
-    return refuseOversized(request, server)
-  })
-
-  async function refuseOversized(request: Request, server: Server | null): Promise<Response | undefined> {
     // Elysia serves `/path/` as `/path`, so a trailing slash reaches the same route.
     const path = withoutSlash(requestUrl(request).pathname)
     const limit = actions.get(path) ?? prefixes.find(([mount]) => path === mount || path.startsWith(`${mount}/`))?.[1]
     const allowed = limit?.bytes ?? bytes
 
     return limit && await exceeds(request, allowed) ? limit.refuse(request, allowed, server) : undefined
-  }
+  })
 }
 
 // `Content-Length` frames the body, so it is the size when sent; a body sent in chunks without it is counted on a copy, only up to the limit, leaving the request's own for Elysia to read.

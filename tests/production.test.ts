@@ -956,6 +956,22 @@ export default api()
   .get('/', () => ({ ok: true, big: 1n }))
   .post('/', () => ({ posted: true }))
   .get('/loop', () => loop)
+  .get('/plain', ({ set }) => {
+    set.status = 202
+    set.headers['x-plain'] = 'kept'
+
+    return { items: [1, 2] }
+  })
+  .get('/typed', ({ set }) => {
+    set.headers['content-type'] = 'application/vnd.api+json'
+
+    return { data: [] }
+  })
+  .get('/named', ({ set }) => {
+    set.status = 'Created'
+
+    return { made: true }
+  })
 `)
 
       const entries: LogEntry[] = []
@@ -965,6 +981,13 @@ export default api()
       expect((await post({ 'sec-fetch-site': 'cross-site' })).status).toBe(403)
       expect(await (await post({ 'sec-fetch-site': 'same-origin' })).json()).toEqual({ posted: true })
       expect(await (await app.handle(new Request('http://localhost/api/open'))).json()).toEqual({ ok: true, big: '1' })
+      const plain = await app.handle(new Request('http://localhost/api/open/plain'))
+      const typed = await app.handle(new Request('http://localhost/api/open/typed'))
+      const named = await app.handle(new Request('http://localhost/api/open/named'))
+
+      expect([plain.status, plain.headers.get('x-plain'), plain.headers.get('content-type'), await plain.json()]).toEqual([202, 'kept', 'application/json;charset=utf-8', { items: [1, 2] }])
+      expect([typed.headers.get('content-type'), await typed.json()]).toEqual(['application/vnd.api+json', { data: [] }])
+      expect([named.status, await named.json()]).toEqual([201, { made: true }])
       expect((await app.handle(new Request('http://localhost/api/open/loop'))).status).toBe(500)
       expect(entries.some(entry => 'error' in entry && (/cyclic/i).test(entry.error?.message ?? ''))).toBe(true)
     }

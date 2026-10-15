@@ -215,7 +215,7 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
 
           return answeringRequest(context.request, async () => inLocale(context.request, options, async () => admit(guards, sharedContext(context.request, () => ({ ...context })), options, cors)))
         })
-        .mapResponse(({ responseValue, set }) => withBigints(sendable(responseValue), set))
+        .mapResponse(({ responseValue, set }) => jsonReply(sendable(responseValue), set))
         .onError(({ request, error, set }) => {
           const span = spans.get(request)
 
@@ -300,9 +300,15 @@ function sentAsIs(value: object): boolean {
   return STREAMED.some(method => typeof (value as Record<string, unknown>)[method] === 'function')
 }
 
-// JSON has no bigint, which JSON.stringify throws on: a plain object or array holding one is answered with each written as its digits, as a database's bigint ids usually are.
-function withBigints(value: unknown, set: { status?: number | string, headers: Record<string, unknown> }): Response | undefined {
-  if (typeof value !== 'object' || value === null || (Object.getPrototypeOf(value) !== Object.prototype && !Array.isArray(value)) || stringifies(value) || !holdsBigint(value))
+// A plain object or array is serialized here, once, rather than by Elysia: JSON has no bigint, which JSON.stringify throws on, so one holding a bigint is answered with each written as its digits, as a database's bigint ids usually are.
+// Anything the plain pass cannot settle, a cycle, a status given by name or a cookie Elysia's jar holds, is left to Elysia.
+function jsonReply(value: unknown, set: { status?: number | string, headers: Record<string, unknown>, cookie?: object }): Response | undefined {
+  if (typeof value !== 'object' || value === null || (Object.getPrototypeOf(value) !== Object.prototype && !Array.isArray(value)) || (set.status !== undefined && typeof set.status !== 'number') || (set.cookie !== undefined && Object.keys(set.cookie).length > 0))
+    return undefined
+
+  const text = serialized(value)
+
+  if (text === undefined)
     return undefined
 
   const headers = new Headers()
@@ -313,20 +319,22 @@ function withBigints(value: unknown, set: { status?: number | string, headers: R
       headers.append(name, String(item))
   }
 
-  headers.set('content-type', 'application/json')
+  if (!headers.has('content-type'))
+    headers.set('content-type', 'application/json;charset=utf-8')
 
-  return new Response(JSON.stringify(value, (_key, item: unknown) => typeof item === 'bigint' ? item.toString() : item), { status: typeof set.status === 'number' ? set.status : 200, headers })
+  return new Response(text, { status: set.status ?? 200, headers })
 }
 
-// Whether JSON.stringify takes the value as it is, which is how nearly every reply goes: cheaper than walking it for a bigint, and what throws, a bigint or a cycle, is walked after.
-function stringifies(value: object): boolean {
+// Plain first, the bigint-aware pass only for a value the plain one threw on; undefined for a cycle, which Elysia's own pass names.
+function serialized(value: object): string | undefined {
   try {
-    JSON.stringify(value)
-
-    return true
+    return JSON.stringify(value)
   }
   catch {
-    return false
+    if (!holdsBigint(value))
+      return undefined
+
+    return JSON.stringify(value, (_key, item: unknown) => typeof item === 'bigint' ? item.toString() : item)
   }
 }
 

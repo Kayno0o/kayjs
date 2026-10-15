@@ -225,7 +225,7 @@ export default defineConfig({ requireGuards: true })
 - Such a cookie cannot be revoked: `destroy()` clears the browser's copy, but one taken before stays valid until `maxAge`, so a site that must end a session everywhere, after a password change say, uses a store.
 - In production the first `regenerate()` on a session without a store logs a warning saying so.
 - With a store, the cookie carries only a sealed id, and `destroy()` deletes the session itself.
-- `memoryStore()` from `kay/server` keeps sessions in the process, gone on restart.
+- `memoryStore()` from `kay/server` keeps sessions in the process, gone on restart, the oldest going past 100,000.
 - `sqliteStore(path)` keeps them in a SQLite file shared by the processes on one machine, creating its directory, as `sqliteRates`, `sqliteCache` and `sqliteJobs` do; called again with the same file, it gives the store already open. A file deleted or replaced under a running server is noticed within seconds and opened afresh; a file put in its place takes its `-wal` and `-shm` along, or none, as SQLite would otherwise replay the old ones over it.
 - Any object with `get(id)`, `set(id, data, maxAge)` and `delete(id)`, each sync or async, is a store too, such as one over Redis.
 - `deleteWhere(match)` on `memoryStore()` and `sqliteStore(path)` deletes every session whose data `match` returns true for, a person's once they asked to be erased or changed their password say, resolving with how many went; `sqliteStore` also drops expired sessions every hour.

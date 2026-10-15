@@ -377,7 +377,7 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
     return answer(revalidated(request, `W/"${name}"`, () => Bun.file(file), ownHeaders(set, negotiated ? negotiatedRevalidated : revalidatedAs)))
   })
 
-  // The oldest entry goes when the map is full, so a burst of new keys does not empty what the hot ones filled.
+  // The oldest entry goes when the map is full, where emptying it would drop every key kept warm.
   function keep<T>(map: Map<string, T>, key: string, value: T): void {
     if (map.size >= MOST_ANSWERED && !map.has(key))
       map.delete(map.keys().next().value!)
