@@ -278,6 +278,7 @@ describe('the dev tool\'s routes served by kay', () => {
     expect((await outcomes(false)).noted).toEqual([undefined, undefined, undefined])
     expect((await outcomes(true)).noted[0]).toBe('the redirect from /old')
     expect((await outcomes(true)).noted[2]).toBe(`the guard ${routes}/members/_guard.ts`)
+    expect((await (await pages({ ...settings, extensions: [{ name: 'closed', server: closed }] })).handle(new Request('http://localhost/_kay/health/'))).status).toBe(200)
     expect((await outcomes(false, [{ name: 'closed', server: closed }])).health).toBe(200)
     expect((await outcomes(true, [{ name: 'closed', server: closed }])).health).toBe(200)
   })

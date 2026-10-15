@@ -32,7 +32,13 @@ export function serveHealth(app: Elysia, lifecycle: Lifecycle, holds: () => bool
   const path = config.path ?? HEALTH_PATH
 
   app.onRequest(async ({ request }) => {
-    if ((request.method !== 'GET' && request.method !== 'HEAD') || new URL(request.url).pathname !== path || !holds())
+    if (request.method !== 'GET' && request.method !== 'HEAD')
+      return undefined
+
+    const requested = new URL(request.url).pathname
+
+    // A trailing slash is the same route, as Elysia routes it.
+    if ((requested !== path && requested !== `${path}/`) || !holds())
       return undefined
 
     if (lifecycle.draining)
