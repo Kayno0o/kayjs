@@ -2,6 +2,7 @@ import type { Elysia } from 'elysia'
 import type { ServedPaths } from './served-paths'
 import { KayError } from '../compiler/errors'
 import { noteRedirect } from './dev-notes'
+import { requestUrl } from './request-url'
 
 // A path moved elsewhere, by its old path: `'/blog/:slug': '/posts/:slug'`, a `*` carrying the rest of the path. Permanent, a 308, unless it says otherwise.
 export type Redirects = Record<string, string | { to: string, permanent?: boolean }>
@@ -107,7 +108,7 @@ export function serveRedirects(app: Elysia, redirects: Redirect[], dev?: boolean
       const values = params as Record<string, string>
       // Named params arrive decoded, so they are encoded again; the `*` arrives as the browser sent it.
       const target = redirect.to.replaceAll(TARGET_PART, (_part, name: string | undefined) => name === undefined ? values['*'] ?? '' : encodeURIComponent(values[redirect.names.get(name)!] ?? ''))
-      const { search } = new URL(request.url)
+      const { search } = requestUrl(request)
       const path = target.startsWith('/') ? target.replace(LEADING_SLASHES, '/') : target
       const location = search !== '' && !path.includes('?') ? `${path}${search}` : path
 

@@ -20,6 +20,7 @@ import { limiter } from './limit'
 import { clientAddress } from './protection'
 import { revalidated } from './public'
 import { remoteAllowed, remotePatterns, remoteVariants } from './remote'
+import { requestUrl } from './request-url'
 import { decodePath } from './routes'
 import { headerCopies, ownHeaders } from './security'
 import { storedImage } from './storage'
@@ -233,7 +234,7 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
     }
     const fail = (body: string, status: number) => guarded(new Response(body, { status, headers: ownHeaders(set, text) }))
 
-    const url = new URL(request.url)
+    const url = requestUrl(request)
     const src = url.searchParams.get('src') ?? ''
     let source = await findSource(src, options, clientAddress(request, server))
 

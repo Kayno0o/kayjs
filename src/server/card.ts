@@ -19,6 +19,7 @@ import { coverImage } from './crop'
 import { readFace } from './face'
 import { DEFAULT_QUALITY, drawing, findSource, MAX_UPLOAD_PIXELS, VARIANTS_DIR } from './image'
 import { revalidated } from './public'
+import { requestUrl } from './request-url'
 
 export interface CardSetup {
   // `.kay/client`, where the key cards are signed with is kept.
@@ -329,7 +330,7 @@ export function serveCards(app: Elysia, cards: Cards, options: ImageRouteOptions
   const pending = new Map<string, Promise<void>>()
 
   app.get(CARD_ROUTE, async ({ request }) => {
-    const url = new URL(request.url)
+    const url = requestUrl(request)
     const title = url.searchParams.get('title') ?? ''
     const src = url.searchParams.get('src') ?? undefined
     const spec = cardSpec(title, src)

@@ -7,6 +7,7 @@ import { kayLog } from '../runtime/log'
 import { wholeResponse } from './compress'
 import { logMessage } from './log'
 import { START_COMMAND, START_PARENT } from './parent'
+import { requestUrl } from './request-url'
 
 export const HEALTH_PATH = '/_kay/health'
 const DEFAULT_SHUTDOWN_TIMEOUT = 10
@@ -35,7 +36,7 @@ export function serveHealth(app: Elysia, lifecycle: Lifecycle, holds: () => bool
     if (request.method !== 'GET' && request.method !== 'HEAD')
       return undefined
 
-    const requested = new URL(request.url).pathname
+    const requested = requestUrl(request).pathname
 
     // A trailing slash is the same route, as Elysia routes it.
     if ((requested !== path && requested !== `${path}/`) || !holds())

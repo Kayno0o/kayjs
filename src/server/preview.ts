@@ -16,6 +16,7 @@ import { DRAFT_ROUTE } from '../runtime/swap'
 import { isCrossSite, overHttps } from './actions'
 import { nodeCrypto } from './builtins'
 import { requestCookies } from './cookies'
+import { requestUrl } from './request-url'
 import { useStampSecret } from './stamp'
 import { visitAs } from './visit'
 
@@ -199,7 +200,7 @@ export function previewUrl(path: string, options: { ttl?: Duration, edit?: boole
 export function servePreview(app: Elysia): void {
   app.get(PREVIEW_ROUTE, ({ request }) => {
     const current = settings!
-    const query = new URL(request.url).searchParams
+    const query = requestUrl(request).searchParams
     const path = query.get('path') ?? '/'
     const edit = query.has('edit')
 

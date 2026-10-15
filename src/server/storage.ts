@@ -8,6 +8,7 @@ import { FILES_ROUTE } from '../runtime/image'
 import { kayLog } from '../runtime/log'
 import { imageHeader } from './image-format'
 import { holdsImageMetadata, stripImageMetadata } from './image-metadata'
+import { requestUrl } from './request-url'
 import { headerCopies, ownedHeaders, ownHeaders, setSecurityHeaders } from './security'
 import { signedText, signText } from './stamp'
 
@@ -331,7 +332,7 @@ export function serveFiles(app: Elysia, security: Record<string, string> | undef
       if (!PRIVATE_SEGMENT.test(key))
         return await fileResponse(key, request, IMMUTABLE, own)
 
-      const query = new URL(request.url).searchParams
+      const query = requestUrl(request).searchParams
       const until = Number(query.get('until'))
 
       if (!linkSigned(key, query))
