@@ -175,11 +175,13 @@ function packageName(directory: string): string {
 // A packed copy installs like a published package, its dependencies only; a `file:` folder would drag in its devDependencies too.
 // Built and packed from a copy beside the checkout, never in it: `prepack` writing types and dist into the checkout would shadow src for every process type-checking or walking it meanwhile.
 async function packKay(vendor: string): Promise<string> {
-  const { devDependencies: _, workspaces: __, ...manifest } = await Bun.file(join(KAY_ROOT, 'package.json')).json() as { files: string[], devDependencies?: unknown, workspaces?: unknown }
+  const manifest = await Bun.file(join(KAY_ROOT, 'package.json')).json() as { files: string[], devDependencies?: unknown, workspaces?: unknown }
   const stage = await mkdtemp(join(tmpdir(), 'kay-pack-'))
 
   try {
     // Without the workspace libraries, whose versions only an install of the checkout resolves, and which installing kay never reads.
+    delete manifest.devDependencies
+    delete manifest.workspaces
     await Bun.write(join(stage, 'package.json'), JSON.stringify(manifest, null, 2))
     await Promise.all(manifest.files.filter(entry => entry !== 'types' && entry !== 'dist').map(async entry => cp(join(KAY_ROOT, entry), join(stage, entry), { recursive: true })))
 
