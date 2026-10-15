@@ -17,7 +17,10 @@ describe('cms()', () => {
 
     const { server } = cms()
 
-    expect(async () => typeof server === 'function' && server()).toThrow('kayjs-cms: a production server saves no edit to the working tree')
+    expect(() => {
+      if (typeof server === 'function')
+        void server()
+    }).toThrow('kayjs-cms: a production server saves no edit to the working tree')
   })
 
   test('boots a production server told where files go, and any server outside production', () => {
