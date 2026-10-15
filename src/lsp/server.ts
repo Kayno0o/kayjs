@@ -46,7 +46,7 @@ interface Project {
   shadowTree: string
   shadowFiles: Set<string>
   // The content hash of each, as the last write left it: a time stamp cannot tell two writes within one millisecond apart.
-  shadowStamps: Map<string, number | bigint>
+  shadowStamps: Map<string, bigint>
   // As of the last shadow write: the static components only islands render, the library components the app never imports, whose errors are the library's, and the libraries.
   islandOnly: Set<string>
   unreached: Set<string>
@@ -69,6 +69,7 @@ interface Document extends ShadowFile {
   queries: string
 }
 
+const LAYOUT_SHADOW_SUFFIX = '/_layout.kay.tsx'
 const KAY_FILE = /^file:.*\.kay$/
 const IMPORT_DECLARATION = /^\s*import\s/
 const TRAILING_SEMICOLON = /;$/
@@ -304,17 +305,28 @@ export class KayLanguageServer {
   private async writeAfterSave(modulesChanged: boolean) {
     const options = new Map([...this.projects].map(([root, project]) => [root, project.options]))
 
-    this.server.notify('workspace/didChangeWatchedFiles', { changes: await this.writeShadows() })
+    const changes = await this.writeShadows()
+    // The layouts are read from disk to tell their queries, so only a pass in which one came, changed or went reads them.
+    const layoutsChanged = changes.some(({ uri }) => uri.endsWith(LAYOUT_SHADOW_SUFFIX))
+
+    this.server.notify('workspace/didChangeWatchedFiles', { changes })
     // An open component that came to be rendered only by islands, or stopped being, whose project read its config again, or that takes as signals those a changed module now exports, or stops, or whose layouts above gain or drop a `query`, compiles again before the files are checked.
     for (const previous of this.documents.values()) {
-      const file = fileURLToPath(previous.uri)
-      const project = this.projects.get(projectRootOf(file, this.root))
-
-      if ((project?.islandOnly.has(file) ?? false) !== previous.insideIsland || (project !== undefined && project.options !== options.get(project.root)) || (modulesChanged && JSON.stringify(importedSignals(file, previous.source)) !== previous.signals) || (project !== undefined && JSON.stringify(layoutQueries(file, previous.source, project.routesDir, project.mounts)) !== previous.queries))
+      if (this.needsCompile(previous, options, modulesChanged, layoutsChanged))
         this.refresh(previous)
     }
     this.scheduleDiagnostics()
     this.scheduleProjectChecks()
+  }
+
+  private needsCompile(previous: Document, options: Map<string, CheckOptions>, modulesChanged: boolean, layoutsChanged: boolean): boolean {
+    const file = fileURLToPath(previous.uri)
+    const project = this.projects.get(projectRootOf(file, this.root))
+
+    return (project?.islandOnly.has(file) ?? false) !== previous.insideIsland
+      || (project !== undefined && project.options !== options.get(project.root))
+      || (modulesChanged && JSON.stringify(importedSignals(file, previous.source)) !== previous.signals)
+      || (layoutsChanged && project !== undefined && JSON.stringify(layoutQueries(file, previous.source, project.routesDir, project.mounts)) !== previous.queries)
   }
 
   // Writes the shadow tree of every project holding a .kay file, and returns the shadow files that came, changed and went.
@@ -337,7 +349,7 @@ export class KayLanguageServer {
 
       const types = await writeShadowTypes(root, project.options)
       const files = new Set(types.files.keys())
-      const stamps = new Map([...types.files].map(([path, shadow]) => [path, Bun.hash(shadow.tsx)] as const))
+      const stamps = new Map([...types.files].map(([path, shadow]) => [path, Bun.hash.wyhash(shadow.tsx)] as const))
 
       changes.push(
         ...[...files].flatMap((path): FileEvent[] => project.shadowFiles.has(path) ? stamps.get(path) !== project.shadowStamps.get(path) ? [{ uri: pathToFileURL(path).href, type: CHANGED }] : [] : [{ uri: pathToFileURL(path).href, type: CREATED }]),
