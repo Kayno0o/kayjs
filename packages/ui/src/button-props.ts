@@ -2,6 +2,7 @@ import type { JSX } from 'kay'
 import type { IconProps } from 'kay/icons'
 import type { IconSlot } from './defaults'
 
+// Repeated in button.kay, which the docs read the props of: a prop is listed from the file declaring it.
 export interface Look {
   variant?: 'default' | 'accent' | 'danger' | undefined
   // Drawn before the label.
