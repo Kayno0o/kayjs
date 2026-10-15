@@ -19,6 +19,7 @@ function values(): Record<string, unknown> {
   return held
 }
 
+// Marked pure, with the symbol above, so the entry drops them when no island reads `publicEnv`: the bundler keeps a top-level call it cannot prove harmless.
 // The variables kay.config.ts declares public, read from the server's environment as it boots: the one way an island reads the environment, on the server and in the browser alike.
 export const publicEnv = /* @__PURE__ */ new Proxy({}, {
   get: (_target, name) => typeof name === 'string' ? values()[name] : undefined,

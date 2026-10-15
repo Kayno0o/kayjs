@@ -1,6 +1,7 @@
 import { provideContext, readContext } from './reactive'
 
 // What a component hands the first field it renders, read by the server's markup.
+// Marked pure so the entry drops it when no island describes a field.
 const DESCRIBED = /* @__PURE__ */ Symbol('kay.described')
 
 interface Description {

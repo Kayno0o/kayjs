@@ -1,5 +1,6 @@
 // The JSON scripts a server writes into a page for its islands, each parsed once: a streamed page brings more of them as it goes, and a swap the next page's.
 const parsed = new WeakMap<Element, unknown>()
+// Marked pure so the entry drops it when no island reads page data.
 const MALFORMED = /* @__PURE__ */ Symbol('malformed')
 // The text of each script that did not parse, read again once it changed, as one read before the stream ended it would.
 const failed = new WeakMap<Element, string>()
