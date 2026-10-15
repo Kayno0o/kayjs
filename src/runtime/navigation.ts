@@ -53,7 +53,6 @@ export interface HistoryState {
 
 const SKIPPED_PATHS = /^\/(?:_kay|api)(?:\/|$)/
 const ACTION_PATH = /^\/_kay\/action\//
-const HASH = /#.*/
 const SCROLL_SAVE_MS = 150
 const LEAVE_MESSAGE = 'This page has unsaved changes. Leave it anyway?'
 
@@ -160,7 +159,7 @@ function fragment(hash: string): string {
 }
 
 export function pageKey(url: URL): string {
-  return url.href.replace(HASH, '')
+  return url.href.replace(/#.*/, '')
 }
 
 // A page of this app: same origin, under its mount point, and none of kay's own routes or the API's.

@@ -415,6 +415,46 @@ describe('page swap, checking a form in the browser', () => {
     }
   })
 
+  it('drops a waiting query write found on another page than it was set on, a traversal or a retry after a swap', () => {
+    const timers = throttled()
+
+    try {
+      setURL('http://localhost/back?x=1')
+      tick(1000)
+
+      const level = persisted('level', '', { storage: 'query' })
+
+      level.set('1')
+      level.set('2')
+      // Back to another entry inside the gap: the address is already the one reached.
+      setURL('http://localhost/earlier?y=2')
+      tick(200)
+      timers.fire()
+      expect(location.pathname + location.search).toBe('/earlier?y=2')
+
+      const refuse = spyOn(history, 'replaceState').mockImplementation(() => {
+        throw new DOMException('too many', 'SecurityError')
+      })
+
+      try {
+        tick(1000)
+        level.set('3')
+        setURL('http://localhost/elsewhere')
+        tick(200)
+        timers.fire()
+      }
+      finally {
+        refuse.mockRestore()
+      }
+
+      expect(timers.pending()).toBe(0)
+      expect(location.pathname + location.search).toBe('/elsewhere')
+    }
+    finally {
+      timers.restore()
+    }
+  })
+
   it('flushes a waiting query write when the page is hidden or goes away, and before a navigation reads the address', () => {
     const timers = throttled()
 

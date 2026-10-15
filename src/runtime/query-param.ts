@@ -1,5 +1,5 @@
 import type { Persisted, Stored } from './persist'
-import { navigation } from './navigation'
+import { navigation, pageKey } from './navigation'
 import { pageData } from './page-data'
 import { keep } from './persist'
 
@@ -93,14 +93,20 @@ function pageRules(): QueryRules | undefined {
 }
 
 // WebKit throws a SecurityError past 100 history writes in 10 s, which a slider dragged fast reaches.
-// Every param shares one gap: a write goes through at once when the last is 200 ms old, else the latest values wait and land in one `replaceState`. The page flushes them before it is left or navigated, and a refused write never throws out of `set()`.
+// Every param shares one gap, a throttle with a leading write: one goes through at once, then at most one per 200 ms while values keep coming, the latest ones landing in a single `replaceState`.
+// The page flushes them before it is left or navigated, one found on another page than it was set on is dropped, and a refused write never throws out of `set()`.
 const WRITE_GAP = 200
 const pending = new Map<string, [value: unknown, fallback: unknown]>()
 let timer: ReturnType<typeof setTimeout> | undefined
 let lastWrite = 0
 let retrying = false
+// The page the pending values were set on, which a traversal or a swap may have left by the time they are written.
+let queuedOn = ''
 
 function saveParam(name: string, value: unknown, fallback: unknown): void {
+  if (pending.size === 0)
+    queuedOn = pageKey(new URL(location.href))
+
   pending.set(name, [value, fallback])
 
   if (!navigation.flush) {
@@ -130,6 +136,14 @@ function flush(): void {
     return
 
   const url = new URL(location.href)
+
+  if (pageKey(url) !== queuedOn) {
+    pending.clear()
+    retrying = false
+
+    return
+  }
+
   const rules = pageRules()
 
   for (const [name, [value, fallback]] of pending) {
