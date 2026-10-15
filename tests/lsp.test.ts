@@ -1072,7 +1072,9 @@ describe('kay lsp with a slow tsgo', () => {
         client.notify('textDocument/didChange', { textDocument: { uri, version }, contentChanges: [{ text: `p {${version}}\n` }] })
       }
       // Until the last change is published, as a real tsgo starting under load takes longer than any fixed wait.
-      for (const limit = Date.now() + 15_000; last !== 5 && Date.now() < limit;)
+      const published = () => last === 5
+
+      for (const limit = Date.now() + 15_000; !published() && Date.now() < limit;)
         await Bun.sleep(20)
 
       expect(last).toBe(5)
