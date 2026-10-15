@@ -79,9 +79,14 @@ function varyOrigin(vary: string | null | undefined): string {
   return vary.split(',').some(name => ['origin', '*'].includes(name.trim().toLowerCase())) ? vary : `${vary}, Origin`
 }
 
+// What the module's rule alone decides: a route's own value for any of these is replaced by the rule's, or dropped when the rule grants the caller nothing.
+const GRANT = new Set(['access-control-allow-origin', 'access-control-allow-credentials', 'access-control-expose-headers'])
+
 // Puts the headers a response of the module carries on the headers a route set, or on a response it built: an answer naming the caller's origin differs by it, so caches keep one per origin.
 export function withCors(rule: CorsRule, request: Request, headers: Record<string, unknown> | Headers): void {
   const set = (name: string, value: string) => headers instanceof Headers ? headers.set(name, value) : headers[name] = value
+
+  dropGrant(headers)
 
   for (const [name, value] of Object.entries(corsHeaders(rule, request)))
     set(name, value)
@@ -90,10 +95,54 @@ export function withCors(rule: CorsRule, request: Request, headers: Record<strin
     set('vary', varyOrigin(headers instanceof Headers ? headers.get('vary') : headers.vary as string | undefined))
 }
 
+// The grant headers a route set itself, whatever their case, off the headers.
+function dropGrant(headers: Record<string, unknown> | Headers): void {
+  if (headers instanceof Headers) {
+    for (const name of GRANT)
+      headers.delete(name)
+
+    return
+  }
+
+  for (const name of Object.keys(headers)) {
+    if (GRANT.has(name.toLowerCase()))
+      delete headers[name]
+  }
+}
+
+// A response of the route's own without the grant headers it carries itself, the module's rule alone granting: the same response, or a mutable copy when its headers are immutable, a `fetch()` result's in some runtimes, which takes the context's Vary since the copy is Elysia's to merge no more.
+export function withoutOwnGrant(response: Response, contextVary: unknown): Response {
+  try {
+    dropGrant(response.headers)
+
+    return response
+  }
+  catch {
+    const headers = new Headers(response.headers)
+
+    dropGrant(headers)
+
+    if (typeof contextVary === 'string')
+      headers.set('vary', contextVary)
+
+    return new Response(response.body, { status: response.status, statusText: response.statusText, headers })
+  }
+}
+
 // Origin kept in the Vary of a response the route made: the grant itself rides on the context, which carries it onto this response for the one request, so a response answered twice never keeps another caller's.
-export function varyByOrigin(rule: CorsRule, headers: Headers): void {
-  if (!rule.any)
-    headers.set('vary', varyOrigin(headers.get('vary')))
+// Immutable headers, such as a `fetch()` result's, take it through the context's Vary instead.
+export function varyByOrigin(rule: CorsRule, headers: Headers, context: Record<string, unknown>): void {
+  if (rule.any)
+    return
+
+  const vary = varyOrigin(headers.get('vary'))
+
+  try {
+    headers.set('vary', vary)
+  }
+  catch {
+    context.vary = vary
+  }
 }
 
 // A response built before the route ran, such as a body over the limit, with the headers the module's answers carry.

@@ -1,5 +1,6 @@
 import { rm } from 'node:fs/promises'
 import { join, relative } from 'node:path'
+import { brotliDecompressSync } from 'node:zlib'
 import { afterAll, describe, expect, it, spyOn } from 'bun:test'
 import { check } from '../src/check'
 import { admitCrossSite, crossSiteRefused } from '../src/server/actions'
@@ -175,6 +176,83 @@ describe('an API module opening its routes to other sites', () => {
     }
     finally {
       await rm(dir, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('answers of a route\'s own under a cors rule', () => {
+  it('lets the module\'s rule alone grant: a route\'s own Access-Control-Allow-Origin, -Credentials and -Expose-Headers are replaced, or dropped for a caller the rule does not list', async () => {
+    for (const path of ['own-grant', 'own-header', 'frozen']) {
+      const listed = await site.fetch(`/api/shared/${path}`, { headers: { origin: APP } })
+
+      expect([path, listed.status, listed.headers.get('access-control-allow-origin'), listed.headers.get('access-control-allow-credentials'), listed.headers.get('access-control-expose-headers')]).toEqual([path, 200, APP, 'true', 'x-total'])
+      expect(listed.headers.get('vary')).toContain('Origin')
+
+      for (const headers of [{ origin: 'https://evil.example' }, {}]) {
+        const refused = await site.fetch(`/api/shared/${path}`, { headers })
+
+        expect([path, refused.status, refused.headers.get('access-control-allow-origin'), refused.headers.get('access-control-allow-credentials'), refused.headers.get('access-control-expose-headers')]).toEqual([path, 200, null, null, null])
+        expect(refused.headers.get('vary')).toContain('Origin')
+      }
+    }
+  })
+
+  it('applies the same rule to a module opened to any origin', async () => {
+    const answer = await site.fetch('/api/open/own-grant', { headers: { origin: 'https://anyone.example' } })
+
+    expect([answer.headers.get('access-control-allow-origin'), answer.headers.get('access-control-allow-credentials'), answer.headers.get('vary')]).toEqual(['*', null, null])
+  })
+
+  it('leaves a module without a rule its own Access-Control headers, whichever modules with a rule come before it', async () => {
+    const answer = await site.fetch('/api/zeta', { headers: { origin: APP } })
+
+    expect([answer.headers.get('access-control-allow-origin'), answer.headers.get('vary')]).toEqual(['https://own.example', null])
+  })
+
+  it('answers a Response whose headers cannot be written, a redirect or a fetch() result in some runtimes, with its Vary and grant instead of a 500', async () => {
+    const frozen = await site.fetch('/api/shared/frozen', { headers: { origin: APP, vary: 'x' } })
+
+    expect(frozen.status).toBe(200)
+    expect(frozen.headers.get('vary')).toBe('Accept-Encoding, Origin')
+    expect(await frozen.text()).toBe('frozen')
+  })
+
+  it('answers a redirect, a fetch() result, a cookie, a non-200 status and a 404 Response each with the grant and Origin in Vary', async () => {
+    for (const [path, status] of [['redirect', 302], ['upstream', 200], ['cookie', 200], ['created', 201], ['missing', 404]] as const) {
+      const answer = await site.fetch(`/api/shared/${path}`, { headers: { origin: APP }, redirect: 'manual' })
+
+      expect([path, answer.status, answer.headers.get('access-control-allow-origin'), answer.headers.get('vary')]).toEqual([path, status, APP, 'Origin'])
+
+      const other = await site.fetch(`/api/shared/${path}`, { headers: { origin: 'https://evil.example' }, redirect: 'manual' })
+
+      expect([path, other.status, other.headers.get('access-control-allow-origin'), other.headers.get('vary')]).toEqual([path, status, null, 'Origin'])
+    }
+
+    const cookie = await site.fetch('/api/shared/cookie', { headers: { origin: APP } })
+
+    expect(cookie.headers.get('set-cookie')).toContain('session=abc')
+  })
+
+  it('compresses a large Response made per request, each answer naming its own caller', async () => {
+    const compressed = await testSite({ routes: 'tests/fixtures/cors/src/routes', api: 'tests/fixtures/cors/src/api', compress: true })
+
+    try {
+      const grants: (string | null)[] = []
+
+      for (const headers of [{ origin: APP }, { origin: 'capacitor://localhost' }, {}, { origin: APP }]) {
+        const answer = await compressed.fetch('/api/shared/large', { headers: { ...headers, 'accept-encoding': 'br' } })
+
+        grants.push(answer.headers.get('access-control-allow-origin'))
+        expect(answer.headers.get('content-encoding')).toBe('br')
+        expect(answer.headers.get('vary')).toContain('Origin')
+        expect(answer.headers.get('vary')?.toLowerCase()).toContain('accept-encoding')
+        expect(brotliDecompressSync(await answer.arrayBuffer()).toString()).toBe('large '.repeat(2000))
+      }
+
+      expect(grants).toEqual([APP, 'capacitor://localhost', null, APP])
+    }
+    finally {
+      await compressed.close()
     }
   })
 })

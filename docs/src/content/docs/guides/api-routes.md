@@ -49,6 +49,8 @@ export default api({
 
 kay answers the browser's preflight before the guards run, with the module's methods, and lets those pages' requests through, cookies included with `credentials: true`. `origins: '*'` opens it to any site, without cookies. `headers` limits the request headers allowed, `expose` names the response headers a page may read, and `maxAge` sets how long a browser keeps the preflight's answer, an hour by default.
 
+The module's `cors` is the only place that grants. If a route sets `Access-Control-Allow-Origin`, `Access-Control-Allow-Credentials` or `Access-Control-Expose-Headers` itself, or returns a `Response` that carries them, such as one from `fetch()`, kay replaces them with the module's, or drops them for an origin the module does not list. A route that needs another rule goes in a module of its own.
+
 </Callout>
 
 ## OpenAPI

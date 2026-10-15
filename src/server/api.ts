@@ -16,7 +16,7 @@ import { kayLog } from '../runtime/log'
 import { encodeValue, unsendable } from '../runtime/wire'
 import { admitCrossSite, crossSiteRefused, guardsFirst, inLocale, passGuards } from './actions'
 import { importModule } from './bundle'
-import { corsAdmits, corsResponse, corsRule, preflight, varyByOrigin, withCors } from './cors'
+import { corsAdmits, corsResponse, corsRule, preflight, varyByOrigin, withCors, withoutOwnGrant } from './cors'
 import { loadGuard, requiredGuards } from './guards'
 import { answeringRequest, statusOf } from './log'
 import { requestId } from './protection'
@@ -45,6 +45,9 @@ const streamReporters = new WeakMap<Response, { report: (error: unknown) => void
 
 // The span of each API request in flight.
 const spans = new WeakMap<Request, Span>()
+
+// The module a request matched, as the first hook of its group saw it.
+const owners = new WeakMap<Request, object>()
 
 // Mounts each module's default export, an Elysia instance, under its path: its guards run first, then a websocket upgrade or an unsafe request from another site is refused, unless the module's `cors` lets that site in.
 // Gives back the body limit of each module by the path it is mounted at, and the modules as mounted.
@@ -87,6 +90,7 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
       return group
         // A span from the guards to the response, which the handler's own spans do not nest under: the handler runs in Elysia's call, not in one kay makes.
         .onBeforeHandle(({ request, route: mounted }) => {
+          owners.set(request, instance)
           // `/api/echo` rather than the `/api/echo/` a module's `/` route is mounted at.
           const route = mounted.length > 1 ? mounted.replace(TRAILING_SLASH, '') : mounted
           const span = startSpan(`${request.method} ${route}`, { kind: SERVER_SPAN, attributes: { 'http.request.method': request.method, 'http.route': route, 'url.path': requestUrl(request).pathname, 'kay.request.id': requestId(request) } })
@@ -104,10 +108,14 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
 
           return answeringRequest(context.request, async () => inLocale(context.request, options, async () => admit(guards, sharedContext(context.request, () => ({ ...context })), options, cors)))
         })
-        .mapResponse(({ responseValue, set }) => {
+        // Elysia runs the `mapResponse` of every module registered before the one matched, so only the matched module's, which knows its cors rule, acts.
+        .mapResponse(({ request, responseValue, set }) => {
+          if (owners.get(request) !== undefined && owners.get(request) !== instance)
+            return undefined
+
           const value = sendable(responseValue)
 
-          return value instanceof Response ? carriedOver(set, value) : jsonReply(value, set)
+          return value instanceof Response ? carriedOver(set, value, cors !== undefined) : jsonReply(value, set)
         })
         .onError(({ request, error, set }) => {
           const span = spans.get(request)
@@ -136,7 +144,7 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
           // A Vary the route set itself keeps Origin; a Response of the route's own gets only that, as the grant is on the context, which `mapResponse` carries over.
           if (cors) {
             if (responseValue instanceof Response)
-              varyByOrigin(cors, responseValue.headers)
+              varyByOrigin(cors, responseValue.headers, set.headers)
             else
               withCors(cors, request, set.headers)
           }
@@ -158,7 +166,7 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
 const answeredBefore = new WeakSet<Response>()
 
 // A Response of the route's own that carries everything the context held, which leaves Elysia nothing to copy it for; undefined when `carryContext` left something on the context, a cookie or a status, for Elysia to merge.
-function carriedOver(set: { status?: number | string, headers: Record<string, unknown>, cookie?: object }, given: Response): Response | undefined {
+function carriedOver(set: { status?: number | string, headers: Record<string, unknown>, cookie?: object }, given: Response, underCors: boolean): Response | undefined {
   // Nothing on the context: a page route's response, which carried it already and must not be stripped of it by a second pass.
   if (Object.keys(set.headers).length === 0)
     return undefined
@@ -175,6 +183,9 @@ function carriedOver(set: { status?: number | string, headers: Record<string, un
       for (const name of carriedNames(given))
         given.headers.delete(name)
 
+      if (underCors)
+        withoutOwnGrant(given, undefined)
+
       return undefined
     }
 
@@ -184,6 +195,10 @@ function carriedOver(set: { status?: number | string, headers: Record<string, un
   else {
     answeredBefore.add(given)
   }
+
+  // The module's rule grants alone: the route's own grant headers would win over the context's, the caller's origin included.
+  if (underCors)
+    response = withoutOwnGrant(response, set.headers.vary)
 
   carryContext(set as Context['set'], response)
 
