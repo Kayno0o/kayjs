@@ -12,8 +12,12 @@ const DEFAULT_SHUTDOWN_TIMEOUT = 10
 // A check slower than this fails, so a hung database never hangs the probe with it.
 const CHECK_TIMEOUT_MS = 5000
 
-// Names the `kay start` running the server, in a process group of its own that a kill of its group never reaches: the server stops once that process is gone.
+// Names the `kay start` or `kay render` running the server, which a SIGKILL of that process alone, or of `kay start`'s group, leaves running: the server stops once that process is gone.
 export const START_PARENT = 'KAY_START_PID'
+// Which of the two it is, for the line the server logs as it stops.
+export const START_COMMAND = 'KAY_START_COMMAND'
+// Set on `globalThis` while a server watches its parent, so the watch `kay render` preloads for a bare `Bun.serve` leaves it the stop.
+export const PARENT_WATCHED = Symbol.for('kay.parentWatched')
 const PARENT_POLL_MS = 1000
 
 interface Lifecycle {
@@ -50,7 +54,7 @@ export function shutdownSeconds(timeout: Duration): number {
   return durationSeconds(timeout, 'shutdownTimeout')
 }
 
-// On SIGTERM, SIGINT or SIGHUP, or once the `kay start` running it is gone, the server stops taking connections, lets the open requests and streams finish, runs the app's `onStop` hooks, then the process exits.
+// On SIGTERM, SIGINT or SIGHUP, or once the `kay start` or `kay render` running it is gone, the server stops taking connections, lets the open requests and streams finish, runs the app's `onStop` hooks, then the process exits.
 // Past `wait` whatever is still open is closed and the process exits with 1.
 export function stopOnSignal(app: Elysia, lifecycle: Lifecycle, wait: Duration = DEFAULT_SHUTDOWN_TIMEOUT): void {
   const timeout = shutdownSeconds(wait)
@@ -85,19 +89,22 @@ export function stopOnSignal(app: Elysia, lifecycle: Lifecycle, wait: Duration =
     const onTerm = () => void stop('SIGTERM received')
     const onInt = () => void stop('SIGINT received')
     const onHup = () => void stop('SIGHUP received')
-    // Only the server `kay start` runs itself watches it, not a process the app starts in turn, whose parent is the server.
+    // Only the server `kay start` or `kay render` runs itself watches it, not a process the app starts in turn, whose parent is the server.
     const named = Number(process.env[START_PARENT] ?? Number.NaN)
     const parent = named === process.ppid ? named : undefined
-    const watch = parent === undefined ? undefined : setInterval(() => process.ppid !== parent && void stop('kay start exited'), PARENT_POLL_MS)
+    const exited = `${process.env[START_COMMAND] ?? 'kay start'} exited`
+    const watch = parent === undefined ? undefined : setInterval(() => process.ppid !== parent && void stop(exited), PARENT_POLL_MS)
 
     // Killed while the server booted, which left it to another parent already.
     if (parent === undefined && Number.isInteger(named) && named > 0 && !alive(named)) {
-      void stop('kay start exited')
+      Reflect.set(globalThis, PARENT_WATCHED, true)
+      void stop(exited)
 
       return
     }
 
     watch?.unref()
+    Reflect.set(globalThis, PARENT_WATCHED, watch !== undefined)
     process.once('SIGTERM', onTerm)
     process.once('SIGINT', onInt)
     process.once('SIGHUP', onHup)
@@ -105,6 +112,7 @@ export function stopOnSignal(app: Elysia, lifecycle: Lifecycle, wait: Duration =
     // A server stopped another way gives the signals back, to the next app that starts.
     release = () => {
       clearInterval(watch)
+      Reflect.set(globalThis, PARENT_WATCHED, false)
       process.off('SIGTERM', onTerm)
       process.off('SIGINT', onInt)
       process.off('SIGHUP', onHup)

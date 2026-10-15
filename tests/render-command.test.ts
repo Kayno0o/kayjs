@@ -16,6 +16,42 @@ async function render(...args: string[]): Promise<{ out: string, err: string, co
   return { out, err, code }
 }
 
+// Kills `kay render` alone once its server printed `pid N` and `ready`, then answers what the server printed until `printed` holds, and its pid.
+async function killedRender(dir: string, url: string, printed: (err: string) => boolean): Promise<{ err: string, pid: number }> {
+  const child = Bun.spawn([process.execPath, cli, 'render', url, dir], { stdin: 'ignore', stdout: 'ignore', stderr: 'pipe' })
+  const reader = child.stderr.getReader()
+  const decoder = new TextDecoder()
+  let err = ''
+  let killed = false
+
+  while (!killed || !printed(err)) {
+    const { value, done } = await reader.read()
+
+    if (done)
+      throw new Error(`kay render's stderr closed early: ${err}`)
+
+    err += decoder.decode(value)
+
+    if (!killed && err.includes('ready')) {
+      child.kill('SIGKILL')
+      killed = true
+    }
+  }
+
+  void reader.cancel()
+
+  return { err, pid: Number((/pid (\d+)/).exec(err)![1]) }
+}
+
+function alive(pid: number): boolean {
+  try {
+    return process.kill(pid, 0)
+  }
+  catch {
+    return false
+  }
+}
+
 // The bare fixture, with this config, and an entry of its own when given one.
 async function project(config?: string, server?: string): Promise<string> {
   const dir = await fixtureCopy('bare')
@@ -201,6 +237,33 @@ p {user} via {via}
     const stubborn = await project(undefined, `process.on('SIGTERM', () => {})\nBun.serve({ fetch: () => new Response('up') })\n`)
 
     expect(await render('/', stubborn)).toMatchObject({ code: 0, out: 'up' })
+  }, 15_000)
+
+  // An entry printing its pid, then `ready` once it serves.
+  const announced = (server: string) => `console.log(\`pid \${process.pid}\`)\n${server.replace('listening on 3000', 'ready')}`
+
+  it.each([
+    ['a bare Bun.serve', `Bun.serve({ fetch: () => new Promise<Response>(() => {}) })\nconsole.log('ready')\n`],
+    ['pages() in development', SERVER],
+  ])('stops %s once kay render is killed alone', async (_, server) => {
+    const { pid } = await killedRender(await project(undefined, announced(server)), '/', () => true)
+
+    for (let tries = 0; alive(pid) && tries < 100; tries++)
+      await Bun.sleep(50)
+
+    expect(alive(pid)).toBe(false)
+  }, 15_000)
+
+  it('names kay render as the process gone when a production server drains', async () => {
+    const draining = await project(undefined, announced(SERVER.replace('pages()', 'pages({ dev: false })')))
+
+    await writeFile(join(draining, 'src', 'routes', 'hang.kay'), `--- server\nawait new Promise(() => {})\n---\np never\n`)
+
+    const { err, pid } = await killedRender(draining, '/hang', printed => printed.includes('exited; finishing open requests'))
+
+    process.kill(pid, 'SIGKILL')
+
+    expect(err).toContain('kay render exited; finishing open requests')
   }, 15_000)
 
   it('fails when the entry exits before it serves', async () => {

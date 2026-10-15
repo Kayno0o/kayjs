@@ -24,7 +24,8 @@ const stderrColors = createColors({ stream: process.stderr })
 export const toStderr: Paint = (styles, text) => styles.reduce((paint, style) => paint[style], stderrColors)(text)
 
 export interface Parsed {
-  values: Record<string, string | boolean | undefined>
+  // A `multiple` option comes as an array.
+  values: Record<string, string | boolean | string[] | undefined>
   positionals: string[]
 }
 
@@ -162,7 +163,7 @@ export interface PrintedProblem {
 export type FailureProblem = Omit<PrintedProblem, 'file' | 'line' | 'column'> & Partial<Pick<PrintedProblem, 'file' | 'line' | 'column'>>
 
 // `--format`, `text` when not given, among the `formats` the command prints in: undefined, once said which it takes, for another.
-export function formatOption(command: string, value: string | boolean | undefined, formats: readonly ProblemFormat[] = ['text', 'json']): ProblemFormat | undefined {
+export function formatOption(command: string, value: Parsed['values'][string], formats: readonly ProblemFormat[] = ['text', 'json']): ProblemFormat | undefined {
   const format = typeof value === 'string' ? value : 'text'
 
   if ((formats as readonly string[]).includes(format))

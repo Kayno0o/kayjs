@@ -1,5 +1,5 @@
 import type { Feature, Preset } from '../new'
-import type { Command } from './command'
+import type { Command, Parsed } from './command'
 import process from 'node:process'
 import { colors } from '@kaynooo/utils/tools/colors'
 import { createProject, FEATURE_NAMES, pickFeatures, PRESET_NAMES, PRESETS, refuseTarget } from '../new'
@@ -22,7 +22,7 @@ export const scaffold: Command = {
         return 1
       }
 
-      const listed = (list: string | boolean | undefined) => typeof list === 'string' ? list.split(',').map(name => name.trim()).filter(name => name !== '') : []
+      const listed = (list: Parsed['values'][string]) => typeof list === 'string' ? list.split(',').map(name => name.trim()).filter(name => name !== '') : []
       const unknown = [...listed(added), ...listed(removed)].find(name => !FEATURE_NAMES.includes(name as Feature))
 
       if (unknown !== undefined) {

@@ -10,7 +10,7 @@ import { loadConfig } from '../config'
 import { environmentWithoutDotenv, PAGES_ENTRY } from '../dev'
 import { projectPaths } from '../project'
 import { basePath, routerPath } from '../server/base'
-import { START_PARENT } from '../server/lifecycle'
+import { START_COMMAND, START_PARENT } from '../server/lifecycle'
 import { projectRoot } from './command'
 
 const SOCKET_PRELOAD = join(import.meta.dir, '..', 'dev', 'render-socket.ts')
@@ -30,10 +30,9 @@ export const render: Command = {
   options: { entry: { type: 'string' }, method: { type: 'string' }, body: { type: 'string' }, header: { type: 'string', multiple: true }, cookie: { type: 'string', multiple: true }, include: { type: 'boolean', short: 'i' } },
   positionals: 2,
   run: async ({ values, positionals: [url, path] }, refuse) => {
-    // `multiple` options come as arrays, which `Parsed` does not type.
     const { entry: option, method, body, include } = values
-    const headerLines = values.header as unknown as string[] | undefined ?? []
-    const cookies = values.cookie as unknown as string[] | undefined ?? []
+    const headerLines = Array.isArray(values.header) ? values.header : []
+    const cookies = Array.isArray(values.cookie) ? values.cookie : []
 
     if (url === undefined)
       return refuse('kay render takes the URL to render, such as /about')
@@ -85,7 +84,7 @@ export const render: Command = {
       serving = resolve
     })
     // The server's own output is a log, which goes beside the body rather than into it.
-    const server = Bun.spawn([process.execPath, '--preload', SOCKET_PRELOAD, typeof option === 'string' ? resolve(option) : existsSync(entry) ? entry : PAGES_ENTRY], { cwd: root, env: { ...env, NODE_ENV: 'development', [START_PARENT]: String(process.pid), KAY_RENDER_SOCKET: socket, [RENDER_OUTPUT]: basename(output) }, stdin: 'ignore', stdout: 2, stderr: 'inherit', ipc: (message: { serving?: boolean }) => message.serving === true && serving(true) })
+    const server = Bun.spawn([process.execPath, '--preload', SOCKET_PRELOAD, typeof option === 'string' ? resolve(option) : existsSync(entry) ? entry : PAGES_ENTRY], { cwd: root, env: { ...env, NODE_ENV: 'development', [START_PARENT]: String(process.pid), [START_COMMAND]: 'kay render', KAY_RENDER_SOCKET: socket, [RENDER_OUTPUT]: basename(output) }, stdin: 'ignore', stdout: 2, stderr: 'inherit', ipc: (message: { serving?: boolean }) => message.serving === true && serving(true) })
 
     // Interrupted, it leaves no server or build behind.
     const stops = STOPS.map(signal => [signal, () => {

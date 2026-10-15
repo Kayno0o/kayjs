@@ -44,7 +44,7 @@ export const dev: Command = {
       return refuse(`--format takes \`text\` or \`json\`, not \`${String(format)}\``)
 
     if (debuggerAt !== undefined && host === undefined && !isLoopback(new URL(debuggerAt).hostname))
-      return refuse(`--inspect=${inspect} opens the debugger past this machine, and whoever reaches it runs code on it; add --host to mean it`)
+      return refuse(`--inspect=${String(inspect)} opens the debugger past this machine, and whoever reaches it runs code on it; add --host to mean it`)
 
     const root = resolve(inDir ? path : '.')
 
