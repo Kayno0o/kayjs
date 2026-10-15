@@ -115,7 +115,9 @@ function play(element: Element, phase: Phase, done: () => void): void {
 
 // As a block shows it: plays the enter phase of an element with a transition.
 function enter(node: Node): void {
-  leaving.delete(node)
+  // Ends a leave still playing even when no enter phase does, in a hidden tab or for a visitor asking for less motion.
+  if (leaving.delete(node))
+    playing.get(node as Element)?.()
 
   if (hasTransition(node) && node.isConnected && !still())
     play(node, 'enter', () => undefined)
@@ -140,11 +142,8 @@ function leave(node: Node): void {
 // As a block shows what is still leaving again: its enter phase cancels the leave.
 function back(nodes: Node[]): void {
   for (const node of nodes) {
-    if (leaving.has(node)) {
-      // Ends the leave even when no enter phase plays, in a hidden tab or for a visitor asking for less motion.
-      playing.get(node as Element)?.()
+    if (leaving.has(node))
       enter(node)
-    }
   }
 }
 

@@ -1083,6 +1083,60 @@ describe('transitions', () => {
     expect([...parent.children].map(child => child.localName)).toEqual(['p', 'i', 'b'])
   })
 
+  // A block whose branch returns one node it keeps, which an expression in a compiled branch never does.
+  async function mountRetained() {
+    const { branches, transition } = await import('../src/runtime/dom')
+    const { createSignal } = await import('../src/runtime/reactive')
+    const parent = document.createElement('div')
+    const panel = document.createElement('p')
+    const [open, setOpen] = createSignal(true)
+
+    panel.setAttribute('style', 'transition-duration: 200ms')
+    transition(panel, 'name', 'fade')
+    document.body.append(parent)
+    branches(parent, null, null, [[open, () => panel]])
+
+    return { parent, panel, setOpen }
+  }
+
+  it('keep a retained node an if branch returns again during its leave phase', async () => {
+    const { parent, panel, setOpen } = await mountRetained()
+
+    try {
+      setOpen(false)
+      await settle()
+      await twoFrames()
+      expect(panel.className).toBe('fade-leave-active fade-leave-to')
+      setOpen(true)
+      await settle()
+      expect([panel.isConnected, panel.className]).toEqual([true, 'fade-enter-from fade-enter-active'])
+      await done()
+      expect([panel.isConnected, panel.className]).toEqual([true, ''])
+    }
+    finally {
+      parent.remove()
+    }
+  })
+
+  it('keep a retained node an if branch returns again during its leave phase in a hidden tab', async () => {
+    const { parent, panel, setOpen } = await mountRetained()
+
+    try {
+      setOpen(false)
+      await settle()
+      await twoFrames()
+      Object.defineProperty(document, 'hidden', { value: true, configurable: true })
+      setOpen(true)
+      await settle()
+      await done()
+      expect([panel.isConnected, panel.className]).toEqual([true, ''])
+    }
+    finally {
+      delete (document as { hidden?: boolean }).hidden
+      parent.remove()
+    }
+  })
+
   it('does work linear in the kept units with transitions when one is appended or the order changes', async () => {
     const { insert, playTransitions, Range } = await import('../src/runtime/dom')
     const { createSignal } = await import('../src/runtime/reactive')
