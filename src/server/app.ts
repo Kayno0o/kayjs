@@ -29,7 +29,6 @@ import { serveCards } from './card'
 import { compressResponse, fixedTexts } from './compress'
 import { DEV_A11Y, DEV_AXE, DEV_EVENTS, DEV_HEAD, DEV_INSPECTOR, DEV_OPEN, DEV_PATCH, DEV_ROUTES, DEV_TOOL, devA11y, devAxe, devEvents, devInspector, devPatch, devRoutes, devTool, followBuilds, hotSwap, openInEditor, refuseForeignHosts } from './dev'
 import { clearDevErrorsOnAnswer } from './dev-errors'
-import { devHead } from './dev-head'
 import { claimEndpoints, serveEndpoints } from './endpoints'
 import { entryUrls } from './entry-urls'
 import { servePublicEnv } from './env'
@@ -265,6 +264,9 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
 
   // The dev tool's Routes tab, once the endpoints and API modules are known, and its Head tab.
   if (mode.dev) {
+    // Loaded in development only: the seo rules reach the compiler, which a production server does not load.
+    const { devHead } = await import('./dev-head')
+
     app.post(DEV_HEAD, async ({ request }) => devHead(request, { config: { site, seo: options.seo, favicon: options.favicon, lints: options.lints }, routes, base, trailingSlash: options.trailingSlash, locales: i18n?.settings }))
     app.get(DEV_ROUTES, () => Response.json(devRoutes(root, routes, endpoints, api.mounted, i18n?.settings, base, { claims: served.kay(), extensions: mountedByExtensions, notes: options.seo !== undefined && site === undefined ? [NO_ORIGIN_NOTE] : [] })))
   }
