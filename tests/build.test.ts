@@ -234,6 +234,58 @@ describe('kay build', () => {
     }
   })
 
+  it('builds the stylesheets again in kay dev for an edit of the imports of a module they follow, whatever other modules the earlier builds signed', async () => {
+    const project = await scratchDir('kay-sheets-')
+    const files = {
+      'src/parts/card.css': '.card { color: red }\n',
+      'src/parts/extra.css': '.extra { color: blue }\n',
+      'src/parts/card.kay': '---\nimport \'./card.css\'\n---\narticle.card x\n',
+      'src/routes/index.kay': '---\nimport Card from \'../parts/card.kay\'\n---\nCard\n',
+    }
+
+    await Promise.all(Object.entries(files).map(async ([file, content]) => Bun.write(join(project, file), content)))
+    const build = devBuilder(project, {})
+    const cwd = process.cwd()
+    const card = join(project, 'src/parts/card.kay')
+    const sheet = async (styles: Record<string, string>) => (Bun.file(join(clientDir(project), styles['src/routes/index.kay']!.slice('/_kay/'.length))).text())
+    // A build reads its stylesheets' inputs once done, which the next one waits for: an empty one, so the edit comes after.
+    const edit = async (source: string, file = card, name = 'src/parts/card.kay') => {
+      await build([])
+      await Bun.write(file, source)
+
+      return build([name])
+    }
+
+    try {
+      // As `kay dev` starts its builder, with the root as the working directory.
+      process.chdir(project)
+      const first = await build(null)
+
+      expect(await sheet(first.styles!)).not.toContain('.extra')
+      // The text alone: the imports it signs as are the same.
+      expect((await edit('---\nimport \'./card.css\'\n---\narticle.card y\n')).styles).toBeUndefined()
+      expect((await edit('---\nimport \'./card.css\'\n---\nsection\n  article.card y\n')).styles).toBeUndefined()
+
+      const added = await edit('---\nimport \'./card.css\'\nimport \'./extra.css\'\n---\narticle.card y\n')
+
+      expect(await sheet(added.styles!)).toContain('.extra')
+      // The page, signed by the build above, is unchanged in what it imports; the card's new signature is the one kept.
+      expect((await edit('---\nimport Card from \'../parts/card.kay\'\n---\nCard\np page\n', join(project, 'src/routes/index.kay'), 'src/routes/index.kay')).styles).toBeUndefined()
+      expect((await edit('---\nimport \'./card.css\'\nimport \'./extra.css\'\n---\narticle.card z\n')).styles).toBeUndefined()
+
+      const removed = await edit('---\nimport \'./card.css\'\n---\narticle.card z\n')
+
+      expect(await sheet(removed.styles!)).not.toContain('.extra')
+      // A module that stops parsing has no signature: it builds them again, and again once fixed.
+      expect((await edit('---\nimport \'./card.css\'\n---\narticle.card z {\n')).failed).toBe(true)
+      expect((await edit('---\nimport \'./card.css\'\nimport \'./extra.css\'\n---\narticle.card z\n')).styles).toBeDefined()
+    }
+    finally {
+      process.chdir(cwd)
+      await rm(project, { recursive: true, force: true })
+    }
+  })
+
   it('maps each island chunk to the lines and text of its .kay source', async () => {
     const counter = join(root, 'counter.kay')
     const source = await Bun.file(counter).text()

@@ -64,7 +64,8 @@ export async function styleSignature(path: string, source: string): Promise<stri
 
 // For the stylesheet build: components and modules shrink to their imports, so Bun follows them down to every stylesheet a page uses, and the assets they import are written for the server to serve.
 // A page's server code is left out but for its assets, the components and stylesheets it imports, and the components of the collections whose entries it renders, and nothing outside the project but stylesheets is followed: no server-only module ever reaches the bundler.
-export function styleImports(root: string, libraries: KayLibrary[] = []): BunPlugin {
+// `loaded` collects the components and modules it shrank, which the bundler leaves out of its list of inputs once nothing but side-effect imports of them remains.
+export function styleImports(root: string, libraries: KayLibrary[] = [], loaded?: Set<string>): BunPlugin {
   const project = root + sep
   // Tailwind reads the class names of every module the bundle parses, so importing the ones kay collected from the `.class` shorthand hands them over with no `@source` line.
   const classesFile = projectPaths(root).classes
@@ -125,6 +126,8 @@ export function styleImports(root: string, libraries: KayLibrary[] = []): BunPlu
     name: 'kay-styles',
     setup(build) {
       build.onLoad({ filter: KAY_FILE }, async ({ path }) => {
+        loaded?.add(path)
+
         const source = await Bun.file(path).text()
         const { script, server, template } = parseKay(source)
         const styles = server ? serverStyles(source.slice(server.start, server.end), path) : ''
@@ -136,7 +139,11 @@ export function styleImports(root: string, libraries: KayLibrary[] = []): BunPlu
 
         return { contents: classes + contents + styles + content, loader: 'js' }
       })
-      build.onLoad({ filter: SCRIPT_FILE }, async ({ path }) => ({ contents: await imports(await Bun.file(path).text(), path, scriptLoader(path)), loader: 'js' }))
+      build.onLoad({ filter: SCRIPT_FILE }, async ({ path }) => {
+        loaded?.add(path)
+
+        return { contents: await imports(await Bun.file(path).text(), path, scriptLoader(path)), loader: 'js' }
+      })
       // Bun resolves a file through the listing of its directory a build of the same process still running took, which the class list written since may be missing from.
       build.onResolve({ filter: new RegExp(`^${RegExp.escape(classesFile)}$`) }, () => ({ path: classesFile }))
       // `url(/logo.png)` points at a public file the server serves as is.

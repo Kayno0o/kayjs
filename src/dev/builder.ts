@@ -8,8 +8,8 @@ import { join, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { outputDir } from '../build/assets'
 import { bothBundles, bundleIslands, bundleStyles, clearClientOutput, readClientSources, writeClasses } from '../build/client'
-import { forgetSources } from '../build/files'
-import { sourceWords } from '../build/libraries'
+import { forgetSources, readSource } from '../build/files'
+import { fileWords, sourceWords } from '../build/libraries'
 import { inSignalsScope } from '../build/signals'
 import { mapBundleToKay } from '../build/sourcemap'
 import { styleSignature } from '../build/styles'
@@ -68,6 +68,8 @@ export function devBuilder(root: string, options: ClientOptions): (changed: stri
   const realRoot = realpathSync(root)
   let last: Built | undefined
   const graph: ImportGraph = new Map()
+  // What a module's text signed as, so a stylesheet build parses only the inputs whose text changed since it last did.
+  const signed = new Map<string, { hash: number | bigint, signature: string | undefined }>()
   const classesOf = async (built: Built) => built.classes ??= tailwindClasses(built.styleInputs)
 
   const stylesChanged = async (previous: Built, sources: ClientSources, texts: Map<string, string | undefined>): Promise<boolean> => {
@@ -78,7 +80,7 @@ export function devBuilder(root: string, options: ClientOptions): (changed: stri
       if (CSS_FILE.test(file))
         return true
 
-      if (previous.styleInputs.has(file) && (text === undefined || await signatureOf(file, text) !== previous.signatures.get(file)))
+      if (previous.styleInputs.has(file) && (text === undefined || await signatureOf(file, text, signed) !== previous.signatures.get(file)))
         return true
 
       const known = previous.words.get(file)
@@ -96,21 +98,21 @@ export function devBuilder(root: string, options: ClientOptions): (changed: stri
 
   const readInputs = async (inputs: Set<string>, signatures: Map<string, string>, words: Map<string, Set<string>>) => {
     await Promise.all([...inputs].map(async (file) => {
-      const text = await readText(file)
+      const text = readSourceText(file)
 
       if (text === undefined)
         return
 
       // One that does not parse has no signature, so its next edit builds the stylesheets again.
       if (SCRIPT_OR_COMPONENT.test(file)) {
-        try {
-          signatures.set(file, await styleSignature(file, text))
-        }
-        catch {}
+        const signature = await signatureOf(file, text, signed)
+
+        if (signature !== undefined)
+          signatures.set(file, signature)
       }
 
       if (plugins && SCANNED_FILE.test(file))
-        words.set(file, new Set(sourceWords(text)))
+        words.set(file, new Set(fileWords(file)))
     }))
   }
 
@@ -118,6 +120,7 @@ export function devBuilder(root: string, options: ClientOptions): (changed: stri
     // A full build reads every module's imports afresh.
     if (changed === null) {
       graph.clear()
+      signed.clear()
       forgetSources()
     }
 
@@ -149,7 +152,7 @@ export function devBuilder(root: string, options: ClientOptions): (changed: stri
     if (scripts)
       void pointMapsAtKay(scripts.maps)
 
-    const styleInputs = styles ? realPaths(styles.inputs) : previous!.styleInputs
+    const styleInputs = styles ? realPaths([...styles.inputs, ...styles.followed]) : previous!.styleInputs
     const signatures = styles ? new Map<string, string>() : previous!.signatures
     const words = previous?.words ?? new Map<string, Set<string>>()
 
@@ -218,9 +221,28 @@ async function pointMapsAtKay(maps: string[]): Promise<void> {
   }
 }
 
-async function signatureOf(file: string, text: string): Promise<string | undefined> {
+async function signatureOf(file: string, text: string, signed: Map<string, { hash: number | bigint, signature: string | undefined }>): Promise<string | undefined> {
+  const hash = Bun.hash(text)
+  const known = signed.get(file)
+
+  if (known?.hash === hash)
+    return known.signature
+
+  let signature: string | undefined
+
   try {
-    return await styleSignature(file, text)
+    signature = await styleSignature(file, text)
+  }
+  catch {}
+
+  signed.set(file, { hash, signature })
+
+  return signature
+}
+
+function readSourceText(file: string): string | undefined {
+  try {
+    return readSource(file).text
   }
   catch {
     return undefined

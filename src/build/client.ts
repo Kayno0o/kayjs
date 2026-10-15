@@ -381,11 +381,12 @@ async function refuseBuiltinImports(root: string, logs: Bun.BuildOutput['logs'],
     throw new Error(`kay: a browser has no ${builtins.join(', ')}, and islands import modules reaching ${builtins.length === 1 ? 'it' : 'them'}: ${chains.join('; ')}. An island bundles every module it imports, the database or environment one opens as it loads included: move what the island needs to a module importing none of it, or pass it as a prop.`)
 }
 
-// Each page and layout is an entry whose code shrinks to its imports, so what comes out is the stylesheet of everything it renders: each one's URL by the file relative to the root, and every module the build read.
-export async function bundleStyles(root: string, { pages, libraries }: Pick<ClientSources, 'pages' | 'libraries'>, options: ClientOptions): Promise<{ styles: Record<string, string>, inputs: string[] }> {
+// Each page and layout is an entry whose code shrinks to its imports, so what comes out is the stylesheet of everything it renders: each one's URL by the file relative to the root, and every module the build read, `followed` adding the ones it shrank to their imports, which the bundler's list of inputs leaves out.
+export async function bundleStyles(root: string, { pages, libraries }: Pick<ClientSources, 'pages' | 'libraries'>, options: ClientOptions): Promise<{ styles: Record<string, string>, inputs: string[], followed: string[] }> {
   if (pages.length === 0)
-    return { styles: {}, inputs: [] }
+    return { styles: {}, inputs: [], followed: [] }
 
+  const shrunk = new Set<string>()
   const build = await Bun.build({
     entrypoints: pages,
     outdir: clientDir(root),
@@ -393,7 +394,7 @@ export async function bundleStyles(root: string, { pages, libraries }: Pick<Clie
     minify: options.minify ?? false,
     metafile: true,
     naming: { entry: '[name]-[hash].[ext]', chunk: '[name]-[hash].[ext]', asset: '[name]-[hash].[ext]' },
-    plugins: [styleImports(root, libraries), ...mergingSupports(options.plugins ?? [])],
+    plugins: [styleImports(root, libraries, shrunk), ...mergingSupports(options.plugins ?? [])],
   })
 
   if (!build.success)
@@ -418,7 +419,7 @@ export async function bundleStyles(root: string, { pages, libraries }: Pick<Clie
     await Promise.all(build.outputs.filter(output => CSS_OUTPUT.test(output.path)).map(async output => Bun.write(output.path, rebaseCss(await Bun.file(output.path).text(), base))))
   }
 
-  return { styles, inputs: Object.keys(build.metafile!.inputs).map(input => resolve(input)) }
+  return { styles, inputs: Object.keys(build.metafile!.inputs).map(input => resolve(input)), followed: [...shrunk] }
 }
 
 function islandManifest(root: string, outputs: Outputs, islands: Map<string, string>, entry: string, hot: boolean): Omit<ClientManifest, 'styles'> {
