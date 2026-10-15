@@ -635,11 +635,16 @@ export class DomTemplate extends TemplateWriter {
   private component(element: ElementNode): void {
     const { b } = this
     const dynamic = b.isDynamicTag(element.tag)
+    // A tag read at runtime may name a form, whose `submit` handler, written or spread, is held as a written form's is.
+    const holds = dynamic && element.attributes.some(attribute => attribute.kind === 'spread' || this.source(attribute.name).toLowerCase() === 'onsubmit')
+
+    if (holds)
+      b.add(`(${helperName('holdSubmits')}(), `)
 
     b.add(dynamic ? 'KayDynamic(' : 'KayComponent(').addSource(element.tag).add(', ')
 
     this.componentProps(element, true)
-    b.add(')')
+    b.add(holds ? '))' : ')')
   }
 
   protected rendered(nodes: Node[]): void {

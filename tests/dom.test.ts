@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { kay } from '../src/build/plugin'
+import { compileKay } from '../src/compiler'
 import { patch } from '../src/runtime/dev-patch'
 import { cappedSizes } from '../src/runtime/image'
 import { LIVE_RELOAD } from '../src/server/dev'
@@ -133,6 +134,14 @@ describe('a dynamic tag', () => {
 
     expect(frame.outerHTML).toBe('<iframe title="a"></iframe>')
     expect(() => dynamic('img src=x onerror=alert(1)', {})).toThrow('is not an element name')
+  })
+
+  it('loads the submit hold only when its props may carry an onSubmit, written or spread', () => {
+    const compiled = (tag: string) => compileKay(`---\nconst { as: Tag = 'form' } = props<{ as?: string }>()\n---\n${tag}\n`, 'main.kay', { output: 'dom' }).tsx
+
+    expect(compiled('Tag(onSubmit={() => undefined})')).toContain('KayHoldSubmits()')
+    expect(compiled('Tag({...{}})')).toContain('KayHoldSubmits()')
+    expect(compiled('Tag(class="a" onClick={() => undefined})')).not.toContain('KayHoldSubmits()')
   })
 })
 
@@ -1405,6 +1414,33 @@ describe('a form submitted in the browser', () => {
       await dispose()
     }
   })
+
+  // Each alone, so the dynamic tag is all that loads the hold into its runtime.
+  const dynamicForm = (tag: string) => `---\nconst { as: Tag = 'form' } = props<{ as?: string }>()\nconst answers: (() => void)[] = []\n\nfunction send(event: SubmitEvent) {\n  event.preventDefault()\n\n  return new Promise<void>(resolve => answers.push(resolve))\n}\n---\n${tag}\n  button#go(type="submit") Send\nbutton#settle(type="button" onClick={() => answers.shift()?.()}) settle\n`
+  const mountDynamic = site({ 'main.kay': dynamicForm('Tag(onSubmit={send})') }, true)
+  const mountDynamicSpread = site({ 'main.kay': dynamicForm('Tag({...{ onSubmit: send }})') }, true)
+
+  for (const [how, mount] of [['written', mountDynamic], ['spread', mountDynamicSpread]] as const) {
+    it(`holds an onSubmit ${how} on a dynamic tag naming a form`, async () => {
+      const { root, dispose } = await mount()
+
+      try {
+        const form = root.querySelector('form')!
+        const busy = () => [form, root.querySelector('#go')].map(element => element!.getAttribute('aria-busy'))
+
+        form.requestSubmit()
+        await settle()
+        expect(busy()).toEqual(['true', 'true'])
+
+        root.querySelector<HTMLElement>('#settle')!.click()
+        await settle()
+        expect(busy()).toEqual([null, null])
+      }
+      finally {
+        await dispose()
+      }
+    })
+  }
 
   // bun test fails on any unhandled rejection whatever listens for it, so the rejection is observed in a process of its own.
   it('still reports an onSubmit that rejects, and is no longer aria-busy once it settled', async () => {
