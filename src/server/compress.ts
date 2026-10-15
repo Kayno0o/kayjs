@@ -232,28 +232,133 @@ async function gzipFound(body: Buffer, found: Found[]): Promise<{ gzip: Uint8Arr
   return { gzip: await compressing(async () => gzipAround(body, found, deflateRaw)), late: true }
 }
 
-// A gzip of the fixed texts with markup rendered per request between them, which alone is deflated: a prerendered page around its server islands.
-export async function gzipBetween(fixed: FixedText[], between: string[]): Promise<Uint8Array<ArrayBuffer> | ReadableStream<Uint8Array>> {
-  const chunks: Uint8Array[] = []
-  const found: Found[] = []
-  let at = 0
+// A part of a page cut at its holes, kept deflated only: the bytes are inflated for a browser taking no gzip, and `crc` and `shift` let the gzip trailer's crc be built without them.
+export interface SplicePart {
+  // Ends on a full flush, as `FixedText.deflated` does.
+  deflated: Buffer
+  // The crc-32 of the part's bytes, and their count.
+  crc: number
+  length: number
+  // What appending `length` zero bytes does to a crc, as 32 columns: `shifted(shift, crc) ^ part.crc` is the crc of the text before the part followed by it.
+  shift: Uint32Array
+}
 
-  for (const [index, text] of fixed.entries()) {
-    found.push({ text, at })
-    chunks.push(text.bytes)
-    at += text.bytes.length
+const CRC_POLY = 0xEDB88320
 
-    const markup = between[index]
+function matrixTimes(matrix: Uint32Array, vector: number): number {
+  let sum = 0
 
-    if (markup !== undefined && index < fixed.length - 1) {
-      const bytes = Buffer.from(markup)
+  for (let bit = 0; vector !== 0; bit++, vector >>>= 1) {
+    if ((vector & 1) !== 0)
+      sum ^= matrix[bit]!
+  }
 
-      chunks.push(bytes)
-      at += bytes.length
+  return sum >>> 0
+}
+
+function matrixSquare(square: Uint32Array, matrix: Uint32Array): void {
+  for (let column = 0; column < 32; column++)
+    square[column] = matrixTimes(matrix, matrix[column]!)
+}
+
+// What `length` zero bytes do to a crc, as zlib's crc32_combine builds it.
+function zerosOperator(length: number): Uint32Array {
+  const operator = new Uint32Array(32)
+
+  for (let column = 0; column < 32; column++)
+    operator[column] = 2 ** column >>> 0
+
+  if (length === 0)
+    return operator
+
+  const even = new Uint32Array(32)
+  const odd = new Uint32Array(32)
+
+  odd[0] = CRC_POLY
+
+  for (let column = 1; column < 32; column++)
+    odd[column] = 2 ** (column - 1) >>> 0
+
+  matrixSquare(even, odd)
+  matrixSquare(odd, even)
+
+  // The square-and-multiply over the bits of length, the matrices alternating, product kept in `operator`.
+  const result = Uint32Array.from(operator)
+  let remaining = length
+  let from = odd
+  let to = even
+
+  while (remaining > 0) {
+    matrixSquare(to, from)
+
+    if ((remaining & 1) !== 0) {
+      for (let column = 0; column < 32; column++)
+        result[column] = matrixTimes(to, result[column]!)
+    }
+
+    remaining = Math.floor(remaining / 2)
+    ;[from, to] = [to, from]
+  }
+
+  return result
+}
+
+// The same off the event loop, for a text cut from a page while serving it.
+export async function splicePartAsync(text: string): Promise<SplicePart> {
+  const { constants, deflateRaw, crc32 } = nodeZlib()
+  const bytes = Buffer.from(text)
+  const deflated = await compressing(async () => new Promise<Buffer>((resolve, reject) => deflateRaw(bytes, { level: 9, finishFlush: constants.Z_FULL_FLUSH }, (error, result) => error ? reject(error) : resolve(result))))
+
+  return { deflated, crc: crc32(bytes), length: bytes.length, shift: zerosOperator(bytes.length) }
+}
+
+// The text of a part, inflated.
+export function splicePartText(part: SplicePart): string {
+  const { constants, inflateRawSync } = nodeZlib()
+
+  return part.length === 0 ? '' : inflateRawSync(part.deflated, { finishFlush: constants.Z_SYNC_FLUSH }).toString()
+}
+
+// A gzip of the parts with markup rendered per request between them, which alone is deflated: a prerendered page around its server islands.
+export async function gzipParts(parts: SplicePart[], between: string[]): Promise<Uint8Array<ArrayBuffer> | ReadableStream<Uint8Array>> {
+  const { crc32, deflateRawSync } = nodeZlib()
+  const markups = parts.map((_, index) => index < parts.length - 1 ? Buffer.from(between[index] ?? '') : Buffer.alloc(0))
+  const late = markups.reduce((total, markup) => total + markup.length, 0) > SPLICE_HERE_BYTES
+  const chunks: Uint8Array[] = [GZIP_HEADER]
+  let crc = 0
+  let length = 0
+
+  for (const [index, part] of parts.entries()) {
+    if (part.length > 0) {
+      chunks.push(part.deflated)
+      crc = (matrixTimes(part.shift, crc) ^ part.crc) >>> 0
+      length += part.length
+    }
+
+    const markup = markups[index]!
+
+    if (markup.length > 0) {
+      chunks.push(late ? await compressing(async () => deflateRaw(markup, false)) : deflateRawSync(markup, runOptions(false)))
+      crc = crc32(markup, crc)
+      length += markup.length
     }
   }
 
-  const { gzip, late } = await gzipFound(Buffer.concat(chunks), found)
+  const trailer = new Uint8Array(8)
+  const view = new DataView(trailer.buffer)
+
+  view.setUint32(0, crc, true)
+  view.setUint32(4, length % 2 ** 32, true)
+  // An empty final block, which ends the member after the last full flush.
+  chunks.push(deflateRawSync(Buffer.alloc(0), runOptions(true)), trailer)
+
+  const gzip = new Uint8Array(chunks.reduce((total, chunk) => total + chunk.length, 0))
+  let written = 0
+
+  for (const chunk of chunks) {
+    gzip.set(chunk, written)
+    written += chunk.length
+  }
 
   return late ? lateBody(gzip) : gzip
 }

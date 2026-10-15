@@ -1,11 +1,11 @@
 import type { ServerIslandMode } from '../runtime/html'
 import type { ClientBuild } from './client'
-import type { FixedText } from './compress'
+import type { SplicePart } from './compress'
 import type { ServedRoute } from './guards'
 import type { RenderOptions, RequestContext, ServedPage } from './render'
 import { SERVER_ISLAND } from '../runtime/html'
 import { ISLAND_HEADER, ISLAND_PARAM } from '../runtime/server-islands'
-import { fixedTextAsync, gzipBetween, preferredEncoding } from './compress'
+import { gzipParts, preferredEncoding, splicePartAsync, splicePartText } from './compress'
 import { renderServerIslands, servePrerendered } from './render'
 import { freshStamp, STAMP_HOLE } from './stamp'
 import { freshWork } from './work'
@@ -17,9 +17,9 @@ const GZIP: ReadonlySet<'gzip'> = new Set(['gzip'])
 // What fills a gap of the page per request: a server island, by its place in the page, a form's stamp, by the action it posts to, or a `proofOfWork` challenge or a `workChallenge` field, by its mark.
 type Hole = { island: number } | { action: string } | { work: string } | { field: string }
 
-// The page cut at its holes, each part deflated once.
+// The page cut at its holes, each part kept deflated only, with its crc.
 interface Cut {
-  parts: FixedText[]
+  parts: SplicePart[]
   holes: Hole[]
 }
 
@@ -39,16 +39,35 @@ export function serverIslandModes(html: string): ServerIslandMode[] {
   return [...html.matchAll(SERVER_ISLAND)].map(modeOf)
 }
 
-async function cutOf(page: ServedPage, all: boolean): Promise<Cut> {
+export async function cutOf(page: ServedPage, all: boolean): Promise<Cut> {
   let { cut: islands } = page
 
   if (islands?.html !== page.html)
     page.cut = islands = { html: page.html }
 
-  return all ? islands.all ??= cutAt(islands.html, true) : islands.inline ??= cutAt(islands.html, false)
+  const kind = all ? 'all' : 'inline'
+  const cached = islands[kind]
+
+  if (cached)
+    return cached
+
+  const cut = cutAt(islands.html, all)
+
+  islands[kind] = cut
+
+  // A cut that failed, a page file unreadable say, is made again by the next request rather than kept as the answer.
+  try {
+    return await cut
+  }
+  catch (error) {
+    if (islands[kind] === cut)
+      delete islands[kind]
+
+    throw error
+  }
 }
 
-// The page text is read again for each of the two cuts rather than held beside the parts, which are the page in bytes and deflated.
+// The page text is read again for each of the two cuts rather than held beside the parts, which are the page deflated.
 async function cutAt(source: ServedPage['html'], all: boolean): Promise<Cut> {
   const html = typeof source === 'string' ? source : await source.text()
   const islands = [...html.matchAll(SERVER_ISLAND)].filter(match => all || modeOf(match) === 'inline').map(match => ({ match, hole: { island: Number(match[1]) } }))
@@ -65,7 +84,7 @@ async function cutAt(source: ServedPage['html'], all: boolean): Promise<Cut> {
 
   parts.push(html.slice(from))
 
-  return { parts: await Promise.all(parts.map(fixedTextAsync)), holes }
+  return { parts: await Promise.all(parts.map(splicePartAsync)), holes }
 }
 
 // The page with its holes filled for this request, gzipped when the browser takes it.
@@ -74,9 +93,9 @@ async function splice(page: ServedPage, all: boolean, islands: string[], request
   const between = holes.map(hole => 'action' in hole ? freshStamp(hole.action) : 'work' in hole ? freshWork(hole.work) : 'field' in hole ? freshFieldWork(hole.field) : islands[hole.island] ?? '')
 
   if (!preferredEncoding(request.headers.get('accept-encoding'), GZIP))
-    return { body: parts.map((part, index) => part.bytes.toString() + (between[index] ?? '')).join(''), gzip: false }
+    return { body: parts.map((part, index) => splicePartText(part) + (between[index] ?? '')).join(''), gzip: false }
 
-  return { body: await gzipBetween(parts, between), gzip: true }
+  return { body: await gzipParts(parts, between), gzip: true }
 }
 
 function modeOf([mark, index]: RegExpExecArray): ServerIslandMode {
