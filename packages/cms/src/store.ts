@@ -152,7 +152,7 @@ export async function deleteEntry(ref: EntryRef, author?: Identity, { version, r
     return found
 
   if (required && version === undefined && await versionOf(ref) !== undefined)
-    return unversioned(ref)
+    return unversioned(ref, true)
 
   const committed = await commitChange(ref, { repoPath: found.file.repoPath, absolute: found.file.absolute, text: undefined, message: `content(${collection.name}): delete ${ref.slug}`, author, base: version })
 
@@ -195,8 +195,9 @@ async function commitChange(ref: EntryRef, change: FileChange): Promise<{ commit
   }
 }
 
-function unversioned(ref: EntryRef): { issues: Issue[] } {
+// A delete naming none comes from an editor older than the server, or from one keeping its edits over a file deleted and made again since, which it never showed.
+function unversioned(ref: EntryRef, deleting = false): { issues: Issue[] } {
   log.warn(`refused a change to ${ref.collection}/${ref.slug} naming no version, from an editor older than the server`)
 
-  return refused(ref, 'This editor is older than the server: copy your changes, reload the page, then make them again')
+  return refused(ref, deleting ? 'This editor has not shown the file as it is now, so it will not delete it: reload the page to see it, then delete again' : 'This editor is older than the server: copy your changes, reload the page, then make them again')
 }

@@ -160,7 +160,9 @@ describe('saveEntry', () => {
       const older = 'This editor is older than the server: copy your changes, reload the page, then make them again'
 
       expect(await saveEntry({ collection: 'posts', slug: 'hello', data: { title: 'Hi' } }, { required: true })).toHaveProperty('issues.0.message', older)
-      expect(await deleteEntry({ collection: 'posts', slug: 'hello' }, undefined, { required: true })).toHaveProperty('issues.0.message', older)
+
+      // A delete naming none also comes from edits kept over a deleted file made again since, whose editor is not older.
+      expect(await deleteEntry({ collection: 'posts', slug: 'hello' }, undefined, { required: true })).toHaveProperty('issues.0.message', 'This editor has not shown the file as it is now, so it will not delete it: reload the page to see it, then delete again')
       expect(saved).toEqual([])
 
       await deleteEntry({ collection: 'posts', slug: 'hello' }, undefined, { version: fileVersion('hello'), required: true })

@@ -115,6 +115,23 @@ describe('saveDraft targets', () => {
     expect(sent.map(({ url, body }) => [url, body.data.title])).toEqual([['/api/cms/entries/posts/a', 'First'], ['/api/cms/entries/posts/b', 'Second']])
   })
 
+  it('toasts a refusal once when the join under another slug is refused the same way', async () => {
+    server(() => ({ issues: [{ collection: 'posts', slug: 'hello', path: '', message: 'Forgejo did not answer' }] }), 1)
+
+    const drafts = opened()
+
+    drafts.set(post, 'title', 'First')
+
+    const first = saveDraft(drafts, post, { slug: 'a' })
+    const second = saveDraft(drafts, post, { slug: 'b' })
+
+    expect(await Promise.all([first, second])).toEqual([false, false])
+    expect(toasts().map(toast => toast.message)).toEqual(['Not saved: Forgejo did not answer'])
+
+    expect(await saveDraft(drafts, post, { slug: 'b' })).toBe(false)
+    expect(toasts().map(toast => toast.message)).toEqual(['Not saved: Forgejo did not answer', 'Not saved: Forgejo did not answer'])
+  })
+
   it('writes the edits kept over a deleted file as a new entry, so a file made meanwhile is not written over', async () => {
     const sent = server(() => ({ saved: true, version: 'v2' }))
     const drafts = opened()

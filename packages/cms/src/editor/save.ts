@@ -7,12 +7,13 @@ import filesApi from '../api/files'
 import { entryKey } from '../markers'
 
 type Outcome = { issues: Issue[], conflict?: { version: string | null } | undefined } | { saved: true, commit?: unknown, version?: string | undefined }
-interface SaveOptions { slug?: string, locale?: string | undefined, create?: boolean }
+// `told` is the toast a save this one waited for ended on, which a refusal worded the same does not repeat.
+interface SaveOptions { slug?: string, locale?: string | undefined, create?: boolean, told?: string | undefined }
 
 // The save of each entry on its way, and whether another was asked for meanwhile.
 const saving = new WeakMap<Drafts, Map<string, Flight>>()
 
-interface Flight { done: Promise<boolean>, again: boolean, target: string }
+interface Flight { done: Promise<boolean>, again: boolean, target: string, told?: string | undefined }
 
 // Saves an entry's draft, under the slug and locale a new entry was given, and says how it went; true once saved.
 // A save asked for while one is on its way waits for it, then saves the edits typed meanwhile once, so the same version is never sent twice.
@@ -26,9 +27,9 @@ export async function saveDraft(drafts: Drafts, ref: EntryRef, options: SaveOpti
   saving.set(drafts, inFlight)
 
   if (running && running.target !== target) {
-    await running.done
+    const saved = await running.done
 
-    return saveDraft(drafts, ref, options)
+    return saveDraft(drafts, ref, saved ? options : { ...options, told: running.told })
   }
 
   if (running) {
@@ -42,11 +43,11 @@ export async function saveDraft(drafts: Drafts, ref: EntryRef, options: SaveOpti
 
   flight.done = (async () => {
     try {
-      let saved = await saveOnce(drafts, ref, options)
+      let saved = await saveOnce(drafts, ref, options, flight)
 
       while (saved && flight.again && drafts.changed(ref)) {
         flight.again = false
-        saved = await saveOnce(drafts, ref, options)
+        saved = await saveOnce(drafts, ref, options, flight)
       }
 
       return saved
@@ -60,7 +61,7 @@ export async function saveDraft(drafts: Drafts, ref: EntryRef, options: SaveOpti
   return flight.done
 }
 
-async function saveOnce(drafts: Drafts, ref: EntryRef, { slug = ref.slug, locale = ref.locale, create = false }: SaveOptions): Promise<boolean> {
+async function saveOnce(drafts: Drafts, ref: EntryRef, { slug = ref.slug, locale = ref.locale, create = false, told }: SaveOptions, flight: Flight): Promise<boolean> {
   const entry = drafts.entry(ref)
 
   if (!entry)
@@ -83,13 +84,13 @@ async function saveOnce(drafts: Drafts, ref: EntryRef, { slug = ref.slug, locale
     // A refusal of the entry as a whole, a conflict or a forge that failed, stays shown while the editor types, as no render clears it.
     if (whole) {
       drafts.refuse(ref, { message: whole.message, conflict: outcome.conflict })
-      toast.error(`Not saved: ${whole.message}`)
+      tell(flight, told, `Not saved: ${whole.message}`)
 
       return false
     }
 
     drafts.report(issues)
-    toast.error('Not saved: some fields need fixing')
+    tell(flight, told, 'Not saved: some fields need fixing')
 
     return false
   }
@@ -101,6 +102,14 @@ async function saveOnce(drafts: Drafts, ref: EntryRef, { slug = ref.slug, locale
   drafts.report([])
 
   return true
+}
+
+// Toasts a refusal, unless the save this one waited for ended on the same toast.
+function tell(flight: Flight, told: string | undefined, message: string): void {
+  flight.told = message
+
+  if (message !== told)
+    toast.error(message)
 }
 
 // Deletes a saved entry, naming the version the editor or the list showed, and says how it went; true once deleted.
