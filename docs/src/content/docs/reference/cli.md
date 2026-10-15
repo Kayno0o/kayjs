@@ -27,6 +27,7 @@ bun run dev
 | `kay fmt [paths]` | Format `.kay` files |
 | `kay migrate astro [dir]` | Translate an Astro project into a kay one |
 | `kay lsp --stdio` | The language server behind the editor extension |
+| `kay mcp` | Serve the project to an agent as MCP tools and resources |
 
 ## kay new
 
@@ -315,6 +316,32 @@ Translates an Astro project's `.astro` files into `.kay` ones, its pages into `s
 `--format json` gives what it wrote and left to do as one document ([Output for tools](#output-for-tools)).
 
 The [Astro guide](/guides/migrating-from-astro) shows what it translates and how to finish what it lists.
+
+## kay mcp
+
+```sh
+claude mcp add kay -- bunx kay mcp
+```
+
+Serves the project in the current directory to an agent as an [MCP](https://modelcontextprotocol.io) server over stdio, so it calls kay's commands as typed tools instead of running them in a shell. Nothing is set up in the app: the agent's client starts `kay mcp` from the project's root. Another client takes the same command in its JSON config:
+
+```json
+{ "mcpServers": { "kay": { "command": "bunx", "args": ["kay", "mcp"] } } }
+```
+
+It speaks the revision that opens with `initialize` (`2025-11-25` and earlier) and `2026-07-28`, whose requests carry their version in `_meta`. Stdout holds the protocol alone.
+
+| Tool | Does |
+| --- | --- |
+| `check` | `kay check --format json`: `{ errors, warnings, problems }`. `paths` narrows the report to files or directories of the project, `only` to a group of lints, `denyWarnings` counts warnings as failures. A problem found is a result, not an error |
+| `routes` | `kay routes --format json`: every route with its file, layouts and guards |
+| `explain` | The lints and error codes, or with `name` a lint, an error code or a group, as `kay explain --format json` |
+| `render` | `kay render` on `url`, with `method`, `body`, `headers` and `cookies`: the body, then the status line, headers and server log. A status of 400 or above is an error result that keeps the body |
+| `dev_errors` | The errors a running `kay dev` met, read from `.kay/dev/errors.json` ([Errors without a browser](#errors-without-a-browser)); empty when it has met none |
+
+The resources are `kay://llms.txt`, the index to start from, and one `kay://llms/<file>.md` for each guide of kay's `llms/`, described by its title and the headings of its sections.
+
+Each tool runs its command in a child process, so a call costs what the command does: a `check` takes as long as `kay check`. `kay mcp` keeps no project loaded between calls, as `kay lsp` does.
 
 ## Other commands
 

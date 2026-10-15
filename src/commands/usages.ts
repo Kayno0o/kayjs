@@ -11,4 +11,5 @@ export const USAGES = {
   fmt: 'fmt [paths...] [--check] [--format text|json] [--quiet]',
   migrate: 'migrate astro [dir] [--out <dir>] [--format text|json] [--quiet]',
   lsp: 'lsp --stdio',
+  mcp: 'mcp [--stdio]',
 } as const

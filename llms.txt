@@ -36,7 +36,7 @@ To build a site, read [Build a site](llms/site.md) first: one page walking throu
 - [API routes](llms/api-routes.md): Elysia modules under `src/api/`, server-sent events, websockets and rooms, and reading them typed from islands
 - [Testing](llms/testing.md): `kay/test`: rendering pages and posting actions in `bun test`, browser tests
 - [Checks and lints](llms/checks.md): what `kay check` reports, every lint at its default level and how to change it, ESLint on `.kay` files
-- [Project setup and commands](llms/project.md): `kay.config.ts`, tsconfig, editor setup, every `kay` CLI command and template, and `kay render <url>`, printing what a page renders without starting a server
+- [Project setup and commands](llms/project.md): `kay.config.ts`, tsconfig, editor setup, every `kay` CLI command and template, and `kay render <url>`, printing what a page renders without starting a server, and `kay mcp`, serving kay's tools and these guides to an agent
 - [Running in production](llms/production.md): request logs, tracing and Server-Timing, health checks and graceful shutdown, cron and background jobs, running behind a proxy, security headers and CSP, compression
 - [Upgrading](llms/upgrading.md): what each minor release of kay and its libraries breaks, and what an app changes to move to it
 - [What's new](llms/whats-new.md): what each release adds, newest first, each feature with the doc covering it

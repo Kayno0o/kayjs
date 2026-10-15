@@ -1,0 +1,239 @@
+import type { Resource, Tool, ToolResult } from './protocol'
+import { existsSync } from 'node:fs'
+import { readdir } from 'node:fs/promises'
+import { isAbsolute, join, relative, resolve, sep } from 'node:path'
+import process from 'node:process'
+import { KAY_DIR } from '../build/assets'
+import { LINT_GROUPS } from '../compiler/lints'
+import { INVALID_PARAMS, RpcError } from './protocol'
+
+const CLI = join(import.meta.dir, '..', 'cli.ts')
+const KAY_ROOT = join(import.meta.dir, '..', '..')
+const LLMS_DIR = join(KAY_ROOT, 'llms')
+const DEV_ERRORS = join(KAY_DIR, 'dev', 'errors.json')
+// A page or a check running longer is cut short, as a model waiting on it would be.
+const CALL_TIMEOUT_MS = 5 * 60_000
+// What a result keeps of a stream, so that a huge page does not fill the model's context.
+const MAX_OUTPUT = 512 * 1024
+const SCHEME = /^https?:\/\//
+const HEADING = /^(#{1,2}) (.+)$/gm
+const READ_ONLY = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
+
+interface Run {
+  code: number
+  stdout: string
+  stderr: string
+}
+
+// The tools and resources of the project at `root`, which is where each tool's `kay` command runs.
+export async function projectCapabilities(root: string): Promise<{ tools: Tool[], resources: Resource[] }> {
+  return { tools: tools(root), resources: await resources() }
+}
+
+function tools(root: string): Tool[] {
+  const kay = async (args: string[]) => run(root, args)
+  const document = async (args: string[]) => jsonResult(await kay(args))
+
+  return [
+    {
+      name: 'check',
+      title: 'Check the project',
+      description: 'Type-checks the project, .kay files and templates included, and lints it. Answers `{ errors, warnings, problems }`, each problem with its file, line, column, severity, code and message. Give `paths` to report only on those files or directories; the project is still checked as a whole. A problem is a result, not a failure of the tool.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          paths: { type: 'array', items: { type: 'string' }, description: 'Files or directories in the project to report on, relative to the project root.' },
+          only: { type: 'string', enum: Object.keys(LINT_GROUPS), description: 'Report one group of lints alone, such as `seo`.' },
+          denyWarnings: { type: 'boolean', description: 'Count warnings as failures. The report is the same.' },
+        },
+        additionalProperties: false,
+      },
+      annotations: READ_ONLY,
+      run: async (args) => {
+        const paths = stringList(args.paths, 'paths').map(path => insideProject(root, path))
+        const only = optionalString(args.only, 'only')
+
+        return document(['check', ...only === undefined ? [] : ['--only', only], ...args.denyWarnings === true ? ['--deny-warnings'] : [], '--format', 'json', ...paths.length === 0 ? [] : ['--', ...paths]])
+      },
+    },
+    {
+      name: 'routes',
+      title: 'List the routes',
+      description: 'Lists every route the project serves, without running a page: `{ routes, unlisted }`, each route with its methods, path, kind (page, action, endpoint, api, plugin, redirect, feed or kay), the file serving it, and its layouts and guards, outermost first.',
+      inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+      annotations: READ_ONLY,
+      run: async () => document(['routes', '--format', 'json']),
+    },
+    {
+      name: 'explain',
+      title: 'Explain a lint or an error code',
+      description: 'Without a name, lists the lints and the error codes kay raises with their groups and summaries. With the name of a lint, a lint group, an error code or an error group, explains it: for a lint an example it reports and the same written right, for an error code where its fix is written in the guide.',
+      inputSchema: { type: 'object', properties: { name: { type: 'string', description: 'A lint such as `missing-alt`, an error code, or a group of either.' } }, additionalProperties: false },
+      annotations: READ_ONLY,
+      run: async (args) => {
+        const name = optionalString(args.name, 'name')
+
+        return document(['explain', '--format', 'json', ...name === undefined ? [] : ['--', name]])
+      },
+    },
+    {
+      name: 'render',
+      title: 'Render a URL',
+      description: 'Answers one request as the app\'s server would under `kay dev`, without starting it on a port, and returns the body, then the status line, the headers and what the server logged. A status of 400 or above is an error result that still carries the body. Boots the whole app: a POST runs its action against the app\'s database.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          url: { type: 'string', description: 'A path such as `/about`, or an http URL.' },
+          method: { type: 'string', description: 'The HTTP method; GET, or POST when a body is given.' },
+          body: { type: 'string', description: 'The request body, sent as a form unless a content-type header says otherwise.' },
+          headers: { type: 'array', items: { type: 'string' }, description: 'Request headers, each as `name: value`.' },
+          cookies: { type: 'array', items: { type: 'string' }, description: 'Cookies, each as `name=value`, such as a session cookie for a guarded page.' },
+        },
+        required: ['url'],
+        additionalProperties: false,
+      },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+      run: async (args) => {
+        const { url } = args
+        const method = optionalString(args.method, 'method')
+        const body = optionalString(args.body, 'body')
+
+        // A value that began with `-` would be read as an option.
+        if (typeof url !== 'string' || !(url.startsWith('/') || SCHEME.test(url)))
+          throw new RpcError(INVALID_PARAMS, 'url takes a path such as /about or an http URL')
+
+        const result = await kay(['render', url, '--include', ...method === undefined ? [] : [`--method=${method}`], ...body === undefined ? [] : [`--body=${body}`], ...stringList(args.headers, 'headers').map(header => `--header=${header}`), ...stringList(args.cookies, 'cookies').map(cookie => `--cookie=${cookie}`)])
+
+        return {
+          content: [
+            { type: 'text', text: result.stdout },
+            { type: 'text', text: `kay render exited ${result.code}\n${result.stderr}`.trim() },
+          ],
+          isError: result.code !== 0,
+        }
+      },
+    },
+    {
+      name: 'dev_errors',
+      title: 'Read the dev server\'s errors',
+      description: 'Reads the errors a running `kay dev` met, from `.kay/dev/errors.json`: why the server failed to boot, requests that threw and errors islands met in the browser, each with its message, report and where the project\'s own code threw. An error leaves the list once the file compiles or the request answers again. Answers an empty list when `kay dev` has met none or has not run.',
+      inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+      annotations: READ_ONLY,
+      run: async () => {
+        const file = Bun.file(join(root, DEV_ERRORS))
+
+        if (!await file.exists())
+          return jsonText({ errors: [], note: `${DEV_ERRORS} does not exist: \`kay dev\` has not run in this project, or has met no error since.` })
+
+        try {
+          return jsonText(await file.json() as object)
+        }
+        catch {
+          return { content: [{ type: 'text', text: `${DEV_ERRORS} is not valid JSON; \`kay dev\` may be writing it, call again.` }], isError: true }
+        }
+      },
+    },
+  ]
+}
+
+// The llms/ files, which hold the guide to each part of kay, and the index that links them.
+async function resources(): Promise<Resource[]> {
+  const files = (await readdir(LLMS_DIR)).filter(name => name.endsWith('.md')).toSorted()
+  const index: Resource = {
+    uri: 'kay://llms.txt',
+    name: 'llms.txt',
+    title: 'kay: start here',
+    description: 'The rules easy to get wrong and links to the guide of each part of kay. Read it first.',
+    mimeType: 'text/markdown',
+    read: async () => Bun.file(join(KAY_ROOT, 'llms.txt')).text(),
+  }
+
+  return [index, ...await Promise.all(files.map(async (name) => {
+    const path = join(LLMS_DIR, name)
+    const text = await Bun.file(path).text()
+    const headings = [...text.matchAll(HEADING)].map(match => ({ level: match[1]!.length, title: match[2]! }))
+    const title = headings.find(heading => heading.level === 1)?.title ?? name
+
+    return {
+      uri: `kay://llms/${name}`,
+      name,
+      title,
+      description: `Sections: ${headings.filter(heading => heading.level === 2).map(heading => heading.title).join(', ')}`,
+      mimeType: 'text/markdown',
+      read: async () => Bun.file(path).text(),
+    } satisfies Resource
+  }))]
+}
+
+// Runs `kay` with `args` in `root`, as a child so that what a command prints, exits with or throws cannot reach the protocol on this process's stdout.
+async function run(root: string, args: string[]): Promise<Run> {
+  const child = Bun.spawn([process.execPath, CLI, ...args], { cwd: root, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe', env: process.env })
+  const timer = setTimeout(() => child.kill(), CALL_TIMEOUT_MS)
+
+  try {
+    const [stdout, stderr] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text()])
+
+    return { code: await child.exited, stdout: truncate(stdout), stderr: truncate(stderr) }
+  }
+  finally {
+    clearTimeout(timer)
+  }
+}
+
+function truncate(text: string): string {
+  return text.length > MAX_OUTPUT ? `${text.slice(0, MAX_OUTPUT)}\n[truncated at ${MAX_OUTPUT} characters]` : text
+}
+
+// A command under `--format json` leaves one document on stdout whatever its exit code, a problem found included; one that could not run also says why on stderr, and without a document nothing ran.
+function jsonResult({ code, stdout, stderr }: Run): ToolResult {
+  let document: object
+
+  try {
+    document = JSON.parse(stdout) as object
+  }
+  catch {
+    return { content: [{ type: 'text', text: stderr.trim() || stdout.trim() || 'The command printed nothing.' }], isError: true }
+  }
+
+  const result = jsonText(document)
+
+  return code !== 0 && stderr.trim() !== '' ? { ...result, content: [...result.content, { type: 'text', text: stderr.trim() }], isError: true } : result
+}
+
+function jsonText(document: object): ToolResult {
+  return { content: [{ type: 'text', text: JSON.stringify(document) }], structuredContent: document }
+}
+
+function optionalString(value: unknown, name: string): string | undefined {
+  if (value === undefined)
+    return undefined
+
+  if (typeof value !== 'string')
+    throw new RpcError(INVALID_PARAMS, `${name} takes a string`)
+
+  return value
+}
+
+function stringList(value: unknown, name: string): string[] {
+  if (value === undefined)
+    return []
+
+  if (!Array.isArray(value) || value.some(item => typeof item !== 'string'))
+    throw new RpcError(INVALID_PARAMS, `${name} takes a list of strings`)
+
+  return value as string[]
+}
+
+// A path in the project, relative to its root, so that `check` is never pointed outside it.
+function insideProject(root: string, path: string): string {
+  const absolute = resolve(root, path)
+  const inside = relative(root, absolute)
+
+  if (inside === '' || isAbsolute(inside) || inside.split(sep)[0] === '..')
+    throw new RpcError(INVALID_PARAMS, `${path} is not a file or directory inside the project`)
+
+  if (!existsSync(absolute))
+    throw new RpcError(INVALID_PARAMS, `${path} does not exist`)
+
+  return inside
+}

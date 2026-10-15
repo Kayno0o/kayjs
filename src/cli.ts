@@ -18,6 +18,7 @@ const COMMANDS: Record<keyof typeof USAGES, () => Promise<Command>> = {
   fmt: async () => (await import('./commands/fmt')).fmt,
   migrate: async () => (await import('./commands/migrate')).migrate,
   lsp: async () => (await import('./commands/lsp')).lsp,
+  mcp: async () => (await import('./commands/mcp')).mcp,
 }
 const USAGE = Object.values(USAGES).map((line, index) => `${index === 0 ? 'Usage: ' : '       '}kay ${line}`).join('\n')
 

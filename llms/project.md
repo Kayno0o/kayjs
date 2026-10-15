@@ -101,6 +101,22 @@ kay render /about
 kay render /account --cookie session=…
 ```
 
+### Give an agent kay's tools
+
+`kay mcp` serves the project in the current directory as an MCP server over stdio, for an agent to call instead of running `kay` in a shell. It needs nothing in the app: the agent's client starts it from the project's root.
+
+```sh
+claude mcp add kay -- bunx kay mcp
+```
+
+Another client takes the same command in its JSON config, `mcp.json` or `.mcp.json` at the project's root:
+
+```json
+{ "mcpServers": { "kay": { "command": "bunx", "args": ["kay", "mcp"] } } }
+```
+
+The tools are `check` (`paths`, `only`, `denyWarnings`), `routes`, `explain` (a lint or an error code, `name`), `render` (`url`, `method`, `body`, `headers`, `cookies`) and `dev_errors`; the resources are `kay://llms.txt` and one `kay://llms/<file>.md` per guide, each listing its sections. See [Commands](#commands).
+
 ### Format the templates
 
 `kay fmt` formats `.kay` files, and `--check` lists the unformatted ones and fails:
@@ -334,6 +350,12 @@ export default defineConfig({
   - Renaming a server value renames its reads in the template, and renaming a destructured prop renames it in every parent passing it.
   - It runs the project's `kay.config.ts`, and the modules it imports, as soon as a `.kay` file is opened, as `bun` would: open only a project you trust, as with its `package.json` scripts.
 
+- `kay mcp [--stdio]`:
+  - Serve the project in the current directory to an agent as an MCP server over stdio (newline-delimited JSON-RPC), in both the revision that opens with `initialize` (`2025-11-25` and earlier) and `2026-07-28`, whose requests carry their version in `_meta`; it needs no setup in the app and prints nothing but protocol on stdout.
+  - Tools, each with an input schema: `check` runs `kay check --format json` and answers its document, taking `paths` (files or directories inside the project to report on), `only` (a lint group) and `denyWarnings`; `routes` answers `kay routes --format json`; `explain` lists the lints and error codes, or explains the lint, error code or group in `name`; `render` runs `kay render` on `url` with `method`, `body`, `headers` (`name: value`) and `cookies` (`name=value`), answering the body, then the status line, headers and server log, as an error result for a status of 400 or above; `dev_errors` reads `.kay/dev/errors.json` (see `kay dev`), an empty list when `kay dev` has met nothing.
+  - Each tool runs the command in a child process of its own, so a call pays what the command costs, a `check` as long as `kay check`; a problem found is a result, a command that could not run an error result (`isError`).
+  - Resources: `kay://llms.txt`, and `kay://llms/<file>.md` for each file of `llms/`, with the file's title and the headings of its sections as description; only those are readable.
+  - Register it with `claude mcp add kay -- bunx kay mcp`, or as `{ "mcpServers": { "kay": { "command": "bunx", "args": ["kay", "mcp"] } } }` in a client's JSON config.
 - Every command prints its usage for `--help` or `-h`, and refuses an option or argument it does not take.
 - `kay build`, `kay check`, `kay dev`, `kay fmt`, `kay migrate` and `kay new` take `--quiet`: the problems and one summary line (`kay build` one per step it ran, `--static` and `--compile` adding theirs), without the size report, the files one by one or the next step; `kay fmt --check` names the unformatted files alone; `kay dev` its ready line and errors, no line per restart or stylesheet swap; every other command refuses it.
 - Colour only goes to a terminal, never under `NO_COLOR` or `TERM=dumb`, and `FORCE_COLOR` brings it back to a pipe; a redrawn line or a cleared screen only ever goes to a terminal.
