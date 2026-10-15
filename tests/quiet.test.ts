@@ -1,3 +1,4 @@
+import { watch } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
@@ -86,10 +87,23 @@ describe('--quiet', () => {
 
   it('scaffolds with the line saying what it created, and not how to run it', async () => {
     const root = await project({})
-    const { stdout, stderr, code } = await kay(['new', 'app', '-y', '--quiet'], root)
+    const created: string[] = []
+    // Packing kay from this checkout writes nothing into it, which every other test type-checks and walks meanwhile.
+    const watcher = watch(join(import.meta.dir, '..'), (_, name) => {
+      if (name === 'types' || name === 'dist')
+        created.push(name)
+    })
 
-    expect(code, stderr).toBe(0)
-    expect(stdout).toMatch(/^created app, [^\n]+ files\n$/)
+    try {
+      const { stdout, stderr, code } = await kay(['new', 'app', '-y', '--quiet'], root)
+
+      expect(code, stderr).toBe(0)
+      expect(stdout).toMatch(/^created app, [^\n]+ files\n$/)
+      expect(created).toEqual([])
+    }
+    finally {
+      watcher.close()
+    }
   })
 
   it('is refused by a command whose output is its answer', async () => {

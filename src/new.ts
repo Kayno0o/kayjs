@@ -1,7 +1,8 @@
 import type { ConfigSettings, Feature } from './templates'
 import { randomBytes } from 'node:crypto'
 import { existsSync, statSync } from 'node:fs'
-import { mkdir, readdir, rm, writeFile } from 'node:fs/promises'
+import { cp, mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
 import process from 'node:process'
 import { checklist, select } from './prompt'
@@ -172,16 +173,31 @@ function packageName(directory: string): string {
 }
 
 // A packed copy installs like a published package, its dependencies only; a `file:` folder would drag in its devDependencies too.
+// Built and packed from a copy beside the checkout, never in it: `prepack` writing types and dist into the checkout would shadow src for every process type-checking or walking it meanwhile.
 async function packKay(vendor: string): Promise<string> {
-  const child = Bun.spawn([process.execPath, 'pm', 'pack', '--quiet', '--destination', vendor], { cwd: KAY_ROOT, stdout: 'pipe', stderr: 'pipe' })
-  const [output, errors, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+  const { devDependencies: _, workspaces: __, ...manifest } = await Bun.file(join(KAY_ROOT, 'package.json')).json() as { files: string[], devDependencies?: unknown, workspaces?: unknown }
+  const stage = await mkdtemp(join(tmpdir(), 'kay-pack-'))
 
-  if (code !== 0) {
-    // What `prepack` built and `postpack` would have removed, which would otherwise shadow `src` for the checkout's own type check.
-    await Promise.all(['types', 'dist'].map(async dir => rm(join(KAY_ROOT, dir), { recursive: true, force: true })))
+  try {
+    // Without the workspace libraries, whose versions only an install of the checkout resolves, and which installing kay never reads.
+    await Bun.write(join(stage, 'package.json'), JSON.stringify(manifest, null, 2))
+    await Promise.all(manifest.files.filter(entry => entry !== 'types' && entry !== 'dist').map(async entry => cp(join(KAY_ROOT, entry), join(stage, entry), { recursive: true })))
 
-    throw new Error(`kay: packing ${KAY_ROOT} failed\n${errors}`)
+    const types = Bun.spawn([join(KAY_ROOT, 'node_modules/.bin/tsgo'), '-p', join(KAY_ROOT, 'tsconfig.build.json'), '--outDir', join(stage, 'types')], { stdout: 'pipe', stderr: 'pipe' })
+    const [typeErrors, typesCode, processor] = await Promise.all([new Response(types.stdout).text(), types.exited, Bun.build({ entrypoints: [join(KAY_ROOT, 'src/eslint/index.ts')], target: 'node', packages: 'external', outdir: join(stage, 'dist'), naming: 'eslint.js' })])
+
+    if (typesCode !== 0 || !processor.success)
+      throw new Error(`kay: packing ${KAY_ROOT} failed\n${typeErrors}${processor.logs.join('\n')}`)
+
+    const child = Bun.spawn([process.execPath, 'pm', 'pack', '--quiet', '--ignore-scripts', '--destination', vendor], { cwd: stage, stdout: 'pipe', stderr: 'pipe' })
+    const [output, errors, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+
+    if (code !== 0)
+      throw new Error(`kay: packing ${KAY_ROOT} failed\n${errors}`)
+
+    return `file:./vendor/${basename(output.trim())}`
   }
-
-  return `file:./vendor/${basename(output.trim())}`
+  finally {
+    await rm(stage, { recursive: true, force: true })
+  }
 }
