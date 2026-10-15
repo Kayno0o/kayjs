@@ -428,6 +428,8 @@ const site = await testSite()
 const page = await site.submit(signIn, { identifier: 'ada@example.com', password: 'correct horse battery' }, { from: '/login' })
 ```
 
+The prebuilt pages' actions import as `@kaynooo/kayjs-auth/pages/<page>.kay`, such as `import { password } from '@kaynooo/kayjs-auth/pages/sign-in.kay'` and `import { signOut } from '@kaynooo/kayjs-auth/pages/account/_layout.kay'`, and a test submits them as it does its own. `kay check` types such a module by its default export alone, so the test types each action by its fields (`examples/noticeboard/tests/pages.ts` does).
+
 A test needing a signed-in request without going through a form takes `await auth.sessionCookie(userId)`, the `Cookie` header of a new session signed in as that user, as `signIn` makes it, against the app's own auth, to send by hand: `app.handle(new Request(url, { headers: { cookie } }))`.
 
 Each `testSite` keeps its own cookies, one browser each. `memoryStore()` keeps each test's users apart, and a mailer pushing into an array hands the test the links it would have mailed, `url` included; with kayjs-mail, its `outbox` holds what was sent.

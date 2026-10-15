@@ -1,10 +1,9 @@
 import { afterAll, describe, expect, it } from 'bun:test'
 import { browserPath, testSite } from 'kay/test'
-import { auth } from '../src/auth'
 import { post } from '../src/routes/index.kay'
 import { joinAs } from './members'
 
-const site = await testSite({ use: [auth.plugin], browser: true })
+const site = await testSite({ browser: true })
 
 afterAll(async () => {
   await site.close()
@@ -17,7 +16,7 @@ describe.skipIf(!browserPath())('in a browser', () => {
     await joinAs(site, 'Ada')
     await joinAs(site, 'Grace')
 
-    const page = await site.open('/login')
+    const page = await site.open('/auth/sign-in')
 
     await page.fill('input[name="identifier"]', 'ada')
     await page.fill('input[name="password"]', 'correct horse battery')

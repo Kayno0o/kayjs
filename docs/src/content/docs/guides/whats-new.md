@@ -7,6 +7,7 @@ This page lists what each release adds, newest first, with a link to where each 
 
 ## Unreleased
 
+- **Test the prebuilt auth pages**: their actions import as `@kaynooo/kayjs-auth/pages/<page>.kay`, for a test to submit them ([kayjs-auth](/llms/kayjs-auth)).
 - **kayjs-auth reads a bearer token and its user together**: one query instead of two with the built-in stores; a custom store may add `bearerTokens.findByDigestWithUser`. [kayjs-auth](/libraries/kayjs-auth)
 - **Build report per route**: `kay build` prints one row per route with the scripts and stylesheets it loads and whether it was prerendered, the time each stage took and what each cache under `.kay/cache` answered, each size beside its change since the last build. [kay build](/reference/cli#kay-build)
 - **The app preset runs the app as a role that cannot change the schema**: `app_rw` reads and writes rows, the migrations run as the owner, and default privileges cover the tables a later migration creates. [Database roles](/guides/deployment#database-roles), [Upgrading](/guides/upgrading)

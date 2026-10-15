@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- kayjs-auth: the prebuilt pages' actions import as `@kaynooo/kayjs-auth/pages/<page>.kay`, for a test to submit them ([kayjs-auth](../packages/auth/llms.txt)).
 - kayjs-auth: a request sending a bearer token reads the token and its user in one query with the built-in stores, and a custom store may add `bearerTokens.findByDigestWithUser` for the same ([kayjs-auth](../packages/auth/llms.txt)).
 - `kay build` prints a table with one row per route (scripts and stylesheets it loads, whether it was prerendered), the time each stage took and what each cache under `.kay/cache` answered, each size beside its change since the last build; `--format json` carries them as `routes`, `stages` and `caches` ([Commands](project.md#commands)).
 - The `app` preset connects the app as `app_rw`, a Postgres role that reads and writes rows but cannot change the schema, and runs the migrations as the owner; `db/roles.sh` creates it and sets default privileges, so a later migration needs no `GRANT` ([Commands](project.md), adopting it in [1.45.0](upgrading.md)).

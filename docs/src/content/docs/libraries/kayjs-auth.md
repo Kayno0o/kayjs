@@ -183,6 +183,6 @@ A mailed link opens a page of yours that shows a button posting the token to an 
 
 </Callout>
 
-The `email` option sends the verification, reset and magic-link mails. With [kayjs-mail](/libraries/kayjs-mail), `email: { mailer: authMailer(mail.enqueue) }` renders them as themed mails; `authMailer` comes from kayjs-mail and needs its `mailExtension` in `kay.config.ts`. The `examples/noticeboard` project in the kay repository runs kayjs-auth on Postgres.
+The `email` option sends the verification, reset and magic-link mails. With [kayjs-mail](/libraries/kayjs-mail), `email: { mailer: authMailer(mail.enqueue) }` renders them as themed mails; `authMailer` comes from kayjs-mail and needs its `mailExtension` in `kay.config.ts`. The `examples/noticeboard` project in the kay repository runs kayjs-auth on Postgres with `authPages`, `mailExtension` and `authMailer`, and no sign-in page of its own.
 
 <ReadMore href="/llms/kayjs-auth">Two-factor, bearer tokens, API gates, roles, limits, account changes and the store contract are in the full kayjs-auth reference.</ReadMore>

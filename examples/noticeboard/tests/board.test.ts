@@ -2,13 +2,12 @@ import { outbox } from '@kaynooo/kayjs-mail'
 import { afterAll, expect, it } from 'bun:test'
 import { testSite } from 'kay/test'
 import board from '../src/api/board'
-import { auth } from '../src/auth'
-import { signOut } from '../src/routes/account/index.kay'
 import { post } from '../src/routes/index.kay'
-import { joinAs } from './members'
+import { joinAs, mailTo } from './members'
+import { signOut } from './pages'
 
-// The mailer is left out: its plugin would run the queue as soon as a test starts the server, where `runJobs()` runs it here and now.
-const site = await testSite({ use: [auth.plugin] })
+// The site takes the plugins of kay.config.ts's extensions, the mailer's queue included, which `runJobs()` also drains here and now.
+const site = await testSite()
 
 afterAll(async () => {
   await site.close()
@@ -26,7 +25,7 @@ it('pins a notice, which every open board hears of at once and confirmed members
   const reader = await joinAs(site, 'Ada', { confirmed: true })
   const unconfirmed = await joinAs(site, 'Linus')
 
-  await site.submit(signOut, {}, { from: '/account' })
+  await site.submit(signOut, {}, { from: '/auth/account' })
 
   const watching = site.socket(board, '/')
 
@@ -53,7 +52,7 @@ it('pins a notice, which every open board hears of at once and confirmed members
   expect((await site.visit(`/notices/${id}`)).title()).toBe('Bake sale | Noticeboard')
 
   // The queue runs the announcement, which queues one mail per confirmed member but the author, sent as the queues drain.
-  expect(await site.runJobs()).toBe(2)
+  await mailTo(site, reader)
   expect(outbox.to(reader).map(each => each.subject)).toEqual(['New notice: Bake sale'])
   expect(outbox.to(reader)[0]!.html).toContain(`http://localhost:3000/notices/${id}`)
   expect(outbox.to(author)).toEqual([])

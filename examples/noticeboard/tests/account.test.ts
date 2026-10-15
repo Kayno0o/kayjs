@@ -1,16 +1,10 @@
 import { outbox } from '@kaynooo/kayjs-mail'
 import { afterAll, beforeEach, expect, it } from 'bun:test'
 import { testSite } from 'kay/test'
-import { auth } from '../src/auth'
-import { signOut } from '../src/routes/account/index.kay'
-import { mailLink, signIn } from '../src/routes/login.kay'
-import { spend } from '../src/routes/magic.kay'
-import { join } from '../src/routes/register.kay'
-import { choose, request } from '../src/routes/reset.kay'
-import { confirm } from '../src/routes/verify.kay'
 import { joinAs, mailedToken } from './members'
+import { magicLink, password, register, request, reset, signOut, spend, verify } from './pages'
 
-const site = await testSite({ use: [auth.plugin] })
+const site = await testSite()
 
 beforeEach(() => {
   outbox.clear()
@@ -24,67 +18,60 @@ it('joins, signed in at once, and mails a link that confirms the address', async
   const email = await joinAs(site, 'Ada')
 
   expect((await site.visit('/')).find('nav a')[1]?.text).toBe('Ada')
-  expect((await site.visit('/account')).find('.kui-badge')[0]?.text).toBe('Not confirmed')
+  expect((await site.visit('/auth/account')).html).toContain('Not verified')
 
-  const token = await mailedToken(site, email, '/verify')
+  const token = await mailedToken(site, email, '/auth/verify-email')
 
   expect(outbox.to(email)[0]?.subject).toContain('Confirm')
 
-  const confirmed = await site.submit(confirm, { token }, { from: '/verify' })
+  const confirmed = await site.submit(verify, { token }, { from: '/auth/verify-email' })
 
   expect(confirmed.url).toBe('/')
-  expect((await site.visit('/account')).find('.kui-badge')[0]?.text).toBe('Confirmed')
+  expect((await site.visit('/auth/account')).html).toContain('Verified')
 })
 
 it('words what kayjs-auth refuses a new member for', async () => {
-  const page = await site.submit(join, { username: 'x', email: 'not an address', password: 'short' }, { from: await site.visit('/register') })
+  await site.submit(signOut, {}, { from: '/auth/account' })
+
+  const page = await site.submit(register, { email: 'not an address', password: 'short' }, { from: await site.visit('/auth/register') })
 
   expect(page.status).toBe(400)
-  expect(page.html).toContain('Write 2 to 32 characters')
-  expect(page.html).toContain('Write an address such as ada@example.com')
-  expect(page.html).toContain('Write at least 10 characters')
+  expect(page.find('.kui-form-field-issue').map(issue => issue.text)).toEqual(['Type a valid address.', 'Use at least 10 characters.'])
 })
 
 it('keeps the account section for members, and comes back to it after signing in', async () => {
-  const visitor = await testSite({ use: [auth.plugin] })
-
-  try {
-    expect((await visitor.visit('/account')).url).toBe('/login?redirect=%2Faccount')
-    expect((await visitor.submit(signIn, { identifier: 'nobody', password: 'wrong password!' }, { from: await visitor.visit('/login') })).html).toContain('Wrong name, address or password')
-  }
-  finally {
-    await visitor.close()
-  }
-
   await joinAs(site, 'Grace')
-  expect((await site.submit(signOut, {}, { from: '/account' })).url).toBe('/')
-  expect((await site.visit('/account')).url).toBe('/login?redirect=%2Faccount')
-  expect((await site.submit(signIn, { identifier: 'grace', password: 'correct horse battery', redirect: '/account' }, { from: await site.visit('/login?redirect=%2Faccount') })).url).toBe('/account')
+  await site.submit(signOut, {}, { from: '/auth/account' })
+  expect((await site.visit('/auth/account')).url).toBe('/auth/sign-in?redirect=%2Fauth%2Faccount')
+  expect((await site.submit(password, { identifier: 'nobody', password: 'wrong password!' }, { from: await site.visit('/auth/sign-in') })).status).toBe(400)
+  expect((await site.submit(password, { identifier: 'grace', password: 'correct horse battery', redirect: '/auth/account' }, { from: await site.visit('/auth/sign-in?redirect=%2Fauth%2Faccount') })).url).toBe('/auth/account')
 })
 
 it('signs in from a mailed link, which only its button spends', async () => {
   const email = await joinAs(site, 'Linus')
 
-  await site.submit(signOut, {}, { from: '/account' })
+  await site.submit(signOut, {}, { from: '/auth/account' })
   outbox.clear()
-  expect((await site.submit(mailLink, { email }, { from: await site.visit('/login') })).html).toContain('a link to sign in is on its way')
-  const token = await mailedToken(site, email, '/magic')
+  await site.submit(magicLink, { email }, { from: await site.visit('/auth/sign-in') })
+  const token = await mailedToken(site, email, '/auth/magic-link')
 
-  expect((await site.visit(`/magic?token=${token}`)).find('nav a')[1]?.text).toBe('Sign in')
-  expect((await site.submit(spend, { token }, { from: `/magic?token=${token}` })).find('nav a')[1]?.text).toBe('Linus')
-  expect((await site.submit(spend, { token }, { from: `/magic?token=${token}` })).html).toContain('This link has expired or was already used.')
+  expect((await site.visit(`/auth/magic-link?token=${token}`)).find('nav a')[1]?.text).toBe('Sign in')
+  expect((await site.submit(spend, { token }, { from: `/auth/magic-link?token=${token}` })).find('nav a')[1]?.text).toBe('Linus')
+
+  await site.submit(signOut, {}, { from: '/auth/account' })
+  expect((await site.submit(spend, { token }, { from: `/auth/magic-link?token=${token}` })).status).toBe(400)
 })
 
 it('resets a forgotten password from a mailed link', async () => {
   const email = await joinAs(site, 'Barbara', { confirmed: true })
 
-  await site.submit(signOut, {}, { from: '/account' })
+  await site.submit(signOut, {}, { from: '/auth/account' })
   outbox.clear()
-  await site.submit(request, { email }, { from: await site.visit('/reset') })
-  const token = await mailedToken(site, email, '/reset')
+  await site.submit(request, { email }, { from: await site.visit('/auth/reset-password') })
+  const token = await mailedToken(site, email, '/auth/reset-password')
 
-  expect((await site.submit(choose, { token, password: 'short' }, { from: `/reset?token=${token}` })).html).toContain('Write at least 10 characters')
-  expect((await site.submit(choose, { token, password: 'a brand new passphrase' }, { from: `/reset?token=${token}` })).find('nav a')[1]?.text).toBe('Barbara')
-  await site.submit(signOut, {}, { from: '/account' })
-  expect((await site.submit(signIn, { identifier: email, password: 'a brand new passphrase' }, { from: await site.visit('/login') })).url).toBe('/')
+  expect((await site.submit(reset, { token, password: 'short' }, { from: `/auth/reset-password?token=${token}` })).status).toBe(400)
+  expect((await site.submit(reset, { token, password: 'a brand new passphrase' }, { from: `/auth/reset-password?token=${token}` })).find('nav a')[1]?.text).toBe('Barbara')
+  await site.submit(signOut, {}, { from: '/auth/account' })
+  expect((await site.submit(password, { identifier: email, password: 'a brand new passphrase' }, { from: await site.visit('/auth/sign-in') })).url).toBe('/')
 })

@@ -25,6 +25,7 @@
       "types": "./types/rules.d.ts",
       "default": "./src/rules.ts"
     },
+    "./pages/*.kay": "./src/pages/routes/*.kay",
     "./pg": {
       "types": "./types/pg.d.ts",
       "default": "./src/pg.ts"

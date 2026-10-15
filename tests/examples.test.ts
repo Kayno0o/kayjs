@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { check } from '../src/check'
+import { loadConfig } from '../src/config'
 
 const CLI = join(import.meta.dir, '../src/cli.ts')
 const APP = join(import.meta.dir, '../examples/noticeboard')
@@ -17,7 +18,7 @@ const SECRETS = { SESSION_SECRET: 'only-for-tests-0123456789abcdefghijklmnop', A
 // The example runs kay from this checkout with kayjs-auth, kayjs-mail and kayjs-ui as the root installs them, so a change on either side that breaks the other fails here before it reaches a site.
 describe('the noticeboard example', () => {
   it('passes kay check, the libraries\' components typed from the node_modules above it', async () => {
-    expect(await check(APP)).toEqual([])
+    expect(await check(APP, await loadConfig(APP))).toEqual([])
   }, 60_000)
 
   // Signs in, mails links, pins notices over the rooms, runs the queue and drives the islands in a browser, each test file on a database of its own.
@@ -47,16 +48,16 @@ describe('the noticeboard example', () => {
       if (code !== 0 || !report.includes('compiled '))
         throw new Error(`kay build --compile failed:\n${report}${errors}`)
 
-      // Nothing reaches the database or a mail server until a page asks: the page a reset link opens needs neither, where the sign-in page reads the client's attempts for its proof of work.
+      // Nothing reaches the database or a mail server until a page asks: the page a magic link opens needs neither, where the sign-in page reads the client's attempts for its proof of work.
       const server = Bun.spawn([join(dir, 'server')], { cwd: dir, env: { PATH: process.env.PATH, PORT: '0', ...SECRETS, DATABASE_URL: 'postgres://app:app@127.0.0.1:1/none', SMTP_HOST: 'localhost' }, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' })
 
       try {
         const origin = `http://localhost:${await listeningPort(server)}`
-        const reset = await (await fetch(`${origin}/reset?token=mailed`)).text()
-        const stylesheet = (/<link rel="stylesheet" href="(\/_kay\/[^"]+\.css)"/).exec(reset)![1]!
+        const magic = await (await fetch(`${origin}/auth/magic-link?token=mailed`)).text()
+        const stylesheet = (/<link rel="stylesheet" href="(\/_kay\/[^"]+\.css)"/).exec(magic)![1]!
 
-        expect(reset).toContain('<title>Reset your password | Noticeboard</title>')
-        expect(reset).toContain('class="kui-form-field')
+        expect(magic).toContain('<title>Sign in | Noticeboard</title>')
+        expect(magic).toContain('class="kui-btn')
         expect(await (await fetch(`${origin}${stylesheet}`)).text()).toContain('.kui-btn')
         expect(await Bun.spawn([join(dir, 'server'), '--health'], { cwd: dir, env: { PATH: process.env.PATH, PORT: new URL(origin).port }, stdin: 'ignore', stdout: 'ignore', stderr: 'ignore' }).exited).toBe(0)
       }
