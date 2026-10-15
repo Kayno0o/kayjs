@@ -8,8 +8,9 @@ import { failedTests } from './test-failures'
 // It prints one line per step, their output going to a log in the worktree's git folder, and a failure ends on the step's last lines, exiting with one of EXIT's codes.
 const EXIT = { unlandable: 2, conflict: 3, step: 4, refused: 5 }
 const LOG = join((await $`git rev-parse --absolute-git-dir`.text()).trim(), 'land.log')
-// Lines of a failing step's output shown after its failed tests, the rest staying in the log.
+// Lines of a failing step's output shown, the rest staying in the log: its last ones, or after its failed tests only bun test's summary.
 const TAIL = 30
+const SUMMARY = 8
 const FIXTURE = /^tests\/fixtures\/([^/]+)\//
 const PACKAGE = /^packages\/([^/]+)\//
 // Read by every test file or by kay itself rather than imported, so `bun test --changed` cannot follow them.
@@ -51,7 +52,9 @@ async function step(label: string, command: $.ShellPromise) {
   console.log(`exit ${exitCode}, ${seconds} s`)
   const lines = output.trimEnd().split('\n')
 
-  console.error([...failedTests(lines), lines.slice(-TAIL).join('\n')].join('\n\n'))
+  const failures = failedTests(lines)
+
+  console.error([...failures, lines.slice(failures.length > 0 ? -SUMMARY : -TAIL).join('\n')].join('\n\n'))
   fail(`${label} exited with ${exitCode}: its whole output is in ${LOG}`, EXIT.step)
 }
 
