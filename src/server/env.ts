@@ -4,6 +4,7 @@ import process from 'node:process'
 import { t } from 'elysia'
 import { PUBLIC_ENV } from '../runtime/env'
 import { kayLog } from '../runtime/log'
+import { fixedReply } from './compress'
 import { readFields } from './query'
 
 // A `s.Object` of the variables, each read on its own.
@@ -78,7 +79,10 @@ export function servePublicEnv(app: Elysia, served: ServedPaths, schema: EnvSche
     kayLog('warn', `publicEnv declares ${exposed.join(', ')}, which every visitor reads from ${PUBLIC_ENV_PATH}; keep a secret in defineEnv, read on the server alone`)
 
   ;(globalThis as { [PUBLIC_ENV]?: unknown })[PUBLIC_ENV] = values
-  app.get(PUBLIC_ENV_PATH, () => new Response(publicEnvModule(values), { headers: { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-cache' } }))
+
+  const reply = fixedReply(publicEnvModule(values), { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-cache' })
+
+  app.get(PUBLIC_ENV_PATH, async ({ request }) => reply(request))
 }
 
 export function publicEnvModule(values: Record<string, unknown>): string {

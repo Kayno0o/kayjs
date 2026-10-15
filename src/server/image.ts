@@ -198,6 +198,7 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
   // The AVIF sources variants are being written from, by version, decoded once for all of them.
   const decodedAvif = new Map<string, { png?: Promise<Blob | Uint8Array>, writers: number }>()
   const importedVariants = new Map<string, Bun.BunFile>()
+  const runtimeSizes = new Map<string, { width: number, height: number, format: string, animated: boolean }>()
   // An imported variant by the URL that asked for it and whether its `Accept` takes AVIF, so a repeated request skips parsing the URL.
   const answered = new Map<string, { file: Bun.BunFile, headers: HeaderCopies }>()
   const text = headerCopies(TEXT, options.security)
@@ -258,11 +259,15 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
     const { path } = source
     let stats: { size: number, mtimeMs: number } | undefined
     let own = source.immutable ? importedSizes.get(path) : undefined
+    let runtimeKey: string | undefined
 
     if (!own) {
       try {
         stats = await stat(path)
-        own = await imageHeader(Bun.file(path), source.immutable ? undefined : MAX_UPLOAD_PIXELS)
+        // A runtime image may change in place, so its header is kept by the size and time just read.
+        runtimeKey = source.immutable ? undefined : `${path}\n${stats.size}\n${stats.mtimeMs}`
+        own = runtimeKey === undefined ? undefined : runtimeSizes.get(runtimeKey)
+        own ??= await imageHeader(Bun.file(path), source.immutable ? undefined : MAX_UPLOAD_PIXELS)
       }
       catch (error) {
         if ((error as { code?: string }).code === 'ERR_IMAGE_TOO_MANY_PIXELS')
@@ -273,6 +278,8 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
 
       if (source.immutable)
         importedSizes.set(path, own)
+      else if (runtimeKey !== undefined)
+        keep(runtimeSizes, runtimeKey, own)
     }
 
     const variant = requestedVariant(url, own, allowed)
@@ -370,12 +377,17 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
     return answer(revalidated(request, `W/"${name}"`, () => Bun.file(file), ownHeaders(set, negotiated ? negotiatedRevalidated : revalidatedAs)))
   })
 
+  // The oldest entry goes when the map is full, so a burst of new keys does not empty what the hot ones filled.
+  function keep<T>(map: Map<string, T>, key: string, value: T): void {
+    if (map.size >= MOST_ANSWERED && !map.has(key))
+      map.delete(map.keys().next().value!)
+
+    map.set(key, value)
+  }
+
   function remembered(key: string, file: Bun.BunFile, headers: HeaderCopies, set: Context['set']): Response {
     if (key.length <= LONGEST_ANSWERED) {
-      if (answered.size >= MOST_ANSWERED)
-        answered.clear()
-
-      answered.set(key, { file, headers })
+      keep(answered, key, { file, headers })
     }
 
     return new Response(file, { headers: ownHeaders(set, headers) })

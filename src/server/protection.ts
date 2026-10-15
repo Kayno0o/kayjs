@@ -123,6 +123,8 @@ export function sqliteRates(path: string): RateStore {
   const db = openSqlite(path)
 
   db.run('CREATE TABLE IF NOT EXISTS kay_rates (key TEXT PRIMARY KEY, count INTEGER NOT NULL, reset_at INTEGER NOT NULL)')
+  // The sweep deletes by `reset_at`, so an index keeps it off a scan of every key.
+  db.run('CREATE INDEX IF NOT EXISTS kay_rates_reset ON kay_rates (reset_at)')
   db.run('CREATE TABLE IF NOT EXISTS kay_rates_salt (id INTEGER PRIMARY KEY CHECK (id = 1), salt TEXT NOT NULL)')
   db.query('INSERT OR IGNORE INTO kay_rates_salt (id, salt) VALUES (1, ?)').run(crypto.randomUUID())
 

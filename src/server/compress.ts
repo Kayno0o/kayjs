@@ -97,6 +97,34 @@ export async function compressText(text: string): Promise<Partial<Record<Encodin
   return copies
 }
 
+// A reply every request gets alike, as the sitemap or the worker: compressed once per encoding, by the first request taking it, rather than on every one. One taking none, or a body too small to compress, gets it whole for the compression hook to judge.
+export function fixedReply(body: string | Promise<string>, headers: Record<string, string>): (request: Request) => Promise<Response> {
+  const copies = new Map<Encoding, Promise<Uint8Array<ArrayBuffer> | undefined>>()
+
+  return async (request) => {
+    const text = await body
+    const encoding = text.length < MIN_SIZE ? undefined : preferredEncoding(request.headers.get('accept-encoding'), ON_THE_FLY)
+
+    if (!encoding)
+      return wholeResponse(text, { headers })
+
+    let copy = copies.get(encoding)
+
+    if (!copy)
+      copies.set(encoding, copy = shrunk(new TextEncoder().encode(text), encoding))
+
+    const bytes = await copy
+
+    return bytes ? new Response(bytes, { headers: { ...headers, 'content-encoding': encoding, 'vary': 'accept-encoding' } }) : wholeResponse(text, { headers })
+  }
+}
+
+async function shrunk(bytes: Uint8Array<ArrayBuffer>, encoding: Encoding): Promise<Uint8Array<ArrayBuffer> | undefined> {
+  const copy = await compressBytes(bytes, encoding)
+
+  return copy.length < bytes.length * 0.9 ? copy : undefined
+}
+
 // At most this many bodies compress at once: past it each costs more CPU, as the threads fight over caches, and its encoder's memory, for no more throughput.
 const compressing = limiter(4)
 
@@ -131,6 +159,15 @@ export function fixedText(text: string): FixedText {
   const bytes = Buffer.from(text)
 
   return { bytes, head: bytes.subarray(0, HEAD_BYTES), deflated: deflateRawSync(bytes, { level: 9, finishFlush: constants.Z_FULL_FLUSH }) }
+}
+
+// The same off the event loop, for a text cut from a page while serving it.
+export async function fixedTextAsync(text: string): Promise<FixedText> {
+  const { constants } = nodeZlib()
+  const bytes = Buffer.from(text)
+  const deflated = await new Promise<Buffer>((resolve, reject) => nodeZlib().deflateRaw(bytes, { level: 9, finishFlush: constants.Z_FULL_FLUSH }, (error, result) => error ? reject(error) : resolve(result)))
+
+  return { bytes, head: bytes.subarray(0, HEAD_BYTES), deflated }
 }
 
 function offsetOf(body: Buffer, text: FixedText): number {

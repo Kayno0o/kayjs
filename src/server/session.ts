@@ -82,6 +82,8 @@ const IV_BYTES = 12
 const TAG_BYTES = 16
 // A store drops expired sessions once every so many writes.
 const SWEEP_EVERY = 1000
+// The most sessions the memory store holds: past it the oldest go, so a flood of visitors cannot fill the process.
+const MOST_SESSIONS = 100_000
 // How often a SQLite store drops expired sessions on its own, so a quiet site does not keep them.
 const SWEEP_MS = 60 * 60 * 1000
 // How often a SQLite store looks whether its file was deleted or replaced, at most.
@@ -367,7 +369,12 @@ export function memoryStore(): SessionStore & { deleteWhere: NonNullable<Session
         }
       }
 
+      // Deleted first, so a session written again counts as the newest.
+      sessions.delete(id)
       sessions.set(id, { text: stringify(data), expires: now + maxAge * 1000 })
+
+      if (sessions.size > MOST_SESSIONS)
+        sessions.delete(sessions.keys().next().value!)
     },
     delete(id) {
       sessions.delete(id)

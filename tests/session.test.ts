@@ -141,6 +141,23 @@ describe('sessions', () => {
     })
   }
 
+  it('caps the memory store, the oldest sessions going first and a session written again counting as new', async () => {
+    const store = memoryStore()
+
+    await store.set('first', { n: 0 }, 60)
+
+    for (let index = 0; index < 99_999; index++)
+      await store.set(`s${index}`, { n: index }, 60)
+
+    await store.set('first', { n: 1 }, 60)
+    await store.set('overflow', { n: 2 }, 60)
+
+    expect(await store.get('first')).toEqual({ n: 1 })
+    expect(await store.get('s0')).toBeUndefined()
+    expect(await store.get('s1')).toEqual({ n: 1 })
+    expect(await store.get('overflow')).toEqual({ n: 2 })
+  })
+
   it('seals the cookie: it can be neither read nor altered, a forged one cleared', async () => {
     const visit = browser(counter())
 

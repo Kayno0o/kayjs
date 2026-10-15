@@ -5,7 +5,7 @@ import type { ServedRoute } from './guards'
 import type { RenderOptions, RequestContext, ServedPage } from './render'
 import { SERVER_ISLAND } from '../runtime/html'
 import { ISLAND_HEADER, ISLAND_PARAM } from '../runtime/server-islands'
-import { fixedText, gzipBetween, preferredEncoding } from './compress'
+import { fixedTextAsync, gzipBetween, preferredEncoding } from './compress'
 import { renderServerIslands, servePrerendered } from './render'
 import { freshStamp, STAMP_HOLE } from './stamp'
 import { freshWork } from './work'
@@ -26,7 +26,6 @@ interface Cut {
 export interface CutIslands {
   // The page text the parts were cut from: a revalidation replaces it.
   html: ServedPage['html']
-  text: Promise<string>
   // Cut at the inline islands only, deferred ones keeping the copy standing in for them, or at every island; at the stamps either way.
   inline?: Promise<Cut>
   all?: Promise<Cut>
@@ -43,18 +42,15 @@ export function serverIslandModes(html: string): ServerIslandMode[] {
 async function cutOf(page: ServedPage, all: boolean): Promise<Cut> {
   let { cut: islands } = page
 
-  if (islands?.html !== page.html) {
-    const { html } = page
+  if (islands?.html !== page.html)
+    page.cut = islands = { html: page.html }
 
-    page.cut = islands = { html, text: typeof html === 'string' ? Promise.resolve(html) : html.text() }
-  }
-
-  const { text } = islands
-
-  return all ? islands.all ??= cutAt(await text, true) : islands.inline ??= cutAt(await text, false)
+  return all ? islands.all ??= cutAt(islands.html, true) : islands.inline ??= cutAt(islands.html, false)
 }
 
-async function cutAt(html: string, all: boolean): Promise<Cut> {
+// The page text is read again for each of the two cuts rather than held beside the parts, which are the page in bytes and deflated.
+async function cutAt(source: ServedPage['html'], all: boolean): Promise<Cut> {
+  const html = typeof source === 'string' ? source : await source.text()
   const islands = [...html.matchAll(SERVER_ISLAND)].filter(match => all || modeOf(match) === 'inline').map(match => ({ match, hole: { island: Number(match[1]) } }))
   const stamps = [...html.matchAll(STAMP_HOLE)].map(match => ({ match, hole: match[1] !== undefined ? { action: decodeURIComponent(match[1]) } : match[2] !== undefined ? { work: match[2] } : { field: match[3]! } }))
   const parts: string[] = []
@@ -69,7 +65,7 @@ async function cutAt(html: string, all: boolean): Promise<Cut> {
 
   parts.push(html.slice(from))
 
-  return { parts: parts.map(fixedText), holes }
+  return { parts: await Promise.all(parts.map(fixedTextAsync)), holes }
 }
 
 // The page with its holes filled for this request, gzipped when the browser takes it.

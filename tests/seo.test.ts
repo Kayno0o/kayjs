@@ -225,6 +225,19 @@ describe('sitemap and robots', () => {
     ])
   })
 
+  it('compresses the sitemap once per encoding, every request getting the same bytes', async () => {
+    const plain = await (await app.handle(new Request('http://localhost/sitemap.xml'))).text()
+    const first = await app.handle(new Request('http://localhost/sitemap.xml', { headers: { 'accept-encoding': 'gzip' } }))
+    const second = await app.handle(new Request('http://localhost/sitemap.xml', { headers: { 'accept-encoding': 'gzip' } }))
+    const brotli = await app.handle(new Request('http://localhost/sitemap.xml', { headers: { 'accept-encoding': 'br, gzip' } }))
+    const bytes = await first.bytes()
+
+    expect([first.headers.get('content-encoding'), first.headers.get('vary'), first.headers.get('content-type')]).toEqual(['gzip', 'accept-encoding', 'application/xml; charset=utf-8'])
+    expect(new TextDecoder().decode(Bun.gunzipSync(bytes))).toBe(plain)
+    expect(Buffer.from(await second.bytes()).equals(Buffer.from(bytes))).toBe(true)
+    expect(brotli.headers.get('content-encoding')).toBe('br')
+  })
+
   it('points crawlers at the sitemap', async () => {
     const response = await app.handle(new Request('http://localhost/robots.txt'))
 

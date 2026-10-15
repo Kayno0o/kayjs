@@ -8,6 +8,7 @@ import { relative } from 'node:path'
 import process from 'node:process'
 import { escape } from '../runtime/escape'
 import { importModule } from './bundle'
+import { fixedReply } from './compress'
 import { hostLocale, localeCopies } from './i18n'
 import { pageSetting } from './page-settings'
 import { listedIn, listedParams, pathOf } from './prerendered'
@@ -29,7 +30,7 @@ export interface SitemapOptions {
 // `/sitemap.xml` and `/robots.txt` for a project with a `site`, unless something the app serves already takes that path.
 export function serveSitemap(app: Elysia, served: ServedPaths, routes: ServedRoute[], origin: string, options: SitemapOptions = {}): void {
   // With locales by domain, each host lists its own pages: a sitemap may only name URLs of the host it is on.
-  const cached = new Map<string | undefined, { xml: Promise<string>, at: number }>()
+  const cached = new Map<string | undefined, { xml: Promise<string>, reply: (request: Request) => Promise<Response>, at: number }>()
   const settings = options.locales
   const hostOf = (request: Request) => settings?.hosts ? hostLocale(settings, request) : undefined
 
@@ -38,11 +39,14 @@ export function serveSitemap(app: Elysia, served: ServedPaths, routes: ServedRou
       const locale = hostOf(request)
       let sitemap = cached.get(locale)
 
-      if (options.dev || !sitemap || Date.now() - sitemap.at > CACHE_MS)
-        cached.set(locale, sitemap = { xml: sitemapXml(routes, origin, options.trailingSlash, settings, locale), at: Date.now() })
+      if (options.dev || !sitemap || Date.now() - sitemap.at > CACHE_MS) {
+        const xml = sitemapXml(routes, origin, options.trailingSlash, settings, locale)
+
+        cached.set(locale, sitemap = { xml, reply: fixedReply(xml, { 'content-type': 'application/xml; charset=utf-8', 'cache-control': `public, max-age=${CACHE_MS / 1000}` }), at: Date.now() })
+      }
 
       try {
-        return new Response(await sitemap.xml, { headers: { 'content-type': 'application/xml; charset=utf-8', 'cache-control': `public, max-age=${CACHE_MS / 1000}` } })
+        return await sitemap.reply(request)
       }
       catch (error) {
         cached.delete(locale)

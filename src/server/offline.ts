@@ -9,6 +9,7 @@ import { NOTICES_FILE } from '../build/licenses'
 import { escapeAttribute } from '../runtime/escape'
 import { textDirection } from '../runtime/i18n'
 import { kayLog } from '../runtime/log'
+import { fixedReply } from './compress'
 import { PUBLIC_ENV_PATH } from './env'
 import { DEFAULT_LANG } from './i18n'
 
@@ -172,9 +173,9 @@ export async function serveServiceWorker(app: Elysia, served: ServedPaths, optio
     return
 
   const script = options.offline !== undefined ? await workerScript(options, options.offline) : UNREGISTER
-  const headers = { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-cache' }
+  const reply = fixedReply(script, { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-cache' })
 
-  app.get(SERVICE_WORKER, () => new Response(script, { headers }))
+  app.get(SERVICE_WORKER, async ({ request }) => reply(request))
 }
 
 async function workerScript(options: ServiceWorkerOptions, offline: true | OfflineConfig): Promise<string> {
