@@ -211,6 +211,23 @@ describe('SaveForm', () => {
     expect(status(root)).toBe('No unsaved change.')
   })
 
+  test('Discard after a save keeps the value of an input with no name, whose default the save rewrote', async () => {
+    const root = await saveForm(async input => input.name)
+
+    type(root, 'kept', '#nameless')
+    type(root, 'Grace')
+    await settle()
+    root.querySelector('form')!.requestSubmit()
+    await settle()
+    type(root, 'Hopper')
+    await settle()
+    click(buttons(root)[0]!)
+    await settle()
+
+    expect(root.querySelector<HTMLInputElement>('#nameless')!.value).toBe('kept')
+    expect(root.querySelector<HTMLInputElement>('#name')!.value).toBe('Grace')
+  })
+
   test('a failure no field shows keeps the focus on the Save button', async () => {
     const root = await saveForm(async () => {
       throw new Error('offline')

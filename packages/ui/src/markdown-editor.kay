@@ -29,7 +29,7 @@ let area: HTMLTextAreaElement | undefined
 const ref = startRef<HTMLTextAreaElement>((element) => {
   area = element
   element.defaultValue = untrack(() => value)
-}, { app: rest.ref })
+}, rest.ref)
 // Set by Escape, so the Tab after it moves on rather than indenting.
 let leaving = false
 

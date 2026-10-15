@@ -30,7 +30,7 @@ effect(() => {
 const ref = startRef<HTMLInputElement>((element) => {
   box = element
   element.defaultChecked = untrack(() => checked)
-}, { app: rest.ref })
+}, rest.ref)
 
 // A reset puts the switch back on its default, which the app's `onChange` then hears of; one meeting a change under way waits for it.
 const resetting = resetWhenIdle(busy, () => {

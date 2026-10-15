@@ -110,7 +110,8 @@ function pick(next: string) {
   hidden.dispatchEvent(new Event('input', { bubbles: true }))
 }
 
-const ref = startRef<HTMLElement>(() => undefined, { app: rest.ref })
+// The app's ref goes to the root once, whatever its attributes do afterwards.
+const ref = startRef<HTMLElement>(undefined, rest.ref)
 
 // The hidden input is no default of its own to reset to, so a reset sends the picker back to `initial`, and empties the search the browser emptied.
 onFormReset(() => searchBox, () => {

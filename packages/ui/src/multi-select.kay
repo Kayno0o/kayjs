@@ -83,7 +83,7 @@ onFormReset(() => root, () => {
     box.checked = picked().some(one => one === shown()[index]?.value)
 })
 
-const ref = startRef<HTMLElement>(element => root = element, { app: rest.ref })
+const ref = startRef<HTMLElement>(element => root = element, rest.ref)
 
 onFormDefaults(() => root, () => {
   const held = picked()

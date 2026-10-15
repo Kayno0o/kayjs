@@ -41,7 +41,7 @@ function picked(select: HTMLSelectElement) {
     select.form?.requestSubmit()
 }
 
-const ref = startRef<HTMLSelectElement>(element => box = element, { app: rest.ref })
+const ref = startRef<HTMLSelectElement>(element => box = element, rest.ref)
 ---
 // Each option says whether it is selected, so the right one stays chosen when the options arrive after the value.
 select.kui-field-input({...rest} ref={ref} class={className} onChange={event => picked(event.currentTarget)})

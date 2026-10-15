@@ -219,18 +219,26 @@ describe('a form reset during a change under way', () => {
     expect(root.querySelector<HTMLInputElement>('input[name="size"]:checked')!.value).toBe('m')
   })
 
-  test('is dropped once the control is gone', async () => {
-    const { gate, told, root } = await waiting()
+  for (const [name, selector, changed, restored] of [
+    ['Checkbox', 'input[name="agree"]', 'agree=false', 'agree=true'],
+    ['Toggle', 'input[name="power"]', 'power=true', 'power=false'],
+    ['ChipGroup', 'input[name="decks"][value="games"]', 'decks=films,games', 'decks=films'],
+    ['Segmented', 'input[name="size"][value="l"]', 'size=l', 'size=m'],
+  ] as const) {
+    test(`is dropped once ${name} is gone`, async () => {
+      const { gate, told, root } = await waiting()
 
-    click(root.querySelector('input[name="agree"]'))
-    click(root.querySelector('#reset'))
-    await settle()
-    mounted!.unmount()
-    gate.resolve(true)
-    await settle()
+      click(root.querySelector(selector))
+      click(root.querySelector('#reset'))
+      await settle()
+      mounted!.unmount()
+      gate.resolve(true)
+      await settle()
 
-    expect(told).toEqual(['agree=false'])
-  })
+      expect(told).toEqual([changed])
+      expect(told).not.toContain(restored)
+    })
+  }
 })
 
 describe('the app\'s ref on a control', () => {
@@ -242,6 +250,19 @@ describe('the app\'s ref on a control', () => {
     click(mounted.root.querySelector('#change'))
     await settle()
 
-    expect(got.sort()).toEqual(['markdown:TEXTAREA', 'select:SELECT', 'text:INPUT', 'textarea:TEXTAREA'])
+    expect(got.sort()).toEqual(['icon:DIV', 'markdown:TEXTAREA', 'plain-first:INPUT', 'select:SELECT', 'text:INPUT', 'textarea:TEXTAREA'])
+  })
+
+  test('runs a ref swapped for another on the element again, and the old one no more', async () => {
+    const got: string[] = []
+
+    mounted = await mount('src/components/form-reset-ref.kay', { got: (name: string) => got.push(name) })
+    await settle()
+    click(mounted.root.querySelector('#swap'))
+    await settle()
+    click(mounted.root.querySelector('#change'))
+    await settle()
+
+    expect(got.filter(name => name.startsWith('plain'))).toEqual(['plain-first', 'plain-second'])
   })
 })

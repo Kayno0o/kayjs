@@ -1,11 +1,13 @@
 ---
 import { signal } from 'kay'
 import MarkdownEditor from '@kaynooo/kayjs-ui/markdown-editor.kay'
+import IconPicker from '@kaynooo/kayjs-ui/icon-picker.kay'
 import Select from '@kaynooo/kayjs-ui/select.kay'
 import Textarea from '@kaynooo/kayjs-ui/textarea.kay'
 import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
 
-// The app's `ref` on each control, and a button changing the attributes they spread, which makes kay run a ref again.
+// The app's `ref` on each control, and a button changing the attributes they spread, which kay answers by running a ref again only when its identity changes.
+// `plain` is a spread element of the page's own: a ref kept as it is runs once, a ref swapped for another runs once more.
 const { got } = props<{ got?: (name: string, element: Element) => void }>()
 
 function note(name: string, element: Element) {
@@ -16,6 +18,10 @@ function note(name: string, element: Element) {
 }
 
 const hint = signal('a')
+const first = (element: Element) => note('plain-first', element)
+const second = (element: Element) => note('plain-second', element)
+const plain = signal<'first' | 'second'>('first')
+const none = async () => []
 const levels = [{ value: 'a', label: 'A' }] as const
 ---
 form
@@ -23,4 +29,7 @@ form
   Textarea(name="bio" placeholder={hint()} ref={element => note('textarea', element)})
   MarkdownEditor(placeholder={hint()} ref={element => note('markdown', element)})
   Select(name="level" options={levels} value="a" class={hint()} ref={element => note('select', element)})
+  IconPicker(search={none} ref={element => note('icon', element)} class={hint()})
+  input#plain({...{ placeholder: hint() }} ref={plain() === 'first' ? first : second})
+  button#swap(type="button" onClick={() => plain.set('second')}) Swap
   button#change(type="button" onClick={() => hint.set('b')}) Change

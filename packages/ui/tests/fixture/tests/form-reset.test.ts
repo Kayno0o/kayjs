@@ -75,7 +75,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a form res
       await page.click('#change')
       await page.waitUntil(() => document.querySelector<HTMLInputElement>('input[name="title"]')!.placeholder === 'b')
 
-      expect(await page.evaluate(() => (window as unknown as { refs: string[] }).refs.sort())).toEqual(['markdown', 'select', 'text', 'textarea'])
+      expect(await page.evaluate(() => (window as unknown as { refs: string[] }).refs.sort())).toEqual(['icon', 'markdown', 'plain-first', 'select', 'text', 'textarea'])
     }
     finally {
       await site.close()

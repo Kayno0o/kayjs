@@ -42,7 +42,7 @@ const ref = startRef<HTMLInputElement>((input) => {
 
   if (start !== undefined)
     input.defaultValue = spelled(start)
-}, { app: rest.ref })
+}, rest.ref)
 
 function read(input: HTMLInputElement): string | number | null {
   if (type !== 'number')

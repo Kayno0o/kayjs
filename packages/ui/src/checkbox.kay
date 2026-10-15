@@ -34,9 +34,8 @@ effect(() => {
 const ref = startRef<HTMLInputElement>((element) => {
   box = element
   element.defaultChecked = untrack(() => checked)
-}, { every: (element) => {
-  element.indeterminate = indeterminate
-} })
+  element.indeterminate = untrack(() => indeterminate)
+})
 
 // A reset puts the box back on its default, which the app's `onChange` then hears of; one meeting a change under way waits for it.
 const resetting = resetWhenIdle(busy, () => {

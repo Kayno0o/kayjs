@@ -63,7 +63,7 @@ function toggle(input: HTMLInputElement, option: Value) {
   void pick(options.map(one => one.value).filter(one => one === option ? input.checked : picked().includes(one)))
 }
 
-const ref = startRef<HTMLElement>(element => root = element, { app: rest.ref })
+const ref = startRef<HTMLElement>(element => root = element, rest.ref)
 
 // A reset puts the boxes back on their defaults, which the app's `onChange` then hears of; one meeting a change under way waits for it.
 const resetting = resetWhenIdle(busy, () => {

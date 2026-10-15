@@ -32,6 +32,7 @@ SaveForm(action={rename} failure="Could not save" saved="Saved." onSaved={onSave
   FormField(label="Name" name="name")
     input#name(name="name" value="Ada")
   textarea#notes(name="notes")
+  input#nameless
   if extra()
     input#extra(name="extra")
 Toaster

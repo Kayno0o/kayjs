@@ -34,7 +34,7 @@ const ref = startRef<HTMLTextAreaElement>((element) => {
 
   if (start !== undefined)
     element.defaultValue = start
-}, { app: rest.ref })
+}, rest.ref)
 
 ---
 textarea.kui-field-input({...rest} ref={ref} value={untrack(() => value)} class={className} onInput={event => { heard(event.currentTarget.value); onInput?.(event.currentTarget.value) }} onChange={event => { heard(event.currentTarget.value); onChange?.(event.currentTarget.value) }} onBlur={event => { sync(true); onBlur?.(event) }})
