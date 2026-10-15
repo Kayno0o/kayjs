@@ -210,6 +210,79 @@ describe('the collections a CMS edits', () => {
     expect(info).toEqual((await collections()).find(each => each.name === 'articles'))
   })
 
+  it('runs a loader once for an entry screen\'s info and entry at once, and once more for each read after', async () => {
+    let loads = 0
+    const tales = collection({ name: 'tales', load: async () => {
+      loads++
+      await Bun.sleep(5)
+
+      return [{ slug: 'hello', data: { title: 'Hello' }, body: '# Hi' }]
+    } }, { schema: t.Object({ title: t.String() }) })
+
+    await exporting([['tales', tales]], async () => {
+      const [info, found] = await Promise.all([collectionInfo('tales'), entries('tales', { slug: 'hello' })])
+
+      expect(loads).toBe(1)
+      expect(info).toMatchObject({ kind: 'loaded', count: 1, body: { kind: 'markdown' } })
+      expect(found.map(entry => entry.slug)).toEqual(['hello'])
+
+      await entries('tales')
+
+      expect(loads).toBe(2)
+    })
+  })
+
+  it('leaves a loader alone for the names and kinds of its collections when counts is false', async () => {
+    let loads = 0
+    const tales = collection({ name: 'tales', load: () => {
+      loads++
+
+      return []
+    } }, { schema: t.Object({ title: t.String() }) })
+
+    await exporting([['tales', tales]], async () => {
+      expect(await collectionInfo('tales', { counts: false })).toEqual({ name: 'tales', kind: 'loaded', schema: expect.objectContaining({ type: 'object' }), components: [], localized: false })
+      expect((await collections({ counts: false })).map(each => each.name)).toEqual(['tales'])
+      expect(loads).toBe(0)
+    })
+  })
+
+  it('asks a loader able to count for the count, and to give one entry for that entry, running `load` for neither', async () => {
+    const calls: string[] = []
+    const tales = collection({
+      name: 'tales',
+      load: () => {
+        calls.push('load')
+
+        return []
+      },
+      count: () => {
+        calls.push('count')
+
+        return 7
+      },
+      body: false,
+      get: (place) => {
+        calls.push(`get ${place}`)
+
+        return place === 'fr/hello' ? { slug: place, data: { title: 'Salut' }, html: '' } : undefined
+      },
+    }, { schema: t.Object({ title: t.String() }), localized: true })
+
+    await exporting([['tales', tales]], async () => {
+      expect(await collectionInfo('tales')).toMatchObject({ kind: 'loaded', count: 7 })
+      expect(await collectionInfo('tales')).not.toHaveProperty('body')
+      expect((await entries('tales', { slug: 'hello', locale: 'fr' })).map(entry => [entry.slug, entry.locale, entry.data])).toEqual([['hello', 'fr', { title: 'Salut' }]])
+      expect(await entries('tales', { slug: 'hello', locale: 'en' })).toEqual([])
+      expect(calls).toEqual(['count', 'count', 'get fr/hello', 'get en/hello'])
+
+      // Without a locale in a localized collection the slug could be any locale's, so `load` runs.
+      await entries('tales', { slug: 'hello' })
+
+      expect(calls.at(-1)).toBe('load')
+    })
+  })
+
   it('reads the entries a filter keeps alone, in their order, a folder no other file', async () => {
     const read = spyOn(Bun, 'file')
 

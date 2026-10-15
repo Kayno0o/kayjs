@@ -64,6 +64,12 @@ export interface ContentLoader {
   name: string
   // Every entry, drafts included; `preview` is true for a visitor in preview mode and in `kay dev`, for a CMS that serves drafts apart.
   load: (context: { preview: boolean }) => LoadedEntry[] | Promise<LoadedEntry[]>
+  // How many entries `load` gives, for a source able to say without giving them: a CMS screen listing collections asks it instead of running `load`.
+  count?: ((context: { preview: boolean }) => number | Promise<number>) | undefined
+  // Whether the entries hold a Markdown `body` rather than `html`, which a CMS editing them reads off `count` alone; true when left out.
+  body?: boolean | undefined
+  // The entry of that place, its slug with the locale before it, `fr/launch`, in a localized collection, or undefined for none: a CMS editing one entry asks it instead of running `load` for all.
+  get?: ((place: string, context: { preview: boolean }) => LoadedEntry | undefined | Promise<LoadedEntry | undefined>) | undefined
   // How long the entries are served before the next read refreshes them in the background, as `cached` does; without it, until `invalidate()` or a restart.
   ttl?: Duration | undefined
   // Keeps the entries across restarts and processes, as `cached` does.

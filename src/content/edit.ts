@@ -170,24 +170,26 @@ export function markdownField(options?: StringOptions): ReturnType<typeof t.Stri
 }
 
 // Every collection the content config exports, as a CMS edits it.
-export async function collections(): Promise<CollectionInfo[]> {
+// `counts: false` leaves out `body`, `count` and `problem`, so no loader runs and no folder is listed for a caller that needs the names, schemas and kinds alone.
+export async function collections({ counts = true }: { counts?: boolean | undefined } = {}): Promise<CollectionInfo[]> {
   const repoRoot = repositoryRoot()
 
-  return Promise.all(registered.map(async ([name, collection]) => infoOf(name, collection, repoRoot)))
+  return Promise.all(registered.map(async ([name, collection]) => infoOf(name, collection, repoRoot, counts)))
 }
 
 // The collection exported as `name`, as a CMS edits it, reading no other; undefined when none is.
-export async function collectionInfo(name: string): Promise<CollectionInfo | undefined> {
+// `counts: false` leaves out `body`, `count` and `problem`, which a loaded collection's loader is run to tell and a folder's files are listed to tell, for a caller that needs the schema, the kind and the folder alone.
+export async function collectionInfo(name: string, { counts = true }: { counts?: boolean | undefined } = {}): Promise<CollectionInfo | undefined> {
   const found = registered.find(([exported]) => exported === name)?.[1]
 
-  return found && infoOf(name, found, repositoryRoot())
+  return found && infoOf(name, found, repositoryRoot(), counts)
 }
 
-async function infoOf(name: string, collection: Collection<unknown>, repoRoot: string): Promise<CollectionInfo> {
+async function infoOf(name: string, collection: Collection<unknown>, repoRoot: string, counts = true): Promise<CollectionInfo> {
   const { draft, localized = false, schema } = collection.options
   const dir = collection.dir === undefined ? undefined : folderOf(collection.dir)
   const inRepo = dir === undefined ? undefined : repoPath(repoRoot, dir)
-  const { body, count, problem } = await bodyHeld(name, collection, dir)
+  const { body, count, problem } = counts ? await bodyHeld(name, collection, dir) : { body: false, count: undefined, problem: undefined }
 
   return {
     name,
@@ -212,7 +214,7 @@ export async function entries(name: string, filter: EntryFilter = {}): Promise<S
   if (filter.locale !== undefined && !localized)
     throw new Error(`kay: entries() was asked for the ${filter.locale} entries of ${name}, which is not localized`)
 
-  const found = collection.dir === undefined ? kept(await loadedEntries(name, collection), localized, filter) : await folderEntries(name, folderOf(collection.dir), localized, filter)
+  const found = collection.dir === undefined ? await loadedFound(name, collection, localized, filter) : await folderEntries(name, folderOf(collection.dir), localized, filter)
   const placed = found.map(({ slug, ...entry }) => ({ ...placeOf(slug, localized), ...entry }))
 
   return Promise.all(placed.map(async (entry) => {
@@ -331,7 +333,7 @@ export async function saveEntry(name: string, entry: WrittenEntry, options: { cr
     await turn.ready
     const place = entry.locale === undefined ? entry.slug : `${entry.locale}/${entry.slug}`
 
-    if (options.create === true && (await loadedEntries(name, collection)).some(each => each.slug === place))
+    if (options.create === true && (await loadedEntries(name, collection, { shared: false })).some(each => each.slug === place))
       return { issues: [existingIssue(name, entry.slug, entry.locale)] }
 
     await save(options.create === true ? { ...entry, create: true } : entry)
@@ -381,7 +383,7 @@ export async function removeEntry(name: string, slug: string, locale?: string): 
     await turn.ready
     const place = locale === undefined ? slug : `${locale}/${slug}`
 
-    if (!(await loadedEntries(name, collection)).some(entry => entry.slug === place))
+    if (!(await loadedEntries(name, collection, { shared: false })).some(entry => entry.slug === place))
       return { issues: [{ ...at, path: '', key: 'slug', message: 'names no entry of the collection' }] }
 
     await remove(at.locale === undefined ? { slug } : { slug, locale: at.locale })
@@ -526,7 +528,32 @@ async function readEntry(dir: string, file: string): Promise<{ data: SourceEntry
   }
 }
 
-async function loadedEntries(name: string, collection: Collection<unknown>): Promise<Omit<SourceEntry, 'draft'>[]> {
+// The loads under way by collection: a screen asking for a collection's info and its entry at once shares one run of the loader.
+const loading = new Map<string, Promise<Omit<SourceEntry, 'draft'>[]>>()
+
+// `shared: false` reads past a load under way, which may have begun before a save, for the check a save or a remove makes before writing.
+async function loadedEntries(name: string, collection: Collection<unknown>, { shared = true }: { shared?: boolean } = {}): Promise<Omit<SourceEntry, 'draft'>[]> {
+  if (!shared)
+    return readLoaded(name, collection)
+
+  const running = loading.get(name)
+
+  if (running)
+    return running
+
+  const run = readLoaded(name, collection)
+
+  loading.set(name, run)
+
+  try {
+    return await run
+  }
+  finally {
+    loading.delete(name)
+  }
+}
+
+async function readLoaded(name: string, collection: Collection<unknown>): Promise<Omit<SourceEntry, 'draft'>[]> {
   let loaded: unknown
 
   try {
@@ -539,16 +566,38 @@ async function loadedEntries(name: string, collection: Collection<unknown>): Pro
   if (!Array.isArray(loaded))
     throw new Error(`kay: ${name}'s load gave ${typeof loaded}, not an array of entries`)
 
-  return loaded.map((item: unknown) => {
-    const { slug, data, body } = (typeof item === 'object' && item !== null ? item : {}) as { slug?: unknown, data?: unknown, body?: unknown }
+  return loaded.map(item => sourceOf(name, item))
+}
 
-    if (typeof slug !== 'string')
-      throw new Error(`kay: ${name}'s load gave an entry with no slug: ${JSON.stringify(item)}`)
+// An entry a loader gave, as the source holds it.
+function sourceOf(name: string, item: unknown): Omit<SourceEntry, 'draft'> {
+  const { slug, data, body } = (typeof item === 'object' && item !== null ? item : {}) as { slug?: unknown, data?: unknown, body?: unknown }
 
-    const fields = isFields(data) ? { data } : { data: undefined, problem: `kay: ${name}'s entry ${slug} holds ${valueKind(data)} as its data, not an object of fields` }
+  if (typeof slug !== 'string')
+    throw new Error(`kay: ${name}'s load gave an entry with no slug: ${JSON.stringify(item)}`)
 
-    return { slug, ...fields, ...typeof body === 'string' && { body } }
-  })
+  const fields = isFields(data) ? { data } : { data: undefined, problem: `kay: ${name}'s entry ${slug} holds ${valueKind(data)} as its data, not an object of fields` }
+
+  return { slug, ...fields, ...typeof body === 'string' && { body } }
+}
+
+// The entries of a loaded collection the filter keeps: a loader able to give one entry is asked for it alone, any other runs `load`.
+async function loadedFound(name: string, collection: Collection<unknown>, localized: boolean, filter: EntryFilter): Promise<Omit<SourceEntry, 'draft'>[]> {
+  const { get } = collection.loader!
+
+  if (!get || filter.slug === undefined || (localized && filter.locale === undefined))
+    return kept(await loadedEntries(name, collection), localized, filter)
+
+  let one: unknown
+
+  try {
+    one = await get(filter.locale === undefined ? filter.slug : `${filter.locale}/${filter.slug}`, { preview: true })
+  }
+  catch (error) {
+    throw new Error(`kay: ${name}'s get threw: ${error instanceof Error ? error.message : String(error)}`, { cause: error })
+  }
+
+  return kept(one === undefined ? [] : [sourceOf(name, one)], localized, filter)
 }
 
 // Whether an entry's data is an object of fields, and no list or plain value; its values are taken as they are, so a loader's class instance or function fails only where it is serialized, as an island's prop.
@@ -583,6 +632,11 @@ async function holdsBody(name: string, collection: Collection<unknown>, dir: str
 
     return { body: files.length === 0 || files.some(file => MARKDOWN.test(file)), count: files.length }
   }
+
+  const { count, body = true } = collection.loader!
+
+  if (count)
+    return { body, count: await count({ preview: true }) }
 
   const loaded = await loadedEntries(name, collection)
 
