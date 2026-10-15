@@ -45,6 +45,12 @@ class Agent {
     void this.process.stdin.flush()
   }
 
+  // Writes without ending the line.
+  sendPartial(text: string): void {
+    void this.process.stdin.write(text)
+    void this.process.stdin.flush()
+  }
+
   async close(): Promise<number> {
     await this.process.stdin.end()
 
@@ -249,6 +255,76 @@ describe.concurrent('kay mcp', () => {
 
       own.send('{ not json')
       expect((await parseError).error?.code).toBe(-32700)
+      expect((await own.request('ping')).result).toEqual({})
+    }
+    finally {
+      expect(await own.close()).toBe(0)
+    }
+  })
+
+  it('refuses an id that is no string or number, and a request whose params are no object', async () => {
+    const own = new Agent(root)
+
+    try {
+      for (const id of [{ a: 1 }, [1], true, false]) {
+        const refused = own.reply(null)
+
+        own.send({ jsonrpc: '2.0', id, method: 'ping' })
+        expect((await refused).error).toMatchObject({ code: -32600 })
+      }
+
+      for (const params of [[1], 'text', 5, true, null]) {
+        const refused = own.reply(70)
+
+        own.send({ jsonrpc: '2.0', id: 70, method: 'tools/list', params })
+        expect((await refused).error).toMatchObject({ code: -32602 })
+      }
+
+      expect((await own.request('ping')).result).toEqual({})
+    }
+    finally {
+      expect(await own.close()).toBe(0)
+    }
+  })
+
+  it('answers an invalid request with the id it carries when that id is readable', async () => {
+    const own = new Agent(root)
+
+    try {
+      for (const id of [71, 'seventy-two']) {
+        const refused = own.reply(id)
+
+        own.send({ jsonrpc: '2.0', id, method: 5 })
+        expect((await refused).error).toMatchObject({ code: -32600 })
+      }
+
+      const batch = own.reply(null)
+
+      own.send([{ jsonrpc: '2.0', id: 1, method: 'ping' }])
+      expect((await batch).error).toMatchObject({ code: -32600 })
+    }
+    finally {
+      expect(await own.close()).toBe(0)
+    }
+  })
+
+  it('refuses a line over the cap, drops it up to its newline, and keeps serving', async () => {
+    const own = new Agent(root)
+
+    try {
+      // Without a newline, then the rest of the line in a later write, then a good request.
+      const refused = own.reply(null)
+
+      own.sendPartial(`{"jsonrpc":"2.0","id":1,"method":"ping","params":{"x":"${'a'.repeat(5 * 1024 * 1024)}`)
+      expect((await refused).error).toMatchObject({ code: -32600 })
+      own.send('b"}}')
+      expect((await own.request('ping')).result).toEqual({})
+
+      // A whole line over the cap in one go.
+      const whole = own.reply(null)
+
+      own.send(`{"jsonrpc":"2.0","id":2,"method":"ping","params":{"x":"${'a'.repeat(5 * 1024 * 1024)}"}}`)
+      expect((await whole).error).toMatchObject({ code: -32600 })
       expect((await own.request('ping')).result).toEqual({})
     }
     finally {

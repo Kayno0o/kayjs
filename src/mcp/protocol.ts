@@ -1,12 +1,10 @@
 import { version } from '../../package.json'
 
-type Id = number | string
-
 interface Request {
   jsonrpc: '2.0'
-  id?: Id | null
+  id?: unknown
   method?: string
-  params?: Record<string, unknown>
+  params?: unknown
 }
 
 export interface Tool {
@@ -56,7 +54,17 @@ const VERSION_META = 'io.modelcontextprotocol/protocolVersion'
 const SERVER_INFO_META = 'io.modelcontextprotocol/serverInfo'
 const SERVER_INFO = { name: 'kay', title: 'kay', version }
 
+// The longest line read, a request being far shorter; a longer one is refused instead of growing the buffer.
+const MAX_LINE = 4 * 1024 * 1024
+
 const INSTRUCTIONS = 'kay is a Bun web framework whose components are `.kay` files. Run `check` after editing a `.kay` file, `routes` to see what the app serves, `render` to see what a URL answers, `dev_errors` for what `kay dev` met, and `explain` for a lint or error code a report names. Read the `kay://llms.txt` resource first, it links the guide to each part of the framework.'
+
+// The id of a message that is no valid request, when it is one a reply can carry.
+function readableId(message: unknown): string | number | null {
+  const id = typeof message === 'object' && message !== null && !Array.isArray(message) ? (message as Request).id : undefined
+
+  return typeof id === 'string' || typeof id === 'number' ? id : null
+}
 
 // Speaks MCP over newline-delimited JSON-RPC: both the revision that opens with `initialize` and the one carrying its version in every request's `_meta`, serving `tools` and `resources`.
 export class McpServer {
@@ -68,10 +76,20 @@ export class McpServer {
     const decoder = new TextDecoder()
     const pending = new Set<Promise<void>>()
     let buffer = ''
+    // Set once a line went over the cap, until its newline ends it.
+    let skipping = false
+
+    const tooLong = () => write(JSON.stringify({ jsonrpc: '2.0', id: null, error: { code: INVALID_REQUEST, message: `Request over ${MAX_LINE} bytes` } }))
 
     const take = (line: string) => {
       if (line.trim() === '')
         return
+
+      if (line.length > MAX_LINE) {
+        tooLong()
+
+        return
+      }
 
       const answering = this.receive(line, write).finally(() => pending.delete(answering))
 
@@ -82,12 +100,26 @@ export class McpServer {
       buffer += decoder.decode(chunk, { stream: true })
 
       for (let end = buffer.indexOf('\n'); end !== -1; end = buffer.indexOf('\n')) {
-        take(buffer.slice(0, end))
+        if (skipping)
+          skipping = false
+        else
+          take(buffer.slice(0, end))
+
         buffer = buffer.slice(end + 1)
+      }
+
+      if (buffer.length > MAX_LINE) {
+        if (!skipping)
+          tooLong()
+
+        skipping = true
+        buffer = ''
       }
     }
 
-    take(buffer + decoder.decode())
+    if (!skipping)
+      take(buffer + decoder.decode())
+
     this.closing?.()
     await Promise.all(pending)
   }
@@ -114,7 +146,7 @@ export class McpServer {
     if (typeof message !== 'object' || message === null || Array.isArray(message) || typeof message.method !== 'string') {
       // A response or a batch: this server sends no requests, and the revisions it speaks have no batches.
       if (typeof message !== 'object' || message === null || !('result' in message || 'error' in message))
-        write(JSON.stringify({ jsonrpc: '2.0', id: null, error: { code: INVALID_REQUEST, message: 'Invalid request' } }))
+        write(JSON.stringify({ jsonrpc: '2.0', id: readableId(message), error: { code: INVALID_REQUEST, message: 'Invalid request' } }))
 
       return
     }
@@ -125,8 +157,19 @@ export class McpServer {
 
     const { id } = message
 
+    if (typeof id !== 'string' && typeof id !== 'number') {
+      write(JSON.stringify({ jsonrpc: '2.0', id: null, error: { code: INVALID_REQUEST, message: 'A request id is a string or a number' } }))
+
+      return
+    }
+
     try {
-      const result = await this.handle(message.method, message.params ?? {})
+      const params = message.params === undefined ? {} : message.params
+
+      if (typeof params !== 'object' || params === null || Array.isArray(params))
+        throw new RpcError(INVALID_PARAMS, 'Params are an object')
+
+      const result = await this.handle(message.method, params as Record<string, unknown>)
 
       write(JSON.stringify({ jsonrpc: '2.0', id, result }))
     }
