@@ -5,6 +5,8 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { outputDir } from '../src/build/assets'
+import { runCommand } from '../src/commands/command'
+import { dev as devCommand } from '../src/commands/dev'
 import { pages } from '../src/server'
 import { answeredWithoutError, DEV_ERRORS_FILE, recordRequestError, trackDevErrors } from '../src/server/dev-errors'
 import { scratchDir } from './scratch'
@@ -155,6 +157,31 @@ describe('the errors kay dev lists for a reader without a browser', () => {
     expect(listed(own)).toEqual([expect.objectContaining({ kind: 'boot', message: expect.stringContaining('config broke') })])
   })
 
+  it('lists a project that failed to resolve from its config, as a new process', async () => {
+    const own = await scratchDir('dev-errors-')
+
+    await Bun.write(join(own, 'kay.config.ts'), 'export default { routes: 1 }\n')
+    const run = Bun.spawnSync([process.execPath, '-e', `import { pages } from ${JSON.stringify(join(import.meta.dir, '../src/server'))}\nawait pages({ root: ${JSON.stringify(own)}, dev: true }).catch(() => undefined)`], { env: { ...process.env, KAY_DEV_CODE: 'test' }, stderr: 'pipe' })
+
+    expect(run.exitCode).toBe(0)
+    expect(listed(own)).toEqual([expect.objectContaining({ kind: 'boot', message: expect.stringContaining('paths[1]') })])
+  })
+
+  it('removes what a server killed mid-write left, and keeps a running one\'s', async () => {
+    const own = await scratchDir('dev-errors-')
+    const dir = outputDir(own)
+    const dead = Bun.spawnSync([process.execPath, '-e', 'process.exit(0)']).pid
+
+    await Bun.write(join(dir, `${DEV_ERRORS_FILE}.${dead}`), '{')
+    await Bun.write(join(dir, `${DEV_ERRORS_FILE}.${process.pid}`), '{')
+    const run = Bun.spawnSync([process.execPath, '-e', `import { trackDevErrors } from ${JSON.stringify(join(import.meta.dir, '../src/server/dev-errors.ts'))}\ntrackDevErrors(${JSON.stringify(own)})`], { env: { ...process.env, KAY_DEV_CODE: 'test' }, stderr: 'pipe' })
+
+    expect(run.stderr.toString()).toBe('')
+    expect(existsSync(join(dir, `${DEV_ERRORS_FILE}.${dead}`))).toBe(false)
+    expect(existsSync(join(dir, `${DEV_ERRORS_FILE}.${process.pid}`))).toBe(true)
+    expect(listed(own)).toEqual([])
+  })
+
   // Last, as it stops this process tracking errors.
   it('writes nothing for a server run outside kay dev', async () => {
     delete process.env.KAY_DEV_CODE
@@ -214,6 +241,23 @@ describe('kay dev --format json', () => {
       await Promise.all([reading, readingErrors])
     }
   }, 40_000)
+
+  it('points console.log back at stdout once it returns, run in-process', async () => {
+    const project = await scratchDir('dev-errors-')
+    const held = Bun.listen({ hostname: '127.0.0.1', port: 0, socket: { data: () => undefined } })
+    const log = console.log
+    const said = spyOn(console, 'error').mockImplementation(() => undefined)
+
+    try {
+      expect(await runCommand(devCommand, [project, '--format', 'json', `--inspect=127.0.0.1:${held.port}`], 'usage')).toBe(1)
+      expect(said).toHaveBeenCalledWith(expect.stringContaining('in use'))
+      expect(console.log).toBe(log)
+    }
+    finally {
+      said.mockRestore()
+      held.stop(true)
+    }
+  })
 
   it('refuses another format', async () => {
     const child = Bun.spawn([process.execPath, CLI, 'dev', '--format', 'yaml'], { stdout: 'ignore', stderr: 'pipe' })

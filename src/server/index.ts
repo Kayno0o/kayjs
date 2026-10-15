@@ -61,7 +61,7 @@ export async function pages(options: PagesOptions = {}) {
   if (mode.dev)
     trackDevErrors(root)
 
-  const project = resolveProject(root, { ...await withBootFailure(source.config(root, options)), dev: mode.dev, prebuilt: mode.prebuilt }, mode)
+  const project = await withBootFailure(async () => resolveProject(root, { ...await source.config(root, options), dev: mode.dev, prebuilt: mode.prebuilt }, mode))
   const loadClient = async () => source.client(project)
 
   if (!mode.dev)
@@ -78,10 +78,10 @@ export async function pages(options: PagesOptions = {}) {
   }
 }
 
-// A config that fails to load still stops the server, `kay dev` listing why.
-async function withBootFailure<T>(loading: Promise<T>): Promise<T> {
+// A config that fails to load, or a project that fails to resolve from it, still stops the server, `kay dev` listing why.
+async function withBootFailure<T>(load: () => Promise<T>): Promise<T> {
   try {
-    return await loading
+    return await load()
   }
   catch (error) {
     recordBootFailure(error)

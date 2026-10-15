@@ -1,6 +1,6 @@
 import type { Elysia } from 'elysia'
 import type { FileDiagnostic } from '../build/transform'
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join, relative } from 'node:path'
 import process from 'node:process'
 import { outputDir, underKayDev } from '../build/assets'
@@ -32,6 +32,8 @@ export const DEV_ERRORS_FILE = 'errors.json'
 // A page a crawler or a loop keeps failing on under many paths keeps the file readable.
 const MAX_ERRORS = 50
 const BOOT = 'boot'
+// What `save` writes before renaming it into place, named after its server's pid.
+const PARTIAL = /^errors\.json\.(\d+)$/
 
 let tracked: { root: string, file: string, errors: Map<string, DevError>, base: string } | undefined
 // The requests that met an error, which their response then never clears.
@@ -49,6 +51,7 @@ export function trackDevErrors(root: string): void {
     const file = join(outputDir(root), DEV_ERRORS_FILE)
 
     tracked = { root, file, errors: new Map(readErrors(file)), base: '' }
+    removeStalePartials(dirname(file))
   }
 
   tracked.errors.delete(BOOT)
@@ -204,6 +207,32 @@ function keyOf(error: DevError): string {
     return `request ${error.request!.method} ${error.request!.path}`
 
   return error.kind === 'browser' ? `browser ${error.request!.path}` : BOOT
+}
+
+// What a server killed mid-write left; a running server's own is left alone, as it renames it in a moment.
+function removeStalePartials(dir: string): void {
+  try {
+    for (const name of readdirSync(dir)) {
+      const pid = PARTIAL.exec(name)?.[1]
+
+      if (pid !== undefined && !running(Number(pid)))
+        rmSync(join(dir, name), { force: true })
+    }
+  }
+  // No directory yet, as for a project's first server.
+  catch {}
+}
+
+function running(pid: number): boolean {
+  try {
+    process.kill(pid, 0)
+
+    return true
+  }
+  catch (error) {
+    // Another user's process, running still.
+    return (error as NodeJS.ErrnoException).code === 'EPERM'
+  }
 }
 
 // Written whole and renamed into place, so a reader never meets half a file.

@@ -51,32 +51,38 @@ export const dev: Command = {
     // Under `json`, stdout holds the events alone: what this process prints otherwise, as kay.config.ts read below, goes to stderr.
     const events = format === 'json' ? eventWriter() : undefined
 
-    warnOtherKay('dev', root)
-    const entry = typeof option === 'string' ? resolve(option) : inDir ? undefined : path
-    const config = await loadConfig(root)
-    const { promise, resolve: interrupted } = Promise.withResolvers<void>()
-    // Keys only from a person at a terminal: a pipe, a CI log or an agent gets the lines alone, and its stdin is left unread.
-    const keys = format === 'text' && process.stdin.isTTY && process.stdout.isTTY ? process.stdin : undefined
-    let stop: () => Promise<void>
-
     try {
-      stop = await startDev(root, { entry, port: typeof port === 'string' ? Number(port) : undefined, host, inspect: debuggerAt, open: open === true, format, keys, onQuit: interrupted, log: events, quiet: values.quiet === true, config })
+      warnOtherKay('dev', root)
+      const entry = typeof option === 'string' ? resolve(option) : inDir ? undefined : path
+      const config = await loadConfig(root)
+      const { promise, resolve: interrupted } = Promise.withResolvers<void>()
+      // Keys only from a person at a terminal: a pipe, a CI log or an agent gets the lines alone, and its stdin is left unread.
+      const keys = format === 'text' && process.stdin.isTTY && process.stdout.isTTY ? process.stdin : undefined
+      let stop: () => Promise<void>
+
+      try {
+        stop = await startDev(root, { entry, port: typeof port === 'string' ? Number(port) : undefined, host, inspect: debuggerAt, open: open === true, format, keys, onQuit: interrupted, log: events?.write, quiet: values.quiet === true, config })
+      }
+      catch (error) {
+        if (!(error instanceof InspectorAddressInUse))
+          throw error
+
+        console.error(error.message)
+
+        return 1
+      }
+
+      process.once('SIGINT', interrupted)
+      process.once('SIGTERM', interrupted)
+      await promise
+      await stop()
+
+      return 0
     }
-    catch (error) {
-      if (!(error instanceof InspectorAddressInUse))
-        throw error
-
-      console.error(error.message)
-
-      return 1
+    // Called in-process, as a test does, what follows prints to stdout again.
+    finally {
+      events?.restore()
     }
-
-    process.once('SIGINT', interrupted)
-    process.once('SIGTERM', interrupted)
-    await promise
-    await stop()
-
-    return 0
   },
 }
 
@@ -88,11 +94,17 @@ function inspectorAddress(value: string): string {
   return `ws://${withHost}${withHost.includes('/') ? '' : '/kay'}`
 }
 
-// Writes each event to stdout, and every other `console.log` of this process to stderr.
-function eventWriter(): (line: string) => void {
-  const print = console.log.bind(console)
+// Writes each event to stdout, and every other `console.log` of this process to stderr until restored.
+function eventWriter(): { write: (line: string) => void, restore: () => void } {
+  const log = console.log
+  const print = log.bind(console)
 
   console.log = console.error
 
-  return line => print(line)
+  return {
+    write: line => print(line),
+    restore: () => {
+      console.log = log
+    },
+  }
 }
