@@ -1,4 +1,4 @@
-import { readdir, writeFile } from 'node:fs/promises'
+import { readdir, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 import { cacheCounts, resetCacheCounts } from '../src/build/cache'
@@ -97,6 +97,25 @@ describe('cached compressed copies', () => {
 
     expect(counted('compressed copies')).toEqual({ cached: 1, made: 2 })
     expect(Bun.gunzipSync(await Bun.file(join(dir, 'app.js.gz')).bytes())).toEqual(new TextEncoder().encode(text('second')))
+  })
+
+  it('makes an entry again when one of its copies is gone', async () => {
+    const root = await scratchDir('copies-missing-')
+    const dir = join(root, 'client')
+    const cache = join(root, 'cache')
+
+    await Bun.write(join(dir, 'app.js'), 'word '.repeat(400))
+    await compressFiles(dir, cachedCopies(cache))
+
+    const brotli = (await readdir(cache)).find(name => name.endsWith('.br'))!
+
+    await rm(join(cache, brotli))
+    await rm(join(dir, 'app.js.br'))
+    resetCacheCounts()
+    await compressFiles(dir, cachedCopies(cache))
+
+    expect(counted('compressed copies')).toEqual({ cached: 0, made: 1 })
+    expect(await Bun.file(join(dir, 'app.js.br')).exists()).toBe(true)
   })
 
   it('remembers a file whose copies do not shrink it', async () => {

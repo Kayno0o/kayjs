@@ -7,10 +7,10 @@ import { writeAtomically } from './files'
 // Bumped when the levels or the rule keeping a copy change, so older entries are never read as the new ones.
 const COPIES_VERSION = 1
 const SUFFIXES: Record<StoredEncoding, string> = { br: 'br', gzip: 'gz' }
-const ENTRY_FILE = /^[\da-f]{64}\.(?:br|gz|done)$/
+const ENTRY_FILE = /^[\da-f]{64}\.(?:br|gz|done)(?:\..+\.tmp)?$/
 
 // The copies `kay build` writes, kept under the cache by the SHA-256 of the file's content, so a file unchanged since an earlier build is not compressed again.
-// An entry holds the copies worth writing and a marker, written last, so one cut short is made again; a file whose copies do not shrink it keeps the marker alone and is not compressed again either.
+// An entry holds the copies worth writing and a marker naming them, written last, so an entry cut short or missing a copy is made again; a file whose copies do not shrink it keeps the marker alone and is not compressed again either.
 export function cachedCopies(dir: string): StrongestCopies {
   return async (bytes) => {
     const name = new Bun.CryptoHasher('sha256').update(`${COPIES_VERSION}:`).update(bytes).digest('hex')
@@ -21,23 +21,21 @@ export function cachedCopies(dir: string): StrongestCopies {
     for (const suffix of Object.values(SUFFIXES))
       touchCacheFile(join(dir, `${name}.${suffix}`))
 
-    if (await Bun.file(marker).exists()) {
-      const copies: Partial<Record<StoredEncoding, Uint8Array<ArrayBuffer>>> = {}
+    try {
+      const listed = await Bun.file(marker).json() as StoredEncoding[]
 
-      try {
-        for (const [encoding, suffix] of Object.entries(SUFFIXES)) {
-          const file = Bun.file(join(dir, `${name}.${suffix}`))
+      if (Array.isArray(listed)) {
+        const copies: Partial<Record<StoredEncoding, Uint8Array<ArrayBuffer>>> = {}
 
-          if (await file.exists())
-            copies[encoding as StoredEncoding] = await file.bytes()
-        }
+        for (const encoding of listed)
+          copies[encoding] = await Bun.file(join(dir, `${name}.${SUFFIXES[encoding]}`)).bytes()
 
         countCache('compressed copies', true)
 
         return copies
       }
-      catch {}
     }
+    catch {}
 
     countCache('compressed copies', false)
 
@@ -45,7 +43,7 @@ export function cachedCopies(dir: string): StrongestCopies {
 
     try {
       await Promise.all(Object.entries(made).map(async ([encoding, copy]) => writeAtomically(join(dir, `${name}.${SUFFIXES[encoding as StoredEncoding]}`), copy)))
-      await writeAtomically(marker, '')
+      await writeAtomically(marker, JSON.stringify(Object.keys(made)))
     }
     catch {}
 

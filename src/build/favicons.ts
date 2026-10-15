@@ -92,6 +92,9 @@ async function entryKey(source: FaviconSource): Promise<string | undefined> {
   const hasher = new Bun.CryptoHasher('sha256').update(`${version}\n${Bun.version}\n`)
 
   try {
+    // The drawing code itself, so a kay changed in place under the same version never reuses older icons.
+    hasher.update(await Bun.file(join(import.meta.dir, '../server/favicon.ts')).bytes())
+
     for (const [role, file] of Object.entries({ image: source.image, svg: source.svg, maskable: source.maskable })) {
       if (file === undefined) {
         hasher.update(`${role}:none\n`)
