@@ -25,9 +25,11 @@ interface ServedAsset {
 
 // Whether the request spells a file as the build writes it, raw or percent-encoded as its URL in the build's list, which are the only spellings kept.
 function isBuildSpelling(dir: string, path: string, spelled: string): boolean {
-  const name = relative(dir, path)
+  return spelled === relative(dir, path) || spelled === encodedName(dir, path)
+}
 
-  return spelled === name || spelled === name.split(sep).map(encodeURIComponent).join('/')
+function encodedName(dir: string, path: string): string {
+  return relative(dir, path).split(sep).map(encodeURIComponent).join('/')
 }
 
 // Serves the browser build under `/_kay/`, each file with its compressed copy when the browser takes it, and gives the path of each, whose responses carry the security headers themselves.
@@ -100,5 +102,5 @@ export async function serveBuildFiles(app: Elysia, client: ClientBuild, { dev, s
     return new Response(copy.file, { headers: ownHeaders(set, copy.headers) })
   })
 
-  return clientFiles.map(file => `${ASSET_PREFIX}${relative(client.dir, file).split(sep).map(encodeURIComponent).join('/')}`)
+  return clientFiles.map(file => `${ASSET_PREFIX}${encodedName(client.dir, file)}`)
 }

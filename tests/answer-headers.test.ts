@@ -221,6 +221,7 @@ describe('the asset route\'s cache of build files', () => {
     expect(await cached(false, '/plain.js', '/%70lain.js', 'plain.js')).toBe(404)
     expect(await cached(false, '/dir%20name/%C3%A9.js', '/dir%20name/%c3%a9.js', 'dir name/é.js')).toBe(404)
     expect(await cached(false, '/plain.js', '/plain.js/', 'plain.js')).toBe(404)
+    expect(await cached(false, '/dir%20name%2f%C3%A9.js', '/dir%20name%2f%C3%A9.js', 'dir name/é.js')).toBe(404)
   })
 
   it('keeps nothing in development', async () => {
@@ -235,7 +236,7 @@ describe('the asset route\'s cache of build files', () => {
       for (const spelled of ['/a%20b.js', '/a%20b%2ejs', '/%61%20b.js'])
         expect(await (await get(spelled)).text()).toBe('spaced')
 
-      for (const hostile of ['/..%2fpackage.json', '/%2e%2e/plain.js', '/dir%20name/..%2f..%2fplain.js', '/a%20b.js%00', '/%00', '/a%2520b.js', '/dir%20name', '/missing%20name.js'])
+      for (const hostile of ['/..%2fpackage.json', '/%2e%2e%2fplain.js', '/dir%20name/..%2f..%2fplain.js', '/a%20b.js%00', '/%00', '/a%2520b.js', '/dir%20name', '/missing%20name.js'])
         expect((await get(hostile)).status).toBe(404)
 
       // A refused name is not kept either.
