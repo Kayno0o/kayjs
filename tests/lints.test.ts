@@ -138,10 +138,12 @@ describe('deprecated-schema-name', () => {
     const twice = 'import { t } from \'kay\'\nconst a = 1\nconst a = 2\n'
 
     const duplicate = { code: undefined, severity: undefined, at: 'a' }
+    // The statement declaring it again is left out of the analysis, which still reads the rest.
+    const deprecated = { code: 'deprecated-schema-name', severity: 'warning', at: 't' }
 
-    expect(lints(`---\n${twice}---\ndiv {a}`)).toEqual([duplicate])
-    expect(lints(`--- server\n${twice}---\ndiv x`)).toEqual([duplicate])
-    expect(moduleChecks(twice)).toEqual([])
+    expect(lints(`---\n${twice}---\ndiv {a}`)).toEqual([deprecated, duplicate])
+    expect(lints(`--- server\n${twice}---\ndiv x`)).toEqual([deprecated, duplicate])
+    expect(moduleChecks(twice).map(d => d.message)).toEqual(['`t` from \'kay\' is `s` now'])
   })
 })
 
