@@ -10,6 +10,7 @@ import { readdir, rename, rm, stat } from 'node:fs/promises'
 import { basename, extname, join, normalize, resolve, sep } from 'node:path'
 import { ASSET_PREFIX } from '../build/assets'
 import { KayError } from '../compiler/errors'
+import { countCache } from '../build/cache'
 import { aspectKey, CARD, croppedSize, cutOrBelow, DEFAULT_ASPECTS, DEFAULT_MAX_DENSITY, FILES_ROUTE, IMAGE_ROUTE, IMAGE_WIDTHS, parseAspect, recordVariants, requestedRemoteVariants, requestedVariants, RESIZABLE, setAspects, setMaxDensity, setRemoteImages, setResolvedImages, SMALL_STEP, variantHeight, variantSuffix } from '../runtime/image'
 import { inLocale, passGuards } from './actions'
 import { AVIF_ENCODER, AVIF_SPEED, DEFAULT_AVIF_QUALITY, encodeAvif } from './avif'
@@ -155,10 +156,14 @@ export async function writeImageVariants(clientDir: string, quality = DEFAULT_QU
       if (await Bun.file(target).exists())
         return
 
-      if (cached !== undefined && await Bun.file(cached).exists())
+      if (cached !== undefined && await Bun.file(cached).exists()) {
+        countCache('image variants', true)
         await Bun.write(target, Bun.file(cached))
-      else
+      }
+      else {
+        countCache('image variants', false)
         missing.push({ variant, format, target, cached })
+      }
     }))
 
     if (missing.length === 0)

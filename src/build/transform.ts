@@ -11,7 +11,7 @@ import { isInteractive } from '../compiler/codegen'
 import { isErrorCode } from '../compiler/errors'
 import { parseKay } from '../compiler/parser'
 import { analyzeScript } from '../compiler/script'
-import { pruneCache, readCacheEntry, writeCacheEntry } from './cache'
+import { countCache, pruneCache, readCacheEntry, writeCacheEntry } from './cache'
 import { throughLinks } from './links'
 import { anyBrowserOnly, mayImportPackage, packagesToProbe } from './probe'
 import { importedSignals, keepImportedSignals } from './signals'
@@ -91,6 +91,8 @@ export async function transformKayCached(source: string, filename: string, given
   const entry = cacheEntry(options.cacheDir, filename, `${options.target}${hydratable ? '-hydratable' : ''}${options.inspect === true ? '-inspect' : ''}`, `${options.target}\0${hydratable}\0${options.clientOnly === true}\0${options.inspect === true}\0${options.root ?? process.cwd()}\0${throughLinks(options.root ?? process.cwd(), filename)}\0${JSON.stringify(signals)}\0${source}`)
   const cached = await readCacheEntry<string>(entry)
 
+  countCache('components', cached !== undefined)
+
   if (cached !== undefined) {
     registerSourceMap(filename, () => {
       const { code, map } = compile(source, filename, options, signals)
@@ -122,6 +124,8 @@ export async function analyzeKayCached(source: string, filename: string, root: s
     return last.analysis
 
   const cached = await readCacheEntry<Analysis>(entry)
+
+  countCache('analyses', cached !== undefined)
 
   if (cached !== undefined) {
     analyzed.set(slot, { file: filename, key: entry.key, analysis: cached })

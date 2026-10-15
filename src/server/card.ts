@@ -11,6 +11,7 @@ import { readdir, rename, rm, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { ASSET_PREFIX } from '../build/assets'
 import { KayError } from '../compiler/errors'
+import { countCache } from '../build/cache'
 import { CARD, CARD_ROUTE, IMPORTED, setCardMaker, variantFilesLinked, VARIANTS } from '../runtime/image'
 import { nodeCrypto } from './builtins'
 import { drawCard, LOGO_SIZE } from './card-draw'
@@ -414,7 +415,11 @@ export async function writeCards(clientDir: string, cacheDir?: string, remote?: 
     if (await Bun.file(target).exists())
       continue
 
-    if (cached === undefined || !await Bun.file(cached).exists()) {
+    const kept = cached !== undefined && await Bun.file(cached).exists()
+
+    countCache('share cards', kept)
+
+    if (!kept) {
       const source = card.image === undefined ? undefined : await findSource(card.image, { clientDir, cacheDir: '', remote })
 
       if (source && 'status' in source)

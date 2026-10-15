@@ -4,7 +4,8 @@ import type { RenderedPage } from '../check/seo'
 import type { KayConfig } from '../config'
 import type { Project } from '../project'
 import type { ClientBuild } from '../server/client'
-import type { SizeReport } from './report'
+import type { Route } from '../server/routes'
+import type { BuildSummary, RouteSize, SizeReport, StageTime, StoredReport } from './report'
 import { existsSync } from 'node:fs'
 import { rename, rm } from 'node:fs/promises'
 import { availableParallelism } from 'node:os'
@@ -28,9 +29,12 @@ import { prerenderPages } from '../server/prerender'
 import { remoteImages, remotePatterns } from '../server/remote'
 import { slashedPath } from '../server/routes'
 import { linkStoredFiles } from '../server/storage'
+import { cacheCounts, resetCacheCounts } from './cache'
 import { buildClient } from './client'
 import { compileServer } from './compile'
 import { codecWarnings, iconSetPackages, iconSetWarnings, NOTICES_FILE, packagesOf, thirdPartyNotices } from './licenses'
+import { readStoredReport, storedReport, writeStoredReport } from './report'
+import { routeSizes } from './route-sizes'
 import { writeSearchIndex } from './search'
 import { inSignalsScope } from './signals'
 import { exportStatic, refuseStaticConfig } from './static'
@@ -70,7 +74,8 @@ export interface BuildResult {
   linted: CheckDiagnostic[]
   // The stage that stopped the build, with what it threw unless its problems did. The last build is back in place when the check, the bundle or the output failed.
   failed?: { stage: BuildStage, error?: unknown }
-  built?: { islands: number, stylesheets: number, prerendered: number, entries: number, report: SizeReport | undefined, ms: number }
+  // `summary` holds what each route loads, the time of each stage and what the caches answered; `previous` the sizes of the last successful build of the same kind, which the sizes are compared to.
+  built?: { islands: number, stylesheets: number, prerendered: number, entries: number, report: SizeReport | undefined, summary: BuildSummary, previous: StoredReport | undefined, ms: number }
   exported?: { pages: number, files: number, dir: string, ms: number }
   compiled?: { executable: string, ms: number }
 }
@@ -89,6 +94,12 @@ async function runBuild(root: string, config: KayConfig, options: BuildOptions):
   const checking = checkWith !== undefined
   const exported = options.exportTo !== undefined
   const result: BuildResult = { checked: [], linted: [] }
+  // The sizes of the last good build, read before this one can replace them.
+  const lastReport = await readStoredReport(project.paths.report, exported)
+  let checkMs = 0
+  let bundleMs = 0
+
+  resetCacheCounts()
   // A callback throwing while the last build waits aside puts it back, as a failing stage does.
   const reportAside = async (stage: BuildStage) => {
     try {
@@ -117,10 +128,13 @@ async function runBuild(root: string, config: KayConfig, options: BuildOptions):
   let bundleEnded = false
   // Whichever of the check and the bundle ends first says what still runs.
   const checkRun = async () => {
+    const began = performance.now()
+
     try {
       return checkWith ? await checkStage(project, checkWith, exported) : []
     }
     finally {
+      checkMs = performance.now() - began
       checkEnded = true
 
       if (!bundleEnded && step === 'checking and bundling')
@@ -128,10 +142,13 @@ async function runBuild(root: string, config: KayConfig, options: BuildOptions):
     }
   }
   const bundleRun = async () => {
+    const began = performance.now()
+
     try {
       return await bundleStage(project, exported, options.analyze === true, report)
     }
     finally {
+      bundleMs = performance.now() - began
       bundleEnded = true
 
       if (!checkEnded)
@@ -183,8 +200,11 @@ async function runBuild(root: string, config: KayConfig, options: BuildOptions):
 
   result.linted = linted
 
-  if (!failing(linted))
-    result.built = { islands: Object.keys(client.islands).length, stylesheets: client.styles.size, prerendered, entries, report: client.report, ms: performance.now() - started }
+  if (!failing(linted)) {
+    const summary: BuildSummary = { routes: made.routes, stages: [...checking ? [{ name: 'check', ms: checkMs }] : [], { name: 'bundle', ms: bundleMs }, ...made.stages], caches: cacheCounts() }
+
+    result.built = { islands: Object.keys(client.islands).length, stylesheets: client.styles.size, prerendered, entries, report: client.report, summary, previous: lastReport, ms: performance.now() - started }
+  }
 
   await reportAside('output')
 
@@ -195,6 +215,10 @@ async function runBuild(root: string, config: KayConfig, options: BuildOptions):
   }
 
   await rm(previous, { recursive: true, force: true })
+
+  // Kept only now that the build is known good, so a failed one leaves the sizes of the last.
+  if (result.built)
+    await writeStoredReport(project.paths.report, storedReport(result.built.report, result.built.summary, exported))
 
   if (options.exportTo !== undefined) {
     const stage = performance.now()
@@ -292,8 +316,17 @@ async function bundleStage(project: Project, exported: boolean, analyze: boolean
 }
 
 // The rest of what the server serves from `.kay/client`, which runs the app's content config and pages, so only once the check passed: content manifests, prerendered pages, the variants of images only they import, and favicons, compressed.
-async function outputStage(project: Project, exported: boolean, client: ClientBuild, checking: boolean, report: Report): Promise<{ prerendered: number, entries: number, linted: CheckDiagnostic[] }> {
+async function outputStage(project: Project, exported: boolean, client: ClientBuild, checking: boolean, report: Report): Promise<{ prerendered: number, entries: number, linted: CheckDiagnostic[], routes: RouteSize[], stages: StageTime[] }> {
   const { root, config, paths } = project
+  const stages: StageTime[] = []
+  let lapStart = performance.now()
+  // Time since the last lap goes to the stage that just ended.
+  const lap = (name: string) => {
+    const now = performance.now()
+
+    stages.push({ name, ms: now - lapStart })
+    lapStart = now
+  }
 
   // The collections are read for the pages, so their time counts with them.
   report({ step: 'prerendering' })
@@ -308,12 +341,19 @@ async function outputStage(project: Project, exported: boolean, client: ClientBu
   }
 
   const rendered: RenderedPage[] = []
-  const prerendered = await prerenderPages(project, client, { exportAll: exported, rendered, onRoute: (done, total) => report({ step: 'prerendering', done, total, unit: 'routes' }) })
+  const routes: Route[] = []
+  const prerendered = await prerenderPages(project, client, { exportAll: exported, rendered, routes, onRoute: (done, total) => report({ step: 'prerendering', done, total, unit: 'routes' }) })
 
   if (config.search === true) {
     report({ step: 'indexing for search' })
     await writeSearchIndex(client.dir, rendered.flatMap(page => page.search === false ? [] : [{ path: slashedPath(page.path, config.trailingSlash), html: page.html, weight: page.search }]))
   }
+
+  lap('prerender')
+
+  const sizes = await routeSizes(root, client, routes, rendered, client.report)
+
+  lap('route sizes')
 
   // Every page ran, so the compiled files of components since deleted can go.
   await pruneCompileCache(cacheDir(root))
@@ -328,12 +368,15 @@ async function outputStage(project: Project, exported: boolean, client: ClientBu
   report({ step: 'writing images, cards and favicons' })
   await writeRemoteVariants(client.dir, remote, config.images?.quality)
   await writeCards(client.dir, cacheDir(root, 'cards'), remote)
+  lap('images and cards')
 
   const favicon = faviconSource(root, config.favicon, config.manifest)
 
   // The check warned of what an SVG draws poorly already.
   if (favicon !== undefined)
     await writeFavicons(favicon, join(client.dir, '..', FAVICON_DIR), checking ? () => undefined : undefined)
+
+  lap('favicons')
 
   for (const warning of [...iconSetWarnings(root), ...codecWarnings(root)])
     console.warn(warning)
@@ -346,10 +389,12 @@ async function outputStage(project: Project, exported: boolean, client: ClientBu
     report({ step: 'running page hooks' })
 
   await hookPrerendered(root, hooks, { clientDir: client.dir, publicDir: paths.public, base: basePath(config.base), aspects: config.images?.aspects }, paths.output)
+  lap('page hooks')
   report({ step: 'compressing' })
   await Promise.all([compressFiles(client.dir), compressFiles(join(paths.output, PRERENDERED_DIR))])
+  lap('compress')
 
-  return { prerendered, entries, linted }
+  return { prerendered, entries, linted, routes: sizes, stages }
 }
 
 function imageProgress(report: Report): (done: number, total: number) => void {

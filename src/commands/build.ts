@@ -4,7 +4,7 @@ import { writeSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { buildProject } from '../build/pipeline'
-import { formatSizeReport } from '../build/report'
+import { formatBuildReport } from '../build/report'
 import { KayCompileError } from '../build/transform'
 import { fromCompile } from '../check/shadow-types'
 import { errorCodeOf } from '../compiler/errors'
@@ -126,12 +126,12 @@ async function printStage(stage: BuildStage, result: BuildResult, format: Proble
     await printProblems(result.linted, false, format)
 
     if (result.built) {
-      const { islands, stylesheets, prerendered, entries, report, ms } = result.built
+      const { islands, stylesheets, prerendered, entries, report, summary, previous, ms } = result.built
 
       done('built', `${count(islands, 'island')}, ${count(stylesheets, 'stylesheet')} and ${count(prerendered, 'prerendered page')}${entries > 0 ? ` from ${entries} content ${entries === 1 ? 'entry' : 'entries'}` : ''}`, ms)
 
-      if (report && !quiet)
-        console.log(formatSizeReport(report))
+      if (!quiet)
+        console.log(`\n${formatBuildReport(report, summary, { width: process.stdout.isTTY ? process.stdout.columns : undefined, previous })}`)
     }
   }
 
@@ -191,7 +191,7 @@ async function buildToDocument(root: string, options: BuildOptions): Promise<num
     ...problemCounts(problems),
     problems,
     ...failed && { failed: { stage: failed.stage } },
-    ...built && { built: { islands: built.islands, stylesheets: built.stylesheets, prerendered: built.prerendered, entries: built.entries, ms: Math.round(built.ms), sizes: built.report } },
+    ...built && { built: { islands: built.islands, stylesheets: built.stylesheets, prerendered: built.prerendered, entries: built.entries, ms: Math.round(built.ms), sizes: built.report, routes: built.summary.routes, stages: built.summary.stages.map(stage => ({ name: stage.name, ms: Math.round(stage.ms) })), caches: built.summary.caches } },
     ...exported && { exported: { pages: exported.pages, files: exported.files, dir: shown(exported.dir), ms: Math.round(exported.ms) } },
     ...compiled && { compiled: { executable: shown(compiled.executable), ms: Math.round(compiled.ms) } },
   })

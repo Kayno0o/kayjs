@@ -5,6 +5,8 @@ What each release of kay and its libraries adds, newest first, each feature with
 ## Unreleased
 
 - kayjs-auth: a request sending a bearer token reads the token and its user in one query with the built-in stores, and a custom store may add `bearerTokens.findByDigestWithUser` for the same ([kayjs-auth](../packages/auth/llms.txt)).
+||||||| parent of 1c5dba3 (feat(build): kay build prints each route's cost, the stage times, the cache hits and the change since the last build)
+- `kay build` prints a table with one row per route (scripts and stylesheets it loads, whether it was prerendered), the time each stage took and what each cache under `.kay/cache` answered, each size beside its change since the last build; `--format json` carries them as `routes`, `stages` and `caches` ([Commands](project.md#commands)).
 - The `app` preset connects the app as `app_rw`, a Postgres role that reads and writes rows but cannot change the schema, and runs the migrations as the owner; `db/roles.sh` creates it and sets default privileges, so a later migration needs no `GRANT` ([Commands](project.md), adopting it in [1.45.0](upgrading.md)).
 - kayjs-ui: IconPicker's `Show more` asks `search(query, limit, offset)` for the next page and adds it, where it asked again for every icon shown ([kayjs-ui](../packages/ui/llms.txt), in [1.45.0](upgrading.md#1450)).
 - The dev tool's Request tab also shows the response headers (CSP and cache-control first), whether `kay build` prerenders the page, the guards that ran and their outcome, the redirects the request went through before the page and what made them, and the server's time to answer ([Commands](project.md#commands)).

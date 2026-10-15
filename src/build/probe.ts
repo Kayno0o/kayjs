@@ -3,7 +3,7 @@ import { existsSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join, sep } from 'node:path'
 import process from 'node:process'
 import { browserGlobalMissing } from '../compiler/globals'
-import { readCacheEntry, writeCacheEntry } from './cache'
+import { countCache, readCacheEntry, writeCacheEntry } from './cache'
 
 // What a specifier starts with when it names no package: a relative path, a URL scheme such as `node:`, kay itself or an icon.
 const NOT_A_PACKAGE = String.raw`[./]|[a-z]+:|kay(?![^/'"])|~icons/`
@@ -81,6 +81,8 @@ async function browserOnly(specifier: string, from: string, cacheDir: string | u
 async function cachedProbe(key: string, file: string, from: string, cacheDir: string | undefined): Promise<boolean> {
   const slot = cacheDir === undefined ? undefined : { file: join(cacheDir, `${Bun.hash(key).toString(36)}-browser-only.json`), key }
   const cached = slot && await readCacheEntry<boolean>(slot)
+
+  countCache('package probes', cached !== undefined)
 
   if (cached !== undefined)
     return cached

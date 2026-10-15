@@ -2,7 +2,7 @@ import type { BunPlugin } from 'bun'
 import type { CacheSlot } from './cache'
 import { readdirSync, statSync } from 'node:fs'
 import { dirname, join, resolve, sep } from 'node:path'
-import { readCacheEntry, writeCacheEntry } from './cache'
+import { countCache, readCacheEntry, writeCacheEntry } from './cache'
 import { fileStamp, settledBefore } from './files'
 import { compilerFingerprint } from './transform'
 
@@ -151,8 +151,12 @@ export interface RuntimeSearchCache {
 export async function runtimeChunk(entry: string, options: { plugins: BunPlugin[], define: Record<string, string>, external: string[], cache?: RuntimeSearchCache | undefined }): Promise<RuntimeChunk | undefined> {
   const slot = options.cache && { file: options.cache.file, key: Bun.hash([compilerFingerprint(), JSON.stringify(options.define), options.external.join(), options.plugins.map(plugin => plugin.name).join(), RUNTIME_DIR, options.cache.key].join('\0')).toString(36) }
   const known = slot && await readCacheEntry<Remembered>(slot)
+  const fresh = known !== undefined && Object.entries(known.inputs).every(([file, stamp]) => fileStamp(file) === stamp)
 
-  if (known && Object.entries(known.inputs).every(([file, stamp]) => fileStamp(file) === stamp))
+  if (slot)
+    countCache('runtime chunk', fresh)
+
+  if (known && fresh)
     return { dir: dirname(entry), anchor: known.anchor, lazy: new Set(known.lazy) }
 
   const started = Date.now()

@@ -1,5 +1,6 @@
 import type { BunPlugin } from 'bun'
 import type { BuildOptions, BuildResult } from '../src/build/pipeline'
+import type { BuildSummary, RouteSize, SizeReport, StoredReport } from '../src/build/report'
 import type { KayConfig } from '../src/config'
 import type { ClientBuild } from '../src/server/client'
 import { existsSync, utimesSync } from 'node:fs'
@@ -15,7 +16,7 @@ import { buildClient, readClientSources } from '../src/build/client'
 import { forgetSources, keepSources, readSource, realPath, writeIfChanged } from '../src/build/files'
 import { fileWords, reachesAny } from '../src/build/libraries'
 import { BUNDLED_LICENCES, codecWarnings, thirdPartyNotices, unknownCodecVersions } from '../src/build/licenses'
-import { formatSizeReport } from '../src/build/report'
+import { formatBuildReport, formatRouteTable, formatSizeReport, shorten } from '../src/build/report'
 import { anchorModule, runtimeChunk } from '../src/build/runtime-chunk'
 import { runtimeConfig, withoutPlugins } from '../src/build/runtime-config'
 import { importedSignals, inSignalsScope } from '../src/build/signals'
@@ -1657,6 +1658,128 @@ describe('the size report', () => {
   it('reports no JavaScript bundle for a site with no island', () => {
     expect(formatSizeReport({ islands: [] })).toBe('no JavaScript bundle: no page has an island')
   })
+})
+
+describe('the build report', () => {
+  const summary = (routes: RouteSize[]): BuildSummary => ({ routes, stages: [{ name: 'check', ms: 4210 }, { name: 'bundle', ms: 87.4 }], caches: [{ name: 'image variants', cached: 40, made: 2 }, { name: 'components', cached: 0, made: 3 }] })
+  const route = (pattern: string, js: number, css = 0, pages = 1): RouteSize => ({ route: pattern, js, css, pages, estimated: pages === 0 })
+
+  it('shows one row per route with its scripts, stylesheets and whether it was prerendered, the change since the last build beside each size', () => {
+    const previous: StoredReport = { version: 1, exported: false, entry: 10_240, islands: {}, routes: { '/': { js: 10_240, css: 1024 }, '/blog/:slug': { js: 5120, css: 0 } } }
+    const printed = formatRouteTable([route('/', 13_517, 1024), route('/blog/:slug', 5120, 0, 200), route('/live', 2048, 0, 0), route('/new', 0, 512)], { previous })
+
+    expect(printed).toMatch(/^Routes, gzip .*\n {2}route +rendered +JS +CSS\n/)
+    expect(printed).toMatch(/^ {2}\/ +prerendered +13\.2 KB \[\+3\.2 KB\] +1\.0 KB$/m)
+    // An unchanged size says nothing, and what the last build did not have is new.
+    expect(printed).toMatch(/^ {2}\/blog\/:slug +prerendered x200 +5\.0 KB +0\.0 KB$/m)
+    expect(printed).toMatch(/^ {2}\/live +on request +~2\.0 KB \[new\] +0\.0 KB \[new\]$/m)
+    expect(formatRouteTable([route('/', 1024)])).not.toContain('[')
+  })
+
+  it('never runs past the width, shortening the middle of a long path and listing the lightest routes as a count', () => {
+    const long = `/${'section/'.repeat(12)}:slug`
+    const many = Array.from({ length: 30 }, (_, index) => route(`/page-${index}`, 1000 + index))
+    const printed = formatRouteTable([route(long, 9000), ...many], { width: 70 })
+
+    expect(Math.max(...printed.split('\n').map(line => line.length))).toBeLessThanOrEqual(70)
+    expect(printed).toContain('/section/section/')
+    expect(printed).toContain('...')
+    expect(printed).toContain('and 6 more routes, lighter than these')
+    expect(shorten('abcdefghij', 8)).toBe('ab...hij')
+    expect(shorten('abc', 8)).toBe('abc')
+  })
+
+  it('prints the stages and what each cache answered as plain text, with no colour for a log', () => {
+    const printed = formatBuildReport(undefined, summary([route('/', 1024)]))
+
+    expect(printed).toContain('check   4.2 s')
+    expect(printed).toContain('bundle  87 ms')
+    expect(printed).toContain('image variants: 40 cached, 2 made')
+    expect(printed).toContain('components:     0 cached, 3 made')
+    // eslint-disable-next-line no-control-regex
+    expect(printed).not.toMatch(/\x1B/)
+  })
+
+  it('compares the islands to the last build', () => {
+    const report: SizeReport = { entry: { size: { raw: 9000, gzip: 4096 } }, islands: [{ file: 'src/a.kay', size: { raw: 3000, gzip: 2048 } }, { file: 'src/b.kay', size: { raw: 800, gzip: 400 } }] }
+    const printed = formatSizeReport(report, { previous: { version: 1, exported: false, entry: 4096, islands: { 'src/a.kay': 1024 }, routes: {} } })
+
+    expect(printed).toMatch(/^ {2}src\/a\.kay +\+2\.0 KB \(2\.9 KB\) \[\+1\.0 KB\]$/m)
+    expect(printed).toMatch(/^ {2}src\/b\.kay +\+0\.4 KB \(0\.8 KB\) \[new\]$/m)
+    expect(printed).toMatch(/^ {2}entry, loaded by every page with an island +4\.0 KB \(8\.8 KB\)$/m)
+  })
+
+  it('weighs each route, times the stages, counts what the caches answered, and keeps the sizes of the last good build only', async () => {
+    const root = await scratchProject({
+      'tsconfig.json': tsconfig,
+      'src/counter.kay': '---\nimport { signal } from \'kay\'\n\nconst n = signal(0)\n---\nbutton(type="button" onClick={() => n.set(n() + 1)}) {n()}\n',
+      'src/page.css': '.page-marker { color: red }\n',
+      'src/routes/index.kay': '--- server\nimport \'../page.css\'\n\nexport const page = { prerender: true }\n---\n---\nimport Counter from \'../counter.kay\'\n---\nhead\n  title Home\n  meta(name="description" content="Home")\nCounter\n',
+      'src/routes/live.kay': '---\nimport Counter from \'../counter.kay\'\n---\nhead\n  title Live\n  meta(name="description" content="Live")\nCounter\n',
+      'src/routes/plain.kay': '--- server\nexport const page = { prerender: true }\n---\nhead\n  title Plain\n  meta(name="description" content="Plain")\np Plain\n',
+    })
+    // In a process of its own, as the prerender registers the .kay loader for the project.
+    const build = async (options: BuildOptions = {}) => {
+      const script = `import { buildProject } from ${JSON.stringify(join(import.meta.dir, '../src/build/pipeline'))}\n\nconsole.log(JSON.stringify(await buildProject(${JSON.stringify(root)}, {}, ${JSON.stringify(options)})))\n`
+      const child = Bun.spawn([process.execPath, '-e', script], { cwd: root, stdout: 'pipe', stderr: 'pipe' })
+      const [output, errors, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+
+      expect({ code, errors }).toEqual({ code: 0, errors: '' })
+
+      return JSON.parse(output.trim().split('\n').at(-1)!) as BuildResult
+    }
+    const stored = projectPaths(root).report
+
+    try {
+      const firstResult = await build()
+      const first = firstResult.built!
+      const byRoute = Object.fromEntries(first.summary.routes.map(each => [each.route, each]))
+
+      expect(first.previous).toBeUndefined()
+      expect(byRoute['/']).toMatchObject({ pages: 1, estimated: false })
+      expect(byRoute['/']!.js).toBeGreaterThan(0)
+      expect(byRoute['/']!.css).toBeGreaterThan(0)
+      expect(byRoute['/plain']).toMatchObject({ pages: 1, js: 0, css: 0 })
+      // Not prerendered, so the scripts are what its components can load: the entry and the island.
+      expect(byRoute['/live']).toMatchObject({ pages: 0, estimated: true })
+      expect(byRoute['/live']!.js).toBe(byRoute['/']!.js)
+      expect(first.summary.stages.map(stage => stage.name)).toEqual(['check', 'bundle', 'prerender', 'route sizes', 'images and cards', 'favicons', 'page hooks', 'compress'])
+      expect(first.summary.stages.every(stage => stage.ms >= 0)).toBe(true)
+      expect(first.summary.caches.find(cache => cache.name === 'components')).toBeDefined()
+      expect(first.summary.caches.find(cache => cache.name === 'components')!.made).toBeGreaterThan(0)
+      expect(existsSync(stored)).toBe(true)
+
+      // Built again with nothing edited, everything compiled comes from the cache and the sizes are the same.
+      const second = (await build()).built!
+      const components = second.summary.caches.find(cache => cache.name === 'components')!
+
+      expect(components.cached).toBeGreaterThan(0)
+      expect(components.made).toBe(0)
+      expect(second.previous!.routes['/']).toEqual({ js: byRoute['/']!.js, css: byRoute['/']!.css })
+      expect(formatBuildReport(second.report, second.summary, { previous: second.previous })).not.toContain('[')
+
+      // A failed build, the check refusing it, leaves the sizes of the last good one for the next to compare to.
+      const kept = await Bun.file(stored).text()
+
+      await Bun.write(join(root, 'src/routes/plain.kay'), '--- server\nexport const page = { prerender: true }\n---\na(href="/nowhere") Lost\n')
+      expect((await build()).failed).toEqual({ stage: 'check' })
+      expect(await Bun.file(stored).text()).toBe(kept)
+
+      await Bun.write(join(root, 'src/routes/plain.kay'), '--- server\nexport const page = { prerender: true }\n---\nhead\n  title Plain\n  meta(name="description" content="Plain")\np Plain\n')
+      await Bun.write(join(root, 'src/routes/extra.kay'), '--- server\nexport const page = { prerender: true }\n---\nhead\n  title Extra\n  meta(name="description" content="Extra")\np Extra\n')
+
+      const third = (await build()).built!
+
+      expect(third.previous!.routes['/extra']).toBeUndefined()
+      expect(formatBuildReport(third.report, third.summary, { previous: third.previous })).toMatch(/^ {2}\/extra +prerendered +0\.0 KB \[new\] +0\.0 KB \[new\]$/m)
+
+      // A static export weighs differently, so it is not compared to a server build.
+      expect((await build({ exportTo: 'dist' })).built!.previous).toBeUndefined()
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  }, 120_000)
 })
 
 describe('the runtime chunk', () => {

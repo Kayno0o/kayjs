@@ -39,7 +39,7 @@ export interface ProjectPaths {
   // The server entry `kay dev`, `kay check` and `kay build --compile` start from.
   entry: string
   content: string
-  // Under `.kay`: what compiling the project keeps between runs, the executable's generated entry, the browser build with the directory it serves, the shadow tree, the class names kay collects for Tailwind (at the path an app's own `@source` line may name, but for each test worker's) and the components tests mount.
+  // Under `.kay`: what compiling the project keeps between runs, the executable's generated entry, the browser build with the directory it serves, the shadow tree, the class names kay collects for Tailwind (at the path an app's own `@source` line may name, but for each test worker's), the components tests mount and the last build's report.
   cache: string
   compile: string
   output: string
@@ -47,6 +47,8 @@ export interface ProjectPaths {
   types: string
   classes: string
   tests: string
+  // The sizes the last successful `kay build` printed, for the next one to show its change against.
+  report: string
 }
 
 export function projectPaths(root: string, config: Pick<KayConfig, 'routes' | 'publicDir' | 'api' | 'content'> & { entry?: string | undefined } = {}): ProjectPaths {
@@ -66,6 +68,7 @@ export function projectPaths(root: string, config: Pick<KayConfig, 'routes' | 'p
     types: join(absolute, SHADOW_DIR),
     classes: join(absolute, KAY_DIR, `classes${testWorker()}.txt`),
     tests: join(absolute, KAY_DIR, 'test'),
+    report: join(absolute, KAY_DIR, `report${testWorker()}.json`),
   }
 }
 

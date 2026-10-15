@@ -13,6 +13,24 @@ interface CacheEntry<Value> {
   value: Value
 }
 
+// How often each named cache answered from disk and how often its value had to be made, for the build report.
+const counts = new Map<string, { cached: number, made: number }>()
+
+export function countCache(name: string, cached: boolean): void {
+  const count = counts.get(name) ?? { cached: 0, made: 0 }
+
+  count[cached ? 'cached' : 'made']++
+  counts.set(name, count)
+}
+
+export function resetCacheCounts(): void {
+  counts.clear()
+}
+
+export function cacheCounts(): { name: string, cached: number, made: number }[] {
+  return [...counts].map(([name, count]) => ({ name, ...count }))
+}
+
 // The entries this process read or wrote, which a full build leaves in place when it prunes.
 const touched = new Set<string>()
 

@@ -54,6 +54,8 @@ export interface PrerenderOptions {
   exportAll?: boolean
   // Receives every page rendered, for `kay build` to lint their heads.
   rendered?: RenderedPage[] | undefined
+  // Receives every route of the project, for `kay build` to weigh what each loads.
+  routes?: Route[] | undefined
   // Hears how many of the routes it went through, those it prerenders nothing of included.
   onRoute?: ((done: number, total: number) => void) | undefined
 }
@@ -68,6 +70,8 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
 
   const dir = join(output, PRERENDERED_DIR)
   const { mounts, routes, matchers, i18n, locales, site, renderOptions } = await setupPages(project, async () => client, true)
+
+  options.routes?.push(...routes)
 
   const pages: Record<string, PrerenderedPage> = {}
   const paths = new Map<string, string>()
