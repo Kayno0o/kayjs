@@ -684,6 +684,40 @@ describe('queue', () => {
       }
     })
 
+    it('stops with a worker whose store answers after the stop, and runs a job enqueued while the poller reads the store', async () => {
+      jest.useFakeTimers({ now: 0 })
+
+      const gate = Promise.withResolvers<void>()
+      const store = memoryJobs()
+      const nextRunAt = store.nextRunAt.bind(store)
+      let held = false
+
+      store.nextRunAt = async (name) => {
+        held = true
+        await gate.promise
+
+        return nextRunAt(name)
+      }
+
+      const ran: string[] = []
+      const work = queue('gated', (payload: string) => ran.push(payload), { store })
+      const app = new Elysia().use(work).listen(0)
+
+      try {
+        await flush()
+        expect(held).toBe(true)
+        // Enqueued while the poller waits on the store: it looks again at once instead of sleeping on.
+        await work.enqueue('a')
+        gate.resolve()
+        await flush()
+        expect(ran).toEqual(['a'])
+      }
+      finally {
+        jest.useRealTimers()
+        await shutdown(app)
+      }
+    })
+
     it('wakes for a job its own retry puts at a time before the wait ends', async () => {
       jest.useFakeTimers({ now: 0 })
 

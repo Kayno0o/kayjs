@@ -170,15 +170,6 @@ export function fixedText(text: string): FixedText {
   return { bytes, head: bytes.subarray(0, HEAD_BYTES), deflated: deflateRawSync(bytes, { level: 9, finishFlush: constants.Z_FULL_FLUSH }) }
 }
 
-// The same off the event loop, for a text cut from a page while serving it, a few at a time.
-export async function fixedTextAsync(text: string): Promise<FixedText> {
-  const { constants, deflateRaw } = nodeZlib()
-  const bytes = Buffer.from(text)
-  const deflated = await compressing(async () => new Promise<Buffer>((resolve, reject) => deflateRaw(bytes, { level: 9, finishFlush: constants.Z_FULL_FLUSH }, (error, result) => error ? reject(error) : resolve(result))))
-
-  return { bytes, head: bytes.subarray(0, HEAD_BYTES), deflated }
-}
-
 function offsetOf(body: Buffer, text: FixedText): number {
   for (let at = body.indexOf(text.head); at >= 0; at = body.indexOf(text.head, at + 1)) {
     if (body.subarray(at, at + text.bytes.length).equals(text.bytes))

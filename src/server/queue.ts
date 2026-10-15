@@ -279,7 +279,11 @@ export function queue<Payload>(name: string, handler: (payload: Payload) => unkn
   let polling = false
   // The wait of the next empty look: the poll, doubling up to `idlePoll` while no job is found, shared by the workers as one looks at a time.
   let idleWait = POLL_MS
+  // Counts the wakes, so a worker finding one came while it awaited the store looks again.
+  let wakes = 0
   const wake = () => {
+    wakes++
+
     for (const sleeper of sleepers)
       sleeper()
   }
@@ -369,17 +373,17 @@ export function queue<Payload>(name: string, handler: (payload: Payload) => unkn
 
     purged = now
 
-    const { purge } = store()
+    const current = store()
 
-    if (purge) {
-      await purge.call(store(), name, now - keepFailed)
+    if (current.purge) {
+      await current.purge(name, now - keepFailed)
 
       return
     }
 
-    for (const job of await store().failed(name)) {
+    for (const job of await current.failed(name)) {
       if (job.runAt < now - keepFailed)
-        await store().complete(job.id)
+        await current.complete(job.id)
     }
   }
 
@@ -414,8 +418,15 @@ export function queue<Payload>(name: string, handler: (payload: Payload) => unkn
 
         polling = true
 
+        const seen = wakes
+
         try {
           const next = await store().nextRunAt(name)
+
+          // Something was enqueued, retried or claimed meanwhile, before the sleep could be woken.
+          if (wakes !== seen)
+            continue
+
           const wait = next === undefined ? idleWait : Math.min(idleWait, Math.max(0, next - Date.now()))
 
           idleWait = Math.min(idleWait * 2, idlePoll)
@@ -502,6 +513,9 @@ export function queue<Payload>(name: string, handler: (payload: Payload) => unkn
 
 // Waits `ms`, or less once the signal aborts or something wakes the sleepers.
 async function sleep(ms: number, signal: AbortSignal, sleepers: Set<() => void>): Promise<void> {
+  if (signal.aborted)
+    return
+
   let timer: ReturnType<typeof setTimeout> | undefined
 
   await new Promise<void>((resolve) => {

@@ -220,6 +220,7 @@ export function sqliteRooms(path: string, { poll = POLL }: { poll?: number } = {
   const own = new Map<string, { room: string, connection: string, member: string }>()
   let last = 0
   let reading: ReturnType<typeof setInterval> | undefined
+  let closed = false
   let beating: ReturnType<typeof setInterval> | undefined
 
   const beat = () => {
@@ -252,7 +253,7 @@ export function sqliteRooms(path: string, { poll = POLL }: { poll?: number } = {
 
   // The process says it is alive, and reads what others publish, only while it holds a connection: one with none has no member to keep or to deliver to.
   const sync = () => {
-    const held = own.size > 0
+    const held = own.size > 0 && !closed
 
     if (held && !beating) {
       beat()
@@ -304,6 +305,7 @@ export function sqliteRooms(path: string, { poll = POLL }: { poll?: number } = {
       }
     },
     close() {
+      closed = true
       clearInterval(beating)
       clearInterval(reading)
       beating = undefined

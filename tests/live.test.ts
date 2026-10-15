@@ -1245,6 +1245,14 @@ describe('rooms', () => {
         timers.length = 0
         room.join(ada, 'hall', 'ada')
         expect(timers.toSorted((a, b) => a - b)).toEqual([5, 2000])
+
+        // Leaving a listener after the store closed neither beats nor throws.
+        const afterClose = sqliteRooms(join(dir, 'closed.sqlite'))
+        const stop = afterClose.subscribe(() => undefined)
+
+        afterClose.add('hall', 'c1', '')
+        afterClose.close()
+        expect(stop).not.toThrow()
       }
       finally {
         intervals.mockRestore()

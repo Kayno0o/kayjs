@@ -11,7 +11,7 @@ kay and its libraries share one version number, so one section covers them all. 
 
 ### An idle queue looks at its store every 10 seconds at most
 
-- A `queue` backs off while idle, looking from one worker 1 second after a job, then twice as long after each empty look up to `idlePoll`, 10 seconds by default, where it looked every second. A job enqueued in the same process, or a retry, still runs at once; one enqueued by another process, a script or a second server, waits 10 seconds at worst. An app relying on a pickup within a second from another process sets `idlePoll: '1s'`.
+- A `queue` backs off while idle, looking from one worker 1 second after a job, then twice as long after each empty look up to `idlePoll`, 10 seconds by default, where it looked every second. A job enqueued in the same process, still runs at once and a retry is picked up when due; one enqueued by another process, a script or a second server, waits 10 seconds at worst. An app relying on a pickup within a second from another process sets `idlePoll: '1s'`.
 - A custom `JobStore` may add `purge(queue, before)`, removing the expired failed jobs in one call; without it they are removed one by one as before.
 
 ### The app preset's database runs the app as a role that cannot change the schema
