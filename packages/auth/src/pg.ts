@@ -347,12 +347,33 @@ export function pgStore(db: Database): AuthStore {
 // A bearer token's query with its user's columns joined on as `u.<column>`.
 const JOINED_COLUMNS = [...Object.keys(AuthBearerTokens.columns), ...Object.keys(AuthUsers.columns).map(column => `u.${column}`)]
 
+// Untyped because pg-orm types a `pick` by its column names, which these are built from at run time.
 function joinedUser(q: any) {
   return q.join(AuthUsers, 'u', (e: any) => e.eq('user_id', e.ref('u.id'))).pick(...JOINED_COLUMNS)
 }
 
 // The user columns holding a date.
 const DATE_COLUMNS = new Set(['email_verified_at', 'totp_enabled_at', 'banned_at', 'banned_until', 'created_at'])
+
+// One user column's value as the user alone gives it: anything but null or what is typed already is converted as pg-orm converts it for SQLite.
+function decoded(column: string, value: unknown): unknown {
+  if (value === null || value === undefined)
+    return value
+
+  if (column === 'roles' && typeof value === 'string') {
+    try {
+      return JSON.parse(value)
+    }
+    catch {
+      return value
+    }
+  }
+
+  if (column === 'guest' && typeof value !== 'boolean')
+    return Boolean(value)
+
+  return DATE_COLUMNS.has(column) && !(value instanceof Date) ? new Date(value as string | number) : value
+}
 
 // The user a joined row holds, its columns typed as a read of the user alone gives them: Postgres types them as it reads, SQLite hands a date as text, an array as JSON text and a boolean as 0 or 1.
 function userOf(row: Record<string, unknown>): UserRow {
@@ -361,11 +382,7 @@ function userOf(row: Record<string, unknown>): UserRow {
   for (const column of Object.keys(AuthUsers.columns)) {
     const value = row[`u.${column}`]
 
-    user[column] = column === 'roles' && typeof value === 'string'
-      ? JSON.parse(value)
-      : column === 'guest' && typeof value === 'number'
-        ? value !== 0
-        : DATE_COLUMNS.has(column) && typeof value === 'string' ? new Date(value) : value
+    user[column] = decoded(column, value)
   }
 
   return user as UserRow
