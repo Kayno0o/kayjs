@@ -139,13 +139,10 @@ export function setSecurityHeaders(set: Context['set'], security: [name: string,
 // The copy a file route answers with: the secured one when the context holds no header, since the response's own would win over the app's; else the plain one, the security headers going on the context as on every other route.
 // The request id every context holds goes on the response itself when it is alone there, so Elysia has no header to copy the response for.
 export function ownHeaders(set: Context['set'], copies: HeaderCopies): Record<string, string> {
-  const id = requestIdAlone(set.headers)
+  const id = takeAloneRequestId(set)
 
-  if (id !== undefined) {
-    delete set.headers[REQUEST_ID_HEADER]
-
+  if (id !== undefined)
     return { ...copies.secured, [REQUEST_ID_HEADER]: id }
-  }
 
   if (Object.keys(set.headers).length === 0)
     return copies.secured
@@ -198,7 +195,7 @@ export function carryContext<T extends Response>(set: Context['set'], response: 
 
 // The same for headers built per request: the security headers go under what the response sets, and the request id on the response when it is alone on the context.
 export function ownedHeaders(set: Context['set'], headers: Record<string, string>, security: [name: string, value: string][]): Record<string, string> {
-  const id = requestIdAlone(set.headers)
+  const id = takeAloneRequestId(set)
 
   if (id === undefined && Object.keys(set.headers).length > 0) {
     setSecurityHeaders(set, security)
@@ -206,10 +203,8 @@ export function ownedHeaders(set: Context['set'], headers: Record<string, string
     return headers
   }
 
-  if (id !== undefined) {
-    delete set.headers[REQUEST_ID_HEADER]
+  if (id !== undefined)
     headers[REQUEST_ID_HEADER] = id
-  }
 
   for (const [name, value] of security)
     headers[name] ??= value
@@ -217,15 +212,19 @@ export function ownedHeaders(set: Context['set'], headers: Record<string, string
   return headers
 }
 
-function requestIdAlone(headers: Context['set']['headers']): string | undefined {
+// The request id when it is the only header on the context, taken off it for the response to carry.
+function takeAloneRequestId(set: Context['set']): string | undefined {
   let id: string | undefined
 
-  for (const name in headers) {
+  for (const name in set.headers) {
     if (name !== REQUEST_ID_HEADER)
       return undefined
 
-    id = headers[name]
+    id = set.headers[name]
   }
+
+  if (id !== undefined)
+    delete set.headers[REQUEST_ID_HEADER]
 
   return id
 }
