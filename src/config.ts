@@ -14,7 +14,7 @@ import type { Rewrite } from './server/rewrite'
 import type { Prefetch } from './server/speculation'
 import type { FileStore } from './server/storage'
 import type { Tracer } from './server/trace'
-import { existsSync } from 'node:fs'
+import { existsSync, realpathSync } from 'node:fs'
 import { join } from 'node:path'
 import process from 'node:process'
 import { KayError } from './compiler/errors'
@@ -313,12 +313,56 @@ export async function loadConfig(root: string, fresh = false): Promise<KayConfig
   return withSiteUrl(withExtensions(await importConfig(root, fresh)))
 }
 
+const SERVER_SPECIFIER = /(['"])kay\/server\1/g
+const SERVER_NAMES_IMPORT = /\bimport\s+(type\s+)?\{([^}]*)\}\s*from\s*(['"])kay\/server\3/g
+const TYPE_PREFIX = /^type\s/
+const SOURCE_TRANSPILER = new Bun.Transpiler({ loader: 'ts' })
+// The config files read without the server: their `kay/server` import takes only `defineConfig`, which this module holds, so a process building the client or writing the types skips loading Elysia and the rest of the server.
+const lightConfigs = new Set<string>()
+
+// The config's source with its `kay/server` import pointed at this module, or undefined when it takes anything else from there.
+// The imports the transpiler finds must be exactly the ones matched, so a comment, a string or a dynamic import naming the module leaves the server loaded.
+function withoutServer(source: string): string | undefined {
+  const named = [...source.matchAll(SERVER_NAMES_IMPORT)]
+
+  if (named.length === 0 || named.length !== SOURCE_TRANSPILER.scanImports(source).filter(({ path }) => path === 'kay/server').length)
+    return undefined
+
+  const onlyDefineConfig = named.every(([, type, names]) => type !== undefined || names!.split(',').map(name => name.trim()).filter(name => name !== '').every(name => TYPE_PREFIX.test(name) || name === 'defineConfig'))
+
+  return onlyDefineConfig ? source.replace(SERVER_NAMES_IMPORT, statement => statement.replace(SERVER_SPECIFIER, () => JSON.stringify(import.meta.path))) : undefined
+}
+
+// A runtime plugin cannot resolve a bare specifier, so the config's source is rewritten as it loads.
+// The plugin takes only this file, and only when it is light, as a loader answering nothing for a file fails and one answering for every config would keep later plugins from theirs.
+// `plugin.clearAll()` of the server loader drops it, after which the config loads the server as before.
+async function readConfigLightly(file: string): Promise<void> {
+  const real = realpathSync(file)
+
+  if (lightConfigs.has(real) || withoutServer(await Bun.file(real).text()) === undefined)
+    return
+
+  lightConfigs.add(real)
+  Bun.plugin({
+    name: 'kay-config',
+    setup(build) {
+      build.onLoad({ filter: new RegExp(`^${RegExp.escape(real)}(?:\\?.*)?$`) }, async () => {
+        const source = await Bun.file(real).text()
+
+        return { contents: withoutServer(source) ?? source, loader: 'ts' as const }
+      })
+    },
+  })
+}
+
 // The config as `kay.config.ts` writes it, its extensions' config not laid under it yet.
 async function importConfig(root: string, fresh = false): Promise<KayConfig> {
   const file = join(root, CONFIG_FILE)
 
   if (!existsSync(file))
     return {}
+
+  await readConfigLightly(file)
 
   const { default: config } = await import(fresh ? `${file}?${Date.now()}` : file) as { default?: KayConfig }
 
