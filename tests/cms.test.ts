@@ -260,17 +260,22 @@ describe('the collections a CMS edits', () => {
     })
   })
 
-  it('does not hand a read during a save the load that began before it', async () => {
+  it.each(['save', 'remove'] as const)('does not hand a read during a %s the load that began before it', async (write) => {
     let held = [{ slug: 'hello', data: { title: 'Old' } }]
+    let loads = 0
     const tales = collection({ name: 'tales', load: async () => {
       const seen = structuredClone(held)
 
+      loads++
       await Bun.sleep(30)
 
       return seen
     }, save: async (entry) => {
       await Bun.sleep(10)
       held = [{ slug: entry.slug, data: entry.data as { title: string } }]
+    }, remove: async () => {
+      await Bun.sleep(10)
+      held = []
     } }, { schema: t.Object({ title: t.String() }) })
 
     await exporting([['tales', tales]], async () => {
@@ -278,17 +283,19 @@ describe('the collections a CMS edits', () => {
 
       await Bun.sleep(5)
 
-      const saving = saveEntry('tales', { slug: 'hello', data: { title: 'New' } })
+      const writing = write === 'save' ? saveEntry('tales', { slug: 'hello', data: { title: 'New' } }) : removeEntry('tales', 'hello')
 
-      await Bun.sleep(5)
+      await Bun.sleep(3)
 
       const during = entries('tales')
 
-      await saving
-
-      expect((await during)[0]!.data).toEqual({ title: 'Old' })
-      expect((await entries('tales'))[0]!.data).toEqual({ title: 'New' })
+      await Bun.sleep(3)
+      // The read made while the write is under way began its own load rather than joining the first.
+      expect(loads).toBe(2)
+      await writing
+      await during
       expect((await slow)[0]!.data).toEqual({ title: 'Old' })
+      expect((await entries('tales')).map(entry => entry.data)).toEqual(write === 'save' ? [{ title: 'New' }] : [])
     })
   })
 

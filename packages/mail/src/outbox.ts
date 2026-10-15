@@ -6,6 +6,12 @@ import { linksOf } from './text'
 // Where `kay dev` lists the outbox and serves the mail samples.
 export const PREVIEW_PATH = '/_kay/mail'
 
+// Each route the dev pages answer, by method: the mailer registers these ahead of loading them, and a test holds the list to the pages' own.
+export const PREVIEW_ROUTES = {
+  get: [PREVIEW_PATH, `${PREVIEW_PATH}.json`, `${PREVIEW_PATH}/samples`, `${PREVIEW_PATH}/samples/html`, `${PREVIEW_PATH}/events`, `${PREVIEW_PATH}/:id`, `${PREVIEW_PATH}/:id/eml`, `${PREVIEW_PATH}/:id/html`],
+  post: [`${PREVIEW_PATH}/samples/send`, `${PREVIEW_PATH}/clear`, `${PREVIEW_PATH}/:id/send`],
+} as const
+
 export interface SentMail extends Mail {
   id: string
   sentAt: Date

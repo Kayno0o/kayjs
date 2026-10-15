@@ -8,25 +8,38 @@ import { defineEnv, queue, renderToString } from 'kay/server'
 import parseAddresses from 'nodemailer/lib/addressparser'
 import { escapeHtml as escape } from './escape'
 import { log } from './log'
-import { addressOf, outbox, PREVIEW_PATH } from './outbox'
+import { addressOf, outbox, PREVIEW_ROUTES } from './outbox'
 import { checkKey, smtp } from './smtp'
 import { htmlToText } from './text'
 
-// The development pages' routes, which read `./preview` on the first request to one: a plugin that registers routes at once, so it mounts as any other, with handlers that hand the request to the pages once they are loaded.
+// The development pages' routes, which read `./preview` on the first request to one: a plugin that registers its routes at once, so it mounts as any other, with handlers that hand the request to the pages once they are loaded. Each is registered by its method and path, as the pages do, since a catch-all would lose to the page fallback's `GET /*`.
 function mountPreview(plugin: Elysia, render: (message: Message) => Promise<Mail>, relay: Relay): void {
-  let pages: ((request: Request) => Promise<Response>) | undefined
+  let pages: Promise<(request: Request) => Promise<Response>> | undefined
 
-  const handle = async ({ request }: { request: Request }) => {
-    if (!pages) {
-      const app = (await import('./preview')).preview(render, relay)
+  const load = async () => {
+    const app = (await import('./preview')).preview(render, relay)
 
-      pages = request => app.handle(request)
-    }
-
-    return pages(request)
+    return async (request: Request) => app.handle(request)
   }
 
-  plugin.all(PREVIEW_PATH, handle).all(`${PREVIEW_PATH}.json`, handle).all(`${PREVIEW_PATH}/*`, handle)
+  const handle = async ({ request }: { request: Request }) => {
+    pages ??= load()
+
+    try {
+      return await (await pages)(request)
+    }
+    catch (error) {
+      pages = undefined
+
+      throw error
+    }
+  }
+
+  for (const path of PREVIEW_ROUTES.get)
+    plugin.get(path, handle)
+
+  for (const path of PREVIEW_ROUTES.post)
+    plugin.post(path, handle)
 }
 
 export interface MailerOptions {

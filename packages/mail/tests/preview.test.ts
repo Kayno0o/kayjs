@@ -74,6 +74,30 @@ describe('the development outbox page', () => {
     expect((await site.visit('/_kay/mail')).html).toContain('Through the app')
   })
 
+  it('serves every page of the dev pages through an app, the page fallback not answering for them', async () => {
+    const mail = mailer({ from: 'dev@example.com' })
+    const site = await testSite({ root: 'tests/fixture', extensions: [mailExtension(async () => mail)] })
+
+    await mail.send({ to: 'ada@example.com', subject: 'Through the app', html: '<p>Hi</p>' })
+
+    const id = outbox.last()!.id
+    const answers = await Promise.all([`/_kay/mail/${id}`, `/_kay/mail/${id}/html`, `/_kay/mail/${id}/eml`, '/_kay/mail.json'].map(async path => [path, (await site.fetch(path)).status] as const))
+
+    expect(answers.filter(([, status]) => status !== 200)).toEqual([])
+    expect((await site.fetch('/_kay/mail/clear', { method: 'POST', headers: { 'sec-fetch-site': 'same-origin' } })).status).toBeLessThan(400)
+    expect(outbox.mails).toHaveLength(0)
+  })
+
+  it('registers, ahead of loading them, the very routes the dev pages answer', async () => {
+    const { preview } = await import('../src/preview')
+    const { PREVIEW_ROUTES } = await import('../src/outbox')
+    const pages = preview(async () => ({}) as never, { missing: () => [], server: () => '', to: () => undefined, send: async () => ({}) as never })
+    const own = pages.routes.map(route => `${route.method} ${route.path}`).sort()
+    const registered = [...PREVIEW_ROUTES.get.map(path => `GET ${path}`), ...PREVIEW_ROUTES.post.map(path => `POST ${path}`)].sort()
+
+    expect(registered).toEqual(own)
+  })
+
   it('lists the outbox as JSON, oldest first, each mail whole, for a browser test in another process', async () => {
     const mail = mailer({ from: 'dev@example.com' })
 
@@ -185,6 +209,14 @@ describe('the mail samples page', () => {
   beforeAll(() => process.chdir(`${root}/tests/fixture`))
   afterAll(() => process.chdir(root))
 
+  it('serves its pages through an app too', async () => {
+    const mail = mailer({ from: 'dev@example.com' })
+    const site = await testSite({ root: '.', extensions: [mailExtension(async () => mail)] })
+
+    expect((await site.fetch('/_kay/mail/samples')).status).toBe(200)
+    expect((await site.fetch('/_kay/mail/samples?mail=welcome.kay')).status).toBe(200)
+  })
+
   it('lists the app\'s mails, linked from the outbox, reloading once kay dev restarts the server', async () => {
     const mail = mailer({ from: 'dev@example.com' })
     const list = await get(mail, '/_kay/mail/samples')
@@ -290,7 +322,7 @@ describe('sending a development mail for real', () => {
     expect(sent.status).toBe(303)
     expect(sent.headers.get('location')).toBe(`/_kay/mail/${id}?sent=me%40example.com`)
     expect(server.received.at(-1)?.to).toEqual(['<me@example.com>'])
-    expect(server.received.at(-1)?.data).not.toContain('cc@example.com')
+    expect(server.received.at(-1)?.data).not.toContain('Cc:')
     expect(await (await get(mail, sent.headers.get('location')!)).text()).toContain(`<p class="sent">Sent to me@example.com over 127.0.0.1:${server.port}.</p>`)
   })
 
