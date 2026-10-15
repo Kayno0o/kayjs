@@ -1,5 +1,5 @@
 import { watch } from 'node:fs'
-import { rm } from 'node:fs/promises'
+import { readdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
@@ -100,6 +100,12 @@ describe('--quiet', () => {
       expect(code, stderr).toBe(0)
       expect(stdout).toMatch(/^created app, [^\n]+ files\n$/)
       expect(created).toEqual([])
+
+      // The declaration maps point at the sources the package ships, as prepack's do, not at this checkout.
+      const [tarball] = await readdir(join(root, 'app/vendor'))
+      const map = Bun.spawnSync(['tar', '-xzOf', join(root, 'app/vendor', tarball!), 'package/types/bun.d.ts.map']).stdout.toString()
+
+      expect((JSON.parse(map) as { sources: string[] }).sources).toEqual(['../src/bun.ts'])
     }
     finally {
       watcher.close()

@@ -3,7 +3,7 @@ import { randomBytes } from 'node:crypto'
 import { existsSync, statSync } from 'node:fs'
 import { cp, mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { basename, join, resolve } from 'node:path'
+import { basename, dirname, join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { checklist, select } from './prompt'
 import { agentsFile, templateFiles } from './templates'
@@ -186,10 +186,19 @@ async function packKay(vendor: string): Promise<string> {
     await Promise.all(manifest.files.filter(entry => entry !== 'types' && entry !== 'dist').map(async entry => cp(join(KAY_ROOT, entry), join(stage, entry), { recursive: true })))
 
     const types = Bun.spawn([join(KAY_ROOT, 'node_modules/.bin/tsgo'), '-p', join(KAY_ROOT, 'tsconfig.build.json'), '--outDir', join(stage, 'types')], { stdout: 'pipe', stderr: 'pipe' })
-    const [typeErrors, typesCode, processor] = await Promise.all([new Response(types.stdout).text(), types.exited, Bun.build({ entrypoints: [join(KAY_ROOT, 'src/eslint/index.ts')], target: 'node', packages: 'external', outdir: join(stage, 'dist'), naming: 'eslint.js' })])
+    const [typeErrors, typeWarnings, typesCode, processor] = await Promise.all([new Response(types.stdout).text(), new Response(types.stderr).text(), types.exited, Bun.build({ entrypoints: [join(KAY_ROOT, 'src/eslint/index.ts')], target: 'node', packages: 'external', outdir: join(stage, 'dist'), naming: 'eslint.js' })])
 
     if (typesCode !== 0 || !processor.success)
-      throw new Error(`kay: packing ${KAY_ROOT} failed\n${typeErrors}${processor.logs.join('\n')}`)
+      throw new Error(`kay: packing ${KAY_ROOT} failed\n${typeErrors}${typeWarnings}${processor.logs.join('\n')}`)
+
+    // tsgo points each declaration map at the checkout's sources; the package ships its own beside the types, as prepack's maps say.
+    for (const name of new Bun.Glob('**/*.d.ts.map').scanSync(join(stage, 'types'))) {
+      const path = join(stage, 'types', name)
+      const map = await Bun.file(path).json() as { sources: string[] }
+
+      map.sources = map.sources.map(source => relative(dirname(path), join(stage, relative(KAY_ROOT, resolve(dirname(path), source)))))
+      await Bun.write(path, JSON.stringify(map))
+    }
 
     const child = Bun.spawn([process.execPath, 'pm', 'pack', '--quiet', '--ignore-scripts', '--destination', vendor], { cwd: stage, stdout: 'pipe', stderr: 'pipe' })
     const [output, errors, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
