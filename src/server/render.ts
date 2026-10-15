@@ -8,7 +8,7 @@ import type { ServerIslandMode } from '../runtime/html'
 import type { Locale } from '../runtime/i18n'
 import type { QueryRules } from '../runtime/query-param'
 import type { ClientBuild, PrerenderedPage } from './client'
-import type { Encoding } from './compress'
+import type { StoredEncoding } from './compress'
 import type { DevRequest } from './dev'
 import type { Flash, SuccessFlash } from './flash'
 import type { Refusal, ServedRoute } from './guards'
@@ -97,7 +97,7 @@ interface LoadedRoute {
 export interface ServedPage extends Omit<PrerenderedPage, 'pattern' | 'file' | 'headers'> {
   html: string | Bun.BunFile
   // The compressed copies `kay build` wrote, or a revalidation made.
-  encoded: Partial<Record<Encoding, Uint8Array<ArrayBuffer> | Bun.BunFile>>
+  encoded: Partial<Record<StoredEncoding, Uint8Array<ArrayBuffer> | Bun.BunFile>>
   headers: [string, string][]
   // Set on the first request needing it: when to render the page again, and the parts its server islands cut it into.
   revalidation?: Revalidation | undefined
@@ -408,7 +408,7 @@ export async function servePrerendered(route: ServedRoute, page: ServedPage, par
     return respond(rendering, new Rebased(body))
   }
 
-  const encodings = Object.keys(page.encoded) as Encoding[]
+  const encodings = Object.keys(page.encoded) as StoredEncoding[]
   const encoding = preferredEncoding(context.request.headers.get('accept-encoding'), new Set(encodings))
   // Each encoding is a representation of its own, with its own tag.
   const etag = encoding ? `${page.etag.slice(0, -1)}-${encoding}"` : page.etag

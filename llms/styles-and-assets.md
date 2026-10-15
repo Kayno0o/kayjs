@@ -192,7 +192,7 @@ export default defineConfig({ inlineStyles: true })
 - `inlineStyles: true` in kay.config.ts writes those stylesheets into each page's head as `style` elements instead of linking them, in production and prerendered pages, `kay dev` still linking them.
 - The first paint then waits for no stylesheet request, which on a phone over slow 4G painted a page with a 110 KB stylesheet 440 ms sooner.
 - But every page then carries the stylesheet again, compressed, since no cache keeps it between pages, the swap's included.
-- With `compress` on, a rendered page compresses only what lies around them, their compressed copy made once as the server starts, so it goes out as gzip even to a browser taking brotli: on a 110 KB stylesheet, a fifth of the CPU brotli takes, for no more bytes.
+- With `compress` on, a rendered page compresses only what lies around them, their compressed copy made once as the server starts, so it goes out as gzip even to a browser taking zstd or brotli: on a 110 KB stylesheet, a fifth of the CPU brotli takes, for no more bytes.
 - A streamed page, one with an `await` block, compresses whole as before.
 - Their relative `url()`s point where the linked file's did, and kay's `content-security-policy` lets each through by its hash.
 - Pages `kay build` prerendered keep what the setting was then, so it belongs in kay.config.ts rather than in `pages()` alone, where a server turning it off would hash none of their styles.

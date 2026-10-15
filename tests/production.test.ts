@@ -1678,7 +1678,7 @@ describe('compression', () => {
 
     // Side by side, leading, trailing, alone, twice, in another order than given, and around more than deflates on the main thread.
     for (const page of [`<head>${a}${b}</head>${text}`, `${a}${text}`, `${text}${b}`, a, `${a}${text}${a}`, `${b}${a}`, `${a}${text.repeat(200)}${b}`]) {
-      const response = await send(page, 'br, gzip')
+      const response = await send(page, 'gzip, deflate, br, zstd')
 
       expect(response.headers.get('content-encoding')).toBe('gzip')
       expect(await decoded(response)).toBe(page)
@@ -1726,7 +1726,7 @@ describe('compression', () => {
     }
   })
 
-  it('compresses with zstd for a browser taking it, whole or streamed, and brotli or gzip for one that does not', async () => {
+  it('compresses a whole body with zstd for a browser taking it, a stream with brotli or gzip, and brotli or gzip for a browser without zstd', async () => {
     const { compressResponse, wholeResponse } = await import('../src/server/compress')
     const page = `<p>${'zstd page '.repeat(300)}</p>`
     const send = async (accept: string, body: string | ReadableStream<Uint8Array> = page) => (await compressResponse(new Request('http://localhost/', { headers: { 'accept-encoding': accept } }), typeof body === 'string' ? wholeResponse(body, { headers: { 'content-type': 'text/html' } }) : new Response(body, { headers: { 'content-type': 'text/html' } })))!
@@ -1738,7 +1738,7 @@ describe('compression', () => {
 
     let close!: () => void
     const parts: Uint8Array[] = []
-    const streamed = await send('zstd', new ReadableStream<Uint8Array>({
+    const streamed = await send('gzip, deflate, br, zstd', new ReadableStream<Uint8Array>({
       start(controller) {
         // Two chunks a macrotask apart, so the body is read as a stream rather than whole.
         controller.enqueue(new TextEncoder().encode(page))
@@ -1756,16 +1756,29 @@ describe('compression', () => {
     for (let read = await reader.read(); !read.done; read = await reader.read())
       parts.push(read.value)
 
-    expect(streamed.headers.get('content-encoding')).toBe('zstd')
-    expect(Bun.zstdDecompressSync(Buffer.concat(parts)).toString()).toBe(`${page}<p>later</p>`)
+    expect(streamed.headers.get('content-encoding')).toBe('br')
+    expect(brotliDecompressSync(Buffer.concat(parts)).toString()).toBe(`${page}<p>later</p>`)
+
+    // A browser taking zstd alone gets a stream as it is.
+    const plain = await send('zstd', new ReadableStream<Uint8Array>({
+      start(controller) {
+        setTimeout(() => {
+          controller.enqueue(new TextEncoder().encode(page))
+          controller.close()
+        }, 5)
+      },
+    }))
+
+    expect(plain.headers.get('content-encoding')).toBeNull()
+    expect(await plain.text()).toBe(page)
   })
 
-  it('compresses a body rendered again from its second time on only once, a reply from the copy kept going out with its length', async () => {
+  it('compresses a body rendered again from its second time on only once, a body of the same length but other bytes compressed for itself', async () => {
     const { compressResponse, wholeResponse } = await import('../src/server/compress')
     const words = (count: number, from: number) => Array.from({ length: count }, (_, i) => ((i + from) * 2654435761 % 1e9).toString(36)).join(' ')
     const send = async (body: string) => (await compressResponse(new Request('http://localhost/', { headers: { 'accept-encoding': 'zstd' } }), wholeResponse(body, { headers: { 'content-type': 'text/html' } })))!
     const small = `<p>${words(300, 7)}</p>`
-    const other = `<p>${words(300, 8)}</p>`
+    const other = `<p>${words(300, 7).replace('a', 'b')}</p>`
     const large = `<p>${words(9000, 9)}</p>`
     const here = spyOn(Bun, 'zstdCompressSync')
     const pooled = spyOn(Bun, 'zstdCompress')
@@ -1777,10 +1790,12 @@ describe('compression', () => {
 
       // Seen once and once kept, then taken from the copy kept.
       expect(here).toHaveBeenCalledTimes(2)
+      expect(other).toHaveLength(small.length)
+      expect(other).not.toBe(small)
       expect(Bun.zstdDecompressSync(new Uint8Array(await (await send(other)).arrayBuffer())).toString()).toBe(other)
       expect(here).toHaveBeenCalledTimes(3)
 
-      // Past what Bun corks once a reply waited on zlib's threads, so only a copy taken within the tick goes out with its length.
+      // Past what Bun corks once a reply waited on a macrotask, so a kept copy goes as a stream too, as its page may have waited on I/O.
       const replies = []
 
       for (let time = 0; time < 3; time++) {
@@ -1790,7 +1805,7 @@ describe('compression', () => {
       }
 
       expect(pooled).toHaveBeenCalledTimes(2)
-      expect(replies).toEqual([{ chunked: true, text: large }, { chunked: true, text: large }, { chunked: false, text: large }])
+      expect(replies).toEqual([{ chunked: true, text: large }, { chunked: true, text: large }, { chunked: true, text: large }])
     }
     finally {
       here.mockRestore()
