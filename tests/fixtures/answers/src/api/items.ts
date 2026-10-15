@@ -14,6 +14,11 @@ export default new Elysia()
   .get('/response', () => new Response('plain', { headers: { 'content-type': 'text/plain', 'x-own': 'mine' } }))
   .get('/constant', constant)
   .get('/reused', () => reused)
+  .get('/reused-cookied', ({ set }) => {
+    set.headers['set-cookie'] = 'b=2; Path=/'
+
+    return reused
+  })
   .get('/cookied', ({ set }) => {
     set.headers['set-cookie'] = 'a=1; Path=/'
 

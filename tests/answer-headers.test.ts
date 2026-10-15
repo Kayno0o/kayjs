@@ -116,6 +116,19 @@ describe('the headers of every kind of answer', () => {
     await expectAnswer(await get('/api/items/cookied'), 200, { 'content-type': 'text/plain', 'vary': 'accept-encoding', 'set-cookie': 'a=<value>; Path=<value>' })
   })
 
+  it('a reused Response answered with a cookie or status never shows an earlier request\'s id', async () => {
+    const ids = new Set<string>()
+
+    for (const path of ['/api/items/reused', '/api/items/reused-cookied', '/api/items/reused-cookied']) {
+      const response = await get(path)
+
+      ids.add(response.headers.get('x-request-id')!)
+    }
+
+    expect(ids.size).toBe(3)
+    expect((await get('/api/items/reused-cookied')).headers.getSetCookie()).toEqual(['b=2; Path=/'])
+  })
+
   it('a build asset and a stored file carry them beside their caching', async () => {
     await expectAnswer(await get(asset), 200, { 'cache-control': IMMUTABLE, 'content-type': 'text/javascript;charset=utf-8', 'vary': 'accept-encoding' })
     await expectAnswer(await get(asset, { 'accept-encoding': 'br' }), 200, { 'cache-control': IMMUTABLE, 'content-encoding': 'br', 'content-type': 'text/javascript;charset=utf-8', 'vary': 'accept-encoding' })

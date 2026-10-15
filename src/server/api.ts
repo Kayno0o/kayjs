@@ -167,7 +167,16 @@ function carriedOver(set: { status?: number | string, headers: Record<string, un
 
   // A Response answered before is answered again as a copy, so two requests in flight never share one object whose headers each rewrites; the first request's headers come off the copy.
   if (answeredBefore.has(given)) {
-    response = given.clone()
+    try {
+      response = given.clone()
+    }
+    catch {
+      // A body already sent cannot be copied: the headers of the earlier request come off the original, for Elysia to merge this one's.
+      for (const name of carriedNames(given))
+        given.headers.delete(name)
+
+      return undefined
+    }
 
     for (const name of carriedNames(given))
       response.headers.delete(name)
@@ -178,7 +187,8 @@ function carriedOver(set: { status?: number | string, headers: Record<string, un
 
   carryContext(set as Context['set'], response)
 
-  return Object.keys(set.headers).length > 0 ? undefined : response
+  // Left on the context, Elysia merges it into the copy, which no earlier request's headers are on.
+  return Object.keys(set.headers).length > 0 && response === given ? undefined : response
 }
 
 // Logs an error a route threw and hands it to `onError`, keeping its message out of a production answer, where Elysia would send it.
