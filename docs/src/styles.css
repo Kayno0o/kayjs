@@ -317,6 +317,13 @@ main {
   height: 1.3em;
 }
 
+.story {
+  margin: 0.4rem 0 0;
+  color: var(--subtext);
+  font-family: var(--mono);
+  font-size: 0.9rem;
+}
+
 .lede {
   max-width: 44rem;
   margin: 0.6rem 0 1.4rem;

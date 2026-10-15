@@ -119,6 +119,7 @@ head
     h1
       img(src="/favicon.svg" alt="" width="64" height="64")
       | kay
+    p.story Named for the kingfisher: a fast, precise dive with almost no splash.
     p.lede A Bun web framework. One #[code .kay] file per component, pages rendered to plain HTML on the server, interactive islands in the browser, and types down to the template line.
     .hero-actions
       Button(class="px-4 py-2 text-sm" variant="accent" href="/getting-started/introduction" label="Get started")
