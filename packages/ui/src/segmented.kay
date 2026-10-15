@@ -40,7 +40,8 @@ const radios = () => [...root?.querySelectorAll<HTMLInputElement>('.kui-segmente
 // Focus follows the check, as it does for a radio moved by an arrow key: one left on a radio that snapped back would read as unchecked to a screen reader while the group holds another.
 function check(wanted: string | null) {
   const all = radios()
-  const focused = all.find(radio => radio === root?.ownerDocument.activeElement)
+  const active = root?.ownerDocument.activeElement
+  const focused = all.find(radio => radio === active)
 
   for (const radio of all)
     radio.checked = radio.value === wanted

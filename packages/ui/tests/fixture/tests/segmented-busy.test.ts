@@ -29,7 +29,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a Segmente
       await page.press('ArrowLeft')
       expect(await state()).toEqual({ checked: 'l', focused: 'l' })
       await page.press('ArrowLeft')
-      await page.evaluate(() => document.querySelector<HTMLInputElement>('input[value="s"]')!.click())
+      await page.click('.kui-segmented-option:first-child .kui-segmented-label')
       expect(await state()).toEqual({ checked: 'l', focused: 'l' })
 
       // The refusal puts the first option back, and focus follows it.
@@ -37,6 +37,25 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a Segmente
       await page.waitUntil(() => document.querySelector<HTMLInputElement>('input[name="size"]:checked')!.value === 'm')
 
       expect(await state()).toEqual({ checked: 'm', focused: 'm' })
+      expect(page.errors).toEqual([])
+    }
+    finally {
+      await site.close()
+    }
+  }, 120_000)
+
+  test('leaves focus alone when it has moved off the group before the refusal', async () => {
+    const site = await testSite({ root: ROOT, browser: { path } })
+
+    try {
+      const page = await site.open('/segmented-busy')
+
+      await page.click('.kui-segmented-option:last-child .kui-segmented-label')
+      await page.waitUntil(() => (window as unknown as { held?: string }).held === 'l')
+      await page.click('#release')
+      await page.waitUntil(() => document.querySelector<HTMLInputElement>('input[name="size"]:checked')!.value === 'm')
+
+      expect(await page.evaluate(() => document.activeElement?.id)).toBe('release')
       expect(page.errors).toEqual([])
     }
     finally {
