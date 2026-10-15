@@ -2,7 +2,7 @@ import { existsSync, readFileSync, realpathSync } from 'node:fs'
 import { isBuiltin } from 'node:module'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import { parseKay } from '../compiler/parser'
-import { findKayFiles, scriptLoader, transpilerFor } from './files'
+import { findKayFiles, readSource, scriptLoader, transpilerFor } from './files'
 import { GLOB_CALL, globbedFiles } from './glob'
 
 // A package shipping `.kay` components, which the consuming project compiles as its own.
@@ -292,8 +292,7 @@ export async function reachesAny(root: string, libraries: KayLibrary[], from: st
 // The modules `file` imports, its `import.meta.glob` matches included, that a build follows, by real path as Bun resolves them: `project`'s own, the root's real path, and its kay libraries', `library` naming which; never another package's.
 // With `graph`, a module with a glob is read again each time, and one whose paths found are gone; a file written since that shadows a path found, `./foo.ts` beside `./foo/index.ts`, goes unseen until the module changes, as Bun keeps what it resolved anyway.
 async function followedImports(root: string, project: string, libraries: KayLibrary[], file: string, graph?: ImportGraph): Promise<{ path: string, library: KayLibrary | undefined }[]> {
-  const source = await Bun.file(file).text()
-  const hash = Bun.hash(source)
+  const { text: source, hash } = readSource(file)
   let imports = graph?.get(file)
 
   // A path gone with no event, as an install dropping a library's component, has the imports found again.
@@ -353,6 +352,13 @@ function resolvedPath(specifier: string, importer: string): string | undefined {
 // The words of a file, as Tailwind would read them off a file of the app: class names among them, in a template or a string of a script.
 export function sourceWords(source: string): string[] {
   return source.split(NOT_IN_CLASS).filter(word => word !== '')
+}
+
+// The words of a file as `sourceWords` finds them, kept with its text while the file stays.
+export function fileWords(file: string): string[] {
+  const read = readSource(file)
+
+  return read.words ??= sourceWords(read.text)
 }
 
 // What a module imports: a component's fences, or a script whole.

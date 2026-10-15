@@ -1,5 +1,5 @@
 import type { Dirent } from 'node:fs'
-import { realpathSync } from 'node:fs'
+import { readFileSync, realpathSync, statSync } from 'node:fs'
 import { mkdir, readdir, readFile, rename, rm } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 import { KAY_DIR } from './assets'
@@ -31,6 +31,38 @@ export function transpilerFor(loader: Bun.JavaScriptLoader): Bun.Transpiler {
     transpilers.set(loader, found = new Bun.Transpiler({ loader }))
 
   return found
+}
+
+interface SourceRead {
+  text: string
+  hash: number | bigint
+  // The words of the file, found the first time Tailwind's side of a build asks.
+  words?: string[]
+}
+
+const reads = new Map<string, SourceRead & { stamp: string }>()
+
+// A source file's text and hash, read again only when the file changed: its inode, times and size are the stamp, so an edit, a link retargeted or a file replaced by a rename all read afresh, and nothing has to tell the cache.
+// Throws as reading a missing file does.
+export function readSource(file: string): SourceRead {
+  const stats = statSync(file)
+  const stamp = `${stats.ino}-${stats.mtimeMs}-${stats.ctimeMs}-${stats.size}`
+  const known = reads.get(file)
+
+  if (known?.stamp === stamp)
+    return known
+
+  const text = readFileSync(file, 'utf8')
+  const read = { stamp, text, hash: Bun.hash(text) }
+
+  reads.set(file, read)
+
+  return read
+}
+
+// Forgets every file read, for a build of everything to start from the disk.
+export function forgetSources(): void {
+  reads.clear()
 }
 
 // The path as Bun keys its module cache, a symlinked folder resolved, for a file deleted too.

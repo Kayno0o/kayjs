@@ -11,9 +11,9 @@ import tailwind from 'bun-plugin-tailwind'
 import { describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
 import { ASSET_FILE, clientDir, outputDir, writeAsset } from '../src/build/assets'
-import { buildClient } from '../src/build/client'
-import { realPath, writeIfChanged } from '../src/build/files'
-import { reachesAny } from '../src/build/libraries'
+import { buildClient, readClientSources } from '../src/build/client'
+import { forgetSources, readSource, realPath, writeIfChanged } from '../src/build/files'
+import { fileWords, reachesAny } from '../src/build/libraries'
 import { BUNDLED_LICENCES, codecWarnings, thirdPartyNotices, unknownCodecVersions } from '../src/build/licenses'
 import { formatSizeReport } from '../src/build/report'
 import { anchorModule } from '../src/build/runtime-chunk'
@@ -1217,6 +1217,74 @@ describe('what a build keeps in memory', () => {
       await Bun.write(join(project, 'src/state.ts'), 'import { signal } from \'kay\'\n\nexport const total = signal(0)\n')
       expect((await build(['src/state.ts'])).failed).toBe(false)
       expect(await island()).toContain('() => total()')
+    }
+    finally {
+      await rm(project, { recursive: true, force: true })
+    }
+  })
+
+  it('reads a source file again once it was edited, replaced, retargeted or deleted, with nothing telling the cache', async () => {
+    const dir = resolve(await scratchDir('kay-reads-'))
+    const file = join(dir, 'a.ts')
+    const link = join(dir, 'link.ts')
+
+    try {
+      await Bun.write(file, 'export const a = 1\n')
+      await Bun.write(join(dir, 'b.ts'), 'export const b = 2\n')
+      await symlink(file, link)
+      const first = readSource(file)
+
+      expect(readSource(file)).toBe(first)
+      expect(fileWords(file)).toEqual(['export', 'const', 'a', '1'])
+      expect(fileWords(file)).toBe(fileWords(file))
+
+      // The same size, so only the times tell.
+      await Bun.write(file, 'export const a = 2\n')
+      expect(readSource(file).text).toBe('export const a = 2\n')
+      expect(fileWords(file)).toContain('2')
+
+      expect(readSource(link).text).toBe('export const a = 2\n')
+      await rm(link)
+      await symlink(join(dir, 'b.ts'), link)
+      expect(readSource(link).text).toBe('export const b = 2\n')
+
+      await Bun.write(join(dir, 'next.ts'), 'export const a = 3\n')
+      await rename(join(dir, 'next.ts'), file)
+      expect(readSource(file).text).toBe('export const a = 3\n')
+
+      await rm(file)
+      expect(() => readSource(file)).toThrow()
+      forgetSources()
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('reads the client sources of a rebuild again for a changed component and a changed library component or script it reaches', async () => {
+    const project = await scratchProject({
+      'package.json': JSON.stringify({ name: 'app', dependencies: { lib: '1.0.0' } }),
+      'node_modules/lib/package.json': JSON.stringify({ name: 'lib', peerDependencies: { kay: '*' }, exports: { './*.kay': './*.kay' } }),
+      'node_modules/lib/chip.kay': '---\nimport \'./colors\'\n---\np.chip-a x\n',
+      'node_modules/lib/colors.ts': 'export const color = \'text-red-500\'\n',
+      'src/routes/index.kay': '---\nimport Chip from \'lib/chip.kay\'\n---\nChip\n',
+    })
+    const graph = new Map()
+    const classes = async () => [...(await readClientSources(project, {}, graph)).classes]
+
+    try {
+      expect(await classes()).toEqual(expect.arrayContaining(['chip-a', 'text-red-500']))
+
+      await Bun.write(join(project, 'node_modules/lib/chip.kay'), '---\nimport \'./colors\'\n---\np.chip-b x\n')
+      expect(await classes()).toEqual(expect.arrayContaining(['chip-b']))
+      expect(await classes()).not.toContain('chip-a')
+
+      await Bun.write(join(project, 'node_modules/lib/colors.ts'), 'export const color = \'text-blue-500\'\n')
+      await Bun.write(join(project, 'src/routes/index.kay'), '---\nimport Chip from \'lib/chip.kay\'\n---\nChip\np.own-class y\n')
+      const after = await classes()
+
+      expect(after).toEqual(expect.arrayContaining(['text-blue-500', 'chip-b', 'own-class']))
+      expect(after).not.toContain('text-red-500')
     }
     finally {
       await rm(project, { recursive: true, force: true })

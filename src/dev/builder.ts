@@ -8,6 +8,7 @@ import { join, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { outputDir } from '../build/assets'
 import { bothBundles, bundleIslands, bundleStyles, clearClientOutput, readClientSources, writeClasses } from '../build/client'
+import { forgetSources } from '../build/files'
 import { sourceWords } from '../build/libraries'
 import { inSignalsScope } from '../build/signals'
 import { mapBundleToKay } from '../build/sourcemap'
@@ -115,8 +116,10 @@ export function devBuilder(root: string, options: ClientOptions): (changed: stri
 
   const build = async (changed: string[] | null): Promise<BuildOutcome> => {
     // A full build reads every module's imports afresh.
-    if (changed === null)
+    if (changed === null) {
       graph.clear()
+      forgetSources()
+    }
 
     const sources = await readClientSources(root, options, graph)
     const previous = changed !== null && last !== undefined && await readText(join(output, MANIFEST)) === last.manifest ? last : undefined

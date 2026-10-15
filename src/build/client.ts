@@ -17,8 +17,8 @@ import { fromManifest, MANIFEST, PRERENDERED_DIR, writeManifest } from '../serve
 import { PUBLIC_ENV_PATH } from '../server/env'
 import { extensionEditor, routeMounts } from '../server/routes'
 import { ASSET_PREFIX, clientDir, outputDir } from './assets'
-import { findKayFiles, writeIfChanged } from './files'
-import { findKayLibraries, reachableLibraryFiles, reachesAny, sourceWords } from './libraries'
+import { findKayFiles, readSource, writeIfChanged } from './files'
+import { fileWords, findKayLibraries, reachableLibraryFiles, reachesAny } from './libraries'
 import { packagesOf } from './licenses'
 import { throughLinks } from './links'
 import { kay } from './plugin'
@@ -152,7 +152,7 @@ export async function readClientSources(root: string, options: ClientOptions = {
   const libraries = await findKayLibraries(root)
   const fromLibraries = await reachableLibraryFiles(root, libraries, [...own, ...mounted], graph)
   const files = [...own, ...mounted, ...fromLibraries.components]
-  const sources = await Promise.all(files.map(async file => Bun.file(file).text()))
+  const sources = files.map(file => readSource(file).text)
 
   const cacheDir = projectPaths(root).cache
   const analyses = await Promise.all(files.map(async (file, index) => analyzeKayCached(sources[index]!, file, root, cacheDir, options.hot, options.lints)))
@@ -203,8 +203,8 @@ export async function readClientSources(root: string, options: ClientOptions = {
   }
 
   // Tailwind reads the app's files itself, never a package's, so the words of the library files the app reaches go to it here: its components, and its scripts holding default classes.
-  for (const source of [...sources.slice(own.length), ...await Promise.all(fromLibraries.scripts.map(async file => Bun.file(file).text()))]) {
-    for (const name of sourceWords(source))
+  for (const file of [...files.slice(own.length), ...fromLibraries.scripts]) {
+    for (const name of fileWords(file))
       classes.add(name)
   }
 
