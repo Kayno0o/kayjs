@@ -18,7 +18,7 @@ import { buildClient, readClientSources } from '../src/build/client'
 import { forgetSources, keepSources, readSource, realPath, writeIfChanged } from '../src/build/files'
 import { fileWords, reachesAny } from '../src/build/libraries'
 import { BUNDLED_LICENCES, codecWarnings, thirdPartyNotices, unknownCodecVersions } from '../src/build/licenses'
-import { formatBuildReport, formatRouteTable, formatSizeReport, shorten } from '../src/build/report'
+import { formatBuildReport, formatRemoved, formatRouteTable, formatSizeReport, gzipSize, shorten } from '../src/build/report'
 import { routeSizes } from '../src/build/route-sizes'
 import { anchorModule, runtimeChunk } from '../src/build/runtime-chunk'
 import { runtimeConfig, withoutPlugins } from '../src/build/runtime-config'
@@ -1728,6 +1728,81 @@ describe('the build report', () => {
       await rm(dir, { recursive: true, force: true })
       await rm(join(dir, '../outside.js'), { force: true })
     }
+  })
+
+  it('reads a route whose pages all answered another status as prerendered, with the scripts they load', async () => {
+    const dir = await scratchDir('route-sizes-')
+
+    try {
+      await Bun.write(join(dir, 'a.js'), 'export const a = 1\n'.repeat(50))
+
+      const route = { pattern: '/gone', file: '/app/src/routes/gone.kay', params: [], layouts: [] } as unknown as Route
+      const sizes = await routeSizes('/app', { dir, styles: new Map() } as unknown as ClientBuild, [route], [], undefined, [{ file: route.file, html: '<script type="module" src="/_kay/a.js"></script>' }, { file: route.file, html: '' }])
+
+      expect(sizes).toEqual([{ route: '/gone', js: expect.any(Number), css: 0, pages: 2, estimated: false }])
+      expect(sizes[0]!.js).toBeGreaterThan(0)
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('estimates an unprerendered route through helpers, dynamic imports and aliases, counts a shared chunk once, and charges the entry to a form or a deferred island', async () => {
+    const dir = await scratchDir('route-sizes-')
+
+    try {
+      const chunk = async (name: string, size: number) => Bun.write(join(dir, 'out', name), Array.from({ length: size }, (_, index) => `export const v${index} = ${index * 7919 % 1013}\n`).join(''))
+
+      await Promise.all([chunk('entry.js', 60), chunk('a.js', 40), chunk('b.js', 40), chunk('shared.js', 80)])
+      await Promise.all(Object.entries({
+        'tsconfig.json': JSON.stringify({ compilerOptions: { baseUrl: '.', paths: { '~/*': ['src/*'] } } }),
+        'src/a.kay': 'p A\n',
+        'src/b.kay': 'p B\n',
+        'src/lib/index.ts': 'export { default as A } from \'../a.kay\'\n',
+        'src/routes/helper.kay': '---\nimport { A } from \'../lib/index\'\n---\nA\n',
+        'src/routes/dynamic.kay': '---\nconst load = () => import(\'../b.kay\')\n---\np Dynamic\n',
+        'src/routes/alias.kay': '---\nimport A from \'~/a.kay\'\n---\nA\n',
+        'src/routes/both.kay': '---\nimport A from \'../a.kay\'\nimport B from \'../b.kay\'\n---\nA\nB\n',
+        'src/routes/form.kay': 'form(action={add})\n  input(name="title")\n',
+        'src/routes/defer.kay': '---\nimport A from \'../a.kay\'\n---\nA(server="defer")\n',
+        'src/routes/plain.kay': 'p Plain\n',
+      }).map(async ([path, content]) => Bun.write(join(dir, path), content)))
+
+      const url = (name: string) => `/_kay/${name}`
+      const report: SizeReport = {
+        entry: { size: { raw: 0, gzip: 0 }, chunks: [url('entry.js')] },
+        islands: [
+          { file: 'src/a.kay', size: { raw: 0, gzip: 0 }, chunks: [url('a.js'), url('shared.js')] },
+          { file: 'src/b.kay', size: { raw: 0, gzip: 0 }, chunks: [url('b.js'), url('shared.js')] },
+        ],
+      }
+      const routes = ['helper', 'dynamic', 'alias', 'both', 'form', 'defer', 'plain'].map(name => ({ pattern: `/${name}`, file: join(dir, `src/routes/${name}.kay`), params: [], layouts: [] }) as unknown as Route)
+      const sizes = Object.fromEntries((await routeSizes(dir, { dir: join(dir, 'out'), styles: new Map(), navigation: true } as unknown as ClientBuild, routes, [], report)).map(each => [each.route, each.js]))
+      const [entry, a, b, shared] = await Promise.all(['entry.js', 'a.js', 'b.js', 'shared.js'].map(async name => gzipSize(await Bun.file(join(dir, 'out', name)).bytes())))
+
+      expect(sizes['/helper']).toBe(entry! + a! + shared!)
+      expect(sizes['/alias']).toBe(entry! + a! + shared!)
+      expect(sizes['/dynamic']).toBe(entry! + b! + shared!)
+      expect(sizes['/both']).toBe(entry! + a! + b! + shared!)
+      expect(sizes['/form']).toBe(entry)
+      expect(sizes['/defer']).toBe(entry! + a! + shared!)
+      expect(sizes['/plain']).toBe(0)
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('lists what the last build had and this one does not', () => {
+    const previous: StoredReport = { version: 1, exported: false, entry: 2048, islands: { 'src/a.kay': 1024, 'src/b.kay': 512 }, routes: { '/': { js: 1024, css: 0 }, '/old': { js: 512, css: 512 } } }
+    const now = summary([route('/', 1024)])
+    const printed = formatRemoved({ entry: { size: { raw: 0, gzip: 2048 } }, islands: [{ file: 'src/a.kay', size: { raw: 0, gzip: 1024 } }] }, now, previous)
+
+    expect(printed).toBe('Removed since the last build:\n  island  src/b.kay  was 0.5 KB\n  route   /old  was 1.0 KB')
+    expect(formatRemoved(undefined, now, previous)).toContain('entry   loaded by every page with an island  was 2.0 KB')
+    expect(formatRemoved({ entry: { size: { raw: 0, gzip: 2048 } }, islands: [{ file: 'src/a.kay', size: { raw: 0, gzip: 0 } }, { file: 'src/b.kay', size: { raw: 0, gzip: 0 } }] }, summary([route('/', 1), route('/old', 1)]), previous)).toBe('')
+    expect(formatRemoved(undefined, now, undefined)).toBe('')
+    expect(formatBuildReport(undefined, now, { previous })).toContain('Removed since the last build:')
   })
 
   it('weighs each route, times the stages, counts what the caches answered, and keeps the sizes of the last good build only', async () => {

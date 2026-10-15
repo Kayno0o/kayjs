@@ -53,6 +53,22 @@ describe('--quiet', () => {
     expect(stdout).toMatch(/^built 1 island, 0 stylesheets and 0 prerendered pages in \d+ ms\n$/)
   }, 30_000)
 
+  it('builds printing the size report, with no escape code in a pipe', async () => {
+    const root = await project({
+      'kay.config.ts': 'export default { favicon: false }\n',
+      'src/counter.kay': counter,
+      'src/routes/index.kay': '--- server\nimport Counter from \'../counter.kay\'\n---\nCounter\n',
+    })
+    const { stdout, stderr, code } = await kay(['build', '.', '--no-check'], root)
+
+    expect(code, stderr).toBe(0)
+    expect(stdout).toContain('JavaScript, gzip (minified):')
+    expect(stdout).toMatch(/^ {2}src\/counter\.kay +\+\d/m)
+    expect(stdout).toMatch(/^Routes, gzip/m)
+    // eslint-disable-next-line no-control-regex
+    expect(stdout).not.toMatch(/\x1B/)
+  }, 30_000)
+
   it('migrates listing what is left to do by hand, and not every file written', async () => {
     const root = await project({
       'package.json': '{ "dependencies": { "astro": "^5.0.0" } }',

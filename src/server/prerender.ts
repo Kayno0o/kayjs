@@ -54,6 +54,8 @@ export interface PrerenderOptions {
   exportAll?: boolean
   // Receives every page rendered, for `kay build` to lint their heads.
   rendered?: RenderedPage[] | undefined
+  // Receives the pages that answered a status other than 200, which the head lints and the search index leave out, for `kay build` to weigh the scripts they load.
+  others?: Pick<RenderedPage, 'file' | 'html'>[] | undefined
   // Receives every route of the project, for `kay build` to weigh what each loads.
   routes?: Route[] | undefined
   // Hears how many of the routes it went through, those it prerenders nothing of included.
@@ -149,6 +151,9 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
           const search = pageSetting(module, 'search') as PageSettings['search']
 
           options.rendered?.push({ path: copy.path, file: route.file, locale: copy.locale, html, noindex, sitemap: pageSetting(module, 'sitemap') !== undefined, search: noindex || search === false || guardedPage(route, config.requireGuards) ? false : search?.weight ?? 1 })
+        }
+        else {
+          options.others?.push({ file: route.file, html })
         }
 
         pages[copy.key] = { pattern: route.pattern, file: name, status: response.status, headers: storedHeaders(response.headers), etag: pageEtag(html), renderedAt: Date.now(), revalidate, ...islands.length > 0 ? { islands } : {}, ...stamps ? { stamps } : {}, ...readsSite ? { readsSite } : {} }

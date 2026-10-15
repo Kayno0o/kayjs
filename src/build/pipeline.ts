@@ -343,8 +343,9 @@ async function outputStage(project: Project, exported: boolean, client: ClientBu
   }
 
   const rendered: RenderedPage[] = []
+  const others: Pick<RenderedPage, 'file' | 'html'>[] = []
   const routes: Route[] = []
-  const prerendered = await prerenderPages(project, client, { exportAll: exported, rendered, routes, onRoute: (done, total) => report({ step: 'prerendering', done, total, unit: 'routes' }) })
+  const prerendered = await prerenderPages(project, client, { exportAll: exported, rendered, others, routes, onRoute: (done, total) => report({ step: 'prerendering', done, total, unit: 'routes' }) })
 
   if (config.search === true) {
     report({ step: 'indexing for search' })
@@ -353,7 +354,7 @@ async function outputStage(project: Project, exported: boolean, client: ClientBu
 
   lap('prerender')
 
-  const sizes = await routeSizes(root, client, routes, rendered, client.report)
+  const sizes = await routeSizes(root, client, routes, rendered, client.report, others)
 
   lap('route sizes')
 

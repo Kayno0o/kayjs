@@ -3,17 +3,22 @@ import type { ClientBuild } from '../server/client'
 import type { Route } from '../server/routes'
 import type { RouteSize, SizeReport } from './report'
 import { join, relative } from 'node:path'
+import { actionOf, elementsIn, serverIslandOf } from '../compiler/ast'
+import { parseKay } from '../compiler/parser'
 import { ASSET_PREFIX } from './assets'
 import { resolveFrom } from './files'
 import { gzipSize } from './report'
 
 // A script a page loads from the build, whatever the mount point puts before it.
 const SCRIPT_URL = /(?:src|href)="[^"]*?(\/_kay\/[^"?#]+\.js)[?#"]/g
-const KAY_IMPORT = /\bfrom\s+['"]([^'"]+\.kay)['"]/g
+// Every specifier a module names, static or dynamic, `from 'x'`, `import 'x'` or `import('x')`; one in a comment or a string only adds a file the estimate may overcount.
+const IMPORT = /\b(?:from|import)\s*(?:\(\s*)?['"]([^'"]+)['"]/g
+const SCRIPT = /\.[cm]?[jt]sx?$/
 
 // What each route loads, gzip: the stylesheets of its layouts and page, and the scripts its prerendered pages link, the heaviest page of them.
-// A route none of whose pages was prerendered has no page to read, so its scripts are the entry and every island its components can reach, which is at most what a request loads.
-export async function routeSizes(root: string, client: ClientBuild, routes: Route[], rendered: RenderedPage[], report: SizeReport | undefined): Promise<RouteSize[]> {
+// A route none of whose pages was prerendered has no page to read, so its scripts are the entry and every island its components can reach, through helpers, dynamic imports and aliases too, which is at most what a request loads.
+// A page answering a status other than 200 is still a prerendered page.
+export async function routeSizes(root: string, client: ClientBuild, routes: Route[], rendered: RenderedPage[], report: SizeReport | undefined, others: Pick<RenderedPage, 'file' | 'html'>[] = []): Promise<RouteSize[]> {
   const sizes = new Map<string, Promise<number>>()
   const measure = async (url: string): Promise<number> => {
     let size = sizes.get(url)
@@ -37,31 +42,30 @@ export async function routeSizes(root: string, client: ClientBuild, routes: Rout
     return size
   }
   const total = async (urls: Iterable<string>) => (await Promise.all([...urls].map(measure))).reduce((sum, size) => sum + size, 0)
-  const pagesOf = Map.groupBy(rendered, page => page.file)
-  const islandSizes = new Map((report?.islands ?? []).map(island => [island.file, island.size.gzip]))
-  const reached = new Map<string, Promise<string[]>>()
+  const pagesOf = Map.groupBy([...rendered, ...others], page => page.file)
+  const islandChunks = new Map((report?.islands ?? []).map(island => [island.file, island.chunks ?? []]))
+  const entryChunks = report?.entry?.chunks ?? []
+  const reads = new Map<string, Promise<SourceFacts>>()
   const bySize = new Map<string, RouteSize>()
 
-  // The `.kay` files a component imports, however deep, which are islands.
-  const islandsReached = async (file: string, seen = new Set<string>()): Promise<Set<string>> => {
-    const found = new Set<string>()
-
+  // What the files a component imports, however deep and whatever they are, lead to.
+  const reach = async (file: string, found: Reach, seen: Set<string>): Promise<void> => {
     if (seen.has(file))
-      return found
+      return
 
     seen.add(file)
 
     const name = relative(root, file).replaceAll('\\', '/')
 
-    if (islandSizes.has(name))
-      found.add(name)
+    if (islandChunks.has(name))
+      found.islands.add(name)
 
-    for (const imported of await importsOf(file, reached)) {
-      for (const island of await islandsReached(imported, seen))
-        found.add(island)
-    }
+    const facts = await factsOf(file, root, reads)
 
-    return found
+    found.ships ||= (facts.posts && client.navigation === true) || facts.defers
+
+    for (const imported of facts.imports)
+      await reach(imported, found, seen)
   }
 
   for (const route of routes) {
@@ -79,38 +83,70 @@ export async function routeSizes(root: string, client: ClientBuild, routes: Rout
       continue
     }
 
+    const found: Reach = { islands: new Set(), ships: false }
     const seen = new Set<string>()
-    const islands = new Set<string>()
 
-    for (const file of [...route.layouts, route.file]) {
-      for (const island of await islandsReached(file, seen))
-        islands.add(island)
-    }
+    for (const file of [...route.layouts, route.file])
+      await reach(file, found, seen)
 
-    const js = islands.size === 0 ? 0 : (report?.entry?.size.gzip ?? 0) + [...islands].reduce((sum, island) => sum + islandSizes.get(island)!, 0)
+    // A chunk two islands share is weighed once, and the entry ships with an island or when a form or a deferred island needs it.
+    const chunks = found.islands.size === 0 && !found.ships ? [] : new Set([...entryChunks, ...[...found.islands].flatMap(island => islandChunks.get(island)!)])
 
-    bySize.set(route.pattern, { route: route.pattern, js, css, pages: 0, estimated: true })
+    bySize.set(route.pattern, { route: route.pattern, js: await total(chunks), css, pages: 0, estimated: true })
   }
 
   return [...bySize.values()]
 }
 
-async function importsOf(file: string, memo: Map<string, Promise<string[]>>): Promise<string[]> {
-  let imports = memo.get(file)
+// What a source file says without running it: the files it imports, and whether its template makes a page load the entry.
+interface SourceFacts {
+  imports: string[]
+  // A form posting to an action, which the entry sends without a reload.
+  posts: boolean
+  // A server island the entry fetches once the page has loaded.
+  defers: boolean
+}
 
-  if (imports === undefined) {
-    imports = (async () => {
+interface Reach {
+  islands: Set<string>
+  ships: boolean
+}
+
+async function factsOf(file: string, root: string, memo: Map<string, Promise<SourceFacts>>): Promise<SourceFacts> {
+  let facts = memo.get(file)
+
+  if (facts === undefined) {
+    facts = (async () => {
       try {
         const source = await Bun.file(file).text()
+        const imports = [...source.matchAll(IMPORT)].flatMap(([, specifier]) => followed(resolveFrom(specifier!, file), root) ?? [])
 
-        return [...source.matchAll(KAY_IMPORT)].flatMap(([, specifier]) => resolveFrom(specifier!, file) ?? [])
+        if (!file.endsWith('.kay'))
+          return { imports, posts: false, defers: false }
+
+        const elements = [...elementsIn(parseKay(source).template)]
+
+        return { imports, posts: elements.some(element => actionOf(element, source) !== undefined), defers: elements.some(element => serverIslandOf(element, source)?.mode === 'defer') }
       }
       catch {
-        return []
+        return { imports: [], posts: false, defers: false }
       }
     })()
-    memo.set(file, imports)
+    memo.set(file, facts)
   }
 
-  return imports
+  return facts
+}
+
+// A component anywhere, as a package may ship islands; a script only of the app, as the rest is a library whose islands an app imports as components.
+function followed(file: string | undefined, root: string): string | undefined {
+  if (file === undefined)
+    return undefined
+
+  if (file.endsWith('.kay'))
+    return file
+
+  const path = relative(root, file)
+
+  return SCRIPT.test(file) && !path.startsWith('..') && !path.split(/[/\\]/).includes('node_modules') ? file : undefined
 }

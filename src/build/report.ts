@@ -14,6 +14,8 @@ export interface IslandSize {
   file: string
   // What it loads beyond the entry, the chunks it shares with other islands included.
   size: Size
+  // Those chunks' URLs, for a total over several islands to count a shared one once.
+  chunks?: string[] | undefined
   // The modules weighing most in those chunks, with `kay build --analyze`.
   modules?: ModuleSize[] | undefined
 }
@@ -27,7 +29,7 @@ export interface ModuleSize {
 
 // What the browser loads for islands: the entry every page with one loads first, then each island's own chunks.
 export interface SizeReport {
-  entry?: { size: Size, modules?: ModuleSize[] | undefined } | undefined
+  entry?: { size: Size, chunks?: string[] | undefined, modules?: ModuleSize[] | undefined } | undefined
   islands: IslandSize[]
 }
 
@@ -81,13 +83,13 @@ export async function sizeReport(root: string, dir: string, manifest: Omit<Clien
   const report: SizeReport = { islands: [] }
 
   if (entryChunks.length > 0)
-    report.entry = { size: await total(entryChunks), modules: modules(entryChunks) }
+    report.entry = { size: await total(entryChunks), chunks: entryChunks, modules: modules(entryChunks) }
 
   for (const [id, chunks] of Object.entries(manifest.islands)) {
     const own = chunks.filter(chunk => !loaded.has(chunk))
     const file = islands.get(id)
 
-    report.islands.push({ file: file === undefined ? id : relative(root, file).replaceAll('\\', '/'), size: await total(own), modules: modules(own) })
+    report.islands.push({ file: file === undefined ? id : relative(root, file).replaceAll('\\', '/'), size: await total(own), chunks: own, modules: modules(own) })
   }
 
   report.islands.sort((a, b) => b.size.gzip - a.size.gzip || a.file.localeCompare(b.file))
@@ -272,11 +274,39 @@ export function formatCaches(caches: CacheCount[]): string {
   return ['Caches under .kay/cache:', ...caches.map(cache => `  ${`${cache.name}:`.padEnd(width + 1)} ${cache.cached} cached, ${cache.made} made`)].join('\n')
 }
 
-// Everything `kay build` prints after the build: the islands, the routes, the stages and the caches.
+const SHOWN_REMOVED = 10
+
+// What the last build had and this one does not, which `[change]` cannot show as it only compares what is still there.
+export function formatRemoved(report: SizeReport | undefined, summary: BuildSummary, previous: StoredReport | undefined, width = Infinity): string {
+  if (previous === undefined)
+    return ''
+
+  const islands = new Set((report?.islands ?? []).map(island => island.file))
+  const routes = new Set(summary.routes.map(route => route.route))
+  const gone = [
+    ...previous.entry !== undefined && report?.entry === undefined ? [{ kind: 'entry', name: 'loaded by every page with an island', gzip: previous.entry }] : [],
+    ...Object.entries(previous.islands).filter(([file]) => !islands.has(file)).map(([file, gzip]) => ({ kind: 'island', name: file, gzip })),
+    ...Object.entries(previous.routes).filter(([route]) => !routes.has(route)).map(([route, size]) => ({ kind: 'route', name: route, gzip: size.js + size.css })),
+  ]
+
+  if (gone.length === 0)
+    return ''
+
+  const hidden = gone.length - SHOWN_REMOVED
+
+  return [
+    'Removed since the last build:',
+    ...gone.slice(0, SHOWN_REMOVED).map(each => `${shorten(`  ${each.kind.padEnd(6)}  ${each.name}`, Math.max(20, width - 16))}  was ${kb(each.gzip)}`),
+    ...hidden > 0 ? [`  and ${hidden} more`] : [],
+  ].join('\n')
+}
+
+// Everything `kay build` prints after the build: the islands, the routes, what went, the stages and the caches.
 export function formatBuildReport(report: SizeReport | undefined, summary: BuildSummary, view: ReportView = {}): string {
   return [
     report === undefined ? '' : formatSizeReport(report, view),
     formatRouteTable(summary.routes, view),
+    formatRemoved(report, summary, view.previous, view.width),
     formatStages(summary.stages),
     formatCaches(summary.caches),
   ].filter(part => part !== '').join('\n\n')
