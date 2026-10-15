@@ -21,7 +21,7 @@ import { basePath } from '../server/base'
 import { writeCards } from '../server/card'
 import { ENTRY_RECORD, EXECUTABLE_RECORD, PRERENDERED_DIR } from '../server/client'
 import { compressFiles } from '../server/compress'
-import { FAVICON_DIR, faviconSource, writeFavicons } from '../server/favicon'
+import { FAVICON_DIR, faviconSource } from '../server/favicon'
 import { fontFiles } from '../server/fonts'
 import { avifQuality, writeImageVariants, writeRemoteVariants } from '../server/image'
 import { hookPrerendered } from '../server/page-hook'
@@ -32,6 +32,8 @@ import { linkStoredFiles } from '../server/storage'
 import { cacheCounts, resetCacheCounts } from './cache'
 import { buildClient } from './client'
 import { compileServer } from './compile'
+import { cachedCopies, pruneCopies } from './compressed'
+import { writeCachedFavicons } from './favicons'
 import { codecWarnings, iconSetPackages, iconSetWarnings, NOTICES_FILE, packagesOf, thirdPartyNotices } from './licenses'
 import { readStoredReport, storedReport, writeStoredReport } from './report'
 import { routeSizes } from './route-sizes'
@@ -384,7 +386,7 @@ async function outputStage(project: Project, exported: boolean, client: ClientBu
 
   // The check warned of what an SVG draws poorly already.
   if (favicon !== undefined)
-    await writeFavicons(favicon, join(client.dir, '..', FAVICON_DIR), checking ? () => undefined : undefined)
+    await writeCachedFavicons(favicon, join(client.dir, '..', FAVICON_DIR), cacheDir(root, 'favicons'), checking ? () => undefined : undefined)
 
   lap('favicons')
 
@@ -401,7 +403,14 @@ async function outputStage(project: Project, exported: boolean, client: ClientBu
   await hookPrerendered(root, hooks, { clientDir: client.dir, publicDir: paths.public, base: basePath(config.base), aspects: config.images?.aspects }, paths.output)
   lap('page hooks')
   report({ step: 'compressing' })
-  await Promise.all([compressFiles(client.dir), compressFiles(join(paths.output, PRERENDERED_DIR))])
+  const copies = cachedCopies(cacheDir(root, 'compressed'))
+
+  await Promise.all([compressFiles(client.dir, copies), compressFiles(join(paths.output, PRERENDERED_DIR), copies)])
+
+  // A static export compresses its own pages next, which can share content with these, so it prunes once it has.
+  if (!exported)
+    await pruneCopies(cacheDir(root, 'compressed'))
+
   lap('compress')
 
   return { prerendered, entries, linted, routes: sizes, stages }

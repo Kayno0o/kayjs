@@ -7,6 +7,7 @@ This page lists what each release adds, newest first, with a link to where each 
 
 ## Unreleased
 
+- **Warmer builds**: a build compresses a file and draws the favicons only when their content changed, keeping the results under `.kay/cache`, so a build with nothing new spends about a quarter less CPU. [CLI reference](/reference/cli)
 - **Cheaper compression**: a page rendered per request goes out as zstd to a browser that takes it, at about a quarter of brotli's CPU, and a page rendering the same bytes again is compressed only once. The server spends about half the CPU per compressed page it did. [Deployment](/guides/deployment)
 - **Library actions in tests**: `kay check` types the named exports of a library page, such as kayjs-auth's actions, as the file declares them, so a test imports one without a cast.
 - **A lighter config load**: a `kay.config.ts` importing only `defineConfig` from `kay/server` loads without the server in the processes that only read the config (the client builder, the types process, `kay build`, `kay check`), about 230 ms and 13 MiB less each.

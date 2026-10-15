@@ -69,9 +69,10 @@ export interface FaviconOptions {
 }
 
 // The favicon in the sizes browsers ask for: an ICO of PNGs, the Apple touch icon and the manifest's icons, maskable ones included; what an SVG draws poorly goes to `warn`, kay's log by default.
-export async function faviconFiles({ image: source, svg, maskable }: FaviconSource, warn?: (message: string) => void): Promise<Map<string, Uint8Array<ArrayBuffer>>> {
-  const png = await drawer(source, 'favicon', warn)
-  const maskablePng = maskable === undefined ? undefined : await drawer(maskable, 'maskable icon', warn)
+// A raster source too small to draw sharp icons from goes to `enlarged`, kay's log by default, whatever `warn` is.
+export async function faviconFiles({ image: source, svg, maskable }: FaviconSource, warn?: (message: string) => void, enlarged?: (message: string) => void): Promise<Map<string, Uint8Array<ArrayBuffer>>> {
+  const png = await drawer(source, 'favicon', warn, enlarged)
+  const maskablePng = maskable === undefined ? undefined : await drawer(maskable, 'maskable icon', warn, enlarged)
   const files = new Map<string, Uint8Array<ArrayBuffer>>()
 
   for (const [path, size] of Object.entries(PNG_FILES))
@@ -98,7 +99,7 @@ function iconType(path: string): string {
 }
 
 // Draws the image at each size: an SVG drawn at it, so even the 16-pixel icon is sharp, an image resized to it once checked square.
-async function drawer(image: string, what: string, warn?: (message: string) => void): Promise<(size: number) => Promise<Uint8Array<ArrayBuffer>>> {
+async function drawer(image: string, what: string, warn?: (message: string) => void, enlarged?: (message: string) => void): Promise<(size: number) => Promise<Uint8Array<ArrayBuffer>>> {
   if (SVG_FILE.test(image)) {
     const draw = await svgIconOf(image, what, warn)
 
@@ -106,7 +107,7 @@ async function drawer(image: string, what: string, warn?: (message: string) => v
     return async size => draw(size)
   }
 
-  await checkSquare(image, what)
+  await checkSquare(image, what, enlarged)
 
   return async size => new Uint8Array(await new Bun.Image(image).resize(size, size).png().bytes())
 }
@@ -140,7 +141,7 @@ export async function svgFaviconProblems(source: FaviconSource | undefined): Pro
   return problems.flat()
 }
 
-async function checkSquare(source: string, what: string): Promise<void> {
+async function checkSquare(source: string, what: string, enlarged: (message: string) => void = message => kayLog('warn', message)): Promise<void> {
   const { width, height } = await new Bun.Image(source).metadata()
 
   if (width !== height)
@@ -148,7 +149,7 @@ async function checkSquare(source: string, what: string): Promise<void> {
 
   // Enlarged to the sizes it lacks, so the manifest keeps the 192 and 512 icons a browser asks for before it offers to install the site.
   if (width < LARGEST)
-    kayLog('warn', `the ${what} ${source} is ${width}x${height}, enlarged to the icons up to ${LARGEST}x${LARGEST}, which look blurred; a source of ${LARGEST}x${LARGEST} or more keeps them sharp`)
+    enlarged(`the ${what} ${source} is ${width}x${height}, enlarged to the icons up to ${LARGEST}x${LARGEST}, which look blurred; a source of ${LARGEST}x${LARGEST} or more keeps them sharp`)
 }
 
 export async function writeFavicons(source: FaviconSource, dir: string, warn?: (message: string) => void): Promise<void> {

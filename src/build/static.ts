@@ -9,7 +9,7 @@ import process from 'node:process'
 import { Elysia } from 'elysia'
 import { KayError } from '../compiler/errors'
 import { pageHooks } from '../config'
-import { resolveProject } from '../project'
+import { cacheDir, resolveProject } from '../project'
 import { joinBase } from '../runtime/base'
 import { escape, escapeAttribute } from '../runtime/escape'
 import { localePath, splitLocale, untranslatedPath } from '../runtime/i18n'
@@ -23,6 +23,7 @@ import { applyPageHooks, assetFiles } from '../server/page-hook'
 import { publicFiles, servedPublicly } from '../server/public'
 import { withoutSlash } from '../server/routes'
 import { siteOrigin } from '../server/seo'
+import { cachedCopies, pruneCopies } from './compressed'
 
 // Left in the directory a static export writes, so a later export knows it may clear it, and never clears one it did not write.
 interface App {
@@ -137,7 +138,8 @@ export async function exportStatic(project: Project, client: ClientBuild, outdir
 
   written.push(...await writeLocaleRedirects(app, out, config, built.map(([path]) => path), base, origin))
 
-  await compressPaths(written)
+  await compressPaths(written, cachedCopies(cacheDir(root, 'compressed')))
+  await pruneCopies(cacheDir(root, 'compressed'))
 
   return { pages: built.length, files: written.length }
 }

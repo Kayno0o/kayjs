@@ -52,19 +52,21 @@ async function compressGzip(bytes: Uint8Array, level: number): Promise<Uint8Arra
 }
 
 // Writes a brotli and a gzip copy beside every compressible file under the directory, at the strongest levels since it happens once, at build time; a copy saving little is not written.
-export async function compressFiles(dir: string): Promise<void> {
-  await compressPaths(await filesUnder(dir))
+export async function compressFiles(dir: string, copiesOf: StrongestCopies = strongestCopies): Promise<void> {
+  await compressPaths(await filesUnder(dir), copiesOf)
 }
 
-// The same for the files listed, those not worth compressing left out.
-export async function compressPaths(paths: string[]): Promise<void> {
+export type StrongestCopies = (bytes: Uint8Array<ArrayBuffer>) => Promise<Partial<Record<StoredEncoding, Uint8Array<ArrayBuffer>>>>
+
+// The same for the files listed, those not worth compressing left out; `copiesOf` makes the copies of one file's bytes, which a build backs with a cache.
+export async function compressPaths(paths: string[], copiesOf: StrongestCopies = strongestCopies): Promise<void> {
   await Promise.all(paths.filter(path => COMPRESSIBLE.test(path)).map(async (path) => {
     const bytes = await Bun.file(path).bytes()
 
     if (bytes.length < MIN_SIZE)
       return
 
-    await Promise.all(Object.entries(await strongestCopies(bytes)).map(async ([encoding, copy]) => Bun.write(encodedPath(path, encoding as StoredEncoding), copy)))
+    await Promise.all(Object.entries(await copiesOf(bytes)).map(async ([encoding, copy]) => Bun.write(encodedPath(path, encoding as StoredEncoding), copy)))
   }))
 }
 
@@ -75,7 +77,7 @@ export async function compressTextStrongest(text: string): Promise<Partial<Recor
   return bytes.length < MIN_SIZE ? {} : strongestCopies(bytes)
 }
 
-async function strongestCopies(bytes: Uint8Array<ArrayBuffer>): Promise<Partial<Record<StoredEncoding, Uint8Array<ArrayBuffer>>>> {
+export async function strongestCopies(bytes: Uint8Array<ArrayBuffer>): Promise<Partial<Record<StoredEncoding, Uint8Array<ArrayBuffer>>>> {
   const { constants } = nodeZlib()
   const copies: [StoredEncoding, Uint8Array<ArrayBuffer>][] = [
     ['br', await compressBrotli(bytes, { [constants.BROTLI_PARAM_QUALITY]: constants.BROTLI_MAX_QUALITY, [constants.BROTLI_PARAM_SIZE_HINT]: bytes.length })],
