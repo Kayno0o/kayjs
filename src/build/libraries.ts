@@ -358,7 +358,7 @@ export function sourceWords(source: string): string[] {
 export function fileWords(file: string): string[] {
   const read = readSource(file)
 
-  return read.words ??= sourceWords(read.text)
+  return read.words ??= [...new Set(sourceWords(read.text))]
 }
 
 // What a module imports: a component's fences, or a script whole.

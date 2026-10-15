@@ -40,34 +40,73 @@ interface SourceRead {
   words?: string[]
 }
 
-const reads = new Map<string, SourceRead & { stamp: string }>()
-
-// What tells a file changed: its inode, times and size.
-export function fileStamp(file: string): string | undefined {
-  const stats = statSync(file, { throwIfNoEntry: false })
-
-  return stats?.isFile() === true ? `${stats.ino}-${stats.mtimeMs}-${stats.ctimeMs}-${stats.size}` : undefined
+interface KeptRead extends SourceRead {
+  stamp: string
+  // Written so recently that a second write could leave the stamp as it is, so it is read again at the next call.
+  racy: boolean
+  used: number
 }
 
-// A source file's text and hash, read again only when the file changed: its inode, times and size are the stamp, so an edit, a link retargeted or a file replaced by a rename all read afresh, and nothing has to tell the cache.
+const reads = new Map<string, KeptRead>()
+let generation = 0
+// A write this close to a read may share its timestamps with the next write: filesystems tell times apart by a tick or, on some, by two seconds.
+const SETTLED_MS = 2000
+const BOM = '\uFEFF'
+
+// What tells a file changed: its inode, times and size; undefined for what is no file, or cannot be looked at.
+export function fileStamp(file: string): string | undefined {
+  try {
+    const stats = statSync(file, { throwIfNoEntry: false })
+
+    return stats?.isFile() === true ? `${stats.ino}-${stats.mtimeMs}-${stats.ctimeMs}-${stats.size}` : undefined
+  }
+  catch {
+    return undefined
+  }
+}
+
+// Whether the file was written before `before`, in milliseconds since the epoch, with room for the timestamps' grain: undefined stamps and files written since are not.
+export function settledBefore(file: string, before: number): boolean {
+  try {
+    const stats = statSync(file, { throwIfNoEntry: false })
+
+    return stats !== undefined && stats.mtimeMs < before - SETTLED_MS
+  }
+  catch {
+    return false
+  }
+}
+
+// A source file's text without a byte order mark, as `Bun.file().text()` reads it, and its hash, read again only when the file changed: its inode, times and size are the stamp, so an edit, a link retargeted or a file replaced by a rename all read afresh, and nothing has to tell the cache.
 // Throws as reading a missing file does.
 export function readSource(file: string): SourceRead {
-  const stamp = fileStamp(file)
-
-  if (stamp === undefined)
-    throw new Error(`ENOENT: no such file, read '${file}'`)
-
+  const stats = statSync(file)
+  const stamp = `${stats.ino}-${stats.mtimeMs}-${stats.ctimeMs}-${stats.size}`
   const known = reads.get(file)
 
-  if (known?.stamp === stamp)
-    return known
+  if (known?.stamp === stamp && !known.racy) {
+    known.used = generation
 
-  const text = readFileSync(file, 'utf8')
-  const read = { stamp, text, hash: Bun.hash(text) }
+    return known
+  }
+
+  const raw = readFileSync(file, 'utf8')
+  const text = raw.startsWith(BOM) ? raw.slice(1) : raw
+  const read = { stamp, text, hash: Bun.hash(text), racy: Date.now() - stats.mtimeMs < SETTLED_MS, used: generation }
 
   reads.set(file, read)
 
   return read
+}
+
+// Forgets the files no read asked for since the last call, gone or no longer built, as `keepAnalyses` does the components'.
+export function keepSources(): void {
+  for (const [file, read] of reads) {
+    if (read.used < generation)
+      reads.delete(file)
+  }
+
+  generation++
 }
 
 // Forgets every file read, for a build of everything to start from the disk.

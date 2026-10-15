@@ -1,8 +1,9 @@
 import type { BunPlugin } from 'bun'
+import type { CacheSlot } from './cache'
 import { readdirSync, statSync } from 'node:fs'
 import { dirname, join, resolve, sep } from 'node:path'
 import { readCacheEntry, writeCacheEntry } from './cache'
-import { fileStamp } from './files'
+import { fileStamp, settledBefore } from './files'
 import { compilerFingerprint } from './transform'
 
 // Bun's code splitting gives each set of entry points sharing code a chunk of its own: an entry, islands and the page swap reaching kay's runtime each in their own way leave a page loading it in four or five small files.
@@ -138,7 +139,8 @@ interface Remembered {
 }
 
 // The search is kept in `cache.file` while its inputs stay as they were: every module its bundle read, kay's own runtime, and what `cache.key` says of the rest, such as the islands the entry imports.
-// A module an edit adds or a file shadowing one is not looked for; the chunk is then only split a little differently until another input changes, and nothing breaks.
+// A module an edit adds or a file shadowing one is not looked for, and a plugin is told apart by its name only; the chunk is then only split a little differently until another input changes, and nothing breaks.
+// Nothing is kept when an input was written during or just before the search: it may have changed after the bundle read it.
 export interface RuntimeSearchCache {
   file: string
   key: string
@@ -147,29 +149,41 @@ export interface RuntimeSearchCache {
 // Bundles `entry` with kay's runtime left out, then each lazy runtime module with its siblings left out, to learn what of the runtime the client build uses where.
 // Undefined when the build fails, which the real one then reports.
 export async function runtimeChunk(entry: string, options: { plugins: BunPlugin[], define: Record<string, string>, external: string[], cache?: RuntimeSearchCache | undefined }): Promise<RuntimeChunk | undefined> {
-  const slot = options.cache && { file: options.cache.file, key: Bun.hash([compilerFingerprint(), JSON.stringify(options.define), options.external.join(), options.plugins.map(plugin => plugin.name).join(), options.cache.key].join('\0')).toString(36) }
+  const slot = options.cache && { file: options.cache.file, key: Bun.hash([compilerFingerprint(), JSON.stringify(options.define), options.external.join(), options.plugins.map(plugin => plugin.name).join(), RUNTIME_DIR, options.cache.key].join('\0')).toString(36) }
   const known = slot && await readCacheEntry<Remembered>(slot)
 
   if (known && Object.entries(known.inputs).every(([file, stamp]) => fileStamp(file) === stamp))
     return { dir: dirname(entry), anchor: known.anchor, lazy: new Set(known.lazy) }
 
+  const started = Date.now()
   const found = await searchRuntime(entry, options)
 
-  if (found && slot) {
+  if (found && slot)
+    await remember(slot, found, started)
+
+  return found?.chunk
+}
+
+async function remember(slot: CacheSlot, found: { chunk: RuntimeChunk, inputs: string[] }, started: number): Promise<void> {
+  try {
     const runtime = (readdirSync(RUNTIME_DIR, { recursive: true }) as string[]).map(file => join(RUNTIME_DIR, file))
     const inputs: Record<string, string> = {}
 
     for (const file of [PACKAGE, ...runtime, ...found.inputs]) {
       const stamp = fileStamp(file)
 
-      if (stamp !== undefined)
-        inputs[file] = stamp
+      if (stamp === undefined)
+        continue
+
+      if (!settledBefore(file, started))
+        return
+
+      inputs[file] = stamp
     }
 
     await writeCacheEntry(slot, { inputs, anchor: found.chunk.anchor, lazy: [...found.chunk.lazy] } satisfies Remembered)
   }
-
-  return found?.chunk
+  catch {}
 }
 
 async function searchRuntime(entry: string, options: { plugins: BunPlugin[], define: Record<string, string>, external: string[] }): Promise<{ chunk: RuntimeChunk, inputs: string[] } | undefined> {

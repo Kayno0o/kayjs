@@ -1,4 +1,5 @@
 import type { ImportedSignals, SignalKind } from '../compiler/module-signals'
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { readFileSync, statSync } from 'node:fs'
 import { moduleSignals } from '../compiler/module-signals'
 import { resolveFrom, scriptLoader, transpilerFor } from './files'
@@ -6,39 +7,46 @@ import { fences, SCRIPT_FILE } from './libraries'
 
 const KAY_MODULE = /^kay(?:\/|$)/
 const scanned = new Map<string, { stamp: string, signals: Record<string, SignalKind> }>()
+
 // Inside a scope, what a component's imports exported, found once for all the passes over it: the analysis, the browser and the server compile.
-const memo = new Map<string, { source: string, found: ImportedSignals }>()
-let scopes = 0
+type Memo = Map<string, { source: string, found: ImportedSignals }>
+const scope = new AsyncLocalStorage<Memo>()
+// Bun calls a plugin back from outside the scope's async context, so while one scope is the only one open its memo answers there too; with two open, a callback without a context looks again.
+const open = new Set<Memo>()
 // What each component imports, read again only once its text changes.
 const imports = new Map<string, { hash: number | bigint, specifiers: string[] }>()
 
 // The signals and memos the modules a component imports export, which its template reads and writes as its own; part of every cache key of its compile, so editing such a module compiles the component again.
 // A package is left out, its code too large to scan on every compile, unless a relative import reaches into it, as a library's own components do.
 export function importedSignals(file: string, source: string): ImportedSignals {
-  const memoized = scopes > 0 ? memo.get(file) : undefined
+  const memo = scope.getStore() ?? (open.size === 1 ? open.values().next().value : undefined)
+  const memoized = memo?.get(file)
 
   if (memoized?.source === source)
     return memoized.found
 
   const found = readImportedSignals(file, source)
 
-  if (scopes > 0)
-    memo.set(file, { source, found })
+  memo?.set(file, { source, found })
 
   return found
 }
 
 // A build, or one of the dev builder's rebuilds, runs inside a scope: the files do not change meanwhile, so each component's signals are looked up once instead of once per pass, and the next scope starts from the disk again.
-// Outside one, as in a server compiling on a request or the language server, every call looks again.
+// Outside one, as in a server compiling on a request or the language server, every call looks again, and two scopes open at once each answer only the calls inside it.
 export async function inSignalsScope<T>(run: () => Promise<T>): Promise<T> {
-  scopes++
+  if (scope.getStore())
+    return run()
+
+  const memo: Memo = new Map()
+
+  open.add(memo)
 
   try {
-    return await run()
+    return await scope.run(memo, run)
   }
   finally {
-    if (--scopes === 0)
-      memo.clear()
+    open.delete(memo)
   }
 }
 

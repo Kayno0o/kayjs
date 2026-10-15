@@ -8,7 +8,7 @@ import { join, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { outputDir } from '../build/assets'
 import { bothBundles, bundleIslands, bundleStyles, clearClientOutput, readClientSources, writeClasses } from '../build/client'
-import { forgetSources, readSource } from '../build/files'
+import { forgetSources, keepSources, readSource } from '../build/files'
 import { fileWords, sourceWords } from '../build/libraries'
 import { inSignalsScope } from '../build/signals'
 import { mapBundleToKay } from '../build/sourcemap'
@@ -125,6 +125,8 @@ export function devBuilder(root: string, options: ClientOptions): (changed: stri
     }
 
     const sources = await readClientSources(root, options, graph)
+
+    keepSources()
     const previous = changed !== null && last !== undefined && await readText(join(output, MANIFEST)) === last.manifest ? last : undefined
 
     last = undefined
@@ -153,6 +155,12 @@ export function devBuilder(root: string, options: ClientOptions): (changed: stri
       void pointMapsAtKay(scripts.maps)
 
     const styleInputs = styles ? realPaths([...styles.inputs, ...styles.followed]) : previous!.styleInputs
+
+    for (const file of signed.keys()) {
+      if (!styleInputs.has(file))
+        signed.delete(file)
+    }
+
     const signatures = styles ? new Map<string, string>() : previous!.signatures
     const words = previous?.words ?? new Map<string, Set<string>>()
 

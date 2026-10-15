@@ -2,7 +2,7 @@ import type { BunPlugin } from 'bun'
 import type { BuildOptions, BuildResult } from '../src/build/pipeline'
 import type { KayConfig } from '../src/config'
 import type { ClientBuild } from '../src/server/client'
-import { existsSync } from 'node:fs'
+import { existsSync, utimesSync } from 'node:fs'
 import { mkdir, mkdtemp, readdir, realpath, rename, rm, stat, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join, relative, resolve } from 'node:path'
@@ -12,7 +12,7 @@ import { describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
 import { ASSET_FILE, clientDir, outputDir, writeAsset } from '../src/build/assets'
 import { buildClient, readClientSources } from '../src/build/client'
-import { forgetSources, readSource, realPath, writeIfChanged } from '../src/build/files'
+import { forgetSources, keepSources, readSource, realPath, writeIfChanged } from '../src/build/files'
 import { fileWords, reachesAny } from '../src/build/libraries'
 import { BUNDLED_LICENCES, codecWarnings, thirdPartyNotices, unknownCodecVersions } from '../src/build/licenses'
 import { formatSizeReport } from '../src/build/report'
@@ -41,6 +41,14 @@ async function scratchProject(files: Record<string, string>): Promise<string> {
   await Promise.all(Object.entries(files).map(async ([path, content]) => Bun.write(join(root, path), content)))
 
   return root
+}
+
+// Ages a file's times, as a file written a while ago has them, so the caches trusting a stamp do trust it.
+function settle(...files: string[]): void {
+  const past = new Date(Date.now() - 60_000)
+
+  for (const file of files)
+    utimesSync(file, past, past)
 }
 
 describe('kay build', () => {
@@ -1244,6 +1252,33 @@ describe('what a build keeps in memory', () => {
     }
   })
 
+  it('keeps the signals looked up in each of two scopes open at once to the calls inside it', async () => {
+    const dir = resolve(await scratchDir('kay-scope-'))
+    const file = join(dir, 'count.kay')
+    const source = '---\nimport { count } from \'./state\'\n---\np.count {count()}\n'
+
+    try {
+      await Bun.write(join(dir, 'state.ts'), 'import { signal } from \'kay\'\n\nexport const count = signal(0)\n')
+      const { promise: held, resolve: release } = Promise.withResolvers<void>()
+      const early = inSignalsScope(async () => {
+        const found = importedSignals(file, source)
+
+        await held
+
+        return found
+      })
+
+      // A scope opened while the first is open does not see what the first looked up.
+      await Bun.write(join(dir, 'state.ts'), 'export const count = () => 0\n')
+      expect(await inSignalsScope(async () => importedSignals(file, source))).toEqual({})
+      release()
+      expect(await early).toEqual({ './state': { count: 'signal' } })
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
   it('compiles an island again in kay dev once a module it imports stops exporting a signal', async () => {
     const project = await scratchProject({
       'src/state.ts': 'import { signal } from \'kay\'\n\nexport const total = signal(0)\n',
@@ -1284,6 +1319,7 @@ describe('what a build keeps in memory', () => {
       await Bun.write(file, 'export const a = 1\n')
       await Bun.write(join(dir, 'b.ts'), 'export const b = 2\n')
       await symlink(file, link)
+      settle(file, join(dir, 'b.ts'))
       const first = readSource(file)
 
       expect(readSource(file)).toBe(first)
@@ -1292,6 +1328,7 @@ describe('what a build keeps in memory', () => {
 
       // The same size, so only the times tell.
       await Bun.write(file, 'export const a = 2\n')
+      settle(file)
       expect(readSource(file).text).toBe('export const a = 2\n')
       expect(fileWords(file)).toContain('2')
 
@@ -1305,10 +1342,66 @@ describe('what a build keeps in memory', () => {
       expect(readSource(file).text).toBe('export const a = 3\n')
 
       await rm(file)
-      expect(() => readSource(file)).toThrow()
+      expect(() => readSource(file)).toThrow(expect.objectContaining({ code: 'ENOENT' }))
       forgetSources()
     }
     finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('reads a file written a moment ago again at every call, as a second write could leave its stamp as it is', async () => {
+    const dir = resolve(await scratchDir('kay-reads-'))
+    const file = join(dir, 'a.ts')
+
+    try {
+      await Bun.write(file, 'export const a = 1\n')
+      const first = readSource(file)
+
+      expect(readSource(file)).not.toBe(first)
+      settle(file)
+      const settled = readSource(file)
+
+      expect(readSource(file)).toBe(settled)
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('reads a component as Bun does, the byte order mark left out', async () => {
+    const dir = resolve(await scratchDir('kay-reads-'))
+    const file = join(dir, 'a.kay')
+
+    try {
+      await Bun.write(file, '\uFEFF---\nimport \'./state\'\n---\np x\n')
+      expect(readSource(file).text).toBe(await Bun.file(file).text())
+      expect(readSource(file).text.startsWith('---')).toBe(true)
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('forgets the files no read asked for since the last call', async () => {
+    const dir = resolve(await scratchDir('kay-reads-'))
+    const [kept, dropped] = [join(dir, 'kept.ts'), join(dir, 'dropped.ts')] as const
+
+    try {
+      await Bun.write(kept, 'export const k = 1\n')
+      await Bun.write(dropped, 'export const d = 1\n')
+      settle(kept, dropped)
+      keepSources()
+      const first = [readSource(kept), readSource(dropped)]
+
+      keepSources()
+      expect(readSource(kept)).toBe(first[0]!)
+      keepSources()
+      expect(readSource(kept)).toBe(first[0]!)
+      expect(readSource(dropped)).not.toBe(first[1]!)
+    }
+    finally {
+      forgetSources()
       await rm(dir, { recursive: true, force: true })
     }
   })
@@ -1354,7 +1447,8 @@ describe('what a build keeps in memory', () => {
 
     try {
       await Bun.write(entry, 'import \'../island\'\n')
-      await Bun.write(island, 'import { signal } from \'kay\'\n\nexport const count = signal(0)\n')
+      await Bun.write(island, 'import { signal } from \'kay\'\n\nexport const count = signal\n')
+      settle(entry, island)
       const first = await find()
 
       expect(first?.anchor).toContain('signal as k')
@@ -1365,8 +1459,9 @@ describe('what a build keeps in memory', () => {
       expect(await find()).toEqual(first)
       expect(searches).toBe(1)
 
-      // A module it read now imports more of the runtime, with the same size and nothing telling the cache.
+      // A module it read now imports more of the runtime, at the same size and nothing telling the cache but its times.
       await Bun.write(island, 'import { effect } from \'kay\'\n\nexport const count = effect\n')
+      settle(island)
       const second = await find()
 
       expect(searches).toBe(2)
@@ -1379,13 +1474,52 @@ describe('what a build keeps in memory', () => {
       await find('another registry')
       expect(searches).toBe(3)
 
+      // A module written a moment before the search may have changed after it read it: nothing is kept.
+      await Bun.write(island, 'import { signal } from \'kay\'\n\nexport const count = signal\n')
+      await find()
+      await find()
+      expect(searches).toBe(5)
+
       // A module it read is gone: the search fails, which the real build reports.
       await rm(island)
       expect(await find()).toBeUndefined()
-      expect(searches).toBe(4)
+      expect(searches).toBe(6)
     }
     finally {
       await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('bundles the islands once to find the runtime chunk while a build\'s modules stay as they were, and again for another registry', async () => {
+    const project = await scratchDir('kay-runtime-build-')
+    const files = {
+      'src/counter.kay': '---\nimport { signal } from \'kay\'\n\nconst n = signal(0)\n---\nbutton(type="button" onClick={() => n.set(n() + 1)}) {n()}\n',
+      'src/routes/index.kay': '---\nimport Counter from \'../counter.kay\'\n---\nCounter\n',
+    }
+    let setups = 0
+    const counting = { name: 'counting', setup: () => void setups++ }
+    const searches = async () => {
+      setups = 0
+      await buildClient(project, { plugins: [counting] })
+
+      return setups
+    }
+
+    try {
+      await Promise.all(Object.entries(files).map(async ([path, content]) => Bun.write(join(project, path), content)))
+      settle(...Object.keys(files).map(path => join(project, path)))
+      const cold = await searches()
+
+      // The search is the extra bundle, beside the build and the stylesheets'.
+      expect(await searches()).toBe(cold - 1)
+
+      await Bun.write(join(project, 'src/extra.kay'), 'p.extra x\n')
+      await Bun.write(join(project, 'src/routes/index.kay'), '---\nimport Counter from \'../counter.kay\'\nimport Extra from \'../extra.kay\'\n---\nCounter\nExtra\n')
+      settle(join(project, 'src/extra.kay'), join(project, 'src/routes/index.kay'))
+      expect(await searches()).toBe(cold - 1)
+    }
+    finally {
+      await rm(project, { recursive: true, force: true })
     }
   })
 
