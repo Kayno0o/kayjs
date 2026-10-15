@@ -17,6 +17,8 @@ import { limiter } from '../src/server/limit'
 import { fixtureCopy, scratchDir } from './scratch'
 
 const fixtures = join(import.meta.dir, 'fixtures')
+// Inside the checkout too, but where `bun pm pack` never looks, so a folder a test holds unreadable there does not fail the pack of kay `kay new` runs beside it.
+const UNPACKED = join(import.meta.dir, '../node_modules/.cache')
 // Tests on a scratch project of their own run together, but four checks at most at a time, as tsgo is multithreaded itself; a test's wait for its turn counts in its timeout. Every test of a file waits at once, so the last one waits for all the others, which a host busy with other suites stretches past 30 s.
 const turn = limiter(4)
 
@@ -231,8 +233,11 @@ function watchChecks(root: string, ...flags: string[]): { report: () => Promise<
 }
 
 // A project inside the checkout, so `kay` and the types resolve without installing anything.
-async function scratchProject(files: Record<string, string>): Promise<string> {
-  const root = await scratchDir('check-')
+async function scratchProject(files: Record<string, string>, unpacked = false): Promise<string> {
+  if (unpacked)
+    await mkdir(UNPACKED, { recursive: true })
+
+  const root = unpacked ? await mkdtemp(join(UNPACKED, 'check-')) : await scratchDir('check-')
 
   await Promise.all(Object.entries({ 'tsconfig.json': tsconfig, ...files }).map(async ([path, content]) => Bun.write(join(root, path), content)))
 
@@ -1197,7 +1202,7 @@ describe.concurrent('kay check, edge cases', () => {
   })
 
   it('walks past a directory it cannot read, as a container-owned data directory bind-mounted into the project is', async () => {
-    const root = await scratchProject({ 'src/a.kay': 'p hi\n', 'data-dev/postgres/keep': '' })
+    const root = await scratchProject({ 'src/a.kay': 'p hi\n', 'data-dev/postgres/keep': '' }, true)
 
     try {
       await chmod(join(root, 'data-dev/postgres'), 0o000)

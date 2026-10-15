@@ -1,7 +1,7 @@
 import type { ConfigSettings, Feature } from './templates'
 import { randomBytes } from 'node:crypto'
 import { existsSync, statSync } from 'node:fs'
-import { mkdir, readdir, writeFile } from 'node:fs/promises'
+import { mkdir, readdir, rm, writeFile } from 'node:fs/promises'
 import { basename, join, resolve } from 'node:path'
 import process from 'node:process'
 import { checklist, select } from './prompt'
@@ -176,8 +176,12 @@ async function packKay(vendor: string): Promise<string> {
   const child = Bun.spawn([process.execPath, 'pm', 'pack', '--quiet', '--destination', vendor], { cwd: KAY_ROOT, stdout: 'pipe', stderr: 'pipe' })
   const [output, errors, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
 
-  if (code !== 0)
+  if (code !== 0) {
+    // What `prepack` built and `postpack` would have removed, which would otherwise shadow `src` for the checkout's own type check.
+    await Promise.all(['types', 'dist'].map(async dir => rm(join(KAY_ROOT, dir), { recursive: true, force: true })))
+
     throw new Error(`kay: packing ${KAY_ROOT} failed\n${errors}`)
+  }
 
   return `file:./vendor/${basename(output.trim())}`
 }
