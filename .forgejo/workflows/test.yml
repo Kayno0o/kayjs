@@ -17,12 +17,44 @@ permissions:
 env:
   BUN_INSTALL_CACHE_DIR: /tmp/bun-cache
 
+# One run at a time and none cancelled, so a run that starts always answers: Forgejo's default cancelled nearly every run, as landings come faster than one takes. Forgejo then starts every queued run in turn, which the `latest` job ends within seconds once a newer push is queued.
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
-  test:
-    # A release's version commit, `v1.2.3`, pushed alone, is tested by the publish workflow its tag starts, on the same tree; no other commit title starts with a `v`. Code commits pushed along with it still get the steps only this workflow runs.
-    if: github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'v') || github.event.commits[1] != null
+  # A push's run tests every commit since the last one passed, so a run whose commit is no longer the branch's head leaves its tests to the newer push's.
+  latest:
     runs-on: alpine
-    timeout-minutes: 20
+    timeout-minutes: 2
+    outputs:
+      current: ${{ steps.head.outputs.current }}
+
+    steps:
+      - name: Find whether a newer push is queued behind this run
+        id: head
+        run: |
+          current=true
+          if [ "$GITHUB_EVENT_NAME" = push ]; then
+            # An API that does not answer leaves the tests to run.
+            head=$(curl -sf --max-time 10 -H "Authorization: token $TOKEN" "$API/repos/$GITHUB_REPOSITORY/branches/$GITHUB_REF_NAME" | jq -r '.commit.id // empty' || true)
+            if [ -n "$head" ] && [ "$head" != "$GITHUB_SHA" ]; then
+              echo "Main moved on to $head, whose run tests this commit too"
+              current=false
+            fi
+          fi
+          echo "current=$current" >> "$GITHUB_OUTPUT"
+        env:
+          API: ${{ github.server_url }}/api/v1
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  test:
+    needs: latest
+    # A release's version commit, `v1.2.3`, pushed alone, is tested by the publish workflow its tag starts, on the same tree; no other commit title starts with a `v`. Code commits pushed along with it still get the steps only this workflow runs.
+    if: needs.latest.outputs.current == 'true' && (github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'v') || github.event.commits[1] != null)
+    runs-on: alpine
+    # Well past the slowest run so far (about 10 minutes), so a hung run frees the queue behind it.
+    timeout-minutes: 15
 
     steps:
       # Deep enough to find the last commit these tests passed.
@@ -30,12 +62,12 @@ jobs:
         with:
           fetch-depth: 50
 
-      # Since the last commit these tests passed, as a push cancels the runs before it and is tested for them all; a push reaching no passed commit counts as changing everything.
+      # Since the last commit these tests passed, by the test job's own status, which reads `skipped` on a run left to a newer push's: that run tests every commit since then. A push reaching no passed commit counts as changing everything.
       - name: Find what changed since the last tested commit
         id: changed
         run: |
           verdict() {
-            curl -sf --max-time 10 -H "Authorization: token $TOKEN" "$API/repos/$GITHUB_REPOSITORY/commits/$1/status" | jq -r '[.statuses[]? | select(.context | startswith("Tests /")) | .status // .state] | first // empty' || true
+            curl -sf --max-time 10 -H "Authorization: token $TOKEN" "$API/repos/$GITHUB_REPOSITORY/commits/$1/status" | jq -r '[.statuses[]? | select(.context | startswith("Tests / test ")) | .status // .state] | first // empty' || true
           }
           base=
           if [ "$GITHUB_EVENT_NAME" = push ]; then
