@@ -91,13 +91,14 @@ function label(parsed: Parsed): string {
 // Runs `handler` when `keys` is pressed, `keys` following the signals a function reads (`null` binds nothing), for as long as the island lives: `mod+s` is Cmd+S on macOS and iOS and Ctrl+S elsewhere, `ctrl`, `meta`, `alt` and `shift` name a modifier, and a key is a character, `escape`, `enter`, `arrowup` or `space`.
 // Nothing happens on the server, while composing text with an IME, or when something handled the event first, so the innermost of two bindings on one key wins when it prevents the default.
 export function shortcut(keys: string | (() => string | null | undefined), handler: (event: KeyboardEvent) => void, options: ShortcutOptions = {}): void {
+  // Checked on the server too, so a misspelt spec fails the render rather than the hydration.
+  if (typeof keys === 'string')
+    parse(keys, false)
+
   if (typeof document === 'undefined')
     return
 
   const apple = isApple()
-
-  if (typeof keys === 'string')
-    parse(keys, apple)
 
   onMount(() => {
     const scope = typeof options.on === 'function' ? options.on() : options.on
