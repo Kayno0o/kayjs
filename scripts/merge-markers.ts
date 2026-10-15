@@ -13,9 +13,16 @@ export function addedMarkers(diff: string): Marker[] {
   const markers: Marker[] = []
   let file = ''
   let line = 0
+  let inHunk = false
 
   for (const text of diff.split('\n')) {
-    if (text.startsWith('+++ ')) {
+    if (text.startsWith('diff --git ')) {
+      inHunk = false
+
+      continue
+    }
+
+    if (!inHunk && text.startsWith('+++ ')) {
       file = text.slice(4).replace(/^b\//, '')
 
       continue
@@ -29,7 +36,7 @@ export function addedMarkers(diff: string): Marker[] {
       continue
     }
 
-    if (!text.startsWith('+') || text.startsWith('+++'))
+    if (!text.startsWith('+'))
       continue
 
     if (MARKER.test(text.slice(1)))

@@ -54,6 +54,14 @@ describe('merge markers', () => {
   })
 })
 
+describe('merge markers after a line starting with ++', () => {
+  it('keeps the file and the line count', () => {
+    const diff = ['diff --git a/x.md b/x.md', '--- a/x.md', '+++ b/x.md', '@@ -1,0 +1,3 @@', '++ item', '+x', '+=======', ''].join('\n')
+
+    expect(addedMarkers(diff)).toEqual([{ file: 'x.md', line: 3, text: '=======' }])
+  })
+})
+
 describe('parallel landings of the whats-new and upgrading files', () => {
   it('rebases two branches adding lines under the same heading without a conflict, keeping the table intact', async () => {
     const work = await scratchRepo()
