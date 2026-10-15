@@ -1,15 +1,16 @@
 import type { Server } from 'bun'
 import type { Elysia, TSchema } from 'elysia'
+import type { BlockList } from 'node:net'
 import type { ProxyConfig } from '../config'
 import type { ActionRateLimit, RateLimit, RateStore, RateWindow, ServerAction } from '../runtime/action'
 import type { Duration } from '../runtime/duration'
-import { BlockList, isIP } from 'node:net'
 import { KayError } from '../compiler/errors'
 import { honeypotField, minTimeOf, STAMP_FIELD } from '../runtime/action'
 import { durationSeconds } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
 import { openSqlite } from '../runtime/sqlite.server'
 import { NAVIGATE_HEADER, WORK_HEADER } from '../runtime/swap'
+import { nodeNet } from './builtins'
 import { rewrittenAddress } from './rewrite'
 import { sharedKey, stampTime } from './stamp'
 import { proofOfWork, signWork, workRefusal } from './work'
@@ -433,9 +434,13 @@ function fromTrusted(address: string, proxy: ProxyConfig | null | undefined): bo
     return true
 
   const ranges = proxy ? rangesOf(proxy) : undefined
+
+  if (ranges === undefined)
+    return false
+
   const family = familyOf(address)
 
-  return ranges !== undefined && family !== undefined && ranges.check(address, family.name)
+  return family !== undefined && ranges.check(address, family.name)
 }
 
 function rangesOf(proxy: ProxyConfig): BlockList | undefined {
@@ -446,7 +451,7 @@ function rangesOf(proxy: ProxyConfig): BlockList | undefined {
   let ranges = trustedRanges.get(key)
 
   if (!ranges) {
-    ranges = new BlockList()
+    ranges = new (nodeNet().BlockList)()
 
     for (const range of proxy.trusted as unknown[]) {
       const [, address = '', bits] = typeof range === 'string' ? RANGE.exec(range.trim()) ?? [range, range.trim()] : []
@@ -467,7 +472,7 @@ function rangesOf(proxy: ProxyConfig): BlockList | undefined {
 
 // An address's family as `BlockList` names it, and how many bits it has; none for anything but an address.
 function familyOf(address: string): { name: 'ipv4' | 'ipv6', bits: number } | undefined {
-  const family = isIP(address)
+  const family = nodeNet().isIP(address)
 
   return family === 0 ? undefined : family === 4 ? { name: 'ipv4', bits: 32 } : { name: 'ipv6', bits: 128 }
 }

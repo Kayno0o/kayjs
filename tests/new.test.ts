@@ -16,7 +16,7 @@ import { createProject, FEATURE_NAMES, PRESETS, toggle } from '../src/new'
 const repo = join(import.meta.dir, '..')
 const LISTENING = /localhost:(\d+)/
 // Top-level imports of the Node modules a compiled server loads only once a feature needs them.
-const EAGER_BUILTINS = [...['zlib', 'crypto', 'http'].flatMap(name => [`from "${name}"`, `from "node:${name}"`]), 'from "bun:sqlite"']
+const EAGER_BUILTINS = [...['zlib', 'crypto', 'http', 'net'].flatMap(name => [`from "${name}"`, `from "node:${name}"`]), 'from "bun:sqlite"']
 // A Postgres whose user may create databases, for the scaffolded app's tests: CI sets it, as pg-orm's own tests have one.
 const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL
 // A scaffold installed, checked, linted, tested and built: about 30 s in CI, and past 60 s there under a loaded parallel run.
@@ -769,10 +769,11 @@ describe('kay build --compile', () => {
     expect(code).toBe(0)
     // For `kay start` to run.
     expect(await Bun.file(join(outputDir(dir), 'executable')).text()).toBe('server')
-    // Serving the build it embeds, it carries neither kay's compiler nor Babel, and loads zlib, crypto, http and SQLite only once a feature needs them.
+    // Serving the build it embeds, it carries neither kay's compiler nor Babel, and loads zlib, crypto, http, net and SQLite only once a feature needs them.
     const executable = Buffer.from(await Bun.file(join(dir, 'server')).bytes())
 
-    expect(executable.includes('compiler/codegen.ts')).toBe(false)
+    // The compiler's parser, which the prerenderer and the dev tool's Head tab reach, is left out with them.
+    expect(['compiler/codegen.ts', 'compiler/parser.ts'].filter(file => executable.includes(file))).toEqual([])
     expect(EAGER_BUILTINS.filter(statement => executable.includes(statement))).toEqual([])
     await rm(join(dir, 'node_modules/build-stamp'), { recursive: true })
 

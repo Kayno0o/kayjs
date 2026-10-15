@@ -9,7 +9,6 @@ import type { MountedApi } from './openapi'
 import type { Endpoint } from './routes'
 import type { Claim } from './served-paths'
 import { readFileSync, statSync } from 'node:fs'
-import { isIP } from 'node:net'
 import { hostname } from 'node:os'
 import { basename, isAbsolute, join, relative, resolve } from 'node:path'
 import process from 'node:process'
@@ -20,6 +19,7 @@ import { bootDevTool } from '../runtime/dev-boot'
 import { kayLog } from '../runtime/log'
 import { isCrossSite } from './actions'
 import { routerPath } from './base'
+import { nodeNet } from './builtins'
 import { BUILD_FAILURE, clientOptionsKey, fromManifest, readManifest } from './client'
 import { redirectedBy } from './dev-notes'
 import { editorCommand } from './editor'
@@ -382,7 +382,7 @@ export function refuseForeignHosts(app: Elysia, site: string | undefined): void 
     const host = request.headers.get('host')
     const name = host === null ? undefined : URL.parse(`http://${host}`)?.hostname.replace(TRAILING_DOT, '')
 
-    if (host === null || (name !== undefined && (LOCAL_NAME.test(name) || isIP(name.replace(BRACKETS, '')) !== 0 || allowed.has(name))))
+    if (host === null || (name !== undefined && (LOCAL_NAME.test(name) || nodeNet().isIP(name.replace(BRACKETS, '')) !== 0 || allowed.has(name))))
       return
 
     return new Response(`kay dev answers to localhost, an IP address or the site, and ${host} is none of them; list it in KAY_DEV_HOSTS to reach the server by that name\n`, { status: 421, headers: { 'content-type': 'text/plain; charset=utf-8' } })
