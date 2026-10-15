@@ -4,7 +4,8 @@ import { $ } from 'bun'
 
 // Claude Code's WorktreeCreate and WorktreeRemove hooks, and `just worktree <name>`: a worktree starts at the HEAD it is made from and installs its own dependencies, so its `node_modules/kay -> ..` runs its own source rather than the main checkout's.
 // `bun .claude/hooks/worktree.ts create [name]` or `remove`, reading the hook's input on stdin when no name is given; only the worktree path goes to stdout, which Claude Code reads.
-const PACKAGES = ['.', 'bench/apps/solid', 'bench/apps/svelte']
+// Every bench app too, since `just land` checks them all when a root config such as the lockfile changes.
+const PACKAGES = ['.', 'bench/apps/astro', 'bench/apps/next', 'bench/apps/nuxt', 'bench/apps/solid', 'bench/apps/svelte']
 
 async function mainCheckout(dir: string): Promise<string> {
   return dirname((await $`git rev-parse --path-format=absolute --git-common-dir`.cwd(dir).quiet().text()).trim())
