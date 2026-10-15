@@ -16,6 +16,30 @@ const BOOT = (/<script>([\s\S]*)<\/script>/).exec(DEV_BOOT)![1]!
 
 const { error, warn } = console
 
+// A PerformanceObserver the test reports entries to by type, installed on the window until the test removes it.
+function fakeObserver() {
+  const observers: { type: string, callback: (list: { getEntries: () => unknown[] }) => void }[] = []
+
+  ;(window as unknown as { PerformanceObserver: unknown }).PerformanceObserver = class {
+    constructor(private callback: (list: { getEntries: () => unknown[] }) => void) {}
+
+    observe({ type }: { type: string }): void {
+      observers.push({ type, callback: this.callback })
+    }
+
+    disconnect(): void {
+      return undefined
+    }
+  }
+
+  return {
+    report: (type: string, entries: unknown[]) => {
+      for (const observer of observers.filter(observer => observer.type === type))
+        observer.callback({ getEntries: () => entries })
+    },
+  }
+}
+
 // As a page runs it once, the console quiet but for what the tests read.
 beforeAll(() => {
   GlobalRegistrator.register()
@@ -625,7 +649,7 @@ describe('the dev tool', () => {
   it('lists the images of the page with the variant and format each got, the size served against the size drawn, the largest paint and what is wrong with each, and outlines one on hover', async () => {
     const { happyDOM } = window as unknown as { happyDOM: { setURL: (url: string) => void } }
     const { href } = location
-    const observed: ((list: { getEntries: () => { element: Element }[] }) => void)[] = []
+    const observed = fakeObserver()
 
     happyDOM.setURL('http://localhost/')
     document.body.innerHTML = [
@@ -652,15 +676,6 @@ describe('the dev tool', () => {
     const { devicePixelRatio } = window
 
     Object.defineProperty(window, 'devicePixelRatio', { value: 2, configurable: true })
-    ;(window as unknown as { PerformanceObserver: unknown }).PerformanceObserver = class {
-      constructor(callback: (typeof observed)[number]) {
-        observed.push(callback)
-      }
-
-      observe(): void { return undefined }
-      disconnect(): void { return undefined }
-    }
-
     const asked: string[] = []
     const fetching = spyOn(window, 'fetch').mockImplementation((async (url: string, init: RequestInit) => {
       asked.push(`${init.method} ${url}`)
@@ -674,7 +689,7 @@ describe('the dev tool', () => {
 
     try {
       tool = startDevTool()
-      observed[0]!({ getEntries: () => [{ element: document.getElementById('hero')! }] })
+      observed.report('largest-contentful-paint', [{ startTime: 900, renderTime: 900, element: document.getElementById('hero')! }])
       shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-images')!.click()
       await Bun.sleep(20)
 
@@ -709,6 +724,68 @@ describe('the dev tool', () => {
       delete (window as { PerformanceObserver?: unknown }).PerformanceObserver
       Object.defineProperty(window, 'devicePixelRatio', { value: devicePixelRatio, configurable: true })
       document.body.innerHTML = ''
+      happyDOM.setURL(href)
+    }
+  })
+
+  it('shows LCP, CLS and INP as the page is used each against its limit, and the HTML, CSS and JS gzipped with the island chunks split out, saying they are dev sizes', async () => {
+    const { happyDOM } = window as unknown as { happyDOM: { setURL: (url: string) => void } }
+    const { href } = location
+    const observed = fakeObserver()
+    const files: Record<string, string> = {
+      '/': `<!doctype html><title>Home</title>${'<p>Hello</p>'.repeat(200)}`,
+      '/_kay/_layout-1.css': 'body { margin: 0 }\n'.repeat(100),
+      '/_kay/entry-abc.js': 'export const run = () => 1\n'.repeat(400),
+      '/_kay/counter-def.js': 'export const count = () => 2\n'.repeat(50),
+      '/_kay/dev/tool.js': 'the tool itself, left out',
+    }
+    const fetched: string[] = []
+
+    happyDOM.setURL('http://localhost/')
+
+    const performance = spyOn(window.performance, 'getEntriesByType').mockImplementation(((type: string) => type === 'resource' ? Object.keys(files).filter(path => path !== '/').map(path => ({ name: `http://localhost${path}` })) : []) as unknown as typeof window.performance.getEntriesByType)
+    const fetching = spyOn(window, 'fetch').mockImplementation((async (url: string) => {
+      fetched.push(new URL(url, 'http://localhost').pathname)
+
+      return new Response(files[new URL(url, 'http://localhost').pathname])
+    }) as unknown as typeof window.fetch)
+    const facts = () => [...shadow().querySelectorAll('#kay-dev-performance dt')].map(term => `${term.textContent}: ${term.nextElementSibling!.firstChild!.textContent}`)
+    const size = (...texts: string[]) => {
+      const bytes = texts.reduce((sum, text) => sum + Bun.gzipSync(text).length, 0)
+
+      return bytes < 1024 ? `${bytes} B` : `${(bytes / 1024).toFixed(1)} KB`
+    }
+
+    try {
+      tool = startDevTool()
+      observed.report('largest-contentful-paint', [{ startTime: 3000, renderTime: 3000, element: null }])
+      observed.report('layout-shift', [{ startTime: 100, value: 0.04, hadRecentInput: false }, { startTime: 400, value: 0.08, hadRecentInput: false }, { startTime: 450, value: 0.5, hadRecentInput: true }, { startTime: 9000, value: 0.01, hadRecentInput: false }])
+      shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-performance')!.click()
+      await Bun.sleep(30)
+
+      expect(facts().slice(0, 3)).toEqual(['LCP: 3000 ms - needs improvement', 'CLS: 0.120 - needs improvement', 'INP: no interaction yet'])
+      expect(shadow().querySelector('#kay-dev-performance .note')?.textContent).toBe(' (good up to 2500 ms, poor past 4000 ms)')
+
+      // Interactions: the slowest of each, the worst taken; a later report moves the open tab.
+      observed.report('event', [{ interactionId: 1, duration: 80 }, { interactionId: 1, duration: 120 }, { interactionId: 2, duration: 240 }, { duration: 900 }])
+
+      expect(facts()[2]).toBe('INP: 240 ms - needs improvement')
+      expect(shadow().querySelector('#kay-dev-tab-performance .count')?.textContent).toBe('3')
+
+      expect(fetched.sort()).toEqual(['/', '/_kay/_layout-1.css', '/_kay/counter-def.js', '/_kay/entry-abc.js'])
+      expect(facts().slice(3)).toEqual([
+        `HTML: ${size(files['/']!)}`,
+        `CSS: ${size(files['/_kay/_layout-1.css']!)}`,
+        `JS: ${size(files['/_kay/entry-abc.js']!, files['/_kay/counter-def.js']!)}`,
+        `Entry: ${size(files['/_kay/entry-abc.js']!)}`,
+        `Island chunks: ${size(files['/_kay/counter-def.js']!)}`,
+      ])
+      expect(shadow().querySelector('#kay-dev-performance')!.textContent).toContain('Dev sizes: not minified')
+    }
+    finally {
+      fetching.mockRestore()
+      performance.mockRestore()
+      delete (window as { PerformanceObserver?: unknown }).PerformanceObserver
       happyDOM.setURL(href)
     }
   })

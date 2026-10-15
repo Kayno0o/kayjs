@@ -109,6 +109,9 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .route .path { overflow-wrap: anywhere; }
 .route .file { grid-column: 2 / -1; color: var(--muted); }
 .secret { color: var(--warn); }
+.good { color: var(--ok, #1a7f37); }
+.poor { color: var(--error, #cf222e); }
+.needs { color: var(--warn); }
 .image { padding: 6px 4px; border-bottom: 1px solid var(--border); }
 .image:last-child { border-bottom: 0; }
 .image:hover { background: var(--accent-soft); border-radius: 4px; }
@@ -468,7 +471,10 @@ export function startDevTool(doc: Document = document): DevTool {
   request = requestTab(doc, tool)
   headTab(doc, tool, listening.signal)
   envTab(doc, tool, listening.signal)
-  imagesTab(doc, tool, listening.signal)
+  const vitals = watchVitals(doc.defaultView!, listening.signal)
+
+  imagesTab(doc, tool, vitals, listening.signal)
+  performanceTab(doc, tool, vitals)
   routesTab(doc, tool, listening.signal)
   doc.addEventListener('click', (event) => {
     const target = event.target instanceof Element ? event.target.closest<HTMLButtonElement>('button[data-kay-open],button[data-kay-copy]') : null
@@ -1144,10 +1150,109 @@ function pageImages(doc: Document, lcp: Element | undefined): ImageInfo[] {
   })
 }
 
+// The Web Vitals "good" and "poor" limits: a value up to the first is good, past the second poor.
+const VITAL_LIMITS = { lcp: [2500, 4000], cls: [0.1, 0.25], inp: [200, 500] } as const
+// A new window of layout shifts starts after a gap this long, and one never lasts past the second.
+const SHIFT_GAP_MS = 1000
+const SHIFT_WINDOW_MS = 5000
+
+type VitalName = keyof typeof VITAL_LIMITS
+
+interface Vitals {
+  // The largest paint so far, the element it painted when it is on the page.
+  lcp?: { ms: number, element: Element | undefined } | undefined
+  cls: number
+  inp?: number | undefined
+  // Called after any of them changes.
+  changed: (() => void)[]
+}
+
+function rateVital(name: VitalName, value: number): 'good' | 'needs' | 'poor' {
+  const [good, poor] = VITAL_LIMITS[name]
+
+  return value <= good ? 'good' : value <= poor ? 'needs' : 'poor'
+}
+
+interface ShiftEntry extends PerformanceEntry {
+  value: number
+  hadRecentInput: boolean
+}
+
+interface EventEntry extends PerformanceEntry {
+  interactionId?: number
+}
+
+// The page's LCP, CLS and INP as the browser reports them from the moment the tool loads, earlier entries included; a browser without an entry type leaves that vital out.
+function watchVitals(win: Window & typeof globalThis, signal: AbortSignal): Vitals {
+  const vitals: Vitals = { cls: 0, changed: [] }
+  const observe = (type: string, handle: (entries: PerformanceEntry[]) => void, options: PerformanceObserverInit & { durationThreshold?: number } = {}) => {
+    try {
+      const observer = new win.PerformanceObserver(list => handle(list.getEntries()))
+
+      observer.observe({ type, buffered: true, ...options })
+      signal.addEventListener('abort', () => observer.disconnect())
+    }
+    catch {
+      // Not every browser reports every type.
+    }
+  }
+  const announce = () => {
+    for (const listener of vitals.changed)
+      listener()
+  }
+  // The layout shifts without a recent input, in windows: the vital is the worst window.
+  let windowStart = 0
+  let windowEnd = 0
+  let windowValue = 0
+  // The slowest event of each interaction.
+  const interactions = new Map<number, number>()
+
+  observe('largest-contentful-paint', (entries) => {
+    const entry = entries.at(-1) as (PerformanceEntry & { element?: Element | null, renderTime: number, loadTime: number }) | undefined
+
+    if (entry) {
+      vitals.lcp = { ms: entry.renderTime || entry.loadTime || entry.startTime, element: entry.element ?? undefined }
+      announce()
+    }
+  })
+  observe('layout-shift', (entries) => {
+    for (const entry of entries as ShiftEntry[]) {
+      if (entry.hadRecentInput)
+        continue
+
+      if (windowValue > 0 && entry.startTime - windowEnd < SHIFT_GAP_MS && entry.startTime - windowStart < SHIFT_WINDOW_MS) {
+        windowValue += entry.value
+      }
+      else {
+        windowStart = entry.startTime
+        windowValue = entry.value
+      }
+
+      windowEnd = entry.startTime
+      vitals.cls = Math.max(vitals.cls, windowValue)
+    }
+
+    announce()
+  })
+  observe('event', (entries) => {
+    for (const entry of entries as EventEntry[]) {
+      if (entry.interactionId !== undefined && entry.interactionId > 0)
+        interactions.set(entry.interactionId, Math.max(interactions.get(entry.interactionId) ?? 0, entry.duration))
+    }
+
+    // The longest interaction, or the 98th percentile of many, as the metric is defined.
+    const slowest = [...interactions.values()].sort((a, b) => b - a)
+
+    vitals.inp = slowest[Math.min(slowest.length - 1, Math.floor(slowest.length / 50))]
+    announce()
+  }, { durationThreshold: 16 })
+
+  return vitals
+}
+
 // The images of the page: the variant and format each got, the size served against the size drawn, which one is the largest paint, and what is wrong with it; hovering or focusing a row outlines the image, and the list is read again as the tab shows and as the page changes under it.
-function imagesTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
+function imagesTab(doc: Document, tool: DevTool, vitals: Vitals, signal: AbortSignal): void {
   const win = doc.defaultView!
-  let lcp: Element | undefined
   let asked = 0
   let reread: () => void = () => undefined
   const tab = tool.tab({ id: 'images', label: 'Images', shown: () => reread() })
@@ -1165,22 +1270,11 @@ function imagesTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
     })
   }
 
-  try {
-    const observer = new win.PerformanceObserver((list) => {
-      lcp = (list.getEntries().at(-1) as (PerformanceEntry & { element?: Element | null }) | undefined)?.element ?? undefined
-      schedule()
-    })
-
-    observer.observe({ type: 'largest-contentful-paint', buffered: true })
-    signal.addEventListener('abort', () => observer.disconnect())
-  }
-  catch {
-    // A browser without the entry type shows no largest paint.
-  }
+  vitals.changed.push(schedule)
 
   const read = async () => {
     const ask = ++asked
-    const images = pageImages(doc, lcp?.isConnected === true ? lcp : undefined)
+    const images = pageImages(doc, vitals.lcp?.element?.isConnected === true ? vitals.lcp.element : undefined)
     const body = tool.make('div')
     const formats: HTMLElement[] = []
 
@@ -1279,6 +1373,132 @@ async function imageFormat(win: Window & typeof globalThis, src: string): Promis
 
 function formatBytes(bytes: number): string {
   return bytes < 1024 ? `${bytes} B` : `${(bytes / 1024).toFixed(1)} KB`
+}
+
+// The gzipped size of some text, as a server would send it.
+async function gzipSize(text: string): Promise<number> {
+  const stream = new Blob([text]).stream().pipeThrough(new CompressionStream('gzip'))
+
+  return (await new Response(stream).arrayBuffer()).byteLength
+}
+
+interface Weight {
+  html: number
+  css: { url: string, bytes: number }[]
+  entry: { url: string, bytes: number }[]
+  chunks: { url: string, bytes: number }[]
+}
+
+// The page's HTML, the stylesheets and scripts it loaded gzipped, as sent in development: not minified, with the dev-only code, so larger than `kay build` makes them. The dev tool's own scripts and the live reload stay out.
+async function pageWeight(win: Window & typeof globalThis): Promise<Weight> {
+  const here = win.location.origin
+  const urls = [...new Set(win.performance.getEntriesByType('resource').map(entry => entry.name))].filter((name) => {
+    const url = new URL(name)
+
+    return url.origin === here && (/\.(?:js|css)$/).test(url.pathname) && !url.pathname.startsWith('/_kay/dev/')
+  })
+  const sized = async (url: string, accept = '*/*') => gzipSize(await (await win.fetch(url, { headers: { accept } })).text())
+  const [html, files] = await Promise.all([
+    sized(win.location.href, 'text/html'),
+    Promise.all(urls.map(async url => ({ url: new URL(url).pathname, bytes: await sized(url) }))),
+  ])
+  const isEntry = (url: string) => url.slice(url.lastIndexOf('/') + 1).startsWith('entry-')
+
+  return {
+    html,
+    css: files.filter(file => file.url.endsWith('.css')),
+    entry: files.filter(file => file.url.endsWith('.js') && isEntry(file.url)),
+    chunks: files.filter(file => file.url.endsWith('.js') && !isEntry(file.url)),
+  }
+}
+
+// The page's weight and Web Vitals: LCP, CLS and INP each against its good limit as the page is used, and the HTML, CSS and JS gzipped, the island chunks split from the entry.
+function performanceTab(doc: Document, tool: DevTool, vitals: Vitals): void {
+  const win = doc.defaultView!
+  let reread: () => void = () => undefined
+  const tab = tool.tab({ id: 'performance', label: 'Performance', shown: () => reread() })
+  const vitalsPanel = tool.make('dl', 'facts')
+  const weightPanel = tool.make('div')
+  let asked = 0
+  const vital = (name: VitalName, label: string, value: number | undefined, format: (value: number) => string, detail?: string) => {
+    const [good, poor] = VITAL_LIMITS[name]
+    const shown = tool.make('dd')
+
+    if (value === undefined) {
+      shown.append(tool.make('span', 'note', name === 'inp' ? 'no interaction yet' : 'not reported yet'))
+    }
+    else {
+      const rating = rateVital(name, value)
+
+      shown.append(tool.make('span', rating, `${format(value)} - ${rating === 'needs' ? 'needs improvement' : rating}`), tool.make('span', 'note', ` (good up to ${format(good)}, poor past ${format(poor)})`))
+
+      if (detail !== undefined)
+        shown.append(tool.make('div', 'note', detail))
+    }
+
+    vitalsPanel.append(tool.make('dt', '', label), shown)
+  }
+  const renderVitals = () => {
+    const element = vitals.lcp?.element
+    const painted = element === undefined ? undefined : `${element.localName}${element.id === '' ? '' : `#${element.id}`}`
+    const rated = [vitals.lcp?.ms === undefined ? undefined : rateVital('lcp', vitals.lcp.ms), vitals.inp === undefined ? undefined : rateVital('inp', vitals.inp), rateVital('cls', vitals.cls)]
+    const bad = rated.filter(rating => rating !== undefined && rating !== 'good').length
+
+    vitalsPanel.replaceChildren()
+    vital('lcp', 'LCP', vitals.lcp?.ms, ms => `${Math.round(ms)} ms`, painted === undefined ? undefined : `painted: ${painted}`)
+    vital('cls', 'CLS', vitals.cls, value => value.toFixed(3))
+    vital('inp', 'INP', vitals.inp, ms => `${Math.round(ms)} ms`)
+    tab.count(bad, bad > 0 ? 'error' : undefined)
+  }
+  const reload = async () => {
+    const ask = ++asked
+
+    renderVitals()
+    weightPanel.replaceChildren(tool.make('div', 'note', 'Measuring the weight...'))
+
+    let weight: Weight
+
+    try {
+      weight = await pageWeight(win)
+    }
+    catch (error) {
+      if (ask === asked)
+        weightPanel.replaceChildren(tool.make('div', 'empty', `Could not measure the weight: ${error instanceof Error ? error.message : String(error)}`))
+
+      return
+    }
+
+    if (ask !== asked)
+      return
+
+    const facts = tool.make('dl', 'facts')
+    const total = (files: { bytes: number }[]) => files.reduce((sum, file) => sum + file.bytes, 0)
+    const row = (term: string, text: string, files: { url: string, bytes: number }[] = []) => {
+      const value = tool.make('dd')
+
+      value.append(text)
+
+      for (const file of files)
+        value.append(tool.make('div', 'note mono', `${file.url} ${formatBytes(file.bytes)}`))
+
+      facts.append(tool.make('dt', '', term), value)
+    }
+
+    row('HTML', formatBytes(weight.html))
+    row('CSS', formatBytes(total(weight.css)), weight.css)
+    row('JS', formatBytes(total(weight.entry) + total(weight.chunks)))
+    row('Entry', formatBytes(total(weight.entry)), weight.entry)
+    row('Island chunks', weight.chunks.length === 0 ? 'none loaded' : formatBytes(total(weight.chunks)), weight.chunks)
+    weightPanel.replaceChildren(tool.make('h3', 'heading', 'Weight, gzipped'), facts, tool.make('div', 'note', 'Dev sizes: not minified and with the dev-only code, so `kay build` makes them smaller.'))
+  }
+
+  reread = () => void reload()
+  vitals.changed.push(() => {
+    if (tab.panel.hidden === false)
+      renderVitals()
+  })
+  tab.panel.append(tool.make('h3', 'heading', 'Web Vitals since the page loaded'), vitalsPanel, weightPanel)
+  renderVitals()
 }
 
 const ROUTE_KINDS: Record<DevRoute['kind'], string> = { page: 'Pages', endpoint: 'Endpoints', api: 'API', kay: 'Served by kay' }
