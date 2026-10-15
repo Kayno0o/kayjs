@@ -233,7 +233,7 @@ export function collection<Schema extends TSchema, Components extends Record<str
     let drafted = preview.loads.get(draftKey) as Promise<Entries<Data>> | undefined
 
     if (!drafted) {
-      preview.loads.set(draftKey, drafted = new Promise<Entries<Data>>((resolve) => {
+      preview.loads.set(draftKey, drafted = Promise.try(() => {
         const raw = raws.get(entries) ?? []
         const written = new Map<string, RawEntry>()
 
@@ -247,7 +247,7 @@ export function collection<Schema extends TSchema, Components extends Record<str
         // The drafted entries alone are decoded; the others are copied when localized, as indexing sets their translations and the collection's own are shared with every request.
         const kept = entries.list.filter(entry => !written.has(localized ? `${entry.locale}/${entry.slug}` : entry.slug))
 
-        resolve(indexed([...localized ? kept.map(entry => ({ ...entry })) : kept, ...decodeEach([...written.values()])]))
+        return indexed([...localized ? kept.map(entry => ({ ...entry })) : kept, ...decodeEach([...written.values()])])
       }))
     }
 

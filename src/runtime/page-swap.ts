@@ -728,6 +728,12 @@ function later(from: ChildNode | null, node: Node): ChildNode | undefined {
   return undefined
 }
 
+function byName(element: Element | null): Element | null {
+  const name = element?.getAttribute('name') ?? ''
+
+  return name === '' ? null : document.getElementsByName(name)[0] ?? null
+}
+
 // The element focused before, found again on a refreshed page or on Back and Forward between entries of one path; on a new page, its autofocus field, its heading or its main, so a screen reader starts there, the title announced. Back and Forward skip the autofocus field, which the visitor left already.
 async function moveFocus(swap: Swap, policy: Policy): Promise<void> {
   if (policy.focus === 'refused' && swap.refused && await showRefusal(document.forms[swap.refused.form], swap.refused.control))
@@ -741,8 +747,7 @@ async function moveFocus(swap: Swap, policy: Policy): Promise<void> {
     if (before?.isConnected)
       return
 
-    const byName = (before?.getAttribute('name') ?? '') !== '' ? document.getElementsByName(before!.getAttribute('name')!)[0] : null
-    const again = before?.id !== undefined && before.id !== '' ? document.getElementById(before.id) : byName
+    const again = before?.id !== undefined && before.id !== '' ? document.getElementById(before.id) : byName(before)
 
     if (again instanceof HTMLElement)
       again.focus({ preventScroll: true })

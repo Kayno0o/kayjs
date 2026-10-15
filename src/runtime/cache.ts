@@ -172,9 +172,7 @@ async function firstLoad<T>(key: string, ttl: number, pending: Entry, load: () =
 }
 
 async function refresh(key: string, ttl: number, entry: Entry, load: () => unknown, store: CacheStore | undefined): Promise<void> {
-  const loading = new Promise<unknown>((resolve) => {
-    resolve(load())
-  })
+  const loading = Promise.try(load)
 
   entry.loading = loading
 

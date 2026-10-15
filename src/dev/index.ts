@@ -636,7 +636,7 @@ function changedFilesNamed(root: string, files: string[]): string[] {
   return kept.length > 0 ? kept : files.filter(file => !files.some(other => other.startsWith(`${file}/`)))
 }
 
-// The system's browser, or the command `BROWSER` names; `missing` hears of a machine without one.
+// The system's browser, or the command `BROWSER` names.
 function browserCommand(): string[] {
   if (process.env.BROWSER !== undefined && process.env.BROWSER !== '')
     return [process.env.BROWSER]
@@ -647,6 +647,7 @@ function browserCommand(): string[] {
   return process.platform === 'win32' ? ['cmd', '/c', 'start', '""'] : ['xdg-open']
 }
 
+// `missing` hears of a machine without a browser.
 function openBrowser(url: string, missing: (command: string) => void): void {
   const command = browserCommand()
 

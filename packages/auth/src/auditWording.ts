@@ -46,7 +46,7 @@ const FRENCH_SIGN_INS: Record<string, string> = {
 
 // The phrase a detail maps to in `phrases`, or `fallback` when it maps to none.
 function byDetail(phrases: Record<string, string>, fallback: string): AuditPhrase {
-  return detail => (detail === null ? undefined : phrases[detail]) ?? fallback
+  return detail => (detail !== null && Object.hasOwn(phrases, detail) ? phrases[detail] : undefined) ?? fallback
 }
 
 function signedIn(label: string, methods: Record<string, string>, provider: (name: string) => string) {

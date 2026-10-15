@@ -135,8 +135,11 @@ async function termScores(dir: string, shards: Set<string>, term: string): Promi
   const two = searchShard(term)
   const longer = [...shards].filter(shard => shard.startsWith(`${two}-`))
   // A term of three letters or more needs only the file of its first three when two letters were split; one of two needs them all.
-  const wider = term.length > MIN_WORD ? [searchShard(term, MIN_WORD + 1)] : [two, ...longer]
-  const files = longer.length === 0 ? [two] : wider
+  let files = [two]
+
+  if (longer.length > 0)
+    files = term.length > MIN_WORD ? [searchShard(term, MIN_WORD + 1)] : [two, ...longer]
+
   const found = await Promise.all(files.filter(shard => shards.has(shard)).map(async shard => load<Record<string, number[]>>(`${dir}w-${shard}.json`)))
 
   for (const [word, postings] of found.flatMap(words => Object.entries(words))) {

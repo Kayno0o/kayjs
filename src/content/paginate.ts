@@ -87,7 +87,6 @@ export function isPaginated(value: unknown): value is Paginated<unknown> {
   return typeof value === 'object' && value !== null && PAGINATED in value
 }
 
-// The path of the page being rendered, untranslated and without its locale's prefix, its page segment left out.
 function pageNumber(param: string | number | undefined): number {
   if (param === undefined)
     return 1
@@ -98,6 +97,7 @@ function pageNumber(param: string | number | undefined): number {
   return PAGE_NUMBER.test(param) ? Number(param) : Number.NaN
 }
 
+// The path of the page being rendered, untranslated and without its locale's prefix, its page segment left out.
 function listPath(numbered: boolean): string {
   const state = localeState()
 

@@ -67,6 +67,7 @@ function createOutbox(): Outbox {
 
   return {
     mails,
+    // eslint-disable-next-line ts/require-await -- the interface returns a promise
     send: async (mail): Promise<Delivery> => {
       const id = crypto.randomUUID()
       const sent = { ...mail, id, sentAt: new Date() }
@@ -79,7 +80,7 @@ function createOutbox(): Outbox {
       if (mails.length > KEPT)
         mails.splice(0, mails.length - KEPT)
 
-      return Promise.resolve({ messageId: `<${id}@outbox>`, accepted: [...mail.to, ...mail.cc, ...mail.bcc].map(addressOf), rejected: [], response: 'kept in the outbox' })
+      return { messageId: `<${id}@outbox>`, accepted: [...mail.to, ...mail.cc, ...mail.bcc].map(addressOf), rejected: [], response: 'kept in the outbox' }
     },
     last: () => mails.at(-1),
     to: (address) => {

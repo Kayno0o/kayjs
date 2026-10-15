@@ -152,8 +152,10 @@ export function deprecatedSchemaNames(fence: ParsedFence, renamable = true): Dia
 
         const references = local.name === 't' ? path.scope.getBinding('t')?.referencePaths ?? [] : []
         const rename = renamable && local.name === 't' && !path.scope.hasBinding('s') && references.every(reference => !reference.scope.hasBinding('s'))
-        const renamed = rename ? [path.node, ...references.map(reference => reference.node)].map(node => ({ ...span(node), text: 's' })) : [{ ...span(path.node), text: 's as t' }]
-        const edits = local.name !== 't' ? [{ ...span(imported), text: 's' }] : renamed
+        let edits = [{ ...span(imported), text: 's' }]
+
+        if (local.name === 't')
+          edits = rename ? [path.node, ...references.map(reference => reference.node)].map(node => ({ ...span(node), text: 's' })) : [{ ...span(path.node), text: 's as t' }]
 
         diagnostics.push({
           ...span(imported),

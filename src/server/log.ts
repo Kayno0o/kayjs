@@ -50,7 +50,6 @@ const answering = new AsyncLocalStorage<Request>()
 // The requests being answered: a context outliving its answer, a timer it started say, no longer logs under it.
 const inFlight = new WeakSet<Request>()
 
-// The path of a request's absolute URL, cut out rather than parsed: a request's URL comes normalized already, and parsing one costs more than logging it.
 // The status an Elysia response went out with: the response's own, else the one set on the context, else 200.
 export function statusOf(responseValue: unknown, set: { status?: unknown }): number {
   if (responseValue instanceof Response)
@@ -59,6 +58,7 @@ export function statusOf(responseValue: unknown, set: { status?: unknown }): num
   return typeof set.status === 'number' ? set.status : 200
 }
 
+// The path of a request's absolute URL, cut out rather than parsed: a request's URL comes normalized already, and parsing one costs more than logging it.
 export function pathOf(url: string): string {
   const start = url.indexOf('/', url.indexOf('//') + 2)
   const query = url.indexOf('?', start)

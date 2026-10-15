@@ -26,6 +26,7 @@ export const NOTCH_ZOOM = 1.15
 const LINE = 16
 const PAGE = 400
 const NOTCH = 100
+const UNIT_OF_MODE: Record<number, number> = { 1: LINE, 2: PAGE }
 
 // A plate as it starts, and as fitting it puts it back: filling its frame, taken nowhere.
 export function fitted(): Plate {
@@ -34,7 +35,7 @@ export function fitted(): Plate {
 
 // How far a wheel event takes the plate in or out, whichever units the browser reports it in.
 export function wheelZoom(deltaY: number, deltaMode = 0, notch = NOTCH_ZOOM): number {
-  const unit = { 1: LINE, 2: PAGE }[deltaMode] ?? 1
+  const unit = UNIT_OF_MODE[deltaMode] ?? 1
   const travelled = deltaY * unit
 
   return notch ** (-travelled / NOTCH)

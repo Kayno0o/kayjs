@@ -20,8 +20,8 @@ interface MountModule {
   mount: (element: HTMLElement, props: Record<string, unknown>) => () => void
 }
 
-// One bundle per component and version of its file, for the test process, evaluated again on every mount.
 const SAFE_HTML_MODULE = /(?:^|[/\\])safe-html(?:\.ts)?$/
+// One bundle per component and version of its file, for the test process, evaluated again on every mount.
 const bundles = new Map<string, Promise<string>>()
 
 // Lets queued effects and timers due now land, as after a click, before the DOM is read.

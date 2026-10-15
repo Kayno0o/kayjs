@@ -336,7 +336,6 @@ function markupOf(attributes: Map<string, string | true>): string {
   return markup
 }
 
-// A JSON script, such as JSON-LD, takes its data as an object or as text.
 function tagContent(tag: HeadTag): string {
   if (tag.tag === 'script')
     return scriptText(tag)
@@ -344,6 +343,7 @@ function tagContent(tag: HeadTag): string {
   return tag.tag === 'style' ? inlineText(tag) ?? '' : escape(text(tag))
 }
 
+// A JSON script, such as JSON-LD, takes its data as an object or as text.
 function scriptText(tag: HeadTag): string {
   if (!DATA_SCRIPT.test(String(tag.props.type ?? '')))
     return text(tag).replace(SCRIPT_BREAK, '<\\$1')

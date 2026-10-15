@@ -415,7 +415,6 @@ function lastOf(unit: Unit): Node {
   return unit instanceof Range ? unit.last : unit
 }
 
-// The units a value renders to, read by `eachChild`: a text node for its text, a node or a range as it is.
 function rowUnit(made: Unit[]): Unit | null {
   if (made.length === 0)
     return null
@@ -423,6 +422,7 @@ function rowUnit(made: Unit[]): Unit | null {
   return made.length === 1 ? made[0]! : new Range(firstOf(made[0]!), lastOf(made.at(-1)!))
 }
 
+// The units a value renders to, read by `eachChild`: a text node for its text, a node or a range as it is.
 function units(value: unknown): Unit[] {
   const out: Unit[] = []
 

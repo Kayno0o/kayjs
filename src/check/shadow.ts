@@ -196,14 +196,22 @@ export function pageRoute(file: string, routesDir: string, mounts: RouteMount[])
   return file.startsWith(pagesDir + sep) ? routeOf(pagesDir, file) : undefined
 }
 
+function matcherType(routesDir: string, shadowDir: string, matcher: string): string {
+  const source = matcherSource(routesDir, matcher)
+
+  if (source === undefined)
+    return 'unknown'
+
+  const module = source === 'kay' ? `'kay/params').${matcher}` : `${JSON.stringify(relative(shadowDir, source).replace(TS_FILE, ''))}).default`
+
+  return `Exclude<ReturnType<typeof import(${module}>, undefined>`
+}
+
 // A matcher's param is what it returns, the project's own or kay's; an optional one may be missing.
 function paramTypesOf(routesDir: string, shadowDir: string, route: Pick<Route, 'params' | 'optional' | 'matchers'>): Record<string, string> {
   return Object.fromEntries(route.params.map((name) => {
     const matcher = route.matchers?.[name]
-    const source = matcher === undefined ? undefined : matcherSource(routesDir, matcher)
-    const module = source === 'kay' ? `'kay/params').${matcher}` : `${JSON.stringify(relative(shadowDir, source ?? '').replace(TS_FILE, ''))}).default`
-    const checked = source === undefined ? 'unknown' : `Exclude<ReturnType<typeof import(${module}>, undefined>`
-    const type = matcher === undefined ? 'string' : checked
+    const type = matcher === undefined ? 'string' : matcherType(routesDir, shadowDir, matcher)
 
     return [name, route.optional?.includes(name) ? `${type} | undefined` : type]
   }))

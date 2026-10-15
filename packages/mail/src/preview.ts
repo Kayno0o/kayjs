@@ -74,10 +74,15 @@ pre{white-space:pre-wrap;background:#fff;border:1px solid #e5e5e0;padding:12px;m
 h2{font-size:15px;margin:24px 0 8px}
 `
 
-function shown(addresses: Address | Address[] | undefined): string {
-  const all = [addresses ?? []].flat()
+function addressList(addresses: Address | Address[] | undefined): Address[] {
+  if (addresses === undefined)
+    return []
 
-  return escape(all.map(address => typeof address === 'string' ? address : `${address.name} <${address.address}>`).join(', '))
+  return Array.isArray(addresses) ? addresses : [addresses]
+}
+
+function shown(addresses: Address | Address[] | undefined): string {
+  return escape(addressList(addresses).map(address => typeof address === 'string' ? address : `${address.name} <${address.address}>`).join(', '))
 }
 
 function page(title: string, body: string, status = 200, script = ''): Response {

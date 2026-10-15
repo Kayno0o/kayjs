@@ -64,8 +64,8 @@ import { serveFiles } from './storage'
 import { serveViolationReports } from './violations'
 import { agreeOnWildcards } from './wildcards'
 
-// What the dev tool's Routes tab says when `seo` is set without the origin the site is public at.
 const JSON_EXTENSION = /\.json$/
+// What the dev tool's Routes tab says when `seo` is set without the origin the site is public at.
 const NO_ORIGIN_NOTE = 'seo is set but not the origin the site is public at, so there is no sitemap or robots.txt: set site in kay.config.ts or SITE_URL.'
 
 // Options given here win over the project's `kay.config.ts`.

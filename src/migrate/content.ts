@@ -116,7 +116,6 @@ class SchemaTranslator {
   }
 }
 
-// The folder a collection's entries are in, relative to the config: the `glob` loader's `base`, else Astro's `src/content/<name>`.
 function literalKey(key: t.Node): string | undefined {
   if (key.type === 'Identifier')
     return key.name
@@ -128,6 +127,7 @@ function callOf(node: t.Node | undefined): t.CallExpression | undefined {
   return node?.type === 'CallExpression' ? node : undefined
 }
 
+// The folder a collection's entries are in, relative to the config: the `glob` loader's `base`, else Astro's `src/content/<name>`.
 function folderOf(options: t.ObjectExpression, name: string): string | undefined {
   const loader = options.properties.find((property): property is t.ObjectProperty => property.type === 'ObjectProperty' && property.key.type === 'Identifier' && property.key.name === 'loader')
 
