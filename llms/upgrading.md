@@ -4,6 +4,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ## 1.45.0
 
+### kayjs-auth's two-factor setup no longer carries a server-drawn QR code
+
+- `setUpTwoFactor` answers `setup: { secret, uri }`: `qr`, an SVG data URI drawn on the server, is gone. Draw `uri` with kayjs-ui's `QrCode`, as kayjs-auth's own security page does.
+
 ### A `for` over objects with no `id` reuses its rows
 
 - Rows of plain objects with no `id`, no `key` and no identity left in the new list are now matched, between the rows that did match, to the unmatched rows in their place, where each used to be a new row. A list of fresh objects (results fetched again) reuses its rows by position: row-local state and enter transitions carry over. Give such items an `id` or a `key` when each must start afresh.

@@ -1,6 +1,5 @@
 import type { JWTVerifyGetKey } from 'jose'
 import type { OAuthClientConfig, OAuthEndpoints, OAuthProvider, OAuthTokens, OpenIdCheck } from './types'
-import { createRemoteJWKSet, errors, jwtVerify } from 'jose'
 import { PROVIDER_TIMEOUT_MS } from './timeout'
 
 // How far apart the provider's clock and this one may be when an ID token's times are read.
@@ -94,6 +93,8 @@ export function createOAuthClient<Raw = any, User = unknown>(provider: OAuthProv
     if (idToken === undefined)
       throw new OAuthExchangeError(400, `OAuth token response missing id_token (${provider.name})`)
 
+    // jose loads with the first ID token, so an app with no OpenID provider never reads it.
+    const { createRemoteJWKSet, errors, jwtVerify } = await import('jose')
     let keys = keySets.get(check.jwksUrl)
 
     if (!keys) {

@@ -193,6 +193,8 @@ export class Auth<Scope extends string = string, Role extends string = string, O
 
     this.session = guardSession(session, crossSite)
 
+    let languages: string[] | undefined
+
     this[STATE] = {
       core,
       session: this.session,
@@ -200,7 +202,12 @@ export class Auth<Scope extends string = string, Role extends string = string, O
       client,
       address,
       userAgent: request.headers.get('user-agent') ?? '',
-      languages: acceptedLocales(request.headers.get('accept-language') ?? ''),
+      // Read off the header when a flow first needs a language.
+      get languages() {
+        languages ??= acceptedLocales(request.headers.get('accept-language') ?? '')
+
+        return languages
+      },
       current: () => this.record(),
       via: () => this.source,
       complete: async (record, redirect, method) => completeSignIn(this[STATE], record, redirect, method, (signedIn, how) => this.establish(signedIn, how)),

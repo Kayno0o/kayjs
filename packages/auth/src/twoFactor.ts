@@ -3,7 +3,6 @@ import type { Core } from './core'
 import type { RequestState } from './state'
 import type { UserRecord } from './store'
 import { comparePasswords, nanoid } from '@kaynooo/utils'
-import { qrCodeDataUri } from '@kaynooo/utils/tools'
 import { banned } from './core'
 import { report } from './events'
 import { deriveKeys, digest } from './keys'
@@ -39,9 +38,8 @@ export type ProofFailure = 'signed-out' | 'proof' | 'stale' | 'limited' | 'imper
 export interface TwoFactorSetup {
   // Base32, for typing into an authenticator by hand.
   secret: string
+  // Draw it as a QR code with kayjs-ui's `QrCode`.
   uri: string
-  // The URI as a QR code, an SVG data URI for an `img`.
-  qr: string
 }
 
 // What a sign-in waiting for its second factor keeps in the session.
@@ -167,7 +165,7 @@ export async function setUpTwoFactor(state: RequestState, proof: Proof): Promise
 
   await state.core.store.users.update(proved.record.id, { totpSecret: state.core.keys.encrypt(secret, totpContext(proved.record.id)) })
 
-  return { ok: true, setup: { secret, uri, qr: qrCodeDataUri(uri) } }
+  return { ok: true, setup: { secret, uri } }
 }
 
 // Turns the second factor on once the authenticator proves it holds the secret; answers the recovery codes, shown this once.

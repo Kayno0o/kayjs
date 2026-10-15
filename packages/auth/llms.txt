@@ -262,7 +262,7 @@ if failure
 
 ## Two-factor
 
-- `setUpTwoFactor(proof)` answers `setup: { secret, uri, qr }`: the base32 secret to type in, its `otpauth://` URI, and the URI as a QR code, an SVG data URI for an `img`. `enableTwoFactor(code)` turns the factor on once the authenticator gives a right code, and answers ten recovery codes, `abcde-fghij-klmno`, to show this once. Its tries count as a sign-in code's do, `'limited'` past them.
+- `setUpTwoFactor(proof)` answers `setup: { secret, uri }`: the base32 secret to type in and its `otpauth://` URI, to draw with kayjs-ui's `QrCode`. `enableTwoFactor(code)` turns the factor on once the authenticator gives a right code, and answers ten recovery codes, `abcde-fghij-klmno`, to show this once. Its tries count as a sign-in code's do, `'limited'` past them.
 - From then on every way of signing in stops at the `twoFactorPage`. `twoFactorPending()` says whether a sign-in waits there (for ten minutes), and `verifyTwoFactor(code)` finishes it with an authenticator code or a recovery code, answering `{ ok: true, redirect }`, or `'invalid'`, `'expired'` or `'limited'`.
 - An authenticator code works once, even at two sign-ins at the same moment, and the step either side of now is accepted. A recovery code works once and mails a warning. Eight tries in 15 minutes stop the account's attempts.
 - `regenerateRecoveryCodes(proof)` voids the old set, `recoveryCodesLeft()` counts the unused ones, `disableTwoFactor(proof)` turns the factor off and voids the codes. TOTP secrets are stored encrypted, bound to their user.

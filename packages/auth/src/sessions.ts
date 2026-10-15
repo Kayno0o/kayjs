@@ -54,28 +54,28 @@ export async function listSessions(state: RequestState): Promise<UserSession[]> 
     return []
 
   const now = Date.now()
-  const sessions: UserSession[] = []
+  const kept: SessionRecord[] = []
 
   for (const found of await state.core.store.sessions.listByUser(record.id)) {
-    if (!live(state.core, found, record, now)) {
+    if (live(state.core, found, record, now))
+      kept.push(found)
+    else
       await state.core.store.sessions.delete(record.id, found.id)
-
-      continue
-    }
-
-    sessions.push({
-      id: found.id,
-      current: found.id === signedIn?.session,
-      device: readDevice(found.userAgent),
-      userAgent: found.userAgent,
-      ip: found.ip,
-      place: await locate(state.core, found.ip),
-      createdAt: found.createdAt,
-      lastSeenAt: found.lastSeenAt,
-    })
   }
 
-  return sessions
+  // Every lookup at once: the list waits on the slowest, not on their sum.
+  const places = await Promise.all(kept.map(found => locate(state.core, found.ip)))
+
+  return kept.map((found, index) => ({
+    id: found.id,
+    current: found.id === signedIn?.session,
+    device: readDevice(found.userAgent),
+    userAgent: found.userAgent,
+    ip: found.ip,
+    place: places[index]!,
+    createdAt: found.createdAt,
+    lastSeenAt: found.lastSeenAt,
+  }))
 }
 
 function live(core: Core, session: SessionRecord, record: UserRecord, now: number): boolean {

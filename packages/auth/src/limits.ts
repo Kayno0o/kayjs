@@ -44,11 +44,6 @@ export const DEFAULT_LIMITS = {
 
 export type Limits = Record<keyof typeof DEFAULT_LIMITS, Limit>
 
-// Whether `key` is out of attempts, without counting one.
-export async function exhausted(store: AuthStore, key: string, limit: Limit): Promise<boolean> {
-  return await store.attempts.count(key) >= limit.max
-}
-
 // Counts one attempt and answers whether it was over the limit.
 export async function spend(store: AuthStore, key: string, limit: Limit): Promise<boolean> {
   return await store.attempts.hit(key, limit.window) > limit.max

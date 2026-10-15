@@ -44,7 +44,7 @@ export const AuthTokens = defineTable('auth_token', t => ({
   email: t.text().notNull(),
   redirect: t.text().nullable(),
   expires_at: t.timestamptz().notNull(),
-})).withIndexes([{ columns: ['user_id', 'type'] }])
+})).withIndexes([{ columns: ['user_id', 'type'] }, { columns: ['expires_at'] }])
 
 export const AuthRecoveryCodes = defineTable('auth_recovery_code', t => ({
   id: t.serial().primaryKey(),
@@ -61,7 +61,7 @@ export const AuthBearerTokens = defineTable('auth_bearer_token', t => ({
   created_at: t.timestamptz().notNull(),
   last_used_at: t.timestamptz().nullable(),
   expires_at: t.timestamptz().nullable(),
-})).withIndexes([{ columns: ['user_id'] }])
+})).withIndexes([{ columns: ['user_id'] }, { columns: ['expires_at'] }])
 
 export const AuthSessions = defineTable('auth_session', t => ({
   id: t.text().primaryKey(),
@@ -72,7 +72,7 @@ export const AuthSessions = defineTable('auth_session', t => ({
   created_at: t.timestamptz().notNull(),
   last_seen_at: t.timestamptz().notNull(),
   max_age: t.int4().nullable(),
-})).withIndexes([{ columns: ['user_id'] }])
+})).withIndexes([{ columns: ['user_id'] }, { columns: ['last_seen_at'] }, { columns: ['created_at'] }])
 
 export const AuthPasskeys = defineTable('auth_passkey', t => ({
   id: t.text().primaryKey(),
@@ -98,7 +98,7 @@ export const AuthAudit = defineTable('auth_audit', t => ({
   user_agent: t.text().notNull(),
   actor_id: t.text().nullable(),
   at: t.timestamptz().notNull(),
-})).withIndexes([{ columns: ['user_id', 'at'] }, { columns: ['at'] }])
+})).withIndexes([{ columns: ['user_id', 'at'] }, { columns: ['at'] }, { columns: ['actor_id'] }])
 
 export const AuthOrganizations = defineTable('auth_organization', t => ({
   id: t.text().primaryKey(),
@@ -125,7 +125,7 @@ export const AuthInvitations = defineTable('auth_invitation', t => ({
   invited_by: t.text().nullable().references(userId, 'id', { onDelete: 'set null' }),
   created_at: t.timestamptz().notNull(),
   expires_at: t.timestamptz().notNull(),
-})).withIndexes([{ columns: ['organization_id'] }, { columns: ['email'] }])
+})).withIndexes([{ columns: ['organization_id'] }, { columns: ['email'] }, { columns: ['expires_at'] }])
 
 export const AuthAttempts = defineTable('auth_attempt', t => ({
   key: t.text().primaryKey(),

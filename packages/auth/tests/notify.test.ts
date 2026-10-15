@@ -118,3 +118,46 @@ describe('changes to what protects the account', () => {
     expect(events).toEqual(['signed-in', 'password-changed'])
   })
 })
+
+describe('a slow mailer', () => {
+  test.each(['never answers', 'rejects', 'throws'] as const)('a sign-in answers although the mailer %s on its notice mail', async (mode) => {
+    const sent: Mail[] = []
+    let failing = false
+    const app = testApp({
+      url: 'https://site.test',
+      site: 'Site',
+      email: {
+        mailer: {
+          send: (mail) => {
+            sent.push(mail)
+
+            if (!failing)
+              return
+
+            if (mode === 'throws')
+              throw new Error('relay down')
+
+            return mode === 'rejects' ? Promise.reject(new Error('relay down')) : new Promise<void>(Function.prototype as () => void)
+          },
+        },
+        links: LINKS,
+        requireVerified: false,
+      },
+    })
+
+    const ada = app.browser()
+
+    await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
+    await ada.call('verifyEmail', new URL(sent.at(-1)!.url!).searchParams.get('token'))
+    failing = true
+    sent.length = 0
+
+    const answer = await Promise.race([
+      app.browser().json('/password', from('10.0.0.9', 'Firefox')),
+      new Promise<'timeout'>(resolve => setTimeout(resolve, 1500, 'timeout')),
+    ])
+
+    expect(answer).not.toBe('timeout')
+    expect(sent.map(mail => mail.kind)).toEqual(['new-sign-in'])
+  })
+})

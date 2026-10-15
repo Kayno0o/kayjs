@@ -12,7 +12,7 @@ import { banned } from './core'
 import { digest, randomToken } from './keys'
 import { spend, typedKey } from './limits'
 import { log } from './log'
-import { writing } from './mail'
+import { sendAside, writing } from './mail'
 import { notify } from './notify'
 import { emailProblem, normalizeEmail } from './rules'
 import { endOtherSessions, removeIdentities, revokeBearerTokens } from './sessions'
@@ -279,17 +279,10 @@ export async function warnHolder(state: RequestState, holder: UserRecord): Promi
   if (await spend(core.store, `account-exists:${holder.id}`, core.limits.resendAccount))
     return
 
-  void (async () => {
-    try {
-      const { locale, templates } = writing(mail, [holder.locale, ...state.languages])
-      const url = `${core.url}${core.signInPage}`
+  const { locale, templates } = writing(mail, [holder.locale, ...state.languages])
+  const url = `${core.url}${core.signInPage}`
 
-      await mail.mailer.send({ to: email, kind: 'account-exists', site: core.site, locale, url, ...templates['account-exists']({ site: core.site, email, url, locale }) })
-    }
-    catch (error) {
-      log.error('mailing account-exists failed', error)
-    }
-  })()
+  sendAside(mail, () => ({ to: email, kind: 'account-exists', site: core.site, locale, url, ...templates['account-exists']({ site: core.site, email, url, locale }) }), 'account-exists')
 }
 
 // Signs in with the code a magic link mail carried, in the session that asked for it.

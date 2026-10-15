@@ -48,11 +48,10 @@ async function enrolled() {
 }
 
 describe('setting up a second factor', () => {
-  test('gives a secret, its URI and a QR code, and turns on with a code from it', async () => {
+  test('gives a secret and its URI, and turns on with a code from it', async () => {
     const { setup, recoveryCodes, ada, store } = await enrolled()
 
     expect(setup.setup.uri).toStartWith('otpauth://totp/Site%3Aada%40example.com?secret=')
-    expect(setup.setup.qr).toStartWith('data:image/svg+xml,')
     expect(recoveryCodes).toHaveLength(10)
     expect(recoveryCodes[0]).toMatch(/^[2-9a-z]{5}-[2-9a-z]{5}-[2-9a-z]{5}$/)
     expect(await ada.json('/me')).toMatchObject({ twoFactor: true })

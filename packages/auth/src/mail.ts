@@ -1,6 +1,7 @@
 import type { EmailCore } from './email'
 import type { LinkType } from './store'
 import { language, pickLocale } from './locale'
+import { log } from './log'
 
 // A change to what protects an account, mailed to its verified address and given to `onEvent`.
 export type SecurityEvent = 'new-sign-in' | 'password-changed' | 'email-changed' | 'two-factor-enabled' | 'two-factor-disabled' | 'recovery-code-used' | 'recovery-codes-regenerated' | 'provider-linked' | 'provider-unlinked' | 'passkey-added' | 'passkey-removed' | 'token-created' | 'signed-out-everywhere' | 'account-deleted'
@@ -190,6 +191,18 @@ export const frenchTemplates: Templates = {
 
 // kayjs-auth's own templates by language, English for any other.
 export const builtInTemplates: Record<string, Templates> = { en: defaultTemplates, fr: frenchTemplates }
+
+// Sends the mail `build` makes without making the request wait on the mailer: a slow or down relay costs the response nothing, and a failure, a sync throw included, is logged. The mail is handed to the mailer before the first await, so a mailer that answers at once has it by the time this returns.
+export function sendAside(email: EmailCore, build: () => Mail, what: string): void {
+  void (async () => {
+    try {
+      await email.mailer.send(build())
+    }
+    catch (error) {
+      log.error(`mailing ${what} failed`, error)
+    }
+  })()
+}
 
 // The language to write in for a reader wanting `wanted`, most wanted first, and its templates.
 export function writing(email: EmailCore, wanted: readonly (string | null | undefined)[]): { locale: string, templates: Templates } {

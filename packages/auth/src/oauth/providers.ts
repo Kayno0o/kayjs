@@ -1,5 +1,4 @@
 import type { OAuthProvider, OAuthTokens, OAuthUser } from './types'
-import { importPKCS8, SignJWT } from 'jose'
 import { PROVIDER_TIMEOUT_MS } from './timeout'
 
 const TRAILING_SLASHES = /\/+$/
@@ -249,6 +248,9 @@ export function appleProvider(opts: { teamId: string, keyId: string, privateKey:
     async clientSecret(clientId) {
       if (signed?.clientId === clientId && signed.expires - Date.now() > APPLE_SECRET_MARGIN_MS)
         return signed.value
+
+      // jose loads when Apple's secret is first signed.
+      const { importPKCS8, SignJWT } = await import('jose')
 
       key ??= importPKCS8(opts.privateKey, 'ES256')
 
