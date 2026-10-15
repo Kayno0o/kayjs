@@ -148,7 +148,7 @@ describe('SaveForm', () => {
   })
 
   test('Discard restores the initial values, clears the messages and calls onDiscard', async () => {
-    let answer: Answer = { errors: { name: 'Taken' } }
+    const answer: Answer = { errors: { name: 'Taken' } }
     const root = await saveForm(async () => answer)
 
     type(root, 'Grace')
@@ -165,8 +165,39 @@ describe('SaveForm', () => {
     expect(root.querySelector('.kui-form-field-issue')).toBeNull()
     expect(status(root)).toBe('No unsaved change.')
     expect(discarded).toBe(1)
+  })
 
-    answer = 'x'
+  test('Discard after a save goes back to the saved values', async () => {
+    const root = await saveForm(async input => input.name)
+
+    type(root, 'Grace')
+    await settle()
+    root.querySelector('form')!.requestSubmit()
+    await settle()
+    type(root, 'Hopper')
+    await settle()
+
+    expect(status(root)).toBe('Unsaved changes.')
+
+    click(buttons(root)[0]!)
+    await settle()
+
+    expect(root.querySelector<HTMLInputElement>('#name')!.value).toBe('Grace')
+    expect(status(root)).toBe('No unsaved change.')
+  })
+
+  test('a failure no field shows keeps the focus on the Save button', async () => {
+    const root = await saveForm(async () => {
+      throw new Error('offline')
+    })
+
+    type(root, 'Grace')
+    await settle()
+    buttons(root)[1]!.focus()
+    root.querySelector('form')!.requestSubmit()
+    await settle()
+
+    expect(document.activeElement).toBe(buttons(root)[1]!)
   })
 
   test('a control added to the form makes it dirty', async () => {

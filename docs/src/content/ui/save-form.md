@@ -29,6 +29,6 @@ The form is dirty when what its controls hold differs from what they held when i
 - The bar's status is a live region, so a screen reader hears the changes pile up, the save start and the form come back clean. The buttons stay focusable as the form turns clean, so the focus stays on the one pressed.
 - `dirtyLabel`, `cleanLabel`, `savingLabel`, `saveLabel` and `discardLabel` replace the texts.
 
-A control set by a signal changes the form with no input event: after setting one from code, dispatch an `input` event on it.
+A control set by a signal changes the form with no input event: after setting one from code, dispatch an `input` event on it. The library's own signal-driven controls (Checkbox, Toggle, ChipGroup, MultiSelect, Select) keep their state in signals that Discard cannot reach, so put them back in `onDiscard`.
 
 <ReadMore href="/essentials/forms-and-actions">Actions and forms are covered in their own guide.</ReadMore>

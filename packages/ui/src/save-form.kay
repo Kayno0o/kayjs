@@ -39,6 +39,39 @@ function snapshot() {
   return JSON.stringify([...new FormData(form)].map(([name, value]) => [name, typeof value === 'string' ? value : [value.name, value.size, value.lastModified]]))
 }
 
+// What each control holds now, which becomes its default once saved: a Discard then goes back to the saved values, not to the ones first rendered.
+function values(): () => void {
+  const held = [...form!.elements].map((control): (() => void) => {
+    if (control instanceof HTMLInputElement || control instanceof HTMLTextAreaElement) {
+      const { value } = control
+      const checked = control instanceof HTMLInputElement && control.checked
+
+      return () => {
+        control.defaultValue = value
+
+        if (control instanceof HTMLInputElement)
+          control.defaultChecked = checked
+      }
+    }
+
+    if (control instanceof HTMLSelectElement) {
+      const picked = [...control.options].map(option => option.selected)
+
+      return () => {
+        for (const [index, option] of [...control.options].entries())
+          option.defaultSelected = picked[index] ?? false
+      }
+    }
+
+    return () => undefined
+  })
+
+  return () => {
+    for (const keep of held)
+      keep()
+  }
+}
+
 function check() {
   dirty.set(snapshot() !== baseline)
 }
@@ -52,18 +85,19 @@ onMount(() => {
 
   const observer = new MutationObserver(check)
 
-  observer.observe(form!, { childList: true, subtree: true })
+  observer.observe(form!, { childList: true, subtree: true, attributes: true, attributeFilter: ['value', 'checked', 'selected', 'disabled'] })
   onCleanup(() => observer.disconnect())
 })
 
 async function submit(event: SubmitEvent) {
   event.preventDefault()
 
-  if (action.pending() || !dirty() || !form)
+  if (action.pending() || !form || snapshot() === baseline)
     return
 
   // Edits made while the save is under way stay unsaved.
   const sent = snapshot()
+  const adopt = values()
   const done = await callAction(form, action, issues, failure, refused)
 
   if (!done)
@@ -71,6 +105,7 @@ async function submit(event: SubmitEvent) {
 
   issues.set({})
   baseline = sent
+  adopt()
   check()
 
   if (saved)
@@ -80,7 +115,7 @@ async function submit(event: SubmitEvent) {
 }
 
 function discard() {
-  if (!dirty() || action.pending())
+  if (action.pending())
     return
 
   form?.reset()
@@ -91,14 +126,14 @@ function discard() {
 
 // Ctrl or Cmd with S saves, the browser's own save dialog kept away even when there is nothing to save.
 function saveOnShortcut(event: KeyboardEvent) {
-  if (event.key.toLowerCase() !== 's' || !(event.ctrlKey || event.metaKey) || event.altKey)
+  if ((event.code !== 'KeyS' && event.key.toLowerCase() !== 's') || !(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey)
     return
 
   event.preventDefault()
   form?.requestSubmit()
 }
 ---
-form.kui-save-form(class={className} ref={element => form = element} novalidate onSubmit={submit} onInput={check} onChange={check} onKeyDown={saveOnShortcut})
+form.kui-save-form(class={className} ref={element => form = element} onSubmit={submit} onInput={check} onChange={check} onKeyDown={saveOnShortcut})
   .kui-form-grid
     slot
   .kui-save-bar
