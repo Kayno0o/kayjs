@@ -29,7 +29,7 @@ const NOT_IN_URL = /[^\x21-\x7E]+/g
 // Stylesheets import for their effect, or for their text `with { type: 'text' }`, other assets for their URL. TypeScript matches a wildcard module case-sensitively, so both `.png` and `.PNG` are declared; a mixed case such as `.Png` is not.
 export const ASSET_TYPES = ['declare module \'*.css\' {\n  const text: string\n  export default text\n}\n', ...ASSET_EXTENSIONS.flatMap(extension => [extension, extension.toUpperCase()]).map(extension => `declare module '*.${extension}' {\n  const url: string\n  export default url\n}\n`)].join('\n')
 
-// Each component a library exports, typed as the module its specifier names: rootDirs merges relative imports only, so a package's `.kay` files reach the app through these.
+// Each component a library exports, typed as the module its specifier names, with the named exports (actions, `page`) the file declares: rootDirs merges relative imports only, so a package's `.kay` files reach the app through these.
 export function packageTypes(root: string, libraries: KayLibrary[]): string {
   const shadowDir = projectPaths(root).types
 
@@ -39,7 +39,7 @@ export function packageTypes(root: string, libraries: KayLibrary[]): string {
     const name = componentName(file)
 
     // Named after the component, which is what auto-import offers it as.
-    return `declare module ${JSON.stringify(specifier)} {\n  const ${name}: typeof import(${JSON.stringify(`./${shadow}`)}).default\n  export default ${name}\n}\n`
+    return `declare module ${JSON.stringify(specifier)} {\n  const ${name}: typeof import(${JSON.stringify(`./${shadow}`)}).default\n  export default ${name}\n  export * from ${JSON.stringify(`./${shadow}`)}\n}\n`
   })).join('\n')
 }
 

@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- `kay check` types the named exports of a library's `.kay` module, such as a prebuilt page's actions, as the file declares them, so a test imports one without a cast ([kayjs-auth](../packages/auth/llms.txt)).
 - `kay build --compile server --verify` starts the executable it wrote, waits for its health route and runs `--health`, failing the build with the server's own output when it crashes at startup ([Check the executable starts](production.md#check-the-executable-starts)).
 - `testSite()` builds the islands for the browser and throws when one fails, such as an island reaching a Bun builtin, once per process; `islands: false` skips it ([Testing](testing.md#browser-tests)).
 - `testSite()` builds the islands for the browser and throws when one fails, such as an island reaching a Bun builtin, once per process, and `islands: false` skips it ([Testing](testing.md#test-site)).

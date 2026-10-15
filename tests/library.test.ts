@@ -314,6 +314,19 @@ describe('kay libraries', () => {
     }))
   })
 
+  it('types the named exports a library\'s module declares, an action imported by a test taking its input as the file declares it', async () => {
+    const project = await newProject()
+
+    await write(join(project, 'node_modules/kay-lib'), { 'src/signup.kay': '--- server\nimport { action } from \'kay\'\n\nexport const page = { guards: false }\n\nexport const signup = action((input: { email: string }) => input, input => input.email)\n---\np signup\n' })
+    await write(project, { 'src/signup.test.ts': 'import { signup } from \'kay-lib/signup.kay\'\n\nexport const ok = signup\nexport const missing = (await import(\'kay-lib/signup.kay\')).missing\n' })
+
+    const { code, output } = await run('check', project)
+
+    expect(output).toContain('Property \'missing\' does not exist')
+    expect(output).not.toContain('TS2614')
+    expect(code).toBe(1)
+  })
+
   it('types a library\'s components in the app, reporting an error inside one the app uses at its own line, and the app\'s settings against the defaults, leaving a glob it cannot read to the check or the build reporting it', async () => {
     const project = await newProject()
 
