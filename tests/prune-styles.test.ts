@@ -6,8 +6,8 @@ import { afterAll, describe, expect, it } from 'bun:test'
 import { clientDir } from '../src/build/assets'
 import { buildClient } from '../src/build/client'
 import { findKayLibraries } from '../src/build/libraries'
-import { classTokens, pruneClasses, pruneNodes, unusedLibraryClasses } from '../src/build/prune'
-import { mergeSupports, mergingSupports, parse, print } from '../src/build/supports'
+import { classTokens, pruneNodes, unusedLibraryClasses } from '../src/build/prune'
+import { mergingSupports, parse, print } from '../src/build/supports'
 import { devBuilder } from '../src/dev/builder'
 import { stylesOnly, watchProject } from '../src/dev/sources'
 import { scratchDir } from './scratch'
@@ -29,8 +29,9 @@ describe('classTokens', () => {
   })
 })
 
-describe('pruneClasses', () => {
+describe('pruneNodes', () => {
   const unused = new Set(['gone', 'gone-too'])
+  const pruneClasses = (css: string, classes: ReadonlySet<string>) => print(pruneNodes(parse(css), classes))
 
   it('drops a rule whose selector needs an unused class, and only the selectors of a list that do', () => {
     expect(pruneClasses('.kept{a:b}.gone{c:d}', unused)).toBe('.kept{a:b}')
@@ -69,13 +70,6 @@ describe('pruneClasses', () => {
     expect(pruneClasses('.gone{a:b}', new Set())).toBe('.gone{a:b}')
   })
 
-  it('prunes a parsed stylesheet the way the text is, so one parse serves the pruning and the merge', () => {
-    const css = '@supports (display:grid){.a{--x:1}}.gone{c:d}@supports (display:grid){.b{--y:1}}.kept{e:f}'
-
-    expect(print(pruneNodes(parse(css), unused))).toBe(pruneClasses(css, unused))
-    expect(pruneNodes(parse(css), new Set())).toEqual(parse(css))
-  })
-
   it('merges the blocks pruning leaves one after the other, in one pass over the output', async () => {
     const dir = await scratchDir('prune-merge-')
     const css = '@supports (display:grid){.a{--x:1}}\n.gone{c:d}\n@supports (display:grid){.b{--y:1}}\n'
@@ -90,7 +84,6 @@ describe('pruneClasses', () => {
     expect(out.match(/@supports/g)).toHaveLength(1)
     expect(out).toContain('--x')
     expect(out).toContain('--y')
-    expect(mergeSupports(pruneClasses(css, unused)).match(/@supports/g)).toHaveLength(1)
   })
 })
 

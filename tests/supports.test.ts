@@ -2,7 +2,7 @@ import type { BunPlugin } from 'bun'
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
-import { mergeSupports, mergingSupports } from '../src/build/supports'
+import { mergingSupports } from '../src/build/supports'
 import { scratchDir } from './scratch'
 
 let dir: string
@@ -26,6 +26,21 @@ async function bundled(css: string, minify = false): Promise<string> {
 
 const TAILWIND = '@supports (color: color-mix(in lab, red, red))'
 
+// The merge as the stylesheet build runs it on a stylesheet no plugin loads, the text as it is when nothing merges.
+async function mergeSupports(css: string): Promise<string> {
+  const file = join(dir, `merge-${Bun.hash(css)}.css`)
+  let load: ((args: { path: string }) => unknown) | undefined
+
+  await Bun.write(file, css)
+  await mergingSupports([]).at(-1)!.setup({ onLoad: (_: unknown, callback: typeof load) => {
+    load = callback
+  } } as never)
+
+  const result = await load!({ path: file }) as { contents: string } | undefined
+
+  return result?.contents ?? css
+}
+
 describe('mergeSupports', () => {
   it('keeps every override Tailwind nests in a rule for a color-mix(), through Bun, minified or not', async () => {
     const css = `:root {\n  --a: var(--x);\n  ${TAILWIND} {\n    & {\n      --a: color-mix(in srgb, var(--x) 14%, var(--y));\n    }\n  }\n  --b: var(--z);\n  ${TAILWIND} {\n    & {\n      --b: color-mix(in srgb, var(--z) 12%, transparent);\n    }\n  }\n}\n`
@@ -34,7 +49,7 @@ describe('mergeSupports', () => {
     expect(await bundled(css)).not.toContain('--b: color-mix')
 
     for (const minify of [false, true]) {
-      const out = (await bundled(mergeSupports(css), minify)).replace(/\s/g, '')
+      const out = (await bundled(await mergeSupports(css), minify)).replace(/\s/g, '')
 
       expect(out).toContain('--a:var(--x)')
       expect(out).toContain('--b:var(--z)')
@@ -50,7 +65,7 @@ describe('mergeSupports', () => {
     expect(await bundled(css)).not.toContain('--a: 2')
 
     for (const minify of [false, true]) {
-      const out = (await bundled(mergeSupports(css), minify)).replace(/\s/g, '')
+      const out = (await bundled(await mergeSupports(css), minify)).replace(/\s/g, '')
 
       for (const name of ['--a', '--b', '--d', '--e'])
         expect(out).toContain(`${name}:2`)
@@ -58,46 +73,46 @@ describe('mergeSupports', () => {
   })
 
   it('keeps a block testing the condition of the one right before it, for other selectors too', async () => {
-    const out = await bundled(mergeSupports('@supports (display: grid) { .a { --x: 2; } }\n@supports (display: grid) { .b { --y: 2; } }\n'))
+    const out = await bundled(await mergeSupports('@supports (display: grid) { .a { --x: 2; } }\n@supports (display: grid) { .b { --y: 2; } }\n'))
 
     expect(out).toContain('--x: 2')
     expect(out).toContain('--y: 2')
   })
 
   it('keeps overrides nested under a media query in a rule, and in a rule nested in a rule', async () => {
-    const out = await bundled(mergeSupports(`.a {\n  @media (width > 40rem) {\n    ${TAILWIND} { --x: 2; }\n    ${TAILWIND} { --y: 2; }\n  }\n  .b {\n    ${TAILWIND} { --z: 2; }\n    color: red;\n    ${TAILWIND} { --w: 2; }\n  }\n}\n`))
+    const out = await bundled(await mergeSupports(`.a {\n  @media (width > 40rem) {\n    ${TAILWIND} { --x: 2; }\n    ${TAILWIND} { --y: 2; }\n  }\n  .b {\n    ${TAILWIND} { --z: 2; }\n    color: red;\n    ${TAILWIND} { --w: 2; }\n  }\n}\n`))
 
     for (const name of ['--x', '--y', '--z', '--w'])
       expect(out).toContain(`${name}: 2`)
   })
 
   it('ends a declaration the merged block held without its semicolon', async () => {
-    expect(mergeSupports(`.a { ${TAILWIND} { --x: 2 } ${TAILWIND} { --y: 2 } }`)).toBe(`.a { ${TAILWIND} { --x: 2 ; --y: 2 } }`)
+    expect(await mergeSupports(`.a { ${TAILWIND} { --x: 2 } ${TAILWIND} { --y: 2 } }`)).toBe(`.a { ${TAILWIND} { --x: 2 ; --y: 2 } }`)
   })
 
-  it('leaves alone blocks testing other conditions, or with a rule between, and their order', () => {
+  it('leaves alone blocks testing other conditions, or with a rule between, and their order', async () => {
     const css = `@supports (display: grid) { .a { --x: 1 } }\n@supports (display: flex) { .a { --x: 2 } }\n@supports (display: grid) { .a { --x: 3 } }\n.b { color: red }\n@supports (display: flex) { .a { --x: 4 } }\n`
 
-    expect(mergeSupports(css)).toBe(css)
+    expect(await mergeSupports(css)).toBe(css)
   })
 
-  it('reads a brace or a semicolon in a string, a comment or an unquoted url() as text', () => {
+  it('reads a brace or a semicolon in a string, a comment or an unquoted url() as text', async () => {
     const css = `.a { content: "}{;"; background: url(data:image/svg+xml,<svg><style>a{fill:red}</style></svg>); /* } { ; */ ${TAILWIND} { --x: 2; } }\n.b { content: '\\'}' }\n`
 
-    expect(mergeSupports(css)).toBe(css)
-    expect(mergeSupports(css.replace('.b {', `${TAILWIND} { .c { --y: 2 } }\n.b {`))).toContain('--y: 2')
+    expect(await mergeSupports(css)).toBe(css)
+    expect(await mergeSupports(css.replace('.b {', `${TAILWIND} { .c { --y: 2 } }\n.b {`))).toContain('--y: 2')
   })
 
-  it('keeps what follows a `}` closing nothing, for Bun to report it', () => {
+  it('keeps what follows a `}` closing nothing, for Bun to report it', async () => {
     const css = `.a { color: red }\n}\n.b { color: blue }\n${TAILWIND} { .c { --x: 2 } }\n${TAILWIND} { .d { --y: 2 } }\n`
 
-    expect(mergeSupports(css)).toBe(`.a { color: red }\n}\n.b { color: blue }\n${TAILWIND} { .c { --x: 2 }  .d { --y: 2 } }\n`)
+    expect(await mergeSupports(css)).toBe(`.a { color: red }\n}\n.b { color: blue }\n${TAILWIND} { .c { --x: 2 }  .d { --y: 2 } }\n`)
   })
 
-  it('leaves alone custom properties whose value is a block, and the case of a condition', () => {
+  it('leaves alone custom properties whose value is a block, and the case of a condition', async () => {
     const css = `.a { --x: { a: b }; --x: { c: d } }\n@supports (--Foo: x) { .a { --y: 1 } }\n@supports (--foo: x) { .a { --y: 2 } }\n`
 
-    expect(mergeSupports(css)).toBe(css)
+    expect(await mergeSupports(css)).toBe(css)
   })
 
   it('merges what a plugin loads as CSS, and the stylesheets no plugin loads', async () => {
@@ -119,9 +134,9 @@ describe('mergeSupports', () => {
     }
   })
 
-  it('returns a stylesheet testing nothing as it is', () => {
+  it('returns a stylesheet testing nothing as it is', async () => {
     const css = '.a { color: red }\n@media (width > 1px) { .a { color: blue } }\n'
 
-    expect(mergeSupports(css)).toBe(css)
+    expect(await mergeSupports(css)).toBe(css)
   })
 })

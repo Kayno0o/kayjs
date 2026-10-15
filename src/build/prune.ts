@@ -3,7 +3,7 @@ import type { Node } from './supports'
 import { dirname, resolve } from 'node:path'
 import { CSS_FILE, findProjectFiles, readSource } from './files'
 import { exportsFile } from './libraries'
-import { COMMENTS, parse, print } from './supports'
+import { COMMENTS, parse } from './supports'
 
 // The at-rules whose block holds style rules, applying under a condition or in a layer.
 const CONDITIONAL = /^@(?:media|container|supports|layer|scope|starting-style|document)\b/i
@@ -134,12 +134,7 @@ function prune(nodes: Node[], unused: ReadonlySet<string>): Node[] {
   })
 }
 
-// The stylesheet without the selectors needing a class of `unused`, and without the rules and conditional blocks left with none.
-export function pruneClasses(css: string, unused: ReadonlySet<string>): string {
-  return unused.size === 0 || !css.includes('{') ? css : print(prune(parse(css), unused))
-}
-
-// The same on a parsed stylesheet, for a build parsing each output once.
+// The parsed stylesheet without the selectors needing a class of `unused`, and without the rules and conditional blocks left with none.
 export function pruneNodes(nodes: Node[], unused: ReadonlySet<string>): Node[] {
   return unused.size === 0 ? nodes : prune(nodes, unused)
 }

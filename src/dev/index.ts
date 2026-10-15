@@ -9,7 +9,6 @@ import { networkInterfaces } from 'node:os'
 import { join, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { ASSET_EXTENSIONS } from '../build/assets'
-import { CSS_FILE } from '../build/files'
 import { CONFIG_FILE, loadConfig } from '../config'
 import { projectPaths, savedPublicDir } from '../project'
 import { startClientBuilder } from './client'
@@ -376,14 +375,14 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
       return false
 
     // A root Markdown file naming no pruned class leaves the stylesheets as they are.
-    if (outcome.styles === undefined && !files.some(file => CSS_FILE.test(file)))
+    if (outcome.styles === undefined)
       return true
 
     const named = changedFilesNamed(root, files)
     const changed = describe(named)
     const ms = Math.round(performance.now() - started)
 
-    tell(server, { ...outcome.styles && { styles: outcome.styles }, built: { changed, ms, styles: true } })
+    tell(server, { styles: outcome.styles, built: { changed, ms, styles: true } })
 
     if (options.quiet !== true)
       sayRebuild('styles', { changed: named, ms }, `${changed}: stylesheets swapped`, `${stamp()} ${changed}: stylesheets swapped in ${ms} ms`)

@@ -147,11 +147,6 @@ function atRule(node: { prelude: string }): boolean {
   return node.prelude.replace(COMMENTS, '').trim().startsWith('@')
 }
 
-// The stylesheet with every block Bun would drop merged into one it keeps.
-export function mergeSupports(css: string): string {
-  return css.includes('{') ? print(merge(parse(css), false)) : css
-}
-
 // The stylesheet build's plugins, each stylesheet one returns merged, and a last one merging those no plugin loads; `transform` runs on the parsed stylesheet first, as kay prunes a library's unused classes, so each output is parsed and printed once.
 export function mergingSupports(plugins: BunPlugin[], transform: (nodes: Node[]) => Node[] | Promise<Node[]> = nodes => nodes): BunPlugin[] {
   const rewrite = async (css: string) => css.includes('{') ? print(merge(await transform(parse(css)), false)) : css
