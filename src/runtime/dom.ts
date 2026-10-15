@@ -778,7 +778,6 @@ function keyedRows<T>(region: Region, previous: Row[], list: readonly T[], key: 
 
   const after = firstNode(previous, oldEnd) ?? region.end
   const byKey = new Map<unknown, Row>()
-  const oldAt = new Map<Row, number>()
 
   for (let index = start; index < oldEnd; index++) {
     const row = previous[index]!
@@ -789,28 +788,24 @@ function keyedRows<T>(region: Region, previous: Row[], list: readonly T[], key: 
       removeRow(twin)
 
     byKey.set(row.key, row)
-    oldAt.set(row, index)
   }
 
   const matched: (Row | undefined)[] = []
-  // The old index of the last row matched up to each position.
-  const before: number[] = []
-  let lastAt = start - 1
+  let fresh = false
 
   for (let index = start; index < newEnd; index++) {
     const row = byKey.get(keys[index])
 
-    if (row) {
+    if (row)
       byKey.delete(keys[index])
-      lastAt = oldAt.get(row)!
-    }
+    else if (typeof keys[index] === 'object' && keys[index] !== null)
+      fresh = true
 
     matched.push(row)
-    before.push(lastAt)
   }
 
-  // A row of plain objects edited immutably comes back as copies no key matches: a copy takes the row left unmatched in its place between the rows around it, so an edit, a removal or an insertion keeps the other rows' nodes, fields and focus.
-  const replaced = key === rowKey && byKey.size > 0 ? pairCopies(keys, matched, before, byKey, oldAt, start, oldEnd) : undefined
+  // A list of plain objects edited immutably comes back as copies no key matches: a copy takes the row left unmatched in its place between the rows around it, so an edit, a removal or an insertion keeps the other rows' nodes, fields and focus.
+  const replaced = fresh && key === rowKey && byKey.size > 0 ? pairCopies(previous, matched, keys, byKey, start, oldEnd) : undefined
   const middle: Row[] = []
   let added = 0
 
@@ -818,7 +813,6 @@ function keyedRows<T>(region: Region, previous: Row[], list: readonly T[], key: 
     const row = matched[index - start] ?? replaced?.get(index)
 
     if (row) {
-      row.key = keys[index]
       update(row, index)
       middle.push(row)
     }
@@ -850,36 +844,51 @@ function keyedRows<T>(region: Region, previous: Row[], list: readonly T[], key: 
   return [...previous.slice(0, start), ...middle, ...previous.slice(oldEnd)]
 }
 
-// Gives each unmatched object key a row left in `byKey` that sits, in the old order, between the old rows matched around it, and takes those rows out of `byKey`.
-function pairCopies(keys: unknown[], matched: (Row | undefined)[], before: number[], byKey: Map<unknown, Row>, oldAt: Map<Row, number>, start: number, oldEnd: number): Map<number, Row> {
-  const left = [...byKey.values()]
+// Gives each unmatched object key a row left in `byKey` that sits, in the old order, between the old rows matched around it, and takes those rows out of `byKey`, the pair's key being the new one. Best effort: a removal and an edit in the same gap pair the first leftover row with the copy.
+function pairCopies(previous: Row[], matched: (Row | undefined)[], keys: unknown[], byKey: Map<unknown, Row>, start: number, oldEnd: number): Map<number, Row> {
+  const oldAt = new Map<Row, number>()
+
+  for (let index = start; index < oldEnd; index++)
+    oldAt.set(previous[index]!, index)
+
+  const left = [...byKey.values()].sort((a, b) => oldAt.get(a)! - oldAt.get(b)!)
   const paired = new Map<number, Row>()
   // The old index of the next matched row after each position.
   const next: number[] = []
   let following = oldEnd
+  let before = start - 1
   let cursor = 0
 
   for (let at = matched.length - 1; at >= 0; at--) {
     if (matched[at])
-      following = oldAt.get(matched[at]!)!
+      following = Math.min(following, oldAt.get(matched[at]!)!)
 
     next[at] = following
   }
 
   for (let at = 0; at < matched.length; at++) {
+    const row = matched[at]
+
+    if (row) {
+      before = Math.max(before, oldAt.get(row)!)
+
+      continue
+    }
+
     const key = keys[start + at]
 
-    if (matched[at] || typeof key !== 'object' || key === null)
+    if (typeof key !== 'object' || key === null)
       continue
 
-    while (cursor < left.length && oldAt.get(left[cursor]!)! <= before[at]!)
+    while (cursor < left.length && oldAt.get(left[cursor]!)! <= before)
       cursor++
 
-    const row = left[cursor]
+    const candidate = left[cursor]
 
-    if (row && oldAt.get(row)! < next[at]! && typeof row.key === 'object' && row.key !== null) {
-      paired.set(start + at, row)
-      byKey.delete(row.key)
+    if (candidate && oldAt.get(candidate)! < next[at]! && typeof candidate.key === 'object' && candidate.key !== null) {
+      paired.set(start + at, candidate)
+      byKey.delete(candidate.key)
+      candidate.key = key
       cursor++
     }
   }

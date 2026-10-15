@@ -7,6 +7,12 @@ A minor release of kay can break your app. This page lists each one that does, w
 
 kay and its libraries share one version number, so one section covers them all. A minor that is not listed broke nothing.
 
+## 1.45.0
+
+### A `for` over objects with no `id` reuses its rows
+
+Rows of plain objects with no `id`, no `key` and no identity left in the new list are now matched, between the rows that did match, to the unmatched rows in their place, where each used to be a new row. A list of fresh objects (results fetched again) reuses its rows by position, so row-local state and enter transitions carry over. Give such items an `id` or a `key` when each must start afresh.
+
 ## 1.44.0
 
 ### kayjs-auth asks for a proof of work

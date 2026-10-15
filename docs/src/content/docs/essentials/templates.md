@@ -91,7 +91,7 @@ match post.status
 
 A `for` tracks its rows by `item.id`. When your items have no `id`, name a key: `for post of posts key={post.slug}`.
 
-Rows of plain objects with no `id`, edited immutably (`rows.set(rows().filter(...))`, `{ ...row, text }`), need no key either: a copy no key matches takes the unmatched row left in its place between the rows around it, so an edit, a removal or an insertion keeps every other row's nodes, fields and focus. Avoid `key={index}` for such rows, which matches by position and hands a removed row's place to the next one.
+Rows of plain objects with no `id`, edited immutably (`rows.set(rows().filter(...))`, `{ ...row, text }`), need no key either: a copy no key matches takes the unmatched row left in its place between the rows around it, so an edit, a removal or an insertion keeps every other row's nodes, fields and focus. Avoid `key={index}` for such rows, which matches by position and hands a removed row's place to the next one. A removal and an edit in the same gap pair the first unmatched row with the copy, and a list of fresh objects reuses the rows by position, so give such rows an `id` when each must start afresh.
 
 A `const` line names a value for the lines after it, computed once per row:
 

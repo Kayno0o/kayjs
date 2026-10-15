@@ -635,10 +635,18 @@ ul
       expect(document.activeElement).toBe(c!)
       expect(c!.selectionStart).toBe(1)
 
+      // The index a copy is edited at follows the removal.
+      d!.value = 'dd'
+      d!.dispatchEvent(new Event('input', { bubbles: true }))
+      await settle()
+      expect(inputs()).toEqual([a!, c!, d!])
+      expect(values()).toEqual(['aa', 'c!', 'dd'])
+
       // Removing the first and the last in one update.
       rows.set(rows().slice(1, -1))
       await settle()
       expect(inputs()).toEqual([c!])
+      expect(values()).toEqual(['c!'])
 
       // Inserted in the middle and at both ends, equal rows included.
       rows.set([{ text: 'x' }, rows()[0]!, { text: 'x' }, { text: 'x' }])
@@ -682,6 +690,57 @@ ul
       await settle()
       expect(inputs()).toEqual([d!, a!, c!])
       expect(values()).toEqual(['new', 'a!', 'c!'])
+    }
+    finally {
+      await dispose()
+    }
+  })
+
+  const mountGaps = site({
+    'main.kay': `---
+import { signal } from 'kay'
+
+const rows = signal([{ text: 'a' }, { text: 'hide' }, { text: 'c' }])
+const ids = signal([{ id: 1, text: 'a' }, { id: 2, text: 'b' }])
+;(globalThis as { gaps?: object }).gaps = { rows, ids }
+---
+ul.plain
+  for row of rows()
+    if row.text !== 'hide'
+      li {row.text}
+ul.ids
+  for row of ids()
+    li {row.text}
+`,
+  })
+
+  it('pair copies around rows that draw nothing, and never pair rows matched by an id', async () => {
+    const { root, dispose } = await mountGaps()
+    const { rows, ids } = (globalThis as unknown as { gaps: { rows: { (): { text: string }[], set: (next: { text: string }[]) => void }, ids: { (): { id: number, text: string }[], set: (next: { id: number, text: string }[]) => void } } }).gaps
+    const items = (selector: string) => [...root.querySelectorAll(selector)]
+
+    try {
+      const [a, c] = items('.plain li')
+
+      rows.set([{ text: 'A' }, rows()[1]!, { text: 'C' }])
+      await settle()
+      expect(items('.plain li')).toEqual([a!, c!])
+      expect(items('.plain li').map(item => item.textContent)).toEqual(['A', 'C'])
+
+      // The row that draws nothing is shown by an edit: a new item in its place.
+      rows.set([rows()[0]!, { text: 'b' }, rows()[2]!])
+      await settle()
+      expect(items('.plain li').map(item => item.textContent)).toEqual(['A', 'b', 'C'])
+      expect(items('.plain li')[0]).toBe(a)
+      expect(items('.plain li')[2]).toBe(c)
+
+      // Rows with an id are matched by it alone: a new id is a new node.
+      const [one, two] = items('.ids li')
+
+      ids.set([{ id: 3, text: 'x' }, { id: 2, text: 'b2' }])
+      await settle()
+      expect(items('.ids li')[1]).toBe(two)
+      expect(items('.ids li')[0]).not.toBe(one!)
     }
     finally {
       await dispose()
