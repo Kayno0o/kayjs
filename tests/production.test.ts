@@ -1607,10 +1607,11 @@ describe('compression', () => {
     expect(page.headers.get('content-security-policy')).toStartWith('default-src \'self\'')
     expect(Bun.zstdDecompressSync(await page.bytes()).toString()).toBe(await plain.text())
 
-    const brotli = await fetch('/contact', 'gzip, deflate, br')
+    // Safari takes no zstd, and gets gzip: at the levels a request affords, brotli saves no bytes over it on a page.
+    const safari = await fetch('/contact', 'gzip, deflate, br')
 
-    expect(brotli.headers.get('content-encoding')).toBe('br')
-    expect(new TextDecoder().decode(brotliDecompressSync(await brotli.bytes()))).toBe(await (await fetch('/contact', 'identity')).text())
+    expect(safari.headers.get('content-encoding')).toBe('gzip')
+    expect(new TextDecoder().decode(Bun.gunzipSync(await safari.bytes()))).toBe(await (await fetch('/contact', 'identity')).text())
     expect(plain.headers.get('content-encoding')).toBeNull()
     expect(plain.headers.get('vary')).toContain('accept-encoding')
 
@@ -1684,10 +1685,10 @@ describe('compression', () => {
       expect(await decoded(response)).toBe(page)
     }
 
-    for (const [page, accept, type] of [[`${a}${text}`, 'br, gzip;q=0', 'text/html'], [text, 'br, gzip', 'text/html'], [`{"css":${JSON.stringify(a)}}`, 'br, gzip', 'application/json']] as const) {
+    for (const [page, accept, type, encoding] of [[`${a}${text}`, 'br, gzip;q=0', 'text/html', 'br'], [text, 'br, gzip', 'text/html', 'gzip'], [`{"css":${JSON.stringify(a)}}`, 'br', 'application/json', 'br']] as const) {
       const response = await send(page, accept, type)
 
-      expect(response.headers.get('content-encoding')).toBe('br')
+      expect(response.headers.get('content-encoding')).toBe(encoding)
       expect(await decoded(response)).toBe(page)
     }
   })
@@ -1700,8 +1701,8 @@ describe('compression', () => {
     const fixed = fixedTexts([style])
     // Random bytes, which no compression shrinks enough to send compressed.
     let seed = 1
-    const noise = Uint8Array.from({ length: 20_000 }, () => (seed = Math.imul(seed, 1664525) + 1013904223 | 0) >>> 24)
-    const pages: Record<string, string | Uint8Array<ArrayBuffer>> = { '/pool': `<p>${words(12000)}</p>`, '/spliced': `${style}<p>${words(12000)}</p>`, '/here': `${style}<p>${words(100)}</p>`, '/small': `<p>${words(1500)}</p>`, '/noise': noise }
+    const noise = Uint8Array.from({ length: 140_000 }, () => (seed = Math.imul(seed, 1664525) + 1013904223 | 0) >>> 24)
+    const pages: Record<string, string | Uint8Array<ArrayBuffer>> = { '/pool': `<p>${words(24000)}</p>`, '/spliced': `${style}<p>${words(12000)}</p>`, '/here': `${style}<p>${words(100)}</p>`, '/small': `<p>${words(1500)}</p>`, '/noise': noise }
     const server = Bun.serve({ port: 0, hostname: '127.0.0.1', fetch: async (request) => {
       const response = wholeResponse(pages[new URL(request.url).pathname]!, { headers: { 'content-type': 'text/html' } })
 
@@ -1726,12 +1727,12 @@ describe('compression', () => {
     }
   })
 
-  it('compresses a whole body with zstd for a browser taking it, a stream with brotli or gzip, and brotli or gzip for a browser without zstd', async () => {
+  it('compresses a whole body with zstd for a browser taking it, else gzip, else brotli, and a stream with brotli or gzip', async () => {
     const { compressResponse, wholeResponse } = await import('../src/server/compress')
     const page = `<p>${'zstd page '.repeat(300)}</p>`
     const send = async (accept: string, body: string | ReadableStream<Uint8Array> = page) => (await compressResponse(new Request('http://localhost/', { headers: { 'accept-encoding': accept } }), typeof body === 'string' ? wholeResponse(body, { headers: { 'content-type': 'text/html' } }) : new Response(body, { headers: { 'content-type': 'text/html' } })))!
 
-    for (const [accept, encoding] of [['gzip, deflate, br, zstd', 'zstd'], ['zstd;q=0.5, br', 'br'], ['gzip, br, zstd;q=0', 'br'], ['gzip', 'gzip']] as const)
+    for (const [accept, encoding] of [['gzip, deflate, br, zstd', 'zstd'], ['gzip, deflate, br', 'gzip'], ['zstd;q=0.5, br', 'br'], ['gzip, br, zstd;q=0', 'gzip'], ['br, gzip;q=0.5', 'br'], ['gzip', 'gzip']] as const)
       expect((await send(accept)).headers.get('content-encoding')).toBe(encoding)
 
     expect(Bun.zstdDecompressSync(new Uint8Array(await (await send('zstd')).arrayBuffer())).toString()).toBe(page)
@@ -1773,13 +1774,35 @@ describe('compression', () => {
     expect(await plain.text()).toBe(page)
   })
 
+  it('compresses a page for Chrome or Safari without loading node:zlib', async () => {
+    const { compressResponse, wholeResponse } = await import('../src/server/compress')
+    const loaded = spyOn(process, 'getBuiltinModule')
+
+    try {
+      for (const accept of ['gzip, deflate, br, zstd', 'gzip, deflate, br']) {
+        for (const size of [300, 12000]) {
+          const page = `<p>${Array.from({ length: size }, (_, i) => (i * 2654435761 % 1e9).toString(36)).join(' ')} ${accept}</p>`
+          const response = (await compressResponse(new Request('http://localhost/', { headers: { 'accept-encoding': accept } }), wholeResponse(page, { headers: { 'content-type': 'text/html' } })))!
+
+          expect(response.headers.get('content-encoding')).toBe(accept.includes('zstd') ? 'zstd' : 'gzip')
+        }
+      }
+
+      expect(loaded.mock.calls.filter(([name]) => name === 'node:zlib')).toEqual([])
+    }
+    finally {
+      loaded.mockRestore()
+    }
+  })
+
   it('compresses a body rendered again from its second time on only once, a body of the same length but other bytes compressed for itself', async () => {
     const { compressResponse, wholeResponse } = await import('../src/server/compress')
     const words = (count: number, from: number) => Array.from({ length: count }, (_, i) => ((i + from) * 2654435761 % 1e9).toString(36)).join(' ')
     const send = async (body: string) => (await compressResponse(new Request('http://localhost/', { headers: { 'accept-encoding': 'zstd' } }), wholeResponse(body, { headers: { 'content-type': 'text/html' } })))!
     const small = `<p>${words(300, 7)}</p>`
     const other = `<p>${words(300, 7).replace('a', 'b')}</p>`
-    const large = `<p>${words(9000, 9)}</p>`
+    // Past what compresses within the tick.
+    const large = `<p>${words(25000, 9)}</p>`
     const here = spyOn(Bun, 'zstdCompressSync')
     const pooled = spyOn(Bun, 'zstdCompress')
     const server = Bun.serve({ port: 0, hostname: '127.0.0.1', fetch: async () => send(large) })

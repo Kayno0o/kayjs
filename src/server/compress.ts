@@ -12,7 +12,9 @@ export type StoredEncoding = Exclude<Encoding, 'zstd'>
 const ENCODINGS: Encoding[] = ['zstd', 'br', 'gzip']
 const SUFFIXES: Record<StoredEncoding, string> = { br: '.br', gzip: '.gz' }
 const STORED: StoredEncoding[] = ['br', 'gzip']
-const ON_THE_FLY: ReadonlySet<Encoding> = new Set(ENCODINGS)
+// While serving, gzip before brotli: at the levels a request affords, brotli costs about what gzip does for bytes no fewer on a page, and only it needs node:zlib loaded.
+const ON_THE_FLY_ORDER: Encoding[] = ['zstd', 'gzip', 'br']
+const ON_THE_FLY: ReadonlySet<Encoding> = new Set(ON_THE_FLY_ORDER)
 // Brotli and gzip alone for a copy compressed once and sent many times, where zstd's extra bytes would go out on every reply, and for a stream, which holds its encoder's memory while open, brotli's cut window less than zstd's.
 const ONCE_OR_STREAMED: ReadonlySet<StoredEncoding> = new Set(STORED)
 const GZIP_ONLY: ReadonlySet<Encoding> = new Set(['gzip'])
@@ -166,8 +168,8 @@ function brotliWindow(length: number): number {
   return Math.min(Math.max(Math.ceil(Math.log2(length)), constants.BROTLI_MIN_WINDOW_BITS), constants.BROTLI_MAX_WINDOW_BITS)
 }
 
-// Up to this size a body compresses on the main thread, within its request's tick: handing it to zlib's threads costs more than compressing it, and its reply goes out corked with a length.
-const COMPRESS_HERE_BYTES = 16 * 1024
+// Up to this size a body compresses on the main thread, within its request's tick: it costs about a quarter less CPU than on zlib's threads, gzip needs no node:zlib loaded, and its reply goes out corked with a length. Past it, the main thread would stall for more than about half a millisecond.
+const COMPRESS_HERE_BYTES = 128 * 1024
 
 function compressBytesHere(bytes: Uint8Array<ArrayBuffer>, encoding: Encoding): Uint8Array<ArrayBuffer> {
   if (encoding === 'zstd')
@@ -503,7 +505,7 @@ export function compressResponse(request: Request, response: Response, fixed?: F
   if (request.method === 'HEAD' || BODILESS.has(status) || headers.has('content-encoding') || NO_TRANSFORM.test(headers.get('cache-control') ?? '') || !COMPRESSIBLE_TYPE.test(headers.get('content-type') ?? '') || (size !== undefined && size < MIN_SIZE))
     return undefined
 
-  const encoding = preferredEncoding(request.headers.get('accept-encoding'), ON_THE_FLY)
+  const encoding = preferredEncoding(request.headers.get('accept-encoding'), ON_THE_FLY, ON_THE_FLY_ORDER)
 
   // Whatever the browser takes, a shared cache keeps one copy per encoding; one taking none gets the response as it is, its body never read.
   if (!encoding) {
@@ -695,15 +697,15 @@ export function encodedPath(path: string, encoding: StoredEncoding): string {
   return `${path}${SUFFIXES[encoding]}`
 }
 
-// The best of the encodings at hand the request accepts, read off `Accept-Encoding` with its `q` weights; `q=0` refuses one.
-export function preferredEncoding<E extends Encoding>(accept: string | null, available: ReadonlySet<E> | undefined): E | undefined {
+// The best of the encodings at hand the request accepts, read off `Accept-Encoding` with its `q` weights, a tie going to the first in `order`; `q=0` refuses one.
+export function preferredEncoding<E extends Encoding>(accept: string | null, available: ReadonlySet<E> | undefined, order: readonly Encoding[] = ENCODINGS): E | undefined {
   if (accept === null || accept === '' || !available || available.size === 0)
     return undefined
 
   const weights = encodingWeights(accept)
   let best: E | undefined
 
-  for (const encoding of ENCODINGS as E[]) {
+  for (const encoding of order as E[]) {
     if (available.has(encoding) && weights[encoding] > 0 && (best === undefined || weights[encoding] > weights[best]))
       best = encoding
   }
