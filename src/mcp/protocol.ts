@@ -16,8 +16,10 @@ export interface Tool {
   run: (args: Record<string, unknown>) => Promise<ToolResult>
 }
 
+export type Content = { type: 'text', text: string } | { type: 'image', data: string, mimeType: string } | { type: 'resource', resource: { uri: string, mimeType: string, blob: string } }
+
 export interface ToolResult {
-  content: { type: 'text', text: string }[]
+  content: Content[]
   structuredContent?: object
   isError?: boolean
 }

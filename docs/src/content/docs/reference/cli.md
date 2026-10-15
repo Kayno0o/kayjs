@@ -337,12 +337,12 @@ It speaks the revision that opens with `initialize` (`2025-11-25` and earlier) a
 | `check` | `kay check --format json`: `{ errors, warnings, problems }`. `paths` narrows the report to files or directories of the project (`.` is all of it, and a directory holding a `package.json` is a path to report on, not a new project), `only` to a group of lints, `denyWarnings` counts warnings as failures. A problem found is a result, not an error |
 | `routes` | `kay routes --format json`: every route with its file, layouts and guards |
 | `explain` | The lints and error codes, or with `name` a lint, an error code or a group, as `kay explain --format json` |
-| `render` | `kay render` on `url`, with `method`, `body`, `headers` and `cookies`: the body, then the status line, headers and server log. A status of 400 or above is an error result that keeps the body |
+| `render` | `kay render` on `url`, with `method`, `body`, `headers` and `cookies`: the body, then the status line, headers and server log. A body that is not text comes back as an image or a blob, unchanged. A status of 400 or above is an error result that keeps the body |
 | `dev_errors` | The errors a running `kay dev` met, read from `.kay/dev/errors.json` ([Errors without a browser](#errors-without-a-browser)); empty when it has met none |
 
 The resources are `kay://llms.txt`, the index to start from, and one `kay://llms/<file>.md` for each guide of kay's `llms/`, described by its title and the headings of its sections.
 
-Each tool runs its command in a child process, so a call costs what the command does: a `check` takes as long as `kay check`. `kay mcp` keeps no project loaded between calls, as `kay lsp` does.
+Each tool runs its command in a child process, so a call costs what the command does: a `check` takes as long as `kay check`. Calls run one at a time, in the order they came, as they share the project's `.kay` and a `render` boots the whole app; a call waits for the one before it. A command that is stopped, by a timeout or by the client leaving, takes what it started along, its server or its type checker. `kay mcp` keeps no project loaded between calls, as `kay lsp` does.
 
 ## Other commands
 

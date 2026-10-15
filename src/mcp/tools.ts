@@ -1,4 +1,4 @@
-import type { Resource, Tool, ToolResult } from './protocol'
+import type { Content, Resource, Tool, ToolResult } from './protocol'
 import { existsSync } from 'node:fs'
 import { readdir } from 'node:fs/promises'
 import { isAbsolute, join, relative, resolve, sep } from 'node:path'
@@ -18,15 +18,26 @@ const MAX_OUTPUT = 512 * 1024
 // How long a child gets to stop on SIGTERM before it is killed.
 const STOP_WAIT_MS = 2000
 const SCHEME = /^https?:\/\//
+const CONTENT_TYPE = /^content-type:\s*([^;\s]+)/im
+// A body read as text: a `text/` type, or one of the structured formats that are text, `+json` and `+xml` suffixes included.
+const TEXT_TYPE = /^(?:text\/|application\/(?:json|xml|javascript|ecmascript|x-www-form-urlencoded|graphql|yaml|.+\+(?:json|xml)))/i
 const HEADING = /^(#{1,2}) (.+)$/gm
 const READ_ONLY = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
 
 // The commands running for a call.
 const children = new Set<Bun.Subprocess>()
+// The calls of this project, one after the other: they share its `.kay`, and each `render` boots the whole app.
+let queue = Promise.resolve()
+// Set once the commands are stopped for good, so that a call still waiting its turn does not start one.
+let stopped = false
 
 interface Run {
   code: number
   stdout: string
+  // What the command wrote to stdout as it wrote it, which `stdout` reads as text; a page that is no text is these bytes.
+  body: Uint8Array
+  // The body was cut at the limit, which for bytes that are no text makes them useless.
+  truncated: boolean
   stderr: string
 }
 
@@ -114,13 +125,9 @@ function tools(root: string): Tool[] {
 
         const result = await kay(['render', url, '--include', ...method === undefined ? [] : [`--method=${method}`], ...body === undefined ? [] : [`--body=${body}`], ...stringList(args.headers, 'headers').map(header => `--header=${header}`), ...stringList(args.cookies, 'cookies').map(cookie => `--cookie=${cookie}`)])
 
-        return {
-          content: [
-            { type: 'text', text: result.stdout },
-            { type: 'text', text: `kay render exited ${result.code}\n${result.stderr}`.trim() },
-          ],
-          isError: result.code !== 0,
-        }
+        const status: Content = { type: 'text', text: `kay render exited ${result.code}\n${result.stderr}`.trim() }
+
+        return { content: [renderedBody(result), status], isError: result.code !== 0 }
       },
     },
     {
@@ -181,7 +188,29 @@ async function resources(): Promise<Resource[]> {
 }
 
 // Runs `kay` with `args` in `root`, as a child so that what a command prints, exits with or throws cannot reach the protocol on this process's stdout.
+// One call at a time: the next waits for the one before, a failed call included, and its timeout starts when it does.
 async function run(root: string, args: string[]): Promise<Run> {
+  const before = queue
+  let done!: () => void
+
+  queue = new Promise<void>((resolve) => {
+    done = resolve
+  })
+
+  await before
+
+  try {
+    return await spawnKay(root, args)
+  }
+  finally {
+    done()
+  }
+}
+
+async function spawnKay(root: string, args: string[]): Promise<Run> {
+  if (stopped)
+    return { code: 1, stdout: '', body: new Uint8Array(), truncated: false, stderr: `kay ${args[0]} did not run: kay mcp is stopping` }
+
   const child = Bun.spawn([process.execPath, CLI, ...args], { cwd: root, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe', env: process.env, detached: true })
   let timedOut = false
   const timer = setTimeout(() => {
@@ -192,10 +221,15 @@ async function run(root: string, args: string[]): Promise<Run> {
   children.add(child)
 
   try {
-    const [stdout, stderr] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text()])
+    const [out, stderr] = await Promise.all([new Response(child.stdout).bytes(), new Response(child.stderr).text()])
     const code = await child.exited
+    const truncated = out.length > MAX_OUTPUT
+    const body = truncated ? out.subarray(0, MAX_OUTPUT) : out
 
-    return { code, stdout: timedOut ? '' : truncate(stdout), stderr: timedOut ? `kay ${args[0]} was stopped after ${CALL_TIMEOUT_MS / 1000} s` : truncate(stderr) }
+    if (timedOut)
+      return { code, stdout: '', body: new Uint8Array(), truncated: false, stderr: `kay ${args[0]} was stopped after ${CALL_TIMEOUT_MS / 1000} s` }
+
+    return { code, stdout: truncated ? `${new TextDecoder().decode(body)}\n[truncated at ${MAX_OUTPUT} bytes]` : new TextDecoder().decode(body), body, truncated, stderr: truncate(stderr) }
   }
   finally {
     clearTimeout(timer)
@@ -203,8 +237,25 @@ async function run(root: string, args: string[]): Promise<Run> {
   }
 }
 
+// The body of a render as the page's type calls for: text as text, an image as an image, any other bytes as a blob, none of them passed through a text decoder, which would replace what it cannot read.
+function renderedBody(result: Run): Content {
+  const type = CONTENT_TYPE.exec(result.stderr)?.[1]?.toLowerCase()
+
+  if (type === undefined || TEXT_TYPE.test(type) || result.body.length === 0)
+    return { type: 'text', text: result.stdout }
+
+  if (result.truncated)
+    return { type: 'text', text: `[the ${type} body is over ${MAX_OUTPUT} bytes and is not returned]` }
+
+  const data = result.body.toBase64()
+
+  return type.startsWith('image/') && type !== 'image/svg+xml' ? { type: 'image', data, mimeType: type } : { type: 'resource', resource: { uri: 'kay://render/body', mimeType: type, blob: data } }
+}
+
 // Stops every command still running, as the client going away or a call abandoned leaves no one to read its answer; `now` kills them at once, for a process about to exit, which no later escalation would outlive.
 export function stopChildren(now = false): void {
+  stopped = true
+
   for (const child of children) {
     if (now)
       signalGroup(child, 'SIGKILL')

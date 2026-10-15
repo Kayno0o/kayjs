@@ -194,6 +194,108 @@ export const slow: B[N4] = null as never
   }, 90_000)
 })
 
+describe('kay mcp calls in one project', () => {
+  it('runs them one at a time, in the order they came', async () => {
+    const own = await scratchDir('mcp-queue-')
+
+    await Bun.write(join(own, 'tsconfig.json'), tsconfig)
+
+    // Each page notes when its render reached it, then keeps the render going for a second.
+    for (const name of ['first', 'second', 'third']) {
+      await Bun.write(join(own, `src/routes/${name}.kay`), `--- server
+await Bun.write(${JSON.stringify(join(own, name))}, String(Date.now()))
+await Bun.sleep(1000)
+---
+p ${name}
+`)
+    }
+
+    const queued = new Agent(own)
+
+    try {
+      const replies = ['first', 'second', 'third'].map(async name => queued.request('tools/call', { name: 'render', arguments: { url: `/${name}` } }))
+
+      for (const reply of await Promise.all(replies))
+        expect(reply.result?.isError).toBe(false)
+
+      const [first, second, third] = await Promise.all(['first', 'second', 'third'].map(async name => Number(await Bun.file(join(own, name)).text())))
+
+      expect(second! - first!).toBeGreaterThanOrEqual(1000)
+      expect(third! - second!).toBeGreaterThanOrEqual(1000)
+    }
+    finally {
+      expect(await queued.close()).toBe(0)
+      await rm(own, { recursive: true, force: true })
+    }
+  }, 90_000)
+
+  it('runs the call after one that failed', async () => {
+    const own = await scratchDir('mcp-queue-failed-')
+
+    await Bun.write(join(own, 'tsconfig.json'), tsconfig)
+    await Bun.write(join(own, 'src/routes/index.kay'), 'p Home\n')
+
+    const queued = new Agent(own)
+
+    try {
+      const missing = queued.request('tools/call', { name: 'render', arguments: { url: '/nowhere' } })
+      const home = queued.request('tools/call', { name: 'render', arguments: { url: '/' } })
+
+      expect((await missing).result?.isError).toBe(true)
+      expect((await home).result?.content?.[0]?.text).toContain('<p>Home</p>')
+    }
+    finally {
+      expect(await queued.close()).toBe(0)
+      await rm(own, { recursive: true, force: true })
+    }
+  }, 90_000)
+
+  it('returns a body that is no text intact, as an image or a blob', async () => {
+    const own = await scratchDir('mcp-binary-')
+    const bytes = [0x89, 0x50, 0x4E, 0x47, 0xFF, 0xFE, 0x00, 0xC3, 0x28, 0x80]
+
+    await Bun.write(join(own, 'tsconfig.json'), tsconfig)
+    await Bun.write(join(own, 'src/routes/pixel.png.ts'), `export function GET() {
+  return new Response(new Uint8Array([${bytes.join(', ')}]), { headers: { 'content-type': 'image/png' } })
+}
+`)
+    await Bun.write(join(own, 'src/routes/data.bin.ts'), `export function GET() {
+  return new Response(new Uint8Array([${bytes.join(', ')}]), { headers: { 'content-type': 'application/octet-stream' } })
+}
+`)
+    await Bun.write(join(own, 'src/routes/note.txt.ts'), `export function GET() {
+  return new Response('plain', { headers: { 'content-type': 'text/plain; charset=utf-8' } })
+}
+`)
+
+    const binary = new Agent(own)
+    const decoded = (data: unknown) => [...Buffer.from(String(data), 'base64')]
+
+    try {
+      const image = await binary.request('tools/call', { name: 'render', arguments: { url: '/pixel.png' } })
+      const [picture] = image.result?.content as unknown as { type: string, data: string, mimeType: string }[]
+
+      expect(picture).toMatchObject({ type: 'image', mimeType: 'image/png' })
+      expect(decoded(picture?.data)).toEqual(bytes)
+
+      const blob = await binary.request('tools/call', { name: 'render', arguments: { url: '/data.bin' } })
+      const [resource] = blob.result?.content as unknown as { type: string, resource: { mimeType: string, blob: string } }[]
+
+      expect(resource?.type).toBe('resource')
+      expect(resource?.resource.mimeType).toBe('application/octet-stream')
+      expect(decoded(resource?.resource.blob)).toEqual(bytes)
+
+      const text = await binary.request('tools/call', { name: 'render', arguments: { url: '/note.txt' } })
+
+      expect(text.result?.content?.[0]).toEqual({ type: 'text', text: 'plain' })
+    }
+    finally {
+      expect(await binary.close()).toBe(0)
+      await rm(own, { recursive: true, force: true })
+    }
+  }, 90_000)
+})
+
 describe.concurrent('kay mcp', () => {
   it('opens with initialize as the revisions before 2026-07-28 do, answering the version asked for when it speaks it', async () => {
     const { result } = await agent.request('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'test', version: '1' } })
