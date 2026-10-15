@@ -76,7 +76,7 @@ The `app` preset's `compose.prod.yaml` runs the app and the migrations under two
 
 `db/roles.sh` creates `app_rw`: the database image runs it once, when it first creates the database. It also sets default privileges for the owner, so the tables, sequences and schemas a later migration creates are reachable by `app_rw` with no `GRANT` in the migration. `pg-orm.config.ts` reads `MIGRATE_DATABASE_URL` before `DATABASE_URL`, so `bun run db:migrate` and `db:generate` run as the owner wherever it is set. Development does the same with `app_rw:app_rw` in `.env`.
 
-pg-orm's migration history table, `_pgorm_migrations`, is writable by `app_rw` like any table the owner creates. The password goes into the URL as it is, so keep it to letters and digits. An existing app adopts the roles with [the upgrading steps](/guides/upgrading).
+pg-orm's migration history table, `_pgorm_migrations`, is the exception: `app_rw` reads it and cannot write it, so a compromised app cannot make a deploy re-run or skip a migration. The script does it with an event trigger (creating one takes a superuser, which the image's user is), and it revokes the writes from a table that exists already. The password goes into the URL as it is, so keep it to letters and digits. An existing app adopts the roles with [the upgrading steps](/guides/upgrading).
 
 ## Health check and shutdown
 

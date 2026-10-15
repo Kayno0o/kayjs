@@ -14,8 +14,10 @@ permissions:
   contents: read
 
 # Pinned so the cache step and bun agree on one folder, whatever HOME the runner image sets.
+# CI is set outright, as the tests that fail instead of skipping without a browser or a database read it, and a runner not exporting it would skip them silently.
 env:
   BUN_INSTALL_CACHE_DIR: /tmp/bun-cache
+  CI: 'true'
 
 # One run at a time and none cancelled, so a run that starts always answers: Forgejo's default cancelled nearly every run, as landings come faster than one takes. Forgejo then starts every queued run in turn, which the `latest` job ends within seconds once a newer push is queued.
 concurrency:

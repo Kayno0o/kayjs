@@ -395,6 +395,19 @@ GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO app_rw;
 ALTER DEFAULT PRIVILEGES FOR ROLE :"owner" GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO app_rw;
 ALTER DEFAULT PRIVILEGES FOR ROLE :"owner" GRANT USAGE ON SEQUENCES TO app_rw;
 ALTER DEFAULT PRIVILEGES FOR ROLE :"owner" GRANT USAGE ON SCHEMAS TO app_rw;
+
+-- pg-orm's migration history table is created after this script, so the default privileges reach it: an event trigger takes its writes back as it is created, and the revoke below covers one that exists already.
+CREATE OR REPLACE FUNCTION kay_protect_migrations() RETURNS event_trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog AS $$
+DECLARE created record;
+BEGIN
+  FOR created IN SELECT object_identity FROM pg_event_trigger_ddl_commands() WHERE command_tag = 'CREATE TABLE' AND object_identity LIKE '%._pgorm_migrations' LOOP
+    EXECUTE format('REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON %s FROM app_rw', created.object_identity);
+  END LOOP;
+END
+$$;
+DROP EVENT TRIGGER IF EXISTS kay_protect_migrations;
+CREATE EVENT TRIGGER kay_protect_migrations ON ddl_command_end WHEN TAG IN ('CREATE TABLE') EXECUTE FUNCTION kay_protect_migrations();
+SELECT format('REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON %s FROM app_rw', oid::regclass) FROM pg_class WHERE relname = '_pgorm_migrations' AND relkind = 'r' AND relnamespace = 'public'::regnamespace \\gexec
 SQL
 `
 

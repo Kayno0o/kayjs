@@ -11,7 +11,7 @@ const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL ?? ''
 const url = TEST_DATABASE_URL === '' ? undefined : new URL(TEST_DATABASE_URL)
 const PASSWORD = 'rolepass0123'
 const DATABASE = 'kay_app_roles_test'
-// CI has psql, so a missing one fails there instead of skipping.
+// CI has psql, so a missing one fails there instead of skipping: the workflows set CI.
 const run = it.skipIf((url === undefined || Bun.which('psql') === null) && (process.env.CI ?? '') === '')
 
 function connect(user: string, password: string) {
@@ -77,6 +77,8 @@ describe('the app template\'s db/roles.sh', () => {
 
     // A table made before the role exists, as in an app adopting it.
     await owner.unsafe('CREATE TABLE "early" ("id" serial PRIMARY KEY, "name" text NOT NULL)')
+    // The migration history table, there before the script as in an app adopting it.
+    await owner.unsafe('CREATE TABLE "_pgorm_migrations" ("id" serial PRIMARY KEY, "name" text NOT NULL)')
     await runScript(PASSWORD)
     // Run again, with another password: the role exists already, and the password follows.
     await runScript(`${PASSWORD}2`)
@@ -100,6 +102,22 @@ describe('the app template\'s db/roles.sh', () => {
         await app.unsafe(`UPDATE ${table} SET "name" = 'b'`)
         expect((await app.unsafe<{ name: string }[]>(`SELECT "name" FROM ${table}`)).map(row => row.name)).toEqual(['b'])
         await app.unsafe(`DELETE FROM ${table}`)
+      }
+
+      // The history table is read, never written: the one the script found, and the one a later migrate run creates after it.
+      for (const created of ['found', 'created later']) {
+        if (created === 'created later') {
+          await owner.unsafe('DROP TABLE "_pgorm_migrations"')
+          await owner.unsafe('CREATE TABLE "_pgorm_migrations" ("id" serial PRIMARY KEY, "name" text NOT NULL)')
+        }
+
+        await owner.unsafe('INSERT INTO "_pgorm_migrations" ("name") VALUES (\'0001\')')
+        expect([created, (await app.unsafe<{ name: string }[]>('SELECT "name" FROM "_pgorm_migrations"')).map(row => row.name)]).toEqual([created, ['0001']])
+
+        for (const statement of ['INSERT INTO "_pgorm_migrations" ("name") VALUES (\'0002\')', 'UPDATE "_pgorm_migrations" SET "name" = \'x\'', 'DELETE FROM "_pgorm_migrations"', 'TRUNCATE "_pgorm_migrations"'])
+          expect([created, statement, await permission(app, statement)]).toEqual([created, statement, '42501'])
+
+        await owner.unsafe('DELETE FROM "_pgorm_migrations"')
       }
 
       // USAGE draws ids; moving a sequence is not allowed.

@@ -25,7 +25,7 @@ A new app now connects as `app_rw`, which reads and writes rows but cannot drop,
 
 Tables in a schema other than `public` that exist already are not granted: run `GRANT USAGE ON SCHEMA <name> TO app_rw`, then `GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA <name> TO app_rw` and `GRANT USAGE ON ALL SEQUENCES IN SCHEMA <name> TO app_rw`. Those the owner creates later are covered. A table created by a role other than the owner is not granted either.
 
-The script also revokes `CREATE` on `public` from `PUBLIC` (already the default from Postgres 15), and `app_rw` is a role of the cluster: two apps sharing one cluster share it, so give the second another name. pg-orm's migration history table, `_pgorm_migrations`, is writable by `app_rw` like any table the owner creates.
+The script also revokes `CREATE` on `public` from `PUBLIC` (already the default from Postgres 15), and `app_rw` is a role of the cluster: two apps sharing one cluster share it, so give the second another name. pg-orm's migration history table, `_pgorm_migrations`, is the one table `app_rw` only reads: an event trigger the script creates takes its writes back as the owner creates it, and the script revokes them from one that exists already. Creating the trigger takes a superuser, which the database image's user is.
 
 ### kayjs-auth's two-factor setup no longer carries a server-drawn QR code
 
