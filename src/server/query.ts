@@ -39,6 +39,12 @@ const FIELD = /^\/([^/]*)/
 // The schema a route's `ctx.query` is read against: its layouts' `query` and its page's merged, a name two of them declare allowed when their schemas are the same and an error otherwise.
 // `files` and `modules` are the route's chain, the page last.
 export function chainQuery(files: string[], modules: object[]): unknown {
+  const page = modules.at(-1)!
+
+  // Nothing to merge when no layout declares one, and nothing allocated to find out.
+  if (!layoutDeclares(modules))
+    return pageSetting(page, 'query')
+
   const declared = modules.flatMap((module, index) => {
     const schema = pageSetting(module, 'query')
 
@@ -47,7 +53,7 @@ export function chainQuery(files: string[], modules: object[]): unknown {
   const last = declared.at(-1)
 
   if (declared.length <= 1)
-    return last?.schema ?? pageSetting(modules.at(-1)!, 'query')
+    return last?.schema ?? pageSetting(page, 'query')
 
   const parts = declared.map(({ schema }) => schema)
   const known = mergedQueries.get(last!.schema)
@@ -83,6 +89,15 @@ export function chainQuery(files: string[], modules: object[]): unknown {
   mergedQueries.set(last!.schema, { parts, merged })
 
   return merged
+}
+
+function layoutDeclares(modules: object[]): boolean {
+  for (let index = 0; index < modules.length - 1; index++) {
+    if (isSchema(pageSetting(modules[index]!, 'query')))
+      return true
+  }
+
+  return false
 }
 
 // `ctx.query`: the search params read against the page's `query` schema, a refusal answering 400.

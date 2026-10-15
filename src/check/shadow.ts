@@ -2,7 +2,7 @@ import type { Diagnostic, SourceMap } from '../compiler'
 import type { Span } from '../compiler/ast'
 import type { LintLevels } from '../compiler/lints'
 import type { ImportedSignals } from '../compiler/module-signals'
-import type { Route } from '../server/routes'
+import type { Route, RouteMount } from '../server/routes'
 import { existsSync, readFileSync } from 'node:fs'
 import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import { importedSignals } from '../build/signals'
@@ -12,7 +12,7 @@ import { analyzeServer } from '../compiler/script'
 import { projectPaths } from '../project'
 import * as builtInMatchers from '../runtime/params'
 import { matcherFile } from '../server/params'
-import { falseKeys, routeOf } from '../server/routes'
+import { directoriesUp, falseKeys, fileAt, routeOf, routeTrees, virtualDir } from '../server/routes'
 
 // What the shadow tree was last compiled with, for tools that compile one file at a time without reading kay.config.ts, such as the ESLint processor.
 export const SHADOW_SETTINGS = 'kay-shadow.json'
@@ -39,7 +39,7 @@ export interface ShadowFile {
 export interface ShadowSettings {
   routesDir: string
   // The routes directories the app's extensions mount, whose pages' params are read from their own paths.
-  mounts: string[]
+  mounts: RouteMount[]
   islandOnly: Set<string>
   // The levels kay.config.ts gives the lints, which the compiler reports by.
   lints?: LintLevels | undefined
@@ -56,15 +56,15 @@ export function shadowSource(root: string, shadow: string): string {
 }
 
 export function serializeShadowSettings(root: string, settings: ShadowSettings): string {
-  return `${JSON.stringify({ routes: relative(root, settings.routesDir), mounts: settings.mounts.map(dir => relative(root, dir)), islandOnly: [...settings.islandOnly].map(file => relative(root, file)).sort(), ...settings.lints && { lints: settings.lints } }, null, 2)}\n`
+  return `${JSON.stringify({ routes: relative(root, settings.routesDir), mounts: settings.mounts.map(({ dir, prefix }) => ({ dir: relative(root, dir), prefix })), islandOnly: [...settings.islandOnly].map(file => relative(root, file)).sort(), ...settings.lints && { lints: settings.lints } }, null, 2)}\n`
 }
 
 // The settings the shadow tree was written with, or the defaults when no `kay check`, `kay dev` or LSP has written it yet.
 export function readShadowSettings(root: string): ShadowSettings {
   try {
-    const saved = JSON.parse(readFileSync(join(projectPaths(root).types, SHADOW_SETTINGS), 'utf8')) as { routes: string, mounts?: string[], islandOnly: string[], lints?: LintLevels }
+    const saved = JSON.parse(readFileSync(join(projectPaths(root).types, SHADOW_SETTINGS), 'utf8')) as { routes: string, mounts?: (string | RouteMount)[], islandOnly: string[], lints?: LintLevels }
 
-    return { routesDir: resolve(root, saved.routes), mounts: (saved.mounts ?? []).map(dir => resolve(root, dir)), islandOnly: new Set(saved.islandOnly.map(file => resolve(root, file))), lints: saved.lints }
+    return { routesDir: resolve(root, saved.routes), mounts: (saved.mounts ?? []).map(mount => typeof mount === 'string' ? { dir: resolve(root, mount), prefix: '' } : { ...mount, dir: resolve(root, mount.dir) }), islandOnly: new Set(saved.islandOnly.map(file => resolve(root, file))), lints: saved.lints }
   }
   catch {
     return { routesDir: projectPaths(root).routes, mounts: [], islandOnly: new Set() }
@@ -73,7 +73,7 @@ export function readShadowSettings(root: string): ShadowSettings {
 
 export interface ShadowOptions {
   routesDir: string
-  mounts: string[]
+  mounts: RouteMount[]
   // For a static component only islands render.
   insideIsland?: boolean
   lints?: LintLevels | undefined
@@ -81,7 +81,7 @@ export interface ShadowOptions {
 }
 
 // Compiles one .kay file for type checking, its route params typed when it is a page of the routes directory or of an extension's, by the matchers beside `routesDir`.
-export function compileShadow(root: string, file: string, source: string, { routesDir, mounts, insideIsland = false, lints, signals = importedSignals(file, source) }: ShadowOptions): { shadow: ShadowFile, diagnostics: Diagnostic[] } {
+export function compileShadow(root: string, file: string, source: string, { routesDir, mounts, insideIsland = false, lints, signals = importedSignals(file, source) }: ShadowOptions): { shadow: ShadowFile, diagnostics: Diagnostic[], queries: string[] | undefined } {
   const route = pageRoute(file, routesDir, mounts)
   const shadowDir = dirname(shadowPath(root, file))
   // rootDirs only merges paths inside the project, so an import reaching outside it is pointed there from the shadow file.
@@ -97,33 +97,31 @@ export function compileShadow(root: string, file: string, source: string, { rout
 
     return relative(shadowDir, target)
   }
-  const { tsx, map, diagnostics } = compileKay(source, file, { root, params: route?.params, paramTypes: route && paramTypesOf(routesDir, shadowDir, route), outerQueries: layoutQueries(file, source, routesDir, mounts), check: true, insideIsland, relocateImport, lints, importedSignals: signals })
+  const queries = layoutQueries(file, source, routesDir, mounts)
+  const { tsx, map, diagnostics } = compileKay(source, file, { root, params: route?.params, paramTypes: route && paramTypesOf(routesDir, shadowDir, route), outerQueries: queries, check: true, insideIsland, relocateImport, lints, importedSignals: signals })
   // Reported as the server reports it, rather than as a type error in the shadow file.
   const unknown = Object.values(route?.matchers ?? {}).filter(matcher => matcherSource(routesDir, matcher) === undefined)
 
-  return { shadow: { source, file, tsx, map }, diagnostics: [...diagnostics, ...unknown.map(matcher => ({ start: 0, end: 0, message: `names the matcher ${matcher}, which is neither ${relative(root, matcherFile(routesDir, matcher))} nor one kay ships: ${Object.keys(builtInMatchers).join(', ')}` }))] }
+  return { shadow: { source, file, tsx, map }, queries, diagnostics: [...diagnostics, ...unknown.map(matcher => ({ start: 0, end: 0, message: `names the matcher ${matcher}, which is neither ${relative(root, matcherFile(routesDir, matcher))} nor one kay ships: ${Object.keys(builtInMatchers).join(', ')}` }))] }
 }
 
 // The `query` types of the layouts above a page or a layout, which its shadow depends on besides its own source.
-export function layoutQueries(file: string, source: string, routesDir: string, mounts: string[]): string[] | undefined {
-  return pageRoute(file, routesDir, mounts) || basename(file) === LAYOUT ? outerQueries(file, source, mounts.find(dir => file.startsWith(dir + sep)) ?? routesDir) : undefined
+export function layoutQueries(file: string, source: string, routesDir: string, mounts: RouteMount[]): string[] | undefined {
+  return pageRoute(file, routesDir, mounts) || basename(file) === LAYOUT ? outerQueries(file, source, routeTrees(routesDir, mounts)) : undefined
 }
 
-// The type of each `query` schema declared by the layouts above `file` in its routes directory, outermost first: a layout or page reads them through `ctx.query` as the server merges them.
-export function outerQueries(file: string, source: string, pagesDir: string): string[] {
-  if (!file.startsWith(pagesDir + sep) || falseKeys(source).has('layouts'))
+// The type of each `query` schema declared by the layouts above `file` in the URL tree of the app's routes and its extensions', outermost first: a layout or page reads them through `ctx.query` as the server merges them.
+export function outerQueries(file: string, source: string, trees: RouteMount[]): string[] {
+  if (!trees.some(({ dir }) => file.startsWith(dir + sep)) || falseKeys(source).has('layouts'))
     return []
 
   const above: { layout: string, text: string }[] = []
 
-  for (let dir = dirname(file); dir.startsWith(pagesDir); dir = dirname(dir)) {
-    const layout = join(dir, LAYOUT)
+  for (const dir of directoriesUp(virtualDir(trees, dirname(file)))) {
+    const layout = fileAt(trees, dir, LAYOUT)
 
-    if (layout !== file && existsSync(layout))
+    if (layout !== undefined && layout !== file)
       above.push({ layout, text: readFileSync(layout, 'utf8') })
-
-    if (dir === pagesDir)
-      break
   }
 
   // The innermost layout that leaves its parents out starts the chain.
@@ -191,8 +189,8 @@ function wordEnd(source: string, offset: number): number {
 }
 
 // The route of `file` when it is a page, its path read from the routes directory holding it: the app's, or an extension's. Its matchers are the app's either way.
-export function pageRoute(file: string, routesDir: string, mounts: string[]): ReturnType<typeof routeOf> {
-  const pagesDir = mounts.find(dir => file.startsWith(dir + sep)) ?? routesDir
+export function pageRoute(file: string, routesDir: string, mounts: RouteMount[]): ReturnType<typeof routeOf> {
+  const pagesDir = mounts.find(({ dir }) => file.startsWith(dir + sep))?.dir ?? routesDir
 
   return file.startsWith(pagesDir + sep) ? routeOf(pagesDir, file) : undefined
 }

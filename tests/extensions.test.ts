@@ -479,7 +479,7 @@ describe('an extension listed from beside the app', () => {
       expect(output).not.toContain('Cannot find name \'onCleanup\'')
       expect(output).toContain('14 errors')
       // What the ESLint processor types the pages by.
-      expect(readShadowSettings(join(dir, 'app')).mounts).toContain(join(dir, 'lib/routes'))
+      expect(readShadowSettings(join(dir, 'app')).mounts.map(mount => mount.dir)).toContain(join(dir, 'lib/routes'))
       // The workspace package once, by the link the app imports it through, its routes listed by either path.
       expect((await writeShadowTypes(join(dir, 'app'), { extensions: [{ name: 'ws', routes: { dir: join(dir, 'app/node_modules/ws-lib/routes'), prefix: '/ws' } }, { name: 'ws-more', routes: { dir: join(dir, 'ws/more'), prefix: '/more' } }] })).libraries.filter(library => library.extension).map(library => library.dir.slice(dir.length + 1)).sort()).toEqual(['app/node_modules/ws-lib'])
     }

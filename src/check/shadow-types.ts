@@ -104,7 +104,7 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
   if (libraries.pages.length > 0)
     await tree.write(EXTENSION_PAGES, libraries.pages.map(file => `import ${JSON.stringify(`./${relative(projectPaths(root).types, shadowPath(root, file)).slice(0, -'.tsx'.length)}`)}\n`).join(''))
 
-  await tree.write(SHADOW_SETTINGS, serializeShadowSettings(root, { routesDir, mounts: mounts.map(mount => mount.dir), islandOnly: own.islandOnly, lints: options.lints }))
+  await tree.write(SHADOW_SETTINGS, serializeShadowSettings(root, { routesDir, mounts, islandOnly: own.islandOnly, lints: options.lints }))
   // `contentChecks` writes the props check once it read the collections.
   await tree.removeStale([CONTENT_CHECK])
 
@@ -151,7 +151,7 @@ async function ownShadows(root: string, options: CheckOptions, tree: ShadowTree,
 
   for (const file of files) {
     const source = sources.get(file)!
-    const { shadow, diagnostics: compileDiagnostics } = await compileShadowCached(cacheDir, root, file, source, { routesDir, mounts: mounts.map(mount => mount.dir), insideIsland: islandOnly.has(file), lints: options.lints })
+    const { shadow, diagnostics: compileDiagnostics } = await compileShadowCached(cacheDir, root, file, source, { routesDir, mounts, insideIsland: islandOnly.has(file), lints: options.lints })
 
     await tree.shadow(shadow, shadowPath(root, file))
     for (const diagnostic of compileDiagnostics)
@@ -184,7 +184,7 @@ async function libraryShadows(root: string, options: CheckOptions, own: string[]
 
   await Promise.all(files.map(async (file) => {
     const source = await Bun.file(file).text()
-    const { shadow, diagnostics: compileDiagnostics } = await compileShadowCached(cacheDir, root, file, source, { routesDir, mounts: mounts.map(mount => mount.dir), lints: options.lints })
+    const { shadow, diagnostics: compileDiagnostics } = await compileShadowCached(cacheDir, root, file, source, { routesDir, mounts, lints: options.lints })
 
     await tree.shadow(shadow, shadowPath(root, file))
 
@@ -251,11 +251,12 @@ async function compileShadowCached(cacheDir: string, root: string, file: string,
   const route = pageRoute(file, routesDir, mounts)
   const matchers = Object.values(route?.matchers ?? {}).map(matcher => matcherSource(routesDir, matcher) ?? '')
   const signals = importedSignals(file, source)
-  const slot = cacheEntry(cacheDir, file, 'shadow', JSON.stringify([root, routesDir, mounts, insideIsland, lints ?? {}, matchers, signals, layoutQueries(file, source, routesDir, mounts), source]))
+  const queries = layoutQueries(file, source, routesDir, mounts)
+  const slot = cacheEntry(cacheDir, file, 'shadow', JSON.stringify([root, routesDir, mounts, insideIsland, lints ?? {}, matchers, signals, queries, source]))
   const cached = await readCacheEntry<{ tsx: string, map: ReturnType<SourceMap['toJSON']>, diagnostics: Diagnostic[] }>(slot)
 
   if (cached !== undefined)
-    return { shadow: { source, file, tsx: cached.tsx, map: SourceMap.fromJSON(cached.map) }, diagnostics: cached.diagnostics }
+    return { shadow: { source, file, tsx: cached.tsx, map: SourceMap.fromJSON(cached.map) }, diagnostics: cached.diagnostics, queries }
 
   const compiled = compileShadow(root, file, source, { routesDir, mounts, insideIsland, lints, signals })
 

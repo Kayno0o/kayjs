@@ -16,7 +16,7 @@ import { findKayFiles, realPath } from '../build/files'
 import { importedSignals } from '../build/signals'
 import { configCheckOptions, configProblems, contentChecks, generatedChecks, generatedProblem, projectProblems, stopProbes, TSGO, writeShadowTypes } from '../check'
 import { diagnoseShadow, reportsTypeErrors, servedByTheApp, servedLocales } from '../check/diagnose'
-import { compileShadow, generatedSpan, shadowPath, shadowSource, sourceSpan } from '../check/shadow'
+import { compileShadow, generatedSpan, layoutQueries, shadowPath, shadowSource, sourceSpan } from '../check/shadow'
 import { formatKay } from '../compiler/format'
 import { lintLevels } from '../compiler/lints'
 import { offsetAt, positionAt } from '../compiler/mapping'
@@ -41,7 +41,6 @@ interface Project {
   routesDir: string
   // The routes its extensions mount, and their directories, which every compile reads.
   mounts: RouteMount[]
-  mountDirs: string[]
   // The prefixes its locales serve pages under.
   locales: string[]
   shadowTree: string
@@ -66,6 +65,8 @@ interface Document extends ShadowFile {
   insideIsland: boolean
   // The signals of the modules it imports, as compiled with: a module changing them compiles the file again.
   signals: string
+  // The `query` types of the layouts above it, as compiled with: a layout gaining or dropping one compiles the file again.
+  queries: string
 }
 
 const KAY_FILE = /^file:.*\.kay$/
@@ -304,12 +305,12 @@ export class KayLanguageServer {
     const options = new Map([...this.projects].map(([root, project]) => [root, project.options]))
 
     this.server.notify('workspace/didChangeWatchedFiles', { changes: await this.writeShadows() })
-    // An open component that came to be rendered only by islands, or stopped being, whose project read its config again, or that takes as signals those a changed module now exports, or stops, compiles again before the files are checked.
+    // An open component that came to be rendered only by islands, or stopped being, whose project read its config again, or that takes as signals those a changed module now exports, or stops, or whose layouts above gain or drop a `query`, compiles again before the files are checked.
     for (const previous of this.documents.values()) {
       const file = fileURLToPath(previous.uri)
       const project = this.projects.get(projectRootOf(file, this.root))
 
-      if ((project?.islandOnly.has(file) ?? false) !== previous.insideIsland || (project !== undefined && project.options !== options.get(project.root)) || (modulesChanged && JSON.stringify(importedSignals(file, previous.source)) !== previous.signals))
+      if ((project?.islandOnly.has(file) ?? false) !== previous.insideIsland || (project !== undefined && project.options !== options.get(project.root)) || (modulesChanged && JSON.stringify(importedSignals(file, previous.source)) !== previous.signals) || (project !== undefined && JSON.stringify(layoutQueries(file, previous.source, project.routesDir, project.mounts)) !== previous.queries))
         this.refresh(previous)
     }
     this.scheduleDiagnostics()
@@ -369,7 +370,6 @@ export class KayLanguageServer {
     project.options = { ...configCheckOptions(config), routes: (project.root === this.root ? this.routesSetting : undefined) ?? config.routes }
     project.routesDir = projectPaths(project.root, project.options).routes
     project.mounts = routeMounts(project.root, project.options.extensions)
-    project.mountDirs = project.mounts.map(mount => mount.dir)
     project.locales = servedLocales(project.options.i18n)
     project.configured = true
   }
@@ -379,7 +379,7 @@ export class KayLanguageServer {
     let project = this.projects.get(root)
 
     if (!project)
-      this.projects.set(root, project = { root, options: {}, routesDir: projectPaths(root).routes, mounts: [], mountDirs: [], locales: [], shadowTree: `${projectPaths(root).types}/`, shadowFiles: new Set(), shadowStamps: new Map(), islandOnly: new Set(), unreached: new Set(), libraries: [], configured: false })
+      this.projects.set(root, project = { root, options: {}, routesDir: projectPaths(root).routes, mounts: [], locales: [], shadowTree: `${projectPaths(root).types}/`, shadowFiles: new Set(), shadowStamps: new Map(), islandOnly: new Set(), unreached: new Set(), libraries: [], configured: false })
 
     return project
   }
@@ -400,8 +400,8 @@ export class KayLanguageServer {
     const project = this.projectAt(projectRootOf(file, this.root))
     const insideIsland = project.islandOnly.has(file)
     const signals = importedSignals(file, source)
-    const { shadow, diagnostics } = compileShadow(project.root, file, source, { routesDir: project.routesDir, mounts: project.mountDirs, insideIsland, lints: project.options.lints, signals })
-    const document = { ...shadow, uri, shadowUri: pathToFileURL(shadowPath(project.root, file)).href, version, diagnostics, insideIsland, signals: JSON.stringify(signals) }
+    const { shadow, diagnostics, queries } = compileShadow(project.root, file, source, { routesDir: project.routesDir, mounts: project.mounts, insideIsland, lints: project.options.lints, signals })
+    const document = { ...shadow, uri, shadowUri: pathToFileURL(shadowPath(project.root, file)).href, version, diagnostics, insideIsland, signals: JSON.stringify(signals), queries: JSON.stringify(queries) }
 
     this.documents.set(uri, document)
 
@@ -906,7 +906,7 @@ export class KayLanguageServer {
     const file = shadowSource(project.root, path)
     const source = Bun.file(file)
 
-    return await source.exists() ? compileShadow(project.root, file, await source.text(), { routesDir: project.routesDir, mounts: project.mountDirs, insideIsland: project.islandOnly.has(file), lints: project.options.lints }).shadow : undefined
+    return await source.exists() ? compileShadow(project.root, file, await source.text(), { routesDir: project.routesDir, mounts: project.mounts, insideIsland: project.islandOnly.has(file), lints: project.options.lints }).shadow : undefined
   }
 
   // `offset` is the position in the .kay source.

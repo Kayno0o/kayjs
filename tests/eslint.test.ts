@@ -93,7 +93,7 @@ describe('kay/eslint', () => {
 
       expect(processor.preprocess(source, page)[0]!.text).not.toContain('"id": string')
 
-      await Bun.write(settings, serializeShadowSettings(root, { routesDir: join(root, 'src/routes'), mounts: [join(root, 'lib/routes')], islandOnly: new Set() }))
+      await Bun.write(settings, serializeShadowSettings(root, { routesDir: join(root, 'src/routes'), mounts: [{ dir: join(root, 'lib/routes'), prefix: '' }], islandOnly: new Set() }))
 
       expect(processor.preprocess(source, page)[0]!.text).toContain('"id": string')
     }

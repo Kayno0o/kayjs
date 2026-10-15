@@ -889,6 +889,63 @@ describe('kay lsp on a save', () => {
       await rm(dir, { recursive: true, force: true })
     }
   })
+
+  it('compiles an open page again when a layout above it gains or drops a query', async () => {
+    const dir = await scratchDir('lsp-layout-query-')
+    const page = 'src/routes/a.kay'
+    const layout = 'src/routes/_layout.kay'
+    const source = '--- server\nconst query = ctx.query\n---\np {String(query)}\n'
+    const withQuery = '--- server\nimport { s } from \'kay\'\n\nexport const page = { query: s.Object({ q: s.String() }) }\n---\nslot\n'
+    const encoder = new TextEncoder()
+    const toServer = new TransformStream<Uint8Array>()
+    const toClient = new TransformStream<Uint8Array>()
+    const writeToServer = toServer.writable.getWriter()
+    const writeToClient = toClient.writable.getWriter()
+    const client = new Connection(toClient.readable, (data) => {
+      void writeToServer.write(encoder.encode(data))
+    })
+    const server = new KayLanguageServer(new Connection(toServer.readable, (data) => {
+      void writeToClient.write(encoder.encode(data))
+    }))
+
+    await Promise.all([Bun.write(join(dir, 'tsconfig.json'), await Bun.file(join(fixtures, 'site/tsconfig.json')).text()), Bun.write(join(dir, page), source), Bun.write(join(dir, layout), 'slot\n')])
+
+    try {
+      const uri = pathToFileURL(join(dir, page)).href
+
+      await client.request('initialize', { processId: process.pid, rootUri: pathToFileURL(dir).href, capabilities: {} })
+      client.notify('initialized', {})
+      client.notify('textDocument/didOpen', { textDocument: { uri, languageId: 'kay', version: 1, text: source } })
+      await Bun.sleep(300)
+
+      const tsgo = (server as unknown as { tsgo: { connection: Connection } }).tsgo.connection
+      const compiled: string[] = []
+      const notify = spyOn(tsgo, 'notify').mockImplementation((method: string, params?: unknown) => {
+        if (method === 'textDocument/didChange')
+          compiled.push((params as { contentChanges: { text: string }[] }).contentChanges[0]!.text)
+      })
+      const save = async (text: string) => {
+        await Bun.write(join(dir, layout), text)
+        client.notify('workspace/didChangeWatchedFiles', { changes: [{ uri: pathToFileURL(join(dir, layout)).href, type: 2 }] })
+        await Bun.sleep(400)
+      }
+
+      await save(withQuery)
+      await save(withQuery.replace('q: s.String()', 'q: s.Integer()'))
+      await save('slot\n')
+      notify.mockRestore()
+
+      expect(compiled).toHaveLength(2)
+      expect(compiled[0]).toContain('_layout.kay')
+      expect(compiled[1]).not.toContain('_layout.kay')
+    }
+    finally {
+      const { tsgo } = server as unknown as { tsgo?: { process: { kill: () => void } } }
+
+      tsgo?.process.kill()
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
 })
 
 describe('kay lsp with a slow tsgo', () => {

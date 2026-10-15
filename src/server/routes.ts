@@ -580,7 +580,7 @@ function treeHolding(trees: RouteMount[], at: string, name: string): RouteMount 
 }
 
 // Where a directory of one of the trees sits in the URL tree.
-function virtualDir(trees: RouteMount[], dir: string): string {
+export function virtualDir(trees: RouteMount[], dir: string): string {
   const tree = trees.find(({ dir: root }) => dir === root || dir.startsWith(root + sep))!
   const rest = relative(tree.dir, dir).split(sep).filter(Boolean).join('/')
 

@@ -565,6 +565,19 @@ describe.concurrent('kay check, edge cases', () => {
     }
   })
 
+  it('types a mounted extension page\'s ctx.query with the app\'s layouts above its URL', async () => {
+    const layout = '--- server\nimport { s } from \'kay\'\n\nexport const page = { query: s.Object({ q: s.String() }) }\n---\nslot\n'
+    const page = '--- server\nconst q: number = ctx.query.q\n---\np {q}\n'
+    const root = await scratchProject({ 'src/routes/index.kay': 'p home\n', 'src/routes/auth/_layout.kay': layout, 'lib/routes/login.kay': page })
+
+    try {
+      expect((await check(root, { extensions: [{ name: 'lib', routes: { dir: join(root, 'lib/routes'), prefix: '/auth' } }] })).map(d => [basename(d.file), d.line, d.code ?? firstLine(d.message)])).toEqual([['login.kay', 2, 'TS2322']])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('reports a name a layout and its page declare with different schemas, and a special page declaring a query', async () => {
     const schema = (field: string) => `--- server\nimport { s } from 'kay'\n\nexport const page = { query: s.Object({ period: ${field} }) }\n---\np Page\n`
     const root = await scratchProject({

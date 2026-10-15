@@ -1,8 +1,11 @@
 import type { Elysia } from 'elysia'
-import { describe, expect, it } from 'bun:test'
+import { join } from 'node:path'
+import { describe, expect, it, spyOn } from 'bun:test'
+import { layoutQueries } from '../src/check/shadow'
 import { s } from '../src/runtime'
 import { pages } from '../src/server'
 import { chainQuery } from '../src/server/query'
+import { scratchDir } from './scratch'
 
 const routes = 'tests/fixtures/layout-query/src/routes'
 const READ = /<p class="read">([^<]*)<\/p>/
@@ -129,5 +132,49 @@ describe('chainQuery', () => {
 
   it('names both files of a name declared with two schemas', () => {
     expect(() => chainQuery(['layout.kay', 'page.kay'], [{ page: { query: s.Object({ q: s.String() }) } }, { page: { query: s.Object({ q: s.Integer() }) } }])).toThrow('`q` is declared by the `query` of both layout.kay and page.kay, with different schemas')
+  })
+})
+
+describe('chainQuery without a layout query', () => {
+  it('returns the page\'s schema and allocates no array', () => {
+    const page = s.Object({ site: s.String() })
+    const flatMap = spyOn(Array.prototype, 'flatMap')
+
+    try {
+      expect(chainQuery(['layout.kay', 'page.kay'], [{ page: { query: 'nope' } }, { page: { query: page } }])).toBe(page)
+      expect(chainQuery(['layout.kay', 'page.kay'], [{}, {}])).toBeUndefined()
+      expect(flatMap).not.toHaveBeenCalled()
+    }
+    finally {
+      flatMap.mockRestore()
+    }
+  })
+})
+
+describe('layoutQueries of a mounted extension page', () => {
+  const query = '--- server\nimport { s } from \'kay\'\n\nexport const page = { query: s.Object({ q: s.String() }) }\n---\nslot\n'
+
+  it('types the app\'s layouts above its URL, the app\'s winning over the extension\'s at one directory', async () => {
+    const dir = await scratchDir('layout-query-mount-')
+    const app = join(dir, 'app/src/routes')
+    const lib = join(dir, 'lib/routes')
+    const mounts = [{ dir: lib, prefix: '/auth' }]
+    const page = join(lib, 'login/index.kay')
+
+    await Promise.all([
+      Bun.write(join(app, '_layout.kay'), query),
+      Bun.write(join(app, 'auth/_layout.kay'), query),
+      Bun.write(join(lib, '_layout.kay'), query),
+      Bun.write(join(lib, 'login/_layout.kay'), query),
+      Bun.write(page, 'p login\n'),
+    ])
+
+    const import_ = (layout: string) => `(typeof import(${JSON.stringify(layout)}))["page"]["query"]`
+
+    expect(layoutQueries(page, 'p login\n', app, mounts)).toEqual([
+      import_('../../../app/src/routes/_layout.kay'),
+      import_('../../../app/src/routes/auth/_layout.kay'),
+      import_('./_layout.kay'),
+    ])
   })
 })
