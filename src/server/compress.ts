@@ -118,9 +118,10 @@ export function fixedReply(body: string | Promise<string>, headers: Record<strin
     try {
       bytes = await copy
     }
-    // A failed run is tried again by the next request, this one going out whole.
+    // A failed run is tried again by the next request, this one going out whole; a retry already stored by a newer request stays.
     catch {
-      copies.delete(encoding)
+      if (copies.get(encoding) === copy)
+        copies.delete(encoding)
     }
 
     return bytes ? new Response(bytes, { headers: { ...headers, 'content-encoding': encoding, 'vary': 'accept-encoding' } }) : wholeResponse(text, { headers })

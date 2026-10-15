@@ -876,6 +876,53 @@ describe('API routes', () => {
     expect(await created.json()).toEqual(['3'])
   })
 
+  it('answer 204, 205 and 304 with a value as that status and no body', async () => {
+    const copy = await fixtureCopy('production')
+
+    try {
+      await Bun.write(join(copy, 'src/api/bare.ts'), `import { api } from 'kay/server'
+
+export default api()
+  .get('/204', ({ set }) => {
+    set.status = 204
+
+    return { gone: true }
+  })
+  .get('/205', ({ set }) => {
+    set.status = 205
+
+    return ['reset']
+  })
+  .get('/304', ({ set }) => {
+    set.status = 304
+    set.headers['x-kept'] = 'yes'
+
+    return { same: true }
+  })
+`)
+
+      const app = await pages({ routes: join(copy, 'src/routes'), api: join(copy, 'src/api'), prebuilt: false })
+
+      const server = Bun.serve({ port: 0, fetch: app.fetch })
+
+      try {
+        for (const status of [204, 205, 304]) {
+          const reply = await fetch(`http://localhost:${server.port}/api/bare/${status}`)
+
+          expect([reply.status, await reply.text()]).toEqual([status, ''])
+        }
+
+        expect((await fetch(`http://localhost:${server.port}/api/bare/304`)).headers.get('x-kept')).toBe('yes')
+      }
+      finally {
+        await server.stop(true)
+      }
+    }
+    finally {
+      await rm(copy, { recursive: true, force: true })
+    }
+  })
+
   it('answer 500 to a class instance or a Map, a status() body included, logging the route and what it answered, where Elysia would send [object Object]', async () => {
     const copy = await fixtureCopy('production')
     const entries: LogEntry[] = []
