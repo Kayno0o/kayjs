@@ -1,7 +1,7 @@
 import type { ClientBuild } from '../src/server/client'
 import process from 'node:process'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
-import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
+import { afterAll, beforeAll, describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { t, ValidationError } from 'elysia'
 import { clientDir } from '../src/build/assets'
 import { resolveProject } from '../src/project'
@@ -298,6 +298,93 @@ describe('page swap, checking a form in the browser', () => {
     expect(persisted<number>('page', 2, { storage: 'query' })()).toBe(1)
     expect(persisted('q', 'all', { storage: 'query' })()).toBe('all')
     document.head.innerHTML = ''
+  })
+
+  it('keeps a fast-changing query param under the browser\'s history limit, the last value written once the window has room, the signal always current', () => {
+    const setURL = (url: string) => (window as unknown as { happyDOM: { setURL: (url: string) => void } }).happyDOM.setURL(url)
+    const replace = spyOn(history, 'replaceState')
+    const timers: (() => void)[] = []
+    const later = spyOn(globalThis, 'setTimeout').mockImplementation(((run: () => void) => {
+      timers.push(run)
+
+      return 0
+    }) as unknown as typeof setTimeout)
+
+    try {
+      document.head.innerHTML = ''
+      setURL('http://localhost/slider')
+      // A window of its own, whatever the tests before it wrote.
+      setSystemTime(Date.now() + 60_000)
+
+      const level = persisted<number>('level', 0, { storage: 'query' })
+
+      for (let value = 1; value <= 80; value++) {
+        level.set(value)
+        expect(level()).toBe(value)
+      }
+
+      expect(replace).toHaveBeenCalledTimes(50)
+      expect(location.search).toBe('?level=50')
+      expect(timers.length).toBeGreaterThan(0)
+
+      setSystemTime(Date.now() + 31_000)
+      timers.at(-1)!()
+      expect(location.search).toBe('?level=80')
+      expect(level()).toBe(80)
+    }
+    finally {
+      setSystemTime()
+      later.mockRestore()
+      replace.mockRestore()
+    }
+  })
+
+  it('never throws out of set() when the browser refuses a history write, the signal kept', () => {
+    const refuse = spyOn(history, 'replaceState').mockImplementation(() => {
+      throw new DOMException('Attempt to use history.replaceState() more than 100 times per 30 seconds', 'SecurityError')
+    })
+
+    try {
+      setSystemTime(Date.now() + 60_000)
+
+      const refused = persisted('refused', 'a', { storage: 'query' })
+
+      expect(() => refused.set('b')).not.toThrow()
+      expect(refused()).toBe('b')
+    }
+    finally {
+      setSystemTime()
+      refuse.mockRestore()
+    }
+  })
+
+  it('drops a deferred query write once the page has swapped to another path', () => {
+    const setURL = (url: string) => (window as unknown as { happyDOM: { setURL: (url: string) => void } }).happyDOM.setURL(url)
+    const timers: (() => void)[] = []
+    const later = spyOn(globalThis, 'setTimeout').mockImplementation(((run: () => void) => {
+      timers.push(run)
+
+      return 0
+    }) as unknown as typeof setTimeout)
+
+    try {
+      setURL('http://localhost/one')
+      setSystemTime(Date.now() + 60_000)
+
+      const moved = persisted<number>('moved', 0, { storage: 'query' })
+
+      for (let value = 1; value <= 55; value++)
+        moved.set(value)
+
+      expect(timers.length).toBeGreaterThan(0)
+      setURL('http://localhost/two')
+      timers.at(-1)!()
+      expect(location.search).toBe('')
+    }
+    finally {
+      setSystemTime()
+      later.mockRestore()
+    }
   })
 
   it('keeps a string in the query unless the signal is typed otherwise, as the URL holds text', () => {

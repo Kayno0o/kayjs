@@ -91,9 +91,43 @@ function pageRules(): QueryRules | undefined {
   return pageData<QueryRules>(QUERY_SCRIPT, JSON.parse, true)[0]
 }
 
+// WebKit throws a SecurityError past 100 history writes in 30 s, Firefox past 200 in 10 s, which a slider dragged for long enough reaches.
+// Writes under the budget land at once; past it only each param's last value is kept and written once the window has room, and a refused write never throws out of `set()`.
+const WRITE_WINDOW = 30_000
+const WRITE_BUDGET = 50
+const writes: number[] = []
+const deferred = new Map<string, ReturnType<typeof setTimeout>>()
+
+function saveParam(name: string, value: unknown, fallback: unknown): void {
+  clearTimeout(deferred.get(name))
+  deferred.delete(name)
+
+  const now = Date.now()
+
+  while (writes.length > 0 && now - writes[0]! >= WRITE_WINDOW)
+    writes.shift()
+
+  if (writes.length < WRITE_BUDGET) {
+    writes.push(now)
+    writeParam(name, value, fallback)
+
+    return
+  }
+
+  const path = location.pathname
+
+  deferred.set(name, setTimeout(() => {
+    deferred.delete(name)
+
+    // A swap to another page since: the value is no longer this URL's to write.
+    if (location.pathname === path)
+      saveParam(name, value, fallback)
+  }, WRITE_WINDOW - (now - writes[0]!)))
+}
+
 // Takes the current history entry's place, keeping its state, which holds kay's place in history: writing as the visitor types adds no entry to go back through.
 // A list as the param repeated; nothing, blank text or the default leaves it out, so a page left as it was keeps its plain address.
-function saveParam(name: string, value: unknown, fallback: unknown): void {
+function writeParam(name: string, value: unknown, fallback: unknown): void {
   const url = new URL(location.href)
   const rules = pageRules()
   const defaults = [rules && Object.hasOwn(rules, name) ? rules[name]!.default : undefined, fallback].filter(given => given !== undefined).map(given => JSON.stringify(given))
@@ -105,5 +139,10 @@ function saveParam(name: string, value: unknown, fallback: unknown): void {
       url.searchParams.append(name, String(item))
   }
 
-  history.replaceState(history.state, '', url)
+  try {
+    history.replaceState(history.state, '', url)
+  }
+  catch {
+    // Refused by the browser's limit: the address stays behind the signal until the next write.
+  }
 }
