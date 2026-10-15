@@ -60,7 +60,7 @@ const INSTRUCTIONS = 'kay is a Bun web framework whose components are `.kay` fil
 
 // Speaks MCP over newline-delimited JSON-RPC: both the revision that opens with `initialize` and the one carrying its version in every request's `_meta`, serving `tools` and `resources`.
 export class McpServer {
-  // `closing` runs when the client closes its input, before the calls still running are waited for.
+  // `closing` runs when the client closes its input, as the calls still running are waited for.
   constructor(private readonly tools: Tool[], private readonly resources: Resource[], private readonly closing?: () => void) {}
 
   // Reads `input` line by line until it closes, answering each message through `write`.

@@ -255,4 +255,12 @@ describe.concurrent('kay mcp', () => {
       expect(await own.close()).toBe(0)
     }
   })
+
+  it('answers the calls made before its input closed, and exits', async () => {
+    const own = new Agent(root)
+    const reply = own.request('tools/call', { name: 'routes', arguments: {} })
+
+    expect(await own.close()).toBe(0)
+    expect((await reply).result?.structuredContent).toHaveProperty('routes')
+  })
 })

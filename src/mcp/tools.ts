@@ -201,10 +201,14 @@ async function run(root: string, args: string[]): Promise<Run> {
   }
 }
 
-// Stops every command still running, as the client going away or a call abandoned leaves no one to read its answer.
-export function stopChildren(): void {
-  for (const child of children)
-    stop(child)
+// Stops every command still running, as the client going away or a call abandoned leaves no one to read its answer; `now` kills them at once, for a process about to exit, which no later escalation would outlive.
+export function stopChildren(now = false): void {
+  for (const child of children) {
+    if (now)
+      child.kill('SIGKILL')
+    else
+      stop(child)
+  }
 }
 
 // SIGTERM first, so the command stops what it started, then SIGKILL for one that does not.
