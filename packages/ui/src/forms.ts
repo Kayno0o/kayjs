@@ -1,4 +1,4 @@
-import { context, describeField, effect, uid } from 'kay'
+import { context, describeField, effect, markInvalid, uid } from 'kay'
 
 // The messages a FormDialog's last call was refused with, by field name, which each FormField inside it reads for its own `name`.
 export const formIssues = context<(() => Record<string, string>) | undefined>(undefined)
@@ -31,12 +31,11 @@ export function fieldLinks(group: boolean, hint: boolean, messages: () => readon
     return links
   }
 
-  let marked = false
-  const touchedFields = new Map<HTMLElement, boolean>()
+  const marked = new Set<HTMLElement>()
 
   effect(() => {
     if (group) {
-      markGroup(links, messages().length > 0, touchedFields)
+      markGroup(links, messages().length > 0, marked)
 
       return
     }
@@ -56,30 +55,23 @@ export function fieldLinks(group: boolean, hint: boolean, messages: () => readon
     else
       control.removeAttribute('aria-describedby')
 
-    if (invalid) {
-      marked = control.getAttribute('aria-invalid') !== 'true' || marked
-      control.setAttribute('aria-invalid', 'true')
-    }
-    else if (marked) {
-      marked = false
-      control.removeAttribute('aria-invalid')
-    }
+    markInvalid(control, links, invalid)
   })
 
   return links
 }
 
-// The map tells whether the group set `aria-invalid` itself, so one the page marked is left as it is when the message clears.
-function markGroup(links: FieldLinks, shown: boolean, touched: Map<HTMLElement, boolean>): void {
-  const fields = shown ? [...document.querySelectorAll<HTMLElement>(`[data-kui-field="${links.frame}"] :is(${FIELDS})`)].filter(field => field.closest('[data-kui-field]')?.getAttribute('data-kui-field') === links.frame) : [...touched.keys()]
+// The fields the group marked, which it clears once its message does; `markInvalid` leaves one the page or a refused post still marks.
+function markGroup(links: FieldLinks, shown: boolean, marked: Set<HTMLElement>): void {
+  const fields = shown ? [...document.querySelectorAll<HTMLElement>(`[data-kui-field="${links.frame}"] :is(${FIELDS})`)].filter(field => field.closest('[data-kui-field]')?.getAttribute('data-kui-field') === links.frame) : [...marked]
 
   for (const field of fields) {
     const own = (field.getAttribute('aria-describedby') ?? '').split(SPACES).filter(id => id !== '' && id !== links.issues)
 
     if (shown) {
       field.setAttribute('aria-describedby', [...own, links.issues].join(' '))
-      touched.set(field, touched.get(field) ?? field.getAttribute('aria-invalid') !== 'true')
-      field.setAttribute('aria-invalid', 'true')
+      marked.add(field)
+      markInvalid(field, links, true)
 
       continue
     }
@@ -89,9 +81,7 @@ function markGroup(links: FieldLinks, shown: boolean, touched: Map<HTMLElement, 
     else
       field.removeAttribute('aria-describedby')
 
-    if (touched.get(field))
-      field.removeAttribute('aria-invalid')
-
-    touched.delete(field)
+    markInvalid(field, links, false)
+    marked.delete(field)
   }
 }

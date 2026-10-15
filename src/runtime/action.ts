@@ -6,6 +6,7 @@ import type { Locale } from './i18n'
 import { withBase } from './base'
 import { durationSeconds } from './duration'
 import { escapeAttribute } from './escape'
+import { holdInvalid } from './invalid'
 import { leave, mayLeave, navigation, prefetched } from './navigation'
 import { pageData } from './page-data'
 import { ownSignal, undoable, untrack } from './reactive'
@@ -436,6 +437,15 @@ export function formChecked(target: unknown, name: string, value: unknown): bool
 // `aria-invalid` for a field a refused post or call got an error for.
 export function formInvalid(target: unknown, name: string): 'true' | undefined {
   return isAction(target) && (target as FormTarget).error(name) !== undefined ? 'true' : undefined
+}
+
+// What holds the mark of a refused field in an island, beside a component marking the same control.
+const REFUSED = {}
+
+// Marks an island field `aria-invalid` while a refused post or call gave `field` of a form posting to `target` a message, and takes kay's mark off once there is none, leaving one a component still holds.
+// The template writes no `aria-invalid` on a field kay marks, so one found is the server's render of this same refusal.
+export function formMarked(element: Element, target: unknown, field: string): void {
+  holdInvalid(element, REFUSED, formError(target, field) !== undefined, false)
 }
 
 // Adds `id` to an island field's `aria-describedby` while a refused post or call gave `field` of a form posting to `target` a message (`''` for the form's own), and takes it out once there is none, leaving the ids others wrote there.

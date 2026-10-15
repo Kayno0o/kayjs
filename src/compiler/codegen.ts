@@ -211,7 +211,7 @@ class ModuleShell {
 
     // What fills a form's fields back in once a post was refused.
     if (runs && facts.actionForm)
-      kayHelpers.push('formValue', 'formChecked', 'formInvalid', 'formError')
+      kayHelpers.push('formValue', 'formChecked', mode === 'dom' ? 'formMarked' : 'formInvalid', 'formError')
 
     // An island toggles a refused field's message in its description, beside the ids a component wrote there.
     if (mode === 'dom' && errors !== undefined && errors.describing.size > 0)
@@ -686,7 +686,7 @@ export function mayPromote(file: KayFile, script: ScriptAnalysis): boolean {
   return someNode(file.template, node => node.kind === 'element' && node.component && (node.attributes.some(attribute => (attribute.kind === 'expression' || attribute.kind === 'spread') && mayHoldFunction(file.source.slice(attribute.expression.start, attribute.expression.end), names)) || node.children.some(child => child.kind === 'slot' && child.params !== undefined)))
 }
 
-type KayHelper = 'formAction' | 'formValue' | 'formChecked' | 'formDescribed' | 'formInvalid' | 'formError' | 'formProtection' | 'registerActions' | 'actionStub' | 'autoDefer'
+type KayHelper = 'formAction' | 'formValue' | 'formChecked' | 'formDescribed' | 'formInvalid' | 'formMarked' | 'formError' | 'formProtection' | 'registerActions' | 'actionStub' | 'autoDefer'
 
 type Helper = TemplateHelper | 'omit'
 

@@ -1,0 +1,34 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+export const claim = action(t.Object({ handle: t.String({ minLength: 3, maxLength: 40, error: 'Three letters at least' }) }), () => undefined)
+--- script
+import { signal } from 'kay'
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+
+// A message of the page's own beside the action's, which the island shows and hides as a check of its own would.
+const issue = signal<string>()
+const bumped = signal(0)
+
+async function send(handle: string) {
+  try {
+    await claim({ handle }, { refresh: false })
+  }
+  catch {
+    // What the call was refused for shows through claim.error.
+  }
+}
+---
+main
+  form#claim(action={claim})
+    FormField(label="Handle" issue={issue()})
+      input(name="handle")
+    if claim.error('handle') as message
+      p {message}
+    button#post(formnovalidate) Claim
+  button#bump(type="button" onClick={() => bumped.set(1)}) {bumped()}
+  button#accept(type="button" onClick={() => void send('abcd')}) Accept
+  button#refuse(type="button" onClick={() => void send('ab')}) Refuse
+  button#show(type="button" onClick={() => issue.set('Taken already')}) Show
+  button#hide(type="button" onClick={() => issue.set(undefined)}) Hide

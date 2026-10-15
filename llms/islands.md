@@ -334,6 +334,7 @@ const dispose = mount(Panel, document.querySelector('#panel')!, { title: 'Ticket
 - A `try` whose block fails on the server draws its `catch` block's ids apart, so the ids after it match the browser's, which keeps the server's markup there.
 - `describeField(ids)` from `kay`, called in a component's script, adds `ids` to the `aria-describedby` of the first `input`, `select` or `textarea` the component renders on the server, its slot included, after the field's own ids and a refused field's message, so a form field ties the control its parent writes to its hint and message; a field with a spread keeps it too, and a `hidden`, `submit`, `button`, `reset` or `image` input is skipped whether its `type` is written or an expression; in an island the ids stay as the field turns refused and valid again, kay adding and removing the message alone.
 - It acts on the server's markup alone: inside an island, the browser keeps such a link itself as the messages change. Importing it keeps a component static.
+- `markInvalid(element, by, invalid)` from `kay` marks a field `aria-invalid="true"` for `by`, any value naming the source, while `invalid`, and takes the mark off once no source holds it, kay's own mark of a refused field included, leaving one the page wrote before any source; a form field marking the control its parent writes calls it from an effect, so the field stays invalid while either it or the action refuses it.
 
 ### Browser-only components
 

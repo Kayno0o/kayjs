@@ -37,6 +37,7 @@ import { collection } from 'kay/content'
 | `sanitizeHtml`, `trustHtml` | Clean untrusted HTML, its options typed `SanitizeOptions`, or mark HTML as safe to render, which a spread's `innerHTML` requires |
 | `uid` | A unique id that matches between server and browser |
 | `describeField` | Adds ids to the `aria-describedby` of the first field a component renders on the server, its slot included, for a form field linking the control its parent writes to its hint |
+| `markInvalid` | Marks a field `aria-invalid` for one source among several, such as a form field's own message beside a refused post in an island, taking the mark off once none holds it |
 | `previewing` | Whether the visitor is in preview mode |
 | `editing` | Whether the visitor is in edit mode, a CMS editing content on the page |
 | `logFrom` | A library's log, `logFrom('my-library').error(message, error)`, written where the app's `log` setting sends kay's messages, or to the console as `[my-library] message` outside a server |

@@ -5,8 +5,20 @@ import process from 'node:process'
 import { describe, expect, it, spyOn } from 'bun:test'
 import { chromium } from 'playwright-core'
 import { compileKay } from '../src/compiler'
-import { formDescribed } from '../src/runtime/action'
+import { formDescribed, formMarked } from '../src/runtime/action'
+import { markInvalid } from '../src/runtime/invalid'
 import { browserPath, testSite } from '../src/test'
+
+// An element keeping its attributes, for the helpers an island runs on its fields.
+function fakeElement(): Element {
+  const attributes = new Map<string, string>()
+
+  return {
+    getAttribute: (name: string) => attributes.get(name) ?? null,
+    setAttribute: (name: string, value: string) => void attributes.set(name, value),
+    removeAttribute: (name: string) => void attributes.delete(name),
+  } as unknown as Element
+}
 
 // The islands built for the island form's tests, which load pages in Chromium only once they open one.
 const site = await testSite({ routes: 'tests/fixtures/forms/src/routes', browser: true })
@@ -224,6 +236,61 @@ describe('the messages a refused form is described by', () => {
     attributes.set('aria-describedby', 'hint')
     formDescribed(element, target, 'title', 'title-error')
     expect(attributes.get('aria-describedby')).toBe('hint title-error')
+  })
+
+  it('marks an island\'s refused field through its own helper, the server keeping the attribute', () => {
+    const source = 'form(action={add})\n  input(name="title")\n'
+    const dom = compileKay(source, 'page.kay', { output: 'dom' }).tsx
+
+    expect(dom).toMatch(/KayFormMarked\(\w+, \(add\), "title"\)/)
+    expect(dom).toContain('formMarked as KayFormMarked')
+    expect(dom).not.toContain('KayFormInvalid')
+    expect(compileKay(source, 'page.kay', { output: 'html' }).tsx).toContain('KayAttribute("aria-invalid", KayFormInvalid((add), "title"))')
+  })
+
+  it('keeps a field invalid while any source marks it, takes the mark off once none does, and leaves one the page wrote', () => {
+    const element = fakeElement()
+    let errors: Record<string, string> = { title: 'Too short' }
+    const target = Object.assign(() => undefined, { [Symbol.for('kay.action')]: true, error: (field: string) => errors[field] })
+    const field = {}
+    const invalid = () => element.getAttribute('aria-invalid')
+
+    // The mark the server rendered for the refusal is kay's own.
+    element.setAttribute('aria-invalid', 'true')
+    formMarked(element, target, 'title')
+    markInvalid(element, field, true)
+    errors = {}
+    formMarked(element, target, 'title')
+    expect(invalid()).toBe('true')
+
+    markInvalid(element, field, false)
+    expect(invalid()).toBeNull()
+
+    formMarked(element, target, 'title')
+    markInvalid(element, field, false)
+    expect(invalid()).toBeNull()
+
+    errors = { title: 'Too short' }
+    markInvalid(element, field, true)
+    formMarked(element, target, 'title')
+    markInvalid(element, field, false)
+    expect(invalid()).toBe('true')
+
+    errors = {}
+    formMarked(element, target, 'title')
+    expect(invalid()).toBeNull()
+
+    // A mark the page wrote before any source stays, and a source that never marked the field leaves another's alone.
+    const page = fakeElement()
+
+    page.setAttribute('aria-invalid', 'true')
+    markInvalid(page, field, true)
+    markInvalid(page, field, false)
+    expect(page.getAttribute('aria-invalid')).toBe('true')
+
+    page.setAttribute('aria-invalid', 'false')
+    markInvalid(page, {}, false)
+    expect(page.getAttribute('aria-invalid')).toBe('false')
   })
 })
 

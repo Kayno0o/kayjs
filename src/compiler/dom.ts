@@ -473,7 +473,7 @@ export class DomTemplate extends TemplateWriter {
       }
 
       if (field?.invalid && target) {
-        own.push(variable => b.add(`KayEffect(() => KayProperty(${variable(node)}, "aria-invalid", KayFormInvalid((`).addSource(target).add(`), ${JSON.stringify(field.name)})));`))
+        own.push(variable => b.add(`KayEffect(() => KayFormMarked(${variable(node)}, (`).addSource(target).add(`), ${JSON.stringify(field.name)}));`))
 
         if (described)
           own.push(variable => b.add(`KayEffect(() => KayFormDescribed(${variable(node)}, (`).addSource(target).add(`), ${JSON.stringify(field.name)}, ${JSON.stringify(described.id)}));`))
