@@ -6,7 +6,7 @@ import { afterAll, describe, expect, it } from 'bun:test'
 import { clientDir } from '../src/build/assets'
 import { buildClient } from '../src/build/client'
 import { findKayLibraries } from '../src/build/libraries'
-import { pruneClasses, pruneNodes, unusedLibraryClasses } from '../src/build/prune'
+import { classTokens, pruneClasses, pruneNodes, unusedLibraryClasses } from '../src/build/prune'
 import { mergeSupports, mergingSupports, parse, print } from '../src/build/supports'
 import { devBuilder } from '../src/dev/builder'
 import { scratchDir } from './scratch'
@@ -15,6 +15,17 @@ const projects: string[] = []
 
 afterAll(async () => {
   await Promise.all(projects.map(async dir => rm(dir, { recursive: true, force: true })))
+})
+
+describe('classTokens', () => {
+  it('yields each run of class characters one at a time, never as one array of them all', () => {
+    const tokens = classTokens('{"a": "hover:kui-btn md:[x]/y", "n": 12}')
+
+    expect(Array.isArray(tokens)).toBe(false)
+    expect(tokens.next()).toEqual({ done: false, value: 'a' })
+    expect([...tokens]).toEqual(['hover', 'kui-btn', 'md', 'x', 'y', 'n', '12'])
+    expect([...classTokens('')]).toEqual([])
+  })
 })
 
 describe('pruneClasses', () => {
@@ -174,6 +185,18 @@ describe('a library\'s stylesheet in an app', () => {
 
     expect(unused).toContain('ui-unused')
     expect(unused).not.toContain('ui-demo')
+  })
+
+  it('reads a large data file of the app for the classes it names', async () => {
+    const root = await newProject(PLAIN_CSS)
+    const rows = Array.from({ length: 200_000 }, (_, index) => `{"id":${index},"name":"row ${index}"}`)
+
+    await Bun.write(join(root, 'src/data.json'), `[${rows.join(',')},{"class":"ui-unused"}]`)
+
+    const unused = await unusedLibraryClasses(root, await findKayLibraries(root), [])
+
+    expect(unused).not.toContain('ui-unused')
+    expect(unused).toContain('ui-unused-too')
   })
 
   it('prunes what Tailwind inlines of it as well', async () => {

@@ -163,7 +163,7 @@ function addRuleClasses(nodes: Node[], into: Set<string>): void {
 }
 
 const sheetClasses = new WeakMap<object, string[]>()
-const fileTokens = new WeakMap<object, string[]>()
+const fileTokens = new WeakMap<object, Set<string>>()
 
 // A file removed since the walk found it, a dangling link or one the user cannot read holds nothing to prune by: left out, it can only keep more rules.
 function readable(file: string): ReturnType<typeof readSource> | undefined {
@@ -195,20 +195,22 @@ function stylesheetClasses(file: string): string[] {
 }
 
 // Every run of the characters a plain class is written with: a word read across `:`, `[` or `/` holds the class it names, `hover:kui-btn` or `class:kui-btn`.
-export function classTokens(text: string): string[] {
-  return text.match(TOKEN) ?? []
+// Yielded one at a time, so a large data file never has all of its tokens held at once.
+export function* classTokens(text: string): Generator<string, void, undefined> {
+  for (const match of text.matchAll(TOKEN))
+    yield match[0]
 }
 
-function tokensOf(file: string): string[] {
+function tokensOf(file: string): ReadonlySet<string> {
   const read = readable(file)
 
   if (read === undefined)
-    return []
+    return new Set()
 
   let tokens = fileTokens.get(read)
 
   if (tokens === undefined)
-    fileTokens.set(read, tokens = [...new Set(classTokens(read.text))])
+    fileTokens.set(read, tokens = new Set(classTokens(read.text)))
 
   return tokens
 }
