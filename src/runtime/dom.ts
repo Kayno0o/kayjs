@@ -16,6 +16,9 @@ export { componentClass, merge, omit, spreadAttributes } from './values'
 
 // Several sibling nodes rendered as one: a block or a component returning more than one node. Its first and last nodes stay in place while what sits between changes.
 export class Range {
+  // The nodes it was made of when it was taken out while one still plays its leave phase, as its plain nodes are gone by then and a walk from `first` could not find them.
+  nodes?: Node[] | undefined
+
   constructor(readonly first: Node, readonly last: Node) {}
 }
 
@@ -322,8 +325,8 @@ class Region {
 }
 
 function insertUnit(parent: Node, unit: Unit, before: Node | null): void {
-  // Before its own first node: already in place, and moving its nodes one by one before that one would put them in front of it.
-  if (before === firstOf(unit))
+  // Before its own first node: already in place, and moving its nodes one by one before that one would put them in front of it, unless some are gone.
+  if (before === firstOf(unit) && !isStale(unit))
     return
 
   if (!(unit instanceof Range)) {
@@ -332,20 +335,29 @@ function insertUnit(parent: Node, unit: Unit, before: Node | null): void {
     return
   }
 
-  let node: Node | null = unit.first
-
-  while (node) {
-    const next: Node | null = node === unit.last ? null : node.nextSibling
-
-    parent.insertBefore(node, before)
-    node = next
+  for (const node of nodesOf(unit)) {
+    // A node of the unit already there stays, the ones after it going behind it.
+    if (node === before)
+      before = node.nextSibling
+    else
+      parent.insertBefore(node, before)
   }
+
+  unit.nodes = undefined
+}
+
+// Whether some nodes of a unit are not in the document, a unit taken out while one of them was still leaving.
+function isStale(unit: Unit): boolean {
+  return unit instanceof Range && unit.nodes !== undefined
 }
 
 // The nodes a unit is made of, in order.
 function nodesOf(unit: Unit): Node[] {
   if (!(unit instanceof Range))
     return [unit]
+
+  if (unit.nodes)
+    return unit.nodes
 
   const nodes: Node[] = []
 
@@ -357,8 +369,13 @@ function nodesOf(unit: Unit): Node[] {
 
 // An element with a `transition` plays its leave phase first.
 function removeUnit(unit: Unit): void {
-  for (const node of nodesOf(unit))
+  const nodes = nodesOf(unit)
+
+  for (const node of nodes)
     transitions ? transitions.leave(node) : node.parentNode?.removeChild(node)
+
+  if (unit instanceof Range && nodes.some(node => transitions?.leaving(node)))
+    unit.nodes = nodes
 }
 
 // What a block shows after its first render plays its enter phase, the elements with a `transition` it starts with.
@@ -511,10 +528,10 @@ export function insert(element: Node | null, start: Node | null, end: Node | nul
       while (at && transitions?.leaving(at))
         at = at.nextSibling
 
-      if (firstOf(unit) === at)
-        at = lastOf(unit).nextSibling
-      else
+      if (isStale(unit) || firstOf(unit) !== at)
         region.insert(unit, at ?? region.end)
+
+      at = lastOf(unit).nextSibling
     }
 
     current = next

@@ -1192,6 +1192,38 @@ describe('transitions', () => {
     }
   })
 
+  const mountReturningPair = site({
+    'pair.kay': 'p.panel(transition="fade" style="transition-duration: 200ms") Hi\ni.plain\n',
+    'main.kay': '---\nimport { signal } from \'kay\'\nimport Pair from \'./pair.kay\'\n\nconst b = document.createElement(\'b\')\nconst pair = Pair({})\nconst open = signal(true)\n;(globalThis as { flip?: () => void }).flip = () => open.set(!open())\n---\ndiv\n  | {[open() ? pair : null, b]}\n',
+  })
+
+  it('show a unit of several nodes whole and in order when it comes back during its leave phase', async () => {
+    const { root, dispose } = await mountReturningPair()
+    const flip = (globalThis as unknown as { flip: () => void }).flip
+    const names = () => [...root.querySelector('div')!.children].map(child => child.localName)
+
+    try {
+      const panel = root.querySelector('.panel')!
+
+      expect(names()).toEqual(['p', 'i', 'b'])
+      flip()
+      await updated()
+      await twoFrames()
+      flip()
+      await updated()
+      expect(names()).toEqual(['p', 'i', 'b'])
+      await done()
+      expect([panel.isConnected, panel.className, names()]).toEqual([true, 'panel', ['p', 'i', 'b']])
+      flip()
+      await updated()
+      await done()
+      expect(names()).toEqual(['b'])
+    }
+    finally {
+      await dispose()
+    }
+  })
+
   it('draw a unit after a leaving node at the end of the part', async () => {
     const { root, dispose } = await mountKeptMoves()
     const step = (globalThis as unknown as { step: () => void }).step
