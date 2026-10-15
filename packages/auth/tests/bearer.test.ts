@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, setSystemTime, test } from 'bun:test'
 import { Elysia } from 'elysia'
+import { memoryStore } from '../src/memoryStore'
 import { browser as browserOf, testApp } from './helpers/app'
 
 const PASSWORD = 'correct horse battery'
@@ -208,3 +209,56 @@ describe('issuing a token from the server', () => {
     expect(await app.auth.issueToken(user.id, 'Phone')).toEqual({ ok: false, error: 'banned' })
   })
 })
+
+describe('reading a token and its user', () => {
+  // A store counting the reads a request makes for a token, with or without the joined read.
+  function counting(joined: boolean) {
+    const store = memoryStore()
+    const calls = { digest: 0, joined: 0, user: 0 }
+    const { findByDigestWithUser, ...bearerTokens } = store.bearerTokens
+
+    return {
+      calls,
+      store: {
+        ...store,
+        users: { ...store.users, get: async (id: string) => {
+          calls.user++
+
+          return store.users.get(id)
+        } },
+        bearerTokens: {
+          ...bearerTokens,
+          findByDigest: async (digest: string) => {
+            calls.digest++
+
+            return store.bearerTokens.findByDigest(digest)
+          },
+          ...joined && { findByDigestWithUser: async (digest: string) => {
+            calls.joined++
+
+            return findByDigestWithUser!(digest)
+          } },
+        },
+      },
+    }
+  }
+
+  test.each([[true, [1, 0, 0]], [false, [0, 1, 1]]] as const)('with the joined read %s, a request sending a token makes the reads %j', async (joined, reads) => {
+    const { calls, store } = counting(joined)
+    const { browser, minted } = await withTokenIn(store)
+
+    calls.digest = calls.joined = calls.user = 0
+
+    expect(await browser().json('/me', { headers: { authorization: `Bearer ${minted.token}` } })).toMatchObject({ email: 'ada@example.com' })
+    expect([calls.joined, calls.digest, calls.user]).toEqual([...reads])
+  })
+})
+
+async function withTokenIn(store: ReturnType<typeof memoryStore>) {
+  const app = testApp({ scopes: ['posts:read', 'posts:write', 'stats'], store })
+  const ada = app.browser()
+
+  await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
+
+  return { ...app, ada, minted: await ada.call('createToken', { password: PASSWORD }, 'Phone', {}) }
+}

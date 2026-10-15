@@ -154,6 +154,46 @@ export function storeContract(name: string, fresh: () => Promise<AuthStore>) {
       expect(await store.bearerTokens.findByDigest('d1')).toBeUndefined()
     })
 
+    test('a bearer token comes with its user in one read, typed as the separate reads give them', async () => {
+      if (!store.bearerTokens.findByDigestWithUser)
+        return
+
+      const user = userRecord({
+        id: 'u1',
+        email: 'ada@example.com',
+        username: 'Ada',
+        roles: ['admin', 'editor'],
+        guest: true,
+        sessionVersion: 3,
+        emailVerifiedAt: new Date('2026-01-01T00:00:00Z'),
+        totpEnabledAt: new Date('2026-01-02T00:00:00Z'),
+        bannedAt: new Date('2026-01-03T00:00:00Z'),
+        bannedUntil: new Date('2026-01-04T00:00:00Z'),
+        banReason: 'spam',
+        locale: 'fr',
+      })
+
+      await store.users.create(user)
+      await store.bearerTokens.create({ id: 't1', userId: 'u1', label: 'Phone', digest: 'd1', scopes: ['posts:read'], createdAt: new Date('2026-01-01T00:00:00Z'), lastUsedAt: null, expiresAt: null })
+
+      const joined = await store.bearerTokens.findByDigestWithUser('d1')
+
+      expect(joined?.token).toEqual(await store.bearerTokens.findByDigest('d1'))
+      expect(joined?.user).toEqual(await store.users.get('u1'))
+      expect(joined?.user.roles).toEqual(['admin', 'editor'])
+      expect(joined?.user.guest).toBe(true)
+      expect(joined?.user.bannedUntil).toEqual(new Date('2026-01-04T00:00:00Z'))
+
+      const plain = userRecord({ id: 'u2', email: 'bob@example.com' })
+
+      await store.users.create(plain)
+      await store.bearerTokens.create({ id: 't2', userId: 'u2', label: 'Laptop', digest: 'd2', scopes: null, createdAt: new Date('2026-01-01T00:00:00Z'), lastUsedAt: null, expiresAt: null })
+      expect((await store.bearerTokens.findByDigestWithUser('d2'))?.user).toEqual(await store.users.get('u2'))
+      expect(await store.bearerTokens.findByDigestWithUser('nope')).toBeUndefined()
+      await store.users.delete('u1')
+      expect(await store.bearerTokens.findByDigestWithUser('d1')).toBeUndefined()
+    })
+
     test('sessions are got, listed by user oldest first, updated, and deleted by their owner only', async () => {
       const session = (id: string, createdAt: string, maxAge: number | null = null) => ({ id, userId: 'u1', version: 0, userAgent: 'Firefox', ip: '10.0.0.1', createdAt: new Date(createdAt), lastSeenAt: new Date(createdAt), maxAge })
 

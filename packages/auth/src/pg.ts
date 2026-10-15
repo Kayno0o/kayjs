@@ -278,6 +278,11 @@ export function pgStore(db: Database): AuthStore {
         await bearerTokens.write.insertOne({ id: token.id, user_id: token.userId, label: token.label, digest: token.digest, scopes: token.scopes, created_at: token.createdAt, last_used_at: token.lastUsedAt, expires_at: token.expiresAt })
       },
       findByDigest: async digest => toBearerToken(await bearerTokens.read.findOne({ digest })),
+      async findByDigestWithUser(digest) {
+        const [row] = await bearerTokens.read.findMany(q => joinedUser(q).where({ digest }).limit(1)) as unknown as (InferEntity<typeof AuthBearerTokens> & Record<string, unknown>)[]
+
+        return row && { token: toBearerToken(row)!, user: toUser(userOf(row))! }
+      },
       listByUser: async userId => (await bearerTokens.read.findMany(q => q.where({ user_id: userId }).orderBy('created_at', 'asc'))).map(row => toBearerToken(row)!),
       async touch(id, at) {
         await bearerTokens.write.updateById(id, { last_used_at: at })
@@ -337,6 +342,33 @@ export function pgStore(db: Database): AuthStore {
       ])
     },
   }
+}
+
+// A bearer token's query with its user's columns joined on as `u.<column>`.
+const JOINED_COLUMNS = [...Object.keys(AuthBearerTokens.columns), ...Object.keys(AuthUsers.columns).map(column => `u.${column}`)]
+
+function joinedUser(q: any) {
+  return q.join(AuthUsers, 'u', (e: any) => e.eq('user_id', e.ref('u.id'))).pick(...JOINED_COLUMNS)
+}
+
+// The user columns holding a date.
+const DATE_COLUMNS = new Set(['email_verified_at', 'totp_enabled_at', 'banned_at', 'banned_until', 'created_at'])
+
+// The user a joined row holds, its columns typed as a read of the user alone gives them: Postgres types them as it reads, SQLite hands a date as text, an array as JSON text and a boolean as 0 or 1.
+function userOf(row: Record<string, unknown>): UserRow {
+  const user: Record<string, unknown> = {}
+
+  for (const column of Object.keys(AuthUsers.columns)) {
+    const value = row[`u.${column}`]
+
+    user[column] = column === 'roles' && typeof value === 'string'
+      ? JSON.parse(value)
+      : column === 'guest' && typeof value === 'number'
+        ? value !== 0
+        : DATE_COLUMNS.has(column) && typeof value === 'string' ? new Date(value) : value
+  }
+
+  return user as UserRow
 }
 
 function toUser(row: UserRow | null): UserRecord | undefined {

@@ -261,6 +261,8 @@ export interface AuthStore {
   bearerTokens: {
     create: (token: BearerTokenRecord) => MaybePromise<void>
     findByDigest: (digest: string) => MaybePromise<BearerTokenRecord | undefined>
+    // The token with that digest and its user in one query, undefined when either is missing; without it kayjs-auth calls `findByDigest` then `users.get`.
+    findByDigestWithUser?: (digest: string) => MaybePromise<{ token: BearerTokenRecord, user: UserRecord } | undefined>
     listByUser: (userId: string) => MaybePromise<BearerTokenRecord[]>
     // Records a use, without changing anything else.
     touch: (id: string, at: Date) => MaybePromise<void>

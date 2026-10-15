@@ -138,13 +138,17 @@ export async function bearerUser(core: Core, request: Request): Promise<{ record
 
 // The user a bearer token belongs to, as a websocket handshake checks one; an expired token is refused.
 export async function tokenUser(core: Core, token: string): Promise<{ record: UserRecord, scopes: string[] | null } | undefined> {
-  const found = await core.store.bearerTokens.findByDigest(digest(token))
+  const { bearerTokens, users } = core.store
+  const hash = digest(token)
+  // One query for both when the store has it; the user is read only for a token that has not expired.
+  const joined = await bearerTokens.findByDigestWithUser?.(hash)
+  const found = bearerTokens.findByDigestWithUser ? joined?.token : await bearerTokens.findByDigest(hash)
   const now = new Date()
 
   if (!found || (found.expiresAt !== null && found.expiresAt <= now))
     return undefined
 
-  const record = await core.store.users.get(found.userId)
+  const record = bearerTokens.findByDigestWithUser ? joined?.user : await users.get(found.userId)
 
   if (!record)
     return undefined

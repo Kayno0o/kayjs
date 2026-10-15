@@ -248,6 +248,12 @@ export function memoryStore(): AuthStore {
         bearerTokens.set(token.id, copyToken(token)!)
       },
       findByDigest: digest => copyToken([...bearerTokens.values()].find(token => token.digest === digest)),
+      findByDigestWithUser(digest) {
+        const token = copyToken([...bearerTokens.values()].find(each => each.digest === digest))
+        const user = token && copy(users.get(token.userId))
+
+        return token && user ? { token, user } : undefined
+      },
       listByUser: userId => [...bearerTokens.values()].filter(token => token.userId === userId).map(token => copyToken(token)!),
       touch(id, at) {
         const token = bearerTokens.get(id)
