@@ -142,7 +142,19 @@ async function hydrateIsland(registry: IslandRegistry, element: HTMLElement): Pr
     return
   }
 
-  const [{ default: component }, slots] = await Promise.all([load(), staticSlots(registry, element)])
+  let loaded: [Awaited<ReturnType<IslandRegistry[string]>>, Awaited<ReturnType<typeof staticSlots>>]
+
+  try {
+    loaded = await Promise.all([load(), staticSlots(registry, element)])
+  }
+  catch (error) {
+    // A chunk that failed to load is dropped like a missing one.
+    takeEvents(element)
+
+    throw error
+  }
+
+  const [{ default: component }, slots] = loaded
 
   // A page swap took it away while its chunk loaded: hydrated now, its effects would outlive it. One in a static slot its island hid hydrates as it shows it again.
   if (!element.isConnected) {

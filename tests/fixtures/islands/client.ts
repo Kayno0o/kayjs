@@ -13,6 +13,7 @@ const registry = {
   'tests/fixtures/islands/priced.kay': () => import('./priced.kay'),
   'tests/fixtures/islands/mounted.kay': () => import('./mounted.kay'),
   'tests/fixtures/islands/vouched.kay': () => import('./vouched.kay'),
+  'tests/fixtures/islands/broken.kay': async () => Promise.reject(new Error('chunk failed to load')),
 }
 
 export const ready = hydrateIslands(registry)

@@ -171,6 +171,20 @@ describe('islands', () => {
     }
   })
 
+  it('drops the clicks made on an island whose chunk failed to load', async () => {
+    // eslint-disable-next-line no-new-func -- runs the inline hydration script, which happy-dom does not execute from markup
+    (new Function(HYDRATION_SCRIPT) as () => void)()
+    document.body.innerHTML = '<slot data-component="tests/fixtures/islands/broken.kay"><button>Broken</button></slot>'
+    document.querySelector('button')!.dispatchEvent(new Event('click', { bubbles: true }))
+
+    const queue = (globalThis as { _$K?: Event[] })._$K!
+    const { hydrateAgain } = await import(join(outdir, 'client.js')) as { hydrateAgain: () => Promise<void> }
+
+    expect(queue).toHaveLength(1)
+    await expect(hydrateAgain()).rejects.toThrow('chunk failed to load')
+    expect(queue).toEqual([])
+  })
+
   it('keeps the last 50 events queued for an island that has not hydrated, and one input event per run on the same field', () => {
     // eslint-disable-next-line no-new-func -- runs the inline hydration script, which happy-dom does not execute from markup
     (new Function(HYDRATION_SCRIPT) as () => void)()
