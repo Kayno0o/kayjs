@@ -45,7 +45,7 @@ form#form
   Checkbox#free(label="Free" onChange={free.set})
   ChipGroup(label="Decks" name="decks" options={options} value={decks()} onChange={decks.set})
   Segmented(label="Size" name="size" options={sizes} value={size()} onChange={size.set})
-  Segmented(label="Sort" name="sort" options={sizes} value={sort()} onChange={sort.set})
+  Segmented(label="Sort" name="sort" options={sizes} value={sort()} onChange={(value: 's' | 'm' | 'l' | null) => sort.set(value)})
   TextInput#formname(name="form" value={formName()} onInput={formName.set})
   Select#level(name="level" options={levels} value={level()} onChange={level.set})
   MultiSelect(label="Tags" name="tags" options={choices} value={tags()} onChange={tags.set})

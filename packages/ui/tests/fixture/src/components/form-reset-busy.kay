@@ -15,5 +15,5 @@ form#form
   Toggle(name="power" label="Power" onChange={value => answer('power', value)})
   ChipGroup(label="Decks" name="decks" options={decks} value={['films']} onChange={value => answer('decks', value)})
   Segmented(label="Size" name="size" options={sizes} value="m" onChange={(value: 's' | 'm' | 'l') => answer('size', value)})
-  Segmented(label="Sort" name="sort" options={sizes} value={null} onChange={value => answer('sort', value)})
+  Segmented(label="Sort" name="sort" options={sizes} value={null} onChange={(value: 's' | 'm' | 'l' | null) => answer('sort', value)})
   button#reset(type="reset") Reset
