@@ -1031,6 +1031,29 @@ describe('transitions', () => {
     }
   })
 
+  it('keep a unit that comes back during its leave phase in a hidden tab, which plays no enter phase', async () => {
+    const { root, dispose } = await mountReturning()
+    const flip = (globalThis as unknown as { flip: () => void }).flip
+
+    try {
+      const panel = root.querySelector('.panel')!
+
+      flip()
+      await updated()
+      await twoFrames()
+      Object.defineProperty(document, 'hidden', { value: true, configurable: true })
+      flip()
+      await updated()
+      await done()
+      expect([panel.isConnected, panel.className]).toEqual([true, 'panel'])
+    }
+    finally {
+      // The document's own getter, on its prototype, shows again.
+      delete (document as { hidden?: boolean }).hidden
+      await dispose()
+    }
+  })
+
   it('does work linear in the kept units with transitions when one is appended or the order changes', async () => {
     const { insert, playTransitions, Range } = await import('../src/runtime/dom')
     const { createSignal } = await import('../src/runtime/reactive')
