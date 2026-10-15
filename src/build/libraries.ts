@@ -15,6 +15,8 @@ export interface KayLibrary {
   files: string[]
   // The `.kay` files by the specifiers its exports map gives them, `kayjs-ui/button.kay`.
   specifiers: Map<string, string>
+  // Its exports map as subpath and target pairs, undefined when it has none and every file is importable.
+  exports: [string, string][] | undefined
   // A linked extension's package, which holds only the modules nearest to its own package.json: a workspace package inside it is another.
   extension?: true
 }
@@ -65,7 +67,7 @@ export async function findKayLibraries(root: string): Promise<KayLibrary[]> {
       const files = (await findKayFiles(realDir)).map(file => join(dir, relative(realDir, file)))
 
       if (files.length > 0)
-        found.set(dir, { name, dir, realDir, files, specifiers: exportedSpecifiers(name, dir, own, files) })
+        found.set(dir, { name, dir, realDir, files, specifiers: exportedSpecifiers(name, dir, own, files), exports: exportTargets(own.exports) })
 
       await visit(dir, own, LIBRARY_DEPENDENCIES)
     }))
@@ -192,23 +194,33 @@ function exportedSpecifiers(name: string, dir: string, manifest: Manifest, files
     }
 
     for (const [key, target] of exported) {
-      const star = target.indexOf('*')
+      const star = starOf(target, path)
 
-      if (star === -1) {
-        if (target === path)
-          specifiers.set(`${name}${key.slice(1)}`, file)
-
-        continue
-      }
-
-      const [before, after] = [target.slice(0, star), target.slice(star + 1)]
-
-      if (path.startsWith(before) && path.endsWith(after) && path.length >= before.length + after.length)
-        specifiers.set(`${name}${key.slice(1).replace('*', path.slice(before.length, path.length - after.length))}`, file)
+      if (star !== undefined)
+        specifiers.set(`${name}${key.slice(1).replace('*', star)}`, file)
     }
   }
 
   return new Map([...specifiers].filter(([specifier]) => specifier.endsWith(KAY_EXTENSION)))
+}
+
+// What the `*` of an export's target stands for in `path`, `./src/theme.css`, empty for a target naming it exactly, undefined when the target does not reach it.
+function starOf(target: string, path: string): string | undefined {
+  const star = target.indexOf('*')
+
+  if (star === -1)
+    return target === path ? '' : undefined
+
+  const [before, after] = [target.slice(0, star), target.slice(star + 1)]
+
+  return path.startsWith(before) && path.endsWith(after) && path.length >= before.length + after.length ? path.slice(before.length, path.length - after.length) : undefined
+}
+
+// Whether an app can import the library's file, by its real path: one its exports map reaches, any file when it has none.
+export function exportsFile(library: KayLibrary, file: string): boolean {
+  const path = `./${relative(library.realDir, file).split(sep).join('/')}`
+
+  return library.exports === undefined || library.exports.some(([, target]) => starOf(target, path) !== undefined)
 }
 
 // The exports map as subpath and target pairs, a conditional target read as its `default` or first string.

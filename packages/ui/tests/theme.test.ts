@@ -27,6 +27,9 @@ const THIRD_PARTY = /^(?:ct-|group$)/
 // The tokens of a skin's offset shadows and press-down, with their value.
 const PRESS_TOKEN = /(--kui-(?:shadow-raised|shadow-press|press-travel)): ([^;]+);/g
 
+// A `kui-` class a string or template literal ends on, with more added to it; `--kui-` names an anchor or a token.
+const BUILT_CLASS = /(?<![\w-])kui-[\w-]*(?:\$\{|['"`]\s*\+)/g
+
 const HEX = /^#[\da-f]{6}$/i
 const RGB_ALPHA = /^rgb\((\d+) (\d+) (\d+) \/ ([\d.]+)\)$/
 const LIGHT_DARK = /^light-dark\(([^,]+), (.+)\)$/
@@ -159,6 +162,11 @@ describe('theme.css', () => {
     const quoted = new Set([...components.map(({ source }) => source), ...scripts].flatMap(source => [...source.matchAll(QUOTED)].map(([, name]) => name)))
 
     expect([...classes].filter(name => !written.has(name) && !quoted.has(name) && !THIRD_PARTY.test(name))).toEqual([])
+  })
+
+  // kay leaves out the rules of the classes no file writes whole, so a class put together at runtime would lose its own.
+  test('writes every class whole, never putting one together at runtime', () => {
+    expect([...components.map(({ source }) => source), ...scripts].flatMap(source => source.match(BUILT_CLASS) ?? [])).toEqual([])
   })
 
   test('gives every colour a light and a dark value, or names another colour', () => {

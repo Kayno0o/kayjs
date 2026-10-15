@@ -42,6 +42,10 @@ The script also revokes `CREATE` on `public` from `PUBLIC` (already the default 
 
 - `localPath` (and kayjs-auth's `safeRedirect`, now the same function) returns the fallback for a value with a backslash, a control character or a malformed `%` escape in its path, or one that leaves the site once decoded (`/%2F/evil.example`, `/%09/evil.example`), and resolves a value with leading spaces where it fell back. An app passing such paths on purpose encodes them first.
 
+### A library's stylesheet keeps only the classes the app writes
+
+The rules of kayjs-ui's theme, and of any kay library's exported stylesheet, whose classes no file of the app's folder or library component it reaches writes whole are left out. A class put together at runtime (`` `kui-btn-${tone}` ``), written only in content kept outside the project (a CMS body in the database), or only in files outside the app's folder (a Tailwind `@source` elsewhere, a workspace package that is not a kay library) loses its rules: write each such class whole in a file of the app, for instance in a comment in `app.css` ([Using a component library](components.md#using-a-component-library)).
+
 ## 1.44.0
 
 ### kayjs-auth asks for a proof of work by default

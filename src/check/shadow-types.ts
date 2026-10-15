@@ -211,7 +211,7 @@ async function extensionPackages(root: string, libraries: KayLibrary[], extensio
     // Left out: the app itself, when the package holds it as a fixture; the other projects inside it, to their own checks; a kay library's files, to the library. A package linked into `node_modules` goes by that path, as the app imports it.
     const files = (await findKayFiles(dir, { project: true, ownOnly: true, ownKayOnly: true })).filter(file => !realpathSync(file).startsWith(realRoot + sep) && libraryOf(libraries, file) === undefined)
 
-    return { name: basename(dir), dir, realDir: realpathSync(dir), files, specifiers: new Map<string, string>(), extension: true as const }
+    return { name: basename(dir), dir, realDir: realpathSync(dir), files, specifiers: new Map<string, string>(), exports: undefined, extension: true as const }
   }))
 }
 

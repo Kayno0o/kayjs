@@ -47,6 +47,10 @@ Rows of plain objects with no `id`, no `key` and no identity left in the new lis
 
 `localPath` now returns the fallback for a path with a backslash, a control character or a malformed `%` escape, and for one that leaves your site once decoded, like `/%2F/evil.example`. kayjs-auth's `safeRedirect` is now the same function. A value with leading spaces is resolved instead of falling back. If your app passes such paths on purpose, encode them first.
 
+### A library's stylesheet keeps only the classes your app writes
+
+kay now leaves out the rules of kayjs-ui's theme whose classes no file of your app writes in full. A class you put together at runtime, such as `kui-btn-${tone}`, loses its rules. So does one written only in content stored in a database, or only in files outside your app's folder. Write each such class in full in a comment of `app.css`. [app.css](/structure/app-css) shows how.
+
 ## 1.44.0
 
 ### kayjs-auth asks for a proof of work

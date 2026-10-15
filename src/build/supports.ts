@@ -3,7 +3,8 @@ import { CSS_FILE } from './styles'
 
 const SUPPORTS_PRELUDE = /^@supports\b/i
 const SPACES = /\s+/g
-const COMMENTS = /\/\*[\s\S]*?\*\//g
+
+export const COMMENTS = /\/\*[\s\S]*?\*\//g
 // An unquoted `url(`, whose contents may hold any brace or semicolon.
 const URL_OPEN = /^url\([^'"\s]/i
 

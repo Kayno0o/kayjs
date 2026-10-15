@@ -1,11 +1,12 @@
 import type { KayLibrary } from './libraries'
 import type { Node } from './supports'
 import { findProjectFiles, readSource } from './files'
-import { parse, print } from './supports'
+import { exportsFile } from './libraries'
+import { COMMENTS, parse, print } from './supports'
 
-const COMMENTS = /\/\*[\s\S]*?\*\//g
 // The at-rules whose block holds style rules, applying under a condition or in a layer.
 const CONDITIONAL = /^@(?:media|container|supports|layer|scope|starting-style|document)\b/i
+const NAMED_LAYER = /^@layer\s+[^\s{]/i
 const IDENT_CHAR = /[\w\u0080-\uFFFF-]/
 // A class written with no escape, the only kind a word of a source file names as written.
 const PLAIN_CLASS = /^-?[A-Z_][\w-]*$/i
@@ -113,7 +114,13 @@ function prune(nodes: Node[], unused: ReadonlySet<string>): Node[] {
     if (kind === 'conditional') {
       const body = prune(node.body, unused)
 
-      return blank(body) && !blank(node.body) ? [] : [{ prelude: node.prelude, body }]
+      if (!blank(body) || blank(node.body))
+        return [{ prelude: node.prelude, body }]
+
+      // A layer named first here keeps its place in the order of layers.
+      const prelude = node.prelude.replace(COMMENTS, '').trim()
+
+      return NAMED_LAYER.test(prelude) ? [{ text: `${prelude};` }] : []
     }
 
     if (kind !== 'rule')
@@ -154,9 +161,23 @@ function addRuleClasses(nodes: Node[], into: Set<string>): void {
 const sheetClasses = new WeakMap<object, string[]>()
 const fileTokens = new WeakMap<object, string[]>()
 
+// A file removed since the walk found it, a dangling link or one the user cannot read holds nothing to prune by: left out, it can only keep more rules.
+function readable(file: string): ReturnType<typeof readSource> | undefined {
+  try {
+    return readSource(file)
+  }
+  catch {
+    return undefined
+  }
+}
+
 // The classes a stylesheet's rules need, kept with its text while the file stays.
 function stylesheetClasses(file: string): string[] {
-  const read = readSource(file)
+  const read = readable(file)
+
+  if (read === undefined)
+    return []
+
   let classes = sheetClasses.get(read)
 
   if (classes === undefined) {
@@ -175,7 +196,11 @@ export function classTokens(text: string): string[] {
 }
 
 function tokensOf(file: string): string[] {
-  const read = readSource(file)
+  const read = readable(file)
+
+  if (read === undefined)
+    return []
+
   let tokens = fileTokens.get(read)
 
   if (tokens === undefined)
@@ -184,9 +209,9 @@ function tokensOf(file: string): string[] {
   return tokens
 }
 
-// The classes the stylesheets of the app's kay libraries style which nothing names: no file of the app, and none of `named`, the words kay read of the library files it reaches.
+// The classes the stylesheets an app can import from its kay libraries style which nothing names: no file of the app, and none of `named`, the words kay read of the library files it reaches.
 export async function unusedLibraryClasses(root: string, libraries: KayLibrary[], named: Iterable<string>): Promise<Set<string>> {
-  const sheets = (await Promise.all(libraries.map(async library => findProjectFiles(library.realDir, CSS_FILE, { project: true, ownKayOnly: true })))).flat()
+  const sheets = (await Promise.all(libraries.map(async library => (await findProjectFiles(library.realDir, CSS_FILE, { project: true, ownKayOnly: true })).filter(file => exportsFile(library, file))))).flat()
   const unused = new Set(sheets.flatMap(stylesheetClasses))
 
   if (unused.size === 0)
