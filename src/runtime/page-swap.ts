@@ -82,6 +82,12 @@ export function prefetch(url: URL, link: Element): void {
   if (held && Date.now() - held.at < PREFETCH_TTL_MS)
     return
 
+  // Pages past their time go now, as nothing else asks for them.
+  for (const [other, { at }] of prefetched) {
+    if (Date.now() - at >= PREFETCH_TTL_MS)
+      prefetched.delete(other)
+  }
+
   const page = fetchPage(url)
 
   prefetched.set(key, { at: Date.now(), page })
@@ -379,7 +385,10 @@ function tokens(value: string | undefined): string[] {
 // An element a script changed or added since stays the script's, and the next page's copy of it is not added again, nor its meta of the same name serving another value.
 function mergeHead(next: Document): { loaded: Promise<unknown>, commit: () => void } {
   const incoming = [...next.head.children].filter(element => !element.matches(UNMERGED))
-  const take = (key: string | undefined, of: (element: Element) => string | undefined = element => element.outerHTML) => {
+  // Each element serialized once, as every `take` compares against all that are left.
+  const markup = new Map<Element, string>()
+  const html = (element: Element) => markup.get(element) ?? (markup.set(element, element.outerHTML), markup.get(element)!)
+  const take = (key: string | undefined, of: (element: Element) => string | undefined = html) => {
     const at = key === undefined ? -1 : incoming.findIndex(element => of(element) === key)
 
     if (at !== -1)
@@ -394,12 +403,12 @@ function mergeHead(next: Document): { loaded: Promise<unknown>, commit: () => vo
   for (const element of document.head.children as HTMLCollectionOf<HeadElement>) {
     // A stylesheet `kay dev` swapped in for an edited one is the server's as it stands.
     if (element.matches('[data-kay-dev]'))
-      element._$s = element.outerHTML
+      element._$s = html(element)
 
     const key = element._$s
 
-    if (key !== element.outerHTML) {
-      const same = take(element.outerHTML)
+    if (key !== html(element)) {
+      const same = take(html(element))
 
       if (!take(key) && !same)
         named.push(element)
@@ -415,7 +424,7 @@ function mergeHead(next: Document): { loaded: Promise<unknown>, commit: () => vo
   const loading: Promise<unknown>[] = []
 
   for (const element of incoming) {
-    const key = element.outerHTML
+    const key = html(element)
     const added: HeadElement = element.tagName === 'SCRIPT' ? runnable(element as HTMLScriptElement) : document.adoptNode(element)
 
     added._$s = key
@@ -453,9 +462,18 @@ function ranAlready(element: Element): boolean {
   return element instanceof HTMLScriptElement && RUNNABLE_TYPES.has(element.type.toLowerCase())
 }
 
+// The markup a script was added with, which is what makes it the same script on the next page; kept on the copy, so a script is serialized once however many pages follow.
+const scriptMarkups = new WeakMap<HTMLScriptElement, string>()
+
+function scriptMarkup(script: HTMLScriptElement): string {
+  return scriptMarkups.get(script) ?? script.outerHTML
+}
+
 // A script a parser made never runs once moved into another document, so it is made again.
 function runnable(script: HTMLScriptElement): HTMLScriptElement {
   const copy = document.createElement('script')
+
+  scriptMarkups.set(copy, script.outerHTML)
 
   for (const { name, value } of script.attributes)
     copy.setAttribute(name, value)
@@ -528,7 +546,7 @@ function swapBody(next: Document, policy: Policy): void {
   const opened = 'popover' in HTMLElement.prototype ? [...old.querySelectorAll(':popover-open')] : []
 
   // What ran already, the hydration script for one, runs once.
-  const ran = new Set([...document.scripts].map(script => script.outerHTML))
+  const ran = new Set([...document.scripts].map(scriptMarkup))
 
   for (const script of body.querySelectorAll('script')) {
     if (ran.has(script.outerHTML))
@@ -789,7 +807,26 @@ function viewTransitions(): boolean {
       continue
     }
 
-    if (optsIn(rules))
+    let known = transitionSheets.get(sheet)
+
+    // Walked once per sheet, again if rules were added or removed; only a sheet naming the rule has its conditions tested.
+    if (known?.length !== rules.length) {
+      known = { length: rules.length, names: namesTransition(rules) }
+      transitionSheets.set(sheet, known)
+    }
+
+    if (known.names && optsIn(rules))
+      return true
+  }
+
+  return false
+}
+
+const transitionSheets = new WeakMap<CSSStyleSheet, { length: number, names: boolean }>()
+
+function namesTransition(rules: CSSRuleList): boolean {
+  for (const rule of rules) {
+    if (rule.constructor.name === 'CSSViewTransitionRule' || ('cssRules' in rule && namesTransition(rule.cssRules as CSSRuleList)))
       return true
   }
 

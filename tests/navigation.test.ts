@@ -375,6 +375,31 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     expect(await state()).toEqual({ themes: ['#123456'], images: ['/x.png', '/b.png'], added: 1, secondOnly: 0, mode: 'dark' })
   })
 
+  it('serializes each head element and script a fixed number of times per swap', async () => {
+    await page.goto(origin)
+    await page.evaluate(() => {
+      (window as { kayAlive?: boolean }).kayAlive = true
+      const counts = { html: 0 }
+      const original = Object.getOwnPropertyDescriptor(Element.prototype, 'outerHTML')!
+
+      Object.defineProperty(Element.prototype, 'outerHTML', { ...original, get(this: Element) {
+        counts.html++
+
+        return original.get!.call(this)
+      } })
+      ;(window as { counts?: typeof counts }).counts = counts
+    })
+    await page.click('a.second')
+    await page.locator('h1', { hasText: 'Second' }).waitFor()
+
+    const measured = await page.evaluate(() => ({
+      html: (window as { counts?: { html: number } }).counts!.html,
+      elements: document.head.children.length + document.scripts.length,
+    }))
+
+    expect(measured.html).toBeLessThanOrEqual(measured.elements * 3)
+  })
+
   it('restores where the page was scrolled to when going back, focusing its heading without scrolling and announcing its title', async () => {
     await page.goto(origin)
     await page.evaluate(() => {

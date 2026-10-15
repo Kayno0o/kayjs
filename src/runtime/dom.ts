@@ -660,11 +660,16 @@ export function loop<T>(element: Node | null, start: Node | null, end: Node | nu
       let setIndex: ((index: number) => void) | undefined
       let readIndex: (() => number) | number = index
 
+      // Made on the first read, as most rows never read their index.
       if (key !== false) {
-        const [read, write] = createSignal(index)
+        let latest = index
+        let signal: ReturnType<typeof createSignal<number>> | undefined
 
-        readIndex = read
-        setIndex = write
+        readIndex = () => (signal ??= createSignal(latest))[0]()
+        setIndex = (next) => {
+          latest = next
+          signal?.[1](next)
+        }
       }
 
       const value = render(readItem, readIndex)
@@ -1189,12 +1194,18 @@ export function dispatch(event: Event): void {
   const key = `$$${event.type}`
   let node = (event.composedPath?.()[0] ?? event.target) as Node | null
 
-  Object.defineProperty(event, 'currentTarget', { configurable: true, get: () => node ?? document })
+  let defined = false
 
   while (node) {
     const handler = (node as unknown as Record<string, unknown>)[key] as ((event: Event) => void) | undefined
 
     if (handler && !(node as unknown as { disabled?: boolean }).disabled) {
+      // Only once a handler runs, as most events on a page reach none.
+      if (!defined) {
+        defined = true
+        Object.defineProperty(event, 'currentTarget', { configurable: true, get: () => node ?? document })
+      }
+
       handler.call(node, event)
 
       if (event.cancelBubble)

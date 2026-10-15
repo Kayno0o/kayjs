@@ -625,6 +625,28 @@ describe('loops', () => {
     }
   })
 
+  const mount17c = site({
+    'main.kay': '---\nimport { signal } from \'kay\'\n\nconst list = signal([1, 2, 3])\n;(globalThis as { reorder?: () => void }).reorder = () => list.set([3, 1, 2])\nconst heard: string[] = []\n;(globalThis as { heard?: string[] }).heard = heard\n---\nul\n  for n, i of list() key={n}\n    li(onClick={() => heard.push(`${n}:${i}`)}) row\n',
+  })
+
+  it('give a row that reads its index only in a handler the index of its place after a reorder', async () => {
+    const { root, dispose } = await mount17c()
+    const { reorder, heard } = globalThis as unknown as { reorder: () => void, heard: string[] }
+
+    try {
+      reorder()
+      await settle()
+
+      for (const row of root.querySelectorAll('li'))
+        (row as HTMLElement).click()
+
+      expect(heard).toEqual(['3:0', '1:1', '2:2'])
+    }
+    finally {
+      await dispose()
+    }
+  })
+
   const mount17b = site({
     'main.kay': '---\nimport { signal } from \'kay\'\n\nconst kept = document.createElement(\'b\')\nconst n = signal(1)\n;(globalThis as { bump?: () => void }).bump = () => n.set(n() + 1)\n---\np\n  | {[kept, \'x\' + n()]}\n',
   })
@@ -647,6 +669,33 @@ describe('loops', () => {
       moves.mockRestore()
       await dispose()
     }
+  })
+})
+
+describe('delegated events', () => {
+  it('give an event their element as currentTarget only once a handler runs', async () => {
+    const { dispatch } = await import('../src/runtime/dom')
+    const outer = document.createElement('div')
+    const inner = document.createElement('button')
+    const seen: unknown[] = []
+
+    outer.append(inner)
+    document.body.append(outer)
+
+    const idle = new Event('click', { bubbles: true })
+
+    Object.defineProperty(idle, 'target', { value: inner })
+    dispatch(idle)
+    expect(Object.hasOwn(idle, 'currentTarget')).toBe(false)
+
+    ;(outer as unknown as Record<string, unknown>).$$click = (event: Event) => seen.push(event.currentTarget)
+
+    const heard = new Event('click', { bubbles: true })
+
+    Object.defineProperty(heard, 'target', { value: inner })
+    dispatch(heard)
+    expect(seen).toEqual([outer])
+    outer.remove()
   })
 })
 
