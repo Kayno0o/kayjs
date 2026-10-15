@@ -141,4 +141,29 @@ describe('the dev tool\'s routes served by kay', () => {
     expect((await listedBy({ routes, seo: { name: 'Shop' }, site: 'https://shop.example' })).notes).toEqual([])
     expect((await listedBy({ routes })).notes).toEqual([])
   })
+
+  it('answers a path the Routes tab lists as the app\'s with the app\'s route, not the health check', async () => {
+    const dir = await scratchDir('dev-routes-health-')
+    const routes = relative(process.cwd(), join(dir, 'routes'))
+
+    await Bun.write(join(dir, 'routes/index.kay'), 'p Home\n')
+    await Bun.write(join(dir, 'routes/health.kay'), 'p Mine\n')
+    await Bun.write(join(dir, 'routes/up.txt.ts'), 'export function GET() {\n  return \'mine\'\n}\n')
+
+    const own = await pages({ routes, dev: true, health: { path: '/health' } })
+    const listed = (await (await own.handle(new Request(`http://localhost${DEV_ROUTES}`))).json() as DevRoutes).routes
+
+    expect(listed.filter(route => route.path === '/health').map(route => route.kind)).toEqual(['page'])
+    expect(await (await own.handle(new Request('http://localhost/health'))).text()).toContain('Mine')
+
+    const endpoint = await pages({ routes, dev: true, health: { path: '/up.txt' } })
+
+    expect(await (await endpoint.handle(new Request('http://localhost/up.txt'))).text()).toBe('mine')
+
+    const custom = await pages({ routes, dev: true, health: { path: '/ping' } })
+    const standard = await pages({ routes, dev: true })
+
+    expect((await custom.handle(new Request('http://localhost/ping'))).status).toBe(200)
+    expect((await standard.handle(new Request('http://localhost/_kay/health'))).status).toBe(200)
+  })
 })

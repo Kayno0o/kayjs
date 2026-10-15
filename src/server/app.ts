@@ -8,6 +8,7 @@ import type { OwnRoutes } from './dev'
 import type { ServedRoute } from './guards'
 import type { ImageRouteOptions } from './image'
 import type { ServedPage } from './render'
+import type { Claim } from './served-paths'
 import type { PageSetup } from './setup'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
@@ -219,11 +220,11 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   if (base !== '')
     rebaseRedirects(app, base)
 
-  if (options.health !== false) {
-    // Offered, so an app file at the path keeps it as before.
-    served.offer({ path: options.health?.path ?? HEALTH_PATH, owner: 'the health check', kind: 'kay' })
-    serveHealth(app, lifecycle, options.health)
-  }
+  // Offered, so an app file at the path keeps it; the check is served once every claim is in, and only where it still holds the path.
+  const health: Claim | undefined = options.health === false ? undefined : { path: options.health?.path ?? HEALTH_PATH, owner: 'the health check', kind: 'kay' }
+
+  if (health)
+    served.offer(health)
 
   if (options.publicEnv)
     servePublicEnv(app, served, options.publicEnv)
@@ -278,6 +279,10 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
 
   claimRedirects(served, redirects)
   claimApi(served, api.mounted, servesOpenApi ? openapi : undefined)
+
+  if (health && served.holds(health))
+    serveHealth(app, lifecycle, options.health === false ? undefined : options.health)
+
   limitBodies(app, options.bodyLimit ?? DEFAULT_BODY_LIMIT, options.preview ? new Map([...actionLimits, [DRAFT_ROUTE, DRAFT_BODY_LIMIT]]) : actionLimits, api.limits)
 
   if (servesOpenApi) {
