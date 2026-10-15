@@ -1,0 +1,57 @@
+---
+import type { ButtonProps, TagAttributes } from './button-props'
+import { signal } from 'kay'
+import { buttonOf, linkOf, lookOf } from './button-props'
+import { isPromiseLike } from './change'
+import Icon from './icon.kay'
+
+const { variant = 'default', icon, busy, label, class: className, onClick, ...rest } = props<ButtonProps>()
+
+const attributes = rest as TagAttributes
+
+const pending = signal(false)
+const spinning = () => busy ?? pending()
+const look = () => lookOf(variant, className)
+
+async function press(event: MouseEvent) {
+  if (pending()) {
+    event.preventDefault()
+
+    return
+  }
+
+  const answer: unknown = (onClick as ((event: MouseEvent) => unknown) | undefined)?.(event)
+
+  if (!isPromiseLike(answer))
+    return
+
+  pending.set(true)
+
+  // Logged rather than thrown, as a Toggle's: the button coming back is what the user sees.
+  try {
+    await answer
+  }
+  catch (error) {
+    console.error('kayjs-ui: a Button\'s onClick failed', error)
+  }
+  finally {
+    pending.set(false)
+  }
+}
+---
+if linkOf(attributes) as link
+  a.kui-btn({...link} class={look()} aria-busy={spinning() ? 'true' : undefined} onClick={press})
+    if spinning()
+      Icon(icon="spinner" class="kui-spinner")
+    else if icon
+      Icon(icon={icon})
+    | {label}
+    slot
+else if buttonOf(attributes) as button
+  button.kui-btn({...button} class={look()} disabled={button.disabled || (busy === undefined && pending())} aria-busy={spinning() ? 'true' : undefined} onClick={press})
+    if spinning()
+      Icon(icon="spinner" class="kui-spinner")
+    else if icon
+      Icon(icon={icon})
+    | {label}
+    slot

@@ -407,7 +407,7 @@ const dispose = mount(Panel, document.querySelector('#panel')!, { title: 'Ticket
 - `focusInvalid(root)` from `kay` does that once its writes rendered: it runs the effects they left pending, as `flush()` does, then focuses the first field marked `aria-invalid="true"` under `root`, the whole document without one, that takes focus, such as one on a tab the write just showed, and resolves to whether one did, so the island needs no `requestAnimationFrame`.
 - A field inside `hidden="until-found"` or a closed `details` is revealed first, as find-in-page reveals it, unless it is disabled or inert: innermost first, each `details` opens and each such element gets a bubbling `beforematch`, where a tab list shows its panel, then loses `hidden`.
 - Revealing stops where a listener hides that element again, shows it itself, takes it out or opens a `details` above it, the rest left as it is.
-- While it posts, the form has `aria-busy="true"` and a second submit does nothing.
+- While it posts, the form has `aria-busy="true"` and a second submit does nothing; it has it too while an `onSubmit` of the island's returns a promise.
 - A file upload's progress, from 0 to 1, is the form's `--kay-progress` custom property and the value of each `progress` inside it.
 - Before posting, the browser checks the form against the action's schema, with the message the server would give, the schema's `error` option when set: the length, pattern, `email` and `uuid` formats and bounds of each field, numbers, booleans and list sizes.
 - A refused field shows the browser's own bubble, cleared as it is edited.

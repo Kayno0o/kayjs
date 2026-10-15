@@ -1139,15 +1139,69 @@ export function setStyle(element: Element, value: unknown): void {
     element.setAttribute('style', styleText(value))
 }
 
+// A submit handler as it listens: while it answers a promise the form and its submit buttons are `aria-busy`, which kayjs-ui styles as a spinner.
+const held = new WeakMap<(event: Event) => void, (event: Event) => void>()
+const holds = new WeakMap<Element, number>()
+const marked = new WeakSet<Element>()
+
+function holding(handler: (event: Event) => void): (event: Event) => void {
+  let listener = held.get(handler)
+
+  if (!listener) {
+    listener = function (this: unknown, event) {
+      const answer: unknown = handler.call(this, event)
+
+      if (typeof Reflect.get(new Object(answer), 'then') === 'function' && event.currentTarget instanceof HTMLFormElement)
+        void hold(event.currentTarget, answer as PromiseLike<unknown>)
+    }
+    held.set(handler, listener)
+  }
+
+  return listener
+}
+
+function setBusy(form: HTMLFormElement, busy: boolean): void {
+  for (const element of [form, ...form.elements]) {
+    if (element !== form && !(element instanceof HTMLButtonElement && element.type === 'submit'))
+      continue
+
+    // One the page marked busy itself is left as it is.
+    if (busy && !element.hasAttribute('aria-busy')) {
+      element.setAttribute('aria-busy', 'true')
+      marked.add(element)
+    }
+    else if (!busy && marked.delete(element)) {
+      element.removeAttribute('aria-busy')
+    }
+  }
+}
+
+async function hold(form: HTMLFormElement, answer: PromiseLike<unknown>): Promise<void> {
+  holds.set(form, (holds.get(form) ?? 0) + 1)
+  setBusy(form, true)
+
+  try {
+    await answer
+  }
+  finally {
+    const left = holds.get(form)! - 1
+
+    holds.set(form, left)
+
+    if (left === 0)
+      setBusy(form, false)
+  }
+}
+
 // `onClick` listens for `click`: through the document's one listener for the common events, on the element for the others.
 export function listen(element: Element, name: string, handler: (event: Event) => void, replaced?: (event: Event) => void): void {
   const type = name.slice(2).toLowerCase()
 
   if (!DELEGATED.has(type)) {
     if (replaced)
-      element.removeEventListener(type, replaced)
+      element.removeEventListener(type, held.get(replaced) ?? replaced)
 
-    element.addEventListener(type, handler)
+    element.addEventListener(type, type === 'submit' ? holding(handler) : handler)
 
     return
   }
@@ -1168,7 +1222,7 @@ function unlisten(element: Element, name: string, handler: (event: Event) => voi
   if (DELEGATED.has(type))
     (element as ElementRecord)[`$$${type}`] = undefined
   else
-    element.removeEventListener(type, handler)
+    element.removeEventListener(type, held.get(handler) ?? handler)
 }
 
 // Calls the handlers from the event's target up, each seeing its own element as `currentTarget`, until one stops propagation.

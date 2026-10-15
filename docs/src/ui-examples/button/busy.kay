@@ -1,12 +1,8 @@
 ---
 import Button from '@kaynooo/kayjs-ui/button.kay'
 
-const saving = signal(false)
-
 async function save() {
-  saving.set(true)
   await new Promise(resolve => setTimeout(resolve, 1500))
-  saving.set(false)
 }
 ---
-Button(label="Save" variant="accent" busy={saving()} onClick={save})
+Button(label="Save" variant="accent" onClick={save})

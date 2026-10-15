@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- kayjs-ui: a `Button` whose `onClick` returns a promise is busy and disabled until it settles, alone among the buttons on one action, and a submit `Button` is busy while its form's async `onSubmit` runs, which marks the form `aria-busy`.
 - kayjs-ui: `Select` and `MultiSelect` take the type of their options' values, a number option handing back a number, a breaking change in [1.44.0](upgrading.md#1440).
 - kayjs-ui: `ConfirmDelete` takes `success`, toasted once through, and `tone="neutral"` for a confirm that is not a deletion.
 - kayjs-ui: `FileDrop` takes `compact`, a slim row to sit inline in a form.

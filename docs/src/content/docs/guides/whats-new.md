@@ -7,6 +7,7 @@ This page lists what each release adds, newest first, with a link to where each 
 
 ## Unreleased
 
+- **`Button`** is busy and disabled until the promise its `onClick` returned settles, alone among the buttons on one action, and a submit button is busy while its form's async `onSubmit` runs. [Button](/ui/button#busy)
 - **`Select` and `MultiSelect`** take the type of their options' values, so a union needs no cast and a number option hands back a number. [Select](/ui/select#typed-values)
 - **`ConfirmDelete`** toasts a `success` message once through, and `tone="neutral"` words it for a confirm that deletes nothing. [ConfirmDelete](/ui/confirm-delete#a-confirm-that-is-not-a-deletion)
 - **`FileDrop`** takes `compact`, a slim row that sits inline in a form. [FileDrop](/ui/file-drop#compact)

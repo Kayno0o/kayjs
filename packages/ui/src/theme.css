@@ -186,6 +186,22 @@
     @apply inline-flex cursor-pointer items-center justify-center gap-kui-inline border-0 px-3 py-1 text-xs whitespace-nowrap font-kui-label tracking-kui-action text-kui-text uppercase transition-[color,translate,box-shadow] duration-150;
   }
 
+  /* A submit button while its form's onSubmit is pending: a spinner drawn in CSS, the button being static markup. A Button given `busy` draws its own and is left alone. */
+  .kui-btn:where([type='submit'][aria-busy='true']:not(:has(.kui-spinner))) {
+    @apply cursor-progress;
+    pointer-events: none;
+
+    & .kui-icon {
+      display: none;
+    }
+
+    &::after {
+      content: '';
+      order: -1;
+      @apply size-4 shrink-0 animate-spin rounded-full border-2 border-current border-t-transparent;
+    }
+  }
+
   .kui-btn-accent {
     --kui-shell-line: var(--color-kui-accent);
     --kui-shell-fill: var(--color-kui-accent);
