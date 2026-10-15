@@ -10,6 +10,7 @@ import { outputDir } from '../build/assets'
 import { bothBundles, bundleIslands, bundleStyles, clearClientOutput, readClientSources, writeClasses } from '../build/client'
 import { forgetSources, keepSources, readSource } from '../build/files'
 import { fileWords, sourceWords } from '../build/libraries'
+import { classTokens, NAMING_FILE } from '../build/prune'
 import { inSignalsScope } from '../build/signals'
 import { mapBundleToKay } from '../build/sourcemap'
 import { styleSignature } from '../build/styles'
@@ -48,6 +49,8 @@ interface Built {
   words: Map<string, Set<string>>
   // Which new words make Tailwind classes, when a stylesheet imports it: compiled by the first new word after each stylesheet build, so edits adding none pay nothing.
   classes?: Promise<ClassWords | undefined> | undefined
+  // The classes of a kay library's stylesheets whose rules the stylesheets left out, as nothing named them.
+  unused: Set<string>
   // Reading them once the stylesheets are built, which the next build waits for.
   read: Promise<void>
   // The manifest as written: another one in its place, as a server building its own client writes, means building everything again.
@@ -76,11 +79,19 @@ export function devBuilder(root: string, options: ClientOptions): (changed: stri
     if (!sameItems(previous.sources.pages, sources.pages) || (plugins && !sameItems(previous.sources.classes, sources.classes)))
       return true
 
+    const named = (words: string[]) => words.some(word => classTokens(word).some(token => previous.unused.has(token)))
+
+    if (previous.unused.size > 0 && named([...sources.classes].filter(word => !previous.sources.classes.has(word))))
+      return true
+
     for (const [file, text] of texts) {
       if (CSS_FILE.test(file))
         return true
 
       if (previous.styleInputs.has(file) && (text === undefined || await signatureOf(file, text, signed) !== previous.signatures.get(file)))
+        return true
+
+      if (previous.unused.size > 0 && text !== undefined && NAMING_FILE.test(file) && named([text]))
         return true
 
       const known = previous.words.get(file)
@@ -179,6 +190,7 @@ export function devBuilder(root: string, options: ClientOptions): (changed: stri
       styleInputs,
       signatures,
       words,
+      unused: styles?.unused ?? previous!.unused,
       read: styles ? readInputs(styleInputs, signatures, words) : Promise.resolve(),
       classes: styles ? undefined : previous!.classes,
       manifest: text,

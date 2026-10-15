@@ -27,6 +27,8 @@ The `@kaynooo` scope must point at the Forgejo registry in your `.npmrc`. kay an
 }
 ```
 
+Your stylesheet ships only the rules of the components you render. kay leaves out every `kui-` rule whose class no file of your app, and no component it renders, writes whole. A class you put together at runtime, such as `kui-btn-${tone}`, is not seen: write it whole in any file of your app, a comment in `app.css` say, to keep its rules.
+
 The palette button in this site's header picks a theme, from Catppuccin to Tokyo Night, and a scheme; the whole site follows, its code included. Your `@theme` sets the theme picked so:
 
 <ThemeTokens />

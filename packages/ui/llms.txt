@@ -34,6 +34,8 @@ bun add @kaynooo/kayjs-ui @iconify-json/tabler
 }
 ```
 
+kay leaves out the theme's rules for the `kui-` classes no file of the app or component it renders writes whole, so an app ships the CSS of the components it uses; a class put together at runtime, or written only in a CMS body, is kept by writing it whole in any file of the app, a comment in `app.css` say ([Using a component library](../../llms/components.md#using-a-component-library)).
+
 The theme's tokens are `@theme default`, so the app's `@theme` overrides any of them wherever it sits. Each colour is `--color-kui-<name>`, used as `bg-kui-<name>` and the like, and holds `light-dark(light, dark)`:
 
 - Surfaces, deepest first: `mantle`, `canvas`, `surface0`, `surface1`.

@@ -7,10 +7,10 @@ const COMMENTS = /\/\*[\s\S]*?\*\//g
 // An unquoted `url(`, whose contents may hold any brace or semicolon.
 const URL_OPEN = /^url\([^'"\s]/i
 
-type Node = { text: string } | { prelude: string, body: Node[] }
+export type Node = { text: string } | { prelude: string, body: Node[] }
 
 // The stylesheet as text runs and blocks, each block its prelude (what leads to its `{`, the whitespace and comments before included) and what it holds; strings, comments and `url()` are read past whole, so a brace in one is not one.
-function parse(css: string): Node[] {
+export function parse(css: string): Node[] {
   let at = 0
   const read = (depth: number): Node[] => {
     const nodes: Node[] = []
@@ -83,7 +83,7 @@ function parse(css: string): Node[] {
   return read(0)
 }
 
-function print(nodes: Node[]): string {
+export function print(nodes: Node[]): string {
   return nodes.map(node => 'text' in node ? node.text : `${node.prelude}{${print(node.body)}}`).join('')
 }
 
@@ -151,15 +151,16 @@ export function mergeSupports(css: string): string {
   return css.includes('{') ? print(merge(parse(css), false)) : css
 }
 
-// The stylesheet build's plugins, each stylesheet one returns merged, and a last one merging those no plugin loads.
-export function mergingSupports(plugins: BunPlugin[]): BunPlugin[] {
+// The stylesheet build's plugins, each stylesheet one returns merged, and a last one merging those no plugin loads; `transform` runs on each first, as kay prunes a library's unused classes.
+export function mergingSupports(plugins: BunPlugin[], transform: (css: string) => string = css => css): BunPlugin[] {
+  const rewrite = (css: string) => mergeSupports(transform(css))
   const wrapped = plugins.map((plugin): BunPlugin => ({
     ...plugin,
     async setup(build) {
       const onLoad: PluginBuilder['onLoad'] = (constraints, callback) => build.onLoad(constraints, async (args) => {
         const result = await (callback)(args)
 
-        return result && 'contents' in result && typeof result.contents === 'string' && (result.loader === 'css' || (result.loader === undefined && CSS_FILE.test(args.path))) ? { ...result, contents: mergeSupports(result.contents) } : result
+        return result && 'contents' in result && typeof result.contents === 'string' && (result.loader === 'css' || (result.loader === undefined && CSS_FILE.test(args.path))) ? { ...result, contents: rewrite(result.contents) } : result
       })
 
       return plugin.setup(new Proxy(build, { get: (target, key) => key === 'onLoad' ? onLoad : Reflect.get(target, key) as unknown }))
@@ -170,7 +171,7 @@ export function mergingSupports(plugins: BunPlugin[]): BunPlugin[] {
     setup(build) {
       build.onLoad({ filter: CSS_FILE }, async ({ path }) => {
         const css = await Bun.file(path).text()
-        const merged = mergeSupports(css)
+        const merged = rewrite(css)
 
         return merged === css ? undefined : { contents: merged, loader: 'css' }
       })

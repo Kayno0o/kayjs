@@ -23,6 +23,7 @@ import { fileWords, findKayLibraries, reachableLibraryFiles, reachesAny } from '
 import { packagesOf } from './licenses'
 import { throughLinks } from './links'
 import { kay } from './plugin'
+import { pruneClasses, unusedLibraryClasses } from './prune'
 import { sizeReport } from './report'
 import { ANCHOR, runtimeAnchor, runtimeChunk } from './runtime-chunk'
 import { builtinChains, refusedBuiltins, refuseServerOnlyReads } from './server-only'
@@ -384,11 +385,13 @@ async function refuseBuiltinImports(root: string, logs: Bun.BuildOutput['logs'],
 }
 
 // Each page and layout is an entry whose code shrinks to its imports, so what comes out is the stylesheet of everything it renders: each one's URL by the file relative to the root, and every module the build read, `followed` adding the ones it shrank to their imports, which the bundler's list of inputs leaves out.
-export async function bundleStyles(root: string, { pages, libraries }: Pick<ClientSources, 'pages' | 'libraries'>, options: ClientOptions): Promise<{ styles: Record<string, string>, inputs: string[], followed: string[] }> {
+// The rules of a kay library's stylesheets needing a class nothing names are left out, `unused` listing those classes.
+export async function bundleStyles(root: string, { pages, libraries, classes }: Pick<ClientSources, 'pages' | 'libraries' | 'classes'>, options: ClientOptions): Promise<{ styles: Record<string, string>, inputs: string[], followed: string[], unused: Set<string> }> {
   if (pages.length === 0)
-    return { styles: {}, inputs: [], followed: [] }
+    return { styles: {}, inputs: [], followed: [], unused: new Set() }
 
   const shrunk = new Set<string>()
+  const unused = await unusedLibraryClasses(root, libraries, classes)
   const since = raisedMark()
   const build = await Bun.build({
     entrypoints: pages,
@@ -397,7 +400,7 @@ export async function bundleStyles(root: string, { pages, libraries }: Pick<Clie
     minify: options.minify ?? false,
     metafile: true,
     naming: { entry: '[name]-[hash].[ext]', chunk: '[name]-[hash].[ext]', asset: '[name]-[hash].[ext]' },
-    plugins: [styleImports(root, libraries, shrunk), ...mergingSupports(options.plugins ?? [])],
+    plugins: [styleImports(root, libraries, shrunk), ...mergingSupports(options.plugins ?? [], css => pruneClasses(css, unused))],
   })
 
   if (!build.success)
@@ -422,7 +425,7 @@ export async function bundleStyles(root: string, { pages, libraries }: Pick<Clie
     await Promise.all(build.outputs.filter(output => CSS_OUTPUT.test(output.path)).map(async output => Bun.write(output.path, rebaseCss(await Bun.file(output.path).text(), base))))
   }
 
-  return { styles, inputs: Object.keys(build.metafile!.inputs).map(input => resolve(input)), followed: [...shrunk] }
+  return { styles, inputs: Object.keys(build.metafile!.inputs).map(input => resolve(input)), followed: [...shrunk], unused }
 }
 
 function islandManifest(root: string, outputs: Outputs, islands: Map<string, string>, entry: string, hot: boolean): Omit<ClientManifest, 'styles'> {

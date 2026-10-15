@@ -22,4 +22,10 @@ With Tailwind, registered in [`kay.config.ts`](/structure/kay-config), it needs 
 
 `@import`, nesting and relative `url()` assets work in it, as in any stylesheet a component imports. kayjs-ui's theme is imported right after Tailwind, and an `@theme` block below overrides its tokens.
 
+kay leaves out the rules of a library's stylesheet that no file of your app uses. A rule stays when its classes are written whole somewhere kay reads: a template, a script, a Markdown file, a stylesheet, even a comment. A class you build at runtime, or one written only in content stored in a database, is not seen. Write it whole in a comment of `app.css` to keep its rules:
+
+```css
+/* Built at runtime: kui-btn-danger kui-btn-accent */
+```
+
 <ReadMore href="/essentials/styling-and-assets#tailwind">Tailwind and component styles in the styling guide.</ReadMore>
