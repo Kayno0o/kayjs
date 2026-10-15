@@ -46,7 +46,10 @@ describe('the headers of every kind of answer', () => {
     app = await pages({ routes: `${dir}/src/routes`, api: `${dir}/src/api`, prebuilt: false, log: false, compress: true, storage: memoryFiles() })
     key = await files.put(new File([new Uint8Array(2000)], 'a.png', { type: 'image/png' }))
 
-    const html = await (await app.handle(new Request(`${ORIGIN}/`))).text()
+    const first = await app.handle(new Request(`${ORIGIN}/`))
+    const html = await first.text()
+
+    page = shape(first)['content-security-policy']!
 
     asset = (/\/_kay\/entry-[^"]+\.js/).exec(html)![0]
     action = (/<form[^>]*action="([^"]+)"/).exec(html)![1]!.replaceAll('&amp;', '&')
@@ -66,7 +69,6 @@ describe('the headers of every kind of answer', () => {
   it('a page carries the security headers, its request id and its caching', async () => {
     const response = await get('/')
 
-    page = shape(response)['content-security-policy']!
     expect(page).toContain('default-src \'self\'')
     await expectAnswer(response, 200, { 'cache-control': 'private, no-cache', 'content-type': 'text/html; charset=utf-8', 'vary': 'cookie, accept-encoding' })
     await expectAnswer(await get('/', { 'accept-encoding': 'br' }), 200, { 'cache-control': 'private, no-cache', 'content-encoding': 'br', 'content-type': 'text/html; charset=utf-8', 'vary': 'cookie, accept-encoding' })
@@ -130,19 +132,21 @@ describe('the headers of every kind of answer', () => {
 
   it('hands Elysia the response the route made, with no copy of it', async () => {
     const dir = await fixtureCopy('answers')
-    let made: unknown
+    let made = Promise.withResolvers<unknown>()
     const inner = await pages({ routes: `${dir}/src/routes`, api: `${dir}/src/api`, prebuilt: false, log: false, compress: false, storage: memoryFiles() })
     const stored = await files.put(new File([new Uint8Array(2000)], 'b.png', { type: 'image/png' }))
     const outer = new Elysia().onAfterResponse({ as: 'global' }, ({ responseValue }) => {
-      made = responseValue
+      made.resolve(responseValue)
     }).use(inner)
     const sent = async (path: string, init?: RequestInit) => {
+      made = Promise.withResolvers<unknown>()
+
       const response = await outer.handle(new Request(`${ORIGIN}${path}`, init))
 
       // After-response hooks run once the response is out.
-      await Bun.sleep(5)
+      const answered = await made.promise
 
-      return { response, same: response === made }
+      return { response, same: response === answered }
     }
 
     expect((await sent('/')).same).toBe(true)

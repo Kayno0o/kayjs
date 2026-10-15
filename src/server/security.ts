@@ -163,16 +163,17 @@ const carried = new WeakMap<Response, string[]>()
 // A static response is cloned by Elysia after this runs, so it carries the headers of the request that is answered, not the one before.
 export function carryContext<T extends Response>(set: Context['set'], response: T): T {
   const { status } = set
-
-  if (set.cookie || set.headers['set-cookie'] !== undefined || (status !== undefined && status !== 200 && (typeof status !== 'number' || response.status === 200)) || response.headers.get('transfer-encoding') === 'chunked')
-    return response
-
   const { headers } = response
   const names: string[] = []
 
   try {
     for (const name of carried.get(response) ?? [])
       headers.delete(name)
+
+    carried.delete(response)
+
+    if (set.cookie || set.headers['set-cookie'] !== undefined || (status !== undefined && status !== 200 && (typeof status !== 'number' || response.status === 200)) || headers.get('transfer-encoding') === 'chunked')
+      return response
 
     for (const name in set.headers) {
       if (!headers.has(name)) {
