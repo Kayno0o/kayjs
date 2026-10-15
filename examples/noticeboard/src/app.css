@@ -20,8 +20,4 @@
   .skip-link {
     @apply absolute top-0 left-0 z-100 -translate-y-full bg-kui-canvas px-2 py-1 transition-transform focus:translate-y-0;
   }
-
-  .page-form {
-    @apply mt-4 flex max-w-sm flex-col items-start gap-3;
-  }
 }
