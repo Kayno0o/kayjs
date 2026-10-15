@@ -1,0 +1,18 @@
+---
+import { infiniteList } from '@kaynooo/kayjs-ui'
+import LoadMore from '@kaynooo/kayjs-ui/load-more.kay'
+
+const { first = [{ id: 1 }, { id: 2 }, { id: 3 }], size, onLoad, loadingLabel, failureLabel, retryLabel } = props<{
+  first?: { id: number }[]
+  size: number
+  onLoad: (offset: number) => Promise<{ id: number }[] | undefined>
+  loadingLabel?: string
+  failureLabel?: string
+  retryLabel?: string
+}>()
+
+const feed = infiniteList(first, { size, key: row => row.id, load: ({ offset }) => onLoad(offset) })
+---
+for row of feed.rows() key={row.id}
+  p.row {row.id}
+LoadMore(list={feed} loadingLabel={loadingLabel} failureLabel={failureLabel} retryLabel={retryLabel})

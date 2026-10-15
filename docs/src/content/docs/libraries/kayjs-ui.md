@@ -54,7 +54,7 @@ TooltipHost
 
 ## Using a component
 
-Import each component by its `.kay` path. Types, `toast`, `attempt` and `editing` come from the package itself:
+Import each component by its `.kay` path. Types, `toast`, `attempt`, `editing` and `infiniteList` come from the package itself:
 
 ```kay
 ---
@@ -108,7 +108,7 @@ Navigation: [Tabs](/ui/tabs), [TabNav](/ui/tab-nav), [Segmented](/ui/segmented),
 
 Data: [Table](/ui/table), [Stat](/ui/stat), [Meter](/ui/meter), [BarList](/ui/bar-list), [Badge](/ui/badge), [Avatar](/ui/avatar), [LineChart](/ui/line-chart), [ScatterChart](/ui/scatter-chart), [ContributionGraph](/ui/contribution-graph), [QrCode](/ui/qr-code), [SiteFavicon](/ui/site-favicon), [Icon](/ui/icon).
 
-Media: [MediaGallery](/ui/media-gallery), [Carousel](/ui/carousel), [ZoomPane](/ui/zoom-pane), [WhenVisible](/ui/when-visible).
+Media: [MediaGallery](/ui/media-gallery), [Carousel](/ui/carousel), [ZoomPane](/ui/zoom-pane), [WhenVisible](/ui/when-visible), [LoadMore](/ui/load-more).
 
 Drag and drop (`Sortable`, `Board`, `DropTargets`) comes from `@kaynooo/kayjs-ui/dnd` and is in the full reference.
 

@@ -944,6 +944,19 @@
     @apply h-px;
   }
 
+  /* The end of an infinite list: empty until a page loads or fails. */
+  .kui-load-more {
+    @apply block;
+  }
+
+  .kui-load-more-loading {
+    @apply py-2 text-sm text-kui-subtext0;
+  }
+
+  .kui-load-more-failed {
+    @apply flex flex-wrap items-center gap-3 py-2 text-sm text-kui-error;
+  }
+
   .kui-masonry {
     @apply grid items-start;
     grid-template-columns: repeat(auto-fill, minmax(min(var(--kui-masonry-min), 100%), 1fr));

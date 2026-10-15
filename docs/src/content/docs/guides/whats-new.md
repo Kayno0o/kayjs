@@ -7,6 +7,7 @@ This page lists what each release adds, newest first, with a link to where each 
 
 ## Unreleased
 
+- **kayjs-ui `infiniteList` and `LoadMore`** own an infinite-scroll list's rows, offset or cursor paging, the end of the list, a retry after a failed page and the "Loading more" row, dropping a row already shown when the list shifts. [LoadMore](/ui/load-more)
 - **Concurrent static export** writes endpoint files, the sitemap and feeds sixteen at a time, so an endpoint's `GET` no longer runs alone. [Routing](/essentials/routing#endpoint-files)
 - **`markInvalid`** marks a field invalid for one source among several. A refused field in an island stays invalid while a `FormField` still shows a message for it. [Modules](/reference/modules)
 

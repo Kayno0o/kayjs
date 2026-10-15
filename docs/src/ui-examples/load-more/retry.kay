@@ -1,0 +1,23 @@
+---
+import { infiniteList } from '@kaynooo/kayjs-ui'
+import LoadMore from '@kaynooo/kayjs-ui/load-more.kay'
+
+const SIZE = 10
+let calls = 0
+
+// The second page fails once, which stops the list on "Try again" instead of loading another.
+async function page(offset: number) {
+  await new Promise(resolve => setTimeout(resolve, 400))
+
+  if (++calls === 1)
+    throw new Error('offline')
+
+  return Array.from({ length: offset < 30 ? SIZE : 3 }, (_, index) => ({ id: offset + index + 1 }))
+}
+
+const rows = infiniteList(Array.from({ length: SIZE }, (_, index) => ({ id: index + 1 })), { size: SIZE, key: row => row.id, load: ({ offset }) => page(offset) })
+---
+.h-48.overflow-y-auto.rounded-lg.border.border-kui-surface2
+  for row of rows.rows() key={row.id}
+    p.px-3.py-1 Row {row.id}
+  LoadMore(list={rows} failureLabel="Could not load more rows.")

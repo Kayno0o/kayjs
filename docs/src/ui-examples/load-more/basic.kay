@@ -1,0 +1,21 @@
+---
+import { infiniteList } from '@kaynooo/kayjs-ui'
+import LoadMore from '@kaynooo/kayjs-ui/load-more.kay'
+
+const SIZE = 15
+const TOTAL = 40
+const everyone = Array.from({ length: TOTAL }, (_, index) => ({ id: index + 1 }))
+
+// A source paging by offset, as an API with `?offset=` does.
+async function page(offset: number) {
+  await new Promise(resolve => setTimeout(resolve, 500))
+
+  return everyone.slice(offset, offset + SIZE)
+}
+
+const people = infiniteList(everyone.slice(0, SIZE), { size: SIZE, key: person => person.id, load: ({ offset }) => page(offset) })
+---
+.h-48.overflow-y-auto.rounded-lg.border.border-kui-surface2
+  for person of people.rows() key={person.id}
+    p.px-3.py-1 Person {person.id}
+  LoadMore(list={people})

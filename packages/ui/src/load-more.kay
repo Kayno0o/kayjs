@@ -1,0 +1,26 @@
+---
+import type { InfiniteList } from './infinite-list'
+import Button from './button.kay'
+import WhenVisible from './when-visible.kay'
+
+const { list, margin, loadingLabel = 'Loading more…', failureLabel = 'Could not load more.', retryLabel = 'Try again' } = props<{
+  // The list this draws the end of, from `infiniteList`.
+  list: InfiniteList<unknown>
+  // How far outside the scroll box counts as in view already, in pixels: see WhenVisible.
+  margin?: number | undefined
+  loadingLabel?: string | undefined
+  failureLabel?: string | undefined
+  retryLabel?: string | undefined
+}>()
+---
+// The end of an infinite list: the sentinel while there are more rows, a status while a page loads, and an alert with a retry once a page failed, which loads no other until it is pressed.
+.kui-load-more
+  if !list.ended()
+    if list.failed()
+      .kui-load-more-failed(role="alert")
+        p {failureLabel}
+        Button(label={retryLabel} busy={list.pending()} disabled={list.pending()} onClick={list.retry})
+    else
+      WhenVisible(onVisible={list.more} margin={margin})
+      if list.pending()
+        p.kui-load-more-loading(role="status") {loadingLabel}
