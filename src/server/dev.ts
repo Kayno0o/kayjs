@@ -19,6 +19,7 @@ import { outputDir, underKayDev } from '../build/assets'
 import { bootDevTool } from '../runtime/dev-boot'
 import { kayLog } from '../runtime/log'
 import { isCrossSite } from './actions'
+import { routerPath } from './base'
 import { BUILD_FAILURE, clientOptionsKey, fromManifest, readManifest } from './client'
 import { redirectedBy } from './dev-notes'
 import { editorCommand } from './editor'
@@ -436,9 +437,17 @@ const RECORDED_RESPONSES = 50
 const REDIRECT_MEMORY_MS = 30_000
 const FRAMEWORK_PATH = /^\/_kay\//
 
-// Records what each response of a dev server carried, and the redirect hops leading to a path, so the Request tab can say how a page was answered and sent.
-// Registered after the hooks that shape a response, so the headers are the ones sent.
-export function recordResponses(app: Elysia): void {
+// A cookie's name and attributes stay, its value does not: it is a session's secret and the tab can be on a shared screen.
+const COOKIE_VALUE = /^([^=;]*)=[^;]*/
+
+function maskedValue(name: string, value: string): string {
+  return name === 'set-cookie' ? value.replace(COOKIE_VALUE, '$1=...') : value
+}
+
+// Records what each page a dev server answers carried, and the redirect hops leading to a path, so the Request tab can say how a page was answered and sent.
+// A hop is handed to the next page request for its target from the same user agent within a short while, so a second tab on the same browser can take it; kay cannot tell a followed redirect from a request that merely comes next.
+// Registered after the hooks that shape a response, so the headers are the ones sent; a request answered before the routes, or by a hook that stops the others, is not recorded.
+export function recordResponses(app: Elysia, base = ''): void {
   const started = new WeakMap<Request, number>()
   const recorded = new Map<string, DevResponse>()
   const hops = new Map<string, { redirects: DevResponse['redirects'], at: number }>()
@@ -462,24 +471,28 @@ export function recordResponses(app: Elysia): void {
     }
 
     const status = response?.status ?? (typeof set.status === 'number' ? set.status : 200)
+    const agent = request.headers.get('user-agent') ?? ''
     const here = `${url.pathname}${url.search}`
-    const now = performance.now()
-    const prior = hops.get(here)
-    const redirects = prior && Date.now() - prior.at < REDIRECT_MEMORY_MS ? prior.redirects : []
-
-    hops.delete(here)
-
     const location = status >= 300 && status < 400 ? headers.get('location') : null
     const target = location === null ? undefined : URL.parse(location, request.url)
+    const remembered = hops.get(`${agent} ${here}`)
+    const redirects = remembered && Date.now() - remembered.at < REDIRECT_MEMORY_MS ? remembered.redirects : []
 
-    if (target) {
-      hops.set(`${target.pathname}${target.search}`, { redirects: [...redirects, { from: here, status, by: redirectedBy(request) }], at: Date.now() })
+    hops.delete(`${agent} ${here}`)
+
+    // The location is under `base` as the browser sends it, the next request is not.
+    if (target?.origin === url.origin) {
+      hops.set(`${agent} ${routerPath(target.pathname, base)}${target.search}`, { redirects: [...redirects, { from: here, status, by: redirectedBy(request) }], at: Date.now() })
 
       if (hops.size > RECORDED_RESPONSES)
         hops.delete(hops.keys().next().value!)
     }
 
-    recorded.set(requestId(request), { headers: [...headers.entries()], ms: now - (started.get(request) ?? now), redirects })
+    // The pages are what the tab asks about; the assets around them would push them out.
+    if (!headers.get('content-type')?.startsWith('text/html'))
+      return
+
+    recorded.set(requestId(request), { headers: [...headers.entries()].map(([name, value]) => [name, maskedValue(name, value)]), ms: performance.now() - (started.get(request) ?? performance.now()), redirects })
 
     if (recorded.size > RECORDED_RESPONSES)
       recorded.delete(recorded.keys().next().value!)

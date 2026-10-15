@@ -232,10 +232,13 @@ const serverIslandReach = new Map<string, Promise<boolean>>()
 async function willPrerender(route: ServedRoute, page: PageModule): Promise<DevRequest['prerender']> {
   const setting = pageSetting(page, 'prerender')
 
+  if (setting === false)
+    return undefined
+
   if (setting === true)
     return 'page'
 
-  if (setting !== undefined && setting !== false)
+  if (setting !== undefined)
     return 'listed'
 
   if (route.params.length > 0)
@@ -251,10 +254,18 @@ async function willPrerender(route: ServedRoute, page: PageModule): Promise<DevR
   return await reach ? 'server islands' : undefined
 }
 
+// A file that cannot be read or parsed is not an island, and is looked at again on the next request.
 async function reachesIsland(file: string): Promise<boolean> {
-  const { reachesServerIsland } = await import('./prerender')
+  try {
+    const { reachesServerIsland } = await import('./prerender')
 
-  return reachesServerIsland(file)
+    return await reachesServerIsland(file)
+  }
+  catch {
+    serverIslandReach.delete(file)
+
+    return false
+  }
 }
 
 function refusalOutcome(error: unknown): string {

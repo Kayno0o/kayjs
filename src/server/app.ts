@@ -118,7 +118,7 @@ function serveDevRoutes(app: App, root: string, client: ClientBuild, mode: Mode,
   app.get(DEV_TOOL, () => devTool())
   app.get(DEV_A11Y, () => devA11y())
   app.get(DEV_AXE, () => devAxe())
-  recordResponses(app)
+  recordResponses(app, base)
 
   if (mode.underKayDev) {
     followBuilds()

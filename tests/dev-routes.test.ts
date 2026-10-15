@@ -170,7 +170,7 @@ describe('the dev tool\'s routes served by kay', () => {
   it('says how a page was answered: the guards that ran and their outcome, a redirect before it, what `kay build` does with it, the headers and the time', async () => {
     const dir = await scratchDir('dev-routes-answered-')
     const routes = relative(process.cwd(), join(dir, 'routes'))
-    const members = 'import { guard } from \'kay\'\n\nexport default guard(({ request, redirect }) => {\n  if (!request.headers.has(\'x-member\'))\n    redirect(\'/login\')\n})\n'
+    const members = 'import { guard } from \'kay\'\n\nexport default guard(({ request, redirect, deny }) => {\n  if (request.headers.has(\'x-banned\'))\n    deny(403)\n\n  if (!request.headers.has(\'x-member\'))\n    redirect(\'/login\')\n})\n'
     const vip = 'import { guard } from \'kay\'\n\nexport default guard(({ request, deny }) => {\n  if (!request.headers.has(\'x-vip\'))\n    deny(403, \'VIPs only\')\n})\n'
 
     await Promise.all([
@@ -178,6 +178,7 @@ describe('the dev tool\'s routes served by kay', () => {
       Bun.write(join(dir, 'routes/login.kay'), 'p Login\n'),
       Bun.write(join(dir, 'routes/_error.kay'), 'p Failed\n'),
       Bun.write(join(dir, 'routes/static.kay'), '--- server\nexport const page = { prerender: true }\n---\np Static\n'),
+      Bun.write(join(dir, 'routes/cookie.kay'), '--- server\nctx.cookies.set(\'sid\', \'secret\')\n---\np Cookie\n'),
       Bun.write(join(dir, 'routes/members/_guard.ts'), members),
       Bun.write(join(dir, 'routes/members/index.kay'), 'p Members\n'),
       Bun.write(join(dir, 'routes/members/vip/_guard.ts'), vip),
@@ -187,7 +188,7 @@ describe('the dev tool\'s routes served by kay', () => {
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
 
     try {
-      const dev = await pages({ routes, dev: true, redirects: { '/old': '/static' } })
+      const dev = await pages({ routes, dev: true, redirects: { '/old': '/static', '/away': 'https://other.example/static' } })
       const visit = async (path: string, headers: Record<string, string> = {}) => {
         const response = await dev.handle(new Request(`http://localhost${path}`, { headers, redirect: 'manual' }))
         const block = REQUEST_BLOCK.exec(await response.text())
@@ -199,6 +200,9 @@ describe('the dev tool\'s routes served by kay', () => {
       expect((await visit('/')).request).toMatchObject({ guards: [] })
       expect((await visit('/static')).request).toMatchObject({ prerender: 'page' })
       expect((await visit('/login')).request!.prerender).toBeUndefined()
+      expect((await visit('/members/vip')).request).toBeUndefined()
+      expect((await visit('/members/vip', { 'x-banned': '1' })).request).toMatchObject({ status: 403, guards: [{ outcome: expect.stringContaining('denied with 403') }, { outcome: 'did not run' }] })
+      expect((await visit('/members/vip', { 'x-member': '1', 'x-vip': '1' })).request).toMatchObject({ guards: [{ outcome: 'passed' }, { outcome: 'passed' }] })
       expect((await visit('/members', { 'x-member': '1' })).request).toMatchObject({ guards: [{ file: `${routes}/members/_guard.ts`, outcome: 'passed' }] })
       expect((await visit('/members/vip', { 'x-member': '1' })).request).toMatchObject({ status: 403, guards: [{ outcome: 'passed' }, { file: `${routes}/members/vip/_guard.ts`, outcome: 'denied with 403: VIPs only' }] })
 
@@ -222,6 +226,17 @@ describe('the dev tool\'s routes served by kay', () => {
       await visit('/old')
 
       expect((await recorded((await visit('/static')).request!.id)).redirects).toEqual([{ from: '/old', status: 308, by: 'the redirect from /old' }])
+      // A redirect to another site leads to no page of this one, and a cookie's value stays out of the record.
+      await visit('/away')
+
+      expect((await recorded((await visit('/static')).request!.id)).redirects).toEqual([])
+
+      const cookie = await recorded((await visit('/cookie')).request!.id)
+
+      expect(cookie.headers.filter(([name]) => name === 'set-cookie').map(([, value]) => value.slice(0, value.indexOf(';')))).toEqual(['sid=...'])
+      expect(cookie.headers.map(([name]) => name)).toContain('content-security-policy')
+      expect(cookie.headers.map(([name]) => name)).toContain('cache-control')
+
       expect((await dev.handle(new Request(`http://localhost${DEV_REQUEST}?id=nothing`, { headers: { 'x-kay-dev': '1' } }))).status).toBe(404)
       expect((await dev.handle(new Request(`http://localhost${DEV_REQUEST}?id=nothing`))).status).toBe(403)
     }
