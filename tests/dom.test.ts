@@ -137,10 +137,11 @@ describe('a dynamic tag', () => {
   })
 
   it('loads the submit hold only when its props may carry an onSubmit, written or spread', () => {
-    const compiled = (tag: string) => compileKay(`---\nconst { as: Tag = 'form' } = props<{ as?: string }>()\n---\n${tag}\n`, 'main.kay', { output: 'dom' }).tsx
+    const compiled = (tag: string) => compileKay(`---\nconst { as: Tag = 'form', ...rest } = props<{ as?: string, onSubmit?: () => void }>()\n---\n${tag}\n`, 'main.kay', { output: 'dom' }).tsx
 
     expect(compiled('Tag(onSubmit={() => undefined})')).toContain('KayHoldSubmits()')
-    expect(compiled('Tag({...{}})')).toContain('KayHoldSubmits()')
+    expect(compiled('Tag(onsubmit={() => undefined})')).toContain('KayHoldSubmits()')
+    expect(compiled('Tag({...rest})')).toContain('KayHoldSubmits()')
     expect(compiled('Tag(class="a" onClick={() => undefined})')).not.toContain('KayHoldSubmits()')
   })
 })
