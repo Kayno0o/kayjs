@@ -32,6 +32,7 @@ import { buildClient } from './client'
 import { compileServer } from './compile'
 import { codecWarnings, iconSetPackages, iconSetWarnings, NOTICES_FILE, packagesOf, thirdPartyNotices } from './licenses'
 import { writeSearchIndex } from './search'
+import { inSignalsScope } from './signals'
 import { exportStatic, refuseStaticConfig } from './static'
 
 export type BuildStage = 'check' | 'bundle' | 'output' | 'export' | 'compile'
@@ -76,6 +77,10 @@ export interface BuildResult {
 // Bundles the browser code for production, minified unless kay.config.ts says otherwise, and renders the pages marked `prerender`; the server then boots without bundling.
 // It checks the project while it bundles for the browser, runs no page, API module or guard until that passed, and leaves the last build in place when either fails.
 export async function buildProject(root: string, config: KayConfig, options: BuildOptions = {}): Promise<BuildResult> {
+  return inSignalsScope(async () => runBuild(root, config, options))
+}
+
+async function runBuild(root: string, config: KayConfig, options: BuildOptions): Promise<BuildResult> {
   const project = resolveProject(root, config)
   const { output } = project.paths
   const previous = `${output}-previous`

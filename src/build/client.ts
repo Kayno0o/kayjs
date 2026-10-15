@@ -25,6 +25,7 @@ import { kay } from './plugin'
 import { sizeReport } from './report'
 import { ANCHOR, runtimeAnchor, runtimeChunk } from './runtime-chunk'
 import { builtinChains, refusedBuiltins, refuseServerOnlyReads } from './server-only'
+import { inSignalsScope } from './signals'
 import { forgetBundleMaps } from './sourcemap'
 import { styleImports, withoutStyles } from './styles'
 import { mergingSupports } from './supports'
@@ -95,6 +96,10 @@ export interface ClientSources {
 // Bundles what the browser needs: one entry hydrating the islands, each island in its own chunk, and a stylesheet per page and layout.
 // Every component is compiled first, so all of the project's syntax errors come out together instead of one per bundler run.
 export async function buildClient(root: string, options: ClientOptions = {}): Promise<ClientBuild> {
+  return inSignalsScope(async () => bundleClient(root, options))
+}
+
+async function bundleClient(root: string, options: ClientOptions): Promise<ClientBuild> {
   const sources = await readClientSources(root, options)
 
   await clearClientOutput(root)

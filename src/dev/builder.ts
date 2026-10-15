@@ -9,6 +9,7 @@ import process from 'node:process'
 import { outputDir } from '../build/assets'
 import { bothBundles, bundleIslands, bundleStyles, clearClientOutput, readClientSources, writeClasses } from '../build/client'
 import { sourceWords } from '../build/libraries'
+import { inSignalsScope } from '../build/signals'
 import { mapBundleToKay } from '../build/sourcemap'
 import { styleSignature } from '../build/styles'
 import { KayCompileError } from '../build/transform'
@@ -174,7 +175,7 @@ export function devBuilder(root: string, options: ClientOptions): (changed: stri
 
   return async (changed) => {
     try {
-      return await build(changed)
+      return await inSignalsScope(async () => build(changed))
     }
     catch (error) {
       last = undefined

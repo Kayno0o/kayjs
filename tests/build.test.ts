@@ -18,6 +18,7 @@ import { BUNDLED_LICENCES, codecWarnings, thirdPartyNotices, unknownCodecVersion
 import { formatSizeReport } from '../src/build/report'
 import { anchorModule } from '../src/build/runtime-chunk'
 import { runtimeConfig, withoutPlugins } from '../src/build/runtime-config'
+import { importedSignals, inSignalsScope } from '../src/build/signals'
 import { describeThrown, mapBundleToKay, mapStack } from '../src/build/sourcemap'
 import { analyzeKayCached, compilerModules, keepAnalyses, transformKayCached } from '../src/build/transform'
 import { loadConfig, withConfig } from '../src/config'
@@ -1150,6 +1151,75 @@ describe('what a build keeps in memory', () => {
     }
     finally {
       await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('looks up the signals a component imports once inside a scope, and from the disk again in the next', async () => {
+    const dir = resolve(await scratchDir('kay-scope-'))
+    const file = join(dir, 'count.kay')
+    const source = '---\nimport { count } from \'./state\'\n---\np.count {count()}\n'
+    const asSignal = 'import { signal } from \'kay\'\n\nexport const count = signal(0)\n'
+
+    try {
+      await Bun.write(join(dir, 'state.ts'), asSignal)
+      // Outside a scope every call looks again.
+      expect(importedSignals(file, source)).toEqual({ './state': { count: 'signal' } })
+      await Bun.write(join(dir, 'state.ts'), 'export const count = () => 0\n')
+      expect(importedSignals(file, source)).toEqual({})
+      await Bun.write(join(dir, 'state.ts'), asSignal)
+
+      await inSignalsScope(async () => {
+        const first = importedSignals(file, source)
+
+        expect(first).toEqual({ './state': { count: 'signal' } })
+        await Bun.write(join(dir, 'state.ts'), 'export const count = () => 0\n')
+        // The files do not change inside a build: the second pass over the component gets the first one's answer.
+        expect(importedSignals(file, source)).toBe(first)
+        // A changed source of the component itself is looked up again.
+        expect(importedSignals(file, `${source}\n`)).toEqual({})
+      })
+
+      await inSignalsScope(async () => {
+        expect(importedSignals(file, source)).toEqual({})
+        await Bun.write(join(dir, 'state.ts'), asSignal)
+      })
+      await inSignalsScope(async () => {
+        expect(importedSignals(file, source)).toEqual({ './state': { count: 'signal' } })
+      })
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('compiles an island again in kay dev once a module it imports stops exporting a signal', async () => {
+    const project = await scratchProject({
+      'src/state.ts': 'import { signal } from \'kay\'\n\nexport const total = signal(0)\n',
+      'src/total.kay': '---\nimport { total } from \'./state\'\n---\nbutton(type="button" onClick={() => total.set(1)}) {total}\n',
+      'src/routes/index.kay': '---\nimport Total from \'../total.kay\'\n---\nTotal\n',
+    })
+    const build = devBuilder(project, {})
+    const island = async () => {
+      const { islands } = await Bun.file(join(outputDir(project), 'manifest.json')).json() as { islands: Record<string, string[]> }
+
+      return Bun.file(join(clientDir(project), basename(islands['src/total.kay']![0]!))).text()
+    }
+
+    try {
+      expect((await build(null)).failed).toBe(false)
+      // A signal the template names without calling is read as one.
+      expect(await island()).toContain('() => total()')
+
+      await Bun.write(join(project, 'src/state.ts'), 'export const total = 0\n')
+      expect((await build(['src/state.ts'])).failed).toBe(false)
+      expect(await island()).not.toContain('total()')
+
+      await Bun.write(join(project, 'src/state.ts'), 'import { signal } from \'kay\'\n\nexport const total = signal(0)\n')
+      expect((await build(['src/state.ts'])).failed).toBe(false)
+      expect(await island()).toContain('() => total()')
+    }
+    finally {
+      await rm(project, { recursive: true, force: true })
     }
   })
 
