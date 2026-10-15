@@ -318,6 +318,7 @@ const SERVER_NAMES_IMPORT = /\bimport\s+(type\s+)?\{([^}]*)\}\s*from\s*(['"])kay
 const TYPE_PREFIX = /^type\s/
 // Created on first use: this module is also bundled for Node, where `Bun` does not exist at load.
 let sourceTranspiler: Bun.Transpiler | undefined
+const transpiler = () => sourceTranspiler ??= new Bun.Transpiler({ loader: 'ts' })
 // The config files read without the server: their `kay/server` import takes only `defineConfig`, which this module holds, so a process building the client or writing the types skips loading Elysia and the rest of the server.
 const lightConfigs = new Set<string>()
 
@@ -326,7 +327,7 @@ const lightConfigs = new Set<string>()
 function withoutServer(source: string): string | undefined {
   const named = [...source.matchAll(SERVER_NAMES_IMPORT)]
 
-  if (named.length === 0 || named.length !== (sourceTranspiler ??= new Bun.Transpiler({ loader: 'ts' })).scanImports(source).filter(({ path }) => path === 'kay/server').length)
+  if (named.length === 0 || named.length !== transpiler().scanImports(source).filter(({ path }) => path === 'kay/server').length)
     return undefined
 
   const onlyDefineConfig = named.every(([, type, names]) => type !== undefined || names!.split(',').map(name => name.trim()).filter(name => name !== '').every(name => TYPE_PREFIX.test(name) || name === 'defineConfig'))
