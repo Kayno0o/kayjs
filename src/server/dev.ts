@@ -38,6 +38,7 @@ export const DEV_AXE = '/_kay/dev/axe.js'
 export const DEV_ROUTES = '/_kay/dev/routes'
 export const DEV_HEAD = '/_kay/dev/head'
 export const DEV_REQUEST = '/_kay/dev/request'
+export const DEV_SIZES = '/_kay/dev/sizes'
 const PATCH_SOURCE = resolve(import.meta.dir, '../runtime/dev-patch.ts')
 const TOOL_SOURCE = resolve(import.meta.dir, '../runtime/dev-tool.ts')
 const INSPECTOR_SOURCE = resolve(import.meta.dir, '../runtime/dev-inspector.ts')

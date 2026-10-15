@@ -765,6 +765,7 @@ describe('the dev tool', () => {
       '/_kay/dev/tool.js': 'the tool itself, left out',
       '/_kay/env.js': 'export default {}\n',
       '/_kay/search-tbghfygg.js': 'export const search = () => 6\n'.repeat(40),
+      '/_kay/dev/sizes': JSON.stringify({ sizes: { route: '/', js: 5120, css: 256, estimated: true, exported: false, built: Date.now() - 2 * 3_600_000 } }),
       '/_kay/lib-calendar.js': 'export const calendar = () => 4\n'.repeat(20),
       '/_kay/lib-original.js': 'export const original = () => 5\n'.repeat(25),
       '/_kay/old-1.css': 'a { color: red }\n',
@@ -811,7 +812,7 @@ describe('the dev tool', () => {
       expect(shadow().querySelector('#kay-dev-tab-performance .count')?.textContent).toBe('3')
 
       // The HTML is sized from the document the browser holds, not fetched again; two unhashed files whose names end in 8 letters stay two, and an island hashed in letters only is still one.
-      expect(fetched.sort()).toEqual(['/_kay/_layout-1.css', '/_kay/counter-def45678.js', '/_kay/entry-abc12345.js', '/_kay/lib-calendar.js', '/_kay/lib-original.js', '/_kay/page-swap-aa11bb22.js', '/_kay/search-tbghfygg.js'])
+      expect(fetched.sort()).toEqual(['/_kay/_layout-1.css', '/_kay/counter-def45678.js', '/_kay/dev/sizes', '/_kay/entry-abc12345.js', '/_kay/lib-calendar.js', '/_kay/lib-original.js', '/_kay/page-swap-aa11bb22.js', '/_kay/search-tbghfygg.js'])
       expect(facts().slice(3)).toEqual([
         expect.stringMatching(/^HTML: \d/),
         `CSS: ${size(files['/_kay/_layout-1.css']!)}`,
@@ -819,8 +820,18 @@ describe('the dev tool', () => {
         `Entry: ${size(files['/_kay/entry-abc12345.js']!)}`,
         `Island chunks: ${size(files['/_kay/counter-def45678.js']!, files['/_kay/search-tbghfygg.js']!)}`,
         `Other chunks: ${size(files['/_kay/page-swap-aa11bb22.js']!, files['/_kay/lib-calendar.js']!, files['/_kay/lib-original.js']!)}`,
+        'JS: ~5.0 KB',
+        'CSS: 256 B',
       ])
       expect(shadow().querySelector('#kay-dev-performance')!.textContent).toContain('Dev sizes: not minified')
+
+      // The last build's sizes for the route, with their age, the estimate marked.
+      const built = [...shadow().querySelectorAll('#kay-dev-performance dl')].at(-1)!.textContent
+      const text = shadow().querySelector('#kay-dev-performance')!.textContent
+
+      expect(built).toBe('JS~5.0 KBCSS256 B')
+      expect(text).toContain('Route /, server build made 2 h ago')
+      expect(text).toContain('~ marks an estimate')
       expect(shadow().querySelector('#kay-dev-performance')!.textContent).toContain('Measured on the load of /.')
 
       // A link swaps in another page without a load: the vitals say which load they belong to.

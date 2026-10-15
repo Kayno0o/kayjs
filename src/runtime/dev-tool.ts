@@ -13,6 +13,7 @@ const ENV_URL = '/_kay/env.js'
 const MODULE_START = 'export default '
 const HEAD_HEADER = 'x-kay-dev'
 const REQUEST_URL = '/_kay/dev/request'
+const SIZES_URL = '/_kay/dev/sizes'
 // Shown first among the response headers.
 const FIRST_HEADERS = ['content-security-policy', 'content-security-policy-report-only', 'cache-control']
 const PRERENDER = { 'page': 'prerendered by kay build', 'listed': 'prerendered by kay build for the paths its setting lists', 'server islands': 'prerendered by kay build, its server islands rendered on request' }
@@ -1429,6 +1430,40 @@ function transferred(win: Window & typeof globalThis, href: string): string {
   return entry !== undefined && entry.encodedBodySize > 0 ? `, ${formatBytes(entry.encodedBodySize)}` : ''
 }
 
+interface BuiltSizes {
+  route: string
+  js: number
+  css: number
+  estimated: boolean
+  exported: boolean
+  built: number
+}
+
+// What the last `kay build` measured for this page's route, which the server reads from the report kept under `.kay`; nothing when no build was made or the route is not in it.
+async function builtSizes(win: Window & typeof globalThis): Promise<BuiltSizes | undefined> {
+  try {
+    const response = await win.fetch(`${SIZES_URL}?path=${encodeURIComponent(win.location.pathname)}`, { headers: { [HEAD_HEADER]: '1' }, cache: 'no-store', signal: AbortSignal.timeout(IMAGE_REQUEST_MS) })
+
+    return response.ok ? ((await response.json()) as { sizes?: BuiltSizes }).sizes : undefined
+  }
+  catch {
+    return undefined
+  }
+}
+
+// How long ago, in the largest whole unit.
+function ago(ms: number): string {
+  const minutes = Math.floor(ms / 60_000)
+
+  if (minutes < 1)
+    return 'less than a minute ago'
+
+  if (minutes < 60)
+    return `${minutes} min ago`
+
+  return minutes < 1440 ? `${Math.floor(minutes / 60)} h ago` : `${Math.floor(minutes / 1440)} days ago`
+}
+
 function formatBytes(bytes: number): string {
   return bytes < 1024 ? `${bytes} B` : `${(bytes / 1024).toFixed(1)} KB`
 }
@@ -1589,6 +1624,17 @@ function performanceTab(doc: Document, tool: DevTool, vitals: Vitals, signal: Ab
     row('Island chunks', weight.islands.length === 0 ? 'none loaded' : formatBytes(total(weight.islands)), weight.islands)
     row('Other chunks', weight.other.length === 0 ? 'none loaded' : formatBytes(total(weight.other)), weight.other)
     weightPanel.replaceChildren(tool.make('h3', 'heading', 'Weight, gzipped'), facts, tool.make('div', 'note', 'Dev sizes: not minified and with the dev-only code, so `kay build` makes them smaller.'))
+
+    const built = await builtSizes(doc.defaultView!)
+
+    if (ask !== asked || built === undefined)
+      return
+
+    const production = tool.make('dl', 'facts')
+    const mark = built.estimated ? '~' : ''
+
+    production.append(tool.make('dt', '', 'JS'), tool.make('dd', '', `${mark}${formatBytes(built.js)}`), tool.make('dt', '', 'CSS'), tool.make('dd', '', formatBytes(built.css)))
+    weightPanel.append(tool.make('h3', 'heading', 'Last kay build'), production, tool.make('div', 'note', `Route ${built.route}, ${built.exported ? 'static export' : 'server build'} made ${ago(Date.now() - built.built)}, minified and without the dev-only code${built.estimated ? '; ~ marks an estimate, as no page of the route was prerendered, the scripts being what its components can load' : ''}. Build again for sizes of the code as it is now.`))
   }
 
   reread = () => void reload()

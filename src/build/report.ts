@@ -156,7 +156,8 @@ export interface StoredReport {
   exported: boolean
   entry?: number | undefined
   islands: Record<string, number>
-  routes: Record<string, { js: number, css: number }>
+  // `estimated` when no page of the route was prerendered, so its scripts are what its components can load.
+  routes: Record<string, { js: number, css: number, estimated?: boolean | undefined }>
 }
 
 export function storedReport(report: SizeReport | undefined, summary: BuildSummary, exported: boolean): StoredReport {
@@ -165,7 +166,7 @@ export function storedReport(report: SizeReport | undefined, summary: BuildSumma
     exported,
     entry: report?.entry?.size.gzip,
     islands: Object.fromEntries((report?.islands ?? []).map(island => [island.file, island.size.gzip])),
-    routes: Object.fromEntries(summary.routes.map(route => [route.route, { js: route.js, css: route.css }])),
+    routes: Object.fromEntries(summary.routes.map(route => [route.route, { js: route.js, css: route.css, estimated: route.estimated }])),
   }
 }
 
