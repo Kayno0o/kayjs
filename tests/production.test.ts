@@ -20,6 +20,7 @@ import { resolveProject } from '../src/project'
 import { action, logFrom } from '../src/runtime'
 import { sqliteCache } from '../src/runtime/cache.server'
 import { logSink, setLogSink } from '../src/runtime/log'
+import { openSqlite } from '../src/runtime/sqlite.server'
 import { solveWork } from '../src/runtime/work'
 import { inlineScriptHashes, invalidatePage, pages, requestId, shutdown, sqliteJobs, sqliteStore } from '../src/server'
 import { servePages } from '../src/server/app'
@@ -736,6 +737,20 @@ console.log(JSON.stringify(warnings))
     }
     finally {
       setSystemTime()
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('opens a shared SQLite file in WAL without a disk sync per commit', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kay-sqlite-'))
+
+    try {
+      const db = openSqlite(join(dir, 'shared.sqlite'))
+
+      expect([db.query('PRAGMA journal_mode').get(), db.query('PRAGMA synchronous').get()]).toEqual([{ journal_mode: 'wal' }, { synchronous: 1 }])
+      db.close()
+    }
+    finally {
       await rm(dir, { recursive: true, force: true })
     }
   })

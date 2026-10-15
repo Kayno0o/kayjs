@@ -16,6 +16,8 @@ export function openSqlite(path: string): Database {
   const db = new sqlite.Database(path, { create: true })
 
   db.run('PRAGMA journal_mode = WAL')
+  // A commit waits on no disk sync, only checkpoints do: under WAL a power cut may lose the last writes, never corrupt the file.
+  db.run('PRAGMA synchronous = NORMAL')
   // Another process writing waits its turn rather than failing the write.
   db.run('PRAGMA busy_timeout = 5000')
 
