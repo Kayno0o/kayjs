@@ -1365,23 +1365,41 @@ describe('a form submitted in the browser', () => {
     }
   })
 
+  // Alone, so no earlier test has loaded the hold into a runtime this one shares.
   const mountSpread = site({
-    'main.kay': '---\nconst answers: (() => void)[] = []\nconst props = { onSubmit(event: SubmitEvent) { event.preventDefault(); return new Promise<void>(resolve => answers.push(resolve)) } }\n---\nform({...props})\n  button#go(type="submit") Send\nbutton#settle(type="button" onClick={() => answers.shift()?.()}) settle\n',
-  })
+    'main.kay': '---\nimport { signal } from \'kay\'\n\nconst answers: (() => void)[] = []\nconst mode = signal(0)\nconst log = signal(\'\')\nconst on = (name: string) => (event: SubmitEvent) => {\n  event.preventDefault()\n  log.set(log() + name)\n\n  return new Promise<void>(resolve => answers.push(resolve))\n}\nconst first = on(\'a\')\nconst second = on(\'b\')\n---\nform({...{ get onSubmit() { return mode() === 0 ? first : mode() === 1 ? second : undefined } }})\n  button#go(type="submit") Send\nbutton#settle(type="button" onClick={() => answers.shift()?.()}) settle\nbutton#next(type="button" onClick={() => mode.set(mode() + 1)}) next\np#log {log()}\n',
+  }, true)
 
-  it('holds an onSubmit a spread on a form gives, as long as it is pending', async () => {
+  it('holds an onSubmit a spread on a form gives, replaces it and drops it', async () => {
     const { root, dispose } = await mountSpread()
 
     try {
       const form = root.querySelector('form')!
+      const busy = () => [form, root.querySelector('#go')].map(element => element!.getAttribute('aria-busy'))
+      const click = async (id: string) => {
+        root.querySelector<HTMLElement>(id)!.click()
+        await settle()
+      }
 
       form.requestSubmit()
       await settle()
-      expect([form, root.querySelector('#go')].map(element => element!.getAttribute('aria-busy'))).toEqual(['true', 'true'])
+      expect(busy()).toEqual(['true', 'true'])
 
-      root.querySelector<HTMLElement>('#settle')!.click()
+      await click('#settle')
+      expect(busy()).toEqual([null, null])
+
+      await click('#next')
+      form.requestSubmit()
       await settle()
-      expect([form, root.querySelector('#go')].map(element => element!.getAttribute('aria-busy'))).toEqual([null, null])
+      expect(root.querySelector('#log')!.textContent).toBe('ab')
+      expect(busy()).toEqual(['true', 'true'])
+      await click('#settle')
+
+      await click('#next')
+      form.requestSubmit()
+      await settle()
+      expect(root.querySelector('#log')!.textContent).toBe('ab')
+      expect(busy()).toEqual([null, null])
     }
     finally {
       await dispose()
@@ -1405,7 +1423,9 @@ describe('a form submitted in the browser', () => {
       console.log(JSON.stringify({ reasons, busy: [form, form.querySelector('button')].map(element => element.getAttribute('aria-busy')) }))
     `
     const run = Bun.spawn([process.execPath, '-e', script], { stdout: 'pipe', stderr: 'pipe' })
+    const [out, err] = await Promise.all([new Response(run.stdout).text(), new Response(run.stderr).text(), run.exited])
 
-    expect(JSON.parse(await new Response(run.stdout).text())).toEqual({ reasons: ['refused'], busy: [null, null] })
+    expect(err).toBe('')
+    expect(JSON.parse(out)).toEqual({ reasons: ['refused'], busy: [null, null] })
   })
 })

@@ -41,7 +41,7 @@ async function hold(form: HTMLFormElement, answer: PromiseLike<unknown>): Promis
   holds.set(form, (holds.get(form) ?? 0) + 1)
   setBusy(form, true)
 
-  // A rejection is rethrown once the hold is released, so it is reported as it would be without one.
+  // A rejection is rethrown once the hold is released, so it is reported as it would be without one; a handler that catches its own promise's rejection still has it reported.
   try {
     await answer
   }
