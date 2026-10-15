@@ -13,7 +13,7 @@ import { warnOtherKay } from '../src/commands/command'
 import { compileKay } from '../src/compiler'
 import { SHADOW_DIR } from '../src/project'
 import { limiter } from '../src/server/limit'
-import { scratchDir } from './scratch'
+import { fixtureCopy, scratchDir } from './scratch'
 
 const fixtures = join(import.meta.dir, 'fixtures')
 // Tests on a scratch project of their own run together, but four checks at most at a time, as tsgo is multithreaded itself; a test's wait for its turn counts in its timeout.
@@ -36,19 +36,33 @@ async function kay(args: string[], options: { cwd?: string, env?: Record<string,
 }
 
 describe('kay check', () => {
+  // Each on a copy of the fixture, so no shadow tree or tsgo state an earlier run, branch or test left in its `.kay` reaches the check.
   it('passes a valid app, .ts files importing .kay components included', async () => {
-    expect(await check(join(fixtures, 'app'))).toEqual([])
+    const root = await fixtureCopy('app')
+
+    try {
+      expect(await check(root)).toEqual([])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
   })
 
   it('rewrites the shadow tree in place, removing only files no .kay source produces any more', async () => {
-    const stale = join(fixtures, 'app', '.kay', 'types', 'src', 'gone.kay.tsx')
-    const kept = join(fixtures, 'app', '.kay', 'types', 'src', 'todo-item.kay.tsx')
+    const root = await fixtureCopy('app')
+    const stale = join(root, '.kay', 'types', 'src', 'gone.kay.tsx')
+    const kept = join(root, '.kay', 'types', 'src', 'todo-item.kay.tsx')
 
-    await Bun.write(stale, 'export {}')
-    await check(join(fixtures, 'app'))
+    try {
+      await Bun.write(stale, 'export {}')
+      await check(root)
 
-    expect(await Bun.file(stale).exists()).toBe(false)
-    expect(await Bun.file(kept).exists()).toBe(true)
+      expect(await Bun.file(stale).exists()).toBe(false)
+      expect(await Bun.file(kept).exists()).toBe(true)
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
   })
 
   it('passes a site of pages, layouts and islands, with route params and server data typed', async () => {
