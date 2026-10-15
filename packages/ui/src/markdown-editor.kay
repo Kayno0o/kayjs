@@ -178,15 +178,21 @@ function paste(event: ClipboardEvent) {
   }
 }
 
-// The HTML to Markdown converter loads on the first paste of rich text rather than with the island; the plain text goes in if it cannot load.
+// The HTML to Markdown converter loads on the first paste of rich text rather than with the island; the text alone goes in if it cannot load.
+// The text lands where the paste was, unless the field changed while the converter loaded, as a second paste or typing does: then at the selection by then.
 async function pasteMarkdown(field: HTMLTextAreaElement, html: string, plain: string): Promise<void> {
-  const { selectionStart: start, selectionEnd: end } = field
-  let text = plain
+  const before = field.value
+  const at = { start: field.selectionStart, end: field.selectionEnd }
+  let text: string
 
   try {
     text = (await import('@kaynooo/utils/browser/markdown')).htmlToMarkdown(html)
   }
-  catch {}
+  catch {
+    text = plain || (new DOMParser().parseFromString(html, 'text/html').body.textContent ?? '')
+  }
+
+  const { start, end } = field.value === before ? at : { start: field.selectionStart, end: field.selectionEnd }
 
   applyEdit(field, { start, end, text, selectionStart: start + text.length, selectionEnd: start + text.length })
 }

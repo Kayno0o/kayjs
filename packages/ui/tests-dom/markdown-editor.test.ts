@@ -40,6 +40,12 @@ function paste(target: EventTarget, files: File[], html?: string): Event {
   return event
 }
 
+// Resolves once a paste of rich text changed the reported value, the converter loading on the first one.
+async function converted(state: { value: string }, previous: string): Promise<void> {
+  for (let tries = 0; tries < 1000 && state.value === previous; tries++)
+    await Bun.sleep(5)
+}
+
 describe('MarkdownEditor', () => {
   test('continues a list on Enter and reports the text', async () => {
     const state = await editor('- milk')
@@ -83,12 +89,20 @@ describe('MarkdownEditor', () => {
     const state = await editor('')
 
     expect(paste(state.area, [], '<p>Read <strong>this</strong></p>').defaultPrevented).toBe(true)
-
-    // The converter loads on the first paste.
-    for (let tries = 0; tries < 200 && state.value === ''; tries++)
-      await Bun.sleep(5)
+    await converted(state, '')
 
     expect(state.value).toBe('Read **this**')
+  })
+
+  test('puts a paste at the caret of the moment it lands when the field changed while the converter loaded', async () => {
+    const state = await editor('ab')
+
+    state.area.setSelectionRange(1, 1)
+    paste(state.area, [], '<strong>x</strong>')
+    state.area.setRangeText(' typed ', 2, 2, 'end')
+    await converted(state, 'ab')
+
+    expect(state.value).toBe('ab typed **x**')
   })
 
   test('embeds a pasted image behind a placeholder, then swaps in the uploaded url', async () => {
