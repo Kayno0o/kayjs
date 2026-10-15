@@ -367,7 +367,7 @@ export function isCrossSite(request: Request, site?: string): boolean {
   const origin = request.headers.get('origin')
   const fetchSite = request.headers.get('sec-fetch-site')
 
-  return (origin !== null && !sameHost(request, origin, site)) || (fetchSite !== null && !SAME_SITE_FETCH.has(fetchSite))
+  return (origin !== null && !sameHost(request, URL.parse(origin), site)) || (fetchSite !== null && !SAME_SITE_FETCH.has(fetchSite))
 }
 
 // The requests an `api({ cors })` module let in from another site, which a library checking Origin itself, such as kayjs-auth, leaves alone.
@@ -485,15 +485,29 @@ export async function passGuards(guards: LoadedGuard[], context: { request: Requ
   return refusal ? stopped(refusal.error, request, state, options) : state
 }
 
-// Hosts rather than origins: behind a TLS-terminating proxy the browser says https while the request arrives as http. The host of `site` in kay.config.ts counts too, for a proxy that does not pass the browser's `Host` on.
-function sameHost(request: Request, url: string | null, appUrl?: string): url is string {
-  if (url === null || !URL.canParse(url))
-    return false
+// The host of `site` in kay.config.ts, parsed once per origin.
+let siteHost: { origin: string, host: string | undefined } | undefined
 
-  const { host } = new URL(url)
+function configuredHost(): string | undefined {
   const site = configuredSite()
 
-  return host === requestUrl(request).host || (site !== undefined && host === new URL(site.origin).host) || (appUrl !== undefined && URL.canParse(appUrl) && host === new URL(appUrl).host)
+  if (site === undefined)
+    return undefined
+
+  if (siteHost?.origin !== site.origin)
+    siteHost = { origin: site.origin, host: URL.parse(site.origin)?.host }
+
+  return siteHost.host
+}
+
+// Hosts rather than origins: behind a TLS-terminating proxy the browser says https while the request arrives as http. The host of `site` in kay.config.ts counts too, for a proxy that does not pass the browser's `Host` on.
+function sameHost(request: Request, url: URL | null, appUrl?: string): url is URL {
+  if (url === null)
+    return false
+
+  const { host } = url
+
+  return host === requestUrl(request).host || host === configuredHost() || (appUrl !== undefined && host === URL.parse(appUrl)?.host)
 }
 
 // A fetch from an island wants a result; a plain form post goes back to the page it came from.
@@ -505,20 +519,34 @@ function isFormCall(request: Request): boolean {
   return request.headers.get('x-kay-action') === FORM_CALL
 }
 
+// Where each post came from, worked out once however many of the post's stages ask.
+const postedFromCache = new WeakMap<Request, string | null>()
+
 // The page a post came from on this site: the one its form names when a refused post rendered it, else the one kay's script names, else its `Referer`.
 function postedFrom(request: Request): string | undefined {
-  const page = (named: string | null) => named !== null && URL.canParse(named, request.url) ? new URL(named, request.url).href : null
-  const back = page(requestUrl(request).searchParams.get(BACK_PARAMETER))
-  const sent = page(request.headers.get(PAGE_HEADER))
-  const referer = request.headers.get('referer')
+  let from = postedFromCache.get(request)
+
+  if (from === undefined)
+    postedFromCache.set(request, from = fromWhere(request) ?? null)
+
+  return from ?? undefined
+}
+
+function fromWhere(request: Request): string | undefined {
+  const resolved = (named: string | null) => named === null ? null : URL.parse(named, request.url)
+  const back = resolved(requestUrl(request).searchParams.get(BACK_PARAMETER))
 
   if (sameHost(request, back))
-    return back
+    return back.href
+
+  const sent = resolved(request.headers.get(PAGE_HEADER))
 
   if (sameHost(request, sent))
-    return sent
+    return sent.href
 
-  return sameHost(request, referer) ? referer : undefined
+  const referer = request.headers.get('referer')
+
+  return referer !== null && sameHost(request, URL.parse(referer)) ? referer : undefined
 }
 
 function backTo(request: Request): string {

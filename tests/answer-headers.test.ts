@@ -101,6 +101,17 @@ describe('the headers of every kind of answer', () => {
     await expectAnswer(await get(action, { origin: 'http://evil.test' }, post), 403, {})
   })
 
+  it('sends a post back to the page its form names, else its script\'s, else its referer, never to another site', async () => {
+    const back = async (path: string, headers: Record<string, string>) => (await get(path, { origin: ORIGIN, ...headers }, { method: 'POST', body: new URLSearchParams({ title: 'x' }) })).headers.get('location')
+
+    expect(await back(`${action}?kay_back=${encodeURIComponent('/named?a=1')}`, { 'x-kay-page': '/script', 'referer': `${ORIGIN}/ref` })).toBe(`${ORIGIN}/named?a=1`)
+    expect(await back(action, { 'x-kay-page': '/script', 'referer': `${ORIGIN}/ref` })).toBe(`${ORIGIN}/script`)
+    expect(await back(action, { referer: `${ORIGIN}/ref?b=2` })).toBe(`${ORIGIN}/ref?b=2`)
+    expect(await back(`${action}?kay_back=${encodeURIComponent('https://evil.test/x')}`, { 'x-kay-page': 'https://evil.test/y', 'referer': `${ORIGIN}/ref` })).toBe(`${ORIGIN}/ref`)
+    expect(await back(action, { 'x-kay-page': '//evil.test/y', 'referer': 'https://evil.test/z' })).toBe('/')
+    expect(await back(action, { referer: '/relative' })).toBe('/')
+  })
+
   it('hands Elysia the response the route made, with no copy of it', async () => {
     const dir = await fixtureCopy('answers')
     let made: unknown
