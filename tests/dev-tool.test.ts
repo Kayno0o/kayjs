@@ -735,15 +735,26 @@ describe('the dev tool', () => {
     const files: Record<string, string> = {
       '/': `<!doctype html><title>Home</title>${'<p>Hello</p>'.repeat(200)}`,
       '/_kay/_layout-1.css': 'body { margin: 0 }\n'.repeat(100),
-      '/_kay/entry-abc.js': 'export const run = () => 1\n'.repeat(400),
-      '/_kay/counter-def.js': 'export const count = () => 2\n'.repeat(50),
+      '/_kay/entry-abc12345.js': 'export const run = () => 1\n'.repeat(400),
+      '/_kay/counter-def45678.js': 'export const count = () => 2\n'.repeat(50),
+      '/_kay/page-swap-aa11bb22.js': 'export const swap = () => 3\n'.repeat(30),
       '/_kay/dev/tool.js': 'the tool itself, left out',
+      '/_kay/env.js': 'export default {}\n',
+      '/_kay/old-1.css': 'a { color: red }\n',
     }
+    // What the browser loaded over the page's life: the island rebuilt since, a stylesheet swapped with a query, and one the page no longer links.
+    const loaded = ['/_kay/_layout-1.css', '/_kay/_layout-1.css?kay-dev=2', '/_kay/entry-abc12345.js', '/_kay/counter-00000000.js', '/_kay/counter-def45678.js', '/_kay/page-swap-aa11bb22.js', '/_kay/dev/tool.js', '/_kay/env.js', '/_kay/old-1.css']
     const fetched: string[] = []
 
     happyDOM.setURL('http://localhost/')
+    // The stylesheet is only linked: the test reads its address, the browser's own load is not part of it.
+    const { settings } = (window as unknown as { happyDOM: { settings: { disableCSSFileLoading: boolean, handleDisabledFileLoadingAsSuccess: boolean } } }).happyDOM
 
-    const performance = spyOn(window.performance, 'getEntriesByType').mockImplementation(((type: string) => type === 'resource' ? Object.keys(files).filter(path => path !== '/').map(path => ({ name: `http://localhost${path}` })) : []) as unknown as typeof window.performance.getEntriesByType)
+    Object.assign(settings, { disableCSSFileLoading: true, handleDisabledFileLoadingAsSuccess: true })
+    document.head.insertAdjacentHTML('beforeend', '<link rel="stylesheet" href="/_kay/_layout-1.css?kay-dev=2">')
+    document.body.innerHTML = '<slot data-component="src/components/counter.kay"></slot>'
+
+    const performance = spyOn(window.performance, 'getEntriesByType').mockImplementation(((type: string) => type === 'resource' ? loaded.map(path => ({ name: `http://localhost${path}` })) : []) as unknown as typeof window.performance.getEntriesByType)
     const fetching = spyOn(window, 'fetch').mockImplementation((async (url: string) => {
       fetched.push(new URL(url, 'http://localhost').pathname)
 
@@ -767,18 +778,19 @@ describe('the dev tool', () => {
       expect(shadow().querySelector('#kay-dev-performance .note')?.textContent).toBe(' (good up to 2500 ms, poor past 4000 ms)')
 
       // Interactions: the slowest of each, the worst taken; a later report moves the open tab.
-      observed.report('event', [{ interactionId: 1, duration: 80 }, { interactionId: 1, duration: 120 }, { interactionId: 2, duration: 240 }, { duration: 900 }])
+      observed.report('event', [{ interactionId: 1, duration: 80 }, { interactionId: 1, duration: 120 }, { interactionId: 2, duration: 240 }, { duration: 900 }, { interactionId: 3, duration: 800, target: shadow().host }])
 
       expect(facts()[2]).toBe('INP: 240 ms - needs improvement')
       expect(shadow().querySelector('#kay-dev-tab-performance .count')?.textContent).toBe('3')
 
-      expect(fetched.sort()).toEqual(['/', '/_kay/_layout-1.css', '/_kay/counter-def.js', '/_kay/entry-abc.js'])
+      expect(fetched.sort()).toEqual(['/', '/_kay/_layout-1.css', '/_kay/counter-def45678.js', '/_kay/entry-abc12345.js', '/_kay/page-swap-aa11bb22.js'])
       expect(facts().slice(3)).toEqual([
         `HTML: ${size(files['/']!)}`,
         `CSS: ${size(files['/_kay/_layout-1.css']!)}`,
-        `JS: ${size(files['/_kay/entry-abc.js']!, files['/_kay/counter-def.js']!)}`,
-        `Entry: ${size(files['/_kay/entry-abc.js']!)}`,
-        `Island chunks: ${size(files['/_kay/counter-def.js']!)}`,
+        `JS: ${size(files['/_kay/entry-abc12345.js']!, files['/_kay/counter-def45678.js']!, files['/_kay/page-swap-aa11bb22.js']!)}`,
+        `Entry: ${size(files['/_kay/entry-abc12345.js']!)}`,
+        `Island chunks: ${size(files['/_kay/counter-def45678.js']!)}`,
+        `Other chunks: ${size(files['/_kay/page-swap-aa11bb22.js']!)}`,
       ])
       expect(shadow().querySelector('#kay-dev-performance')!.textContent).toContain('Dev sizes: not minified')
     }
@@ -786,6 +798,8 @@ describe('the dev tool', () => {
       fetching.mockRestore()
       performance.mockRestore()
       delete (window as { PerformanceObserver?: unknown }).PerformanceObserver
+      document.body.innerHTML = ''
+      document.head.querySelector('link[rel=stylesheet]')?.remove()
       happyDOM.setURL(href)
     }
   })

@@ -44,9 +44,9 @@ const KINDS: Record<ProblemKind, string> = {
 }
 
 const STYLE = `
-:host { all: initial; --bg: #fff; --surface: #f5f5f7; --fg: #1c1c22; --muted: #6a6a76; --border: #e2e2e8; --accent: #6d28d9; --accent-soft: rgb(109 40 217 / 10%); --on-accent: #fff; --error: #c4262e; --warn: #9a5b00; --shadow: 0 8px 28px rgb(0 0 0 / 18%); color-scheme: light; }
+:host { all: initial; --bg: #fff; --surface: #f5f5f7; --fg: #1c1c22; --muted: #6a6a76; --border: #e2e2e8; --accent: #6d28d9; --accent-soft: rgb(109 40 217 / 10%); --on-accent: #fff; --error: #c4262e; --warn: #9a5b00; --ok: #1a7f37; --shadow: 0 8px 28px rgb(0 0 0 / 18%); color-scheme: light; }
 @media (prefers-color-scheme: dark) {
-  :host { --bg: #1b1b21; --surface: #25252d; --fg: #ececf1; --muted: #a2a2ae; --border: #36363f; --accent: #a78bfa; --accent-soft: rgb(167 139 250 / 16%); --on-accent: #1b1b21; --error: #ff7a7a; --warn: #f2b450; --shadow: 0 8px 28px rgb(0 0 0 / 50%); color-scheme: dark; }
+  :host { --bg: #1b1b21; --surface: #25252d; --fg: #ececf1; --muted: #a2a2ae; --border: #36363f; --accent: #a78bfa; --accent-soft: rgb(167 139 250 / 16%); --on-accent: #1b1b21; --error: #ff7a7a; --warn: #f2b450; --ok: #5fd68a; --shadow: 0 8px 28px rgb(0 0 0 / 50%); color-scheme: dark; }
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
@@ -109,8 +109,8 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .route .path { overflow-wrap: anywhere; }
 .route .file { grid-column: 2 / -1; color: var(--muted); }
 .secret { color: var(--warn); }
-.good { color: var(--ok, #1a7f37); }
-.poor { color: var(--error, #cf222e); }
+.good { color: var(--ok); }
+.poor { color: var(--error); }
 .needs { color: var(--warn); }
 .image { padding: 6px 4px; border-bottom: 1px solid var(--border); }
 .image:last-child { border-bottom: 0; }
@@ -474,7 +474,7 @@ export function startDevTool(doc: Document = document): DevTool {
   const vitals = watchVitals(doc.defaultView!, listening.signal)
 
   imagesTab(doc, tool, vitals, listening.signal)
-  performanceTab(doc, tool, vitals)
+  performanceTab(doc, tool, vitals, listening.signal)
   routesTab(doc, tool, listening.signal)
   doc.addEventListener('click', (event) => {
     const target = event.target instanceof Element ? event.target.closest<HTMLButtonElement>('button[data-kay-open],button[data-kay-copy]') : null
@@ -1163,8 +1163,8 @@ interface Vitals {
   lcp?: { ms: number, element: Element | undefined } | undefined
   cls: number
   inp?: number | undefined
-  // Called after any of them changes.
-  changed: (() => void)[]
+  // Called with the vital that changed.
+  changed: ((name: VitalName) => void)[]
 }
 
 function rateVital(name: VitalName, value: number): 'good' | 'needs' | 'poor' {
@@ -1180,6 +1180,7 @@ interface ShiftEntry extends PerformanceEntry {
 
 interface EventEntry extends PerformanceEntry {
   interactionId?: number
+  target?: Node | null
 }
 
 // The page's LCP, CLS and INP as the browser reports them from the moment the tool loads, earlier entries included; a browser without an entry type leaves that vital out.
@@ -1196,9 +1197,9 @@ function watchVitals(win: Window & typeof globalThis, signal: AbortSignal): Vita
       // Not every browser reports every type.
     }
   }
-  const announce = () => {
+  const announce = (name: VitalName) => {
     for (const listener of vitals.changed)
-      listener()
+      listener(name)
   }
   // The layout shifts without a recent input, in windows: the vital is the worst window.
   let windowStart = 0
@@ -1212,10 +1213,12 @@ function watchVitals(win: Window & typeof globalThis, signal: AbortSignal): Vita
 
     if (entry) {
       vitals.lcp = { ms: entry.renderTime || entry.loadTime || entry.startTime, element: entry.element ?? undefined }
-      announce()
+      announce('lcp')
     }
   })
   observe('layout-shift', (entries) => {
+    const before = vitals.cls
+
     for (const entry of entries as ShiftEntry[]) {
       if (entry.hadRecentInput)
         continue
@@ -1232,10 +1235,17 @@ function watchVitals(win: Window & typeof globalThis, signal: AbortSignal): Vita
       vitals.cls = Math.max(vitals.cls, windowValue)
     }
 
-    announce()
+    if (vitals.cls !== before)
+      announce('cls')
   })
   observe('event', (entries) => {
+    const before = vitals.inp
+
     for (const entry of entries as EventEntry[]) {
+      // The tool's own clicks are not the page's.
+      if (entry.target instanceof win.Element && entry.target.closest(HOST) !== null)
+        continue
+
       if (entry.interactionId !== undefined && entry.interactionId > 0)
         interactions.set(entry.interactionId, Math.max(interactions.get(entry.interactionId) ?? 0, entry.duration))
     }
@@ -1244,7 +1254,9 @@ function watchVitals(win: Window & typeof globalThis, signal: AbortSignal): Vita
     const slowest = [...interactions.values()].sort((a, b) => b - a)
 
     vitals.inp = slowest[Math.min(slowest.length - 1, Math.floor(slowest.length / 50))]
-    announce()
+
+    if (vitals.inp !== before)
+      announce('inp')
   }, { durationThreshold: 16 })
 
   return vitals
@@ -1270,7 +1282,10 @@ function imagesTab(doc: Document, tool: DevTool, vitals: Vitals, signal: AbortSi
     })
   }
 
-  vitals.changed.push(schedule)
+  vitals.changed.push((name) => {
+    if (name === 'lcp')
+      schedule()
+  })
 
   const read = async () => {
     const ask = ++asked
@@ -1386,35 +1401,66 @@ interface Weight {
   html: number
   css: { url: string, bytes: number }[]
   entry: { url: string, bytes: number }[]
-  chunks: { url: string, bytes: number }[]
+  islands: { url: string, bytes: number }[]
+  other: { url: string, bytes: number }[]
 }
 
-// The page's HTML, the stylesheets and scripts it loaded gzipped, as sent in development: not minified, with the dev-only code, so larger than `kay build` makes them. The dev tool's own scripts and the live reload stay out.
-async function pageWeight(win: Window & typeof globalThis): Promise<Weight> {
-  const here = win.location.origin
-  const urls = [...new Set(win.performance.getEntriesByType('resource').map(entry => entry.name))].filter((name) => {
-    const url = new URL(name)
+// A built file's name without its hash, `counter` of `counter-48rr5xzz.js`.
+const HASHED_NAME = /^(.*)-[a-z\d]{8}\.(?:js|css)$/
 
-    return url.origin === here && (/\.(?:js|css)$/).test(url.pathname) && !url.pathname.startsWith('/_kay/dev/')
-  })
-  const sized = async (url: string, accept = '*/*') => gzipSize(await (await win.fetch(url, { headers: { accept } })).text())
-  const [html, files] = await Promise.all([
+// The page's HTML, the stylesheets and scripts it loaded gzipped, as sent in development: not minified, with the dev-only code, so larger than `kay build` makes them. The dev tool's own scripts, the live reload and the public env stay out; a file rebuilt since it first loaded counts once, in its latest form, and a stylesheet only while the page links it.
+async function pageWeight(doc: Document): Promise<Weight> {
+  const win = doc.defaultView!
+  const here = win.location.origin
+  const linked = new Set([...doc.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]')].map(link => new URL(link.href, here).pathname))
+  const latest = new Map<string, string>()
+
+  for (const entry of win.performance.getEntriesByType('resource')) {
+    const url = parseUrl(entry.name, here)
+
+    if (url === undefined || url.origin !== here || !(/\.(?:js|css)$/).test(url.pathname) || url.pathname.startsWith('/_kay/dev/') || url.pathname === '/_kay/env.js')
+      continue
+
+    if (url.pathname.endsWith('.css') && !linked.has(url.pathname))
+      continue
+
+    const file = url.pathname.slice(url.pathname.lastIndexOf('/') + 1)
+    const name = HASHED_NAME.exec(file)?.[1]
+
+    // Later entries are later loads: the hash of an island rebuilt since replaces the one before.
+    latest.set(name === undefined ? url.pathname : `${url.pathname.slice(0, url.pathname.length - file.length)}${name}.${file.slice(file.lastIndexOf('.') + 1)}`, url.pathname)
+  }
+
+  const sized = async (url: string, accept = '*/*') => {
+    const response = await win.fetch(url, { headers: { accept } })
+
+    if (!response.ok)
+      throw new Error(`${url} answered ${response.status}`)
+
+    return gzipSize(await response.text())
+  }
+  const [html, settled] = await Promise.all([
     sized(win.location.href, 'text/html'),
-    Promise.all(urls.map(async url => ({ url: new URL(url).pathname, bytes: await sized(url) }))),
+    Promise.allSettled([...latest.values()].map(async url => ({ url, bytes: await sized(url) }))),
   ])
+  const files = settled.flatMap(result => result.status === 'fulfilled' ? [result.value] : [])
+  const components = new Set([...doc.querySelectorAll('[data-component]')].map(element => (element.getAttribute('data-component') ?? '').replace(/^.*\//, '').replace(/\.kay$/, '')))
   const isEntry = (url: string) => url.slice(url.lastIndexOf('/') + 1).startsWith('entry-')
+  const isIsland = (url: string) => components.has(HASHED_NAME.exec(url.slice(url.lastIndexOf('/') + 1))?.[1] ?? '')
+  const scripts = files.filter(file => file.url.endsWith('.js'))
 
   return {
     html,
     css: files.filter(file => file.url.endsWith('.css')),
-    entry: files.filter(file => file.url.endsWith('.js') && isEntry(file.url)),
-    chunks: files.filter(file => file.url.endsWith('.js') && !isEntry(file.url)),
+    entry: scripts.filter(file => isEntry(file.url)),
+    islands: scripts.filter(file => !isEntry(file.url) && isIsland(file.url)),
+    other: scripts.filter(file => !isEntry(file.url) && !isIsland(file.url)),
   }
 }
 
 // The page's weight and Web Vitals: LCP, CLS and INP each against its good limit as the page is used, and the HTML, CSS and JS gzipped, the island chunks split from the entry.
-function performanceTab(doc: Document, tool: DevTool, vitals: Vitals): void {
-  const win = doc.defaultView!
+function performanceTab(doc: Document, tool: DevTool, vitals: Vitals, signal: AbortSignal): void {
+  let scheduled = false
   let reread: () => void = () => undefined
   const tab = tool.tab({ id: 'performance', label: 'Performance', shown: () => reread() })
   const vitalsPanel = tool.make('dl', 'facts')
@@ -1459,7 +1505,7 @@ function performanceTab(doc: Document, tool: DevTool, vitals: Vitals): void {
     let weight: Weight
 
     try {
-      weight = await pageWeight(win)
+      weight = await pageWeight(doc)
     }
     catch (error) {
       if (ask === asked)
@@ -1486,18 +1532,30 @@ function performanceTab(doc: Document, tool: DevTool, vitals: Vitals): void {
 
     row('HTML', formatBytes(weight.html))
     row('CSS', formatBytes(total(weight.css)), weight.css)
-    row('JS', formatBytes(total(weight.entry) + total(weight.chunks)))
+    row('JS', formatBytes(total(weight.entry) + total(weight.islands) + total(weight.other)))
     row('Entry', formatBytes(total(weight.entry)), weight.entry)
-    row('Island chunks', weight.chunks.length === 0 ? 'none loaded' : formatBytes(total(weight.chunks)), weight.chunks)
+    row('Island chunks', weight.islands.length === 0 ? 'none loaded' : formatBytes(total(weight.islands)), weight.islands)
+    row('Other chunks', weight.other.length === 0 ? 'none loaded' : formatBytes(total(weight.other)), weight.other)
     weightPanel.replaceChildren(tool.make('h3', 'heading', 'Weight, gzipped'), facts, tool.make('div', 'note', 'Dev sizes: not minified and with the dev-only code, so `kay build` makes them smaller.'))
   }
 
   reread = () => void reload()
-  vitals.changed.push(() => {
-    if (tab.panel.hidden === false)
-      renderVitals()
+  vitals.changed.push(renderVitals)
+
+  // A page swap brings other HTML, styles and islands: the weight is measured again.
+  const swaps = new MutationObserver(() => {
+    if (tab.panel.hidden === false && !scheduled) {
+      scheduled = true
+      queueMicrotask(() => {
+        scheduled = false
+        reread()
+      })
+    }
   })
-  tab.panel.append(tool.make('h3', 'heading', 'Web Vitals since the page loaded'), vitalsPanel, weightPanel)
+
+  swaps.observe(doc.head, { childList: true })
+  signal.addEventListener('abort', () => swaps.disconnect())
+  tab.panel.append(tool.make('h3', 'heading', 'Web Vitals of the page load'), vitalsPanel, weightPanel)
   renderVitals()
 }
 
