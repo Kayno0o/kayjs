@@ -1147,7 +1147,7 @@ describe.concurrent('kay dev', () => {
       expect(await sockets()).toEqual([])
       await Promise.all([rm(root, { recursive: true, force: true }), rm(spawned, { force: true })])
     }
-  })
+  }, 60_000)
 
   it.serial('lets no page of another site reach the debugger, as Bun\'s inspector does', async () => {
     const proxy = inspectorProxy('ws://localhost:0/kay', () => undefined, () => 3000)
@@ -1469,16 +1469,18 @@ describe.concurrent('kay dev', () => {
         }
       }
 
+      // A builder let go of still exiting under load is not a second one: what is checked is that one is left.
+      await until(() => builders().length === 1, 10_000)
+
       const [first] = builders()
 
-      expect(builders()).toHaveLength(1)
       expect(lines.join('\n')).not.toContain('the process building the client exited')
 
       // One gone on its own starts again with the next build.
       process.kill(Number(first), 'SIGKILL')
       // A restart still finishing under load may start the next one at once, so the wait is for this one gone, not for none.
       // Reaped, not just out of the list: a dying process empties its cmdline before kay dev hears it exit, and an edit in between asks the dead one to build.
-      await until(() => !existsSync(`/proc/${first}`))
+      await until(() => !existsSync(`/proc/${first}`), 20_000)
       await Bun.write(join(root, 'src/counter.kay'), counter(9))
       await until(() => builders().length === 1 && builders()[0] !== first, 10_000)
     }

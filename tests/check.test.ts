@@ -16,10 +16,10 @@ import { limiter } from '../src/server/limit'
 import { fixtureCopy, scratchDir } from './scratch'
 
 const fixtures = join(import.meta.dir, 'fixtures')
-// Tests on a scratch project of their own run together, but four checks at most at a time, as tsgo is multithreaded itself; a test's wait for its turn counts in its timeout.
+// Tests on a scratch project of their own run together, but four checks at most at a time, as tsgo is multithreaded itself; a test's wait for its turn counts in its timeout. Every test of a file waits at once, so the last one waits for all the others, which a host busy with other suites stretches past 30 s.
 const turn = limiter(4)
 
-setDefaultTimeout(30_000)
+setDefaultTimeout(90_000)
 
 async function check(root: string, options?: CheckOptions): ReturnType<typeof checkProject> {
   return turn(async () => checkProject(root, options))
@@ -209,12 +209,12 @@ async function scratchProject(files: Record<string, string>): Promise<string> {
   return root
 }
 
-// Moves the start of the project's last clean check a second later, as a wait would: kay counts a file written within a second before a check as changed since.
-async function startedLater(root: string): Promise<void> {
+// Moves the start of the project's last clean check a second later by default, as a wait would: kay counts a file written within a second before a check as changed since.
+async function startedLater(root: string, by = 1000): Promise<void> {
   const file = join(root, '.kay/cache/check/clean.json')
   const entry = await Bun.file(file).json() as { value: { started: number } }
 
-  entry.value.started += 1000
+  entry.value.started += by
   await Bun.write(file, JSON.stringify(entry))
 }
 
@@ -485,7 +485,8 @@ describe.concurrent('kay check, edge cases', () => {
 
     try {
       expect(await check(root)).toEqual([])
-      await startedLater(root)
+      // An hour, so a file of kay's sources or node_modules in the checkout, which another test file may touch meanwhile, never counts as changed.
+      await startedLater(root, 3_600_000)
       await rm(buildInfo)
       expect(await check(root)).toEqual([])
       expect(await Bun.file(buildInfo).exists()).toBe(false)

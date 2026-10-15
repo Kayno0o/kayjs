@@ -28,7 +28,7 @@ import { compressTextStrongest } from '../src/server/compress'
 import { probeHealth } from '../src/server/lifecycle'
 import { answeringRequest, useLogger } from '../src/server/log'
 import { hookPrerendered } from '../src/server/page-hook'
-import { clientAddress, countSucceeded, memoryRates, protectionRefusal, rateKey, rateLimit, sqliteRates } from '../src/server/protection'
+import { clientAddress, countSucceeded, memoryRates, protectionRefusal, rateKey, rateLimit, sqliteRates, trustProxy } from '../src/server/protection'
 import { securityHeaders } from '../src/server/security'
 import { signStamp } from '../src/server/stamp'
 import { CspViolation } from '../src/server/violations'
@@ -842,8 +842,11 @@ console.log(JSON.stringify([keys.has(plain('before')), keys.has(plain('after')),
   })
 
   it('refuses a proxy setting it cannot read, as the server boots', async () => {
-    for (const proxy of [{}, { hops: 1, header: 'x-real-ip' }, { hops: 0 }, { hops: 1.5 }, { header: ' ' }, { hops: 1, trusted: ['a CDN'] }, { hops: 1, trusted: ['10.0.0.0/33'] }, { hops: 1, trusted: ['::/129'] }])
-      await expect(pages({ routes: `${FIXTURE}/src/routes`, prebuilt: false, proxy })).rejects.toThrow('kay: proxy')
+    // One through `pages()`, which reads it as the server boots; the rest where it is read, as setting the routes up costs half a second each, which a busy host multiplies.
+    await expect(pages({ routes: `${FIXTURE}/src/routes`, prebuilt: false, proxy: {} })).rejects.toThrow('kay: proxy')
+
+    for (const proxy of [{ hops: 1, header: 'x-real-ip' }, { hops: 0 }, { hops: 1.5 }, { header: ' ' }, { hops: 1, trusted: ['a CDN'] }, { hops: 1, trusted: ['10.0.0.0/33'] }, { hops: 1, trusted: ['::/129'] }])
+      expect(() => trustProxy(new Elysia(), proxy)).toThrow('kay: proxy')
   })
 
   it('types the honeypot as one of the form\'s fields for kay check, a misspelt one still refused', async () => {
@@ -860,7 +863,7 @@ console.log(JSON.stringify([keys.has(plain('before')), keys.has(plain('after')),
     finally {
       await rm(copy, { recursive: true, force: true })
     }
-  })
+  }, 30_000)
 })
 
 describe('API routes', () => {

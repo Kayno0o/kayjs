@@ -115,12 +115,18 @@ describe('markdownHtml', () => {
   })
 
   it('formats in an island in linear time, and shows Markdown it cannot format as it is written', () => {
-    const started = performance.now()
+    // The best of three runs, so a pause under load does not count; eight times the input takes about eight times as long, where marked unbounded took sixty-four.
+    const best = (markdown: string) => Math.min(...Array.from({ length: 3 }, () => {
+      const started = performance.now()
 
-    islandMarkdown('*a '.repeat(16_000))
-    islandMarkdown('_a ~b '.repeat(8000))
-    // About half a second alone, where marked unbounded took ten; a whole suite running at once slows it down.
-    expect(performance.now() - started).toBeLessThan(6000)
+      islandMarkdown(markdown)
+
+      return performance.now() - started
+    }))
+    const small = best('*a '.repeat(1000)) + best('_a ~b '.repeat(500))
+    const large = best('*a '.repeat(8000)) + best('_a ~b '.repeat(4000))
+
+    expect(large / small).toBeLessThan(24)
     expect<string>(islandMarkdown(`${'> '.repeat(10_000)}x`)).toStartWith('<p>&gt; &gt; ')
     expect<string>(islandMarkdown('**a**'.repeat(20_001))).toStartWith('<p>**a**')
   })
