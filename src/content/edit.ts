@@ -17,6 +17,9 @@ import { dataIssues, decodeEntries, unknownComponents } from './validate'
 // The last turn each collection's saves and removes took, which settles once it and every one before it are done.
 const saving = new Map<string, Promise<void>>()
 
+// The loads under way by collection: a screen asking for a collection's info and its entry at once shares one run of the loader.
+const loading = new Map<string, Promise<Omit<SourceEntry, 'draft'>[]>>()
+
 // The kinds of string field a CMS edits apart from plain text, as `x-kay: { kind }` in the schema says.
 export type FieldKind = 'image' | 'file' | 'markdown' | 'reference'
 
@@ -337,6 +340,8 @@ export async function saveEntry(name: string, entry: WrittenEntry, options: { cr
       return { issues: [existingIssue(name, entry.slug, entry.locale)] }
 
     await save(options.create === true ? { ...entry, create: true } : entry)
+    // A load that began before this write must not be joined by a read after it.
+    loading.delete(name)
     collection.invalidate()
 
     return {}
@@ -387,6 +392,7 @@ export async function removeEntry(name: string, slug: string, locale?: string): 
       return { issues: [{ ...at, path: '', key: 'slug', message: 'names no entry of the collection' }] }
 
     await remove(at.locale === undefined ? { slug } : { slug, locale: at.locale })
+    loading.delete(name)
     collection.invalidate()
 
     return {}
@@ -527,9 +533,6 @@ async function readEntry(dir: string, file: string): Promise<{ data: SourceEntry
     return { data: undefined, ...body !== undefined && { body }, problem: `kay: ${relative(contentPlace().root, absolute).split(sep).join('/')}:${error.line} ${error.message}` }
   }
 }
-
-// The loads under way by collection: a screen asking for a collection's info and its entry at once shares one run of the loader.
-const loading = new Map<string, Promise<Omit<SourceEntry, 'draft'>[]>>()
 
 // `shared: false` reads past a load under way, which may have begun before a save, for the check a save or a remove makes before writing.
 async function loadedEntries(name: string, collection: Collection<unknown>, { shared = true }: { shared?: boolean } = {}): Promise<Omit<SourceEntry, 'draft'>[]> {

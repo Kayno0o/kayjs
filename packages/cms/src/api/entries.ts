@@ -14,6 +14,9 @@ export default api()
     if (!screen)
       throw new UnknownCollection(`No collection ${params.collection}`)
 
+    if (screen.collection.problem !== undefined)
+      return status(500, screen.collection.problem)
+
     return screen.entry ? { collection: screen.collection, entry: screen.entry } : status(404, `No entry ${params.slug} in ${params.collection}`)
   }, { query: locale })
   .post('/:collection/:slug', async ({ params, body, request }) => saveEntry({ collection: params.collection, slug: params.slug, locale: body.locale, data: body.data, body: body.body }, { create: body.create, version: body.version, required: true, author: authors.get(request) }), {

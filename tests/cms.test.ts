@@ -232,6 +232,34 @@ describe('the collections a CMS edits', () => {
     })
   })
 
+  it('does not hand a read after a save the load that began before it', async () => {
+    let held = [{ slug: 'hello', data: { title: 'Old' } }]
+    let loads = 0
+    const tales = collection({ name: 'tales', load: async () => {
+      const seen = structuredClone(held)
+
+      loads++
+      await Bun.sleep(30)
+
+      return seen
+    }, save: (entry) => {
+      held = [{ slug: entry.slug, data: entry.data as { title: string } }]
+    } }, { schema: t.Object({ title: t.String() }) })
+
+    await exporting([['tales', tales]], async () => {
+      const slow = entries('tales')
+
+      await Bun.sleep(5)
+      await saveEntry('tales', { slug: 'hello', data: { title: 'New' } })
+
+      const after = await entries('tales')
+
+      expect(after[0]!.data).toEqual({ title: 'New' })
+      expect((await slow)[0]!.data).toEqual({ title: 'Old' })
+      expect(loads).toBe(2)
+    })
+  })
+
   it('leaves a loader alone for the names and kinds of its collections when counts is false', async () => {
     let loads = 0
     const tales = collection({ name: 'tales', load: () => {

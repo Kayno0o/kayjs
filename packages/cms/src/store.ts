@@ -50,6 +50,13 @@ export async function entryScreen(ref: EntryRef): Promise<{ collection: Collecti
     return undefined
 
   if (entry.status === 'rejected') {
+    // A loader's error may name its database or its credentials, which every editor would see: the log has it, the screen the generic reason.
+    if (collection.value.kind === 'loaded') {
+      log.error(`${collection.value.name}'s entry failed to read`, entry.reason)
+
+      return { collection: { ...collection.value, problem: `kay: ${collection.value.name}'s entries failed to read; the server's log says why` }, entry: undefined }
+    }
+
     if (collection.value.problem === undefined)
       throw entry.reason
 

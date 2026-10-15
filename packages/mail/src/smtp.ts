@@ -94,7 +94,19 @@ export function smtp(settings: SmtpSettings): Transport {
       sending++
 
       try {
-        const current = await pending
+        let current: Awaited<typeof pending>
+
+        try {
+          current = await pending
+        }
+        catch (error) {
+          // nodemailer failed to load: the next mail tries again.
+          if (transporter === pending)
+            transporter = undefined
+
+          throw error
+        }
+
         const info = await current.sendMail(nodemailerMessage(mail))
 
         return { messageId: info.messageId, accepted: info.accepted, rejected: info.rejected, response: info.response }

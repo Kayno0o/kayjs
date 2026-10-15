@@ -9,10 +9,18 @@ async function load(): Promise<Webauthn> {
   return import('@simplewebauthn/server')
 }
 
-function webauthn(): Promise<Webauthn> {
-  loaded ??= load()
+async function webauthn(): Promise<Webauthn> {
+  try {
+    loaded ??= load()
 
-  return loaded
+    return await loaded
+  }
+  catch (error) {
+    // A failed load is tried again by the next ceremony.
+    loaded = undefined
+
+    throw error
+  }
 }
 
 export async function generateAuthenticationOptions(...args: Parameters<Webauthn['generateAuthenticationOptions']>) {

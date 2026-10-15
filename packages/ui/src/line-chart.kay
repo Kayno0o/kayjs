@@ -105,7 +105,18 @@ onMount(() => {
   let chart: InstanceType<typeof LineChartClass> | undefined
 
   void (async () => {
-    const { LineChart, FixedScaleAxis: fixedScale } = await import('chartist')
+    let loaded: typeof import('chartist')
+
+    try {
+      loaded = await import('chartist')
+    }
+    catch (error) {
+      console.error('kayjs-ui: LineChart draws with chartist, which could not be loaded; install it with `bun add chartist`', error)
+
+      return
+    }
+
+    const { LineChart, FixedScaleAxis: fixedScale } = loaded
 
     if (gone)
       return

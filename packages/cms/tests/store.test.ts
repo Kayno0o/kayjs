@@ -21,6 +21,7 @@ let loaded: { slug: string, data: unknown }[]
 let removed: string[]
 let stored: Record<string, SourceEntry[]>
 let infoCalls: unknown[]
+let failing = false
 
 // kay's content API, answering from `stored` and recording what a loader was handed.
 const content: typeof Content = {
@@ -32,7 +33,7 @@ const content: typeof Content = {
 
     return [posts, products, outside].find(collection => collection.name === name)
   },
-  entries: async (collection, filter) => (stored[collection] ?? []).filter(entry => (filter?.slug === undefined || entry.slug === filter.slug) && (filter?.locale === undefined || entry.locale === filter.locale)),
+  entries: async (collection, filter) => failing ? Promise.reject(new Error('kay: products\'s load threw: password for db.internal')) : (stored[collection] ?? []).filter(entry => (filter?.slug === undefined || entry.slug === filter.slug) && (filter?.locale === undefined || entry.locale === filter.locale)),
   entrySource: async (collection, slug, data, options) => options?.create && stored[collection]?.some(entry => entry.slug === slug)
     ? { issues: [{ collection, slug, path: '', key: 'slug', message: TAKEN }] }
     : (data as Record<string, unknown>).title === ''
@@ -71,6 +72,7 @@ beforeEach(() => {
   loaded = []
   removed = []
   infoCalls = []
+  failing = false
   stored = { posts: [{ slug: 'hello', path: 'content/posts/hello.md', data: { title: 'Hello', draft: true }, body: 'Hi', draft: true }], products: [{ slug: 'mug', data: { name: 'Mug' }, draft: false }] }
   configure({ files: { save: async (change) => {
     saved.push(change)
@@ -185,6 +187,15 @@ describe('saveEntry', () => {
     expect(await entryScreen({ collection: 'products', slug: 'mug' })).toEqual({ collection: products, entry: stored.products![0] })
     expect(infoCalls).toEqual([['products', { counts: false }], ['products', undefined]])
     expect(await entryScreen({ collection: 'nothing', slug: 'x' })).toBeUndefined()
+  })
+
+  test('shows a loaded collection whose entry fails to read as unreadable, without the loader\'s message', async () => {
+    failing = true
+
+    const screen = await entryScreen({ collection: 'products', slug: 'mug' })
+
+    expect(screen?.entry).toBeUndefined()
+    expect(screen?.collection.problem).toBe('kay: products\'s entries failed to read; the server\'s log says why')
   })
 
   test('throws for a collection kay does not list', async () => {
