@@ -1,3 +1,4 @@
+import { readdirSync, readFileSync, readlinkSync } from 'node:fs'
 import { mkdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
@@ -51,6 +52,10 @@ class Agent {
     void this.process.stdin.flush()
   }
 
+  get pid(): number {
+    return this.process.pid
+  }
+
   async close(): Promise<number> {
     await this.process.stdin.end()
 
@@ -87,6 +92,106 @@ beforeAll(async () => {
 afterAll(async () => {
   await agent.close()
   await rm(root, { recursive: true, force: true })
+})
+
+// Every process whose working directory is the project's: the commands of a call and what they started.
+function processesIn(dir: string, running = ''): number[] {
+  const found: number[] = []
+
+  for (const name of readdirSync('/proc')) {
+    try {
+      if ((/^\d+$/).test(name) && readlinkSync(`/proc/${name}/cwd`) === dir && readFileSync(`/proc/${name}/cmdline`, 'utf8').includes(running))
+        found.push(Number(name))
+    }
+    catch {
+      // Gone, or not ours to read.
+    }
+  }
+
+  return found
+}
+
+describe('kay mcp stopping a call', () => {
+  it('leaves no process of a render behind once its client is stopped mid-render', async () => {
+    const own = await scratchDir('mcp-stop-')
+
+    await Bun.write(join(own, 'tsconfig.json'), tsconfig)
+    await Bun.write(join(own, 'src/routes/hang.kay'), `--- server
+await Bun.write(${JSON.stringify(join(own, 'serving'))}, String(process.pid))
+await Bun.sleep(120_000)
+---
+p Late
+`)
+
+    const stopped = new Agent(own)
+
+    try {
+      void stopped.request('tools/call', { name: 'render', arguments: { url: '/hang' } })
+
+      // Read afresh each time, as a file keeps the size it had when it was opened.
+      const served = async () => {
+        try {
+          return await Bun.file(join(own, 'serving')).text()
+        }
+        catch {
+          return ''
+        }
+      }
+
+      for (let waited = 0; await served() === '' && waited < 60_000; waited += 100)
+        await Bun.sleep(100)
+
+      const server = Number(await served())
+
+      expect(server).toBeGreaterThan(0)
+
+      expect(processesIn(own).length).toBeGreaterThan(1)
+      process.kill(stopped.pid, 'SIGTERM')
+
+      for (let waited = 0; processesIn(own).length > 0 && waited < 10_000; waited += 100)
+        await Bun.sleep(100)
+
+      expect(processesIn(own)).toEqual([])
+      expect(() => process.kill(server, 0)).toThrow()
+    }
+    finally {
+      await rm(own, { recursive: true, force: true })
+    }
+  }, 90_000)
+
+  it('leaves no type checker behind once its client is stopped mid-check', async () => {
+    const own = await scratchDir('mcp-stop-check-')
+
+    await Bun.write(join(own, 'tsconfig.json'), tsconfig)
+    await Bun.write(join(own, 'src/routes/index.kay'), 'p Hi\n')
+    // A type that takes the checker a few seconds.
+    await Bun.write(join(own, 'src/slow.ts'), `type D = '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9'
+type N4 = \`\${D}\${D}\${D}\${D}\`
+type A = { [K in N4]: { [J in N4]: K | J } }
+type B = { [K in N4]: A[K][N4] }
+export const slow: B[N4] = null as never
+`)
+
+    const stopped = new Agent(own)
+
+    try {
+      void stopped.request('tools/call', { name: 'check', arguments: {} })
+
+      for (let waited = 0; processesIn(own, 'tsgo').length === 0 && waited < 60_000; waited += 20)
+        await Bun.sleep(20)
+
+      expect(processesIn(own, 'tsgo').length).toBeGreaterThan(0)
+      process.kill(stopped.pid, 'SIGTERM')
+
+      for (let waited = 0; processesIn(own).length > 0 && waited < 1000; waited += 20)
+        await Bun.sleep(20)
+
+      expect(processesIn(own)).toEqual([])
+    }
+    finally {
+      await rm(own, { recursive: true, force: true })
+    }
+  }, 90_000)
 })
 
 describe.concurrent('kay mcp', () => {

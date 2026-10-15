@@ -182,7 +182,7 @@ async function resources(): Promise<Resource[]> {
 
 // Runs `kay` with `args` in `root`, as a child so that what a command prints, exits with or throws cannot reach the protocol on this process's stdout.
 async function run(root: string, args: string[]): Promise<Run> {
-  const child = Bun.spawn([process.execPath, CLI, ...args], { cwd: root, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe', env: process.env })
+  const child = Bun.spawn([process.execPath, CLI, ...args], { cwd: root, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe', env: process.env, detached: true })
   let timedOut = false
   const timer = setTimeout(() => {
     timedOut = true
@@ -207,16 +207,26 @@ async function run(root: string, args: string[]): Promise<Run> {
 export function stopChildren(now = false): void {
   for (const child of children) {
     if (now)
-      child.kill('SIGKILL')
+      signalGroup(child, 'SIGKILL')
     else
       stop(child)
   }
 }
 
-// SIGTERM first, so the command stops what it started, then SIGKILL for one that does not.
+// SIGTERM first, so the command cleans up after itself, then SIGKILL for what does not stop.
 function stop(child: Bun.Subprocess): void {
-  child.kill()
-  setTimeout(() => child.kill('SIGKILL'), STOP_WAIT_MS).unref()
+  signalGroup(child, 'SIGTERM')
+  setTimeout(signalGroup, STOP_WAIT_MS, child, 'SIGKILL').unref()
+}
+
+// A command runs in a process group of its own, so what it started, such as the server of a render or the type checker of a check, stops with it whether or not the command forwards the signal.
+function signalGroup(child: Bun.Subprocess, signal: NodeJS.Signals): void {
+  try {
+    process.kill(-child.pid, signal)
+  }
+  catch {
+    // The group ended meanwhile.
+  }
 }
 
 function truncate(text: string): string {
