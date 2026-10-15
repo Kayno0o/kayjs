@@ -207,7 +207,7 @@ describe('a library\'s stylesheet in an app', () => {
 
     await Promise.all([
       Bun.write(theme, `@import "./parts/extra.css";\n@import url(./parts/quoted.css);\n${LIBRARY_THEME}`),
-      Bun.write(join(library, 'src/parts/extra.css'), '@import \'../deep.css\';\n.ui-part { padding: 12px; }\n.ui-part-used { padding: 13px; }\n'),
+      Bun.write(join(library, 'src/parts/extra.css'), '@import\'../deep.css\';\n.ui-part { padding: 12px; }\n.ui-part-used { padding: 13px; }\n'),
       Bun.write(join(library, 'src/parts/quoted.css'), '.ui-quoted { padding: 14px; }\n'),
       Bun.write(join(library, 'src/deep.css'), '.ui-deep { padding: 15px; }\n'),
       Bun.write(join(root, 'src/notes.txt'), 'ui-part-used\n'),
@@ -250,7 +250,7 @@ describe('a library\'s stylesheet in an app', () => {
     const build = devBuilder(root, {})
     const stylesheet = async (styles: Record<string, string> | undefined) => Bun.file(join(clientDir(root), styles!['src/routes/index.kay']!.slice('/_kay/'.length))).text()
     const changes: string[] = []
-    const stop = watchProject(root, file => changes.push(file))
+    const stop = watchProject(root, file => changes.push(file), { rootNaming: true })
 
     try {
       expect(libraryRules(await stylesheet((await build(null)).styles))).toEqual(KEPT)

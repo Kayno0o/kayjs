@@ -77,12 +77,12 @@ async function firstEvent(response: Response): Promise<string> {
 }
 
 describe.concurrent('the dev watcher', () => {
-  async function watched(files: Record<string, string>) {
+  async function watched(files: Record<string, string>, options: { rootNaming?: boolean } = {}) {
     const root = await mkdtemp(join(tmpdir(), 'kay-watch-'))
     const changes: string[] = []
 
     await Promise.all(Object.entries(files).map(async ([path, content]) => Bun.write(join(root, path), content)))
-    const stop = watchProject(root, file => changes.push(file))
+    const stop = watchProject(root, file => changes.push(file), options)
     // Whether a change to `file` arrives while `act` runs again and again, which a watcher that stopped never reports; a directory is armed a moment after its event, so a first change may predate the watcher.
     const sees = async (file: string, act: (attempt: number) => Promise<unknown>, timeout = 5000) => {
       changes.length = 0
@@ -189,19 +189,32 @@ describe.concurrent('the dev watcher', () => {
     }
   })
 
-  it('ignores tests and the root files nothing reads, and keeps what it reads, a root Markdown file a stylesheet\'s pruning reads included', async () => {
+  it('ignores tests and the root files no server reads, and keeps what it reads', async () => {
     const { root, sees, cleanup } = await watched({ 'src/server.ts': '', 'src/a.test.ts': '', 'src/__tests__/a.ts': '', 'tests/a.test.ts': '', '.env': '', 'README.md': '', 'LICENSE': '', 'kay.config.ts': '', 'package.json': '{}', 'bun.lock': '', 'public/a.txt': '' })
 
     try {
       expect(await sees('tests/a.test.ts', async attempt => Bun.write(join(root, 'tests/a.test.ts'), String(attempt)), 300)).toBe(false)
       expect(await sees('src/a.test.ts', async attempt => Bun.write(join(root, 'src/a.test.ts'), String(attempt)), 300)).toBe(false)
       expect(await sees('src/__tests__/a.ts', async attempt => Bun.write(join(root, 'src/__tests__/a.ts'), String(attempt)), 300)).toBe(false)
+      expect(await sees('README.md', async attempt => Bun.write(join(root, 'README.md'), String(attempt)), 300)).toBe(false)
       expect(await sees('LICENSE', async attempt => Bun.write(join(root, 'LICENSE'), String(attempt)), 300)).toBe(false)
 
-      for (const file of ['kay.config.ts', '.env', 'package.json', 'bun.lock', 'src/server.ts', 'public/a.txt', 'README.md'])
+      for (const file of ['kay.config.ts', '.env', 'package.json', 'bun.lock', 'src/server.ts', 'public/a.txt'])
         expect(await sees(file, async attempt => Bun.write(join(root, file), String(attempt)))).toBe(true)
 
       expect(await sees('public', async () => rm(join(root, 'public'), { recursive: true }))).toBe(true)
+    }
+    finally {
+      await cleanup()
+    }
+  })
+
+  it('reports a root Markdown file once asked for the root files a stylesheet\'s pruning reads, and still not a licence', async () => {
+    const { root, sees, cleanup } = await watched({ 'src/server.ts': '', 'README.md': '', 'LICENSE': '' }, { rootNaming: true })
+
+    try {
+      expect(await sees('README.md', async attempt => Bun.write(join(root, 'README.md'), String(attempt)))).toBe(true)
+      expect(await sees('LICENSE', async attempt => Bun.write(join(root, 'LICENSE'), String(attempt)), 300)).toBe(false)
     }
     finally {
       await cleanup()

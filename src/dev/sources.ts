@@ -95,8 +95,8 @@ function isDirectory(path: string): boolean {
 }
 
 // The root is watched for the entries it gains and loses, each top-level directory recursively, and a directory created again gets a new watcher, the old one staying on the inode that is gone.
-// `onChange` gets the changed path relative to the root, and `onScratch` hears of the files editors write beside a source instead; the returned function stops watching. `tests` watches the tests too, as `kay check` reads them.
-export function watchProject(root: string, onChange: (file: string) => void, { tests = false, onScratch }: { tests?: boolean, onScratch?: () => void } = {}): () => void {
+// `onChange` gets the changed path relative to the root, and `onScratch` hears of the files editors write beside a source instead; the returned function stops watching. `tests` watches the tests too, as `kay check` reads them, and `rootNaming` the root files only a stylesheet's pruning reads, as `kay dev` rebuilds them.
+export function watchProject(root: string, onChange: (file: string) => void, { tests = false, onScratch, rootNaming = false }: { tests?: boolean, onScratch?: () => void, rootNaming?: boolean } = {}): () => void {
   const ignored = gitIgnoredNames(root)
   const watched = (name: string) => (watchedName(name) || (tests && TEST_DIRS.has(name))) && !ignored.has(name)
   const directories = new Map<string, FSWatcher>()
@@ -138,7 +138,7 @@ export function watchProject(root: string, onChange: (file: string) => void, { t
 
     watchDirectory(name)
 
-    if (directory || isDirectory(join(root, name)) || SERVER_ROOT_FILE.test(name) || ROOT_NAMING_FILE.test(name))
+    if (directory || isDirectory(join(root, name)) || SERVER_ROOT_FILE.test(name) || (rootNaming && ROOT_NAMING_FILE.test(name)))
       onChange(name)
   })
 

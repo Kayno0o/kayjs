@@ -12,8 +12,8 @@ const IDENT_CHAR = /[\w\u0080-\uFFFF-]/
 // A class written with no escape, the only kind a word of a source file names as written.
 const PLAIN_CLASS = /^-?[A-Z_][\w-]*$/i
 const TOKEN = /[\w-]+/g
-// A relative `@import`, its path quoted or inside `url()`.
-const RELATIVE_IMPORT = /@import\s+(?:url\(\s*)?(?:"(\.\.?\/[^"]*)"|'(\.\.?\/[^']*)'|(\.\.?\/[^\s'"();]+))/gi
+// An `@import` and its path, quoted or inside `url()`: read relative to the file, so one naming a package or a URL resolves to no file of the library.
+const IMPORT = /@import\s*(?:url\(\s*)?(?:"([^"]+)"|'([^']+)'|([^\s'"();]+))/gi
 
 // The files of an app a class may be written in: those Tailwind reads, stylesheets restyling one and data files.
 export const NAMING_FILE = /\.(?:kay|[cm]?[jt]sx?|html?|mdx?|css|json|ya?ml|txt)$/
@@ -230,7 +230,7 @@ function importableSheets(library: KayLibrary, files: string[]): string[] {
     if (text === undefined)
       continue
 
-    for (const match of text.matchAll(RELATIVE_IMPORT)) {
+    for (const match of text.matchAll(IMPORT)) {
       const imported = resolve(dirname(file), match[1] ?? match[2] ?? match[3]!)
 
       if (own.has(imported) && !found.has(imported)) {

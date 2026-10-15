@@ -9,6 +9,7 @@ import { networkInterfaces } from 'node:os'
 import { join, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { ASSET_EXTENSIONS } from '../build/assets'
+import { CSS_FILE } from '../build/files'
 import { CONFIG_FILE, loadConfig } from '../config'
 import { projectPaths, savedPublicDir } from '../project'
 import { startClientBuilder } from './client'
@@ -374,6 +375,10 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     if (!outcome || outcome.failed || server !== child)
       return false
 
+    // A root Markdown file naming no pruned class leaves the stylesheets as they are.
+    if (outcome.styles === undefined && !files.some(file => CSS_FILE.test(file)))
+      return true
+
     const named = changedFilesNamed(root, files)
     const changed = describe(named)
     const ms = Math.round(performance.now() - started)
@@ -515,6 +520,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     clearTimeout(timer)
     timer = setTimeout(settle, DEBOUNCE_MS)
   }, {
+    rootNaming: true,
     onScratch: () => {
       scratchWritten = performance.now()
     },
