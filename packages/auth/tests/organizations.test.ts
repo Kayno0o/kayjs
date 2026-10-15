@@ -96,6 +96,7 @@ describe('organizations', () => {
     expect(await ada.browser.call('createOrganization', { name: 'Again', slug: 'acme' })).toEqual({ ok: false, error: 'slug-taken' })
     expect(await ada.browser.call('createOrganization', { name: 'Bad', slug: 'no spaces' })).toEqual({ ok: false, error: 'invalid-slug' })
     expect(await ada.browser.call('createOrganization', { name: '  ' })).toEqual({ ok: false, error: 'invalid-name' })
+    expect(await ada.browser.call('createOrganization', { name: 'Blank', slug: '  ' })).toMatchObject({ ok: true, membership: { organization: { name: 'Blank', slug: null } } })
 
     const grace = await person('grace@example.com')
 

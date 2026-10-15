@@ -20,7 +20,7 @@ A session handing issues to subagents lands for them: a subagent goes through st
 
 ## Checks
 
-- `bun run check` is kay check (types, templates included). `bun run bench:check` checks every benchmark app, `bench:check:kay` the one on kay alone. A change under `packages/<name>` runs `bun run check` and `bun run test` in that folder too; the root lint already covers it, ESLint taking each file's nearest config.
+- `bun run check` is kay check (types, templates included). `bun run bench:check` checks every benchmark app, `bench:check:kay` the one on kay alone. A change under `packages/<name>` runs `bun run check` and `bun run test` in that folder too; the root lint already covers it, linting kay then running each library's own lint in turn, one process each.
 - `bun test tests/<file>.test.ts` while working; the whole suite as `bun run test`, every file at once in this checkout (`bun test --parallel`, the slowest first by `tests/timings.json`, which `bun run test:timings` measures again), as CI runs it on half the cores. A test that writes into a fixture works on `fixtureCopy()` from `tests/scratch.ts`, and its scratch files go under `scratchDir()`, so no other file's build meets them.
 - The slow files: `new.test.ts` (scaffolds and type-checks apps), `browser.test.ts` (Chromium through `BUN_CHROME_PATH`), `docs-contrast.test.ts` (builds the docs, axe-core in Chromium), `check.test.ts`, `forms.test.ts`.
 - `examples.test.ts` and the app template's own tests run only with `TEST_DATABASE_URL`, a Postgres whose user may create databases.

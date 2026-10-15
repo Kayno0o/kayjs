@@ -10,6 +10,13 @@ describe('describeAuditEntry', () => {
     expect(describeAuditEntry({ event: 'banned', detail: null })).toBe('Suspended')
   })
 
+  test('says the plain phrase for an empty detail, or an organization event naming no role', () => {
+    expect(describeAuditEntry({ event: 'email-changed', detail: '' })).toBe('Email changed')
+    expect(describeAuditEntry({ event: 'member-joined', detail: '' })).toBe('Joined an organization')
+    expect(describeAuditEntry({ event: 'member-joined', detail: 'org1' })).toBe('Joined an organization')
+    expect(describeAuditEntry({ event: 'member-roles-changed', detail: '' }, { locale: 'fr' })).toBe('Rôles dans l’organisation changés')
+  })
+
   test('words it in the language of the locale when kayjs-auth ships it, English otherwise', () => {
     expect(describeAuditEntry({ event: 'provider-linked', detail: 'Discord' }, { locale: 'fr-FR' })).toBe('Compte Discord associé')
     expect(describeAuditEntry({ event: 'password-changed', detail: null }, { locale: 'de' })).toBe('Password changed')

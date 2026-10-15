@@ -141,6 +141,13 @@ describe('admin', () => {
     expect(said()).toEqual([['banned', 'ada@example.com', 'spam', 'root@example.com'], ['unbanned', 'ada@example.com', undefined, 'root@example.com']])
   })
 
+  test('a ban whose reason is blank keeps none', async () => {
+    const { admin, ada, store } = await setup()
+
+    expect(await admin.browser.post('/ban', { id: ada.id, reason: '  ' })).toMatchObject({ ok: true, user: { ban: { reason: null } } })
+    expect((await store.users.get(ada.id))!.banReason).toBeNull()
+  })
+
   test('a ban until a date lifts itself then', async () => {
     const { admin, ada, browser } = await setup()
     const until = new Date(Date.now() + 60 * 60 * 1000)

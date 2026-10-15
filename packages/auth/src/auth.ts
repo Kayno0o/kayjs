@@ -1178,7 +1178,7 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
     onEvent: options.onEvent,
     organizations: options.organizations && organizationsCore(options.organizations),
     pruned: { at: 0, running: Promise.resolve() },
-    audit: options.audit !== undefined && options.audit !== false ? { maxAge: (options.audit === true ? undefined : options.audit.maxAge) ?? DEFAULT_AUDIT_MAX_AGE, prunedAt: 0 } : undefined,
+    audit: options.audit == null || options.audit === false ? undefined : { maxAge: (options.audit === true ? undefined : options.audit.maxAge) ?? DEFAULT_AUDIT_MAX_AGE, prunedAt: 0 },
   }
 
   for (const [name, { client }] of oauth) {

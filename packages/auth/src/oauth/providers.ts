@@ -298,9 +298,9 @@ function openIdUser(claims: OpenIdClaims): OAuthUser {
 
 /** Maps a standard OAuth2 token payload (`access_token`, `expires_in`, ...) to `OAuthTokens`. */
 function parseStandardTokens(raw: unknown): OAuthTokens {
-  const answer = (raw ?? {}) as { access_token?: string | null, refresh_token?: string | null, expires_in?: unknown, scope?: string | null, token_type?: string | null, id_token?: unknown, error?: string | null }
+  const answer = (raw ?? {}) as { access_token?: unknown, refresh_token?: string | null, expires_in?: unknown, scope?: string | null, token_type?: string | null, id_token?: unknown, error?: string | null }
 
-  if (answer.access_token == null || answer.access_token === '')
+  if (typeof answer.access_token !== 'string' || answer.access_token === '')
     throw new Error(`OAuth token response missing access_token${answer.error == null || answer.error === '' ? '' : `: ${answer.error}`}`)
 
   return {

@@ -16,7 +16,7 @@ function orgRoles(detail: string | null): string | null {
 }
 
 // Names the detail, as `read` gives it, in the phrase when there is one, else says the plain phrase.
-function naming(named: (detail: string) => string, plain: string, read: (detail: string | null) => string | null = detail => detail === '' ? null : detail): AuditPhrase {
+function naming(named: (detail: string) => string, plain: string, read: (detail: string | null) => string | null = detail => detail == null || detail === '' ? null : detail): AuditPhrase {
   return (detail) => {
     const shown = read(detail)
 

@@ -43,7 +43,7 @@ describe('kay\'s libraries', () => {
   })
 
   it.each(libraries)('$path asks for the Bun kay asks for', ({ manifest }) => {
-    expect(manifest.engines?.bun).toBe(root.engines!.bun!)
+    expect(manifest.engines?.bun).toBe(root.engines!.bun)
   })
 })
 

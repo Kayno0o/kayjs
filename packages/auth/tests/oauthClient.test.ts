@@ -181,6 +181,8 @@ describe('provider presets', () => {
 
   test('parseTokens rejects a payload with no access_token', () => {
     expect(() => discordProvider().parseTokens({ error: 'invalid_grant' })).toThrow('missing access_token: invalid_grant')
+    expect(() => discordProvider().parseTokens({ access_token: '' })).toThrow('OAuth token response missing access_token')
+    expect(() => discordProvider().parseTokens({ access_token: 42, error: '' })).toThrow(/missing access_token$/)
   })
 })
 
