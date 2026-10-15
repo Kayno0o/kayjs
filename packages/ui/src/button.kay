@@ -1,6 +1,6 @@
 ---
 import type { ButtonProps, TagAttributes } from './button-props'
-import BusyButton from './busy-button.kay'
+import BusyButton from './internal/busy-button.kay'
 import { buttonOf, linkOf, lookOf } from './button-props'
 import Icon from './icon.kay'
 

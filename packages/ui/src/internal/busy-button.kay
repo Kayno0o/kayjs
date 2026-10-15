@@ -1,9 +1,9 @@
 ---
-import type { ButtonProps, TagAttributes } from './button-props'
+import type { ButtonProps, TagAttributes } from '../button-props'
 import { signal } from 'kay'
-import { buttonOf, linkOf, lookOf } from './button-props'
-import { isPromiseLike } from './change'
-import Icon from './icon.kay'
+import { buttonOf, linkOf, lookOf } from '../button-props'
+import { isPromiseLike } from '../change'
+import Icon from '../icon.kay'
 
 const { variant = 'default', icon, busy, label, class: className, onClick, ...rest } = props<ButtonProps>()
 
