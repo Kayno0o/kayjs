@@ -47,7 +47,7 @@ import { registerScript } from './offline'
 import { errorPage } from './overlay'
 import { pageSetting } from './page-settings'
 import { matchesEtag } from './public'
-import { chainQuery, queryRules, queryScript, readQuery } from './query'
+import { chainQuery, queryRules, queryScript, readQuery, readQueryLeniently } from './query'
 import { reportServerError } from './report'
 import { guardUrl, routeChain } from './routes'
 import { inServerScope, readPersonally, wasReadPersonally, withOutcome } from './scope'
@@ -155,6 +155,8 @@ interface Rendering {
   prerendering: boolean
   // The form post the browser came back from, if any, as the page asks for it.
   outcome: () => Outcome | null
+  // Whether the route's query was read against its schema, which a special page rendered in place of the route reads again if not.
+  queryRead: () => boolean
   // The same, for kay to hand to islands, which asking for does not tie the page to the visitor unless they carry one.
   carried: () => Outcome | null
   // Development only, for the dev tool: the route the request matched, and its loads as they were timed.
@@ -457,12 +459,14 @@ function createRendering(context: RequestContext, params: Record<string, unknown
   const url = new URL(request.url)
   // The search params as text until the page's schema reads them; most pages never look.
   let query: Readonly<Record<string, unknown>> | undefined
+  let raw: Readonly<Record<string, unknown>> | undefined
   const rendering: Rendering = {
     headers,
     status: 200,
     base,
     prerendering,
     // How a form post went is for the one page the browser went back to.
+    queryRead: () => query !== undefined,
     outcome: asked,
     carried: readOnce,
     writeCookies: () => {
@@ -478,7 +482,7 @@ function createRendering(context: RequestContext, params: Record<string, unknown
       locale: (localeState()?.locale ?? lang) as Locale,
       params,
       get query() {
-        return query ??= readQuery(undefined, url)
+        return query ?? (raw ??= readQuery(undefined, url))
       },
       set query(value) {
         query = value
@@ -608,6 +612,9 @@ async function renderSpecialPage(page: SpecialPage, rendering: Rendering, loaded
   for (const files of layoutsFailed ? [[page.file]] : [[...page.layouts, page.file], [page.file]]) {
     try {
       const modules = await importAll(files, options)
+
+      if (!rendering.queryRead() && !options.prerendering)
+        rendering.ctx.query = readQueryLeniently(chainQuery(files, modules), rendering.ctx.url)
 
       return renderDocument(files, modules, await runLoads(files, modules, rendering.ctx, loaded), client, rendering, withEditor(page, options))
     }

@@ -4,7 +4,7 @@ import { s } from 'kay'
 export const page = { query: s.Object({ period: s.String({ maxLength: 4, default: '24h' }), rows: s.Optional(s.Integer({ minimum: 1 })) }) }
 
 const { period } = ctx.query
-const label: string = period
+const label: string = period.toUpperCase().toLowerCase()
 ---
 section.traffic(data-period={label})
   slot

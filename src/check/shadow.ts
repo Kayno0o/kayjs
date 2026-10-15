@@ -97,11 +97,16 @@ export function compileShadow(root: string, file: string, source: string, { rout
 
     return relative(shadowDir, target)
   }
-  const { tsx, map, diagnostics } = compileKay(source, file, { root, params: route?.params, paramTypes: route && paramTypesOf(routesDir, shadowDir, route), outerQueries: route || basename(file) === LAYOUT ? outerQueries(file, source, mounts.find(dir => file.startsWith(dir + sep)) ?? routesDir) : undefined, check: true, insideIsland, relocateImport, lints, importedSignals: signals })
+  const { tsx, map, diagnostics } = compileKay(source, file, { root, params: route?.params, paramTypes: route && paramTypesOf(routesDir, shadowDir, route), outerQueries: layoutQueries(file, source, routesDir, mounts), check: true, insideIsland, relocateImport, lints, importedSignals: signals })
   // Reported as the server reports it, rather than as a type error in the shadow file.
   const unknown = Object.values(route?.matchers ?? {}).filter(matcher => matcherSource(routesDir, matcher) === undefined)
 
   return { shadow: { source, file, tsx, map }, diagnostics: [...diagnostics, ...unknown.map(matcher => ({ start: 0, end: 0, message: `names the matcher ${matcher}, which is neither ${relative(root, matcherFile(routesDir, matcher))} nor one kay ships: ${Object.keys(builtInMatchers).join(', ')}` }))] }
+}
+
+// The `query` types of the layouts above a page or a layout, which its shadow depends on besides its own source.
+export function layoutQueries(file: string, source: string, routesDir: string, mounts: string[]): string[] | undefined {
+  return pageRoute(file, routesDir, mounts) || basename(file) === LAYOUT ? outerQueries(file, source, mounts.find(dir => file.startsWith(dir + sep)) ?? routesDir) : undefined
 }
 
 // The type of each `query` schema declared by the layouts above `file` in its routes directory, outermost first: a layout or page reads them through `ctx.query` as the server merges them.

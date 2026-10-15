@@ -54,7 +54,7 @@ export function persisted<T>(name: string, value: PlainValue<T>, options?: Persi
   })
 }
 
-// A signal holding the page's query param `name`, read as the page's `query` schema reads it, so `queryParam<number>('page')` holds a number; the schema's default when the param is left out or refused, which writing leaves out of the URL.
+// A signal holding the page's query param `name`, read as the `query` schemas of the page and its layouts read it, so `queryParam<number>('page')` holds a number; the schema's default when the param is left out or refused, which writing leaves out of the URL.
 // Without a schema naming the param, its text, as `persisted(name, '', { storage: 'query' })` keeps it.
 export function queryParam<T = string | undefined>(name: string): Signal<T> {
   const [own, write] = createSignal<T>(undefined as T)
@@ -282,7 +282,7 @@ export interface PageContext<Params extends Record<string, unknown> = Record<str
   // The locale the page is served in, as `i18n` in kay.config.ts gives it; the site's `lang` without.
   locale: Locale
   params: Params
-  // The search params, read against the page's `export const page = { query: s.Object(...) }`; a query it refuses answers 400. Their raw text is `url.searchParams`.
+  // The search params, read against the `query` of the page and its layouts, `export const page = { query: s.Object(...) }`, merged; a query it refuses answers 400. Their raw text is `url.searchParams`.
   query: Query
   // Read on demand; what a page sets or deletes goes out as Set-Cookie headers, redirects included.
   cookies: CookieMap
@@ -361,7 +361,7 @@ export function defer<T>(value: T | PromiseLike<T>): Deferred<T> {
   return promise as Deferred<T>
 }
 
-// `export const page = { ... }` in a page's server fence; a layout takes `layouts`, `security` and `reload`, which apply to the pages under it, and `guards`, which opens its own actions.
+// `export const page = { ... }` in a page's server fence; a layout takes `query` as well as `layouts`, `security` and `reload`, which apply to the pages under it, and `guards`, which opens its own actions.
 export interface PageSettings {
   // `kay build` renders the page once: `true` for a route without params, else the params of each page to render, as a list, a function returning one, a content collection or a `paginate()` list.
   prerender?: boolean | object
@@ -392,7 +392,7 @@ export interface PageSecurity {
   headers?: Record<string, string | false>
 }
 
-// What a page's query schema gives `ctx.query`.
+// What a query schema gives `ctx.query`.
 export type QueryOf<Schema> = Schema extends TSchema ? Static<Schema> : never
 
 // What a page's template reads: every name its `--- server` fence declares.

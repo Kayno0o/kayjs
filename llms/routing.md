@@ -216,7 +216,7 @@ export default (value: string) =>
 - A page's settings are the keys of one object its server fence exports, `export const page = { prerender: true, revalidate: '1h' }`.
 - `kay` exports the type `PageSettings`, which `kay check` types the object by (`satisfies PageSettings`): the editor completes the keys and an unknown one is a type error.
 - kay reads the object as written, a literal with no spread, computed key or method.
-- A layout takes `layouts`, `security` and `reload`, the last two applying to every page under it, and `guards: false`, which opens its own actions alone, the pages under it keeping their guards.
+- A layout takes `layouts`, `query`, `security` and `reload`, the last two applying to every page under it, and `guards: false`, which opens its own actions alone, the pages under it keeping their guards.
 - `query` on a special page is reported; a layout sets it like a page does (see `ctx.query`).
 - A setting exported under its own name, `export const prerender = true` or `export async function prerender()`, is a compile error.
 - `kay check --fix` moves it into `page`, a function as an arrow, unless the fence names a value `page` itself or reads the setting.
@@ -250,7 +250,7 @@ The fence's `ctx`:
   - Each is read as a form field is (a number from decimal text, a list from a repeated name, `true` from `on`), one left out takes its `default`, and a query the schema refuses renders `_error.kay` with status 400, once the guards let the request through.
   - A layout declares the params it reads the same way, in its own `page`, and the pages under it do not repeat the schema: `ctx.query` is read once against every `query` of the route's layouts and its page merged, so a layout and its page see the same typed values.
   - A layout's `ctx.query` is typed by the layouts above it and its own, a page's by every layout above it and its own.
-  - A name two of them declare is accepted when their schemas are the same, and refused when they differ: `kay check` reports it on the later file for schemas written inline as `s.Object({ ... })`, and the render fails for any other.
+  - A name two of them declare is accepted when their schemas are the same, and refused when they differ: `kay check` reports it on the later file for schemas written inline as `s.Object({ ... })`, and the render fails for any other. The merged schema takes its object keywords, such as `additionalProperties`, from the innermost file.
   - A page with `layouts: false` reads none of the dropped layouts' params. `query` on a special page is reported, "Only a page or a layout declares its query".
   - Without a schema each name reads as its text, a repeated one as a list, typed `unknown`; the raw text is `ctx.url.searchParams`.
   - An island reads and writes one param the same way with `queryParam` (see islands).

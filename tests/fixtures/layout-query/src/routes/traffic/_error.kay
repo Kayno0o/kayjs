@@ -1,0 +1,7 @@
+--- server
+const { status, message, stack } = ctx.error
+---
+h1 Error {status}
+p.message {message}
+if stack
+  pre.stack {stack}

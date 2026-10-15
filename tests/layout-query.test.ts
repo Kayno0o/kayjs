@@ -59,6 +59,19 @@ describe('a layout\'s query', () => {
     }
   })
 
+  it('gives the layouts of a failure page the query their schema reads, a refused field as its default', async () => {
+    const refused = await get(app, '/traffic/deep?period=toolong&view=sideways')
+    const missing = await get(app, '/traffic/gone?period=7d')
+    const unread = await get(app, '/traffic/gone?period=toolong')
+
+    expect(refused.status).toBe(400)
+    expect(refused.html).toContain('<section class="traffic" data-period="24h">')
+    expect(missing.status).toBe(404)
+    expect(missing.html).toContain('<section class="traffic" data-period="7d">')
+    expect(missing.html).toContain('Gone')
+    expect(unread.html).toContain('data-period="24h"')
+  })
+
   it('reads hostile names as names, polluting nothing', async () => {
     const hostile = await get(app, '/traffic/plain?__proto__=x&constructor=y&toString=z&period=7d')
 
@@ -96,6 +109,10 @@ describe('a layout\'s query', () => {
 })
 
 describe('chainQuery', () => {
+  it('refuses a name optional in one schema and required in the other', () => {
+    expect(() => chainQuery(['a.kay', 'b.kay'], [{ page: { query: s.Object({ q: s.Optional(s.String()) }) } }, { page: { query: s.Object({ q: s.String() }) } }])).toThrow('`q` is declared')
+  })
+
   const layout = s.Object({ period: s.String({ default: '24h' }), shared: s.Optional(s.String()) })
   const page = s.Object({ site: s.String(), shared: s.Optional(s.String()) })
 

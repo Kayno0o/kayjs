@@ -55,7 +55,7 @@ export function chainQuery(files: string[], modules: object[]): unknown {
   if (known?.parts.length === parts.length && known.parts.every((part, index) => part === parts[index]))
     return known.merged
 
-  const properties = new Map<string, { file: string, field: TSchema }>()
+  const properties = new Map<string, { file: string, field: TSchema, optional: boolean }>()
   const required = new Set<string>()
 
   for (const { file, schema } of declared) {
@@ -63,11 +63,12 @@ export function chainQuery(files: string[], modules: object[]): unknown {
 
     for (const [name, field] of Object.entries(own.properties ?? {})) {
       const first = properties.get(name)
+      const optional = !own.required?.includes(name)
 
-      if (first && first.field !== field && JSON.stringify(first.field) !== JSON.stringify(field))
+      if (first && (first.optional !== optional || (first.field !== field && JSON.stringify(first.field) !== JSON.stringify(field))))
         throw new Error(`\`${name}\` is declared by the \`query\` of both ${relative(process.cwd(), first.file)} and ${relative(process.cwd(), file)}, with different schemas`)
 
-      properties.set(name, first ?? { file, field })
+      properties.set(name, first ?? { file, field, optional })
     }
 
     for (const name of own.required ?? [])
@@ -98,6 +99,25 @@ export function readQuery(schema: unknown, url: URL): Readonly<Record<string, un
     return read.value
 
   throw new Denied(400, `Invalid query: ${[...read.refused].map(([name, message]) => name === '' ? message : `${name}: ${message}`).join('; ')}`)
+}
+
+// `ctx.query` for a page that answers a failure, where a layout's load runs although the route's own query was refused, or never read: a field the schema refuses reads as its default, or is left out, so a layout still gets what its types promise.
+export function readQueryLeniently(schema: unknown, url: URL): Readonly<Record<string, unknown>> {
+  const input = searchInput(url)
+
+  if (!isSchema(schema))
+    return input
+
+  const read = readFields(schema, input)
+
+  if ('value' in read)
+    return read.value
+
+  const fields = (schema as ObjectSchema).properties ?? {}
+  const kept = Object.fromEntries(Object.entries(input).filter(([name]) => !read.refused.has(name) && name in fields))
+  const retry = readFields(schema, kept)
+
+  return 'value' in retry ? retry.value : input
 }
 
 // Text read the way a form's fields are, a top-level field left out taking its schema's default, then checked and decoded: the value, or a message per field refused.

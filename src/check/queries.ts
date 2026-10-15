@@ -9,11 +9,17 @@ interface Field {
   source: string
   // Where the name is written, in the file's source.
   at: number
-  // The field's schema as written, without its whitespace.
+  length: number
+  // The field's schema as written, as its syntax tree without positions, so quotes and whitespace do not tell two apart.
   text: string
 }
 
-const WHITESPACE = /\s+/g
+// The keys of a syntax tree node that say where it is written rather than what.
+const POSITIONS = new Set(['start', 'end', 'loc', 'extra', 'leadingComments', 'trailingComments', 'innerComments'])
+
+function withoutPositions(key: string, value: unknown): unknown {
+  return POSITIONS.has(key) ? undefined : value
+}
 
 // A name two files of one route's chain declare in their `query` with schemas written differently, which the server refuses to merge; only schemas written inline as `s.Object({ ... })` are compared, the server checking the others when it renders.
 export async function queryClashes(routes: Route[]): Promise<CheckDiagnostic[]> {
@@ -39,7 +45,7 @@ export async function queryClashes(routes: Route[]): Promise<CheckDiagnostic[]> 
           const before = field.source.slice(0, field.at).split('\n')
 
           reported.add(`${field.file}\0${name}`)
-          diagnostics.push({ file: field.file, line: before.length, column: before.at(-1)!.length + 1, end: field.at + name.length, message: `\`${name}\` is declared by the \`query\` of ${first.file} with another schema`, help: 'declare it once, in the outermost file that needs it, or write the same schema' })
+          diagnostics.push({ file: field.file, line: before.length, column: before.at(-1)!.length + 1, end: field.at + field.length, message: `\`${name}\` is declared by the \`query\` of ${first.file} with another schema`, help: 'declare it once, in the outermost file that needs it, or write the same schema' })
         }
 
         if (!first)
@@ -68,10 +74,13 @@ async function fieldsOf(file: string): Promise<Map<string, Field> | undefined> {
     const found = new Map<string, Field>()
 
     for (const property of object.properties) {
-      const name = property.type === 'ObjectProperty' && !property.computed ? property.key.type === 'Identifier' ? property.key.name : property.key.type === 'StringLiteral' ? property.key.value : undefined : undefined
+      if (property.type !== 'ObjectProperty' || property.computed)
+        continue
 
-      if (name !== undefined && property.type === 'ObjectProperty')
-        found.set(name, { file, source, at: query.value.start + property.key.start!, text: source.slice(query.value.start + property.value.start!, query.value.start + property.value.end!).replace(WHITESPACE, '') })
+      const name = property.key.type === 'Identifier' ? property.key.name : property.key.type === 'StringLiteral' ? property.key.value : undefined
+
+      if (name !== undefined)
+        found.set(name, { file, source, at: query.value.start + property.key.start!, length: property.key.end! - property.key.start!, text: JSON.stringify(property.value, withoutPositions) })
     }
 
     return found
