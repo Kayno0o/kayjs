@@ -7,6 +7,7 @@ This page lists what each release adds, newest first, with a link to where each 
 
 ## Unreleased
 
+- **`Segmented`** shows no option picked while its `value` is `null`. [Segmented](/ui/segmented#none-picked)
 - **A number `TextInput`** hands back a number, or `null` once emptied, rather than a string. [TextInput](/ui/text-input)
 - **`images.card.logo`** puts the site's logo at the top left of every share card, an SVG or an image. [Social card](/essentials/head-and-seo#social-card)
 - **A kingfisher is kay's default favicon**, shown by a site that names none of its own. [Favicon](/essentials/head-and-seo#favicon)

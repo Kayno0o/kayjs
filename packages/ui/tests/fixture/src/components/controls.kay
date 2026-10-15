@@ -26,9 +26,12 @@ function share(value: 'private' | 'link' | 'public') {
 }
 
 const ranges = [{ value: 'day', label: 'Day' }, { value: 'week', label: 'Week' }] as const
+const zoom = signal<'day' | 'week' | null>(null)
 ---
 form#form
   Segmented(label="Range" name="range" options={ranges} value="day" onChange={onRange})
   Toggle(name="digest" label="Daily digest" onChange={onDigest})
   Toggle#publish(name="public" label="Public" checked={published()} onChange={publish})
   Segmented#share(label="Sharing" name="sharing" options={shares} value={sharing()} onChange={share})
+Segmented#zoom(label="Zoom" name="zoom" options={ranges} value={zoom()} onChange={zoom.set})
+button#unzoom(type="button" onClick={() => zoom.set(null)}) Unzoom

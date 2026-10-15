@@ -5,8 +5,8 @@ import { changeAccepted } from './change'
 
 const { options, value, label, name, onChange, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
   options: readonly { value: Value, label: string }[]
-  // The option picked to start with; a group whose parent passes another follows it.
-  value: Value
+  // The option picked to start with, or `null` for none, such as while what shows matches no option; a group whose parent passes another follows it.
+  value: Value | null
   // Names the group for screen readers.
   label: string
   // The radios' name, which the group submits under inside a form; one unique on the page is drawn when none is given.
@@ -19,7 +19,7 @@ const { options, value, label, name, onChange, class: className, ...rest } = pro
 
 // Held as a string: a signal cannot take a type parameter that might be a function.
 const group = name ?? uid()
-const picked = signal<string>(value)
+const picked = signal<string | null>(value)
 const busy = signal(false)
 // How often the parent's `value` reached the group, so a change under way knows whether the parent answered it.
 let synced = 0
@@ -30,7 +30,7 @@ effect(() => {
 })
 
 // Checks the radio of `wanted` again, in this group only: the binding may never have seen the radio that took the check.
-function check(input: HTMLInputElement, wanted: string) {
+function check(input: HTMLInputElement, wanted: string | null) {
   for (const radio of input.closest('.kui-segmented')?.querySelectorAll<HTMLInputElement>('.kui-segmented-input') ?? [])
     radio.checked = radio.value === wanted
 }

@@ -181,6 +181,24 @@ test('a Segmented group whose change is under way is busy and picks nothing else
   }
 })
 
+test('a Segmented group shows none picked while its parent passes null, and again once the parent goes back to it', async () => {
+  mounted = await mount('src/components/controls.kay', { onRange: () => undefined, onDigest: () => undefined })
+
+  const radios = () => [...mounted!.root.querySelectorAll<HTMLInputElement>('#zoom input')].map(radio => radio.checked)
+
+  expect(radios()).toEqual([false, false])
+
+  click(mounted.root.querySelector('#zoom input[value="week"]'))
+  await settle()
+
+  expect(radios()).toEqual([false, true])
+
+  click(mounted.root.querySelector('#unzoom'))
+  await settle()
+
+  expect(radios()).toEqual([false, false])
+})
+
 test('a Segmented group leaves the option its parent picked while a refused change was under way', async () => {
   const logged = spyOn(console, 'error').mockImplementation(() => undefined)
 
