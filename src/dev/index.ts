@@ -82,7 +82,7 @@ const CLEAR_SCREEN = '\x1B[2J\x1B[3J\x1B[H'
 const CTRL_C = '\x03'
 const ESCAPE = '\x1B'
 // The interfaces of containers, bridges and VPNs, whose address a phone on the network does not reach.
-const VIRTUAL_INTERFACE = /^(?:docker|br-|veth|virbr|vmnet|vboxnet|tun|tap|wg|tailscale|zt|lxc|lxd|cni|flannel)/
+const VIRTUAL_INTERFACE = /^(?:docker|br-|bridge|veth|virbr|vmnet|vboxnet|tun|utun|tap|wg|tailscale|zt|lxc|lxd|cni|flannel)/
 const STDERR = 2
 
 // Runs the server entry in development and restarts it on every change; a fresh process is the only way to drop modules Bun has loaded.
@@ -483,8 +483,11 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     keys.on('data', onKey)
   }
 
-  // As a change does, but for no file: open pages load the page again.
+  // As a change does, but for no file: open pages load the page again. A change still waiting on the debounce goes with it, its timer cleared so it does not restart again for nothing.
   function restartNow() {
+    clearTimeout(timer)
+    waitingSince = undefined
+    waited = false
     forced = true
     codeVersion++
     changed = true
@@ -537,8 +540,8 @@ function openBrowser(url: string, missing: (command: string) => void): void {
 }
 
 // The address of this machine others on its network reach it by: the first of an interface no container, bridge or VPN made, else the first.
-export function networkAddress(): string | undefined {
-  const external = Object.entries(networkInterfaces()).flatMap(([name, entries]) => (entries ?? []).filter(entry => entry.family === 'IPv4' && !entry.internal).map(entry => ({ name, address: entry.address })))
+export function networkAddress(interfaces: ReturnType<typeof networkInterfaces> = networkInterfaces()): string | undefined {
+  const external = Object.entries(interfaces).flatMap(([name, entries]) => (entries ?? []).filter(entry => entry.family === 'IPv4' && !entry.internal).map(entry => ({ name, address: entry.address })))
 
   return (external.find(entry => !VIRTUAL_INTERFACE.test(entry.name)) ?? external[0])?.address
 }

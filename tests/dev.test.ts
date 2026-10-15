@@ -692,6 +692,16 @@ describe.concurrent('kay dev', () => {
     }
   })
 
+  it('names the network address of the first interface no container, bridge or VPN made, on Linux and macOS alike', () => {
+    const entry = (address: string, internal = false) => ({ address, netmask: '255.255.255.0', family: 'IPv4' as const, mac: '00:00:00:00:00:00', internal, cidr: `${address}/24` })
+
+    for (const name of ['docker0', 'br-1a2b', 'veth9', 'virbr0', 'tun0', 'wg0', 'tailscale0', 'utun3', 'bridge100'])
+      expect(networkAddress({ lo0: [entry('127.0.0.1', true)], [name]: [entry('10.0.0.2')], en0: [entry('192.168.1.20')] })).toBe('192.168.1.20')
+
+    expect(networkAddress({ lo: [entry('127.0.0.1', true)], utun3: [entry('10.0.0.2')] })).toBe('10.0.0.2')
+    expect(networkAddress({ lo: [entry('127.0.0.1', true)] })).toBeUndefined()
+  })
+
   it.serial('listens on localhost alone unless --host opens it, keeping a hostname the app names', async () => {
     const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
     const lines: string[] = []
@@ -819,10 +829,19 @@ describe.concurrent('kay dev', () => {
       await Bun.sleep(50)
       expect(quit).toBe(2)
 
-      // Pressed with only a stylesheet changed, which would only swap it in, it restarts all the same.
-      await Bun.write(join(root, 'src/app.css'), 'p { color: red }\n')
-      keys.write('r')
-      await until(() => lines.length === 4)
+      // Pressed with only a stylesheet changed, which would only swap it in, it restarts all the same: r goes in once a watcher saw the change, before kay dev's debounce swaps the stylesheet alone.
+      const stopWatching = watchProject(root, (file) => {
+        if (file === 'src/app.css')
+          setImmediate(() => keys.write('r'))
+      })
+
+      try {
+        await Bun.write(join(root, 'src/app.css'), 'p { color: red }\n')
+        await until(() => lines.length === 4)
+      }
+      finally {
+        stopWatching()
+      }
       expect(lines[3]).toMatch(/^\d\d:\d\d:\d\d (?:src\/app\.css|r pressed): restarted in \d+ ms$/)
     }
     finally {

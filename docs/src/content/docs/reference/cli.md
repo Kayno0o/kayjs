@@ -97,9 +97,9 @@ kay dev: http://localhost:3000 (ready in 412 ms)
 14:03:05 the server exited with code 1, waiting for a change
 ```
 
-Under `--host` with no address, or one listening on every address, a second line names the address other devices on the network reach the server at, that of the first interface no container, bridge or VPN made: `kay dev: http://192.168.1.20:3000 on the network`.
+Under `--host` with no address, or one listening on every address, a second line names the address other devices on the network reach the server at: `kay dev: http://192.168.1.20:3000 on the network`. It shows when the output is piped too. The address is that of the first interface no container, bridge or VPN made.
 
-In a terminal, the line under the address lists the keys `kay dev` reads: `o` opens the address in the browser, `r` restarts the server, `c` clears the screen and `q` or Ctrl+C quits. Piped, as in CI or under a coding agent, or with `--format json`, it reads no key and prints no such line.
+In a terminal, the line under the address lists the keys `kay dev` reads: `o` opens the address in the browser, `r` restarts the server, `c` clears the screen and `q` or Ctrl+C quits. Ctrl+Z does not suspend `kay dev`, as it reads that key too: quit with `q` and start it again instead. Piped, as in CI or under a coding agent, or with `--format json`, it reads no key and prints no such line.
 
 An entry's own `Listening on http://localhost:3000` line is left out; kay's own start line only shows in production.
 
