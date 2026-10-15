@@ -915,9 +915,13 @@ function headTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
 }
 
 // Names a variable of a secret goes by, and the shapes of the values of one: a URL carrying a password, a token with a well-known prefix, a long run of random-looking characters.
-const SECRET_NAME = /SECRET|PASSW(?:OR)?D|PRIVATE|TOKEN|CREDENTIAL|AUTH|API_?KEY|(?:^|_)KEY$/i
-const SECRET_PREFIX = /^(?:sk|rk)_(?:live|test)_|^gh[pousr]_|^github_pat_|^xox[abprs]-|^AKIA[0-9A-Z]{16}|^eyJ[\w-]+\.[\w-]+\.|^-----BEGIN /
+const SECRET_NAME = /SECRET|PASSW(?:OR)?D|PRIVATE|TOKEN|CREDENTIAL|AUTH_?(?:KEY|TOKEN|SECRET)|(?:^|_)(?:DATABASE|DB|POSTGRES|PG|MYSQL|REDIS|MONGO(?:DB)?)_URL$/i
+// A key may be public by design (a map or analytics key), so its name alone only calls for a look.
+const KEY_NAME = /(?:^|_)KEY$/i
+const PUBLIC_NAME = /PUBLIC|PUBLISHABLE/i
+const SECRET_PREFIX = /^(?:sk|rk)_(?:live|test)_|^sk-|^gh[pousr]_|^github_pat_|^glpat-|^npm_|^SG\.|^xox[abprs]-|^AKIA[0-9A-Z]{16}|^eyJ[\w-]+\.[\w-]+\.|^-----BEGIN /
 const URL_PASSWORD = /^[a-z][\w+.-]*:\/\/[^/\s:@]+:[^/\s@]+@/i
+const HEX_SECRET = /^[0-9a-f]{32,}$/i
 const RANDOM_LIKE = /^[\w+/=.-]{24,}$/
 // Bits per character of a run of random base64 sits near 5; words and paths stay under 4.
 const RANDOM_ENTROPY = 4
@@ -931,21 +935,27 @@ function entropy(value: string): number {
   return -[...counts.values()].reduce((sum, count) => sum + count / value.length * Math.log2(count / value.length), 0)
 }
 
-// Why a public variable looks like a secret, if it does.
-function secretReason(name: string, value: unknown): string | undefined {
+// Why a public variable looks like a secret, if it does; `maybe` when only its name is a key's, which may be public by design.
+function secretReason(name: string, value: unknown): { reason: string, maybe: boolean } | undefined {
   if (SECRET_NAME.test(name))
-    return 'its name looks like a secret'
+    return { reason: 'its name looks like a secret', maybe: false }
 
-  if (typeof value !== 'string')
-    return undefined
+  if (typeof value === 'string') {
+    if (URL_PASSWORD.test(value))
+      return { reason: 'its value is a URL with a password', maybe: false }
 
-  if (URL_PASSWORD.test(value))
-    return 'its value is a URL with a password'
+    if (SECRET_PREFIX.test(value))
+      return { reason: 'its value looks like a token', maybe: false }
 
-  if (SECRET_PREFIX.test(value))
-    return 'its value looks like a token'
+    if (HEX_SECRET.test(value))
+      return { reason: 'its value is a long hexadecimal string, like a token', maybe: false }
 
-  return RANDOM_LIKE.test(value) && !value.includes('/') && entropy(value) >= RANDOM_ENTROPY ? 'its value looks random, like a key' : undefined
+    // A path or a URL has slashes in the places a base64 string has none.
+    if (RANDOM_LIKE.test(value) && !value.startsWith('/') && !value.includes('://') && entropy(value) >= RANDOM_ENTROPY)
+      return { reason: 'its value looks random, like a key', maybe: false }
+  }
+
+  return KEY_NAME.test(name) && !PUBLIC_NAME.test(name) ? { reason: 'its name is a key\'s, which is fine if the key is public by design, such as a map\'s', maybe: true } : undefined
 }
 
 // The variables `publicEnv` sends every visitor, read from the module the browser loads, so a secret declared public is seen; fetched as the tab shows and again after each restart.
@@ -956,16 +966,20 @@ function envTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
   let asked = 0
   const read = async () => {
     const ask = ++asked
-    const base = doc.querySelector('meta[name="kay-base"]')?.getAttribute('content') ?? ''
     let values: Record<string, unknown> | undefined
     let failure: string | undefined
 
     try {
-      const response = await win.fetch(`${base}${ENV_URL}`, { cache: 'no-store' })
-      const text = response.ok && (response.headers.get('content-type') ?? '').includes('javascript') ? await response.text() : undefined
+      const response = await win.fetch(ENV_URL, { cache: 'no-store' })
 
-      if (text !== undefined) {
-        if (!text.startsWith(MODULE_START))
+      // The route is there only when `publicEnv` is declared; any other answer is a failure to read it.
+      if (response.status !== 404) {
+        if (!response.ok)
+          throw new Error(`the server answered ${response.status}`)
+
+        const text = await response.text()
+
+        if (!(response.headers.get('content-type') ?? '').includes('javascript') || !text.startsWith(MODULE_START))
           throw new Error('the module is not the one kay sends')
 
         values = JSON.parse(text.slice(MODULE_START.length)) as Record<string, unknown>
@@ -997,14 +1011,17 @@ function envTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
     let flagged = 0
 
     for (const [name, value] of entries) {
-      const reason = secretReason(name, value)
+      const found = secretReason(name, value)
       const shown = tool.make('dd')
 
       shown.append(tool.make('span', 'mono', typeof value === 'string' ? value : JSON.stringify(value)))
 
-      if (reason !== undefined) {
+      if (found?.maybe === true) {
+        shown.append(tool.make('div', 'note', `Every visitor reads this: ${found.reason}.`))
+      }
+      else if (found !== undefined) {
         flagged++
-        shown.append(tool.make('div', 'secret', `Every visitor reads this: ${reason}. Keep a secret in defineEnv, read on the server alone.`))
+        shown.append(tool.make('div', 'secret', `Every visitor reads this, and ${found.reason}. Keep a secret in defineEnv, read on the server alone.`))
       }
 
       facts.append(tool.make('dt', 'mono', name), shown)

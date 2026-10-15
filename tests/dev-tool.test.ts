@@ -6,6 +6,7 @@ import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, afterEach, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { t } from 'elysia'
 import { startDevTool } from '../src/runtime/dev-tool'
+import { PUBLIC_ENV } from '../src/runtime/env'
 import { reportError } from '../src/runtime/reactive'
 import { pages } from '../src/server'
 import { DEV_BOOT, problemsBlock } from '../src/server/dev'
@@ -554,13 +555,13 @@ describe('the dev tool', () => {
   it('lists the env the browser receives, as the server sends it, flags what looks like a secret, and says when the app sends none', async () => {
     const dir = await scratchDir('dev-tool-env-')
     const routes = relative(process.cwd(), join(dir, 'routes'))
-    const names = ['KAY_TEST_ZOOM', 'KAY_TEST_MAP_STYLE', 'KAY_TEST_STRIPE_SECRET', 'KAY_TEST_SESSION', 'KAY_TEST_FEED', 'KAY_TEST_REGION'] as const
-    const given = { KAY_TEST_ZOOM: '12', KAY_TEST_MAP_STYLE: 'streets', KAY_TEST_STRIPE_SECRET: 'abc', KAY_TEST_SESSION: 'q8Zr3VxK1mT9yB2nWd5LpC7aHs4JfE6u', KAY_TEST_FEED: 'postgres://app:hunter2@db.internal/app', KAY_TEST_REGION: 'eu-west-1' }
+    const names = ['KAY_TEST_ZOOM', 'KAY_TEST_MAP_KEY', 'KAY_TEST_STRIPE_SECRET', 'KAY_TEST_SESSION', 'KAY_TEST_FEED', 'KAY_TEST_REGION', 'KAY_TEST_REDIS_URL', 'KAY_TEST_HEX', 'KAY_TEST_AWS', 'KAY_TEST_PUBLISHABLE_KEY'] as const
+    const given = { KAY_TEST_ZOOM: '12', KAY_TEST_MAP_KEY: 'pk.123', KAY_TEST_STRIPE_SECRET: 'abc', KAY_TEST_SESSION: 'q8Zr3VxK1mT9yB2nWd5LpC7aHs4JfE6u', KAY_TEST_FEED: 'postgres://app:hunter2@db.internal/app', KAY_TEST_REGION: 'eu-west-1', KAY_TEST_REDIS_URL: 'redis://cache:6379', KAY_TEST_HEX: '9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08', KAY_TEST_AWS: 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY1', KAY_TEST_PUBLISHABLE_KEY: 'pk_live_abc' }
 
     await Bun.write(join(dir, 'routes/index.kay'), 'p Home\n')
     Object.assign(process.env, given)
 
-    const publicEnv = t.Object({ KAY_TEST_ZOOM: t.Numeric(), KAY_TEST_MAP_STYLE: t.String(), KAY_TEST_STRIPE_SECRET: t.String(), KAY_TEST_SESSION: t.String(), KAY_TEST_FEED: t.String(), KAY_TEST_REGION: t.String() })
+    const publicEnv = t.Object({ KAY_TEST_ZOOM: t.Numeric(), KAY_TEST_MAP_KEY: t.String(), KAY_TEST_STRIPE_SECRET: t.String(), KAY_TEST_SESSION: t.String(), KAY_TEST_FEED: t.String(), KAY_TEST_REGION: t.String(), KAY_TEST_REDIS_URL: t.String(), KAY_TEST_HEX: t.String(), KAY_TEST_AWS: t.String(), KAY_TEST_PUBLISHABLE_KEY: t.String() })
     const { happyDOM } = window as unknown as { happyDOM: { setURL: (url: string) => void } }
     const { href } = location
     const asked: string[] = []
@@ -570,7 +571,7 @@ describe('the dev tool', () => {
 
       return app.handle(new Request(`http://localhost${url}`))
     }) as unknown as typeof window.fetch)
-    const rows = () => [...shadow().querySelectorAll('#kay-dev-env dt')].map(term => `${term.textContent} = ${term.nextElementSibling!.querySelector('.mono')!.textContent}${term.nextElementSibling!.querySelector('.secret') ? ' (flagged)' : ''}`)
+    const rows = () => [...shadow().querySelectorAll('#kay-dev-env dt')].map(term => `${term.textContent} = ${term.nextElementSibling!.querySelector('.mono')!.textContent}${term.nextElementSibling!.querySelector('.secret') ? ' (flagged)' : term.nextElementSibling!.querySelector('.note') ? ' (noted)' : ''}`)
 
     try {
       happyDOM.setURL('http://localhost/')
@@ -581,13 +582,17 @@ describe('the dev tool', () => {
       expect(asked).toEqual(['/_kay/env.js'])
       expect(rows()).toEqual([
         'KAY_TEST_ZOOM = 12',
-        'KAY_TEST_MAP_STYLE = streets',
+        'KAY_TEST_MAP_KEY = pk.123 (noted)',
         'KAY_TEST_STRIPE_SECRET = abc (flagged)',
         'KAY_TEST_SESSION = q8Zr3VxK1mT9yB2nWd5LpC7aHs4JfE6u (flagged)',
         'KAY_TEST_FEED = postgres://app:hunter2@db.internal/app (flagged)',
         'KAY_TEST_REGION = eu-west-1',
+        'KAY_TEST_REDIS_URL = redis://cache:6379 (flagged)',
+        'KAY_TEST_HEX = 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08 (flagged)',
+        'KAY_TEST_AWS = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY1 (flagged)',
+        'KAY_TEST_PUBLISHABLE_KEY = pk_live_abc',
       ])
-      expect(shadow().querySelector('#kay-dev-tab-env .count')?.textContent).toBe('3')
+      expect(shadow().querySelector('#kay-dev-tab-env .count')?.textContent).toBe('6')
 
       // No `publicEnv`: nothing reaches the browser, and the tab says so after the restart.
       app = await pages({ routes, dev: true })
@@ -596,6 +601,15 @@ describe('the dev tool', () => {
 
       expect(shadow().querySelector('#kay-dev-env .empty')?.textContent).toContain('sends no public env')
       expect(shadow().querySelector<HTMLElement>('#kay-dev-tab-env .count')!.hidden).toBe(true)
+
+      // Only a missing route means none: a failing server, or a page answering in its place, is told as a failure.
+      for (const answer of [new Response(null, { status: 503 }), new Response('<p>Home</p>', { headers: { 'content-type': 'text/html' } })]) {
+        fetching.mockImplementation((async () => answer.clone()) as unknown as typeof window.fetch)
+        window.dispatchEvent(new CustomEvent('kay-dev-built', { detail: JSON.stringify({ id: 'c', at: 0, changed: 'kay.config.ts', ms: 1 }) }))
+        await Bun.sleep(20)
+
+        expect(shadow().querySelector('#kay-dev-env .empty')?.textContent).toContain('Could not read the public env')
+      }
     }
     finally {
       fetching.mockRestore()
@@ -603,6 +617,8 @@ describe('the dev tool', () => {
 
       for (const name of names)
         delete process.env[name]
+
+      delete (globalThis as { [PUBLIC_ENV]?: unknown })[PUBLIC_ENV]
     }
   })
 })
