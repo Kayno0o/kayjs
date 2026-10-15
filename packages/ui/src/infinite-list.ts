@@ -66,11 +66,11 @@ export function infiniteList<Row>(first: Row[], options: InfiniteListOptions<Row
       lastFetched = page.at(-1) ?? lastFetched
       ended.set(page.length < size)
       failed.set(false)
-      rows.set((current) => {
-        const fresh = key === undefined ? page : page.filter(row => !shown.has(key(row)) && shown.add(key(row)))
 
-        return fresh.length === 0 ? current : [...current, ...fresh]
-      })
+      const fresh = key === undefined ? page : page.filter(row => !shown.has(key(row)) && shown.add(key(row)))
+
+      if (fresh.length > 0)
+        rows.set(current => [...current, ...fresh])
     }
     catch {
       failed.set(true)
