@@ -1075,7 +1075,9 @@ describe('transitions', () => {
       document.createDocumentFragment().append(first, unit.last)
     }
 
-    const hooks = { enter: () => undefined, leave: (node: Node) => void node.parentNode?.removeChild(node), leaving: () => false, back: () => undefined }
+    let backs = 0
+    const leaving = new Set<Node>()
+    const hooks = { enter: () => undefined, leave: (node: Node) => void node.parentNode?.removeChild(node), leaving, back: () => void backs++ }
 
     playTransitions({ ...hooks, has: (node): node is Element => marked.has(node) })
 
@@ -1094,6 +1096,12 @@ describe('transitions', () => {
       await settle()
       expect(reads).toBeLessThan(5000)
       expect(parent.firstChild as Node | null).toBe(units[999]!.first)
+      // No node plays its leave phase: no array of the units' nodes is built to look for one.
+      expect(backs).toBe(0)
+      leaving.add(units[0]!.first)
+      setList(units.slice(1))
+      await settle()
+      expect(backs).toBe(1)
     }
     finally {
       playTransitions({ ...hooks, has: (_node): _node is Element => false })

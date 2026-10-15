@@ -56,8 +56,8 @@ export interface Transitions {
   has: (node: Node) => node is Element
   enter: (node: Node) => void
   leave: (node: Node) => void
-  // Whether the element plays its leave phase.
-  leaving: (node: Node) => boolean
+  // The elements playing their leave phase.
+  leaving: ReadonlySet<Node>
   // Ends the leave phase of the elements, which play their enter phase instead.
   back: (nodes: Node[]) => void
 }
@@ -374,7 +374,7 @@ function removeUnit(unit: Unit): void {
   for (const node of nodes)
     transitions ? transitions.leave(node) : node.parentNode?.removeChild(node)
 
-  if (unit instanceof Range && nodes.some(node => transitions?.leaving(node)))
+  if (unit instanceof Range && nodes.some(node => transitions?.leaving.has(node)))
     unit.nodes = nodes
 }
 
@@ -518,14 +518,15 @@ export function insert(element: Node | null, start: Node | null, end: Node | nul
     }
 
     // A unit back before its leave phase ended is still in the document; its enter phase ends that leave.
-    transitions?.back(next.flatMap(nodesOf))
+    if (transitions && transitions.leaving.size > 0)
+      transitions.back(next.flatMap(nodesOf))
 
     // Each unit goes before the first node not yet placed, unless already there, so a kept unit is not moved.
     let at = region.start ? region.start.nextSibling : region.element!.firstChild
 
     for (const unit of next) {
       // The cursor only lands on a unit's first node or a node playing its leave phase, one that is no unit of `next` now, which stays between the kept units until it ends.
-      while (at && transitions?.leaving(at))
+      while (at && transitions?.leaving.has(at))
         at = at.nextSibling
 
       if (isStale(unit) || firstOf(unit) !== at)

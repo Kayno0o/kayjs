@@ -22,7 +22,7 @@ const phasesOf = new WeakMap<Element, Phases>()
 // Ends the phase an element is playing, as the other one starts.
 const playing = new WeakMap<Element, () => void>()
 // The elements playing their leave phase.
-const leaving = new WeakSet<Node>()
+const leaving = new Set<Node>()
 const CLASS_LIST = /\s+/
 const PRESET_STEP = { '': '', '-from': 'From', '-to': 'To' } as const
 const REDUCED_MOTION = '(prefers-reduced-motion: reduce)'
@@ -142,7 +142,7 @@ function back(nodes: Node[]): void {
   }
 }
 
-const HOOKS = { has: hasTransition, enter, leave, leaving: (node: Node) => leaving.has(node), back }
+const HOOKS = { has: hasTransition, enter, leave, leaving, back }
 
 // Called by the generated code for `transition` (part `name`), a name or a preset, and each `transition:` part.
 export function transition(element: Element, part: string, value: unknown): void {
