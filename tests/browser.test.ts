@@ -686,13 +686,15 @@ process.exit(0)
     try {
       const child = Bun.spawn([process.execPath, script, path!], { env: { ...process.env, TMPDIR: temp }, stdout: 'pipe', stderr: 'pipe' })
       const [out, errors, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
-      const [opened, closed, idle] = out.trim().split('\n').map(line => kinds(JSON.parse(line) as string[]))
+      const listings = out.trim().split('\n').map(line => JSON.parse(line) as string[])
+      const [opened, closed] = listings.map(kinds)
 
       expect({ code, errors }).toEqual({ code: 0, errors: '' })
       // One owned directory, the killed run's gone; Bun's profile stays empty, Chrome running on kay's.
       expect(running(opened!)).toEqual(['bun', 'chrome', 'kay'])
       expect(running(closed!)).toEqual(['bun', 'chrome', 'kay'])
-      expect(idle).toEqual([])
+      // By name, so a directory left behind says what made it.
+      expect(listings[2]?.filter(name => name !== LOCKED)).toEqual([])
       // The page opened last, left open, goes at exit.
       expect(kinds(await readdir(temp))).toEqual([])
     }

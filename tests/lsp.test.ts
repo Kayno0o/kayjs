@@ -1071,7 +1071,10 @@ describe('kay lsp with a slow tsgo', () => {
         await Bun.sleep(DIAGNOSTICS_DELAY + 50)
         client.notify('textDocument/didChange', { textDocument: { uri, version }, contentChanges: [{ text: `p {${version}}\n` }] })
       }
-      await Bun.sleep(SLOW * 8)
+      // Until the last change is published, as a real tsgo starting under load takes longer than any fixed wait.
+      for (const limit = Date.now() + 15_000; last !== 5 && Date.now() < limit;)
+        await Bun.sleep(20)
+
       expect(last).toBe(5)
       expect(most).toBe(1)
       expect(started).toBeLessThanOrEqual(3)
