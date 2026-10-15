@@ -137,12 +137,12 @@ export function forgejo({ url, repo, branch, token, timeout = 15_000, fetch: req
   }
 
   async function commit({ repoPath, text, message, author, base }: FileChange, signal: AbortSignal, posting: () => void): Promise<Commit | undefined> {
-    const send = async (address: string, init: RequestInit = {}) => request(address, { ...init, headers, signal })
+    const send = async (address: string, init: RequestInit = {}, within = signal) => request(address, { ...init, headers, signal: within })
 
     // The blob sha of the file on the branch, which an update or a delete must name; undefined when it does not exist.
-    const currentSha = async () => {
+    const currentSha = async (within = signal) => {
       const query = branch === undefined ? '' : `?ref=${encodeURIComponent(branch)}`
-      const response = await send(`${api}/contents/${repoPath.split('/').map(encodeURIComponent).join('/')}${query}`)
+      const response = await send(`${api}/contents/${repoPath.split('/').map(encodeURIComponent).join('/')}${query}`, {}, within)
 
       if (response.status === 404)
         return undefined
@@ -169,7 +169,8 @@ export function forgejo({ url, repo, branch, token, timeout = 15_000, fetch: req
 
     // Another save landed between the read and the commit.
     if (response.status === 409 || (response.status === 422 && SHA_MISMATCH.test(await response.clone().text())))
-      throw new SaveConflict(await conflictVersion(currentSha), operation === 'create')
+      // The read of the version the conflict reports has its own time, as the save's may be all but spent on the commit that was refused.
+      throw new SaveConflict(await conflictVersion(async () => currentSha(AbortSignal.timeout(timeout))), operation === 'create')
 
     const { commit } = await answer<{ commit: { sha: string, html_url?: string } }>(response)
 

@@ -11,7 +11,7 @@ void mock.module('@kaynooo/kayjs-ui', async () => import(toastModule))
 const { default: entriesApi } = await import('../src/api/entries')
 const { default: filesApi } = await import('../src/api/files')
 const { createDrafts } = await import('../src/drafts')
-const { deleteUnusedUploadsInChunks, saveDraft } = await import('../src/editor/save')
+const { deleteSaved, deleteUnusedUploadsInChunks, saveDraft } = await import('../src/editor/save')
 
 // What kay's build gives an API module's default export in the browser: where it is served.
 Object.assign(entriesApi, { [Symbol.for('kay.api')]: '/api/cms/entries' })
@@ -19,16 +19,16 @@ Object.assign(filesApi, { [Symbol.for('kay.api')]: '/api/cms/files' })
 
 const post: DraftEntry = { collection: 'posts', slug: 'hello', data: { title: 'Hello' } }
 
-interface Sent { method: string, body: { data: Record<string, unknown>, version?: string } }
+interface Sent { method: string, url: string, body: { data: Record<string, unknown>, version?: string, create?: boolean } }
 
 // The entries API answering each save after `wait`, with `answer`, recording what was sent.
 function server(answer: (body: Sent['body'], count: number) => unknown, wait = 20) {
   const sent: Sent[] = []
 
   spyOn(globalThis, 'fetch').mockImplementation((async (_input: string | URL | Request, init?: RequestInit) => {
-    const body = JSON.parse(String(init?.body)) as Sent['body']
+    const body = (init?.body === undefined ? {} : JSON.parse(String(init.body))) as Sent['body']
 
-    sent.push({ method: init?.method ?? 'GET', body })
+    sent.push({ method: init?.method ?? 'GET', url: String(_input), body })
     await Bun.sleep(wait)
 
     return Response.json(answer(body, sent.length))
@@ -95,6 +95,60 @@ describe('saveDraft', () => {
     expect(await saveDraft(drafts, post)).toBe(false)
     expect(drafts.issues(post, 'title').map(issue => issue.message)).toEqual(['Required'])
     expect(toasts().at(-1)?.message).toBe('Not saved: some fields need fixing')
+  })
+})
+
+describe('saveDraft targets', () => {
+  it('saves the edits of a join under its own slug and locale rather than the running save\'s', async () => {
+    const sent = server((_body, count) => ({ saved: true, version: `v${count + 1}` }))
+    const drafts = opened()
+
+    drafts.set(post, 'title', 'First')
+
+    const first = saveDraft(drafts, post, { slug: 'a' })
+
+    drafts.set(post, 'title', 'Second')
+
+    const second = saveDraft(drafts, post, { slug: 'b', locale: 'fr' })
+
+    expect(await Promise.all([first, second])).toEqual([true, true])
+    expect(sent.map(({ url, body }) => [url, body.data.title])).toEqual([['/api/cms/entries/posts/a', 'First'], ['/api/cms/entries/posts/b', 'Second']])
+  })
+
+  it('answers a join under another slug with the running save\'s outcome when nothing changed since', async () => {
+    const sent = server(() => ({ saved: true, version: 'v2' }))
+    const drafts = opened()
+
+    drafts.set(post, 'title', 'Once')
+
+    expect(await Promise.all([saveDraft(drafts, post, { slug: 'a' }), saveDraft(drafts, post, { slug: 'b' })])).toEqual([true, true])
+    expect(sent).toHaveLength(1)
+  })
+
+  it('writes the edits kept over a deleted file as a new entry, so a file made meanwhile is not written over', async () => {
+    const sent = server(() => ({ saved: true, version: 'v2' }))
+    const drafts = opened()
+
+    drafts.set(post, 'title', 'Mine')
+    drafts.refuse(post, { message: 'saved since', conflict: { version: null } })
+    drafts.keepEdits(post)
+
+    expect(await saveDraft(drafts, post)).toBe(true)
+    expect(sent.map(({ body }) => [body.create, body.version])).toEqual([[true, undefined]])
+
+    drafts.set(post, 'title', 'Mine again')
+    await saveDraft(drafts, post)
+    expect(sent.map(({ body }) => [body.create, body.version])).toEqual([[true, undefined], [false, 'v2']])
+  })
+})
+
+describe('deleteSaved', () => {
+  it('names the version it is given, and reads none when it has none', async () => {
+    const sent = server(() => ({ saved: true }))
+
+    expect(await deleteSaved(post, 'v1')).toBe(true)
+    expect(await deleteSaved(post)).toBe(true)
+    expect(sent.map(({ method, url }) => [method, url])).toEqual([['DELETE', '/api/cms/entries/posts/hello?version=v1'], ['DELETE', '/api/cms/entries/posts/hello']])
   })
 })
 

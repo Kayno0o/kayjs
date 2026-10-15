@@ -77,8 +77,8 @@ export async function entryOf(ref: EntryRef): Promise<StoredEntry | undefined> {
   return version === undefined ? entry : { ...entry, version }
 }
 
-// The version of a folder entry's file as it lies on disk.
-async function versionOf(ref: EntryRef): Promise<string | undefined> {
+// The version of a folder entry's file as it lies on disk; undefined for a missing one.
+export async function versionOf(ref: EntryRef): Promise<string | undefined> {
   const found = await entryFile(ref.collection, ref.slug, { locale: ref.locale })
 
   if ('issues' in found)

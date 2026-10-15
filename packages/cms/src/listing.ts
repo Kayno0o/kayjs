@@ -11,6 +11,8 @@ export interface EntryRow {
   url?: string | undefined
   // Why the entry's file does not parse, when it does not.
   problem?: string | undefined
+  // The version of a folder entry's file as the list read it, which a delete from the list names, so it never removes a file saved since.
+  version?: string | undefined
 }
 
 export const PAGE_SIZE = 50
@@ -57,16 +59,26 @@ function pageAt(total: number, page: number, size: number): { page: number, page
 }
 
 // A page of the collection's rows: a search reads every entry to match their titles, a plain page its own entries alone.
-export async function pageRows(collection: CollectionInfo, search: string, page: number, read: (filter: EntryFilter) => Promise<SourceEntry[]>): Promise<{ rows: EntryRow[], page: number, pages: number }> {
+// `versionOf` reads the version of a folder entry's file, for the rows of the page shown alone.
+export async function pageRows(collection: CollectionInfo, search: string, page: number, read: (filter: EntryFilter) => Promise<SourceEntry[]>, versionOf?: (ref: EntryRef) => Promise<string | undefined>): Promise<{ rows: EntryRow[], page: number, pages: number }> {
   if (collection.problem !== undefined)
     return pageOf([], 1)
 
+  const versioned = async <T extends { rows: EntryRow[] }>(listed: T): Promise<T> => {
+    if (!versionOf || collection.kind !== 'folder')
+      return listed
+
+    const rows = await Promise.all(listed.rows.map(async row => ({ ...row, version: await versionOf({ collection: collection.name, slug: row.slug, locale: row.locale }) })))
+
+    return { ...listed, rows }
+  }
+
   if (search.trim() !== '')
-    return pageOf(searchRows(rowsOf(collection, await read({})), search), page)
+    return versioned(pageOf(searchRows(rowsOf(collection, await read({})), search), page))
 
   const at = pageAt(collection.count ?? 0, page, PAGE_SIZE)
 
-  return { rows: rowsOf(collection, await read({ offset: at.offset, limit: PAGE_SIZE })), page: at.page, pages: at.pages }
+  return versioned({ rows: rowsOf(collection, await read({ offset: at.offset, limit: PAGE_SIZE })), page: at.page, pages: at.pages })
 }
 
 export function collectionPath(prefix: string, collection: string): string {

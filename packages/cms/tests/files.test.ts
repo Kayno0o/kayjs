@@ -166,6 +166,25 @@ describe('forgejo', () => {
   })
 })
 
+describe('forgejo timeout', () => {
+  test('gives the read of the version a conflict reports its own time, not what the commit left of the save\'s', async () => {
+    const wait = async (signal: AbortSignal | null | undefined, ms: number) => {
+      await Bun.sleep(ms)
+      signal?.throwIfAborted()
+    }
+    const request = async (_input: string | URL | Request, init?: RequestInit): Promise<Response> => {
+      const posting = init?.method === 'POST'
+
+      await wait(init?.signal, posting ? 50 : 20)
+
+      return posting ? Response.json({ message: 'conflict' }, { status: 409 }) : Response.json({ sha: 'f00d' })
+    }
+    const saver = forgejo({ url: 'https://git.example.com', repo: 'me/site', token: 't0k', timeout: 80, fetch: request as typeof fetch })
+
+    await expect(saver.save({ ...change, repoPath: 'a.md', text: 'mine', base: 'f00d' })).rejects.toMatchObject({ current: 'f00d' })
+  })
+})
+
 const dir = await mkdtemp(join(tmpdir(), 'kayjs-cms-'))
 
 describe('workingTree', () => {

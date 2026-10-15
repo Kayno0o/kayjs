@@ -29,7 +29,7 @@ async function publish(row: EntryRow): Promise<void> {
 }
 
 async function remove(row: EntryRow): Promise<void> {
-  if (await deleteSaved(ref(row)))
+  if (await deleteSaved(ref(row), row.version))
     await refresh()
 }
 ---

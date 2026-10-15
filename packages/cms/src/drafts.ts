@@ -24,6 +24,8 @@ export function createDrafts({ show, delay = 150 }: DraftsOptions) {
   const saved = new Map<string, DraftEntry>()
   // The version of each entry's file its saved state was read from, which the next save names.
   const versions = new Map<string, string | undefined>()
+  // The entries whose file the other side deleted and whose edits were kept: their next save creates the file, and is refused if one was made meanwhile.
+  const recreated = new Set<string>()
   const current = signal<ReadonlyMap<string, DraftEntry>>(new Map())
   const issues = signal<readonly Issue[]>([])
   const refusals = signal<ReadonlyMap<string, Refusal>>(new Map())
@@ -126,6 +128,7 @@ export function createDrafts({ show, delay = 150 }: DraftsOptions) {
     // Drops the entry's unsaved edits, rendering the page without them.
     reset(ref: EntryRef): void {
       refuse(ref, undefined)
+      recreated.delete(entryKey(ref))
       update(ref, () => undefined)
     },
     // Takes the entry as it was sent for its saved state, once a save went through: an edit made while it was on its way stays unsaved.
@@ -134,6 +137,7 @@ export function createDrafts({ show, delay = 150 }: DraftsOptions) {
 
       saved.set(key, sent)
       versions.set(key, version)
+      recreated.delete(key)
       current.set(new Map(current()))
       refuse(ref, undefined)
     },
@@ -150,7 +154,15 @@ export function createDrafts({ show, delay = 150 }: DraftsOptions) {
         return
 
       versions.set(entryKey(ref), conflict.version ?? undefined)
+
+      if (conflict.version === null)
+        recreated.add(entryKey(ref))
+
       refuse(ref, undefined)
+    },
+    // Whether the entry's next save creates its file, its edits kept over a file deleted meanwhile.
+    recreating(ref: EntryRef): boolean {
+      return recreated.has(entryKey(ref))
     },
     // Shows the issues a save was refused with, as a render's are shown.
     report(refusals: readonly Issue[]): void {

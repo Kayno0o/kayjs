@@ -75,6 +75,23 @@ describe('pageRows', () => {
   })
 })
 
+describe('pageRows versions', () => {
+  it('gives each row of a folder collection the version its file had as listed, and a loaded one none', async () => {
+    const stock: SourceEntry[] = [{ slug: 'a', data: { title: 'A' }, draft: false, path: 'content/a.md' }, { slug: 'b', data: { title: 'B' }, draft: false, path: 'content/b.md' }]
+    const read = async () => stock
+    const asked: string[] = []
+    const versionOf = async (ref: { slug: string }) => {
+      asked.push(ref.slug)
+
+      return `v-${ref.slug}`
+    }
+
+    expect((await pageRows({ ...posts, count: 2 }, '', 1, read, versionOf)).rows.map(row => row.version)).toEqual(['v-a', 'v-b'])
+    expect((await pageRows({ ...posts, kind: 'loaded', count: 2 }, '', 1, read, versionOf)).rows.map(row => row.version)).toEqual([undefined, undefined])
+    expect(asked).toEqual(['a', 'b'])
+  })
+})
+
 describe('paths', () => {
   it('encodes each segment of a nested slug, and the locale as a query', () => {
     expect(entryPath('/admin', { collection: 'docs', slug: 'guides/a b', locale: 'fr' })).toBe('/admin/collections/docs/guides/a%20b?locale=fr')

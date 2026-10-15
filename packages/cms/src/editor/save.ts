@@ -10,16 +10,26 @@ type Outcome = { issues: Issue[], conflict?: { version: string | null } | undefi
 interface SaveOptions { slug?: string, locale?: string | undefined, create?: boolean }
 
 // The save of each entry on its way, and whether another was asked for meanwhile.
-const saving = new WeakMap<Drafts, Map<string, { done: Promise<boolean>, again: boolean }>>()
+const saving = new WeakMap<Drafts, Map<string, Flight>>()
+
+interface Flight { done: Promise<boolean>, again: boolean, target: string }
 
 // Saves an entry's draft, under the slug and locale a new entry was given, and says how it went; true once saved.
 // A save asked for while one is on its way waits for it, then saves the edits typed meanwhile once, so the same version is never sent twice.
+// One asked for under another slug or locale waits for it too, then saves the edits typed meanwhile under its own.
 export async function saveDraft(drafts: Drafts, ref: EntryRef, options: SaveOptions = {}): Promise<boolean> {
-  const inFlight = saving.get(drafts) ?? new Map<string, { done: Promise<boolean>, again: boolean }>()
+  const inFlight = saving.get(drafts) ?? new Map<string, Flight>()
   const key = entryKey(ref)
+  const target = JSON.stringify([options.slug ?? ref.slug, options.locale ?? ref.locale])
   const running = inFlight.get(key)
 
   saving.set(drafts, inFlight)
+
+  if (running && running.target !== target) {
+    const outcome = await running.done
+
+    return outcome && !drafts.changed(ref) ? outcome : saveDraft(drafts, ref, options)
+  }
 
   if (running) {
     // A new entry saved again would be created twice; its page saves the rest.
@@ -28,7 +38,7 @@ export async function saveDraft(drafts: Drafts, ref: EntryRef, options: SaveOpti
     return running.done
   }
 
-  const flight = { done: Promise.resolve(false), again: false }
+  const flight: Flight = { done: Promise.resolve(false), again: false, target }
 
   flight.done = (async () => {
     try {
@@ -55,6 +65,9 @@ async function saveOnce(drafts: Drafts, ref: EntryRef, { slug = ref.slug, locale
 
   if (!entry)
     return false
+
+  // Edits kept over a file deleted meanwhile make it again, refused if one was made since rather than written over.
+  create ||= drafts.recreating(ref)
 
   const outcome = await attempt(() => call(entriesApi, '/:collection/:slug', {
     method: 'post',
@@ -90,13 +103,13 @@ async function saveOnce(drafts: Drafts, ref: EntryRef, { slug = ref.slug, locale
   return true
 }
 
-// Deletes a saved entry, naming the version it was opened at, and says how it went; true once deleted.
-// A list of entries shows no version, so a delete from it names the one the entry is at as it is asked.
+// Deletes a saved entry, naming the version the editor or the list showed, and says how it went; true once deleted.
+// With none, as for a loaded entry, none is named: the server refuses a folder entry's delete naming no version rather than removing one the editor never saw.
 export async function deleteSaved(ref: EntryRef, version?: string | undefined): Promise<boolean> {
   const outcome = await attempt(async () => call(entriesApi, '/:collection/:slug', {
     method: 'delete',
     params: { collection: ref.collection, slug: ref.slug },
-    query: { ...localeOf(ref), ...versionOf(version ?? await currentVersion(ref)) },
+    query: { ...localeOf(ref), ...versionOf(version) },
   }), 'Could not delete')
 
   return settled(outcome, 'Deleted', 'Not deleted')
@@ -145,12 +158,6 @@ export async function publishSaved(ref: EntryRef): Promise<boolean> {
   }), 'Could not publish')
 
   return settled(outcome, 'Published', 'Not published')
-}
-
-async function currentVersion(ref: EntryRef): Promise<string | undefined> {
-  const { entry } = await call(entriesApi, '/:collection/:slug', { params: { collection: ref.collection, slug: ref.slug }, query: localeOf(ref) })
-
-  return entry.version
 }
 
 function localeOf({ locale }: EntryRef): { locale?: string } {

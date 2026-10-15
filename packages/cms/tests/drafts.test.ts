@@ -176,6 +176,18 @@ describe('saving', () => {
     drafts.keepEdits(post)
     expect([drafts.refusal(post), drafts.version(post), drafts.value(post, 'title')]).toEqual([undefined, 'f00d', 'Mine, typed on'])
 
+    drafts.refuse(post, { message: 'saved since', conflict: { version: null } })
+    drafts.keepEdits(post)
+    expect([drafts.version(post), drafts.recreating(post)]).toEqual([undefined, true])
+    drafts.reset(post)
+    expect(drafts.recreating(post)).toBe(false)
+
+    drafts.set(post, 'title', 'Mine')
+    drafts.refuse(post, { message: 'saved since', conflict: { version: null } })
+    drafts.keepEdits(post)
+    drafts.markSaved(post, drafts.entry(post)!, 'f00e')
+    expect(drafts.recreating(post)).toBe(false)
+
     drafts.refuse(post, { message: 'Forgejo did not answer' })
     drafts.markSaved(post, drafts.entry(post)!, 'f00e')
     expect(drafts.refusal(post)).toBeUndefined()
