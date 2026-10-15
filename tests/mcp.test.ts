@@ -151,6 +151,35 @@ describe.concurrent('kay mcp', () => {
     expect((narrowed.result?.structuredContent as typeof document).problems).toEqual([])
   })
 
+  it('narrows a check to a directory holding a package.json or the project root itself, still checking the project', async () => {
+    const nested = await scratchDir('mcp-nested-')
+
+    await Bun.write(join(nested, 'tsconfig.json'), tsconfig)
+    await Bun.write(join(nested, 'src/routes/index.kay'), 'img(src="/a.png")\n')
+    await Bun.write(join(nested, 'src/routes/pkg/package.json'), '{}')
+    await Bun.write(join(nested, 'src/routes/pkg/index.kay'), 'img(src="/b.png")\n')
+
+    const own = new Agent(nested)
+    const files = async (paths: string[]) => {
+      const reply = await own.request('tools/call', { name: 'check', arguments: { paths } })
+
+      expect(reply.result?.isError).toBeFalsy()
+
+      return (reply.result?.structuredContent as { problems: { file: string, code: string }[] }).problems.filter(problem => problem.code === 'missing-alt').map(problem => problem.file.split('/').slice(-2).join('/'))
+    }
+
+    try {
+      // The directory is a sub-package the project's check leaves out: nothing to report, and no new project root.
+      expect(await files(['src/routes/pkg'])).toEqual([])
+      expect(await files(['src/routes/pkg', 'src/routes/index.kay'])).toEqual(['routes/index.kay'])
+      expect(await files(['.'])).toEqual(['routes/index.kay'])
+      expect(await files(['src/routes/pkg', '.'])).toEqual(['routes/index.kay'])
+    }
+    finally {
+      expect(await own.close()).toBe(0)
+    }
+  })
+
   it('refuses a path outside the project or one that is no file, and an argument of the wrong kind', async () => {
     // An argument the model got wrong is a result it can read and retry, not a protocol error.
     for (const paths of [['../outside'], ['missing.kay'], ['/etc'], [3], 'src']) {

@@ -47,7 +47,7 @@ function tools(root: string): Tool[] {
       inputSchema: {
         type: 'object',
         properties: {
-          paths: { type: 'array', items: { type: 'string' }, description: 'Files or directories in the project to report on, relative to the project root.' },
+          paths: { type: 'array', items: { type: 'string' }, description: 'Files or directories in the project to report on, relative to the project root; `.` is the whole project.' },
           only: { type: 'string', enum: Object.keys(LINT_GROUPS), description: 'Report one group of lints alone, such as `seo`.' },
           denyWarnings: { type: 'boolean', description: 'Count warnings as failures. The report is the same.' },
         },
@@ -55,13 +55,15 @@ function tools(root: string): Tool[] {
       },
       annotations: READ_ONLY,
       run: async (args) => {
-        const paths = stringList(args.paths, 'paths').map(path => insideProject(root, path))
+        const given = stringList(args.paths, 'paths').map(path => insideProject(root, path))
+        // The project root among the paths is the whole report.
+        const paths = given.includes('') ? [] : given
         const only = optionalString(args.only, 'only')
 
         if (only !== undefined && !isLintGroup(only))
           throw new Error(`only takes a group of lints, ${Object.keys(LINT_GROUPS).join(', ')}`)
 
-        return document(['check', ...only === undefined ? [] : [`--only=${only}`], ...args.denyWarnings === true ? ['--deny-warnings'] : [], '--format', 'json', ...paths.length === 0 ? [] : ['--', ...paths]])
+        return document(['check', ...only === undefined ? [] : [`--only=${only}`], ...args.denyWarnings === true ? ['--deny-warnings'] : [], '--format', 'json', ...paths.length === 0 ? [] : ['--', root, ...paths]])
       },
     },
     {
@@ -268,12 +270,12 @@ function stringList(value: unknown, name: string): string[] {
   return value as string[]
 }
 
-// A path in the project, relative to its root, so that `check` is never pointed outside it.
+// A path in the project, relative to its root, so that `check` is never pointed outside it; the root itself is the empty string.
 function insideProject(root: string, path: string): string {
   const absolute = resolve(root, path)
   const inside = relative(root, absolute)
 
-  if (inside === '' || isAbsolute(inside) || inside.split(sep)[0] === '..')
+  if (isAbsolute(inside) || inside.split(sep)[0] === '..')
     throw new Error(`${path} is not a file or directory inside the project`)
 
   if (!existsSync(absolute))
