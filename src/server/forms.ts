@@ -21,7 +21,11 @@ export function formsScript(forms: Set<Action<never, unknown>>): string {
   return Object.keys(rules).length === 0 ? '' : `<script type="application/json" data-kay-forms>${JSON.stringify(rules).replaceAll('<', '\\u003c')}</script>`
 }
 
+// A stand-in action, which a static site's page holds in place of one it cannot serve, has no schema to read.
 function formRules(action: ServerAction<TSchema, unknown>): FormRules | undefined {
+  if (typeof action.schema !== 'object' || action.schema === null)
+    return undefined
+
   let rules = rulesCache.get(action.schema)
 
   if (rules === undefined) {

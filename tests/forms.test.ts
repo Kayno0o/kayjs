@@ -5,8 +5,9 @@ import process from 'node:process'
 import { describe, expect, it, spyOn } from 'bun:test'
 import { chromium } from 'playwright-core'
 import { compileKay } from '../src/compiler'
-import { formDescribed, formMarked } from '../src/runtime/action'
+import { actionStub, formDescribed, formMarked } from '../src/runtime/action'
 import { markInvalid } from '../src/runtime/invalid'
+import { formsScript } from '../src/server/forms'
 import { browserPath, testSite } from '../src/test'
 
 // An element keeping its attributes, for the helpers an island runs on its fields.
@@ -473,5 +474,11 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
 
     expect(await described()).toEqual([['choose-hint choose-first-error', 'true'], ['last-note last-hint choose-last-error', 'true']])
     expect(page.errors).toEqual([])
+  })
+})
+
+describe('formsScript', () => {
+  it('skips a stand-in action, which has no schema to read', () => {
+    expect(formsScript(new Set([actionStub('/contact')]))).toBe('')
   })
 })
