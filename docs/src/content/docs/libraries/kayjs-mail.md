@@ -11,13 +11,17 @@ description: Send mail from kay apps with SMTP, mails written as .kay components
 bun add @kaynooo/kayjs-mail
 ```
 
-The `@kaynooo` scope must point at the Forgejo registry in your `.npmrc` (a project made by `kay new` has it). kay and Elysia are peers. It is released with kay, at kay's own version, and peers on kay's minor: install the one matching your kay, and move them together. An app on a `^0.x` range moves to kay's version by hand, as a caret on 0.x never reaches it.
+The `@kaynooo` scope must point at the Forgejo registry. A project made by `kay new` already has it in its `.npmrc`; for another, see [Installation](/getting-started/installation).
+
+kay and Elysia are peers. kayjs-mail is released with kay, at kay's own version, and peers on kay's minor. Install the one matching your kay and move them together.
+
+An app on a `^0.x` range moves to kay's version by hand, as a caret on 0.x never reaches it.
 
 ## Setup
 
 In a kay project, `kay add mail` does the install and the two files below for you.
 
-`src/mail.ts` creates the mailer. `from` is your own address, a visitor's address goes in `replyTo`:
+`src/mail.ts` creates the mailer. `from` is your own address. A visitor's address goes in `replyTo`.
 
 ```ts
 import { mailer } from '@kaynooo/kayjs-mail'
@@ -25,7 +29,7 @@ import { mailer } from '@kaynooo/kayjs-mail'
 export const mail = mailer({ from: 'Site <contact@example.com>', lang: 'en' })
 ```
 
-Listed in `kay.config.ts`, the server uses it to run the queue and, under `kay dev`, serve the outbox at `/_kay/mail`:
+List it in `kay.config.ts`. The server then runs the queue and, under `kay dev`, serves the outbox at `/_kay/mail`.
 
 ```ts
 import { mailExtension } from '@kaynooo/kayjs-mail'
@@ -39,11 +43,28 @@ export default defineConfig({
 
 The path is the file exporting the mailer as `mail`, relative to the project root. kay imports it only as the server starts, and `kay build --compile` bakes it into the executable.
 
-In production the mailer reads `SMTP_HOST` (required), `SMTP_PORT` (465 by default), `SMTP_USER` and `SMTP_PASS`, and `SMTP_FROM` unless `from` is set. A missing one stops the boot. `kay env` lists them with no wiring, the host and the sender as required in production. On a port other than 465 a server not offering STARTTLS is refused, unless `SMTP_INSECURE=true`, for a local Mailpit, which a set `SMTP_PASS` overrides; the error says so, at the first mail and in a warning when the server starts. Each mail sent is logged with its subject and how many recipients it went to at which domains, `mailer({ logRecipients: true })` naming them in full. `MAIL_TO` is where a mail naming no recipient goes, such as a contact form's, and DKIM signing and a rate limit have variables of their own.
+## Production settings
+
+In production the mailer reads its settings from the environment. `SMTP_HOST` is required, and so is `SMTP_FROM` unless `from` is set. A missing required one stops the boot. `kay env` lists them with no wiring.
+
+| Variable | Use |
+| --- | --- |
+| `SMTP_HOST` | The server to send through. Required. |
+| `SMTP_PORT` | Optional, 465 by default. |
+| `SMTP_USER`, `SMTP_PASS` | Optional, both or neither, for a server needing no login. |
+| `SMTP_FROM` | The sender, unless `from` is set. |
+| `SMTP_INSECURE` | Optional. `true` sends in clear to a server without STARTTLS, such as a local Mailpit. |
+| `MAIL_TO` | Optional. Where a mail naming no recipient goes, such as a contact form's. |
+
+On a port other than 465 a server not offering STARTTLS is refused, at the first mail and in a warning when the server starts. Set `SMTP_INSECURE=true` for a local Mailpit. A set `SMTP_PASS` overrides it, so a password never goes in clear.
+
+Each mail sent is logged with its subject and how many recipients it went to at which domains. Set `mailer({ logRecipients: true })` to name them in full. DKIM signing and a rate limit have variables of their own.
+
+<ReadMore href="/llms/kayjs-mail">Every variable, DKIM signing, the rate limit and a mailer that boots without SMTP set up.</ReadMore>
 
 ## Writing a mail
 
-A mail is a `.kay` component. Clients drop stylesheets, so the components kayjs-mail ships use inline styles, themed through the library settings:
+A mail is a `.kay` component. Clients drop stylesheets, so the components kayjs-mail ships use inline styles, themed through the library settings.
 
 ```kay
 ---
@@ -60,7 +81,9 @@ Layout(preheader="Your account is ready")
   Button(href={url}) Confirm my address
 ```
 
-Besides `Layout`, `Heading`, `Paragraph` and `Button`, it ships `Code`, `Divider`, `Image`, `Link`, and `Row` with `Column` for columns that stack on a phone. They hold in Outlook for Windows, and switch to dark colours in a client's dark mode, derived from the light ones unless `settings.dark` gives them.
+It also ships `Code`, `Divider`, `Image`, `Link`, and `Row` with `Column` for columns that stack on a phone. They hold in Outlook for Windows.
+
+In a client's dark mode they switch to dark colours, derived from the light ones unless `settings.dark` gives them.
 
 <Callout type="note">
 
@@ -70,7 +93,7 @@ Tailwind classes do nothing in a mail. Style with `style` attributes.
 
 ## Sending
 
-`enqueue` renders the mail now and queues it, so a mail server outage never fails the visitor's action. `send` sends before it answers and throws on failure, an `Error` with the original value as its `cause` when the transport throws something that is not one. `mail.failed()` lists the queued mails given up on, and `mail.remove({ recipient: 'ada@example.com' })` deletes every queued or failed mail to that address, for a person who asked to be erased.
+Use `enqueue` in an action. It renders the mail now and queues it, so a mail server outage never fails the visitor's action.
 
 ```kay
 --- server
@@ -94,11 +117,17 @@ export const signUp = action(newUser, async ({ name, email }) => {
 ---
 ```
 
-A message also takes `cc`, `bcc`, `replyTo`, `attachments`, `lang`, `unsubscribe` for one-click unsubscribe, or `html` and `text` in place of `view`. Left without `to`, it goes to `MAIL_TO`. Each address holds one mailbox: a visitor's `a@x.com,b@y.com` is refused, and several recipients go as a list. An empty `cc`, `bcc`, `replyTo` or `from`, as a form's blank field gives, is left out; an empty `to` is refused.
+`send` sends before it answers and throws on failure. Use it where you need to know the mail went out.
+
+A message also takes `cc`, `bcc`, `replyTo`, `attachments`, `lang` and `unsubscribe` for one-click unsubscribe. Give `html` and `text` in place of `view` to skip the component. Left without `to`, a message goes to `MAIL_TO`.
+
+Each address holds one mailbox. A visitor's `a@x.com,b@y.com` is refused, and several recipients go as a list. An empty `cc`, `bcc`, `replyTo` or `from`, as a form's blank field gives, is left out. An empty `to` is refused.
+
+To list the queued mails given up on, call `mail.failed()`. To erase a person, call `mail.remove({ recipient: 'ada@example.com' })`, which deletes every queued or failed mail to that address.
 
 ## A contact form
 
-`contactForm(mail, options)` gives the arguments of `action` for a contact form, so a site writes no schema, no error mapping and no mail wrapper:
+`contactForm(mail, options)` gives the arguments of `action` for a contact form. A site writes no schema, no error mapping and no mail wrapper.
 
 ```kay
 --- server
@@ -115,14 +144,27 @@ export const contact = action(...contactForm(mail, {
 
 The page shows it with [ContactForm](/ui/contact-form) from kayjs-ui, or with its own `form(action={contact})` and `input(field="name")`, `input(field="email")` and `textarea(field="message")`.
 
-- The action checks a one-line `name`, an `email` and a `message` of at most 5000 characters, then the `fields` you add, whose schemas are yours. It mails them to `to`, or `MAIL_TO` when left out, with the visitor in `replyTo` and the message quoted. `labels` renames a field in the mail, `subject` and `view` replace the subject and the mail's component, which gets `ContactMailProps`.
-- A message with more than `maxLinks` links (3 by default) is refused. `rateLimit` allows 30 posts and 5 that went through every 10 minutes, `honeypot` is the `website` field, answered as if it worked, and `minTime` is 3 seconds. `protection` replaces the limits.
-- A mailer that is `optional` and not set up answers 503, a mail that fails to send answers 502, each with a worded refusal the form shows; `reach` adds how else to reach the site, `hello@example.com` or a phone number. The refusals read the `mail.contact` messages in the page's language, in English and French, which your own `src/messages` override key by key. They come with `mailExtension`, so a mailer used with `.use(mail)` alone has none. The mail itself is written in the page's language, not the recipient's.
-- The schema's own field messages and ContactForm's labels (`mail.contact.errors` and `mail.contact.form`) are in the page's language too, with the same override. `errors: { name, email, message }` replaces the field messages with a text or a function, and ContactForm's label props replace its labels. Without `mailExtension` the field messages and the labels read English.
+The action checks a one-line `name`, an `email` and a `message` of at most 5000 characters, then the `fields` you add, whose schemas are yours. It mails them to `to`, or `MAIL_TO` when left out, with the visitor in `replyTo` and the message quoted.
+
+Use `labels` to rename a field in the mail. Use `subject` and `view` to replace the subject and the mail's component, which gets `ContactMailProps`.
+
+### Spam protection
+
+A message with more than `maxLinks` links (3 by default) is refused. `rateLimit` allows 30 posts and 5 that went through every 10 minutes. `honeypot` is the `website` field, answered as if it worked, and `minTime` is 3 seconds. Set `protection` to replace the limits.
+
+### Refusals and wording
+
+A mailer that is `optional` and not set up answers 503. A mail that fails to send answers 502. Each comes with a refusal the form shows, and `reach` adds how else to reach the site, such as `hello@example.com` or a phone number.
+
+The refusals read the `mail.contact` messages in the page's language, in English and French. Your own `src/messages` override them key by key. They come with `mailExtension`, so a mailer used with `.use(mail)` alone has none. The mail itself is written in the page's language, not the recipient's.
+
+The schema's field messages (`mail.contact.errors`) and ContactForm's labels (`mail.contact.form`) follow the page's language too, with the same override. Set `errors: { name, email, message }` to replace the field messages with a text or a function. ContactForm's label props replace its labels. Without `mailExtension`, both read English.
 
 ## Previewing
 
-Under `kay dev`, `/_kay/mail` lists the mails sent, each with its html at desktop or phone width, its text and its size. `/_kay/mail/samples` renders every mail under `src/mails` without sending it, with the props a `.preview.ts` beside it default-exports:
+Under `kay dev`, `/_kay/mail` lists the mails sent, each with its html at desktop or phone width, its text and its size.
+
+`/_kay/mail/samples` renders every mail under `src/mails` without sending it. It takes the props a `.preview.ts` beside the mail default-exports.
 
 ```ts
 // src/mails/welcome.preview.ts
@@ -136,29 +178,31 @@ export default {
 
 ## Testing
 
-Under `bun test`, mails go to the `outbox`. An enqueued mail reaches it once `site.runJobs()` ran:
+Under `bun test`, mails go to the `outbox`. An enqueued mail reaches it once `site.runJobs()` ran.
 
 ```ts
 import { outbox } from '@kaynooo/kayjs-mail'
+import { expect, it } from 'bun:test'
 import { testSite } from 'kay/test'
+import { signUp } from '../src/routes/index.kay'
 
 const site = await testSite()
 
-await site.submit(
-  signUp,
-  { name: 'Ada', email: 'ada@example.com' },
-  { from: '/' },
-)
-await site.runJobs()
+it('welcomes a new account', async () => {
+  await site.submit(signUp, { name: 'Ada', email: 'ada@example.com' }, { from: '/' })
+  await site.runJobs()
 
-expect(outbox.to('ada@example.com')[0]?.subject).toBe('Welcome, Ada')
+  expect(outbox.to('ada@example.com')[0]?.subject).toBe('Welcome, Ada')
+})
 ```
 
 `outbox.waitFor(address)` waits for a mail to arrive, and `outbox.links(mail)` gives the links it carries, such as a confirmation link to visit next.
 
 ## With kayjs-auth
 
-`authMailer` sends [kayjs-auth](/libraries/kayjs-auth)'s mails (verification, reset, magic links, security notices) through your mailer, themed by your mail settings. It needs `mailExtension` in `kay.config.ts`, as above. A view written from scratch can take its default wording from `authWords(mail)`, which throws for a `mail.kind` kayjs-auth does not send.
+`authMailer` sends [kayjs-auth](/libraries/kayjs-auth)'s mails through your mailer, themed by your mail settings. Those are verification, reset, magic links and security notices. It needs `mailExtension` in `kay.config.ts`, as above.
+
+A view written from scratch can take its default wording from `authWords(mail)`. It throws for a `mail.kind` kayjs-auth does not send.
 
 ```ts
 // src/auth.ts

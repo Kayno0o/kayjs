@@ -11,11 +11,15 @@ description: A set of kay components styled by one theme you restyle from your o
 bun add @kaynooo/kayjs-ui @iconify-json/tabler
 ```
 
-The `@kaynooo` scope must point at the Forgejo registry in your `.npmrc`. kay and Tailwind v4 are peers, and the default icons are Tabler's. It is released with kay, at kay's own version, and peers on kay's minor: install the one matching your kay, and move them together. An app on a `^0.x` range moves to kay's version by hand, as a caret on 0.x never reaches it.
+The `@kaynooo` scope must point at the Forgejo registry. A project made by `kay new` already has it in its `.npmrc`; for another, see [Installation](/getting-started/installation).
+
+kay and Tailwind v4 are peers, and the default icons are Tabler's. kayjs-ui is released with kay, at kay's own version, and peers on kay's minor. Install the one matching your kay and move them together.
+
+An app on a `^0.x` range moves to kay's version by hand, as a caret on 0.x never reaches it.
 
 ## Theme
 
-`src/app.css` imports the theme right after Tailwind. Override any token in your own `@theme`:
+`src/app.css` imports the theme right after Tailwind. Override any token in your own `@theme`.
 
 ```css
 @import 'tailwindcss';
@@ -27,13 +31,23 @@ The `@kaynooo` scope must point at the Forgejo registry in your `.npmrc`. kay an
 }
 ```
 
-Your stylesheet ships only the rules of the components you render. kay leaves out every `kui-` rule whose class no file of your app, and no component it renders, writes whole. A class you put together at runtime, such as `kui-btn-${tone}`, is not seen: write it in full in any file of your app, such as a comment in `app.css`, to keep its rules.
+Your stylesheet ships only the rules of the components you render. kay drops every `kui-` rule whose class no file of your app, and no component it renders, writes whole.
 
-The palette button in this site's header picks a theme, from Catppuccin to Tokyo Night, and a scheme; the whole site follows, its code included. Your `@theme` sets the theme picked so:
+A class you put together at runtime, such as `kui-btn-${tone}`, is not seen. Write it in full in any file of your app, such as a comment in `app.css`, to keep its rules.
+
+### Tokens
+
+The palette button in this site's header picks a theme, from Catppuccin to Tokyo Night, and a scheme. The whole site follows, its code included. Your `@theme` sets the theme picked so.
 
 <ThemeTokens />
 
-Colours are `--color-kui-<name>`, used as `bg-kui-<name>`, and hold `light-dark(light, dark)`. `--color-kui-field-border` is the solid line of text fields, buttons, toggles, carousel dots and empty stars, at 3:1 on every surface: a palette changing the surfaces sets it to match. A few tokens shape boxes rather than colour them, such as `--kui-border-card` for every hairline. A brutalist skin sets `--kui-shadow-raised` (under cards, rows, widgets and toasts), `--kui-shadow-press` (under framed buttons) and `--kui-press-travel` (how far a pressed button moves down, dropping its shadow), which draw nothing by default. The theme is dark unless the visitor's system asks for light, and `data-theme="light"` or `"dark"` on `html` wins over both. A site in one theme sets it in its root layout's `head` block:
+Colours are `--color-kui-<name>`, used as `bg-kui-<name>`, and hold `light-dark(light, dark)`. `--color-kui-field-border` is the solid line of text fields, buttons, toggles, carousel dots and empty stars, at 3:1 on every surface. A palette that changes the surfaces sets it to match.
+
+A few tokens shape boxes rather than colour them, such as `--kui-border-card` for every hairline. A brutalist skin sets `--kui-shadow-raised` (under cards, rows, widgets and toasts), `--kui-shadow-press` (under framed buttons) and `--kui-press-travel` (how far a pressed button moves down). All three draw nothing by default.
+
+### Light or dark
+
+The theme is dark unless the visitor's system asks for light. `data-theme="light"` or `"dark"` on `html` wins over both. A site in one theme sets it in its root layout's `head` block.
 
 ```kay
 head
@@ -41,7 +55,9 @@ head
 slot
 ```
 
-Render one `Toaster` and one `TooltipHost` in the root layout, `src/routes/_layout.kay`:
+### Toaster and tooltips
+
+Render one `Toaster` and one `TooltipHost` in the root layout, `src/routes/_layout.kay`.
 
 ```kay
 ---
@@ -56,7 +72,7 @@ TooltipHost
 
 ## Using a component
 
-Import each component by its `.kay` path. Types, `toast`, `attempt`, `editing` and `infiniteList` come from the package itself:
+Import each component by its `.kay` path. Types, `toast`, `attempt`, `editing` and `infiniteList` come from the package itself.
 
 ```kay
 ---
@@ -70,13 +86,13 @@ Button(label="Save" variant="accent" onClick={save})
 
 <Callout type="warning">
 
-A page can pass a Dialog or a Popover its content, but a layout or a page with a `--- server` fence cannot pass a function or a block with parameters, such as a Table's `@cell`: put those in a component of yours, which then renders as an island.
+A page can pass a Dialog or a Popover its content. A layout, or a page with a `--- server` fence, cannot pass a function or a block with parameters, such as a Table's `@cell`. Put those in a component of yours, which then renders as an island.
 
 </Callout>
 
 ## Settings
 
-Icons are slots (`close`, `delete`, `search`, ...) mapped to any icon set. Replace some in your own settings module:
+Icons are slots (`close`, `delete`, `search`, ...) mapped to any icon set. Replace some in your own settings module.
 
 ```ts
 // kay.config.ts

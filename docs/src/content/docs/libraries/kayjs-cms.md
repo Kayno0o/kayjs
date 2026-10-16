@@ -3,7 +3,9 @@ title: kayjs-cms
 order: 4
 description: Edit a kay site's content on the page it renders, and manage each collection from screens generated from its schema.
 ---
-`@kaynooo/kayjs-cms` opens the real page in edit mode: click a title, edit it in a sidebar, and the page updates as you type. Its screens, generated from each collection's schema, list, search, add, edit, publish and delete entries. Both save the same way: a file entry as a Forgejo commit, or in the working tree under `kay dev`, and a loaded entry through its collection's loader.
+`@kaynooo/kayjs-cms` edits a kay site's [content collections](/guides/content) in two ways. Edit mode opens the real page: click a title, edit it in a sidebar, and the page updates as you type. The screens, generated from each collection's schema, list, search, add, edit, publish and delete entries.
+
+Both save the same way. A file entry is a Forgejo commit, or a change in the working tree under `kay dev`. A loaded entry goes through its collection's loader.
 
 ## Install
 
@@ -11,13 +13,15 @@ description: Edit a kay site's content on the page it renders, and manage each c
 bun add @kaynooo/kayjs-cms @iconify-json/tabler
 ```
 
-The `@kaynooo` scope must point at the Forgejo registry in your `.npmrc` (a project made by `kay new` has it). kay and kayjs-ui are peers: the editor is drawn with kayjs-ui, so the app imports its theme. It is released with kay, at kay's own version, and peers on kay's minor: install the one matching your kay, and move them together. An app on a `^0.x` range moves to kay's version by hand, as a caret on 0.x never reaches it.
+The `@kaynooo` scope must point at the Forgejo registry. A project made by `kay new` already has it in its `.npmrc`; for another, see [Installation](/getting-started/installation).
+
+kay and kayjs-ui are peers. The editor is drawn with kayjs-ui, so the app imports [its theme](/libraries/kayjs-ui#theme). kayjs-cms is released with kay, at kay's own version, and peers on kay's minor. Install the one matching your kay and move them together.
+
+An app on a `^0.x` range moves to kay's version by hand, as a caret on 0.x never reaches it.
 
 ## Setup
 
-In a kay project, `kay add cms` installs the packages and adds the extension below with its defaults.
-
-`cms()` goes in `kay.config.ts`'s `extensions`:
+In a kay project, `kay add cms` installs the packages and adds the extension below with its defaults. Otherwise, put `cms()` in `kay.config.ts`'s `extensions`.
 
 ```ts
 import { cms, forgejo } from '@kaynooo/kayjs-cms'
@@ -35,17 +39,49 @@ export default defineConfig({
 })
 ```
 
-The screens live at `/admin` (`prefix` moves them) and stay closed without a `guard`. `guard` also takes the built guard itself, `auth.guard({ require: 'editor' })`, which makes `kay.config.ts` import `./src/auth`, and with it the app's database, for every `kay build` and `kay check`. In edit mode, kay renders the editor at the end of every page, with the entries the page read; "Edit on page" links on the screens put an editor the guard admitted in edit mode, and the editor's "Stop editing" button leaves it. Once there is a guard, every save needs it, edit mode included: an edit cookie or link is tied to no user. With a guard, `author` names who a save is committed as, such as the signed-in user.
+The screens live at `/admin`. Set `prefix` to move them. They stay closed without a `guard`.
 
-An image pasted or dropped into a Markdown body, the entry's own or a Markdown field's, is uploaded as a file field's would be and embedded where the cursor is; a refused upload shows a message and leaves the text as it was.
+`guard` also takes the built guard itself, `auth.guard({ require: 'editor' })`. Then `kay.config.ts` imports `./src/auth`, and with it the app's database, for every `kay build` and `kay check`.
 
-A file field takes PNG, JPEG, WebP, GIF, AVIF and PDF files unless `uploads` lists others (`['image/*', 'application/pdf']`). A body whose Markdown renders HTML that would run as the site or cover it, anything kay's sanitizer drops, such as a `<script>`, an `onclick` or a `style`, a `javascript:` link, or a tag left open for the page around it to close, is refused on save unless `rawHtml` lists the collection; the collection's own components and HTML shown in a code block are fine.
+## Edit mode
 
-A commit shows on the site once it has rebuilt from it. A save or a delete made over another save, or over one's own before the site rebuilt from it, is refused rather than writing over it: the refusal stays on the form, and its Keep my edits button lets the next save write the edits over that save. A save taking over 15 seconds (`timeout`) or a forge out of reach fails with the reason, saying so when the commit may still have gone through. A repository checked out with CRLF line endings, or using SHA-256 object names, gives files another version than the editor computes, so every save conflicts. The Forgejo token needs write access to the repository's contents, and the commit is the token's user's. An image or file field (`imageField()`, `fileField()` from `kay/content`) takes a file dropped or picked, stored through kay's [file storage](/guides/file-storage), and keeps the path that serves it.
+In edit mode, kay renders the editor at the end of every page, with the entries the page read. The "Edit on page" links on the screens put an editor the guard admitted in edit mode. The editor's "Stop editing" button leaves it.
 
-Replacing or removing a file leaves the old upload stored: the unused-uploads screen at `<prefix>/uploads` lists the uploads directly in a collection's folder that no entry mentions, in any collection, locale, draft or loaded collection, each with the image variants it would take with it, and deletes only the ones you confirm, and only with a `guard`. Uploads under a day old, or that the storage dates not at all, are held back: a save the site has not rebuilt from, another server's save or an unsaved form may use them. A URL written by hand in a page, a file of the repository outside the collections or an older revision a revert brings back is not seen either, so check each upload before you confirm; the screen lists nothing while a collection or entry cannot be read, or the storage cannot list its files.
+Once there is a guard, every save needs it, edit mode included, as an edit cookie or link is tied to no user. With a guard, `author` names who a save is committed as, such as the signed-in user.
 
-An app replaces a screen by writing a page at its path, `src/routes/admin/new/[collection].kay` say, and can render the screens' own `@kaynooo/kayjs-cms/entry-editor.kay` and `@kaynooo/kayjs-cms/entry-table.kay` in it.
+## Files and images
+
+An image or file field (`imageField()`, `fileField()` from `kay/content`) takes a file dropped or picked. It is stored through kay's [file storage](/guides/file-storage), and the field keeps the path that serves it.
+
+An image pasted or dropped into a Markdown body is uploaded the same way and embedded where the cursor is. A refused upload shows a message and leaves the text as it was.
+
+A file field takes PNG, JPEG, WebP, GIF, AVIF and PDF files. Set `uploads` to list others, such as `['image/*', 'application/pdf']`.
+
+Replacing or removing a file leaves the old upload stored. The unused-uploads screen at `<prefix>/uploads` lists the uploads no entry mentions, and deletes only the ones you confirm, and only with a `guard`.
+
+Check each upload before you confirm. A URL written by hand in a page, or a file outside the collections, is not seen as a use.
+
+<ReadMore href="/llms/kayjs-cms">Which uploads the unused-uploads screen holds back, and when it lists nothing.</ReadMore>
+
+## Raw HTML in a body
+
+A Markdown body whose HTML would run as the site or cover it is refused on save. That is anything kay's sanitizer drops, such as a `<script>`, an `onclick`, a `style`, a `javascript:` link, or a tag left open for the page around it to close.
+
+List the collection in `rawHtml` to allow it. The collection's own components and HTML shown in a code block are always fine.
+
+## Saves and conflicts
+
+A commit shows on the site once it has rebuilt from it. The Forgejo token needs write access to the repository's contents, and the commit is the token's user's.
+
+A save or a delete made over another save is refused rather than writing over it. So is one made over your own save before the site rebuilt from it. The refusal stays on the form, and its Keep my edits button lets the next save write your edits over that save.
+
+A save that takes over 15 seconds (`timeout`), or a forge out of reach, fails with the reason. It says so when the commit may still have gone through.
+
+A repository checked out with CRLF line endings, or using SHA-256 object names, gives files another version than the editor computes, so every save conflicts.
+
+## Replacing a screen
+
+Write a page at the screen's path, such as `src/routes/admin/new/[collection].kay`. It can render the screens' own `@kaynooo/kayjs-cms/entry-editor.kay` and `@kaynooo/kayjs-cms/entry-table.kay`.
 
 ## In the dev tool
 

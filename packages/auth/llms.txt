@@ -180,9 +180,9 @@ a(href="/auth/discord?redirect=/account" data-no-prefetch) Sign in with Discord
 
 ```kay
 --- server
-import { t } from 'elysia'
+import { s } from 'kay'
 
-export const signIn = action(t.Object({ identifier: t.String({ maxLength: 254 }), password: t.String() }), async (input, ctx) => {
+export const signIn = action(s.Object({ identifier: s.String({ maxLength: 254 }), password: s.String() }), async (input, ctx) => {
   const result = await ctx.locals.auth.signInWithPassword({ ...input, redirect: ctx.url.searchParams.get('redirect') ?? '/' })
 
   if (!result.ok)
@@ -231,11 +231,11 @@ email: {
 
 ```kay
 --- server
-import { t } from 'elysia'
+import { s } from 'kay'
 
-export const query = t.Object({ token: t.Optional(t.String()) })
+export const query = s.Object({ token: s.Optional(s.String()) })
 
-export const spend = action(t.Object({ token: t.String() }), async ({ token }, ctx) => {
+export const spend = action(s.Object({ token: s.String() }), async ({ token }, ctx) => {
   const result = await ctx.locals.auth.signInWithMagicLink(token)
 
   if (!result.ok)

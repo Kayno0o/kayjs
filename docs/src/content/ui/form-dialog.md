@@ -6,11 +6,11 @@ FormDialog needs an action exported by a page, so it is shown here as code. `src
 
 ```kay
 --- server
-import { t } from 'elysia'
+import { s } from 'kay'
 
-const renaming = t.Object({
-  id: t.String({ maxLength: 64 }),
-  title: t.String({
+const renaming = s.Object({
+  id: s.String({ maxLength: 64 }),
+  title: s.String({
     minLength: 2,
     maxLength: 200,
     error: 'Two letters at least',

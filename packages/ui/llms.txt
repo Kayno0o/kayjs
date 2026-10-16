@@ -81,7 +81,7 @@ export default defineConfig({ settings: { '@kaynooo/kayjs-ui': './src/ui-setting
 // src/ui-settings.ts
 import type { Settings } from '@kaynooo/kayjs-ui'
 import { defaults } from '@kaynooo/kayjs-ui'
-import close from '~icons/lucide/x'
+import close from '~icons/tabler/x'
 
 const settings: Settings = { ...defaults, icons: { ...defaults.icons, close } }
 
@@ -328,9 +328,10 @@ PageSection(title="Moons")
 
     ```ts
     import tabler from '@iconify-json/tabler/icons.json'
+    import { s } from 'kay'
     import { iconNames, iconProps } from 'kay/icons'
 
-    export const findIcons = action(t.Object({ query: t.String({ maxLength: 200 }), limit: t.Number(), offset: t.Number() }), async ({ query, limit, offset }) =>
+    export const findIcons = action(s.Object({ query: s.String({ maxLength: 200 }), limit: s.Integer(), offset: s.Integer() }), async ({ query, limit, offset }) =>
       iconNames(tabler).filter(name => name.includes(query)).slice(offset, offset + limit).map(name => ({ name: `tabler:${name}`, icon: iconProps(tabler, name)! })))
     ```
 
@@ -449,9 +450,9 @@ FormField frames a control with its label, hint and messages; inside an island a
 
 ```kay
 --- server
-import { t } from 'elysia'
+import { s } from 'kay'
 
-export const rename = action(t.Object({ id: t.String({ maxLength: 64 }), title: t.String({ minLength: 2, maxLength: 200, error: 'Two letters at least' }) }), async ({ id, title }) => posts.rename(id, title))
+export const rename = action(s.Object({ id: s.String({ maxLength: 64 }), title: s.String({ minLength: 2, maxLength: 200, error: 'Two letters at least' }) }), async ({ id, title }) => posts.rename(id, title))
 ---
 ```
 
