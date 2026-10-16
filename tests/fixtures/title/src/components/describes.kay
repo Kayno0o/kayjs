@@ -1,0 +1,8 @@
+---
+function explode(): string {
+  throw new Error('failed to render')
+}
+---
+head
+  meta(name="description" content="From a failed block")
+p {explode()}

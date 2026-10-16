@@ -1,8 +1,9 @@
 --- server
 import { defer } from 'kay'
 
-const answer = defer(Bun.sleep(10).then(() => { throw new Error('no answer') }))
+const answer = defer(Bun.sleep(10).then(() => 42))
 --- script
+import Failing from '../components/failing.kay'
 import Room from '../components/room.kay'
 ---
 h1 Failed await
@@ -10,6 +11,7 @@ Room(label="Healthy")
 await answer
   p.pending Thinking
 then value
-  Room(label="Late")
-catch error
-  p.fallback Fallback
+  try
+    Failing(label="Late")
+  catch
+    p.fallback Fallback

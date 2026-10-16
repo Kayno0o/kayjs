@@ -48,13 +48,20 @@ describe('an island that fails to render', () => {
     expect(await marked('/failed')).toEqual(['room titled'])
   })
 
-  it('leaves the title of the island before a streamed block that rejects', async () => {
+  it('leaves the title of the island before a failing one in a streamed block', async () => {
     expect(await served('/failedawait')).toBe('Healthy')
     expect(await marked('/failedawait')).toEqual(['room titled'])
   })
 
   it('leaves the page its own title when no island rendered', async () => {
-    expect(await served('/failedalone')).not.toBe('Broken')
+    expect(await served('/failedalone')).toBeUndefined()
     expect(await marked('/failedalone')).toEqual([])
+  })
+
+  it('drops the other head tags its block set', async () => {
+    const html = await (await app.handle(new Request('http://localhost/failedmeta'))).text()
+
+    expect(html).toContain('Fallback')
+    expect(html).not.toContain('From a failed block')
   })
 })

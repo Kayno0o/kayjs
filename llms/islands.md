@@ -330,6 +330,7 @@ const dispose = mount(Panel, document.querySelector('#panel')!, { title: 'Ticket
 - A block the server rendered `catch` for keeps that markup as it came, since the error stayed on the server.
 - `catch` takes the error under a name or none, typed `unknown`.
 - A `try` without `catch` renders nothing when it throws.
+- On the server, what a block that threw set in the page's `head`, an island's title included, goes with it: the page serves the title of an island it rendered, or its own.
 - An error no `try` catches in the browser, from an effect, a handler or a promise nobody awaited, is reported the same way.
 - An island whose script throws as it hydrates keeps its server markup, lifeless.
 - The browser sends at most 10 distinct errors per page load, leaving out another origin's scripts, whose details it hides.

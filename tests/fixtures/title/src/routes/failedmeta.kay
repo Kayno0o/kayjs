@@ -1,0 +1,8 @@
+---
+import Describes from '../components/describes.kay'
+---
+h1 Failed meta
+try
+  Describes
+catch
+  p.fallback Fallback

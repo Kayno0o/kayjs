@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- A `try` block that throws on the server takes back the `head` tags and island titles its components set, so a page never serves a title from an island it did not render ([Head](head.md)).
 - `kay/eslint` passes the classes of a template, the shorthand `.flex.flex-col` and a static `class="..."`, to the Tailwind rules of `@kaynooo/eslint`, reporting at the class in the `.kay` file and fixing inside a static `class` of an element with no shorthand ([Checks](checks.md#lint-the-script-fences-and-template-expressions-with-eslint)).
 - `kay/eslint` lints the expressions of a template, attribute values, `{...}` in text and the heads of `if`, `match`, `for`, `await`, `const` and `slot`, reporting at their `.kay` line and column and fixing them in the file ([Checks](checks.md#lint-the-script-fences-and-template-expressions-with-eslint)).
 - `kay dev` bundles a worker (kay's own proof-of-work worker included) once per session and again only when a file it read changes, instead of starting a process for it on every island edit: an edit spends about 13% less CPU over 21 edits ([Project](project.md)).

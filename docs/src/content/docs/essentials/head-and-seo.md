@@ -34,7 +34,7 @@ The server renders the first title, so a search engine and the first paint see i
 
 Following a link to another page shows that page's own title, and going back shows the island's again once it hydrates. A title is the text as written, so a missing value needs `?? ''`. An island rendered in the browser alone (`hydrate="client"`) sets its title as written, with no template. An island kept across pages with `persist` shows the next page's title at a swap and sets its own again when a signal it reads changes.
 
-If two islands on a page both set a title, the one last in the page shows, as the server renders it, hydrated or not and whichever hydrated last; a change in the others leaves it. An island rendered in the browser alone is not counted.
+If two islands on a page both set a title, the one last in the page shows, as the server renders it, hydrated or not and whichever hydrated last; a change in the others leaves it. An island rendered in the browser alone is not counted. A `try` block that throws on the server takes back what its components set in the head, so the page never serves a title or tag from a block `catch` replaced.
 
 ## Attributes on `<html>`
 
