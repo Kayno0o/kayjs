@@ -1,0 +1,9 @@
+--- client
+import { signal } from 'kay'
+import { visitors } from '../live'
+
+const shown = signal(false)
+---
+button.reveal(onClick={() => shown.set(true)}) Reveal
+if shown()
+  p.revealed {visitors()} revealed

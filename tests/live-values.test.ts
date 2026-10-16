@@ -1,4 +1,4 @@
-import type { LivePage, LiveRequest, LiveUpdate } from '../src/runtime/live-value'
+import type { LivePage, LiveRequest } from '../src/runtime/live-value'
 import type { TestSite } from '../src/test'
 import { existsSync } from 'node:fs'
 import { join, resolve } from 'node:path'
@@ -10,9 +10,9 @@ import { outputDir } from '../src/build/assets'
 import { liveId, liveIds } from '../src/build/live-ids'
 import { compileKay } from '../src/compiler'
 import { PROOF_LIFETIME_MS } from '../src/runtime/live-value'
-import { decodeServerValue } from '../src/runtime/wire'
 import { MAX_CONNECTIONS } from '../src/server/live'
 import { browserPath, testSite } from '../src/test'
+import { Feed, JSON_POST, pagesOf, proofsOf } from './live-helpers'
 import { fixtureCopy } from './scratch'
 
 const ROOT = 'tests/fixtures/live-values'
@@ -21,8 +21,6 @@ const idOf = (name: string) => liveId('/app/src/live.ts', '/app', name)
 const VISITORS = idOf('visitors')
 const ROOM = idOf('room')
 const SECRET = idOf('secret')
-const SCRIPT = /<script type="application\/json" data-kay-live>([^<]*)<\/script>/g
-const JSON_POST = { method: 'POST', headers: { 'content-type': 'application/json' } }
 // The gzipped JS the fixture's home page, with islands reading live values, loads up front: a few bytes above what it measures, as the budget in tests/static.test.ts is.
 const LIVE_EAGER_JS_BUDGET = 11_900
 
@@ -33,59 +31,9 @@ async function values(): Promise<Values> {
   return import(resolve(ROOT, 'src/live.ts')) as Promise<Values>
 }
 
-// The scripts of live values a page carries, read as its islands read them.
-function pagesOf(html: string): LivePage[] {
-  return [...html.matchAll(SCRIPT)].map(([, text]) => decodeServerValue(text!.replaceAll('\\u003c', '<')) as LivePage)
-}
-
-function proofsOf(pages: LivePage[]): LiveRequest['proofs'] {
-  return pages.map(({ values, sig, at }) => ({ keys: values.map(([id, key]) => [id, key] as [string, string]), at, sig }))
-}
-
 // The values a page read, once each.
 function idsOf(page: LivePage): string[] {
   return [...new Set(page.values.map(([id]) => id))].toSorted()
-}
-
-// What a connection delivers, one event at a time.
-class Feed {
-  private readonly reader: ReadableStreamDefaultReader<Uint8Array>
-  private readonly decoder = new TextDecoder()
-  private buffer = ''
-
-  constructor(readonly response: Response) {
-    this.reader = response.body!.getReader()
-  }
-
-  async next(): Promise<LiveUpdate[]> {
-    for (;;) {
-      const end = this.buffer.indexOf('\n\n')
-
-      if (end !== -1) {
-        const block = this.buffer.slice(0, end)
-
-        this.buffer = this.buffer.slice(end + 2)
-
-        const data = block.split('\n').filter(line => line.startsWith('data: ')).map(line => line.slice(6)).join('\n')
-
-        if (data !== '')
-          return decodeServerValue(data) as LiveUpdate[]
-
-        continue
-      }
-
-      const { done, value } = await this.reader.read()
-
-      if (done)
-        throw new Error('the connection ended')
-
-      this.buffer += this.decoder.decode(value, { stream: true })
-    }
-  }
-
-  async close(): Promise<void> {
-    await this.reader.cancel()
-  }
 }
 
 async function tick(): Promise<void> {

@@ -26,6 +26,8 @@ export interface GenerateOptions {
   island?: string | undefined
   // The island renders in the browser only: `--- client`, or a package it imports cannot load on the server.
   client?: boolean | undefined
+  // The live values the island imports, which its server render notes to prove the page may follow them even when the render reads none, as a handler does not run there.
+  lives?: string[] | undefined
   // Path relative to the project root, naming the module's actions.
   moduleId: string
   // Development: every element carries its source position, for `kay dev`'s inspector.
@@ -371,7 +373,7 @@ class ModuleShell {
     else if (this.kind === 'twin')
       b.add(`\nexport default ((props: never) => KayInsideIsland() ? KayHydrated(props) : ${name}(props)) as typeof ${name}\n`)
     else if (this.kind === 'island')
-      b.add(`\nexport default KayIsland(${JSON.stringify(this.options.island)}, ${name}${this.genericComponent ? ' as never' : ''}${islandMessages(src, this.options.client)})${this.genericIslandType()}\n`)
+      b.add(`\nexport default KayIsland(${JSON.stringify(this.options.island)}, ${name}${this.genericComponent ? ' as never' : ''}${islandMessages(src, this.options.client, this.options.output === 'html' ? this.options.lives : undefined)})${this.genericIslandType()}\n`)
   }
 
   private get wrapped(): boolean {
@@ -862,9 +864,12 @@ function typeParameterNames(parameters: string): string[] {
   return names
 }
 
-// The message keys an island's source names, as the third argument to `island()`, or nothing for an island naming none.
-export function islandMessages(source: string, client = false): string {
+// The message keys an island's source names, as the third argument to `island()`, or nothing for an island naming none; the live values it imports go last.
+export function islandMessages(source: string, client = false, lives: string[] = []): string {
   const keys = [...new Set(Array.from(source.matchAll(MESSAGE_KEY), match => match[2]!))]
+
+  if (lives.length > 0)
+    return `, ${JSON.stringify(keys)}, ${client}, undefined, [${lives.join(', ')}]`
 
   if (client)
     return `, ${JSON.stringify(keys)}, true`

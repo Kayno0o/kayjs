@@ -5,6 +5,7 @@ import { escapeAttribute } from './escape'
 import { withFieldMarks } from './fields'
 import { headMark, setsIslandTitle } from './head'
 import { child, omit } from './html'
+import { noteLives } from './live-value'
 import { TITLED_ATTRIBUTE } from './markers'
 import { renderOnServer, scope } from './reactive'
 import { SLOT_END, SLOT_START } from './static-slots'
@@ -82,8 +83,8 @@ export function noteMessage(key: string): void {
 // On the server an interactive component renders inside a `<slot>` the browser hydrates, its props serialized for the client.
 // A client-only one, `client` or rendered with `hydrate="client"`, leaves the slot empty for the browser to render into, and inside another island renders nothing.
 // Browsers lay a slot out as `display: contents`, so the island sits in a flex or grid parent as its own markup would, with no stylesheet to ship.
-// `messages` are the keys its source passes `t()` as they are written, which it may only look up once in the browser.
-export function island<P extends object>(id: string, component: ((props: P) => JSX.Element) | undefined, messages: readonly string[] = [], client = false, why = 'is interactive'): IslandComponent<P> {
+// `messages` are the keys its source passes `t()` as they are written, which it may only look up once in the browser. `lives` are the live values it imports, which the page proves though only the browser may read them.
+export function island<P extends object>(id: string, component: ((props: P) => JSX.Element) | undefined, messages: readonly string[] = [], client = false, why = 'is interactive', lives: readonly unknown[] = []): IslandComponent<P> {
   const render = (props: P & IslandOptions) => {
     const when = props.hydrate
     const kept = props.persist === false || props.persist === '' || props.persist === true ? undefined : props.persist
@@ -93,6 +94,8 @@ export function island<P extends object>(id: string, component: ((props: P) => J
 
     for (const key of messages)
       noteMessage(key)
+
+    noteLives(lives)
 
     if (depth > 0)
       return browserOnly ? { t: '' } as unknown as JSX.Element : component!(own)

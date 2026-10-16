@@ -1,0 +1,7 @@
+---
+import Late from '../components/late.kay'
+import LateClient from '../components/late-client.kay'
+---
+h1 Late
+Late
+LateClient

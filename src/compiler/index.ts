@@ -81,9 +81,13 @@ const BACKSLASH = /\\/g
 // An icon of an installed set, `~icons/tabler/home`, which the template may draw as a tag.
 const ICON_IMPORT = /^~icons\//
 
-// The first live value a script imports, which makes its component an island: the server changes it and the page follows.
+// The live values a script imports, which make its component an island: the server changes them and the page follows.
+function liveBindings(script: ScriptAnalysis, imported: ImportedSignals | undefined): ScriptAnalysis['imports'] {
+  return script.imports.filter(binding => !binding.typeOnly && imported?.[binding.source]?.[binding.imported] === 'live')
+}
+
 function liveImport(script: ScriptAnalysis, imported: ImportedSignals | undefined): string | undefined {
-  return script.imports.find(binding => !binding.typeOnly && imported?.[binding.source]?.[binding.imported] === 'live')?.local
+  return liveBindings(script, imported)[0]?.local
 }
 
 // Whether a component renders as an island of its own, as compileKay decides it, without generating its code.
@@ -138,7 +142,7 @@ export function compileKay(source: string, filename: string, options: CompileOpt
   const promotion = island === undefined && !routeFile ? promotionCause(file, script) : undefined
   const promote = promotion === undefined ? undefined : islandId(filename, options.root)
   const why = island === undefined ? promotion : islandCause(file, script) ?? (live === undefined ? undefined : `\`${live}\`, a live value`)
-  const generateOptions = { island, client, twin, promote, output: options.output, hydratable: hydratableServer && (island !== undefined || options.twinBuild === true), moduleId: islandId(filename, options.root), includeServer: options.includeServer, params: options.params, paramTypes: options.paramTypes, outerQueries: options.outerQueries, check: options.check, insideIsland: options.insideIsland, inspect: options.inspect, relocateImport: options.relocateImport, errorPage: basename(filename) === ERROR_PAGE, special: basename(filename).startsWith('_') && basename(filename) !== LAYOUT }
+  const generateOptions = { island, client, lives: island === undefined ? undefined : liveBindings(script, options.importedSignals).map(binding => binding.local), twin, promote, output: options.output, hydratable: hydratableServer && (island !== undefined || options.twinBuild === true), moduleId: islandId(filename, options.root), includeServer: options.includeServer, params: options.params, paramTypes: options.paramTypes, outerQueries: options.outerQueries, check: options.check, insideIsland: options.insideIsland, inspect: options.inspect, relocateImport: options.relocateImport, errorPage: basename(filename) === ERROR_PAGE, special: basename(filename).startsWith('_') && basename(filename) !== LAYOUT }
   // The analysis pass names the component so no read resolves to it, then the name is chosen free of what the code reads.
   const analysis = generate(file, script, server, { ...generateOptions, name: SELF })
   const imported = new Map<string, SignalKind>([...script.imports, ...server?.imports ?? []].flatMap((binding) => {
@@ -189,8 +193,13 @@ export function compileKay(source: string, filename: string, options: CompileOpt
   const reported = (options.check ? applyLints(diagnostics, source, options.lints) : diagnostics).sort((a, b) => a.start - b.start)
 
   // The server never renders a client-only island, so its module leaves the script out: a package touching `window` as it loads never loads there.
-  if (client && options.output === 'html' && island !== undefined)
-    return { tsx: `import { island as KayIsland } from 'kay/island'\n\nexport default KayIsland(${JSON.stringify(island)}, undefined${islandMessages(source, true)})\n`, map: new SourceMap([], []), island, why, classes: templateFacts(file).classes, diagnostics: reported }
+  if (client && options.output === 'html' && island !== undefined) {
+    // Only the live values it imports stay, so the page it renders in proves them.
+    const lives = liveBindings(script, options.importedSignals)
+    const imports = lives.map(binding => `import { ${binding.imported} as ${binding.local} } from ${JSON.stringify(binding.source)}\n`).join('')
+
+    return { tsx: `import { island as KayIsland } from 'kay/island'\n${imports}\nexport default KayIsland(${JSON.stringify(island)}, undefined${islandMessages(source, true, lives.map(binding => binding.local))})\n`, map: new SourceMap([], []), island, why, classes: templateFacts(file).classes, diagnostics: reported }
+  }
 
   return {
     tsx: final.builder.code,

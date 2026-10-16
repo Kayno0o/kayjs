@@ -1,0 +1,9 @@
+---
+import { signal } from 'kay'
+import { visitors } from '../live'
+
+const open = signal(false)
+---
+button.toggle(onClick={() => open.set(!open())}) Show
+if open()
+  p.late {visitors()} late

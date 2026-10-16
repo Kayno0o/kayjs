@@ -124,6 +124,18 @@ function notify(slot: ServerSlot, key: string): void {
     listener()
 }
 
+const slotOfHandle = new WeakMap<object, ServerSlot>()
+
+// An island's server render notes the live values it imports, so the page proves them though the render did not read them, as when a handler or a `--- client` fence reads one later. A keyed value is left out: its key is not known before it is read.
+export function noteLives(handles: readonly unknown[]): void {
+  for (const handle of handles) {
+    const slot = typeof handle === 'function' ? slotOfHandle.get(handle) : undefined
+
+    if (slot !== undefined && !slot.keyed)
+      noteRead(slot, '', slotValue(slot, ''))
+  }
+}
+
 function serverLive(id: string, initial: unknown): Handle {
   const keyed = typeof initial === 'function'
   const known = slots().get(id)
@@ -158,6 +170,8 @@ function serverLive(id: string, initial: unknown): Handle {
   }
 
   const handle = keyed ? (key: LiveKey) => read(keyText(key)) : () => read('')
+
+  slotOfHandle.set(handle, slot)
 
   return Object.assign(handle, keyed
     ? {

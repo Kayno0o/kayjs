@@ -218,7 +218,7 @@ The limits of the first version:
 - A proof is good for an hour. An open page asks for its own page again every half hour to get a new one, so a visitor who may no longer see the page stops following within the hour, and a page the server refuses the proof of, after a restart without `KAY_SECRET` for instance, asks again at once and follows on the new one.
 - A connection that drops, or is refused while a server restarts, is retried with a growing delay, and a hidden tab waits until it is shown. The proof is signed with `KAY_SECRET`, or with a key made at start-up.
 - A client holds at most 20 live connections at once, a few tabs; the next one is refused until another closes.
-- A value an island reads only after the page rendered, behind a click for instance, is not followed unless the render read it too.
+- A page can follow every plain live value its islands import, so one read behind a click or only in the browser, in a `--- client` island for instance, is followed too. A value per key read only after the page rendered is not, because the server cannot know the key before it is read: read it in the template.
 
 ## Websockets
 
