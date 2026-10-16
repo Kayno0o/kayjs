@@ -558,12 +558,13 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('live val
 
 // A server that refuses or drops the connections of a page as a deploy or a restart does: each POST to the live route takes the next step of `plan`, `drop` an event stream that ends at once and a number a response of that status; past the plan they go through.
 function flaky() {
-  const plan: (number | 'drop')[] = []
+  // 'slow' is a 429 that takes a second to come, long enough for a test to hide the tab before the retry is scheduled.
+  const plan: (number | 'drop' | 'slow')[] = []
   const posts: string[] = []
   const gets: string[] = []
   // The pages whose renewal comes back with no live value, as for a visitor who may no longer see them.
   const gone = new Set<string>()
-  const app = new Elysia().onRequest(({ request }) => {
+  const app = new Elysia().onRequest(async ({ request }) => {
     if (request.method === 'GET')
       gets.push(new URL(request.url).pathname)
 
@@ -579,6 +580,12 @@ function flaky() {
 
     if (step === 'drop')
       return new Response('', { headers: { 'content-type': 'text/event-stream' } })
+
+    if (step === 'slow') {
+      await Bun.sleep(1000)
+
+      return new Response(null, { status: 429 })
+    }
 
     return step === undefined ? undefined : new Response(null, { status: step })
   })
@@ -650,6 +657,27 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('live val
       server.gone.delete('/other')
       server.plan.length = 0
     }
+  })
+
+  it('waits while the tab is hidden after a refusal, and connects once it is shown', async () => {
+    server.posts.length = 0
+    server.plan.push('slow')
+    live.visitors.set(70)
+
+    await using page = await site.open('/other')
+
+    await page.waitUntil(() => document.querySelector('p.online')?.textContent === '70 online')
+    // The first request is still waiting for its refusal.
+    await page.evaluate(() => Object.defineProperty(document, 'hidden', { configurable: true, get: () => true }))
+    await Bun.sleep(3000)
+    expect(server.posts.length).toBe(1)
+    await page.evaluate(() => {
+      Reflect.deleteProperty(document, 'hidden')
+      document.dispatchEvent(new Event('visibilitychange'))
+    })
+    live.visitors.set(71)
+    await page.waitUntil(() => document.querySelector('p.online')?.textContent === '71 online', { timeout: 5000 })
+    expect(server.posts.length).toBe(2)
   })
 
   it('leaves one connection when the page changes during a backoff', async () => {
