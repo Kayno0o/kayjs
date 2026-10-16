@@ -3,14 +3,9 @@ import { localize, t } from 'kay/i18n'
 import Button from '@kaynooo/kayjs-ui/button.kay'
 import TabNav from '@kaynooo/kayjs-ui/tab-nav.kay'
 
-export const signOut = action(async (ctx) => {
-  await ctx.locals.auth.signOut()
-
-  return ctx.redirect(localize(ctx.locals.auth.features().pages?.home ?? '/'))
-})
-
 const features = ctx.locals.auth.features()
 const current = ctx.url.pathname
+const home = localize(features.pages?.home ?? '/')
 const base = localize(`${features.pages?.prefix ?? features.prefix}/account`)
 const links = [
   { href: base, label: t('auth.account.nav.profile') },
@@ -26,7 +21,8 @@ head
 .kayjs-auth.mx-auto.flex.w-full.max-w-3xl.flex-col.gap-6.px-4.py-8
   .flex.flex-wrap.items-center.justify-between.gap-4
     h1.kui-heading-section {t('auth.account.title')}
-    form(action={signOut})
+    form(method="post" action={`${features.prefix}/sign-out`})
+      input(type="hidden" name="redirect" value={home})
       Button(type="submit" label={t('auth.account.signOut')})
   TabNav(links={links} current={current} label={t('auth.account.nav.label')})
   slot

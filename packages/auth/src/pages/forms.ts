@@ -2,12 +2,12 @@ import type { MinTimeRefusal } from 'kay'
 import type { Auth } from '../auth'
 import type { CaptchaAction } from '../captcha'
 import type { Proof } from '../twoFactor'
-import type { AuthFeatures } from './index'
+import type { AuthFeatures, ProfileProblem } from './index'
 import type en from './messages/en'
 import { t } from 'elysia'
 import { t as message } from 'kay/i18n'
 import { passkeyAssertion, passkeyAttestation } from '../payloads'
-import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH, USERNAME_MAX_LENGTH, USERNAME_MIN_LENGTH } from '../rules'
+import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH, PROFILE_MAX_LENGTH, USERNAME_MAX_LENGTH, USERNAME_MIN_LENGTH } from '../rules'
 
 // The codes the pages word, as the English catalog, which every other language mirrors, holds them: a code a flow answers with no message is a type error here.
 type Catalog = typeof en['auth']
@@ -58,6 +58,8 @@ export const schemas = {
   token: t.Object({ token }),
   verify: t.Object({ token, password: t.Optional(password) }),
   proof: t.Object(proof),
+  // Whichever fields the app's profile has: `saveProfile` reads those it knows.
+  profile: t.Object({}, { additionalProperties: true }),
   changePassword: t.Object({ ...proof, newPassword: password }),
   changeEmail: t.Object({ ...proof, email }),
   changeUsername: t.Object({ username: t.String({ maxLength: 128 }) }),
@@ -132,6 +134,11 @@ export function issue(...[field, problem]: [field: 'email', problem: Problem<'em
     case 'password': return message(`auth.fields.password.${problem}`, { min: PASSWORD_MIN_LENGTH, max: PASSWORD_MAX_LENGTH })
     case 'username': return message(`auth.fields.username.${problem}`, { min: USERNAME_MIN_LENGTH, max: USERNAME_MAX_LENGTH })
   }
+}
+
+// What a page shows under a profile field the app asked for, `max` being the field's own limit when it set one.
+export function profileIssue(problem: ProfileProblem, max?: number): string {
+  return typeof problem === 'object' ? problem.message : message(`auth.fields.profile.${problem}`, { max: max ?? PROFILE_MAX_LENGTH })
 }
 
 // The message for the `?error=` a failed provider sign-in comes back with; undefined for none, or one kayjs-auth never sends.

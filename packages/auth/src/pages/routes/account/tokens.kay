@@ -27,7 +27,7 @@ export const revoke = action(schemas.id, async ({ id }, ctx) => {
 })
 
 const auth = ctx.locals.auth
-const user = (await auth.user())!
+const user = await auth.requireUser()
 const features = auth.features()
 const tokens = await auth.tokens()
 const created = ctx.succeeded(create)?.data

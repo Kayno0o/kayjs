@@ -12,13 +12,27 @@ export const mails: Mail[] = []
 
 export const store = memoryStore()
 
+// What the app keeps beside each user, by id.
+export const profiles = new Map<string, Record<string, string>>()
+
 export const auth = createAuth({
   sessions: session<AuthSessionData>({ secret: SECRET }),
   secret: SECRET,
   store,
   url: 'http://localhost',
   site: 'Fixture',
-  pages: true,
+  pages: {
+    profile: {
+      fields: { displayName: { label: 'Display name', required: true, maxLength: 20 }, bio: { label: 'Bio', type: 'textarea' } },
+      load: user => profiles.get(user.id) ?? {},
+      save: (user, values) => {
+        if (values.displayName === 'admin')
+          return { errors: { displayName: 'Pick another name.' } }
+
+        profiles.set(user.id, values)
+      },
+    },
+  },
   oauth: { discord: { provider: discordProvider(), clientId: 'discord-id', clientSecret: 'discord-secret' } },
   email: {
     mailer: {

@@ -72,7 +72,7 @@ export const removePasskey = action(schemas.removePasskey, async (input, ctx) =>
 })
 
 const auth = ctx.locals.auth
-const user = (await auth.user())!
+const user = await auth.requireUser()
 const features = auth.features()
 const passwordSaved = ctx.succeeded(changePassword) !== undefined
 const passwordRefused = ctx.failed(changePassword)?.data

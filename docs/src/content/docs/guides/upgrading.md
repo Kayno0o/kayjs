@@ -35,6 +35,10 @@ To keep every page's stylesheets linked, set `inlineStyles: false` in `kay.confi
 
 A test or a script that reads a page's `link rel="stylesheet"` to fetch the file now reads the `style` text instead, or sets `inlineStyles: false`.
 
+### kayjs-auth's account layout has no `signOut` action
+
+The account pages sign out with a post to `/auth/sign-out`, under the `prefix` of `createAuth`. A test or a page importing `signOut` from `@kaynooo/kayjs-auth/pages/account/_layout.kay` now fails `kay check`, as an import of something that is gone. Post to the route instead, with `site.fetch('/auth/sign-out', { method: 'POST' })` in a test, or give your own page a form posting there. No lint finds it, as the import already fails the check. See [kayjs-auth](/libraries/kayjs-auth#the-signed-in-user).
+
 ### `deprecated-schema-name` is in the `deprecated` group
 
 `lints: { code: ... }` in `kay.config.ts` no longer sets it, and `kay check --only code` no longer lists it. Set `deprecated`, or the lint by name. `kay upgrade` rewrites it, and every deprecation after it, as it moves your app. See [Deprecations](/reference/checks#deprecations).

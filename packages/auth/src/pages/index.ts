@@ -1,7 +1,7 @@
 import type { AnyElysia } from 'elysia'
 import type { KayExtension } from 'kay/server'
 import type { CaptchaWidget } from '../captcha'
-import type { Core } from '../core'
+import type { Core, User } from '../core'
 import type { CodedLink, CodeMode } from '../email'
 import type { LinkType } from '../store'
 
@@ -10,6 +10,41 @@ export interface AuthPagesOptions {
   prefix?: string | undefined
   // Where a sign-in goes when nothing asked for another page, and a sign-out always: `/` by default.
   home?: string | undefined
+}
+
+// One input of the profile form the account page shows beside the username.
+export interface ProfileField {
+  label: string
+  // An `input` of this type, or a `textarea`; `text` by default.
+  type?: 'text' | 'textarea' | 'tel' | 'url' | 'email' | undefined
+  autocomplete?: string | undefined
+  required?: boolean | undefined
+  // The longest value, 500 characters by default.
+  maxLength?: number | undefined
+}
+
+// A field of the profile form with what the user holds in it.
+export interface ProfileFieldView extends ProfileField {
+  name: string
+  value: string
+}
+
+// Why a field was refused: left empty, too long, or in the words of the app's `save`.
+export type ProfileProblem = 'required' | 'too-long' | { message: string }
+
+// The profile data an app keeps beside kayjs-auth's users, edited on the account page's profile form.
+export interface ProfileOptions<Field extends string = string> {
+  fields: Record<Field, ProfileField>
+  // What each field holds now for this user, read when the form renders.
+  load: (user: User) => Partial<Record<Field, string | null | undefined>> | Promise<Partial<Record<Field, string | null | undefined>>>
+  // Stores values already trimmed and checked against `required` and `maxLength`; returns `{ errors }` naming what it refused, by field.
+  save: (user: User, values: Record<Field, string>) => void | { errors: Partial<Record<Field, string>> } | Promise<void | { errors: Partial<Record<Field, string>> }>
+}
+
+// What `createAuth`'s `pages` option takes: `authPages`' own options and the profile data of the app.
+export interface AuthPagesConfig extends AuthPagesOptions {
+  // Extra fields on the account page's profile form, with where they are read and stored.
+  profile?: ProfileOptions | undefined
 }
 
 export interface AuthPages<Server extends AnyElysia = AnyElysia> extends KayExtension<Server> {
@@ -63,7 +98,7 @@ export function featuresOf(core: Core): AuthFeatures {
     scopes: [...core.scopes],
     prefix: core.prefix,
     signInPage: core.signInPage,
-    pages: core.pages ?? null,
+    pages: core.pages ? { prefix: core.pages.prefix, home: core.pages.home } : null,
   }
 }
 
@@ -82,12 +117,31 @@ export function pagePaths(prefix: string) {
   }
 }
 
+// The module `src/auth.ts` is: the `createAuth` result as its `auth` export or its default one.
+export type AuthModule = { auth: { plugin: AnyElysia } } | { default: { plugin: AnyElysia } }
+
+// The plugin of an `AuthModule`, for `kay check` to type `ctx.locals.auth` off.
+export type PluginOf<Module> = Module extends { auth: { plugin: infer Plugin extends AnyElysia } } ? Plugin : Module extends { default: { plugin: infer Plugin extends AnyElysia } } ? Plugin : never
+
+async function pluginIn<Module extends AuthModule>(load: () => Promise<Module>): Promise<PluginOf<Module>> {
+  const module: AuthModule = await load()
+
+  return ('auth' in module ? module.auth.plugin : module.default.plugin) as PluginOf<Module>
+}
+
+// kayjs-auth for `extensions` in kay.config.ts, as the whole declaration: `authExtension(() => import('./src/auth'))` for the module making `auth` with `createAuth`, exported as `auth` or by default. The module loads as the server starts, never as the config is read, so the config stays off the app's database, and `kay check` types `ctx.locals.auth` and links to kayjs-auth's routes off it.
+export function authExtension<Module extends AuthModule>(load: () => Promise<Module>): KayExtension<PluginOf<Module>> {
+  return { name: 'auth', server: async () => pluginIn(load) }
+}
+
 // The sign-in, register, mailed-link and account pages, for `extensions` in kay.config.ts. Give `createAuth` the same `prefix` and `home` as `pages`, or `pages: true` for the defaults.
-// `server` hands `pages()` the app's `auth.plugin`, so the app mounts nothing else and `kay check` types `ctx.locals.auth` and links to kayjs-auth's routes: a function importing it, called only when `pages()` builds the app, so kay.config.ts never loads the app's database.
-export function authPages<Server extends AnyElysia = AnyElysia>(options: AuthPagesOptions & { server?: (() => Server | Promise<Server>) | undefined } = {}): AuthPages<Server> {
+// `auth` loads the app's `auth` as `authExtension` does, so the app mounts nothing else and `kay check` types `ctx.locals.auth` and links to kayjs-auth's routes; `server` hands `pages()` any other plugin carrying it.
+export function authPages<Module extends AuthModule>(options: AuthPagesOptions & { auth: () => Promise<Module> }): AuthPages<PluginOf<Module>>
+export function authPages<Server extends AnyElysia = AnyElysia>(options?: AuthPagesOptions & { server?: (() => Server | Promise<Server>) | undefined }): AuthPages<Server>
+export function authPages(options: AuthPagesOptions & { auth?: (() => Promise<AuthModule>) | undefined, server?: (() => AnyElysia | Promise<AnyElysia>) | undefined } = {}): AuthPages {
   return {
     name: '@kaynooo/kayjs-auth',
-    server: options.server,
+    server: options.auth ? async () => pluginIn(options.auth!) : options.server,
     routes: { dir: `${import.meta.dir}/routes`, prefix: options.prefix ?? DEFAULT_PREFIX },
     messages: `${import.meta.dir}/messages`,
     prefix: options.prefix ?? DEFAULT_PREFIX,
@@ -96,9 +150,11 @@ export function authPages<Server extends AnyElysia = AnyElysia>(options: AuthPag
 }
 
 // The prefix and home `createAuth` reads off its `pages` option.
-export function pagesOf(pages: boolean | AuthPagesOptions | undefined): { prefix: string, home: string } | undefined {
+export function pagesOf(pages: boolean | AuthPagesConfig | undefined): { prefix: string, home: string, profile?: ProfileOptions } | undefined {
   if (pages == null || pages === false)
     return undefined
 
-  return { prefix: (pages === true ? undefined : pages.prefix) ?? DEFAULT_PREFIX, home: (pages === true ? undefined : pages.home) ?? '/' }
+  const options = pages === true ? {} : pages
+
+  return { prefix: options.prefix ?? DEFAULT_PREFIX, home: options.home ?? '/', ...options.profile && { profile: options.profile } }
 }

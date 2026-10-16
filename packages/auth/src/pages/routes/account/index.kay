@@ -2,7 +2,7 @@
 import { t } from 'kay/i18n'
 import Message from '../../components/message.kay'
 import Proof from '../../components/proof.kay'
-import { failure, issue, proofOf, schemas } from '../../forms'
+import { failure, issue, profileIssue, proofOf, schemas } from '../../forms'
 import Badge from '@kaynooo/kayjs-ui/badge.kay'
 import Button from '@kaynooo/kayjs-ui/button.kay'
 import FormField from '@kaynooo/kayjs-ui/form-field.kay'
@@ -32,8 +32,17 @@ export const changeUsername = action(schemas.changeUsername, async ({ username }
   return 'saved'
 })
 
+export const saveProfile = action(schemas.profile, async (input, ctx) => {
+  const result = await ctx.locals.auth.saveProfile(input)
+
+  if (!result.ok)
+    return ctx.fail(400, 'errors' in result ? { errors: result.errors } : { error: 'form' as const })
+
+  return 'saved'
+})
+
 const auth = ctx.locals.auth
-const user = (await auth.user())!
+const user = await auth.requireUser()
 const features = auth.features()
 const resent = ctx.succeeded(resend) !== undefined
 const resendError = ctx.failed(resend)?.data?.error
@@ -41,6 +50,10 @@ const emailSent = ctx.succeeded(changeEmail)?.data
 const emailRefused = ctx.failed(changeEmail)?.data
 const usernameSaved = ctx.succeeded(changeUsername) !== undefined
 const usernameRefused = ctx.failed(changeUsername)?.data
+const profile = await auth.profile()
+const profileSaved = ctx.succeeded(saveProfile) !== undefined
+const profileRefused = ctx.failed(saveProfile)?.data
+const profileProblems = profileRefused && 'errors' in profileRefused ? profileRefused.errors : {}
 ---
 PageSection(title={t('auth.account.profile.title')})
   .flex.flex-col.gap-3
@@ -68,6 +81,19 @@ PageSection(title={t('auth.account.profile.title')})
       if usernameRefused && 'error' in usernameRefused
         Message(text={failure(usernameRefused.error)})
       Button(type="submit" label={t('auth.account.profile.saveUsername')})
+    if profile
+      form.flex.flex-col.gap-3(action={saveProfile})
+        for field of profile key={field.name}
+          FormField(label={field.label} issue={profileProblems[field.name] && profileIssue(profileProblems[field.name]!, field.maxLength)} required={field.required})
+            if field.type === 'textarea'
+              textarea(name={field.name} rows="4" maxlength={field.maxLength ?? 500} required={field.required}) {field.value}
+            else
+              input(name={field.name} type={field.type ?? 'text'} value={field.value} autocomplete={field.autocomplete} maxlength={field.maxLength ?? 500} required={field.required})
+        if profileSaved
+          Message(tone="success" text={t('auth.account.profile.profileSaved')})
+        if profileRefused && 'error' in profileRefused
+          Message(text={failure(profileRefused.error)})
+        Button(type="submit" label={t('auth.account.profile.saveProfile')})
 if features.email
   PageSection(title={t('auth.account.profile.changeEmail')})
     form.flex.flex-col.gap-3(action={changeEmail})

@@ -1,0 +1,16 @@
+--- server
+import { t } from 'elysia'
+
+export const page = { guards: false }
+
+export const save = action(t.Object({ text: t.String({ maxLength: 100 }) }), async ({ text }, ctx) => {
+  const user = await ctx.locals.auth.requireUser()
+
+  return `${user.email}: ${text}`
+})
+
+const user = await ctx.locals.auth.requireUser()
+const back = ctx.locals.auth.signInUrl(ctx.url.searchParams.get('back') ?? undefined)
+---
+p#note Note of {user.email}
+p#back {back}

@@ -35,7 +35,7 @@ export async function joinAs(site: TestSite, name: string, options: { confirmed?
   const email = `${name.toLowerCase()}@example.com`
 
   // The register page sends a member already signed in away.
-  await site.submit(signOut, {}, { from: '/auth/account' })
+  await signOut(site)
   expect((await site.submit(register, { email, password: 'correct horse battery' }, { from: await site.visit('/auth/register') })).url).toBe('/')
   expect((await site.submit(changeUsername, { username: name }, { from: '/auth/account' })).html).toContain('Your username is saved.')
 

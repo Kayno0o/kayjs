@@ -7,7 +7,7 @@ const part = t.String({ maxLength: PART_MAX })
 // A credential id is up to 1023 bytes, 1364 characters in base64url.
 const ID_MAX = 1366
 const credential = { id: t.String({ maxLength: ID_MAX }), rawId: t.String({ maxLength: ID_MAX }), type: t.Literal('public-key'), clientExtensionResults: t.Object({}, { additionalProperties: true }) }
-const transports = t.Optional(t.Array(t.String({ maxLength: 32 }), { maxItems: 8 }))
+const transports = t.Optional(t.Array(t.String({ maxLength: 32 }), { maxItems: 16 }))
 
 // The answer to `passkeySignInOptions()`, `twoFactorPasskeyOptions()` or `passkeyProofOptions()`, for the schema of an action calling `signInWithPasskey`, `verifyTwoFactorPasskey` or a proof.
 export const passkeyAssertion = t.Unsafe<AuthenticationResponseJSON>(t.Object({

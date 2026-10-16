@@ -88,6 +88,8 @@ export default defineMessages({
         username: 'Nom d’utilisateur',
         saveUsername: 'Enregistrer le nom',
         usernameSaved: 'Votre nom d’utilisateur est enregistré.',
+        saveProfile: 'Enregistrer le profil',
+        profileSaved: 'Votre profil est enregistré.',
         changeEmail: 'Changer d’adresse',
         newEmail: 'Nouvelle adresse',
         sendChange: 'Envoyer un lien de confirmation',
@@ -225,6 +227,7 @@ export default defineMessages({
       email: { invalid: 'Saisissez une adresse valide.', taken: 'Un compte utilise déjà cette adresse.', unchanged: 'C’est déjà votre adresse.' },
       password: { 'too-short': 'Utilisez au moins {min} caractères.', 'too-long': 'Utilisez au plus {max} caractères.', 'breached': 'Ce mot de passe figure dans une fuite de données : choisissez-en un autre.' },
       username: { 'length': 'Utilisez entre {min} et {max} caractères.', 'characters': 'Utilisez des lettres, chiffres, espaces, points, tirets et tirets bas.', 'mixed-scripts': 'Utilisez un seul alphabet.', 'taken': 'Ce nom d’utilisateur est pris.', 'unchanged': 'C’est déjà votre nom d’utilisateur.' },
+      profile: { 'required': 'Renseignez ce champ.', 'too-long': 'Utilisez {max} caractères au plus.' },
     },
   },
 })

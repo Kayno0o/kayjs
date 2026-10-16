@@ -9,7 +9,7 @@ export default defineConfig({
   plugins: [tailwind],
   seo: { name: 'Noticeboard', titleTemplate: '%s | Noticeboard', description: 'A club noticeboard, made with kay and its libraries' },
   extensions: [
-    authPages({ server: async () => (await import('./src/auth')).auth.plugin }),
+    authPages({ auth: () => import('./src/auth') }),
     mailExtension('./src/mail'),
   ],
 })

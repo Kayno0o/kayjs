@@ -8,6 +8,7 @@ import type { OAuthFlow } from './oauth/flow'
 import type { createTokenRefresher, StoredCredential } from './oauth/refresher'
 import type { OAuthProvider, OAuthUser } from './oauth/types'
 import type { OrganizationsCore } from './organizations'
+import type { ProfileOptions } from './pages'
 import type { PasskeyChallenge, Relying } from './passkeys'
 import type { AuthStore, IdentityRecord, UserRecord } from './store'
 import type { Challenge } from './twoFactor'
@@ -80,7 +81,7 @@ export interface Core {
   signInPage: string
   twoFactorPage: string
   // The prebuilt pages' prefix and home, with the `pages` option.
-  pages?: { prefix: string, home: string } | undefined
+  pages?: { prefix: string, home: string, profile?: ProfileOptions | undefined } | undefined
   // The site's name, as mails and authenticators show it.
   site: string
   limits: Limits

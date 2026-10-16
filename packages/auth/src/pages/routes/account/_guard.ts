@@ -8,11 +8,8 @@ export default guard<{ auth: Auth }>(async (ctx) => {
   if (await auth.via() === 'session')
     return
 
-  if (ctx.request.method === 'GET') {
-    const signIn = auth.features().signInPage
-
-    ctx.redirect(`${signIn}${signIn.includes('?') ? '&' : '?'}redirect=${encodeURIComponent(ctx.url.pathname + ctx.url.search)}`)
-  }
+  if (ctx.request.method === 'GET')
+    ctx.redirect(auth.signInUrl())
 
   ctx.deny(401)
 })

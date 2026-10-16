@@ -2,7 +2,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, setSystemTime, spyOn, test } from 'bun:test'
 import { testSite } from 'kay/test'
 import { totpCode, totpStep } from '../../../src/totp'
-import { mails, store } from '../src/auth'
+import { mails, profiles, store } from '../src/auth'
 
 // The fixture is served the way an app serves itself: kay's pages, kayjs-auth's plugin handed over by its extension and its prebuilt pages among them.
 const ROOT = join(import.meta.dir, '..')
@@ -17,8 +17,8 @@ const browser = () => testSite({ root: ROOT })
 
 // Imported once a site has registered the .kay loader for the fixture, a project of its own beside kayjs-auth.
 await browser()
-const { signOut } = await import(join(PAGES, 'account', '_layout.kay'))
-const { changeEmail } = await import(join(PAGES, 'account', 'index.kay'))
+const { changeEmail, saveProfile } = await import(join(PAGES, 'account', 'index.kay'))
+const { save } = await import('../src/routes/note.kay')
 const { connect } = await import(join(PAGES, 'account', 'connections.kay'))
 const { disable, enable, setUp } = await import(join(PAGES, 'account', 'security.kay'))
 const { end, endOthers } = await import(join(PAGES, 'account', 'sessions.kay'))
@@ -46,6 +46,16 @@ async function signedUp(email: string) {
   expect(account).toMatchObject({ url: '/auth/account', status: 200 })
 
   return visitor
+}
+
+// The account page's sign-out button: a form posting to kayjs-auth's own route.
+async function signOut(visitor: Awaited<ReturnType<typeof browser>>, redirect?: string, init: { headers?: Record<string, string> } = {}) {
+  const body = new FormData()
+
+  if (redirect !== undefined)
+    body.set('redirect', redirect)
+
+  return visitor.fetch('/auth/sign-out', { method: 'POST', body, ...init })
 }
 
 const lastLink = (kind: string) => new URL(mails.findLast(mail => mail.kind === kind)!.url!)
@@ -89,7 +99,9 @@ describe('the prebuilt pages', () => {
     const account = await ada.submit(register, { email: 'ada@example.com', password: PASSWORD, redirect: '/auth/account' }, { from: await ada.visit('/auth/register?redirect=%2Fauth%2Faccount') })
 
     expect(text(account, '#kayjs-auth-email')).toBe('ada@example.com')
-    expect(await ada.submit(signOut, {}, { from: '/auth/account' })).toMatchObject({ url: '/' })
+    const left = await signOut(ada, '/')
+
+    expect([left.status, left.headers.get('location')]).toEqual([303, '/'])
     expect(text(await ada.visit('/'), '#who')).toBe('Anonymous')
   })
 
@@ -145,7 +157,7 @@ describe('the prebuilt pages', () => {
   })
 
   test('a wrong password is refused with a message, and the right one signs in to where the visitor was going', async () => {
-    await (await signedUp('grace@example.com')).submit(signOut, {}, { from: '/auth/account' })
+    await signOut((await signedUp('grace@example.com')))
 
     const visitor = await browser()
     const refused = await visitor.submit(password, { identifier: 'grace@example.com', password: 'wrong password', redirect: '/auth/account' }, { from: await visitor.visit('/auth/sign-in') })
@@ -211,7 +223,7 @@ describe('the prebuilt pages', () => {
     const recoveryCodes = enabled.find('#kayjs-auth-recovery-codes li').map(code => code.text)
 
     expect(recoveryCodes).toHaveLength(10)
-    await ada.submit(signOut, {}, { from: '/auth/account' })
+    await signOut(ada)
 
     const visitor = await browser()
 
@@ -232,7 +244,7 @@ describe('the prebuilt pages', () => {
   })
 
   test('a magic link is mailed from the sign-in page and spent through the app\'s own page at that path', async () => {
-    await (await signedUp('magic@example.com')).submit(signOut, {}, { from: '/auth/account' })
+    await signOut((await signedUp('magic@example.com')))
 
     const visitor = await browser()
 
@@ -251,7 +263,7 @@ describe('the prebuilt pages', () => {
   })
 
   test('a forgotten password is reset through the mailed link', async () => {
-    await (await signedUp('reset@example.com')).submit(signOut, {}, { from: '/auth/account' })
+    await signOut((await signedUp('reset@example.com')))
 
     const visitor = await browser()
 
@@ -491,4 +503,126 @@ test('an organization\'s guard reads its route\'s param, for its page and its ac
   expect(await ada.call(rename, { name: 'Acme Inc' }, { from: '/orgs/acme' })).toBe('Acme Inc')
   await expect(grace.call(rename, { name: 'Taken' }, { from: '/orgs/acme' })).rejects.toThrow()
   expect((await store.organizations!.get('o1'))!.name).toBe('Acme Inc')
+})
+
+describe('a site on kayjs-auth with no wiring of its own', () => {
+  test('signing out is a post to kayjs-auth\'s route: it ends the session and goes to a path of the site, never to another', async () => {
+    for (const hostile of ['//evil.test', 'https://evil.test/', '/\\evil.test', 'javascript:alert(1)']) {
+      const ada = await signedUp(`out-${Math.random()}@example.com`)
+      const left = await signOut(ada, hostile)
+
+      expect([left.status, left.headers.get('location')]).toEqual([303, '/'])
+      expect(text(await ada.visit('/'), '#who')).toBe('Anonymous')
+    }
+
+    const grace = await signedUp('grace-out@example.com')
+    const left = await signOut(grace, '/auth/sign-in?redirect=%2Fnote')
+
+    expect([left.status, left.headers.get('location')]).toEqual([303, '/auth/sign-in?redirect=%2Fnote'])
+    // A line break does not split the header: the path comes back without it.
+    expect((await signOut(await signedUp('crlf@example.com'), '/ok\r\nSet-Cookie: x=1')).headers.get('location')).not.toMatch(/[\r\n]/)
+    // No redirect field, or an anonymous visitor posting, goes home as well.
+    expect((await signOut(await browser())).headers.get('location')).toBe('/')
+  })
+
+  test('a link, a prefetch or a post from another site signs no one out', async () => {
+    const ada = await signedUp('keeps@example.com')
+
+    expect((await ada.fetch('/auth/sign-out')).status).toBe(404)
+    expect((await signOut(ada, '/', { headers: { origin: 'https://evil.test' } })).status).toBe(403)
+    expect(text(await ada.visit('/'), '#who')).toBe('Signed in as keeps@example.com')
+  })
+
+  test('the account page signs out with a form of its own, back to the language\'s home', async () => {
+    const ada = await signedUp('form@example.com')
+
+    for (const [path, home] of [['/auth/account', '/'], ['/fr/auth/account', '/fr']] as const) {
+      const page = await ada.visit(path)
+
+      expect(page.find('form[action$="/sign-out"]').map(form => [form.attributes.action, form.attributes.method])).toEqual([['/auth/sign-out', 'post']])
+      expect(page.find('form[action$="/sign-out"] input[name="redirect"]').map(input => input.attributes.value)).toEqual([home])
+    }
+  })
+
+  test('a page asking for a user sends an anonymous visitor to sign in and back with its query, and an action refuses with a 401', async () => {
+    const anonymous = await browser()
+
+    expect(await anonymous.visit('/note?a=1&b=%2F')).toMatchObject({ url: '/auth/sign-in?redirect=%2Fnote%3Fa%3D1%26b%3D%252F', status: 200 })
+    expect((await anonymous.refusal(save, { text: 'hi' }, { from: '/note' })).status).toBe(401)
+
+    const ada = await signedUp('note@example.com')
+
+    expect(text(await ada.visit('/note'), '#note')).toBe('Note of note@example.com')
+    expect(await ada.call(save, { text: 'hi' }, { from: '/note' })).toBe('note@example.com: hi')
+  })
+
+  test('the sign-in link leads back here by default and to a path of the site when told, never to another site', async () => {
+    const ada = await signedUp('back@example.com')
+    const backs = async (query: string) => text(await ada.visit(`/note${query}`), '#back')
+
+    expect(await backs('')).toBe('/auth/sign-in?redirect=%2Fnote')
+    expect(await backs('?back=/auth/account')).toBe('/auth/sign-in?redirect=%2Fauth%2Faccount')
+
+    for (const hostile of ['//evil.test', 'https://evil.test', '/\\evil.test', 'javascript:alert(1)'])
+      expect(await backs(`?back=${encodeURIComponent(hostile)}`)).toBe('/auth/sign-in?redirect=%2F')
+  })
+
+  test('a request reads its user once, however many times a page and its guards ask', async () => {
+    const ada = await signedUp('once@example.com')
+    const reads = spyOn(store.users, 'get')
+
+    try {
+      await ada.visit('/note')
+
+      expect(reads).toHaveBeenCalledTimes(1)
+    }
+    finally {
+      reads.mockRestore()
+    }
+  })
+})
+
+describe('the profile form of the account page', () => {
+  test('shows the app\'s fields with what it holds, stores what passes and drops what is no field', async () => {
+    profiles.clear()
+
+    const ada = await signedUp('profile@example.com')
+    const page = await ada.visit('/auth/account')
+
+    expect(page.find('input[name="displayName"]').map(input => [input.attributes.maxlength, input.attributes.required])).toEqual([['20', '']])
+    expect(page.find('textarea[name="bio"]')).toHaveLength(1)
+
+    const saved = await ada.submit(saveProfile, { displayName: '  Ada  ', bio: 'Maths', ignored: 'x' } as never, { from: '/auth/account' })
+
+    expect([...profiles.values()]).toEqual([{ displayName: 'Ada', bio: 'Maths' }])
+    expect(saved.find('input[name="displayName"]')[0]?.attributes.value).toBe('Ada')
+    expect(saved.text()).toContain('Your profile is saved.')
+  })
+
+  test('says what was refused, in the page\'s language, and stores nothing then', async () => {
+    profiles.clear()
+
+    const ada = await signedUp('refused@example.com')
+    const refused = async (fields: Record<string, string>, from = '/auth/account') => (await ada.submit(saveProfile, fields as never, { from })).text()
+
+    expect(await refused({ displayName: '   ', bio: '' })).toContain('Fill this in.')
+    expect(await refused({ displayName: 'x'.repeat(21), bio: '' })).toContain('Use at most 20 characters.')
+    expect(await refused({ displayName: 'a', bio: 'y'.repeat(501) })).toContain('Use at most 500 characters.')
+    expect(await refused({ displayName: 'admin', bio: '' })).toContain('Pick another name.')
+    expect(await refused({ displayName: '', bio: '' }, '/fr/auth/account')).toContain('Renseignez ce champ.')
+    expect(profiles.size).toBe(0)
+  })
+
+  test('an anonymous visitor cannot save one, and a value with markup is shown as text', async () => {
+    profiles.clear()
+
+    expect((await (await browser()).refusal(saveProfile, { displayName: 'a' } as never, { from: '/auth/account' })).status).toBe(401)
+    expect(profiles.size).toBe(0)
+
+    const ada = await signedUp('markup@example.com')
+    const page = await ada.submit(saveProfile, { displayName: '<b>Ada</b>', bio: '</textarea><script>boom()</script>' } as never, { from: '/auth/account' })
+
+    expect(page.html).not.toContain('<script>boom()')
+    expect(page.find('textarea[name="bio"]')[0]?.text).toBe('</textarea><script>boom()</script>')
+  })
 })

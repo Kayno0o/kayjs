@@ -25,7 +25,7 @@ it('pins a notice, which every open board hears of at once and confirmed members
   const reader = await joinAs(site, 'Ada', { confirmed: true })
   const unconfirmed = await joinAs(site, 'Linus')
 
-  await site.submit(signOut, {}, { from: '/auth/account' })
+  await signOut(site)
 
   const watching = site.socket(board, '/')
 

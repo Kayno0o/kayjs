@@ -102,7 +102,7 @@ describe('llms.txt and its docs', () => {
     expect(Object.keys(await import('kay/internal')).sort()).toEqual(['actionStub', 'autoDefer', 'formAction', 'formChecked', 'formDescribed', 'formError', 'formInvalid', 'formMarked', 'formProtection', 'formValue', 'isAction', 'registerActions', 'registerImage'])
     expect(Object.keys(await import('kay/internal/server'))).toEqual(['probeHealth', 'registerBundle'])
     expect(Object.keys(await import('kay/internal/title'))).toEqual(['pageTitle'])
-    expect(Object.keys(await import('kay/library')).sort()).toEqual(['GENERATE_SECRET', 'MIN_SECRET_LENGTH', 'READ_METHODS', 'RESTART_RELOAD', 'UNSAFE_ATTRIBUTE', 'UNSAFE_TAGS', 'acceptedLocales', 'durationSeconds', 'escapeHtml', 'isUrlAttribute', 'matchLocale', 'openWith', 'sameText', 'sealWith', 'sourceHash', 'underKayDev', 'validLocale', 'weakSecrets'])
+    expect(Object.keys(await import('kay/library')).sort()).toEqual(['GENERATE_SECRET', 'MIN_SECRET_LENGTH', 'READ_METHODS', 'RESTART_RELOAD', 'UNSAFE_ATTRIBUTE', 'UNSAFE_TAGS', 'acceptedLocales', 'durationSeconds', 'escapeHtml', 'isUrlAttribute', 'matchLocale', 'openWith', 'sameText', 'sealWith', 'sourceHash', 'stoppers', 'underKayDev', 'validLocale', 'weakSecrets'])
     expect(['actionStub', 'formAction', 'isAction', 'registerActions'].filter(name => name in runtime)).toEqual([])
     expect(['registerBundle', 'shutDown', 'events'].filter(name => name in server)).toEqual([])
     expect(server).toMatchObject({ shutdown: expect.any(Function), eventStream: expect.any(Function) })

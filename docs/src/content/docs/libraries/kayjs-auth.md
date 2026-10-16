@@ -34,18 +34,18 @@ export const auth = createAuth({
 
 `secret` is at least 32 characters and not the session's secret.
 
-Then hand the plugin to kay in `kay.config.ts`. It is imported only when the server starts, so the config never loads your database:
+Then declare it in `kay.config.ts`. The module loads only when the server starts, so the config never loads your database:
 
 ```ts
 import { authPages } from '@kaynooo/kayjs-auth'
 import { defineConfig } from 'kay/server'
 
 export default defineConfig({
-  extensions: [authPages({ server: async () => (await import('./src/auth')).auth.plugin })],
+  extensions: [authPages({ auth: () => import('./src/auth') })],
 })
 ```
 
-Every page, action and guard can now read `ctx.locals.auth`, typed. `pages: true` serves the prebuilt pages under `/auth`: `/auth/sign-in`, `/auth/register`, `/auth/account` and the rest. A file of yours at the same path, such as `src/routes/auth/sign-in.kay`, replaces that page. To write every page yourself, leave out `pages` and set `signInPage` to your sign-in page.
+Every page, action and guard can now read `ctx.locals.auth`, typed. `pages: true` serves the prebuilt pages under `/auth`: `/auth/sign-in`, `/auth/register`, `/auth/account` and the rest. A file of yours at the same path, such as `src/routes/auth/sign-in.kay`, replaces that page. To write every page yourself, leave out `pages` and set `signInPage` to your sign-in page, and list `authExtension(() => import('./src/auth'))` instead of `authPages`.
 
 ### Postgres
 
@@ -75,6 +75,25 @@ else
 ```
 
 On a plain Elysia app, which has no Origin check of kay's own, a browser's cross-site POST or websocket upgrade reads the session as signed out, and a session write from it, such as a sign-in or a sign-out, is refused with a 403. Its `Origin` must name the request's host or the host of `url`, so an app behind a proxy that does not pass `Host` on sets `url`. `auth.socketUser(ws)` answers `null` and closes such a socket. Requests with no `Origin` (scripts, webhooks), safe methods and `Authorization: Bearer` tokens are left alone.
+
+A page or an action that needs a user asks for one with `requireUser()`. An anonymous visitor reading a page goes to the sign-in page and comes back, and a post, an action's call included, is refused with a 401, so no check is written by hand:
+
+```kay
+--- server
+const user = await ctx.locals.auth.requireUser()
+---
+p Hello {user.email}
+```
+
+For a link of your own, `signInUrl()` is the sign-in page leading back to the current page, and `signInUrl('/pricing')` to another path of the site. A path that is not of the site leads home.
+
+A sign-out button is a form posting to `/auth/sign-out`, with no action of yours. Its `redirect` field says where to go next, a path of the site, `/` by default. A link signs no one out, and a post from another site is refused:
+
+```kay
+form(method="post" action="/auth/sign-out")
+  input(type="hidden" name="redirect" value="/")
+  button Sign out
+```
 
 ## Signing in with a password
 
@@ -108,9 +127,28 @@ form(action={signIn})
 
 Changing what protects the account (`changePassword`, `changeEmail`, `deleteAccount`, the second factor, passkeys, linked providers, tokens) takes a `proof`: `{ password }`, `{ code }` from the authenticator or a recovery code, or `{ passkey }`. With two-factor on, `changeEmail`, `disableTwoFactor`, `regenerateRecoveryCodes`, `passkeyRegistrationOptions` and `linkProvider` refuse the password alone and take the code or a passkey.
 
+## Your own profile fields
+
+A site that keeps data of its own on its users, such as a display name, keeps the prebuilt account pages. `pages.profile` adds those fields to the profile form:
+
+```ts
+export const auth = createAuth({
+  // ...
+  pages: {
+    profile: {
+      fields: { displayName: { label: 'Display name', required: true, maxLength: 40 }, bio: { label: 'Bio', type: 'textarea' } },
+      load: async user => db.profiles.get(user.id),
+      save: async (user, values) => { await db.profiles.set(user.id, values) },
+    },
+  },
+})
+```
+
+`load` gives what each field holds now. `save` gets the values trimmed, after `required` and `maxLength` (500 by default) passed, and may return `{ errors: { displayName: 'Taken' } }` to refuse one. A page of your own calls `auth.profile()` and `auth.saveProfile(values)`.
+
 ## Passkeys in an island
 
-An island asks for a passkey with `@kaynooo/kayjs-auth/browser`, which calls the browser's own WebAuthn methods and ships no library. `askPasskey(options)` and `makePasskey(options)` take the options an action returned and answer the JSON the next action takes, or null when the person picked none. `canAskPasskey()` and `canMakePasskey()` say whether to show the button, and `passkeyFailure(caught, errors, failed)` gives the message for what threw.
+An island asks for a passkey with `@kaynooo/kayjs-auth/browser`, which calls the browser's own WebAuthn methods and ships no library. `askPasskey(options)` and `makePasskey(options)` take the options an action returned and answer the JSON the next action takes, or null when the person picked none. `askPasskey(options, { autofill: true })` offers the passkeys in the autofill of a field with `autocomplete="username webauthn"` instead. `canAskPasskey()` and `canMakePasskey()` say whether to show the button, and `passkeyFailure(caught, errors, failed)` gives the message for what threw.
 
 An action takes that answer with `passkeyAssertion` for a sign-in, a second factor or a proof, and `passkeyAttestation` for adding a passkey. They type it as kayjs-auth reads it, so no cast is needed, and refuse an answer missing a part with a 422.
 

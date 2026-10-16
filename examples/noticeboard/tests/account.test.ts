@@ -31,7 +31,7 @@ it('joins, signed in at once, and mails a link that confirms the address', async
 })
 
 it('words what kayjs-auth refuses a new member for', async () => {
-  await site.submit(signOut, {}, { from: '/auth/account' })
+  await signOut(site)
 
   const page = await site.submit(register, { email: 'not an address', password: 'short' }, { from: await site.visit('/auth/register') })
 
@@ -41,7 +41,7 @@ it('words what kayjs-auth refuses a new member for', async () => {
 
 it('keeps the account section for members, and comes back to it after signing in', async () => {
   await joinAs(site, 'Grace')
-  await site.submit(signOut, {}, { from: '/auth/account' })
+  await signOut(site)
   expect((await site.visit('/auth/account')).url).toBe('/auth/sign-in?redirect=%2Fauth%2Faccount')
   expect((await site.submit(password, { identifier: 'nobody', password: 'wrong password!' }, { from: await site.visit('/auth/sign-in') })).status).toBe(400)
   expect((await site.submit(password, { identifier: 'grace', password: 'correct horse battery', redirect: '/auth/account' }, { from: await site.visit('/auth/sign-in?redirect=%2Fauth%2Faccount') })).url).toBe('/auth/account')
@@ -50,7 +50,7 @@ it('keeps the account section for members, and comes back to it after signing in
 it('signs in from a mailed link, which only its button spends', async () => {
   const email = await joinAs(site, 'Linus')
 
-  await site.submit(signOut, {}, { from: '/auth/account' })
+  await signOut(site)
   outbox.clear()
   await site.submit(magicLink, { email }, { from: await site.visit('/auth/sign-in') })
   const token = await mailedToken(site, email, '/auth/magic-link')
@@ -58,20 +58,20 @@ it('signs in from a mailed link, which only its button spends', async () => {
   expect((await site.visit(`/auth/magic-link?token=${token}`)).find('nav a')[1]?.text).toBe('Sign in')
   expect((await site.submit(spend, { token }, { from: `/auth/magic-link?token=${token}` })).find('nav a')[1]?.text).toBe('Linus')
 
-  await site.submit(signOut, {}, { from: '/auth/account' })
+  await signOut(site)
   expect((await site.submit(spend, { token }, { from: `/auth/magic-link?token=${token}` })).status).toBe(400)
 })
 
 it('resets a forgotten password from a mailed link', async () => {
   const email = await joinAs(site, 'Barbara', { confirmed: true })
 
-  await site.submit(signOut, {}, { from: '/auth/account' })
+  await signOut(site)
   outbox.clear()
   await site.submit(request, { email }, { from: await site.visit('/auth/reset-password') })
   const token = await mailedToken(site, email, '/auth/reset-password')
 
   expect((await site.submit(reset, { token, password: 'short' }, { from: `/auth/reset-password?token=${token}` })).status).toBe(400)
   expect((await site.submit(reset, { token, password: 'a brand new passphrase' }, { from: `/auth/reset-password?token=${token}` })).find('nav a')[1]?.text).toBe('Barbara')
-  await site.submit(signOut, {}, { from: '/auth/account' })
+  await signOut(site)
   expect((await site.submit(password, { identifier: email, password: 'a brand new passphrase' }, { from: await site.visit('/auth/sign-in') })).url).toBe('/')
 })

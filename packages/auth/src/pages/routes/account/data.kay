@@ -34,7 +34,7 @@ export const signInAgain = action(async (ctx) => {
 })
 
 const auth = ctx.locals.auth
-const user = (await auth.user())!
+const user = await auth.requireUser()
 const features = auth.features()
 const refused = ctx.failed(remove)?.data?.error
 const notProved = ctx.failed(prove)?.data?.error

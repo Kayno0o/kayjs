@@ -58,3 +58,6 @@ export function usernameProblem(username: string): UsernameProblem | undefined {
 
   return mixesConfusableScripts(name) ? 'mixed-scripts' : undefined
 }
+
+// The longest a profile field of the account page holds unless it says otherwise.
+export const PROFILE_MAX_LENGTH = 500

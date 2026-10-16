@@ -22,6 +22,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 - A page whose stylesheets compress under about 14 KB together now carries them as `style` elements in its head in production, `kay build` prerendered pages and `--static` exports included, where it linked them: the bytes of those pages change, and a stylesheet no longer shows as a request. Above the limit nothing changes. No deprecated lint covers it, as nothing in the app's code is the old form: it is a default.
 - An app keeping every page's stylesheets linked sets `inlineStyles: false` in `kay.config.ts`; one that wants them all inlined whatever their size keeps `inlineStyles: true`. A test or a script reading a page's `link rel="stylesheet"` to fetch the file reads the `style` text instead, or sets `inlineStyles: false`.
 
+### kayjs-auth's account layout has no `signOut` action
+
+- The account pages sign out with a post to `/auth/sign-out` (under the `prefix` of `createAuth`), so `import { signOut } from '@kaynooo/kayjs-auth/pages/account/_layout.kay'` in a test or a page fails `kay check`: post to the route instead, `site.fetch('/auth/sign-out', { method: 'POST' })`, or put the button in your own page as a form posting there. No lint can find it: the import already fails `kay check` as a missing export. [kayjs-auth](../packages/auth/llms.txt)
+
 ### `deprecated-schema-name` is in the `deprecated` group
 
 - `lints: { code: ... }` in `kay.config.ts` no longer sets it, and `kay check --only code` no longer lists it: set `deprecated` or the lint by name. `kay upgrade` rewrites it and every later deprecation, see [Checks](checks.md#apply-the-quick-fixes).

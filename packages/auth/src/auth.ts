@@ -14,7 +14,7 @@ import type { ScopeRequirement } from './gate'
 import type { Limits } from './limits'
 import type { LinkProviderResult, OAuthFailure } from './oauth/flow'
 import type { AcceptResult, CreateOrganizationResult, Invitation, InviteResult, Member, MemberResult, Membership, OrganizationFailure, OrganizationsOptions, UpdateOrganizationResult } from './organizations'
-import type { AuthFeatures, AuthPagesOptions } from './pages'
+import type { AuthFeatures, AuthPagesConfig, ProfileFieldView, ProfileProblem } from './pages'
 import type { Passkey, PasskeyOptionsResult, PasskeySignInResult, RegisterPasskeyResult } from './passkeys'
 import type { CreateUserInput, CreateUserResult, PasswordSignInInput, PasswordSignInResult, RegisterInput, RegisterResult } from './password'
 import type { RoleHierarchy } from './roles'
@@ -25,7 +25,7 @@ import type { AuthStore, LinkType, SessionRecord, UserRecord } from './store'
 import type { Proof, ProofFailure, TwoFactorResult, TwoFactorSetup } from './twoFactor'
 import type { Level, PolicyContext, Predicate, Requirement } from './types'
 import { Elysia } from 'elysia'
-import { READ_METHODS } from 'kay/library'
+import { READ_METHODS, stoppers } from 'kay/library'
 import { clientAddress, crossSiteRefused, rateKey } from 'kay/server'
 import { changePassword, changeUsername, deleteAccount, unlink } from './account'
 import { actingAdmin, adminAuditLog, banUser, changeRole, deleteUser, getUser, isAdmin, listUsers, unbanUser } from './admin'
@@ -45,6 +45,7 @@ import { localeTemplates } from './mail'
 import { noteSignIn, notify } from './notify'
 import { createOAuthClient } from './oauth/client'
 import { finishOAuth, providerToken, sealTokens, startLink, startOAuth } from './oauth/flow'
+import { safeRedirect } from './oauth/redirect'
 import { createOAuthTokenRefresher } from './oauth/refresher'
 import { acceptInvitation, createOrganization, declineInvitation, deleteOrganization, getInvitation, getMembership, holdsInOrganization, invite, listInvitations, listMembers, listMemberships, myInvitations, organizationsCore, removeMember, revokeInvitation, setMemberRoles, updateOrganization } from './organizations'
 import { featuresOf, pagePaths, pagesOf } from './pages'
@@ -53,6 +54,7 @@ import { createUser, register, signInWithPassword } from './password'
 import { pruneWhenDue } from './prune'
 import { meetsRequirement } from './requirement'
 import { createRoleHierarchy } from './roles'
+import { PROFILE_MAX_LENGTH } from './rules'
 import { applyLifetime, chooseRemember, listSessions, liveSession, openSession, revokeBearerTokens } from './sessions'
 import { challenged, completeSignIn, disableTwoFactor, enableTwoFactor, provedLately, regenerateRecoveryCodes, reprove, setUpTwoFactor, verifyTwoFactor } from './twoFactor'
 
@@ -121,7 +123,7 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   // Where a sign-in goes to ask for the second factor, `/two-factor` by default: a page whose form posts the code to an action calling `verifyTwoFactor`.
   twoFactorPage?: string | undefined
   // The prebuilt pages, `authPages()` as kay.config.ts lists it or `true` for its defaults: the sign-in, two-factor and sessions pages and the mailed links default to them.
-  pages?: boolean | AuthPagesOptions | undefined
+  pages?: boolean | AuthPagesConfig | undefined
   // Mail for email verification, password resets, magic links and email changes.
   email?: EmailOptions | undefined
   // OAuth apps by the name their routes take: `{ discord: { provider: discordProvider(), clientId, clientSecret } }`.
@@ -241,6 +243,79 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     const record = await this.record()
 
     return record && publicUser(record)
+  }
+
+  // The signed-in user, who must be there: an anonymous visitor reading a page goes to the sign-in page and comes back, with `pages`, and any other request, an action's included, is refused with a 401, as `auth.guard()` does. For a page or an action to ask for a user without a guard above it; the user is read once per request.
+  async requireUser(): Promise<User> {
+    const user = await this.user()
+
+    if (user)
+      return user
+
+    const { redirect, deny } = stoppers(this.request)
+
+    if (this.core.pages && READ_METHODS.has(this.request.method))
+      redirect(this.signInUrl())
+
+    return deny(401, 'Sign in to continue')
+  }
+
+  // The sign-in page with `?redirect=` set to where it should lead back: this request's path and query, or `back`. A `back` that is not a path of this site leads home, so no link built from input sends anyone away.
+  signInUrl(back?: string): string {
+    const here = new URL(this.request.url)
+
+    return withQuery(this.core.signInPage, `redirect=${encodeURIComponent(safeRedirect(back ?? here.pathname + here.search))}`)
+  }
+
+  // The fields of the profile form the account page shows beside the username, with what this user holds in each, or null when `pages.profile` is not set or no one is signed in.
+  async profile(): Promise<ProfileFieldView[] | null> {
+    const profile = this.core.pages?.profile
+    const user = profile && await this.user()
+
+    if (!profile || !user)
+      return null
+
+    const held = await profile.load(user)
+
+    return Object.entries(profile.fields).map(([name, field]) => ({ ...field, name, value: held[name] ?? '' }))
+  }
+
+  // Stores the values posted from that form through `pages.profile.save`, once trimmed and checked against each field's `required` and `maxLength`: names that are no field are dropped, and nothing is stored while any field is refused.
+  async saveProfile(values: Record<string, unknown>): Promise<{ ok: true } | { ok: false, error: 'signed-out' | 'unavailable' } | { ok: false, errors: Record<string, ProfileProblem> }> {
+    const profile = this.core.pages?.profile
+
+    if (!profile)
+      return { ok: false, error: 'unavailable' }
+
+    const user = await this.user()
+
+    if (!user)
+      return { ok: false, error: 'signed-out' }
+
+    const clean: Record<string, string> = {}
+    const errors: Record<string, ProfileProblem> = {}
+
+    for (const [name, field] of Object.entries(profile.fields)) {
+      const raw = values[name]
+      const value = typeof raw === 'string' ? raw.trim() : ''
+
+      clean[name] = value
+
+      if (value === '' && field.required)
+        errors[name] = 'required'
+      else if (value.length > (field.maxLength ?? PROFILE_MAX_LENGTH))
+        errors[name] = 'too-long'
+    }
+
+    if (Object.keys(errors).length > 0)
+      return { ok: false, errors }
+
+    const refused = await profile.save(user, clean)
+
+    if (!refused)
+      return { ok: true }
+
+    return { ok: false, errors: Object.fromEntries(Object.entries(refused.errors).flatMap(([name, message]) => typeof message === 'string' && Object.hasOwn(profile.fields, name) ? [[name, { message }]] : [])) }
   }
 
   // How `user()` found the user: their session, or a bearer token; null when anonymous.
@@ -566,12 +641,12 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     return this.core.store.sessions.delete(record.id, id)
   }
 
-  // The options for `startRegistration` of `@simplewebauthn/browser`, to make a passkey for the signed-in user once `proof` re-proves them, the second factor when it is on.
+  // The options for `makePasskey` of `@kaynooo/kayjs-auth/browser`, to make a passkey for the signed-in user once `proof` re-proves them, the second factor when it is on.
   async passkeyRegistrationOptions(proof: Proof): Promise<PasskeyOptionsResult<PublicKeyCredentialCreationOptionsJSON, ProofFailure>> {
     return passkeyRegistrationOptions(this[STATE], proof)
   }
 
-  // Keeps the passkey `startRegistration` made, under `name` or the browser and system it was made on.
+  // Keeps the passkey `makePasskey` made, under `name` or the browser and system it was made on.
   async registerPasskey(response: RegistrationResponseJSON, name?: string): Promise<RegisterPasskeyResult> {
     return registerPasskey(this[STATE], response, name)
   }
@@ -588,7 +663,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     return removePasskey(this[STATE], id, proof)
   }
 
-  // The options for `startAuthentication` of `@simplewebauthn/browser`, naming no account; with `useBrowserAutofill` the browser offers the passkeys in the sign-in field's autofill.
+  // The options for `askPasskey` of `@kaynooo/kayjs-auth/browser`, naming no account; with its `autofill` the browser offers the passkeys in the sign-in field's autofill.
   async passkeySignInOptions(): Promise<PublicKeyCredentialRequestOptionsJSON> {
     return passkeySignInOptions(this[STATE])
   }
@@ -952,6 +1027,12 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
       set.headers['cache-control'] = 'no-store'
 
       return exported.data
+    })
+    // The sign-out button of any page: a form posting here, with `redirect` for where to go after, a path of the site, else the pages' home or `/`. A post only, so a link or a prefetch signs no one out, and a cross-site one is refused with a 403.
+    .post(`${core.prefix}/sign-out` as `${Prefix}/sign-out`, async ({ auth, body, redirect }) => {
+      await auth.signOut()
+
+      return redirect(safeRedirect(text((body as Record<string, unknown> | undefined)?.redirect), core.pages?.home ?? '/'), 303)
     })
     // A GET, so a sign-in link works without JavaScript: give it `data-no-prefetch` so a hover starts nothing.
     // Typed as their literal paths, so `kay check` checks links to them once the app registers its Elysia app.
