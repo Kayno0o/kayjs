@@ -382,13 +382,14 @@ function redirectChecks(root: string, options: CheckOptions, { routes, publicPat
 
 // Whether a component renders as an island, through the build's cache of compiles.
 async function rendersAsIslandCached(cacheDir: string, file: string, source: string): Promise<boolean> {
-  const slot = cacheEntry(cacheDir, file, 'renders-island', source)
+  const signals = importedSignals(file, source)
+  const slot = cacheEntry(cacheDir, file, 'renders-island', JSON.stringify([signals, source]))
   const cached = await readCacheEntry<boolean>(slot)
 
   if (cached !== undefined)
     return cached
 
-  const island = rendersAsIsland(source)
+  const island = rendersAsIsland(source, signals)
 
   await writeCacheEntry(slot, island)
 

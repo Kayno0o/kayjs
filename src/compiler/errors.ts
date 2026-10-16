@@ -256,7 +256,7 @@ export const ERRORS = {
   },
   'export-server-render': {
     group: 'export',
-    summary: 'A page with something only a server renders per request: a server island, a form stamp or work challenge, a deferred island with no browser entry.',
+    summary: 'A page with something only a server renders per request: a server island, a form stamp or work challenge, a live value, a deferred island with no browser entry.',
     fix: { file: 'llms/routing.md', heading: 'Server islands' },
   },
   'export-guard': {

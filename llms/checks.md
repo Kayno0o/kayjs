@@ -303,7 +303,7 @@ kay lint --cache
 | `export-needs-params` | export | A page with params whose `prerender` lists none, or that sets `prerender: false`, or lists values its matchers refuse. | [Prerendering](routing.md#prerendering) |
 | `export-image-route` | export | A page linking an image only the image route resizes, which no file of the export holds. | [Static export](routing.md#static-export) |
 | `export-site-url` | export | A page reading the site's URL when neither `site`, SITE_URL nor ORIGIN sets it. | [Site defaults and social cards](head.md#site-defaults-and-social-cards) |
-| `export-server-render` | export | A page with something only a server renders per request: a server island, a form stamp or work challenge, a deferred island with no browser entry. | [Server islands](routing.md#server-islands) |
+| `export-server-render` | export | A page with something only a server renders per request: a server island, a form stamp or work challenge, a live value, a deferred island with no browser entry. | [Server islands](routing.md#server-islands) |
 | `export-guard` | export | A page or endpoint a guard covers, or that `requireGuards` leaves with no guard: only a server runs one per request. | [Guards](server.md#guards) |
 | `export-action` | export | A page exporting an action, which only a server can take. | [Static export](routing.md#static-export) |
 | `export-path-clash` | export | Two pages that would be prerendered to the same file. | [Prerendering](routing.md#prerendering) |

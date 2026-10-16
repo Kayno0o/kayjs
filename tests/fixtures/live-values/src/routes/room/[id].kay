@@ -1,0 +1,9 @@
+---
+import Nav from '../../components/nav.kay'
+import RoomUsers from '../../components/room-users.kay'
+--- server
+const { id } = ctx.params
+---
+Nav
+h1 Room {id}
+RoomUsers(id={id})

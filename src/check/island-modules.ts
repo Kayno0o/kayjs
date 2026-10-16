@@ -4,6 +4,7 @@ import { sep } from 'node:path'
 import { resolveFrom, transpilerFor } from '../build/files'
 import { importsOf } from '../build/libraries'
 import { buildFiles, promotedFiles } from '../build/promotion'
+import { importedSignals } from '../build/signals'
 import { browserRole } from '../compiler'
 import { parseKay } from '../compiler/parser'
 import { islandOnlyComponents } from './island-only'
@@ -36,7 +37,7 @@ export async function browserModules(root: string, routesDir: string, extensions
 
   await Promise.all(built.files.filter(file => !sources.has(file)).map(async file => sources.set(file, await Bun.file(file).text())))
 
-  const roles = built.files.map(file => browserRole(sources.get(file)!, file))
+  const roles = built.files.map(file => browserRole(sources.get(file)!, file, importedSignals(file, sources.get(file)!)))
   const files = [...own.keys()]
   const isPromoted = await promotedFiles(root, built.libraries, built.files, roles)
   const islandOnly = await islandOnlyComponents(root, routesDir, files, sources)

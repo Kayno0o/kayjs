@@ -46,6 +46,7 @@ import { runGuards } from './guards'
 import { historyScript } from './history'
 import { hydrationScript } from './hydration'
 import { DEFAULT_LANG, messagesScript } from './i18n'
+import { liveScript } from './live'
 import { registerScript } from './offline'
 import { errorPage } from './overlay'
 import { pageSetting } from './page-settings'
@@ -805,7 +806,7 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
   const shipsEntry = hasIslands || posts || (client.entry !== undefined && scan?.modes.includes('defer') === true)
   const scripts = shipsEntry ? islandScripts(client, islands.eager, streamed, hasIslands) + (posts ? formsScript(forms, options.dev) : '') + workScript(forms, options.prerendering === true) : ''
   const lang = localeState()?.locale ?? options.lang ?? DEFAULT_LANG
-  const islandData = hasIslands ? messagesScript(islands.messages, true) + outcomeScript(rendering.carried()) + queryScript(rules) : ''
+  const islandData = (hasIslands ? messagesScript(islands.messages, true) + outcomeScript(rendering.carried()) + queryScript(rules) : '') + liveScript()
   const written = `${htmlOpen(lang, head.root)}<head>${headStart(head)}${stylesheets(client, styled)}${head.html}${scripts}${islandData}${kayMetas(options, hasIslands)}${speculationRules(options.prefetch, options.base)}${client.navigation === true && !shipsEntry ? historyScript : ''}${options.offline ? registerScript(options.base ?? '') : ''}${options.dev ? devScripts(client) + (options.prerendering ? '' : requestBlock(files, rendering, options.base ?? '')) : ''}</head><body>${body}`
   const start = marks === undefined ? written : placeFieldMarks(written, marks)
 

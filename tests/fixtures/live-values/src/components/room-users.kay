@@ -1,0 +1,6 @@
+---
+import { room } from '../live'
+
+const { id } = props<{ id: string }>()
+---
+p.users(data-room={id}) {room(id).users} in {id}

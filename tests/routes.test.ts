@@ -86,6 +86,7 @@ describe('kay routes', () => {
         'GET | /_kay/card | kay | share cards',
         'GET | /_kay/files/* | kay | stored files',
         'POST | /_kay/error | kay | browser error reports',
+        'POST | /_kay/live | kay | live values',
         'GET | /favicon.ico | kay | favicon, unless the app serves it',
         'GET | /apple-touch-icon.png | kay | favicon, unless the app serves it',
         'GET | /icon-192.png | kay | favicon, unless the app serves it',

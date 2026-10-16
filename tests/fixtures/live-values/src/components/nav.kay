@@ -1,0 +1,5 @@
+nav
+  a.home(href="/") Home
+  a.about(href="/about") About
+  a.other(href="/other") Other
+  a.lobby(href="/room/lobby") Lobby

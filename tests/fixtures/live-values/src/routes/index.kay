@@ -1,0 +1,9 @@
+---
+import Nav from '../components/nav.kay'
+import Online from '../components/online.kay'
+import RoomUsers from '../components/room-users.kay'
+---
+Nav
+h1 Home
+Online
+RoomUsers(id="lobby")

@@ -35,6 +35,10 @@ export interface ServerScope {
   report: (error: unknown) => void
   // The path of the page being rendered, percent-encoded as requested.
   path: string
+  // The live values the render read, by their id and key, which the page ships to its islands.
+  live?: Map<string, { id: string, key: string, value: unknown, sent?: boolean }>
+  // The ids of live values a component names without reading them yet, which the page proves as it does what was read.
+  liveIds?: Set<string>
 }
 
 const CLEAN = 0

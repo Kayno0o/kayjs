@@ -44,6 +44,7 @@ export const KAY_EXPORTS: Record<string, 'free' | 'request' | 'local'> = {
   ApiError: 'free',
   persisted: 'local',
   queryParam: 'request',
+  live: 'request',
   defer: 'request',
   guard: 'request',
   action: 'request',

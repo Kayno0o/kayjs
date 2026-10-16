@@ -1,0 +1,6 @@
+---
+import Nav from '../components/nav.kay'
+---
+Nav
+h1 About
+p.static Nothing live here

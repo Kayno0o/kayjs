@@ -14,6 +14,7 @@ import { loadConfig } from '../config'
 import { projectPaths } from '../project'
 import { actionUrl } from '../runtime/action'
 import { CARD_ROUTE, FILES_ROUTE, IMAGE_ROUTE } from '../runtime/image'
+import { LIVE_ROUTE } from '../runtime/live-value'
 import { MCP_PATH, OPENAPI_PATH, projectApi, REFERENCE_PATH } from '../server/api-modules'
 import { buildingWithoutEnv, PUBLIC_ENV_PATH } from '../server/env-state'
 import { ERROR_REPORTS } from '../server/errors'
@@ -204,6 +205,7 @@ function kayRoutes(root: string, config: KayConfig): Listed[] {
     kay(CARD_ROUTE, 'share cards'),
     kay(`${FILES_ROUTE}*`, 'stored files'),
     kay(ERROR_REPORTS, 'browser error reports', 'POST'),
+    kay(LIVE_ROUTE, 'live values', 'POST'),
     ...typeof config.security === 'object' && config.security.reports === true ? [kay(CSP_REPORTS, 'CSP violation reports', 'POST')] : [],
     ...config.preview ? [kay(PREVIEW_ROUTE, 'preview mode')] : [],
     ...config.mcp === true ? [kay(MCP_PATH, 'MCP endpoint', 'POST')] : [],

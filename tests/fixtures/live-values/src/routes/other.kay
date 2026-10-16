@@ -1,0 +1,7 @@
+---
+import Nav from '../components/nav.kay'
+import Online from '../components/online.kay'
+---
+Nav
+h1 Other
+Online

@@ -22,6 +22,7 @@ import { projectApi } from './api-modules'
 import { PRERENDERED_DIR, readManifest, writeManifest } from './client'
 import { exportedEndpoints } from './endpoints'
 import { localeCopies, stateFor } from './i18n'
+import { LIVE_MARK } from './live'
 import { readsOf } from './page-reads'
 import { pageSetting } from './page-settings'
 import { matchedParams } from './params'
@@ -179,9 +180,13 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
         const islands = serverIslandModes(html)
         const stamps = html.search(STAMP_HOLE) >= 0
         const readsSite = standInReads() > reads
+        const livesOn = html.includes(LIVE_MARK)
 
-        if (auto && (islands.length > 0 || stamps || readsSite))
-          return skip(unkeptBy(islands.length > 0, stamps))
+        if (auto && (islands.length > 0 || stamps || readsSite || livesOn))
+          return skip(unkeptBy(islands.length > 0, stamps, livesOn))
+
+        if (livesOn)
+          throw new KayError('export-server-render', 'kay: it reads a live value, which only a server holds and signs the connection to per request; drop `prerender` from `export const page`, or read the value in a component the page does not render at build time')
 
         if (options.exportAll && readsSite)
           throw new KayError('export-site-url', 'kay: it reads the site, through siteUrl() or siteOrigin(), which neither `site` in kay.config.ts, SITE_URL nor ORIGIN sets')
@@ -370,9 +375,12 @@ export async function reachesServerIsland(file: string, seen = new Set<string>()
   return false
 }
 
-function unkeptBy(island: boolean, stamps: boolean): string {
+function unkeptBy(island: boolean, stamps: boolean, live: boolean): string {
   if (island)
     return 'holds a server island'
+
+  if (live)
+    return 'reads a live value, which a server holds'
 
   return stamps ? 'holds a form stamp or a work challenge, signed per request' : 'reads the site URL, which no config sets'
 }

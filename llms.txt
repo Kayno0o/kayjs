@@ -33,7 +33,7 @@ To build a site, read [Build a site](llms/site.md) first: one page walking throu
 - [Actions](llms/actions.md): form posts that work without JavaScript and calls from islands, typed by a schema: validation errors, files, redirects, rate limits
 - [Stored files](llms/files.md): `files` keeps uploads on disk or in an S3 bucket, links them from pages, resizes stored images, signs links to private files, and islands read upload progress
 - [Locals, sessions and guards](llms/server.md): per-request `ctx.locals`, cookie sessions and their stores, a typed `defineEnv`, `_guard.ts` route guards
-- [API routes](llms/api-routes.md): Elysia modules under `src/api/`, server-sent events, websockets and rooms, and reading them typed from islands
+- [API routes](llms/api-routes.md): Elysia modules under `src/api/`, server-sent events, websockets and rooms, reading them typed from islands, and `live()` values every open page follows
 - [Testing](llms/testing.md): `kay/test`: rendering pages and posting actions in `bun test`, browser tests
 - [Checks and lints](llms/checks.md): what `kay check` reports, every lint at its default level and how to change it, ESLint on `.kay` files
 - [Project setup and commands](llms/project.md): `kay.config.ts`, tsconfig, editor setup, every `kay` CLI command and template, and `kay render <url>`, printing what a page renders without starting a server, and `kay mcp`, serving kay's tools and these guides to an agent

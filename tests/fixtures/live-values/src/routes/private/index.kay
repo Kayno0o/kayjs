@@ -1,0 +1,5 @@
+---
+import SecretView from '../../components/secret-view.kay'
+---
+h1 Private
+SecretView

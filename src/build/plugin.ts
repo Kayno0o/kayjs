@@ -14,6 +14,7 @@ import { scriptLoader } from './files'
 import { expandGlobs } from './glob'
 import { iconModule, iconNames, installedIconSets } from './icons'
 import { settingsReplacements } from './libraries'
+import { liveIds } from './live-ids'
 import { transformKayCached } from './transform'
 
 export interface KayPluginOptions {
@@ -96,7 +97,8 @@ export function kayPlugin(options: KayPluginOptions, workers: string[]): BunPlug
       const target = options.target ?? (build.config?.target === 'browser' ? 'dom' : 'ssr')
       const root = options.root ?? process.cwd()
       // The project's TypeScript modules, read for their `import.meta.glob` calls, by their real path as Bun loads them.
-      const projectScript = new RegExp(`^${RegExp.escape(realpathSync(root) + sep)}(?!(?:.*/)?node_modules/).*\\.(?:m?ts|tsx)$`)
+      const realRoot = realpathSync(root)
+      const projectScript = new RegExp(`^${RegExp.escape(realRoot + sep)}(?!(?:.*/)?node_modules/).*\\.(?:m?ts|tsx)$`)
 
       // A browser build ships the files its modules point at with `new URL`: a script bundled as a worker of its own, anything else as an asset. Each URL is relative to the module's chunk, so it holds under any base.
       // A build kept in memory, such as the one finding the runtime's chunk, writes nothing and leaves them as written.
@@ -246,7 +248,7 @@ export function kayPlugin(options: KayPluginOptions, workers: string[]): BunPlug
       build.onLoad({ filter: projectScript }, async ({ path }) => {
         const source = await Bun.file(path).text()
         const loader = scriptLoader(path)
-        const contents = anchoring(path, await shippingFiles(expandGlobs(source, path, root, loader), path, loader))
+        const contents = anchoring(path, await shippingFiles(liveIds(expandGlobs(source, path, root, loader), path, realRoot, loader === 'tsx' || loader === 'jsx'), path, loader))
 
         return contents === source && build.config !== undefined ? undefined : { contents, loader }
       })

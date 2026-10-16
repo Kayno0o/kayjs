@@ -7,7 +7,9 @@ import type { SignalKind } from './module-signals'
 import type { PropsBinding } from './script'
 import { createRequire } from 'node:module'
 import { parse } from '@babel/parser'
-import { CURRENT, defaultName, HANDED, PROPS, VALUES, WRITABLE } from './names'
+import { CURRENT, defaultName, HANDED, LOAD, PROPS, VALUES, WRITABLE } from './names'
+
+const LIVE_WRITES = new Set(['set', 'delete'])
 
 const IDENTIFIER = /^[A-Z_$][\w$]*$/i
 const CAPITAL = /^[A-Z]/
@@ -59,6 +61,8 @@ export interface RewriteInput {
   imported?: ReadonlyMap<string, SignalKind> | undefined
   // The name the file gives the component, which a template `const` would hide from the tags after it.
   component?: string | undefined
+  // A page with a server fence, a layout or a special page, which renders once on the server and is no island, so a live value read in its template would not follow the server.
+  fixedPage?: boolean | undefined
   // Type checking a project: a write to a name kay sees no signal made in asserts it holds one, through `KayWritable`.
   check?: boolean | undefined
 }
@@ -342,7 +346,7 @@ class RewriteFinder {
     const shorthand = reference.parent.type === 'ObjectProperty' && reference.parent.shorthand
     const end = source + name.length
 
-    this.diagnostics.push({ start: source, end, code: 'uncalled-signal', checkOnly: true, message: `\`${name}\` is a ${kind}, read by calling it`, help: `\`${name}()\``, fixes: [{ title: `Call \`${name}\``, edits: [{ start: end, end, text: shorthand ? `: ${name}()` : '()' }], safe: true }] })
+    this.diagnostics.push({ start: source, end, code: 'uncalled-signal', checkOnly: true, message: `\`${name}\` is ${kind === 'live' ? 'a live value' : `a ${kind}`}, read by calling it`, help: `\`${name}()\``, fixes: [{ title: `Call \`${name}\``, edits: [{ start: end, end, text: shorthand ? `: ${name}()` : '()' }], safe: true }] })
   }
 
   // Text added at `at`, after a rewrite ending there or before one starting there.
@@ -379,8 +383,8 @@ class RewriteFinder {
     const rightStart = rightFrom !== undefined && map.isExact(rightFrom) ? map.toSource(rightFrom) : undefined
     const rightEnd = right && map.isExact(node.end! - 1) ? map.toSource(node.end! - 1) : undefined
 
-    if (kind === 'memo') {
-      this.diagnostics.push({ ...span, message: `\`${name}\` is a memo, which cannot be written`, help: 'write the signals it is derived from' })
+    if (kind === 'memo' || kind === 'live') {
+      this.diagnostics.push({ ...span, message: kind === 'live' ? `\`${name}\` is a live value, which the server writes and a browser only reads` : `\`${name}\` is a memo, which cannot be written`, help: kind === 'live' ? `\`${name}.set(...)\` from a server fence, an action or a job` : 'write the signals it is derived from' })
 
       return
     }
@@ -459,6 +463,11 @@ class RewriteFinder {
       if (uncalled !== undefined)
         this.reportUncalled(reference, uncalled, name, kind)
 
+      if (kind === 'live') {
+        this.reportLiveWrite(reference, name)
+        this.reportFixedRead(reference, name)
+      }
+
       const handed = this.handed(reference)
 
       if (handed !== undefined) {
@@ -474,6 +483,30 @@ class RewriteFinder {
     }
     for (const violation of binding.constantViolations)
       this.signalWrite(violation, name, kind, {})
+  }
+
+  // A live value read in the template of a page that renders once keeps the value it rendered with.
+  private reportFixedRead(reference: NodePath, name: string) {
+    const start = this.input.map.isExact(reference.node.start!) ? this.input.map.toSource(reference.node.start!) : undefined
+
+    if (this.input.fixedPage && start !== undefined && start >= this.input.templateStart)
+      this.diagnostics.push({ start, end: start + name.length, message: `\`${name}\` is a live value read in a template that renders once on the server`, note: 'a page with a server fence, a layout and a special page are no islands, so it would not follow the server', help: 'read it in a component, which the page renders' })
+  }
+
+  // A live value is written on the server: its `set` and `delete` are reported anywhere but the server fence, which a browser or a template would run.
+  private reportLiveWrite(reference: NodePath, name: string) {
+    const member = reference.parentPath
+
+    if (!member?.isMemberExpression() || member.node.object !== reference.node || member.node.computed || member.node.property.type !== 'Identifier' || !LIVE_WRITES.has(member.node.property.name))
+      return
+
+    if (reference.findParent(parent => parent.isFunctionDeclaration() && parent.node.id?.name === LOAD && (parent.parentPath.isProgram() || parent.parentPath.parentPath?.isProgram() === true)))
+      return
+
+    const start = this.input.map.isExact(reference.node.start!) ? this.input.map.toSource(reference.node.start!) : undefined
+
+    if (start !== undefined)
+      this.diagnostics.push({ start, end: start + name.length, message: `\`${name}\` is a live value, written on the server: from a server fence, an action or a job`, help: 'a browser only reads it' })
   }
 
   // A template `const`: each name it declares is new to the template, never reassigned, and, as `accessor`, read through the memo it is.

@@ -81,16 +81,22 @@ const BACKSLASH = /\\/g
 // An icon of an installed set, `~icons/tabler/home`, which the template may draw as a tag.
 const ICON_IMPORT = /^~icons\//
 
+// The first live value a script imports, which makes its component an island: the server changes it and the page follows.
+function liveImport(script: ScriptAnalysis, imported: ImportedSignals | undefined): string | undefined {
+  return script.imports.find(binding => !binding.typeOnly && imported?.[binding.source]?.[binding.imported] === 'live')?.local
+}
+
 // Whether a component renders as an island of its own, as compileKay decides it, without generating its code.
-export function rendersAsIsland(source: string): boolean {
+export function rendersAsIsland(source: string, imported?: ImportedSignals): boolean {
   const file = parseKay(source)
   const server = analyzeServer(source, file.server)
+  const script = analyzeScript(source, file.script, server?.data.map(data => data.name))
 
-  return file.client !== undefined || isInteractive(file, analyzeScript(source, file.script, server?.data.map(data => data.name)))
+  return file.client !== undefined || isInteractive(file, script) || (file.server === undefined && liveImport(script, imported) !== undefined)
 }
 
 // Whether a component is an island, or a static component that may be promoted to one by what it passes, which the build does only when its imports reach an island; a page, a layout and a special page are neither.
-export function browserRole(source: string, filename: string): 'island' | 'promotable' | undefined {
+export function browserRole(source: string, filename: string, imported?: ImportedSignals): 'island' | 'promotable' | undefined {
   const file = parseKay(source)
 
   if (file.server !== undefined || ROUTE_FILES.has(basename(filename)))
@@ -99,7 +105,7 @@ export function browserRole(source: string, filename: string): 'island' | 'promo
   const server = analyzeServer(source, file.server)
   const script = analyzeScript(source, file.script, server?.data.map(data => data.name))
 
-  if (file.client !== undefined || isInteractive(file, script))
+  if (file.client !== undefined || isInteractive(file, script) || liveImport(script, imported) !== undefined)
     return 'island'
 
   return promotionCause(file, script) === undefined ? undefined : 'promotable'
@@ -125,12 +131,13 @@ export function compileKay(source: string, filename: string, options: CompileOpt
   // Pages, layouts and special pages render on the server: a package they import never switches them.
   const routeFile = file.server !== undefined || ROUTE_FILES.has(basename(filename))
   const client = file.client !== undefined || (options.clientOnly === true && !routeFile)
-  const island = client || isInteractive(file, script) ? islandId(filename, options.root) : undefined
+  const live = routeFile ? undefined : liveImport(script, options.importedSignals)
+  const island = client || isInteractive(file, script) || live !== undefined ? islandId(filename, options.root) : undefined
   const hydratableServer = options.output === 'html' && options.hydratable === true
   const twin = hydratableServer && !options.twinBuild && island === undefined && !routeFile ? `./${basename(filename)}${ISLAND_TWIN}` : undefined
   const promotion = island === undefined && !routeFile ? promotionCause(file, script) : undefined
   const promote = promotion === undefined ? undefined : islandId(filename, options.root)
-  const why = island === undefined ? promotion : islandCause(file, script)
+  const why = island === undefined ? promotion : islandCause(file, script) ?? (live === undefined ? undefined : `\`${live}\`, a live value`)
   const generateOptions = { island, client, twin, promote, output: options.output, hydratable: hydratableServer && (island !== undefined || options.twinBuild === true), moduleId: islandId(filename, options.root), includeServer: options.includeServer, params: options.params, paramTypes: options.paramTypes, outerQueries: options.outerQueries, check: options.check, insideIsland: options.insideIsland, inspect: options.inspect, relocateImport: options.relocateImport, errorPage: basename(filename) === ERROR_PAGE, special: basename(filename).startsWith('_') && basename(filename) !== LAYOUT }
   // The analysis pass names the component so no read resolves to it, then the name is chosen free of what the code reads.
   const analysis = generate(file, script, server, { ...generateOptions, name: SELF })
@@ -141,7 +148,7 @@ export function compileKay(source: string, filename: string, options: CompileOpt
   }))
   // Only code that runs calls the accessors of rows and aliases; the type checker reads them as values, which it narrows.
   const values = options.output === undefined
-  const found = findRewrites({ code: analysis.builder.code, map: analysis.builder.map(), sites: analysis.sites, values, templateStart: file.templateStart, imported, component: componentName(filename), check: options.check })
+  const found = findRewrites({ code: analysis.builder.code, map: analysis.builder.map(), sites: analysis.sites, values, templateStart: file.templateStart, imported, component: componentName(filename), check: options.check, fixedPage: routeFile })
   const fences = [file.script, file.server].map(span => span ? source.slice(span.start, span.end) : '').join('\n')
   const name = freeName(componentName(filename), fences, found.findings.globalReads)
   const final = generate(file, script, server, { ...generateOptions, name, rewrites: found.plan.rewrites, translates: found.plan.translates, values: found.plan.values })

@@ -43,6 +43,7 @@ import { refuseLocaleClashes } from './i18n'
 import { avifQuality, serveImages } from './image'
 import { countWrites } from './kept-pages'
 import { HEALTH_PATH, serveHealth, stopOnSignal } from './lifecycle'
+import { serveLive } from './live'
 import { announceStart, logRequests, pathOf, useLogger } from './log'
 import { mcpBodyLimit, serveMcp } from './mcp'
 import { serveServiceWorker } from './offline'
@@ -321,6 +322,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
     serveMcp(app, document, { title: (document.info as { title: string }).title, version: (document.info as { version: string }).version, base, guards, actions: actionOptions })
 
   serveErrorReports(app, options.onError)
+  serveLive(app)
 
   if (options.security !== undefined && options.security !== false && options.security.reports === true)
     serveViolationReports(app, options.onError)
