@@ -284,6 +284,10 @@ describe('kay/eslint over a template slot\'s parameters', () => {
     expect(await lint('@about(text)', ARROW)).toEqual([])
   })
 
+  it('reports no rule on a slot\'s one parameter whichever way arrow-parens asks, and no fix writes a head that does not parse', async () => {
+    expect(await lint('@about(text)', { 'style/arrow-parens': ['error', 'always'] })).toEqual([])
+  })
+
   it('reports nothing for a slot with several parameters, none, a destructured one or one with a default', async () => {
     expect(await lint('@about(text, index)', ARROW)).toEqual([])
     expect(await lint('@about', ARROW)).toEqual([])

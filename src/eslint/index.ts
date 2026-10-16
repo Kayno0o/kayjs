@@ -98,6 +98,15 @@ export function shadowParser<Options extends ParserOptions, Result>(parser: { pa
   }
 }
 
+const ARROW_PARENS = /(?:^|\/)arrow-parens$/
+const SLOT_HEAD_OPEN = /@[\w-]+\($/
+const PLAIN_NAME = /^[\p{ID_Start}$_][\p{ID_Continue}$\u200C\u200D]*$/u
+
+// A slot's one plain parameter, `@about(text)`: kay writes it bare in the shadow, so a rule about the parentheses around it would report, and fix, text the .kay file holds as the slot's own syntax.
+function slotParameter(source: string, span: { start: number, end: number }): boolean {
+  return source[span.end] === ')' && SLOT_HEAD_OPEN.test(source.slice(0, span.start)) && PLAIN_NAME.test(source.slice(span.start, span.end))
+}
+
 function mapMessage(entry: ShadowFile, message: LintMessage): LintMessage | undefined {
   const tailwind = TAILWIND_RULE.test(message.ruleId ?? '')
   // A parser that throws, as the shadow parser does without a shadow file, reports no line, or line 0.
@@ -108,6 +117,9 @@ function mapMessage(entry: ShadowFile, message: LintMessage): LintMessage | unde
   // A file that does not parse would otherwise pass: kay check names the reason at its line, this only keeps lint from passing.
   if (!span)
     return message.fatal ? { ...message, line: 1, column: 1, endLine: undefined, endColumn: undefined } : undefined
+
+  if (ARROW_PARENS.test(message.ruleId ?? '') && slotParameter(entry.source, span))
+    return undefined
 
   const endPosition = end === undefined ? undefined : positionAt(entry.source, span.end)
   const fix = message.fix && mapFix(entry, message.fix, tailwind)
