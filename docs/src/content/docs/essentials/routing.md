@@ -134,8 +134,6 @@ When the page cannot be kept, `kay build` warns with the file and line. Set the 
 
 A page that shows data another module changes between requests is caught as the app runs. The server then renders it for each request and warns once with its name. `prerender: false` says so up front.
 
-<ReadMore href="/llms/routing#prerendering">What makes a page keepable, how the run-time check works, and how kept pages treat locales and `trailingSlash`.</ReadMore>
-
 A page with params lists the ones to build. Pass a content collection to build one page per entry.
 
 ```kay
@@ -152,9 +150,11 @@ Add `revalidate: '1h'` to `page` to rebuild a prerendered page in the background
 
 </Callout>
 
+<ReadMore href="/llms/routing#prerendering">What makes a page keepable, how the run-time check works, and how kept pages treat locales and `trailingSlash`.</ReadMore>
+
 ### Server islands
 
-`server` on a component call renders that component on each request, inside a page that is otherwise prerendered. Use it for a form with a fresh token, a greeting or a stock count. The page is prerendered with no `prerender` key.
+`server` on a component call renders that component on each request, inside a page that is otherwise prerendered. Use it for a form with a fresh token, a greeting or a stock count. The rest of the page is prerendered, with no `prerender` flag needed.
 
 ```kay
 --- server
