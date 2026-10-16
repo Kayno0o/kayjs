@@ -59,8 +59,14 @@ export function configSeoLints(config: SiteSeo, file: string, sources: Iterable<
   if (descriptions.length === 0)
     report('missing-description', { ...at, message: 'The site has no description', note: 'a page setting none of its own goes without', help: 'set `seo.description` to a sentence saying what the site is' })
 
-  for (const description of descriptions.filter(text => text.length > DESCRIPTION_LENGTH))
-    report('long-description', { ...at, message: `The site description \`seo.description\` runs ${description.length} characters`, note: `search results cut it after about ${DESCRIPTION_LENGTH}, on every page that sets none of its own`, help: 'shorten it to a sentence or two' })
+  const record = typeof config.seo?.description === 'object' ? Object.entries(config.seo.description) : []
+
+  for (const [locale, description] of record.length > 0 ? record : descriptions.map(text => ['', text] as const)) {
+    if (description.length <= DESCRIPTION_LENGTH)
+      continue
+
+    report('long-description', { ...at, message: `The site description \`seo.description\`${locale === '' ? '' : ` for ${locale}`} runs ${description.length} characters`, note: `search results cut it after about ${DESCRIPTION_LENGTH}, on every page that sets none of its own`, help: 'shorten it to a sentence or two' })
+  }
 
   if (config.seo?.image === undefined && ![...sources].some(source => source.includes('og:image')))
     report('missing-share-image', { ...at, message: 'No page has a share image', note: 'a link shared to a social network shows no picture', help: 'set `seo.image`, or an `og:image` per page with `shareCard()` from `kay/image`' })

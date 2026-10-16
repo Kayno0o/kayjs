@@ -794,11 +794,14 @@ describe('localized seo defaults', () => {
     security: false,
     site: SITE,
     i18n,
-    seo: { name: { fr: 'Le site', en: 'The site' }, titleTemplate: { fr: '%s | Le site', en: '%s | The site' }, description: { fr: 'Ce que fait le site', en: 'What the site does' }, locale: { fr: 'fr_FR' } },
+    seo: { name: { fr: 'Le site', en: 'The site' }, titleTemplate: { fr: '%s | Le site', en: '%s | The site' }, description: { fr: 'Ce que fait le site', en: 'What the site does' }, image: { fr: '/fr.png', en: '/en.png' }, imageAlt: { fr: 'Le logo', en: 'The logo' }, locale: { fr: 'fr_FR' } },
   }))
 
+  // One app for every request, as the head of each locale is built once and kept.
+  const shared = seoApp()
+
   async function head(path: string): Promise<string> {
-    return (await (await seoApp()).handle(new Request(`http://localhost${path}`))).text()
+    return (await (await shared).handle(new Request(`http://localhost${path}`))).text()
   }
 
   it('gives each locale its own name, description and title template, a locale the record lacks reading the default\'s', async () => {
@@ -811,5 +814,11 @@ describe('localized seo defaults', () => {
     expect(en).toContain('<meta name="description" content="What the site does">')
     expect(en).toContain('<meta property="og:site_name" content="The site">')
     expect(en).toContain('<meta property="og:locale" content="fr_FR">')
+    expect(fr).toContain('/fr.png')
+    expect(fr).toContain('content="Le logo"')
+    expect(en).toContain('/en.png')
+    expect(en).toContain('content="The logo"')
+    expect(await head('/')).toBe(fr)
+    expect(await head('/en')).toBe(en)
   })
 })
