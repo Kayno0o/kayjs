@@ -487,6 +487,102 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay dev in
     expect((await shown.a11y()).flatMap(violation => violation.nodes.map(node => node.target))).not.toContainEqual(expect.stringContaining('kay-dev'))
     expect(shown.errors).toEqual([])
   }, 60_000)
+
+  it('sizes its drawer to a short panel, and keeps its colours above 4.5:1 in both schemes', async () => {
+    const shown = await dev.open('/', { strict: false })
+
+    await shown.evaluate(() => document.querySelector('kay-dev')!.shadowRoot!.querySelector<HTMLButtonElement>('.bar > button')!.click())
+    await shown.waitUntil(() => document.querySelector('kay-dev')!.shadowRoot!.querySelector<HTMLElement>('.drawer')!.hidden === false)
+
+    const heights = async () => shown.evaluate(() => {
+      const drawer = document.querySelector('kay-dev')!.shadowRoot!.querySelector<HTMLElement>('.drawer')!
+
+      return { drawer: drawer.getBoundingClientRect().height, limit: Math.min(448, innerHeight * 0.6) }
+    })
+
+    expect((await heights()).drawer).toBeLessThan((await heights()).limit - 20)
+
+    // The maximized drawer fills the window.
+    await shown.evaluate(() => document.querySelector('kay-dev')!.shadowRoot!.querySelector<HTMLElement>('.head .icon')!.click())
+    expect((await heights()).drawer).toBeGreaterThan((await heights()).limit)
+    await shown.evaluate(() => document.querySelector('kay-dev')!.shadowRoot!.querySelector<HTMLElement>('.head .icon')!.click())
+
+    // axe-core cannot resolve the drawer's backgrounds (it reports the contrast of each text as undetermined), so the pairs the drawer draws, hovered ones included, are measured here by the WCAG formula; the dark palette is applied by hand, as a browser reporting a dark scheme would.
+    for (const scheme of ['light', 'dark']) {
+      const low = await shown.evaluate((picked: string) => {
+        const host = document.querySelector('kay-dev') as HTMLElement
+        const dark = [...host.shadowRoot!.adoptedStyleSheets[0]!.cssRules].find(rule => rule instanceof CSSMediaRule) as CSSMediaRule
+
+        host.removeAttribute('style')
+
+        if (picked === 'dark') {
+          const style = (dark.cssRules[0] as CSSStyleRule).style
+
+          for (const name of style)
+            host.style.setProperty(name, style.getPropertyValue(name))
+        }
+
+        const probe = document.createElement('i')
+
+        host.shadowRoot!.querySelector('.ui')!.append(probe)
+
+        const rgba = (name: string) => {
+          probe.style.color = `var(--${name})`
+
+          return getComputedStyle(probe).color.match(/[0-9.]+/g)!.map(Number)
+        }
+        const over = (top: number[], under: number[]) => [0, 1, 2].map(at => top[at]! * (top[3] ?? 1) + under[at]! * (1 - (top[3] ?? 1)))
+        const luminance = (colour: number[]) => {
+          const [r, g, b] = colour.map((channel) => {
+            const value = channel / 255
+
+            return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4
+          }) as [number, number, number]
+
+          return 0.2126 * r + 0.7152 * g + 0.0722 * b
+        }
+        const ratio = (fg: string, ...layers: string[]) => {
+          const background = layers.reduce((under, layer) => over(rgba(layer), under), [255, 255, 255])
+          const [light, shade] = [luminance(over(rgba(fg), background)), luminance(background)].sort((a, b) => b - a)
+
+          return (light! + 0.05) / (shade! + 0.05)
+        }
+        // The text colour, then the backgrounds under it, from the page down.
+        const pairs: Record<string, string[]> = {
+          'title': ['muted', 'surface'],
+          'icon': ['muted', 'surface'],
+          'icon:hover': ['fg', 'bg'],
+          'tool': ['muted', 'bg'],
+          'tool:hover': ['fg', 'bg'],
+          'tab': ['muted', 'surface'],
+          'tab:hover': ['muted', 'bg'],
+          'tab selected': ['fg', 'bg'],
+          'count': ['fg', 'surface', 'accent-soft'],
+          'count selected': ['fg', 'bg', 'accent-soft'],
+          'count error': ['bg', 'error'],
+          'mark': ['accent', 'bg'],
+          'bar button:hover': ['fg', 'bg', 'surface'],
+          'mark pressed': ['accent', 'bg', 'accent-soft'],
+          'heading': ['muted', 'bg'],
+          'problem': ['fg', 'bg', 'surface'],
+          'problem error': ['error', 'bg'],
+          'problem warn': ['warn', 'bg'],
+          'route current': ['fg', 'bg', 'accent-soft'],
+        }
+
+        const found = Object.entries(pairs).map(([name, [fg, ...layers]]) => [name, ratio(fg!, ...layers)] as const).filter(([, value]) => value < 4.5).map(([name, value]) => `${picked} ${name} ${value.toFixed(2)}`)
+
+        probe.remove()
+        host.removeAttribute('style')
+
+        return found
+      }, scheme)
+
+      expect(low).toEqual([])
+    }
+
+    expect(shown.errors).toEqual([])
+  }, 60_000)
 })
 
 describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the dev patch in a browser', () => {

@@ -68,9 +68,9 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { .built { transition: none; } }
 .error { color: var(--error); }
 .warn { color: var(--warn); }
-.drawer { position: fixed; bottom: 52px; left: 12px; z-index: 2147483647; display: flex; flex-direction: column; width: min(36rem, calc(100vw - 24px)); height: min(28rem, 60vh); border: 1px solid var(--border); border-radius: 10px; background: var(--bg); box-shadow: var(--shadow); overflow: hidden; }
+.drawer { position: fixed; bottom: 52px; left: 12px; z-index: 2147483647; display: flex; flex-direction: column; width: min(36rem, calc(100vw - 24px)); max-height: min(28rem, 60vh); border: 1px solid var(--border); border-radius: 10px; background: var(--bg); box-shadow: var(--shadow); overflow: hidden; }
 .right .drawer { left: auto; right: 12px; }
-.max .drawer { width: calc(100vw - 24px); height: calc(100vh - 64px); }
+.max .drawer { width: calc(100vw - 24px); height: calc(100vh - 64px); max-height: none; }
 .head { display: flex; align-items: center; gap: 2px; padding: 4px 6px 4px 12px; border-bottom: 1px solid var(--border); background: var(--surface); }
 .title { flex: 1; font-weight: 600; color: var(--muted); }
 .body { display: flex; flex: 1; min-height: 0; }
@@ -78,7 +78,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .tabs button { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 4px 8px; border-radius: 6px; color: var(--muted); text-align: left; white-space: nowrap; }
 .tabs button:hover { background: var(--bg); }
 .tabs button[aria-selected=true] { background: var(--bg); color: var(--fg); box-shadow: 0 0 0 1px var(--border); }
-.tabs .count { padding: 0 6px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 11px; }
+.tabs .count { padding: 0 6px; border-radius: 999px; background: var(--accent-soft); color: var(--fg); font-size: 11px; }
 .tabs .count.error { background: var(--error); color: var(--bg); }
 .content { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }
 .tool { padding: 4px 8px; border-radius: 6px; color: var(--muted); }
@@ -137,7 +137,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .json { margin: 4px 0 0; white-space: pre-wrap; word-break: break-word; }
 .label { position: fixed; z-index: 2147483647; pointer-events: none; padding: 2px 6px; border-radius: 4px; background: var(--accent); color: var(--on-accent); white-space: nowrap; }
 @media (max-width: 480px) {
-  .drawer, .right .drawer, .max .drawer { left: 8px; right: 8px; width: auto; height: min(28rem, 60vh); }
+  .drawer, .right .drawer, .max .drawer { left: 8px; right: 8px; width: auto; }
   .max .drawer { height: calc(100vh - 64px); }
   .tabs { padding: 4px; }
   .tabs button { gap: 6px; padding: 4px 6px; }
