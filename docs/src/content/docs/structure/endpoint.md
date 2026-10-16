@@ -5,7 +5,7 @@ description: A file served at its path with what its GET returns, such as a feed
 path: src/routes/feed.xml.ts
 ---
 
-A `.ts` file in `src/routes/` whose name keeps an extension before `.ts` serves that path with what its `GET` returns, for an `llms.txt`, a feed or a CSV export, with no [API module](/structure/api):
+A `.ts` file in `src/routes/` whose name keeps an extension before `.ts` serves that path with what its `GET` returns. Use it for an `llms.txt`, a feed or a CSV export, with no [API module](/structure/api).
 
 | File | URL |
 | --- | --- |
@@ -25,8 +25,12 @@ export function GET({ params }: EndpointContext<{ slug: string }>) {
 }
 ```
 
-`GET` gets the same `ctx` a page does, minus what only a page has: `request`, `url`, `locale`, `params`, `cookies`, `locals`, `headers`, `redirect`, `notFound` and `deny`. Cookies and headers it sets go out with its answer. It returns a string, a `Blob` or a `Response`. A string goes out as the type its extension names, `text/plain` for `llms.txt`. The guards above it run first, as they do for a page, and `kay build --static` writes it to a file.
+`GET` gets the same `ctx` a page does, minus what only a page has. That is `request`, `url`, `locale`, `params`, `cookies`, `locals`, `headers`, `redirect`, `notFound` and `deny`. Cookies and headers it sets go out with its answer.
 
-A param is a plain `[name]` segment: a rest, an optional or a matcher param stops the server. A `.ts` file with no extension before `.ts`, `format.ts`, stays a helper.
+It returns a string, a `Blob` or a `Response`. A string goes out as the type its extension names, `text/plain` for `llms.txt`.
+
+The guards above it run first, as they do for a page, and `kay build --static` writes it to a file.
+
+A param is a plain `[name]` segment. A rest, an optional or a matcher param stops the server. A `.ts` file with no extension before `.ts`, such as `format.ts`, stays a helper.
 
 <ReadMore href="/essentials/routing#endpoint-files">Endpoint files in the routing guide.</ReadMore>

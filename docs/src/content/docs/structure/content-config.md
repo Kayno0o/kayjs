@@ -5,7 +5,7 @@ description: The content collections, each a folder of files checked against a s
 path: src/content.config.ts
 ---
 
-`src/content.config.ts` declares the content collections, each folder relative to it, so `content/posts` is [`src/content/posts`](/structure/content):
+`src/content.config.ts` declares the content collections, each folder relative to it, so `content/posts` is [`src/content/posts`](/structure/content).
 
 ```ts
 import { s } from 'kay'
@@ -22,7 +22,7 @@ export const posts = collection('content/posts', {
 })
 ```
 
-Pages import a collection from it and read its entries, typed from the schema, with `all()` and `get(slug)`:
+Pages import a collection from it and read its entries, typed from the schema, with `all()` and `get(slug)`.
 
 ```kay
 --- server

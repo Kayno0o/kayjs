@@ -12,7 +12,7 @@ h1 Page not found
 p: a(href="/") Back to the home page
 ```
 
-A page calls `ctx.notFound()` when what its URL names does not exist:
+A page calls `ctx.notFound()` when what its URL names does not exist.
 
 ```kay
 --- server
@@ -23,6 +23,8 @@ const post = await findPost(ctx.params.slug) ?? ctx.notFound()
 h1 {post.title}
 ```
 
-The nearest `_404.kay` wins, wrapped by the layouts of its own folder, so `blog/_404.kay` can answer for the blog alone. Without one, a 404 renders [`_error.kay`](/structure/error).
+The nearest `_404.kay` wins, wrapped by the layouts of its own folder, so `blog/_404.kay` can answer for the blog alone.
+
+Without one, a 404 renders [`_error.kay`](/structure/error).
 
 <ReadMore href="/essentials/routing#not-found-and-errors">Not found and error pages in the routing guide.</ReadMore>

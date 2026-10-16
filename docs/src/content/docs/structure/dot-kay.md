@@ -16,6 +16,8 @@ kay writes `.kay/` at the project's root, and nothing in it is the project's to 
   classes.txt  the .class shorthand's classes, handed to Tailwind
 " />
 
-A `.ts` file imports a component as `import Card from './card.kay'`, typed through the `.kay/types` tree that [`tsconfig.json`](/structure/tsconfig) merges with the sources. `kay dev` builds into `.kay/dev` rather than `.kay/client`, so a `kay build` or a test run beside it leaves the files its pages link in place.
+A `.ts` file imports a component as `import Card from './card.kay'`, typed through the `.kay/types` tree that [`tsconfig.json`](/structure/tsconfig) merges with the sources.
+
+`kay dev` builds into `.kay/dev` rather than `.kay/client`. So a `kay build` or a test run beside it leaves the files its pages link in place.
 
 <ReadMore href="/llms/project">The project, its commands and their builds in the full reference.</ReadMore>

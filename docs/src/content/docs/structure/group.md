@@ -5,7 +5,7 @@ description: A folder in parentheses, grouping pages under a layout or a guard w
 path: src/routes/(group)/
 ---
 
-A folder in parentheses adds nothing to the URL: `(marketing)/pricing.kay` is `/pricing`. It only brings its own [`_layout.kay`](/structure/layout) and [`_guard.ts`](/structure/guard) to the pages inside it.
+A folder in parentheses adds nothing to the URL, so `(marketing)/pricing.kay` is `/pricing`. It only brings its own [`_layout.kay`](/structure/layout) and [`_guard.ts`](/structure/guard) to the pages inside it.
 
 <FileTree tree="
 src/routes/
@@ -17,6 +17,6 @@ src/routes/
     dashboard.kay  /dashboard
 " />
 
-Two pages serving one path stop the server, a group's included: `about.kay` beside `(site)/about.kay`.
+Two pages serving one path stop the server, a group's included, such as `about.kay` beside `(site)/about.kay`.
 
 <ReadMore href="/essentials/routing#layouts">Layouts and groups in the routing guide.</ReadMore>

@@ -5,7 +5,7 @@ description: Elysia modules, each mounted at /api plus its path.
 path: src/api/
 ---
 
-Each `.ts` module in `src/api/` exports an Elysia instance by default, and kay mounts it at `/api` plus its path, with nothing to register. `src/api/notes.ts` serves `/api/notes`:
+Each `.ts` module in `src/api/` exports an Elysia instance by default, and kay mounts it at `/api` plus its path, with nothing to register. `src/api/notes.ts` serves `/api/notes`.
 
 ```ts
 import { s } from 'kay'
@@ -21,7 +21,9 @@ export default api()
   )
 ```
 
-`api()` is an Elysia instance whose handlers read the app's `locals`, so `({ user })` is typed. A [`_guard.ts`](/structure/guard) in `src/api/` protects its routes as it protects pages. A route at the path of a page, a public file, an endpoint or a redirect stops the server at boot.
+`api()` is an Elysia instance whose handlers read the app's `locals`, so `({ user })` is typed.
+
+A [`_guard.ts`](/structure/guard) in `src/api/` protects its routes as it protects pages. A route at the path of a page, a public file, an endpoint or a redirect stops the server at boot.
 
 A single file a static export should write, such as `llms.txt`, is an [endpoint file](/structure/endpoint) in `src/routes/` instead.
 

@@ -20,6 +20,6 @@ import Card from '../components/card.kay'
 Card(title="Welcome")
 ```
 
-A component with an `on*` handler, a `bind:`, a `ref`, or a script using a value from `kay` is an [island](/essentials/islands): rendered on the server, then hydrated in the browser. Every other one ships nothing.
+A component with an `on*` handler, a `bind:`, a `ref`, or a script using a value from `kay` is an [island](/essentials/islands). It is rendered on the server, then hydrated in the browser. Every other one ships nothing.
 
 <ReadMore href="/essentials/components">Components, their fences, props, slots and signals.</ReadMore>

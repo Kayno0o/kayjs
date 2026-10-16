@@ -18,9 +18,11 @@ src/routes/
   [llms.txt.ts](/structure/endpoint)  /llms.txt
 " />
 
-A file starting with `_` is not a route: [`_layout.kay`](/structure/layout), [`_404.kay`](/structure/not-found), [`_error.kay`](/structure/error) and [`_guard.ts`](/structure/guard) apply to the folder they sit in and below, and any other file starting with `_` is not a route either. A `.ts` file whose name keeps an extension before `.ts` is an [endpoint](/structure/endpoint), and any other `.ts` file stays a helper, as do `.test.ts` and `.d.ts` files.
+A file starting with `_` is not a route. [`_layout.kay`](/structure/layout), [`_404.kay`](/structure/not-found), [`_error.kay`](/structure/error) and [`_guard.ts`](/structure/guard) apply to the folder they sit in and below. Any other file starting with `_` is not a route either.
 
-A page URL ending in a slash redirects to the one without: `/about/` to `/about`. Links are plain `a` tags, and `kay check` reports a link to a page that does not exist.
+A `.ts` file whose name keeps an extension before `.ts` is an [endpoint](/structure/endpoint). Any other `.ts` file stays a helper, as do `.test.ts` and `.d.ts` files.
+
+A page URL ending in a slash redirects to the one without, so `/about/` goes to `/about`. Links are plain `a` tags, and `kay check` reports a link to a page that does not exist.
 
 ```kay
 a(href="/about") About

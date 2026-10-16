@@ -5,7 +5,7 @@ description: The project's settings, read by the server and every command.
 path: kay.config.ts
 ---
 
-Settings live in an optional `kay.config.ts` at the project's root, read by `pages()` and every command. It exports its config by default:
+Settings live in an optional `kay.config.ts` at the project's root, read by `pages()` and every command. It exports its config by default.
 
 ```ts
 import { defineConfig } from 'kay/server'

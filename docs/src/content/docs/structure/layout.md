@@ -15,9 +15,11 @@ main
   slot
 ```
 
-Layouts nest, outermost first: `blog/_layout.kay` renders inside the root one. A [group folder](/structure/group) gives a set of pages a layout of their own without changing their URL. A page or a layout whose `page` setting holds `layouts: false` is wrapped by none of the layouts above it, so a section can drop the site's header.
+Layouts nest, outermost first, so `blog/_layout.kay` renders inside the root one. A [group folder](/structure/group) gives a set of pages a layout of their own without changing their URL.
 
-The root layout is where the site's stylesheet, [`app.css`](/structure/app-css), is imported, and where its `head` block sets what every page shares:
+Set `layouts: false` in the `page` of a page or a layout to drop the layouts above it. A section can drop the site's header so.
+
+The root layout is where the site's stylesheet, [`app.css`](/structure/app-css), is imported, and where its `head` block sets what every page shares.
 
 ```kay
 ---
