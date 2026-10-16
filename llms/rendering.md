@@ -145,7 +145,7 @@ const reviews = await cached('reviews', 86_400, fetchReviews, { store: disk })
 - Rows are never swept, since a stale one is still served: `invalidate` keys a site stops using, such as those of deleted posts.
 - The value goes through devalue, as session data does: dates, maps and sets survive, and a value holding a function or a class instance throws on its first load, keeping nothing; on a refresh, it is logged and the stale value kept.
 - `sqliteCache` is server-only: in the browser, `kay/cache` has `cached` and `invalidate` alone.
-- `CacheStore` is the shape of a store, synchronous so that `invalidate` is done when it returns: `get(key)` giving `{ text, freshUntil }`, `set(key, text, freshUntil)`, `delete(key)` and `keys()`, plus, optionally, `publish(message)` and `subscribe(listener)` carrying invalidations between processes, as a Redis channel would.
+- `CacheStore` is the shape of a store, synchronous so that `invalidate` is done when it returns: `get(key)` giving `{ text, freshUntil }`, `set(key, text, freshUntil)`, `delete(key)` and `keys()`, plus, optionally, `publish(message)` and `subscribe(listener)` carrying invalidations between processes, as a Redis channel would; `text` is opaque, to be given back as `set` received it (a value built from a collection or another key starts with a line naming them).
 - In the `server` and `app` templates' image the app runs as `nobody`, so the store's directory is a mounted volume it can write.
 
 ### Streaming

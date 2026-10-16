@@ -48,6 +48,11 @@ const pageListeners = new Set<(paths: string[]) => void>()
 let tracker: Tracker | undefined
 let readListener: ((key: string) => void) | undefined
 const keyListeners = new Set<(matches: (key: string) => boolean) => string[]>()
+
+// Stands for every key, in the reads of a render or a load that read more than the server tracks: any invalidation reaches it.
+export const ALL_READS = '\0all'
+// What the stored text of a value built from other keys opens with: those keys as JSON, then a line break, then the value. A value with none is the bare text, as older versions wrote every one.
+const DEPS_PREFIX = '#deps '
 // Past this many keys, the least recently written goes first.
 const MAX_ENTRIES = 10_000
 // After a background refresh that failed, the longest a stale value is kept before the next call tries again.
@@ -134,8 +139,11 @@ export function onRead(listener: (key: string) => void): void {
 }
 
 // Hears each invalidation by what it matches, and gives back the keys it refreshed pages for, which go to the other processes too.
-export function onKeysInvalidated(listener: (matches: (key: string) => boolean) => string[]): void {
+// Gives back what stops it listening, for a listener that belongs to something a reload replaces.
+export function onKeysInvalidated(listener: (matches: (key: string) => boolean) => string[]): () => void {
   keyListeners.add(listener)
+
+  return () => void keyListeners.delete(listener)
 }
 
 // A store `invalidate` empties too: each one a call names, and a `sqliteCache` as soon as it opens, so an action invalidating after a restart reaches what the store kept before any page asked for it.
@@ -184,7 +192,7 @@ function dropEntries(matches: (key: string) => boolean): string[] {
   const names: string[] = []
 
   for (const [name, entry] of entries) {
-    if (matches(name) || entry.deps?.some(matches)) {
+    if (matches(name) || entry.deps?.some(dep => dep === ALL_READS || matches(dep))) {
       entries.delete(name)
       names.push(name)
     }
@@ -280,7 +288,7 @@ function keep(key: string, entry: Entry, store: CacheStore | undefined): void {
     }
 
     try {
-      store.set(key, text, entry.freshUntil)
+      store.set(key, entry.deps ? `${DEPS_PREFIX}${JSON.stringify(entry.deps)}\n${text}` : text, entry.freshUntil)
     }
     catch (error) {
       kayLog('error', `cached('${key}') could not write its store; keeping the value in memory`, error)
@@ -298,13 +306,24 @@ function readStored(store: CacheStore, key: string): Entry | undefined {
     return undefined
 
   try {
-    return { value: parse(kept.text), freshUntil: kept.freshUntil, loaded: true }
+    const { deps, text } = splitDeps(kept.text)
+
+    return { value: parse(text), freshUntil: kept.freshUntil, loaded: true, ...deps ? { deps } : {} }
   }
   catch {
     store.delete(key)
 
     return undefined
   }
+}
+
+function splitDeps(stored: string): { deps?: string[], text: string } {
+  if (!stored.startsWith(DEPS_PREFIX))
+    return { text: stored }
+
+  const end = stored.indexOf('\n')
+
+  return { deps: JSON.parse(stored.slice(DEPS_PREFIX.length, end)) as string[], text: stored.slice(end + 1) }
 }
 
 // Written last, so it is the last to go.

@@ -3,7 +3,7 @@ import type { Revalidation } from './stale-pages'
 import { compressText, compressTextStrongest } from './compress'
 import { readsOf } from './page-reads'
 import { pageEtag, storedHeaders } from './prerendered'
-import { invalidationCount, revalidationOf } from './stale-pages'
+import { invalidationCount, markPageStale, revalidationOf } from './stale-pages'
 
 // After a render that failed, the longest a page waits before the next request tries again.
 const RETRY_MS = 60_000
@@ -42,7 +42,7 @@ async function rerender(page: ServedPage, render: () => Promise<Response>, reval
 
   try {
     // The body is read within the scope, as a streamed block reads what it needs while it is read.
-    const { result: { response, html }, reads } = await readsOf(async () => {
+    const { result: { response, html }, reads, invalidated } = await readsOf(async () => {
       const rendered = await render()
 
       return { response: rendered, html: rendered.status >= 500 ? '' : await rendered.text() }
@@ -61,6 +61,11 @@ async function rerender(page: ServedPage, render: () => Promise<Response>, reval
     Object.assign(page, { reads, html, encoded, status: response.status, headers: Object.entries(storedHeaders(response.headers)), etag: pageEtag(html), renderedAt: Date.now() })
     revalidation.renderedAfter = started
     revalidation.staleAt = Date.now() + period
+
+    // A key the render read was invalidated before its reads were on the page, which no invalidation could find it by.
+    if (invalidated)
+      markPageStale(page)
+
     // The request waiting goes out with the quick copies; the next get the build's, as small as a page `kay build` wrote.
     void strengthen(page, html)
   }

@@ -1,5 +1,5 @@
 import type { ServedPage } from './render'
-import { broadcast, onKeysInvalidated, onPagesInvalidated } from '../runtime/cache'
+import { ALL_READS, broadcast, onKeysInvalidated, onPagesInvalidated } from '../runtime/cache'
 
 // Kept apart from the renders that read it, so `kay/cache` loads these alone: `invalidatePage` is exported there.
 export interface Revalidation {
@@ -32,13 +32,15 @@ onKeysInvalidated((matches) => {
   const keys = new Set<string>()
 
   markStale((_, page) => {
-    const hit = page.reads?.filter(matches) ?? []
+    const hit = page.reads?.filter(read => read === ALL_READS || matches(read)) ?? []
 
     for (const key of hit)
       keys.add(key)
 
     return hit.length > 0
   })
+
+  keys.delete(ALL_READS)
 
   return [...keys]
 })
@@ -53,7 +55,7 @@ export function trackPrerendered(pages: Map<string, ServedPage>, stale: (page: S
 
   for (const page of pages.values()) {
     if (stale(page))
-      revalidationOf(page).invalidatedAt = ++invalidations
+      markPageStale(page)
   }
 
   return { track, release: () => void served.delete(held) }
@@ -84,13 +86,18 @@ function markStale(matches: (path: string, page: ServedPage) => boolean): string
 
     for (const [path, page] of pages) {
       if (matches(path, page)) {
-        revalidationOf(page).invalidatedAt = ++invalidations
+        markPageStale(page)
         paths.push(path)
       }
     }
   }
 
   return paths
+}
+
+// Counts as an invalidation of the page: the render in place, if it started before, lands outdated.
+export function markPageStale(page: ServedPage): void {
+  revalidationOf(page).invalidatedAt = ++invalidations
 }
 
 export function revalidationOf(page: ServedPage): Revalidation {
