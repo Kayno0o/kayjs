@@ -151,6 +151,10 @@ describe('kay/eslint', () => {
       await rm(join(root, '.kay'), { recursive: true, force: true })
       await Bun.write(join(root, 'kay.config.ts'), 'export default {{\n')
       expect(() => parser.parseForESLint('', { filePath: block, projectService: true })).toThrow('src/routes/index.kay has no type information yet: run kay check, or kay dev, before linting it')
+
+      // A root that failed is not run again for every file the process lints, so a config fixed since still needs the command the error names.
+      await Bun.write(join(root, 'kay.config.ts'), 'export default {}\n')
+      expect(() => parser.parseForESLint('', { filePath: block, projectService: true })).toThrow('has no type information yet')
     }
     finally {
       await rm(root, { recursive: true, force: true })
