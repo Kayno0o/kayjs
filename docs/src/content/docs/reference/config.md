@@ -27,7 +27,7 @@ export default defineConfig({
 })
 ```
 
-Every option is optional. The ones below are the common ones, the rest are in the full reference.
+Every option is optional. The tables give each option's default. The full reference has the rest.
 
 ## Site and SEO
 
@@ -38,9 +38,9 @@ Every option is optional. The ones below are the common ones, the rest are in th
 | `head` | Tags every page's head carries, written as a `head` block compiles them; the CSP lets their inline scripts through. See [Head and SEO](/essentials/head-and-seo) |
 | `favicon` | A square image of 512 px or more, or a square SVG, served as the favicon and the manifest icons. `false` serves none |
 | `manifest` | The web manifest: `shortName`, `themeColor`, `backgroundColor`, `display`, `orientation`, `startUrl`, `scope`, `shortcuts`, and a `maskable` image served as its maskable icons |
-| `offline` | A service worker keeping the build's files and some pages for offline visitors |
-| `search` | `true` indexes the pages `kay build` renders, for `searchResults` to search in the browser. See [Site search](/guides/search) |
-| `lang` | The `lang` of the `html` element |
+| `offline` | `true`, or what to keep: a service worker keeping the build's files and some pages for offline visitors. Off by default |
+| `search` | `true` indexes the pages `kay build` renders, for `searchResults` to search in the browser. Off by default. See [Site search](/guides/search) |
+| `lang` | The `lang` of the `html` element when `i18n` is not set, `en` by default |
 
 ## Routing
 
@@ -49,11 +49,11 @@ Every option is optional. The ones below are the common ones, the rest are in th
 | `routes` | The page directory, `src/routes` by default. See [Routing](/essentials/routing) |
 | `api` | The directory of API modules, `src/api` by default. See [API routes](/guides/api-routes) |
 | `publicDir` | The directory of files served as they are at their path, `public` by default. See [Styling and assets](/essentials/styling-and-assets#public-files) |
-| `redirects` | Old paths sent to new ones with a 308 |
-| `rewrite` | Serves a request from another path, such as a host's pages from a section |
-| `base` | Where the site is mounted when not at its host's root, `/docs` |
-| `trailingSlash` | `never` (the default), `always` or `ignore` |
-| `prefetch` | When links are fetched ahead: `moderate` (on hover) by default; never `/api` routes, downloads or `rel="nofollow"` links |
+| `redirects` | Old paths sent to new ones with a 308, or a 307 with `permanent: false`. See [Routing](/essentials/routing) |
+| `rewrite` | A function returning the path to serve a request from, or `undefined` to serve it as it came. The browser keeps its URL |
+| `base` | Where the site is mounted when it is not at its host's root, such as `/docs`. Unset by default. See [Static export and base path](/guides/static-export#mount-the-site-under-a-path) |
+| `trailingSlash` | `never` (the default) redirects `/about/` to `/about`, `always` the other way, `ignore` serves both. See [Trailing slashes](/guides/static-export#trailing-slashes) |
+| `prefetch` | When the browser fetches a page a link points at: `moderate` on hover (the default), `conservative` on press, `eager` as soon as it can, `false` never. A link with `data-no-prefetch`, a download, `rel="nofollow"` or a path under `/_kay/` or `/api/` is never fetched |
 | `extensions` | What libraries add: their pages and API modules under a prefix, which an app file at the same path replaces, their message catalogs, config laid under the app's, page hooks, a tab for the dev tool, and a CMS's editor rendered in edit mode. See [Routing](/essentials/routing#pages-from-a-library) |
 | `navigation` | The in-place page swap, on by default. `false` loads every page fully. See [Islands](/essentials/islands) |
 
@@ -62,7 +62,7 @@ Every option is optional. The ones below are the common ones, the rest are in th
 | Option | Effect |
 | --- | --- |
 | `content` | The module exporting the collections, `src/content.config.ts` by default. See [Content](/guides/content) |
-| `preview` | Lets an editor see drafts on the live site, with a `secret` |
+| `preview` | Lets an editor see drafts on the live site. `secret` signs the preview links, at least 32 random characters. `maxAge` is how long a visitor stays in preview mode, an hour by default |
 | `storage` | Where `files` keeps uploads: `diskFiles()` by default, or `s3Files()`. See [File storage](/guides/file-storage) |
 | `i18n` | `locales`, `defaultLocale`, and optionally `prefixDefault` or per-locale `domains`, and `paths` translating a page's path per locale. See [Internationalization](/guides/i18n) |
 
@@ -73,10 +73,10 @@ Every option is optional. The ones below are the common ones, the rest are in th
 | `images` | `quality`, `avif`, the share cards' look and logo (`card`), which extra directories (`dirs`) or hosts (`remote`) are resized, and the app's own lookup of private images (`resolve`, `guard`). See [Styling and assets](/essentials/styling-and-assets) |
 | `fonts` | Self-hosted fonts, from files or a Fontsource package |
 | `plugins` | Bun plugins the browser build runs, such as Tailwind's |
-| `budget` | The most JavaScript (`js`) and CSS (`css`) one page may load, compressed, as `'20kb'`; `kay build` warns with `over-budget` for a page over it, naming the modules weighing most. Both are off until set. See [CLI](/reference/cli#kay-build) |
+| `budget` | The most JavaScript (`js`) and CSS (`css`) one page may load, compressed, as `'20kb'`. `kay build` warns with `over-budget` for a page over it. Both are off until set. See [Set a budget](/guides/performance#set-a-budget) |
 | `inlineStyles` | `true` writes every page's styles into its head in production, `false` links them. Unset, a page inlines them when they compress under about 14 KB, or else the rules its own components use, linking the full stylesheet for the rest. See [Styling and assets](/essentials/styling-and-assets#linked-or-inlined-styles) |
-| `minify` | Minifies the browser build, on for `kay build` |
-| `publicEnv` | The environment variables islands may read, as a schema |
+| `minify` | Minifies the browser build. On for `kay build`, off for `kay dev` unless set to `true` |
+| `publicEnv` | The environment variables islands may read, as a schema. No other variable reaches the browser |
 | `settings` | A module for a kay library's settings, such as `{ '@kaynooo/kayjs-ui': './src/ui-settings.ts' }`. See [kayjs-ui](/libraries/kayjs-ui) |
 | `lints` | The level of each lint. See [Checks](/reference/checks) |
 
@@ -84,18 +84,19 @@ Every option is optional. The ones below are the common ones, the rest are in th
 
 | Option | Effect |
 | --- | --- |
-| `security` | The CSP and security headers every response carries, or `false` for none; `X-Frame-Options` follows the policy's `frame-ancestors`. See [Deployment](/guides/deployment) |
-| `proxy` | The proxies in front of the server and the public ranges they reach it from (`trusted`), for the client address rate limits count |
-| `compress` | zstd, brotli and gzip for pages rendered per request, on in production; `false` when a proxy does it |
-| `secret` | What signs form stamps, links to private files and the flash cookie when the app has no `session()`: at least 32 random characters, `KAY_SECRET` when left out. A `session()` secret takes its place |
-| `health` | The route a load balancer polls, `/_kay/health` by default |
-| `log` | One line per request, and kay's own messages: as text, `'json'`, a function receiving each `LogEntry`, or `false` for no request lines |
-| `bodyLimit` | The most bytes an action or API request may send, 1 MB by default |
-| `requireGuards` | Every page, action, endpoint and API module of the app answers 403 unless a guard covers it or it sets `guards: false`, and `kay build --static` refuses to export such a page or endpoint; a library's routes and layouts are left open. See [Sessions and guards](/guides/sessions-and-guards) |
-| `mcp` | An MCP endpoint at `/mcp` for AI agents, with a tool per API route and per action that sets `tool`. See [API routes](/guides/api-routes#letting-an-agent-call-the-app) |
-| `openapi` | An OpenAPI document of the API modules at `/api/openapi.json`, and a reference page. See [API routes](/guides/api-routes#openapi) |
-| `shutdownTimeout` | How long a stopping server lets open requests finish, 10 seconds by default |
+| `security` | The CSP and security headers every response carries, or `false` for none. See [Security](/guides/security) |
+| `proxy` | How many proxies sit in front (`true` for one, a number for more), or `{ header }` naming the header they set. `trusted` lists the public ranges they reach the server from. See [Trust a proxy](/guides/security#trust-a-proxy) |
+| `compress` | Compresses responses rendered per request. On in production; `false` when a proxy or CDN does it |
+| `secret` | What signs form stamps, links to private files and the flash cookie when the app has no `session()`. At least 32 random characters; `KAY_SECRET` when left out. A `session()` secret takes its place |
+| `health` | The route a load balancer polls, `/_kay/health` by default. `{ path, check }` renames it and fails it with 503 when `check` returns false or throws. `false` serves none |
+| `log` | One line per request, and kay's own messages. On in production as text; `'json'` writes one JSON object each, a function receives each `LogEntry`, and `false` turns the request lines off |
+| `bodyLimit` | The most bytes an action or API request may send, 1 MB by default. A bigger one answers 413. See [The request body limit](/guides/security#the-request-body-limit) |
+| `requireGuards` | `true` makes every page, action, endpoint and API module answer 403 unless a guard covers it or it sets `guards: false`. `kay build --static` refuses to export such a page. A library's routes are left open. See [Sessions and guards](/guides/sessions-and-guards) |
+| `mcp` | `true` serves an MCP endpoint at `/mcp` for AI agents, with a tool per API route and per action that sets `tool`. Off by default. See [API routes](/guides/api-routes#letting-an-agent-call-the-app) |
+| `openapi` | `true` serves an OpenAPI document of the API modules at `/api/openapi.json`. `{ reference: true }` adds a page at `/api/reference`. See [API routes](/guides/api-routes#openapi) |
+| `shutdownTimeout` | How long a stopping server lets open requests finish, as seconds or `'30s'`. 10 seconds by default |
 | `onError` | Receives every error a load, render, guard, action or API route throws, for an error tracker |
-| `serverTiming`, `tracer` | A `Server-Timing` header, and OpenTelemetry spans |
+| `serverTiming` | A `Server-Timing` header on pages rendered per request. On in development, off otherwise unless set |
+| `tracer` | An OpenTelemetry tracer, as `trace.getTracer('my-site')`, giving a span per page and API request. None by default |
 
 <ReadMore href="/llms/project">Every option and its exact behaviour are in the full project reference, with the head, locales and production references for the topics above.</ReadMore>
