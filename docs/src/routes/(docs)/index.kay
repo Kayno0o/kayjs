@@ -49,7 +49,7 @@ export const signIn = action(Credentials, async (input, ctx) => {
   if (!result.ok)
     return ctx.fail(400, { error: result.error })
 
-  ctx.redirect(result.redirect)
+  return ctx.redirect(result.redirect)
 })
 ---
 form(action={signIn})

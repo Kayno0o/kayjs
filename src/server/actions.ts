@@ -25,13 +25,14 @@ import { importModule } from './bundle'
 import { cookieJar } from './cookies'
 import { handOver, submittedValues, writeSuccess } from './flash'
 import { requiredGuards, runGuards, unguarded } from './guards'
-import { DEFAULT_LANG, requestLocale, stateFor } from './i18n'
+import { requestLocale, stateFor } from './i18n'
 import { answeringRequest } from './log'
 import { countSucceeded, PRETEND, protectionRefusal, requestId } from './protection'
 import { sharedContext } from './render'
 import { reportServerError } from './report'
 import { requestUrl } from './request-url'
 import { guardUrl } from './routes'
+import { readPersonally } from './scope'
 import { carryContext } from './security'
 import { Denied, NotFound, Redirect, stoppers } from './signals'
 import { answered, SERVER_SPAN, traced } from './trace'
@@ -84,9 +85,8 @@ export interface ActionOptions {
   // Shows a failed action's message instead of a generic one.
   dev?: boolean | undefined
   onError?: KayConfig['onError'] | undefined
-  // An action runs in the locale of the page it was sent from, or the site's one language, `lang` or English, without `i18n`.
+  // An action runs in the locale of the page it was sent from, or the site's one language without `i18n`; an endpoint, which has no locale prefix, in the default one.
   i18n: I18n
-  lang?: string | undefined
   // Where the site is mounted, which the page a refused form post came from is served under.
   base?: string | undefined
   requireGuards?: boolean | undefined
@@ -128,7 +128,7 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], m
       limits.set(value.url, { bytes: value.protection?.bodyLimit, refuse: async (request, bytes, server) => tooLarge(value, request, bytes, server, back) })
       // A span per call, the handler's own spans and the page it renders back nested in it.
       app.post(value.url, async context => traced(`POST ${value.url}`, () => ({ kind: SERVER_SPAN, attributes: { 'http.request.method': 'POST', 'http.route': value.url, 'url.path': value.url, 'kay.request.id': requestId(context.request) } }), async (span) => {
-        const response = await answeringRequest(context.request, async () => inLocale(context.request, options, async () => runAction(value, sharedContext(context.request, () => ({ ...context })), options, back, { params: () => readPage(context.request, page, match, options), url: () => pageUrls.get(context.request) ?? guardedPage(context.request, page, match, options) })))
+        const response = await answeringRequest(context.request, async () => inLocale(context.request, options, async () => runAction(value, sharedContext(context.request, () => ({ ...context })), options, back, { params: () => readPage(context.request, page, match, options), url: () => cachedPageUrl(context.request, () => guardedPage(context.request, page, match, options)) })))
 
         if (span)
           answered(span, response.status)
@@ -250,6 +250,16 @@ function readPage(request: Request, page: ActionPage, match: RouteMatch, { base 
 
   if (postedPage(request, page, match, base) === undefined)
     throw notFromPage()
+}
+
+// The page url of a post, worked out once however many times the handler reads `ctx.url`.
+function cachedPageUrl(request: Request, work: () => URL): URL {
+  let url = pageUrls.get(request)
+
+  if (url === undefined)
+    pageUrls.set(request, url = work())
+
+  return url
 }
 
 // The page of the file a guarded post came from, as a visit to it reaches the guards, so a path they check covers its actions: its static segments as the router names them, without `base` or a trailing slash.
@@ -435,9 +445,9 @@ export function inLocale<T>(request: Request, options: ActionOptions, run: () =>
 }
 
 // What `ctx.locale` reads: the request's locale, or the site's single language.
-export function contextLocale({ lang = DEFAULT_LANG }: Pick<ActionOptions, 'lang'>): Locale {
+export function contextLocale({ i18n }: Pick<ActionOptions, 'i18n'>): Locale {
   // eslint-disable-next-line ts/no-unnecessary-type-assertion -- Locale is a string in kay itself and an app's own locales once its Register names them
-  return (localeState()?.locale ?? lang) as Locale
+  return (localeState()?.locale ?? i18n.settings.defaultLocale) as Locale
 }
 
 // The guards of the action's page, answering for it when one stops the request.
@@ -470,6 +480,8 @@ export async function passGuards(guards: LoadedGuard[], context: { request: Requ
     locale: contextLocale(options),
     params,
     get cookies() {
+      readPersonally(request)
+
       return state.jar.cookies
     },
     locals: context as unknown as Locals,

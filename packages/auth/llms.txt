@@ -9,7 +9,7 @@
 - A method that can fail answers `{ ok: true, ... }` or `{ ok: false, error }`, and field errors come as `errors` holding codes such as `'too-short'` or `'taken'`, never messages: the page words them in its own language.
 - A mailed link opens an app page that shows a button, or the new password's form, posting the token to an action. The page never spends the token on load: mail scanners open links.
 - A sign-in may stop at the second factor. `signInWithPassword`, `signInWithMagicLink`, `resetPassword` and the OAuth callback then answer the `twoFactorPage` as where to go, and the user is signed in once `verifyTwoFactor` gets the code. Redirect to the `redirect` they answer, never to a path of your own.
-- An action that redirects writes `ctx.redirect(...)` as a statement, as everywhere in kay: it throws, so a `return` adds nothing, and `kay check` types `ctx.failed(action)` right either way.
+- An action that redirects writes `return ctx.redirect(...)`, with the `return`, so `kay check` types `ctx.failed(action)` right.
 - A link to an OAuth route changes the session on GET: give it `data-no-prefetch`, so a hover starts nothing.
 
 ## Setup
@@ -185,7 +185,7 @@ export const signIn = action(t.Object({ identifier: t.String({ maxLength: 254 })
   if (!result.ok)
     return ctx.fail(400, { error: result.error })
 
-  ctx.redirect(result.redirect)
+  return ctx.redirect(result.redirect)
 })
 
 const failure = ctx.failed(signIn)
@@ -239,7 +239,7 @@ export const spend = action(t.Object({ token: t.String() }), async ({ token }, c
   if (!result.ok)
     return ctx.fail(400, { error: result.error })
 
-  ctx.redirect(result.redirect)
+  return ctx.redirect(result.redirect)
 })
 
 const failure = ctx.failed(spend)

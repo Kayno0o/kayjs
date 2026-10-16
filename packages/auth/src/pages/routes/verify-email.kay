@@ -17,7 +17,7 @@ export const verify = action(schemas.verify, async ({ token, password }, ctx) =>
   if (!result.ok)
     return ctx.fail(400, { error: result.error === 'invalid' ? 'link' : result.error })
 
-  ctx.redirect(result.redirect)
+  return ctx.redirect(result.redirect)
 })
 
 export const code = action(schemas.emailCode, async ({ code }, ctx) => {
@@ -26,7 +26,7 @@ export const code = action(schemas.emailCode, async ({ code }, ctx) => {
   if (!result.ok)
     return ctx.fail(400, { error: result.error === 'invalid' ? 'code' : result.error })
 
-  ctx.redirect(result.redirect)
+  return ctx.redirect(result.redirect)
 })
 
 export const resend = action(async (ctx) => {

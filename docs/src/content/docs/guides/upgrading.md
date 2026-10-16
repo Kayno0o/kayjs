@@ -13,7 +13,15 @@ kay and its libraries share one version number, so one section covers them all. 
 
 ### `ctx.locale` is the site's language in actions and guards without `i18n`
 
-In an action, a guard on an action and a guard on an API route it was an empty string, and in a page the site's `lang`, English by default. It is the site's `lang` everywhere now. A check such as `if (!ctx.locale)` in an action or a guard never holds any more.
+In an action, a guard on an action and a guard on an API route it was an empty string, and in a page the site's `lang`, English by default. It is the site's `lang` everywhere now, or with `i18n` the locale of the page, and the default locale in an endpoint. A check such as `if (!ctx.locale)` in an action or a guard never holds any more.
+
+### A guard, an endpoint and an action share one context
+
+A context you build by hand, such as a mock in a test, now needs `request`, `url`, `locale`, `params`, `cookies`, `locals`, `headers`, `redirect`, `notFound` and `deny`. Take the type from `RequestContext`.
+
+A guard's `redirect` answers 302 to a GET or HEAD on an API route or an endpoint, where it answered 303. A post still gets 303.
+
+An endpoint that reads `ctx.cookies` goes out with `Cache-Control: private, no-cache` and `Vary: cookie`, unless it sets its own `cache-control`.
 
 ### `deprecated-schema-name` is in the `deprecated` group
 

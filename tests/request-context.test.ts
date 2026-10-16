@@ -16,6 +16,7 @@ describe('the request context', () => {
   let dir = ''
   let app: Awaited<ReturnType<typeof pages>>
   let french: Awaited<ReturnType<typeof pages>>
+  let translated: Awaited<ReturnType<typeof pages>>
   let mounted: Awaited<ReturnType<typeof pages>>
 
   const get = async (path: string, headers: Record<string, string> = {}, server = app) => {
@@ -40,11 +41,16 @@ describe('the request context', () => {
       Bun.write(join(dir, 'routes/guarded/_guard.ts'), GUARD),
       Bun.write(join(dir, 'routes/guarded/[id]/index.kay'), ACTION),
       Bun.write(join(dir, 'routes/guarded/report.json.ts'), ENDPOINT),
+      Bun.write(join(dir, 'messages/fr.ts'), 'export default {}\n'),
+      Bun.write(join(dir, 'messages/en.ts'), 'export default {}\n'),
+      Bun.write(join(dir, 'api/_guard.ts'), GUARD),
+      Bun.write(join(dir, 'api/things.ts'), 'import { api } from \'kay/server\'\n\nexport default api().get(\'/\', () => \'things\')\n'),
       Bun.write(join(dir, 'routes/open/index.kay'), ACTION),
       Bun.write(join(dir, 'routes/open/[name].txt.ts'), ENDPOINT),
     ])
-    app = await pages({ routes: join(dir, 'routes'), prebuilt: false, security: false })
+    app = await pages({ routes: join(dir, 'routes'), prebuilt: false, security: false, api: join(dir, 'api') })
     mounted = await pages({ routes: join(dir, 'routes'), prebuilt: false, security: false, base: '/app' })
+    translated = await pages({ routes: join(dir, 'routes'), prebuilt: false, security: false, i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: join(dir, 'messages') } })
     french = await pages({ routes: join(dir, 'routes'), prebuilt: false, security: false, lang: 'fr' })
   })
 
@@ -117,6 +123,26 @@ describe('the request context', () => {
     const answers = await Promise.all([get('/open/ada.txt', { 'x-do': 'redirect' }, mounted), get('/guarded/report.json', { 'x-do': 'redirect' }, mounted), get('/', { 'x-do': 'redirect' }, mounted)])
 
     expect(answers.map(({ status, location }) => [status, location])).toEqual([[302, '/app/elsewhere'], [302, '/app/elsewhere'], [302, '/app/elsewhere']])
+  })
+
+  it('gives an endpoint on an i18n site the default locale, as no locale prefix reaches it', async () => {
+    expect((await get('/open/ada.txt', {}, translated)).seen).toStartWith('fr|')
+  })
+
+  it('reads an action\'s url as the page\'s without the base, as that page\'s guards do, and the same on each read', async () => {
+    const answer = await post('open/index.kay', 'act', { 'x-kay-page': '/open' }, mounted)
+
+    expect(answer.seen).toBe('en|/open|{}|dark')
+  })
+
+  it('marks an endpoint that read the cookies as private, unless it sets its own caching', async () => {
+    const response = await app.handle(new Request('http://localhost/open/ada.txt', { headers: { cookie: 'theme=dark' } }))
+
+    expect([response.headers.get('cache-control'), response.headers.get('vary')]).toEqual(['private, no-cache', 'cookie'])
+  })
+
+  it('answers a guard\'s redirect on a GET API route with 302, as on a page', async () => {
+    expect(await get('/api/things', { 'x-do': 'redirect' })).toMatchObject({ status: 302, location: '/elsewhere' })
   })
 
   it('keeps a page\'s own redirect at 302', async () => {

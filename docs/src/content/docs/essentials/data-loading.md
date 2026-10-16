@@ -94,7 +94,7 @@ if (post.private && !ctx.locals.user.admin)
 h1 {post.title}
 ```
 
-`notFound()` renders the nearest `_404.kay`, `deny()` renders `_error.kay` with that status and message. All three throw, so they are statements, and a guard, an endpoint and an action read the same `ctx.redirect`, `ctx.notFound()` and `ctx.deny()`. A redirect answers 302 to a read and 303 to a post unless you give a status.
+`notFound()` renders the nearest `_404.kay`, `deny()` renders `_error.kay` with that status and message. All three throw. At the top of a page they are statements, in a guard or an action they are `return`ed. A guard, an endpoint and an action read the same `ctx.redirect`, `ctx.notFound()` and `ctx.deny()`. A redirect answers 302 to a read and 303 to a post unless you give a status.
 
 <Callout type="warning">
 

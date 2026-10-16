@@ -21,7 +21,7 @@ export const remove = action(schemas.proof, async (input, ctx) => {
   if (!result.ok)
     return ctx.fail(400, { error: result.error })
 
-  ctx.redirect(localize(ctx.locals.auth.features().pages?.home ?? '/'))
+  return ctx.redirect(localize(ctx.locals.auth.features().pages?.home ?? '/'))
 })
 
 // An account with neither a password nor a second factor proves it is still the user by a recent sign-in alone, so it signs in again and comes back here.
@@ -31,7 +31,7 @@ export const signInAgain = action(async (ctx) => {
 
   await ctx.locals.auth.signOut()
 
-  ctx.redirect(`${signIn}${signIn.includes('?') ? '&' : '?'}redirect=${encodeURIComponent(localize(`${pages?.prefix ?? prefix}/account/data`))}`)
+  return ctx.redirect(`${signIn}${signIn.includes('?') ? '&' : '?'}redirect=${encodeURIComponent(localize(`${pages?.prefix ?? prefix}/account/data`))}`)
 })
 
 const auth = ctx.locals.auth

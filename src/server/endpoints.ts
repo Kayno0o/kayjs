@@ -15,6 +15,7 @@ import { listedParams, pathOf } from './prerendered'
 import { sharedContext } from './render'
 import { reportServerError } from './report'
 import { routerKey } from './routes'
+import { readPersonally, wasReadPersonally } from './scope'
 import { Denied, NotFound, Redirect, stoppers } from './signals'
 
 type Handler = (ctx: EndpointContext) => unknown
@@ -85,6 +86,8 @@ async function answer(endpoint: ServedEndpoint, context: { request: Request }, p
     params,
     locale: contextLocale(options),
     get cookies() {
+      readPersonally(request)
+
       return jar.cookies
     },
     locals: context as unknown as Locals,
@@ -105,12 +108,26 @@ async function answer(endpoint: ServedEndpoint, context: { request: Request }, p
     return new Response('Internal Server Error', { status: 500, headers: { 'content-type': TEXT } })
   }
 
-  response = new Response(response.body, response)
+  const extra = new Headers(headers)
 
-  for (const [name, value] of headers)
-    response.headers.set(name, value)
+  jar.writeTo(extra)
 
-  jar.writeTo(response.headers)
+  // What the endpoint or its guards read of the cookies is for that visitor alone, as for a page.
+  if (wasReadPersonally(request) && !response.headers.has('cache-control') && !extra.has('cache-control')) {
+    extra.set('cache-control', 'private, no-cache')
+    extra.append('vary', 'cookie')
+  }
+
+  if (!extra.keys().next().done) {
+    response = new Response(response.body, response)
+
+    for (const [name, value] of extra) {
+      if (name === 'set-cookie' || name === 'vary')
+        response.headers.append(name, value)
+      else
+        response.headers.set(name, value)
+    }
+  }
 
   return response
 }

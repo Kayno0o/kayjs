@@ -22,7 +22,7 @@ export const register = action(schemas.register, async (input, ctx) => {
   if (!result.signedIn)
     return 'verify'
 
-  ctx.redirect(localPath(input.redirect, localize(ctx.locals.auth.features().pages?.home ?? '/')))
+  return ctx.redirect(localPath(input.redirect, localize(ctx.locals.auth.features().pages?.home ?? '/')))
 }, guarded)
 
 const auth = ctx.locals.auth

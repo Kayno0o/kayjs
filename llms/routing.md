@@ -54,7 +54,7 @@ h1 Todo {ctx.params.id}
 `RequestContext` from `kay` is what a page, a layout, a guard (`GuardContext`), an endpoint (`EndpointContext`) and an action (`ActionContext`) all read, the same in each:
 
 - `request`, `url`, `locale`, `params`, `cookies`, `locals` and `headers`, read as in a page.
-- `redirect(location, status?)`, `notFound()` and `deny(status?, message?)`, which throw and so are written as statements; `redirect` answers 302 to a read and 303 to a post unless given a status.
+- `redirect(location, status?)`, `notFound()` and `deny(status?, message?)`, which throw, written `return redirect(...)` in a guard, an endpoint or an action handler so TypeScript narrows what follows, and as a statement in a page fence; `redirect` answers 302 to a read and 303 to a post unless given a status.
 - A page adds `query`, `status`, `failed` and `succeeded`, an action `status` and `fail`; an API route reads Elysia's own context, its guards this one.
 - `params` is the route's, matched as a guard reads them, an action's those of the page it was posted from, and `locale` is the site's `lang` without `i18n` in all of them.
 
@@ -267,7 +267,7 @@ The fence's `ctx`:
 - `ctx.locals`, what the app's Elysia `derive`, `resolve` and `decorate` add, such as the signed-in user
 - `ctx.status(404)` and `ctx.headers` set the response. A page rendered per request whose guards, loads or render read the session, `ctx.cookies`, a cookie `persisted` signal or how a form post went goes out as `Cache-Control: private, no-cache` with `Vary: cookie`, so a CDN never hands one visitor's page to another, redirects included, unless `ctx.headers` sets a `cache-control` of its own; what an `await` block reads once the page started streaming comes too late to count
 - `ctx.redirect('/login')`, `ctx.notFound()` and `ctx.deny(403, 'Members only')` stop rendering; `deny` renders `_error.kay` with that status and message
-- They throw, so each is written as a statement, never `return ctx.redirect(...)`, in a page, a layout, a guard, an endpoint and an action alike; `redirect` answers 302 to a read and 303 to a post unless given a status
+- They throw and return `never`: `return` it in a function, a guard, an endpoint or an action handler, which a call through a contextually typed `ctx` needs for TypeScript to narrow what follows, and write a plain statement at the top of a page or layout fence; `redirect` answers 302 to a read and 303 to a post unless given a status
 - `ctx.redirect` goes to any http(s) URL it is given, `//other.example/` included, as an app may send visitors to another site, so a `?next=` param goes through `localPath(value, fallback)` from `kay`, which gives `value` when it is a path of this site and `fallback` otherwise: `ctx.redirect(localPath(ctx.query.next, '/account'))`. The path comes back resolved (dot segments collapsed); a backslash, a control character, or a path that leaves the site once decoded at any depth (`/%2F/evil.example`, `/%09/evil.example`, `/%252F/evil.example`) gives `fallback`, as does a malformed escape in the path.
   - `https://evil.example`, `//evil.example`, `/\evil.example` and a value that is no string all fall back.
   - `fallback` is checked as a link.

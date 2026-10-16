@@ -93,7 +93,7 @@ export const signIn = action(s.Object({
   if (!result.ok)
     return ctx.fail(400, { error: result.error })
 
-  ctx.redirect(result.redirect)
+  return ctx.redirect(result.redirect)
 })
 ---
 form(action={signIn})
@@ -126,7 +126,7 @@ export const register = action(s.Object({
   if (!result.ok)
     return ctx.fail(400, { error: 'error' in result ? result.error : 'invalid' })
 
-  ctx.redirect('/')
+  return ctx.redirect('/')
 })
 
 const challenge = await ctx.locals.auth.captchaChallenge('register')

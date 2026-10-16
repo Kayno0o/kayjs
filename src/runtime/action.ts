@@ -133,7 +133,7 @@ export interface ProtectionMessages {
 }
 
 // The context every request has, `params` those of the page the action was posted from, matched against the action's own route as its guards read them: scope what it touches by them, since the input is the visitor's to choose, and a layout's action gets those every page it wraps names.
-// Its `url` is the action's own, its `locale` the page's it was sent from, and `redirect` answers 303 unless given.
+// Its `url` is that page's, as its guards read it, its `locale` that page's too, and `redirect` answers 303 unless given.
 export interface ActionContext extends RequestContext<RouteParams> {
   // Response status, for a fetch call or the redirect after a plain form post.
   status: (code: number) => void

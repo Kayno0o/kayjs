@@ -7,7 +7,7 @@ import TabNav from '@kaynooo/kayjs-ui/tab-nav.kay'
 export const signOut = action(async (ctx) => {
   await ctx.locals.auth.signOut()
 
-  ctx.redirect(localize(ctx.locals.auth.features().pages?.home ?? '/'))
+  return ctx.redirect(localize(ctx.locals.auth.features().pages?.home ?? '/'))
 })
 
 const features = ctx.locals.auth.features()

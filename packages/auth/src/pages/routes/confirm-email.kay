@@ -16,7 +16,7 @@ export const confirm = action(schemas.token, async ({ token }, ctx) => {
   if (!result.ok)
     return ctx.fail(400, { error: result.error === 'invalid' ? 'link' : result.error })
 
-  ctx.redirect(result.redirect)
+  return ctx.redirect(result.redirect)
 })
 
 const token = ctx.url.searchParams.get('token') ?? ctx.failed(confirm)?.values.token

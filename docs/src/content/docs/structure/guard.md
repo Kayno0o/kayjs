@@ -12,14 +12,14 @@ import { guard } from 'kay'
 
 export default guard(({ locals, redirect, deny }) => {
   if (locals.user === undefined)
-    redirect('/login')
+    return redirect('/login')
 
   if (!locals.user.admin)
-    deny(403, 'Admins only')
+    return deny(403, 'Admins only')
 })
 ```
 
-A guard's `ctx` is the same one a page, an endpoint and an action get: `request`, `url`, `locale`, `params`, `cookies`, `locals`, `headers`, `redirect`, `notFound` and `deny`. `redirect`, `notFound` and `deny` throw, so they are written as statements.
+A guard's `ctx` is the same one a page, an endpoint and an action get: `request`, `url`, `locale`, `params`, `cookies`, `locals`, `headers`, `redirect`, `notFound` and `deny`. `redirect`, `notFound` and `deny` throw. Write `return redirect(...)`, so TypeScript knows nothing after it runs.
 
 Guards still run on every request to a prerendered page. A guard under a param folder reads that param, as `src/routes/orgs/[org]/_guard.ts` reads `params.org`. One in [`src/api/`](/structure/api) protects its routes the same way.
 
