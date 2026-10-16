@@ -103,14 +103,22 @@ export async function detectHost(target: string): Promise<Host> {
   while (!existsSync(dir) && dirname(dir) !== dir)
     dir = dirname(dir)
 
+  return await originHost(dir) ?? 'forgejo'
+}
+
+// The host the `origin` remote of `dir` is on, or nothing when it has none or git cannot be run.
+export async function originHost(dir: string): Promise<Host | undefined> {
   try {
     const git = Bun.spawn(['git', '-C', dir, 'remote', 'get-url', 'origin'], { stdout: 'pipe', stderr: 'ignore' })
     const [url, code] = await Promise.all([new Response(git.stdout).text(), git.exited])
 
-    return code === 0 && GITHUB_REMOTE.test(url) ? 'github' : 'forgejo'
+    if (code !== 0)
+      return undefined
+
+    return GITHUB_REMOTE.test(url) ? 'github' : 'forgejo'
   }
   catch {
-    return 'forgejo'
+    return undefined
   }
 }
 

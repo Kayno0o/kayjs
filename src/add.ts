@@ -4,7 +4,7 @@ import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { basename, dirname, join, relative } from 'node:path'
 import process from 'node:process'
 import { isDeepStrictEqual } from 'node:util'
-import { FEATURE_NAMES, FEATURES, GITHUB_REMOTE, projectFiles } from './new'
+import { FEATURE_NAMES, FEATURES, originHost, projectFiles } from './new'
 
 // Files whose lines are a set: a feature adds the lines the file lacks and keeps the rest.
 const LINE_FILES = new Set(['.gitignore', '.dockerignore'])
@@ -20,7 +20,8 @@ const EXTENSIONS = /extensions:\s*\[/
 const NEWLINE = /\r?\n/
 // A `KEY=value` line of a .env file, with the `export ` some write before it.
 const ENV_LINE = /^\s*(?:export\s+)?([A-Za-z_]\w*)\s*=(.*)$/
-const QUOTED = /^(['"])(.*)\1$/
+const QUOTED = /^(['"])(.*?)\1(?:\s+#.*)?$/
+const INLINE_COMMENT = /\s+#.*$/
 
 // What a library says `kay add <name>` writes: its files, and the entry it adds to `extensions` in kay.config.ts.
 export interface LibraryFeature {
@@ -59,7 +60,7 @@ interface Plan {
 function unquote(value: string): string {
   const trimmed = value.trim()
 
-  return QUOTED.exec(trimmed)?.[2] ?? trimmed
+  return QUOTED.exec(trimmed)?.[2] ?? trimmed.replace(INLINE_COMMENT, '')
 }
 
 async function read(path: string): Promise<string | undefined> {
@@ -317,13 +318,10 @@ async function spawn(command: string[], dir: string): Promise<{ code: number, ou
 
 // The host whose workflows the project uses: its origin remote says it, else the folder already there, else Forgejo.
 async function hostOf(dir: string): Promise<'github' | 'forgejo'> {
-  try {
-    const remote = await spawn(['git', '-C', dir, 'remote', 'get-url', 'origin'], dir)
+  const remote = await originHost(dir)
 
-    if (remote.code === 0)
-      return GITHUB_REMOTE.test(remote.output) ? 'github' : 'forgejo'
-  }
-  catch {}
+  if (remote !== undefined)
+    return remote
 
   return existsSync(join(dir, '.github/workflows')) && !existsSync(join(dir, '.forgejo/workflows')) ? 'github' : 'forgejo'
 }

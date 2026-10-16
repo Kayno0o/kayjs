@@ -401,6 +401,26 @@ it('restores the lockfile of a monorepo root too', async () => {
   }
 })
 
+it('reads a trailing comment of a .env value as no part of it', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'kay-add-'))
+
+  try {
+    const dir = await projectWith(root, [...PRESETS.app.features, 'postgres'])
+    const env = (await Bun.file(join(dir, '.env')).text()).split('\n').filter(line => line !== '').map((line, index) => {
+      const [key, ...value] = line.split('=')
+
+      return index % 2 === 0 ? `${line} # mine` : `${key}="${value.join('=')}" # mine`
+    }).join('\n')
+
+    await writeFile(join(dir, '.env'), `${env}\n`)
+    expect((await addFeatures(dir, ['ws'], { install: false })).written).toEqual([])
+    expect(await Bun.file(join(dir, '.env')).text()).toBe(`${env}\n`)
+  }
+  finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
 it('reads export prefixed and quoted values of .env', async () => {
   const root = await mkdtemp(join(tmpdir(), 'kay-add-'))
   const other = await mkdtemp(join(tmpdir(), 'kay-add-'))
