@@ -450,6 +450,22 @@ describe('a kept page and the state a script declares', () => {
       expect(await readsNothing(route(root, `src/routes/${file}.kay`)), file).toBe(false)
   })
 
+  it('sees an empty container declared later in a list, and not a local let at the start of a line in a function', async () => {
+    const root = await scratch({
+      'src/routes/listed.kay': '---\nimport { count } from \'../listed\'\n---\np {count()}\n',
+      'src/routes/wrapped.kay': '---\nimport { count } from \'../wrapped\'\n---\np {count()}\n',
+      'src/routes/fence.kay': '--- server\nconst a = 1, seen: number[] = []\n\nexport const save = action(s.Object({}), async () => {\n  seen.push(a)\n})\n---\np {seen.length}\n',
+      'src/routes/local.kay': '--- server\nexport function total(values: number[]): number {\nlet sum = 0\n\nfor (const value of values)\n  sum += value\n\nreturn sum\n}\n---\np {total([1, 2])}\n',
+      'src/listed.ts': 'const base = 1, seen: number[] = []\n\nexport function count(): number {\n  return seen.push(base)\n}\n',
+      'src/wrapped.ts': 'const base = 1,\n  seen = new Map<string, number>()\n\nexport function count(): number {\n  return seen.set(String(base), 1).size\n}\n',
+    })
+
+    expect(await readsNothing(route(root, 'src/routes/listed.kay'))).toBe(false)
+    expect(await readsNothing(route(root, 'src/routes/wrapped.kay'))).toBe(false)
+    expect(await readsNothing(route(root, 'src/routes/fence.kay'))).toBe(false)
+    expect(await readsNothing(route(root, 'src/routes/local.kay'))).toBe(true)
+  })
+
   it('keeps refusing a page importing a .ts module with a module-level let or empty container', async () => {
     const root = await scratch({
       'src/routes/let.kay': '---\nimport { next } from \'../counted\'\n---\np {next()}\n',

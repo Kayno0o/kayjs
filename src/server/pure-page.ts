@@ -13,8 +13,17 @@ const CODE_FILE = /\.(?:kay|[cm]?[jt]sx?)$/
 const STATIC_FILE = /\.(?:png|jpe?g|gif|webp|avif|svg|ico|woff2?|ttf|otf|json|css|txt|md|html|toml|ya?ml|csv)$/i
 // Every way a file reads the request or the moment: `ctx`, a clock, a random number, the environment, the file system through Bun, a network fetch, a dynamic import, or a `query` schema, which has the page read the URL's search params.
 const READS_REQUEST = /\b(?:ctx|Date|Intl|Temporal|crypto|process|Bun|performance|fetch|globalThis|require|eval)\b|\bMath\b(?!\s*\??\.\s*(?!random\b)\w)|\bimport\s*\(|\bimport\.meta\b|\bquery\s*:/
-// State a module keeps from one render to the next, which a second render could show differently: a top-level `let` or `var`, an empty container a cache fills, and a container another module imports and changes.
-const MODULE_STATES = [/^(?:export )?(?:let|var) /m, /^(?:export )?const [^=\n]*= *(?:\[ *\]|\{ *\}|new (?:Map|Set|WeakMap|WeakSet|Array|Object)\b)/m]
+// An empty container a cache fills.
+const EMPTY = '(?:\\[\\s*\\]|\\{\\s*\\}|new (?:Map|Set|WeakMap|WeakSet|Array|Object)\\b)'
+// State a module keeps from one render to the next, which a second render could show differently: a top-level `let` or `var`, an empty container a cache fills, one declared later in a list on a line, `const a = 1, seen = []`, or on the line after a comma, and a container another module imports and changes.
+const MODULE_STATES = [
+  /^(?:export )?(?:let|var) /m,
+  new RegExp(`^(?:export )?const [^=\\n]*= *${EMPTY}`, 'm'),
+  new RegExp(`^(?:export )?const [^\\n]*, *[\\w$]+(?: *|:[^=,\\n]*)= *${EMPTY}`, 'm'),
+  new RegExp(`^(?:export )?const [^\\n]*,[ \\t]*\\n\\s*[\\w$]+(?: *|:[^=,\\n]*)= *${EMPTY}`, 'm'),
+]
+// Where a statement of a server fence is judged, at its first line: what is written further down is its body, whatever the column.
+const STATEMENT_STATES = MODULE_STATES.map(state => new RegExp(state.source))
 // An exported literal or `new`, which another module can change; the settings of `page` are read as written, not run.
 const SETTING_NAMES = [PAGE, ...PAGE_SETTINGS].join('|')
 const EXPORTED_STATE = new RegExp(`^export const (?!(?:${SETTING_NAMES})\\b)[^=\\n]*= *(?:[[{]|new )`, 'm')
@@ -45,7 +54,7 @@ function holdsModuleState(file: string, source: string): boolean {
   if (server.unparsed !== undefined || server.broken.length > 0)
     return MODULE_EXPORT.test(source)
 
-  return server.exports.some(({ start, end }) => MODULE_STATES.some(state => state.test(source.slice(start, end).replace(LEADING_COMMENTS, ''))))
+  return server.exports.some(({ start, end }) => STATEMENT_STATES.some(state => state.test(source.slice(start, end).replace(LEADING_COMMENTS, ''))))
 }
 
 // An import or a re-export with what it takes, then one for its effect alone.
