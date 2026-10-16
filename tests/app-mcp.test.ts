@@ -651,6 +651,14 @@ describe('kay check', () => {
     expect((await reported(dir, true)).filter(([file]) => file !== 'src/routes/index.kay')).toEqual([['src/routes/spread.kay', 'spread']])
   })
 
+  it('reports each route where it is written, not at the start of its chain', async () => {
+    const dir = await fixtureCopy('mcp')
+    const found = (await writeShadowTypes(dir, { routes: 'src/routes', api: 'src/api', mcp: true })).problems.find(problem => problem.code === 'deprecated-api-tool')!
+    const line = (await Bun.file(found.file).text()).split('\n')[found.line - 1]!
+
+    expect(line).toContain('/internal')
+  })
+
   it('says nothing without mcp, or when the lint is allowed', async () => {
     const dir = await fixtureCopy('mcp')
 
@@ -768,6 +776,7 @@ describe('a tool call an app can tell', () => {
   it('is seen from a kay guard, so a bearer key reaches the tools and nothing else', async () => {
     const site = await front
 
+    expect((await site.mcp.tools({ headers: KEY })).map(tool => tool.name).sort()).toEqual(['get_seen', 'ping'])
     expect((await site.mcp.call('ping', {}, { headers: KEY })).isError).toBe(false)
     expect((await site.mcp.call('get_seen', {}, { headers: KEY })).data).toEqual({ tool: 'get_seen' })
     expect((await site.fetch('/api/seen', { headers: KEY })).status).toBe(403)
@@ -831,6 +840,10 @@ describe('kay check on routes that opt in', () => {
       '  .put(\'/summary\', () => 1, { detail: { summary: \'x\' } })',
       '  .get(\'/held\', () => 1, options)',
       '  .patch(\'/off\', () => 1, { detail: { tool: false } })',
+      'const cache = new Map()',
+      'cache.get(\'key\', () => 1)',
+      'const app = api()',
+      'app.get(\'/named\', () => 1)',
       '  .delete(\'/hidden\', () => 1, { detail: { hide: true } })',
       '  .get(\'/spread\', () => 1, { ...options })',
       '',
@@ -838,7 +851,7 @@ describe('kay check on routes that opt in', () => {
 
     const found = (await codes(dir)).filter(([, route]) => !route!.endsWith('/internal') && !route!.endsWith('/both'))
 
-    expect(found.sort()).toEqual([['deprecated-api-tool', 'PATCH /off'], ['deprecated-api-tool', 'POST /bare'], ['deprecated-api-tool', 'PUT /summary']])
+    expect(found.sort()).toEqual([['deprecated-api-tool', 'GET /named'], ['deprecated-api-tool', 'POST /bare'], ['deprecated-api-tool', 'PUT /summary']])
   })
 
   it('says nothing without mcp, or when the lints are allowed', async () => {

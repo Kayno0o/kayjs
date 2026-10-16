@@ -127,6 +127,8 @@ Just like an action, `tool: true` keeps the route's own summary as the descripti
 
 A route that answers every method with `.all()` becomes one tool per method. A route with `hide: true` is never a tool, and `kay check` warns when it sets `tool` too.
 
+After an upgrade, `kay check` warns of each route that sets neither `tool` nor `hide`, as it was a tool before. Set `tool: false` on the ones no agent should call.
+
 ### Actions as tools
 
 An action is a tool only when you say so, with `tool` in its third argument. Setting `mcp` never hands an agent an action such as "delete account".
@@ -168,15 +170,15 @@ A tool call reaches your app as a request, with the caller's `Authorization` hea
 import { guard } from 'kay'
 import { toolCall } from 'kay/server'
 
-export default guard(({ request, deny }) => {
+export default guard(({ request, url, deny }) => {
   const key = request.headers.get('authorization') === `Bearer ${process.env.AGENT_KEY}`
 
-  if (key && !toolCall(request))
+  if (key && url.pathname !== '/mcp' && !toolCall(request))
     deny(403, 'This key opens tools only')
 })
 ```
 
-`toolCall(request)` gives `{ tool, client }` for a call that `/mcp` passed on, and nothing for any other request. A client cannot fake it, so the key still opens nothing else. It works the same in a hook you register before `pages()`. Let the key reach `/mcp` itself in that hook or guard.
+`toolCall(request)` gives `{ tool, client }` for a call that `/mcp` passed on, and nothing for any other request. A client cannot fake it, so the key still opens nothing else. The check lets `/mcp` through, as the list of tools is guarded as a request to it. In an Elysia hook registered before `pages()`, read `toolCall(request)` the same way inside `.onRequest(({ request }) => ...)`.
 
 ### Signing in
 
