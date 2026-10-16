@@ -7,7 +7,7 @@ This page lists what each release adds, newest first, with a link to where each 
 
 ## Unreleased
 
-- **Tailwind rules reach template classes**: with `tailwind` on in `@kaynooo/eslint`, `kay/eslint` reports the shorthand classes and static `class` values of a template at their place in the `.kay` file, and fixes those in a `class="..."`. [Checks reference](/reference/checks#eslint)
+- **Tailwind rules reach template classes**: with `tailwind` on in `@kaynooo/eslint`, `kay/eslint` reports the shorthand classes and static `class` values of a template at their place in the `.kay` file, and fixes those in a `class="..."` of an element with no shorthand. [Checks reference](/reference/checks#eslint)
 - **ESLint reaches template expressions**: `kay/eslint` lints attribute values, `{...}` in text and the heads of `if`, `match`, `for`, `await`, `const` and `slot`, reporting at their `.kay` line and column and fixing them in the file. [Checks reference](/reference/checks#eslint)
 - **Pages that read nothing are built once**: a page that reads nothing from its request (no `ctx`, `query`, clock, random number, environment or package import) is prerendered by `kay build` and served from memory without `prerender`, so the bench app's pages cost about 50 and 38 us of CPU per request instead of 650 and 80 (see [Prerendering](/essentials/routing#prerendering)).
 - **One server for the whole `kay dev` session**: an edit to a template, island, loader or API route imports what changed again in the running process and swaps the routes in place, spending about 40% less CPU than a new process per edit. The config, the entry and modules they import still start a new process. [CLI reference](/reference/cli)

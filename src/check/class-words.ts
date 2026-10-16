@@ -42,7 +42,8 @@ export function classSpan(shadow: ShadowFile, start: number, end: number): Span 
   const { group, open, close } = literal
   const piece = start <= open ? group.pieces[0] : pieceAt(group, start - open - 1) ?? group.pieces.find(candidate => candidate.at > start - open - 1)
   const from = start <= open ? piece?.start : sourceOf(group, start - open - 1, false)
-  const to = end > close ? group.pieces.at(-1) && group.pieces.at(-1)!.start + group.pieces.at(-1)!.length : sourceOf(group, end - open - 2, true)
+  const last = group.pieces.at(-1)
+  const to = end > close ? last && last.start + last.length : sourceOf(group, end - open - 2, true)
 
   // A span running on into another piece, the shorthand into the attribute, stops where its first piece does.
   return piece && from !== undefined && to !== undefined ? { start: from, end: Math.max(from, Math.min(to, piece.start + piece.length)) } : undefined
