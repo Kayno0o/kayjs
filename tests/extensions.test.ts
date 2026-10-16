@@ -179,7 +179,7 @@ const greeting = new Elysia({ name: 'kay-lib-greeter' })
 
 export const greeter: KayExtension<typeof greeting> = { name: 'kay-lib-greeter', server: greeting }
 
-export const accounts = (): KayExtension<typeof import('./accounts').accounts> => ({ name: 'kay-lib-accounts', server: async () => (await import('./accounts')).accounts })
+export const accounts = (): KayExtension<typeof import('./accounts').accounts> => ({ name: 'kay-lib-accounts', serverModule: { path: 'node_modules/kay-lib/accounts', export: 'accounts' } })
 `,
   'node_modules/kay-lib/accounts.ts': `import { Elysia } from 'elysia'
 

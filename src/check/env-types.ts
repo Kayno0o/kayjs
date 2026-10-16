@@ -66,7 +66,7 @@ export async function environmentTypes(root: string, options: CheckOptions, serv
   const apiMounts = apiModules.map(module => ({ mount: module.mount, module: modulePath(module.file) }))
   const config = existsSync(join(root, CONFIG_FILE)) ? modulePath(join(root, CONFIG_FILE)) : undefined
   const app = await exportsApp(paths.entry) ? modulePath(paths.entry) : undefined
-  const servers = (options.extensions ?? []).some(extension => extension.server !== undefined)
+  const servers = (options.extensions ?? []).some(extension => extension.server !== undefined || extension.serverModule !== undefined)
   const content = existsSync(paths.content) ? modulePath(paths.content) : undefined
   // `t()` reads the default locale's catalogs, or without `i18n` the site's one language's, when it has any.
   const textLocale = options.i18n?.defaultLocale ?? options.lang ?? DEFAULT_LANG

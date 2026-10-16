@@ -178,15 +178,15 @@ async function importApi(file: string): Promise<{ default?: unknown }> {
   }
 }
 
-// The routes of the server plugins extensions give as an Elysia instance; one given as a function is built only as the server starts.
+// The routes of the server plugins extensions give as an Elysia instance; one given as a function or a module is built only as the server starts.
 function pluginRoutes(config: KayConfig): Listed[] {
   return (config.extensions ?? []).flatMap(({ name, server }) => server instanceof Elysia ? server.routes.filter(route => ROUTE_METHODS.test(route.method)).map(route => ({ methods: route.method.toUpperCase(), path: route.path, kind: 'plugin' as const, by: `the extension ${name}` })) : [])
 }
 
-// What adds routes no file or setting tells of: the server entry, and the extensions' server plugins given as a function.
+// What adds routes no file or setting tells of: the server entry, and the extensions' server plugins given as a function or a module.
 function unlistedServers(root: string, config: KayConfig): string[] {
   const entry = projectPaths(root, config).entry
-  const built = (config.extensions ?? []).filter(({ server }) => typeof server === 'function').map(({ name }) => `the extension ${name}'s server plugin`)
+  const built = (config.extensions ?? []).filter(({ server, serverModule }) => typeof server === 'function' || serverModule !== undefined).map(({ name }) => `the extension ${name}'s server plugin`)
 
   return [...existsSync(entry) ? [shown(entry)] : [], ...built]
 }

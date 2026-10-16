@@ -13,7 +13,7 @@ describe('kay routes', () => {
       'import { Elysia } from \'elysia\'\n',
       'const lib = { name: \'lib\', api: { dir: \'lib/api\', prefix: \'lib\' }, server: new Elysia().get(\'/hooked\', () => 1) }',
       'const built = { name: \'built\', server: () => new Elysia() }\n',
-      'export default { requireGuards: true, publicEnv: {}, extensions: [lib, built], i18n: { locales: [\'en\', \'fr\'], defaultLocale: \'en\', paths: { \'/about\': { fr: \'/a-propos\' } } }, redirects: { \'/old\': \'/\', \'/tmp\': { to: \'/\', permanent: false } } }\n',
+      'export default { requireGuards: true, publicEnv: {}, extensions: [lib, built, { name: \'modular\', serverModule: { path: \'./plugin\' } }], i18n: { locales: [\'en\', \'fr\'], defaultLocale: \'en\', paths: { \'/about\': { fr: \'/a-propos\' } } }, redirects: { \'/old\': \'/\', \'/tmp\': { to: \'/\', permanent: false } } }\n',
     ]
 
     await Promise.all([
@@ -94,7 +94,7 @@ describe('kay routes', () => {
         'GET | /favicon.svg | kay | favicon, unless the app serves it',
         'GET | /sw.js | kay | service worker',
         '',
-        'Not listed: the routes src/server.ts and the extension built\'s server plugin add when the server starts.',
+        'Not listed: the routes src/server.ts and the extension built\'s server plugin and the extension modular\'s server plugin add when the server starts.',
       ])
     }
     finally {
