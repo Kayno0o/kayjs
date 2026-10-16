@@ -142,37 +142,50 @@ describe('HOST', () => {
   })
 
   it.serial.each([undefined, '', '0.0.0.0', '127.0.0.1'])('kay dev keeps its own address when HOST=%p is exported, and leaves the app no HOST', async (exported) => {
-    const root = await scratchDir('host-dev-')
-    const lines: string[] = []
-    const before = process.env.HOST
+    expect(await devAnswer(exported, {})).toBe('localhost undefined')
+  }, 30_000)
 
-    await Bun.write(join(root, 'src/server.ts'), 'const server = Bun.serve({ port: 0, hostname: process.env.HOST, fetch: () => new Response(`${server.hostname} ${process.env.HOST}`) })\n')
-
-    if (exported === undefined)
-      delete process.env.HOST
-    else
-      process.env.HOST = exported
-
-    try {
-      const stop = await dev(root, { log: line => lines.push(line) })
-
-      try {
-        for (let tried = 0; lines.length === 0 && tried < 200; tried++)
-          await Bun.sleep(50)
-
-        const [, port] = (/^kay dev: http:\/\/localhost:(\d+) /).exec(lines[0] ?? '') ?? []
-
-        expect(await (await fetch(`http://localhost:${port}`)).text()).toBe('localhost undefined')
-      }
-      finally {
-        await stop()
-      }
-    }
-    finally {
-      if (before === undefined)
-        delete process.env.HOST
-      else
-        process.env.HOST = before
-    }
+  it.serial('kay dev keeps its own address for a HOST in the .env, and opens to the network with --host while the app still sees no HOST', async () => {
+    expect(await devAnswer(undefined, { dotenv: 'HOST=127.0.0.1\n' })).toBe('localhost undefined')
+    expect(await devAnswer('127.0.0.1', { host: '0.0.0.0', dotenv: 'HOST=127.0.0.1\n' })).toBe('0.0.0.0 undefined')
   }, 30_000)
 })
+
+// What an app that listens on process.env.HOST answers under kay dev, with HOST exported as given.
+async function devAnswer(exported: string | undefined, options: { host?: string, dotenv?: string }): Promise<string> {
+  const root = await scratchDir('host-dev-')
+  const lines: string[] = []
+  const before = process.env.HOST
+
+  if (options.dotenv !== undefined)
+    await Bun.write(join(root, '.env'), options.dotenv)
+
+  await Bun.write(join(root, 'src/server.ts'), 'const server = Bun.serve({ port: 0, hostname: process.env.HOST, fetch: () => new Response(`${server.hostname} ${process.env.HOST}`) })\n')
+
+  if (exported === undefined)
+    delete process.env.HOST
+  else
+    process.env.HOST = exported
+
+  try {
+    const stop = await dev(root, { host: options.host, log: line => lines.push(line) })
+
+    try {
+      for (let tried = 0; lines.length === 0 && tried < 200; tried++)
+        await Bun.sleep(50)
+
+      const [, port] = (/^kay dev: http:\/\/localhost:(\d+) /).exec(lines[0] ?? '') ?? []
+
+      return await (await fetch(`http://localhost:${port}`)).text()
+    }
+    finally {
+      await stop()
+    }
+  }
+  finally {
+    if (before === undefined)
+      delete process.env.HOST
+    else
+      process.env.HOST = before
+  }
+}

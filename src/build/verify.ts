@@ -36,7 +36,8 @@ export async function verifyExecutable(executable: string, root: string, health:
   const { startTimeoutMs = START_TIMEOUT_MS, probeTimeoutMs = PROBE_TIMEOUT_MS } = options
   const started = performance.now()
   const port = String(await freePort())
-  const env = { ...process.env, NODE_ENV: 'production', PORT: port }
+  // HOST is pinned to loopback, where the readiness check and `--health` ask, whatever the build's shell or the project's .env exports.
+  const env = { ...process.env, NODE_ENV: 'production', PORT: port, HOST: '127.0.0.1' }
   const server = Bun.spawn([executable], { cwd: root, env, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe', detached: true })
   const printed = capture(server)
   const running = () => server.exitCode === null && server.signalCode === null

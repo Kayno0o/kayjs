@@ -204,6 +204,23 @@ describe('kay build --format json', () => {
 
     const serving = (status: number) => `#!/usr/bin/env bun\nBun.serve({ hostname: '127.0.0.1', port: Number(process.env.PORT), fetch: () => new Response('', { status: ${status} }) })\nif (process.argv[2] === '--health') process.exit(0)\n`
 
+    it('verifies a server that reads HOST from the build\'s environment, which it pins to loopback', async () => {
+      const reading = await executable('#!/usr/bin/env bun\nBun.serve({ hostname: process.env.HOST, port: Number(process.env.PORT), fetch: () => new Response(\'ok\') })\nif (process.argv[2] === \'--health\') process.exit(0)\n')
+      const before = process.env.HOST
+
+      process.env.HOST = '127.0.0.2'
+
+      try {
+        expect(await verifyExecutable(reading.file, reading.root, false)).toBeGreaterThan(0)
+      }
+      finally {
+        if (before === undefined)
+          delete process.env.HOST
+        else
+          process.env.HOST = before
+      }
+    })
+
     it('takes any answer when the health route is off, and fails on a refusal when it is not', async () => {
       const refusing = await executable(serving(404))
 
