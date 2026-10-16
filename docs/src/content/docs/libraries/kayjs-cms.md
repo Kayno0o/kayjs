@@ -15,6 +15,8 @@ The `@kaynooo` scope must point at the Forgejo registry in your `.npmrc` (a proj
 
 ## Setup
 
+In a kay project, `kay add cms` installs the packages and adds the extension below with its defaults.
+
 `cms()` goes in `kay.config.ts`'s `extensions`:
 
 ```ts

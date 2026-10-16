@@ -16,6 +16,8 @@
 
 ## Setup
 
+`kay add cms` installs the packages and adds `cms()` to `extensions`.
+
 ```ts
 import { cms, forgejo } from '@kaynooo/kayjs-cms'
 import { defineConfig } from 'kay/server'

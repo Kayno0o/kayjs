@@ -15,6 +15,8 @@ The `@kaynooo` scope must point at the Forgejo registry in your `.npmrc` (a proj
 
 ## Setup
 
+In a kay project, `kay add mail` does the install and the two files below for you.
+
 `src/mail.ts` creates the mailer. `from` is your own address, a visitor's address goes in `replyTo`:
 
 ```ts

@@ -12,6 +12,8 @@
 
 ## Setup
 
+`kay add mail` does the install and the two files below.
+
 kayjs-mail is published as `@kaynooo/kayjs-mail` to `https://git.kaynooo.fr/api/packages/kaynooo/npm/`, beside kay. kay and Elysia are peer dependencies.
 
 ```ts

@@ -17,6 +17,7 @@ bun run dev
 | Command | Does |
 | --- | --- |
 | `kay new <dir>` | Scaffold a project that checks, builds and runs |
+| `kay add <features> [dir]` | Add `kay new` features, or a kay library, to an existing project |
 | `kay dev [dir]` | Run the server, restarting on change, with errors shown in the browser |
 | `kay build [dir]` | Check the project and bundle the browser code for production |
 | `kay start [dir]` | Serve the last build as production does |
@@ -71,6 +72,25 @@ Every project gets an `AGENTS.md` for coding agents. It points them at kay's doc
 ```
 kay: accents needs tailwind: add --with tailwind, or drop it with --without accents
 ```
+
+## kay add
+
+```sh
+kay add tailwind,accents
+kay add auth
+kay add mail
+```
+
+`kay add` gives an existing project the files and edits `kay new --with` would have written, then runs `bun install`. It reads which features the project has from its files. A feature that needs another is refused with the command that adds both, such as `kay add server,auth`.
+
+Before it writes anything, it checks that each file it changes is still what `kay new` wrote. A file you changed, such as `src/routes/_layout.kay`, stops it with `kay add: nothing was written` and the lines to remove and add by hand. `package.json` gets the scripts and dependencies it lacks, `.gitignore`, `.dockerignore` and `.env` the lines they lack, and an `AGENTS.md` you edited is left alone.
+
+`mail` and `cms` are the libraries' own features. `kay add mail` adds `@kaynooo/kayjs-mail`, writes `src/mail.ts` and lists `mailExtension` in the `extensions` of `kay.config.ts`, which has to be a plain `defineConfig({ ... })`. `kay add cms` adds `@kaynooo/kayjs-cms`, `@kaynooo/kayjs-ui` and `@iconify-json/tabler`, lists `cms()` there and prints what to set before production.
+
+| Option | Effect |
+| --- | --- |
+| `--no-install` | Writes the files without running `bun install` |
+| `--quiet` | Prints the summary line only |
 
 ## kay dev
 
