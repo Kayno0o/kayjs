@@ -300,19 +300,21 @@ function pointerLeave(event: PointerEvent) {
           span.kui-line-chart-swatch(style={`background-color: ${colors()[index]}`})
           span.kui-line-chart-tooltip-name {item.name}
           span.kui-line-chart-tooltip-value {reading(index)}
-  table.kui-line-chart-data
-    caption {label}
-    thead
-      tr
-        td
-        for item of series key={item.name}
-          th(scope="col") {item.name}
-    tbody
-      for name, index of labels key={index}
+  // A table box ignores the 1px size and clip of sr-only and would scroll the page by its full height, so the table sits in a block that carries them.
+  .kui-line-chart-data
+    table
+      caption {label}
+      thead
         tr
-          th(scope="row") {name}
+          td
           for item of series key={item.name}
-            td {valueText(item, index)}
+            th(scope="col") {item.name}
+      tbody
+        for name, index of labels key={index}
+          tr
+            th(scope="row") {name}
+            for item of series key={item.name}
+              td {valueText(item, index)}
   if onRange
     span.kui-line-chart-hint(id={`${id}-hint`}) {rangeHint}
   if legend ?? series.length > 1

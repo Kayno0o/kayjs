@@ -21,6 +21,18 @@ async function charts() {
 }
 
 describe('LineChart', () => {
+  test('puts the data table in a block that is visually hidden, as a table box would scroll the page by its full height', async () => {
+    const root = await charts()
+    const block = root.querySelector('#line .kui-line-chart-data')!
+    const table = block.querySelector(':scope > table')!
+
+    expect(block.tagName).toBe('DIV')
+    expect(table.className).toBe('')
+    expect(table.querySelector('caption')?.textContent).toBe('Visits')
+    expect(table.querySelectorAll('thead th[scope="col"]')).toHaveLength(2)
+    expect(table.querySelectorAll('tbody th[scope="row"]').length).toBeGreaterThan(0)
+  })
+
   test('draws each series in its colour, the next palette token for one without, and in its own dash after the first', async () => {
     const root = await charts()
     const lines = [...root.querySelectorAll('#line .ct-line')].map(line => line.getAttribute('style'))
