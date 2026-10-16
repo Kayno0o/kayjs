@@ -16,7 +16,7 @@ const titled = new Set<{ host: Element }>()
 // An island's `head` title: the page's title follows `read`, wrapped in `seo.titleTemplate` as the server wraps it unless `raw`, and the site's own while it reads empty.
 // With several islands the title is the one of the island last in the page among those mounted, as the server renders it, whichever hydrated last.
 export function pageTitle(read: () => string, raw: boolean): void {
-  // An island inside another hydrates inline, so its host is the outer island's element.
+  // The nearest island around the element being claimed, which an island inside another hydrates in.
   const host = islandHost()?.closest(ISLAND)
   const entry = host ? { host } : undefined
 
