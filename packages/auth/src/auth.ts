@@ -26,7 +26,7 @@ import type { Proof, ProofFailure, TwoFactorResult, TwoFactorSetup } from './two
 import type { Level, PolicyContext, Predicate, Requirement } from './types'
 import { Elysia } from 'elysia'
 import { READ_METHODS, stoppers } from 'kay/library'
-import { clientAddress, crossSiteRefused, rateKey } from 'kay/server'
+import { clientAddress, crossSiteRefused, crossSiteResponse, rateKey } from 'kay/server'
 import { changePassword, changeUsername, deleteAccount, unlink } from './account'
 import { actingAdmin, adminAuditLog, banUser, changeRole, deleteUser, getUser, isAdmin, listUsers, unbanUser } from './admin'
 import { bearerRequest, bearerUser, createToken, issueToken, listTokens, revokeToken, tokenUser } from './bearer'
@@ -84,10 +84,10 @@ const FORM_POST_FIELDS = ['code', 'state', 'error', 'user']
 export type AuthRequirement<Role extends string> = Requirement<User, Role>
 
 // A session a browser's cross-site POST or websocket upgrade reads as signed out and cannot write, a write answered with a 403: a plain Elysia app has no Origin check of kay's own.
-function guardSession(session: Session<AuthSessionData>, refuse: () => boolean): Session<AuthSessionData> {
+function guardSession(session: Session<AuthSessionData>, refuse: () => boolean, refusal: () => Response): Session<AuthSessionData> {
   const write = <Args extends unknown[]>(call: (...args: Args) => Promise<void>) => async (...args: Args): Promise<void> => {
     if (refuse())
-      throw new Response('Cross-site request refused', { status: 403 })
+      throw refusal()
 
     return call(...args)
   }
@@ -193,7 +193,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     const bearer = bearerRequest(request)
     const crossSite = () => !bearer && crossSiteRefused(request, core.url)
 
-    this.session = guardSession(session, crossSite)
+    this.session = guardSession(session, crossSite, () => crossSiteResponse(request, 'request', core.url))
 
     let languages: string[] | undefined
 

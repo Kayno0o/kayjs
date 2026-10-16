@@ -207,10 +207,10 @@ Use `s.File()` in the schema and `input(type="file" name="avatar")` in the form,
 An action refuses a post that another site sends, as its `Origin` or `Sec-Fetch-Site` header shows, with a 403 in plain text that says what it saw:
 
 ```text
-Cross-site action refused: Origin http://localhost:4701 is not this site (http://127.0.0.1:4701; set site in kay.config.ts if a proxy changes the host)
+Cross-site action refused: Origin http://localhost:4701 is not this site (http://127.0.0.1:4701; set or fix site in kay.config.ts if a proxy changes the host)
 ```
 
-The `Origin` must have the host of the request or of `site` in kay.config.ts, whatever the scheme. So open the site by the address it is served on, or, behind a proxy that does not pass the browser's `Host` on (nginx leaves it out unless told `proxy_set_header Host $host`), set `site` to the public address. A refusal for `Sec-Fetch-Site` says `Sec-Fetch-Site is cross-site, not same-origin or none`.
+The `Origin` must have the host of the request or of `site` in kay.config.ts, whatever the scheme. So open the site by the address it is served on, or, behind a proxy that does not pass the browser's `Host` on (nginx leaves it out unless told `proxy_set_header Host $host`), set `site` to the public address. A refusal for `Sec-Fetch-Site` says `Sec-Fetch-Site is cross-site and the request has no Origin, not same-origin or none`. An api route refuses the same way, saying `request` where this says `action`.
 
 ## Rate limit, honeypot, minimum time and proof-of-work
 

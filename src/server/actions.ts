@@ -418,10 +418,12 @@ export function crossSiteResponse(request: Request, what: 'action' | 'request', 
   if (origin !== null && !sameHost(request, URL.parse(origin), site)) {
     const own = [requestUrl(request).origin, configuredSite()?.origin, site === undefined ? undefined : URL.parse(site)?.origin].filter((value, index, all) => value !== undefined && all.indexOf(value) === index)
 
-    reason = `Origin ${shown(origin)} is not this site (${own.join(' or ')}; set site in kay.config.ts if a proxy changes the host)`
+    reason = `Origin ${shown(origin)} is not this site (${own.join(' or ')}; set or fix site in kay.config.ts if a proxy changes the host)`
   }
   else {
-    reason = `Sec-Fetch-Site is ${shown(fetchSite ?? '')}, not same-origin or none`
+    const seen = shown(fetchSite ?? '')
+
+    reason = `Sec-Fetch-Site is ${seen === '' ? 'empty' : seen}${origin === null ? ' and the request has no Origin' : ''}, not same-origin or none`
   }
 
   return new Response(`${head}: ${reason}`, { status: 403, headers: { 'content-type': TEXT } })

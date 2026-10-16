@@ -3,6 +3,7 @@ import { join, relative } from 'node:path'
 import { brotliDecompressSync } from 'node:zlib'
 import { afterAll, describe, expect, it, spyOn } from 'bun:test'
 import { check } from '../src/check'
+import { configuredSite, setSite } from '../src/runtime/site'
 import { admitCrossSite, crossSiteRefused, crossSiteResponse } from '../src/server/actions'
 import { corsRule } from '../src/server/cors'
 import { testSite } from '../src/test'
@@ -288,8 +289,24 @@ describe('crossSiteRefused', () => {
     const text = await refused.text()
 
     expect(text).toStartWith('Cross-site request refused: Origin https://other.example is not this site (http://app.test')
-    expect(text).toEndWith('https://public.example; set site in kay.config.ts if a proxy changes the host)')
-    expect(await crossSiteResponse(post({ 'sec-fetch-site': 'same-site' }), 'action').text()).toBe('Cross-site action refused: Sec-Fetch-Site is same-site, not same-origin or none')
+    expect(text).toEndWith('https://public.example; set or fix site in kay.config.ts if a proxy changes the host)')
+    expect(await crossSiteResponse(post({ 'sec-fetch-site': '', 'origin': 'http://app.test' }), 'action').text()).toBe('Cross-site action refused: Sec-Fetch-Site is empty, not same-origin or none')
+    expect(await crossSiteResponse(post({ 'sec-fetch-site': 'same-site' }), 'action').text()).toBe('Cross-site action refused: Sec-Fetch-Site is same-site and the request has no Origin, not same-origin or none')
+  })
+
+  it('lists the configured site beside the request\'s own origin once', async () => {
+    const before = configuredSite()
+
+    setSite('https://public.example')
+
+    try {
+      const text = await crossSiteResponse(post({ origin: 'http://evil.example' }), 'action', 'https://public.example').text()
+
+      expect(text).toContain('(http://app.test or https://public.example;')
+    }
+    finally {
+      setSite(before?.origin, before?.slashed ? 'always' : undefined)
+    }
   })
 
   it('leaves a request an API module\'s cors let in', () => {

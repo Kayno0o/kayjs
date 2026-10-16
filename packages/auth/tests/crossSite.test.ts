@@ -27,6 +27,7 @@ describe('a plain Elysia app on auth.plugin', () => {
     const response = await victim.fetch('/sign-in/u1', { method: 'POST', headers: EVIL })
 
     expect(response.status).toBe(403)
+    expect(await response.text()).toStartWith('Cross-site request refused: Origin http://evil.example is not this site (')
     expect(victim.cookies.size).toBe(0)
     expect(await victim.json('/me')).toBe('anonymous')
   })
