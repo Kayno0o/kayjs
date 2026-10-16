@@ -453,11 +453,17 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return prototype === Object.prototype || prototype === null
 }
 
-// The site's URL the environment gives: `SITE_URL`, else `ORIGIN`, which SvelteKit's node adapter and many hosts set, so a server started for either finds its own address.
+// The site's URL the environment gives: `SITE_URL`, which the app set for kay and so fails loudly when wrong, else `ORIGIN`, which SvelteKit's adapter-node reads, so a server started for either finds its own address.
+// `ORIGIN` is generic and other tooling sets it, so one that is no bare http(s) origin is skipped.
 export function siteFromEnv(): string | undefined {
   const { SITE_URL, ORIGIN } = process.env
 
-  return [SITE_URL, ORIGIN].find(url => url !== undefined && url !== '')
+  if (SITE_URL !== undefined && SITE_URL !== '')
+    return SITE_URL
+
+  const url = ORIGIN === undefined ? undefined : URL.parse(ORIGIN)
+
+  return url !== null && url !== undefined && (url.protocol === 'https:' || url.protocol === 'http:') && url.pathname === '/' && url.search === '' && url.hash === '' ? ORIGIN : undefined
 }
 
 function withSiteUrl<Config extends KayConfig>(config: Config): Config {

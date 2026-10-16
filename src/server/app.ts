@@ -348,7 +348,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   if (process.env.NODE_ENV === undefined && !mode.dev && !exported)
     kayLog('warn', 'NODE_ENV is unset, so this server bundles its browser code as it boots and its API answers a refused request with the schema it failed; set NODE_ENV=production where the app is deployed, or run kay dev')
 
-  // `kay build` leaves a server's site to `SITE_URL` at boot, so this is where one with none is told.
+  // `kay build` leaves a server's site to `SITE_URL` or `ORIGIN` at boot, so this is where one with none is told.
   if (site === undefined && options.seo !== undefined && !mode.dev && !exported)
     kayLog('warn', '`seo` is set, but not the origin the site is public at, in kay.config.ts, SITE_URL or ORIGIN: pages get no canonical link or og:url, and the site no sitemap or robots.txt')
 

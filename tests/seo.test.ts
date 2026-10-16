@@ -1,5 +1,6 @@
 import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
+import { loadConfig } from '../src/config'
 import { siteOrigin as currentSiteOrigin, jsonLd, siteUrl } from '../src/runtime/seo'
 import { pages } from '../src/server'
 import { isCrossSite } from '../src/server/actions'
@@ -182,6 +183,42 @@ describe('seo head', () => {
     expect(() => siteOrigin('https://example.com/blog')).toThrow('kay: site is the origin')
     expect(() => siteOrigin('ftp://example.com')).toThrow('kay: site is the origin')
     expect(() => siteOrigin('example.com')).toThrow('kay: site is the origin')
+  })
+
+  it('skips an ORIGIN that is no origin, which other tooling sets, and keeps a trailing slash, while a SITE_URL that is none still fails', async () => {
+    const before = { SITE_URL: process.env.SITE_URL, ORIGIN: process.env.ORIGIN }
+
+    delete process.env.SITE_URL
+
+    try {
+      for (const origin of ['/x', 'null', 'http://localhost:4701/app', 'localhost:4701', 'ftp://example.com', 'http://localhost:4701?a=1']) {
+        process.env.ORIGIN = origin
+
+        expect((await loadConfig('tests/fixtures/seo')).site).toBeUndefined()
+        await pages({ routes: ROUTES, prebuilt: false })
+
+        expect(() => currentSiteOrigin()).toThrow('nor SITE_URL or ORIGIN')
+      }
+
+      process.env.ORIGIN = 'http://localhost:4701/'
+
+      expect((await loadConfig('tests/fixtures/seo')).site).toBe('http://localhost:4701/')
+      await pages({ routes: ROUTES, prebuilt: false })
+
+      expect(currentSiteOrigin()).toBe('http://localhost:4701')
+
+      process.env.SITE_URL = '/x'
+
+      expect((await loadConfig('tests/fixtures/seo')).site).toBe('/x')
+    }
+    finally {
+      for (const name of ['SITE_URL', 'ORIGIN'] as const) {
+        if (before[name] === undefined)
+          delete process.env[name]
+        else
+          process.env[name] = before[name]
+      }
+    }
   })
 
   it('reads the site from ORIGIN when SITE_URL is unset, SITE_URL winning and the config before both, the cross-site check following it', async () => {

@@ -619,7 +619,7 @@ export function recordResponses(app: Elysia, base = ''): void {
 export interface DevHead {
   // What a search result shows of a description before cutting it.
   descriptionLength: number
-  // The origin the site is public at, none when `site` and `SITE_URL` are unset.
+  // The origin the site is public at, none when `site`, `SITE_URL` and `ORIGIN` are unset.
   site?: string | undefined
   // `none` when there is no origin and so no sitemap, `error` when building it failed, `sitemapError` saying why.
   sitemap: 'listed' | 'unlisted' | 'none' | 'error'
