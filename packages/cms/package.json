@@ -1,7 +1,7 @@
 {
   "name": "@kaynooo/kayjs-cms",
   "type": "module",
-  "version": "1.49.0",
+  "version": "1.50.0",
   "description": "A CMS for kay sites: collection screens, and content edited on the page it renders",
   "author": "Kaynooo <https://github.com/Kayno0o>",
   "license": "MIT",
@@ -50,7 +50,7 @@
   },
   "peerDependencies": {
     "@kaynooo/kayjs-ui": "workspace:~",
-    "kay": "~1.49.0"
+    "kay": "~1.50.0"
   },
   "devDependencies": {
     "@happy-dom/global-registrator": "^21.0.3",

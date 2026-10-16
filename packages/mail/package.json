@@ -1,7 +1,7 @@
 {
   "name": "@kaynooo/kayjs-mail",
   "type": "module",
-  "version": "1.49.0",
+  "version": "1.50.0",
   "description": "Mail for kay apps: SMTP configured from typed env variables, mails written as .kay components, a development outbox page, a test outbox and queued sending",
   "author": "Kaynooo <https://github.com/Kayno0o>",
   "license": "MIT",
@@ -51,7 +51,7 @@
   },
   "peerDependencies": {
     "elysia": "^1.4.30",
-    "kay": "~1.49.0"
+    "kay": "~1.50.0"
   },
   "dependencies": {
     "nodemailer": "^10.0.16"

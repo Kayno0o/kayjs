@@ -5,7 +5,7 @@ description: What each release of kay and its libraries adds, with a link to whe
 ---
 This page lists what each release adds, newest first, with a link to where each feature is documented. kay and its libraries share one version number, so one section covers them all. What a release breaks, and what to change in your app, is in [Upgrading](/guides/upgrading).
 
-## Unreleased
+## 1.50.0
 
 - **AI agents sign in to your app**: an MCP client such as Claude Code signs in to an app with kayjs-auth and `mcp` through OAuth, with no code on your side. Your app serves the sign-in documents, a consent page and the tokens, which are kayjs-auth's bearer tokens, and users revoke an agent from the account page. Postgres and SQLite apps run `db.sync()` for the new tables. [Letting an AI agent sign in](/libraries/kayjs-auth#letting-an-ai-agent-sign-in)
 - **Smaller first paints on pages with big stylesheets**: a page whose styles pass the 14 KB inline size writes into its head the rules its own components use, Tailwind's classes included, and links the full stylesheet for the rest without holding the first paint back. A class built at runtime or added by an island still gets its style, and you configure nothing. [Styling and assets](/essentials/styling-and-assets#linked-or-inlined-styles)

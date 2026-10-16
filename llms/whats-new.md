@@ -2,7 +2,7 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
-## Unreleased
+## 1.50.0
 
 - An MCP client (Claude Code, MCP Inspector) signs in to an app with kayjs-auth and `mcp` through OAuth with no code of the app's: the app serves the authorization server and resource metadata, registration (client ID metadata documents and dynamic), PKCE S256, a consent page, rotating refresh tokens that end their family when reused, and an account page listing approved apps with a revoke button; the tokens are kayjs-auth's bearer tokens, so `user()`, `via()` and `requireUser({ scope })` work unchanged. A Postgres or SQLite app runs `db.sync()` for the four `auth_oauth_*` tables and the two `auth_bearer_token` columns, and a custom store may add the optional `oauth` member ([kayjs-auth](../packages/auth/llms.txt), [API routes](api-routes.md#mcp)).
 - A page whose stylesheets pass the 14 KB inline limit now inlines the rules its own components use, Tailwind's utilities included, and links the full stylesheet for the rest without holding the first paint back: a class built at runtime or added by an island still has its rule, nothing to configure, `inlineStyles` still forces one way ([Styles and assets](styles-and-assets.md#link-or-inline-the-stylesheets)).
