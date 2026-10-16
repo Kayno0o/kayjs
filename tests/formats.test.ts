@@ -187,6 +187,55 @@ describe('kay build --format json', () => {
       await expect(verifyExecutable(taken.file, taken.root, undefined)).rejects.toThrow(/exited with code 1[\s\S]*address in use/)
     }, 30_000)
 
+    // A process is gone when it no longer exists, or only waits to be reaped.
+    async function gone(pid: number): Promise<boolean> {
+      try {
+        const stat = await Bun.file(`/proc/${pid}/stat`).text()
+
+        return stat.slice(stat.indexOf(') ') + 2).startsWith('Z')
+      }
+      catch {
+        return true
+      }
+    }
+
+    async function pidAfter(file: string): Promise<number> {
+      for (let tries = 0; tries < 100; tries++) {
+        if (await Bun.file(file).exists())
+          return Number(await Bun.file(file).text())
+
+        await Bun.sleep(20)
+      }
+
+      throw new Error('no pid written')
+    }
+
+    it.skipIf(process.platform !== 'linux')('leaves no process the server started running, after a pass or a failure', async () => {
+      const spawning = (end: string) => `#!/usr/bin/env bun\nimport { writeFileSync } from 'node:fs'\nif (process.argv[2] === '--health') process.exit(0)\nwriteFileSync(import.meta.path + '.pid', String(Bun.spawn(['sleep', '30']).pid))\n${end}\n`
+      const passing = await executable(spawning('Bun.serve({ hostname: \'127.0.0.1\', port: Number(process.env.PORT), fetch: () => new Response(\'\') })'))
+
+      await verifyExecutable(passing.file, passing.root, undefined)
+      expect(await gone(await pidAfter(`${passing.file}.pid`))).toBe(true)
+
+      const failing = await executable(spawning('process.exit(1)'))
+
+      await expect(verifyExecutable(failing.file, failing.root, undefined)).rejects.toThrow('exited with code 1')
+      expect(await gone(await pidAfter(`${failing.file}.pid`))).toBe(true)
+    }, 30_000)
+
+    it.skipIf(process.platform !== 'linux')('does not take the answer of a process outside the server\'s own tree, though the server binds late', async () => {
+      const foreign = 'Bun.serve({ hostname: "127.0.0.1", port: Number(process.env.PORT), fetch: () => new Response("other") }); setTimeout(() => process.exit(0), 3000)'
+      const taken = await executable(`#!/bin/sh\n[ "$1" = "--health" ] && exit 0\nsetsid bun -e '${foreign}' >/dev/null 2>&1 &\nsleep 1\necho "address in use" >&2\nexit 1\n`)
+
+      await expect(verifyExecutable(taken.file, taken.root, undefined)).rejects.toThrow(/exited with code 1[\s\S]*address in use/)
+    }, 30_000)
+
+    it('keeps the last bytes of the output, a cut character included', async () => {
+      const cut = await executable('#!/bin/sh\nprintf "last line \\342\\202" >&2\nexit 1\n')
+
+      await expect(verifyExecutable(cut.file, cut.root, undefined)).rejects.toThrow(/last line \uFFFD/)
+    }, 30_000)
+
     it('names the signal that killed a server which had answered', async () => {
       const killed = await executable(`#!/bin/sh\n[ "$1" = "--health" ] && exit 0\nbun -e 'Bun.serve({ hostname: "127.0.0.1", port: Number(process.env.PORT), fetch: () => new Response("") }); await Bun.sleep(100); process.kill(process.ppid, "SIGKILL")' &\nwait\n`)
 
