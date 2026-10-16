@@ -29,7 +29,7 @@ The name in brackets is a lint. `kay build` runs the same check and `kay dev` li
 
 ## Errors and warnings
 
-Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. Warnings fail the check only with `--deny-warnings`, which the `check` script of a new project passes. `kay build` and `kay dev` never fail on one.
+Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. Warnings fail the check only with `--deny-warnings`. The `check` script of a new project leaves it out, so a warning shows on the diff without failing CI. Add it to the script to fail on warnings too. `kay build` and `kay dev` never fail on one.
 
 | Lint | Default | Group | Reports |
 | --- | --- | --- | --- |
@@ -192,11 +192,11 @@ export default defineConfig({ strict: true, kay: true })
 
 <Callout type="note">
 
-Type-aware rules read files that `kay check`, `kay dev` and the editor write, so run one of them before linting.
+Type-aware rules read files that `kay check`, `kay dev` and the editor write. `kay lint` writes them and then runs `keslint` with your arguments, so run it instead of `keslint` and no check has to come first. A new project's `lint` script is `kay lint --cache`.
 
 </Callout>
 
-The kay extension does not run ESLint. In VS Code, the ESLint extension lints `.kay` files once `eslint.validate` lists the `kay` language. The setting replaces the languages it lints, so name those too, in `.vscode/settings.json`:
+The kay extension does not run ESLint. In VS Code, the ESLint extension lints `.kay` files once `eslint.validate` lists the `kay` language. The setting replaces the languages it lints, so name those too, in `.vscode/settings.json`. `kay new` writes this file when you add ESLint:
 
 ```json
 {

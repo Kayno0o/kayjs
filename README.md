@@ -44,12 +44,13 @@ In production the server serves what `kay build` wrote and bundles nothing at bo
 | `kay build [dir] [-p tsconfig.json] [--no-check] [--analyze]` | bundle the browser code for production while checking the project as `kay check` does, keeping the last build when either fails; `--no-check` skips the check |
 | `kay build [dir] --compile <file> [--entry <file>]` | the same, plus the server and everything it serves in one executable, `--entry` naming the server entry |
 | `kay build [dir] --static [--outdir dist]` | the same, then the whole site as static files for a host with no server |
-| `kay check [dir] [paths...] [-p tsconfig.json] [--entry <file>] [--deny-warnings] [--fix] [--only <group>] [--format text\|github\|json] [--watch]` | type-check the project, `.kay` files included, `-p` naming another tsconfig and `--entry` the server entry whose `app` types `ctx.locals`; warnings fail it only with `--deny-warnings`, and `--fix` applies the fixes that change nothing else first |
+| `kay check [dir] [paths...] [-p tsconfig.json] [--entry <file>] [--deny-warnings] [--fix] [--only <group>] [--format text\|github\|json] [--watch]` | type-check the project, `.kay` files included, `-p` naming another tsconfig and `--entry` the server entry whose `app` types `ctx.locals`; warnings fail it only with `--deny-warnings`, which a scaffolded app leaves out, and `--fix` applies the fixes that change nothing else first |
 | `kay start [dir] [--entry <file>] [--port <port>]` | serve the last build as production does |
 | `kay render <url> [dir] [--method <method>] [--body <text>] [--header <name: value>] [--cookie <name=value>] [-i] [--entry <file>]` | print what the server answers for one URL, as `kay dev` serves it, without starting it on a port |
 | `kay routes [dir]` | list every route the project serves, and the file serving it |
 | `kay explain [lint\|error\|group]` | list the lints and the errors, or a group's, or explain one: a lint with an example it reports and the same written right, an error with where its fix is written |
 | `kay fmt [paths...] [--check]` | format `.kay` files |
+| `kay lint [keslint arguments]...` | write the types the lint of `.kay` files reads, then run the project's `keslint` on the arguments, with no `kay check` needed first |
 | `kay migrate astro [dir] [--out <dir>]` | translate an Astro project into `.kay` files, listing what is left by hand |
 | `kay lsp --stdio` | language server for the editor extension in `editors/vscode` |
 

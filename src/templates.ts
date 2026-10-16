@@ -324,8 +324,7 @@ ${WORKFLOW_SETUP}`,
     `      # Each problem shows on the diff.
       - name: Check
         run: bun run check --format github`,
-    has('eslint') && `      # After the check, which writes the types the lint of .kay files reads.
-      - name: Lint
+    has('eslint') && `      - name: Lint
         run: bun run lint`,
     has('tests') && `      - name: Test
         run: bun run test${database
@@ -363,8 +362,7 @@ ${WORKFLOW_SETUP}`,
           SITE_URL: https://pages.example.com
           SITE_BASE: /\${{ github.repository }}
         run: bun run build`,
-    has('eslint') && `      # After the build's check, which writes the types the lint of .kay files reads.
-      - name: Lint
+    has('eslint') && `      - name: Lint
         run: bun run lint`,
     `      - name: Publish to the gitea-pages branch
         uses: peaceiris/actions-gh-pages@v3
@@ -854,7 +852,9 @@ export function templateFiles(features: ReadonlySet<Feature>, settings: ConfigSe
     ...has('starter') && starterFiles(setup),
     ...has('accents') && ACCENT_FILES,
     ...server && { 'src/server.ts': SERVER_ENTRY },
-    // Type-aware, .kay fences included, once `kay check` or `kay dev` has written the types they read.
+    // The ESLint extension lints only the languages it lists, which replaces its default ones.
+    ...has('eslint') && { '.vscode/settings.json': `${JSON.stringify({ 'eslint.validate': ['javascript', 'javascriptreact', 'typescript', 'typescriptreact', 'kay'] }, null, 2)}\n` },
+    // Type-aware, .kay fences included, over the types `kay lint`, `kay check` and `kay dev` write.
     ...has('eslint') && { 'eslint.config.ts': 'import { defineConfig } from \'@kaynooo/eslint\'\n\nexport default defineConfig({ strict: true, kay: true })\n' },
     ...has('tests') && {
       // `kay/test/preload` lets test files import pages and their actions; an app's `tests/database.ts` gives each test file a database of its own.

@@ -4,7 +4,7 @@
 
 ### Check the project
 
-`kay check` type-checks the project, templates included, and fails on errors; `--deny-warnings` fails on warnings too, as the `check` script `kay new` writes does:
+`kay check` type-checks the project, templates included, and fails on errors; `--deny-warnings` fails on warnings too, which an app adds to its `check` script when it wants none to pile up (the one `kay new` writes is `kay check`, the CI annotating each warning on the diff):
 
 ```sh
 kay check --deny-warnings
@@ -82,7 +82,7 @@ export default defineConfig({ strict: true, kay: true })
 ```
 
 ```sh
-kay check && keslint --cache
+kay lint --cache
 ```
 
 ## Reference
@@ -167,7 +167,7 @@ kay check && keslint --cache
 - `kay check`, `kay build` and `kay dev`'s dev tool print a problem as rustc does, and the editor shows the same message, note and help, type errors and their help included, leaving out the type errors `kay check` leaves out (those of a file that did not compile and of a library component the app never imports).
 - A problem prints as `error[missing-alt]: An \`img\` needs \`alt\``, then ` --> src/routes/index.kay:4:3`, the lines at fault with the span underlined and the other places involved labelled, then `= note:` saying why when the message does not, and `= help:` saying what to write instead.
 - A name in brackets is a lint's, and the project sets its level: `deny` reports it as an error, `warn` as a warning, and `allow` not at all.
-- `kay check` prints warnings beside the errors and counts them apart, failing on them only with `--deny-warnings`, which the `check` script `kay new` writes passes; `kay build` and `kay dev` never fail on one.
+- `kay check` prints warnings beside the errors and counts them apart, failing on them only with `--deny-warnings`, which the `check` script `kay new` writes leaves out; `kay build` and `kay dev` never fail on one.
 - Lints are found while type checking, so a page with one still runs.
 - Beside each open file's problems, the editor runs what `kay check` finds across the project after a save or a change on disk, never on a keystroke: the config, the collections' entries, the locales' messages, what the server refuses when it boots, the settings libraries take and what guards, API modules and matchers export, each shown at its file, open or not.
 - `lints` in `kay.config.ts` sets levels over the defaults: `defineConfig({ lints: { 'positional-key': 'deny', 'unread-name': 'warn' } })`.
@@ -233,7 +233,7 @@ kay check && keslint --cache
 
 - `kay check` reads kay.config.ts: `missing-site`, `missing-description`, `missing-share-image`, `default-favicon`.
 - They point at kay.config.ts.
-- `missing-share-image` and `default-favicon` name what a site lacks until it goes public, as a fresh project from `kay new` does, so only `kay build` and `kay check --only seo` report them, never a plain `kay check`, whose `--deny-warnings` they would fail.
+- `missing-share-image` and `default-favicon` name what a site lacks until it goes public, as a fresh project from `kay new` does, so only `kay build` and `kay check --only seo` report them, never a plain `kay check`.
 - `missing-site` is reported by `kay build --static` alone: a server may read `SITE_URL` when it boots, and one with `seo` set and no site warns then.
 - `kay build` reads the head of every page it prerenders once the check passed: `untitled-page`, `undescribed-page`, `duplicate-title`, `long-description`, `unsized-share-image`, `noindex-in-sitemap`.
 - They point at the page's module and name the path; a page rendered per request is not read.
@@ -309,7 +309,7 @@ kay check && keslint --cache
 - ESLint lints the script and server fences, the template expressions and the template classes (Tailwind rules) of `.kay` files through `kay/eslint`, which `@kaynooo/eslint` wires in with `kay: true`: an `eslint.config.ts` of `export default defineConfig({ strict: true, kay: true })`, run with `keslint --cache`, which `kay new` writes along with `lint` and `lint:fix` scripts.
 - The processor lints the TSX `kay check` type-checks a component as and reports only what falls in the code the author wrote, a fence or a template expression, and the Tailwind rules on template classes, at their `.kay` line and column; `--fix` rewrites the `.kay` file, a fix reaching into generated code dropped, and one adding a line break outside the fences.
 - The markup of a template, its tags and static text, is left to `kay check`, and the rules the generated code around the author's would trip are off in `.kay` files: indentation, blank lines and padding, import order and adjacency, arrow parentheses, nested ternaries and one-line handlers.
-- Type-aware rules, such as `ts/no-floating-promises` under `strict`, read the shadow files `kay check`, `kay dev` and the editor's language server write under `.kay/types`, so lint runs after one of them: a component with none yet fails with `has no type information yet: run kay check, or kay dev, before linting it`, and CI runs `bun run lint` after `bun run check`.
+- Type-aware rules, such as `ts/no-floating-promises` under `strict`, read the shadow files `kay check`, `kay dev` and the editor's language server write under `.kay/types`: `kay lint [keslint arguments]` writes them, then runs the project's `keslint` on its arguments (`kay lint --fix --cache`), which is what the `lint` script `kay new` writes does, so linting needs no check first; `keslint` run alone on a component with none yet fails with `has no type information yet: run kay check, or kay dev, before linting it`.
 - `.kay/types/kay-shadow.json` records the routes directory and the components only islands render, which the processor compiles each file with, as it cannot read `kay.config.ts`.
 - ESLint and the editor's ESLint run under Node, so `kay/eslint` ships prebuilt for Node, and from source under Bun.
-- The kay extension does not run ESLint: in VS Code, the ESLint extension lints `.kay` files once `eslint.validate`, which replaces the languages it lints, lists `kay` too, `"eslint.validate": ["javascript", "javascriptreact", "typescript", "typescriptreact", "kay"]` in `.vscode/settings.json`.
+- The kay extension does not run ESLint: in VS Code, the ESLint extension lints `.kay` files once `eslint.validate`, which replaces the languages it lints, lists `kay` too, `"eslint.validate": ["javascript", "javascriptreact", "typescript", "typescriptreact", "kay"]` in `.vscode/settings.json`, which `kay new` writes with `eslint`.

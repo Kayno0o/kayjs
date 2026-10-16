@@ -20,7 +20,7 @@ kay dev --port 4000 --open
 
 ### Check the project
 
-`kay check` type-checks the project, `.kay` files included, and fails on errors, and on warnings with `--deny-warnings`:
+`kay check` type-checks the project, `.kay` files included, and fails on errors, and on warnings with `--deny-warnings`, which the `check` script `kay new` writes leaves out:
 
 ```sh
 kay check --deny-warnings
@@ -337,6 +337,8 @@ export default defineConfig({
   - List the lints with their groups and default levels and the errors with theirs, or a group's, or print one: a lint with an example it reports and the same written right, an error with where its fix is written.
 - `kay fmt [paths...] [--check] [--format text|json] [--quiet]`:
   - Format `.kay` files; `--check` lists unformatted files and fails.
+- `kay lint [keslint arguments]...`:
+  - Write the types the lint of `.kay` files reads, as `kay check` does, then run the project's `keslint` with the arguments, so linting needs no check before it; its exit code is `keslint`'s (see [Linting](checks.md#linting)).
 - `kay migrate astro [dir] [--out <dir>] [--format text|json] [--quiet]`:
   - Translate an Astro project's `.astro` files into `.kay` ones, `src/pages` into `src/routes` (`404` as `_404`), components and layouts kept in their folder with kebab-case names and the imports of them rewritten, and `src/content.config.ts` into kay's, its zod schemas written in `s`.
   - The frontmatter becomes the fence, a page's `--- server` with `Astro.url`, `params`, `cookies` and `redirect` read from `ctx`, `Astro.props` becomes `props<Props>()`, and the markup the indented template: static classes as the `.class` shorthand, `class:list` as `class`, `&&`, ternaries and `.map` as `if` and `for`, slots as `slot` and `@name` blocks, `client:idle` and `client:visible` as `hydrate`, `set:html` as `innerHTML` through `trustHtml`, a layout's `head` as a `head` block.

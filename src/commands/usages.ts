@@ -9,6 +9,7 @@ export const USAGES = {
   routes: 'routes [dir] [--format text|json]',
   explain: 'explain [lint|error|group] [--format text|json]',
   fmt: 'fmt [paths...] [--check] [--format text|json] [--quiet]',
+  lint: 'lint [keslint arguments]...',
   migrate: 'migrate astro [dir] [--out <dir>] [--format text|json] [--quiet]',
   lsp: 'lsp --stdio',
   mcp: 'mcp [--stdio]',

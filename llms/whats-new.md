@@ -2,6 +2,10 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
+## Unreleased
+
+- `kay lint` writes the types ESLint reads for `.kay` files, then runs the project's `keslint`, so linting needs no `kay check` first; a new project's `lint` script is `kay lint --cache`, its `check` script is `kay check` so a warning shows without failing CI, and `eslint` writes the `.vscode/settings.json` that lets the ESLint extension lint `.kay` files ([Checks](checks.md#linting), [Project](project.md)).
+
 ## 1.45.0
 
 - A `try` block that throws on the server takes back the `head` tags and island titles its components set, so a page never serves a title from an island it did not render ([Head](head.md)).

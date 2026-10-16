@@ -206,10 +206,9 @@ function unresolved(files: Record<string, string>): { paths: string[], undeclare
   }
 }
 
-// Lints as `bun run lint` does, through keslint and the eslint it runs under Node, as JSON.
+// Lints as `bun run lint` does, through `kay lint` and the keslint it runs under Node, as JSON.
 async function lint(dir: string, path: string): Promise<{ filePath: string, messages: { ruleId: string | null, line: number }[] }[]> {
-  const child = Bun.spawn([join(dir, 'node_modules/.bin/keslint'), '--format', 'json', path], { cwd: dir, stdout: 'pipe', stderr: 'pipe' })
-  const [stdout, stderr] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+  const { stdout, stderr } = await kay(['lint', '--format', 'json', path], dir)
 
   expect(stderr).toBe('')
 
@@ -249,6 +248,18 @@ describe('kay command line', () => {
       for (const { args, stdout, stderr, code } of runs)
         expect({ args, stdout, usage: stderr.includes('Usage: kay new'), code }).toEqual({ args, stdout: '', usage: true, code: 1 })
 
+      expect(await readdir(dir)).toEqual([])
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('refuses kay lint in a project with no keslint, writing nothing', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kay-cli-'))
+
+    try {
+      expect(await kay(['lint', '--fix'], dir)).toEqual({ stdout: '', stderr: 'kay lint: the project has no `keslint`: add `@kaynooo/eslint`\n', code: 1 })
       expect(await readdir(dir)).toEqual([])
     }
     finally {
@@ -389,8 +400,10 @@ describe('kay new', () => {
     // The container runs the one executable `kay build --compile` makes.
     expect(files).toEqual(expect.arrayContaining(['Dockerfile', 'compose.prod.yaml', 'src/components/accent-picker.kay']))
     expect(manifest.scripts.compile).toBe('kay build --compile server')
-    // A warning fails CI as an error does, so none piles up unread.
-    expect(manifest.scripts.check).toBe('kay check --deny-warnings')
+    // A warning is shown, and fails CI only where the app adds `--deny-warnings`.
+    expect(manifest.scripts.check).toBe('kay check')
+    expect(manifest.scripts.lint).toBe('kay lint --cache')
+    expect(await Bun.file(join(dir, '.vscode/settings.json')).json()).toEqual({ 'eslint.validate': ['javascript', 'javascriptreact', 'typescript', 'typescriptreact', 'kay'] })
     expect(await Bun.file(join(dir, 'AGENTS.md')).text()).toContain('run `bun run check`, `bun run fmt`, `bun run lint`, and `bun run test`.')
     expect(await Bun.file(join(dir, 'Dockerfile')).text()).toContain('RUN bun run compile')
     expect(await Bun.file(join(dir, 'Dockerfile')).text()).toContain('HEALTHCHECK --interval=30s --timeout=6s CMD ["./server", "--health"]')
@@ -401,7 +414,7 @@ describe('kay new', () => {
     // As strict as kay itself, and checked, linted and tested on every push.
     expect(await Bun.file(join(dir, 'tsconfig.json')).json()).toEqual({ extends: 'kay/tsconfig.json' })
     expect(((await Bun.file(join(repo, 'src/tsconfig.app.json')).json()) as { compilerOptions: Record<string, unknown> }).compilerOptions).toMatchObject({ strict: true, exactOptionalPropertyTypes: true, noFallthroughCasesInSwitch: true, noImplicitOverride: true, noUncheckedIndexedAccess: true })
-    expect(await Bun.file(join(dir, '.forgejo/workflows/test.yml')).text()).toContain('run: bun run check --format github\n\n      # After the check, which writes the types the lint of .kay files reads.\n      - name: Lint\n        run: bun run lint\n\n      - name: Test\n        run: bun run test\n')
+    expect(await Bun.file(join(dir, '.forgejo/workflows/test.yml')).text()).toContain('run: bun run check --format github\n\n      - name: Lint\n        run: bun run lint\n\n      - name: Test\n        run: bun run test\n')
 
     // Stricter than kay itself: its source fails this flag, its declarations must not.
     const scaffolded = await Bun.file(join(dir, 'tsconfig.json')).text()
@@ -461,13 +474,14 @@ describe('kay new', () => {
       expect(files).not.toContain('src/server.ts')
       expect(manifest.scripts.build).toBe('kay build --static')
       expect(await Bun.file(join(dir, '.forgejo/workflows/pages.yml')).text()).toContain('SITE_BASE: /${{ github.repository }}')
-      // Tested before it builds, which checks it, and linted once the check has written the types it reads.
+      // Tested before it builds, which checks it, and linted after.
       expect(await Bun.file(join(dir, '.forgejo/workflows/pages.yml')).text()).toMatch(/run: bun run test\n\n {6}- name: Build the site\n/)
-      expect(await Bun.file(join(dir, '.forgejo/workflows/pages.yml')).text()).toMatch(/run: bun run build\n\n.*\n {6}- name: Lint\n {8}run: bun run lint\n/)
+      expect(await Bun.file(join(dir, '.forgejo/workflows/pages.yml')).text()).toMatch(/run: bun run build\n\n {6}- name: Lint\n {8}run: bun run lint\n/)
 
       await installKay(dir)
-      expect(await checked(dir)).toEqual([])
+      // Linted before any check or dev run wrote the types its rules read.
       expect((await lint(dir, '.')).flatMap(result => result.messages)).toEqual([])
+      expect(await checked(dir)).toEqual([])
 
       // With no server entry, `kay dev` serves the pages with kay's own, live reload included.
       const server = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'dev'], { cwd: dir, env: { ...process.env, PORT: '0' }, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' })
@@ -579,7 +593,7 @@ describe('kay new', () => {
       expect(files).toEqual(['.gitignore', '.npmrc', 'AGENTS.md', 'kay.config.ts', 'package.json', 'src/routes/_layout.kay', 'src/routes/index.kay', 'tsconfig.json'])
       // kay itself comes from the registry this names, whatever else is left out.
       expect(await Bun.file(join(dir, '.npmrc')).text()).toBe('@kaynooo:registry=https://git.kaynooo.fr/api/packages/kaynooo/npm/\n')
-      expect(manifest.scripts).toEqual({ dev: 'kay dev', build: 'kay build --static', check: 'kay check --deny-warnings', fmt: 'kay fmt' })
+      expect(manifest.scripts).toEqual({ dev: 'kay dev', build: 'kay build --static', check: 'kay check', fmt: 'kay fmt' })
       // An agent reads kay's docs as installed, and runs the checks this project's scripts hold.
       expect(await Bun.file(join(dir, 'AGENTS.md')).text()).toBe('# my-app\n\nBuilt with kay, a Bun web framework: a `.kay` file is one component, TypeScript fences then a pug-like template. Read kay\'s docs for the installed version before writing kay code; the topic files they link are in `node_modules/kay/llms/`:\n\n@node_modules/kay/llms.txt\n\nBefore calling a change done, run `bun run check` and `bun run fmt`.\n')
       // Published, so the docs AGENTS.md imports are in node_modules/kay.

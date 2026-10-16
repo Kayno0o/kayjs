@@ -355,7 +355,10 @@ kay explain positional-key   # one lint, with an example and the fix
 kay fmt src                  # format a folder
 kay fmt --check              # list unformatted files and fail
 kay explain --format json    # every lint, for a tool to read
+kay lint --fix --cache       # ESLint, with the types it reads written first
 ```
+
+`kay lint` writes the types ESLint reads for `.kay` files, then runs the project's `keslint` with the arguments you give it. The `lint` script of a new project is `kay lint --cache`.
 
 `kay explain` and `kay fmt` take `--format json` too ([Output for tools](#output-for-tools)).
 
