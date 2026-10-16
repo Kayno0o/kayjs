@@ -1306,6 +1306,45 @@ describe.concurrent('kay dev', () => {
     }
   })
 
+  it('leaves no process of its own running once a kay dev killed with SIGKILL is gone', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
+    const real = realpathSync(root)
+    // Every process started for this project, whoever its parent now is.
+    const left = () => readdirSync('/proc').filter((pid) => {
+      try {
+        return (/preload\.ts|builder\.ts|types\.ts/).test(readFileSync(`/proc/${pid}/cmdline`, 'utf8')) && readlinkSync(`/proc/${pid}/cwd`) === real
+      }
+      catch {
+        return false
+      }
+    })
+
+    await Bun.write(join(root, 'src/server.ts'), 'Bun.serve({ port: 0, fetch: () => new Response() })\n')
+    await Bun.write(join(root, 'src/routes/index.kay'), 'p Home\n')
+    await Bun.write(join(root, 'kay.config.ts'), 'export default {}\n')
+
+    const child = Bun.spawn(['bun', join(import.meta.dir, '../src/cli.ts'), 'dev', root], { stdout: 'pipe', stderr: 'ignore' })
+    let output = ''
+    const reading = (async () => {
+      for await (const chunk of child.stdout.pipeThrough(new TextDecoderStream()))
+        output += chunk
+    })()
+
+    try {
+      await until(() => output.includes('ready in') && left().length > 0, 20_000)
+      child.kill('SIGKILL')
+      await child.exited
+      await until(() => left().length === 0, 10_000)
+    }
+    finally {
+      for (const pid of left())
+        process.kill(Number(pid), 'SIGKILL')
+
+      await reading
+      await rm(root, { recursive: true, force: true })
+    }
+  }, 40_000)
+
   it.serial('opens the debugger --inspect names on every server it runs, at the address it prints once, which a client closing as it connects never ends', async () => {
     const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
     // Outside the project, whose changes restart the server, and written before it listens, so it is there once kay dev prints the address.

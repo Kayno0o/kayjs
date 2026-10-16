@@ -255,6 +255,9 @@ process.on('message', (message: unknown) => {
     void reload(message.reload as ReloadRequest)
 })
 
+// A `kay dev` that is gone, however it ended, takes its server with it: nothing else would stop a server that only an IPC channel ties to it.
+process.on('disconnect', () => process.exit(0))
+
 // An entry that ends on its own ends the process, as it does without a channel to `kay dev`.
 ;(process as { channel?: { unref?: () => void } }).channel?.unref?.()
 
