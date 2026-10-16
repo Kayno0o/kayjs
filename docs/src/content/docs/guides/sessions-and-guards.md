@@ -27,11 +27,15 @@ import { pages } from 'kay/server'
 
 const auth = new Elysia({ name: 'auth' })
   .derive({ as: 'scoped' }, async ({ cookie }) => ({
-    user: await findSession(cookie.session?.value),
+    user: await findSession(
+      cookie['__Host-session']?.value ?? cookie.session?.value,
+    ),
   }))
 
 export const app = new Elysia().use(auth).use(await pages()).listen(3000)
 ```
+
+This example reads the cookie by hand, so it looks for `__Host-session`, the name over https, and for `session` over plain http. Reading it through `session()` needs neither.
 
 A page then reads `ctx.locals.user`, typed. `kay check` and the editor read `export const app` without running it.
 
