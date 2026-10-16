@@ -227,7 +227,7 @@ export default defineMessages({
 })
 ```
 
-Keeping the layout around the app's own lines: `AuthLink` (a link or a code) and `AuthNotice` (news of a change) are the views `authMailer` ships, taking `mail` and any line as a prop over the default wording (`heading`, `lead`, `button` or `review`, `ending`), and children, which go under the lead. `authWords(mail)` gives the default wording of a mail in the language it renders in, for a view written from scratch.
+Keeping the layout around the app's own lines: `AuthLink` (a link or a code) and `AuthNotice` (news of a change) are the views `authMailer` ships, taking `mail` and any line as a prop over the default wording (`heading`, `lead`, `button` or `review`, `ending`), and children, which go under the lead. `authWords(mail)` gives the default wording of a mail in the language it renders in, for a view written from scratch; it throws for a `mail.kind` kayjs-auth does not send, so a view reading `kind` as any string checks it first.
 
 Replacing a kind: `views` takes the app's own `.kay` view for any kind, imported once its first mail goes, as a module imported with kay.config.ts cannot load a `.kay` file. The view gets `{ mail }` (the `AuthMail` type): `mail.site`, `mail.to`, `mail.url`, `mail.code`, `mail.detail` and `mail.kind`; its subject stays the messages' `subject`:
 

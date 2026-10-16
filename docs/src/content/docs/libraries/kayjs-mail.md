@@ -132,7 +132,7 @@ expect(outbox.to('ada@example.com')[0]?.subject).toBe('Welcome, Ada')
 
 ## With kayjs-auth
 
-`authMailer` sends [kayjs-auth](/libraries/kayjs-auth)'s mails (verification, reset, magic links, security notices) through your mailer, themed by your mail settings. It needs `mailExtension` in `kay.config.ts`, as above.
+`authMailer` sends [kayjs-auth](/libraries/kayjs-auth)'s mails (verification, reset, magic links, security notices) through your mailer, themed by your mail settings. It needs `mailExtension` in `kay.config.ts`, as above. A view written from scratch can take its default wording from `authWords(mail)`, which throws for a `mail.kind` kayjs-auth does not send.
 
 ```ts
 // src/auth.ts
