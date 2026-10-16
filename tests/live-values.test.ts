@@ -3,13 +3,15 @@ import type { TestSite } from '../src/test'
 import { existsSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
+import { afterAll, beforeAll, describe, expect, it, setSystemTime } from 'bun:test'
 import { Elysia } from 'elysia'
 import { chromium } from 'playwright-core'
 import { outputDir } from '../src/build/assets'
 import { liveId, liveIds } from '../src/build/live-ids'
 import { compileKay } from '../src/compiler'
+import { PROOF_LIFETIME_MS } from '../src/runtime/live-value'
 import { decodeServerValue } from '../src/runtime/wire'
+import { MAX_CONNECTIONS } from '../src/server/live'
 import { browserPath, testSite } from '../src/test'
 import { fixtureCopy } from './scratch'
 
@@ -35,7 +37,7 @@ function pagesOf(html: string): LivePage[] {
 }
 
 function proofsOf(pages: LivePage[]): LiveRequest['proofs'] {
-  return pages.map(({ values, sig }) => ({ keys: values.map(([id, key]) => [id, key] as [string, string]), sig }))
+  return pages.map(({ values, sig, at }) => ({ keys: values.map(([id, key]) => [id, key] as [string, string]), at, sig }))
 }
 
 // The values a page read, once each.
@@ -211,8 +213,8 @@ describe('live values on the server', () => {
     const ask = async (proofs: LiveRequest['proofs'], watch: LiveRequest['watch']) => (await site.fetch('/_kay/live', { ...JSON_POST, body: JSON.stringify({ proofs, watch }) })).status
 
     expect(await ask([], [[VISITORS, '']])).toBe(403)
-    expect(await ask([{ keys: proofsOf([page!])[0]!.keys, sig: `${page!.sig}x` }], [[VISITORS, '']])).toBe(403)
-    expect(await ask([{ keys: [[SECRET, '']], sig: page!.sig }], [[SECRET, '']])).toBe(403)
+    expect(await ask([{ ...proofsOf([page!])[0]!, sig: `${page!.sig}x` }], [[VISITORS, '']])).toBe(403)
+    expect(await ask([{ keys: [[SECRET, '']], at: page!.at, sig: page!.sig }], [[SECRET, '']])).toBe(403)
     expect(await ask(proofsOf([page!]), [[SECRET, '']])).toBe(403)
     expect(await ask(proofsOf([page!]), [[idOf('missing'), '']])).toBe(403)
   })
@@ -228,6 +230,32 @@ describe('live values on the server', () => {
 
     expect((await feed.next()).map(([id, key]) => [id, key])).toEqual([[ROOM, 'lobby']])
     await feed.close()
+  })
+
+  it('refuses a proof older than its lifetime, a page rendered again giving a fresh one', async () => {
+    const proofs = proofsOf(pagesOf((await site.visit('/other')).html))
+    const ask = async () => (await site.fetch('/_kay/live', { ...JSON_POST, body: JSON.stringify({ proofs, watch: [[VISITORS, '']] }) })).status
+
+    expect(proofs[0]!.at).toBeGreaterThan(Date.now() - 60_000)
+    expect(await ask()).toBe(200)
+
+    try {
+      setSystemTime(new Date(Date.now() + PROOF_LIFETIME_MS + 1000))
+      expect(await ask()).toBe(403)
+    }
+    finally {
+      setSystemTime()
+    }
+
+    expect(await ask()).toBe(200)
+  })
+
+  it('refuses a proof dated after the server\'s clock, which a forger of the date cannot sign', async () => {
+    const [proof] = proofsOf(pagesOf((await site.visit('/other')).html))
+    const post = async (at: number) => (await site.fetch('/_kay/live', { ...JSON_POST, body: JSON.stringify({ proofs: [{ ...proof!, at }], watch: [[VISITORS, '']] }) })).status
+
+    expect(await post(proof!.at + 1)).toBe(403)
+    expect(await post(Date.now() + 3_600_000)).toBe(403)
   })
 
   it('lets a proof cover only what its page read, a watched id outside it ignored', async () => {
@@ -249,7 +277,7 @@ describe('live values on the server', () => {
     expect(await post(JSON.stringify({ proofs }))).toBe(400)
     expect(await post(JSON.stringify({ proofs, watch: [] }))).toBe(400)
     expect(await post(JSON.stringify({ proofs, watch: [[VISITORS, 4]] }))).toBe(400)
-    expect(await post(JSON.stringify({ proofs: [{ keys: [[1, '']], sig: 'x' }], watch: [[VISITORS, '']] }))).toBe(400)
+    expect(await post(JSON.stringify({ proofs: [{ keys: [[1, '']], at: 1, sig: 'x' }], watch: [[VISITORS, '']] }))).toBe(400)
     expect(await post(JSON.stringify({ proofs, watch: Array.from({ length: 501 }, () => [VISITORS, '']) }))).toBe(400)
   })
 
@@ -274,6 +302,41 @@ describe('live values on the server', () => {
 
     expect(live.visitors()).toBe(8)
     expect(live.room('fresh')).toEqual({ id: 'fresh', users: 0 })
+  })
+})
+
+describe('the connections of one client', () => {
+  it('are capped, a slot freeing as one closes', async () => {
+    const site = await testSite({ root: ROOT })
+
+    try {
+      const proofs = proofsOf(pagesOf((await site.visit('/other')).html))
+      const connect = async () => site.fetch('/_kay/live', { ...JSON_POST, body: JSON.stringify({ proofs, watch: [[VISITORS, '']] }) })
+      const feeds: Feed[] = []
+
+      for (let count = 0; count < MAX_CONNECTIONS; count++)
+        feeds.push(new Feed(await connect()))
+
+      const refused = await connect()
+
+      expect(refused.status).toBe(429)
+      const first = feeds.shift()!
+
+      await first.next()
+      await first.close()
+      await Bun.sleep(50)
+
+      const again = await connect()
+
+      expect(again.status).toBe(200)
+      await again.body!.cancel()
+
+      for (const feed of feeds)
+        await feed.close()
+    }
+    finally {
+      await site.close()
+    }
   })
 })
 
@@ -308,7 +371,6 @@ describe('live values in a page', () => {
       const french = pagesOf((await site.visit('/fr/')).html)[0]!
 
       expect(idsOf(french)).toEqual(idsOf(english))
-      expect(french.sig).toBe(english.sig)
     }
     finally {
       await site.close()
@@ -460,7 +522,11 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('live val
 function flaky() {
   const plan: (number | 'drop')[] = []
   const posts: string[] = []
+  const gets: string[] = []
   const app = new Elysia().onRequest(({ request }) => {
+    if (request.method === 'GET')
+      gets.push(new URL(request.url).pathname)
+
     if (request.method !== 'POST' || new URL(request.url).pathname !== '/_kay/live')
       return undefined
 
@@ -474,7 +540,7 @@ function flaky() {
     return step === undefined ? undefined : new Response(null, { status: step })
   })
 
-  return { app, plan, posts }
+  return { app, plan, posts, gets }
 }
 
 describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('live values across a restart', () => {
@@ -506,6 +572,22 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('live val
     await page.waitUntil(() => document.querySelector('p.online')?.textContent === '21 online', { timeout: 15_000 })
     expect(server.posts.length).toBe(plan.length + 1)
     expect(page.errors).toEqual([])
+  })
+
+  it('asks the page again for a fresh proof when the server refuses the one it has, and follows on it', async () => {
+    server.posts.length = 0
+    server.gets.length = 0
+    server.plan.push(403)
+    live.visitors.set(40)
+
+    await using page = await site.open('/other')
+
+    await page.waitUntil(() => document.querySelector('p.online')?.textContent === '40 online')
+    live.visitors.set(41)
+    await page.waitUntil(() => document.querySelector('p.online')?.textContent === '41 online', { timeout: 5000 })
+    expect(server.posts.length).toBe(2)
+    expect(server.gets.filter(path => path === '/other').length).toBe(2)
+    expect(await page.evaluate(() => document.querySelectorAll('script[data-kay-live]').length)).toBe(1)
   })
 
   it('leaves one connection when the page changes during a backoff', async () => {
@@ -558,7 +640,7 @@ describe('live values in a production build', () => {
       'const about = await page(\'/about\')',
       'const found = /<script type="application\\/json" data-kay-live>([^<]*)<\\/script>/.exec(home)?.[1]',
       'const proof = decodeServerValue(found)',
-      `const live = await app.handle(new Request('http://localhost/_kay/live', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ proofs: [{ keys: proof.values.map(([id, key]) => [id, key]), sig: proof.sig }], watch: [[${JSON.stringify(VISITORS)}, '']] }) }))`,
+      `const live = await app.handle(new Request('http://localhost/_kay/live', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ proofs: [{ keys: proof.values.map(([id, key]) => [id, key]), at: proof.at, sig: proof.sig }], watch: [[${JSON.stringify(VISITORS)}, '']] }) }))`,
       'const first = new TextDecoder().decode((await live.body.getReader().read()).value)',
       'console.log(JSON.stringify({ home: home.includes(\'data-kay-live\'), module: /<script type="module"/.test(home), about: about.includes(\'data-kay-live\'), aboutModule: about.includes(\'type="module"\'), status: live.status, type: live.headers.get(\'content-type\'), first }))',
       'process.exit(0)',

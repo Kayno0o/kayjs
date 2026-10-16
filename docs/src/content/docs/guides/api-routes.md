@@ -215,7 +215,9 @@ The limits of the first version:
 - A value is the same for everyone who can render the page. The server sends it only to a request holding the signed proof of a page that read that key of it, so a guard on the page covers it, but there is no value per user. Whatever a page reads while it renders, its server fence included, goes into its HTML, so read only what everyone who sees the page may see.
 - Values live in the memory of one process. Several processes do not share them, and there is no pub/sub adapter yet.
 - A key you set stays until you `delete` it.
-- The proof is signed with `KAY_SECRET`, or with a key made at start-up. Set `KAY_SECRET` if a restart should not leave open pages unable to follow: without it the server refuses their proofs after a restart, and they keep retrying with a growing delay but follow again only once reloaded. A connection that drops, or is refused while a server restarts, is retried with a growing delay, and a hidden tab waits until it is shown.
+- A proof is good for an hour. An open page asks for its own page again every half hour to get a new one, so a visitor who may no longer see the page stops following within the hour, and a page the server refuses the proof of, after a restart without `KAY_SECRET` for instance, asks again at once and follows on the new one.
+- A connection that drops, or is refused while a server restarts, is retried with a growing delay, and a hidden tab waits until it is shown. The proof is signed with `KAY_SECRET`, or with a key made at start-up.
+- A client holds at most 20 live connections at once, a few tabs; the next one is refused until another closes.
 - A value an island reads only after the page rendered, behind a click for instance, is not followed unless the render read it too.
 
 ## Websockets

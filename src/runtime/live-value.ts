@@ -35,6 +35,8 @@ type PlainValue<T> = Exclude<T, (...args: never[]) => unknown>
 
 // The page's script of live values: the value of each as the server rendered it, with the signature that proves the page read those keys.
 export interface LivePage {
+  // When the server made the proof, in milliseconds: it takes it for `PROOF_LIFETIME_MS`.
+  at: number
   sig: string
   values: [id: string, key: string, value: unknown][]
 }
@@ -44,12 +46,14 @@ export type LiveUpdate = [id: string, key: string, value: unknown]
 
 // What a connection asks for: the pages' proofs, and the keys it watches.
 export interface LiveRequest {
-  proofs: { keys: [id: string, key: string][], sig: string }[]
+  proofs: { keys: [id: string, key: string][], at: number, sig: string }[]
   watch: [id: string, key: string][]
 }
 
 export const LIVE_ROUTE = '/_kay/live'
 export const LIVE_SCRIPT = 'script[data-kay-live]'
+// How long the server takes a page's proof, and so how long a page may watch on it before asking for another.
+export const PROOF_LIFETIME_MS = 60 * 60_000
 
 // Another copy of this module, such as a workspace's second install or a dev reload, shares the one registry.
 const REGISTRY = Symbol.for('kay.live')
@@ -202,6 +206,7 @@ const browserSlots = new Map<string, BrowserSlot>()
 const wanted = new Map<string, number>()
 let current: { keys: Set<string>, reader: ReturnType<typeof readEvents<LiveUpdate[]>> } | undefined
 let settling: ReturnType<typeof setTimeout> | undefined
+let renewing: ReturnType<typeof setTimeout> | undefined
 
 function pagesOf(): LivePage[] {
   return typeof document === 'undefined' ? [] : pageData<LivePage>(LIVE_SCRIPT, decodeServerValue)
@@ -284,6 +289,52 @@ function settle(): void {
   settling = setTimeout(sync, SETTLE_MS)
 }
 
+// Asks for the page again and takes its live scripts in place of the page's own, so a proof the server no longer takes, or is about to stop taking, is replaced by one it made now; false when the page no longer holds any, as one the visitor may not see.
+async function renewProofs(signal: AbortSignal | null = null): Promise<boolean> {
+  try {
+    const response = await fetch(location.href, { headers: { accept: 'text/html' }, credentials: 'same-origin', signal })
+
+    if (!response.ok)
+      return false
+
+    const fresh = [...new DOMParser().parseFromString(await response.text(), 'text/html').querySelectorAll(LIVE_SCRIPT)]
+
+    if (fresh.length === 0)
+      return false
+
+    for (const old of document.querySelectorAll(LIVE_SCRIPT))
+      old.remove()
+
+    for (const script of fresh)
+      document.head.append(document.importNode(script, true))
+
+    return true
+  }
+  catch {
+    return false
+  }
+}
+
+// Gets the connection new proofs before the server stops taking the ones it opened with.
+function renewLater(): void {
+  clearTimeout(renewing)
+
+  const made = Math.min(...pagesOf().map(page => page.at))
+
+  if (!Number.isFinite(made))
+    return
+
+  const renew = async () => {
+    if (current && await renewProofs()) {
+      current.reader.close()
+      current = undefined
+      sync()
+    }
+  }
+
+  renewing = setTimeout(() => void renew(), Math.max(made + PROOF_LIFETIME_MS / 2 - Date.now(), SETTLE_MS))
+}
+
 // Opens, moves or closes the one connection so it carries exactly the keys the islands read.
 function sync(): void {
   settling = undefined
@@ -291,6 +342,7 @@ function sync(): void {
   const keys = new Set(wanted.keys())
 
   if (keys.size === 0) {
+    clearTimeout(renewing)
     current?.reader.close()
     current = undefined
 
@@ -302,13 +354,19 @@ function sync(): void {
 
   current?.reader.close()
 
-  const proofs = pagesOf().map(page => ({ keys: page.values.map(([id, key]) => [id, key] as [string, string]), sig: page.sig }))
   const watched = [...keys].map(key => JSON.parse(key) as [string, string])
-  const body = JSON.stringify({ proofs, watch: watched } satisfies LiveRequest)
-  const reader = readEvents<LiveUpdate[]>(async signal => fetch(withBase(LIVE_ROUTE), { method: 'POST', headers: { 'content-type': 'application/json' }, body, signal }), true, false, true)
+  // The proofs are read at each attempt, as a renewed page holds new ones.
+  const post = async (signal: AbortSignal) => fetch(withBase(LIVE_ROUTE), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ proofs: pagesOf().map(page => ({ keys: page.values.map(([id, key]) => [id, key] as [string, string]), at: page.at, sig: page.sig })), watch: watched } satisfies LiveRequest), signal })
+  const reader = readEvents<LiveUpdate[]>(async (signal) => {
+    const response = await post(signal)
+
+    // Refused: the proof may be one a restart or its age made stale, so the page is asked for a new one before the backoff.
+    return response.status === 403 && await renewProofs(signal) ? post(signal) : response
+  }, true, false, true)
 
   reader.on(apply)
   current = { keys, reader }
+  renewLater()
   reader.start()
 }
 

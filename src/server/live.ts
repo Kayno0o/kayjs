@@ -1,7 +1,7 @@
 import type { Elysia } from 'elysia'
 import type { LivePage, LiveRequest, LiveUpdate } from '../runtime/live-value'
 import type { ServerScope } from '../runtime/reactive'
-import { checkLiveWrites, LIVE_ROUTE, liveSlot, slotValue, watchSlot } from '../runtime/live-value'
+import { checkLiveWrites, LIVE_ROUTE, liveSlot, PROOF_LIFETIME_MS, slotValue, watchSlot } from '../runtime/live-value'
 import { currentServerScope } from '../runtime/reactive'
 import { encodeValue, unsendable } from '../runtime/wire'
 import { isCrossSite } from './actions'
@@ -23,9 +23,24 @@ const CONNECTIONS_PER_MINUTE = 120
 const MINUTE_MS = 60_000
 const LIMIT = 'kay:live'
 
+// How many connections one client holds at once: a few tabs, not a flood.
+export const MAX_CONNECTIONS = 20
+// A clock a little ahead of the server's still dates a proof the server made.
+const SKEW_MS = 5000
+const open = new Map<string, number>()
+
 // The proof that a page read these keys of these values: whoever holds it is let watch exactly them, as whoever rendered the page was.
-function proofOf(keys: [string, string][]): string {
-  return signText(PROOF, keys.map(key => JSON.stringify(key)).toSorted().join('\n'))
+function proofText(keys: [string, string][], at: number): string {
+  return `${at}\n${keys.map(key => JSON.stringify(key)).toSorted().join('\n')}`
+}
+
+function proofOf(keys: [string, string][], at: number): string {
+  return signText(PROOF, proofText(keys, at))
+}
+
+// Whether the proof is signed, made by this server and not older than its lifetime.
+function proves(proof: LiveRequest['proofs'][number], now: number): boolean {
+  return proof.at <= now + SKEW_MS && now - proof.at <= PROOF_LIFETIME_MS && signedText(PROOF, proofText(proof.keys, proof.at), proof.sig)
 }
 
 // A value a browser cannot be sent is refused where it is written, not where a connection would later fail on it.
@@ -55,7 +70,8 @@ export function liveScript(scope: ServerScope | undefined = currentServerScope()
   for (const read of fresh)
     read.sent = true
 
-  const page: LivePage = { sig: proofOf(fresh.map(read => [read.id, read.key])), values: fresh.map(read => [read.id, read.key, read.value]) }
+  const at = Date.now()
+  const page: LivePage = { at, sig: proofOf(fresh.map(read => [read.id, read.key]), at), values: fresh.map(read => [read.id, read.key, read.value]) }
 
   return `${LIVE_MARK}${encodeValue(page).replaceAll('<', '\\u003c')}</script>`
 }
@@ -68,7 +84,8 @@ interface Watched {
 }
 
 // The updates a connection sends: every watched value as it is now, then the ones that changed, as often as they do.
-function updates(watched: Watched[]): AsyncIterable<LiveUpdate[]> {
+// It ends when the proofs it was let in on expire, `lifetime` from now, and `closed` runs once it has ended.
+function updates(watched: Watched[], lifetime: number, closed: () => void): AsyncIterable<LiveUpdate[]> {
   return {
     [Symbol.asyncIterator]() {
       const dirty = new Map<string, Watched>()
@@ -79,14 +96,23 @@ function updates(watched: Watched[]): AsyncIterable<LiveUpdate[]> {
         dirty.set(`${entry.id}\0${entry.key}`, entry)
         wake?.()
       }))
+      let expiry: ReturnType<typeof setTimeout> | undefined
       const end = () => {
+        if (state.ended)
+          return
+
         state.ended = true
+        clearTimeout(expiry)
 
         for (const stop of stops)
           stop()
 
+        closed()
         wake?.()
       }
+
+      expiry = setTimeout(end, lifetime)
+      expiry.unref()
 
       return {
         async next() {
@@ -131,7 +157,7 @@ function readRequest(text: string): LiveRequest | undefined {
     if (!Array.isArray(proofs) || !Array.isArray(watch) || watch.length > MAX_WATCHED)
       return undefined
 
-    if (!proofs.every(proof => Array.isArray(proof.keys) && proof.keys.every(key => Array.isArray(key) && typeof key[0] === 'string' && typeof key[1] === 'string') && typeof proof.sig === 'string'))
+    if (!proofs.every(proof => Array.isArray(proof.keys) && proof.keys.every(key => Array.isArray(key) && typeof key[0] === 'string' && typeof key[1] === 'string') && typeof proof.sig === 'string' && typeof proof.at === 'number'))
       return undefined
 
     if (!watch.every(entry => Array.isArray(entry) && typeof entry[0] === 'string' && typeof entry[1] === 'string' && entry[1].length <= MAX_KEY_LENGTH))
@@ -167,7 +193,9 @@ export function serveLive(app: Elysia): void {
     if (asked === undefined || asked.watch.length === 0)
       return new Response(null, { status: 400 })
 
-    const proven = new Set(asked.proofs.filter(proof => signedText(PROOF, proof.keys.map(key => JSON.stringify(key)).toSorted().join('\n'), proof.sig)).flatMap(proof => proof.keys.map(key => JSON.stringify(key))))
+    const now = Date.now()
+    const valid = asked.proofs.filter(proof => proves(proof, now))
+    const proven = new Set(valid.flatMap(proof => proof.keys.map(key => JSON.stringify(key))))
     const watched: Watched[] = []
 
     for (const [id, key] of asked.watch) {
@@ -178,6 +206,25 @@ export function serveLive(app: Elysia): void {
     }
 
     // Nothing proven to watch: refused, as a request with a forged proof is.
-    return watched.length === 0 ? new Response(null, { status: 403 }) : eventStream(updates(watched))
+    if (watched.length === 0)
+      return new Response(null, { status: 403 })
+
+    const client = clientAddress(request, server)
+
+    if ((open.get(client) ?? 0) >= MAX_CONNECTIONS)
+      return new Response(null, { status: 429 })
+
+    open.set(client, (open.get(client) ?? 0) + 1)
+
+    const lifetime = PROOF_LIFETIME_MS - (now - Math.min(...valid.map(proof => proof.at)))
+
+    return eventStream(updates(watched, lifetime, () => {
+      const left = (open.get(client) ?? 1) - 1
+
+      if (left <= 0)
+        open.delete(client)
+      else
+        open.set(client, left)
+    }))
   }, { parse: 'none' })
 }
