@@ -1,6 +1,7 @@
 import type { ServedPage } from './render'
 import type { Revalidation } from './stale-pages'
 import { compressText, compressTextStrongest } from './compress'
+import { readsOf } from './page-reads'
 import { pageEtag, storedHeaders } from './prerendered'
 import { invalidationCount, revalidationOf } from './stale-pages'
 
@@ -40,7 +41,12 @@ async function rerender(page: ServedPage, render: () => Promise<Response>, reval
   }
 
   try {
-    const response = await render()
+    // The body is read within the scope, as a streamed block reads what it needs while it is read.
+    const { result: { response, html }, reads } = await readsOf(async () => {
+      const rendered = await render()
+
+      return { response: rendered, html: rendered.status >= 500 ? '' : await rendered.text() }
+    })
 
     // The render reported its error already; the page as it was stays up.
     if (response.status >= 500) {
@@ -49,11 +55,10 @@ async function rerender(page: ServedPage, render: () => Promise<Response>, reval
       return
     }
 
-    const html = await response.text()
     const encoded = await compressText(html)
 
     // All at once, so no request reads the new html with the old tag.
-    Object.assign(page, { html, encoded, status: response.status, headers: Object.entries(storedHeaders(response.headers)), etag: pageEtag(html), renderedAt: Date.now() })
+    Object.assign(page, { reads, html, encoded, status: response.status, headers: Object.entries(storedHeaders(response.headers)), etag: pageEtag(html), renderedAt: Date.now() })
     revalidation.renderedAfter = started
     revalidation.staleAt = Date.now() + period
     // The request waiting goes out with the quick copies; the next get the build's, as small as a page `kay build` wrote.

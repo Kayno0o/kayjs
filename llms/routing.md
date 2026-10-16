@@ -100,7 +100,7 @@ h1 {post.title}
 
 ### Keep a prerendered page fresh
 
-`revalidate` renders it again in the background once it is older than that, and `invalidatePage` from `kay/cache` makes the next request wait for a fresh render:
+`revalidate` renders it again in the background once it is older than that, and `invalidatePage` from `kay/cache` makes the next request wait for a fresh render; a page needs no call when what it read is invalidated, `invalidate(key)` or `collection.invalidate()` refreshing it (see [Invalidating](#invalidating)):
 
 ```kay
 --- server
@@ -397,7 +397,7 @@ h1 {post.title}
 
 #### Invalidating
 
-An action or an API route that changed what a prerendered page shows calls `invalidatePage` from `kay/cache`, and the next request for it waits for a fresh render rather than getting it as it was, whether or not the page has a `revalidate` period:
+Invalidating a cached value or a collection refreshes every prerendered page that read it, with no other call: the render records the `cached` keys and collections it reads, `invalidate('posts')` or `posts.invalidate()` marks those pages stale, and the next request for one waits for a fresh render. This covers a webhook, in one line, `news.invalidate()`. `invalidatePage` from `kay/cache` is for a page no data source explains, such as a hand-written file or a change in a component; the next request for it waits for a fresh render rather than getting it as it was, whether or not the page has a `revalidate` period:
 
 ```ts
 import { invalidatePage } from 'kay/cache'
@@ -406,9 +406,10 @@ invalidatePage('/blog/hello')
 invalidatePage(path => path.startsWith('/blog/'))
 ```
 
+- Which call: `collection.invalidate()` or `invalidate(key)` when data changed, `invalidatePage` when only a page did, `revalidate` for a page that may drift with no event to tell of it.
 - The path is the one the routes serve, without the base, a locale's page under its segment, `/fr/blog/hello`.
 - Requests arriving while the render runs wait for the same one; a render that fails or answers 5xx is logged, leaves the page as it was, and no request waits on another before a minute has passed.
-- Processes sharing a `sqliteCache` (see [Caching](rendering.md#caching)) mark the same pages within about half a second: a path given as it is reaches them all, a function the paths it matched in this process, which serves the same build.
+- Processes sharing a `sqliteCache` (see [Caching](rendering.md#caching)) mark the same pages, those a key read by `invalidate` or a collection names included within about half a second: a path given as it is reaches them all, a function the paths it matched in this process, which serves the same build.
 
 #### Page hooks
 

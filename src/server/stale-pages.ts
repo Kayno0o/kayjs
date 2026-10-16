@@ -1,5 +1,5 @@
 import type { ServedPage } from './render'
-import { broadcast, onPagesInvalidated } from '../runtime/cache'
+import { broadcast, onKeysInvalidated, onPagesInvalidated } from '../runtime/cache'
 
 // Kept apart from the renders that read it, so `kay/cache` loads these alone: `invalidatePage` is exported there.
 export interface Revalidation {
@@ -25,6 +25,22 @@ export function invalidationCount(): number {
 
 onPagesInvalidated((paths) => {
   markStale(path => paths.includes(path))
+})
+
+// A page that read a key an invalidation drops is stale as a path `invalidatePage` names is: no call beside `invalidate` or `collection.invalidate()` is needed for what a page was built from.
+onKeysInvalidated((matches) => {
+  const keys = new Set<string>()
+
+  markStale((_, page) => {
+    const hit = page.reads?.filter(matches) ?? []
+
+    for (const key of hit)
+      keys.add(key)
+
+    return hit.length > 0
+  })
+
+  return [...keys]
 })
 
 // A page `stale` picks waits for a fresh render on its first request, as one the build rendered for another site.
@@ -54,7 +70,7 @@ export function invalidatePage(path: string | ((path: string) => boolean)): void
     broadcast({ pages: paths })
 }
 
-function markStale(matches: (path: string) => boolean): string[] {
+function markStale(matches: (path: string, page: ServedPage) => boolean): string[] {
   const paths: string[] = []
 
   for (const held of served) {
@@ -67,7 +83,7 @@ function markStale(matches: (path: string) => boolean): string[] {
     }
 
     for (const [path, page] of pages) {
-      if (matches(path)) {
+      if (matches(path, page)) {
         revalidationOf(page).invalidatedAt = ++invalidations
         paths.push(path)
       }

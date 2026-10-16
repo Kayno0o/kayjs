@@ -8,7 +8,7 @@ import type { RawEntry } from './load'
 import type { Heading, Highlighter, Segment } from './markdown'
 import type { ContentProblem } from './validate'
 import { KayError } from '../compiler/errors'
-import { cached, invalidate } from '../runtime/cache'
+import { cached, invalidate, noteRead } from '../runtime/cache'
 import { durationSeconds } from '../runtime/duration'
 import { editableEntries } from '../runtime/fields'
 import { child, localLinks } from '../runtime/html'
@@ -253,7 +253,12 @@ export function collection<Schema extends TSchema, Components extends Record<str
 
     return drafted
   }
-  const loaded = async () => withDrafts(await (loader ? fromLoader : fromFolder)())
+  // A page reading the entries is refreshed when `invalidate()` drops them.
+  const loaded = async () => {
+    noteRead(key)
+
+    return withDrafts(await (loader ? fromLoader : fromFolder)())
+  }
   const hidden = (entry: Entry<Data>) => draft !== undefined && !contentMode().dev && !previewing() && isDraft(draft, entry)
   // A draft translation is left out as a missing one is, the default locale's entry standing in.
   const shown = (entry: Entry<Data> | undefined) => entry !== undefined && !hidden(entry) ? entry : undefined
@@ -288,9 +293,7 @@ export function collection<Schema extends TSchema, Components extends Record<str
     },
     invalidate: () => {
       loading = undefined
-
-      if (loader)
-        invalidate(key)
+      invalidate(key)
     },
   }
 }

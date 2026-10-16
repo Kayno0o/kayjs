@@ -39,6 +39,9 @@ const entries = new Map<string, Entry>()
 const stores = new Set<CacheStore>()
 // What hears the page paths another process marked stale: the server serving them.
 const pageListeners = new Set<(paths: string[]) => void>()
+// What learns of the keys a page render reads, and of the keys an invalidation drops: the server, to refresh the prerendered pages built from them.
+let readListener: ((key: string) => void) | undefined
+const keyListeners = new Set<(matches: (key: string) => boolean) => string[]>()
 // Past this many keys, the least recently written goes first.
 const MAX_ENTRIES = 10_000
 // After a background refresh that failed, the longest a stale value is kept before the next call tries again.
@@ -48,6 +51,8 @@ const RETRY_MS = 60_000
 // A first load that throws throws to its callers and keeps nothing; a refresh that throws is logged and keeps the stale value.
 export async function cached<T, const Ttl extends Duration = Duration>(key: string, ttl: Ttl & PositiveDuration<Ttl>, load: () => T | Promise<T>, options: CacheOptions = {}): Promise<T> {
   const seconds = durationSeconds(ttl, `cached('${key}')'s ttl`)
+
+  noteRead(key)
 
   // A visitor in preview mode sees what the load gives now, which no other visitor gets.
   if (previewing())
@@ -87,6 +92,21 @@ export async function cached<T, const Ttl extends Duration = Duration>(key: stri
   return entry.value as T
 }
 
+// Tells the server a render read `key`, a cached value or a collection's entries, so the page it renders is refreshed when `invalidate` drops it.
+export function noteRead(key: string): void {
+  readListener?.(key)
+}
+
+// The server hears each key a render reads; one listener at a time, which a second import replaces.
+export function onRead(listener: (key: string) => void): void {
+  readListener = listener
+}
+
+// Hears each invalidation by what it matches, and gives back the keys it refreshed pages for, which go to the other processes too.
+export function onKeysInvalidated(listener: (matches: (key: string) => boolean) => string[]): void {
+  keyListeners.add(listener)
+}
+
 // A store `invalidate` empties too: each one a call names, and a `sqliteCache` as soon as it opens, so an action invalidating after a restart reaches what the store kept before any page asked for it.
 export function trackStore(store: CacheStore): void {
   if (stores.has(store))
@@ -123,6 +143,11 @@ export function invalidate(key: string | ((key: string) => boolean)): void {
     }
   }
 
+  for (const listener of keyListeners) {
+    for (const name of listener(matches))
+      dropped.add(name)
+  }
+
   if (dropped.size > 0)
     broadcast({ keys: [...dropped] })
 }
@@ -151,6 +176,11 @@ function heard(message: string): void {
   if ('keys' in invalidation) {
     for (const key of invalidation.keys)
       entries.delete(key)
+
+    const named = new Set(invalidation.keys)
+
+    for (const listener of keyListeners)
+      listener(key => named.has(key))
   }
   else {
     for (const listener of pageListeners)

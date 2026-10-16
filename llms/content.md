@@ -135,10 +135,9 @@ export const posts = collection('content/posts', {
 
 ### Load entries from a headless CMS
 
-A collection takes a `load` function in place of a folder, and a webhook refreshes it through an API route, `src/api/cms.ts`:
+A collection takes a `load` function in place of a folder, and a webhook refreshes it through an API route, `src/api/cms.ts`, one `news.invalidate()` for the entries and every prerendered page that read them:
 
 ```ts
-import { invalidatePage } from 'kay/cache'
 import { api } from 'kay/server'
 import { news } from '../content.config'
 
@@ -147,7 +146,6 @@ export default api().post('/', ({ headers, status }) => {
     return status(401)
 
   news.invalidate()
-  invalidatePage(path => path.startsWith('/news'))
 
   return new Response(null, { status: 204 })
 })
@@ -357,12 +355,11 @@ export const news = collection({
 - `store: sqliteCache(path)` keeps them across restarts and has `invalidate()` reach every process sharing it.
 - `prerender`, `sitemap` and a feed take a loaded collection as a folder's: `kay build` loads it to prerender, so it needs the CMS to answer.
 - `kay check` types it from the schema but never calls the loader, and `kay build` writes nothing of it for production, which reads it when the server runs.
-- A CMS's webhook refreshes it through an API route, and refreshes the prerendered pages showing it; the route refuses a request while the secret is unset, and compares it in constant time:
+- A CMS's webhook refreshes it through an API route, `news.invalidate()` also refreshing the prerendered pages that read it; the route refuses a request while the secret is unset, and compares it in constant time:
 
 ```ts
 // src/api/cms.ts
 import { createHash, timingSafeEqual } from 'node:crypto'
-import { invalidatePage } from 'kay/cache'
 import { api } from 'kay/server'
 import { news } from '../content.config'
 
@@ -375,7 +372,6 @@ export default api().post('/', ({ headers, status }) => {
     return status(401)
 
   news.invalidate()
-  invalidatePage(path => path.startsWith('/news'))
 
   return new Response(null, { status: 204 })
 })

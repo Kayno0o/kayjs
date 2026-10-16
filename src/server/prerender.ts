@@ -22,6 +22,7 @@ import { projectApi } from './api-modules'
 import { PRERENDERED_DIR, readManifest, writeManifest } from './client'
 import { exportedEndpoints } from './endpoints'
 import { localeCopies, stateFor } from './i18n'
+import { readsOf } from './page-reads'
 import { pageSetting } from './page-settings'
 import { matchedParams } from './params'
 import { listedIn, listedParams, pageEtag, pageToken, pathOf, storedHeaders } from './prerendered'
@@ -154,7 +155,7 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
           return { response: rendered, html: await rendered.text() }
         }
         const once = async () => withPageToken(token, read)
-        const { response, html } = await once()
+        const { result: { response, html }, reads: dataRead } = await readsOf(once)
 
         if (auto && response.status !== 200)
           return skip(`answers ${response.status} when rendered without a request`)
@@ -228,7 +229,7 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
           options.others?.push({ file: route.file, html })
         }
 
-        const stored: PrerenderedPage = { pattern: route.pattern, file: name, status: response.status, headers: storedHeaders(response.headers), etag: pageEtag(html), renderedAt: Date.now(), revalidate, ...islands.length > 0 ? { islands } : {}, ...stamps ? { stamps } : {}, ...readsSite ? { readsSite } : {}, ...auto ? { kept: true } : {}, ...token === pageToken(copy.key) ? {} : { token } }
+        const stored: PrerenderedPage = { pattern: route.pattern, file: name, status: response.status, headers: storedHeaders(response.headers), etag: pageEtag(html), renderedAt: Date.now(), revalidate, ...islands.length > 0 ? { islands } : {}, ...stamps ? { stamps } : {}, ...readsSite ? { readsSite } : {}, ...auto ? { kept: true } : {}, ...dataRead.length > 0 ? { reads: dataRead } : {}, ...token === pageToken(copy.key) ? {} : { token } }
 
         pending.push(() => {
           pages[copy.key] = stored

@@ -150,7 +150,7 @@ export const news = collection({
 })
 ```
 
-`news.invalidate()` refreshes it, typically from a webhook in an API route.
+`news.invalidate()` refreshes it, and every prerendered page that read it, typically from a webhook in an API route: that one line is the whole webhook.
 
 A loader able to count its entries or give one says so with `count({ preview })`, `body: false` when it gives `html` rather than Markdown, and `get(place, { preview })`: a CMS listing or editing the collection asks them in place of running `load` for every entry.
 
