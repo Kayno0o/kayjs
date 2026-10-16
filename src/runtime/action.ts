@@ -1,5 +1,5 @@
 import type { CookieMap } from 'bun'
-import type { Static, TSchema } from 'elysia'
+import type { Static, t, TSchema } from 'elysia'
 import type { ErrorStatus, Locals, Redirect, RouteParams } from './checks'
 import type { Duration } from './duration'
 import type { Locale } from './i18n'
@@ -269,8 +269,29 @@ export function actionUrl(moduleId: string, name: string): string {
   return `/_kay/action/${moduleId.replace(UNSAFE_URL_CHARACTERS, '_').replace(PARENT_SEGMENT, '~')}/${name}`
 }
 
+// What an action with no input takes: no fields, so `add()` calls it.
+export type NoInputAction<Output, Honeypot extends string = never> = ServerAction<EmptySchema, Output, Honeypot> & ((input?: undefined, options?: CallOptions) => Promise<Success<Output>>)
+
+// An empty object schema built by hand: `t.Object({})` would carry Elysia into the islands importing this module, and TypeBox reads a schema by this symbol.
+type EmptySchema = ReturnType<typeof t.Object<Record<never, never>>>
+
+const EMPTY_SCHEMA = { [Symbol.for('TypeBox.Kind')]: 'Object', type: 'object', properties: {} } as unknown as EmptySchema
+
 // Declares a server action in a page's `--- server` fence: Elysia validates the input against `schema` before `handler` runs.
-export function action<Schema extends TSchema, Output, const Honeypot extends string = never>(schema: Schema, handler: (input: Static<Schema>, ctx: ActionContext) => Output | Promise<Output>, protection?: ActionProtection<Honeypot>): ServerAction<Schema, Awaited<Output>, Honeypot> {
+// Without a schema the action takes no input, as with an empty object schema, and its handler gets the context alone.
+export function action<Output, const Honeypot extends string = never>(handler: (ctx: ActionContext) => Output | Promise<Output>, protection?: ActionProtection<Honeypot>): NoInputAction<Awaited<Output>, Honeypot>
+export function action<Schema extends TSchema, Output, const Honeypot extends string = never>(schema: Schema, handler: (input: Static<Schema>, ctx: ActionContext) => Output | Promise<Output>, protection?: ActionProtection<Honeypot>): ServerAction<Schema, Awaited<Output>, Honeypot>
+export function action(first: unknown, second?: unknown, third?: ActionProtection<string>): unknown {
+  if (typeof first === 'function') {
+    const handler = first as (ctx: ActionContext) => unknown
+
+    return declare(EMPTY_SCHEMA, (_input, ctx) => handler(ctx), second as ActionProtection<string> | undefined)
+  }
+
+  return declare(first as TSchema, second as (input: unknown, ctx: ActionContext) => unknown, third)
+}
+
+function declare(schema: TSchema, handler: (input: unknown, ctx: ActionContext) => unknown, protection: ActionProtection<string> | undefined): ServerAction<TSchema, unknown> {
   // Refused as the module loads, rather than on the first post.
   if (protection?.minTime !== undefined)
     minTimeOf(protection)
@@ -295,7 +316,7 @@ export function action<Schema extends TSchema, Output, const Honeypot extends st
     handler: { value: handler, enumerable: true },
     protection: { value: protection, enumerable: true },
     [ACTION]: { value: true },
-  }) as unknown as ServerAction<Schema, Awaited<Output>, Honeypot>
+  }) as unknown as ServerAction<TSchema, unknown>
 }
 
 // What a browser build exports in place of a server action.
@@ -606,7 +627,7 @@ async function post<Output>(url: string, input: unknown, onProgress: (sent: numb
 }
 
 // The encoding keeps numbers, booleans and Dates typed, which form fields would turn into strings; only a call carrying files needs multipart, whose boundary fetch writes.
-export function encodeCall(input: unknown): EncodedCall {
+export function encodeCall(input: unknown = {}): EncodedCall {
   // Sent as the form it is, for the server to read as a form post and answer as a call.
   if (input instanceof FormData)
     return { headers: { 'x-kay-action': FORM_CALL }, body: input }

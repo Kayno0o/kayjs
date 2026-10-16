@@ -29,7 +29,7 @@ export const code = action(schemas.emailCode, async ({ code }, ctx) => {
   return ctx.redirect(result.redirect)
 })
 
-export const resend = action(schemas.nothing, async (_input, ctx) => {
+export const resend = action(async (ctx) => {
   const result = await ctx.locals.auth.sendVerification()
 
   return result.ok ? 'sent' : ctx.fail(400, { error: result.error })

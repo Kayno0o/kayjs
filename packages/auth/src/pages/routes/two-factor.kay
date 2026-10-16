@@ -20,7 +20,7 @@ export const verify = action(schemas.twoFactor, async ({ code }, ctx) => {
   return ctx.redirect(result.redirect)
 })
 
-export const passkeyOptions = action(schemas.nothing, async (_input, ctx) => {
+export const passkeyOptions = action(async (ctx) => {
   const result = await ctx.locals.auth.twoFactorPasskeyOptions()
 
   return result.ok ? result.options : ctx.fail(400, { error: result.error })

@@ -1,11 +1,10 @@
 --- server
 import { action } from 'kay'
 import { localize, t } from 'kay/i18n'
-import { schemas } from '../../forms'
 import Button from '@kaynooo/kayjs-ui/button.kay'
 import TabNav from '@kaynooo/kayjs-ui/tab-nav.kay'
 
-export const signOut = action(schemas.nothing, async (_input, ctx) => {
+export const signOut = action(async (ctx) => {
   await ctx.locals.auth.signOut()
 
   return ctx.redirect(localize(ctx.locals.auth.features().pages?.home ?? '/'))

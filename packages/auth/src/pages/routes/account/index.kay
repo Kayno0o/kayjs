@@ -9,7 +9,7 @@ import Button from '@kaynooo/kayjs-ui/button.kay'
 import FormField from '@kaynooo/kayjs-ui/form-field.kay'
 import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
 
-export const resend = action(schemas.nothing, async (_input, ctx) => {
+export const resend = action(async (ctx) => {
   const result = await ctx.locals.auth.sendVerification()
 
   return result.ok ? 'sent' : ctx.fail(400, { error: result.error })

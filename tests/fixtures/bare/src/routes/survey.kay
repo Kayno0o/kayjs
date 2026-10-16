@@ -19,6 +19,15 @@ export const gallery = action(t.Object({ photos: t.Files() }), ({ photos }) => p
 
 export const nothing = action(t.Object({}), () => undefined)
 
+// No schema: the action takes no input and its handler gets the context alone.
+export const ping = action((ctx) => {
+  ctx.headers.set('x-ping', ctx.request.method)
+
+  return 'pong'
+})
+
+export const trap = action(() => 'passed', { honeypot: 'website' })
+
 export const fails = action(t.Object({ status: t.Number() }), ({ status }, ctx) => ctx.fail(status, 'Refused'))
 
 export const away = action(t.Object({ to: t.String({ maxLength: 200 }) }), ({ to }, ctx) => ctx.redirect(to))

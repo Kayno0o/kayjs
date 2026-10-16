@@ -101,7 +101,7 @@ export function unboundedFields(server: ServerAnalysis | undefined): Diagnostic[
   const diagnostics: Diagnostic[] = []
 
   eachNode(fence.ast.program, (node) => {
-    if (node.type !== 'CallExpression' || node.callee.type !== 'Identifier' || node.callee.name !== 'action' || !node.arguments[0])
+    if (node.type !== 'CallExpression' || node.callee.type !== 'Identifier' || node.callee.name !== 'action' || !node.arguments[0] || node.arguments[0].type === 'ArrowFunctionExpression' || node.arguments[0].type === 'FunctionExpression')
       return
 
     schemaStrings(node.arguments[0], undefined, (call, field) => {

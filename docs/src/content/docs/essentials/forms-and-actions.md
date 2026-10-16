@@ -28,6 +28,19 @@ form(action={add})
 
 Text reaches the schema trimmed, and an optional field left blank counts as left out.
 
+## An action with no input
+
+An action that takes nothing, such as a sign-out, leaves the schema out and gives its handler alone. The handler gets the context.
+
+```kay
+export const signOut = action(async (ctx) => {
+  await ctx.locals.session.destroy()
+  ctx.redirect('/')
+})
+```
+
+`form(action={signOut})` posts it, and an island calls `signOut()`. Options such as a rate limit go second, as they do with a schema.
+
 ## Showing errors
 
 A post the schema refuses renders the page again, and the fields keep what was sent. An `error` line shows the message of a field, and a bare `error` the form-wide one.

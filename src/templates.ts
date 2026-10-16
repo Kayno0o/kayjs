@@ -681,11 +681,10 @@ export default guard(async ({ locals, redirect }) => {
 })
 `,
     'src/routes/account/index.kay': `--- server
-import { s } from 'kay'
 import { db } from '../../db'
 import { Member } from '../../db/member'
 
-export const signOut = action(s.Object({}), async (_input, ctx) => {
+export const signOut = action(async ctx => {
   await ctx.locals.session.destroy()
   ctx.redirect('/')
 })

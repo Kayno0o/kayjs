@@ -221,6 +221,7 @@ form(action={add})
   button Add
 ```
 
+- An action with no input leaves the schema out: `action(async (ctx) => { ... }, protection?)`, validated as an empty object, its handler getting the context alone, called as `signOut()`, `signOut(undefined, { refresh: false })` or `site.call(signOut)`, and posted by `form(action={signOut})`.
 - `s` from `kay` is Elysia's schema builder, its `t` under the name translations leave free, there to save an import in server fences and server modules, `defineEnv` and API modules included.
 - The browser has none, nor Elysia's, which reads `Bun`: schemas live in modules only the server imports, and what an island needs of one, a length or a list of choices, in another module both import.
 - A client build, `kay dev`'s and `kay test`'s included, refuses an island reaching kay's `s`, naming the modules taking it from `kay`.

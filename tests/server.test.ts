@@ -1906,6 +1906,39 @@ describe('action input', () => {
     }
   })
 
+  it('serves an action declared without a schema as one taking no input, to a call, a form and a hostile body alike', async () => {
+    const json = { 'content-type': 'application/json', 'x-kay-action': '1' }
+    const call = await post('ping', stringify({}), json)
+
+    expect(call.status).toBe(200)
+    expect(parse(await call.text())).toBe('pong')
+
+    // An empty body is a call too, as `ping()` sends it from an island.
+    expect(parse(await (await post('ping', stringify(undefined), json)).text())).toBe('pong')
+
+    // A plain form post carrying stray fields goes through, as it does with an empty object schema.
+    const form = await post('ping', new URLSearchParams('stray=1'))
+
+    expect([form.status, form.headers.get('x-ping')]).toEqual([303, 'POST'])
+    expect((await post('ping', new URLSearchParams())).status).toBe(303)
+
+    // What is no object is refused before the handler runs, as an empty object schema refuses it.
+    for (const body of ['[]', '"x"', '1', 'null', 'not json']) {
+      const refused = await post('ping', body, json)
+
+      expect([body, refused.status, refused.headers.get('x-ping')]).toEqual([body, (await post('nothing', body, json)).status, null])
+      expect(refused.status).toBeGreaterThanOrEqual(400)
+    }
+  })
+
+  it('applies the protection of an action declared without a schema', async () => {
+    const trapped = await post('trap', new URLSearchParams('website=http://spam'))
+
+    expect(trapped.status).toBe(422)
+    expect((await post('trap', new URLSearchParams())).status).toBe(303)
+    expect((await bare.handle(new Request('http://localhost/survey'))).status).toBe(200)
+  })
+
   it('fails a call with the status ctx.fail gives, refusing one that is no error status', async () => {
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
     const fail = async (status: number) => post('fails', stringify({ status }), { 'content-type': 'application/json', 'x-kay-action': '1' })

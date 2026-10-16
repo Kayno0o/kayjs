@@ -66,7 +66,7 @@ export const signIn = action(credentials, async (input, ctx) => {
   ctx.redirect('/')
 })
 
-export const signOut = action(s.Object({}), async (_input, ctx) => {
+export const signOut = action(async ctx => {
   await ctx.locals.session.destroy()
   ctx.redirect('/login')
 })

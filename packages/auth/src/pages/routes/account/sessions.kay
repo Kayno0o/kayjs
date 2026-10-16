@@ -17,7 +17,7 @@ export const end = action(schemas.id, async ({ id }, ctx) => {
   return current ? ctx.redirect(localize(auth.features().pages?.home ?? '/')) : 'ended'
 })
 
-export const endOthers = action(schemas.nothing, async (_input, ctx) => {
+export const endOthers = action(async (ctx) => {
   await ctx.locals.auth.signOutEverywhere({ keepThisOne: true })
 
   return 'ended'

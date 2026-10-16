@@ -1,4 +1,4 @@
-import type { Action, Failure, s, ServerAction } from '../src/runtime'
+import type { Action, Failure, NoInputAction, s, ServerAction } from '../src/runtime'
 import type { TestSite } from '../src/test'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -65,6 +65,24 @@ describe('kay/test', () => {
     expect((await signed.visit('/')).html).toContain('<p>Hello, signed in as Ada</p>')
     expect((await signed.submit(signOut, {})).html).toContain('<p>Hello, signed out</p>')
     expect(signed.cookies.has('session')).toBe(false)
+  })
+
+  it('calls an action declared without a schema with no input at all', async () => {
+    const bare = await testSite({ routes: 'tests/fixtures/bare/src/routes' })
+    const { ping } = await import(join(import.meta.dir, 'fixtures/bare/src/routes/survey.kay')) as { ping: NoInputAction<string> }
+
+    // Any action passes where a form or a helper takes one of any input.
+    const asAnyAction: Action<never, unknown> = ping
+
+    expect(asAnyAction).toBe(ping)
+    expect(await bare.call(ping)).toBe('pong')
+    expect(await bare.call(ping, {})).toBe('pong')
+    expect(await bare.call(ping, new FormData())).toBe('pong')
+    // `bun run check` fails on an `@ts-expect-error` with no error under it, so the type check is what this asserts.
+    // @ts-expect-error -- an action with fields needs them
+    const missing = async () => bare.call(add)
+
+    expect(missing).toBeFunction()
   })
 
   it('calls an action with a form\'s fields, read as a form post reads them and answered as a call', async () => {

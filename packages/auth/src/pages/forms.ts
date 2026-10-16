@@ -49,7 +49,6 @@ export const schemas = {
   reset: t.Object({ token, password }),
   token: t.Object({ token }),
   verify: t.Object({ token, password: t.Optional(password) }),
-  nothing: t.Object({}),
   proof: t.Object(proof),
   changePassword: t.Object({ ...proof, newPassword: password }),
   changeEmail: t.Object({ ...proof, email }),

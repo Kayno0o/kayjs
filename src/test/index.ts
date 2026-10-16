@@ -76,6 +76,8 @@ export interface VisitInit {
 export type FormValue = string | Blob
 
 type InputOf<Target> = Target extends Action<infer Input, unknown> ? Input : never
+// A call to an action whose fields are all optional, or that takes none, may leave its input out.
+type CallArguments<Target> = object extends InputOf<Target> ? [input?: InputOf<Target> | FormData, init?: VisitInit & { from?: string }] : [input: InputOf<Target> | FormData, init?: VisitInit & { from?: string }]
 
 export interface TestSite {
   // A GET as a browser makes it: earlier cookies sent, redirects followed.
@@ -84,7 +86,7 @@ export interface TestSite {
   // A post to an action with `minTime` goes through as if its form had been open long enough; `openedFor` sends one as if open that long instead, `0` as if just opened.
   submit: <Input, Honeypot extends string = never>(action: Action<Input, unknown, Honeypot>, fields: Partial<Record<Extract<keyof Input, string> | Honeypot | typeof STAMP_FIELD, FormValue | FormValue[] | undefined>>, init?: VisitInit & { from?: string | Visit, openedFor?: Duration | 0 }) => Promise<Visit>
   // The call an island makes, with its input or a form's fields: the result, an `ActionError` thrown, or an `ActionRedirect` when it redirects. `from` names the page it is made on, whose params the action reads.
-  call: <Target extends Action<never, unknown>>(action: Target, input: InputOf<Target> | FormData, init?: VisitInit & { from?: string }) => Promise<Success<ResultOf<Target>>>
+  call: <Target extends Action<never, unknown>>(action: Target, ...call: CallArguments<Target>) => Promise<Success<ResultOf<Target>>>
   // A call expected to be refused, as `call` makes it: the `ActionError` with its status, errors and typed data; one that went through fails the test, and any other error is thrown.
   refusal: <Target extends Action<never, unknown>>(action: Target, input: InputOf<Target> | FormData, init?: VisitInit & { from?: string }) => Promise<ActionError<FailureData<ResultOf<Target>>>>
   // A request to any route, an API module's included, with the cookies so far; the response as it is, redirects not followed.
@@ -295,7 +297,7 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
     return server
   }
 
-  const call: TestSite['call'] = async (action, input, init = {}) => {
+  const call: TestSite['call'] = async (action, ...[input, init = {}]) => {
     const { headers, body } = encodeCall(input)
 
     const sent: Record<string, string> = { ...headers, origin: ORIGIN }
@@ -418,7 +420,7 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
     call,
     refusal: async (action, input, init) => {
       try {
-        await call(action, input, init)
+        await call(action, ...[input, init] as CallArguments<typeof action>)
       }
       catch (error) {
         // `Target` only bounds the action, so its own `refused` types the data as unknown.

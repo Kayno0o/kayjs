@@ -25,7 +25,7 @@ export const remove = action(schemas.proof, async (input, ctx) => {
 })
 
 // An account with neither a password nor a second factor proves it is still the user by a recent sign-in alone, so it signs in again and comes back here.
-export const signInAgain = action(schemas.nothing, async (_input, ctx) => {
+export const signInAgain = action(async (ctx) => {
   const { signInPage, pages, prefix } = ctx.locals.auth.features()
   const signIn = localize(signInPage)
 
