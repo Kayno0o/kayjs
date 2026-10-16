@@ -50,6 +50,11 @@ The script also revokes `CREATE` on `public` from `PUBLIC` (already the default 
 
 The rules of kayjs-ui's theme, and of any kay library's exported stylesheet, whose classes no file of the app's folder or library component it reaches writes whole are left out. A class put together at runtime (`` `kui-btn-${tone}` ``), written only in content kept outside the project (a CMS body in the database), or only in files outside the app's folder (a Tailwind `@source` elsewhere, a workspace package that is not a kay library) loses its rules: write each such class whole in a file of the app, for instance in a comment in `app.css` ([Using a component library](components.md#using-a-component-library)).
 
+### Pages that read nothing are kept by the build
+
+- `kay build` keeps a page that reads nothing from its request ([Prerendering](routing.md#prerendering)) and serves it from memory, without `prerender`. A page showing a value a function builds, such as `export const messages = seed()` read by a page and changed by an action, no longer shows later changes on its own: the first visit after a request that can write renders it live, and a page that differs is rendered per request from then on, with one warning naming it. A value changed with no request, by a timer or a job, is not seen.
+- To skip the check and the warning, or for such a value, add `export const page = { prerender: false }` to the page.
+
 ## 1.44.0
 
 ### kayjs-auth asks for a proof of work by default

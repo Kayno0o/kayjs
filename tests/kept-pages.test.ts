@@ -1,7 +1,7 @@
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
-import { describe, expect, it } from 'bun:test'
+import { afterAll, describe, expect, it } from 'bun:test'
 import { outputDir } from '../src/build/assets'
 import { readsNothing } from '../src/server/pure-page'
 import { scratchDir } from './scratch'
@@ -36,7 +36,9 @@ async function built(root: string): Promise<string[]> {
 
 interface Asked {
   path: string
+  method?: string
   headers?: Record<string, string>
+  body?: string
 }
 
 interface Answered {
@@ -46,9 +48,10 @@ interface Answered {
   text: string
 }
 
-// A server of its own on what the build wrote, which the requests go through in order: one process serves one project.
-async function served(root: string, asked: Asked[], options = ''): Promise<Answered[]> {
-  await Bun.write(join(root, 'serve.ts'), `import { Elysia } from 'elysia'\nimport { pages } from ${JSON.stringify(join(import.meta.dir, '../src/server'))}\n\nconst app = new Elysia().use(await pages({ root: ${JSON.stringify(root)}, prebuilt: true, log: false, compress: false${options} }))\nconst answers = []\n\nfor (const { path, headers } of ${JSON.stringify(asked)}) {\n  const response = await app.handle(new Request(\`http://localhost\${path}\`, { headers }))\n\n  answers.push({ status: response.status, etag: response.headers.get('etag'), cache: response.headers.get('cache-control'), text: await response.text() })\n}\n\nconsole.log(JSON.stringify(answers))\nprocess.exit(0)\n`)
+// A server of its own on what the build wrote, which the requests go through in order, a group of them together: one process serves one project.
+// The warnings it logged come with the answers.
+async function servedWith(root: string, asked: (Asked | Asked[])[], options = ''): Promise<{ answers: Answered[], warnings: string }> {
+  await Bun.write(join(root, 'serve.ts'), `import { Elysia } from 'elysia'\nimport { pages } from ${JSON.stringify(join(import.meta.dir, '../src/server'))}\n\nconst app = new Elysia().use(await pages({ root: ${JSON.stringify(root)}, prebuilt: true, log: false, compress: false${options} }))\nconst answers = []\nconst ask = async ({ path, method, headers, body }) => {\n  const response = await app.handle(new Request(\`http://localhost\${path}\`, { method, headers, body }))\n\n  return { status: response.status, etag: response.headers.get('etag'), cache: response.headers.get('cache-control'), text: await response.text() }\n}\n\nfor (const group of ${JSON.stringify(asked)}) {\n  if (Array.isArray(group))\n    answers.push(...await Promise.all(group.map(ask)))\n  else\n    answers.push(await ask(group))\n}\n\nconsole.log(JSON.stringify(answers))\nprocess.exit(0)\n`)
 
   const child = Bun.spawn([process.execPath, join(root, 'serve.ts')], { cwd: root, stdout: 'pipe', stderr: 'pipe', env: { ...process.env, NODE_ENV: 'production' } })
   const [out, err, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
@@ -56,7 +59,13 @@ async function served(root: string, asked: Asked[], options = ''): Promise<Answe
   if (code !== 0)
     throw new Error(`${out}${err}`)
 
-  return JSON.parse(out.slice(out.lastIndexOf('\n[') + 1)) as Answered[]
+  const at = out.lastIndexOf('\n[') + 1
+
+  return { answers: JSON.parse(out.slice(at)) as Answered[], warnings: `${out.slice(0, at)}${err}` }
+}
+
+async function served(root: string, asked: (Asked | Asked[])[], options = ''): Promise<Answered[]> {
+  return (await servedWith(root, asked, options)).answers
 }
 
 // The page and what it imports, under src/routes by the page's name.
@@ -197,4 +206,136 @@ describe('a page that reads nothing from its request', () => {
       await rm(root, { recursive: true, force: true })
     }
   }, 60_000)
+})
+
+interface Tally {
+  stable: number
+  asked: number
+}
+
+const ACTION_HEADERS = { 'content-type': 'application/json', 'x-kay-action': '1', 'referer': 'http://localhost/' }
+const post = (file: string, name: string): Asked => ({ path: `/_kay/action/src/routes/${file}/${name}`, method: 'POST', headers: ACTION_HEADERS, body: '[{}]' })
+const read = (path: string, headers?: Record<string, string>): Asked => headers ? { path, headers } : { path }
+// The value is built by a call, which the build cannot see an action change; `tally` counts the renders the server makes.
+const GUESTBOOK: Record<string, string> = {
+  'src/guestbook.ts': 'export const messages = seed()\nexport const counts = tally()\n\nfunction seed(): string[] {\n  return [\'first\']\n}\n\nfunction tally() {\n  return { stable: 0, asked: 0 }\n}\n\nexport function add(): void {\n  messages.push(`m${messages.length}`)\n}\n\nexport function stable(): string {\n  counts.stable++\n\n  return \'Stable\'\n}\n\nexport function asked(): string {\n  counts.asked++\n\n  return messages.join(\',\')\n}\n',
+  'src/routes/index.kay': '---\nimport { messages } from \'../guestbook\'\n---\np {messages.join(\',\')}\n',
+  'src/routes/about.kay': '---\nimport { stable } from \'../guestbook\'\n---\np {stable()}\n',
+  'src/routes/asked.kay': '--- server\nimport { asked } from \'../guestbook\'\n\nexport const page = { prerender: true }\n---\np {asked()}\n',
+  'src/routes/add.kay': '--- server\nimport { s } from \'kay\'\nimport { add } from \'../guestbook\'\n\nexport const save = action(s.Object({}), async () => {\n  add()\n})\n---\nform(action={save}) button Add\n',
+  'src/routes/fail.kay': '--- server\nimport { s } from \'kay\'\nimport { add } from \'../guestbook\'\n\nexport const save = action(s.Object({}), async () => {\n  add()\n\n  throw new Error(\'boom\')\n})\n---\nform(action={save}) button Fail\n',
+  'src/routes/calls.json.ts': 'import { counts } from \'../guestbook\'\n\nexport function GET(): Response {\n  return Response.json(counts)\n}\n',
+  'src/routes/private/_guard.ts': 'import { guard } from \'kay\'\n\nexport default guard(({ request, deny }) => {\n  if (!request.headers.has(\'x-pass\'))\n    deny(403)\n})\n',
+  'src/routes/private/index.kay': '---\nimport { messages } from \'../../guestbook\'\n---\np {messages.join(\',\')}\n',
+}
+
+describe('a kept page after a request that can write', () => {
+  const roots: string[] = []
+
+  async function guestbook(files: Record<string, string> = GUESTBOOK): Promise<string> {
+    const root = await project(files)
+
+    roots.push(root)
+    await built(root)
+
+    return root
+  }
+
+  afterAll(async () => {
+    await Promise.all(roots.map(async root => rm(root, { recursive: true, force: true })))
+  })
+
+  it('shows what an action changed on the first visit after it', async () => {
+    const root = await guestbook()
+    const [before, written, after, again] = await served(root, [read('/'), post('add.kay', 'save'), read('/'), read('/')])
+
+    expect(before!.text).toContain('first<')
+    expect(before!.etag).not.toBeNull()
+    expect(written!.status).toBeLessThan(400)
+    expect(after!.text).toContain('first,m1')
+    expect(again!.text).toContain('first,m1')
+  }, 120_000)
+
+  it('answers a page that did not change from the kept copy, rendering it once per write', async () => {
+    const root = await guestbook()
+    const [first, , second, third, , fourth, counts] = await served(root, [read('/about'), post('add.kay', 'save'), read('/about'), read('/about'), post('add.kay', 'save'), read('/about'), read('/calls.json')])
+
+    expect(second!.etag).toBe(first!.etag)
+    expect(third!.etag).toBe(first!.etag)
+    expect(fourth!.etag).toBe(first!.etag)
+    expect((JSON.parse(counts!.text) as Tally).stable).toBe(2)
+  }, 120_000)
+
+  it('renders once for two visits racing right after a write', async () => {
+    const root = await guestbook()
+    const answers = await served(root, [post('add.kay', 'save'), [read('/about'), read('/about'), read('/')], read('/calls.json')])
+
+    expect(answers.slice(1, 4).map(answer => answer.status)).toEqual([200, 200, 200])
+    expect(answers[1]!.text).toBe(answers[2]!.text)
+    expect(answers[3]!.text).toContain('first,m1')
+    expect((JSON.parse(answers[4]!.text) as Tally).stable).toBe(1)
+  }, 120_000)
+
+  it('warns once, naming the page and how to opt out', async () => {
+    const root = await guestbook()
+    const { warnings } = await servedWith(root, [post('add.kay', 'save'), read('/'), post('add.kay', 'save'), read('/'), read('/about')])
+
+    expect(warnings.match(/the page \/ was kept/g)).toHaveLength(1)
+    expect(warnings).toContain('prerender: false')
+    expect(warnings).not.toContain('/about')
+  }, 120_000)
+
+  it('leaves a page the author asked to prerender as it was built', async () => {
+    const root = await guestbook()
+    const [, , asked, counts] = await served(root, [post('add.kay', 'save'), read('/'), read('/asked'), read('/calls.json')])
+
+    expect(asked!.text).toContain('first<')
+    expect((JSON.parse(counts!.text) as Tally).asked).toBe(0)
+  }, 120_000)
+
+  it('keeps running the guards of a page that changed', async () => {
+    const root = await guestbook()
+    const [, refused, allowed, again] = await served(root, [post('add.kay', 'save'), read('/private'), read('/private', { 'x-pass': '1' }), read('/private')])
+
+    expect(refused!.status).toBe(403)
+    expect(allowed!.status).toBe(200)
+    expect(allowed!.text).toContain('first,m1')
+    expect(again!.status).toBe(403)
+  }, 120_000)
+
+  it('checks again after a write that failed', async () => {
+    const root = await guestbook()
+    const [failed, after] = await served(root, [post('fail.kay', 'save'), read('/')])
+
+    expect(failed!.status).toBeGreaterThanOrEqual(500)
+    expect(after!.text).toContain('first,m1')
+  }, 120_000)
+
+  it('answers HEAD and a conditional request from the page as it is now', async () => {
+    const root = await guestbook()
+    const [old, stableOld] = await served(root, [read('/'), read('/about')])
+    const [, head, conditional, stable, stableHead] = await served(root, [post('add.kay', 'save'), { path: '/', method: 'HEAD' }, read('/', { 'if-none-match': old!.etag! }), read('/about', { 'if-none-match': stableOld!.etag! }), { path: '/about', method: 'HEAD' }])
+
+    expect(head!.status).toBe(200)
+    expect(head!.text).toBe('')
+    expect(conditional!.status).toBe(200)
+    expect(conditional!.text).toContain('first,m1')
+    expect(stable!.status).toBe(304)
+    expect(stableHead!.status).toBe(200)
+  }, 120_000)
+
+  it('is checked per locale, under a base and a trailing slash', async () => {
+    const root = await guestbook({
+      ...GUESTBOOK,
+      'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ log: false, base: \'/app\', trailingSlash: \'always\', i18n: { locales: [\'fr\', \'en\'], defaultLocale: \'fr\', messages: \'src/messages\' } })\n',
+      'src/messages/fr.ts': MESSAGES.fr,
+      'src/messages/en.ts': MESSAGES.en,
+      'src/routes/index.kay': '--- server\nimport { t } from \'kay/i18n\'\nimport { messages } from \'../guestbook\'\n---\np {t(\'hello\')} {messages.join(\',\')}\n',
+    })
+    const [, fr, en, again] = await served(root, [post('add.kay', 'save'), read('/'), read('/en/'), read('/en/')])
+
+    expect(fr!.text).toContain('Bonjour first,m1')
+    expect(en!.text).toContain('Hello first,m1')
+    expect(again!.text).toContain('Hello first,m1')
+  }, 120_000)
 })

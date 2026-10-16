@@ -55,6 +55,12 @@ Rows of plain objects with no `id`, no `key` and no identity left in the new lis
 
 kay now leaves out the rules of kayjs-ui's theme whose classes no file of your app writes in full. A class you put together at runtime, such as `kui-btn-${tone}`, loses its rules. So does one written only in content stored in a database, or only in files outside your app's folder. Write each such class in full in a comment of `app.css`. [app.css](/structure/app-css) shows how.
 
+### Pages that read nothing are kept by the build
+
+`kay build` now keeps a page that reads nothing from its request and serves it from memory, without `prerender` (see [Prerendering](/essentials/routing#prerendering)). A page showing a value that a function builds, such as an array an action adds to, could look stale because of this, so the first visit after a request that can write renders it again and compares it with the kept copy. A page that comes out different is rendered for each request from then on, and the server warns once with its name.
+
+To skip the check and the warning, or for a value that a timer or a background job changes with no request, add `export const page = { prerender: false }` to the page.
+
 ## 1.44.0
 
 ### kayjs-auth asks for a proof of work

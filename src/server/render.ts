@@ -101,6 +101,9 @@ export interface ServedPage extends Omit<PrerenderedPage, 'pattern' | 'file' | '
   headers: [string, string][]
   // Set on the first request needing it: when to render the page again, and the parts its server islands cut it into.
   revalidation?: Revalidation | undefined
+  // For a kept page: the write count it was last shown to match the live render at, and the check running now.
+  checkedAt?: number | undefined
+  checking?: Promise<void> | undefined
   cut?: CutIslands | undefined
 }
 

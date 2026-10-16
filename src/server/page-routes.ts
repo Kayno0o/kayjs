@@ -4,6 +4,7 @@ import type { LocaleSettings } from '../runtime/i18n'
 import type { ClientBuild } from './client'
 import type { ServedRoute } from './guards'
 import type { I18n } from './i18n'
+import type { Writes } from './kept-pages'
 import type { PageHook, RenderedPage } from './page-hook'
 import type { Matcher, RouterShape } from './params'
 import type { RenderOptions, RequestContext, ServedPage } from './render'
@@ -19,6 +20,7 @@ import { encodedCopies, encodedPath, filesUnder } from './compress'
 import { noteRedirect } from './dev-notes'
 import { handedOverFlash } from './flash'
 import { cookieLocale, hostLocale, localeCookie, preferredLocale, prerenderKey, stateFor } from './i18n'
+import { stillKept } from './kept-pages'
 import { answeringRequest } from './log'
 import { hookedResponse } from './page-hook'
 import { matchedParams, positionalParams, slashSpelling } from './params'
@@ -45,6 +47,8 @@ export interface ResponderOptions {
   // What the extensions' page hooks did to the prerendered pages, done again to each the server renders afresh.
   transforms: PageHook[]
   pageFile: RenderedPage['file']
+  // Counts the requests that can write, which a kept page is checked after.
+  writes?: Writes
 }
 
 // The prerendered pages by route pattern, then by path, with the compressed copies `kay build` wrote: only the brotli one is read into memory, at boot, the others served from their files.
@@ -74,7 +78,7 @@ export async function loadPrerendered(client: ClientBuild): Promise<Map<string, 
     if (!paths)
       byRoute.set(page.pattern, paths = new Map<string, ServedPage>())
 
-    paths.set(path, { status: page.status, etag: page.etag, headers: Object.entries(page.headers), renderedAt: page.renderedAt, revalidate: page.revalidate, islands: page.islands, stamps: page.stamps, readsSite: page.readsSite, ...loaded[index]! })
+    paths.set(path, { status: page.status, etag: page.etag, headers: Object.entries(page.headers), renderedAt: page.renderedAt, revalidate: page.revalidate, islands: page.islands, stamps: page.stamps, readsSite: page.readsSite, kept: page.kept, ...loaded[index]! })
   }
 
   return byRoute
@@ -91,7 +95,10 @@ async function forVisitor(render: () => Promise<Response>): Promise<Response> {
 }
 
 // How a page answers one request: rendered afresh, or the copy `kay build` rendered, revalidated, with its server islands filled in.
-export function pageResponder({ client, renderOptions, prerendered, settings, transforms, pageFile }: ResponderOptions): PageResponder {
+export function pageResponder({ client, renderOptions, prerendered, settings, transforms, pageFile, writes = { count: 0 } }: ResponderOptions): PageResponder {
+  // Rendered as `kay build` renders it: without the request, for whoever its guards let through; it starts within the request, so in its locale.
+  const prerender = async (route: ServedRoute, params: Record<string, unknown>, url: URL, key: string) => hookedResponse(await renderPage({ ...route, guards: [] }, { request: new Request(`http://localhost${url.pathname}`) }, params, client, { ...renderOptions, prerendering: true }), transforms, key, pageFile)
+
   return async (route, params, context, url) => {
     const render = async () => renderPage(route, context, params, client, renderOptions)
 
@@ -117,8 +124,11 @@ export function pageResponder({ client, renderOptions, prerendered, settings, tr
     if (hasFlash(context.request) || handedOverFlash(context.request))
       return forVisitor(render)
 
-    // Rendered as `kay build` renders it: without the request, for whoever its guards let through; it starts within the request, so in its locale.
-    await revalidateStale(page, async () => hookedResponse(await renderPage({ ...route, guards: [] }, { request: new Request(`http://localhost${url.pathname}`) }, params, client, { ...renderOptions, prerendering: true }), transforms, key, pageFile), error => reportServerError(error, context.request, renderOptions.onError))
+    // A kept page is compared with a live render after a request that wrote, the first visit after it; the rest of the time this is a comparison of two numbers.
+    if (page.kept === true && (page.checkedAt ?? 0) !== writes.count && !await stillKept(copies, key, page, writes, async () => prerender(route, params, url, key)))
+      return render()
+
+    await revalidateStale(page, async () => prerender(route, params, url, key), error => reportServerError(error, context.request, renderOptions.onError))
 
     const served = page.islands !== undefined || page.stamps === true ? await serveServerIslands(route, page, params, context, url, client, renderOptions) : undefined
 

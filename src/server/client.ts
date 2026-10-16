@@ -50,6 +50,8 @@ export interface PrerenderedPage {
   stamps?: boolean | undefined
   // Its render read the site, which the build had none of: the server renders it again before serving it.
   readsSite?: boolean | undefined
+  // The build kept it on its own, as nothing marked it: the server checks it again after a request that can write.
+  kept?: boolean | undefined
 }
 
 export interface ClientBuild extends Omit<ClientManifest, 'styles' | 'pages'> {

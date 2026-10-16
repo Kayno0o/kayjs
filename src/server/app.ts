@@ -40,6 +40,7 @@ import { FAVICON_DIR, faviconSource, serveFavicons } from './favicon'
 import { loadGuard, loadGuards, requiredGuards } from './guards'
 import { refuseLocaleClashes } from './i18n'
 import { avifQuality, serveImages } from './image'
+import { countWrites } from './kept-pages'
 import { HEALTH_PATH, serveHealth, stopOnSignal } from './lifecycle'
 import { announceStart, logRequests, pathOf, useLogger } from './log'
 import { serveServiceWorker } from './offline'
@@ -357,7 +358,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   await servePublic(app, served, publicServed)
   serveRedirects(app, redirects, mode.dev)
 
-  const respond = withPageHeaders(pageResponder({ client, renderOptions, prerendered, settings: i18n?.settings, transforms: pageHooks(options.extensions), pageFile: assetFiles({ clientDir: client.dir, publicDir: paths.public, base, aspects: options.images?.aspects }) }), securityOptions, security)
+  const respond = withPageHeaders(pageResponder({ client, renderOptions, prerendered, writes: countWrites(app), settings: i18n?.settings, transforms: pageHooks(options.extensions), pageFile: assetFiles({ clientDir: client.dir, publicDir: paths.public, base, aspects: options.images?.aspects }) }), securityOptions, security)
 
   servePageRoutes(app, { table, served, matchers, i18n, locales, client, renderOptions, trailingSlash: options.trailingSlash ?? 'never', fallback: source.fallback(paths.routes, mounts), respond })
   agreeOnWildcards(app)
