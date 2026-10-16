@@ -40,6 +40,7 @@ export function liveIds(source: string, file: string, root: string, jsx = false)
   if (names.size === 0)
     return source
 
+  const comments = ast.comments ?? []
   const inserts: { at: number, text: string }[] = []
 
   for (const statement of ast.program.body) {
@@ -52,11 +53,22 @@ export function liveIds(source: string, file: string, root: string, jsx = false)
       if (id.type !== 'Identifier' || init?.type !== 'CallExpression' || init.callee.type !== 'Identifier' || !names.has(init.callee.name) || init.arguments.length !== 1)
         continue
 
-      // After the argument's last token, parentheses and a trailing comma included.
+      // After the argument's last token, parentheses and a trailing comma included, before any comment closing the call.
       let at = init.end! - 1
 
-      while (at > 0 && SPACE.test(source[at - 1]!))
-        at--
+      for (let moved = true; moved;) {
+        moved = false
+
+        while (at > 0 && SPACE.test(source[at - 1]!))
+          at--
+
+        const comment = comments.find(found => found.end === at)
+
+        if (comment) {
+          at = comment.start!
+          moved = true
+        }
+      }
 
       const text = JSON.stringify(liveId(file, root, id.name))
 

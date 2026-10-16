@@ -305,7 +305,7 @@ function sync(): void {
   const proofs = pagesOf().map(page => ({ keys: page.values.map(([id, key]) => [id, key] as [string, string]), sig: page.sig }))
   const watched = [...keys].map(key => JSON.parse(key) as [string, string])
   const body = JSON.stringify({ proofs, watch: watched } satisfies LiveRequest)
-  const reader = readEvents<LiveUpdate[]>(async signal => fetch(withBase(LIVE_ROUTE), { method: 'POST', headers: { 'content-type': 'application/json' }, body, signal }), true)
+  const reader = readEvents<LiveUpdate[]>(async signal => fetch(withBase(LIVE_ROUTE), { method: 'POST', headers: { 'content-type': 'application/json' }, body, signal }), true, false, true)
 
   reader.on(apply)
   current = { keys, reader }

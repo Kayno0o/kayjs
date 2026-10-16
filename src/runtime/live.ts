@@ -318,9 +318,9 @@ export function openSocket<Send, Receive>(connect: () => WebSocket | undefined):
   }
 }
 
-// An event stream read as it arrives, through `request`; a GET stream that drops reconnects, a stream that ran to its end or failed stays as it is.
+// An event stream read as it arrives, through `request`; a GET stream that drops reconnects, a stream that ran to its end or failed stays as it is; with `retryRefused`, a response that is not ok is tried again after the backoff too, as a stream across a restart needs.
 // `start()` opens it once; given a request, it opens a new run of it, closing the one going and forgetting its last value.
-export function readEvents<T>(request: (signal: AbortSignal) => Promise<Response>, reconnect: boolean, idle = false): EventReader<T> & { start: (next?: (signal: AbortSignal) => Promise<Response>) => void } {
+export function readEvents<T>(request: (signal: AbortSignal) => Promise<Response>, reconnect: boolean, idle = false, retryRefused = false): EventReader<T> & { start: (next?: (signal: AbortSignal) => Promise<Response>) => void } {
   const [status, setStatus] = ownSignal<StreamStatus>(idle ? 'idle' : 'connecting')
   const values = listeners<T>()
   let run: AbortController | undefined
@@ -331,6 +331,31 @@ export function readEvents<T>(request: (signal: AbortSignal) => Promise<Response
   const settle = (final: StreamStatus) => {
     if (status() !== 'closed')
       setStatus(final)
+  }
+
+  const onEvent = (event: string, data: string): StreamStatus | undefined => {
+    if (event === END_EVENT)
+      return 'done'
+
+    if (event === ERROR_EVENT)
+      return 'failed'
+
+    let value: T
+
+    try {
+      value = decodeServerValue(data) as T
+    }
+    catch (error) {
+      console.error('kay: an event stream sent a value that does not decode', error)
+
+      return 'failed'
+    }
+
+    // Only a stream that delivered something counts as back, so one dropping as soon as it opens keeps backing off.
+    attempt = 0
+    values.receive(value)
+
+    return undefined
   }
 
   const read = async (controller: AbortController) => {
@@ -346,38 +371,19 @@ export function readEvents<T>(request: (signal: AbortSignal) => Promise<Response
       }
 
       if (!response.ok || !response.body) {
-        if (!controller.signal.aborted)
+        if (!retryRefused) {
           settle('failed')
 
-        return
+          return
+        }
+
+        // Refused, as a server is while it restarts or a proof is stale: tried again after the backoff.
+        void response.body?.cancel()
       }
-
-      setStatus('open')
-
-      ended = await parseEvents(response.body, controller.signal, (event, data) => {
-        if (event === END_EVENT)
-          return 'done'
-
-        if (event === ERROR_EVENT)
-          return 'failed'
-
-        let value: T
-
-        try {
-          value = decodeServerValue(data) as T
-        }
-        catch (error) {
-          console.error('kay: an event stream sent a value that does not decode', error)
-
-          return 'failed'
-        }
-
-        // Only a stream that delivered something counts as back, so one dropping as soon as it opens keeps backing off.
-        attempt = 0
-        values.receive(value)
-
-        return undefined
-      })
+      else {
+        setStatus('open')
+        ended = await parseEvents(response.body, controller.signal, onEvent)
+      }
     }
     catch {}
 

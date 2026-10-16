@@ -314,6 +314,8 @@ describe('the id of a live value', () => {
     expect(named('export const a = live((0))')).toContain('live((0), "src/live.ts#a")')
     expect(named('export const a = live(0,)')).toContain('live(0, "src/live.ts#a")')
     expect(named('export const a = live({ x: [1, 2] })')).toContain('live({ x: [1, 2] }, "src/live.ts#a")')
+    expect(named('export const a = live(0 // first, then more\n)')).toContain('live(0, "src/live.ts#a" // first, then more\n)')
+    expect(named('export const a = live(0 /* zero */)')).toContain('live(0, "src/live.ts#a" /* zero */)')
     expect(named('export const a = live(\n  (id: string) => ({ id }),\n)')).toContain('({ id }), "src/live.ts#a"\n)')
   })
 })
@@ -441,6 +443,77 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('live val
     expect(await page.text('p.users')).toBe('2 in green')
     live.room.set('green', { id: 'green', users: 3 })
     await page.waitUntil(() => document.querySelector('p.users')?.textContent === '3 in green')
+  })
+})
+
+// A server that refuses or drops the connections of a page as a deploy or a restart does: each POST to the live route takes the next step of `plan`, `drop` an event stream that ends at once and a number a response of that status; past the plan they go through.
+function flaky() {
+  const plan: (number | 'drop')[] = []
+  const posts: string[] = []
+  const app = new Elysia().onRequest(({ request }) => {
+    if (request.method !== 'POST' || new URL(request.url).pathname !== '/_kay/live')
+      return undefined
+
+    posts.push(request.url)
+
+    const step = plan.shift()
+
+    if (step === 'drop')
+      return new Response('', { headers: { 'content-type': 'text/event-stream' } })
+
+    return step === undefined ? undefined : new Response(null, { status: step })
+  })
+
+  return { app, plan, posts }
+}
+
+describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('live values across a restart', () => {
+  let site: TestSite
+  let live: Values
+  const server = flaky()
+
+  beforeAll(async () => {
+    site = await testSite({ root: ROOT, use: [server.app], browser: { path: chrome } })
+    live = await values()
+  }, 120_000)
+
+  afterAll(async () => site?.close())
+
+  it.each([
+    ['an event stream that ended', ['drop' as const]],
+    ['a 403, a proof the server no longer takes', [403]],
+    ['a 429', [429]],
+    ['all of them in a row', ['drop' as const, 403, 429]],
+  ])('keeps following past %s', async (_, plan) => {
+    server.posts.length = 0
+    server.plan.push(...plan)
+    live.visitors.set(20)
+
+    await using page = await site.open('/other')
+
+    await page.waitUntil(() => document.querySelector('p.online')?.textContent === '20 online')
+    live.visitors.set(21)
+    await page.waitUntil(() => document.querySelector('p.online')?.textContent === '21 online', { timeout: 15_000 })
+    expect(server.posts.length).toBe(plan.length + 1)
+    expect(page.errors).toEqual([])
+  })
+
+  it('leaves one connection when the page changes during a backoff', async () => {
+    server.posts.length = 0
+    server.plan.push(429, 429, 429)
+    live.visitors.set(30)
+
+    await using page = await site.open('/')
+
+    await page.waitUntil(() => document.querySelector('p.online') !== null)
+    await page.click('a.other')
+    await page.waitUntil(() => location.pathname === '/other')
+    live.visitors.set(31)
+    await page.waitUntil(() => document.querySelector('p.online')?.textContent === '31 online', { timeout: 15_000 })
+
+    const { liveSlot } = await import('../src/runtime/live-value')
+
+    expect(liveSlot(VISITORS)!.listeners.get('')?.size).toBe(1)
   })
 })
 
