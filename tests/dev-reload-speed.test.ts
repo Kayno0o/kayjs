@@ -1,3 +1,4 @@
+import type { Subprocess } from 'bun'
 import { realpath, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { expect, it } from 'bun:test'
@@ -5,8 +6,8 @@ import { dev } from '../src/dev'
 import { planReload } from '../src/dev/reload'
 import { scratchDir } from './scratch'
 
-// What a reload of the running process costs on a small site, with the time `kay dev` reports for it: a new process costs about 250 ms on an idle machine, so the best of a few edits stays under it even when the machine is busy.
-const RELOAD_BUDGET_MS = 250
+// A loose backstop only: a new process costs about 250 ms on an idle host and far more under load, so time cannot tell a reload from a restart. The real guard is that no edit starts a server process.
+const RELOAD_BUDGET_MS = 2000
 const EDITS = 4
 
 async function until(condition: () => boolean | Promise<boolean>, timeout = 15_000) {
@@ -21,6 +22,7 @@ it('reloads a server component, a post and a dependency of the content config in
   const probe = Bun.listen({ hostname: 'localhost', port: 0, socket: { data: () => undefined } })
   const { port } = probe
   const lines: string[] = []
+  const children: Subprocess[] = []
 
   probe.stop(true)
 
@@ -32,7 +34,7 @@ it('reloads a server component, a post and a dependency of the content config in
     'src/routes/index.kay': '--- server\nimport { label, posts } from \'../content.config\'\n\nconst post = await posts.get(\'hello\')\nconst { Content } = post!\n---\nh1 {post!.data.title}\np {label}\nContent\n',
   }).map(async ([path, content]) => Bun.write(join(root, path), content)))
 
-  const stop = await dev(root, { port, log: line => lines.push(line) })
+  const stop = await dev(root, { port, log: line => lines.push(line), onRestart: child => children.push(child) })
   const reloads = () => lines.filter(line => (/reloaded in \d+ ms$/).test(line))
   const page = async () => {
     try {
@@ -75,6 +77,9 @@ it('reloads a server component, a post and a dependency of the content config in
     expect(component).toBeLessThan(RELOAD_BUDGET_MS)
     expect(post).toBeLessThan(RELOAD_BUDGET_MS)
     expect(dependency).toBeLessThan(RELOAD_BUDGET_MS)
+    // The one server process of the session took every edit.
+    expect(children).toHaveLength(1)
+    expect(children[0]!.exitCode).toBeNull()
     expect(lines.filter(line => line.includes('restarted'))).toEqual([])
   }
   finally {
