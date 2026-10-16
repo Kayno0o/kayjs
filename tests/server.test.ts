@@ -1913,7 +1913,7 @@ describe('action input', () => {
     expect(call.status).toBe(200)
     expect(parse(await call.text())).toBe('pong')
 
-    // An empty body is a call too, as `ping()` sends it from an island.
+    // An empty body is a call too, a body decoding to undefined.
     expect(parse(await (await post('ping', stringify(undefined), json)).text())).toBe('pong')
 
     // A plain form post carrying stray fields goes through, as it does with an empty object schema.

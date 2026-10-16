@@ -1519,6 +1519,10 @@ describe('kay check, string fields an action leaves unbounded', () => {
     ])
   })
 
+  it('leaves a handler of an action with no schema alone, whatever strings it builds', () => {
+    expect(fields('export const run = action(() => t.String())\nexport const again = action(function () { return t.String() })')).toEqual([])
+  })
+
   it('leaves bounded fields, secrets that never come back, options it cannot read and schemas outside actions alone', () => {
     expect(fields('const options = { maxLength: 9 }\nexport const page = { query: t.Object({ q: t.String() }) }\nexport const signIn = action(t.Object({ name: t.String({ maxLength: 40 }), password: t.String(), apiKey: t.String(), note: t.String(options), other: t.String({ ...options }) }), () => 1)')).toEqual([])
   })

@@ -41,7 +41,7 @@ it('shows why a book was refused', async () => {
 })
 ```
 
-`site.call(action, input)` calls an action as an island does, and throws `ActionError` when it fails. `site.refusal(action, input)` makes a call expected to be refused and resolves with that `ActionError`, its `status`, `errors` and `data` typed from the handler; it fails the test when the call goes through.
+`site.call(action, input)` calls an action as an island does, and throws `ActionError` when it fails. An action with no input takes no second argument: `site.call(signOut)`. `site.refusal(action, input)` makes a call expected to be refused and resolves with that `ActionError`, its `status`, `errors` and `data` typed from the handler; it fails the test when the call goes through.
 
 An action with `minTime` takes the post as if its form had been open long enough, so a test of something else needs no waiting. A test of the minimum itself says how long the form was open: `{ from: '/', openedFor: 0 }` posts as soon as the page loaded. An action with `proofOfWork` gets a solved challenge with each post and call, unless the test sends its own `x-kay-work` header, `''` for none.
 

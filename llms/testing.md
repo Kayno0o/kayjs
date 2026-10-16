@@ -186,7 +186,7 @@ it('shows why a todo was refused', async () => {
 - A `kay_since` among the fields, such as a forged one, wins over all of it, the clock left alone.
 - `openedFor` signs a stamp of its own, so a test checking that the refused page keeps the stamp its form rendered with posts that stamp as `kay_since`, read off the visit with `page.find('input[name="kay_since"]')`.
 - Both `visit` and `submit` resolve with `{ url, status, headers, html }`, which also reads the page as a crawler does (see below).
-- `site.call(action, input)` calls an action as an island does, `input` its typed input or a `FormData`.
+- `site.call(action, input)` calls an action as an island does, `input` its typed input or a `FormData`, left out for an action with no input or only optional fields: `site.call(signOut)`.
 - `{ from: '/orgs/acme' }` names the page a call is made on, for an action reading its params.
 - `site.call` resolves with the action's result, throws `ActionError` when it fails and `ActionRedirect` with `location` when it redirects.
 - `site.refusal(action, input)` makes the same call expecting it refused: it resolves with the `ActionError`, `data` typed from the handler, and fails the test when the call went through.
