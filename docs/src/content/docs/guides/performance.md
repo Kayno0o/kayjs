@@ -1,0 +1,139 @@
+---
+title: Performance and the dev tool
+order: 9.3
+description: Find what a page costs and what went wrong in it, with the dev tool and inspector under kay dev, and the size report, --analyze and budgets in kay build.
+---
+
+Under `kay dev`, every page carries a small bar at the bottom left with a count of the page's problems. Click it, or press Alt+Shift+K, to open the dev tool. Press Escape to close it.
+
+```sh
+kay dev --open
+```
+
+The bar turns red when a problem is an error. Production pages never carry the dev tool.
+
+## The tabs
+
+Each tab answers one question about the page in view. A tab with a count in the bar needs your attention.
+
+| Tab | Shows |
+| --- | --- |
+| Problems | Errors, recovered mismatches, blocked sources, accessibility findings and `kay check` results |
+| Request | The route, layouts, params, locale, guards, redirects and response headers |
+| Head | The search result, canonical and hreflang links, social tags and JSON-LD |
+| Routes | Every page, endpoint and API route the server serves |
+| Env | The variables `publicEnv` sends to the browser |
+| Images | Each image's variant, format, size and what it is drawn at |
+| Performance | The Web Vitals of the load and the weight of the page |
+| i18n | The page's locale, its copies and the message keys no locale has |
+| Islands | Each island and the values its signals hold now |
+
+A library can add a tab of its own, with nothing to declare in the app. kayjs-auth shows who is signed in, kayjs-mail lists the mails sent to the outbox, and kayjs-cms toggles edit mode.
+
+<ReadMore href="/llms/components#a-tab-for-a-library">Writing a tab for your own library.</ReadMore>
+
+## Problems
+
+The Problems tab collects what went wrong on the page. It lists errors nothing caught, islands that did not match their server markup, sources the Content-Security-Policy blocked, and what axe-core finds in the rendered page.
+
+It also shows what `kay check` reports without type checking. A problem logged again shows once, with how many times it came.
+
+Click a problem to open its `.kay` file in your editor. Dismiss hides a problem for the rest of the browser tab, until its text changes.
+
+## Request and head
+
+The Request tab shows what served the page: the route it matched, its layouts, params and locale, and how long each load took. It lists the guards that ran and what each did, and the redirects the request went through.
+
+The Head tab shows the head as a search result: the title and description with their length, the canonical link, the social card preview and each JSON-LD block. What `kay check` would flag in the head of a built page shows as a problem.
+
+## Images
+
+The Images tab lists each image of the page. It shows the variant kay served, its format and size, and the size it is drawn at.
+
+It flags an image served at more than four times the pixels it shows, one with no `width` and `height`, and a lazy-loaded one that is already in view. Hover a row to outline the image on the page.
+
+## Web Vitals
+
+The Performance tab shows the Web Vitals of the page load as the browser reports them. LCP, CLS and INP each appear against their good limit, 2.5 s, 0.1 and 200 ms.
+
+The weight of the page follows: the HTML, the CSS and the JS it loaded, gzipped, file by file. These are dev sizes, with nothing minified, so `kay build` makes them smaller.
+
+Under them, "Last kay build" gives the scripts and stylesheets the last build measured for the page's route. A `~` marks an estimate.
+
+## The inspector
+
+Every page `kay dev` serves knows which `.kay` line wrote each element. Hold Alt to outline the element under the pointer with its file, line and column.
+
+```text
+h1 src/routes/index.kay:12:3
+```
+
+Alt+click opens that line in your editor, and the click never reaches the page. Inspect, on the dev tool's bar, does what Alt does until the next click or Escape. Use it where your system keeps Alt+click for itself.
+
+The Islands tab lists each island's component. A click opens its file, and hovering a row outlines the island.
+
+## Choose the editor
+
+The editor is `KAY_EDITOR`, else `VISUAL` or `EDITOR` when they name a known editor, else the first one found on the `PATH`. kay knows VS Code, Cursor, Zed, Sublime Text, JetBrains IDEs and code-server.
+
+`KAY_EDITOR` may be any command. It gets the position the way the editor among its words takes it, or the file appended.
+
+```sh
+KAY_EDITOR=zed bun run dev
+KAY_EDITOR="tmux new-window nvim" bun run dev
+```
+
+With no editor found, the page says so and the terminal prints the position. Tests, `pages({ dev: true })` and production builds carry no inspector.
+
+<ReadMore href="/llms/project#commands">Editors reached over SSH, how the position is passed to each editor and the other dev tool tabs in full.</ReadMore>
+
+## The error page
+
+When a page throws and the app has no `_error.kay`, kay shows an error page in development. It holds the message, the lines around where your code threw and your stack frames, with those of kay and the dependencies folded away.
+
+A Copy button copies the message and stack as the terminal shows them. A compile error appears as `kay check` prints it. The page reloads itself once the error is fixed.
+
+## What a page weighs
+
+`kay build` prints the JavaScript a page with islands loads, gzipped and minified. It lists the entry first, then what each island adds, the heaviest first.
+
+```sh
+kay build
+```
+
+Three tables follow. Routes has one row per route, with the gzip scripts and stylesheets it loads. Stages shows how long each step took. Caches shows how many entries each cache gave and how many it had to make.
+
+Each size shows its change since the last build, as `[+3.2 KB]`, or `[new]` for a row the last build did not have. The sizes are kept in `.kay/report.json`.
+
+## Find the heavy modules
+
+Add `--analyze` to name the five modules that weigh most in the entry and in each island. A package counts as one module, and kay's runtime is listed file by file.
+
+```sh
+kay build --analyze
+```
+
+Use it when an island is larger than you expect. The module at the top is usually a library you can load later or replace.
+
+## Set a budget
+
+A budget makes the build warn when a page loads too much. Nothing is limited until you set one.
+
+```ts
+export default defineConfig({ budget: { js: '20kb', css: '10kb' } })
+```
+
+Each key is a size in bytes, or a string ending in `b`, `kb` or `mb`. It limits what one page loads, compressed as a host serves it.
+
+The build then warns with `over-budget` for each route over its budget. The warning names the file and the three modules that weigh most in its scripts.
+
+Set the lint to `deny` to fail the build on it, or pass `--deny-warnings`. Each limit must be a positive size. `kay check` refuses zero, a negative number and an exponent.
+
+```ts
+export default defineConfig({
+  budget: { js: '20kb' },
+  lints: { 'over-budget': 'deny' },
+})
+```
+
+<ReadMore href="/llms/project#commands">How a route's scripts are estimated when none of its pages was prerendered, and the JSON form of the report.</ReadMore>
