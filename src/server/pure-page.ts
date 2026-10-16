@@ -339,6 +339,7 @@ function withoutComments(source: string): string {
       }
       else if (char === '}') {
         braces--
+        // The length `result` will have once this `}` is appended, so a `/` right after it reads as a division.
         valueEnd = literals.pop() === true ? result.length + 1 : -1
 
         if (holes.at(-1) === braces) {
