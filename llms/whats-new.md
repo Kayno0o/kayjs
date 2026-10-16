@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- `keslint --cache` lints every `.kay` file again after a kay upgrade, so findings a new kay adds show at once, and a lint message on a prop names it as the file writes it, not `__props.name` ([Checks](checks.md#linting)).
 - kayjs-auth's OAuth server ends a refresh token family 90 days after its first token whatever its rotations (a token unused for 30 days is still refused), shows an approved app's last use as its last API call, and asks the user again when an app starts declaring `scopes` after approving a client while it declared none ([kayjs-auth](../packages/auth/llms.txt)).
 
 ## 1.50.0

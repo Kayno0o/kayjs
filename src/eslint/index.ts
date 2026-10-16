@@ -4,6 +4,7 @@ import { spawnSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { dirname, join, relative, resolve } from 'node:path'
+import { version } from '../../package.json'
 import { classEdit, classSpan } from '../check/class-words'
 import { codeEdit, compileShadow, inFences, readShadowSettings, shadowPath, sourceSpan } from '../check/shadow'
 import { offsetAt, positionAt } from '../compiler/mapping'
@@ -43,8 +44,9 @@ const BLOCK_PATH = /^(.+\.kay)[/\\]\d+_kay\.tsx$/
 // Lint runs each file through preprocess then postprocess before the next, so this only ever holds the one being linted.
 const compiled = new Map<string, ShadowFile>()
 
+// ESLint keys its cache on `meta.name@meta.version`, so a kay upgrade that adds findings re-lints every .kay file.
 export const processor = {
-  meta: { name: 'kay' },
+  meta: { name: 'kay', version },
   supportsAutofix: true,
 
   preprocess(text: string, filename: string): { text: string, filename: string }[] {
@@ -106,9 +108,9 @@ function writeTypes(root: string): boolean {
 }
 
 // Points typescript-eslint at the shadow file `kay check` writes for the .kay file being linted, which the project's tsconfig includes, so type-aware rules see the whole project.
-export function shadowParser<Options extends ParserOptions, Result>(parser: { parseForESLint: (code: string, options: Options) => Result }): { meta: { name: string }, parseForESLint: (code: string, options: Options) => Result } {
+export function shadowParser<Options extends ParserOptions, Result>(parser: { parseForESLint: (code: string, options: Options) => Result }): { meta: { name: string, version: string }, parseForESLint: (code: string, options: Options) => Result } {
   return {
-    meta: { name: 'kay/shadow-parser' },
+    meta: { name: 'kay/shadow-parser', version },
     parseForESLint(code, options) {
       const match = BLOCK_PATH.exec(options.filePath ?? '')
 
@@ -129,6 +131,7 @@ export function shadowParser<Options extends ParserOptions, Result>(parser: { pa
 
 const ARROW_PARENS = /(?:^|\/)arrow-parens$/
 const SLOT_HEAD_OPEN = /@[\w-]+\($/
+const COMPILED_PROPS = /\b__props\./g
 const PLAIN_NAME = /^[\p{ID_Start}$_][\p{ID_Continue}$\u200C\u200D]*$/u
 
 // A slot's one plain parameter, `@about(text)`: kay writes it bare in the shadow, so a rule about the parentheses around it would report, and fix, text the .kay file holds as the slot's own syntax.
@@ -151,14 +154,16 @@ function mapMessage(entry: ShadowFile, message: LintMessage): LintMessage | unde
     return undefined
 
   const endPosition = end === undefined ? undefined : positionAt(entry.source, span.end)
+  // Props compile to `__props.name`, in a fence as in the template, so a message or fix quoting that code is put back to what the .kay file wrote, unless the file writes `__props` itself.
+  const named = entry.source.includes('__props') ? (text: string) => text : (text: string) => text.replaceAll(COMPILED_PROPS, '')
   const fix = message.fix && mapFix(entry, message.fix, tailwind)
   const suggestions = message.suggestions?.flatMap((suggestion) => {
     const mappedFix = mapFix(entry, suggestion.fix, tailwind)
 
-    return mappedFix ? [{ ...suggestion, fix: mappedFix }] : []
+    return mappedFix ? [{ ...suggestion, desc: named(suggestion.desc), fix: { ...mappedFix, text: named(mappedFix.text) } }] : []
   })
 
-  return { ...message, ...positionAt(entry.source, span.start), endLine: endPosition?.line, endColumn: endPosition?.column, fix, suggestions }
+  return { ...message, message: named(message.message), ...positionAt(entry.source, span.start), endLine: endPosition?.line, endColumn: endPosition?.column, fix: fix && { ...fix, text: named(fix.text) }, suggestions }
 }
 
 // A fix stands only when the code it replaces was copied verbatim from the .kay file, or is a class the template writes as the string joins it, and a line break it adds only in a fence: a template expression is one line of the file.

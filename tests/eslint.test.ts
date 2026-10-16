@@ -445,3 +445,86 @@ div.flex.flex-col.nope-x(class="p-4 m-2 w-4 h-4" id="a")
     expect(found).toEqual(['4:zz-a', '4:zz-b'])
   })
 })
+
+describe('kay/eslint versions', () => {
+  it('carries kay\'s version on the processor and the parser, so the ESLint cache drops with a kay upgrade', async () => {
+    const { version } = await Bun.file(join(import.meta.dir, '..', 'package.json')).json() as { version: string }
+
+    expect(processor.meta.version).toBe(version)
+    expect(shadowParser({ parseForESLint: () => 0 }).meta).toEqual({ name: 'kay/shadow-parser', version })
+  })
+
+  it('lints a cached file again once the processor\'s version changes, and not before', async () => {
+    const { ESLint } = await import('eslint')
+    const root = await scratchDir('eslint-cache-')
+    const file = join(root, 'a.kay')
+    const cacheLocation = join(root, 'cache')
+    let linted = 0
+    const run = async (version: string) => {
+      const counting = { ...processor, meta: { ...processor.meta, version }, preprocess(text: string, filename: string) {
+        linted++
+
+        return processor.preprocess(text, filename)
+      } }
+      const eslint = new ESLint({ cwd: root, overrideConfigFile: true, overrideConfig: [{ files: ['**/*.kay'], processor: counting }] as never, cache: true, cacheLocation })
+
+      await eslint.lintFiles([file])
+    }
+
+    await Bun.write(join(root, 'tsconfig.json'), '{}')
+    await Bun.write(file, CARD)
+
+    await run('1.0.0')
+    await run('1.0.0')
+
+    expect(linted).toBe(1)
+
+    await run('1.0.1')
+
+    expect(linted).toBe(2)
+  })
+})
+
+describe('kay/eslint messages over template expressions', () => {
+  const tsParser = import('@typescript-eslint/parser')
+
+  async function lint(text: string, rules: Record<string, unknown>) {
+    const { default: parser } = await tsParser
+    const { ESLint } = await import('eslint')
+    const overrideConfig = [
+      { files: ['**/*.kay'], processor },
+      { files: ['**/*.kay/*.tsx'], languageOptions: { parser }, rules },
+    ] as never
+
+    return (await new ESLint({ cwd: join(import.meta.dir, 'fixtures', 'lint'), overrideConfigFile: true, overrideConfig }).lintText(text, { filePath: FILE }))[0]!.messages
+  }
+
+  it('names the file\'s own identifiers in a message, and keeps the __props a file writes', async () => {
+    const [implicit] = await lint('---\nconst { matching } = props<{ matching: string[] }>()\n---\np {`${matching.length}`}\n', { 'no-implicit-coercion': ['error', { disallowTemplateShorthand: true }] })
+
+    expect(implicit!.message).toContain('String(matching.length)')
+    expect(implicit!.message).not.toContain('__props')
+
+    const [literal] = await lint('---\nconst { list } = props<{ list: number[] }>()\nconst note = `${list.length}`\n---\np x\n', { 'no-implicit-coercion': ['error', { disallowTemplateShorthand: true }] })
+
+    expect(literal!.message).toContain('String(list.length)')
+
+    const [fence] = await lint('---\nconst __props = { a: 1 }\nconst s = `${__props.a}`\n---\np x\n', { 'no-implicit-coercion': ['error', { disallowTemplateShorthand: true }] })
+
+    expect(fence!.message).toContain('String(__props.a)')
+  })
+
+  it('names them in the description and the text of a suggestion and a fix', () => {
+    const source = '---\nconst { list } = props<{ list: number[] }>()\n---\np {list.length}\n'
+    const [block] = processor.preprocess(source, FILE)
+    const tsx = block!.text
+    const start = tsx.indexOf('__props.list.length') + '__props.'.length
+    const range: [number, number] = [start, start + 'list'.length]
+    const fix = { range, text: 'String(__props.list.length)' }
+    const [message] = processor.postprocess([[at(tsx, start, { message: 'Use String(__props.list.length)', fix, suggestions: [{ desc: 'Wrap __props.list.length', fix }] })]], FILE)
+
+    expect(message).toEqual(expect.objectContaining({ message: 'Use String(list.length)', fix: { range: [source.indexOf('list.length'), source.indexOf('list.length') + 4], text: 'String(list.length)' } }))
+    expect(message!.suggestions![0]!.desc).toBe('Wrap list.length')
+    expect(message!.suggestions![0]!.fix.text).toBe('String(list.length)')
+  })
+})
