@@ -121,6 +121,14 @@ describe('security headers', () => {
     expect(securityHeaders({ islands, security: false })).toBeUndefined()
   })
 
+  it('lets an inline style through once, however many pages carry it', () => {
+    const style = '.a{color:red}'
+    const hashes = directives(securityHeaders({ security: { csp: { 'style-src': ['\'self\''] } }, styles: [style, '.b{color:blue}', style, style] })!['content-security-policy']!).get('style-src')!.filter(source => source.startsWith('\'sha256-'))
+
+    expect(hashes).toHaveLength(2)
+    expect(new Set(hashes).size).toBe(2)
+  })
+
   it('sends X-Frame-Options as frame-ancestors says, under the app\'s own', () => {
     const frames = (csp: Record<string, string[] | false> | false, headers?: Record<string, string | false>, page?: Record<string, string[]>) => securityHeaders({ security: { csp, headers } }, page ? [{ csp: page }] : [])!['x-frame-options']
 

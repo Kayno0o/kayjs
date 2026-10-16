@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import tailwind from 'bun-plugin-tailwind'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { clientDir } from '../src/build/assets'
-import { pruneNodes, styledClassNames } from '../src/build/class-rules'
+import { pruneNodes, selectors, styledClassNames } from '../src/build/class-rules'
 import { buildClient } from '../src/build/client'
 import { findKayLibraries } from '../src/build/libraries'
 import { classTokens, unusedLibraryClasses } from '../src/build/prune'
@@ -38,6 +38,11 @@ describe('pruneNodes', () => {
     expect(pruneClasses('.kept{a:b}.gone{c:d}', unused)).toBe('.kept{a:b}')
     expect(pruneClasses('.gone, .kept > p, .x.gone-too{a:b}', unused)).toBe(' .kept > p{a:b}')
     expect(pruneClasses('a.gone:hover, .gone::before{a:b}', unused)).toBe('')
+  })
+
+  it('reads an escaped character outside the BMP as one, in a class name and between selectors', () => {
+    expect(selectors('.a\\😀b, \\😀.c').map(each => each.classes)).toEqual([['a\\😀b'], ['c']])
+    expect(pruneClasses('.a\\😀b{a:b}.gone\\😀{c:d}', new Set(['gone\\😀']))).toBe('.a\\😀b{a:b}')
   })
 
   it('keeps a selector naming an unused class only inside a pseudo-class or an attribute', () => {

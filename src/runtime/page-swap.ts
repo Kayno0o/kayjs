@@ -398,13 +398,22 @@ function tokens(value: string | undefined): string[] {
   return value?.split(SPACES).filter(Boolean) ?? []
 }
 
+// A markup as the parser serializes it back, so the raw text of a noscript and the elements of a parsed one read alike, an `&` in an href included.
+function serialized(markup: string): string {
+  const template = document.createElement('template')
+
+  template.innerHTML = markup
+
+  return template.innerHTML
+}
+
 // How the server put a head element in, whatever a script or the parser did to its markup since: a shared stylesheet is the same before and after its media is set, and a noscript holds its markup as text in a page and as elements in a parsed one.
 function headKey(element: Element): string {
   if (element.matches(REST_LINK))
     return `<link data-kay-rest href="${element.getAttribute('href')}">`
 
   if (element.tagName === 'NOSCRIPT')
-    return `<noscript>${element.firstElementChild === null ? element.textContent : element.innerHTML}</noscript>`
+    return `<noscript>${element.firstElementChild === null ? serialized(element.textContent ?? '') : element.innerHTML}</noscript>`
 
   return element.outerHTML
 }

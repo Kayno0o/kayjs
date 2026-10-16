@@ -320,6 +320,32 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('the page sw
     await page.close()
   })
 
+  it('keeps a noscript whose markup holds an ampersand through a swap, as the server serves it', async () => {
+    const page = await browser.newPage()
+
+    // Both pages carry the same noscript, as a layout's would.
+    await page.route(`${origin}/**`, async (route) => {
+      const response = await route.fetch()
+
+      if (!(response.headers()['content-type'] ?? '').includes('text/html')) {
+        await route.fulfill({ response })
+
+        return
+      }
+
+      await route.fulfill({ response, body: (await response.text()).replace('</head>', '<noscript><link rel="stylesheet" href="/amp.css?a=1&b=2"></noscript></head>') })
+    })
+    await page.goto(`${origin}/`)
+    await page.evaluate(() => {
+      (window as { kept?: HTMLElement | undefined }).kept = [...document.head.querySelectorAll('noscript')].find(element => element.textContent?.includes('a=1&b=2'))
+    })
+    expect(await page.evaluate(() => (window as { kept?: HTMLElement | undefined }).kept !== undefined)).toBe(true)
+    await page.click('a.about')
+    await page.locator('h1', { hasText: 'About' }).waitFor()
+    expect(await page.evaluate(() => [...document.head.querySelectorAll('noscript')].includes((window as { kept?: HTMLElement | undefined }).kept!))).toBe(true)
+    await page.close()
+  })
+
   it('drops the shared stylesheet of the layout it leaves, and keeps the new inline rules ahead of the one it keeps', async () => {
     const page = await browser.newPage()
 

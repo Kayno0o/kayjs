@@ -7,9 +7,11 @@ const NAMED_LAYER = /^@layer\s+[^\s{]/i
 const IDENT_CHAR = /[\w\u0080-\uFFFF-]/
 const HEX_ESCAPE = /^\\[\da-f]{1,6}[ \t\n\r\f]?/i
 
-// How many characters the escape starting at `at` takes: a hex escape and the one space ending it, or the backslash and the character after.
+// How many UTF-16 units the escape starting at `at` takes: a hex escape and the one space ending it, or the backslash and the character after, a surrogate pair included.
 function escapeLength(text: string, at: number): number {
-  return HEX_ESCAPE.exec(text.slice(at, at + 9))?.[0].length ?? 2
+  const hex = HEX_ESCAPE.exec(text.slice(at, at + 9))?.[0].length
+
+  return hex ?? 1 + String.fromCodePoint(text.codePointAt(at + 1) ?? 0x20).length
 }
 
 export interface Selector {
