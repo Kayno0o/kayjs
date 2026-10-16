@@ -8,7 +8,7 @@ import { rm } from 'node:fs/promises'
 import { networkInterfaces } from 'node:os'
 import { join, resolve, sep } from 'node:path'
 import process from 'node:process'
-import { ASSET_EXTENSIONS } from '../build/assets'
+import { ASSET_EXTENSIONS, KAY_DIR, testWorker } from '../build/assets'
 import { CONFIG_FILE, loadConfig } from '../config'
 import { projectPaths, savedPublicDir } from '../project'
 import { startClientBuilder } from './client'
@@ -700,6 +700,22 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   }
   finally {
     verified.resolve()
+  }
+
+  // An earlier run left a client build: its builder starts as the first server boots, instead of once the server asks for it.
+  if (!configRefused && !stopping && building === undefined && existsSync(join(root, KAY_DIR, `dev${testWorker()}`, 'manifest.json'))) {
+    wantsClient = true
+
+    const early = buildClient()
+
+    building = early
+    // A failure shows where a server awaits it.
+    void (async () => {
+      try {
+        await early
+      }
+      catch {}
+    })()
   }
 
   if (!booted && !configRefused && !stopping)

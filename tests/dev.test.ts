@@ -515,6 +515,42 @@ describe.concurrent('kay dev', () => {
     }
   }, 40_000)
 
+  it('starts the client builder at once only when an earlier run left a client build', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
+    const said = spyOn(console, 'error').mockImplementation(() => undefined)
+
+    await Bun.write(join(root, 'src/server.ts'), 'setInterval(() => undefined, 1000)\n')
+    await Bun.write(join(root, 'src/routes/index.kay'), 'p Home\n')
+    await Bun.write(join(root, 'kay.config.ts'), 'export default {}\n')
+
+    const real = realpathSync(root)
+
+    try {
+      // No build before: the server never asks for the client, so no builder starts.
+      const first = await dev(root)
+
+      await Bun.sleep(1500)
+      expect(childrenRunning(real, 'builder.ts')).toHaveLength(0)
+      await first()
+
+      await Bun.write(join(root, '.kay/dev/manifest.json'), '{}')
+
+      const second = await dev(root)
+
+      await until(() => childrenRunning(real, 'builder.ts').length === 1, 5000)
+      await second()
+
+      // A config that does not load is refused before any builder starts, so its error shows once.
+      await Bun.write(join(root, 'kay.config.ts'), 'throw new Error(\'config broke\')\n')
+      await expect(dev(root, { refuseConfig: true })).rejects.toBeInstanceOf(ConfigRefused)
+      expect(childrenRunning(real, 'builder.ts')).toHaveLength(0)
+    }
+    finally {
+      said.mockRestore()
+      await rm(root, { recursive: true, force: true })
+    }
+  }, 60_000)
+
   it('writes the types with the defaults while kay.config.ts does not load', async () => {
     const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
 
