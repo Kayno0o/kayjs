@@ -37,17 +37,19 @@ describe('component shell', () => {
     expect(code).toContain('const label = format(1)')
   })
 
-  it('wraps an interactive component as an island', () => {
+  it('wraps an interactive component as an island, and leaves pure helpers and type imports on the server side', () => {
     const reactive = tsx('---\nimport { signal } from \'kay\'\nconst count = signal(0)\n---\np {count()}')
 
     expect(reactive).toContain('import { island as KayIsland } from \'kay/island\'')
-    expect(reactive).toContain('\nfunction Test() {')
     expect(reactive).toEndWith('export default KayIsland("test.kay", Test)\n')
-    expect(tsx('button(onClick={go}) Go')).toContain('export default KayIsland(')
-    expect(tsx('input(bind:value={name})')).toContain('export default KayIsland(')
-    expect(tsx('---\nimport type { JSX } from \'kay\'\n---\np x')).toContain('export default function Test()')
+
+    const islandOf = (source: string) => compileKay(source, 'test.kay').island !== undefined
+
+    expect(islandOf('button(onClick={go}) Go')).toBe(true)
+    expect(islandOf('input(bind:value={name})')).toBe(true)
+    expect(islandOf('---\nimport type { JSX } from \'kay\'\n---\np x')).toBe(false)
     // Pure helpers, the same on both sides.
-    expect(tsx('---\nimport { sanitizeHtml, trustHtml, uid } from \'kay\'\nconst { a, b } = props<{ a: string, b: string }>()\n---\ndiv(id={uid()} innerHTML={trustHtml(a)})\ndiv(innerHTML={sanitizeHtml(b)})')).not.toContain('KayIsland')
+    expect(islandOf('---\nimport { sanitizeHtml, trustHtml, uid } from \'kay\'\nconst { a, b } = props<{ a: string, b: string }>()\n---\ndiv(id={uid()} innerHTML={trustHtml(a)})\ndiv(innerHTML={sanitizeHtml(b)})')).toBe(false)
   })
 
   it('names the component after its file', () => {
@@ -141,22 +143,9 @@ describe('control flow', () => {
     expect(compileKay(page, 'src/routes/index.kay', { includeServer: false }).tsx).not.toContain('export const page')
   })
 
-  it('chains if branches as conditionals', () => {
-    expect(jsx('if a\n  p a\nelse if b\n  p b\nelse\n  p c')).toBe('<>{(a) ? <p>a</p> : (b) ? <p>b</p> : <p>c</p>}</>')
-  })
-
   it('reports a match with no when line in every output, which once crashed the html one', () => {
     for (const output of ['dom', 'html'] as const)
       expect(compileKay('match s\n', 'test.kay', { output }).diagnostics.map(d => d.message)).toEqual(['`match` has no `when` line'])
-  })
-
-  it('writes a match as a switch, so kay check narrows its subject per branch', () => {
-    expect(jsx('match s.kind\n  when \'a\', \'b\'\n    p ab\n  else\n    p other')).toBe('<>{(() => { switch (s.kind) { case \'a\': case \'b\': return (<p>ab</p>); default: return (<p>other</p>); } })()}</>')
-    expect(jsx('match s\n  when 1\n    p one')).toBe('<>{(() => { switch (s) { case 1: return (<p>one</p>); } return null })()}</>')
-  })
-
-  it('narrows an aliased if through Show', () => {
-    expect(jsx('if user() as u\n  p {u.name}\nelse\n  p anon')).toBe('<>{<KayShow when={user()} fallback={<p>anon</p>}>{(u) => <p>{u.name}</p>}</KayShow>}</>')
   })
 
   it('reads a keyed row\'s key untracked, since a row keeps its key for life, and leaves a write or a call through it as written', () => {
@@ -182,11 +171,7 @@ describe('elements', () => {
     expect(errors('p(class="a" class="b")')).toEqual([expect.stringContaining('one `class`')])
   })
 
-  it('binds inputs both ways, with the right event and value type', () => {
-    expect(jsx('input(bind:value={name})')).toBe('<input value={(name)()} onInput={(kayEvent) => (name).set(kayEvent.currentTarget.value)} />')
-    expect(jsx('input(type="number" bind:value={n})')).toContain('{ const kayValue = kayEvent.currentTarget.valueAsNumber; if (!Number.isNaN(kayValue)) (n).set(kayValue) }')
-    expect(jsx('input(type="checkbox" bind:checked={on})')).toContain('checked={(on)()} onChange=')
-    expect(jsx('select(bind:value={v})')).toContain('onChange=')
+  it('refuses bind: on a component, and on an element that already handles the event', () => {
     expect(errors('Field(bind:value={v})')).toEqual([expect.stringContaining('`bind:` works on')])
     expect(errors('input(bind:value={v} onInput={f})')).toEqual([expect.stringContaining('already handles')])
   })

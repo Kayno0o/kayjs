@@ -1723,6 +1723,30 @@ describe('match blocks', () => {
   })
 })
 
+describe('bind:checked and bind:value on a select', () => {
+  const mountBound = site({ 'main.kay': '---\nimport { signal } from \'kay\'\nconst on = signal(false)\nconst choice = signal(\'a\')\n---\ninput#box(type="checkbox" bind:checked={on})\nselect#pick(bind:value={choice})\n  option(value="a") A\n  option(value="b") B\np#out {on() ? \'on\' : \'off\'} {choice()}\n' })
+
+  it('follows the box and the choice both ways', async () => {
+    const { root, dispose } = await mountBound()
+    const box = root.querySelector<HTMLInputElement>('#box')!
+    const pick = root.querySelector<HTMLSelectElement>('#pick')!
+    const output = root.querySelector('#out')!
+
+    try {
+      expect(output.textContent).toBe('off a')
+      box.checked = true
+      box.dispatchEvent(new Event('change', { bubbles: true }))
+      pick.value = 'b'
+      pick.dispatchEvent(new Event('change', { bubbles: true }))
+      await settle()
+      expect(output.textContent).toBe('on b')
+    }
+    finally {
+      await dispose()
+    }
+  })
+})
+
 describe('bind:value on a number input', () => {
   const mountNumber = site({ 'main.kay': '---\nimport { signal } from \'kay\'\nconst n = signal<number>(5)\n---\ninput#num(type="number" bind:value={n})\ninput#range(type="range" min="0" max="10" bind:value={n})\np#out {n()}\n' })
 
