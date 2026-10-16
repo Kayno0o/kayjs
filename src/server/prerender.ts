@@ -17,7 +17,7 @@ import { durationSeconds } from '../runtime/duration'
 import { IMAGE_ROUTE } from '../runtime/image'
 import { runInLocale } from '../runtime/locale-state'
 import { standInReads } from '../runtime/site'
-import { withPageToken } from '../runtime/uid'
+import { withPageToken } from '../runtime/uid.server'
 import { projectApi } from './api-modules'
 import { PRERENDERED_DIR, readManifest, writeManifest } from './client'
 import { exportedEndpoints } from './endpoints'
@@ -125,14 +125,14 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
         // onError is the app's for requests it answers; the build logs what a prerendered page throws.
         const render = async () => renderPage({ ...route, guards: [] }, { request }, matched, client, { ...renderOptions, onError: undefined, prerendering: true })
         const inLocale = async () => runInLocale(stateFor(locales, copy.locale ?? locales.settings.defaultLocale, path, request), render)
-        // The ids a page draws keep apart from those of the page it is swapped for, so each kept page has a token of its own, the same on both renders; the body is read within it, as a stream draws its ids as it is read.
+        // The ids a page draws keep apart from those of the page it is swapped for, so each page has a token of its own, the same on every render and build; the body is read within it, as a stream draws its ids as it is read.
         const token = pageToken(copy.key)
         const read = async () => {
           const rendered = await inLocale()
 
           return { response: rendered, html: await rendered.text() }
         }
-        const once = async () => auto ? withPageToken(token, read) : read()
+        const once = async () => withPageToken(token, read)
         const { response, html } = await once()
 
         if (auto && response.status !== 200)

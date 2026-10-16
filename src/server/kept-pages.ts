@@ -1,7 +1,7 @@
 import type { Elysia } from 'elysia'
 import type { ServedPage } from './render'
 import { kayLog } from '../runtime/log'
-import { withPageToken } from '../runtime/uid'
+import { withPageToken } from '../runtime/uid.server'
 import { pageEtag, pageToken } from './prerendered'
 
 // How many requests that can write have started or ended, which a kept page is checked against.

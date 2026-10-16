@@ -6,7 +6,8 @@ import { withFieldMarks } from './fields'
 import { child, omit } from './html'
 import { renderOnServer, scope } from './reactive'
 import { SLOT_END, SLOT_START } from './static-slots'
-import { countIds, islandPrefix, pageIds } from './uid'
+import { countIds } from './uid'
+import { islandPrefix, pageIds } from './uid.server'
 import { encodeValue, unsendable } from './wire'
 
 // Island roots render synchronously, so a counter is enough to tell whether a component already sits inside one.

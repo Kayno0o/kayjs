@@ -8,6 +8,8 @@ import { kay } from '../src/build/plugin'
 import { attempt, child, FAILED_MARKER } from '../src/runtime/html'
 import { collectIslands } from '../src/runtime/island.server'
 import { uid, withIds } from '../src/runtime/uid'
+import { pageIds, withPageToken } from '../src/runtime/uid.server'
+import { pageToken } from '../src/server/prerendered'
 import { settle } from '../src/test'
 import { scratchDir } from './scratch'
 
@@ -68,6 +70,43 @@ describe('uid', () => {
     const again = new Set([...render().result.matchAll(ID)].map(match => match[1]!))
 
     expect([...html.matchAll(ID)].map(match => match[1]!).filter(id => again.has(id))).toEqual([])
+  })
+
+  it('gives the pages of a site ids apart, those of a kept page and of one rendered per request alike', async () => {
+    const ids = (html: string) => new Set([...html.matchAll(ID)].map(match => match[1]!))
+    const [home, about] = await Promise.all([pageToken('/'), pageToken('/about')].map(async token => withPageToken(token, async () => render().result)))
+    const perRequest = render().result
+
+    expect(pageToken('/')).not.toBe(pageToken('/about'))
+    expect([...ids(home!)].filter(id => ids(about!).has(id) || ids(perRequest).has(id))).toEqual([])
+    expect([...ids(about!)].filter(id => ids(perRequest).has(id))).toEqual([])
+  })
+
+  it('draws the same ids on every render of a page under one token', async () => {
+    const first = await withPageToken('kfixed', async () => render().result)
+    const second = await withPageToken('kfixed', async () => render().result)
+
+    expect(second).toBe(first)
+    expect(first).toContain('data-uid="kfixed-0-"')
+  })
+
+  it('keeps a token to its own render while others run at the same time', async () => {
+    const drawn = async (token: string | undefined, wait: number) => {
+      const run = async () => {
+        await Bun.sleep(wait)
+
+        return pageIds(() => uid())
+      }
+
+      return token === undefined ? run() : withPageToken(token, run)
+    }
+    const [slow, fast, none] = await Promise.all([drawn('kslow', 20), drawn('kfast', 1), drawn(undefined, 10)])
+
+    expect(slow).toBe('kslow-0')
+    expect(fast).toBe('kfast-0')
+    expect(none).not.toMatch(/^k(slow|fast)-/)
+    // Once every render ended, none leaves its token behind.
+    expect(pageIds(() => uid())).not.toMatch(/^k(slow|fast)-/)
   })
 
   it('gives back the ids of a try block that failed on the server, its fallbacks drawing apart', () => {

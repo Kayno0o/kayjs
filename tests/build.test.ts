@@ -784,6 +784,37 @@ describe('kay.config.ts', () => {
     }
   }, 30_000)
 
+  it('gives the same prerendered pages on every build, their ids apart from page to page', async () => {
+    const field = '---\nimport { signal, uid } from \'kay\'\n\nconst n = signal(0)\nconst id = uid()\n---\nlabel(for={id}) Count\nbutton(id={id} type="button" onClick={() => n.set(n() + 1)}) {n()}\n'
+    const page = (title: string) => `--- server\nexport const page = { prerender: true }\n---\n---\nimport Field from '../field.kay'\n---\nh1 ${title}\nField\nField\n`
+    const root = await scratchProject({
+      'package.json': JSON.stringify({ name: 'app', private: true }),
+      'src/field.kay': field,
+      'src/routes/index.kay': page('Home'),
+      'src/routes/about.kay': page('About'),
+    })
+    const build = async () => {
+      const [report, code] = await printed(Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', root, '--no-check', '--static'], { stdout: 'pipe', stderr: 'pipe' }))
+
+      expect(code, report).toBe(0)
+
+      return Promise.all(['index', 'about'].map(async name => Bun.file(join(root, `dist/${name}.html`)).text()))
+    }
+
+    try {
+      const first = await build()
+      const second = await build()
+      const ids = first.map(html => new Set([...html.matchAll(/\bid="([^"]+)"/g)].map(match => match[1]!)))
+
+      expect(second).toEqual(first)
+      expect(ids[0]!.size).toBeGreaterThan(0)
+      expect([...ids[0]!].filter(id => ids[1]!.has(id))).toEqual([])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  }, 60_000)
+
   it('strips the config Bun loads through a symlinked project', async () => {
     const root = await scratchProject({
       'kay.config.ts': 'import stamp from \'./stamp\'\n\nexport default { plugins: [stamp], lang: \'en\' }\n',
