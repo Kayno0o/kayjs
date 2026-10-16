@@ -20,8 +20,8 @@ function shown(address: Address): string {
   return typeof address === 'string' ? address : address.address
 }
 
-export default async function mailDevTool(tool: DevTool): Promise<void> {
-  const tab = tool.tab({ id: 'mail', label: 'Mail', summary: count => `${count} mail${count === 1 ? '' : 's'}`, shown: () => void refresh() })
+export default function mailDevTool(tool: DevTool): void {
+  const tab = tool.tab({ id: 'mail', label: 'Mail', summary: count => `${count} mail${count === 1 ? '' : 's'}`, shown: show, hidden: hide })
   let asked = 0
   let live: EventSource | undefined
   const previewed = new Set<string>()
@@ -85,6 +85,17 @@ export default async function mailDevTool(tool: DevTool): Promise<void> {
     return item
   }
 
+  function show(): void {
+    live ??= new EventSource(EVENTS_URL)
+    live.onmessage = () => void refresh()
+    void refresh()
+  }
+
+  function hide(): void {
+    live?.close()
+    live = undefined
+  }
+
   async function refresh(): Promise<void> {
     const ask = ++asked
     let mails: SentMail[]
@@ -114,9 +125,6 @@ export default async function mailDevTool(tool: DevTool): Promise<void> {
     if (ask !== asked)
       return
 
-    live ??= new EventSource(EVENTS_URL)
-    live.onmessage = () => void refresh()
-
     if (mails.length === 0) {
       empty('No mail has been sent since the server started.')
 
@@ -127,5 +135,5 @@ export default async function mailDevTool(tool: DevTool): Promise<void> {
     tab.panel.replaceChildren(...mails.toReversed().map(row))
   }
 
-  await refresh()
+  void refresh()
 }

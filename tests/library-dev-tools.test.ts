@@ -7,10 +7,23 @@ import mailDevTool from '../packages/mail/src/devTool'
 import { startDevTool } from '../src/runtime/dev-tool'
 
 // The Auth, Mail and CMS tabs the libraries ship as browser modules, run on the real dev tool with the library's dev routes answered by a stub.
+class Stream {
+  static open = 0
+  onmessage: (() => void) | null = null
+
+  constructor() {
+    Stream.open++
+  }
+
+  close(): void {
+    Stream.open--
+  }
+}
+
 beforeAll(() => {
   GlobalRegistrator.register()
   // happy-dom has no event streams.
-  Object.assign(globalThis, { EventSource: class { onmessage: (() => void) | null = null } })
+  Object.assign(globalThis, { EventSource: Stream })
 })
 afterAll(async () => {
   await GlobalRegistrator.unregister()
@@ -78,7 +91,8 @@ describe('the libraries\' dev tool tabs', () => {
     const fetching = answering({ 'GET /_kay/mail.json': () => Response.json(mails) })
 
     tool = startDevTool()
-    await mailDevTool(tool)
+    mailDevTool(tool)
+    await Bun.sleep(5)
     shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-mail')!.click()
     await Bun.sleep(0)
 
@@ -96,12 +110,30 @@ describe('the libraries\' dev tool tabs', () => {
     fetching.mockRestore()
   })
 
+  it('holds the mail event stream open only while the tab is shown', async () => {
+    const fetching = answering({ 'GET /_kay/mail.json': () => Response.json([]) })
+    const streams = () => Stream.open
+
+    Stream.open = 0
+
+    tool = startDevTool()
+    mailDevTool(tool)
+    await Bun.sleep(5)
+    expect(streams()).toBe(0)
+    shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-mail')!.click()
+    expect(streams()).toBe(1)
+    shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-problems')!.click()
+    expect(streams()).toBe(0)
+    fetching.mockRestore()
+  })
+
   it('says the outbox is not there outside kay dev, and none was sent when it is empty', async () => {
     let answer = new Response(null, { status: 404 })
     const fetching = answering({ 'GET /_kay/mail.json': () => answer })
 
     tool = startDevTool()
-    await mailDevTool(tool)
+    mailDevTool(tool)
+    await Bun.sleep(5)
     shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-mail')!.click()
     await Bun.sleep(0)
     expect(panel('mail').textContent).toContain('under `kay dev` alone')

@@ -51,8 +51,8 @@
       "default": "./src/runtime/seo.ts"
     },
     "./dev-tool": {
-      "types": "./types/runtime/dev-tool.d.ts",
-      "default": "./src/runtime/dev-tool.ts"
+      "types": "./types/runtime/dev-tool.public.d.ts",
+      "default": "./src/runtime/dev-tool.public.ts"
     },
     "./edit": {
       "types": "./types/runtime/edit.d.ts",

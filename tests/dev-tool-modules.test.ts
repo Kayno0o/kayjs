@@ -30,6 +30,24 @@ async function loaded(app: Awaited<ReturnType<typeof pages>>): Promise<string[]>
 }
 
 describe('the dev tool modules of extensions', () => {
+  it('serves the libraries\' own modules as browser code with no import left', async () => {
+    const { routes } = await site()
+    const modules = ['auth', 'mail', 'cms'].map(name => ({ name, devTool: { module: join(import.meta.dir, '..', 'packages', name, 'src', 'devTool.ts') } }))
+    const app = await pages({ routes, dev: true, extensions: modules })
+    const urls = await loaded(app)
+
+    expect(urls).toHaveLength(3)
+
+    for (const url of urls) {
+      const response = await get(app, url)
+      const body = await response.text()
+
+      expect(response.status).toBe(200)
+      expect(body).toContain('export default')
+      expect(body).not.toMatch(/^import /m)
+    }
+  })
+
   it('loads each module an extension names after the tool, served as browser code, and nothing else', async () => {
     const { routes, dir } = await site()
     const app = await pages({ routes, dev: true, extensions: [{ name: 'one', devTool: { module: join(dir, 'one.ts') } }, { name: 'two', devTool: { module: join(dir, 'two.js') } }] })
