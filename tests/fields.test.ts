@@ -35,22 +35,29 @@ describe('defineEnv', () => {
     expect(() => defineEnv(worded, { PORT: 'x' })).toThrow('PORT: the port is a number')
   })
 
-  it('leaves an empty optional out rather than reading it as a blank value, whatever its type', () => {
+  describe('a variable left out or written empty', () => {
     const optional = t.Object({ USER: t.Optional(t.String()), DEBUG: t.Optional(t.Boolean()), HOSTS: t.Optional(t.Array(t.String())) })
+    const defaulted = t.Object({ DEBUG: t.Boolean({ default: true }), HOSTS: t.Array(t.String(), { default: ['a'] }) })
+    const required = t.Object({ DEBUG: t.Boolean(), HOSTS: t.Array(t.String()) })
 
-    // The case a reader branching on `undefined` depends on: a mailer handed `''` would send an empty user instead of no auth at all.
-    expect(defineEnv(optional, { USER: '', DEBUG: '', HOSTS: '' })).toEqual({})
-    expect(defineEnv(t.Object({ USER: t.Optional(t.String({ default: 'z' })) }), { USER: '' })).toEqual({ USER: 'z' })
-  })
+    it.each([
+      // The case a reader branching on `undefined` depends on: a mailer handed `''` would send an empty user instead of no auth at all.
+      ['leaves an empty optional out, whatever its type', optional, { USER: '', DEBUG: '', HOSTS: '' }, {}],
+      ['gives an empty optional its default', t.Object({ USER: t.Optional(t.String({ default: 'z' })) }), { USER: '' }, { USER: 'z' }],
+      ['fills an empty boolean and list with their defaults', defaulted, { DEBUG: '', HOSTS: '' }, { DEBUG: true, HOSTS: ['a'] }],
+      ['fills a boolean and list left out with their defaults', defaulted, {}, { DEBUG: true, HOSTS: ['a'] }],
+      ['keeps a value of spaces, which only quoting makes', t.Object({ PREFIX: t.String() }), { PREFIX: ' ' }, { PREFIX: ' ' }],
+    ])('%s', (_name, schema, env, expected) => {
+      expect(defineEnv(schema, env)).toEqual(expected)
+    })
 
-  it('fills an empty variable\'s default and refuses it where the schema gives none, for a boolean and a list too', () => {
-    expect(defineEnv(t.Object({ DEBUG: t.Boolean({ default: true }), HOSTS: t.Array(t.String(), { default: ['a'] }) }), { DEBUG: '', HOSTS: '' })).toEqual({ DEBUG: true, HOSTS: ['a'] })
-    expect(() => defineEnv(t.Object({ DEBUG: t.Boolean() }), { DEBUG: '' })).toThrow('DEBUG: ')
-    expect(() => defineEnv(t.Object({ HOSTS: t.Array(t.String()) }), { HOSTS: '' })).toThrow('HOSTS: ')
-  })
-
-  it('keeps a value of spaces, which only quoting makes', () => {
-    expect(defineEnv(t.Object({ PREFIX: t.String() }), { PREFIX: ' ' })).toEqual({ PREFIX: ' ' })
+    it.each([
+      ['an empty required boolean', t.Object({ DEBUG: t.Boolean() }), { DEBUG: '' }, 'DEBUG: '],
+      ['an empty required list', t.Object({ HOSTS: t.Array(t.String()) }), { HOSTS: '' }, 'HOSTS: '],
+      ['a required boolean and list left out', required, {}, 'DEBUG: '],
+    ])('refuses %s', (_name, schema, env, message) => {
+      expect(() => defineEnv(schema, env)).toThrow(message)
+    })
   })
 
   it('leaves kay build alone over an empty required variable, as over a missing one', () => {
@@ -69,11 +76,6 @@ describe('defineEnv', () => {
 
   it('names every variable missing or refused in the error that stops the boot', () => {
     expect(() => defineEnv(schema, { PORT: '80a' })).toThrow(new Error('kay: the environment does not match its schema\n  DATABASE_URL: Property \'DATABASE_URL\' is missing\n  PORT: Property \'PORT\' should be one of: \'integer\', \'integer\''))
-  })
-
-  it('refuses a required boolean or list left out, unless the schema gives it a default', () => {
-    expect(() => defineEnv(t.Object({ DEBUG: t.Boolean(), HOSTS: t.Array(t.String()) }), {})).toThrow('DEBUG: ')
-    expect(defineEnv(t.Object({ DEBUG: t.Boolean({ default: true }), HOSTS: t.Array(t.String(), { default: ['a'] }) }), {})).toEqual({ DEBUG: true, HOSTS: ['a'] })
   })
 
   it('lets kay build go on without a variable, a read of it failing instead', () => {

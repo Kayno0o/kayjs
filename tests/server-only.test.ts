@@ -7,51 +7,63 @@ import { refuseServerOnlyReads, serverOnlyReads } from '../src/build/server-only
 const names = (code: string) => serverOnlyReads(code).map(read => read.name)
 
 describe('a server-only global in a built chunk', () => {
-  it('is found as the bare read it is, whatever it is read for', () => {
-    expect(names('var s = process.env.SITE_DOMAIN || void 0;\n')).toEqual(['process'])
-    expect(names('Bun.file("x");\n')).toEqual(['Bun'])
-    expect(names('var p = process; var s = p.env.X;\n')).toEqual(['process'])
-    expect(names('process.on("exit", () => {});\nBun.serve({});\n')).toEqual(['Bun', 'process'])
+  it.each([
+    ['var s = process.env.SITE_DOMAIN || void 0;\n', ['process']],
+    ['Bun.file("x");\n', ['Bun']],
+    ['var p = process; var s = p.env.X;\n', ['process']],
+    ['process.on("exit", () => {});\nBun.serve({});\n', ['Bun', 'process']],
+  ])('is found as the bare read it is, whatever it is read for: %p', (code, found) => {
+    expect(names(code)).toEqual(found)
   })
 
-  it('is not the name of something else', () => {
-    expect(names('function f(process) { return process.env.X }\n')).toEqual([])
-    expect(names('var o = { process: 1 }; o.process; o["process"];\n')).toEqual([])
-    expect(names('import process from "node:process";\nprocess.exit(0);\n')).toEqual([])
-    expect(names('var Bun = globalThis.Bun; Bun?.file("x");\n')).toEqual([])
+  it.each([
+    ['function f(process) { return process.env.X }\n', []],
+    ['var o = { process: 1 }; o.process; o["process"];\n', []],
+    ['import process from "node:process";\nprocess.exit(0);\n', []],
+    ['var Bun = globalThis.Bun; Bun?.file("x");\n', []],
+  ])('is not the name of something else: %p', (code, found) => {
+    expect(names(code)).toEqual(found)
   })
 
-  it('is left alone where a `typeof` asked about it first', () => {
-    expect(names('var d = typeof process !== "undefined" && process.env.MODE;\n')).toEqual([])
-    expect(names('var d = typeof process > "u" ? "x" : process.env.X;\n')).toEqual([])
-    expect(names('if (typeof process !== "undefined") { process.env.X }\n')).toEqual([])
-    expect(names('if (typeof process !== "undefined") process.env.X;\n')).toEqual([])
-    expect(names('if (typeof process < "u") { var a = process.env.X; use(a) }\n')).toEqual([])
-    expect(names('while (typeof process !== "undefined") { process.exit() }\n')).toEqual([])
-    expect(names('function f() { if (typeof process === "undefined") return; return process.env.X }\n')).toEqual([])
+  it.each([
+    ['var d = typeof process !== "undefined" && process.env.MODE;\n', []],
+    ['var d = typeof process > "u" ? "x" : process.env.X;\n', []],
+    ['if (typeof process !== "undefined") { process.env.X }\n', []],
+    ['if (typeof process !== "undefined") process.env.X;\n', []],
+    ['if (typeof process < "u") { var a = process.env.X; use(a) }\n', []],
+    ['while (typeof process !== "undefined") { process.exit() }\n', []],
+    ['function f() { if (typeof process === "undefined") return; return process.env.X }\n', []],
     // The flag a module computes once and branches on later, minified into one declaration or not.
-    expect(names('var has = typeof process !== "undefined";\nvar v = has ? process.env.X : 1;\n')).toEqual([])
-    expect(names('var has = typeof process !== "undefined", v = has ? process.env.X : 1;\n')).toEqual([])
+    ['var has = typeof process !== "undefined";\nvar v = has ? process.env.X : 1;\n', []],
+    ['var has = typeof process !== "undefined", v = has ? process.env.X : 1;\n', []],
+  ])('is left alone where a `typeof` asked about it first: %p', (code, found) => {
+    expect(names(code)).toEqual(found)
   })
 
-  it('is left alone inside a `try` whose `catch` takes the error a missing global throws', () => {
+  it.each([
     // html-to-image's getPixelRatio, as it ships.
-    expect(names('function ratio() { let p; try { p = process } catch (e) {} return p && p.env ? p.env.devicePixelRatio : null }\n')).toEqual([])
-    expect(names('try { Bun.file("x") } catch {}\n')).toEqual([])
+    ['function ratio() { let p; try { p = process } catch (e) {} return p && p.env ? p.env.devicePixelRatio : null }\n', []],
+    ['try { Bun.file("x") } catch {}\n', []],
     // A `finally` alone lets the error through, and the `catch` covers its `try` block, not itself.
-    expect(names('try { process.exit() } finally {}\n')).toEqual(['process'])
-    expect(names('try { f() } catch (e) { process.exit() }\n')).toEqual(['process'])
+    ['try { process.exit() } finally {}\n', ['process']],
+    ['try { f() } catch (e) { process.exit() }\n', ['process']],
+  ])('is left alone inside a `try` whose `catch` takes the error a missing global throws: %p', (code, found) => {
+    expect(names(code)).toEqual(found)
   })
 
-  it('is found where the guard covers other code in the same statement, as minifying merges it', () => {
-    expect(names('var o = typeof process < "u" ? "production" : "x", c = process.env.OTHER;\n')).toEqual(['process'])
-    expect(names('var d = typeof Bun !== "undefined" && Bun.version, p = process.env.X;\n')).toEqual(['process'])
+  it.each([
+    ['var o = typeof process < "u" ? "production" : "x", c = process.env.OTHER;\n', ['process']],
+    ['var d = typeof Bun !== "undefined" && Bun.version, p = process.env.X;\n', ['process']],
     // A guard on one global says nothing about another.
-    expect(names('var d = typeof window !== "undefined" && process.env.X;\n')).toEqual(['process'])
+    ['var d = typeof window !== "undefined" && process.env.X;\n', ['process']],
+  ])('is found where the guard covers other code in the same statement, as minifying merges it: %p', (code, found) => {
+    expect(names(code)).toEqual(found)
   })
 
-  it('is found outside the function a guard stands in', () => {
-    expect(names('function f() { if (typeof process === "undefined") return; return process.env.X }\nvar top = process.env.Y;\n')).toEqual(['process'])
+  it.each([
+    ['function f() { if (typeof process === "undefined") return; return process.env.X }\nvar top = process.env.Y;\n', ['process']],
+  ])('is found outside the function a guard stands in: %p', (code, found) => {
+    expect(names(code)).toEqual(found)
   })
 })
 

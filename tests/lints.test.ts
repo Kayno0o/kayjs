@@ -181,16 +181,22 @@ describe('page settings', () => {
     expect(fixed('--- server\nexport function sitemap() {\n  const sitemap = 1\n\n  return function () {\n    return [this, arguments, sitemap]\n  }\n}\n---\np x')).toEqual(['--- server\nexport const page = {\n  sitemap: () => {\n    const sitemap = 1\n\n    return function () {\n      return [this, arguments, sitemap]\n    }\n  },\n}\n---\np x'])
   })
 
-  it('adds to the page export there is, on its line or one key a line', () => {
-    expect(fixed('--- server\nexport const page = { noindex: true }\nexport const layouts = false\n---\np x')).toEqual(['--- server\nexport const page = { noindex: true, layouts: false }\n---\np x'])
-    expect(fixed('--- server\nexport const layouts = false\nexport const page = {\n  noindex: true,\n}\n---\np x')).toEqual(['--- server\nexport const page = {\n  noindex: true,\n  layouts: false,\n}\n---\np x'])
-    expect(fixed('--- server\nexport const page = {}\nexport const layouts = false\n---\np x')).toEqual(['--- server\nexport const page = { layouts: false }\n---\np x'])
+  it.each([
+    ['on its line', '--- server\nexport const page = { noindex: true }\nexport const layouts = false\n---\np x', '--- server\nexport const page = { noindex: true, layouts: false }\n---\np x'],
+    ['one key a line', '--- server\nexport const layouts = false\nexport const page = {\n  noindex: true,\n}\n---\np x', '--- server\nexport const page = {\n  noindex: true,\n  layouts: false,\n}\n---\np x'],
+    ['to an empty one', '--- server\nexport const page = {}\nexport const layouts = false\n---\np x', '--- server\nexport const page = { layouts: false }\n---\np x'],
+  ])('adds to the page export there is, %s', (_name, source, expected) => {
+    expect(fixed(source)).toEqual([expected])
   })
 
-  it('leaves a setting the fence reads, one with a type of its own, or one page already sets, for the author to move', () => {
-    expect(fixed('--- server\nexport const prerender = true\nconst again = prerender\n---\np {again}')).toEqual([])
-    expect(fixed('--- server\nexport const revalidate: number = 60\n---\np x')).toEqual([])
+  it.each([
+    ['a setting the fence reads', '--- server\nexport const prerender = true\nconst again = prerender\n---\np {again}'],
+    ['one with a type of its own', '--- server\nexport const revalidate: number = 60\n---\np x'],
+  ])('leaves %s for the author to move', (_name, source) => {
+    expect(fixed(source)).toEqual([])
+  })
 
+  it('leaves a setting page already sets for the author to move', () => {
     const twice = '--- server\nexport const page = { prerender: true }\nexport const prerender = false\n---\np x'
 
     expect(compileKay(twice, 'list.kay').diagnostics.map(d => d.message)).toEqual(['`prerender` is set twice, in `page` and on its own'])

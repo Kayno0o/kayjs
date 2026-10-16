@@ -869,9 +869,11 @@ console.log(JSON.stringify([keys.has(plain('before')), keys.has(plain('after')),
     }
   })
 
-  it('refuses a rate limit window it cannot read as the action is declared', () => {
-    expect(() => action(t.Object({}), () => 1, { rateLimit: { max: 1, window: 'soon' as never } })).toThrow('kay: rateLimit.window is \'soon\'; it takes a positive duration')
-    expect(() => action(t.Object({}), () => 1, { rateLimit: [{ max: 1, window: '1m' }, { max: 1, window: '1m', count: 'succeeded', store: { hit: () => ({ count: 1, resetAt: 0 }) } }] })).toThrow('needs a peek(key) method')
+  it.each([
+    ['a window it cannot read', { max: 1, window: 'soon' as never }, 'kay: rateLimit.window is \'soon\'; it takes a positive duration'],
+    ['a store without peek on a limit counting successes', [{ max: 1, window: '1m' }, { max: 1, window: '1m', count: 'succeeded', store: { hit: () => ({ count: 1, resetAt: 0 }) } }] as never, 'needs a peek(key) method'],
+  ])('refuses %s as the action is declared', (_name, rateLimit, message) => {
+    expect(() => action(t.Object({}), () => 1, { rateLimit })).toThrow(message)
   })
 
   it.each([
@@ -955,9 +957,20 @@ console.log(JSON.stringify([keys.has(plain('before')), keys.has(plain('after')),
   it('refuses a proxy setting it cannot read, as the server boots', async () => {
     // One through `pages()`, which reads it as the server boots; the rest where it is read, as setting the routes up costs half a second each, which a busy host multiplies.
     await expect(pages({ routes: `${FIXTURE}/src/routes`, prebuilt: false, proxy: {} })).rejects.toThrow('kay: proxy')
+  })
 
-    for (const proxy of [{ hops: 1, header: 'x-real-ip' }, { hops: 0 }, { hops: 1.5 }, 0, 1.5, { header: ' ' }, { hops: 1, trusted: ['a CDN'] }, { hops: 1, trusted: ['10.0.0.0/33'] }, { hops: 1, trusted: ['::/129'] }])
-      expect(() => trustProxy(new Elysia(), proxy)).toThrow('kay: proxy')
+  it.each([
+    [{ hops: 1, header: 'x-real-ip' }],
+    [{ hops: 0 }],
+    [{ hops: 1.5 }],
+    [0],
+    [1.5],
+    [{ header: ' ' }],
+    [{ hops: 1, trusted: ['a CDN'] }],
+    [{ hops: 1, trusted: ['10.0.0.0/33'] }],
+    [{ hops: 1, trusted: ['::/129'] }],
+  ])('refuses the proxy setting %p where it is read', (proxy) => {
+    expect(() => trustProxy(new Elysia(), proxy)).toThrow('kay: proxy')
   })
 
   it('types the honeypot as one of the form\'s fields for kay check, a misspelt one still refused', async () => {
@@ -1244,9 +1257,8 @@ describe('request body limits', () => {
     expect(await (await post(MB)).text()).toBe(String(MB))
   })
 
-  it('refuses a limit it cannot read, as the server boots', async () => {
-    for (const bodyLimit of [0, -1, 1.5])
-      await expect(serve(bodyLimit)).rejects.toThrow('kay: bodyLimit')
+  it.each([0, -1, 1.5])('refuses a limit of %p, as the server boots', async (bodyLimit) => {
+    await expect(serve(bodyLimit)).rejects.toThrow('kay: bodyLimit')
   })
 })
 

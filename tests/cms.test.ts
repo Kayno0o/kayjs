@@ -502,9 +502,16 @@ describe('the collections a CMS edits', () => {
       { collection: 'articles', slug: '../escape', path: 'title', message: expect.any(String) },
     ] })
     expect(await rejection(entrySource('news', 'launch', {}))).toMatchObject({ message: expect.stringContaining('saveEntry()') })
-    // An entry's data is an object of fields, as `entries()` reads it back.
-    expect(await entrySource('pages', 'listed', [1])).toEqual({ issues: [{ collection: 'pages', slug: 'listed', path: '', message: 'holds a list as its data, not an object of fields' }] })
-    expect(await saveEntry('news', { slug: 'plain', data: 'text' })).toEqual({ issues: [{ collection: 'news', slug: 'plain', path: '', message: 'holds a string as its data, not an object of fields' }] })
+  })
+
+  // An entry's data is an object of fields, as `entries()` reads it back.
+  it.each([
+    ['a list', 'entrySource', 'pages', 'listed', [1]],
+    ['a string', 'saveEntry', 'news', 'plain', 'text'],
+  ] as const)('refuses data that is %s, not an object of fields', async (kind, call, collection, slug, data) => {
+    const result = call === 'entrySource' ? await entrySource(collection, slug, data) : await saveEntry(collection, { slug, data })
+
+    expect(result).toEqual({ issues: [{ collection, slug, path: '', message: `holds a ${kind.slice(2)} as its data, not an object of fields` }] })
   })
 
   it('gives the file a folder entry is read from, for the CMS to delete', async () => {
