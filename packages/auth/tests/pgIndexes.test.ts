@@ -18,6 +18,9 @@ const FILTERS: Record<string, string> = {
   'sessions by creation': 'SELECT 1 FROM "auth_session" WHERE "created_at" < 1',
   'audit by age': 'SELECT 1 FROM "auth_audit" WHERE "at" < 1',
   'audit by user': 'SELECT 1 FROM "auth_audit" WHERE "user_id" = \'a\'',
+  'oauth codes by expiry': 'SELECT 1 FROM "auth_oauth_code" WHERE "expires_at" <= 1',
+  'oauth refresh tokens by expiry': 'SELECT 1 FROM "auth_oauth_refresh" WHERE "expires_at" <= 1',
+  'oauth clients by age': 'SELECT 1 FROM "auth_oauth_client" WHERE "created_at" < 1',
   'audit by actor': 'SELECT 1 FROM "auth_audit" WHERE "actor_id" = \'a\'',
 }
 

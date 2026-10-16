@@ -32,6 +32,8 @@ export const OPENAPI_PATH = `${API_PREFIX}/openapi.json`
 export const REFERENCE_PATH = `${API_PREFIX}/reference`
 // Where `mcp` serves the app's tools.
 export const MCP_PATH = '/mcp'
+// Where an MCP client finds how to sign in, which the endpoint's 401 points to.
+export const RESOURCE_METADATA = '/.well-known/oauth-protected-resource'
 const GUARD = '_guard.ts'
 const API_OPTIONS = /\bapi\s*\(\s*\{/
 // Tests, declarations, and files or directories starting with `_`, guards and helpers, are no modules.

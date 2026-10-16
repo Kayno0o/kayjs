@@ -38,6 +38,11 @@ export const DEFAULT_LIMITS = {
   inviteAddress: { max: 5, window: DAY },
   // An export walks every table the app's onExport reads, so asking for one again and again is not free.
   export: { max: 6, window: HOUR },
+  // Registering a client writes a row for anyone who asks, and reading a client's metadata document makes a request for them.
+  oauthRegister: { max: 20, window: HOUR },
+  oauthDocument: { max: 30, window: 15 * MINUTE },
+  // Loose, as a client refreshes its token for every user behind one address; a wrong code or refresh token is hopeless to guess.
+  oauthToken: { max: 300, window: 15 * MINUTE },
   // Guessing a token is hopeless; this keeps trying from being free.
   link: { max: 40, window: HOUR },
 } satisfies Record<string, Limit>

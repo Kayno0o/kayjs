@@ -15,7 +15,7 @@ import { projectPaths } from '../project'
 import { actionUrl } from '../runtime/action'
 import { CARD_ROUTE, FILES_ROUTE, IMAGE_ROUTE } from '../runtime/image'
 import { LIVE_ROUTE } from '../runtime/live-value'
-import { MCP_PATH, OPENAPI_PATH, projectApi, REFERENCE_PATH } from '../server/api-modules'
+import { MCP_PATH, OPENAPI_PATH, projectApi, REFERENCE_PATH, RESOURCE_METADATA } from '../server/api-modules'
 import { buildingWithoutEnv, PUBLIC_ENV_PATH } from '../server/env-state'
 import { ERROR_REPORTS } from '../server/errors'
 import { FAVICON_PATHS, faviconSource, localeManifests } from '../server/favicon'
@@ -208,7 +208,7 @@ function kayRoutes(root: string, config: KayConfig): Listed[] {
     kay(LIVE_ROUTE, 'live values', 'POST'),
     ...typeof config.security === 'object' && config.security.reports === true ? [kay(CSP_REPORTS, 'CSP violation reports', 'POST')] : [],
     ...config.preview ? [kay(PREVIEW_ROUTE, 'preview mode')] : [],
-    ...config.mcp === true ? [kay(MCP_PATH, 'MCP endpoint', 'POST')] : [],
+    ...config.mcp === true ? [kay(MCP_PATH, 'MCP endpoint', 'POST'), kay(RESOURCE_METADATA, 'MCP sign-in metadata'), kay(`${RESOURCE_METADATA}${MCP_PATH}`, 'MCP sign-in metadata')] : [],
     ...openapi !== undefined && openapi.dev !== true ? [kay(OPENAPI_PATH, 'OpenAPI document'), ...openapi.reference === true ? [kay(REFERENCE_PATH, 'API reference')] : []] : [],
     ...config.site === undefined ? [] : [kay(SITEMAP, 'sitemap, unless the app serves it'), kay(ROBOTS, 'robots.txt, unless the app serves it')],
     ...favicon ? FAVICON_PATHS.filter(path => (path !== SVG_ICON || favicon.svg !== undefined) && (!MASKABLE_ICON.test(path) || favicon.maskable !== undefined)).map(path => kay(path, 'favicon, unless the app serves it')) : [],

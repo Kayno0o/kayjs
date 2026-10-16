@@ -1,3 +1,4 @@
+import type { OAuthClient } from './authorize/clients'
 import type { CaptchaOptions } from './captcha'
 import type { EmailCore, PendingCode } from './email'
 import type { AuthEvent, EventContext } from './events'
@@ -105,6 +106,8 @@ export interface Core {
   // Whether a new password is known from a breach.
   breached?: ((password: string) => boolean | Promise<boolean>) | undefined
   email?: EmailCore | undefined
+  // Set when the app is an OAuth server for MCP clients: the prebuilt pages and a store keeping its data are there.
+  oauthServer?: { fetchDocument: (url: string) => Promise<unknown>, documents: Map<string, { client: OAuthClient, expires: number }> } | undefined
   oauth: Map<string, { app: OAuthApp, client: ReturnType<typeof createOAuthClient<never, OAuthUser>> }>
   refreshers: Map<string, ReturnType<typeof createTokenRefresher<string, RefreshSubject>>>
   allow?: ((profile: Profile) => boolean | Promise<boolean>) | undefined

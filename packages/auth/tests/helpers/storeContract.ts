@@ -1,4 +1,4 @@
-import type { AuthStore } from '../../src/store'
+import type { AuthStore, OAuthCodeRecord, OAuthRefreshRecord } from '../../src/store'
 import { beforeEach, describe, expect, setSystemTime, test } from 'bun:test'
 import { userRecord } from './app'
 
@@ -428,6 +428,120 @@ export function storeContract(name: string, fresh: () => Promise<AuthStore>) {
       expect((await store.sessions.listByUser('u1')).map(session => session.id)).toEqual(['live'])
       expect((await store.sessions.listByUser('u2')).map(session => session.id)).toEqual(['current'])
       expect(await store.attempts.count('long')).toBe(1)
+    })
+
+    describe('the OAuth server', () => {
+      const bearer = (id: string, oauth?: { clientId: string, family: string }) => ({ id, userId: 'u1', label: id, digest: `d-${id}`, scopes: ['posts:read'], createdAt: new Date('2026-01-01T00:00:00Z'), lastUsedAt: null, expiresAt: null, ...oauth && { oauth } })
+      const refresh = (digest: string, fields: Partial<OAuthRefreshRecord> = {}): OAuthRefreshRecord => ({ digest, userId: 'u1', clientId: 'c1', scopes: ['posts:read'], family: 'f1', createdAt: new Date('2026-01-01T00:00:00Z'), expiresAt: new Date('2030-01-01T00:00:00Z'), usedAt: null, ...fields })
+      const code = (digest: string, fields: Partial<OAuthCodeRecord> = {}): OAuthCodeRecord => ({ digest, userId: 'u1', clientId: 'c1', redirectUri: 'http://127.0.0.1/cb', challenge: 'challenge', scopes: null, family: 'f1', createdAt: new Date('2026-01-01T00:00:00Z'), expiresAt: new Date('2030-01-01T00:00:00Z'), usedAt: null, ...fields })
+
+      test('clients and grants round-trip, a second approval replaces the scopes and keeps the first date', async () => {
+        const oauth = store.oauth!
+
+        await store.users.create(userRecord({ id: 'u1' }))
+        await oauth.clients.create({ id: 'c1', name: 'Agent', redirectUris: ['http://127.0.0.1/cb'], createdAt: new Date('2026-01-01T00:00:00Z') })
+
+        expect(await oauth.clients.get('c1')).toEqual({ id: 'c1', name: 'Agent', redirectUris: ['http://127.0.0.1/cb'], createdAt: new Date('2026-01-01T00:00:00Z') })
+        expect(await oauth.clients.get('missing')).toBeUndefined()
+
+        await oauth.grants.put({ userId: 'u1', clientId: 'c1', clientName: 'Agent', scopes: ['posts:read'], createdAt: new Date('2026-01-01T00:00:00Z'), lastUsedAt: null })
+        await oauth.grants.put({ userId: 'u1', clientId: 'c1', clientName: 'Agent 2', scopes: null, createdAt: new Date('2027-01-01T00:00:00Z'), lastUsedAt: null })
+        await oauth.grants.touch('u1', 'c1', new Date('2026-06-01T00:00:00Z'))
+
+        expect(await oauth.grants.get('u1', 'c1')).toEqual({ userId: 'u1', clientId: 'c1', clientName: 'Agent 2', scopes: null, createdAt: new Date('2026-01-01T00:00:00Z'), lastUsedAt: new Date('2026-06-01T00:00:00Z') })
+        expect(await oauth.grants.listByUser('u1')).toHaveLength(1)
+        expect(await oauth.grants.get('u2', 'c1')).toBeUndefined()
+      })
+
+      test('a code and a refresh token are spent once, the second spend told from a token never issued', async () => {
+        const oauth = store.oauth!
+
+        await store.users.create(userRecord({ id: 'u1' }))
+        await oauth.codes.create(code('code'))
+        await oauth.refresh.create(refresh('rt'))
+
+        const at = new Date('2026-02-01T00:00:00Z')
+
+        expect(await oauth.codes.use('code', at)).toMatchObject({ reused: false, code: { clientId: 'c1', redirectUri: 'http://127.0.0.1/cb', scopes: null } })
+        expect(await oauth.codes.use('code', new Date('2026-03-01T00:00:00Z'))).toMatchObject({ reused: true, code: { usedAt: at } })
+        expect(await oauth.codes.use('missing', at)).toBeUndefined()
+
+        const [first, second] = await Promise.all([oauth.refresh.use('rt', at), oauth.refresh.use('rt', at)])
+
+        expect([first?.reused, second?.reused].sort()).toEqual([false, true])
+        expect(await oauth.refresh.use('missing', at)).toBeUndefined()
+      })
+
+      test('revoking a grant takes back that client\'s refresh and bearer tokens only, and a family only its own', async () => {
+        const oauth = store.oauth!
+
+        await store.users.create(userRecord({ id: 'u1' }))
+        await oauth.grants.put({ userId: 'u1', clientId: 'c1', clientName: 'One', scopes: null, createdAt: new Date(), lastUsedAt: null })
+        await oauth.grants.put({ userId: 'u1', clientId: 'c2', clientName: 'Two', scopes: null, createdAt: new Date(), lastUsedAt: null })
+        await oauth.refresh.create(refresh('rt1'))
+        await oauth.refresh.create(refresh('rt1b', { family: 'f1b' }))
+        await oauth.refresh.create(refresh('rt2', { clientId: 'c2', family: 'f2' }))
+        await store.bearerTokens.create(bearer('a1', { clientId: 'c1', family: 'f1' }))
+        await store.bearerTokens.create(bearer('a1b', { clientId: 'c1', family: 'f1b' }))
+        await store.bearerTokens.create(bearer('a2', { clientId: 'c2', family: 'f2' }))
+        await store.bearerTokens.create(bearer('plain'))
+
+        expect(await store.bearerTokens.findByDigest('d-a1')).toMatchObject({ oauth: { clientId: 'c1', family: 'f1' } })
+        expect((await store.bearerTokens.findByDigest('d-plain'))?.oauth).toBeUndefined()
+
+        await oauth.refresh.revokeFamily('u1', 'f1b')
+
+        expect(await oauth.refresh.use('rt1b', new Date())).toBeUndefined()
+        expect(await store.bearerTokens.findByDigest('d-a1b')).toBeUndefined()
+        expect(await store.bearerTokens.findByDigest('d-a1')).toBeDefined()
+
+        expect(await oauth.grants.revoke('u1', 'c1')).toBe(true)
+        expect(await oauth.grants.revoke('u1', 'c1')).toBe(false)
+        expect(await oauth.refresh.use('rt1', new Date())).toBeUndefined()
+        expect(await store.bearerTokens.findByDigest('d-a1')).toBeUndefined()
+        expect(await oauth.refresh.use('rt2', new Date())).toMatchObject({ reused: false })
+        expect((await store.bearerTokens.listByUser('u1')).map(token => token.id).sort()).toEqual(['a2', 'plain'])
+
+        await oauth.refresh.deleteForUser('u1')
+
+        expect(await oauth.refresh.use('rt2', new Date())).toBeUndefined()
+      })
+
+      test('deleting a user deletes their grants, codes and refresh tokens, and prune drops what expired and clients nobody approved', async () => {
+        const oauth = store.oauth!
+        const at = (days: number) => new Date(Date.UTC(2026, 5, 1) + days * 24 * 3600 * 1000)
+
+        await store.users.create(userRecord({ id: 'u1' }))
+        await store.users.create(userRecord({ id: 'u2' }))
+        await oauth.grants.put({ userId: 'u1', clientId: 'c1', clientName: 'One', scopes: null, createdAt: at(0), lastUsedAt: null })
+        await oauth.codes.create(code('gone-with-user'))
+        await oauth.refresh.create(refresh('rt-user'))
+        await store.users.delete('u1')
+
+        expect(await oauth.grants.listByUser('u1')).toEqual([])
+        expect(await oauth.codes.use('gone-with-user', at(0))).toBeUndefined()
+        expect(await oauth.refresh.use('rt-user', at(0))).toBeUndefined()
+
+        await oauth.codes.create(code('old-code', { userId: 'u2', expiresAt: at(-1) }))
+        await oauth.codes.create(code('live-code', { userId: 'u2', expiresAt: at(1) }))
+        await oauth.refresh.create(refresh('old-rt', { userId: 'u2', expiresAt: at(-1) }))
+        await oauth.refresh.create(refresh('live-rt', { userId: 'u2', expiresAt: at(1) }))
+        await oauth.clients.create({ id: 'stale', name: 'Stale', redirectUris: ['http://127.0.0.1/cb'], createdAt: at(-40) })
+        await oauth.clients.create({ id: 'approved', name: 'Approved', redirectUris: ['http://127.0.0.1/cb'], createdAt: at(-40) })
+        await oauth.clients.create({ id: 'fresh', name: 'Fresh', redirectUris: ['http://127.0.0.1/cb'], createdAt: at(-1) })
+        await oauth.grants.put({ userId: 'u2', clientId: 'approved', clientName: 'Approved', scopes: null, createdAt: at(-30), lastUsedAt: null })
+
+        setSystemTime(at(0))
+        await store.prune!({ now: at(0), bearerExpiredBefore: at(-30), sessionMaxAge: 30 * 24 * 3600, sessionAbsoluteMaxAge: 365 * 24 * 3600 })
+
+        expect(await oauth.codes.use('old-code', at(0))).toBeUndefined()
+        expect(await oauth.codes.use('live-code', at(0))).toBeDefined()
+        expect(await oauth.refresh.use('old-rt', at(0))).toBeUndefined()
+        expect(await oauth.refresh.use('live-rt', at(0))).toBeDefined()
+        expect(await oauth.clients.get('stale')).toBeUndefined()
+        expect(await oauth.clients.get('approved')).toBeDefined()
+        expect(await oauth.clients.get('fresh')).toBeDefined()
+      })
     })
 
     test('attempts count within their window, start over after it, and reset', async () => {

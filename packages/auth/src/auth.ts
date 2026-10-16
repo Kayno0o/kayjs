@@ -29,6 +29,9 @@ import { READ_METHODS, stoppers, underKayDev } from 'kay/library'
 import { clientAddress, crossSiteRefused, crossSiteResponse, rateKey } from 'kay/server'
 import { changePassword, changeUsername, deleteAccount, unlink } from './account'
 import { actingAdmin, adminAuditLog, banUser, changeRole, deleteUser, getUser, isAdmin, listUsers, unbanUser } from './admin'
+import { documentFetcher } from './authorize/clients'
+import { protectedResourceMetadata, siteRoot } from './authorize/metadata'
+import { serveOAuthServer } from './authorize/routes'
 import { bearerRequest, bearerUser, createToken, issueToken, listTokens, revokeToken, tokenUser } from './bearer'
 import { pwnedPassword } from './breached'
 import { admit, captchaChallenge, captchaRequired, proofOfWork } from './captcha'
@@ -176,6 +179,8 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   breachedPasswords?: boolean | ((password: string) => boolean | Promise<boolean>) | undefined
   // The proxies in front, read as kay.config.ts's `proxy` is, for a plain Elysia app that kay's `pages()` does not serve; a kay app sets it in kay.config.ts instead.
   proxy?: KayConfig['proxy'] | undefined
+  // MCP clients sign in to the app by OAuth, on by default with `pages` and a store keeping it (`memoryStore` and `pgStore` do): kayjs-auth serves the discovery documents, the authorization and token endpoints and the consent page, and the tokens it issues are bearer tokens. `false` turns it off; `fetch` reads the metadata document a client names by its URL, over the public internet only unless the app's own says otherwise.
+  oauthServer?: boolean | { fetch?: ((url: string) => Promise<Response>) | undefined } | undefined
   // Replaces the default decision, which reads a string as a role and runs a predicate; use it with `decide` for grants on single records.
   authorize?: ((user: User | null, requirement: AuthRequirement<Role>, level: Level, ctx: PolicyContext) => Promise<boolean>) | undefined
 }
@@ -518,6 +523,16 @@ export class Auth<Scope extends string = string, Role extends string = string, O
   // What the config enables, for a page to show only what works: the providers, mail, passkeys, scopes and the prebuilt pages.
   features(): AuthFeatures {
     return featuresOf(this.core)
+  }
+
+  // The RFC 9728 metadata of the protected resource `name` served at `path`, which kay's MCP endpoint asks for; null while the OAuth server is off. It points MCP clients at the app's own authorization server.
+  oauthResource(path: string, name: string): Record<string, unknown> | null {
+    if (!this.core.oauthServer)
+      return null
+
+    const root = siteRoot(this.core, this.request)
+
+    return protectedResourceMetadata(this.core, root, `${root}${path}`, name)
   }
 
   // The providers the signed-in user has linked.
@@ -1079,6 +1094,9 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
       return redirect(`${core.prefix}/${params.provider}/callback?${query}`, 303)
     })
 
+  if (core.oauthServer)
+    serveOAuthServer(plugin as unknown as Elysia, core)
+
   // Under `kay dev` alone: the dev tool's Auth tab reads the session here, and signs out at the sign-out route.
   if (underKayDev()) {
     (plugin as unknown as Elysia).get(DEV_PATH, async (ctx) => {
@@ -1276,6 +1294,7 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
       templates: localeTemplates(locales, options.email.templates, options.email.translations),
       codes: typeof options.email.codes === 'string' ? { 'magic-link': options.email.codes, 'verify-email': options.email.codes } : { 'magic-link': 'link', 'verify-email': 'link', ...options.email.codes },
     },
+    oauthServer: oauthServerOf(options, pages),
     oauth,
     refreshers: new Map(),
     allow: options.allow,
@@ -1312,6 +1331,18 @@ function createCore<Data extends AuthSessionData, Role extends string, Prefix ex
   }
 
   return core
+}
+
+function oauthServerOf(options: { oauthServer?: boolean | { fetch?: ((url: string) => Promise<Response>) | undefined } | undefined, store: AuthStore }, pages: Core['pages']): Core['oauthServer'] {
+  const wanted = options.oauthServer
+
+  if (wanted === false || (wanted === undefined && !(pages && options.store.oauth)))
+    return undefined
+
+  if (!pages || !options.store.oauth)
+    throw new Error('kayjs-auth: `oauthServer` needs the prebuilt `pages`, for its consent page, and a store with `oauth`, as `memoryStore` and `pgStore` have')
+
+  return { fetchDocument: documentFetcher(typeof wanted === 'object' ? wanted.fetch : undefined), documents: new Map() }
 }
 
 function breachedCheck(option: boolean | ((password: string) => boolean | Promise<boolean>) | undefined): ((password: string) => boolean | Promise<boolean>) | undefined {

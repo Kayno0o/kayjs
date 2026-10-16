@@ -52,6 +52,57 @@ export interface BearerTokenRecord {
   lastUsedAt: Date | null
   // Null for a token that never expires.
   expiresAt: Date | null
+  // Set on a token an OAuth client was given, which revoking the client takes back; left out otherwise.
+  oauth?: { clientId: string, family: string } | null | undefined
+}
+
+// A client registered by itself with the app's OAuth server (dynamic client registration), always public: it holds no secret. A client named by a metadata document URL is read from that URL and not stored.
+export interface OAuthClientRecord {
+  id: string
+  name: string
+  redirectUris: string[]
+  createdAt: Date
+}
+
+// What a user approved for a client, so signing in again skips the consent page until they revoke it or the client asks for more.
+export interface OAuthGrantRecord {
+  userId: string
+  clientId: string
+  // The client's name when it was approved, for the account page.
+  clientName: string
+  // Null for every scope.
+  scopes: string[] | null
+  createdAt: Date
+  lastUsedAt: Date | null
+}
+
+// An authorization code, stored as its digest and spent once; the row stays until it expires, so a second spend is told from a code never issued.
+export interface OAuthCodeRecord {
+  digest: string
+  userId: string
+  clientId: string
+  redirectUri: string
+  // The PKCE challenge, S256.
+  challenge: string
+  scopes: string[] | null
+  // The tokens issued for it share this one, so spending the code twice takes them all back.
+  family: string
+  createdAt: Date
+  expiresAt: Date
+  usedAt: Date | null
+}
+
+// A refresh token, stored as its digest and replaced by a new one each time it is spent.
+export interface OAuthRefreshRecord {
+  digest: string
+  userId: string
+  clientId: string
+  scopes: string[] | null
+  family: string
+  createdAt: Date
+  expiresAt: Date
+  // Set once spent: spending it again means it leaked, and takes the whole family back.
+  usedAt: Date | null
 }
 
 // A browser signed in as a user, so they can see where they are signed in and end one.
@@ -169,7 +220,7 @@ export interface AuthStore {
     create: (user: UserRecord) => MaybePromise<UserRecord | void>
     // The user once changed, or undefined when there is none; throws when the change takes an email or a username another user has.
     update: (id: string, patch: Partial<Omit<UserRecord, 'id' | 'createdAt'>>) => MaybePromise<UserRecord | undefined>
-    // Deletes the user with everything kayjs-auth keeps for them: identities, links, sessions, passkeys, bearer tokens, recovery codes and memberships; invitations they sent lose their `invitedBy`.
+    // Deletes the user with everything kayjs-auth keeps for them: identities, links, sessions, passkeys, bearer tokens, OAuth grants, codes and refresh tokens, recovery codes and memberships; invitations they sent lose their `invitedBy`.
     delete: (id: string) => MaybePromise<void>
     // Newest first; `search` matches part of the email or the username, whatever its case, or the whole id.
     // With `total: false` the caller does not read `total`, so a store may skip counting.
@@ -270,6 +321,38 @@ export interface AuthStore {
     delete: (userId: string, id: string) => MaybePromise<boolean>
     // Deletes every token of the user in one query; without it kayjs-auth deletes them one by one.
     deleteForUser?: (userId: string) => MaybePromise<void>
+  }
+  // Needed only for the OAuth server (MCP clients signing in): without it the server is off.
+  oauth?: {
+    clients: {
+      create: (client: OAuthClientRecord) => MaybePromise<void>
+      get: (id: string) => MaybePromise<OAuthClientRecord | undefined>
+    }
+    grants: {
+      get: (userId: string, clientId: string) => MaybePromise<OAuthGrantRecord | undefined>
+      // Creates the grant or replaces the one of that user and client, keeping its `createdAt`.
+      put: (grant: OAuthGrantRecord) => MaybePromise<void>
+      // Records a use, without changing anything else.
+      touch: (userId: string, clientId: string, at: Date) => MaybePromise<void>
+      // Oldest first.
+      listByUser: (userId: string) => MaybePromise<OAuthGrantRecord[]>
+      // Deletes the grant with the user's refresh tokens and bearer tokens issued under it for that client; false when they have none.
+      revoke: (userId: string, clientId: string) => MaybePromise<boolean>
+    }
+    codes: {
+      create: (code: OAuthCodeRecord) => MaybePromise<void>
+      // Marks the code spent and answers it, `reused` when it was spent already: once only, even when two requests spend it together. Undefined for one never issued.
+      use: (digest: string, at: Date) => MaybePromise<{ code: OAuthCodeRecord, reused: boolean } | undefined>
+    }
+    refresh: {
+      create: (token: OAuthRefreshRecord) => MaybePromise<void>
+      // As `codes.use`.
+      use: (digest: string, at: Date) => MaybePromise<{ token: OAuthRefreshRecord, reused: boolean } | undefined>
+      // Deletes the refresh tokens of the family and the bearer tokens issued under it.
+      revokeFamily: (userId: string, family: string) => MaybePromise<void>
+      // Deletes every refresh token of the user, as signing out everywhere does.
+      deleteForUser: (userId: string) => MaybePromise<void>
+    }
   }
   // Digests of the codes that sign in in place of a second factor.
   recoveryCodes: {

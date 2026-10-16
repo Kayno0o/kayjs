@@ -12,7 +12,7 @@ import { configuredSite } from '../runtime/site'
 import { FAILURE_HEADER, REDIRECT_HEADER } from '../runtime/swap'
 import { decodeServerValue, encodeValue } from '../runtime/wire'
 import { isCrossSite } from './actions'
-import { MCP_PATH } from './api-modules'
+import { MCP_PATH, RESOURCE_METADATA } from './api-modules'
 import { guardRefusal, toolName } from './openapi'
 import { clientAddress, keepRequestId, markAgentCall, requestId, wasChallenged } from './protection'
 import { requestUrl } from './request-url'
@@ -47,7 +47,6 @@ const TEXT_TYPE = /^text\/|\bjson\b|\bxml\b/
 const DOT_SEGMENT = /^\.{1,2}$/
 // The JSON-RPC code of a request a guard refused, in the range the spec leaves to servers.
 const REFUSED = -32001
-const RESOURCE_METADATA = '/.well-known/oauth-protected-resource'
 const NO_BODY = new Set(['get', 'delete'])
 
 // The headers every answer of the endpoint carries.
@@ -350,6 +349,25 @@ export const mcpBodyLimit: BodyLimit = {
   refuse: () => new Response(JSON.stringify({ jsonrpc: '2.0', id: null, error: { code: INVALID_REQUEST, message: 'Request too large' } }), { status: 413, headers: ANSWER }),
 }
 
+// What an auth library with an OAuth server of its own, kayjs-auth, tells of it through the `auth` of the context.
+interface ResourceOwner {
+  oauthResource?: (path: string, name: string) => Record<string, unknown> | null
+}
+
+// The OAuth 2.0 protected resource metadata (RFC 9728) a client finds from the 401's pointer, or at the well-known path of the endpoint: the auth library's answer, which names its authorization server, else a 404 for an app that signs no one in by OAuth.
+function serveResourceMetadata(app: Elysia, name: string): void {
+  const headers = { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'public, max-age=300', 'access-control-allow-origin': '*' }
+
+  for (const route of [RESOURCE_METADATA, `${RESOURCE_METADATA}${MCP_PATH}`]) {
+    app.get(route, (served) => {
+      const document = (served as unknown as { auth?: ResourceOwner }).auth?.oauthResource?.(MCP_PATH, name)
+
+      return document ? new Response(JSON.stringify(document), { headers }) : new Response(null, { status: 404 })
+    })
+    app.options(route, () => new Response(null, { status: 204, headers: { 'access-control-allow-origin': '*', 'access-control-allow-methods': 'GET, OPTIONS', 'access-control-allow-headers': 'content-type, mcp-protocol-version', 'access-control-max-age': '86400' } }))
+  }
+}
+
 // Serves the tools of `document` at `/mcp` over Streamable HTTP: one JSON-RPC message per POST, answered with JSON.
 export function serveMcp(app: Elysia, document: Schema, options: McpOptions): void {
   const calls = new AsyncLocalStorage<CallContext>()
@@ -403,4 +421,5 @@ export function serveMcp(app: Elysia, document: Schema, options: McpOptions): vo
   }, { parse: 'none' })
   app.get(MCP_PATH, notAllowed)
   app.delete(MCP_PATH, notAllowed)
+  serveResourceMetadata(app, options.title)
 }

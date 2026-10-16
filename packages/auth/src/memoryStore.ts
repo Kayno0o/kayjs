@@ -1,6 +1,8 @@
-import type { AuditRecord, AuthStore, BearerTokenRecord, IdentityRecord, InvitationRecord, MemberRecord, OrganizationRecord, PasskeyRecord, PruneLimits, SessionRecord, TokenRecord, UserRecord } from './store'
+import type { AuditRecord, AuthStore, BearerTokenRecord, IdentityRecord, InvitationRecord, MemberRecord, OAuthClientRecord, OAuthCodeRecord, OAuthGrantRecord, OAuthRefreshRecord, OrganizationRecord, PasskeyRecord, PruneLimits, SessionRecord, TokenRecord, UserRecord } from './store'
 
 const SWEEP_EVERY = 1000
+// A client that registered itself and was never approved by anyone is dropped after this long.
+const UNUSED_CLIENT_MS = 30 * 24 * 60 * 60 * 1000
 
 // Everything in this process's memory, gone on restart: for tests, and for trying kayjs-auth before a database is wired.
 export function memoryStore(): AuthStore {
@@ -14,11 +16,23 @@ export function memoryStore(): AuthStore {
   const organizations = new Map<string, OrganizationRecord>()
   const members = new Map<string, MemberRecord>()
   const invitations = new Map<string, InvitationRecord>()
+  const oauthClients = new Map<string, OAuthClientRecord>()
+  const oauthGrants = new Map<string, OAuthGrantRecord>()
+  const oauthCodes = new Map<string, OAuthCodeRecord>()
+  const oauthRefresh = new Map<string, OAuthRefreshRecord>()
   let audit: AuditRecord[] = []
   const attempts = new Map<string, { count: number, resetAt: number }>()
   let hits = 0
   const identityKey = (provider: string, providerId: string) => `${provider}\n${providerId}`
   const memberKey = (organizationId: string, userId: string) => `${organizationId}\n${userId}`
+  const grantKey = (userId: string, clientId: string) => `${userId}\n${clientId}`
+
+  const dropTokens = (matches: (token: BearerTokenRecord) => boolean) => {
+    for (const [key, token] of bearerTokens) {
+      if (matches(token))
+        bearerTokens.delete(key)
+    }
+  }
 
   const claimSlug = (organization: OrganizationRecord) => {
     for (const other of organizations.values()) {
@@ -91,6 +105,13 @@ export function memoryStore(): AuthStore {
         for (const [key, token] of bearerTokens) {
           if (token.userId === id)
             bearerTokens.delete(key)
+        }
+
+        for (const map of [oauthGrants, oauthCodes, oauthRefresh] as Map<string, { userId: string }>[]) {
+          for (const [key, record] of map) {
+            if (record.userId === id)
+              map.delete(key)
+          }
         }
 
         for (const [key, session] of sessions) {
@@ -274,6 +295,91 @@ export function memoryStore(): AuthStore {
         }
       },
     },
+    oauth: {
+      clients: {
+        create(client) {
+          oauthClients.set(client.id, { ...client, redirectUris: [...client.redirectUris] })
+        },
+        get(id) {
+          const client = oauthClients.get(id)
+
+          return client && { ...client, redirectUris: [...client.redirectUris] }
+        },
+      },
+      grants: {
+        get: (userId, clientId) => copyGrant(oauthGrants.get(grantKey(userId, clientId))),
+        put(grant) {
+          const key = grantKey(grant.userId, grant.clientId)
+
+          oauthGrants.set(key, { ...copyGrant(grant)!, createdAt: oauthGrants.get(key)?.createdAt ?? grant.createdAt })
+        },
+        touch(userId, clientId, at) {
+          const grant = oauthGrants.get(grantKey(userId, clientId))
+
+          if (grant)
+            grant.lastUsedAt = at
+        },
+        listByUser: userId => oldestFirst([...oauthGrants.values()].filter(grant => grant.userId === userId)).map(grant => copyGrant(grant)!),
+        revoke(userId, clientId) {
+          for (const [key, token] of oauthRefresh) {
+            if (token.userId === userId && token.clientId === clientId)
+              oauthRefresh.delete(key)
+          }
+
+          dropTokens(token => token.userId === userId && token.oauth?.clientId === clientId)
+
+          return oauthGrants.delete(grantKey(userId, clientId))
+        },
+      },
+      codes: {
+        create(code) {
+          oauthCodes.set(code.digest, copyOAuth(code))
+        },
+        use(digest, at) {
+          const code = oauthCodes.get(digest)
+
+          if (!code)
+            return undefined
+
+          const reused = code.usedAt !== null
+
+          code.usedAt ??= at
+
+          return { code: copyOAuth(code), reused }
+        },
+      },
+      refresh: {
+        create(token) {
+          oauthRefresh.set(token.digest, copyOAuth(token))
+        },
+        use(digest, at) {
+          const token = oauthRefresh.get(digest)
+
+          if (!token)
+            return undefined
+
+          const reused = token.usedAt !== null
+
+          token.usedAt ??= at
+
+          return { token: copyOAuth(token), reused }
+        },
+        revokeFamily(userId, family) {
+          for (const [key, token] of oauthRefresh) {
+            if (token.userId === userId && token.family === family)
+              oauthRefresh.delete(key)
+          }
+
+          dropTokens(token => token.userId === userId && token.oauth?.family === family)
+        },
+        deleteForUser(userId) {
+          for (const [key, token] of oauthRefresh) {
+            if (token.userId === userId)
+              oauthRefresh.delete(key)
+          }
+        },
+      },
+    },
     recoveryCodes: {
       replace(userId, digests) {
         recoveryCodes.set(userId, new Set(digests))
@@ -400,6 +506,20 @@ export function memoryStore(): AuthStore {
           attempts.delete(key)
       }
 
+      for (const map of [oauthCodes, oauthRefresh]) {
+        for (const [key, record] of map) {
+          if (record.expiresAt.getTime() <= at)
+            map.delete(key)
+        }
+      }
+
+      const granted = new Set([...oauthGrants.values()].map(grant => grant.clientId))
+
+      for (const [key, client] of oauthClients) {
+        if (client.createdAt.getTime() < at - UNUSED_CLIENT_MS && !granted.has(key))
+          oauthClients.delete(key)
+      }
+
       for (const [key, session] of sessions) {
         if (session.lastSeenAt.getTime() < at - sessionMaxAge * 1000 || session.createdAt.getTime() < at - sessionAbsoluteMaxAge * 1000 || session.version < (users.get(session.userId)?.sessionVersion ?? 0))
           sessions.delete(key)
@@ -414,7 +534,15 @@ function copy(user: UserRecord | undefined): UserRecord | undefined {
 }
 
 function copyToken(token: BearerTokenRecord | undefined): BearerTokenRecord | undefined {
-  return token && { ...token, scopes: token.scopes && [...token.scopes] }
+  return token && { ...token, scopes: token.scopes && [...token.scopes], ...token.oauth && { oauth: { ...token.oauth } } }
+}
+
+function copyGrant(grant: OAuthGrantRecord | undefined): OAuthGrantRecord | undefined {
+  return grant && { ...grant, scopes: grant.scopes && [...grant.scopes] }
+}
+
+function copyOAuth<T extends OAuthCodeRecord | OAuthRefreshRecord>(record: T): T {
+  return { ...record, scopes: record.scopes && [...record.scopes] }
 }
 
 function copyPasskey(passkey: PasskeyRecord | undefined): PasskeyRecord | undefined {

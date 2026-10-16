@@ -24,7 +24,7 @@ import { kayLog } from '../runtime/log'
 import { DRAFT_ROUTE } from '../runtime/swap'
 import { registerActionRoutes } from './actions'
 import { serveApi } from './api'
-import { MCP_PATH, sharedGuards } from './api-modules'
+import { MCP_PATH, RESOURCE_METADATA, sharedGuards } from './api-modules'
 import { rebaseCss, rebaseRedirects } from './base'
 import { DEFAULT_BODY_LIMIT, limitBodies } from './body'
 import { serveBuildFiles } from './build-files'
@@ -302,8 +302,12 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   claimRedirects(served, redirects)
   claimApi(served, api.mounted, servesOpenApi ? openapi : undefined)
 
-  if (options.mcp === true)
+  if (options.mcp === true) {
     served.claim({ path: MCP_PATH, owner: '`mcp`', kind: 'kay', method: 'ALL' })
+
+    for (const path of [RESOURCE_METADATA, `${RESOURCE_METADATA}${MCP_PATH}`])
+      served.claim({ path, owner: '`mcp`', kind: 'kay', method: 'ALL' })
+  }
 
   limitBodies(app, options.bodyLimit ?? DEFAULT_BODY_LIMIT, new Map([...actionLimits, ...options.preview ? [[DRAFT_ROUTE, DRAFT_BODY_LIMIT] as const] : [], ...options.mcp === true ? [[MCP_PATH, mcpBodyLimit] as const] : []]), api.limits)
 

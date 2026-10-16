@@ -262,6 +262,36 @@ describe('calling an action', () => {
   })
 })
 
+describe('sign-in metadata', () => {
+  it('is a 404 while no auth library names an authorization server, as no client can sign in by OAuth', async () => {
+    for (const path of ['/.well-known/oauth-protected-resource', '/.well-known/oauth-protected-resource/mcp'])
+      expect((await site.fetch(path)).status).toBe(404)
+
+    expect((await off.fetch('/.well-known/oauth-protected-resource')).status).toBe(404)
+  })
+
+  it('is what the auth of the context answers for the endpoint, at the root path and the endpoint\'s', async () => {
+    const asked: string[][] = []
+    const oauth = await testSite({ routes, api, mcp: true, islands: false, locals: () => ({ auth: { oauthResource: (path: string, name: string) => {
+      asked.push([path, name])
+
+      return { resource: `https://app.example${path}`, authorization_servers: ['https://app.example'] }
+    } } }) })
+
+    for (const path of ['/.well-known/oauth-protected-resource', '/.well-known/oauth-protected-resource/mcp']) {
+      const response = await oauth.fetch(path)
+
+      expect(response.status).toBe(200)
+      expect(response.headers.get('access-control-allow-origin')).toBe('*')
+      expect(await response.json()).toEqual({ resource: 'https://app.example/mcp', authorization_servers: ['https://app.example'] })
+    }
+
+    expect(asked).toEqual([['/mcp', expect.any(String)], ['/mcp', expect.any(String)]])
+    expect((await oauth.fetch('/.well-known/oauth-protected-resource', { method: 'OPTIONS' })).status).toBe(204)
+    await oauth.close()
+  })
+})
+
 describe('guards', () => {
   it('asks for a sign-in with 401 and a pointer to the resource metadata when a guard refuses', async () => {
     const response = await rpc(site, 'tools/call', { name: 'wipe', arguments: { confirm: true } })

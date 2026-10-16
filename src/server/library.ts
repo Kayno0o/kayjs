@@ -2,6 +2,7 @@
 export { underKayDev } from '../build/assets'
 export { durationSeconds } from '../runtime/duration'
 export { isUrlAttribute, UNSAFE_ATTRIBUTE, UNSAFE_TAGS } from '../runtime/sanitize'
+export { configuredSite } from '../runtime/site'
 export { acceptedLocales, matchLocale, validLocale } from './accept-language'
 export { sourceHash } from './csp'
 export { RESTART_RELOAD } from './dev'

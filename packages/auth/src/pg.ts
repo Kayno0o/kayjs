@@ -1,5 +1,5 @@
 import type { Database, InferEntity } from '@kaynooo/pg-orm'
-import type { AuditRecord, AuthStore, BearerTokenRecord, IdentityRecord, InvitationRecord, MemberRecord, OrganizationRecord, PasskeyRecord, PruneLimits, SessionRecord, TokenRecord, TokenType, UserRecord } from './store'
+import type { AuditRecord, AuthStore, BearerTokenRecord, IdentityRecord, InvitationRecord, MemberRecord, OAuthClientRecord, OAuthCodeRecord, OAuthGrantRecord, OAuthRefreshRecord, OrganizationRecord, PasskeyRecord, PruneLimits, SessionRecord, TokenRecord, TokenType, UserRecord } from './store'
 import { defineTable } from '@kaynooo/pg-orm'
 
 export const AuthUsers = defineTable('auth_user', t => ({
@@ -61,7 +61,10 @@ export const AuthBearerTokens = defineTable('auth_bearer_token', t => ({
   created_at: t.timestamptz().notNull(),
   last_used_at: t.timestamptz().nullable(),
   expires_at: t.timestamptz().nullable(),
-})).withIndexes([{ columns: ['user_id'] }, { columns: ['expires_at'] }])
+  // Set on a token an OAuth client was given.
+  oauth_client: t.text().nullable(),
+  oauth_family: t.text().nullable(),
+})).withIndexes([{ columns: ['user_id'] }, { columns: ['expires_at'] }, { columns: ['user_id', 'oauth_client'] }, { columns: ['user_id', 'oauth_family'] }])
 
 export const AuthSessions = defineTable('auth_session', t => ({
   id: t.text().primaryKey(),
@@ -127,6 +130,47 @@ export const AuthInvitations = defineTable('auth_invitation', t => ({
   expires_at: t.timestamptz().notNull(),
 })).withIndexes([{ columns: ['organization_id'] }, { columns: ['email'] }, { columns: ['expires_at'] }])
 
+export const AuthOAuthClients = defineTable('auth_oauth_client', t => ({
+  id: t.text().primaryKey(),
+  name: t.text().notNull(),
+  redirect_uris: t.array(t.text()).notNull(),
+  created_at: t.timestamptz().notNull(),
+})).withIndexes([{ columns: ['created_at'] }])
+
+export const AuthOAuthGrants = defineTable('auth_oauth_grant', t => ({
+  id: t.serial().primaryKey(),
+  user_id: t.text().notNull().references(userId, 'id', { onDelete: 'cascade' }),
+  client_id: t.text().notNull(),
+  client_name: t.text().notNull(),
+  scopes: t.array(t.text()).nullable(),
+  created_at: t.timestamptz().notNull(),
+  last_used_at: t.timestamptz().nullable(),
+})).withIndexes([{ columns: ['user_id', 'client_id'], unique: true }, { columns: ['client_id'] }])
+
+export const AuthOAuthCodes = defineTable('auth_oauth_code', t => ({
+  digest: t.text().primaryKey(),
+  user_id: t.text().notNull().references(userId, 'id', { onDelete: 'cascade' }),
+  client_id: t.text().notNull(),
+  redirect_uri: t.text().notNull(),
+  challenge: t.text().notNull(),
+  scopes: t.array(t.text()).nullable(),
+  family: t.text().notNull(),
+  created_at: t.timestamptz().notNull(),
+  expires_at: t.timestamptz().notNull(),
+  used_at: t.timestamptz().nullable(),
+})).withIndexes([{ columns: ['expires_at'] }, { columns: ['user_id'] }])
+
+export const AuthOAuthRefresh = defineTable('auth_oauth_refresh', t => ({
+  digest: t.text().primaryKey(),
+  user_id: t.text().notNull().references(userId, 'id', { onDelete: 'cascade' }),
+  client_id: t.text().notNull(),
+  scopes: t.array(t.text()).nullable(),
+  family: t.text().notNull(),
+  created_at: t.timestamptz().notNull(),
+  expires_at: t.timestamptz().notNull(),
+  used_at: t.timestamptz().nullable(),
+})).withIndexes([{ columns: ['user_id', 'family'] }, { columns: ['user_id', 'client_id'] }, { columns: ['expires_at'] }])
+
 export const AuthAttempts = defineTable('auth_attempt', t => ({
   key: t.text().primaryKey(),
   count: t.int4().notNull(),
@@ -134,9 +178,12 @@ export const AuthAttempts = defineTable('auth_attempt', t => ({
 })).withIndexes([{ columns: ['reset_at'] }])
 
 // The tables to list in the app's `new Database({ tables })`, so `db.sync()` creates them.
-export const authTables = [AuthUsers, AuthIdentities, AuthTokens, AuthRecoveryCodes, AuthBearerTokens, AuthSessions, AuthPasskeys, AuthAudit, AuthOrganizations, AuthMembers, AuthInvitations, AuthAttempts] as const
+export const authTables = [AuthUsers, AuthIdentities, AuthTokens, AuthRecoveryCodes, AuthBearerTokens, AuthSessions, AuthPasskeys, AuthAudit, AuthOrganizations, AuthMembers, AuthInvitations, AuthAttempts, AuthOAuthClients, AuthOAuthGrants, AuthOAuthCodes, AuthOAuthRefresh] as const
 
 type UserRow = InferEntity<typeof AuthUsers>
+
+// A client that registered itself and that nobody approved is dropped after this long.
+const UNUSED_CLIENT_MS = 30 * 24 * 60 * 60 * 1000
 
 // kayjs-auth's data in the app's Postgres or SQLite database, through pg-orm: list `authTables` in the database's tables.
 export function pgStore(db: Database): AuthStore {
@@ -152,6 +199,10 @@ export function pgStore(db: Database): AuthStore {
   const members = db.repo(AuthMembers)
   const invitations = db.repo(AuthInvitations)
   const attempts = db.repo(AuthAttempts)
+  const oauthClients = db.repo(AuthOAuthClients)
+  const oauthGrants = db.repo(AuthOAuthGrants)
+  const oauthCodes = db.repo(AuthOAuthCodes)
+  const oauthRefresh = db.repo(AuthOAuthRefresh)
 
   return {
     users: {
@@ -275,7 +326,7 @@ export function pgStore(db: Database): AuthStore {
     },
     bearerTokens: {
       async create(token) {
-        await bearerTokens.write.insertOne({ id: token.id, user_id: token.userId, label: token.label, digest: token.digest, scopes: token.scopes, created_at: token.createdAt, last_used_at: token.lastUsedAt, expires_at: token.expiresAt })
+        await bearerTokens.write.insertOne({ id: token.id, user_id: token.userId, label: token.label, digest: token.digest, scopes: token.scopes, created_at: token.createdAt, last_used_at: token.lastUsedAt, expires_at: token.expiresAt, oauth_client: token.oauth?.clientId ?? null, oauth_family: token.oauth?.family ?? null })
       },
       findByDigest: async digest => toBearerToken(await bearerTokens.read.findOne({ digest })),
       async findByDigestWithUser(digest) {
@@ -291,6 +342,72 @@ export function pgStore(db: Database): AuthStore {
       delete: async (userId, id) => await bearerTokens.write.deleteOne({ id, user_id: userId }) !== null,
       async deleteForUser(userId) {
         await bearerTokens.write.deleteMany({ user_id: userId })
+      },
+    },
+    oauth: {
+      clients: {
+        async create(client) {
+          await oauthClients.write.insertOne({ id: client.id, name: client.name, redirect_uris: client.redirectUris, created_at: client.createdAt })
+        },
+        get: async id => toOAuthClient(await oauthClients.read.findById(id)),
+      },
+      grants: {
+        get: async (userId, clientId) => toOAuthGrant(await oauthGrants.read.findOne({ user_id: userId, client_id: clientId })),
+        async put(grant) {
+          await oauthGrants.write.upsertOne({ user_id: grant.userId, client_id: grant.clientId, client_name: grant.clientName, scopes: grant.scopes, created_at: grant.createdAt, last_used_at: grant.lastUsedAt }, ['user_id', 'client_id'], ['client_name', 'scopes', 'last_used_at'])
+        },
+        async touch(userId, clientId, at) {
+          await oauthGrants.write.updateMany({ last_used_at: at }, { user_id: userId, client_id: clientId }, { pk: true })
+        },
+        listByUser: async userId => (await oauthGrants.read.findMany(q => q.where({ user_id: userId }).orderBy('created_at', 'asc').orderBy('id', 'asc'))).map(row => toOAuthGrant(row)!),
+        async revoke(userId, clientId) {
+          return db.transaction(async (tx) => {
+            await oauthRefresh.using(tx).write.deleteMany({ user_id: userId, client_id: clientId })
+            await bearerTokens.using(tx).write.deleteMany({ user_id: userId, oauth_client: clientId })
+
+            return await oauthGrants.using(tx).write.deleteOne({ user_id: userId, client_id: clientId }) !== null
+          })
+        },
+      },
+      codes: {
+        async create(code) {
+          await oauthCodes.write.insertOne({ digest: code.digest, user_id: code.userId, client_id: code.clientId, redirect_uri: code.redirectUri, challenge: code.challenge, scopes: code.scopes, family: code.family, created_at: code.createdAt, expires_at: code.expiresAt, used_at: code.usedAt })
+        },
+        async use(digest, at) {
+          // One UPDATE on the unspent row, so of two requests spending the code only one finds it unspent.
+          const [spent] = await oauthCodes.write.updateMany({ used_at: at }, e => e.and(e.eq('digest', digest), e.isNull('used_at')))
+
+          if (spent)
+            return { code: toOAuthCode(spent), reused: false }
+
+          const row = await oauthCodes.read.findById(digest)
+
+          return row ? { code: toOAuthCode(row), reused: true } : undefined
+        },
+      },
+      refresh: {
+        async create(token) {
+          await oauthRefresh.write.insertOne({ digest: token.digest, user_id: token.userId, client_id: token.clientId, scopes: token.scopes, family: token.family, created_at: token.createdAt, expires_at: token.expiresAt, used_at: token.usedAt })
+        },
+        async use(digest, at) {
+          const [spent] = await oauthRefresh.write.updateMany({ used_at: at }, e => e.and(e.eq('digest', digest), e.isNull('used_at')))
+
+          if (spent)
+            return { token: toOAuthRefresh(spent), reused: false }
+
+          const row = await oauthRefresh.read.findById(digest)
+
+          return row ? { token: toOAuthRefresh(row), reused: true } : undefined
+        },
+        async revokeFamily(userId, family) {
+          await db.transaction(async (tx) => {
+            await oauthRefresh.using(tx).write.deleteMany({ user_id: userId, family })
+            await bearerTokens.using(tx).write.deleteMany({ user_id: userId, oauth_family: family })
+          })
+        },
+        async deleteForUser(userId) {
+          await oauthRefresh.write.deleteMany({ user_id: userId })
+        },
       },
     },
     recoveryCodes: {
@@ -336,6 +453,10 @@ export function pgStore(db: Database): AuthStore {
         invitations.write.deleteMany({ expires_at: { lte: now } }),
         bearerTokens.write.deleteMany({ expires_at: { lt: bearerExpiredBefore } }),
         attempts.write.deleteMany({ reset_at: { lte: now } }),
+        oauthCodes.write.deleteMany({ expires_at: { lte: now } }),
+        oauthRefresh.write.deleteMany({ expires_at: { lte: now } }),
+        // A client that registered itself and that nobody approved within a month.
+        db.raw`DELETE FROM "auth_oauth_client" WHERE "created_at" < ${new Date(now.getTime() - UNUSED_CLIENT_MS)} AND NOT EXISTS (SELECT 1 FROM "auth_oauth_grant" WHERE "auth_oauth_grant"."client_id" = "auth_oauth_client"."id")`,
         sessions.write.deleteMany({ last_seen_at: { lt: new Date(now.getTime() - sessionMaxAge * 1000) } }),
         sessions.write.deleteMany({ created_at: { lt: new Date(now.getTime() - sessionAbsoluteMaxAge * 1000) } }),
         // A session the user's version moved past is already refused, so its row goes too.
@@ -446,7 +567,23 @@ function toToken(row: InferEntity<typeof AuthTokens>): TokenRecord {
 }
 
 function toBearerToken(row: InferEntity<typeof AuthBearerTokens> | null): BearerTokenRecord | undefined {
-  return row ? { id: row.id, userId: row.user_id, label: row.label, digest: row.digest, scopes: row.scopes, createdAt: row.created_at, lastUsedAt: row.last_used_at, expiresAt: row.expires_at } : undefined
+  return row ? { id: row.id, userId: row.user_id, label: row.label, digest: row.digest, scopes: row.scopes, createdAt: row.created_at, lastUsedAt: row.last_used_at, expiresAt: row.expires_at, ...row.oauth_client != null && row.oauth_family != null && { oauth: { clientId: row.oauth_client, family: row.oauth_family } } } : undefined
+}
+
+function toOAuthClient(row: InferEntity<typeof AuthOAuthClients> | null): OAuthClientRecord | undefined {
+  return row ? { id: row.id, name: row.name, redirectUris: row.redirect_uris, createdAt: row.created_at } : undefined
+}
+
+function toOAuthGrant(row: InferEntity<typeof AuthOAuthGrants> | null): OAuthGrantRecord | undefined {
+  return row ? { userId: row.user_id, clientId: row.client_id, clientName: row.client_name, scopes: row.scopes, createdAt: row.created_at, lastUsedAt: row.last_used_at } : undefined
+}
+
+function toOAuthCode(row: InferEntity<typeof AuthOAuthCodes>): OAuthCodeRecord {
+  return { digest: row.digest, userId: row.user_id, clientId: row.client_id, redirectUri: row.redirect_uri, challenge: row.challenge, scopes: row.scopes, family: row.family, createdAt: row.created_at, expiresAt: row.expires_at, usedAt: row.used_at }
+}
+
+function toOAuthRefresh(row: InferEntity<typeof AuthOAuthRefresh>): OAuthRefreshRecord {
+  return { digest: row.digest, userId: row.user_id, clientId: row.client_id, scopes: row.scopes, family: row.family, createdAt: row.created_at, expiresAt: row.expires_at, usedAt: row.used_at }
 }
 
 function toSession(row: InferEntity<typeof AuthSessions> | null): SessionRecord | undefined {
