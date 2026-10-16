@@ -713,10 +713,11 @@ describe('component names', () => {
 
     it('reads `typeof` of a template `const` as the type its memo holds, at the top of a type and nested, in html and dom', () => {
       for (const output of ['html', 'dom'] as const) {
-        const code = compileKay('---\nconst items = signal([1])\n---\nfor n of items\n  const t = n + 1\n  p {(t as unknown as typeof t)} {(1 as unknown as { a: { b: typeof t }, f: (v: typeof t) => void })}', 'test.kay', { output }).tsx
+        const code = compileKay('---\nconst items = signal([1])\n---\nfor n of items\n  const t = n + 1\n  p {(t as unknown as typeof t)} {(1 as unknown as { a: { b: typeof t }, f: (v: typeof t) => void })} {(1 as unknown as typeof t.a)}', 'test.kay', { output }).tsx
 
         expect(code).toContain('as unknown as ReturnType<typeof t>)')
         expect(code).toContain('{ a: { b: ReturnType<typeof t> }, f: (v: ReturnType<typeof t>) => void }')
+        expect(code).toContain('as unknown as ReturnType<typeof t>["a"])')
         expect(code).not.toContain('typeof t()')
       }
     })
