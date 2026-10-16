@@ -841,6 +841,9 @@ describe('what kay exports to a page that is kept', () => {
       'src/routes/division-after-ternary-object.ts': 'import { collection } from \'kay/content\'\n\nexport const half = (flag: boolean) => flag ? {} / 2 : 1 // a collection\nexport const posts = collection(\'content/posts\', {})\n',
       'src/routes/regex-after-case-block.ts': 'import { collection } from \'kay/content\'\n\nconst loader = { name: \'rows\', load: () => [] }\n\nexport const f = (n: number) => { switch (n) { case 1: { } /a\\//.test(\'a/\') } }, posts = collection(loader, {})\n',
       'src/routes/regex-after-label-block.ts': 'import { collection } from \'kay/content\'\n\nconst loader = { name: \'rows\', load: () => [] }\n\nexport const f = () => { outer: { } /a\\//.test(\'a/\') }, posts = collection(loader, {})\n',
+      'src/routes/division-in-nested-value.ts': 'import { collection } from \'kay/content\'\n\nexport const half = Math.max({ a: {} / 2 }, 0) // a collection\nexport const posts = collection(\'content/posts\', {})\n',
+      'src/routes/regex-after-quoted-case.ts': 'import { collection } from \'kay/content\'\n\nconst loader = { name: \'rows\', load: () => [] }\n\nexport const f = (n: string) => { switch (n) { case \'a:b\': { } /a\\//.test(\'a/\') } }, posts = collection(loader, {})\n',
+      'src/routes/regex-after-fallthrough-block.ts': 'import { collection } from \'kay/content\'\n\nconst loader = { name: \'rows\', load: () => [] }\n\nexport const f = (n: number) => { switch (n) { case 1: case 2: { } /a\\//.test(\'a/\') } }, posts = collection(loader, {})\n',
       'src/routes/multiline.ts': 'import { collection } from \'kay/content\'\n\nexport const posts = collection(\n  \'content/posts\',\n  {},\n)\n',
       'src/routes/mixed.ts': 'import { collection } from \'kay/content\'\n\nexport const a = collection(\'content/a\', {})\nexport const b = collection({ name: \'b\', load: () => [] }, {})\n',
       'src/routes/interpolated.ts': 'import { collection } from \'kay/content\'\n\nconst lang = \'fr\'\n\nexport const posts = collection(`content/${lang}`, {})\n',
@@ -867,10 +870,10 @@ describe('what kay exports to a page that is kept', () => {
     expect(await at('src/routes/commented.ts')).toBeUndefined()
     expect(await at('src/routes/multiline.ts')).toBeUndefined()
 
-    for (const page of ['regex-quote', 'nested-template', 'division', 'division-after-brace', 'division-after-nested-object', 'division-after-ternary-object'])
+    for (const page of ['regex-quote', 'nested-template', 'division', 'division-after-brace', 'division-after-nested-object', 'division-after-ternary-object', 'division-in-nested-value'])
       expect(await at(`src/routes/${page}.ts`), page).toBeUndefined()
 
-    for (const page of ['regex-slash', 'nested-loader', 'regex-after-case-block', 'regex-after-label-block'])
+    for (const page of ['regex-slash', 'nested-loader', 'regex-after-case-block', 'regex-after-label-block', 'regex-after-quoted-case', 'regex-after-fallthrough-block'])
       expect(await at(`src/routes/${page}.ts`), page).toMatchObject(loader)
 
     expect(await at('src/routes/mixed.ts')).toMatchObject(loader)

@@ -99,7 +99,9 @@ export interface OAuthRefreshRecord {
   clientId: string
   scopes: string[] | null
   family: string
+  // A token unused for 30 days from here is refused.
   createdAt: Date
+  // Where the whole family ends, 90 days after its first token and the same for each rotation, so a spent token stays this long to catch a reuse.
   expiresAt: Date
   // Set once spent: spending it again means it leaked, and takes the whole family back.
   usedAt: Date | null

@@ -170,12 +170,15 @@ describe('the authorization request', () => {
     const { client_id } = await register(before)
     const ada = await signedIn(before)
     const first = await exchange(before, client_id, await approved(ada, client_id))
+    const pending = await approved(ada, client_id)
     const after = server({ store })
     const again = after.browser()
 
     await again.post('/password', { identifier: 'ada@example.com', password: PASSWORD })
 
     expect(await again.call('oauthAuthorize', params(client_id))).toMatchObject({ kind: 'consent', scopes: ['posts:read'] })
+    // A code given before the app declared scopes is refused, as it would give every one.
+    expect((await exchange(after, client_id, pending)).body.error).toBe('invalid_grant')
     // A refresh token issued under it is refused too, as it would hold every scope the app declares now.
     expect((await token(after, { grant_type: 'refresh_token', refresh_token: String(first.body.refresh_token), client_id })).body.error).toBe('invalid_grant')
 

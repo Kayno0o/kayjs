@@ -2,7 +2,7 @@ import { join, relative } from 'node:path'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { writeShadowTypes } from '../src/check'
 import { bootProblems } from '../src/check/boot'
-import { setSite } from '../src/runtime/site'
+import { configuredSite, setSite } from '../src/runtime/site'
 import { encodeValue } from '../src/runtime/wire'
 import { testSite } from '../src/test'
 import { fixtureCopy } from './scratch'
@@ -298,6 +298,7 @@ describe('sign-in metadata of an app with no site set', () => {
     const auth = (fixed: boolean) => ({ oauthResource: (path: string) => ({ resource: `https://app.example${path}`, authorization_servers: ['https://app.example'] }), oauthOrigin: () => 'https://app.example', oauthFixed: () => fixed })
     const withAuth = async (fixed: boolean) => testSite({ routes, api, mcp: true, islands: false, locals: request => ({ ...locals(request), auth: auth(fixed) }) })
     const [open, fixed] = await Promise.all([withAuth(false), withAuth(true)])
+    const before = configuredSite()
 
     try {
       const withSite = await open.fetch('/.well-known/oauth-protected-resource')
@@ -315,7 +316,7 @@ describe('sign-in metadata of an app with no site set', () => {
       expect((await fixed.fetch('/.well-known/oauth-protected-resource')).headers.get('cache-control')).toBe('public, max-age=300')
     }
     finally {
-      setSite('http://localhost')
+      setSite(before?.origin, before?.slashed === true ? 'always' : 'never')
       await Promise.all([open.close(), fixed.close()])
     }
   })

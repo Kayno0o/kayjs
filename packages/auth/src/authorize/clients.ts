@@ -147,7 +147,7 @@ export async function fetchPublicDocument(url: string, refuses: (address: string
   const send = url.startsWith('https:') ? https.request : http.request
 
   return new Promise((resolveDocument, reject) => {
-    const request = send(url, { lookup: connectTo, headers: { accept: 'application/json' }, signal: AbortSignal.timeout(DOCUMENT_TIMEOUT_MS) }, (response) => {
+    const request = send(url, { lookup: connectTo, headers: { 'accept': 'application/json', 'accept-encoding': 'identity' }, signal: AbortSignal.timeout(DOCUMENT_TIMEOUT_MS) }, (response) => {
       if (response.statusCode !== 200 || !JSON_TYPE.test(response.headers['content-type'] ?? '')) {
         response.destroy()
         reject(new Error('the document did not answer 200 with JSON'))

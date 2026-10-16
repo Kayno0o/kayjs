@@ -87,6 +87,10 @@ async function exchangeCode(core: Core, form: URLSearchParams, root: string): Pr
   if (resource !== null && !sameSite(resource, root))
     return refused('invalid_target', 'The resource is not one of this server')
 
+  // A code issued with every scope before the app declared some does not give them all now.
+  if (issued.scopes === null && core.scopes.size > 0)
+    return refused('invalid_grant', 'The client must be approved again')
+
   const grant = await liveGrant(core, issued.userId, issued.clientId)
 
   return grant ? issue(core, grant, issued.scopes, issued.family, undefined) : refused('invalid_grant', 'The client is not approved')
