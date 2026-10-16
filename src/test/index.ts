@@ -17,6 +17,7 @@ import { buildClient } from '../build/client'
 import { withConfig } from '../config'
 import { clientOptionsOf, PRODUCTION, resolveProject } from '../project'
 import { encodeCall, minTimeOf, readActionResponse, STAMP_FIELD } from '../runtime/action'
+import { joinBase } from '../runtime/base'
 import { durationSeconds } from '../runtime/duration'
 import { openSocket, readEvents, routeUrl, streamRequest } from '../runtime/live'
 import { effect, root as reactiveRoot } from '../runtime/reactive'
@@ -24,6 +25,7 @@ import { PAGE_HEADER, WORK_HEADER, WORK_SCRIPT } from '../runtime/swap'
 import { solveWork } from '../runtime/work'
 import { MCP_PATH } from '../server/api-modules'
 import { servePages } from '../server/app'
+import { basePath, routerPath } from '../server/base'
 import { shutdown } from '../server/lifecycle'
 import { loaderRoot } from '../server/loader'
 import { drainQueues } from '../server/queue'
@@ -256,6 +258,7 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
   const before = [...options.use ?? [], ...locals ? [new Elysia().derive({ as: 'global' }, async ({ request }) => locals(request))] : []]
   const app = before.length === 0 ? pages : before.reduce<AnyElysia>((served, plugin) => served.use(plugin), new Elysia()).use(pages)
   const jar = cookieJar()
+  const base = basePath(config.base)
   let address = nextClient()
 
   // A site made at the top of a file or a describe posts as a new client in each test, so no test meets the rate limits another one's posts counted; one made inside a test, or outside bun test, keeps one.
@@ -273,17 +276,29 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
     return withNatives(async () => app.handle(request))
   }
 
+  // A path as the browser shows it, under `base`; one already under it stays as it is.
+  const shown = (path: string): string => {
+    if (base === '')
+      return path
+
+    const url = new NativeURL(path, ORIGIN)
+
+    return joinBase(base, routerPath(url.pathname, base)) + url.search
+  }
+
   const send = async (path: string, init: Omit<RequestInit, 'headers'> & VisitInit): Promise<Response> => {
-    const request = new NativeRequest(new NativeURL(path, ORIGIN), { ...init, headers: new NativeHeaders(init.headers), redirect: 'manual' })
+    const url = new NativeURL(path, ORIGIN)
+    const routed = routerPath(url.pathname, base)
+    const request = new NativeRequest(new NativeURL(routed + url.search, ORIGIN), { ...init, headers: new NativeHeaders(init.headers), redirect: 'manual' })
 
     sendFrom(request, address)
 
-    return jar.send(handle, request)
+    return jar.send(handle, request, joinBase(base, routed))
   }
 
   const follow = async (response: Response, url: string, headers?: Record<string, string>): Promise<Visit> => {
     let current = response
-    let path = url
+    let path = shown(url)
 
     for (let redirects = 0; current.status >= 300 && current.status < 400 && current.headers.has('location'); redirects++) {
       if (redirects === MAX_REDIRECTS)
@@ -326,7 +341,7 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
     const sent: Record<string, string> = { ...headers, origin: ORIGIN }
 
     if (init.from !== undefined)
-      sent[PAGE_HEADER] = init.from
+      sent[PAGE_HEADER] = shown(init.from)
 
     return readActionResponse<Success<ResultOf<typeof action>>>(await send(action.url, { method: 'POST', headers: { ...sent, ...workHeaders(action), ...init.headers }, body }), action.url)
   }
@@ -368,7 +383,7 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
     fetch: async (path, init = {}) => send(path, init),
     socket: (module, path, ...[options]) => {
       const url = routeUrl(module, path, options as Parameters<typeof routeUrl>[2])
-      const client = openSocket(() => new BunWebSocket(`ws://localhost:${listening().port}${url}`, { headers: { ...options?.headers, ...jar.cookies.size > 0 ? { cookie: jar.header() } : {} } }))
+      const client = openSocket(() => new BunWebSocket(`ws://localhost:${listening().port}${url}`, { headers: { ...options?.headers, ...jar.cookies.size > 0 ? { cookie: jar.header(joinBase(base, url)) } : {} } }))
       const tested = Object.assign(client, inbox(client))
 
       client.start()
@@ -452,13 +467,13 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
 
       const response = await send(posted, {
         method: 'POST',
-        headers: { origin: ORIGIN, referer: new URL((page && answeredAt.get(page)) ?? from, ORIGIN).href, ...workHeaders(action), ...init.headers },
+        headers: { origin: ORIGIN, referer: new URL((page && answeredAt.get(page)) ?? shown(from), ORIGIN).href, ...workHeaders(action), ...init.headers },
         body: form,
       })
       const visit = await follow(response, from, init.headers)
 
       if (!response.headers.has('location'))
-        answeredAt.set(visit, posted)
+        answeredAt.set(visit, shown(posted))
 
       return visit
     },

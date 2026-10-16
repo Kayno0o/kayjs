@@ -49,6 +49,12 @@ An action with `minTime` takes the post as if its form had been open long enough
 
 A site made at the top of the file posts as a new client in each test, so a rate limit counts the posts of one test only.
 
+## A site under a base
+
+A site with a `base` in kay.config.ts is tested under it with nothing more: `testSite({ base: '/blog' })` serves one that sets none. `visit`, `submit` and `fetch` take a path with the base or without it, `/blog/about` or `/about`, and the base itself with or without a trailing slash. A path starting with the base is taken as written, so a route that starts like it is `/blog/blog/hello`.
+
+`url` on a visit is the path as a browser shows it, base included. A redirect to a base-prefixed `Location` is followed with the cookies so far, and each cookie goes only to the paths its `Path` covers, so one set with `Path=/blog` reaches every page and one set with `Path=/other` none. `site.open()` serves the site at the root of its port, since no proxy takes the base off there.
+
 ## Signed-in users
 
 Cookies a response sets go with the next request, so an app on `session()` stays signed in across calls. `use` takes the plugins the server entry uses, and `locals` stands in for a `derive`:

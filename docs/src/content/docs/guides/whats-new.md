@@ -5,6 +5,10 @@ description: What each release of kay and its libraries adds, with a link to whe
 ---
 This page lists what each release adds, newest first, with a link to where each feature is documented. kay and its libraries share one version number, so one section covers them all. What a release breaks, and what to change in your app, is in [Upgrading](/guides/upgrading).
 
+## Unreleased
+
+- **Tests under a base**: `testSite` serves a site under its `base`, `visit`, `submit` and `fetch` take paths with or without it, a redirect to a base-prefixed URL is followed with the cookies, and the cookie jar sends a cookie only to the paths its `Path` covers. [Testing](/guides/testing)
+
 ## 1.49.0
 
 - **MCP refusals keep their headers**: a `tools/list` refused by a guard keeps the guard's headers, `Retry-After` of a 429 among them, and a call to a name no tool has is refused the same way, so a caller who may not list the tools cannot probe their names. [API routes](/guides/api-routes)

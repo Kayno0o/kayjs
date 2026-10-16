@@ -213,7 +213,10 @@ it('shows why a todo was refused', async () => {
 - `site.socket(module, path, options)` opens a websocket route and `site.stream(module, path, options)` reads an event stream as an island does, the options taking `headers` too.
 - Both keep every message in `received` and resolve `next()` with the oldest one not read yet, waiting for one if need be; a stream's `finished()` resolves with all its values once it ended.
 - `site.socket` starts the site on a free port the first time, which `site.close()` stops.
-- Cookies a response sets go with the next request and read as `site.cookies`.
+- Cookies a response sets go with the next request and read as `site.cookies`, each only to the paths its `Path` covers.
+- A site with a `base` in kay.config.ts is served under it with no option: `visit`, `submit`, `fetch` and `call`'s `from` take a path with the base (`/blog/about`, the base itself `/blog` or `/blog/`) or without it (`/about`), and a path starting with the base is taken as given, so a route starting like it is `/blog/blog/hello`.
+- Under a base `visit` and `submit` resolve with `url` as the browser shows it (`/blog/about`), a redirect to a base-prefixed `Location` is followed with the cookies kept, a cookie with `Path=/blog` goes to every page and one with `Path=/other` to none, and `site.mcp` and `site.call` need nothing: `testSite({ base: '/blog' })` serves a config without one under it.
+- `site.open()` serves the site at the root of its port, as no proxy takes a base off.
 - `use` takes the plugins the server entry uses before the pages, in order, so an app on `session()` signs in through `site.submit` and stays signed in: `testSite({ use: [sessions] })`.
 - `locals` stands in for the app's Elysia `derive`, called with each request, after those plugins.
 - A site made at the top of a test file, as `const site = await testSite()` is, sends each test's requests as a client of its own, so a rate limit counts the posts of one test only: a test posting until it is refused needs no other to run first, and none after it is refused.

@@ -585,6 +585,27 @@ describe('a site on kayjs-auth with no wiring of its own', () => {
     expect(await sentTo('/blank/')).toBe('/app/auth/sign-in?redirect=%2Fblank%2F')
   })
 
+  test('under a base, a session signs in, keeps its cookie and reaches requireUser and signInUrl, the paths given with the base or without it', async () => {
+    const site = await testSite({ root: ROOT, base: '/app' })
+
+    expect(await site.visit('/note')).toMatchObject({ url: '/app/auth/sign-in?redirect=%2Fnote', status: 200 })
+
+    const signUp = await site.visit('/app/auth/register?redirect=%2Fnote')
+    const form = signUp.find('form').find(candidate => candidate.attributes.action?.endsWith('/register'))
+    const account = await site.submit(register, { email: 'based@example.com', password: PASSWORD, redirect: '/note' }, { from: signUp })
+
+    expect(form?.attributes.action).toStartWith('/app/')
+    expect(account).toMatchObject({ url: '/app/note', status: 200 })
+    expect(site.cookies.size).toBeGreaterThan(0)
+
+    for (const path of ['/note', '/app/note'])
+      expect(text(await site.visit(path), '#note')).toBe('Note of based@example.com')
+
+    expect(text(await site.visit('/app/note?back=/auth/account'), '#back')).toBe('/auth/sign-in?redirect=%2Fauth%2Faccount')
+    expect(text(await site.visit('/note'), '#back')).toBe('/auth/sign-in?redirect=%2Fnote')
+    expect(await site.call(save, { text: 'hi' }, { from: '/note' })).toBe('based@example.com: hi')
+  })
+
   test('a bearer token limited to scopes passes requireUser only for a scope it holds, and no token edits a profile', async () => {
     profiles.clear()
 
