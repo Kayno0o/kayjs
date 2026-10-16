@@ -28,10 +28,19 @@ const GLOB_MAGIC = /[*?[\]{}()!]/
 // A dependency, or what kay keeps of the project under `.kay`.
 const NOT_PROJECT = /^\/(?:\.kay|(?:.*\/)?node_modules)\//
 
-// The patterns of one `import.meta.glob` call as absolute globs, the negated ones apart.
+// One pattern as an absolute glob, with the folder its fixed part names and whether it names `node_modules`.
+interface Pattern {
+  glob: Bun.Glob
+  text: string
+  base: string
+  segments: Set<string>
+  modules: boolean
+}
+
+// The patterns of one `import.meta.glob` call, the negated ones apart.
 interface Glob {
-  include: string[]
-  exclude: string[]
+  include: Pattern[]
+  exclude: Pattern[]
 }
 
 interface Imports {
@@ -51,6 +60,8 @@ export function planReload({ root, changed, loaded, owned, config, entry }: Relo
   const modules = new Set(loaded.filter(file => file.startsWith(real + sep) && !NOT_PROJECT.test(file.slice(real.length))))
   const kays = (file: string) => file.endsWith('.kay') || owned.some(dir => file.startsWith(dir + sep))
   const seeds: string[] = []
+  // The modules whose glob matches a changed file, which changed no more than their file list did.
+  const holders = new Set<string>()
   // The changed files that are no loaded module and in no folder of kay's, which only a glob can account for.
   const unknown: string[] = []
 
@@ -90,9 +101,11 @@ export function planReload({ root, changed, loaded, owned, config, entry }: Relo
     let matched = false
 
     for (const [module, moduleGlobs] of globs) {
-      if (moduleGlobs.some(glob => matches(glob, path))) {
-        seeds.push(module)
+      if (moduleGlobs.some(glob => matches(glob, path) || matches(glob, realpathOf(path)))) {
+        holders.add(module)
         matched = true
+        // Its file list is read again after the reload, so a file added to it is followed from then on.
+        imports.delete(module)
       }
     }
 
@@ -100,7 +113,7 @@ export function planReload({ root, changed, loaded, owned, config, entry }: Relo
       return { restart: `${file} is no module kay loaded` }
   }
 
-  const evict = new Set(seeds)
+  const evict = new Set([...seeds, ...holders])
 
   for (const file of evict) {
     for (const importer of importers.get(file) ?? [])
@@ -159,7 +172,7 @@ function importsRead(file: string, root: string): Imports {
 
   for (const [, written] of source.matchAll(GLOB)) {
     const patterns = [...written!.matchAll(QUOTED)].map(([, , pattern]) => pattern!)
-    const absolute = (pattern: string) => RELATIVE.test(pattern) ? resolve(dir, pattern) : join(root, pattern)
+    const absolute = (pattern: string) => patternOf(RELATIVE.test(pattern) ? resolve(dir, pattern) : join(root, pattern))
     const glob = {
       include: patterns.filter(pattern => !pattern.startsWith('!')).map(absolute),
       exclude: patterns.filter(pattern => pattern.startsWith('!')).map(pattern => absolute(pattern.slice(1))),
@@ -178,8 +191,24 @@ function importsRead(file: string, root: string): Imports {
   return read
 }
 
+function patternOf(text: string): Pattern {
+  const segments = text.split(sep)
+  const magic = segments.findIndex(segment => GLOB_MAGIC.test(segment))
+  const base = magic === -1 ? dirname(text) : segments.slice(0, magic).join(sep) || sep
+
+  return { glob: new Bun.Glob(text), text, base, segments: new Set(segments), modules: text.includes('node_modules') }
+}
+
+// Whether the loader's scan would find `path` by the pattern: `Bun.Glob.match` alone also takes the dotfiles and the `node_modules` the scan leaves out, unless the pattern names them.
+function found({ glob, base, segments, modules }: Pattern, path: string): boolean {
+  if (!glob.match(path))
+    return false
+
+  return relative(base, path).split(sep).every(segment => segments.has(segment) || !(segment.startsWith('.') || (segment === 'node_modules' && !modules)))
+}
+
 function matches(glob: Glob, path: string): boolean {
-  return glob.include.some(pattern => new Bun.Glob(pattern).match(path)) && !glob.exclude.some(pattern => new Bun.Glob(pattern).match(path))
+  return glob.include.some(pattern => found(pattern, path)) && !glob.exclude.some(pattern => pattern.glob.match(path))
 }
 
 function resolveImport(specifier: string, dir: string): string | undefined {
@@ -194,23 +223,19 @@ function resolveImport(specifier: string, dir: string): string | undefined {
   }
 }
 
-// The files a glob matches, as the loader would import them.
+// The files a glob matches, as the loader would import them: edges that carry a change in one of them to the module holding the glob.
 function globbed(glob: Glob): string[] {
-  const found = new Set<string>()
+  const files = new Set<string>()
 
-  for (const full of glob.include) {
-    const segments = full.split(sep)
-    const magic = segments.findIndex(segment => GLOB_MAGIC.test(segment))
-    const base = magic === -1 ? dirname(full) : segments.slice(0, magic).join(sep) || sep
-
+  for (const { text, base } of glob.include) {
     try {
-      for (const match of new Bun.Glob(relative(base, full)).scanSync({ cwd: base, absolute: true, onlyFiles: true }))
-        found.add(realpathOf(match))
+      for (const match of new Bun.Glob(relative(base, text)).scanSync({ cwd: base, absolute: true, onlyFiles: true }))
+        files.add(realpathOf(match))
     }
     catch {}
   }
 
-  return [...found].filter(file => !glob.exclude.some(pattern => new Bun.Glob(pattern).match(file)))
+  return [...files].filter(file => !glob.exclude.some(pattern => pattern.glob.match(file)))
 }
 
 // Bun keys its modules by real path; a file gone is looked for by its folder's.

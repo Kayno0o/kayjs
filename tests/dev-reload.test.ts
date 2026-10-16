@@ -356,4 +356,47 @@ describe('the modules a change leaves stale', () => {
       await rm(dir, { recursive: true, force: true })
     }
   })
+
+  it('leaves out of a glob what the loader does, and follows a glob held by a TypeScript module, an exclusion and a file added later', async () => {
+    const dir = await scratchDir('reload-plan-')
+
+    await Bun.write(join(dir, 'src/routes/index.kay'), '---\nconst a = import.meta.glob([\'../cards/*.kay\', \'!../cards/skip.kay\'])\n---\np home\n')
+    await Bun.write(join(dir, 'src/cards/a.kay'), 'p a\n')
+    await Bun.write(join(dir, 'src/cards/skip.kay'), 'p skip\n')
+    await Bun.write(join(dir, 'src/cards/b.kay'), '---\nimport Shared from \'../shared.kay\'\n---\nShared\n')
+    await Bun.write(join(dir, 'src/shared.kay'), 'p shared\n')
+    await Bun.write(join(dir, 'src/api/list.ts'), 'export const files = import.meta.glob(\'../cards/*.txt\')\n')
+    await Bun.write(join(dir, 'src/lib/helper.ts'), 'export const files = import.meta.glob(\'../cards/*.txt\')\n')
+
+    try {
+      const real = realpathSync(dir)
+      const at = (file: string) => join(real, file)
+      const files = ['src/routes/index.kay', 'src/cards/a.kay', 'src/cards/skip.kay', 'src/shared.kay', 'src/api/list.ts', 'src/lib/helper.ts']
+      const input = { root: dir, loaded: files.map(at), owned: [at('src/routes'), at('src/api')], config: at('kay.config.ts'), entry: at('src/server.ts') }
+      const plan = (changed: string, loaded = input.loaded) => {
+        const planned = planReload({ ...input, loaded, changed: [changed] })
+
+        return 'evict' in planned ? planned.evict.sort() : planned
+      }
+
+      // A glob held by a module of the API folder is evicted, one held by code the entry may import is not.
+      expect(plan('src/cards/new.txt', input.loaded.filter(file => !file.endsWith('helper.ts')))).toEqual([at('src/api/list.ts'), at('src/server.ts')].sort())
+      expect(plan('src/cards/new.txt', input.loaded.filter(file => !file.endsWith('list.ts')))).toEqual({ restart: 'src/lib/helper.ts is code kay does not load itself' })
+
+      // A file the glob excludes, a dotfile and a file under node_modules reach no module.
+      expect(plan('src/cards/skip.kay')).toEqual([at('src/cards/skip.kay'), at('src/server.ts')].sort())
+      expect(plan('src/cards/.hidden.txt')).toEqual({ restart: 'src/cards/.hidden.txt is no module kay loaded' })
+      expect(plan('src/cards/node_modules/x/y.txt')).toEqual({ restart: 'src/cards/node_modules/x/y.txt is no module kay loaded' })
+
+      // A file added to the glob, then a module it imports edited: the holder follows the new file.
+      expect(plan('src/cards/b.kay')).toContain(at('src/routes/index.kay'))
+
+      const loaded = [...input.loaded, at('src/cards/b.kay')]
+
+      expect(plan('src/shared.kay', loaded)).toContain(at('src/routes/index.kay'))
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
 })
