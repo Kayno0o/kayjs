@@ -346,6 +346,38 @@ export function deprecatedImports(fence: ParsedFence): Diagnostic[] {
   return diagnostics
 }
 
+// What `kay/cache` exports to the server alone: the browser's entry has `cached` and `invalidate`, though the types of the one entry name every export.
+const SERVER_ONLY_CACHE = new Set(['invalidatePage', 'sqliteCache'])
+
+// A server-only name of `kay/cache` imported by a fence that runs in the browser, which the build refuses with a missing export.
+export function serverOnlyImports(fence: ParsedFence): Diagnostic[] {
+  if (!fence.code.includes('kay/cache'))
+    return []
+
+  return fence.ast.program.body.flatMap((node) => {
+    if (node.type !== 'ImportDeclaration' || node.source.value !== 'kay/cache' || node.importKind === 'type')
+      return []
+
+    return node.specifiers.flatMap((specifier) => {
+      if (specifier.type !== 'ImportSpecifier' || specifier.importKind === 'type')
+        return []
+
+      const name = specifier.imported.type === 'Identifier' ? specifier.imported.name : specifier.imported.value
+
+      return !SERVER_ONLY_CACHE.has(name)
+        ? []
+        : [{
+          ...fence.shift(specifier),
+          code: 'server-only-import',
+          message: `\`${name}\` is exported to the server alone, and this code runs in the browser`,
+          note: 'the browser\'s `kay/cache` has `cached` and `invalidate`',
+          help: 'call it from a `--- server` fence or an action, and keep this import there',
+          checkOnly: true,
+        }]
+    })
+  })
+}
+
 const CSS_BINDING = /\bimport\b[^;'"]+from\s*['"][^'"\n]+\.css['"]/
 
 // A stylesheet imported for a value with no `with { type: 'text' }`: kay types it as the text it gives with the attribute, which Bun gives only with it.

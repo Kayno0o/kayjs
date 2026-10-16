@@ -48,7 +48,7 @@ const reviews = await cached('reviews', 86_400, fetchReviews, { store: disk })
 
 <Callout type="note">
 
-The cache lives in the process, and the value is shared by every caller, so never mutate it. A `sqliteCache` is shared by the processes of one machine.
+The cache lives in the process, and the value is shared by every caller, so never mutate it. A `sqliteCache` is shared by the processes of one machine. In the browser, `kay/cache` has `cached` and `invalidate` only, and `kay check` reports `invalidatePage` or `sqliteCache` imported by an island or a `--- client` fence.
 
 </Callout>
 

@@ -271,6 +271,13 @@ export const LINTS = {
     wrong: '---\nimport { signal } from \'kay\'\n\nconst title = signal(\'Todos\')\n---\nh1 {title()}',
     right: '---\nconst title = \'Todos\'\n---\nh1 {title}',
   },
+  'server-only-import': {
+    level: 'deny',
+    group: 'islands',
+    summary: 'A name only the server\'s `kay/cache` has, `invalidatePage` or `sqliteCache`, imported by what runs in the browser, an island\'s script or a `--- client` fence: the browser entry has `cached` and `invalidate` alone, so the build fails there.',
+    wrong: '---\nimport { signal } from \'kay\'\nimport { sqliteCache } from \'kay/cache\'\n\nconst count = signal(0)\n---\nbutton(onClick={() => count++}) {count()}',
+    right: '---\nimport { signal } from \'kay\'\nimport { invalidate } from \'kay/cache\'\n\nconst count = signal(0)\n---\nbutton(onClick={() => count++}) {count()}',
+  },
   'uncaught-await': {
     level: 'warn',
     group: 'code',

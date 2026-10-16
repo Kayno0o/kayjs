@@ -81,7 +81,7 @@ describe('kay explain', () => {
     const [heading, blank, ...rows] = lintList('islands').split('\n')
 
     expect([heading, blank]).toEqual([`islands: ${LINT_GROUPS.islands}`, ''])
-    expect(rows.map(row => row.split(/\s{2,}/)[0])).toEqual(['positional-key', 'identity-key', 'uncalled-signal', 'constant-signal'])
+    expect(rows.map(row => row.split(/\s{2,}/)[0])).toEqual(['positional-key', 'identity-key', 'uncalled-signal', 'constant-signal', 'server-only-import'])
   })
 
   it('explains a lint with an example it reports and the same written right, indented as code, and every lint\'s examples hold', () => {
@@ -583,5 +583,29 @@ describe('what a template gets reported for', () => {
     expect([first!.note, first!.help]).toEqual(['events are written in camelCase', '`onClick`'])
     expect(compileKay('input(onkeydown={go} ondblclick={go})', 'list.kay').diagnostics.map(d => d.help)).toEqual(['`onKeyDown`', '`onDblClick`'])
     expect(compileKay('button(on:click={go}) x', 'list.kay').diagnostics[0]?.fixes).toEqual([{ title: 'Write `onClick`', edits: [{ start: 7, end: 15, text: 'onClick' }], safe: true }])
+  })
+})
+
+describe('server-only-import', () => {
+  const only = (source: string) => lints(source).filter(lint => lint.code === 'server-only-import')
+
+  it('reports invalidatePage and sqliteCache imported from kay/cache by what runs in the browser, an island\'s script and a client fence', () => {
+    const island = '---\nimport { signal } from \'kay\'\nimport { cached, invalidatePage as refresh, sqliteCache } from \'kay/cache\'\n\nconst count = signal(0)\n---\nbutton(onClick={() => count++}) {count()}'
+    const client = '--- client\nimport { invalidatePage } from \'kay/cache\'\n\nconsole.log(invalidatePage)\n---\np x'
+
+    expect(only(island)).toEqual([
+      { code: 'server-only-import', severity: 'error', at: 'invalidatePage as refresh' },
+      { code: 'server-only-import', severity: 'error', at: 'sqliteCache' },
+    ])
+    expect(only(client)).toEqual([{ code: 'server-only-import', severity: 'error', at: 'invalidatePage' }])
+  })
+
+  it('leaves a server fence, a component the server alone renders and what both entries export alone', () => {
+    const server = '--- server\nimport { cached, invalidatePage, sqliteCache } from \'kay/cache\'\n\nconst disk = sqliteCache(\'a.sqlite\')\nconst post = await cached(\'a\', 60, async () => invalidatePage(\'/\'), { store: disk })\n---\np {post}'
+    const plain = '---\nimport { sqliteCache } from \'kay/cache\'\n\nconst disk = sqliteCache(\'a.sqlite\')\n---\np {disk}'
+    const shared = '---\nimport { signal } from \'kay\'\nimport { cached, invalidate } from \'kay/cache\'\n\nconst count = signal(0)\nconst post = cached(\'a\', 60, () => invalidate(\'a\'))\n---\nbutton(onClick={() => count++}) {count()} {post}'
+    const typed = '---\nimport type { sqliteCache } from \'kay/cache\'\nimport { signal } from \'kay\'\n\nconst count = signal(0)\n---\nbutton(onClick={() => count++}) {count()}'
+
+    expect([server, plain, shared, typed].map(only)).toEqual([[], [], [], []])
   })
 })

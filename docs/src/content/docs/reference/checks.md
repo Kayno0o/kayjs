@@ -64,6 +64,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `redundant-alt` | warn | a11y | Alt text that says it is an image |
 | `uncalled-signal` | deny | islands | A signal read by name where its value goes, or handed to a parameter that takes anything, not called |
 | `constant-signal` | warn | islands | A signal that is only ever read |
+| `server-only-import` | deny | islands | `invalidatePage` or `sqliteCache` imported from `kay/cache` by code that runs in the browser |
 | `deprecated-import` | warn | deprecated | A name imported from the entry point it left, such as `invalidatePage`, once in `kay/server` |
 | `css-import-without-text` | deny | code | A stylesheet imported for a value without `with { type: 'text' }` |
 | `literal-tag` | warn | code | An HTML tag written in template text, shown as written |

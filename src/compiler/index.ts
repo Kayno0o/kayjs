@@ -9,7 +9,7 @@ import process from 'node:process'
 import { drawIcons, templateFacts, visitNodes } from './ast'
 import { browserReads } from './browser'
 import { generate, isInteractive, islandCause, islandMessages, promotionCause } from './codegen'
-import { cssImportsWithoutText, deprecatedImports, separatePageSettings, unboundedFields } from './fence-checks'
+import { cssImportsWithoutText, deprecatedImports, separatePageSettings, serverOnlyImports, unboundedFields } from './fence-checks'
 import { applyLints, templateLints } from './lints'
 import { SourceMap } from './mapping'
 import { SELF } from './names'
@@ -143,7 +143,7 @@ export function compileKay(source: string, filename: string, options: CompileOpt
   const broken = diagnostics.some(diagnostic => !diagnostic.checkOnly)
 
   if (options.check)
-    diagnostics.push(...unboundedFields(server), ...[script.fence, server?.fence].flatMap(fence => fence ? [...deprecatedImports(fence), ...cssImportsWithoutText(fence)] : []), ...broken ? [] : [...unreadNames(source, file.template, script, server, found.findings), ...constantSignals(source, file.script, found.findings)], ...templateLints(file))
+    diagnostics.push(...unboundedFields(server), ...[script.fence, server?.fence].flatMap(fence => fence ? [...deprecatedImports(fence), ...cssImportsWithoutText(fence)] : []), ...island !== undefined && !routeFile && script.fence ? serverOnlyImports(script.fence) : [], ...broken ? [] : [...unreadNames(source, file.template, script, server, found.findings), ...constantSignals(source, file.script, found.findings)], ...templateLints(file))
 
   if (file.client && routeFile)
     diagnostics.push({ ...file.client, code: 'client-route-fence', message: 'A page, layout or special page cannot be `--- client`', note: 'it renders on the server', help: 'move what needs the browser to a component it renders, and make that one `--- client`' })
