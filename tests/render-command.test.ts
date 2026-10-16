@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
 import { beforeAll, describe, expect, it } from 'bun:test'
-import { alive } from './alive'
+import { alive, kill } from './alive'
 import { fixtureCopy } from './scratch'
 
 const cli = join(import.meta.dir, '..', 'src', 'cli.ts')
@@ -248,8 +248,7 @@ p {user} via {via}
       expect(alive(pid)).toBe(false)
     }
     finally {
-      if (alive(pid))
-        process.kill(pid, 'SIGKILL')
+      kill(pid)
     }
   }, 15_000)
 
@@ -274,7 +273,7 @@ p {user} via {via}
 
     const { err, pid } = await killedRender(draining, '/hang', printed => printed.includes('exited; finishing open requests'))
 
-    process.kill(pid, 'SIGKILL')
+    kill(pid)
 
     expect(err).toContain('kay render exited; finishing open requests')
   }, 15_000)

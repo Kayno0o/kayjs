@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs'
+import process from 'node:process'
 
 const STATE = /\)\s+(\S)/
 
@@ -11,5 +12,15 @@ export function alive(pid: number): boolean {
   }
   catch {
     return false
+  }
+}
+
+// Kills what a test left running, which may have ended on its own meanwhile.
+export function kill(pid: number): void {
+  try {
+    process.kill(pid, 'SIGKILL')
+  }
+  catch {
+    // Already gone.
   }
 }
