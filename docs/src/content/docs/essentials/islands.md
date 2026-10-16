@@ -33,6 +33,14 @@ input(bind:value={query} aria-label="Search")
 p {matches().length} results
 ```
 
+## See which components are islands
+
+`kay build` lists every island under the JavaScript it ships, with the first thing that made it one: `onClick, line 4`, `bind:value, line 9`, `signal` from kay or a `--- client` fence.
+
+A static component that passes an island a function is listed too, with the prop that may turn it into an island: `format passed to Picker, line 8`. Whether it does depends on the page, which decides as it renders.
+
+`kay build --format json` gives the same as `why` on each island of `built.sizes`, and each route's `islands`.
+
 ## Props to an island
 
 Props a static parent passes are serialized for the browser: objects, arrays, strings, numbers, booleans, dates, maps and sets.

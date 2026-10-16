@@ -17,6 +17,10 @@ export interface IslandSize {
   chunks?: string[] | undefined
   // The modules weighing most in those chunks, with `kay build --analyze`.
   modules?: ModuleSize[] | undefined
+  // What makes it an island, as `onClick, line 4`; for a static component that only becomes one when it passes an island a function, what may, as `onPick passed to Picker, line 8`.
+  why?: string | undefined
+  // The component renders as an island only when a page passes it what only an island sends, so a page may ship none of it.
+  promoted?: boolean | undefined
 }
 
 export interface ModuleSize {
@@ -56,7 +60,7 @@ const KAY_ROOT = resolve(import.meta.dir, '../..')
 const SHOWN_MODULES = 5
 
 // Sizes read off the files the build wrote, gzip as most hosts serve them; `inputs` breaks each chunk down by module.
-export async function sizeReport(root: string, dir: string, manifest: Omit<ClientManifest, 'styles'>, islands: Map<string, string>, inputs?: ChunkInputs): Promise<SizeReport> {
+export async function sizeReport(root: string, dir: string, manifest: Omit<ClientManifest, 'styles'>, islands: Map<string, string>, why: Map<string, { why: string, promoted: boolean }>, inputs?: ChunkInputs): Promise<SizeReport> {
   const sizes = new Map<string, Size>()
   const measure = async (url: string): Promise<Size> => {
     let size = sizes.get(url)
@@ -88,7 +92,7 @@ export async function sizeReport(root: string, dir: string, manifest: Omit<Clien
     const own = chunks.filter(chunk => !loaded.has(chunk))
     const file = islands.get(id)
 
-    report.islands.push({ file: file === undefined ? id : relative(root, file).replaceAll('\\', '/'), size: await total(own), chunks: own, modules: modules(own) })
+    report.islands.push({ file: file === undefined ? id : relative(root, file).replaceAll('\\', '/'), size: await total(own), chunks: own, modules: modules(own), ...why.get(id) })
   }
 
   report.islands.sort((a, b) => b.size.gzip - a.size.gzip || a.file.localeCompare(b.file))
@@ -126,6 +130,8 @@ export interface RouteSize {
   route: string
   js: number
   css: number
+  // The islands its pages render, by file, as the prerendered pages show them; those its components can reach when no page was prerendered.
+  islands: string[]
   // How many pages the build prerendered for it; none when a server renders it per request.
   pages: number
   // The scripts are what the route's components can load rather than what a rendered page did, as no page of it was prerendered.
@@ -205,21 +211,30 @@ export function formatSizeReport(report: SizeReport, { width = Infinity, previou
     return 'no JavaScript bundle: no page has an island'
 
   const compared = previous !== undefined
-  const rows: [string, string, ModuleSize[] | undefined][] = [
-    ...report.entry === undefined ? [] : [['entry, loaded by every page with an island', kilobytes(report.entry.size) + change(report.entry.size.gzip, previous?.entry, compared), report.entry.modules] satisfies [string, string, ModuleSize[] | undefined]],
-    ...report.islands.map(island => [island.file, `+${kilobytes(island.size)}${change(island.size.gzip, previous?.islands[island.file], compared)}`, island.modules] satisfies [string, string, ModuleSize[] | undefined]),
+  const rows: [string, string, ModuleSize[] | undefined, string | undefined][] = [
+    ...report.entry === undefined ? [] : [['entry, loaded by every page with an island', kilobytes(report.entry.size) + change(report.entry.size.gzip, previous?.entry, compared), report.entry.modules, undefined] satisfies [string, string, ModuleSize[] | undefined, string | undefined]],
+    ...report.islands.map(island => [island.file, `+${kilobytes(island.size)}${change(island.size.gzip, previous?.islands[island.file], compared)}`, island.modules, becauseOf(island)] satisfies [string, string, ModuleSize[] | undefined, string | undefined]),
   ]
   const room = Math.max(...rows.map(([, size]) => size.length))
   const names = Math.min(Math.max(...rows.map(([name]) => name.length)), Math.max(20, width - 4 - room))
 
   return [
     'JavaScript, gzip (minified):',
-    ...rows.flatMap(([name, size, shown]) => [
+    ...rows.flatMap(([name, size, shown, because]) => [
       `  ${shorten(name, names).padEnd(names)}  ${size}`,
+      ...because === undefined ? [] : [`      ${shorten(because, Math.max(20, width - 8))}`],
       // An island holding nothing but its own file says nothing more broken down.
       ...(shown !== undefined && shown.length > 1 ? shown : []).map(module => `      ${shorten(module.name, Math.max(20, width - 20))}  ${(module.bytes / 1024).toFixed(1)} KB`),
     ]),
   ].join('\n')
+}
+
+// Why a component is in the list, one line: what makes it an island, or for a static one what would.
+function becauseOf(island: IslandSize): string | undefined {
+  if (island.why === undefined || island.why === '')
+    return undefined
+
+  return island.promoted === true ? `static unless it passes an island what only an island sends: ${island.why}` : `an island because of ${island.why}`
 }
 
 // One row per route, the heaviest first: its pattern, whether it was prerendered, and what it loads.

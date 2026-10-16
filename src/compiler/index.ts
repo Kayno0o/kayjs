@@ -8,7 +8,7 @@ import { basename, relative } from 'node:path'
 import process from 'node:process'
 import { drawIcons, templateFacts, visitNodes } from './ast'
 import { browserReads } from './browser'
-import { generate, isInteractive, islandMessages, mayPromote } from './codegen'
+import { generate, isInteractive, islandCause, islandMessages, promotionCause } from './codegen'
 import { cssImportsWithoutText, deprecatedSchemaNames, separatePageSettings, unboundedFields } from './fence-checks'
 import { applyLints, templateLints } from './lints'
 import { SourceMap } from './mapping'
@@ -63,6 +63,8 @@ export interface CompileResult {
   island?: string | undefined
   // Set when the static component renders as an island should it pass one what only an island sends.
   promote?: string | undefined
+  // What makes the component an island, or what may make it one when `promote` is set, as `onClick, line 4`.
+  why?: string | undefined
   // The `.class` shorthand names, which CSS tools scanning for class names cannot read off `div.md:flex.w-1/2`.
   classes: string[]
   diagnostics: Diagnostic[]
@@ -103,7 +105,9 @@ export function compileKay(source: string, filename: string, options: CompileOpt
   const island = client || isInteractive(file, script) ? islandId(filename, options.root) : undefined
   const hydratableServer = options.output === 'html' && options.hydratable === true
   const twin = hydratableServer && !options.twinBuild && island === undefined && !routeFile ? `./${basename(filename)}${ISLAND_TWIN}` : undefined
-  const promote = island === undefined && !routeFile && mayPromote(file, script) ? islandId(filename, options.root) : undefined
+  const promotion = island === undefined && !routeFile ? promotionCause(file, script) : undefined
+  const promote = promotion === undefined ? undefined : islandId(filename, options.root)
+  const why = island === undefined ? promotion : islandCause(file, script) ?? 'a package that only runs in the browser'
   const generateOptions = { island, client, twin, promote, output: options.output, hydratable: hydratableServer && (island !== undefined || options.twinBuild === true), moduleId: islandId(filename, options.root), includeServer: options.includeServer, params: options.params, paramTypes: options.paramTypes, outerQueries: options.outerQueries, check: options.check, insideIsland: options.insideIsland, inspect: options.inspect, relocateImport: options.relocateImport, errorPage: basename(filename) === ERROR_PAGE, special: basename(filename).startsWith('_') && basename(filename) !== LAYOUT }
   // The analysis pass names the component so no read resolves to it, then the name is chosen free of what the code reads.
   const analysis = generate(file, script, server, { ...generateOptions, name: SELF })
@@ -150,13 +154,14 @@ export function compileKay(source: string, filename: string, options: CompileOpt
 
   // The server never renders a client-only island, so its module leaves the script out: a package touching `window` as it loads never loads there.
   if (client && options.output === 'html' && island !== undefined)
-    return { tsx: `import { island as KayIsland } from 'kay/island'\n\nexport default KayIsland(${JSON.stringify(island)}, undefined${islandMessages(source, true)})\n`, map: new SourceMap([], []), island, classes: templateFacts(file).classes, diagnostics: reported }
+    return { tsx: `import { island as KayIsland } from 'kay/island'\n\nexport default KayIsland(${JSON.stringify(island)}, undefined${islandMessages(source, true)})\n`, map: new SourceMap([], []), island, why, classes: templateFacts(file).classes, diagnostics: reported }
 
   return {
     tsx: final.builder.code,
     map: final.builder.map(),
     island,
     promote,
+    why,
     classes: templateFacts(file).classes,
     diagnostics: reported,
   }

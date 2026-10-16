@@ -1765,9 +1765,38 @@ describe('the size report', () => {
       const printed = formatSizeReport(report!)
 
       expect(printed).toMatch(/^ {2}entry, loaded by every page with an island {2}\d+\.\d KB \(\d+\.\d KB\)$/m)
-      expect(printed).toMatch(/^ {2}src\/big\.kay +\+\d+\.\d KB \(\d+\.\d KB\)\n {6}src\/data\.ts {2}\d+\.\d KB$/m)
+      expect(printed).toMatch(/^ {2}src\/big\.kay +\+\d+\.\d KB \(\d+\.\d KB\)\n {6}an island because of `onClick`, line 7\n {6}src\/data\.ts {2}\d+\.\d KB$/m)
       // An island holding only itself is not broken down.
-      expect(printed.split('\n').at(-1)).toMatch(/^ {2}src\/small\.kay +\+/)
+      expect(printed.split('\n').at(-1)).toBe('      an island because of `onClick`, line 6')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('says what makes each component an island, and what may make a static one', async () => {
+    const root = await scratchProject({
+      'src/clicks.kay': 'button(type="button" onClick={() => {}}) Go\n',
+      'src/field.kay': '---\nlet text = \'\'\n---\ninput(bind:value={text})\n',
+      'src/state.kay': '---\nimport { signal } from \'kay\'\n\nconst n = signal(0)\n---\np {n()}\n',
+      'src/client.kay': '--- client\nconst x = 1\n---\np {x}\n',
+      'src/wrap.kay': '---\nimport Clicks from \'./clicks.kay\'\n\nfunction pick() {}\n---\np Wrapped\nClicks(format={pick})\n',
+      'src/routes/index.kay': '---\nimport Clicks from \'../clicks.kay\'\nimport Field from \'../field.kay\'\nimport State from \'../state.kay\'\nimport Client from \'../client.kay\'\nimport Wrap from \'../wrap.kay\'\n---\nClicks\nField\nState\nClient\nWrap\n',
+    })
+
+    try {
+      const { report } = await buildClient(root, { minify: true, report: 'sizes' })
+      const why = Object.fromEntries(report!.islands.map(island => [island.file, island.why]))
+
+      expect(why).toEqual({
+        'src/clicks.kay': '`onClick`, line 1',
+        'src/field.kay': '`bind:value`, line 4',
+        'src/state.kay': '`signal` from kay',
+        'src/client.kay': 'a `--- client` fence',
+        'src/wrap.kay': '`format` passed to Clicks, line 7',
+      })
+      expect(report!.islands.filter(island => island.promoted).map(island => island.file)).toEqual(['src/wrap.kay'])
+      expect(formatSizeReport(report!)).toContain('static unless it passes an island what only an island sends: `format` passed to Clicks, line 7')
     }
     finally {
       await rm(root, { recursive: true, force: true })
@@ -1781,7 +1810,7 @@ describe('the size report', () => {
 
 describe('the build report', () => {
   const summary = (routes: RouteSize[]): BuildSummary => ({ routes, stages: [{ name: 'check', ms: 4210 }, { name: 'bundle', ms: 87.4 }], caches: [{ name: 'image variants', cached: 40, made: 2 }, { name: 'components', cached: 0, made: 3 }] })
-  const route = (pattern: string, js: number, css = 0, pages = 1): RouteSize => ({ route: pattern, js, css, pages, estimated: pages === 0 })
+  const route = (pattern: string, js: number, css = 0, pages = 1): RouteSize => ({ route: pattern, js, css, islands: [], pages, estimated: pages === 0 })
 
   it('shows one row per route with its scripts, stylesheets and whether it was prerendered, the change since the last build beside each size', () => {
     const previous: StoredReport = { version: 1, exported: false, entry: 10_240, islands: {}, routes: { '/': { js: 10_240, css: 1024 }, '/blog/:slug': { js: 5120, css: 0 } } }
@@ -1838,12 +1867,20 @@ describe('the build report', () => {
       const html = '<script type="module" src="/base/_kay/a.js"></script><p><a href="/_kay/%zz.js">x</a><a href="/_kay/../outside.js">y</a></p>'
       const sizes = await routeSizes('/app', { dir, styles: new Map() } as unknown as ClientBuild, [{ pattern: '/', file: '/app/src/routes/index.kay', params: [], layouts: [] } as unknown as Route], [{ path: '/', file: '/app/src/routes/index.kay', html } as RenderedPage], undefined)
 
-      expect(sizes).toEqual([{ route: '/', js: Bun.gzipSync(await Bun.file(join(dir, 'a.js')).bytes(), { level: 9 }).length, css: 0, pages: 1, estimated: false }])
+      expect(sizes).toEqual([{ route: '/', js: Bun.gzipSync(await Bun.file(join(dir, 'a.js')).bytes(), { level: 9 }).length, css: 0, islands: [], pages: 1, estimated: false }])
     }
     finally {
       await rm(dir, { recursive: true, force: true })
       await rm(join(dir, '../outside.js'), { force: true })
     }
+  })
+
+  it('lists the islands a route\'s prerendered pages render', async () => {
+    const route = { pattern: '/', file: '/app/src/routes/index.kay', params: [], layouts: [] } as unknown as Route
+    const html = '<slot data-component="src/b.kay" data-props="{}"></slot><slot data-component="src/a.kay" data-props="{}"></slot><slot data-component="src/b.kay" data-props="{}"></slot>'
+    const sizes = await routeSizes('/app', { dir: '/nowhere', styles: new Map() } as unknown as ClientBuild, [route], [{ path: '/', file: route.file, html } as RenderedPage], undefined)
+
+    expect(sizes[0]!.islands).toEqual(['src/a.kay', 'src/b.kay'])
   })
 
   it('reads a route whose pages all answered another status as prerendered, with the scripts they load', async () => {
@@ -1855,7 +1892,7 @@ describe('the build report', () => {
       const route = { pattern: '/gone', file: '/app/src/routes/gone.kay', params: [], layouts: [] } as unknown as Route
       const sizes = await routeSizes('/app', { dir, styles: new Map() } as unknown as ClientBuild, [route], [], undefined, [{ file: route.file, html: '<script type="module" src="/_kay/a.js"></script>' }, { file: route.file, html: '' }])
 
-      expect(sizes).toEqual([{ route: '/gone', js: expect.any(Number), css: 0, pages: 2, estimated: false }])
+      expect(sizes).toEqual([{ route: '/gone', js: expect.any(Number), css: 0, islands: [], pages: 2, estimated: false }])
       expect(sizes[0]!.js).toBeGreaterThan(0)
     }
     finally {

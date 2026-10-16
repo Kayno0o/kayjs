@@ -11,6 +11,8 @@ import { gzipSize } from './report'
 
 // A script a page loads from the build, whatever the mount point puts before it.
 const SCRIPT_URL = /(?:src|href)="[^"]*?(\/_kay\/[^"?#]+\.js)[?#"]/g
+// An island's slot in a prerendered page, named by its file.
+const ISLAND_SLOT = /<slot data-component="([^"]+)"/g
 const PATH_SEPARATOR = /[/\\]/
 // Every specifier a module names, static or dynamic, `from 'x'`, `import 'x'` or `import('x')`; one in a comment or a string only adds a file the estimate may overcount.
 const IMPORT = /\b(?:from|import)\s*(?:\(\s*)?['"]([^'"]+)['"]/g
@@ -78,7 +80,7 @@ export async function routeSizes(root: string, client: ClientBuild, routes: Rout
     if (pages.length > 0) {
       const each = await Promise.all(pages.map(async page => total(new Set([...page.html.matchAll(SCRIPT_URL)].map(match => match[1]!)))))
 
-      bySize.set(route.pattern, { route: route.pattern, js: each.reduce((most, size) => Math.max(most, size), 0), css, pages: pages.length, estimated: false })
+      bySize.set(route.pattern, { route: route.pattern, js: each.reduce((most, size) => Math.max(most, size), 0), css, islands: [...new Set(pages.flatMap(page => [...page.html.matchAll(ISLAND_SLOT)].map(match => match[1]!)))].sort(), pages: pages.length, estimated: false })
 
       continue
     }
@@ -92,7 +94,7 @@ export async function routeSizes(root: string, client: ClientBuild, routes: Rout
     // A chunk two islands share is weighed once, and the entry ships with an island or when a form or a deferred island needs it.
     const chunks = found.islands.size === 0 && !found.ships ? [] : new Set([...entryChunks, ...[...found.islands].flatMap(island => islandChunks.get(island)!)])
 
-    bySize.set(route.pattern, { route: route.pattern, js: await total(chunks), css, pages: 0, estimated: true })
+    bySize.set(route.pattern, { route: route.pattern, js: await total(chunks), css, islands: [...found.islands].sort(), pages: 0, estimated: true })
   }
 
   return [...bySize.values()]

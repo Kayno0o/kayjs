@@ -88,6 +88,8 @@ const BUILTINS = [...builtinModules, 'node:*', 'bun', 'bun:*']
 // What the components say before anything is bundled: the islands by id, the classes of the `.class` shorthand, what `kay check` would report of them, and the pages and layouts the stylesheets are gathered from.
 export interface ClientSources {
   islands: Map<string, string>
+  // What makes each island one, by id, as `onClick, line 4`; for a static component that may render as one, what may.
+  why: Map<string, { why: string, promoted: boolean }>
   classes: Set<string>
   problems: string[]
   pages: string[]
@@ -117,7 +119,7 @@ async function bundleClient(root: string, options: ClientOptions): Promise<Clien
   built.packages = packagesOf([...bundled, ...styles.inputs])
 
   if (options.report !== undefined)
-    built.report = await sizeReport(root, clientDir(root), scripts.manifest, sources.islands, options.report === 'modules' ? scripts.inputs : undefined)
+    built.report = await sizeReport(root, clientDir(root), scripts.manifest, sources.islands, sources.why, options.report === 'modules' ? scripts.inputs : undefined)
 
   return built
 }
@@ -141,6 +143,7 @@ export async function bothBundles<Islands extends Promise<unknown> | undefined, 
 // Compiles every component, throwing all of their errors at once. `graph` keeps what each module imports, across builds when given.
 export async function readClientSources(root: string, options: ClientOptions = {}, graph: ImportGraph = new Map()): Promise<ClientSources> {
   const islands = new Map<string, string>()
+  const why = new Map<string, { why: string, promoted: boolean }>()
   const classes = new Set<string>()
   const diagnostics: FileDiagnostic[] = []
   // A library's components the app reaches compile with its own; a kay project nested inside, such as an example, builds on its own.
@@ -178,10 +181,13 @@ export async function readClientSources(root: string, options: ClientOptions = {
         problems.push(formatDiagnostic(source, relative(root, file), diagnostic))
     }
 
-    if (compiled.island !== undefined)
+    if (compiled.island !== undefined) {
       islands.set(compiled.island, file)
-    else if (file === editor)
+      why.set(compiled.island, { why: compiled.why ?? '', promoted: false })
+    }
+    else if (file === editor) {
       throw new KayError('inert-editor', `kay: the editor ${relative(root, file)} runs nothing in the browser, where an editor edits the page: give it a script reading signals, or a \`--- client\` fence`)
+    }
 
     for (const name of compiled.classes)
       classes.add(name)
@@ -199,8 +205,10 @@ export async function readClientSources(root: string, options: ClientOptions = {
   }))
 
   for (const [index, promote] of promoted.entries()) {
-    if (promote !== undefined)
+    if (promote !== undefined) {
       islands.set(promote, files[index]!)
+      why.set(promote, { why: analyses[index]!.why ?? '', promoted: true })
+    }
   }
 
   // Tailwind reads the app's files itself, never a package's, so the words of the library files the app reaches go to it here: its components, and its scripts holding default classes.
@@ -215,7 +223,7 @@ export async function readClientSources(root: string, options: ClientOptions = {
   const routesDir = projectPaths(root, options).routes
 
   // The editor gathers its stylesheet as a page does, an app's own file or not.
-  return { islands, classes, problems, pages: [...new Set([...existsSync(routesDir) ? await findKayFiles(routesDir) : [], ...mounted, ...editor === undefined ? [] : [editor]])], libraries }
+  return { islands, why, classes, problems, pages: [...new Set([...existsSync(routesDir) ? await findKayFiles(routesDir) : [], ...mounted, ...editor === undefined ? [] : [editor]])], libraries }
 }
 
 // A failed build must not leave the previous manifest pointing at files that are gone.

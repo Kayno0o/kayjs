@@ -528,7 +528,7 @@ export function someNode(nodes: readonly Node[], found: (node: Node) => boolean)
   return nodes.some(node => found(node) || childBlocks(node).some(block => someNode(block, found)))
 }
 
-const INTERACTIVE_ATTRIBUTE = /^(?:on[A-Z]|bind:|ref$)/
+export const INTERACTIVE_ATTRIBUTE = /^(?:on[A-Z]|bind:|ref$)/
 const IDENTIFIER = /^[A-Z_$][\w$]*$/i
 
 // What every output and check of a file reads off its template, found once and kept on the file.

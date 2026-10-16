@@ -941,6 +941,11 @@ function undeclared(ast: ParseResult<t.File>, code: string, names: string[], typ
   return found
 }
 
+// The first value from `kay` that makes the script reactive, as it is written: an implicit global such as `signal`, or an import.
+export function reactiveName(script: ScriptAnalysis): string | undefined {
+  return script.implicit[0] ?? script.imports.find(importsReactiveValue)?.imported
+}
+
 function importsReactiveValue(binding: ImportBinding): boolean {
   if (binding.typeOnly)
     return false

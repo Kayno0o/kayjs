@@ -4,7 +4,7 @@ import type { PageSettingName } from './page-settings'
 import type { Sites } from './rewrite'
 import type { ImportBinding, ScriptAnalysis, ServerAnalysis } from './script'
 import { actionUrl } from '../runtime/action'
-import { errorMessages, isHead, someNode, templateFacts } from './ast'
+import { errorMessages, INTERACTIVE_ATTRIBUTE, isHead, someNode, templateFacts } from './ast'
 import { domHelperImport, DomTemplate } from './dom'
 import { mayHoldFunction } from './expression'
 import { htmlHelperImport, HtmlTemplate } from './html'
@@ -15,6 +15,7 @@ import { CodeBuilder, DYNAMIC_TAG } from './mapping'
 import { helperName } from './markup'
 import { defaultName, LOAD, PROPS, VALUES } from './names'
 import { PAGE, PAGE_SETTINGS } from './page-settings'
+import { reactiveName } from './script'
 import { headTagProblem, sharedImports } from './validate'
 
 export interface GenerateOptions {
@@ -759,11 +760,72 @@ export function isInteractive(file: KayFile, script: ScriptAnalysis): boolean {
   return script.reactive || templateFacts(file).interactive
 }
 
-// Whether a static component passes a component what may be a function, a class or an instance of one, or a block taking parameters: should that component be an island, it renders as one itself.
-export function mayPromote(file: KayFile, script: ScriptAnalysis): boolean {
+// What a static component passes a component that may render it as an island, a function, a class or an instance of one, or a block taking parameters, as `onPick passed to Picker, line 8`: the first in the template.
+export function promotionCause(file: KayFile, script: ScriptAnalysis): string | undefined {
   const names = new Set([...script.functions, ...script.imports.filter(binding => !binding.typeOnly).map(binding => binding.local)])
+  let cause: string | undefined
 
-  return someNode(file.template, node => node.kind === 'element' && node.component && (node.attributes.some(attribute => (attribute.kind === 'expression' || attribute.kind === 'spread') && mayHoldFunction(file.source.slice(attribute.expression.start, attribute.expression.end), names)) || node.children.some(child => child.kind === 'slot' && child.params !== undefined)))
+  someNode(file.template, (node) => {
+    if (node.kind !== 'element' || !node.component)
+      return false
+
+    const attribute = node.attributes.find(attribute => (attribute.kind === 'expression' || attribute.kind === 'spread') && mayHoldFunction(file.source.slice(attribute.expression.start, attribute.expression.end), names))
+
+    if (attribute !== undefined) {
+      const prop = attribute.kind === 'spread' ? 'a spread' : `\`${file.source.slice(attribute.name.start, attribute.name.end)}\``
+
+      cause = `${prop} passed to ${node.name}, line ${lineOf(file.source, node.start)}`
+    }
+    else if (node.children.some(child => child.kind === 'slot' && child.params !== undefined)) {
+      cause = `a block taking parameters passed to ${node.name}, line ${lineOf(file.source, node.start)}`
+    }
+
+    return cause !== undefined
+  })
+
+  return cause
+}
+
+// The first thing that makes a component interactive, so an island: `onClick, line 4`, `bind:value, line 9`, `ref, line 3`, `signal from kay` or a `--- client` fence.
+export function islandCause(file: KayFile, script: ScriptAnalysis): string | undefined {
+  if (file.client !== undefined)
+    return 'a `--- client` fence'
+
+  let cause: string | undefined
+
+  someNode(file.template, (node) => {
+    if (node.kind !== 'element')
+      return false
+
+    for (const attribute of node.attributes) {
+      if (attribute.kind === 'spread')
+        continue
+
+      const name = file.source.slice(attribute.name.start, attribute.name.end)
+
+      if (INTERACTIVE_ATTRIBUTE.test(name)) {
+        cause = `\`${name}\`, line ${lineOf(file.source, attribute.name.start)}`
+
+        return true
+      }
+    }
+
+    return false
+  })
+
+  if (cause === undefined && script.reactive)
+    cause = `\`${reactiveName(script)}\` from kay`
+
+  return cause
+}
+
+function lineOf(source: string, offset: number): number {
+  let line = 1
+
+  for (let index = source.indexOf('\n'); index !== -1 && index < offset; index = source.indexOf('\n', index + 1))
+    line++
+
+  return line
 }
 
 type KayHelper = 'formAction' | 'formValue' | 'formChecked' | 'formDescribed' | 'formInvalid' | 'formMarked' | 'formError' | 'formProtection' | 'registerActions' | 'actionStub' | 'autoDefer'
