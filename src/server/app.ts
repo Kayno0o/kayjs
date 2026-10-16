@@ -52,6 +52,7 @@ import { REQUEST_ID_HEADER, requestId, trustProxy } from './protection'
 import { claimPublic, publicFiles, servePublic } from './public'
 import { claimRedirects, readRedirects, serveRedirects } from './redirects'
 import { remoteImages, remotePatterns } from './remote'
+import { reportServerError } from './report'
 import { trackPrerendered } from './revalidate'
 import { rewriteRequests } from './rewrite'
 import { routeMatch, routeTable } from './route-table'
@@ -110,12 +111,12 @@ function sendSecurityHeaders(app: App, security: Record<string, string>, filePat
 }
 
 // Scoped, so the app's own routes are compressed too; what is encoded already, as the build's copies are, goes as it is.
-function compress(app: App, client: ClientBuild, base: string) {
+function compress(app: App, client: ClientBuild, base: string, onError: KayConfig['onError']) {
   // Inlined stylesheets go out as `rebaseHtml` leaves them, under the mount point.
   const fixed = client.inlineStyles && fixedTexts([...client.inlineStyles.values()].map(css => `<style>${rebaseCss(css, base)}</style>`))
 
   // eslint-disable-next-line ts/promise-function-async -- Elysia sends an empty body when a mapResponse promise resolves to undefined
-  app.mapResponse({ as: 'scoped' }, ({ request, responseValue }) => responseValue instanceof Response ? compressResponse(request, responseValue, fixed) : undefined)
+  app.mapResponse({ as: 'scoped' }, ({ request, responseValue }) => responseValue instanceof Response ? compressResponse(request, responseValue, fixed, error => reportServerError(error, request, onError)) : undefined)
 }
 
 function serveDevRoutes(app: App, root: string, client: ClientBuild, mode: Mode, base: string) {
@@ -210,7 +211,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
     sendSecurityHeaders(app, security, filePaths)
 
   if (options.compress ?? process.env.NODE_ENV === 'production')
-    compress(app, client, base)
+    compress(app, client, base, options.onError)
 
   // kay's own messages go out whether requests are logged or not.
   useLogger(typeof log === 'boolean' || log)

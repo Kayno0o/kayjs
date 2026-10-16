@@ -1610,6 +1610,29 @@ describe('compression', () => {
     }
   })
 
+  it('names the route that returns again a Response whose body streamed', async () => {
+    const caught: unknown[] = []
+    let pulls = 0
+    // Its second half comes later than the request's tick, so the body is streamed rather than read whole.
+    const streamed = new Response(new ReadableStream({ async pull(controller) {
+      if (pulls++ > 0)
+        await Bun.sleep(20)
+
+      controller.enqueue(new TextEncoder().encode('row '.repeat(1000)))
+
+      if (pulls > 1)
+        controller.close()
+    } }), { headers: { 'content-type': 'text/plain' } })
+    const app = new Elysia()
+      .use(await pages({ routes, prebuilt: false, compress: true, onError: error => void caught.push(error) }))
+      .get('/api/stream', () => streamed)
+    const fetch = async () => app.handle(new Request('http://localhost/api/stream', { headers: { 'accept-encoding': 'gzip' } }))
+
+    expect(new TextDecoder().decode(Bun.gunzipSync(new Uint8Array(await (await fetch()).arrayBuffer())))).toBe('row '.repeat(2000))
+    expect((await fetch()).status).toBe(500)
+    expect(String(caught.at(-1))).toContain('/api/stream answered a Response whose body was already sent')
+  })
+
   it('compresses what renders per request for a browser taking zstd, brotli or gzip, headers and cookies kept', async () => {
     // Registered after the pages, as hooks only reach the routes that come after them.
     const app = new Elysia()

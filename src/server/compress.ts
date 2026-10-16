@@ -500,7 +500,7 @@ export function wholeResponse(body: string | Uint8Array<ArrayBuffer>, init?: Res
 // A body complete within a tick, as a rendered string is, is compressed in one go with a window cut to its size, and gets a length unless it waited on zlib's threads and goes out at 15 KB or more, compressed or not (`lateBody`); a streamed one is flushed chunk by chunk, so what the server sends early still reaches the browser early.
 // A response left alone is answered synchronously: Elysia sends an empty body for a `mapResponse` promise resolving to undefined.
 // A whole page holding `fixed` texts goes as gzip to a browser taking it, whatever weight it gives zstd or brotli: only the rest of it is compressed, where brotli would compress it all, as its streams cannot be joined.
-export function compressResponse(request: Request, response: Response, fixed?: FixedText[]): Response | undefined | Promise<Response> {
+export function compressResponse(request: Request, response: Response, fixed?: FixedText[], report?: (error: Error) => void): Response | undefined | Promise<Response> {
   const { headers, status } = response
   const length = headers.get('content-length')
   const size = length === null ? wholeSizes.get(response) : Number(length)
@@ -510,6 +510,13 @@ export function compressResponse(request: Request, response: Response, fixed?: F
 
   const encoding = preferredEncoding(request.headers.get('accept-encoding'), ON_THE_FLY, ON_THE_FLY_ORDER)
   const read = readBodies.get(response)
+
+  // A streamed body is sent once: a route returning it again gets an error naming it, rather than an empty or broken reply.
+  if (!read && response.bodyUsed) {
+    report?.(new Error(`${new URL(request.url).pathname} answered a Response whose body was already sent: a route streaming its body returns a new Response each time`))
+
+    return new Response('Internal Server Error', { status: 500, headers: { 'content-type': 'text/plain; charset=utf-8' } })
+  }
 
   // Whatever the browser takes, a shared cache keeps one copy per encoding; one taking none gets the response as it is, its body never read, or what was read of it before.
   if (!encoding) {
