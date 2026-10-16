@@ -497,7 +497,7 @@ class RewriteFinder {
       if (!accessor || this.input.values)
         this.visitBinding(path.scope, name, reference => accessor && tagPosition(reference) === 'opening' ? {} : undefined, readOnly)
       else
-        this.visitBinding(path.scope, name, reference => withShorthand(reference, name, { after: '()' }), readOnly)
+        this.visitBinding(path.scope, name, reference => withShorthand(reference, name, { after: '()' }), readOnly, `ReturnType<typeof ${name}>`)
     }
   }
 
@@ -749,42 +749,43 @@ function isPlainRead(rewrite: Rewrite): boolean {
 
 // The identifier a write to `name` assigns, so the diagnostic lands on the name instead of on the `++` or `[` the statement starts with.
 function assignedIdentifier(violation: t.Node, name: string): t.Identifier | undefined {
-  const find = (pattern: t.Node | null | undefined): t.Identifier | undefined => {
-    if (pattern?.type === 'Identifier')
-      return pattern.name === name ? pattern : undefined
+  if (violation.type === 'AssignmentExpression' || violation.type === 'ForInStatement' || violation.type === 'ForOfStatement')
+    return patternIdentifier(violation.left, name)
 
-    if (pattern?.type === 'ObjectPattern') {
-      for (const property of pattern.properties) {
-        const found = find(property.type === 'RestElement' ? property.argument : property.value)
+  return violation.type === 'UpdateExpression' ? patternIdentifier(violation.argument, name) : undefined
+}
 
-        if (found)
-          return found
-      }
+// The identifier `name` that a binding pattern declares or an assignment target writes.
+function patternIdentifier(pattern: t.Node | null | undefined, name: string): t.Identifier | undefined {
+  if (pattern?.type === 'Identifier')
+    return pattern.name === name ? pattern : undefined
 
-      return undefined
+  if (pattern?.type === 'ObjectPattern') {
+    for (const property of pattern.properties) {
+      const found = patternIdentifier(property.type === 'RestElement' ? property.argument : property.value, name)
+
+      if (found)
+        return found
     }
 
-    if (pattern?.type === 'ArrayPattern') {
-      for (const element of pattern.elements) {
-        const found = find(element)
-
-        if (found)
-          return found
-      }
-
-      return undefined
-    }
-
-    if (pattern?.type === 'AssignmentPattern')
-      return find(pattern.left)
-
-    return pattern?.type === 'RestElement' ? find(pattern.argument) : undefined
+    return undefined
   }
 
-  if (violation.type === 'AssignmentExpression' || violation.type === 'ForInStatement' || violation.type === 'ForOfStatement')
-    return find(violation.left)
+  if (pattern?.type === 'ArrayPattern') {
+    for (const element of pattern.elements) {
+      const found = patternIdentifier(element, name)
 
-  return violation.type === 'UpdateExpression' ? find(violation.argument) : undefined
+      if (found)
+        return found
+    }
+
+    return undefined
+  }
+
+  if (pattern?.type === 'AssignmentPattern')
+    return patternIdentifier(pattern.left, name)
+
+  return pattern?.type === 'RestElement' ? patternIdentifier(pattern.argument, name) : undefined
 }
 
 // A renamed or quoted key replaces the local name; an unrenamed one keeps it, so the read stays mapped to the source.
@@ -813,7 +814,7 @@ function signatureNames(path: NodePath, name: string): boolean {
     const node = parent.node as { parameters?: t.Node[], params?: t.Node[] }
     const params = SIGNATURES.has(parent.node.type) ? node.parameters ?? node.params ?? [] : []
 
-    if (params.some(param => (param.type === 'RestElement' ? param.argument : param).type === 'Identifier' && ((param.type === 'RestElement' ? param.argument : param) as t.Identifier).name === name))
+    if (params.some(param => patternIdentifier(param, name) !== undefined))
       return true
   }
 

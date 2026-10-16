@@ -710,6 +710,27 @@ describe('component names', () => {
       expect(code).toContain('x as ((v: typeof __props.value.a, n: Exclude<(typeof __props)["size"], undefined>) => void)')
       expect(code).toContain('x as ((value: number, w: typeof value) => void)')
     })
+
+    it('reads `typeof` of a template `const` as the type its memo holds, at the top of a type and nested, in html and dom', () => {
+      for (const output of ['html', 'dom'] as const) {
+        const code = compileKay('---\nconst items = signal([1])\n---\nfor n of items\n  const t = n + 1\n  p {(t as unknown as typeof t)} {(1 as unknown as { a: { b: typeof t }, f: (v: typeof t) => void })}', 'test.kay', { output }).tsx
+
+        expect(code).toContain('as unknown as ReturnType<typeof t>)')
+        expect(code).toContain('{ a: { b: ReturnType<typeof t> }, f: (v: ReturnType<typeof t>) => void }')
+        expect(code).not.toContain('typeof t()')
+      }
+    })
+
+    it('leaves `typeof` of a destructured parameter of the enclosing function type alone', () => {
+      for (const output of ['html', 'dom'] as const) {
+        const code = compileKay('---\nconst { a, b } = props<{ a: string, b: string }>()\nconst f = (x: unknown) => x as (({ a }: { a: number }, w: typeof a) => void)\nconst g = (x: unknown) => x as (([b]: number[], ...{ length }: string[]) => typeof b)\n---\np {a}{b}', 'test.kay', { output }).tsx
+
+        expect(code).toContain('(({ a }: { a: number }, w: typeof a) => void)')
+        expect(code).toContain('=> typeof b)')
+        expect(code).not.toContain('typeof __props.a')
+        expect(code).not.toContain('typeof __props.b')
+      }
+    })
   })
 
   it('reports a template `const` named like the component, which its tags after it would render', () => {
