@@ -194,6 +194,39 @@ const rows: Row[] = [
     prepare: guessingCodes,
   },
   {
+    key: 'resend',
+    answers: { ok: true },
+    per: 'client',
+    limit: { max: 2, window: 3600 },
+    prepare: async (limits) => {
+      const { ada } = await registered(limits, mail())
+
+      return async () => ada.call('sendVerification')
+    },
+  },
+  {
+    key: 'emailChange',
+    answers: { ok: true },
+    per: 'client',
+    limit: { max: 2, window: 3600 },
+    prepare: async (limits) => {
+      const { ada } = await registered(limits, mail())
+
+      return async n => ada.call('changeEmail', { password: PASSWORD }, `new${n}@example.com`)
+    },
+  },
+  {
+    key: 'link',
+    answers: { ok: false, error: 'invalid' },
+    per: 'client',
+    limit: { max: 2, window: 3600 },
+    prepare: async (limits) => {
+      const { browser } = await mailed(limits)
+
+      return async () => browser().call('verifyEmail', 'not-a-token')
+    },
+  },
+  {
     key: 'resendAccount',
     answers: { ok: true },
     per: 'account',
@@ -269,10 +302,8 @@ const elsewhere: Partial<Record<keyof Limits, string>> = {
 }
 
 describe('rate limits', () => {
-  test('every limiter is walked here or in the file of its feature, or listed as not walked yet', () => {
-    const notWalked = ['resend', 'emailChange', 'link']
-
-    expect([...new Set([...rows.map(row => row.key), ...Object.keys(elsewhere), ...notWalked])].toSorted()).toEqual(Object.keys(DEFAULT_LIMITS).toSorted())
+  test('every limiter is walked here or in the file of its feature', () => {
+    expect([...new Set([...rows.map(row => row.key), ...Object.keys(elsewhere)])].toSorted()).toEqual(Object.keys(DEFAULT_LIMITS).toSorted())
   })
 
   test.each(rows.map(row => [`${row.key}${row.action === undefined ? '' : ` (${row.action})`}`, row.per, row] as const))('%s answers `limited` once its attempts are spent, per %s', async (_name, _per, row) => {
