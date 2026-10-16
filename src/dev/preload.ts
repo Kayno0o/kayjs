@@ -329,6 +329,12 @@ async function reload(request: ReloadRequest): Promise<void> {
   process.send?.(answer)
 }
 
+// How far the process may grow from its first reload before the next change starts a new one: Bun keeps the code of every ES module it evaluated again, which adds up to about the size of the modules reloaded.
+const GROWTH_LIMIT = Number(process.env.KAY_DEV_RELOAD_GROWTH_MB ?? 64) * 1024 * 1024
+let baseline: number | undefined
+
+delete process.env.KAY_DEV_RELOAD_GROWTH_MB
+
 async function reloaded({ code, startedAt, changed, files }: ReloadRequest): Promise<{ reloaded: true } | { restart: string }> {
   const root = process.cwd()
   let paths: ReturnType<typeof projectPaths>
@@ -347,6 +353,11 @@ async function reloaded({ code, startedAt, changed, files }: ReloadRequest): Pro
 
   if (started.length === 0)
     return { restart: 'the entry started no server' }
+
+  baseline ??= process.memoryUsage.rss()
+
+  if (process.memoryUsage.rss() - baseline > GROWTH_LIMIT)
+    return { restart: 'the server process grew with its reloads' }
 
   process.env.KAY_DEV_CODE = String(code)
   process.env.KAY_DEV_FROM = String(startedAt)

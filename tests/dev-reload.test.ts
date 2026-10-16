@@ -343,35 +343,6 @@ describe.concurrent('kay dev reloading', () => {
       await project.cleanup()
     }
   }, 60_000)
-
-  it('holds the same memory after sixty edits of a large page as after thirty', async () => {
-    const project = await served({ 'src/routes/index.kay': 'h1 Edit 0\n' })
-    const heaps = join(project.root, '.heaps')
-
-    try {
-      // The server process measures itself once the entry ran again, which the page changing waits on.
-      await project.write('src/server.ts', `${ENTRY(project.log)}\nBun.gc(true)\nawait Bun.write(${JSON.stringify(heaps)}, \`\${await Bun.file(${JSON.stringify(heaps)}).text().catch(() => '')}\${process.memoryUsage().heapUsed}\\n\`)\n`)
-      await until(() => project.children.length === 2)
-      await project.sees('Edit 0')
-
-      const measured = () => existsSync(heaps) ? readFileSync(heaps, 'utf8').split('\n').filter(Boolean).map(Number) : []
-
-      for (let edit = 1; edit <= 60; edit++) {
-        await project.write('src/routes/index.kay', `h1 Edit ${edit}\np ${'x'.repeat(200_000)} ${edit}\n`)
-        await project.sees(`Edit ${edit}`)
-      }
-
-      await until(() => measured().length >= 61)
-      const sizes = measured()
-
-      // The heap settles within a few dozen edits; one keeping each version of the page, 200 KB, would grow by 6 MB over the next thirty.
-      expect(project.children).toHaveLength(2)
-      expect(sizes.at(-1)!).toBeLessThan(sizes[30]! + 3_000_000)
-    }
-    finally {
-      await project.cleanup()
-    }
-  }, 120_000)
 })
 
 describe('the modules a change leaves stale', () => {
@@ -512,4 +483,45 @@ describe('the modules a change leaves stale', () => {
       await rm(dir, { recursive: true, force: true })
     }
   })
+})
+
+// Apart from the others: the growth limit is read from the environment the server process starts with.
+describe('kay dev memory', () => {
+  it('holds its resident memory within the growth limit over sixty edits of a large page', async () => {
+    const LIMIT_MB = 8
+    const before = process.env.KAY_DEV_RELOAD_GROWTH_MB
+
+    process.env.KAY_DEV_RELOAD_GROWTH_MB = String(LIMIT_MB)
+
+    const project = await served({ 'src/routes/index.kay': 'h1 Edit 0\n' })
+    const memory = join(project.root, '.memory')
+
+    if (before === undefined)
+      delete process.env.KAY_DEV_RELOAD_GROWTH_MB
+    else
+      process.env.KAY_DEV_RELOAD_GROWTH_MB = before
+
+    try {
+      // The server process measures itself once the entry ran again, which the page changing waits on.
+      await project.write('src/server.ts', `${ENTRY(project.log)}\nBun.gc(true)\nawait Bun.write(${JSON.stringify(memory)}, \`\${await Bun.file(${JSON.stringify(memory)}).text().catch(() => '')}\${process.memoryUsage.rss()}\\n\`)\n`)
+      await until(() => project.children.length === 2)
+      await project.sees('Edit 0')
+
+      for (let edit = 1; edit <= 60; edit++) {
+        await project.write('src/routes/index.kay', `h1 Edit ${edit}\np ${'x'.repeat(200_000)} ${edit}\n`)
+        await project.sees(`Edit ${edit}`)
+      }
+
+      await until(() => lines(memory).length >= 61)
+      const sizes = lines(memory).map(Number)
+      const settled = sizes[3]!
+
+      // Bun keeps the code of every module it evaluates again, about 1 MB per edit of this page, so the process is replaced once it grew by the limit instead of by the edits.
+      expect(Math.max(...sizes) - settled).toBeLessThan((LIMIT_MB + 16) * 2 ** 20)
+      expect(project.children.length).toBeGreaterThan(2)
+    }
+    finally {
+      await project.cleanup()
+    }
+  }, 180_000)
 })
