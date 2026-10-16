@@ -403,6 +403,31 @@ describe('a kept page and the state a script declares', () => {
     expect(await readsNothing(route(root, 'src/routes/exported.kay'))).toBe(false)
   })
 
+  it('tells a page setting from another export in a server fence', async () => {
+    const root = await scratch({
+      'src/routes/settings.kay': '--- server\nlet title = \'Home\'\n\nexport const page = { prerender: true, revalidate: \'1h\' }\n---\nh1 {title}\n',
+      'src/routes/typed.kay': '--- server\nlet title = \'Home\'\n\nexport type Row = { id: number }\n---\nh1 {title}\n',
+      'src/routes/named.kay': '--- server\nconst seen = []\n\nexport const pageSize = seen.length\n---\np {pageSize}\n',
+      'src/routes/function.kay': '--- server\nlet count = 0\n\nexport async function bump(): Promise<void> {\n  count++\n}\n---\np {count}\n',
+      'src/routes/class.kay': '--- server\nlet count = 0\n\nexport abstract class Counter {\n  bump(): void {\n    count++\n  }\n}\n---\np {count}\n',
+    })
+
+    expect(await readsNothing(route(root, 'src/routes/settings.kay'))).toBe(true)
+    expect(await readsNothing(route(root, 'src/routes/typed.kay'))).toBe(true)
+    expect(await readsNothing(route(root, 'src/routes/named.kay'))).toBe(false)
+    expect(await readsNothing(route(root, 'src/routes/function.kay'))).toBe(false)
+    expect(await readsNothing(route(root, 'src/routes/class.kay'))).toBe(false)
+  })
+
+  it('keeps a layout whose script declares a let per render', async () => {
+    const root = await scratch({
+      'src/routes/_layout.kay': '---\nlet label = \'Site\'\n---\np {label}\nslot\n',
+      'src/routes/index.kay': 'h1 Home\n',
+    })
+
+    expect(await readsNothing({ file: join(root, 'src/routes/index.kay'), layouts: [join(root, 'src/routes/_layout.kay')] })).toBe(true)
+  })
+
   it('keeps refusing a page importing a .ts module with a module-level let or empty container', async () => {
     const root = await scratch({
       'src/routes/let.kay': '---\nimport { next } from \'../counted\'\n---\np {next()}\n',
