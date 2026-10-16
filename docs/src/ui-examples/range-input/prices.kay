@@ -13,8 +13,8 @@ const range = signal<RangeValue>([null, null])
 const shown = memo(() =>
   products.filter(
     item =>
-      item.price >= (range()[0] ?? -Infinity) &&
-      item.price <= (range()[1] ?? Infinity),
+      item.price >= (range()[0] ?? -Infinity)
+      && item.price <= (range()[1] ?? Infinity),
   ),
 )
 ---

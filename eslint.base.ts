@@ -13,4 +13,8 @@ export const kayRules: TypedFlatConfigItem[] = [{
     // bun-types types the asymmetric matchers, `expect.stringContaining()` and the like, as any.
     'ts/no-unsafe-argument': 'off',
   },
+}, {
+  // A component declares its handlers and hooks in any order: a function body runs after the whole component, and TypeScript itself rejects a read of a const before its declaration.
+  files: ['**/*.kay/*.tsx'],
+  rules: { 'ts/no-use-before-define': 'off' },
 }]

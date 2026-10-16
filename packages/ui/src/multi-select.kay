@@ -79,8 +79,11 @@ onFormReset(() => root, () => {
   if (!same)
     set([...initial])
 
-  for (const [index, box] of [...root?.querySelectorAll<HTMLInputElement>('.kui-multi-select-checkbox') ?? []].entries())
-    box.checked = picked().some(one => one === shown()[index]?.value)
+  for (const [index, box] of [...root?.querySelectorAll<HTMLInputElement>('.kui-multi-select-checkbox') ?? []].entries()) {
+    const option = shown()[index]
+
+    box.checked = option !== undefined && picked().includes(option.value)
+  }
 })
 
 const ref = startRef<HTMLElement>(element => root = element, rest.ref)
@@ -105,7 +108,10 @@ function toggled(open: boolean) {
 function keyDown(event: KeyboardEvent) {
   const boxes = [...root?.querySelectorAll<HTMLInputElement>('.kui-multi-select-checkbox') ?? []]
   const index = boxes.indexOf(event.target as HTMLInputElement)
-  const move = index === -1 ? (event.key === 'ArrowDown' ? () => 0 : undefined) : MOVES[event.key]
+  let move = MOVES[event.key]
+
+  if (index === -1)
+    move = event.key === 'ArrowDown' ? () => 0 : undefined
 
   if (!move || boxes.length === 0)
     return

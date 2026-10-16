@@ -13,8 +13,8 @@ const notes = [
     id: 4,
     title: 'Reading list',
     body:
-      'Three books, one paper and a long article that will not fit ' +
-      'on one line of a narrow tile.',
+      'Three books, one paper and a long article that will not fit '
+      + 'on one line of a narrow tile.',
   },
   { id: 5, title: 'Reminder', body: 'Water the plants.' },
 ]

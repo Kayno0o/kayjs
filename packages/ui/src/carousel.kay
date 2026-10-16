@@ -43,7 +43,7 @@ effect(() => {
   if (!autoplay || paused() || pointed() || focused() || hidden() || matchMedia('(prefers-reduced-motion: reduce)').matches)
     return
 
-  const timer = setInterval(() => step(1), autoplay)
+  const timer = setInterval(step, autoplay, 1)
 
   onCleanup(() => clearInterval(timer))
 })

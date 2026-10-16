@@ -9,10 +9,7 @@ export const page = { query: t.Object({ token: t.Optional(t.String()) }), guards
 export const spend = action(t.Object({ token: t.String() }), async ({ token }, ctx) => {
   const result = await ctx.locals.auth.signInWithMagicLink(token)
 
-  if (!result.ok)
-    return ctx.fail(400, { error: result.error })
-
-  return ctx.redirect(result.redirect)
+  return !result.ok ? ctx.fail(400, { error: result.error }) : ctx.redirect(result.redirect)
 })
 
 const token = ctx.query.token ?? ''

@@ -18,7 +18,14 @@ const { Content } = topic
 const sections = topic.headings.filter(heading => heading.depth === 2 || heading.depth === 3)
 const { previous, next } = neighbours(await reference.all(), topic.slug, llmsHref)
 const { version } = topic.data
-const source = version !== undefined ? `${libraryRoot(topic.slug)}/llms.txt` : topic.slug === 'overview' ? `${FORGE}/llms.txt` : `${FORGE}/llms/${topic.slug}.md`
+function sourceUrl() {
+  if (version !== undefined)
+    return `${libraryRoot(topic.slug)}/llms.txt`
+
+  return topic.slug === 'overview' ? `${FORGE}/llms.txt` : `${FORGE}/llms/${topic.slug}.md`
+}
+
+const source = sourceUrl()
 --- script
 import Pager from '../../../components/pager.kay'
 import Toc from '../../../components/toc.kay'

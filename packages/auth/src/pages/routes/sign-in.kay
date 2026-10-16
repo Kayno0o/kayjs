@@ -42,10 +42,7 @@ export const passkeyOptions = action(schemas.nothing, async (_input, ctx) => ctx
 export const passkey = action(schemas.passkey, async (input, ctx) => {
   const result = await ctx.locals.auth.signInWithPasskey(input.response as never, input.redirect, { remember: input.remember === true })
 
-  if (!result.ok)
-    return ctx.fail(400, { error: result.error })
-
-  return ctx.redirect(result.redirect)
+  return !result.ok ? ctx.fail(400, { error: result.error }) : ctx.redirect(result.redirect)
 })
 
 const auth = ctx.locals.auth

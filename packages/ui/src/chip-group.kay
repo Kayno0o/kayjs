@@ -67,8 +67,8 @@ const ref = startRef<HTMLElement>(element => root = element, rest.ref)
 
 // A reset puts the boxes back on their defaults, which the app's `onChange` then hears of; one meeting a change under way waits for it.
 const resetting = resetWhenIdle(busy, () => {
-  const ticked = boxes().filter(box => box.defaultChecked).map(box => box.value)
-  const next = options.map(one => one.value).filter(one => ticked.includes(one))
+  const ticked = new Set(boxes().filter(box => box.defaultChecked).map(box => box.value))
+  const next = options.map(one => one.value).filter(one => ticked.has(one))
 
   check(next)
 

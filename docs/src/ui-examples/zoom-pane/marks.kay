@@ -7,8 +7,8 @@ const pins = [
   { name: 'Park', x: 80, y: 20 },
 ]
 const pinStyle = (pin: { x: number, y: number }) =>
-  `left: ${pin.x}%; top: ${pin.y}%; ` +
-  'transform: scale(calc(1 / var(--kui-zoom-scale))); transform-origin: 0 0'
+  `left: ${pin.x}%; top: ${pin.y}%; `
+  + 'transform: scale(calc(1 / var(--kui-zoom-scale))); transform-origin: 0 0'
 ---
 ZoomPane(
   label="Map with pins"

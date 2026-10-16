@@ -38,7 +38,9 @@
   "scripts": {
     "prepare": "$npm_execpath ../../scripts/link-fixture.ts",
     "check": "$npm_execpath check",
+    "prelint": "bun run --cwd ../.. build:eslint",
     "lint": "keslint --cache",
+    "prelint:fix": "bun run --cwd ../.. build:eslint",
     "lint:fix": "keslint --fix --cache",
     "test": "bun test && bun run test:dom",
     "test:dom": "bun --config=tests-dom/bunfig.toml test"

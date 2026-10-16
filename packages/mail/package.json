@@ -42,7 +42,9 @@
     "build:types": "rm -rf types && tsgo -p tsconfig.build.json",
     "prepack": "bun run build:types",
     "postpack": "rm -rf types",
+    "prelint": "bun run --cwd ../.. build:eslint",
     "lint": "keslint --cache",
+    "prelint:fix": "bun run --cwd ../.. build:eslint",
     "lint:fix": "keslint --fix --cache",
     "test": "bun test"
   },

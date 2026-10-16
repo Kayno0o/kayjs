@@ -6,7 +6,7 @@ import Checkbox from './checkbox.kay'
 import Icon from './icon.kay'
 import { cellText, drawnByBlock, nextSort, resolvedColumn, rowKeyOf, rowLabel, rowsMatching, sortedRows } from './table'
 
-const { columns: given, rows, rowKey, sort, serverSort = false, onSort, cell, empty, filter, filterLabel = 'Filter', filterPlaceholder, filterParam, countLabel, noMatch, narrow = "stack", selectable = false, selected, onSelect, bulk, selectAllLabel = 'Select all', selectedLabel, selectRowLabel, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onSelect'> & {
+const { columns: given, rows, rowKey, sort, serverSort = false, onSort, cell, empty, filter, filterLabel = 'Filter', filterPlaceholder, filterParam, countLabel, noMatch, narrow = 'stack', selectable = false, selected, onSelect, bulk, selectAllLabel = 'Select all', selectedLabel, selectRowLabel, class: className, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onSelect'> & {
   columns: Column<Row>[]
   rows: Row[]
   rowKey: RowKey<Row>
@@ -32,7 +32,7 @@ const { columns: given, rows, rowKey, sort, serverSort = false, onSort, cell, em
   // Shown in place of the rows when the filter hides every one; `empty` otherwise.
   noMatch?: JSX.Element
   // Below 30rem of width, rows stack as cards labelled by their headers, or the table scrolls sideways.
-  narrow?: "stack" | "scroll" | undefined
+  narrow?: 'stack' | 'scroll' | undefined
   // A checkbox on each row and, above the rows, a tri-state select-all beside the count of rows picked, in the stacked cards as in the wide table.
   selectable?: boolean | undefined
   // The keys of the rows picked to start from, as `rowKey` reads them; a table whose parent passes another list follows it. A key whose row is no longer in `rows` leaves the selection.

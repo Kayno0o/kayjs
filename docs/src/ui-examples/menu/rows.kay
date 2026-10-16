@@ -6,8 +6,8 @@ const files = signal(['report.pdf', 'notes.md', 'photo.png'])
 
 function entries(file: string): MenuEntry[] {
   return [
-    { label: 'Download', onSelect: () => {} },
-    { label: 'Archive', disabled: true, onSelect: () => {} },
+    { label: 'Download', onSelect: () => undefined },
+    { label: 'Archive', disabled: true, onSelect: () => undefined },
     'separator',
     {
       label: 'Delete',
