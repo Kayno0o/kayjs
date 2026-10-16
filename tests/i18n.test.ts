@@ -21,7 +21,7 @@ import { acceptedLocale, localeSettings, messagesScript, requestLocale } from '.
 import { hookPrerendered } from '../src/server/page-hook'
 import { browserPath, testSite } from '../src/test'
 import { scratchBuild } from './prerendered'
-import { fixtureCopy } from './scratch'
+import { fixtureCopy, scratchDir } from './scratch'
 
 const FIXTURE = 'tests/fixtures/i18n'
 const routes = `${FIXTURE}/src/routes`
@@ -846,6 +846,19 @@ describe('localized seo defaults', () => {
     expect(await manifest('/manifest.webmanifest')).toMatchObject({ name: 'Le site', description: 'Ce que fait le site' })
     expect(await manifest('/manifest.en.webmanifest')).toMatchObject({ name: 'The site', description: 'What the site does' })
     expect((await server.handle(new Request('http://localhost/manifest.fr.webmanifest'))).status).toBe(404)
+  })
+
+  it('serves and links no locale manifest while the app serves the default one itself', async () => {
+    const publicDir = await scratchDir('manifest-')
+
+    await Bun.write(join(publicDir, 'manifest.webmanifest'), '{"name":"Mine"}')
+
+    const server = new Elysia().use(await pages({ routes, publicDir, prebuilt: false, security: false, site: SITE, i18n, seo: { name: { fr: 'Le site', en: 'The site' } } }))
+    const html = await (await server.handle(new Request('http://localhost/en'))).text()
+
+    expect(html).toContain('<link rel="manifest" href="/manifest.webmanifest">')
+    expect((await server.handle(new Request('http://localhost/manifest.en.webmanifest'))).status).toBe(404)
+    expect(await (await server.handle(new Request('http://localhost/manifest.webmanifest'))).text()).toBe('{"name":"Mine"}')
   })
 
   it('serves one manifest while the texts are written once or the other locale reads the default\'s, whatever base and trailingSlash', async () => {

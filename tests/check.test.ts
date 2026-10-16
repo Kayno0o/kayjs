@@ -1731,6 +1731,7 @@ describe.concurrent('kay check, URLs written out besides links', () => {
       'img(src="/_kay/image?src=a.png&w=640" alt="")',
       'button(onClick={go}) {String(fine)}',
       'form(action="/search" method="GET")',
+      'link(rel="manifest" href="/manifest.fr.webmanifest")',
       '',
     ].join('\n')
     const root = await scratchProject({

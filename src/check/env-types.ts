@@ -20,6 +20,9 @@ import { matcherSource, shadowPath } from './shadow'
 
 const PARAM_SEGMENT = /:([^/]+)/g
 
+// The manifests of the locales reading a name or description of their own, served beside the default one.
+const LOCALE_MANIFESTS = `\`/manifest.\${string}.webmanifest\``
+
 // What kay serves itself, whether or not the project turns it on.
 export const KAY_PATHS = [SITEMAP, ROBOTS, ...FAVICON_PATHS, HEALTH_PATH, OPENAPI_PATH, REFERENCE_PATH]
 const UNWRITABLE = /[%?#]/
@@ -76,7 +79,7 @@ export async function environmentTypes(root: string, options: CheckOptions, serv
   // An endpoint with params is linked to as a template: `/feeds/${string}.json`.
   const endpointPaths = endpoints.map(endpoint => endpoint.params.length === 0 ? JSON.stringify(endpoint.pattern) : `\`${endpoint.pattern.replace(PARAM_SEGMENT, () => `\${string}`)}${endpoint.suffix ?? ''}\``)
 
-  return environment(localized, [...publicPaths.map(file => file.url), ...KAY_PATHS], apiMounts, texts, config, app, content, servers, endpointPaths)
+  return environment(localized, [...publicPaths.map(file => file.url), ...KAY_PATHS], apiMounts, texts, config, app, content, servers, [...endpointPaths, LOCALE_MANIFESTS])
 }
 
 // Declares the check-only helpers generated code calls, and the routes and public files links are checked against.

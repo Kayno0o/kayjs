@@ -2,6 +2,7 @@ import type { Collection } from '../content'
 import type { Project } from '../project'
 import type { Cards } from './card'
 import type { ClientBuild } from './client'
+import type { AppManifest } from './favicon'
 import type { I18n } from './i18n'
 import type { Matcher } from './params'
 import type { RenderOptions } from './render'
@@ -46,6 +47,8 @@ export interface PageSetup {
   styles: string[]
   renderOptions: RenderOptions
   cards: Cards
+  // Set once the paths are claimed: whether the app serves the default web manifest itself.
+  appManifest: AppManifest
 }
 
 // What serving pages and prerendering them both start from: the routes and their param matchers, the collections, the locales, the head and the render options.
@@ -90,9 +93,11 @@ export async function setupPages(project: Project, loadClient: () => ClientBuild
   if (!mode.dev)
     await chooseInlineStyles(client, base, config.inlineStyles)
 
+  const appManifest = { served: false }
+
   // Cards are drawn in the fonts the head just wrote, rather than those a `fonts.json` held before.
   const headAndCards = async () => {
-    const { fonts, ...head } = await configHead(root, config, client.dir, source.embedded)
+    const { fonts, ...head } = await configHead(root, config, client.dir, source.embedded, appManifest)
 
     return { ...head, cards: await setupCards({ dir: join(client.dir, '..'), clientDir: client.dir, fonts, config: config.images?.card, logo: config.images?.card?.logo === undefined ? undefined : resolve(root, config.images.card.logo), name: config.seo?.name, defaultLocale: locales.settings.defaultLocale, quality: config.images?.quality, bundled: source.embedded, prebuilt: mode.prebuilt, collect: prerendering }) }
   }
@@ -102,5 +107,5 @@ export async function setupPages(project: Project, loadClient: () => ClientBuild
   if (i18n)
     i18n.settings = linkedSettings(i18n.settings, routes, collections)
 
-  return { source, client, mounts, routes, matchers, collections, i18n, locales, base, site, imageCache, scripts, styles, renderOptions: renderOptionsOf(config, mode, { head, maxDensity, editor: source.editor(root, config) }), cards }
+  return { source, client, mounts, routes, matchers, collections, i18n, locales, base, site, imageCache, scripts, styles, renderOptions: renderOptionsOf(config, mode, { head, maxDensity, editor: source.editor(root, config) }), cards, appManifest }
 }

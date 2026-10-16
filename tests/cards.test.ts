@@ -305,6 +305,12 @@ describe('share cards', () => {
 
       expect(new Set([build.look, png.look, none.look]).size).toBe(3)
 
+      // Only the default locale's name is in the look: another locale's is in the spec of its cards, so changing it renames none of the rest.
+      const named = async (name: { en: string, fr: string }) => setupCards({ dir, clientDir: client, fonts, name, defaultLocale: 'en' })
+
+      expect((await named({ en: 'Site', fr: 'Le site' })).look).toBe((await named({ en: 'Site', fr: 'Autre' })).look)
+      expect((await named({ en: 'Site', fr: 'Le site' })).look).not.toBe((await named({ en: 'Other', fr: 'Le site' })).look)
+
       await setupCards({ dir, clientDir: client, fonts, collect: true })
 
       expect(await Bun.file(built).exists()).toBe(false)

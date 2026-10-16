@@ -103,7 +103,8 @@ export async function setupCards(setup: CardSetup): Promise<Cards> {
     key: await keyFile.exists() ? await keyFile.bytes() : undefined,
     dir: setup.dir,
     bundled: setup.bundled ?? false,
-    look: Bun.hash(JSON.stringify([DRAWING, font instanceof Error ? '' : font.path, background, color, typeof setup.name === 'object' ? JSON.stringify(setup.name) : setup.name ?? '', quality, ...logo === undefined ? [] : [Bun.hash(logo).toString(36)]])).toString(36),
+    // The other locales' names are part of each card's spec, so a change to one renames its cards alone.
+    look: Bun.hash(JSON.stringify([DRAWING, font instanceof Error ? '' : font.path, background, color, localizedText(setup.name, setup.defaultLocale, setup.defaultLocale) ?? '', quality, ...logo === undefined ? [] : [Bun.hash(logo).toString(36)]])).toString(36),
     background,
     color,
     name: localizedText(setup.name, setup.defaultLocale, setup.defaultLocale),
