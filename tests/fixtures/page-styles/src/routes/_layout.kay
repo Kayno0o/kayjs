@@ -1,0 +1,10 @@
+---
+import '../app.css'
+import Ping from '../components/ping.kay'
+---
+nav.px-4.font-bold
+  a.home(href="/") Home
+  a.about(href="/about") About
+  a.widgets(href="/widgets") Widgets
+  Ping
+slot

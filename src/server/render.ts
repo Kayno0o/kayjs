@@ -898,6 +898,11 @@ function stylesheets(client: ClientBuild, files: string[]): string {
     return ''
 
   return stylesheetsOf(client.styles, files.join('\n'), () => {
+    const own = client.pageStyles?.get(files.join('\n'))
+
+    if (own !== undefined)
+      return own.html
+
     const urls = [...new Set(files.map(file => client.styles.get(file)))].filter(url => url !== undefined)
     // Unset, the page inlines its stylesheets only while together they stay within the limit.
     const inline = client.inlineStyles !== undefined && (client.inlineSizes === undefined || urls.reduce((sum, url) => sum + (client.inlineSizes!.get(url) ?? Infinity), 0) <= INLINE_LIMIT)

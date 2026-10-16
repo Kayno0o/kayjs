@@ -109,10 +109,15 @@ function sendSecurityHeaders(app: App, security: Record<string, string>, filePat
   })
 }
 
+// The rules a page writes into its head in place of the stylesheets, which the policy and the compressed copies know by their text.
+function inlinePageStyles(client: ClientBuild): string[] {
+  return [...client.pageStyles?.values() ?? []].flatMap(({ inline }) => inline)
+}
+
 // Scoped, so the app's own routes are compressed too; what is encoded already, as the build's copies are, goes as it is.
 function compress(app: App, client: ClientBuild, base: string, onError: KayConfig['onError']) {
   // Inlined stylesheets go out as `rebaseHtml` leaves them, under the mount point.
-  const fixed = client.inlineStyles && fixedTexts([...client.inlineStyles.values()].map(css => `<style>${rebaseCss(css, base)}</style>`))
+  const fixed = client.inlineStyles && fixedTexts([...client.inlineStyles.values(), ...inlinePageStyles(client)].map(css => `<style>${rebaseCss(css, base)}</style>`))
 
   // eslint-disable-next-line ts/promise-function-async -- Elysia sends an empty body when a mapResponse promise resolves to undefined
   app.mapResponse({ as: 'scoped' }, ({ request, responseValue }) => responseValue instanceof Response ? compressResponse(request, responseValue, fixed, error => reportServerError(error, request, onError)) : undefined)
@@ -204,7 +209,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   const table = routeTable(routes, i18n?.settings, served)
   const app = new Elysia({ name: 'kay/pages', seed: root })
   // Hashed as they go out, under the mount point.
-  const securityOptions = { ...options, dev: mode.dev, islands: client.directives, scripts, styles: [...styles, ...client.inlineStyles?.values() ?? []].map(style => rebaseCss(style, base)) }
+  const securityOptions = { ...options, dev: mode.dev, islands: client.directives, scripts, styles: [...styles, ...client.inlineStyles?.values() ?? [], ...inlinePageStyles(client)].map(style => rebaseCss(style, base)) }
   const security = securityHeaders(securityOptions)
   // The paths of the build's files and the image route, whose responses carry the security headers themselves.
   const filePaths = new Set<string>([IMAGE_ROUTE])

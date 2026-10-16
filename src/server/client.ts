@@ -1,8 +1,12 @@
 import type { ClientOptions } from '../build/client'
 import type { SizeReport } from '../build/report'
+import type { StyleUses } from '../build/style-uses'
+import type { Node } from '../build/supports'
 import type { ServerIslandMode } from '../runtime/html'
 import { join, resolve } from 'node:path'
 import { ASSET_PREFIX, clientDir, outputDir } from '../build/assets'
+import { pruneUnescaped } from '../build/class-rules'
+import { parse, print } from '../build/supports'
 import { NOWHERE } from '../runtime/base'
 import { unrebaseCss } from './base'
 
@@ -16,6 +20,8 @@ export interface ClientManifest {
   islands: Record<string, string[]>
   // The stylesheet of each page, layout and special page that imports any, by path relative to the root.
   styles: Record<string, string>
+  // Which classes the stylesheets style each of them names.
+  styleUses?: StyleUses
   // The pages `kay build` rendered, by URL path.
   pages?: Record<string, PrerenderedPage>
   // The site they were rendered for, its origin and base: a server running for another renders them again.
@@ -30,6 +36,12 @@ export interface ClientManifest {
   problems?: string[]
   // The build `kay dev` keeps: the options it was made with, as `clientOptionsKey` writes them, so a server given others builds its own.
   options?: string
+}
+
+// What a head carries for one chain of layouts and page: the markup, and the inline texts in it.
+export interface PageStyles {
+  html: string
+  inline: string[]
 }
 
 export interface PrerenderedPage {
@@ -62,11 +74,15 @@ export interface PrerenderedPage {
   token?: string | undefined
 }
 
-export interface ClientBuild extends Omit<ClientManifest, 'styles' | 'pages'> {
+export interface ClientBuild extends Omit<ClientManifest, 'styles' | 'pages' | 'styleUses'> {
   dir: string
   // By absolute path.
   styles: Map<string, string>
   pages: Map<string, PrerenderedPage>
+  // The classes a page or layout names, by path: indexes into the classes, or `true` for one that may render others.
+  styleUses?: { classes: string[], entries: Map<string, number[] | true> } | undefined
+  // The head's stylesheets of a page whose own rules fit inline, by its chain of layouts and page, as `pageStyles` writes it.
+  pageStyles?: Map<string, PageStyles> | undefined
   // The text each stylesheet URL is written into heads as, for those a page may inline.
   inlineStyles?: Map<string, string> | undefined
   // Without `inlineStyles` set, how many bytes each of them compresses to: a page inlines its stylesheets when together they stay under `INLINE_LIMIT`.
@@ -159,7 +175,8 @@ export async function readInlineStyles(client: ClientBuild, base: string): Promi
 export const INLINE_LIMIT = 14_000
 
 // `inlineStyles: true` makes every stylesheet inlinable, `false` none, and unset the ones that compress under `INLINE_LIMIT`, the page deciding by the sum of its own.
-export async function chooseInlineStyles(client: ClientBuild, base: string, setting: boolean | undefined): Promise<void> {
+// `chains` lists the layouts and page each route renders: unset, a page whose stylesheets together pass the limit still inlines the rules its own components use, when those fit, and links the stylesheets whole for the rest.
+export async function chooseInlineStyles(client: ClientBuild, base: string, setting: boolean | undefined, chains: string[][] = []): Promise<void> {
   if (setting === false)
     return
 
@@ -183,6 +200,73 @@ export async function chooseInlineStyles(client: ClientBuild, base: string, sett
     client.inlineStyles.set(url, css)
     client.inlineSizes.set(url, size)
   }
+
+  if (client.styleUses !== undefined)
+    client.pageStyles = pageStyles(client, texts, chains)
+}
+
+// Run once the page has all it needs of the shared stylesheets, and so is not held back by them.
+export const restScript = '<script data-kay-rest>for(const l of document.querySelectorAll("link[data-kay-rest]"))l.media="all"</script>'
+
+// The head of each chain whose full stylesheets are too heavy to inline but whose own rules fit: the rules for the classes its components name, written inline, ahead of the full stylesheets linked without holding the first paint back.
+// A class no component names, or one built at runtime, has its rule in the linked stylesheet, which the entry makes apply once the page is up, and at once without scripts.
+function pageStyles(client: ClientBuild, texts: Map<string, string>, chains: string[][]): Map<string, PageStyles> {
+  const { classes, entries } = client.styleUses!
+  const found = new Map<string, PageStyles>()
+  const parsed = new Map<string, Node[]>()
+
+  for (const files of chains) {
+    const key = files.join('\n')
+    const urls = [...new Set(files.map(file => client.styles.get(file)))].filter(url => url !== undefined)
+
+    if (found.has(key) || urls.length === 0 || urls.reduce((sum, url) => sum + (client.inlineSizes?.get(url) ?? Infinity), 0) <= INLINE_LIMIT)
+      continue
+
+    const used = new Set<number>()
+    const named = files.map(file => entries.get(file))
+
+    if (named.some(uses => uses === undefined || uses === true))
+      continue
+
+    for (const uses of named) {
+      for (const index of uses as number[])
+        used.add(index)
+    }
+
+    const unused = new Set(classes.filter((_name, index) => !used.has(index)))
+    const inline: string[] = []
+    const rest: string[] = []
+    let size = 0
+
+    for (const url of urls) {
+      const css = texts.get(url)!
+      let nodes = parsed.get(url)
+
+      if (nodes === undefined)
+        parsed.set(url, nodes = parse(css))
+
+      const own = print(pruneUnescaped(nodes, unused))
+
+      if (own.length !== css.length)
+        rest.push(url)
+
+      if (own.trim() === '')
+        continue
+
+      inline.push(own)
+      size += Bun.gzipSync(own).length
+    }
+
+    if (size > INLINE_LIMIT)
+      continue
+
+    const links = rest.map(url => `<link rel="stylesheet" href="${url}" media="print" data-kay-rest>`).join('')
+    const plain = rest.map(url => `<link rel="stylesheet" href="${url}">`).join('')
+
+    found.set(key, { html: `${links}${rest.length === 0 ? '' : `${restScript}<noscript>${plain}</noscript>`}${inline.map(css => `<style>${css}</style>`).join('')}`, inline })
+  }
+
+  return found
 }
 
 export function fromManifest(root: string, manifest: ClientManifest, dir = clientDir(root)): ClientBuild {
@@ -191,5 +275,6 @@ export function fromManifest(root: string, manifest: ClientManifest, dir = clien
     dir,
     styles: new Map(Object.entries(manifest.styles).map(([file, url]) => [resolve(root, file), url])),
     pages: new Map(Object.entries(manifest.pages ?? {})),
+    styleUses: manifest.styleUses && { classes: manifest.styleUses.classes, entries: new Map(Object.entries(manifest.styleUses.entries).map(([file, uses]) => [resolve(root, file), uses])) },
   }
 }

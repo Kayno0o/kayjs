@@ -23,6 +23,24 @@ export function routeChain(route: { layouts: string[], file: string }): { files:
   return chain
 }
 
+// The layouts then the file of every page a route, a guard or a failure may render, for the head of each to be written ahead.
+export function styleChains(routes: Route[]): string[][] {
+  const chains: string[][] = []
+
+  for (const route of routes) {
+    chains.push(routeChain(route).files)
+
+    for (const special of [route.special, ...route.guards.map(guard => guard.special)]) {
+      for (const page of [special.notFound, special.error]) {
+        if (page !== undefined)
+          chains.push([...page.layouts, page.file], [page.file])
+      }
+    }
+  }
+
+  return chains
+}
+
 export interface Route {
   // Path pattern: `/todos/:id`, `/docs/*`, an optional param as `/blog/:page?`.
   pattern: string

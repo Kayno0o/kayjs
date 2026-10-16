@@ -49,6 +49,11 @@ function importedSpecifiers(code: string, loader: Bun.JavaScriptLoader): string[
   })
 }
 
+export interface Reached {
+  edges: Map<string, string[]>
+  open: Set<string>
+}
+
 // A module importing each of these files for what it brings along.
 function importing(paths: string[]): string {
   return paths.map(path => `import ${JSON.stringify(path)}\n`).join('')
@@ -62,7 +67,8 @@ export async function styleSignature(path: string, source: string): Promise<stri
 // For the stylesheet build: components and modules shrink to their imports, so Bun follows them down to every stylesheet a page uses, and the assets they import are written for the server to serve.
 // A page's server code is left out but for its assets, the components and stylesheets it imports, and the components of the collections whose entries it renders, and nothing outside the project but stylesheets is followed: no server-only module ever reaches the bundler.
 // `loaded` collects the components and modules it shrank, which the bundler leaves out of its list of inputs once nothing but side-effect imports of them remains.
-export function styleImports(root: string, libraries: KayLibrary[] = [], loaded?: Set<string>): BunPlugin {
+// `reached` collects what each module imports among the files followed, and the modules rendering a collection's content, whose markup holds classes no source names.
+export function styleImports(root: string, libraries: KayLibrary[] = [], loaded?: Set<string>, reached?: Reached): BunPlugin {
   const project = root + sep
   // Tailwind reads the class names of every module the bundle parses, so importing the ones kay collected from the `.class` shorthand hands them over with no `@source` line.
   const classesFile = projectPaths(root).classes
@@ -72,13 +78,19 @@ export function styleImports(root: string, libraries: KayLibrary[] = [], loaded?
   const inProject = (path: string) => path.startsWith(project) && !path.includes(`${sep}node_modules${sep}`)
   // A kay library's components and modules are followed as the app's own are.
   const followed = (path: string) => CSS_FILE.test(path) || ((inProject(path) || libraryOf(libraries, path) !== undefined) && (KAY_FILE.test(path) || SCRIPT_FILE.test(path)))
+  const note = (importer: string, paths: string[]) => {
+    if (reached !== undefined)
+      reached.edges.set(importer, [...reached.edges.get(importer) ?? [], ...paths])
+
+    return paths
+  }
   const scan = (code: string, importer: string, loader: Bun.JavaScriptLoader) => [...importedSpecifiers(code, loader).map(path => resolveFrom(path, importer)).filter(path => path !== undefined), ...globbedFiles(code, importer, root, loader)]
   const imports = async (code: string, importer: string, loader: Bun.JavaScriptLoader) => {
     const paths = scan(code, importer, loader)
 
     await Promise.all(paths.filter(path => ASSET_FILE.test(path)).map(async path => writeAsset(path, root, dist)))
 
-    return importing(paths.filter(followed))
+    return importing(note(importer, paths.filter(followed)))
   }
   // Server code never reaches the bundler, but the assets it imports, through the project's modules too, are written all the same.
   const walked = new Set<string>()
@@ -99,7 +111,7 @@ export function styleImports(root: string, libraries: KayLibrary[] = [], loaded?
   }
 
   // A component the server code imports renders on the page as one the script imports does, so its stylesheets, and the ones the server code imports itself, are the page's too.
-  const serverStyles = (code: string, importer: string) => importing(scan(code, importer, 'ts').filter(path => (KAY_FILE.test(path) || CSS_FILE.test(path)) && followed(path)))
+  const serverStyles = (code: string, importer: string) => importing(note(importer, scan(code, importer, 'ts').filter(path => (KAY_FILE.test(path) || CSS_FILE.test(path)) && followed(path))))
 
   // A collection's components render inside the Markdown of its entries, so a page rendering one's `Content` renders those of every collection its server code imports.
   const collections = new Map<string, Promise<Map<string, string[]>>>()
@@ -118,7 +130,9 @@ export function styleImports(root: string, libraries: KayLibrary[] = [], loaded?
       return [...await exported].flatMap(([name, components]) => names.has(name) || names.has('*') ? components.flatMap(component => resolveFrom(component, module) ?? []) : [])
     }))
 
-    return importing([...new Set(files.flat())].filter(followed))
+    reached?.open.add(importer)
+
+    return importing(note(importer, [...new Set(files.flat())].filter(followed)))
   }
 
   return {

@@ -1,0 +1,6 @@
+---
+import { signal } from 'kay'
+
+const pings = signal(0)
+---
+button.ping(onClick={() => pings.set(count => count + 1)}) {pings()}

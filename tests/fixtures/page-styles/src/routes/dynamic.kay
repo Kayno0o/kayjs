@@ -1,0 +1,5 @@
+--- server
+const edge = `border-${'red'}-500`
+---
+h1 Dynamic
+p.edge(class={edge}) built from a template string

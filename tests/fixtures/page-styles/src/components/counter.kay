@@ -1,0 +1,6 @@
+---
+import { signal } from 'kay'
+
+const count = signal(0)
+---
+button.counter.bg-lime-300(onClick={() => count.set(c => c + 1)}) {count()}

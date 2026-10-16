@@ -1,0 +1,5 @@
+--- server
+const tone = ['ring', 4].join('-')
+---
+h1 Data
+p.tone(class={tone}) named nowhere on this page

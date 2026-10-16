@@ -1,0 +1,7 @@
+--- server
+export const page = { prerender: true }
+--- script
+import Fancy from '../components/fancy.kay'
+---
+h1 Prerendered
+Fancy

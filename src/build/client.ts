@@ -6,6 +6,8 @@ import type { FontFallback } from '../server/fonts'
 import type { ImportGraph, KayLibrary } from './libraries'
 import type { BrowserRole } from './promotion'
 import type { ChunkInputs, IslandWhy } from './report'
+import type { StyleUses } from './style-uses'
+import type { Reached } from './styles'
 import type { FileDiagnostic } from './transform'
 import { existsSync } from 'node:fs'
 import { mkdir, rm } from 'node:fs/promises'
@@ -20,18 +22,20 @@ import { fromManifest, MANIFEST, PRERENDERED_DIR, writeManifest } from '../serve
 import { PUBLIC_ENV_PATH } from '../server/env-state'
 import { fontFallbacks, withFontFallbacks } from '../server/fonts'
 import { ASSET_PREFIX, clientDir, outputDir } from './assets'
+import { pruneNodes } from './class-rules'
 import { CSS_FILE, findKayFiles, readSource, writeIfChanged } from './files'
 import { fileWords } from './libraries'
 import { packagesOf } from './licenses'
 import { throughLinks } from './links'
 import { kay } from './plugin'
 import { buildFiles, promotedFiles } from './promotion'
-import { pruneNodes, unusedLibraryClasses } from './prune'
+import { unusedLibraryClasses } from './prune'
 import { sizeReport } from './report'
 import { ANCHOR, runtimeAnchor, runtimeChunk } from './runtime-chunk'
 import { builtinChains, refusedBuiltins, refuseServerOnlyReads } from './server-only'
 import { inSignalsScope } from './signals'
 import { forgetBundleMaps } from './sourcemap'
+import { styleUses } from './style-uses'
 import { styleImports, withoutStyles } from './styles'
 import { mergingSupports } from './supports'
 import { analyzeKayCached, KayCompileError, keepAnalyses } from './transform'
@@ -96,6 +100,8 @@ export interface ClientSources {
   // What makes each island one, by id, as `onClick, line 4`; for a static component that may render as one, what may.
   why: Map<string, IslandWhy>
   classes: Set<string>
+  // The classes each component writes as the `.class` shorthand, by file.
+  shorthand: Map<string, string[]>
   problems: string[]
   pages: string[]
   libraries: KayLibrary[]
@@ -114,7 +120,7 @@ async function bundleClient(root: string, options: ClientOptions): Promise<Clien
   await writeClasses(root, sources.classes)
 
   const [scripts, styles] = await bothBundles(bundleIslands(root, sources.islands, options), bundleStyles(root, sources, options))
-  const manifest: ClientManifest = { ...scripts.manifest, styles: styles.styles, ...options.hot && { problems: sources.problems } }
+  const manifest: ClientManifest = { ...scripts.manifest, styles: styles.styles, ...styles.uses && { styleUses: styles.uses }, ...options.hot && { problems: sources.problems } }
 
   await writeManifest(root, manifest)
 
@@ -150,6 +156,7 @@ export async function readClientSources(root: string, options: ClientOptions = {
   const islands = new Map<string, string>()
   const why = new Map<string, IslandWhy>()
   const classes = new Set<string>()
+  const shorthand = new Map<string, string[]>()
   const diagnostics: FileDiagnostic[] = []
   const { files, own, mounted, editor, libraries, fromLibraries } = await buildFiles(root, options.extensions, graph)
   const sources = files.map(file => readSource(file).text)
@@ -187,6 +194,8 @@ export async function readClientSources(root: string, options: ClientOptions = {
 
     for (const name of compiled.classes)
       classes.add(name)
+
+    shorthand.set(file, [...compiled.classes])
   }
 
   // A static component that may render as an island gets a chunk too, which a page loads only when it does: when it hands an island it renders what only an island sends.
@@ -219,7 +228,7 @@ export async function readClientSources(root: string, options: ClientOptions = {
   const routesDir = projectPaths(root, options).routes
 
   // The editor gathers its stylesheet as a page does, an app's own file or not.
-  return { islands, why, classes, problems, pages: [...new Set([...existsSync(routesDir) ? await findKayFiles(routesDir) : [], ...mounted, ...editor === undefined ? [] : [editor]])], libraries }
+  return { islands, why, classes, shorthand, problems, pages: [...new Set([...existsSync(routesDir) ? await findKayFiles(routesDir) : [], ...mounted, ...editor === undefined ? [] : [editor]])], libraries }
 }
 
 // A failed build must not leave the previous manifest pointing at files that are gone.
@@ -388,11 +397,13 @@ async function refuseBuiltinImports(root: string, logs: Bun.BuildOutput['logs'],
 
 // Each page and layout is an entry whose code shrinks to its imports, so what comes out is the stylesheet of everything it renders: each one's URL by the file relative to the root, and every module the build read, `followed` adding the ones it shrank to their imports, which the bundler's list of inputs leaves out.
 // The rules of a kay library's stylesheets needing a class nothing names are left out, `unused` listing those classes.
-export async function bundleStyles(root: string, { pages, libraries, classes }: Pick<ClientSources, 'pages' | 'libraries' | 'classes'>, options: ClientOptions): Promise<{ styles: Record<string, string>, inputs: string[], followed: string[], unused: Set<string> }> {
+// `uses` tells which of the classes the stylesheets style each page and layout names, for a production server to leave the rules of the rest out of a page's head; development links the stylesheets whole.
+export async function bundleStyles(root: string, { pages, libraries, classes, shorthand }: Pick<ClientSources, 'pages' | 'libraries' | 'classes' | 'shorthand'>, options: ClientOptions): Promise<{ styles: Record<string, string>, inputs: string[], followed: string[], unused: Set<string>, uses?: StyleUses }> {
   if (pages.length === 0)
     return { styles: {}, inputs: [], followed: [], unused: new Set() }
 
   const shrunk = new Set<string>()
+  const reached: Reached = { edges: new Map(), open: new Set() }
   // Read while Bun.build parses and bundles: a stylesheet waits for it only once it is loaded.
   const unusedClasses = unusedLibraryClasses(root, libraries, classes)
   const since = raisedMark()
@@ -403,7 +414,7 @@ export async function bundleStyles(root: string, { pages, libraries, classes }: 
     minify: options.minify ?? false,
     metafile: true,
     naming: { entry: '[name]-[hash].[ext]', chunk: '[name]-[hash].[ext]', asset: '[name]-[hash].[ext]' },
-    plugins: [styleImports(root, libraries, shrunk), ...mergingSupports(options.plugins ?? [], async nodes => pruneNodes(nodes, await unusedClasses))],
+    plugins: [styleImports(root, libraries, shrunk, reached), ...mergingSupports(options.plugins ?? [], async nodes => pruneNodes(nodes, await unusedClasses))],
   }), unusedClasses])
 
   if (!build.success)
@@ -419,6 +430,8 @@ export async function bundleStyles(root: string, { pages, libraries, classes }: 
       styles[relative(root, file)] = assetUrl(meta.cssBundle!)
   }
 
+  const uses = options.hot === true ? undefined : styleUses(root, pages, await Promise.all(build.outputs.filter(output => CSS_FILE.test(output.path)).map(async output => Bun.file(output.path).text())), reached, shorthand)
+
   // The code the entries shrank to is only a vehicle for their stylesheets.
   await Promise.all(build.outputs.filter(output => output.kind === 'entry-point' && JS_OUTPUT.test(output.path)).map(async output => rm(output.path)))
 
@@ -433,7 +446,7 @@ export async function bundleStyles(root: string, { pages, libraries, classes }: 
     }))
   }
 
-  return { styles, inputs: Object.keys(build.metafile!.inputs).map(input => resolve(input)), followed: [...shrunk], unused }
+  return { styles, inputs: Object.keys(build.metafile!.inputs).map(input => resolve(input)), followed: [...shrunk], unused, ...uses && { uses } }
 }
 
 function islandManifest(root: string, outputs: Outputs, islands: Map<string, string>, entry: string, hot: boolean): Omit<ClientManifest, 'styles'> {

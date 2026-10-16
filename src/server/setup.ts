@@ -24,7 +24,7 @@ import { loadMatchers } from './params'
 import { setupPreview } from './preview'
 import { publicFiles } from './public'
 import { refuseClashes } from './route-table'
-import { routeMounts } from './routes'
+import { routeMounts, styleChains } from './routes'
 import { configHead, siteOrigin } from './seo'
 import { projectSource } from './source'
 import { setupStampSecret, warnOnStampKey } from './stamp'
@@ -96,7 +96,7 @@ export async function setupPages(project: Project, loadClient: () => ClientBuild
   }
 
   if (!mode.dev)
-    await chooseInlineStyles(client, base, config.inlineStyles)
+    await chooseInlineStyles(client, base, config.inlineStyles, styleChains(routes))
 
   const [files, endpoints] = await Promise.all([publicFiles(paths.public), source.endpoints(paths.routes, mounts)])
   const ownManifest = appServesManifest(files, endpoints, routes)

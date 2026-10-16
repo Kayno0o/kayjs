@@ -7,6 +7,7 @@ This page lists what each release adds, newest first, with a link to where each 
 
 ## Unreleased
 
+- **Smaller first paints on pages with big stylesheets**: a page whose styles pass the 14 KB inline size writes into its head the rules its own components use, Tailwind's classes included, and links the full stylesheet for the rest without holding the first paint back. A class built at runtime or added by an island still gets its style, and you configure nothing. [Styling and assets](/essentials/styling-and-assets#linked-or-inlined-styles)
 - **Tests under a base**: `testSite` serves a site under its `base`, `visit`, `submit` and `fetch` take paths with or without it, a redirect to a base-prefixed URL is followed with the cookies, and the cookie jar sends a cookie only to the paths its `Path` covers. [Testing](/guides/testing)
 - **Faster pages with inlined styles**: a page that carries inlined stylesheets and renders the same again is no longer compressed again. Its gzip is kept like any other page's, so a short page with inlined styles serves about twice the requests per second.
 - **Live values read late**: a live value an island imports is followed on every page rendering the island, so one read behind a click or in a `--- client` island follows the server too. A value per key read only after the render still does not. [API routes](/guides/api-routes)

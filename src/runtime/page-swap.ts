@@ -54,6 +54,7 @@ const SPECULATION = 'script[type="speculationrules"]'
 // The line a page without kay's script carries for Back after a reload, which a swapped-in page leaves to this one.
 const HISTORY = 'script[data-kay-history]'
 // The head elements a swap leaves to itself rather than merging.
+const REST_LINK = 'link[data-kay-rest]'
 const UNMERGED = `title,${SPECULATION},${HISTORY}`
 // The attributes naming a meta, a head holding one per name and media.
 const META_NAMES = ['name', 'property', 'http-equiv']
@@ -404,7 +405,8 @@ function mergeHead(next: Document): { loaded: Promise<unknown>, commit: () => vo
   // Each element serialized once, as every `take` compares against all that are left.
   const markup = new Map<Element, string>()
   const html = (element: Element) => {
-    const known = markup.get(element) ?? element.outerHTML
+    // A shared stylesheet kay applies once the page is up is the same one before and after, whatever its media.
+    const known = markup.get(element) ?? (element.matches(REST_LINK) ? `<link data-kay-rest href="${element.getAttribute('href')}">` : element.outerHTML)
 
     markup.set(element, known)
 
@@ -451,7 +453,9 @@ function mergeHead(next: Document): { loaded: Promise<unknown>, commit: () => vo
 
     added._$s = key
 
-    if (added instanceof HTMLLinkElement && added.rel === 'stylesheet')
+    if (added instanceof HTMLLinkElement && added.matches(REST_LINK))
+      added.media = 'all'
+    else if (added instanceof HTMLLinkElement && added.rel === 'stylesheet')
       loading.push(loaded(added))
 
     document.head.append(added)

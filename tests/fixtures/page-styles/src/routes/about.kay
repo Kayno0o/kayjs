@@ -1,0 +1,5 @@
+---
+import Fancy from '../components/fancy.kay'
+---
+h1 About
+Fancy

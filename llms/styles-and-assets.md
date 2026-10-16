@@ -171,7 +171,7 @@ p {result()}
 
 ### Link or inline the stylesheets
 
-In production a page writes its stylesheets into its head as `style` elements while together they compress under about 14 KB, so the first paint waits for no stylesheet request, and links them above it, where one cached file serves every page. `inlineStyles` forces one way:
+In production a page writes its stylesheets into its head as `style` elements while together they compress under about 14 KB, so the first paint waits for no stylesheet request, and above it writes the rules its own components use and links the full stylesheets for the rest, one cached file serving every page. `inlineStyles` forces one way:
 
 ```ts
 import { defineConfig } from 'kay/server'
@@ -190,6 +190,10 @@ export default defineConfig({ inlineStyles: false })
 - `import theme from './theme.css' with { type: 'text' }` gives the file's text as written (a Tailwind entry's source, not its build) as a string instead, in server code, the compiled executable and an island's script alike, and joins no page stylesheet.
 - A name without the attribute is the `css-import-without-text` error.
 - By default a page writes those stylesheets into its head as `style` elements when together they gzip under 14,000 bytes, and links them above that, in production and prerendered pages alike, `kay dev` always linking them. The sum is the page's own (its layouts' and its page's), so two pages of one app can differ, and a stylesheet alone over the limit is never inlined.
+- Above that limit a page writes into its head the rules of the classes its own components name (the components it renders, islands and the modules they import included, with the `.class` shorthand and Tailwind's utilities alike), when those fit the limit, and links the full stylesheets ahead of them with `media="print"`, a `data-kay-rest` attribute and a `noscript` copy, which a small inline script makes apply once the head is parsed.
+- Nothing is configured and nothing is missing: a class no component of the page names (built at runtime, put together by an island in the browser or coming from data) has its rule in the linked stylesheet, applied right after the first paint, and a name built from a template string, `` `btn-${kind}` ``, keeps the rules of every class starting or ending with its fixed part.
+- A page rendering a collection's content, or whose own rules still pass the limit, links its stylesheets whole as before; rules written in a stylesheet a component imports are never left out, only the classes Tailwind generates from a name that other pages alone write.
+- The swap brings the next page's rules with it, the shared stylesheet staying once linked; `kay dev`, `inlineStyles: true` and `false` do not split.
 - `inlineStyles: true` in kay.config.ts inlines every page's whatever their size and `false` links them all, which is how a build before 1.46 behaved.
 - The first paint then waits for no stylesheet request, which on a phone over slow 4G painted a page with a 110 KB stylesheet 440 ms sooner, but every page carries the stylesheet again, compressed, since no cache keeps it between pages, the swap's included: past 14 KB that costs more than the request saves, which is why the default links.
 - With `compress` on, a rendered page compresses only what lies around them, their compressed copy made once as the server starts, so it goes out as gzip even to a browser taking zstd or brotli: on a 110 KB stylesheet, a fifth of the CPU brotli takes, for no more bytes.
