@@ -44,14 +44,14 @@ function proves(proof: LiveRequest['proofs'][number], now: number): boolean {
 }
 
 // A value a browser cannot be sent is refused where it is written, not where a connection would later fail on it.
-function checkSendable(id: string, value: unknown): void {
+function checkSendable(label: string, value: unknown): void {
   try {
     encodeValue(value)
   }
   catch (error) {
     const reason = unsendable(error)
 
-    throw new TypeError(`kay: the live value ${id} was set to something that cannot reach the browser${reason === undefined ? '' : `: ${reason}`}`, { cause: error })
+    throw new TypeError(`kay: the live value ${label} was set to something that cannot reach the browser${reason === undefined ? '' : `: ${reason}`}`, { cause: error })
   }
 }
 
@@ -84,10 +84,16 @@ interface Watched {
 }
 
 // The updates a connection sends: every watched value as it is now, then the ones that changed, as often as they do.
-// It ends when the proofs it was let in on expire, `lifetime` from now, and `closed` runs once it has ended.
-function updates(watched: Watched[], lifetime: number, closed: () => void): AsyncIterable<LiveUpdate[]> {
+// It ends when the proofs it was let in on expire, `lifetime` from now.
+// It holds a connection slot of the client from the moment it is read until it ends, and ends at once when the client has none: a response nobody reads holds nothing.
+function updates(watched: Watched[], lifetime: number, client: string): AsyncIterable<LiveUpdate[]> {
   return {
     [Symbol.asyncIterator]() {
+      if ((open.get(client) ?? 0) >= MAX_CONNECTIONS)
+        return { next: async () => Promise.resolve({ value: undefined, done: true as const }) }
+
+      open.set(client, (open.get(client) ?? 0) + 1)
+
       const dirty = new Map<string, Watched>()
       let wake: (() => void) | undefined
       const state = { ended: false }
@@ -107,7 +113,7 @@ function updates(watched: Watched[], lifetime: number, closed: () => void): Asyn
         for (const stop of stops)
           stop()
 
-        closed()
+        release(client)
         wake?.()
       }
 
@@ -147,6 +153,15 @@ function updates(watched: Watched[], lifetime: number, closed: () => void): Asyn
       }
     },
   }
+}
+
+function release(client: string): void {
+  const left = (open.get(client) ?? 1) - 1
+
+  if (left <= 0)
+    open.delete(client)
+  else
+    open.set(client, left)
 }
 
 // What a request asks for, or undefined when it is no request of this route.
@@ -195,14 +210,28 @@ export function serveLive(app: Elysia): void {
 
     const now = Date.now()
     const valid = asked.proofs.filter(proof => proves(proof, now))
-    const proven = new Set(valid.flatMap(proof => proof.keys.map(key => JSON.stringify(key))))
+    // The newest proof naming each key: the one that lets a page watch it for the longest.
+    const proven = new Map<string, number>()
+
+    for (const proof of valid) {
+      for (const key of proof.keys) {
+        const at = JSON.stringify(key)
+
+        proven.set(at, Math.max(proven.get(at) ?? 0, proof.at))
+      }
+    }
+
     const watched: Watched[] = []
+    let oldest = Infinity
 
     for (const [id, key] of asked.watch) {
       const slot = liveSlot(id)
+      const provenAt = proven.get(JSON.stringify([id, key]))
 
-      if (slot !== undefined && proven.has(JSON.stringify([id, key])) && (slot.keyed || key === ''))
+      if (slot !== undefined && provenAt !== undefined && (slot.keyed || key === '')) {
+        oldest = Math.min(oldest, provenAt)
         watched.push({ id, key, value: () => slotValue(slot, key), watch: listener => watchSlot(slot, key, listener) })
+      }
     }
 
     // Nothing proven to watch: refused, as a request with a forged proof is.
@@ -214,17 +243,6 @@ export function serveLive(app: Elysia): void {
     if ((open.get(client) ?? 0) >= MAX_CONNECTIONS)
       return new Response(null, { status: 429 })
 
-    open.set(client, (open.get(client) ?? 0) + 1)
-
-    const lifetime = PROOF_LIFETIME_MS - (now - Math.min(...valid.map(proof => proof.at)))
-
-    return eventStream(updates(watched, lifetime, () => {
-      const left = (open.get(client) ?? 1) - 1
-
-      if (left <= 0)
-        open.delete(client)
-      else
-        open.set(client, left)
-    }))
+    return eventStream(updates(watched, PROOF_LIFETIME_MS - (now - oldest), client))
   }, { parse: 'none' })
 }

@@ -10,6 +10,7 @@ This page lists what each release adds, newest first, with a link to where each 
 - **Tests under a base**: `testSite` serves a site under its `base`, `visit`, `submit` and `fetch` take paths with or without it, a redirect to a base-prefixed URL is followed with the cookies, and the cookie jar sends a cookie only to the paths its `Path` covers. [Testing](/guides/testing)
 - **Faster pages with inlined styles**: a page that carries inlined stylesheets and renders the same again is no longer compressed again. Its gzip is kept like any other page's, so a short page with inlined styles serves about twice the requests per second.
 - **Live values read late**: a live value an island imports is followed on every page rendering the island, so one read behind a click or in a `--- client` island follows the server too. A value per key read only after the render still does not. [API routes](/guides/api-routes)
+- **Live connections, tidier**: a connection lasts as long as the newest proof of the keys it watches, a response nobody reads holds no connection slot, an error about a live value names its constant, and a page that no longer holds a live value asks again only every five minutes after a refusal. [API routes](/guides/api-routes)
 
 ## 1.49.0
 

@@ -22,7 +22,7 @@ const VISITORS = idOf('visitors')
 const ROOM = idOf('room')
 const SECRET = idOf('secret')
 // The gzipped JS the fixture's home page, with islands reading live values, loads up front: a few bytes above what it measures, as the budget in tests/static.test.ts is.
-const LIVE_EAGER_JS_BUDGET = 11_900
+const LIVE_EAGER_JS_BUDGET = 12_000
 
 // The live values of the fixture, imported once a site is up: its plugin gives them their ids.
 type Values = typeof import('./fixtures/live-values/src/live')
@@ -243,7 +243,7 @@ describe('live values on the server', () => {
   })
 
   it('refuses a value a browser cannot be sent where it is set', async () => {
-    expect(() => (live.visitors as { set: (value: unknown) => void }).set(new (class Opaque {})())).toThrow('cannot reach the browser')
+    expect(() => (live.visitors as { set: (value: unknown) => void }).set(new (class Opaque {})())).toThrow(`the live value visitors (${VISITORS}) was set to something that cannot reach the browser`)
   })
 
   it('reads and writes like a plain value outside a request, a keyed one falling back to what its declaration gives', async () => {
@@ -256,23 +256,35 @@ describe('live values on the server', () => {
 })
 
 describe('the connections of one client', () => {
-  it('are capped, a slot freeing as one closes', async () => {
+  async function withSite(run: (connect: (proofs?: LiveRequest['proofs']) => Promise<Response>, proofs: LiveRequest['proofs']) => Promise<void>): Promise<void> {
     const site = await testSite({ root: ROOT })
 
     try {
       const proofs = proofsOf(pagesOf((await site.visit('/other')).html))
-      const connect = async () => site.fetch('/_kay/live', { ...JSON_POST, body: JSON.stringify({ proofs, watch: [[VISITORS, '']] }) })
+
+      await run(async given => site.fetch('/_kay/live', { ...JSON_POST, body: JSON.stringify({ proofs: given ?? proofs, watch: [[VISITORS, '']] }) }), proofs)
+    }
+    finally {
+      await site.close()
+    }
+  }
+
+  it('are capped, a slot freeing as one closes', async () => {
+    await withSite(async (connect) => {
       const feeds: Feed[] = []
 
-      for (let count = 0; count < MAX_CONNECTIONS; count++)
-        feeds.push(new Feed(await connect()))
+      for (let count = 0; count < MAX_CONNECTIONS; count++) {
+        const feed = new Feed(await connect())
+
+        await feed.next()
+        feeds.push(feed)
+      }
 
       const refused = await connect()
 
       expect(refused.status).toBe(429)
       const first = feeds.shift()!
 
-      await first.next()
       await first.close()
       await Bun.sleep(50)
 
@@ -283,6 +295,75 @@ describe('the connections of one client', () => {
 
       for (const feed of feeds)
         await feed.close()
+    })
+  })
+
+  it('hold no slot for a response cancelled before it was read', async () => {
+    await withSite(async (connect) => {
+      for (let count = 0; count < MAX_CONNECTIONS + 5; count++)
+        await (await connect()).body!.cancel()
+
+      const feed = new Feed(await connect())
+
+      expect((await feed.next()).length).toBe(1)
+      await feed.close()
+    })
+  })
+
+  it('end with the proof they were let in on and free their slot', async () => {
+    await withSite(async (connect, proofs) => {
+      const feeds: Feed[] = []
+
+      try {
+        // A proof with 300 milliseconds left.
+        setSystemTime(new Date(Date.now() + PROOF_LIFETIME_MS - 300))
+
+        for (let count = 0; count < MAX_CONNECTIONS; count++) {
+          const feed = new Feed(await connect())
+
+          await feed.next()
+          feeds.push(feed)
+        }
+
+        expect((await connect()).status).toBe(429)
+        await Bun.sleep(500)
+
+        for (const feed of feeds)
+          await expect(feed.next()).rejects.toThrow('the connection ended')
+      }
+      finally {
+        setSystemTime()
+      }
+
+      const again = new Feed(await connect(proofs))
+
+      expect((await again.next()).length).toBe(1)
+      await again.close()
+    })
+  })
+
+  it('last as long as the newest proof naming the keys they watch, not the oldest proof sent', async () => {
+    const site = await testSite({ root: ROOT })
+
+    try {
+      const { visitors } = await values()
+      const old = proofsOf(pagesOf((await site.visit('/room/lobby')).html))
+
+      try {
+        setSystemTime(new Date(Date.now() + PROOF_LIFETIME_MS - 300))
+
+        const fresh = proofsOf(pagesOf((await site.visit('/other')).html))
+        const feed = new Feed(await site.fetch('/_kay/live', { ...JSON_POST, body: JSON.stringify({ proofs: [...old, ...fresh], watch: [[VISITORS, '']] }) }))
+
+        await feed.next()
+        await Bun.sleep(500)
+        visitors.set(n => n + 1)
+        expect((await feed.next()).map(([id]) => id)).toEqual([VISITORS])
+        await feed.close()
+      }
+      finally {
+        setSystemTime()
+      }
     }
     finally {
       await site.close()
@@ -339,6 +420,13 @@ describe('the id of a live value', () => {
     expect(named('export const a = live(0 // first, then more\n)')).toContain(`live(0, "${idOf('a')}" // first, then more\n)`)
     expect(named('export const a = live(0 /* zero */)')).toContain(`live(0, "${idOf('a')}" /* zero */)`)
     expect(named('export const a = live(\n  (id: string) => ({ id }),\n)')).toContain(`({ id }), "${idOf('a')}"\n)`)
+  })
+
+  it('is followed by the constant\'s name for the server, which a browser build leaves out', () => {
+    const source = `import { live } from 'kay'\n\nexport const a = live(0)\n`
+
+    expect(liveIds(source, '/app/src/live.ts', '/app', false, true)).toContain(`live(0, "${idOf('a')}", "a")`)
+    expect(liveIds(source, '/app/src/live.ts', '/app')).not.toContain('"a")')
   })
 })
 
@@ -473,9 +561,14 @@ function flaky() {
   const plan: (number | 'drop')[] = []
   const posts: string[] = []
   const gets: string[] = []
+  // The pages whose renewal comes back with no live value, as for a visitor who may no longer see them.
+  const gone = new Set<string>()
   const app = new Elysia().onRequest(({ request }) => {
     if (request.method === 'GET')
       gets.push(new URL(request.url).pathname)
+
+    if (request.method === 'GET' && request.headers.get('accept') === 'text/html' && gone.has(new URL(request.url).pathname))
+      return new Response('<!doctype html><title>gone</title>', { headers: { 'content-type': 'text/html' } })
 
     if (request.method !== 'POST' || new URL(request.url).pathname !== '/_kay/live')
       return undefined
@@ -490,7 +583,7 @@ function flaky() {
     return step === undefined ? undefined : new Response(null, { status: step })
   })
 
-  return { app, plan, posts, gets }
+  return { app, plan, posts, gets, gone }
 }
 
 describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('live values across a restart', () => {
@@ -538,6 +631,25 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('live val
     expect(server.posts.length).toBe(2)
     expect(server.gets.filter(path => path === '/other').length).toBe(2)
     expect(await page.evaluate(() => document.querySelectorAll('script[data-kay-live]').length)).toBe(1)
+  })
+
+  it('backs off harder than a refusal when the page no longer holds a live value', async () => {
+    server.posts.length = 0
+    server.plan.push('drop', 403, 403, 403, 403)
+    server.gone.add('/other')
+    live.visitors.set(50)
+
+    try {
+      await using page = await site.open('/other')
+
+      await page.waitUntil(() => document.querySelector('p.online')?.textContent === '50 online')
+      await Bun.sleep(3000)
+      expect(server.posts.length).toBe(2)
+    }
+    finally {
+      server.gone.delete('/other')
+      server.plan.length = 0
+    }
   })
 
   it('leaves one connection when the page changes during a backoff', async () => {

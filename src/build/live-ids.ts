@@ -13,7 +13,8 @@ export function liveId(file: string, root: string, name: string): string {
 }
 
 // Gives each `const name = live(...)` at the top of a module the id it is known by, as a second argument, so the server and the browser, which each load the module, name the same value.
-export function liveIds(source: string, file: string, root: string, jsx = false): string {
+// With `names`, the constant's name follows as a third, which the server prints in its errors and a browser has no use for.
+export function liveIds(source: string, file: string, root: string, jsx = false, names = false): string {
   if (!MENTIONS_LIVE.test(source) || !NAMES_KAY.test(source))
     return source
 
@@ -26,7 +27,7 @@ export function liveIds(source: string, file: string, root: string, jsx = false)
     return source
   }
 
-  const names = new Set<string>()
+  const locals = new Set<string>()
 
   for (const statement of ast.program.body) {
     if (statement.type !== 'ImportDeclaration' || statement.source.value !== 'kay' || statement.importKind === 'type')
@@ -34,11 +35,11 @@ export function liveIds(source: string, file: string, root: string, jsx = false)
 
     for (const specifier of statement.specifiers) {
       if (specifier.type === 'ImportSpecifier' && specifier.importKind !== 'type' && (specifier.imported.type === 'Identifier' ? specifier.imported.name : specifier.imported.value) === 'live')
-        names.add(specifier.local.name)
+        locals.add(specifier.local.name)
     }
   }
 
-  if (names.size === 0)
+  if (locals.size === 0)
     return source
 
   const comments = ast.comments ?? []
@@ -51,7 +52,7 @@ export function liveIds(source: string, file: string, root: string, jsx = false)
       continue
 
     for (const { id, init } of declaration.declarations) {
-      if (id.type !== 'Identifier' || init?.type !== 'CallExpression' || init.callee.type !== 'Identifier' || !names.has(init.callee.name) || init.arguments.length !== 1)
+      if (id.type !== 'Identifier' || init?.type !== 'CallExpression' || init.callee.type !== 'Identifier' || !locals.has(init.callee.name) || init.arguments.length !== 1)
         continue
 
       // After the argument's last token, parentheses and a trailing comma included, before any comment closing the call.
@@ -71,7 +72,7 @@ export function liveIds(source: string, file: string, root: string, jsx = false)
         }
       }
 
-      const text = JSON.stringify(liveId(file, root, id.name))
+      const text = names ? `${JSON.stringify(liveId(file, root, id.name))}, ${JSON.stringify(id.name)}` : JSON.stringify(liveId(file, root, id.name))
 
       inserts.push(source[at - 1] === ',' ? { at, text: ` ${text}` } : { at, text: `, ${text}` })
     }

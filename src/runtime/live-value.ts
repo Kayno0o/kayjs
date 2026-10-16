@@ -53,6 +53,8 @@ export interface LiveRequest {
 export const LIVE_ROUTE = '/_kay/live'
 export const LIVE_SCRIPT = 'script[data-kay-live]'
 const RENEW_RETRY_MS = 60_000
+// How long a page that no longer holds live values waits before asking again after a refusal: the proof it has will not be taken again.
+const GONE_RETRY_MS = 5 * 60_000
 
 // How long the server takes a page's proof, and so how long a page may watch on it before asking for another.
 export const PROOF_LIFETIME_MS = 60 * 60_000
@@ -64,6 +66,8 @@ const SETTLE_MS = 30
 
 interface ServerSlot {
   id: string
+  // The constant it is declared as, which only the server knows: what its errors call it by.
+  name: string | undefined
   initial: unknown
   keyed: boolean
   values: Map<string, unknown>
@@ -108,10 +112,10 @@ export function watchSlot(slot: ServerSlot, key: string, listener: () => void): 
   }
 }
 
-let checkWrite: ((id: string, value: unknown) => void) | undefined
+let checkWrite: ((label: string, value: unknown) => void) | undefined
 
 // Installed by the server: refuses a value a browser could not be sent where it is set.
-export function checkLiveWrites(check: (id: string, value: unknown) => void): void {
+export function checkLiveWrites(check: (label: string, value: unknown) => void): void {
   checkWrite = check
 }
 
@@ -136,15 +140,16 @@ export function noteLives(handles: readonly unknown[]): void {
   }
 }
 
-function serverLive(id: string, initial: unknown): Handle {
+function serverLive(id: string, initial: unknown, name: string | undefined): Handle {
   const keyed = typeof initial === 'function'
   const known = slots().get(id)
   // A dev reload evaluates the module again: the values and watchers stay, the declaration is the new one.
-  const slot: ServerSlot = known ?? { id, initial, keyed, values: new Map(), listeners: new Map() }
+  const slot: ServerSlot = known ?? { id, name, initial, keyed, values: new Map(), listeners: new Map() }
 
   if (known) {
     known.initial = initial
     known.keyed = keyed
+    known.name = name
   }
 
   slots().set(id, slot)
@@ -164,7 +169,7 @@ function serverLive(id: string, initial: unknown): Handle {
     if (Object.is(value, current))
       return
 
-    checkWrite?.(slot.id, value)
+    checkWrite?.(slot.name === undefined ? slot.id : `${slot.name} (${slot.id})`, value)
     slot.values.set(key, value)
     notify(slot, key)
   }
@@ -300,6 +305,21 @@ function watch(slot: BrowserSlot, key: string, entry: Entry): void {
   })
 }
 
+// Resolves after `ms`, or as soon as `signal` aborts.
+async function pause(ms: number, signal: AbortSignal): Promise<void> {
+  await new Promise<void>((resolve) => {
+    const timer = setTimeout(done, ms)
+
+    function done() {
+      clearTimeout(timer)
+      signal.removeEventListener('abort', done)
+      resolve()
+    }
+
+    signal.addEventListener('abort', done)
+  })
+}
+
 function settle(): void {
   clearTimeout(settling)
   settling = setTimeout(sync, SETTLE_MS)
@@ -389,8 +409,20 @@ function sync(): void {
   const reader = readEvents<LiveUpdate[]>(async (signal) => {
     const response = await post(signal)
 
+    if (response.status !== 403)
+      return response
+
     // Refused: the proof may be one a restart or its age made stale, so the page is asked for a new one before the backoff.
-    return response.status === 403 && await renewProofs(signal) === 'renewed' ? post(signal) : response
+    const renewed = await renewProofs(signal)
+
+    if (renewed === 'renewed')
+      return post(signal)
+
+    // The page no longer holds any, as for a visitor who may not see it: the stale proof is tried again at a distance.
+    if (renewed === 'gone')
+      await pause(GONE_RETRY_MS, signal)
+
+    return response
   }, true, false, true)
 
   reader.on(apply)
@@ -455,9 +487,9 @@ function browserLive(id: string, initial: unknown): Handle {
 // The build gives each declaration its id, so it is written as `export const name = live(...)` at the top of a module.
 export function live<T>(initial: PlainValue<T>): Live<T>
 export function live<K extends LiveKey, T>(initial: (key: K) => PlainValue<T>): LiveByKey<K, T>
-export function live(initial: unknown, id?: string): unknown {
+export function live(initial: unknown, id?: string, name?: string): unknown {
   if (id === undefined)
     throw new TypeError('kay: live() is declared as `export const name = live(...)` at the top of a module in the project, where the build names it')
 
-  return typeof KAY_BROWSER === 'undefined' && typeof document === 'undefined' ? serverLive(id, initial) : browserLive(id, initial)
+  return typeof KAY_BROWSER === 'undefined' && typeof document === 'undefined' ? serverLive(id, initial, name) : browserLive(id, initial)
 }

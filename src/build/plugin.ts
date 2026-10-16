@@ -248,7 +248,7 @@ export function kayPlugin(options: KayPluginOptions, workers: string[]): BunPlug
       build.onLoad({ filter: projectScript }, async ({ path }) => {
         const source = await Bun.file(path).text()
         const loader = scriptLoader(path)
-        const contents = anchoring(path, await shippingFiles(liveIds(expandGlobs(source, path, root, loader), path, realRoot, loader === 'tsx' || loader === 'jsx'), path, loader))
+        const contents = anchoring(path, await shippingFiles(liveIds(expandGlobs(source, path, root, loader), path, realRoot, loader === 'tsx' || loader === 'jsx', build.config?.target !== 'browser'), path, loader))
 
         return contents === source && build.config !== undefined ? undefined : { contents, loader }
       })
