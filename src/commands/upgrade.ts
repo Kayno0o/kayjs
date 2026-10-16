@@ -1,5 +1,6 @@
 import type { Command } from './command'
 import { existsSync } from 'node:fs'
+import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { minorAfter, minorOf } from '../compiler/lints'
@@ -28,37 +29,43 @@ const RANGE = /^((?:npm:@?[^@]+@)?)[~^]?(\d+\.\d+\.\d+)$/
 // What `bun add` is told to keep a package in the section it was in.
 const SECTION_FLAGS: Record<string, string[]> = { devDependencies: ['--dev'], optionalDependencies: ['--optional'] }
 const KAY_PACKAGE = '@kaynooo/kayjs'
+const SECTION_OPEN = /\s*:\s*\{/y
+const LOCKFILES = ['bun.lock', 'bun.lockb']
 const SEMVER = /^\d+\.\d+\.\d+$/
 const REGEX_SPECIALS = /[.*+?^${}()|[\]\\]/g
 
 // `bun install` alone can read a hand-edited range as no change and keep the old package in node_modules, so a package still at another version is added again, in the section it was in.
-const registryDeps: UpgradeDeps = {
-  latest: async (name, root) => {
-    const { code, stdout } = await run([process.execPath, 'info', name, 'version'], root, true)
+export function registryDepsFor(bun: string): UpgradeDeps {
+  return {
+    latest: async (name, root) => {
+      const { code, stdout } = await run([bun, 'info', name, 'version'], root, true)
 
-    return code === 0 ? stdout.trim() : undefined
-  },
-  install: async (root, changes) => {
-    if ((await run([process.execPath, 'install'], root, false)).code !== 0)
-      return false
-
-    for (const { name, spec, section } of changes) {
-      const installed = join(root, 'node_modules', name, 'package.json')
-      const wanted = spec.slice(spec.lastIndexOf('~') + 1)
-
-      if (existsSync(installed) && ((await Bun.file(installed).json()) as { version?: string }).version === wanted)
-        continue
-
-      const flag = SECTION_FLAGS[section] ?? []
-
-      if ((await run([process.execPath, 'add', ...flag, '--no-cache', `${name}@${spec}`], root, false)).code !== 0)
+      return code === 0 ? stdout.trim() : undefined
+    },
+    install: async (root, changes) => {
+      if ((await run([bun, 'install'], root, false)).code !== 0)
         return false
-    }
 
-    return true
-  },
-  kay: async (root, args, capture) => run([process.execPath, join(root, 'node_modules/kay/src/cli.ts'), ...args], root, capture),
+      for (const { name, spec, section } of changes) {
+        const installed = join(root, 'node_modules', name, 'package.json')
+        const wanted = spec.slice(spec.lastIndexOf('~') + 1)
+
+        if (existsSync(installed) && ((await Bun.file(installed).json()) as { version?: string }).version === wanted)
+          continue
+
+        const flag = SECTION_FLAGS[section] ?? []
+
+        if ((await run([bun, 'add', ...flag, '--no-cache', `${name}@${spec}`], root, false)).code !== 0)
+          return false
+      }
+
+      return true
+    },
+    kay: async (root, args, capture) => run([bun, join(root, 'node_modules/kay/src/cli.ts'), ...args], root, capture),
+  }
 }
+
+const registryDeps = registryDepsFor(process.execPath)
 
 // Moves kay and the kay libraries an app lists to their latest version, installs, then has that kay rewrite the old forms the minors crossed deprecated, one minor at a time, and report what is left to do by hand.
 export const upgrade: Command = {
@@ -82,6 +89,7 @@ export async function upgradeProject(root: string, deps: UpgradeDeps): Promise<n
   }
 
   const original = await Bun.file(manifest).text()
+  const locks = await Promise.all(LOCKFILES.map(async name => ({ path: join(root, name), content: existsSync(join(root, name)) ? await Bun.file(join(root, name)).bytes() : undefined })))
   let source = original
   let packageJson: Record<string, unknown>
 
@@ -128,7 +136,15 @@ export async function upgradeProject(root: string, deps: UpgradeDeps): Promise<n
 
     const spec = `${dependency.prefix}~${target}`
 
-    source = replaceSpec(source, dependency, spec)
+    const replaced = replaceSpec(source, dependency, spec)
+
+    if (replaced === undefined) {
+      printFailure('upgrade', `package.json lists ${dependency.name} as ${JSON.stringify(dependency.spec)} in "${dependency.section}", but kay could not find that entry to move: edit it by hand, then run \`kay upgrade\` again`, 'text')
+
+      return 1
+    }
+
+    source = replaced
     changes.push({ name: dependency.name, spec, section: dependency.section })
   }
 
@@ -143,7 +159,15 @@ export async function upgradeProject(root: string, deps: UpgradeDeps): Promise<n
 
   if (!await deps.install(root, changes) || !existsSync(join(root, 'node_modules/kay/src/cli.ts'))) {
     await Bun.write(manifest, original)
-    printFailure('upgrade', 'the install failed or left no kay in node_modules, so package.json is back as it was and nothing was rewritten; fix the install, then run `kay upgrade` again', 'text')
+
+    for (const { path, content } of locks) {
+      if (content !== undefined)
+        await Bun.write(path, content)
+      else
+        await rm(path, { force: true })
+    }
+
+    printFailure('upgrade', 'the install failed or left no kay in node_modules, so package.json and the lockfile are back as they were and nothing was rewritten; node_modules may still hold what the install did, so run `bun install` once the install is fixed, then `kay upgrade` again', 'text')
 
     return 1
   }
@@ -224,18 +248,65 @@ async function crossed(root: string, from: string, to: string, deps: UpgradeDeps
     .sort((a, b) => minorAfter(minorOf(a)!, minorOf(b)!) ? 1 : -1)
 }
 
-// Rewrites the range inside the section listing the dependency, so a same-looking range in `overrides` or `peerDependencies` is left alone.
-function replaceSpec(source: string, dependency: KayDependency, spec: string): string {
-  const open = new RegExp(`"${dependency.section}"\\s*:\\s*\\{`).exec(source)
+// The span inside the braces of a top-level section of package.json, read as JSON text: a string holding a brace, or a same-named key nested deeper, is not mistaken for it.
+function sectionSpan(source: string, section: string): { start: number, end: number } | undefined {
+  let depth = 0
+  let start: number | undefined
+  let index = 0
 
-  if (open === null)
-    return source
+  while (index < source.length) {
+    const char = source[index]!
 
-  const start = open.index + open[0].length
-  const end = source.indexOf('}', start)
+    if (char === '"') {
+      let close = index + 1
+
+      while (close < source.length && source[close] !== '"')
+        close += source[close] === '\\' ? 2 : 1
+
+      if (start === undefined && depth === 1 && source.slice(index + 1, close) === section) {
+        SECTION_OPEN.lastIndex = close + 1
+
+        const after = SECTION_OPEN.exec(source)
+
+        if (after) {
+          start = close + 1 + after[0].length
+          depth = 2
+          index = start
+
+          continue
+        }
+      }
+
+      index = close + 1
+
+      continue
+    }
+
+    if (char === '{' || char === '[')
+      depth++
+    else if (char === '}' || char === ']')
+      depth--
+
+    if (start !== undefined && depth === 1)
+      return { start, end: index }
+
+    index++
+  }
+
+  return undefined
+}
+
+// Rewrites the range inside the section listing the dependency, so a same-looking range in `overrides` or `peerDependencies` is left alone; undefined when no such entry was found.
+function replaceSpec(source: string, dependency: KayDependency, spec: string): string | undefined {
+  const span = sectionSpan(source, dependency.section)
+
+  if (span === undefined)
+    return undefined
+
   const entry = new RegExp(`("${dependency.name.replace(REGEX_SPECIALS, '\\$&')}"\\s*:\\s*)${JSON.stringify(dependency.spec).replace(REGEX_SPECIALS, '\\$&')}`)
+  const inside = source.slice(span.start, span.end)
 
-  return source.slice(0, start) + source.slice(start, end).replace(entry, (_whole, key: string) => `${key}${JSON.stringify(spec)}`) + source.slice(end)
+  return entry.test(inside) ? source.slice(0, span.start) + inside.replace(entry, (_whole, key: string) => `${key}${JSON.stringify(spec)}`) + source.slice(span.end) : undefined
 }
 
 async function run(args: string[], root: string, capture: boolean): Promise<{ code: number, stdout: string }> {

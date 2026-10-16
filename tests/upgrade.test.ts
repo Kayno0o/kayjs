@@ -1,10 +1,10 @@
 import type { DependencyChange, UpgradeDeps } from '../src/commands/upgrade'
-import { mkdir, rm, symlink } from 'node:fs/promises'
+import { chmod, mkdir, rm, symlink } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it, setDefaultTimeout, spyOn } from 'bun:test'
-import { upgradeProject } from '../src/commands/upgrade'
-import { LINTS } from '../src/compiler/lints'
+import { registryDepsFor, upgradeProject } from '../src/commands/upgrade'
+import { LINTS, minorOf } from '../src/compiler/lints'
 import { scratchDir } from './scratch'
 
 setDefaultTimeout(90_000)
@@ -205,6 +205,155 @@ describe('kay upgrade', () => {
   })
 })
 
+describe('kay upgrade, its manifest and lockfile', () => {
+  it('finds its section past a brace inside a string, and not a same-named key nested deeper', async () => {
+    const manifest = `{
+  "name": "app",
+  "config": { "dependencies": { "kay": "npm:@kaynooo/kayjs@~1.40.1" } },
+  "devDependencies": {
+    "odd": "github:a/b#{x}",
+    "kay": "npm:@kaynooo/kayjs@~1.40.1"
+  }
+}
+`
+    const root = await project(manifest)
+    const { deps } = fakes({ '@kaynooo/kayjs': '1.46.0' })
+
+    try {
+      expect(await quietly(async () => upgradeProject(root, deps))).toBe(0)
+      expect(await Bun.file(join(root, 'package.json')).text()).toBe(manifest.replace('    "kay": "npm:@kaynooo/kayjs@~1.40.1"\n', '    "kay": "npm:@kaynooo/kayjs@~1.46.0"\n'))
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('stops with an error, changing nothing, when the entry it found cannot be edited in the text', async () => {
+    const manifest = MANIFEST.replace('"npm:@kaynooo/kayjs@~1.40.1"', '"npm:@kaynooo/kayjs@\\u007e1.40.1"')
+    const root = await project(manifest)
+    const { deps, calls } = fakes({ '@kaynooo/kayjs': '1.46.0', '@kaynooo/kayjs-ui': '1.46.0' })
+
+    try {
+      expect(await quietly(async () => upgradeProject(root, deps))).toBe(1)
+      expect(await Bun.file(join(root, 'package.json')).text()).toBe(manifest)
+      expect(calls).toEqual({ installs: [], kay: [] })
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('puts bun.lock back with package.json when the install fails, and removes one the install made', async () => {
+    const withLock = await project(MANIFEST, { 'bun.lock': 'old lock\n' })
+    const withoutLock = await project()
+    const failing = fakes({ '@kaynooo/kayjs': '1.46.0', '@kaynooo/kayjs-ui': '1.46.0' })
+
+    failing.deps.install = async (root) => {
+      await Bun.write(join(root, 'bun.lock'), 'new lock\n')
+
+      return false
+    }
+
+    try {
+      expect(await quietly(async () => upgradeProject(withLock, failing.deps))).toBe(1)
+      expect(await Bun.file(join(withLock, 'bun.lock')).text()).toBe('old lock\n')
+      expect(await quietly(async () => upgradeProject(withoutLock, failing.deps))).toBe(1)
+      expect(await Bun.file(join(withoutLock, 'bun.lock')).exists()).toBe(false)
+    }
+    finally {
+      await rm(withLock, { recursive: true, force: true })
+      await rm(withoutLock, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('kay upgrade through the package manager', () => {
+  // A stand-in for `bun` that logs each call and answers by the script it is given.
+  async function stub(answers: string): Promise<{ bun: string, calls: () => Promise<string[][]>, root: string }> {
+    const root = await project()
+    const log = join(root, 'calls.log')
+    const bun = join(root, 'fake-bun')
+
+    await Bun.write(bun, `#!/bin/sh\nprintf '%s\\n' "$*" >> '${log}'\n${answers}\n`)
+    await chmod(bun, 0o755)
+
+    return { bun, root, calls: async () => ((await Bun.file(log).exists()) ? (await Bun.file(log).text()).trim().split('\n').map(line => line.split(' ')) : []) }
+  }
+
+  const SPEC_UI = 'npm:@kaynooo/kayjs-ui@~1.46.0'
+
+  it('reads the latest version from `bun info`, and gives none when it fails', async () => {
+    const { bun, root, calls } = await stub('case "$2" in @kaynooo/kayjs) echo 1.46.0;; *) exit 1;; esac')
+
+    try {
+      const deps = registryDepsFor(bun)
+
+      expect(await deps.latest('@kaynooo/kayjs', root)).toBe('1.46.0')
+      expect(await deps.latest('missing', root)).toBeUndefined()
+      expect(await calls()).toEqual([['info', '@kaynooo/kayjs', 'version'], ['info', 'missing', 'version']])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('installs, then adds again, in its section, a package the install left at another version', async () => {
+    const { bun, root, calls } = await stub('exit 0')
+
+    try {
+      const deps = registryDepsFor(bun)
+
+      await Bun.write(join(root, 'node_modules/stale/package.json'), '{ "version": "1.40.1" }')
+      await Bun.write(join(root, 'node_modules/fresh/package.json'), '{ "version": "1.46.0" }')
+
+      expect(await deps.install(root, [
+        { name: 'stale', spec: 'npm:@kaynooo/kayjs@~1.46.0', section: 'devDependencies' },
+        { name: 'fresh', spec: '~1.46.0', section: 'dependencies' },
+        { name: 'absent', spec: SPEC_UI, section: 'optionalDependencies' },
+        { name: 'plain', spec: SPEC_UI, section: 'dependencies' },
+      ])).toBe(true)
+      expect(await calls()).toEqual([
+        ['install'],
+        ['add', '--dev', '--no-cache', 'stale@npm:@kaynooo/kayjs@~1.46.0'],
+        ['add', '--optional', '--no-cache', `absent@${SPEC_UI}`],
+        ['add', '--no-cache', `plain@${SPEC_UI}`],
+      ])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('answers false when the install, or an add after it, fails', async () => {
+    const failingInstall = await stub('[ "$1" = install ] && exit 1; exit 0')
+    const failingAdd = await stub('[ "$1" = add ] && exit 1; exit 0')
+
+    try {
+      const change = { name: 'absent', spec: '~1.46.0', section: 'dependencies' }
+
+      expect(await registryDepsFor(failingInstall.bun).install(failingInstall.root, [change])).toBe(false)
+      expect(await failingInstall.calls()).toEqual([['install']])
+      expect(await registryDepsFor(failingAdd.bun).install(failingAdd.root, [change])).toBe(false)
+    }
+    finally {
+      await rm(failingInstall.root, { recursive: true, force: true })
+      await rm(failingAdd.root, { recursive: true, force: true })
+    }
+  })
+
+  it('runs the project\'s own kay through the package manager, handing back its output', async () => {
+    const { bun, root, calls } = await stub('echo out')
+
+    try {
+      expect(await registryDepsFor(bun).kay(root, ['explain', 'deprecated'], true)).toEqual({ code: 0, stdout: 'out\n' })
+      expect(await calls()).toEqual([[join(root, 'node_modules/kay/src/cli.ts'), 'explain', 'deprecated']])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+})
+
 describe('kay check --since', () => {
   it('fixes the deprecations of its minor alone', async () => {
     const root = await project(MANIFEST, {
@@ -243,5 +392,15 @@ describe('the deprecations', () => {
     const lints = Object.entries(LINTS).map(([name, lint]) => ({ name, group: lint.group, since: 'since' in lint ? lint.since : undefined }))
 
     expect(lints.filter(lint => (lint.group === 'deprecated') !== (lint.since !== undefined))).toEqual([])
+  })
+
+  it('keeps a deprecation three minors after the one it came in, but those listed here, which wait to go with their old form', async () => {
+    const { version } = (await Bun.file(join(import.meta.dir, '../package.json')).json()) as { version: string }
+    const [major, minor] = minorOf(version)!
+    // Past their three minors, kept until the old form they recognise goes: when one does, its line goes from this list and its lint from LINTS.
+    const overdue = new Set(['deprecated-schema-name'])
+    const past = Object.entries(LINTS).filter(([, lint]) => 'since' in lint && lint.since !== undefined && (minorOf(lint.since)![0] < major || minorOf(lint.since)![1] + 3 < minor)).map(([name]) => name)
+
+    expect(past.sort()).toEqual([...overdue])
   })
 })
