@@ -37,7 +37,7 @@ interface Entry {
 }
 
 // Runs a load apart from the render that triggered it, naming what it read: the server's, so a value built from a collection depends on it.
-type Tracker = <T>(load: () => Promise<T>) => Promise<{ result: T, reads: string[] }>
+type Tracker = <T>(load: () => Promise<T>) => Promise<{ result: T, reads: string[], invalidated?: boolean }>
 
 const entries = new Map<string, Entry>()
 // Every store a call named, which `invalidate` empties too.
@@ -128,7 +128,7 @@ export function trackLoads(track: Tracker): void {
   tracker = track
 }
 
-async function trackedLoad<T>(load: () => T | Promise<T>): Promise<{ result: T, reads: string[] }> {
+async function trackedLoad<T>(load: () => T | Promise<T>): Promise<{ result: T, reads: string[], invalidated?: boolean }> {
   const run = async () => load()
 
   return tracker ? tracker(run) : { result: await run(), reads: [] }
@@ -171,7 +171,7 @@ export function invalidate(key: string | ((key: string) => boolean)): void {
 
   for (const store of stores) {
     for (const name of store.keys()) {
-      if (matches(name) || dropped.has(name)) {
+      if (matches(name) || dropped.has(name) || (!entries.has(name) && storedReads(store, name).some(read => read === ALL_READS || matches(read)))) {
         store.delete(name)
         dropped.add(name)
       }
@@ -238,7 +238,11 @@ function heard(message: string): void {
 
 async function firstLoad<T>(key: string, ttl: number, pending: Entry, load: () => T | Promise<T>, store: CacheStore | undefined): Promise<T> {
   try {
-    const { result: value, reads } = await trackedLoad(load)
+    const { result: value, reads, invalidated } = await trackedLoad(load)
+
+    // A key the load read was invalidated meanwhile, so what it built is not kept.
+    if (invalidated && entries.get(key) === pending)
+      entries.delete(key)
 
     // Only when nothing invalidated the key meanwhile.
     if (entries.get(key) === pending)
@@ -260,10 +264,10 @@ async function refresh(key: string, ttl: number, entry: Entry, load: () => unkno
   entry.loading = loading
 
   try {
-    const { result: value, reads } = await loading
+    const { result: value, reads, invalidated } = await loading
 
-    // Only when nothing invalidated or replaced the key meanwhile.
-    if (entries.get(key) === entry)
+    // Only when nothing invalidated or replaced the key meanwhile, nor a key the load read.
+    if (!invalidated && entries.get(key) === entry)
       keep(key, { value, freshUntil: Date.now() + ttl * 1000, loaded: true, ...reads.length > 0 ? { deps: reads } : {} }, store)
   }
   catch (error) {
@@ -315,6 +319,13 @@ function readStored(store: CacheStore, key: string): Entry | undefined {
 
     return undefined
   }
+}
+
+// What a row of a store was built from, for one no process has in memory yet.
+function storedReads(store: CacheStore, key: string): string[] {
+  const kept = store.get(key)
+
+  return kept ? splitDeps(kept.text).deps ?? [] : []
 }
 
 function splitDeps(stored: string): { deps?: string[], text: string } {

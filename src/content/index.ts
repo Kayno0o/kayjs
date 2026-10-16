@@ -32,8 +32,6 @@ export const COLLECTION = Symbol.for('kay.collection')
 declare const FEED_PATH: unique symbol
 // Loaded entries are kept until `invalidate()` or a restart unless the loader sets a `ttl`: about thirty years.
 const FOREVER = 1e9
-// The listener each collection key has, so declaring one again drops the earlier.
-const listeners = new Map<string, () => void>()
 
 export interface Entry<Data> {
   // The file's path in the collection without its extension, `guides/intro` for `guides/intro.md`; an `index` file takes its folder's.
@@ -256,14 +254,21 @@ export function collection<Schema extends TSchema, Components extends Record<str
     return drafted
   }
 
-  // Whichever process invalidates it, this one loads the entries afresh. A collection declared again, as a reload does, takes over from the one it replaces.
-  listeners.get(key)?.()
-  listeners.set(key, onKeysInvalidated((matches) => {
-    if (matches(key))
-      loading = undefined
+  // Whichever process invalidates it, this one loads the entries afresh. The listener holds the collection weakly, so one a reload replaced is let go of, and leaves the listeners at its next invalidation.
+  const reset = () => {
+    loading = undefined
+  }
+  const weakReset = new WeakRef(reset)
+  const stop = onKeysInvalidated((matches) => {
+    const target = weakReset.deref()
+
+    if (!target)
+      stop()
+    else if (matches(key))
+      target()
 
     return []
-  }))
+  })
   // A page reading the entries is refreshed when `invalidate()` drops them.
   const loaded = async () => {
     noteRead(key)
@@ -302,7 +307,11 @@ export function collection<Schema extends TSchema, Components extends Record<str
 
       return found && editableEntries(name, [found])[0]
     },
-    invalidate: () => invalidate(key),
+    // Holds `reset`, which the listener only holds weakly.
+    invalidate: () => {
+      reset()
+      invalidate(key)
+    },
   }
 }
 

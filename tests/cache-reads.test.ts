@@ -60,6 +60,35 @@ describe('a value restored from a store keeps what it was built from', () => {
     expect(store.get('latest')?.text).not.toContain('collection:news')
   })
 
+  it('is dropped by an invalidation that comes before anything read it', async () => {
+    const { store } = memoryStore()
+    const before = await restart('early-before')
+
+    before.trackLoads(async load => ({ result: await load(), reads: ['collection:news'] }))
+    await before.cached('latest', 600, () => 'one', { store })
+
+    const after = await restart('early-after')
+
+    after.trackStore(store)
+    after.invalidate('collection:news')
+    expect(store.keys()).toEqual([])
+    expect(await after.cached('latest', 600, () => 'two', { store })).toBe('two')
+  })
+
+  it('is dropped by any invalidation when it read more than the server tracks', async () => {
+    const { store } = memoryStore()
+    const before = await restart('all-before')
+
+    before.trackLoads(async load => ({ result: await load(), reads: [before.ALL_READS] }))
+    await before.cached('many', 600, () => 'one', { store })
+
+    const after = await restart('all-after')
+
+    after.trackStore(store)
+    after.invalidate('anything')
+    expect(store.keys()).toEqual([])
+  })
+
   it('still reads a value an older kay stored, with no reads', async () => {
     const { store } = memoryStore()
     const old = await restart('old')
@@ -130,6 +159,33 @@ describe('a render that newly reads a key invalidated while it runs', () => {
     expect(renders).toBe(2)
     expect(page.html).toBe('render 2')
     expect(page.reads).toEqual(['k2'])
+  })
+
+  it('does not keep a cached value whose load read a key invalidated meanwhile, and the page is rendered again', async () => {
+    const page = fakePage(undefined)
+    let loads = 0
+    let renders = 0
+
+    trackPrerendered(new Map([['/c', page]]))
+    page.reads = ['unrelated']
+    invalidate('unrelated')
+
+    await revalidateStale(page, async () => {
+      renders++
+      await cached('built', 600, async () => {
+        noteRead('collection:news')
+
+        if (loads === 0)
+          invalidate('collection:news')
+
+        return ++loads
+      })
+
+      return new Response(`render ${renders}`)
+    }, () => undefined)
+
+    expect(renders).toBe(2)
+    expect(await cached('built', 600, () => 99)).toBe(2)
   })
 
   it('names the invalidation in what readsOf gives back', async () => {

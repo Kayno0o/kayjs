@@ -35,8 +35,16 @@ onKeysInvalidated((matches) => {
 
   return []
 })
-// A `cached` load runs in a scope of its own, so what it reads belongs to its value and not to the page that happened to load it.
-trackLoads(readsOf)
+// A `cached` load runs in a scope of its own, so what it reads belongs to its value and not to the page that happened to load it; a key it read being invalidated meanwhile still makes the page outdated.
+trackLoads(async (load) => {
+  const parent = scope.getStore()
+  const loaded = await readsOf(load)
+
+  if (loaded.invalidated && parent)
+    parent.invalidated = true
+
+  return loaded
+})
 
 // Runs a page render, reading its body too, and lists the cache keys and collections it read, which `invalidate` and `collection.invalidate()` refresh the page for; `invalidated` tells one of them was invalidated meanwhile.
 export async function readsOf<T>(render: () => Promise<T>): Promise<{ result: T, reads: string[], invalidated: boolean }> {
