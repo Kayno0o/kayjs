@@ -1,18 +1,21 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, describe, expect, test } from 'bun:test'
-import { mount, settle } from 'kay/test'
-import { click } from './dom'
+import { mount } from 'kay/test'
+import { click, clock } from './dom'
 
 let mounted: Mounted | undefined
 const toggles: boolean[] = []
 
 afterEach(() => {
+  clock.stop()
   mounted?.unmount()
   toggles.length = 0
 })
 
 async function popovers() {
   mounted = await mount('src/components/popovers.kay', { onToggle: (open: boolean) => toggles.push(open) })
+
+  clock.start()
 
   return mounted.root
 }
@@ -36,13 +39,13 @@ describe('Popover', () => {
     const panel = root.querySelector<HTMLElement>('#menu')!
 
     click(root.querySelector('#show'))
-    await settle()
+    await clock.settle()
 
     expect(panel.matches(':popover-open')).toBe(true)
     expect(root.querySelector('#trigger')?.getAttribute('aria-expanded')).toBe('true')
 
     panel.hidePopover()
-    await settle()
+    await clock.settle()
 
     expect(root.querySelector('#trigger')?.getAttribute('aria-expanded')).toBe('false')
     expect(toggles).toEqual([true, false])
@@ -56,12 +59,12 @@ describe('TooltipHost', () => {
     const tooltip = root.querySelector<HTMLElement>('.kui-tooltip')!
 
     button.querySelector('svg')!.dispatchEvent(new Event('pointerover', { bubbles: true }))
-    await settle()
+    await clock.settle()
 
     expect(tooltip.matches(':popover-open')).toBe(false)
 
-    await Bun.sleep(100)
-    await settle()
+    await clock.elapse(100)
+    await clock.settle()
 
     expect(tooltip.textContent).toBe('Delete')
     expect(tooltip.matches(':popover-open')).toBe(true)
@@ -69,7 +72,7 @@ describe('TooltipHost', () => {
     expect(button.style.getPropertyValue('anchor-name')).toBe('--kui-tooltip-anchor')
 
     document.dispatchEvent(new Event('pointerdown'))
-    await settle()
+    await clock.settle()
 
     expect(tooltip.matches(':popover-open')).toBe(false)
     expect(button.style.getPropertyValue('anchor-name')).toBe('')
@@ -82,8 +85,8 @@ test('keeps a tooltip while the pointer crosses onto it, and Escape closes it un
   const tooltip = root.querySelector<HTMLElement>('.kui-tooltip')!
   const over = async (target: Element, wait = 100) => {
     target.dispatchEvent(new Event('pointerover', { bubbles: true }))
-    await Bun.sleep(wait)
-    await settle()
+    await clock.elapse(wait)
+    await clock.settle()
   }
 
   await over(button)
@@ -98,7 +101,7 @@ test('keeps a tooltip while the pointer crosses onto it, and Escape closes it un
 
   await over(button)
   document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
-  await settle()
+  await clock.settle()
 
   expect(tooltip.matches(':popover-open')).toBe(false)
 
@@ -109,14 +112,15 @@ test('keeps a tooltip while the pointer crosses onto it, and Escape closes it un
 
 test('a second TooltipHost renders nothing while the first is mounted, and takes over once it unmounts', async () => {
   mounted = await mount('src/components/hosts.kay')
+  clock.start()
   const { root } = mounted
   const tip = root.querySelector('#tip')!
   const tooltips = () => [...root.querySelectorAll('.kui-tooltip')]
 
   async function hover(target: Element) {
     target.dispatchEvent(new Event('pointerover', { bubbles: true }))
-    await Bun.sleep(100)
-    await settle()
+    await clock.elapse(100)
+    await clock.settle()
   }
 
   await hover(tip)
@@ -124,7 +128,7 @@ test('a second TooltipHost renders nothing while the first is mounted, and takes
   expect(tooltips().map(item => [item.textContent, item.matches(':popover-open')])).toEqual([['Copy', true]])
 
   click(root.querySelector('#unmount'))
-  await settle()
+  await clock.settle()
   await hover(root.querySelector('#saved')!)
   await hover(tip)
 

@@ -39,6 +39,9 @@ export const clock = {
   // Runs the timers due within `ms` of fake time, in steps of 10 ms with the effects between them, as a clock running on would.
   async elapse(ms: number) {
     await this.flush()
+    // The timers due now, as a real wait of no time lets them run.
+    jest.advanceTimersByTime(0)
+    await this.flush()
 
     for (let elapsed = 0; elapsed < ms; elapsed += STEP_MS) {
       jest.advanceTimersByTime(Math.min(STEP_MS, ms - elapsed))
