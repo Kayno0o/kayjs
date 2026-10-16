@@ -24,6 +24,8 @@ kay build --compile server
 PORT=8080 ./server
 ```
 
+The server listens on every address unless `HOST` names one: `HOST=127.0.0.1 PORT=8080 ./server` answers on the loopback address alone, and `./server --health` asks the address `HOST` names. `kay dev` ignores `HOST` and listens on localhost, or on the network with `--host`.
+
 It reads a `.env` and a `bunfig.toml` where it runs, but nothing else of the project: a file a page reads by path at runtime is not in it.
 
 ### Prove the executable starts

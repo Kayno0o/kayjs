@@ -76,7 +76,9 @@ kay build --compile server
 PORT=8080 ./server
 ```
 
-A project with no `src/server.ts` and no `--entry` runs kay's own server of its pages on `PORT`, 3000 by default, as `kay dev`, `kay start` and `kay render` do, so an app with nothing custom on its server writes no entry: it adds one to mount a plugin, a job or an `onStop` hook.
+A server entry from `kay new` and kay's own server listen on `PORT`, 3000 by default, and on `HOST` when it is set (`HOST=127.0.0.1 ./server`), every address otherwise; `kay dev` ignores `HOST` and listens on localhost, or what `--host` opens, unless the app names a `hostname` itself.
+
+A project with no `src/server.ts` and no `--entry` runs kay's own server of its pages on `PORT` and `HOST`, as `kay dev`, `kay start` and `kay render` do, so an app with nothing custom on its server writes no entry: it adds one to mount a plugin, a job or an `onStop` hook.
 
 ### Export a static site
 

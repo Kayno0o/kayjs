@@ -178,8 +178,18 @@ export async function shutdown(app: AnyElysia): Promise<void> {
   }
 }
 
-// What `<executable> --health` exits with: 0 when the server running beside it answers its health route, on `PORT` or 3000, else 1, for a container image with no curl.
-export async function probeHealth(config: HealthConfig | false | undefined, port = process.env.PORT ?? '3000'): Promise<number> {
+const ANY_ADDRESS = new Set(['', '0.0.0.0', '::', '[::]'])
+
+// Where the server beside the probe answers: loopback when it listens on every address, else the address `HOST` names.
+function probeHost(host: string | undefined): string {
+  if (host === undefined || ANY_ADDRESS.has(host))
+    return '127.0.0.1'
+
+  return host.includes(':') && !host.startsWith('[') ? `[${host}]` : host
+}
+
+// What `<executable> --health` exits with: 0 when the server running beside it answers its health route, on `PORT` or 3000 and at `HOST` when it is set, else 1, for a container image with no curl.
+export async function probeHealth(config: HealthConfig | false | undefined, port = process.env.PORT ?? '3000', host = process.env.HOST): Promise<number> {
   if (config === false) {
     kayLog('error', 'health is false in kay.config.ts, so the server has no health route to ask')
 
@@ -187,7 +197,7 @@ export async function probeHealth(config: HealthConfig | false | undefined, port
   }
 
   try {
-    const response = await fetch(`http://127.0.0.1:${port}${config?.path ?? HEALTH_PATH}`, { signal: AbortSignal.timeout(CHECK_TIMEOUT_MS) })
+    const response = await fetch(`http://${probeHost(host)}:${port}${config?.path ?? HEALTH_PATH}`, { signal: AbortSignal.timeout(CHECK_TIMEOUT_MS) })
 
     return response.ok ? 0 : 1
   }

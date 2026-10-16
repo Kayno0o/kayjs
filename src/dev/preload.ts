@@ -34,6 +34,9 @@ const PORTS_TRIED = 100
 // Where a server listens when the app names no hostname: this machine alone, unless `kay dev --host` opens it to the network.
 const HOST = process.env.KAY_DEV_HOST ?? 'localhost'
 
+// An exported or `.env` `HOST` is production's address and must not open the development server to the network, so the app's `process.env.HOST` is left unset here.
+delete process.env.HOST
+
 // The first server the entry starts is the one `kay dev` reports.
 let port: number | undefined
 // The port the last run asked for and the one it moved to, which this run takes first when it asks for the same.

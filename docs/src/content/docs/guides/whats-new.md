@@ -9,6 +9,7 @@ This page lists what each release adds, newest first, with a link to where each 
 
 - **Highlighter helpers in the content cache**: a collection with a `highlight` recompiles its entries when a module the content config imports changes, so a helper the highlighter calls never leaves entries highlighted by its old code. [Content](/guides/content)
 - **A cross-site refusal says why**: the 403 for a post or request another site sends is plain text naming the `Origin` it got, the origin kay took for the site and the `site` setting that fixes a proxy changing the host. [Forms and actions](/essentials/forms-and-actions)
+- **`HOST` beside `PORT`**: a server from `kay new`, kay's own server and `./server --health` read `HOST`, listening on every address when it is unset. `kay dev` keeps its own address. [Deployment](/guides/deployment)
 - **happy-dom 21 for `mount`**: `kay/test/dom` works with `@happy-dom/global-registrator` 20.14.6 or 21.0.3 and later, so an app on either needs no change. [Testing](/guides/testing)
 
 ## 1.47.0
