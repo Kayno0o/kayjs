@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import { afterEach, describe, expect, setSystemTime, test } from 'bun:test'
+import { memoryStore } from '../src/memoryStore'
 import { authPages } from '../src/pages'
 import { testApp } from './helpers/app'
 
@@ -13,12 +14,13 @@ afterEach(() => {
   setSystemTime()
 })
 
-function server(options: { documents?: Record<string, unknown> } = {}) {
+function server(options: { documents?: Record<string, unknown>, scopes?: ('posts:read' | 'posts:write')[], store?: ReturnType<typeof memoryStore> } = {}) {
   const fetched: string[] = []
   const app = testApp({
     url: 'http://localhost',
     pages: authPages(),
-    scopes: ['posts:read', 'posts:write'],
+    scopes: options.scopes ?? ['posts:read', 'posts:write'],
+    ...options.store && { store: options.store },
     oauthServer: {
       fetch: async (url) => {
         fetched.push(url)
@@ -160,6 +162,28 @@ describe('the authorization request', () => {
     expect(new URL(again.url).searchParams.get('code')).toBeTruthy()
     expect(await ada.call('oauthAuthorize', params(client_id, { scope: 'posts:read posts:write' }))).toMatchObject({ kind: 'consent', scopes: ['posts:read', 'posts:write'] })
     expect(await ada.call('oauthAuthorize', params(client_id, { prompt: 'consent' }))).toMatchObject({ kind: 'consent' })
+  })
+
+  test('an approval held with every scope, from an app declaring none, asks again once the app declares some', async () => {
+    const store = memoryStore()
+    const before = server({ scopes: [], store })
+    const { client_id } = await register(before)
+    const ada = await signedIn(before)
+    const first = await exchange(before, client_id, await approved(ada, client_id))
+    const after = server({ store })
+    const again = after.browser()
+
+    await again.post('/password', { identifier: 'ada@example.com', password: PASSWORD })
+
+    expect(await again.call('oauthAuthorize', params(client_id))).toMatchObject({ kind: 'consent', scopes: ['posts:read'] })
+    // A refresh token issued under it is refused too, as it would hold every scope the app declares now.
+    expect((await token(after, { grant_type: 'refresh_token', refresh_token: String(first.body.refresh_token), client_id })).body.error).toBe('invalid_grant')
+
+    await again.post('/call/oauthDecide', [params(client_id), true])
+
+    expect(await again.call('oauthClients')).toEqual([expect.objectContaining({ scopes: ['posts:read'] })])
+    expect(await again.call('oauthAuthorize', params(client_id))).toMatchObject({ kind: 'redirect' })
+    expect(await again.call('oauthAuthorize', params(client_id, { scope: 'posts:write' }))).toMatchObject({ kind: 'consent' })
   })
 
   test('a denial goes back to the client without a code', async () => {
@@ -337,6 +361,48 @@ describe('refresh tokens', () => {
     setSystemTime(Date.now() + 31 * 24 * 60 * 60 * 1000)
 
     expect((await token(app, { grant_type: 'refresh_token', refresh_token: String(first.body.refresh_token), client_id })).body.error).toBe('invalid_grant')
+  })
+
+  test('a family ends ninety days after its first token, however often it rotates', async () => {
+    const { app, client_id, first } = await signedInClient()
+    const day = 24 * 60 * 60 * 1000
+    const start = Date.now()
+    let refresh = String(first.body.refresh_token)
+
+    for (const elapsed of [20, 40, 60, 80]) {
+      setSystemTime(start + elapsed * day)
+
+      const next = await token(app, { grant_type: 'refresh_token', refresh_token: refresh, client_id })
+
+      expect(next.status).toBe(200)
+      refresh = String(next.body.refresh_token)
+    }
+
+    setSystemTime(start + 100 * day)
+
+    expect((await token(app, { grant_type: 'refresh_token', refresh_token: refresh, client_id })).body.error).toBe('invalid_grant')
+  })
+
+  test('a refresh token unused for thirty days is refused inside its family', async () => {
+    const { app, client_id, first } = await signedInClient()
+
+    setSystemTime(Date.now() + 31 * 24 * 60 * 60 * 1000)
+
+    expect((await token(app, { grant_type: 'refresh_token', refresh_token: String(first.body.refresh_token), client_id })).body.error).toBe('invalid_grant')
+  })
+
+  test('the last use of an approved app is its last call, not its last refresh', async () => {
+    const { app, ada, client_id, first } = await signedInClient()
+
+    expect(await ada.call('oauthClients')).toEqual([expect.objectContaining({ lastUsedAt: null })])
+
+    const second = await token(app, { grant_type: 'refresh_token', refresh_token: String(first.body.refresh_token), client_id })
+
+    expect(await ada.call('oauthClients')).toEqual([expect.objectContaining({ lastUsedAt: null })])
+
+    await app.browser().json('/me', { headers: { authorization: `Bearer ${second.body.access_token}` } })
+
+    expect(await ada.call('oauthClients')).toEqual([expect.objectContaining({ lastUsedAt: expect.any(String) })])
   })
 
   test('stop working once the user revokes the client, with its access token', async () => {

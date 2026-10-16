@@ -58,9 +58,17 @@ export function covers(held: readonly string[] | null, wanted: readonly string[]
   return wanted !== null && wanted.every(scope => held.includes(scope))
 }
 
-// The scopes of an approval once the user approves more: both sets together.
+// Whether an approval already given covers a request: an approval for every scope, given while the app declared none, covers no scope the app declares since.
+function approves(held: readonly string[] | null, wanted: readonly string[] | null): boolean {
+  return held === null ? wanted === null : covers(held, wanted)
+}
+
+// The scopes of an approval once the user approves more: both sets together, with the new ones alone when the approval held every scope of an app declaring none.
 function together(held: readonly string[] | null, wanted: readonly string[] | null): string[] | null {
-  return held === null || wanted === null ? null : [...new Set([...held, ...wanted])]
+  if (wanted === null)
+    return null
+
+  return held === null ? [...wanted] : [...new Set([...held, ...wanted])]
 }
 
 // The scopes a request asks for, null for every one; undefined when it asks for one the app does not declare.
@@ -145,7 +153,7 @@ async function approve(state: RequestState, record: UserRecord, checked: Checked
   await oauth.grants.put(grant)
   await oauth.codes.create({ digest: digest(code), userId: record.id, clientId: checked.client.id, redirectUri: checked.redirectUri, challenge: checked.challenge, scopes: checked.scopes, family: crypto.randomUUID(), createdAt: now, expiresAt: new Date(now.getTime() + CODE_LIFETIME * 1000), usedAt: null })
 
-  if (!held || !covers(held.scopes, checked.scopes))
+  if (!held || !approves(held.scopes, checked.scopes))
     await report(state, record, 'oauth-client-approved', checked.client.name)
 
   return withParams(checked.redirectUri, { code, state: oneOf(checked.params.state), iss: root })
@@ -181,7 +189,7 @@ export async function authorize(state: RequestState, params: AuthorizeParams, ro
 
   const held = await state.core.store.oauth!.grants.get(record.id, checked.client.id)
 
-  if (held && covers(held.scopes, checked.scopes) && !prompt.includes('consent'))
+  if (held && approves(held.scopes, checked.scopes) && !prompt.includes('consent'))
     return { kind: 'redirect', url: await approve(state, record, checked, root) }
 
   if (prompt.includes('none'))

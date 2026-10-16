@@ -155,8 +155,13 @@ export async function tokenUser(core: Core, token: string): Promise<{ record: Us
   if (!record)
     return undefined
 
-  if (found.lastUsedAt === null || now.getTime() - found.lastUsedAt.getTime() > TOUCH_EVERY_MS)
+  if (found.lastUsedAt === null || now.getTime() - found.lastUsedAt.getTime() > TOUCH_EVERY_MS) {
     await core.store.bearerTokens.touch(found.id, now)
+
+    // The account page's "last used" of an approved app is its last call, not its last refresh.
+    if (found.oauth)
+      await core.store.oauth?.grants.touch(found.userId, found.oauth.clientId, now)
+  }
 
   return { record, scopes: found.scopes }
 }

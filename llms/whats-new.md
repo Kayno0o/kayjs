@@ -2,6 +2,10 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
+## Unreleased
+
+- kayjs-auth's OAuth server ends a refresh token family 90 days after its first token whatever its rotations (a token unused for 30 days is still refused), shows an approved app's last use as its last API call, and asks the user again when an app starts declaring `scopes` after approving a client while it declared none ([kayjs-auth](../packages/auth/llms.txt)).
+
 ## 1.50.0
 
 - An MCP client (Claude Code, MCP Inspector) signs in to an app with kayjs-auth and `mcp` through OAuth with no code of the app's: the app serves the authorization server and resource metadata, registration (client ID metadata documents and dynamic), PKCE S256, a consent page, rotating refresh tokens that end their family when reused, and an account page listing approved apps with a revoke button; the tokens are kayjs-auth's bearer tokens, so `user()`, `via()` and `requireUser({ scope })` work unchanged. A Postgres or SQLite app runs `db.sync()` for the four `auth_oauth_*` tables and the two `auth_bearer_token` columns, and a custom store may add the optional `oauth` member ([kayjs-auth](../packages/auth/llms.txt), [API routes](api-routes.md#mcp)).

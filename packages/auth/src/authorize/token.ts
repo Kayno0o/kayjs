@@ -8,9 +8,10 @@ import { spend } from '../limits'
 import { refused } from './reply'
 import { covers, sameSite } from './request'
 
-// Seconds an access token works for, and a refresh token.
+// Seconds an access token works for, a refresh token unused, and a whole family of them from its first token.
 export const ACCESS_LIFETIME = 60 * 60
 export const REFRESH_LIFETIME = 30 * 24 * 60 * 60
+export const FAMILY_LIFETIME = 90 * 24 * 60 * 60
 const VERIFIER = /^[\w.~-]{43,128}$/
 const WHITESPACE = /\s+/
 
@@ -21,8 +22,8 @@ function matches(verifier: string, challenge: string): boolean {
   return computed.length === expected.length && timingSafeEqual(computed, expected)
 }
 
-// A bearer token and a refresh token of one family for the grant, which is how `user()`, `via()` and `requireUser({ scope })` see the client.
-async function issue(core: Core, grant: OAuthGrantRecord, scopes: string[] | null, family: string): Promise<TokenReply> {
+// A bearer token and a refresh token of one family for the grant, which is how `user()`, `via()` and `requireUser({ scope })` see the client; the family ends at `familyEnd` whatever its rotations.
+async function issue(core: Core, grant: OAuthGrantRecord, scopes: string[] | null, family: string, familyEnd: Date | undefined): Promise<TokenReply> {
   const oauth = core.store.oauth!
   const now = new Date()
   const access = randomToken()
@@ -39,8 +40,7 @@ async function issue(core: Core, grant: OAuthGrantRecord, scopes: string[] | nul
     expiresAt: new Date(now.getTime() + ACCESS_LIFETIME * 1000),
     oauth: { clientId: grant.clientId, family },
   })
-  await oauth.refresh.create({ digest: digest(refresh), userId: grant.userId, clientId: grant.clientId, scopes, family, createdAt: now, expiresAt: new Date(now.getTime() + REFRESH_LIFETIME * 1000), usedAt: null })
-  await oauth.grants.touch(grant.userId, grant.clientId, now)
+  await oauth.refresh.create({ digest: digest(refresh), userId: grant.userId, clientId: grant.clientId, scopes, family, createdAt: now, expiresAt: familyEnd ?? new Date(now.getTime() + FAMILY_LIFETIME * 1000), usedAt: null })
 
   return {
     status: 200,
@@ -89,7 +89,7 @@ async function exchangeCode(core: Core, form: URLSearchParams, root: string): Pr
 
   const grant = await liveGrant(core, issued.userId, issued.clientId)
 
-  return grant ? issue(core, grant, issued.scopes, issued.family) : refused('invalid_grant', 'The client is not approved')
+  return grant ? issue(core, grant, issued.scopes, issued.family, undefined) : refused('invalid_grant', 'The client is not approved')
 }
 
 async function rotate(core: Core, form: URLSearchParams): Promise<TokenReply> {
@@ -112,8 +112,13 @@ async function rotate(core: Core, form: URLSearchParams): Promise<TokenReply> {
     return refused('invalid_grant', 'The refresh token was used already')
   }
 
-  if (held.expiresAt <= new Date() || held.clientId !== clientId)
+  // `expiresAt` is where the family ends, so a token also lapses when it sat unused for thirty days.
+  if (held.expiresAt <= new Date() || held.createdAt.getTime() + REFRESH_LIFETIME * 1000 <= Date.now() || held.clientId !== clientId)
     return refused('invalid_grant', 'The refresh token does not match this request')
+
+  // A token holding every scope, issued while the app declared none, does not cover those it declares since.
+  if (held.scopes === null && core.scopes.size > 0)
+    return refused('invalid_grant', 'The client must be approved again')
 
   const asked = form.get('scope')
   const scopes = asked === null ? held.scopes : asked.split(WHITESPACE).filter(Boolean)
@@ -123,7 +128,7 @@ async function rotate(core: Core, form: URLSearchParams): Promise<TokenReply> {
 
   const grant = await liveGrant(core, held.userId, held.clientId)
 
-  return grant ? issue(core, grant, scopes, held.family) : refused('invalid_grant', 'The client is not approved')
+  return grant ? issue(core, grant, scopes, held.family, held.expiresAt) : refused('invalid_grant', 'The client is not approved')
 }
 
 // The token endpoint: the authorization code grant with PKCE, and refresh tokens that rotate, a token used twice ending its family.

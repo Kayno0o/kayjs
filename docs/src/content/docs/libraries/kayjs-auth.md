@@ -283,7 +283,11 @@ The app is asked once. Signing in again skips the consent page until the user re
 
 Nothing is set up. The documents an agent reads, `/.well-known/oauth-authorization-server` and `/.well-known/oauth-protected-resource`, and the endpoints under `/auth/oauth/` are served for you, under your `base` if you have one.
 
-Agents sign in with PKCE, never a client secret. An access token lasts an hour. A refresh token lasts 30 days and is replaced each time it is used. One used twice ends the whole sign-in.
+Agents sign in with PKCE, never a client secret. An access token lasts an hour. A refresh token is replaced each time it is used, and expires after 30 days unused.
+
+A whole sign-in ends 90 days after it began. One refresh token used twice ends it at once.
+
+An approval given while your app declared no `scopes` asks the user again once it declares some.
 
 ```ts
 createAuth({
