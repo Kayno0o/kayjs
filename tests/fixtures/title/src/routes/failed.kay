@@ -1,0 +1,10 @@
+---
+import Failing from '../components/failing.kay'
+import Room from '../components/room.kay'
+---
+h1 Failed
+Room(label="Healthy")
+try
+  Failing(label="Broken")
+catch
+  p.fallback Fallback

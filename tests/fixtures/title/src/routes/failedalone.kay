@@ -1,0 +1,8 @@
+---
+import Failing from '../components/failing.kay'
+---
+h1 Failed alone
+try
+  Failing(label="Broken")
+catch
+  p.fallback Fallback

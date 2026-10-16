@@ -77,6 +77,18 @@ export function head(tags: HeadTag[]): void {
   groups?.push(tags)
 }
 
+// What the head of the render in progress holds, to give back what a block that failed set.
+export function headCheckpoint(): [groups: number, titles: number] {
+  return [groups?.length ?? 0, islandTitles]
+}
+
+export function restoreHead([length, titles]: [number, number]): void {
+  if (groups)
+    groups.length = length
+
+  islandTitles = titles
+}
+
 // Tells whether an island set a title since `mark`.
 export function headMark(): number {
   return islandTitles

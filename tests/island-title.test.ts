@@ -35,3 +35,26 @@ describe('an island setting the page title, rendered by the server', () => {
     expect(setsIslandTitle(mark)).toBe(true)
   })
 })
+
+async function served(path: string): Promise<string | undefined> {
+  const html = await (await app.handle(new Request(`http://localhost${path}`))).text()
+
+  return (/<title>([^<]*)<\/title>/).exec(html)?.[1]
+}
+
+describe('an island that fails to render', () => {
+  it('leaves the title of the island rendered before it', async () => {
+    expect(await served('/failed')).toBe('Healthy')
+    expect(await marked('/failed')).toEqual(['room titled'])
+  })
+
+  it('leaves the title of the island before a streamed block that rejects', async () => {
+    expect(await served('/failedawait')).toBe('Healthy')
+    expect(await marked('/failedawait')).toEqual(['room titled'])
+  })
+
+  it('leaves the page its own title when no island rendered', async () => {
+    expect(await served('/failedalone')).not.toBe('Broken')
+    expect(await marked('/failedalone')).toEqual([])
+  })
+})

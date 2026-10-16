@@ -9,6 +9,7 @@ import { fieldDescription } from './described'
 import { escape, escapeAttribute } from './escape'
 import { fieldMarks, markedAttribute, markedList, markedText, withFieldMarks } from './fields'
 import { nativeConstraints } from './form'
+import { headCheckpoint, restoreHead } from './head'
 import { localizedLink } from './i18n'
 import { imageSource } from './image'
 import { localeState } from './locale-state'
@@ -349,11 +350,14 @@ export function serverIsland<P>(fn: (props: P) => unknown, props: P, mode: Serve
 // A `try` block: what it renders, or once that throws, its `catch` block, the error reported. The marker tells an island hydrating to keep that markup as it came, since the error stayed on the server.
 export function attempt(render: () => string, fallback?: (error: unknown) => string): string {
   const mark = idMark()
+  const checkpoint = headCheckpoint()
 
   try {
     return render()
   }
   catch (error) {
+    // What the block set in the head goes with it: its islands are not in the page.
+    restoreHead(checkpoint)
     const server = currentServerScope()
 
     if (server)
