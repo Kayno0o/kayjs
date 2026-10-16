@@ -34,10 +34,10 @@ import { kayLog } from '../runtime/log'
 import { editing } from '../runtime/preview'
 import { encodeValue, unsendable } from '../runtime/wire'
 import { rebaseHtml } from './base'
-import { importModule } from './bundle'
+import { importModule, onForgetModules } from './bundle'
 import { preferredEncoding, wholeResponse } from './compress'
 import { cookieJar, requestCookies } from './cookies'
-import { A11Y_SCRIPT, DEV_BOOT, devToolScripts, errorPageScripts, LIVE_RELOAD, problemsBlock } from './dev'
+import { A11Y_SCRIPT, DEV_BOOT, devToolScripts, errorPageScripts, liveReload, problemsBlock } from './dev'
 import { noteRedirect } from './dev-notes'
 import { FLASH_COOKIE, handedOverFlash, readFlash } from './flash'
 import { formsScript } from './forms'
@@ -236,6 +236,11 @@ function guardRuns(guards: ServedRoute['guards'], refusal: Refusal | undefined):
 
 // Whether `kay build` writes this page ahead, from its `prerender` setting or a server island its template reaches; read off the source in development only, where the compiler is loaded anyway.
 const serverIslandReach = new Map<string, Promise<boolean>>()
+
+onForgetModules(() => {
+  editors.clear()
+  serverIslandReach.clear()
+})
 
 async function willPrerender(route: ServedRoute, page: PageModule): Promise<DevRequest['prerender']> {
   const setting = pageSetting(page, 'prerender')
@@ -835,7 +840,7 @@ function kayMetas(options: RenderOptions, hasIslands: boolean): string {
 }
 
 function devScripts(client: ClientBuild): string {
-  return problemsBlock(client.problems) + LIVE_RELOAD + DEV_BOOT + devToolScripts() + A11Y_SCRIPT
+  return problemsBlock(client.problems) + liveReload() + DEV_BOOT + devToolScripts() + A11Y_SCRIPT
 }
 
 // What the dev tool's Request tab shows: the route matched, the files that rendered, the params, the status, and how long each load took, the matched route's when another page shows its error.

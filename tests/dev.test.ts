@@ -21,7 +21,7 @@ import { editorCommand } from '../src/server/editor'
 // The parent's pid in /proc/<pid>/stat, after the command name and the state.
 const PARENT_PID = /\) \S+ (\d+)/
 
-// This process's children running `script` for the project at `real`, its real path: `builder.ts` building its client, `spare.ts` its servers.
+// This process's children running `script` for the project at `real`, its real path: `builder.ts` building its client, `preload.ts` its servers.
 function childrenRunning(real: string, script: string): string[] {
   return readdirSync('/proc').filter((pid) => {
     try {
@@ -525,22 +525,6 @@ describe.concurrent('kay dev', () => {
 
     try {
       expect(await Bun.file(join(root, '.kay/types/src/routes/index.kay.tsx')).exists()).toBe(true)
-    }
-    finally {
-      await stop()
-      await rm(root, { recursive: true, force: true })
-    }
-  })
-
-  it('readies the next server once one on a Unix socket is up, as one on a port', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
-
-    await Bun.write(join(root, 'src/server.ts'), `Bun.serve({ unix: ${JSON.stringify(join(root, 'kay.sock'))}, fetch: () => new Response('ok') })\n`)
-    const stop = await dev(root, { log: () => undefined })
-
-    try {
-      // Sooner than the fallback for a server that never says it is up.
-      await until(() => childrenRunning(realpathSync(root), 'spare.ts').length === 2, 1900)
     }
     finally {
       await stop()
@@ -1378,7 +1362,7 @@ describe.concurrent('kay dev', () => {
     const messages: unknown[] = []
 
     await Bun.write(join(root, 'server.ts'), 'const server = Bun.serve({ port: 0, fetch: () => new Response() })\nconsole.log(`Listening on http://localhost:${server.port}`)\nconsole.log(`Listening on http://localhost:${server.port + 1}`)\nconsole.log(\'Listening on\', server.port)\nawait server.stop()\n')
-    const child = Bun.spawn([process.execPath, '--preload', join(import.meta.dir, '../src/dev/spare.ts'), join(root, 'server.ts')], { cwd: root, stdin: 'pipe', stdout: 'pipe', stderr: 'inherit', ipc: message => messages.push(message) })
+    const child = Bun.spawn([process.execPath, '--preload', join(import.meta.dir, '../src/dev/preload.ts'), join(root, 'server.ts')], { cwd: root, stdin: 'pipe', stdout: 'pipe', stderr: 'inherit', ipc: message => messages.push(message) })
 
     try {
       void child.stdin.write('start 0\n')
@@ -1403,7 +1387,7 @@ describe.concurrent('kay dev', () => {
 
     const run = async (env: Record<string, string>) => {
       const messages: unknown[] = []
-      const child = Bun.spawn([process.execPath, '--preload', join(import.meta.dir, '../src/dev/spare.ts'), join(root, 'server.ts')], { cwd: root, env: { ...process.env, ...env }, stdin: 'pipe', stdout: 'ignore', stderr: 'ignore', ipc: message => messages.push(message) })
+      const child = Bun.spawn([process.execPath, '--preload', join(import.meta.dir, '../src/dev/preload.ts'), join(root, 'server.ts')], { cwd: root, env: { ...process.env, ...env }, stdin: 'pipe', stdout: 'ignore', stderr: 'ignore', ipc: message => messages.push(message) })
 
       try {
         void child.stdin.write('start 0\n')
@@ -1596,7 +1580,8 @@ describe.concurrent('kay dev', () => {
       await until(() => lines.length === 5, 10_000)
 
       expect(await (await fetch(url)).text()).toContain('Grace</h1>')
-      expect(children).toHaveLength(4)
+      // The edits to the helper and the page reloaded the one server.
+      expect(children).toHaveLength(1)
     }
     finally {
       await stop()

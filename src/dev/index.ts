@@ -52,9 +52,9 @@ export class ConfigRefused extends Error {}
 const DEBOUNCE_MS = 10
 // How long a source an editor's save left missing is waited for, as saving by renaming it away and writing it anew leaves it, on a machine busy enough to stretch the save.
 const GONE_WAIT_MS = 200
-const SPARE = join(import.meta.dir, 'spare.ts')
-// When a server never says it is up, as one that never serves, the next process starts anyway after this: a guess, which also starts it beside a server that takes longer to boot.
-const SPARE_FALLBACK_MS = 2000
+const PRELOAD = join(import.meta.dir, 'preload.ts')
+// How long a server gets to reload its modules before the change starts a new process: an entry stuck on top-level work, or a process that stopped answering.
+const RELOAD_TIMEOUT_MS = 5000
 // How long stopping waits for the types being written before it kills the process writing them.
 const TYPES_GRACE_MS = 2000
 
@@ -81,15 +81,21 @@ const STDERR = 2
 // eslint-disable-next-line no-control-regex -- escape sequences are what it strips
 const ANSI_STYLE = /\x1B\[[\d;]*m/g
 
-// Runs the server entry in development and restarts it on every change; a fresh process is the only way to drop modules Bun has loaded.
+// Runs the server entry in development and keeps its process through the changes to templates, islands and API modules: the process imports the modules they reached again and runs the entry once more, whose server takes over the one listening.
+// A change to anything else, such as the config, the environment or code kay does not load itself, starts a new process.
 // The client is built beside it, by a process kept from one change to the next, which a stylesheet edit alone needs no restart for.
 // Resolves once watching, with a function stopping the watchers and the server.
 export async function dev(projectRoot: string, options: DevOptions = {}): Promise<() => Promise<void>> {
   const root = resolve(projectRoot)
   const entry = projectPaths(root, options).entry
   let child: Subprocess<'pipe'> | undefined
-  let spare: Subprocess<'pipe'> | undefined
-  let spareEntry: string | undefined
+  // Spawned ahead of its start line, which it loads kay while it waits for: the first server when the config is to be checked first.
+  let waiting: Subprocess<'pipe'> | undefined
+  let waitingEntry: string | undefined
+  // The entry the running process was started with, which a new entry ends.
+  let runningEntry: string | undefined
+  // Answers a reload with how it ended: reloaded, why it needs a new process, or that the process exited meanwhile.
+  let reloadAnswer: ((answer: string) => void) | undefined
   let timer: Timer | undefined
   let changed = false
   // Bun reads these as a process starts, so changing one needs a process started after it.
@@ -207,6 +213,18 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     repeatable = { key, count, rows: Math.max(1, Math.ceil(shown.replace(ANSI_STYLE, '').length / (process.stdout.columns || 80))) }
   }
   const stamp = () => dim(new Date().toLocaleTimeString('en-GB'))
+  // A restart or a reload is over, its report the terminal's and the open pages'.
+  const restarted = (server: Subprocess, url: string | undefined) => {
+    const ms = Math.round(performance.now() - restartedAt)
+    const changed = restartAsked ? 'r pressed' : describe(restartedFor)
+    const moved = url !== undefined && url !== address
+
+    // Quiet, a restart is said only when it moved the address.
+    if (options.quiet !== true || moved)
+      sayRebuild('restart', { changed: restartedFor, ms, ...url !== undefined && { url } }, `${changed}: restarted${moved ? `, now on ${url}` : ''}`, `${stamp()} ${changed}: restarted in ${ms} ms${moved ? `, now on ${url}` : ''}`)
+
+    tell(server, { built: { changed, ms } })
+  }
   // A server reports its address over IPC from the preload; only the one running counts, and only the first time it listens.
   const listened = (server: Subprocess, message: unknown) => {
     if (server !== child || typeof message !== 'object' || message === null || !('listening' in message) || typeof message.listening !== 'string')
@@ -243,17 +261,10 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
       }
     }
     else {
-      const changed = restartAsked ? 'r pressed' : describe(restartedFor)
-
-      // Quiet, a restart is said only when it moved the address.
-      if (options.quiet !== true || url !== address)
-        sayRebuild('restart', { changed: restartedFor, ms, url }, `${changed}: restarted${url === address ? '' : `, now on ${url}`}`, `${stamp()} ${changed}: restarted in ${took}${url === address ? '' : `, now on ${url}`}`)
-
-      tell(server, { built: { changed, ms } })
+      restarted(server, url)
     }
 
     address = url
-    readySpare()
   }
 
   // Settled once the first types write, which tells a config that does not load, is over.
@@ -266,8 +277,8 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     await verified.promise
 
     if (server === child && !stopping && !STOP_SIGNALS.has(server.signalCode ?? '')) {
+      reloadAnswer?.('exited')
       say('exit', { code }, `${stamp()} the server exited with code ${code}, waiting for a change`)
-      readySpare()
     }
   }
 
@@ -356,8 +367,11 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     if ('followsStyles' in message)
       follower = server
 
-    if ('serving' in message && server === child)
-      readySpare()
+    if (server === child && 'reloaded' in message)
+      reloadAnswer?.('reloaded')
+
+    if (server === child && 'restart' in message && typeof message.restart === 'string')
+      reloadAnswer?.(message.restart)
 
     // The server logged it already; only `json` repeats it, as an event.
     if ('devError' in message && json && typeof message.devError === 'object')
@@ -397,9 +411,9 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   const spawn = () => {
     const socket = inspector?.socketFor()
 
-    spareEntry = entryToRun()
+    runningEntry = entryToRun()
 
-    const server = Bun.spawn([process.execPath, '--preload', SPARE, spareEntry], { cwd: root, env: { ...env, NODE_ENV: 'development', ...options.port === undefined ? {} : { PORT: String(options.port) }, KAY_DEV_HOST: options.host ?? 'localhost', ...collapses ? { KAY_DEV_REPORTS_OUTPUT: '1' } : {}, ...socket === undefined ? {} : { BUN_INSPECT: `ws+unix://${socket}` } }, stdin: 'pipe', stdout: json ? STDERR : 'inherit', stderr: 'inherit', ipc: (message, server) => received(server, message) })
+    const server = Bun.spawn([process.execPath, '--preload', PRELOAD, runningEntry], { cwd: root, env: { ...env, NODE_ENV: 'development', ...options.port === undefined ? {} : { PORT: String(options.port) }, KAY_DEV_HOST: options.host ?? 'localhost', ...collapses ? { KAY_DEV_REPORTS_OUTPUT: '1' } : {}, ...socket === undefined ? {} : { BUN_INSPECT: `ws+unix://${socket}` } }, stdin: 'pipe', stdout: json ? STDERR : 'inherit', stderr: 'inherit', ipc: (message, server) => received(server, message) })
 
     if (socket !== undefined) {
       sockets.set(server, socket)
@@ -409,35 +423,55 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     return server
   }
 
-  // The next process waits with kay loaded, started once the running server is up or exits, so it never competes with that server's boot.
-  function readySpare() {
-    if (spare === undefined && !stopping)
-      spare = spawn()
+  const spawnWaiting = () => {
+    waiting?.kill()
+    waiting = spawn()
+    waitingEntry = runningEntry
+    startupChanged = false
   }
 
-  // Each restart takes the process waiting with kay loaded, or a fresh one when none is ready yet.
+  // A new process, taking the one spawned ahead of its start line when it is still right for it.
   let booted = false
   const start = () => {
     booted = true
 
-    if (startupChanged || spare === undefined || spare.exitCode !== null || spareEntry !== entryToRun()) {
-      spare?.kill()
-      spare = spawn()
-      startupChanged = false
-    }
+    if (startupChanged || waiting === undefined || waiting.exitCode !== null || waitingEntry !== entryToRun())
+      spawnWaiting()
 
-    child = spare
-    spare = undefined
-    void child.stdin.write(`start ${codeVersion} ${moved ?? '-'} ${startedAt} ${JSON.stringify(changedFiles.size > MAX_CHANGED_FILES ? null : [...changedFiles])}\n`)
+    const started = waiting!
+
+    child = started
+    waiting = undefined
+    void started.stdin.write(`start ${codeVersion} ${moved ?? '-'} ${startedAt} ${JSON.stringify(changedFiles.size > MAX_CHANGED_FILES ? null : [...changedFiles])}\n`)
     startedAt = codeVersion
     changedFiles = new Set()
-    void child.stdin.flush()
-    options.onRestart?.(child)
-    void reportExit(child)
+    void started.stdin.flush()
+    options.onRestart?.(started)
+    void reportExit(started)
+  }
+  // Whether the running process can take the change in: it is up, the environment and the entry are the ones it started with, and no key asked for a new one.
+  const reloadable = (files: string[], asked: boolean) => !asked && !startupChanged && child !== undefined && child.exitCode === null && runningEntry === entryToRun() && !files.includes(CONFIG_FILE)
+  // Asks the running process to import the modules the change reached again; answers 'reloaded', or why it needs a new process, or 'exited'.
+  const reload = async (server: Subprocess<'pipe'>, files: string[]): Promise<string> => {
+    const answer = new Promise<string>((resolve) => {
+      reloadAnswer = resolve
+    })
+    const timeout = setTimeout(() => reloadAnswer?.('the server did not answer in time'), RELOAD_TIMEOUT_MS)
 
-    const started = child
+    try {
+      server.send({ reload: { code: codeVersion, startedAt, changed: JSON.stringify(changedFiles.size > MAX_CHANGED_FILES ? null : [...changedFiles]), files: files.length > MAX_CHANGED_FILES ? null : files } })
+    }
+    catch {
+      reloadAnswer?.('exited')
+    }
 
-    setTimeout(() => started === child && readySpare(), SPARE_FALLBACK_MS).unref()
+    try {
+      return await answer
+    }
+    finally {
+      clearTimeout(timeout)
+      reloadAnswer = undefined
+    }
   }
   // The server never reads the generated types, only the editor and `kay check` do, so it starts before they are rewritten.
   // The client builds while the last server stops and the next one boots, which waits for it only once it asks.
@@ -458,11 +492,23 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     building = wantsClient ? buildClient() : undefined
 
     const previous = child
+    const server = reloadable(files, asked) ? previous : undefined
+    const answer = server === undefined ? undefined : await reload(server, files)
 
-    child = undefined
-    previous?.kill()
-    await previous?.exited
-    start()
+    if (answer === 'reloaded') {
+      startedAt = codeVersion
+      changedFiles = new Set()
+      restarted(server!, undefined)
+    }
+    // The server exited on its own while it reloaded, which `reportExit` says: nothing runs until the next change.
+    else if (answer !== 'exited') {
+      // A new process loads kay while the one before ends, and starts once it has.
+      spawnWaiting()
+      child = undefined
+      previous?.kill()
+      await previous?.exited
+      start()
+    }
 
     if (typesConfig !== undefined && files.includes(CONFIG_FILE))
       typesConfig = await reloadConfig(root, typesConfig)
@@ -592,7 +638,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     await restarting
     typesAgain = false
     child?.kill()
-    spare?.kill()
+    waiting?.kill()
 
     // A types process stuck importing the config is killed rather than waited for.
     if (typesWriting !== undefined) {
@@ -607,13 +653,13 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     }
 
     typesProcess.close()
-    await Promise.all([child?.exited, spare?.exited, builder?.stop()])
+    await Promise.all([child?.exited, waiting?.exited, builder?.stop()])
     await inspector?.stop()
   }
 
   // Asked to refuse a config that does not load, the first server waits for the first types: its own boot failure would print the same error again. The process it will run in loads kay meanwhile.
   if (options.refuseConfig === true)
-    readySpare()
+    spawnWaiting()
   else
     start()
 

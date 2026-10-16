@@ -29,7 +29,7 @@ import { DEFAULT_BODY_LIMIT, limitBodies } from './body'
 import { serveBuildFiles } from './build-files'
 import { serveCards } from './card'
 import { compressResponse, fixedTexts } from './compress'
-import { DEV_A11Y, DEV_AXE, DEV_EVENTS, DEV_HEAD, DEV_INSPECTOR, DEV_OPEN, DEV_PATCH, DEV_ROUTES, DEV_SIZES, DEV_TOOL, devA11y, devAxe, devEvents, devInspector, devPatch, devRoutes, devTool, followBuilds, hotSwap, openInEditor, recordResponses, refuseForeignHosts } from './dev'
+import { DEV_A11Y, DEV_AXE, DEV_EVENTS, DEV_HEAD, DEV_INSPECTOR, DEV_OPEN, DEV_PATCH, DEV_ROUTES, DEV_SIZES, DEV_TOOL, devA11y, devAxe, devEvents, devInspector, devPatch, devRoutes, devTool, followBuilds, hotSwap, openInEditor, recordResponses, refuseForeignHosts, rememberBoot, trackRunning } from './dev'
 import { clearDevErrorsOnAnswer } from './dev-errors'
 import { claimEndpoints } from './endpoint-claims'
 import { serveEndpoints } from './endpoints'
@@ -122,6 +122,7 @@ function compress(app: App, client: ClientBuild, base: string, onError: KayConfi
 function serveDevRoutes(app: App, root: string, client: ClientBuild, mode: Mode, base: string) {
   const hot = hotSwap(root, client)
 
+  rememberBoot(false, hot)
   app.get(DEV_EVENTS, () => devEvents(false, hot))
   app.get(DEV_PATCH, () => devPatch())
   app.get(DEV_TOOL, () => devTool())
@@ -130,6 +131,7 @@ function serveDevRoutes(app: App, root: string, client: ClientBuild, mode: Mode,
   recordResponses(app, base)
 
   if (mode.underKayDev) {
+    app.onStart(listening => trackRunning(listening))
     followBuilds()
     clearDevErrorsOnAnswer(app, base)
     app.get(DEV_INSPECTOR, () => devInspector())

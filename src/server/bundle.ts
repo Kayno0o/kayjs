@@ -37,6 +37,21 @@ export function bundled(): Bundle | undefined {
 
 // Bun already imports a file once per process; keeping what it gave spares every request the cost of asking it again.
 const imported = new Map<string, unknown>()
+// What other modules of the server keep of the modules imported, which `kay dev` forgets as it reloads.
+const forgetters: (() => void)[] = []
+
+// For a cache of a module's exports: called when `kay dev` reloads the server's modules in this process.
+export function onForgetModules(forget: () => void): void {
+  forgetters.push(forget)
+}
+
+// `kay dev` reloads the changed modules in the running process: every import made so far is asked of Bun again.
+export function forgetModules(): void {
+  imported.clear()
+
+  for (const forget of forgetters)
+    forget()
+}
 
 // A page, layout, special page, guard or API module: the executable's own copy, or the file imported through the `.kay` loader.
 export async function importModule<Module>(file: string): Promise<Module> {

@@ -210,7 +210,8 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('kay dev in 
     }
 
     expect(await sameDocument()).toBe(true)
-    expect(await page.evaluate(() => (window as { kaySources?: EventSource[] }).kaySources!.filter(source => source.readyState !== EventSource.CLOSED).length)).toBe(1)
+    // A reload in the running server keeps the connection the page opened, so it opens none again; at most one stays open when a server restarts.
+    expect(await page.evaluate(() => (window as { kaySources?: EventSource[] }).kaySources!.filter(source => source.readyState !== EventSource.CLOSED).length)).toBeLessThanOrEqual(1)
     expect(await page.evaluate(() => [...document.scripts].filter(script => script.textContent.includes('/_kay/dev/events')).length)).toBe(1)
     expect(await page.locator('meta[name=kay-boot]').count()).toBe(1)
     expect(refused).toEqual([])

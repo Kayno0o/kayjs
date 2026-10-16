@@ -7,7 +7,7 @@ import { compileKay } from '../src/compiler'
 import { patch } from '../src/runtime/dev-patch'
 import { cappedSizes } from '../src/runtime/image'
 import { shortcut } from '../src/runtime/shortcut'
-import { LIVE_RELOAD } from '../src/server/dev'
+import { liveReload } from '../src/server/dev'
 import { settle } from '../src/test'
 import { scratchDir } from './scratch'
 
@@ -1753,8 +1753,8 @@ describe('bind:value on a number input', () => {
 
 describe('the live reload script', () => {
   it('swaps the stylesheets when the server comes back running the same code, and reloads on any other change or a page that fails', async () => {
-    const script = (/<script>([\s\S]*)<\/script>/).exec(LIVE_RELOAD)![1]!
-    const meta = (/<meta name="kay-boot" content="([^"]+)">/).exec(LIVE_RELOAD)!
+    const script = (/<script>([\s\S]*)<\/script>/).exec(liveReload())![1]!
+    const meta = (/<meta name="kay-boot" content="([^"]+)">/).exec(liveReload())!
     const boot = meta[1]!
     let onBoot: (event: { data: string }) => Promise<void> = async () => undefined
     const fetched: string[] = []
@@ -1810,7 +1810,7 @@ describe('the live reload script', () => {
   })
 
   it('connects again every 10 ms for a restart\'s length, then less often down to four times a second, one connection open at a time', async () => {
-    const script = (/<script>([\s\S]*)<\/script>/).exec(LIVE_RELOAD)![1]!
+    const script = (/<script>([\s\S]*)<\/script>/).exec(liveReload())![1]!
     const sources: { closed: boolean, onerror?: () => void, boot?: (event: { data: string }) => void }[] = []
     const delays: number[] = []
     const due: (() => void)[] = []
