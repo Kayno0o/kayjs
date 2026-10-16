@@ -438,6 +438,18 @@ describe('a kept page and the state a script declares', () => {
     expect(await readsNothing(route(root, 'src/routes/fence.kay'))).toBe(true)
   })
 
+  it('refuses a page whose export reads a fence let through a helper, or that exports a let itself', async () => {
+    const root = await scratch({
+      'src/routes/chain.kay': '--- server\nlet n = 0\nconst inc = () => n++\n\nexport const save = action(s.Object({}), async () => {\n  inc()\n})\n---\np {n}\n',
+      'src/routes/commented.kay': '--- server\n/* count */ let count = 0\n\nexport const save = action(s.Object({}), async () => {\n  count++\n})\n---\np {count}\n',
+      'src/routes/exported.kay': '--- server\nexport let n = 0\n---\np {n}\n',
+      'src/routes/typing.kay': '--- server\nlet count = 0\nexport const save = action(s.Object({}), async () => {\n---\np Typing\n',
+    })
+
+    for (const file of ['chain', 'commented', 'exported', 'typing'])
+      expect(await readsNothing(route(root, `src/routes/${file}.kay`)), file).toBe(false)
+  })
+
   it('keeps refusing a page importing a .ts module with a module-level let or empty container', async () => {
     const root = await scratch({
       'src/routes/let.kay': '---\nimport { next } from \'../counted\'\n---\np {next()}\n',

@@ -21,26 +21,31 @@ const EXPORTED_STATE = new RegExp(`^export const (?!(?:${SETTING_NAMES})\\b)[^=\
 // For a server fence the compiler cannot parse, the part of the rule left: it declares state only when it exports something besides a type or a page setting, which may read it.
 const MODULE_EXPORT = new RegExp(`^export (?!(?:type|interface) )(?!(?:async )?(?:const|let|var|function) (?:${SETTING_NAMES})\\b)`, 'm')
 
+// What may be a state declaration anywhere on a line, to spare the compiler's view to a file that has none.
+const MAYBE_STATE = /\b(?:let|var)\b|=\s*(?:\[\s*\]|\{\s*\}|new\b)/
+const LEADING_COMMENTS = /^\s*(?:\/\*[\s\S]*?\*\/\s*|\/\/.*\n\s*)*/
+
 // A `.kay` file runs its scripts and server fence for each render, so a `let` or an empty container there is state only when the compiler moves its statement to module level, as it does one an export of the server fence reads.
 function holdsModuleState(file: string, source: string): boolean {
   if (EXPORTED_STATE.test(source))
     return true
 
-  if (!MODULE_STATES.some(state => state.test(source)))
-    return false
-
   if (!file.endsWith('.kay'))
-    return true
+    return MODULE_STATES.some(state => state.test(source))
+
+  if (!MAYBE_STATE.test(source))
+    return false
 
   const server = analyzeServer(source, parseKay(source).server)
 
   if (server === undefined)
     return false
 
-  if (server.unparsed !== undefined)
+  // A fence being typed, whose statements the compiler cannot place, is judged by the file as before.
+  if (server.unparsed !== undefined || server.broken.length > 0)
     return MODULE_EXPORT.test(source)
 
-  return server.exports.some(({ start, end }) => MODULE_STATES.some(state => state.test(source.slice(start, end))))
+  return server.exports.some(({ start, end }) => MODULE_STATES.some(state => state.test(source.slice(start, end).replace(LEADING_COMMENTS, ''))))
 }
 
 // An import or a re-export with what it takes, then one for its effect alone.
