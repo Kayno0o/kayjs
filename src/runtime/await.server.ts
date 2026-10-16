@@ -13,6 +13,35 @@ export interface PendingBlock {
   failed?: ((error: unknown) => unknown) | undefined
 }
 
+interface EarlyRejections {
+  // Rejected promises nothing has taken yet, with how they failed.
+  held: Map<Promise<unknown>, unknown>
+  // How long one may wait for an `await` block, or any code, to take it before it is logged.
+  graceMs: number
+}
+
+// Shared by every copy of the runtime in the process, so one listener holds them all.
+const EARLY = Symbol.for('kay.earlyRejections')
+const early = ((globalThis as Record<symbol, unknown>)[EARLY] ??= installEarlyRejections()) as EarlyRejections
+
+export const earlyRejections: Pick<EarlyRejections, 'graceMs'> = early
+
+// A promise a page's data holds can reject before its `await` block renders, whoever made it: the process would crash on it, so it is held until something takes it, and logged if nothing does.
+function installEarlyRejections(): EarlyRejections {
+  const state: EarlyRejections = { held: new Map(), graceMs: 30_000 }
+
+  process.on('unhandledRejection', (reason, promise) => {
+    state.held.set(promise, reason)
+    setTimeout(() => {
+      if (state.held.delete(promise))
+        console.error('kay: a promise rejected and nothing took it', reason)
+    }, state.graceMs).unref()
+  })
+  process.on('rejectionHandled', promise => state.held.delete(promise))
+
+  return state
+}
+
 // Renders are synchronous, so the blocks of the one in progress can live here, like the islands it renders.
 let deferred: PendingBlock[] | undefined
 let nextId = 0
@@ -40,9 +69,12 @@ export function Await<T>(props: AwaitProps<T>): JSX.Element {
   if (!(value instanceof Promise))
     return props.ready(value as Awaited<T>)
 
-  // Inside a block that is itself streamed nothing streams, and an island hydrates its pending block and settles it in the browser.
-  if (deferred === undefined || insideIsland())
+  // Inside a block that is itself streamed nothing streams, and an island hydrates its pending block and settles it in the browser; the server takes the promise either way, so a rejection crashes nothing.
+  if (deferred === undefined || insideIsland()) {
+    void Promise.allSettled([value])
+
     return props.pending?.()
+  }
 
   const id = (nextId++).toString(36)
   const blocks = deferred

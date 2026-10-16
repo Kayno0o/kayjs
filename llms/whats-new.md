@@ -10,6 +10,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `kay build` keeps a page importing `s`, `withBase`, `sanitizeHtml` or the other exports of `kay` that read nothing from a request, and one using a `persisted` signal kept in `localStorage`; a signal kept in a cookie or the query still reads the request ([Prerendering](routing.md#prerendering)).
 - The metric-matched font fallback is listed in the `font` shorthand's family list too, and covers a WOFF2 whose `hmtx` table is transformed; `kay dev` reads a swapped font file's metrics again ([Head](head.md#self-host-a-font)).
 - A site serving its own `/manifest.webmanifest` keeps it in every locale: kay no longer serves or links the per-locale manifests beside it, and changing one locale's `seo.name` no longer renames every share card ([Head](head.md#favicon-and-web-manifest)).
+- An `await` block streams any promise it is given, `await data.comments`, a prop or one a component makes, with no `defer()`, and a rejection before it renders crashes no server: `kay check` no longer asks for `defer()` ([Caching and streaming](rendering.md#stream-a-slow-value-into-the-page)).
 - `kay/test/dom` works with `@happy-dom/global-registrator` 20.14.6 or 21.0.3 and later, so an app on either needs no change ([Testing](testing.md#helpers-for-a-test-of-its-own)).
 - A `query` or `defineEnv` schema field's `error` may be a function, as an action's field is, and `kay dev` words a form's rules again after a messages file changes ([Actions](actions.md)).
 

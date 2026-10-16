@@ -109,11 +109,10 @@ describe('kay check', () => {
     const brief = diagnostics.map(d => ({ file: d.file.slice(fixtures.length + 1), line: d.line, column: d.column, code: d.code, message: firstLine(d.message) }))
 
     expect(brief).toEqual([
-      ...[8, 10, 12].map(line => ({ file: 'broken/src/routes/feed.kay', line, column: 1, code: 'uncaught-await', message: 'Nothing renders in place of this block once its value rejects' })),
+      ...[7, 9].map(line => ({ file: 'broken/src/routes/feed.kay', line, column: 1, code: 'uncaught-await', message: 'Nothing renders in place of this block once its value rejects' })),
       { file: 'broken/src/routes/[id].kay', line: 2, column: 30, code: 'TS2339', message: 'Property \'slug\' does not exist on type \'{ id: string; }\'.' },
       { file: 'broken/src/routes/[id].kay', line: 5, column: 9, code: 'TS2551', message: expect.stringContaining('Property \'nam\' does not exist') },
-      { file: 'broken/src/routes/feed.kay', line: 11, column: 11, code: 'TS2551', message: expect.stringContaining('Property \'lengt\' does not exist on type \'string[]\'') },
-      { file: 'broken/src/routes/feed.kay', line: 12, column: 7, code: 'TS2322', message: expect.stringContaining('Wrap the promise in defer()') },
+      { file: 'broken/src/routes/feed.kay', line: 10, column: 11, code: 'TS2551', message: expect.stringContaining('Property \'lengt\' does not exist on type \'string[]\'') },
       { file: 'broken/src/routes/form.kay', line: 10, column: 15, code: 'TS2345', message: 'Argument of type \'"titel"\' is not assignable to parameter of type \'"title"\'.' },
       { file: 'broken/src/routes/form.kay', line: 11, column: 22, code: 'TS2551', message: expect.stringContaining('Property \'titel\' does not exist') },
       { file: 'broken/src/routes/generic.kay', line: 6, column: 44, code: 'TS2551', message: 'Property \'toISOStrin\' does not exist on type \'Date\'. Did you mean \'toISOString\'?' },

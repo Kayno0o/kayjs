@@ -13,6 +13,7 @@ This page lists what each release adds, newest first, with a link to where each 
 - **More pages kept by the build**: a page importing `s`, `withBase`, `sanitizeHtml` or another export of `kay` that reads nothing from a request is kept, and so is one using a `persisted` signal stored in `localStorage`. [Routing](/essentials/routing)
 - **Font fallback in more places**: the fallback is listed in the `font` shorthand's family list too, and covers a WOFF2 whose `hmtx` table is transformed; `kay dev` reads a swapped font file's metrics again. [Fonts](/essentials/styling-and-assets)
 - **Your own manifest in every locale**: a site serving its own `/manifest.webmanifest` keeps it, and kay no longer serves or links the per-locale manifests beside it; changing one locale's `seo.name` no longer renames every share card. [Head and SEO](/essentials/head-and-seo)
+- **`await` takes any promise**: a property, a prop or a promise a component made streams like a fence variable, with no `defer()`, and a rejection before the block renders crashes nothing. [Caching and streaming](/guides/caching-and-streaming)
 - **happy-dom 21 for `mount`**: `kay/test/dom` works with `@happy-dom/global-registrator` 20.14.6 or 21.0.3 and later, so an app on either needs no change. [Testing](/guides/testing)
 - **Function errors in query and env schemas**: a `query` or `defineEnv` field's `error` may be a function, as an action's field is, and `kay dev` words a form's rules again after a messages file changes. [Showing errors](/essentials/forms-and-actions)
 

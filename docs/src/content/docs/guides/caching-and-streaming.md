@@ -82,13 +82,11 @@ catch
 
 Without `catch`, a rejection removes the pending block and is logged. Islands inside a streamed block hydrate when it lands.
 
-A promise reached through a property or a prop, like `await data.comments`, is wrapped with `defer()` from `kay`, which `kay check` reports when missing:
+An `await` block takes any promise, wherever it came from. A property, a prop or a promise a component made all work the same way:
 
 ```kay
 --- server
-import { defer } from 'kay'
-
-const data = { comments: defer(listComments(post.id)) }
+const data = { comments: listComments(post.id) }
 ---
 await data.comments
   p Loading
@@ -97,6 +95,8 @@ then list
 catch
   p Comments are unavailable
 ```
+
+A promise may fail before the page gets to its block. That crashes nothing: the block still shows its `catch`. A promise that fails and that nothing awaits is logged after 30 seconds. `defer()` from `kay` is no longer needed, though code that still calls it keeps working.
 
 <Callout type="warning">
 

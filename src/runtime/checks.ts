@@ -203,17 +203,12 @@ export type IslandProp<Component, Value> = Component extends IslandBrand ? [IsSe
 // A function written in the attribute is checked apart from its value, which a wrapping call would stop a generic component from typing: `0` stands for the attribute.
 export type FunctionProp<Component> = Component extends IslandBrand ? { kayError: 'A layout, or a page with a server fence, sends an island its props serialized: plain objects, arrays, Dates, Maps, Sets, bigints, URLs and RegExps, but no functions, symbols or class instances; a component of its own passing one renders as an island in its place' } : 0
 
-declare const DEFERRED: unique symbol
-
-// A promise `defer()` marked for an `await` block.
-export type Deferred<T> = Promise<T> & { readonly [DEFERRED]: true }
-
-// A promise rejecting before its block renders would crash the process, unless `defer()` took it when it was made; checked across a union too.
-export type AwaitValue<T> = [Exclude<Extract<T, PromiseLike<unknown>>, { readonly [DEFERRED]: true }>] extends [never] ? unknown : { kayError: 'Wrap the promise in defer() where it is made: a rejection before the page renders it would crash the server' }
+// What `defer()` returns, a plain promise: an `await` block takes any promise, so nothing marks one.
+export type Deferred<T> = Promise<T>
 
 // What a template's `await` block compiles to: the value, then a function per block.
 export interface AwaitProps<T> {
-  value: T & AwaitValue<T>
+  value: T
   pending?: (() => JSX.Element) | undefined
   ready: (value: Awaited<T>) => JSX.Element
   failed?: ((error: unknown) => JSX.Element) | undefined

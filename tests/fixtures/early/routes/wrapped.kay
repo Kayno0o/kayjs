@@ -1,0 +1,26 @@
+--- server
+const data = {
+  comments: Promise.reject(new Error('down')),
+  count: Promise.resolve(3),
+  late: new Promise<string>((_resolve, reject) => setTimeout(reject, 60, new Error('late'))),
+  unclaimed: Promise.resolve('x'),
+}
+
+await Bun.sleep(20)
+---
+await data.comments then list
+  p {String(list)}
+catch
+  p.failed Comments are down
+await data.comments then list
+  p {String(list)}
+catch
+  p.again Comments are down again
+await data.count then shown
+  p.now {shown}
+await data.late then text
+  p {text}
+catch
+  p.late Late is down
+await data.unclaimed then text
+  p.plain {text}

@@ -1,0 +1,11 @@
+---
+const { data } = props<{ data: { comments: Promise<string[]> } }>()
+---
+await data.comments then list
+  p {String(list)}
+catch
+  p.failed Unavailable
+await data.comments then list
+  p {String(list)}
+catch
+  p.again Unavailable again

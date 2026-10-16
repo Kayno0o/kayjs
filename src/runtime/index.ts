@@ -360,13 +360,14 @@ export function guard<Own extends object = object>(check: (ctx: GuardContext<Own
   return check as Guard
 }
 
-// Marks a promise for an `await` block and handles its rejection at once: the block renders the failure, and nothing crashes the process before it does.
+// An `await` block takes any promise whatever made it, so this is no longer needed: it still returns the promise as a promise, handling its rejection at once.
+// eslint-disable-next-line ts/promise-function-async -- an async function would hand back a second promise, which rejects with nothing taking it
 export function defer<T>(value: T | PromiseLike<T>): Deferred<T> {
   const promise = Promise.resolve(value)
 
   void Promise.allSettled([promise])
 
-  return promise as Deferred<T>
+  return promise
 }
 
 // `export const page = { ... }` in a page's server fence; a layout takes `query` as well as `layouts`, `security` and `reload`, which apply to the pages under it, and `guards`, which opens its own actions.
