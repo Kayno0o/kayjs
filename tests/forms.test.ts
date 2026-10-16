@@ -3,9 +3,10 @@ import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it, spyOn } from 'bun:test'
+import { t } from 'elysia'
 import { chromium } from 'playwright-core'
 import { compileKay } from '../src/compiler'
-import { actionStub, formDescribed, formMarked } from '../src/runtime/action'
+import { action, actionStub, formDescribed, formMarked } from '../src/runtime/action'
 import { markInvalid } from '../src/runtime/invalid'
 import { formsScript } from '../src/server/forms'
 import { browserPath, testSite } from '../src/test'
@@ -480,5 +481,16 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
 describe('formsScript', () => {
   it('skips a stand-in action, which has no schema to read', () => {
     expect(formsScript(new Set([actionStub('/contact')]))).toBe('')
+  })
+
+  it('reads a function error again under kay dev, caching it otherwise', () => {
+    let word = 'one'
+    const saved = action(t.Object({ name: t.String({ minLength: 1, error: () => word }) }), () => undefined)
+    const pages = new Set<Action<never, unknown>>([saved])
+
+    expect(formsScript(pages)).toContain('one')
+    word = 'two'
+    expect(formsScript(pages)).toContain('one')
+    expect(formsScript(pages, true)).toContain('two')
   })
 })

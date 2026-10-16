@@ -11,11 +11,12 @@ const CHECKED = new Set(['type', 'format', 'pattern', 'minLength', 'maxLength', 
 const rulesCache = new WeakMap<object, Map<string, FormRules | null>>()
 
 // The schemas of the actions a page's forms post to, for the page swap to check a form before posting it; a page whose forms post to none gets nothing.
-export function formsScript(forms: Set<Action<never, unknown>>): string {
+// Under `kay dev` the rules are read again each time, as a messages file may have changed the text a function returns.
+export function formsScript(forms: Set<Action<never, unknown>>, dev?: boolean): string {
   const rules: Record<string, FormRules> = {}
 
   for (const action of forms) {
-    const form = isAction(action) ? formRules(action) : undefined
+    const form = isAction(action) ? formRules(action, dev) : undefined
 
     if (form)
       rules[action.url] = form
@@ -25,13 +26,13 @@ export function formsScript(forms: Set<Action<never, unknown>>): string {
 }
 
 // A stand-in action, which a static site's page holds in place of one it cannot serve, has no schema to read.
-function formRules(action: ServerAction<TSchema, unknown>): FormRules | undefined {
+function formRules(action: ServerAction<TSchema, unknown>, dev: boolean | undefined): FormRules | undefined {
   if (typeof action.schema !== 'object' || action.schema === null)
     return undefined
 
   const locale = localeState()?.locale ?? ''
   const cached = rulesCache.get(action.schema) ?? new Map<string, FormRules | null>()
-  let rules = cached.get(locale)
+  let rules = dev ? undefined : cached.get(locale)
 
   if (rules === undefined) {
     const { properties, required = [] } = action.schema as { properties?: Record<string, unknown>, required?: string[] }

@@ -29,6 +29,12 @@ describe('defineEnv', () => {
     expect(() => defineEnv(schema, { DATABASE_URL: '' })).toThrow('DATABASE_URL: Property \'DATABASE_URL\' is missing')
   })
 
+  it('words a refusal with a function error as with a string', () => {
+    const worded = t.Object({ PORT: t.Numeric({ error: () => 'the port is a number' }) })
+
+    expect(() => defineEnv(worded, { PORT: 'x' })).toThrow('PORT: the port is a number')
+  })
+
   it('leaves an empty optional out rather than reading it as a blank value, whatever its type', () => {
     const optional = t.Object({ USER: t.Optional(t.String()), DEBUG: t.Optional(t.Boolean()), HOSTS: t.Optional(t.Array(t.String())) })
 

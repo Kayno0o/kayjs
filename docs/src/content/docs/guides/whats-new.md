@@ -12,6 +12,7 @@ This page lists what each release adds, newest first, with a link to where each 
 - **`HOST` beside `PORT`**: a server from `kay new`, kay's own server and `./server --health` read `HOST`, listening on every address when it is unset. `kay dev` keeps its own address. [Deployment](/guides/deployment)
 - **More pages kept by the build**: a page importing `s`, `withBase`, `sanitizeHtml` or another export of `kay` that reads nothing from a request is kept, and so is one using a `persisted` signal stored in `localStorage`. [Routing](/essentials/routing)
 - **happy-dom 21 for `mount`**: `kay/test/dom` works with `@happy-dom/global-registrator` 20.14.6 or 21.0.3 and later, so an app on either needs no change. [Testing](/guides/testing)
+- **Function errors in query and env schemas**: a `query` or `defineEnv` field's `error` may be a function, as an action's field is, and `kay dev` words a form's rules again after a messages file changes. [Showing errors](/essentials/forms-and-actions)
 
 ## 1.47.0
 

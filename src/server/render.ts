@@ -803,7 +803,7 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
   const posts = client.entry !== undefined && client.navigation === true && forms.size > 0
   // The entry fetches a deferred server island as it nears the viewport.
   const shipsEntry = hasIslands || posts || (client.entry !== undefined && scan?.modes.includes('defer') === true)
-  const scripts = shipsEntry ? islandScripts(client, islands.eager, streamed, hasIslands) + (posts ? formsScript(forms) : '') + workScript(forms, options.prerendering === true) : ''
+  const scripts = shipsEntry ? islandScripts(client, islands.eager, streamed, hasIslands) + (posts ? formsScript(forms, options.dev) : '') + workScript(forms, options.prerendering === true) : ''
   const lang = localeState()?.locale ?? options.lang ?? DEFAULT_LANG
   const islandData = hasIslands ? messagesScript(islands.messages, true) + outcomeScript(rendering.carried()) + queryScript(rules) : ''
   const written = `${htmlOpen(lang, head.root)}<head>${headStart(head)}${stylesheets(client, styled)}${head.html}${scripts}${islandData}${kayMetas(options, hasIslands)}${speculationRules(options.prefetch, options.base)}${client.navigation === true && !shipsEntry ? historyScript : ''}${options.offline ? registerScript(options.base ?? '') : ''}${options.dev ? devScripts(client) + (options.prerendering ? '' : requestBlock(files, rendering)) : ''}</head><body>${body}`

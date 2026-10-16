@@ -399,10 +399,12 @@ export function mailer(options: MailerOptions = {}): Mailer {
       catch (error) {
         log.error(`${quoted(mail.subject)} to ${whom(recipientsOf(mail))} was not sent`, error)
 
-        if (typeof error === 'object' && error !== null)
-          logged.add(error)
+        // A primitive cannot be tracked, so it is thrown wrapped for the caller to recognise as logged.
+        const thrown = typeof error === 'object' && error !== null ? error : new Error(String(error), { cause: error })
 
-        throw error
+        logged.add(thrown)
+
+        throw thrown
       }
     },
     enqueue: async <P extends object>(message: Message<P>, enqueueOptions?: EnqueueOptions) => {

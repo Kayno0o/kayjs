@@ -6,6 +6,7 @@ import process from 'node:process'
 import { mapValueError } from 'elysia'
 import { TypeCompiler } from 'elysia/type-system'
 import { formInput } from '../runtime/form'
+import { errorText } from './field-errors'
 import { pageSetting } from './page-settings'
 import { Denied } from './signals'
 
@@ -162,7 +163,7 @@ export function readFields(schema: TSchema, input: Record<string, unknown>, form
     const custom = (issue.schema as { error?: unknown }).error
 
     if (!refused.has(name))
-      refused.set(name, typeof custom === 'string' ? custom : mapValueError(issue)?.summary ?? issue.message)
+      refused.set(name, errorText(custom) ?? mapValueError(issue)?.summary ?? issue.message)
   }
 
   return { refused }
