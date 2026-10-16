@@ -12,7 +12,8 @@ import { agentsFile, templateFiles } from './templates'
 const KAY_ROOT = resolve(import.meta.dir, '..')
 const INVALID_NAME_CHARS = /[^a-z0-9._~-]+/g
 const NAME_EDGES = /^[-._~]+|[-._~]+$/g
-const GITHUB_REMOTE = /(?:@|\/\/)github\.com[:/]/
+
+export const GITHUB_REMOTE = /(?:@|\/\/)github\.com[:/]/
 
 export const HOSTS: readonly Host[] = ['forgejo', 'github']
 

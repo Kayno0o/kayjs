@@ -1,10 +1,10 @@
 import type { Feature } from '../src/new'
-import { mkdir, mkdtemp, readdir, rm, symlink, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, readdir, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
 import { expect, it } from 'bun:test'
-import { addExtension, addFeatures, detectFeatures, restore, snapshot as snapshotManifest } from '../src/add'
+import { addExtension, addFeatures, detectFeatures, handEdit, restore, snapshot as snapshotManifest } from '../src/add'
 import { createProject, PRESETS } from '../src/new'
 
 const repo = join(import.meta.dir, '..')
@@ -279,4 +279,203 @@ it('runs as kay add, printing what it wrote', async () => {
   finally {
     await rm(join(dir, '..'), { recursive: true, force: true })
   }
+})
+
+// A `bun` that records its arguments and then runs the shell body, standing in for the real one.
+async function stubBun(root: string, body: string): Promise<{ bun: string, calls: () => Promise<string[]> }> {
+  const bun = join(root, 'stub-bun.sh')
+  const log = join(root, 'calls.log')
+
+  await writeFile(bun, `#!/bin/sh\necho "$@" >> '${log}'\n${body}\n`)
+  await chmod(bun, 0o755)
+
+  return { bun, calls: async () => (await Bun.file(log).exists() ? (await Bun.file(log).text()).trim().split('\n') : []) }
+}
+
+async function projectWith(root: string, features: readonly Feature[]): Promise<string> {
+  const dir = join(root, 'app')
+
+  await createProject(dir, { kay: '^1.0.0', features })
+
+  return dir
+}
+
+it('restores package.json and the lockfile when a library refuses after a stubbed bun add', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'kay-add-'))
+
+  try {
+    const dir = await projectWith(root, PRESETS.server.features)
+
+    await writeFile(join(dir, 'bun.lock'), 'old lock')
+    await mkdir(join(dir, 'node_modules/@kaynooo'), { recursive: true })
+    await symlink(join(repo, 'packages/mail'), join(dir, 'node_modules/@kaynooo/kayjs-mail'))
+    await writeFile(join(dir, 'src/mail.ts'), 'export const mail = 1\n')
+
+    const before = await Bun.file(join(dir, 'package.json')).text()
+    const manifest = JSON.parse(before) as { dependencies: Record<string, string> }
+
+    manifest.dependencies['@kaynooo/kayjs-mail'] = '~1.0.0'
+    await writeFile(join(root, 'after.json'), JSON.stringify(manifest))
+
+    const { bun, calls } = await stubBun(root, `cp '${join(root, 'after.json')}' package.json\nprintf 'new lock' > bun.lock\nprintf 'binary' > bun.lockb`)
+
+    await expect(addFeatures(dir, ['mail'], { bun })).rejects.toThrow('src/mail.ts exists and is not the file mail writes')
+    expect(await calls()).toHaveLength(1)
+    expect(await Bun.file(join(dir, 'package.json')).text()).toBe(before)
+    expect(await Bun.file(join(dir, 'bun.lock')).text()).toBe('old lock')
+    expect(await Bun.file(join(dir, 'bun.lockb')).exists()).toBe(false)
+  }
+  finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+it('installs @iconify-json/tabler as a dev dependency, as kay new does', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'kay-add-'))
+
+  try {
+    const dir = await projectWith(root, PRESETS.server.features.filter(feature => feature !== 'starter' && feature !== 'accents'))
+    const { bun, calls } = await stubBun(root, 'exit 0')
+
+    // The stub installs nothing, so the library cannot be loaded: the calls are what is checked.
+    await expect(addFeatures(dir, ['cms'], { bun })).rejects.toThrow('is not installed')
+
+    const lines = await calls()
+
+    expect(lines).toHaveLength(2)
+    expect(lines[0]).toContain('add @kaynooo/kayjs-cms@~')
+    expect(lines[0]).not.toContain('iconify')
+    expect(lines[1]).toContain('add -d @iconify-json/tabler@')
+  }
+  finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+it('keeps the error that made it restore when the restore fails too', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'kay-add-'))
+
+  try {
+    const dir = await projectWith(root, PRESETS.server.features)
+    const { bun } = await stubBun(root, 'rm -f package.json\nmkdir package.json\nprintf boom >&2\nexit 1')
+    let message = ''
+
+    try {
+      await addFeatures(dir, ['mail'], { bun })
+    }
+    catch (error) {
+      message = (error as Error).message
+    }
+
+    expect(message).toContain('kay add: bun add failed, nothing was written')
+    expect(message).toContain('boom')
+    expect(message).toContain('could not be put back')
+  }
+  finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+it('restores the lockfile of a monorepo root too', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'kay-add-'))
+
+  try {
+    const dir = join(root, 'apps/web')
+
+    await mkdir(dir, { recursive: true })
+    await writeFile(join(root, 'package.json'), '{ "workspaces": ["apps/*"] }\n')
+    await writeFile(join(root, 'bun.lock'), 'root lock')
+    await writeFile(join(dir, 'package.json'), '{ "name": "web" }\n')
+
+    const kept = await snapshotManifest(dir)
+
+    await writeFile(join(root, 'bun.lock'), 'changed')
+    await writeFile(join(dir, 'package.json'), '{}')
+    await restore(dir, kept)
+
+    expect(await Bun.file(join(root, 'bun.lock')).text()).toBe('root lock')
+    expect(await Bun.file(join(dir, 'package.json')).text()).toBe('{ "name": "web" }\n')
+  }
+  finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+it('reads export prefixed and quoted values of .env', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'kay-add-'))
+  const other = await mkdtemp(join(tmpdir(), 'kay-add-'))
+
+  try {
+    const dir = await projectWith(root, [...PRESETS.app.features, 'postgres'])
+    const env = (await Bun.file(join(dir, '.env')).text()).split('\n').filter(line => line !== '').map((line) => {
+      const [key, ...value] = line.split('=')
+
+      return `export ${key}="${value.join('=')}"`
+    }).join('\n')
+
+    await writeFile(join(dir, '.env'), `${env}\n`)
+    expect((await addFeatures(dir, ['ws'], { install: false })).written).toEqual([])
+    expect(await Bun.file(join(dir, '.env')).text()).toBe(`${env}\n`)
+
+    const sqlite = await projectWith(other, PRESETS.app.features)
+
+    await writeFile(join(sqlite, '.env'), 'export SESSION_SECRET="x"\nexport DATABASE_URL="sqlite://data/app.db"\n')
+    await expect(addFeatures(sqlite, ['postgres'], { install: false })).rejects.toThrow('.env: export DATABASE_URL="sqlite://data/app.db" is not what the feature uses')
+  }
+  finally {
+    await rm(root, { recursive: true, force: true })
+    await rm(other, { recursive: true, force: true })
+  }
+})
+
+it('writes the workflow of the host the project remote or folder names, not the first one found', async () => {
+  const features = PRESETS.site.features.filter(feature => feature !== 'ci')
+
+  for (const [remote, folder, expected] of [['git@git.kevyn.fr:a/b.git', '.github', '.forgejo'], ['git@github.com:a/b.git', '.forgejo', '.github'], ['', '.forgejo', '.forgejo'], ['', '.github', '.github']] as const) {
+    const root = await mkdtemp(join(tmpdir(), 'kay-add-'))
+
+    try {
+      const dir = await projectWith(root, features)
+
+      Bun.spawnSync(['git', 'init', '-q'], { cwd: dir })
+
+      if (remote !== '')
+        Bun.spawnSync(['git', 'remote', 'add', 'origin', remote], { cwd: dir })
+
+      await mkdir(join(dir, folder, 'workflows'), { recursive: true })
+
+      const { written } = await addFeatures(dir, ['ci'], { install: false })
+
+      expect({ remote, folder, workflow: written.find(path => path.endsWith('pages.yml')) }).toEqual({ remote, folder, workflow: `${expected}/workflows/pages.yml` })
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  }
+})
+
+it('names a file the author deleted rather than skipping it silently', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'kay-add-'))
+
+  try {
+    const dir = await projectWith(root, ['server', 'starter'])
+
+    await rm(join(dir, 'src/routes/_layout.kay'))
+
+    const result = await addFeatures(dir, ['tailwind'], { install: false })
+
+    expect(result.written).not.toContain('src/routes/_layout.kay')
+    expect(result.notes).toEqual([expect.stringContaining('src/routes/_layout.kay was deleted')])
+  }
+  finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+it('shows a hand edit as an ordered diff', () => {
+  expect(handEdit('a\nb\nc\nd\n', 'a\nB\nc\nD\n')).toBe('-b\n+B\n-d\n+D')
+  // A moved line is a change, which a set of lines would not see.
+  expect(handEdit('a\nb\n', 'b\na\n')).not.toBe('')
+  expect(handEdit('x\nsame\ny\n', 'x\nz\nsame\ny\n')).toBe('+z')
+  expect(handEdit('p\nq\n', 'p\nq\n')).toBe('')
 })

@@ -84,9 +84,9 @@ kay add mail
 
 `kay add` gives an existing project the files and edits `kay new --with` would have written, then runs `bun install`. It reads which features the project has from its files. A feature that needs another is refused with the command that adds both, such as `kay add server,auth`.
 
-Before it writes anything, it checks that each file it changes is still what `kay new` wrote. A file you changed, such as `src/routes/_layout.kay`, stops it with `kay add: nothing was written` and the lines to remove and add by hand. `package.json` gets the scripts and dependencies it lacks, `.gitignore`, `.dockerignore` and `.env` the lines they lack, and an `AGENTS.md` you edited is left alone.
+Before it writes anything, it checks that each file it changes is still what `kay new` wrote. A file you changed, such as `src/routes/_layout.kay`, stops it with `kay add: nothing was written` and the lines to remove and add by hand. `package.json` gets the scripts and dependencies it lacks, `.gitignore`, `.dockerignore` and `.env` the lines they lack, and an `AGENTS.md` you edited is left alone. A file you deleted is not written back, and the output names it. The CI workflow goes where the `origin` remote says (`.github` for GitHub, `.forgejo` otherwise), and without a remote where the project already has one. A failure after `bun add` puts `package.json` and the lockfile (the monorepo root's too) back.
 
-`mail` and `cms` are the libraries' own features. `kay add mail` adds `@kaynooo/kayjs-mail`, writes `src/mail.ts` and lists `mailExtension` in the `extensions` of `kay.config.ts`, which has to be a plain `defineConfig({ ... })`. `kay add cms` adds `@kaynooo/kayjs-cms`, `@kaynooo/kayjs-ui` and `@iconify-json/tabler`, lists `cms()` there and prints what to set before production.
+`mail` and `cms` are the libraries' own features. `kay add mail` adds `@kaynooo/kayjs-mail`, writes `src/mail.ts` and lists `mailExtension` in the `extensions` of `kay.config.ts`, which has to be a plain `defineConfig({ ... })`. `kay add cms` adds `@kaynooo/kayjs-cms`, `@kaynooo/kayjs-ui` and, as a dev dependency, `@iconify-json/tabler`, lists `cms()` there and prints what to set before production.
 
 | Option | Effect |
 | --- | --- |
