@@ -75,8 +75,8 @@ describe('the development outbox page', () => {
   })
 
   it('is served by an app naming the module that exports the mailer, kay importing it', async () => {
-    const site = await testSite({ root: 'tests/fixture', extensions: [mailExtension('./src/mail')] })
-    const { mail } = await import('./fixture/src/mail')
+    const site = await testSite({ root: 'tests/fixture', extensions: [mailExtension('./src/extension-mail')] })
+    const { mail } = await import('./fixture/src/extension-mail')
 
     await mail.send({ to: 'ada@example.com', subject: 'Through the module', text: 'Hello' })
 

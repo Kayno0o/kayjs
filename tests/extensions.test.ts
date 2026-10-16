@@ -471,6 +471,29 @@ describe('an extension naming its server plugin by module', () => {
   })
 })
 
+describe('an extension naming its server plugin by a module importing a .kay file', () => {
+  it('has kay check type the plugin\'s locals, the module reached through the config\'s type alone', async () => {
+    const root = await scratchDir('extension-module-kay-')
+    const files: Record<string, string> = {
+      'package.json': JSON.stringify({ name: 'app' }),
+      'tsconfig.json': TSCONFIG,
+      'kay.config.ts': 'import { defineConfig } from \'kay/server\'\nimport type { KayExtension } from \'kay/server\'\n\nconst own = (): KayExtension<typeof import(\'./src/own\').own> => ({ name: \'own\', serverModule: { path: \'./src/own\', export: \'own\' } })\n\nexport default defineConfig({ extensions: [own()] })\n',
+      'src/own.ts': 'import { Elysia } from \'elysia\'\nimport Card from \'./card.kay\'\n\nexport const own = new Elysia({ name: \'own\' }).derive({ as: \'global\' }, () => ({ label: \'own\', card: Card }))\n',
+      'src/card.kay': 'p Card\n',
+      'src/routes/index.kay': '--- server\nconst label: number = ctx.locals.label\n---\np {label}\n',
+    }
+
+    await Promise.all(Object.entries(files).map(async ([path, content]) => Bun.write(join(root, path), content)))
+
+    const { code, stdout, stderr } = await run([process.execPath, CLI, 'check'], root)
+
+    // The plugin's local is typed, and the .kay file its module imports resolves, so the one error is the wrong type the page gives it.
+    expect(`${stdout}${stderr}`).not.toContain('Cannot find module')
+    expect(`${stdout}${stderr}`).toMatch(/Type 'string' is not assignable to type 'number'/)
+    expect(code).toBe(1)
+  })
+})
+
 describe('an extension listed from beside the app', () => {
   it('has kay check report the errors of its pages and editor and the components they reach as the app\'s own, linked or not', async () => {
     const dir = await scratchDir('extension-local-')
