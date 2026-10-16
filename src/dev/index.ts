@@ -55,6 +55,8 @@ const GONE_WAIT_MS = 200
 const PRELOAD = join(import.meta.dir, 'preload.ts')
 // How long a server gets to reload its modules before the change starts a new process: an entry stuck on top-level work, or a process that stopped answering.
 const RELOAD_TIMEOUT_MS = 5000
+// A process creeps by about 70 KB per reload, so it is replaced before that adds up.
+const MAX_RELOADS = 200
 // How long stopping waits for the types being written before it kills the process writing them.
 const TYPES_GRACE_MS = 2000
 
@@ -108,6 +110,10 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   // The count the last server started with, and the files changed since: a page on that count may swap in what changed.
   let startedAt = codeVersion
   let changedFiles = new Set<string>()
+  // Whether the running process has a server listening, so its first run of the entry is over and it can reload.
+  let listening = false
+  // The reloads the running process took, which bound its memory: Bun keeps some of every module it loaded again, so the process is replaced after MAX_RELOADS.
+  let reloads = 0
   // Every file changed since the last restart began, stylesheets included.
   let touched = new Set<string>()
   // The config the types are written from, read again once kay.config.ts changes.
@@ -367,6 +373,9 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     if ('followsStyles' in message)
       follower = server
 
+    if (server === child && 'listening' in message)
+      listening = true
+
     if (server === child && 'reloaded' in message)
       reloadAnswer?.('reloaded')
 
@@ -441,6 +450,8 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     const started = waiting!
 
     child = started
+    listening = false
+    reloads = 0
     waiting = undefined
     void started.stdin.write(`start ${codeVersion} ${moved ?? '-'} ${startedAt} ${JSON.stringify(changedFiles.size > MAX_CHANGED_FILES ? null : [...changedFiles])}\n`)
     startedAt = codeVersion
@@ -450,25 +461,39 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     void reportExit(started)
   }
   // Whether the running process can take the change in: it is up, the environment and the entry are the ones it started with, and no key asked for a new one.
-  const reloadable = (files: string[], asked: boolean) => !asked && !startupChanged && child !== undefined && child.exitCode === null && runningEntry === entryToRun() && !files.includes(CONFIG_FILE)
+  const reloadable = (files: string[], asked: boolean) => !asked && !startupChanged && listening && reloads < MAX_RELOADS && child !== undefined && child.exitCode === null && runningEntry === entryToRun() && !files.includes(CONFIG_FILE)
   // Asks the running process to import the modules the change reached again; answers 'reloaded', or why it needs a new process, or 'exited'.
-  const reload = async (server: Subprocess<'pipe'>, files: string[]): Promise<string> => {
+  const reload = async (server: Subprocess<'pipe'>, files: string[], sent: string): Promise<string> => {
     const answer = new Promise<string>((resolve) => {
       reloadAnswer = resolve
     })
-    const timeout = setTimeout(() => reloadAnswer?.('the server did not answer in time'), RELOAD_TIMEOUT_MS)
+    let timeout: ReturnType<typeof setTimeout> | undefined
+    let answered = false
 
     try {
-      server.send({ reload: { code: codeVersion, startedAt, changed: JSON.stringify(changedFiles.size > MAX_CHANGED_FILES ? null : [...changedFiles]), files: files.length > MAX_CHANGED_FILES ? null : files } })
+      server.send({ reload: { code: codeVersion, startedAt, changed: sent, files: files.length > MAX_CHANGED_FILES ? null : files } })
     }
     catch {
       reloadAnswer?.('exited')
     }
 
+    // The entry waits for the client build, so the clock starts once it settled.
+    const armed = (async () => {
+      try {
+        await building
+      }
+      catch {}
+
+      if (!answered)
+        timeout = setTimeout(() => reloadAnswer?.('the server did not answer in time'), RELOAD_TIMEOUT_MS)
+    })()
+
     try {
       return await answer
     }
     finally {
+      answered = true
+      void armed
       clearTimeout(timeout)
       reloadAnswer = undefined
     }
@@ -493,11 +518,18 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
 
     const previous = child
     const server = reloadable(files, asked) ? previous : undefined
-    const answer = server === undefined ? undefined : await reload(server, files)
+    // What the reload carries, taken as it is sent: an edit arriving meanwhile belongs to the next one.
+    const sentCode = codeVersion
+    const sentFiles = new Set(changedFiles)
+    const answer = server === undefined ? undefined : await reload(server, files, JSON.stringify(sentFiles.size > MAX_CHANGED_FILES ? null : [...sentFiles]))
 
     if (answer === 'reloaded') {
-      startedAt = codeVersion
-      changedFiles = new Set()
+      startedAt = sentCode
+      reloads++
+
+      for (const file of sentFiles)
+        changedFiles.delete(file)
+
       restarted(server!, undefined)
     }
     // The server exited on its own while it reloaded, which `reportExit` says: nothing runs until the next change.

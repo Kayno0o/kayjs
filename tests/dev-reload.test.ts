@@ -79,6 +79,23 @@ async function served(files: Record<string, string>) {
 }
 
 describe.concurrent('kay dev reloading', () => {
+  it('ends on the last edit of a burst, in the one process', async () => {
+    const project = await served({ 'src/routes/index.kay': 'h1 Burst 0\n' })
+
+    try {
+      for (let edit = 1; edit <= 6; edit++) {
+        await project.write('src/routes/index.kay', `h1 Burst ${edit}\n`)
+        await Bun.sleep(15)
+      }
+
+      await project.sees('Burst 6')
+      expect(project.children).toHaveLength(1)
+    }
+    finally {
+      await project.cleanup()
+    }
+  })
+
   it('shows an edit of a page, a component and an API module without a new process, and stops the app it replaced', async () => {
     const project = await served({
       'src/routes/index.kay': '---\nimport Greeting from \'../greeting.kay\'\n---\nh1 Home\nGreeting\n',

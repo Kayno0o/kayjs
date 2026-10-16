@@ -245,8 +245,13 @@ export async function openInEditor(root: string, request: Request): Promise<Resp
   return Response.json({ opened: false, failed: true })
 }
 
+// The code version pages are told of: the environment's as the run began, kept until the reload announces so a page served by the run before is not told it runs the new code.
+let announcedCode: string | undefined
+
 function bootEvent(failed: boolean, hot?: HotSwap): string {
-  return `event: boot\ndata: ${bootId} ${failed ? bootId : process.env.KAY_DEV_CODE ?? bootId}${hot && !failed ? ` ${JSON.stringify(hot)}` : ''}\n\n`
+  announcedCode ??= process.env.KAY_DEV_CODE
+
+  return `event: boot\ndata: ${bootId} ${failed ? bootId : announcedCode ?? bootId}${hot && !failed ? ` ${JSON.stringify(hot)}` : ''}\n\n`
 }
 
 // A run of the server, which a reload follows in the same process: the pages it serves are the ones to tell once it has taken over.
@@ -254,13 +259,10 @@ export function rememberBoot(failed: boolean, hot?: HotSwap): void {
   latestBoot = { failed, hot }
 }
 
-// Gives the run about to start its own id, before it renders anything that names it.
-export function startReload(): void {
-  bootId = crypto.randomUUID()
-}
-
 // Tells every page connected that the server runs new code, as a new process would by the pages connecting again.
 export function announceReload(): void {
+  bootId = crypto.randomUUID()
+  announcedCode = process.env.KAY_DEV_CODE
   broadcast(bootEvent(latestBoot.failed, latestBoot.hot))
 }
 
@@ -448,6 +450,7 @@ export function refuseForeignHosts(app: Elysia, site: string | undefined): void 
 // What a dev server serves when the project failed to boot: the errors on every page, until a fix restarts it.
 export function bootFailure(error: unknown, root: string): Elysia {
   // Told by its name: the class's module loads the compiler, which a production server never needs.
+  const built = bootId
   const html = compileErrorPage(error instanceof Error && error.name === 'KayCompileError' ? (error as KayCompileError).diagnostics : [], error) + errorPageScripts()
 
   const app = new Elysia({ name: 'kay/pages', seed: root })
@@ -462,7 +465,7 @@ export function bootFailure(error: unknown, root: string): Elysia {
     app.post(DEV_OPEN, async ({ request }) => openInEditor(root, request))
   }
 
-  app.get('/*', () => new Response(html, { status: 500, headers: { 'content-type': 'text/html; charset=utf-8' } }))
+  app.get('/*', () => new Response(html.replaceAll(built, bootId), { status: 500, headers: { 'content-type': 'text/html; charset=utf-8' } }))
 
   return app
 }

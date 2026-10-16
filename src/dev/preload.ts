@@ -5,7 +5,7 @@ import { loadTraverse } from '../compiler/rewrite'
 import { CONFIG_FILE, loadConfig } from '../config'
 import { projectPaths } from '../project'
 import { forgetModules } from '../server/bundle'
-import { announceReload, startReload, stopRunning } from '../server/dev'
+import { announceReload, stopRunning } from '../server/dev'
 import { registerEarlyLoader } from '../server/loader'
 import { loopbackTaken } from './loopback'
 import { planReload } from './reload'
@@ -257,7 +257,14 @@ const baseline = new Set(process.listeners('beforeExit'))
 
 // Imports again the modules the change left stale and runs the entry once more, its servers taking over the ones listening; answers `kay dev` that it did, or that this change needs a new process.
 async function reload(request: ReloadRequest): Promise<void> {
-  const answer = await reloaded(request)
+  let answer: Awaited<ReturnType<typeof reloaded>>
+
+  try {
+    answer = await reloaded(request)
+  }
+  catch {
+    answer = { restart: 'the reload failed' }
+  }
 
   process.send?.(answer)
 }
@@ -295,7 +302,6 @@ async function reloaded({ code, startedAt, changed, files }: ReloadRequest): Pro
     }
 
     forgetModules()
-    startReload()
 
     for (const file of plan.evict)
       delete require.cache[file]
