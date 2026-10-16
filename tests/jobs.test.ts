@@ -232,8 +232,59 @@ describe('schedule', () => {
     }
   })
 
-  it('refuses a job that is no function when the schedule is built', () => {
+  it('refuses a job that is no function when the schedule is built, in a list or a table', () => {
     expect(() => schedule({ '@hourly': ['purge'] as unknown as (() => void)[] })).toThrow('the job scheduled @hourly is no function')
+    expect(() => schedule('@hourly', ['purge'] as unknown as (() => void)[])).toThrow('the job scheduled @hourly is no function')
+    expect(() => schedule({ '@hourly': 'purge' as unknown as () => void })).toThrow('the job scheduled @hourly is no function')
+    expect(() => schedule({ '@hourly': () => undefined, '30s': 'purge' as unknown as () => void })).toThrow('the job scheduled 30s is no function')
+  })
+
+  it('names the lock of each job of a list, a table and a boot run', async () => {
+    const cron = fakeCron()
+    const names: string[] = []
+    const store = memoryJobs()
+    const lock = store.lock.bind(store)
+    const job = () => undefined
+
+    store.lock = async (name, slot) => {
+      names.push(name)
+
+      return lock(name, slot)
+    }
+
+    setSystemTime(new Date('2026-01-01T12:00:00Z'))
+
+    const apps = [
+      new Elysia().use(schedule('@hourly', [job, job], { lock: 'list', store })),
+      new Elysia().use(schedule({ '@hourly': job, '@daily': [job, job] }, { lock: 'table', store })),
+      new Elysia().use(schedule('@hourly', [job, job], { lock: 'boots', boot: true, store })),
+      new Elysia().use(schedule('@hourly', job, { lock: 'single', boot: true, store })),
+    ]
+
+    try {
+      for (const app of apps)
+        app.listen(0)
+
+      await Promise.all(cron.fired.map(async entry => entry.handler()))
+      await Promise.all(apps.map(async app => shutdown(app)))
+      expect(names.toSorted()).toEqual([
+        'boots:@hourly:0',
+        'boots:@hourly:0:boot',
+        'boots:@hourly:1',
+        'boots:@hourly:1:boot',
+        'list:@hourly:0',
+        'list:@hourly:1',
+        'single',
+        'single:boot',
+        'table:@daily:0',
+        'table:@daily:1',
+        'table:@hourly:0',
+      ])
+    }
+    finally {
+      setSystemTime()
+      cron.restore()
+    }
   })
 
   it('runs a job at boot only when asked to', async () => {
