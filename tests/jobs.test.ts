@@ -247,7 +247,7 @@ describe('schedule every so long', () => {
     mkdirSync(dirname(path), { recursive: true })
 
     // A rollback-journal file another process holds a write on, as one just created by a process still switching it to WAL.
-    const holder = Bun.spawn(['bun', '-e', `const { Database } = require('bun:sqlite'); const db = new Database(${JSON.stringify(path)}, { create: true }); db.run('CREATE TABLE t (a)'); db.run('BEGIN EXCLUSIVE'); console.log('held'); setTimeout(() => process.exit(0), 600)`], { stdout: 'pipe' })
+    const holder = Bun.spawn([process.execPath, '-e', `const { Database } = require('bun:sqlite'); const db = new Database(${JSON.stringify(path)}, { create: true }); db.run('CREATE TABLE t (a)'); db.run('BEGIN EXCLUSIVE'); console.log('held'); setTimeout(() => process.exit(0), 600)`], { stdout: 'pipe' })
 
     try {
       await holder.stdout.getReader().read()
