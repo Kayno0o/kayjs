@@ -161,6 +161,10 @@ class RewriteFinder {
   private readonly values = new Map<string, string>()
   // The names nothing in the module declares, of which `globalReads` keeps those read as values.
   private globals: Record<string, unknown> = {}
+  // How each binding kay rewrites is read, for the `typeof` queries Babel leaves out of its references.
+  private readonly readers = new Map<Binding, { name: string, rewrite: (reference: NodePath) => Read | undefined, typeOf: string | undefined }>()
+  // The root names of every `typeof` query: one inside a function type's parameter or a type literal's member is no reference of its binding to Babel.
+  private readonly typeQueries: NodePath<t.Identifier>[] = []
 
   constructor(private readonly input: RewriteInput) {}
 
@@ -179,8 +183,10 @@ class RewriteFinder {
       AssignmentExpression: path => this.assignment(path),
       UpdateExpression: path => this.assignment(path),
       FunctionDeclaration: path => this.loadReads(path),
+      TSTypeQuery: path => this.typeQuery(path),
     })
 
+    this.unlistedTypeQueries()
     this.constantWrites()
 
     return {
@@ -214,50 +220,77 @@ class RewriteFinder {
   // `rewrite` gives what a read becomes, or nothing to leave it as written; `readOnly` reports a write, left out when the caller writes it.
   private visitBinding(scope: Scope, name: string, rewrite: (reference: NodePath) => Read | undefined, readOnly: ReadOnly | undefined, typeOf?: string) {
     const binding = scope.getBinding(name)
-    const { input: { map }, rewrites } = this
+    const { input: { map } } = this
 
     if (!binding)
       return
 
     this.known.add(binding)
+    this.readers.set(binding, { name, rewrite, typeOf })
 
-    for (const reference of valueReferences(binding)) {
-      const node = reference.node
-      const query = typeOf === undefined ? undefined : typeQueryOf(reference)
+    for (const reference of valueReferences(binding))
+      this.visitReference(reference, name, rewrite, typeOf)
 
-      if (query) {
-        const start = map.isExact(query.start!) ? map.toSource(query.start!) : undefined
-
-        if (start !== undefined)
-          rewrites.set(start, { replace: `${typeOf}${memberTypes(query.exprName)}`, end: start + query.exprName.end! - query.start! })
-
-        continue
-      }
-
-      const source = map.isExact(node.start!) ? map.toSource(node.start!) : undefined
-      const tag = tagPosition(reference)
-
-      // The closing tag copies the opening one's name, and the opening tag decides how it is spelled.
-      if (source === undefined || tag === 'closing')
-        continue
-
-      const read = rewrite(reference)
-
-      if (!read)
-        continue
-
-      const { length = name.length, ...found } = read
-      // Type checking copies a tag as a value too, which must not undo the opening tag's.
-      const dynamic = (tag === 'opening' && !isPlainRead(found)) || rewrites.get(source)?.dynamic
-
-      rewrites.set(source, { ...found, end: source + length, dynamic })
-    }
     for (const violation of binding.constantViolations) {
       const identifier = assignedIdentifier(violation.node, name)
       const source = identifier?.start == null ? undefined : map.toSource(identifier.start)
 
       if (source !== undefined && readOnly)
         this.diagnostics.push({ start: source, end: source + name.length, ...readOnly })
+    }
+  }
+
+  private visitReference(reference: NodePath, name: string, rewrite: (reference: NodePath) => Read | undefined, typeOf: string | undefined) {
+    const { input: { map }, rewrites } = this
+    const node = reference.node
+    const query = typeOf === undefined ? undefined : typeQueryOf(reference)
+
+    if (query) {
+      const start = map.isExact(query.start!) ? map.toSource(query.start!) : undefined
+
+      if (start !== undefined)
+        rewrites.set(start, { replace: `${typeOf}${memberTypes(query.exprName)}`, end: start + query.exprName.end! - query.start! })
+
+      return
+    }
+
+    const source = map.isExact(node.start!) ? map.toSource(node.start!) : undefined
+    const tag = tagPosition(reference)
+
+    // The closing tag copies the opening one's name, and the opening tag decides how it is spelled.
+    if (source === undefined || tag === 'closing')
+      return
+
+    const read = rewrite(reference)
+
+    if (!read)
+      return
+
+    const { length = name.length, ...found } = read
+    // Type checking copies a tag as a value too, which must not undo the opening tag's.
+    const dynamic = (tag === 'opening' && !isPlainRead(found)) || rewrites.get(source)?.dynamic
+
+    rewrites.set(source, { ...found, end: source + length, dynamic })
+  }
+
+  private typeQuery(path: NodePath<t.TSTypeQuery>) {
+    let root: NodePath = path.get('exprName')
+
+    while (root.isTSQualifiedName())
+      root = root.get('left')
+
+    if (root.isIdentifier())
+      this.typeQueries.push(root)
+  }
+
+  // The `typeof` queries of a name kay rewrites that Babel did not list among its references, read as the ones it did.
+  private unlistedTypeQueries() {
+    for (const query of this.typeQueries) {
+      const binding = query.scope.getBinding(query.node.name)
+      const reader = binding && this.readers.get(binding)
+
+      if (reader && !binding.referencePaths.some(reference => reference.node === query.node))
+        this.visitReference(query, reader.name, reader.rewrite, reader.typeOf)
     }
   }
 

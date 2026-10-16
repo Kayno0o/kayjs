@@ -693,6 +693,16 @@ describe('component names', () => {
       expect(code).toContain('typeof __props.value')
       expect(code).not.toContain('typeof value')
     })
+
+    it('reads `typeof` as the value inside a function type\'s parameter and a type literal\'s member, in html and dom', () => {
+      for (const output of ['html', 'dom'] as const) {
+        const code = compileKay('---\nconst { value } = props<{ value: string }>()\nconst f = (x: unknown) => x as ((v: typeof value) => void)\nconst g = (x: unknown) => x as { v: typeof value, m(v: typeof value): void }\n---\np {value}', 'test.kay', { output }).tsx
+
+        expect(code).toContain('x as ((v: typeof __props.value) => void)')
+        expect(code).toContain('x as { v: typeof __props.value, m(v: typeof __props.value): void }')
+        expect(code).not.toContain('typeof value')
+      }
+    })
   })
 
   it('reports a template `const` named like the component, which its tags after it would render', () => {
