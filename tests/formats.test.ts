@@ -223,11 +223,38 @@ describe('kay build --format json', () => {
       expect(await gone(await pidAfter(`${failing.file}.pid`))).toBe(true)
     }, 30_000)
 
+    const listening = 'Bun.serve({ hostname: "127.0.0.1", port: Number(process.env.PORT), fetch: () => new Response("other") }); setTimeout(() => process.exit(0), 3000)'
+    const answered = 'for (;;) { try { await fetch(`http://127.0.0.1:${process.env.PORT}/`); break } catch { await Bun.sleep(10) } }'
+
     it.skipIf(process.platform !== 'linux')('does not take the answer of a process outside the server\'s own tree, though the server binds late', async () => {
-      const foreign = 'Bun.serve({ hostname: "127.0.0.1", port: Number(process.env.PORT), fetch: () => new Response("other") }); setTimeout(() => process.exit(0), 3000)'
-      const taken = await executable(`#!/bin/sh\n[ "$1" = "--health" ] && exit 0\nsetsid bun -e '${foreign}' >/dev/null 2>&1 &\nsleep 1\necho "address in use" >&2\nexit 1\n`)
+      // The subshell ends at once, which leaves the listener to init, outside the server's tree.
+      const taken = await executable(`#!/bin/sh\n[ "$1" = "--health" ] && exit 0\n(setsid bun -e '${listening}' >/dev/null 2>&1 &)\nbun -e '${answered}'\nsleep 0.5\necho "address in use" >&2\nexit 1\n`)
 
       await expect(verifyExecutable(taken.file, taken.root, undefined)).rejects.toThrow(/exited with code 1[\s\S]*address in use/)
+    }, 30_000)
+
+    it.skipIf(process.platform !== 'linux')('takes the answer of a process the server started, though it left the group', async () => {
+      const leaving = await executable(`#!/bin/sh\n[ "$1" = "--health" ] && exit 0\nsetsid bun -e '${listening}' >/dev/null 2>&1 &\nwait\n`)
+
+      expect(await verifyExecutable(leaving.file, leaving.root, undefined)).toBeGreaterThan(0)
+    }, 30_000)
+
+    it.skipIf(process.platform !== 'linux')('stops the server and what it started when the build is interrupted', async () => {
+      const root = await project({})
+      const file = join(root, 'server')
+      const script = join(root, 'verify.ts')
+
+      await Bun.write(file, '#!/usr/bin/env bun\nimport { writeFileSync } from \'node:fs\'\nwriteFileSync(import.meta.path + \'.pid\', String(Bun.spawn([\'sleep\', \'30\']).pid))\nawait Bun.sleep(30_000)\n')
+      await Bun.spawn(['chmod', '755', file]).exited
+      await Bun.write(script, `import { verifyExecutable } from ${JSON.stringify(join(import.meta.dir, '../src/build/verify'))}\nawait verifyExecutable(${JSON.stringify(file)}, ${JSON.stringify(root)}, undefined)\n`)
+
+      const verifying = Bun.spawn([process.execPath, script], { stdout: 'ignore', stderr: 'ignore' })
+      const child = await pidAfter(`${file}.pid`)
+
+      verifying.kill('SIGINT')
+      await verifying.exited
+      await Bun.sleep(200)
+      expect(await gone(child)).toBe(true)
     }, 30_000)
 
     it('keeps the last bytes of the output, a cut character included', async () => {

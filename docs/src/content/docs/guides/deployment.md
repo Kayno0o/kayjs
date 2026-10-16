@@ -34,7 +34,7 @@ The executable is bundled apart from what `kay dev` runs, so a module it cannot 
 kay build --compile server --verify
 ```
 
-The build starts the executable on a free port, waits until its health route answers, runs `./server --health` once as a container would, and stops it. If the server exits first, or within a quarter of a second of its first answer, or does not answer within 30 seconds, the build fails with the last 40 lines it wrote, and `kay start` does not run that executable. The server runs in a group of its own that is stopped whole, so nothing it started outlives the build. On Linux an answer only counts when the socket that gave it belongs to that group.
+The build starts the executable on a free port, waits until its health route answers, runs `./server --health` once as a container would, and stops it. If the server exits first, or within a quarter of a second of its first answer, or does not answer within 30 seconds, the build fails with the last 40 lines it wrote, and `kay start` does not run that executable. The server runs in a group of its own that is stopped whole, so nothing it started outlives the build. On Linux an answer only counts when the socket that gave it belongs to the server or a process it started, where the system lets the build see that.
 
 It waits for the health route rather than sleeping, so it takes the time the server needs to start, usually well under a second. It runs your server entry, so whatever that needs at startup, such as a database URL, has to be in the environment of the build. That is why it is off by default: add it to the CI step that builds your image. With `health: false` any answer on the port counts, and `--health` is not run.
 

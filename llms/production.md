@@ -74,7 +74,7 @@ kay build --compile server --verify
 - It waits on the health route, polled every 50 ms, not a fixed sleep: a server that exits or is killed first, or within 250 ms of its first answer, fails at once, one that never answers fails after 30 s, each printing the last 40 lines of what it wrote (`executable-failed`).
 - It runs the app's server entry, so what the entry needs at startup, a database or a secret, must be in the build's environment. It is off by default for that reason; add it to the CI step that builds the image.
 - A failed verify writes no record of the executable, so `kay start` runs the entry instead.
-- The server runs in a process group of its own and everything it started is stopped with it. On Linux an answer only counts when the listening socket belongs to that group, so another process holding the port cannot pass the verify.
+- The server runs in a process group of its own and everything it started is stopped with it. On Linux an answer only counts when the listening socket belongs to the server or a process it started, so another process holding the port cannot pass the verify; where /proc cannot be read, the check is left out. An interrupted build stops the server too.
 - It costs the server's startup plus 250 ms, usually well under a second, and `--format json` carries it as `compiled.verifiedMs`.
 - `health: false` leaves no route to ask, so any answer on the port counts and `--health` is not run.
 
