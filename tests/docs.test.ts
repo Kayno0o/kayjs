@@ -78,7 +78,11 @@ describe('the documentation site', () => {
     const libraries = await loadLibraries()
     const ui = libraries.find(library => library.slug === 'kayjs-ui')!
 
-    expect(libraries.map(library => library.slug)).toEqual(['kayjs-auth', 'kayjs-cms', 'kayjs-mail', 'kayjs-ui'])
+    expect(libraries.filter(library => library.data.source === 'llms.txt').map(library => library.slug)).toEqual(['kayjs-auth', 'kayjs-cms', 'kayjs-mail', 'kayjs-ui'])
+    // The topic files an index lists are pages of their own, the links between them links between pages.
+    expect(libraries.find(library => library.slug === 'kayjs-auth-setup')!.data).toMatchObject({ library: 'kayjs-auth', source: 'llms/setup.md' })
+    expect(libraries.find(library => library.slug === 'kayjs-auth')!.body).toContain('](/llms/kayjs-auth-setup)')
+    expect(libraries.flatMap(library => [...library.body.matchAll(LINK)].filter(([, path]) => path !== undefined))).toEqual([])
     expect(ui.data.version).toBe((await Bun.file(join(root, 'node_modules/@kaynooo/kayjs-ui/package.json')).json() as { version: string }).version)
     // FormDialog posts to an action, which the static site cannot serve, so its page shows code alone.
     expect(components.filter(component => component.data.description === '').map(component => component.slug)).toEqual([])

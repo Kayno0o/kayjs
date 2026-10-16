@@ -38,6 +38,7 @@
   "files": [
     "LICENSE",
     "README.md",
+    "llms",
     "llms.txt",
     "src",
     "types"

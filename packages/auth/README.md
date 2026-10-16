@@ -77,7 +77,7 @@ export default auth.guard({ redirect: '/login' })
 
 ## Reference
 
-The full reference, written for people and coding agents alike, is [llms.txt](llms.txt), with the sign-in action, OAuth providers, mailed links, two-factor and the gate for plain Elysia routes.
+The full reference, written for people and coding agents alike, is [llms.txt](llms.txt), which lists its topic files in [llms/](llms), with the sign-in action, OAuth providers, mailed links, two-factor and the gate for plain Elysia routes.
 
 ## Contributing
 

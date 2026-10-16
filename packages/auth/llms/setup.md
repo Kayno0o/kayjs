@@ -1,0 +1,142 @@
+# kayjs-auth: Setup, pages, the signed-in user, sessions and guards
+
+## Setup
+
+kayjs-auth is published as `@kaynooo/kayjs-auth` to `https://git.kaynooo.fr/api/packages/kaynooo/npm/`, beside kay. kay, Elysia, kayjs-ui (for the prebuilt pages) and, for the Postgres store, `@kaynooo/pg-orm` are peer dependencies.
+
+```ts
+// src/auth.ts
+import type { AuthSessionData } from '@kaynooo/kayjs-auth'
+import { createAuth, discordProvider } from '@kaynooo/kayjs-auth'
+import { authTables, pgStore } from '@kaynooo/kayjs-auth/pg'
+import { Database } from '@kaynooo/pg-orm'
+import { session } from 'kay/server'
+import { mail } from './mail'
+import { Posts } from './tables'
+
+export const db = new Database({ url: process.env.DATABASE_URL!, tables: [...authTables, Posts] })
+
+export const auth = createAuth({
+  sessions: session<AuthSessionData & { cart: string[] }>({ secret: process.env.SESSION_SECRET! }),
+  secret: process.env.AUTH_SECRET!,
+  store: pgStore(db),
+  url: 'https://example.com',
+  site: 'Example',
+  signInPage: '/login',
+  oauth: { discord: { provider: discordProvider(), clientId: process.env.DISCORD_CLIENT_ID!, clientSecret: process.env.DISCORD_CLIENT_SECRET! } },
+  email: { mailer: { send: mail.enqueue }, links: { 'verify-email': '/verify', 'reset-password': '/reset', 'magic-link': '/magic', 'change-email': '/confirm-email' } },
+  roles: { admin: ['editor'], editor: [] },
+})
+```
+
+```ts
+// kay.config.ts
+import { authPages } from '@kaynooo/kayjs-auth'
+import { defineConfig } from 'kay/server'
+
+export default defineConfig({
+  extensions: [authPages({ auth: () => import('./src/auth') })],
+})
+```
+
+That one line is the whole declaration. `auth` loads the module making `auth` with `createAuth`, exported as `auth` or by default, and the extension hands `pages()` its plugin, used before the pages: the app mounts nothing else and declares no `Register`, `kay check` typing `ctx.locals.auth` and checking links to kayjs-auth's routes off it. It loads as `pages()` builds the app, so kay.config.ts never loads the app's database, and `kay check`, the editor and `kay build` never load it. `authPages` also brings the prebuilt pages (see Prebuilt pages); an app keeping its own lists the plugin alone, `authExtension(() => import('./src/auth'))`. `authPages({ server })` takes any other plugin as a function, `server: async () => somePlugin`.
+
+A plain Elysia app, or one mounting the plugin by hand, uses it before the pages, `new Elysia().use(auth.plugin).use(await pages())`, and registers `locals: LocalsOf<typeof auth.plugin>` and `app: typeof auth.plugin` (or its own Elysia instance) in kay's `Register` for `kay check`. The plugin may also sit inside a plugin of the app's own, at any depth: `auth` reaches every route declared after it. The session plugin then goes on the app itself, or is left to `auth.plugin`: used first inside that plugin, it stays there, and every route outside it answers 500 with an error saying so. The plugin uses the session plugin itself, puts `auth` in every request's context (`ctx.locals.auth` in pages, actions and guards, `({ auth })` in Elysia routes), and serves the OAuth routes. `db.sync()` creates kayjs-auth's tables with the app's. What it logs, a mailer, a hook or a check that failed, goes where the app's `log` setting sends kay's messages, headed `kayjs-auth:`, as text, as JSON or to the app's function, under the request being answered.
+
+`createAuth` options:
+
+- `sessions`: the plugin kay's `session()` returns, its data type including `AuthSessionData`.
+- `secret`: at least 32 characters, from the environment, and not the session's secret: kayjs-auth cannot derive the session's keys, so the two stay apart only when the app keeps them apart. Each use gets its own key derived from it: encrypting TOTP secrets and provider tokens, and digesting where a sign-in came from. A list rotates secrets: the first writes, every one reads. After a rotation each user gets one `new-sign-in` mail, since the digest of where they sign in from changes with the secret.
+- `store`: see Stores.
+- `url`: the site's public origin, needed for OAuth callbacks and mailed links; `createAuth` throws without it when either is configured. `site`: the site's name in mails and authenticator apps, the URL's host by default.
+- `prefix`: where the OAuth routes live, `/auth` by default.
+- `signInPage`: where a failed OAuth sign-in goes with `?error=`, `/` by default. `failurePage`: where every failed OAuth sign-in goes instead, with no reason in the URL, so that whether an account may sign in does not leak through an `allow` list. `twoFactorPage`: where a sign-in goes to ask for the code, `/two-factor` by default. `pages`: see Prebuilt pages, which these then default to.
+- `oauth`, `allow`, `onSignUp`, `onProviderProfile`: see OAuth. `signUp`: see Passwords. `email`: see Mailed links. `onDelete`: see Account. `onEvent`: see Security mails. `roles`, `defaultRoles`, `authorize`: see Guards and gates. `scopes`: see Bearer tokens. `limits`: see Limits. `captcha`, `breachedPasswords`: see Bots and breached passwords. `sessionMaxAge`, `rememberMaxAge`, `browserSessionMaxAge`, `sessionAbsoluteMaxAge`, `sessionsPage`, `locate`: see Sessions. `passkeys`: see Passkeys. `audit`: see Events and the audit log. `admin`: see Admin. `organizations`: see Organizations. `oauthServer`: see OAuth server for MCP clients.
+
+## Prebuilt pages
+
+kayjs-auth ships every sign-in and account page as a kay extension, styled with kayjs-ui, in English and French. `authPages()` in kay.config.ts, as in Setup, serves them, and `createAuth` sends users to them:
+
+```ts
+// src/auth.ts
+export const auth = createAuth({ /* ... */ pages: true })
+```
+
+- `authPages({ auth, prefix, home })` and `createAuth({ pages: { prefix, home } })` take the same `prefix` and `home`: `prefix` where the pages live, `/auth` by default, and `home` where a sign-in goes when nothing asked for another page and where a sign-out goes, `/` by default. `pages: true` takes the defaults.
+- The pages: `sign-in` (providers, password, magic link or code, passkey, remember me), `register`, `two-factor`, `reset-password`, `verify-email`, `magic-link`, `confirm-email`, and under `account`: the profile (address, username, verification), `security` (password, two-factor with its QR code and recovery codes, passkeys), `sessions`, `connections` (shown with providers), `tokens`, `clients` (the apps signed in by OAuth, with a revoke button; shown with the OAuth server) and `data` (download, asking for a recent proof first, and deletion). Each works without JavaScript but passkeys, and shows only what the config enables.
+- With `pages`, `signInPage`, `twoFactorPage`, `sessionsPage` and every `email.links` default to those pages, and `auth.guard()` without `redirect` sends an anonymous visitor to the sign-in page, `?redirect=` back. Without `pages`, `email.links` names a page for each kind, or `createAuth` throws.
+- An app file at a page's path replaces that page alone: `src/routes/auth/magic-link.kay` is the app's own magic-link page. Its texts live under `auth` in kay's messages: a key in the app's `src/messages/en.ts`, such as `auth: { signIn: { title: 'Welcome back' } }`, replaces that text and keeps the rest.
+- The pages reached before signing in, `sign-in`, `register`, `two-factor`, `reset-password`, `verify-email`, `magic-link` and `confirm-email`, set `guards: false`: none of the app's guards above them runs there, whatever it checks. An app's root `_guard.ts` asking for a session, `export default auth.guard()`, keeps the rest of the site to signed-in users and still lets visitors sign in, the `account` pages keeping it; but a guard for maintenance, an IP allow-list or invite-only access skips those pages too. An app needing such a guard on one of them replaces that page with its own, which the app's guards cover unless it sets `guards: false`; an app page replacing one under a guard asking for a session sets it. kayjs-auth's own routes, OAuth and the rest, are its plugin's, which page guards never reach.
+- A site with data of its own on its users keeps these pages: `createAuth({ pages: { profile } })` adds fields to the account page's profile form. `profile` is `{ fields, load, save }`: `fields` maps a name to `{ label, type?, autocomplete?, required?, maxLength? }` (`type` an `input` type, or `'textarea'`), `load(user)` answers what each field holds now, and `save(user, values)` stores the trimmed values (a throw answers 500), once `required` and `maxLength` (500 by default) passed, and may return `{ errors: { field: 'message' } }` to refuse. `label` is a string, or a map by locale (`{ en: 'Bio', fr: 'Biographie' }`) the page reads in its own locale, the first when none matches; `load` answering anything but a string, `null` or `undefined` for a field throws, and `save` throwing answers 500. `auth.profile(locale?)` and `auth.saveProfile(values)` are what the form calls, for a page of the app's own, `saveProfile` throwing without `pages.profile`: both need a session, a bearer token cannot edit a profile, and an admin acting as a user can.
+- `captcha.widget`, `turnstileWidget(siteKey)` or `hcaptchaWidget(siteKey)`, is the widget the pages show where `captchaRequired` asks for one; with the proof of work they carry its field instead, and say JavaScript is needed to a browser without it.
+- A provider's button reads its `label`, set on each preset (`GitHub`, `Google`) and overridden by `oauth.<name>.label`.
+- kayjs-ui is a peer of kayjs-auth, so the pages render with the app's own copy; the app keeps `@iconify-json/tabler` and Tailwind, kayjs-ui's peers.
+- kayjs-auth and kayjs-ui are released with kay at its version and peer on kay's minor: the app installs the ones matching its kay and moves them together.
+
+`auth.features()` tells any page, prebuilt or the app's own, what the config enables: `{ providers: [{ name, label }], email, codes, signUp, requireVerified, passkeys, captcha, scopes, prefix, oauthServer, signInPage, pages }`, `captcha` being the widget, `'proof-of-work'` or null.
+
+## The signed-in user
+
+```kay
+--- server
+const user = await ctx.locals.auth.user()
+---
+if user as signedIn
+  p Signed in as {signedIn.email}
+else
+  a(href="/login") Sign in
+```
+
+- `user()` answers `{ id, email, emailVerified, username, roles, hasPassword, twoFactor, locale, guest }`, or `null`. Secrets never leave the store: no hash, no TOTP secret, no token.
+- It reads the session first, then the request's `Authorization: Bearer` token. `via()` says which: `'session'`, `'bearer'` or `null`.
+- `requireUser()` is `user()` for a page or an action that needs one, with no guard above it: it answers the `User`, and for an anonymous request it stops as `auth.guard()` does, a visitor reading a page going to the sign-in page with `?redirect=` set to where they were, with `pages`, and any other request, an action's call included, refused with a 401. The user is read once per request however many of them ask.
+- `requireUser({ redirect, scope })` names the sign-in page of an app without `pages` (an empty `redirect`, as in `guard`, is none), and a scope a bearer token limited to scopes needs, which is otherwise refused with a 403 as `guard()` refuses it. `signInUrl(back?)` is that sign-in URL for a link of the app's own: `a(href={ctx.locals.auth.signInUrl()}) Sign in` leads back to the page it is on, `signInUrl('/pricing')` to another path. A `back` that is not a path of this site, `//evil.example` or `https://...`, leads home instead.
+- A sign-out button is a form posting to kayjs-auth's own route, with no action of the app: `form(method="post" action={`${ctx.locals.auth.features().prefix}/sign-out`})`, with an `input(type="hidden" name="redirect" value="/")` for where to go after, a path of the site, else the pages' `home` or `/`. It answers 303, only to a post: a link or a prefetch signs no one out, and a post from another site gets a 403.
+- `signOut()` signs this session out under a new session id, keeping the rest of the app's session data, and takes it off the user's sessions, so a copy of the cookie is worth nothing either. `signOutEverywhere()` ends every session of the user, copied cookies included, and every bearer token they hold; `signOutEverywhere({ keepThisOne: true })` keeps this session, the tokens still ending.
+- `signIn({ id })` signs a user in directly, without their second factor, for a way of signing in the app proves itself. kayjs-auth's own flows all go through the second factor.
+- A deleted user, one signed out everywhere since, or a session ended or unseen past its lifetime, reads as `null`, and the stale entry leaves the session.
+- A websocket route on an app using the plugin reads its user as `await ws.data.auth.user()`, off the cookie or token its upgrade carried. `auth.socketUser(ws)` does the same for a handler typed for any socket, `null` for an anonymous one or one opened without the plugin. A socket's user is read again once 30 seconds have passed since the last read, so a sign-out, "sign out everywhere", a revoked token or a ban reaches an open socket within 30 seconds of its next read: `ws.data.auth.user()` then answers `null`, and `socketUser` also closes the socket it had answered a user for, with code 1008. A handler reads the user on each message it acts on, not once on `open`.
+- A browser's cross-site POST or websocket upgrade reads the session as signed out on a plain Elysia app too, which has no Origin check of kay's, and a session write from it (a sign-in, a sign-out) answers a 403: `Origin` (or `Sec-Fetch-Site`) must name the request's host, the host of `url` or kay's `site`, so an app behind a proxy that does not pass `Host` on sets `url`. `socketUser` answers `null` and closes such a socket with 1008, and `ws.data.auth.user()` reads `null`. A request with neither header (a script, a webhook), a safe method, an `Authorization: Bearer` token, the OAuth `form_post` callback, and what an `api({ cors })` module of kay admits are left alone.
+
+## Sessions
+
+Each sign-in is kept on the user's list of sessions in the store, whatever holds the session itself, so one can be ended from another browser:
+
+- `sessions()` lists `{ id, current, device, userAgent, ip, place, createdAt, lastSeenAt }`, oldest first, `current` the browser asking. `device` is the user agent read as `{ browser, os, mobile }`, such as `Firefox` and `Windows`, `null` for what it does not know. `place` is what `locate(ip)` answers, an option of the app's over a geolocation database of its own, `null` without one or when it throws. A visit is recorded at most every five minutes, or at once from a new address.
+- `endSession(id)` ends one of them, effective on that browser's next request; ending the current one signs out. It answers false when the user has no session with that id.
+- A session unseen for `sessionMaxAge` seconds, 30 days by default, is over even when its cookie lives on. Set it to the session plugin's own lifetime or shorter. One signed in `sessionAbsoluteMaxAge` seconds ago, 90 days by default as kay's session `absoluteMaxAge` is, is over however often it was seen, "remember me" included: set the two alike.
+- "Remember me": `remember: true` keeps the session `rememberMaxAge` seconds unseen, 90 days by default; `remember: false` gives it a cookie the browser drops on closing, over after `browserSessionMaxAge` unseen, a day by default as kay's session `browserMaxAge` is (keep the two alike). Without `remember` the session takes `sessionMaxAge`, whatever a sign-in before chose in that browser. It goes in as `signInWithPassword({ ..., remember })`, `register({ ..., remember })`, `requestMagicLink(email, redirect, { remember })` (for the link opened, or the code typed, in that browser), `signInWithPasskey(response, redirect, { remember })`, `signIn(user, { remember })` and `?remember=1` or `?remember=0` on an OAuth link, and holds through the second factor.
+- A change to how the account is signed in to ends the user's other sessions, which leave the list, and every bearer token, this browser staying signed in: a password changed or reset, the second factor turned on or off, new recovery codes, a passkey removed, a provider unlinked, a new address confirmed. So does `signOutEverywhere`.
+- Through a bearer token, `sessions()` is empty and `endSession` ends nothing: the list belongs to the browsers.
+- `sessionsPage`, such as `/account/sessions`, is where the app lists them: `new-sign-in` mails link to it, so a user who does not know the sign-in can end it.
+- A sign-in from before the list existed goes on it at its next request.
+
+## Guards and gates
+
+A `_guard.ts` default-exports kayjs-auth's guard:
+
+```ts
+import { auth } from '../../auth'
+
+export default auth.guard({ redirect: '/login', require: 'editor' })
+```
+
+- An anonymous visitor goes to `redirect`, with where they were going as `?redirect=`, a path to hand to `signInWithPassword` or an OAuth link. Without `redirect`, and for any post, the answer is a 401. A user who does not meet `require` gets a 403.
+- A requirement is a role, a predicate `(user, ctx) => boolean`, or a list of which any one passes. A role includes the roles `roles` lists under it: with `{ admin: ['editor'], editor: [] }`, an admin meets `'editor'`. A user's roles are `UserRecord.roles` in the store. `defaultRoles: ['user']` gives every new user those roles, by password or by provider; a store leaves them to kayjs-auth rather than filling them in itself, so it knows which roles were given on purpose.
+- `auth.hasRole('admin')` is the predicate form, `auth.isGranted('admin', user)` the plain check.
+- `authorize: (user, requirement, level, ctx) => Promise<boolean>` replaces the decision, for grants on single records: `decide(grantStore, user, requirement, level, ctx)` reads a `GrantStore` of the app's. `level` is `'read'` for GET and HEAD, `'write'` otherwise.
+
+Plain Elysia routes, such as an API, close behind a gate, which uses the plugin itself:
+
+```ts
+const api = new Elysia({ prefix: '/api' })
+  .use(auth.gate())
+  .get('/me', ({ auth }) => auth.user())
+  .get('/stats', () => stats(), { auth: 'admin' })
+  .get('/health', () => 'ok', { auth: false })
+```
+
+- Every route the instance declares after `.use(auth.gate())` needs a signed-in user, or `gate({ require })`'s requirement. A route asks for more with `auth: <requirement>` and stays open with `auth: false`. Routes added through `group`, `guard`, `route`, `all`, `ws` or a used plugin are closed too, so a route that forgets `auth:` stays closed. A route declared before the gate stays open: use the gate first.
+- `auth.gate()` brings `auth.plugin` along, so `auth` reaches the routes declared after the gate's instance too.
+- Gates nest: a sub-router behind `auth.gate({ require: 'admin' })` inside an app behind `auth.gate()` needs both. A route's `auth:` and `scope:` change only the gate nearest it, so `auth: false` or a looser requirement in the sub-router still meets every gate around it.
+- 401 to an anonymous caller, 403 to a signed-in one who is denied. A bearer token passes as its user.

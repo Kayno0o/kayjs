@@ -46,7 +46,7 @@ export const signUp = action(schema, async ({ name, email }) => {
 
 In production it sends over SMTP and reads `SMTP_HOST` and `SMTP_FROM` (required, `SMTP_FROM` unless `from` is set), and `SMTP_PORT` (465 by default), `SMTP_USER` and `SMTP_PASS` (optional). It stops the boot naming a required one that is missing; `kay env` lists them all. A mail naming no recipient, such as a contact form's, goes to `MAIL_TO`. In development and under `bun test` mails stay in the process's outbox, and the development pages send one for real, to an address you type, over the SMTP the environment names.
 
-The full reference, for people and for LLMs, is [llms.txt](./llms.txt).
+The full reference, for people and for LLMs, is [llms.txt](./llms.txt), which lists its topic files in [llms/](./llms).
 
 ## Contributing
 

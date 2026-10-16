@@ -63,7 +63,7 @@ Button(label="Save" variant="accent" icon="plus" onClick={() => toast.success('S
 
 ## Reference
 
-The full reference, written for people and coding agents alike, is [llms.txt](llms.txt).
+The full reference, written for people and coding agents alike, is [llms.txt](llms.txt), which lists its topic files in [llms/](llms).
 
 ## Contributing
 

@@ -24,9 +24,9 @@ export const docs = collection('content/docs', {
   highlight,
 })
 
-// Written for agents, every option and edge case: llms.txt and the docs it lists, then each library's llms.txt as published.
+// Written for agents, every option and edge case: llms.txt and the docs it lists, then each library's llms.txt and the topic files it lists, as published.
 export const reference = collection({ name: 'reference', load: async () => [...await loadReference(), ...await loadLibraries()] }, {
-  schema: s.Object({ title: s.String(), order: s.Number(), version: s.Optional(s.String()) }),
+  schema: s.Object({ title: s.String(), order: s.Number(), version: s.Optional(s.String()), library: s.Optional(s.String()), source: s.Optional(s.String()) }),
   sort: byOrder,
   highlight,
 })

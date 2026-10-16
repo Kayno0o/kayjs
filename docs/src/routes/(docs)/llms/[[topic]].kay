@@ -17,10 +17,10 @@ const topic = await reference.get(ctx.params.topic ?? 'overview') ?? ctx.notFoun
 const { Content } = topic
 const sections = topic.headings.filter(heading => heading.depth === 2 || heading.depth === 3)
 const { previous, next } = neighbours(await reference.all(), topic.slug, llmsHref)
-const { version } = topic.data
+const { version, library, source: libraryFile } = topic.data
 function sourceUrl() {
-  if (version !== undefined)
-    return `${libraryRoot(topic.slug)}/llms.txt`
+  if (library !== undefined && libraryFile !== undefined)
+    return `${libraryRoot(library)}/${libraryFile}`
 
   return topic.slug === 'overview' ? `${FORGE}/llms.txt` : `${FORGE}/llms/${topic.slug}.md`
 }

@@ -4,7 +4,7 @@ import { propsOf } from './ui-props'
 
 export interface LibraryReference {
   slug: string
-  data: { title: string, order: number, version: string }
+  data: { title: string, order: number, version: string, library: string, source: string }
   body: string
 }
 
@@ -26,14 +26,28 @@ const KEBAB = /-(\w)/g
 const FIRST = /^\w/
 const KAY_FILE = /\.kay$/
 
-// Each library's llms.txt, from its package under packages/ as the workspace links it at the root, listed after kay's own reference: it describes the version kay releases it at.
-export async function loadLibraries(): Promise<LibraryReference[]> {
-  return Promise.all(LIBRARIES.map(async (name, order) => {
-    const text = await Bun.file(join(PACKAGES, name, 'llms.txt')).text()
-    const { version } = await Bun.file(join(PACKAGES, name, 'package.json')).json() as { version: string }
+// A line of a library's llms.txt listing a topic file, `- [Setup](llms/setup.md): ...`.
+const TOPIC = /^- \[[^\]]+\]\(llms\/([\w-]+)\.md\)/gm
+// A link to a topic file of the same library, `llms/setup.md#sessions` from the index or `setup.md#sessions` from another topic, made a link to its page under /llms.
+const TOPIC_LINK = /\]\((?:llms\/)?([\w-]+)\.md(#[\w-]+)?\)/g
 
-    return { slug: name, data: { title: name, order: 100 + order, version }, body: text.replace(TITLE, '').replace(INTRO, '') }
+// Each library's llms.txt and the topic files it lists, from its package under packages/ as the workspace links it at the root, listed after kay's own reference: they describe the version kay releases the library at.
+export async function loadLibraries(): Promise<LibraryReference[]> {
+  const pages = await Promise.all(LIBRARIES.map(async (name, index) => {
+    const dir = join(PACKAGES, name)
+    const text = await Bun.file(join(dir, 'llms.txt')).text()
+    const { version } = await Bun.file(join(dir, 'package.json')).json() as { version: string }
+    const linked = (markdown: string) => markdown.replace(TOPIC_LINK, (_link, topic: string, anchor = '') => `](/llms/${name}-${topic}${anchor})`)
+    const topics = await Promise.all([...text.matchAll(TOPIC)].map(async ([, topic], position) => {
+      const markdown = await Bun.file(join(dir, 'llms', `${topic}.md`)).text()
+
+      return { slug: `${name}-${topic}`, data: { title: TITLE.exec(markdown)?.[1] ?? name, order: 100 + index * 10 + position + 1, version, library: name, source: `llms/${topic}.md` }, body: linked(markdown.replace(TITLE, '')) }
+    }))
+
+    return [{ slug: name, data: { title: name, order: 100 + index * 10, version, library: name, source: 'llms.txt' }, body: linked(text.replace(TITLE, '').replace(INTRO, '')) }, ...topics]
   }))
+
+  return pages.flat()
 }
 
 // One page per component kayjs-ui ships: its usage from src/content/ui/<slug>.md, and its props read from its source.

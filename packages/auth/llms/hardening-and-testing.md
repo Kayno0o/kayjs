@@ -1,0 +1,63 @@
+# kayjs-auth: Bots, breached passwords, limits, stores, testing and the dev tool
+
+## Bots and breached passwords
+
+```ts
+import { createAuth, turnstile, turnstileWidget } from '@kaynooo/kayjs-auth'
+
+createAuth({
+  // ...
+  captcha: { verify: turnstile(process.env.TURNSTILE_SECRET!), widget: turnstileWidget(process.env.TURNSTILE_SITE_KEY!), on: { 'sign-in': 3, 'reset': 'always' } },
+  breachedPasswords: true,
+})
+```
+
+- `captcha` is kay's proof of work unless set, `proofOfWork()`: no third party, no widget and no cookie, the browser hashing for some tens of milliseconds before the request goes through. It costs a bot CPU on each request rather than proving a human, so a site bots target anyway, or whose accounts are worth money to a spammer, sets Turnstile or hCaptcha instead. `captcha: false` turns it off.
+- `proofOfWork({ difficulty, maxAge, store, on })`: `difficulty` is 100,000 by default, doubled with each request past the threshold up to 16 times, and `maxAge` an hour; `store` keeps the solutions already used, this process's memory by default, `sqliteRates(path)` from `kay/server` sharing them between processes; `on` asks registering, resets and magic links always, a password sign-in from the third attempt, and a guest sign-in never, which an app often makes with no form.
+- `await auth.captchaChallenge(action)` is the challenge for this client's next request, null when none is needed or the CAPTCHA is a third party's. A form carries it as `input(type="hidden" name="captcha" data-kay-work={challenge})`, kay's script posts its solution as the field's value, and the action passes it on as the token below; the prebuilt pages do, naming the field `kayjs-captcha`.
+- A browser without JavaScript posts the field empty, refused as `'captcha'`, and so does a form kay's script leaves to the browser (`navigation: false` with no island, `data-reload`, a `target`); the prebuilt pages then say JavaScript is needed, and that a stale solution should be sent again, and set a honeypot and a two-second `minTime` on their forms for the requests a post without JavaScript still reaches.
+- Upgrading from a kayjs-auth without it: the app's own register, reset and magic-link forms carry the field, or the app sets `captcha: false`. A client kay's script does not run in, a plain Elysia app's own pages, a mobile app or a SPA calling the API, has no solver: it sets `captcha: false` or a third party's check. A test calling `auth.register()` directly passes `captcha: false` to the auth it builds. A custom `verify` is now given `'guest'` for `signInAsGuest`, `'register'` before. A test posts from the page it visited, `site.submit(register, fields, { from: await site.visit('/register') })`, which `site.submit` solves the field of.
+- `captcha.verify(token, action)` checks the token the page's widget posted, for `action` one of `'register'`, `'guest'`, `'sign-in'`, `'reset'` and `'magic-link'`. `turnstile(secret)` and `hcaptcha(secret)` are presets calling the provider's siteverify; their widgets post the token as `cf-turnstile-response` and `h-captcha-response`, which the action passes on.
+- The token goes in as `register({ ..., captcha })`, `signInWithPassword({ ..., captcha })`, `requestPasswordReset(email, { captcha })` and `requestMagicLink(email, redirect, { captcha })`. A missing or refused token answers `{ ok: false, error: 'captcha' }`, and so does a `verify` that throws. The request still counts against the client's limit.
+- `captcha.on` sets each request to `'always'` (every one, by default for a third party's check, a guest sign-in as registering), `false`, or a number: asked only once this client made that many of it in the limit's window, so people rarely see it. `auth.captchaRequired(action)` says whether the next one needs it, for the page to show the widget. `captcha.widget` names that widget for the prebuilt pages and `features()`.
+- `breachedPasswords: true` refuses a new password Have I Been Pwned lists, on `register`, `resetPassword` and `changePassword`, as `errors.password: 'breached'`. Only the first five characters of the password's SHA-1 leave the server, the answer padded with decoys. A function `(password) => boolean` checks against a list of the app's own instead. A check that fails or takes over three seconds lets the password through, logged: an outage never stops anyone registering. `pwnedPassword(password)` is exported for a check of the app's own.
+
+## Limits
+
+Attempts are counted in the store, so every process shares them, per client address (read as kay's `rateLimit` reads it, through `proxy` in kay.config.ts) and per account. A plain Elysia app that kay's `pages()` does not serve passes the same setting to `createAuth` as `proxy`, `{ hops: 1 }` behind nginx, or every client counts as the proxy. `limits` overrides any of `DEFAULT_LIMITS`, each `{ max, window }` with `window` in seconds:
+
+- `signIn` 40 and `signInAccount` 6 per 15 minutes; the account counts failures only, and a success clears it.
+- `register` 6 per hour.
+- `resend`, `forgot` and `magicLink` 12 per client and 3 per account per hour (`resendAccount`, `forgotAccount` and `magicLinkAccount`, the last two counted per address); `emailChange` 12 and `emailChangeAccount` 5.
+- `invite` 30 per manager per hour, `inviteAddress` 5 per invited address per day.
+- `export` 6 per account per hour, for `exportData()` and `GET <prefix>/export`.
+- `twoFactor` 30 and `twoFactorAccount` 8 per 15 minutes, for signing in and for turning the factor on; `reprove` 6 per 15 minutes; `link` 40 per hour; `emailCode` 30 per client and `emailCodeAccount` 10 per address per 15 minutes.
+
+## Stores
+
+- `memoryStore()` keeps everything in the process: for tests, and for trying kayjs-auth before a database is wired.
+- `pgStore(db)` from `@kaynooo/kayjs-auth/pg` keeps it in Postgres through pg-orm, or in a SQLite file when the `Database` opens a `sqlite://` URL (`new Database({ url: 'sqlite://data/auth.db', tables: [...authTables] })`, which pg-orm opens in WAL mode with foreign keys on, waiting up to 5 seconds on another process writing), once `authTables` are among the `Database`'s tables: `auth_user`, `auth_identity`, `auth_token`, `auth_recovery_code`, `auth_bearer_token` (with `oauth_client` and `oauth_family` columns), `auth_oauth_client`, `auth_oauth_grant`, `auth_oauth_code`, `auth_oauth_refresh`, `auth_session`, `auth_passkey`, `auth_audit`, `auth_organization`, `auth_member`, `auth_invitation` and `auth_attempt`; what belongs to a user, the audit log and their invitations aside, is deleted with them, and members and invitations with their organization.
+- Any object with the `AuthStore` methods is a store: `users`, `identities`, `tokens`, `recoveryCodes`, `bearerTokens`, `sessions`, `passkeys` and `attempts`, plus `oauth` (`clients`, `grants`, `codes`, `refresh`, written on each method) for the OAuth server, `audit` for the `audit` option and `organizations`, `members` and `invitations` for the `organizations` option, each method sync or async. What must hold is written on each method: emails are looked up exactly, usernames without case; a mailed token, a recovery code and a TOTP step are spent once even by two requests together; deleting a user deletes what kayjs-auth keeps for them, and `audit.list` orders by `at` then `id`, both descending, and takes `before` as a `Date` or an entry's `{ at, id }`; `audit.forget` strips them from the log; `users.list` pages newest first and searches emails and usernames without case. Optional methods save queries and a store without them still works: `users.getMany`, `organizations.getMany`, `identities.deleteForUser` and `bearerTokens.deleteForUser` do in one query what kayjs-auth otherwise does per row, `bearerTokens.findByDigestWithUser` reads a token and its user together (typed as `users.get` gives them) where a request sending one makes two reads, and `prune(limits)` deletes what expired. kayjs-auth starts `prune` at most once an hour, from a request without making it wait, and the built-in stores then delete expired links, codes, invitations and sessions (past their lifetime unseen, or `sessionAbsoluteMaxAge` old), attempt windows that ended, and bearer tokens expired for more than 30 days (the list shows an expired one until then). A store without `prune` keeps those rows, with the IP and browser of a session and the address of a link, until the app deletes them. Attempt counts key an address by a keyed digest of it, never the address itself.
+- A store over an app's own tables: `users.create(user)` answers the user as stored when the store picks its own id, such as a serial column's, `user` whole with only its `id` changed, and kayjs-auth goes on with it (ids are strings, so the store converts); answering nothing keeps the id kayjs-auth picked. TOTP secrets are stored sealed with the auth `secret`: a store whose rows hold plain base32 secrets from before seals each on read with `sealTotpSecret(secret, userId, plain)`, from `@kaynooo/kayjs-auth`, `secret` being the value `createAuth` takes, a list included. A plain base32 value matches `/^[A-Z2-7]+=*$/`, which a sealed one in practice never does, and what kayjs-auth writes afterwards is sealed already.
+
+## Testing
+
+kay's `testSite` builds the site as `pages()` does, the plugin mounted by the extension before the pages, so a test signs in through the site's own forms and stays signed in. An app mounting the plugin by hand passes it as `testSite({ use: [auth.plugin] })`.
+
+```ts
+import { testSite } from 'kay/test'
+import { signIn } from '../src/routes/login.kay'
+
+const site = await testSite()
+const page = await site.submit(signIn, { identifier: 'ada@example.com', password: 'correct horse battery' }, { from: '/login' })
+```
+
+The prebuilt pages' actions import as `@kaynooo/kayjs-auth/pages/<page>.kay`, such as `import { password } from '@kaynooo/kayjs-auth/pages/sign-in.kay'` and `import { changeUsername } from '@kaynooo/kayjs-auth/pages/account/index.kay'`, and a test submits them as it does its own; the sign-out button, a post to `/auth/sign-out`, a test makes with `site.fetch('/auth/sign-out', { method: 'POST' })`. `kay check` types such a module's named exports as the file declares them, so the test imports an action without a cast (`examples/noticeboard/tests/pages.ts` re-exports them).
+
+A test needing a signed-in request without going through a form takes `await auth.sessionCookie(userId)`, the `Cookie` header of a new session signed in as that user, as `signIn` makes it, against the app's own auth, to send by hand: `app.handle(new Request(url, { headers: { cookie } }))`.
+
+Each `testSite` keeps its own cookies, one browser each. `memoryStore()` keeps each test's users apart, and a mailer pushing into an array hands the test the links it would have mailed, `url` included; with kayjs-mail, its `outbox` holds what was sent.
+
+## Dev tool
+
+- Under `kay dev`, the dev tool every dev page carries has an Auth tab, brought by `authPages` and `authExtension` with nothing to add in the app: the session's user (id, email, roles, how they signed in, password, two-factor) with a Sign out button that posts to the pages' `/auth/sign-out`. It reads `/_kay/auth`, a route mounted under `kay dev` alone.

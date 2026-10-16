@@ -60,7 +60,7 @@ On a port other than 465 a server not offering STARTTLS is refused, at the first
 
 Each mail sent is logged with its subject and how many recipients it went to at which domains. Set `mailer({ logRecipients: true })` to name them in full. DKIM signing and a rate limit have variables of their own.
 
-<ReadMore href="/llms/kayjs-mail">Every variable, DKIM signing, the rate limit and a mailer that boots without SMTP set up.</ReadMore>
+<ReadMore href="/llms/kayjs-mail-writing-and-sending">Every variable, DKIM signing, the rate limit and a mailer that boots without SMTP set up.</ReadMore>
 
 ## Writing a mail
 
@@ -220,4 +220,4 @@ export const auth = createAuth({
 
 Under `kay dev`, the dev tool has a Mail tab with nothing to set up. It lists the mails sent to the outbox, newest first. A click on one previews it in place, and Open shows its page.
 
-<ReadMore href="/llms/kayjs-mail">Optional mail setup, other transports, attachments, the queue's retry options and the settings are in the full kayjs-mail reference.</ReadMore>
+<ReadMore href="/llms/kayjs-mail-writing-and-sending">Optional mail setup, other transports, attachments, the queue's retry options and the settings are in the full kayjs-mail reference.</ReadMore>

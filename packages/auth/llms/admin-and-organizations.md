@@ -1,0 +1,56 @@
+# kayjs-auth: Events, the audit log, admin and organizations
+
+## Events and the audit log
+
+`onEvent(event, user, detail, context)` hears every security mail's event above, mailed or not, and these, never mailed:
+
+- `signed-in`, `detail` how: `password`, `register`, `reset-password`, `magic-link`, `email-code`, `oauth:<provider>`, `passkey`, `guest`, or `app` for `auth.signIn`. A sign-in through the second factor is heard once it is answered, with its first factor.
+- `signed-out`.
+- `sign-in-failed`, for an account that exists only: `detail` `password`, `two-factor` or `passkey`.
+- An admin's doing, `actor` the admin: `role-granted` and `role-revoked`, `detail` the role; `banned`, `detail` the reason; `unbanned`; `impersonation-started` and `impersonation-ended`.
+- In an organization, `detail` its id: `organization-created` and `organization-deleted`; `member-joined` and `member-roles-changed`, `detail` the id then the roles given, space-separated; `member-left`; `member-removed`. A manager's doing names them as `actor`.
+- `oauth-client-approved` (first approval of an app, or more scopes) and `oauth-client-revoked`, `detail` the app's name.
+
+`context` is `{ ip, userAgent, actor }`, `actor` the user who acted when it was not the one it happened to, such as an admin. While an admin acts as a user, every event names the admin as `actor`, in the audit log too: an organization created or a member removed, a sign-out everywhere.
+
+With `audit: true`, or `{ maxAge }` in seconds (a year by default), the same events are kept in the store's audit log too, pruned of older ones at most hourly. `auditLog({ before, limit })` gives the signed-in user their own, newest first (entries of one millisecond newest written first, as their ids are time-ordered; entries from before that sort by random id): `{ id, userId, event, detail, ip, userAgent, actorId, at }`. Pass the last entry of a page as `before` for the next one, which skips and repeats none, as is or after a JSON hop; a bare `Date` (or its ISO text) excludes that whole millisecond, and a cursor that is no date answers an empty page. The log is kept past a user's deletion, so it still says what happened, but nothing in it leads back to them: their entries take a new random `userId` and lose the address, browser and detail (which can hold an address or a passkey's name), and the entries they acted in, as an admin or a manager, take it as `actorId` and lose the address and browser. An entry is kept `maxAge`, a year by default, for the account's security and the admins' accountability. Writing it never fails what it records: a failure is logged.
+
+`describeAuditEntry(entry, { locale, wording })` words an entry for a person, its detail included (`Role editor granted`, `Signed in with discord`), in English or French as the pages are, English for another locale. `wording` takes the app's own phrase for any event, a string or a function of the detail, over kayjs-auth's; `auditWording` holds kayjs-auth's by language.
+
+## Admin
+
+`admin: 'admin'`, any requirement a guard takes, names who may manage users; without it, and to anyone else, to an admin acting as someone or to a bearer token, an admin's included, every method below answers `{ ok: false, error: 'forbidden' }`. The methods changing a user, `grantRole`, `revokeRole`, `banUser`, `unbanUser` and `deleteUser`, also answer `stale` unless the admin signed in or re-proved (`reprove`) in the last ten minutes, so a session left open or stolen changes no one; reading users and the audit log takes no such proof.
+
+- `listUsers({ search, offset, limit })` gives `{ ok: true, users, total }`, newest first, 50 a page by default and 200 at most; `search` matches part of an email or a username whatever its case, or a whole id. `getUser(id)` gives one. Each is a `User` with `createdAt` and `ban`, `{ at, until, reason }` while banned, else null.
+- `grantRole(id, role)` and `revokeRole(id, role)` take a role the `roles` option declares (`unknown-role` otherwise), effective on the user's next request. An admin taking back a role of their own that leaves them no longer an admin is refused (`self`).
+- `banUser(id, { reason, until })` bars the user from signing in, for good or until that date (`until` in the past answers `until`), and signs them out everywhere, bearer tokens revoked. Every sign-in of theirs answers `{ ok: false, error: 'banned' }`, an OAuth one `?error=banned`, and `auth.signIn` throws. An admin cannot ban themselves (`self`) or another admin (`admin`): revoke the role first. `unbanUser(id)` lifts it.
+- `deleteUser(id)` deletes the user as `deleteAccount` does, `onDelete(user)` first, and mails them the `account-deleted` notice when `email` is set and their address is verified. The audit log keeps an `account-deleted` entry with the admin as `actorId`, and `onEvent` gets the admin as `context.actor`. It gives `{ ok: true }`, or `{ ok: false, error }` with `forbidden`, `stale`, `not-found`, `self` or `admin` as for `banUser`.
+- `impersonate(id)` signs the admin's browser in as the user, keeping the admin's own sign-in; `impersonator()` gives the admin, to show a banner, and `stopImpersonating()` signs them back in as themselves, or out when their own sign-in ended meanwhile. Meanwhile nothing taking a proof passes (`reprove` answers `impersonating`, and the sign-in counts as stale), no new sign-in mail goes out, and the impersonation ends once the admin is signed out everywhere, banned or no longer an admin. Another admin, oneself and a banned user cannot be impersonated. `signOut()` ends both sign-ins.
+- `adminAuditLog({ userId, before, limit })` gives `{ ok: true, entries }`, everyone's audit log or one user's, paged by `before` as `auditLog` is.
+
+## Organizations
+
+Teams or workspaces users belong to, with roles of their own in each:
+
+```ts
+createAuth({
+  // ...
+  organizations: {
+    roles: { owner: ['admin'], admin: ['member'], member: [] },
+    owner: 'owner',
+    manage: 'admin',
+    defaultRoles: ['member'],
+    invitationPage: '/invitation',
+  },
+})
+```
+
+- `roles` is a hierarchy as the site's `roles` is, typed the same way. Whoever creates an organization holds `owner`: owners alone delete it, and the last one cannot leave, be removed or lose the role (`last-owner`). `manage`, `owner` by default, is what renaming, inviting, removing members and changing their roles take. `create`, any requirement a guard takes, limits who may create one; anyone signed in by default.
+- `createOrganization({ name, slug? })` answers `{ ok: true, membership }`, or `invalid-name` (1 to 100 characters, with no control characters, line breaks or direction marks, the name going into the invitation mail), `invalid-slug` (lowercase letters, digits and dashes, 64 at most, lowercased first) or `slug-taken`. A membership is `{ organization: { id, name, slug, createdAt }, roles, joinedAt }`.
+- `organizations()` lists the user's memberships; `organization(ref)` gives one, by id or slug, null unless a member; `isMember(ref, role?)` says whether they are one, holding `role` when given. `updateOrganization(ref, { name, slug })` renames it, `slug: null` clearing the slug, and `deleteOrganization(ref)` deletes it with its memberships and invitations, answering `'impersonating'` to an admin acting as the owner, as it cannot be undone.
+- `members(ref)` gives `{ ok: true, members }`, each `{ user: { id, email, username }, roles, joinedAt }`, for any member to see. `setMemberRoles(ref, userId, roles)` replaces a member's roles, `removeMember(ref, userId)` removes one, and `leaveOrganization(ref)` leaves. A manager gives only roles they hold, to a member holding none above theirs: an admin cannot make an owner nor demote or remove one (`forbidden`).
+- `invite(ref, email, roles?)` mails the address a link to `invitationPage` + `?invitation=<id>` (`unavailable` without it, or without a mailer, or when the mailer throws), giving `roles`, `defaultRoles` without them, once accepted: `unverified` while the manager has not verified their own address, `member` when the address belongs to a member already, `limited` past `invite`, 30 an hour per manager, or `inviteAddress`, 5 a day per invited address whoever invites it, a count a stranger inviting the address can use up. Inviting an address again replaces its invitation. `invitations(ref)` lists the open ones for managers and `revokeInvitation(ref, id)` revokes one. An invitation lasts `invitationMaxAge` seconds, a week by default. The mail's `kind` is `'invitation'`, the organization's name its template's `detail`.
+- The page reads `invitation(id)`, `{ id, organization, email, roles, invitedBy, createdAt, expiresAt }` or null once revoked, accepted or expired, and posts to an action calling `acceptInvitation(id)`: only an account verified at the invited address joins (`wrong-account`, `unverified`), which an invitee without an account reaches by registering with it. `myInvitations()` lists those open to the user's verified address, `declineInvitation(id)` turns one down.
+- Any failure above may also be `signed-out`, `not-found` (no such organization, or one the user is no member of, so its existence does not leak) or `forbidden` (a member whose roles do not reach).
+- `auth.memberOf(role?)` is a requirement met by a member of the organization the route's `org` param names, by id or slug, holding `role` there when given: `src/routes/orgs/[org]/_guard.ts` exporting `auth.guard({ redirect: '/login', require: auth.memberOf('admin') })`, or `.get('/orgs/:org/settings', handler, { auth: auth.memberOf('admin') })` behind a gate. `organizations.param`, or `memberOf(role, { param })`, names another param. A guard checks a page's actions against the params of the page they are posted from, so an action scopes what it touches by `ctx.params.org`, never by its input. A route without the param, or kay before 1.23, whose guards get no params, is refused, never let through.
+- Deleting a user deletes their memberships; an organization whose last owner deletes their account stays without one. `exportData()` lists the user's memberships as `organizations`.

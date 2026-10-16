@@ -23,7 +23,7 @@ const READERS: [RegExp, string[]][] = [
   [/^(?:llms\/|llms\.txt$)/, ['tests/llms.test.ts', 'tests/docs.test.ts']],
   [/^docs\//, ['tests/docs.test.ts']],
   [/^examples\//, ['tests/examples.test.ts', 'tests/new.test.ts', 'tests/docs.test.ts']],
-  [/^packages\//, ['tests/packages.test.ts', 'tests/docs.test.ts', 'tests/examples.test.ts', 'tests/library.test.ts', 'tests/new.test.ts']],
+  [/^packages\//, ['tests/llms.test.ts', 'tests/packages.test.ts', 'tests/docs.test.ts', 'tests/examples.test.ts', 'tests/library.test.ts', 'tests/new.test.ts']],
   [/^tests\/fixtures\//, ['tests/format.test.ts']],
 ]
 // Half the host's cores, as CI runs them, so a landing leaves the machine to the rest.
