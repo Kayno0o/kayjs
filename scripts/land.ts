@@ -95,8 +95,8 @@ async function step(label: string, argv: string[], cwd = '.') {
   process.stdout.write(`${label}: `)
   await appendFile(LOG, `$ ${label}\n`)
 
-  // Its stderr into its stdout, so one pipe keeps their lines in the order they were written.
-  const child = Bun.spawn(['sh', '-c', 'exec "$@" 2>&1', 'sh', ...argv], { cwd, stdin: 'ignore', stdout: 'pipe', stderr: 'inherit', detached: true })
+  // Its stderr into its stdout, so one pipe keeps their lines in the order they were written, the shell's own included, which says why a command could not start.
+  const child = Bun.spawn(['sh', '-c', 'exec 2>&1; exec "$@"', 'sh', ...argv], { cwd, stdin: 'ignore', stdout: 'pipe', stderr: 'inherit', detached: true })
   let output = ''
   let hung = false
   const limit = setTimeout(() => {

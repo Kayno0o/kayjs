@@ -1,5 +1,5 @@
 import { readdirSync, readlinkSync } from 'node:fs'
-import { rm } from 'node:fs/promises'
+import { rm, symlink } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { $ } from 'bun'
@@ -268,6 +268,24 @@ describe('landing', () => {
         catch {}
       }
     }
+  }, 60_000)
+
+  it('fails a step whose command cannot start with the shell\'s reason, in its summary and its log', async () => {
+    const { clones, land } = await landings('a')
+    // The tools a landing needs, `just` left out, which a change to the workflows runs.
+    const bin = await scratchDir('land-bin-')
+
+    for (const tool of ['bun', 'git', 'sh', 'flock', 'cat', 'true'])
+      await symlink(Bun.which(tool)!, join(bin, tool))
+
+    await Bun.write(join(clones.a!, '.forgejo/workflows/test.yml'), 'on: push\n')
+    await git(clones.a!, 'add', '-A')
+    await git(clones.a!, 'commit', '-qm', 'workflow')
+
+    const { code, err } = await land('a', { PATH: bin }).done()
+    const log = await Bun.file(join(clones.a!, '.git/land.log')).text()
+
+    expect({ code, summary: err.includes('just: not found'), log: log.includes('just: not found') }).toEqual({ code: 4, summary: true, log: true })
   }, 60_000)
 
   it('keeps its exit codes: 2 for nothing to land or changes, 3 for a conflict, 4 for a failed step, 5 for a refused push', async () => {
