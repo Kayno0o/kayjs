@@ -263,7 +263,10 @@ async function extensionPrograms(root: string, options: CheckOptions, extensions
     }
     const config = {
       extends: from(tsconfig),
-      compilerOptions: { rootDirs: [from(root), from(types)], noEmit: true },
+      // What the shadow files are compiled for, whatever the package's own config says.
+      compilerOptions: { jsx: 'preserve', jsxImportSource: 'kay', module: 'Preserve', moduleResolution: 'bundler', rootDirs: [from(root), from(types)], noEmit: true },
+      // The package's own `include` is not inherited, as it names its sources.
+      include: [],
       files: [...library.files.map(file => from(shadowPath(root, file))), ...APP_TYPES.map(name => from(join(types, name)))],
     }
 

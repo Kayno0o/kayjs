@@ -365,6 +365,8 @@ export class KayLanguageServer {
         }),
         ...[...project.shadowFiles].filter(path => !files.has(path)).map((path): FileEvent => ({ uri: pathToFileURL(path).href, type: DELETED })),
         { uri: pathToFileURL(join(project.shadowTree, 'kay-env.d.ts')).href, type: CHANGED },
+        // An extension's tsconfig is read again, as its options may have changed.
+        ...types.programs.map((program): FileEvent => ({ uri: pathToFileURL(program.tsconfig).href, type: CHANGED })),
       )
       project.shadowFiles = files
       project.shadowStamps = stamps

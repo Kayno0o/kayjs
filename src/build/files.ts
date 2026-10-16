@@ -1,7 +1,7 @@
 import type { Dirent } from 'node:fs'
 import { readFileSync, realpathSync, statSync } from 'node:fs'
 import { mkdir, readdir, readFile, rename, rm } from 'node:fs/promises'
-import { basename, dirname, join, sep } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import { KAY_DIR } from './assets'
 
 // Never source at any depth: dependencies, kay's own output and version control.
@@ -257,10 +257,27 @@ export async function writeAtomically(path: string, content: string | Uint8Array
   }
 }
 
-// The files and symbolic links of a tree, the files behind a link left out: a recursive listing goes through a link to a directory, into files that are not the tree's.
+// The files and symbolic links of a tree, never walking into a link to a directory: its files are not the tree's, and a cycle through it would never end.
 export async function treeEntries(dir: string): Promise<{ files: string[], links: string[] }> {
-  const entries = (await readdir(dir, { recursive: true, withFileTypes: true })).map(entry => ({ path: join(entry.parentPath, entry.name), link: entry.isSymbolicLink(), file: entry.isFile() }))
-  const links = entries.filter(entry => entry.link).map(entry => entry.path)
+  const files: string[] = []
+  const links: string[] = []
 
-  return { links, files: entries.filter(entry => entry.file && !links.some(link => entry.path.startsWith(link + sep))).map(entry => entry.path) }
+  await Promise.all((await readdir(dir, { withFileTypes: true })).map(async (entry) => {
+    const path = join(dir, entry.name)
+
+    if (entry.isSymbolicLink()) {
+      links.push(path)
+    }
+    else if (entry.isDirectory()) {
+      const inner = await treeEntries(path)
+
+      files.push(...inner.files)
+      links.push(...inner.links)
+    }
+    else if (entry.isFile()) {
+      files.push(path)
+    }
+  }))
+
+  return { files, links }
 }

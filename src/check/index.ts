@@ -100,7 +100,7 @@ export async function check(root: string, options: CheckOptions = {}): Promise<C
   const shown = await resolvedConfig(root, tsconfig)
   const projectUnused = unusedCodesOf(shown)
   // An extension whose options differ from the app's is checked apart, so its pages are typed as it is written for.
-  const [{ output, errors, code }, problems, ...apart] = await Promise.all([typecheck(root, tsconfig, shown), projectProblems(root, options, content), ...programs.map(async (program, index) => runProgram(root, program, index))])
+  const [{ output, errors, code }, problems, ...apart] = await Promise.all([typecheck(root, tsconfig, shown), projectProblems(root, options, content), ...programs.map(async program => runProgram(root, program))])
   const config = resolve(root, tsconfig)
   const inProgram = (file: string) => programs.some(({ dir }) => file.startsWith(dir + sep))
   const printed = parseTscOutput(output, config, root)
@@ -162,8 +162,8 @@ export async function check(root: string, options: CheckOptions = {}): Promise<C
 }
 
 // One extension program's tsgo run, state kept apart from the app's and the other programs'.
-async function runProgram(root: string, { dir, tsconfig }: ExtensionProgram, index: number) {
-  const { output, errors, code } = await typecheck(root, tsconfig, await resolvedConfig(root, tsconfig), `extension-${index}`)
+async function runProgram(root: string, { dir, tsconfig }: ExtensionProgram) {
+  const { output, errors, code } = await typecheck(root, tsconfig, await resolvedConfig(root, tsconfig), `extension-${Bun.hash(dir).toString(36)}`)
 
   return { dir, tsconfig, output, errors, code }
 }

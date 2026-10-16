@@ -6,6 +6,7 @@ import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { parse } from 'devalue'
 import { t } from 'elysia'
+import { treeEntries } from '../src/build/files'
 import { servedByTheApp, servedLocales } from '../src/check/diagnose'
 import { readShadowSettings } from '../src/check/shadow'
 import { writeShadowTypes } from '../src/check/shadow-types'
@@ -482,6 +483,11 @@ describe('an extension listed from beside the app', () => {
       expect(output).toContain('Cannot find name \'nope\'.')
       expect(output).not.toContain('Cannot find name \'onCleanup\'')
       expect(output).toContain('14 errors')
+      // A second check rewrites the shadow tree, which leaves the dependencies behind the links alone.
+      const again = await run([process.execPath, CLI, 'check'], join(dir, 'app'))
+
+      expect(`${again.stdout}${again.stderr}`).toContain('14 errors')
+      expect(await Bun.file(join(dir, 'lib/node_modules/dep/index.ts')).text()).toContain('libdependency')
       // What the ESLint processor types the pages by.
       expect(readShadowSettings(join(dir, 'app')).mounts.map(mount => mount.dir)).toContain(join(dir, 'lib/routes'))
       // The workspace package once, by the link the app imports it through, its routes listed by either path.
@@ -507,6 +513,27 @@ const OWN_OPTIONS: Record<string, string> = {
   'tight/tsconfig.json': JSON.stringify({ compilerOptions: { ...TSCONFIG_OPTIONS, noUncheckedIndexedAccess: true } }),
   'tight/routes/page.kay': '---\nconst list: string[] = []\nconst first: string = list[0]\n---\np {first}\n',
 }
+
+describe('the files of a tree holding links', () => {
+  it('leaves out what is behind a link to a directory, a cycle included', async () => {
+    const dir = await scratchDir('tree-links-')
+
+    try {
+      await Bun.write(join(dir, 'tree/a/file.ts'), '')
+      await Bun.write(join(dir, 'real/inner/dep.ts'), '')
+      await symlink('..', join(dir, 'real/inner/up'))
+      await symlink('../real', join(dir, 'tree/a/link'))
+
+      const found = await treeEntries(join(dir, 'tree'))
+
+      expect(found.files).toEqual([join(dir, 'tree/a/file.ts')])
+      expect(found.links).toEqual([join(dir, 'tree/a/link')])
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+})
 
 describe('an extension with a tsconfig of its own', () => {
   it('has kay check type its pages under the package\'s options with the app\'s types in scope, the app\'s own files once', async () => {
