@@ -69,6 +69,8 @@ const WHITESPACE = /\s*/y
 const RAW_TEXT = new Set(['script', 'style', 'textarea', 'title'])
 // Line breaks in the text before an offset, for the line a problem sits on.
 const LINE_BREAK = /\n/g
+// Words as the reader counts them, a CJK text's too, which has no spaces to split on.
+const WORDS = new Intl.Segmenter('und', { granularity: 'word' })
 
 export class MarkdownError extends Error {
   readonly code = 'markdown-invalid'
@@ -107,9 +109,6 @@ export function countWords(html: string): number {
 
   return words
 }
-
-// Words as the reader counts them, a CJK text's too, which has no spaces to split on.
-const WORDS = new Intl.Segmenter('und', { granularity: 'word' })
 
 // The HTML an entry's Markdown body puts on the page, each component standing as a `<kay-component>` element around what it wraps, so a CMS can check what an editor wrote before saving it; throws a MarkdownError for components kay cannot read.
 export async function bodyHtml(body: string): Promise<string> {
