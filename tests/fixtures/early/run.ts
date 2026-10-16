@@ -21,10 +21,13 @@ const rejected = () => Promise.reject(new Error('down'))
 // Each promise rejects before its block renders.
 const early = [rejected(), rejected()] as const
 
+await import('./rejected')
+
 await Bun.sleep(20)
 
 result.prop = await renderToString(await load<{ rows: Promise<string[]>, count: number }>('prop.kay'), { rows: early[0], count: 3 })
 result.property = await renderToString(await load<{ data: { comments: Promise<string[]> } }>('property.kay'), { data: { comments: early[1] } })
+result.island = await renderToString(await load('islandpage.kay'), {})
 result.made = await renderToString(await load('made.kay'), {})
 
 const app = await pages({ routes: 'tests/fixtures/early/routes', prebuilt: true })

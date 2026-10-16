@@ -1,0 +1,11 @@
+--- server
+export const page = { prerender: true }
+
+const comments = Promise.reject(new Error('down'))
+
+await new Promise(resolve => setTimeout(resolve, 20))
+---
+await comments then list
+  p {String(list)}
+catch
+  p.failed Prerendered comments are down

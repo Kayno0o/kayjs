@@ -1,0 +1,11 @@
+--- server
+import { cached } from 'kay/cache'
+
+const data = await cached('early-comments', '5m', async () => ({ comments: Promise.reject(new Error('down')) }))
+
+await new Promise(resolve => setTimeout(resolve, 20))
+---
+await data.comments then list
+  p {String(list)}
+catch
+  p.failed Cached comments are down
