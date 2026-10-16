@@ -202,8 +202,8 @@ export type CallResult<Data, Failed>
 
 // An action seen through the calls one island makes, so a row's button reads its own `pending()`.
 export interface TrackedCall<Input, Result> {
-  // Resolves with how the call went, a refusal included; a failure that is no refusal of this action, such as a network error, an abort or a redirect, still throws.
-  (input: Input, options?: CallOptions): Promise<Result>
+  // Resolves with how the call went, any answer the server gave included; a failure that is no answer of this action, such as a network error, an abort or a redirect, still throws.
+  (...call: object extends Input ? [input?: Input, options?: CallOptions] : [input: Input, options?: CallOptions]): Promise<Result>
   (form: FormData, options?: CallOptions): Promise<Result>
   // Whether a call made through this handle is still in flight, read reactively.
   readonly pending: () => boolean
@@ -217,8 +217,7 @@ export interface Action<Input, Output, Honeypot extends string = never> {
   // Whether a call this page made is still in flight, read reactively: `button(disabled={add.pending()})`.
   readonly pending: () => boolean
   // A handle for the calls of one island, one row or one button: `const save = add.track()`, then `await save(input)` resolves with `{ ok, data }` or the refusal, and `save.pending()` reads only its own calls.
-  // eslint-disable-next-line ts/method-signature-style
-  track(): TrackedCall<Input, CallResult<Success<Output>, FailureData<Output>>>
+  readonly track: () => TrackedCall<Input, CallResult<Success<Output>, FailureData<Output>>>
   // How much of the last call carrying files the browser sent, from 0 to 1, while it uploads; undefined otherwise: `progress(value={upload.progress()})`.
   readonly progress: () => number | undefined
   // How the form post the page renders for went, refused, as `ctx.failed` reads it; in an island, how its last call went, read reactively.

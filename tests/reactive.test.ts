@@ -1,8 +1,8 @@
-import type { Action, Failure } from '../src/runtime'
+import type { Action, Failure, NoInputAction } from '../src/runtime'
 import { describe, expect, it, jest, spyOn } from 'bun:test'
 import { stringify } from 'devalue'
 import { batch, debounced, effect, every, flush, linked, listen, memo, onCleanup, onMount, root, selection, signal, untrack, watch } from '../src/runtime'
-import { ActionError, actionStub } from '../src/runtime/action'
+import { ActionError, ActionRedirect, actionStub } from '../src/runtime/action'
 import { navigation } from '../src/runtime/navigation'
 import { createSignal, hydrationEnded, hydrationStarted, ownSignal, recordSignals, renderEffect, renderOnServer, undoable, unrecorded, whenHydrated } from '../src/runtime/reactive'
 import { inServerScope } from '../src/server/scope'
@@ -905,6 +905,9 @@ describe('a tracked action call', () => {
       if (request === 2)
         throw aborted.signal.reason
 
+      if (request === 3)
+        return new Response(null, { status: 303, headers: { 'x-kay-redirect': '/away' } })
+
       return fail(500, { errors: { '': 'Something went wrong' } })
     })
 
@@ -919,8 +922,27 @@ describe('a tracked action call', () => {
       aborted.abort(new Error('left'))
       await expect(call({ id: 1 }, { signal: aborted.signal })).rejects.toThrow('left')
       expect(call.pending()).toBe(false)
+      await expect(call({ id: 1 })).rejects.toBeInstanceOf(ActionRedirect)
+      expect(call.pending()).toBe(false)
       // A handle follows its own action's refusals only.
       expect(other.track().pending()).toBe(false)
+    }
+    finally {
+      fetched.mockRestore()
+    }
+  })
+
+  it('is called with no argument for an action with no input', async () => {
+    const ping = actionStub('/_kay/action/test/ping') as unknown as NoInputAction<string>
+    const fetched = answering(() => new Response(stringify('pong')))
+
+    try {
+      expect(await ping.track()()).toEqual({ ok: true, data: 'pong' })
+      // The type check is what asserts it: an action with fields still needs them.
+      // @ts-expect-error -- an input is required
+      const missing = async () => saved.track()()
+
+      expect(missing).toBeFunction()
     }
     finally {
       fetched.mockRestore()
