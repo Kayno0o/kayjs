@@ -343,7 +343,12 @@ describe('kay libraries', () => {
 
     const { code, output } = await run('check', project)
 
-    expect(reported(output)).toEqual([`${relative(process.cwd(), join(project, 'src/signup.test.ts'))}:4:14 error[TS2322]: Type 'ServerAction<TSchema, unknown, never>' is not assignable to type 'number'.`])
+    const test = relative(process.cwd(), join(project, 'src/signup.test.ts'))
+
+    expect(reported(output)).toEqual([
+      `${test}:4:14 error[TS2322]: Type 'ServerAction<TObject<{ email: TString; }>, string, never>' is not assignable to type 'number'.`,
+      `${test}:5:14 error[TS2322]: Type 'NoInputAction<number, never>' is not assignable to type 'number'.`,
+    ])
     expect(code).toBe(1)
   })
 
