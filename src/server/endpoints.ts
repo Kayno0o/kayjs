@@ -101,7 +101,7 @@ async function answer(endpoint: ServedEndpoint, context: { request: Request }, p
   }
   catch (error) {
     if (error instanceof Redirect || error instanceof Denied || error instanceof NotFound)
-      return stopped(error, request, passed, options)
+      return markedPrivate(stopped(error, request, passed, options), request)
 
     reportServerError(error, request, options.onError)
 
@@ -127,6 +127,16 @@ async function answer(endpoint: ServedEndpoint, context: { request: Request }, p
       else
         response.headers.set(name, value)
     }
+  }
+
+  return response
+}
+
+// A redirect, a denial or a 404 thrown after the cookies were read is for that visitor alone too, unless it sets its own `cache-control`.
+function markedPrivate(response: Response, request: Request): Response {
+  if (wasReadPersonally(request) && !response.headers.has('cache-control')) {
+    response.headers.set('cache-control', 'private, no-cache')
+    response.headers.append('vary', 'cookie')
   }
 
   return response

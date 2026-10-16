@@ -10,6 +10,9 @@ import { scratchDir } from './scratch'
 const STOP = `  const todo = request.headers.get('x-do')\n\n  if (todo === 'redirect')\n    redirect('/elsewhere')\n\n  if (todo === 'redirect-301')\n    redirect('/moved', 301)\n\n  if (todo === 'deny')\n    deny(402, 'Pay first')\n\n  if (todo === 'not-found')\n    notFound()\n`
 const GUARD = `import { guard } from 'kay'\n\nexport default guard(({ request, url, locale, params, cookies, headers, redirect, deny, notFound }) => {\n${STOP}\n  headers.set('x-seen', \`\${locale}|\${url.pathname}|\${JSON.stringify(params)}|\${cookies.get('theme') ?? ''}\`)\n})\n`
 const ENDPOINT = `export function GET({ request, url, locale, params, cookies, headers, redirect, deny, notFound }) {\n${STOP}\n  cookies.set('seen', '1')\n  headers.set('x-seen', \`\${locale}|\${url.pathname}|\${JSON.stringify(params)}|\${cookies.get('theme') ?? ''}\`)\n\n  return 'ok'\n}\n`
+// Reads the cookies, then stops, and `x-cache` sets its own caching first.
+const PEEK = `export function GET({ request, cookies, headers, redirect, deny, notFound }) {\n  cookies.get('theme')\n\n  if (request.headers.has('x-cache'))\n    headers.set('cache-control', 'public, max-age=60')\n${STOP}\n  return 'ok'\n}\n`
+const CALM = `export function GET(ctx) {\n  ctx.redirect('/elsewhere')\n}\n`
 const ACTION = `--- server\nimport { t } from 'elysia'\nimport { action } from 'kay'\n\nexport const act = action(t.Object({}), ({}, { request, url, locale, params, cookies, headers, redirect, deny, notFound }) => {\n${STOP}\n  cookies.set('seen', '1')\n  headers.set('x-seen', \`\${locale}|\${url.pathname}|\${JSON.stringify(params)}|\${cookies.get('theme') ?? ''}\`)\n\n  return 'ok'\n})\n---\nform(action={act})\n  button Go\n`
 
 describe('the request context', () => {
@@ -47,6 +50,8 @@ describe('the request context', () => {
       Bun.write(join(dir, 'api/things.ts'), 'import { api } from \'kay/server\'\n\nexport default api().get(\'/\', () => \'things\')\n'),
       Bun.write(join(dir, 'routes/open/index.kay'), ACTION),
       Bun.write(join(dir, 'routes/open/[name].txt.ts'), ENDPOINT),
+      Bun.write(join(dir, 'routes/peek.txt.ts'), PEEK),
+      Bun.write(join(dir, 'routes/calm.txt.ts'), CALM),
     ])
     app = await pages({ routes: join(dir, 'routes'), prebuilt: false, security: false, api: join(dir, 'api') })
     mounted = await pages({ routes: join(dir, 'routes'), prebuilt: false, security: false, base: '/app' })
@@ -139,6 +144,26 @@ describe('the request context', () => {
     const response = await app.handle(new Request('http://localhost/open/ada.txt', { headers: { cookie: 'theme=dark' } }))
 
     expect([response.headers.get('cache-control'), response.headers.get('vary')]).toEqual(['private, no-cache', 'cookie'])
+  })
+
+  it('marks a redirect, a denial and a 404 of an endpoint that read the cookies as private, unless it sets its own caching', async () => {
+    const marks = async (todo: string, extra: Record<string, string> = {}, server = app) => {
+      const response = await server.handle(new Request('http://localhost/peek.txt', { headers: { 'cookie': 'theme=dark', 'x-do': todo, ...extra }, redirect: 'manual' }))
+
+      return [response.status, response.headers.get('cache-control'), response.headers.get('vary')]
+    }
+
+    expect(await marks('redirect')).toEqual([302, 'private, no-cache', 'cookie'])
+    expect(await marks('deny')).toEqual([402, 'private, no-cache', 'cookie'])
+    expect(await marks('not-found')).toEqual([404, 'private, no-cache', 'cookie'])
+    expect(await marks('redirect', {}, mounted)).toEqual([302, 'private, no-cache', 'cookie'])
+    expect(await marks('redirect', { 'x-cache': '1' })).toEqual([302, 'public, max-age=60', null])
+  })
+
+  it('leaves a redirect of an endpoint that never read the cookies unmarked', async () => {
+    const response = await app.handle(new Request('http://localhost/calm.txt', { headers: { cookie: 'theme=dark' }, redirect: 'manual' }))
+
+    expect(response.headers.get('cache-control')).toBeNull()
   })
 
   it('answers a guard\'s redirect on a GET API route with 302, as on a page', async () => {

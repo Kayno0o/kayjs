@@ -12,7 +12,7 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 - A hand-built context, a test's mock for a guard or a handler, now needs `request`, `url`, `locale`, `params`, `cookies`, `locals`, `headers`, `redirect`, `notFound` and `deny`; take it from `RequestContext` or cast it.
 - A guard's `redirect` answers 302 to a GET or HEAD, on an API route, an endpoint or an image source's `resolve` and `guard` too, where it answered 303; a post still gets 303.
-- An endpoint that reads `ctx.cookies` goes out `Cache-Control: private, no-cache` with `Vary: cookie`, unless it sets its own `cache-control`.
+- An endpoint that reads `ctx.cookies` goes out, a redirect, denial or 404 included, `Cache-Control: private, no-cache` with `Vary: cookie`, unless it sets its own `cache-control`.
 ### `invalidatePage` is imported from `kay/cache`
 
 - It sits beside `invalidate` now, and `kay/server` no longer exports it: `import { invalidatePage } from 'kay/cache'`. `kay upgrade` rewrites the import, `deprecated-import` finds the rest.
