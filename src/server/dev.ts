@@ -1,5 +1,6 @@
 import type { ClientOptions } from '../build/client'
 import type { KayCompileError } from '../build/transform'
+import type { KayExtension } from '../config'
 import type { BuildFailure } from '../dev/builder'
 import type { HotSwap } from '../runtime/client'
 import type { LocaleSettings } from '../runtime/i18n'
@@ -31,6 +32,7 @@ import { apiRoutePath, endpointPath, ROUTE_METHODS } from './routes'
 export const DEV_EVENTS = '/_kay/dev/events'
 export const DEV_PATCH = '/_kay/dev/patch.js'
 export const DEV_TOOL = '/_kay/dev/tool.js'
+export const DEV_EXTENSION = '/_kay/dev/extension/'
 export const DEV_INSPECTOR = '/_kay/dev/inspector.js'
 export const DEV_OPEN = '/_kay/dev/open'
 export const DEV_A11Y = '/_kay/dev/a11y.js'
@@ -138,11 +140,11 @@ function devModule(source: string, start = ''): Response {
   let text = devModules.get(source)
 
   if (text === undefined) {
-    text = new Bun.Transpiler({ loader: 'ts' }).transformSync(readFileSync(source, 'utf8')) + start
+    text = new Bun.Transpiler({ loader: 'ts' }).transformSync(readFileSync(source, 'utf8'))
     devModules.set(source, text)
   }
 
-  return new Response(text, { headers: { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store' } })
+  return new Response(text + start, { headers: { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store' } })
 }
 
 // The module a page without the page swap applies its refresh with.
@@ -151,8 +153,45 @@ export function devPatch(): Response {
 }
 
 // The bar and drawer every dev page shows, which the inspector then joins under `kay dev`.
-export function devTool(): Response {
-  return devModule(TOOL_SOURCE, '\nwindow.$kayDev = startDevTool()\n')
+export function devTool(modules: DevToolFile[] = []): Response {
+  const loading = modules.length === 0 ? '' : `if (window.$kayDev) loadDevModules(window.$kayDev, ${JSON.stringify(modules.map(({ name, url }) => ({ name, url })))})\n`
+
+  return devModule(TOOL_SOURCE, `\nwindow.$kayDev = startDevTool()\n${loading}`)
+}
+
+// A browser module an extension names in `devTool`, the file it is read from and the path it is served at.
+export interface DevToolFile {
+  name: string
+  url: string
+  file: string
+}
+
+// The modules the extensions name, each file once, served from `/_kay/dev/extension/<n>.js` in the order the extensions come.
+export function devToolFiles(root: string, extensions: KayExtension[] | undefined): DevToolFile[] {
+  const files = new Map<string, DevToolFile>()
+
+  for (const { name, devTool: tool } of extensions ?? []) {
+    const file = tool === undefined ? undefined : resolve(root, tool.module)
+
+    if (file !== undefined && !files.has(file))
+      files.set(file, { name, url: `${DEV_EXTENSION}${files.size}.js`, file })
+  }
+
+  return [...files.values()]
+}
+
+// The browser module of one extension, read again on each request: it is the library's file, not kay's, and a dev server holds no cache of it.
+export async function devToolFile(file: string): Promise<Response> {
+  try {
+    const text = new Bun.Transpiler({ loader: 'ts' }).transformSync(await Bun.file(file).text())
+
+    return new Response(text, { headers: { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store' } })
+  }
+  catch (error) {
+    kayLog('error', `kay: the dev tool module ${file} could not be served: ${error instanceof Error ? error.message : String(error)}`)
+
+    return new Response(null, { status: 404 })
+  }
 }
 
 // Joins the dev tool, unless it failed to start, whose error the console already shows.
@@ -486,6 +525,8 @@ export interface DevRequest {
   guards: { file: string, outcome: string }[]
   // What `kay build` does with the page: written ahead (`page`), for the paths its setting lists (`listed`), or because it holds a server island; none when it is rendered on request only.
   prerender?: 'page' | 'listed' | 'server islands' | undefined
+  // The page in each locale of a site with `i18n` that serves more than one, where a language switcher links to: the locale and the address, under the base.
+  locales?: { locale: string, href: string }[] | undefined
 }
 
 // What the server recorded of one response, for the Request tab to ask for once the page is in view.

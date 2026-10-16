@@ -228,6 +228,41 @@ export interface DevTool {
   stop: () => void
 }
 
+// A module a library's extension names in `devTool`, by the extension's name and where kay serves it.
+export interface DevToolModule {
+  name: string
+  url: string
+}
+
+// Calls the default export of each module with the tool, one after another so the tabs keep their order; a module that fails to load, throws or exports no function is logged as a kay problem, naming its extension, and the others still load.
+export async function loadDevModules(tool: DevTool, modules: DevToolModule[], load: (url: string) => Promise<unknown> = async url => import(url), log: (message: string) => void = message => console.error(message)): Promise<void> {
+  for (const { name, url } of modules) {
+    let loaded: { default?: unknown }
+
+    try {
+      loaded = await load(url) as { default?: unknown }
+    }
+    catch (error) {
+      log(`[kay] the dev tool module of ${name} failed to load: ${error instanceof Error ? error.message : String(error)}`)
+
+      continue
+    }
+
+    if (typeof loaded.default !== 'function') {
+      log(`[kay] the dev tool module of ${name} exports no default function`)
+
+      continue
+    }
+
+    try {
+      await (loaded.default as (tool: DevTool) => unknown)(tool)
+    }
+    catch (error) {
+      log(`[kay] the dev tool module of ${name} failed: ${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+}
+
 export function startDevTool(doc: Document = document): DevTool {
   const win = doc.defaultView! as Window & { $kayProblems?: DevProblems, $kayBuilt?: string }
   const state = readState(win)
@@ -531,7 +566,9 @@ export function startDevTool(doc: Document = document): DevTool {
     },
   }
 
-  problems = problemsTab(doc, tool, state, save)
+  const missing = missingMessages()
+
+  problems = problemsTab(doc, tool, state, save, missing)
   request = requestTab(doc, tool)
   headTab(doc, tool, listening.signal)
   envTab(doc, tool, listening.signal)
@@ -540,6 +577,7 @@ export function startDevTool(doc: Document = document): DevTool {
   imagesTab(doc, tool, vitals, listening.signal)
   performanceTab(doc, tool, vitals, listening.signal)
   routesTab(doc, tool, listening.signal)
+  i18nTab(doc, tool, missing, listening.signal)
   doc.addEventListener('click', (event) => {
     const target = event.target instanceof Element ? event.target.closest<HTMLButtonElement>('button[data-kay-open],button[data-kay-copy]') : null
 
@@ -551,7 +589,7 @@ export function startDevTool(doc: Document = document): DevTool {
 }
 
 // What kay logged, what nothing caught, what the policy blocked, what the accessibility check and `kay check` found, grouped by kind, each listed once with how often it came; those the page logged leave with it on a page swap.
-function problemsTab(doc: Document, tool: DevTool, state: DevState, save: () => void): { stop: () => void } {
+function problemsTab(doc: Document, tool: DevTool, state: DevState, save: () => void, missing: MissingMessages): { stop: () => void } {
   const win = doc.defaultView! as Window & { $kayProblems?: DevProblems }
   const tab = tool.tab({ id: 'problems', label: 'Problems', summary: count => `${count} problem${count === 1 ? '' : 's'}`, announce: true })
   const actions = tool.make('div', 'actions')
@@ -610,6 +648,8 @@ function problemsTab(doc: Document, tool: DevTool, state: DevState, save: () => 
     update()
   }
   const add = (logged: DevProblem, check = false) => {
+    missing.note(logged)
+
     const problem = { ...logged, text: problemText(logged) }
     const known = shown.get(problem.text)
 
@@ -720,6 +760,102 @@ function problemsTab(doc: Document, tool: DevTool, state: DevState, save: () => 
       win.$kayProblems = [] as DevProblem[]
     },
   }
+}
+
+const MISSING_MESSAGE = /no locale has the message ("(?:[^"\\]|\\.)*")/
+
+// The message keys the page asked for that no locale has, read off the problems kay logs, which `changed` hears of.
+interface MissingMessages {
+  keys: Set<string>
+  changed: () => void
+  note: (problem: DevProblem) => void
+  clear: () => void
+}
+
+function missingMessages(): MissingMessages {
+  const missing: MissingMessages = {
+    keys: new Set(),
+    changed: () => undefined,
+    note: ({ text }) => {
+      const quoted = MISSING_MESSAGE.exec(text)?.[1]
+      const key = quoted === undefined ? undefined : JSON.parse(quoted) as string
+
+      if (key !== undefined && !missing.keys.has(key)) {
+        missing.keys.add(key)
+        missing.changed()
+      }
+    },
+    clear: () => {
+      if (missing.keys.size > 0) {
+        missing.keys.clear()
+        missing.changed()
+      }
+    },
+  }
+
+  return missing
+}
+
+// The page's locale, a link to the page in each other one, and the messages no locale has; only for a site with `i18n`, whose request block lists the locales.
+function i18nTab(doc: Document, tool: DevTool, missing: MissingMessages, signal: AbortSignal): void {
+  const read = () => JSON.parse(doc.getElementById(REQUEST)?.textContent ?? 'null') as DevRequest | null
+
+  if (read()?.locales === undefined)
+    return
+
+  let render: () => void = () => undefined
+  const tab = tool.tab({ id: 'i18n', label: 'i18n', shown: () => render() })
+
+  render = () => {
+    const request = read()
+
+    if (request?.locales === undefined)
+      return
+
+    const facts = tool.make('dl', 'facts')
+    const switcher = tool.make('dd')
+    const keys = tool.make('dd')
+
+    for (const { locale, href } of request.locales) {
+      const link = tool.make('a', locale === request.locale ? 'mono' : 'link', locale)
+
+      link.href = href
+      link.style.marginRight = '12px'
+
+      if (locale === request.locale)
+        link.setAttribute('aria-current', 'true')
+
+      switcher.append(link)
+    }
+
+    if (missing.keys.size === 0)
+      keys.append(tool.make('span', 'note', 'none'))
+
+    for (const key of missing.keys)
+      keys.append(tool.make('div', 'error mono', key))
+
+    facts.append(tool.make('dt', '', 'Locale'), tool.make('dd', 'mono', request.locale), tool.make('dt', '', 'Page in'), switcher, tool.make('dt', '', 'Missing messages'), keys)
+    tab.count(missing.keys.size, missing.keys.size > 0 ? 'error' : undefined)
+    tab.panel.replaceChildren(facts)
+  }
+  // A page swap brings the next page's block, and starts with the old page's problems gone.
+  const blocks = new MutationObserver((records) => {
+    if (records.some(record => [...record.addedNodes, ...record.removedNodes].some(node => (node as Element).id === REQUEST)))
+      render()
+  })
+  const swaps = new MutationObserver(() => {
+    if (doc.documentElement.hasAttribute('aria-busy'))
+      missing.clear()
+  })
+
+  missing.changed = render
+  render()
+  blocks.observe(doc.head, { childList: true })
+  swaps.observe(doc.documentElement, { attributeFilter: ['aria-busy'] })
+  signal.addEventListener('abort', () => {
+    blocks.disconnect()
+    swaps.disconnect()
+  })
 }
 
 // What served the page: the route it matched, the files that rendered it, its params and status, and how long each load took; read again after each page swap.

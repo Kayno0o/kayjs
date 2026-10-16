@@ -358,3 +358,27 @@ export function authPages({ prefix = '/auth' } = {}): KayExtension {
 - `messages` names a directory of catalogs, `<locale>.ts` each, laid under the app's `src/messages` key by key, with or without `i18n`: see [Locales](locales.md).
 - `transformPage` rewrites each prerendered page before it is written: see [Page hooks](routing.md#page-hooks).
 - `editor` names a `.kay` island, `${import.meta.dir}/editor.kay`, that every page renders last in edit mode but the pages its own `routes` serve, its stylesheets linked after the page's, and carried by `kay build --compile`: see [A CMS editing on the page](content.md#preview-mode).
+- `devTool: { module }` names a browser module, `${import.meta.dir}/devTool.ts`, that adds a tab to the dev tool every dev page carries, with no declaration in the app: see [A tab for a library](#a-tab-for-a-library).
+
+#### A tab for a library
+
+The module is one file, absolute or relative to the project root, whose default export is called with the `DevTool` (`import type { DevTool } from 'kay/dev-tool'`) once the tool has started:
+
+```ts
+import type { DevTool } from 'kay/dev-tool'
+
+export default function shopTab(tool: DevTool): void {
+  const tab = tool.tab({ id: 'shop', label: 'Shop', shown: () => void show() })
+  const show = async () => {
+    const response = await fetch('/_kay/shop', { cache: 'no-store' })
+
+    tab.panel.replaceChildren(tool.make('div', 'mono', response.ok ? JSON.stringify(await response.json()) : 'unavailable'))
+  }
+}
+```
+
+- `tool.tab({ id, label, summary?, announce?, shown?, hidden? })` adds a tab and gives its `panel`, to fill, and `count(n, 'error'?)`, the number beside its name and on the bar; `shown` and `hidden` run as it opens and closes, so a tab fetches its data when shown. `tool.make(tag, className?, text?)` makes an element, `tool.button(text, label)` a button on the bar, `tool.outline(elements, text)` and `tool.hideOutline()` outline elements of the page, `tool.open('file:line:column')` opens an editor.
+- `make` takes the tool's own classes: `facts` (a `dl`), `row`, `mono`, `note`, `empty`, `link`, `error`, `good`, `warn`, `tool` (a button), `actions`.
+- It runs on dev pages only: `kay build` and a production server serve and write none of it. Two extensions naming one file load it once, in the order the extensions come, and a module that fails to load, throws or exports no function is logged as a problem naming its extension, the tool and the other tabs staying.
+- Nothing bundles its imports, so a module imports types only. Its data and actions come from a route of the library's own, mounted under `kay dev` alone (`underKayDev()` from `kay/library`), under the `/_kay/` prefix; a module reads `<meta name="kay-base">` for the base. A route that answers 404, as outside `kay dev`, shows an empty tab saying so.
+- kayjs-auth, kayjs-mail and kayjs-cms bring one each (see their pages), and kay adds the i18n tab itself.

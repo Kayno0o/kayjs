@@ -1,5 +1,5 @@
 import type { Elysia as App } from 'elysia'
-import type { KayConfig } from '../config'
+import type { KayConfig, KayExtension } from '../config'
 import type { Mode, Project } from '../project'
 import type { GuardContext } from '../runtime'
 import type { ActionOptions } from './actions'
@@ -30,7 +30,7 @@ import { DEFAULT_BODY_LIMIT, limitBodies } from './body'
 import { serveBuildFiles } from './build-files'
 import { serveCards } from './card'
 import { compressResponse, fixedTexts } from './compress'
-import { DEV_A11Y, DEV_AXE, DEV_EVENTS, DEV_HEAD, DEV_INSPECTOR, DEV_OPEN, DEV_PATCH, DEV_ROUTES, DEV_SIZES, DEV_TOOL, devA11y, devAxe, devEvents, devInspector, devPatch, devRoutes, devTool, followBuilds, hotSwap, openInEditor, recordResponses, refuseForeignHosts, rememberBoot, trackRunning } from './dev'
+import { DEV_A11Y, DEV_AXE, DEV_EVENTS, DEV_HEAD, DEV_INSPECTOR, DEV_OPEN, DEV_PATCH, DEV_ROUTES, DEV_SIZES, DEV_TOOL, devA11y, devAxe, devEvents, devInspector, devPatch, devRoutes, devTool, devToolFile, devToolFiles, followBuilds, hotSwap, openInEditor, recordResponses, refuseForeignHosts, rememberBoot, trackRunning } from './dev'
 import { clearDevErrorsOnAnswer } from './dev-errors'
 import { claimEndpoints } from './endpoint-claims'
 import { serveEndpoints } from './endpoints'
@@ -117,13 +117,19 @@ function compress(app: App, client: ClientBuild, base: string, onError: KayConfi
   app.mapResponse({ as: 'scoped' }, ({ request, responseValue }) => responseValue instanceof Response ? compressResponse(request, responseValue, fixed, error => reportServerError(error, request, onError)) : undefined)
 }
 
-function serveDevRoutes(app: App, root: string, client: ClientBuild, mode: Mode, base: string) {
+function serveDevRoutes(app: App, root: string, client: ClientBuild, mode: Mode, base: string, extensions: KayExtension[] | undefined) {
   const hot = hotSwap(root, client)
 
   rememberBoot(false, hot)
   app.get(DEV_EVENTS, () => devEvents(false, hot))
   app.get(DEV_PATCH, () => devPatch())
-  app.get(DEV_TOOL, () => devTool())
+  const modules = devToolFiles(root, extensions)
+
+  app.get(DEV_TOOL, () => devTool(modules))
+
+  for (const { url, file } of modules)
+    app.get(url, async () => devToolFile(file))
+
   app.get(DEV_A11Y, () => devA11y())
   app.get(DEV_AXE, () => devAxe())
   recordResponses(app, base)
@@ -244,7 +250,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
 
   // `kay dev` restarts the process on every change, so it has nothing to wait for.
   if (mode.dev)
-    serveDevRoutes(app, root, client, mode, base)
+    serveDevRoutes(app, root, client, mode, base, options.extensions)
   else
     stopOnSignal(app, lifecycle, options.shutdownTimeout)
 

@@ -27,7 +27,7 @@ import { escapeAttribute } from '../runtime/escape'
 import { editMarks, placeFieldMarks, withFieldMarks } from '../runtime/fields'
 import { collectHead } from '../runtime/head'
 import { child, component, newServerIslands, withServerIslands } from '../runtime/html'
-import { textDirection } from '../runtime/i18n'
+import { localePath, textDirection } from '../runtime/i18n'
 import { DEFAULT_MAX_DENSITY, RESOLVED_META } from '../runtime/image'
 import { localeState } from '../runtime/locale-state'
 import { kayLog } from '../runtime/log'
@@ -806,7 +806,7 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
   const scripts = shipsEntry ? islandScripts(client, islands.eager, streamed, hasIslands) + (posts ? formsScript(forms, options.dev) : '') + workScript(forms, options.prerendering === true) : ''
   const lang = localeState()?.locale ?? options.lang ?? DEFAULT_LANG
   const islandData = hasIslands ? messagesScript(islands.messages, true) + outcomeScript(rendering.carried()) + queryScript(rules) : ''
-  const written = `${htmlOpen(lang, head.root)}<head>${headStart(head)}${stylesheets(client, styled)}${head.html}${scripts}${islandData}${kayMetas(options, hasIslands)}${speculationRules(options.prefetch, options.base)}${client.navigation === true && !shipsEntry ? historyScript : ''}${options.offline ? registerScript(options.base ?? '') : ''}${options.dev ? devScripts(client) + (options.prerendering ? '' : requestBlock(files, rendering)) : ''}</head><body>${body}`
+  const written = `${htmlOpen(lang, head.root)}<head>${headStart(head)}${stylesheets(client, styled)}${head.html}${scripts}${islandData}${kayMetas(options, hasIslands)}${speculationRules(options.prefetch, options.base)}${client.navigation === true && !shipsEntry ? historyScript : ''}${options.offline ? registerScript(options.base ?? '') : ''}${options.dev ? devScripts(client) + (options.prerendering ? '' : requestBlock(files, rendering, options.base ?? '')) : ''}</head><body>${body}`
   const start = marks === undefined ? written : placeFieldMarks(written, marks)
 
   if (!streamed)
@@ -840,8 +840,17 @@ function devScripts(client: ClientBuild): string {
 }
 
 // What the dev tool's Request tab shows: the route matched, the files that rendered, the params, the status, and how long each load took, the matched route's when another page shows its error.
-function requestBlock(files: string[], rendering: Rendering): string {
+function requestBlock(files: string[], rendering: Rendering, base: string): string {
   const { loads } = rendering
+  const state = localeState()
+  // A host of its own is a protocol-relative address, which the base does not prefix.
+  const locales = state === undefined || state.implicit === true || state.settings.locales.length < 2
+    ? undefined
+    : state.settings.locales.map((locale) => {
+      const href = localePath(state.settings, state.path, locale, state.host)
+
+      return { locale, href: href.startsWith('//') ? href : base + href }
+    })
   const request: DevRequest = {
     route: rendering.matched,
     page: projectPath(files.at(-1)!),
@@ -851,6 +860,7 @@ function requestBlock(files: string[], rendering: Rendering): string {
     guards: rendering.guards ?? [],
     prerender: rendering.prerender,
     locale: rendering.ctx.locale,
+    locales,
     status: rendering.status,
     error: (rendering.ctx as Partial<ErrorPageContext>).error?.message,
     loads: loads ? loads.files.flatMap((file, index) => loads.modules[index]!.load ? [{ file: projectPath(file), ms: loads.timings?.[index] }] : []) : [],

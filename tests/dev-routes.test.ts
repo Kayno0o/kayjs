@@ -283,3 +283,25 @@ describe('the dev tool\'s routes served by kay', () => {
     expect((await outcomes(true, [{ name: 'closed', server: closed }])).health).toBe(200)
   })
 })
+
+describe('the dev tool\'s i18n tab data', () => {
+  const MESSAGES = 'tests/fixtures/layout-query/src/messages'
+
+  it('lists the page in each locale under the base and the locale paths, and leaves a site without i18n, or with one locale, out', async () => {
+    const { routes } = await site()
+    const request = async (options: Parameters<typeof pages>[0], path: string) => {
+      const dev = await pages({ routes, dev: true, security: false, ...options })
+      const html = await (await dev.handle(new Request(`http://localhost${path}`))).text()
+
+      return JSON.parse(REQUEST_BLOCK.exec(html)![1]!) as DevRequest
+    }
+    const i18n = { locales: ['en', 'fr'], defaultLocale: 'en', messages: MESSAGES }
+
+    expect((await request({ i18n }, '/'))).toMatchObject({ locale: 'en', locales: [{ locale: 'en', href: '/' }, { locale: 'fr', href: '/fr' }] })
+    expect((await request({ i18n }, '/fr/broken')).locales).toEqual([{ locale: 'en', href: '/broken' }, { locale: 'fr', href: '/fr/broken' }])
+    expect((await request({ i18n, base: '/shop' }, '/')).locales).toEqual([{ locale: 'en', href: '/shop/' }, { locale: 'fr', href: '/shop/fr' }])
+    expect((await request({ i18n: { ...i18n, domains: { en: 'example.com', fr: 'example.fr' } } }, '/')).locales).toEqual([{ locale: 'en', href: '//example.com/' }, { locale: 'fr', href: '//example.fr/' }])
+    expect((await request({}, '/')).locales).toBeUndefined()
+    expect((await request({ i18n: { locales: ['en'], defaultLocale: 'en', messages: MESSAGES } }, '/')).locales).toBeUndefined()
+  })
+})

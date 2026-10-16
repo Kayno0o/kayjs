@@ -12,6 +12,9 @@ import { pages } from '../src/server'
 import { DEV_BOOT, problemsBlock } from '../src/server/dev'
 import { scratchDir } from './scratch'
 
+// The fields of a request block the Request tab reads.
+const PAGE = { page: 'src/routes/index.kay', layouts: [], params: {}, id: 'abc', guards: [], status: 200, loads: [] }
+
 const BOOT = (/<script>([\s\S]*)<\/script>/).exec(DEV_BOOT)![1]!
 
 const { error, warn } = console
@@ -444,6 +447,48 @@ describe('the dev tool', () => {
 
     expect(opened).toEqual(['src/routes/_404.kay:1:1'])
     fetching.mockRestore()
+  })
+
+  it('adds an i18n tab for a site with locales alone: the page\'s locale, a link to it in each, the messages no locale has, cleared as a swap starts', async () => {
+    const block = (request: object) => {
+      const script = document.createElement('script')
+
+      script.type = 'application/json'
+      script.id = 'kay-dev-request'
+      script.textContent = JSON.stringify(request)
+
+      return script
+    }
+    const panel = () => shadow().querySelector('#kay-dev-i18n')
+    const links = () => [...panel()!.querySelectorAll('a')].map(link => `${link.textContent} ${link.getAttribute('href')}${link.getAttribute('aria-current') === null ? '' : ' current'}`)
+    const count = () => shadow().querySelector('#kay-dev-tab-i18n .count')?.textContent
+
+    document.head.append(block({ ...PAGE, locale: 'en' }))
+    tool = startDevTool()
+    expect(panel()).toBeNull()
+    tool.stop()
+
+    console.error('[kay] no locale has the message "nav.home"; production shows the key itself')
+    document.head.replaceChildren(block({ ...PAGE, locale: 'en', locales: [{ locale: 'en', href: '/docs/about' }, { locale: 'fr', href: '/docs/fr/a-propos' }] }))
+    tool = startDevTool()
+    expect(links()).toEqual(['en /docs/about current', 'fr /docs/fr/a-propos'])
+    expect(panel()!.textContent).toContain('nav.home')
+    expect(count()).toBe('1')
+
+    console.error('[kay] no locale has the message "nav.home"; production shows the key itself')
+    console.error('[kay] no locale has the message "a\\"b"; production shows the key itself')
+    await Bun.sleep(0)
+    expect(panel()!.querySelectorAll('.error')).toHaveLength(2)
+    expect(panel()!.textContent).toContain('a"b')
+
+    document.head.replaceChildren(block({ ...PAGE, locale: 'fr', locales: [{ locale: 'en', href: '/docs/about' }, { locale: 'fr', href: '/docs/fr/a-propos' }] }))
+    await Bun.sleep(0)
+    expect(links()).toEqual(['en /docs/about', 'fr /docs/fr/a-propos current'])
+
+    document.documentElement.setAttribute('aria-busy', 'true')
+    await Bun.sleep(0)
+    expect(panel()!.querySelectorAll('.error')).toHaveLength(0)
+    expect(count()).toBe('0')
   })
 
   it('lists the routes the server serves as the tab shows and after each restart, filtered as typed, linking the paths no request fills in, the page shown marked', async () => {
