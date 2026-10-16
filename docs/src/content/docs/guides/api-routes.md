@@ -86,7 +86,7 @@ A call goes through the whole app, just as a fetch from a browser would. Guards 
 
 A call that is refused is not an error of the protocol. The agent gets the reason as the tool's result, with the field errors of a schema, and can fix its input and call again.
 
-An agent fills in no form, so `honeypot`, `minTime` and `proofOfWork` do not apply to its calls. `kay check` warns when a tool action has one of them and no guard (an options spread counts as one, but options kept in a variable are not read), because anyone could then call it. Add a guard, or use a `rateLimit` instead.
+An agent fills in no form, so `honeypot`, `minTime` and `proofOfWork` do not apply to its calls. `kay check` warns when a tool action has one of them and no guard (an options spread counts as one, so it warns, but options kept in a variable are not read), because anyone could then call it. Add a guard, or use a `rateLimit` instead.
 
 Routes with a file in their body, and actions with a file in their schema, are not offered, as an agent sends JSON.
 

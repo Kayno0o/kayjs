@@ -22,11 +22,13 @@ const guardedMounted = await testSite({ routes, api: guardedApi, mcp: true, isla
 // Guards that cover every module, and guards that cover only one of them.
 const strict = await testSite({ routes, api: guardedApi, mcp: true, islands: false, requireGuards: true })
 const uncovered = await testSite({ routes, api, mcp: true, islands: false, requireGuards: true })
+// A site with tool actions and no API module has no guard to add, so requireGuards leaves its list open.
+const noApi = await testSite({ routes, api: 'tests/fixtures/mcp/src/none', mcp: true, islands: false, requireGuards: true })
 const documentOnly = await testSite({ routes, api: guardedApi, openapi: true, islands: false })
 const localized = await testSite({ routes, api, mcp: true, islands: false, i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: 'tests/fixtures/i18n/src/messages' } })
 
 afterAll(async () => {
-  await Promise.all([site.close(), off.close(), mounted.close(), localized.close(), openapi.close(), guarded.close(), guardedMounted.close(), strict.close(), uncovered.close(), documentOnly.close()])
+  await Promise.all([site.close(), off.close(), mounted.close(), localized.close(), openapi.close(), guarded.close(), guardedMounted.close(), strict.close(), uncovered.close(), noApi.close(), documentOnly.close()])
 })
 
 async function post(target: typeof site, body: unknown, headers: Record<string, string> = {}) {
@@ -407,6 +409,10 @@ describe('a guarded API directory', () => {
     expect((await strict.mcp.tools({ headers: BEARER })).length).toBeGreaterThan(0)
   })
 
+  it('lists an action-only site\'s tools under requireGuards', async () => {
+    expect((await noApi.mcp.tools()).map(tool => tool.name)).toContain('add_note')
+  })
+
   it('lists freely when the API directory has no guard and the site does not require them', async () => {
     expect((await asked(site, 'tools/list')).response.status).toBe(200)
   })
@@ -458,11 +464,12 @@ describe('operation ids', () => {
   })
 
   it('keeps ids unique in the document when two choose the same', async () => {
-    const twice = await testSite({ routes, api: 'tests/fixtures/mcp-guarded/src/api', openapi: true, islands: false })
-    const ids = Object.values(((await (await twice.fetch('/api/openapi.json', { headers: BEARER })).json()) as { paths: Record<string, Record<string, { operationId: string }>> }).paths).flatMap(each => Object.values(each).map(operation => operation.operationId))
+    const document = await (await documentOnly.fetch('/api/openapi.json', { headers: BEARER })).json() as { paths: Record<string, Record<string, { operationId: string }>> }
+    const ids = Object.values(document.paths).flatMap(each => Object.values(each).map(operation => operation.operationId))
 
     expect(new Set(ids).size).toBe(ids.length)
-    await twice.close()
+    expect(document.paths['/api/items/dup-a']!.get!.operationId).toBe('same')
+    expect(document.paths['/api/items/dup-b']!.get!.operationId).toBe('same_2')
   })
 })
 

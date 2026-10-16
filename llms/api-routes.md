@@ -298,7 +298,7 @@ export default api()
 - A guard answering 401 makes the endpoint answer 401 with `WWW-Authenticate: Bearer resource_metadata="<site>/.well-known/oauth-protected-resource"`, how a client learns to sign in; any other refusal, 403 included, is a result. Only a guard's 401 does: a route answering 401 itself is a result too. A refused `tools/list` answers the same way (401 and the pointer, a redirect counting as a 401), as a JSON-RPC error.
 - An action's result is JSON as its text, and `structuredContent` when an object; a route's JSON or text answer likewise, any other type read as its size.
 - `/mcp` is claimed like a route: a page, endpoint or file serving it stops the boot, and `kay check` reports it.
-- `unguarded-tool` warns, with `mcp`, of a tool action with a `honeypot`, `minTime` or `proofOfWork` that no guard covers: an agent calls it without the form those protections ask of a person. A `...spread` in the options counts as one of them; options that are not an object literal, `action(schema, run, options)`, are not read, so the action is not taken for a tool.
+- `unguarded-tool` warns, with `mcp`, of a tool action with a `honeypot`, `minTime` or `proofOfWork` that no guard covers: an agent calls it without the form those protections ask of a person. A `...spread` in the options counts as one of them, so it warns; options that are not an object literal, `action(schema, run, options)`, are not read, so the action is not taken for a tool.
 - `site.mcp.tools()` and `site.mcp.call(name, args)` in `kay/test`, which send the cookies so far and take `headers` and `from` as `site.call` does.
 
 ### Calling modules from an island
