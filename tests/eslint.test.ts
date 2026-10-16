@@ -1,8 +1,8 @@
 import type { LintMessage } from '../src/eslint'
+import { describe, expect, it } from 'bun:test'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { describe, expect, it } from 'bun:test'
 import { writeShadowTypes } from '../src/check'
 import { readShadowSettings, serializeShadowSettings, SHADOW_SETTINGS } from '../src/check/shadow'
 import { positionAt } from '../src/compiler/mapping'
@@ -122,16 +122,39 @@ describe('kay/eslint', () => {
     expect(messages).toEqual([expect.objectContaining({ line: 5, fix: undefined })])
   })
 
-  it('points the parser at the shadow file kay check writes, and names the command when there is none yet', () => {
+  it('points the parser at the shadow file kay check writes', () => {
     const seen: string[] = []
     const parser = shadowParser({ parseForESLint: (_code: string, options: { filePath?: string, projectService?: boolean }) => seen.push(options.filePath ?? '') })
-    const block = join(FILE, '0_kay.tsx')
 
-    parser.parseForESLint('', { filePath: block })
+    parser.parseForESLint('', { filePath: join(FILE, '0_kay.tsx') })
     parser.parseForESLint('', { filePath: join(import.meta.dir, 'eslint.test.ts') })
 
     expect(seen).toEqual([join(import.meta.dir, '..', '.kay', 'types', 'tests', 'fixtures', 'lint', 'src', 'components', 'card.kay.tsx'), join(import.meta.dir, 'eslint.test.ts')])
-    expect(() => parser.parseForESLint('', { filePath: block, projectService: true })).toThrow('tests/fixtures/lint/src/components/card.kay has no type information yet: run kay check, or kay dev, before linting it')
+  })
+
+  it('writes the types of a project that has none yet, and names the command when it cannot', async () => {
+    const root = await scratchDir('eslint-types-')
+    const seen: string[] = []
+    const parser = shadowParser({ parseForESLint: (_code: string, options: { filePath?: string, projectService?: boolean }) => seen.push(options.filePath ?? '') })
+    const block = join(root, 'src/routes/index.kay/0_kay.tsx')
+
+    try {
+      await Bun.write(join(root, 'package.json'), '{"type":"module"}')
+      await Bun.write(join(root, 'tsconfig.json'), '{"extends":"kay/tsconfig.json"}')
+      await Bun.write(join(root, 'src/routes/index.kay'), 'h1 Hello\n')
+      parser.parseForESLint('', { filePath: block, projectService: true })
+
+      expect(seen).toEqual([join(root, '.kay/types/src/routes/index.kay.tsx')])
+      expect(await Bun.file(seen[0]!).exists()).toBe(true)
+
+      // A project whose config does not load has no types to write.
+      await rm(join(root, '.kay'), { recursive: true, force: true })
+      await Bun.write(join(root, 'kay.config.ts'), 'export default {{\n')
+      expect(() => parser.parseForESLint('', { filePath: block, projectService: true })).toThrow('src/routes/index.kay has no type information yet: run kay check, or kay dev, before linting it')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
   })
 })
 

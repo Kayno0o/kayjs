@@ -10,6 +10,7 @@ export const USAGES = {
   upgrade: 'upgrade [dir]',
   routes: 'routes [dir] [--format text|json]',
   explain: 'explain [lint|error|group] [--format text|json]',
+  types: 'types [dir] [--quiet]',
   fmt: 'fmt [paths...] [--check] [--format text|json] [--quiet]',
   lint: 'lint [keslint arguments]...',
   migrate: 'migrate astro [dir] [--out <dir>] [--format text|json] [--quiet]',

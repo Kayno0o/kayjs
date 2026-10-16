@@ -1,7 +1,9 @@
 // `kay/eslint`: lints the JavaScript of .kay files, the script and server fences and the template's expressions, through the TSX `kay check` type-checks them as, reporting at the .kay line.
 import type { ShadowFile } from '../check/shadow'
+import { spawnSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
-import { relative, resolve } from 'node:path'
+import { createRequire } from 'node:module'
+import { dirname, join, relative, resolve } from 'node:path'
 import { classEdit, classSpan } from '../check/class-words'
 import { codeEdit, compileShadow, inFences, readShadowSettings, shadowPath, sourceSpan } from '../check/shadow'
 import { offsetAt, positionAt } from '../compiler/mapping'
@@ -76,6 +78,22 @@ export const processor = {
   },
 }
 
+// Runs `kay types` for a project whose types nothing wrote yet, as in an editor's ESLint on a fresh app, and tells whether it did: this is a Node bundle, so Bun runs the project's own kay as a child.
+function writeTypes(root: string): boolean {
+  try {
+    // `kay/package.json` is not exported, so kay is found from `kay/eslint`, the file ESLint loaded this from.
+    let kay = dirname(createRequire(join(root, 'package.json')).resolve('kay/eslint'))
+
+    while (!existsSync(join(kay, 'package.json')))
+      kay = dirname(kay)
+
+    return spawnSync('bun', [join(kay, 'src/cli.ts'), 'types', root, '--quiet'], { stdio: 'ignore' }).status === 0
+  }
+  catch {
+    return false
+  }
+}
+
 // Points typescript-eslint at the shadow file `kay check` writes for the .kay file being linted, which the project's tsconfig includes, so type-aware rules see the whole project.
 export function shadowParser<Options extends ParserOptions, Result>(parser: { parseForESLint: (code: string, options: Options) => Result }): { meta: { name: string }, parseForESLint: (code: string, options: Options) => Result } {
   return {
@@ -90,7 +108,7 @@ export function shadowParser<Options extends ParserOptions, Result>(parser: { pa
       const root = projectRootOf(file)
       const shadow = shadowPath(root, file)
 
-      if ((Boolean(options.project) || Boolean(options.projectService)) && !existsSync(shadow))
+      if ((Boolean(options.project) || Boolean(options.projectService)) && !existsSync(shadow) && !writeTypes(root))
         throw new Error(`${relative(root, file)} has no type information yet: run kay check, or kay dev, before linting it`)
 
       return parser.parseForESLint(code, { ...options, filePath: shadow })

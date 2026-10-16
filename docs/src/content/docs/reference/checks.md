@@ -201,7 +201,7 @@ export default defineConfig({ strict: true, kay: true })
 
 <Callout type="note">
 
-Type-aware rules read files that `kay check`, `kay dev` and the editor write. `kay lint` writes them and then runs `keslint` with your arguments, so run it instead of `keslint` and no check has to come first. A new project's `lint` script is `kay lint --cache`.
+Type-aware rules read files that `kay check`, `kay dev` and the editor write. `kay lint` writes them and then runs `keslint` with your arguments, so run it instead of `keslint` and no check has to come first. The editor's ESLint, which runs `keslint` alone, writes them itself the first time it meets a component with none, so a fresh app needs no command first. A new project's `lint` script is `kay lint --cache`.
 
 </Callout>
 

@@ -17,6 +17,7 @@ bun run dev
 | Command | Does |
 | --- | --- |
 | `kay new <dir>` | Scaffold a project that checks, builds and runs |
+| `kay types [dir]` | Write the types the editor's ESLint reads, without checking |
 | `kay add <features> [dir]` | Add `kay new` features, or a kay library, to an existing project |
 | `kay dev [dir]` | Run the server, restarting on change, with errors shown in the browser |
 | `kay build [dir]` | Check the project and bundle the browser code for production |
@@ -91,6 +92,10 @@ Before it writes anything, it checks that each file it changes is still what `ka
 | --- | --- |
 | `--no-install` | Writes the files without running `bun install` |
 | `--quiet` | Prints the summary line only |
+
+## kay types
+
+`kay types [dir]` writes `.kay/types`, which the language server, `kay lint` and the editor's ESLint read, and checks nothing. You rarely run it: the editor's ESLint runs it through `bun` the first time it lints a component with no types yet, so a fresh app lints with no command before it.
 
 ## kay dev
 
