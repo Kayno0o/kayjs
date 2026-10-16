@@ -1,7 +1,7 @@
-import { jest } from 'bun:test'
-import { settle } from 'kay/test'
 import { join } from 'node:path'
 import process from 'node:process'
+import { jest } from 'bun:test'
+import { settle } from 'kay/test'
 
 // Preloaded after `kay/test/dom`, which registers happy-dom with its popover shim. Components mount from the fixture app, which installs the library and replaces its settings as an app does.
 process.env.KAY_ROOT = join(import.meta.dir, '..', 'tests', 'fixture')

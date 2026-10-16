@@ -24,7 +24,7 @@ async function carousel(autoplay?: number) {
   const { root } = mounted
   const section = root.querySelector<HTMLElement>('.kui-carousel')!
 
-  if (autoplay) {
+  if (autoplay !== undefined) {
     section.dispatchEvent(new PointerEvent('pointerenter'))
     await clock.settle()
     clock.start()

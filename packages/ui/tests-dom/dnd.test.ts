@@ -1,11 +1,11 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, describe, expect, spyOn, test } from 'bun:test'
 import { mount, settle } from 'kay/test'
-import { clock } from './dom'
 import { Board } from '../src/dnd/board'
 import { DropTargets } from '../src/dnd/drop-targets'
 import { ACTIVATION_DELAY_MS } from '../src/dnd/pointer'
 import { Sortable } from '../src/dnd/sortable'
+import { clock } from './dom'
 
 const MODIFIERS: KeyboardEventInit[] = [{ altKey: true }, { ctrlKey: true }, { metaKey: true }, { shiftKey: true }]
 

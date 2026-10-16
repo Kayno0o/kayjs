@@ -109,10 +109,32 @@ function failing(names: string[], least: number): string[] {
   }))
 }
 
-// The theme as Tailwind compiles it, after a skin's own CSS.
-async function built(skin: string): Promise<string> {
+// What a rule holds, braces and nested rules included, found by its selector starting a line; undefined when no rule has it.
+function blockOf(css: string, selector: string): string | undefined {
+  for (let at = css.indexOf(`${selector} {`); at !== -1; at = css.indexOf(`${selector} {`, at + 1)) {
+    if (css.slice(css.lastIndexOf('\n', at) + 1, at).trim() !== '')
+      continue
+
+    let depth = 0
+
+    for (let end = at + selector.length + 1; end < css.length; end++) {
+      if (css[end] === '{')
+        depth++
+      else if (css[end] === '}')
+        depth--
+
+      if (depth === 0)
+        return css.slice(at, end + 1)
+    }
+  }
+
+  return undefined
+}
+
+// The theme as Tailwind compiles it, with a skin's own CSS after it, or before it.
+async function built(skin: string, where: 'after' | 'before' = 'after'): Promise<string> {
   const tailwind = Bun.resolveSync('tailwindcss/theme.css', ROOT)
-  const compiler = await compile(`@import 'tailwindcss/theme.css' layer(theme);\n${theme}\n${skin}`, { base: ROOT, loadStylesheet: async (_, base) => ({ path: tailwind, base, content: await Bun.file(tailwind).text() }) })
+  const compiler = await compile(`@import 'tailwindcss/theme.css' layer(theme);\n${where === 'before' ? `${skin}\n${theme}` : `${theme}\n${skin}`}`, { base: ROOT, loadStylesheet: async (_, base) => ({ path: tailwind, base, content: await Bun.file(tailwind).text() }) })
 
   return compiler.build([])
 }
@@ -132,10 +154,8 @@ describe('theme.css', () => {
   })
 
   test('draws the controls a hairline would leave under 3:1 with the field border', () => {
-    const rule = (selector: string) => theme.slice(theme.indexOf(`${selector} {`), theme.indexOf('}', theme.indexOf(`${selector} {`)))
-
-    for (const selector of ['.kui-carousel-dot', '.kui-rating', '.kui-toggle-track', '  .kui-btn'])
-      expect(rule(selector)).toContain('kui-field-border')
+    for (const selector of ['.kui-carousel-dot', '.kui-rating', '.kui-toggle-track', '.kui-btn'])
+      expect(blockOf(theme, selector), selector).toContain('kui-field-border')
   })
 
   test('defines every colour its classes paint with', () => {
@@ -183,16 +203,26 @@ describe('theme.css', () => {
     expect(theme.indexOf('@media (prefers-color-scheme: light)')).toBeLessThan(theme.indexOf('[data-theme=\'light\']'))
   })
 
-  test('declares its tokens as defaults, so the app\'s own @theme wins wherever it sits', () => {
-    expect(theme).toContain('@theme default {')
-    expect(theme).not.toContain('@theme {')
+  test('declares its tokens as defaults, so the app\'s own @theme wins wherever it sits', async () => {
+    const skin = '@theme { --color-kui-accent: red; }'
+
+    for (const where of ['after', 'before'] as const) {
+      const css = await built(skin, where)
+
+      expect(css, where).toContain('--color-kui-accent: red;')
+      expect(css, where).not.toMatch(/--color-kui-accent: light-dark/)
+    }
   })
 
   test('marks the focused menu item and the selected palette option with an accent bar, and an outline forced colours paint', () => {
-    const bar = String.raw`\{\s*(?:\/\*[^*]*\*\/\s*)?(?:@apply [^;]*;\s*)?box-shadow: inset 2px 0 0 var\(--color-kui-accent\);\s*outline: 2px solid transparent;\s*outline-offset: -2px;`
+    const marks = [['.kui-menu-item', '&:focus-visible'], ['.kui-command-palette-option', '&:where([aria-selected=\'true\'])']] as const
 
-    expect(theme).toMatch(new RegExp(String.raw`\.kui-menu-item \{[^}]*&:focus-visible ${bar}`))
-    expect(theme).toMatch(new RegExp(String.raw`\.kui-command-palette-option \{[^}]*&:where\(\[aria-selected='true'\]\) ${bar}`))
+    for (const [selector, state] of marks) {
+      const bar = blockOf(blockOf(theme, selector) ?? '', state)
+
+      expect(bar, `${selector} ${state}`).toContain('box-shadow: inset 2px 0 0 var(--color-kui-accent);')
+      expect(bar, `${selector} ${state}`).toContain('outline: 2px solid transparent;')
+    }
   })
 
   test('sizes a select by its options inside a compact field, and by the row inside any other', async () => {
@@ -211,7 +241,11 @@ describe('theme.css', () => {
 
     expect(await build('')).toEqual(['--kui-shadow-raised none', '--kui-shadow-press none', '--kui-press-travel 0px'])
     expect(await build('@theme { --kui-shadow-raised: 4px 4px 0 black; --kui-shadow-press: 3px 3px 0 black; --kui-press-travel: 3px; }')).toEqual(['--kui-shadow-raised 4px 4px 0 black', '--kui-shadow-press 3px 3px 0 black', '--kui-press-travel 3px'])
-    expect(theme).toMatch(/\.kui-card-row, \.kui-widget, \.kui-toast\) \{\s*box-shadow: var\(--kui-shadow-raised\);/)
-    expect(theme).toMatch(/\.kui-icon-btn:where\(\.kui-shell\) \{\s*box-shadow: var\(--kui-shadow-press\);\s*&:active \{\s*translate: 0 var\(--kui-press-travel\);\s*box-shadow: none;/)
+    expect(blockOf(theme, ':is(.kui-card, .kui-card-row, .kui-widget, .kui-toast)')).toContain('box-shadow: var(--kui-shadow-raised);')
+
+    const press = blockOf(theme, '.kui-icon-btn:where(.kui-shell)')
+
+    expect(press).toContain('box-shadow: var(--kui-shadow-press);')
+    expect(blockOf(press ?? '', '&:active')).toContain('translate: 0 var(--kui-press-travel);')
   })
 })
