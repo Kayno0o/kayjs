@@ -3,67 +3,97 @@ import { routeChain } from './routes'
 
 // What a page may take from `kay` and stay the same for every visitor and every moment: the reactive core and ids, none of which reads a request, a cookie, the environment or a clock.
 const PURE_KAY_NAMES = new Set(['signal', 'memo', 'effect', 'batch', 'onCleanup', 'onMount', 'root', 'untrack', 'selection', 'every', 'watch', 'debounced', 'listen', 'linked', 'context', 'uid'])
+// The same for `kay/i18n`: messages and formats go by the locale, which is part of the key a copy is kept under; the relative time ones read the clock.
+const PURE_I18N_NAMES = new Set(['t', 'T', 'locale', 'localize', 'alternate', 'formatNumber', 'formatDate', 'formatList', 'direction', 'defineMessages'])
 const CODE_FILE = /\.(?:kay|[cm]?[jt]sx?)$/
+// What a file imported for its bytes holds the same on every render; a database, a native module or a wasm file does not.
+const STATIC_FILE = /\.(?:png|jpe?g|gif|webp|avif|svg|ico|woff2?|ttf|otf|json|css|txt|md|html|toml|ya?ml|csv)$/i
 // Every way a file reads the request or the moment: `ctx`, a clock, a random number, the environment, the file system through Bun, a network fetch, a dynamic import, or a `query` schema, which has the page read the URL's search params.
-const READS_REQUEST = /\b(?:ctx|Date|Intl|Temporal|crypto|process|Bun|performance|fetch|globalThis|require|eval)\b|Math\s*\.\s*random|\bimport\s*\(|\bimport\.meta\b|\bquery\s*:/
-// State a module keeps from one render to the next, which a second render could show differently.
-const MODULE_STATE = /^(?:export\s+)?(?:let|var)\s/m
-const IMPORT = /\bimport\b([^'";(]*)['"]([^'"]+)['"]/g
+const READS_REQUEST = /\b(?:ctx|Date|Intl|Temporal|crypto|process|Bun|performance|fetch|globalThis|require|eval)\b|\bMath\s*(?:\??\.|\[)\s*['"]?random|\bimport\s*\(|\bimport\.meta\b|\bquery\s*:/
+// State a module keeps from one render to the next, which a second render could show differently: a top-level `let` or `var`, an empty container a cache fills, and a literal or a container another module imports and changes.
+const MODULE_STATES = [/^(?:export )?(?:let|var) /m, /^(?:export )?const [^=\n]*= *(?:\[ *\]|\{ *\}|new (?:Map|Set|WeakMap|WeakSet|Array|Object)\b)/m, /^export const (?!page\b)[^=\n]*= *(?:[[{]|new )/m]
+// An import or a re-export with what it takes, then one for its effect alone.
+const FROM = /\b(?:import|export)\b([^'";(=]*)\sfrom\s*['"]([^'"]+)['"]/g
+const FOR_EFFECT = /\bimport\s*['"]([^'"]+)['"]/g
 const BRACES = /\{([^}]*)\}/
 const AS_NAME = /\s+as\s+(?:\S.*)?$/
 const TYPE_NAME = /^type\s/
 const TYPE_IMPORT = /^\s*type\b/
 
+export interface Scan {
+  // Whether the file reads nothing itself and imports only what the rules allow.
+  clean: boolean
+  // The files it imports that are code, for the same rules to reach.
+  code: string[]
+}
+
 // Whether the page, its layouts and everything they import provably read nothing a request or the moment changes, so one render serves every visitor.
 // Whatever cannot be shown to is left to render per request: a package, any `kay` entry but its reactive core, a `ctx`, a clock, a `query` schema, module state.
-export async function readsNothing(route: { layouts: string[], file: string }): Promise<boolean> {
+// `scans` keeps what each file holds across the routes of one build.
+export async function readsNothing(route: { layouts: string[], file: string }, scans = new Map<string, Promise<Scan>>()): Promise<boolean> {
   const seen = new Set<string>()
+  const queue = [...routeChain(route).files]
 
-  for (const file of routeChain(route).files) {
-    if (!await pure(file, seen))
+  for (let file = queue.pop(); file !== undefined; file = queue.pop()) {
+    if (seen.has(file))
+      continue
+
+    seen.add(file)
+
+    let scan = scans.get(file)
+
+    if (scan === undefined)
+      scans.set(file, scan = scanned(file))
+
+    const { clean, code } = await scan
+
+    if (!clean)
       return false
+
+    queue.push(...code)
   }
 
   return true
 }
 
-async function pure(file: string, seen: Set<string>): Promise<boolean> {
-  if (seen.has(file))
-    return true
-
-  seen.add(file)
-
+async function scanned(file: string): Promise<Scan> {
   const source = await Bun.file(file).text()
+  const code: string[] = []
 
-  if (READS_REQUEST.test(source) || MODULE_STATE.test(source))
-    return false
+  if (READS_REQUEST.test(source) || MODULE_STATES.some(state => state.test(source)))
+    return { clean: false, code }
 
-  for (const [, clause, specifier] of source.matchAll(IMPORT)) {
-    if (TYPE_IMPORT.test(clause!))
+  const imports = [...source.matchAll(FROM)].map(([, clause, specifier]) => ({ clause: clause!, specifier: specifier! }))
+
+  for (const [, specifier] of source.matchAll(FOR_EFFECT))
+    imports.push({ clause: '', specifier: specifier! })
+
+  for (const { clause, specifier } of imports) {
+    if (TYPE_IMPORT.test(clause))
       continue
 
-    // Messages and formats go by the locale, which is part of the key a copy is kept under.
-    if (specifier === 'kay/i18n')
-      continue
+    if (specifier === 'kay' || specifier === 'kay/i18n') {
+      const imported = (BRACES.exec(clause)?.[1] ?? '').split(',').map(name => name.trim()).filter(name => name !== '' && !TYPE_NAME.test(name))
 
-    if (specifier === 'kay') {
-      const imported = (BRACES.exec(clause!)?.[1] ?? '').split(',').map(name => name.trim()).filter(name => name !== '' && !TYPE_NAME.test(name))
-
-      if (imported.length === 0 || !imported.every(name => PURE_KAY_NAMES.has(name.replace(AS_NAME, ''))))
-        return false
+      if (imported.length === 0 || !imported.every(name => (specifier === 'kay' ? PURE_KAY_NAMES : PURE_I18N_NAMES).has(name.replace(AS_NAME, ''))))
+        return { clean: false, code }
 
       continue
     }
 
-    if (!specifier!.startsWith('.'))
-      return false
+    if (!specifier.startsWith('.'))
+      return { clean: false, code }
 
-    const imported = resolveFrom(specifier!, file)
+    const imported = resolveFrom(specifier, file)
 
-    // A picture or a data file is the same on every render.
-    if (imported === undefined || (CODE_FILE.test(imported) && !await pure(imported, seen)))
-      return false
+    if (imported === undefined)
+      return { clean: false, code }
+
+    if (CODE_FILE.test(imported))
+      code.push(imported)
+    else if (!STATIC_FILE.test(imported))
+      return { clean: false, code }
   }
 
-  return true
+  return { clean: true, code }
 }

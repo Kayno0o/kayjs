@@ -3,6 +3,7 @@ import type { ErrorName, ExportProblem } from '../compiler/errors'
 import type { Project } from '../project'
 import type { PageSettings } from '../runtime'
 import type { ClientBuild, PrerenderedPage } from './client'
+import type { Scan } from './pure-page'
 import type { Route } from './routes'
 import { mkdir } from 'node:fs/promises'
 import { join, relative } from 'node:path'
@@ -79,18 +80,24 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
 
   const pages: Record<string, PrerenderedPage> = {}
   const paths = new Map<string, string>()
+  // The files of pages kept without being asked for, which a page that was asked for takes the place of.
+  const kept = new Set<string>()
+  // What each file read, for the next route to reach it again.
+  const scans = new Map<string, Promise<Scan>>()
 
   // `auto` is a page nothing marks, which the build keeps because it provably reads nothing from its request: it is skipped, never failed, as soon as one render shows otherwise.
-  async function prerenderRoute(route: Route, file: string, marked: boolean, auto = false): Promise<void> {
-    // Written once every locale of the route has rendered, so a route given up on leaves nothing behind.
+  // Gives what writes the route, once every locale of it has rendered, so a route given up on leaves nothing behind.
+  async function prerenderRoute(route: Route, file: string, marked: boolean, auto = false): Promise<(() => Promise<void> | void)[]> {
     const pending: (() => Promise<void> | void)[] = []
+    // The names this route's own copies take, which two of them may not share.
+    const reserved = new Map<string, string>()
 
     const module = await import(route.file) as Record<string, unknown>
     const revalidate = revalidatePeriod(file, pageSetting(module, 'revalidate'))
 
     // A copy that goes stale is rendered again for every visitor with the request a page reads, which an unmarked page was never asked to.
     if (auto && revalidate !== undefined)
-      return
+      return []
 
     const prerender = pageSetting(module, 'prerender')
 
@@ -129,7 +136,7 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
         const { response, html } = await once()
 
         if (auto && response.status !== 200)
-          return
+          return []
 
         if (response.status >= 500)
           throw new KayError('export-page-status', `kay: prerendering ${copy.path} from ${file} failed with ${response.status}; the error is logged above`)
@@ -140,7 +147,7 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
 
         // Two renders of the same page differ when it draws on something the source does not show, a counter or a clock behind a function.
         if (auto && (await once()).html !== html)
-          return
+          return []
 
         if (options.exportAll && IMAGE_LINK.test(html))
           throw new KayError('export-image-route', `kay: ${copy.path} links an image only the image route resizes, such as one from images.dirs, and no file of it is exported`)
@@ -150,7 +157,7 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
         const readsSite = standInReads() > reads
 
         if (auto && (islands.length > 0 || stamps || readsSite))
-          return
+          return []
 
         if (options.exportAll && readsSite)
           throw new KayError('export-site-url', 'kay: it reads the site, through siteUrl() or siteOrigin(), which neither `site` in kay.config.ts nor SITE_URL sets')
@@ -165,17 +172,27 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
           throw new KayError('export-server-render', `kay: it defers a server island, which kay's browser entry fetches, and with no island and \`navigation: false\` the build has none; mark it \`server\` to render it inline instead`)
 
         const name = `${copy.key === '/' ? 'index' : copy.key.slice(1)}.html`
-        const taken = paths.get(name)
+        const taken = reserved.get(name) ?? paths.get(name)
 
-        if (taken !== undefined) {
+        if (taken !== undefined && kept.has(name) && !auto) {
+          // A page the author asked for outranks one the build kept on its own.
+          delete pages[taken]
+          kept.delete(name)
+        }
+        else if (taken !== undefined) {
           if (auto)
-            return
+            return []
 
           throw new KayError('export-path-clash', `kay: ${taken} and ${copy.key} would both be prerendered to ${name}; leave one out of prerender`)
         }
 
+        reserved.set(name, copy.key)
         pending.push(async () => {
           paths.set(name, copy.key)
+
+          if (auto)
+            kept.add(name)
+
           await mkdir(join(dir, name, '..'), { recursive: true })
           await Bun.write(join(dir, name), html)
         })
@@ -186,7 +203,7 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
 
           options.rendered?.push({ path: copy.path, file: route.file, locale: copy.locale, html, noindex, sitemap: pageSetting(module, 'sitemap') !== undefined, search: noindex || search === false || guardedPage(route, config.requireGuards) ? false : search?.weight ?? 1 })
         }
-        else {
+        else if (!auto) {
           options.others?.push({ file: route.file, html })
         }
 
@@ -198,8 +215,7 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
       }
     }
 
-    for (const write of pending)
-      await write()
+    return pending
   }
 
   // What keeps a page from a static export, each named, so one build reports them all.
@@ -212,15 +228,17 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
     const marked = route.params.length === 0 && await reachesServerIsland(route.file)
 
     const asked = marked || options.exportAll === true || await exportsPrerender(route.file)
-    const auto = !asked && route.params.length === 0 && await readsNothing(route)
+    const auto = !asked && route.params.length === 0 && await readsNothing(route, scans)
 
     if (!asked && !auto)
       continue
 
     const file = relative(root, route.file)
 
+    let writes: Awaited<ReturnType<typeof prerenderRoute>>
+
     try {
-      await prerenderRoute(route, file, marked, auto)
+      writes = await prerenderRoute(route, file, marked, auto)
     }
     catch (error) {
       // A page kept on the strength of its source alone is rendered per request when it will not render here.
@@ -231,7 +249,12 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
         throw error
 
       problems.push(exportProblem(file, error))
+
+      continue
     }
+
+    for (const write of writes)
+      await write()
   }
 
   options.onRoute?.(routes.length, routes.length)
