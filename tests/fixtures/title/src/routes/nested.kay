@@ -1,0 +1,8 @@
+---
+import Room from '../components/room.kay'
+import Outer from '../components/outer.kay'
+---
+h1 Nested
+Room(label="First")
+div(style="position: absolute; top: 4000px")
+  Outer(hydrate="visible")

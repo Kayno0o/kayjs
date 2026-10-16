@@ -6,3 +6,4 @@ Room
 a.other(href="/other") Other
 a.two(href="/two") Two
 a.rawed(href="/rawed") Raw
+a.lazy(href="/lazy") Lazy

@@ -72,6 +72,15 @@ export function head(tags: HeadTag[]): void {
   groups?.push(tags)
 }
 
+// Where the head of the render in progress stands, to tell later whether a component set an island's title since.
+export function headMark(): number {
+  return groups?.length ?? 0
+}
+
+export function setsIslandTitle(mark: number): boolean {
+  return groups?.slice(mark).some(group => group.some(tag => tag.tag === 'title' && tag.props.island === true)) ?? false
+}
+
 export function collectHead<T>(render: () => T, options: HeadOptions = {}): { result: T, head: RenderedHead } {
   const previous = groups
   const collected: HeadTag[][] = []

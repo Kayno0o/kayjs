@@ -3,6 +3,7 @@ import type { Html } from './html'
 import type { JSX } from './jsx'
 import { escapeAttribute } from './escape'
 import { withFieldMarks } from './fields'
+import { headMark, setsIslandTitle } from './head'
 import { child, omit } from './html'
 import { renderOnServer, scope } from './reactive'
 import { SLOT_END, SLOT_START } from './static-slots'
@@ -77,6 +78,8 @@ export function island<P extends object>(id: string, component: ((props: P) => J
 
     depth++
 
+    const mark = headMark()
+
     if (rendered) {
       rendered.count++
 
@@ -88,8 +91,10 @@ export function island<P extends object>(id: string, component: ((props: P) => J
       // Detached, as in the browser, where an island reads nothing the page's components provide.
       const { result: html, count } = browserOnly ? { result: '', count: 0 } : withFieldMarks(undefined, () => renderOnServer(() => scope(() => countIds(ids, () => child(component!(given))), true)))
       const shipped = slots.length === 0 ? '' : ` data-slots="${escapeAttribute(slotsValue(slots, html))}"`
+      // Marks an island whose title the page shows, so the browser leaves it alone while a later one has not hydrated.
+      const titled = setsIslandTitle(mark) ? ' data-titled' : ''
       const lazy = when === 'idle' || when === 'visible' ? ` data-hydrate="${when}"` : ''
-      const markup: Html = { t: `<slot data-component="${escapeAttribute(id)}" data-props="${escapeAttribute(serialized)}"${lazy}${shipped}${browserOnly ? ' data-client' : ''}${count === 0 ? '' : ` data-uid="${escapeAttribute(ids)}"`}${persist === undefined ? '' : ` data-persist="${escapeAttribute(persist)}"`}>${html}</slot>` }
+      const markup: Html = { t: `<slot data-component="${escapeAttribute(id)}" data-props="${escapeAttribute(serialized)}"${lazy}${titled}${shipped}${browserOnly ? ' data-client' : ''}${count === 0 ? '' : ` data-uid="${escapeAttribute(ids)}"`}${persist === undefined ? '' : ` data-persist="${escapeAttribute(persist)}"`}>${html}</slot>` }
 
       return markup as unknown as JSX.Element
     }

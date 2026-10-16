@@ -947,6 +947,65 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
     expect(await title(view)).toBe('Beta | Site')
   })
 
+  const renameIn = async (view: TestPage, index: number) => view.evaluate((at: number) => document.querySelectorAll<HTMLElement>('button.rename')[at]?.click(), index)
+  const allHydrated = async (view: TestPage) => view.waitUntil(() => [...document.querySelectorAll('[data-component]')].every(island => (island as { _$k?: boolean })._$k === true))
+
+  it('keeps the served title while the island last in the page has not hydrated, then follows it', async () => {
+    const view = await titles.open('/lazy')
+
+    expect(await title(view)).toBe('Second | Site')
+
+    await renameIn(view, 0)
+
+    expect(await title(view)).toBe('Second | Site')
+
+    await view.evaluate(() => scrollTo(0, 4000))
+    await allHydrated(view)
+
+    expect(await title(view)).toBe('Second | Site')
+
+    await renameIn(view, 1)
+
+    expect(await title(view)).toBe('Beta | Site')
+  })
+
+  it('keeps the served title when the last island hydrates when idle', async () => {
+    const view = await titles.open('/idle')
+
+    await allHydrated(view)
+
+    expect(await title(view)).toBe('Second | Site')
+  })
+
+  it('counts a titled island inside another as the island around it', async () => {
+    const view = await titles.open('/nested')
+
+    expect(await title(view)).toBe('Inner | Site')
+
+    await renameIn(view, 0)
+
+    expect(await title(view)).toBe('Inner | Site')
+
+    await view.evaluate(() => scrollTo(0, 4000))
+    await allHydrated(view)
+
+    expect(await title(view)).toBe('Inner | Site')
+
+    await renameIn(view, 1)
+
+    expect(await title(view)).toBe('Beta | Site')
+  })
+
+  it('keeps the served title after a swap to a page whose last island is not hydrated', async () => {
+    const view = await titles.open('/')
+
+    await view.click('a.lazy')
+    await view.waitFor('h1', { text: 'Lazy' })
+    await view.waitUntil(() => (document.querySelector('[data-component]') as { _$k?: boolean } | null)?._$k === true)
+
+    expect(await title(view)).toBe('Second | Site')
+  })
+
   it('shows the title of the island last in the page after a swap to a page with two', async () => {
     const view = await titles.open('/')
 
