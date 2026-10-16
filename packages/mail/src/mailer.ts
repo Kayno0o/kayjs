@@ -265,7 +265,9 @@ function relay(options: MailerOptions): Relay {
 export function mailExtension(from: string | (() => Promise<Mailer>)): KayExtension<Mailer> {
   const messages = `${import.meta.dir}/messages`
 
-  return typeof from === 'string' ? { name: '@kaynooo/kayjs-mail', serverModule: { path: from, export: 'mail' }, messages } : { name: '@kaynooo/kayjs-mail', server: from, messages }
+  const devTool = { module: `${import.meta.dir}/devTool.ts` }
+
+  return typeof from === 'string' ? { name: '@kaynooo/kayjs-mail', serverModule: { path: from, export: 'mail' }, messages, devTool } : { name: '@kaynooo/kayjs-mail', server: from, messages, devTool }
 }
 
 // Sends mails written as `.kay` components, html or text: over SMTP in production, to the outbox in development and tests. Using it in the server runs the queue `enqueue` fills, and under `kay dev` lists the outbox at `/_kay/mail`.

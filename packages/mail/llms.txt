@@ -274,3 +274,7 @@ AuthLink(mail={mail} lead={t('resetLead', { site: mail.site })})
 - Once an app uses it, `/_kay/mail/samples` lists every kind as `kayjs-auth/<kind>`, rendered through the app's own views in the site's default language with sample data, and gives the app's view of a kind under `src/mails/auth/<kind>.kay` that sample as its props when it has no `.preview.ts`.
 
 `{ send: mail.enqueue }` also fits `email.mailer` as it is, sending kayjs-auth's own html.
+
+## Dev tool
+
+- `mailExtension` adds a Mail tab to the dev tool under `kay dev`, with nothing to add in the app: the outbox newest first, each mail previewed in place (its html in a sandboxed frame, or its text) or opened on its page at `/_kay/mail/<id>`, kept up to date as mails are sent. It reads `/_kay/mail.json`.

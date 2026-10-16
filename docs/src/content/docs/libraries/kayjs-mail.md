@@ -172,4 +172,8 @@ export const auth = createAuth({
 })
 ```
 
+## In the dev tool
+
+Under `kay dev`, the dev tool has a Mail tab with nothing to set up. It lists the mails sent to the outbox, newest first. A click on one previews it in place, and Open shows its page.
+
 <ReadMore href="/llms/kayjs-mail">Optional mail setup, other transports, attachments, the queue's retry options and the settings are in the full kayjs-mail reference.</ReadMore>
