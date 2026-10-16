@@ -338,8 +338,8 @@ describe('kay libraries', () => {
   it('types the named exports a library\'s module declares, an action imported by a test typed as the server action the file declares', async () => {
     const project = await newProject()
 
-    await write(join(project, 'node_modules/kay-lib'), { 'src/signup.kay': '--- server\nimport { action } from \'kay\'\n\nexport const page = { guards: false }\n\nexport const signup = action((input: { email: string }) => input, input => input.email)\n---\np signup\n' })
-    await write(project, { 'src/signup.test.ts': 'import { signup } from \'kay-lib/signup.kay\'\n\nexport const ok = signup\nexport const wrong: number = signup\n' })
+    await write(join(project, 'node_modules/kay-lib'), { 'src/signup.kay': '--- server\nimport { action, s } from \'kay\'\n\nexport const page = { guards: false }\n\nexport const signup = action(s.Object({ email: s.String({ maxLength: 200 }) }), input => input.email)\n\nexport const leave = action(() => 1)\n---\np signup\n' })
+    await write(project, { 'src/signup.test.ts': 'import { leave, signup } from \'kay-lib/signup.kay\'\n\nexport const ok = signup\nexport const wrong: number = signup\nexport const alsoWrong: number = leave\n' })
 
     const { code, output } = await run('check', project)
 
