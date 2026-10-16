@@ -29,6 +29,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `kay build` lists each island with what makes it one, `onClick, line 4`, and a static component that may render as one with the prop it passes, and `--format json` gives them with the islands of each route ([Islands](islands.md#islands)).
 - An action with no input is declared with its handler alone, `action(async (ctx) => ...)`, and called as `signOut()` ([Actions](actions.md#declaring-an-action)).
 - A `transformPage` hook gets the page's `locale` beside its `path` ([Routing](routing.md#page-hooks)).
+- `page.find()` in `kay/test` gives each element's `html`, the markup inside it, beside its `tag`, `attributes` and `text` ([Testing](testing.md#reading-a-page)).
 
 ## 1.45.0
 

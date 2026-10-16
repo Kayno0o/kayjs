@@ -4,6 +4,8 @@ export interface Found {
   attributes: Record<string, string>
   // The text inside, its descendants' included, entities decoded and each run of whitespace one space, trimmed.
   text: string
+  // The markup inside, as the page wrote it, entities and hydration markers included; '' for an element that holds none, such as `img`.
+  html: string
 }
 
 // A page read as a crawler reads it: decoded, whitespace squashed, `undefined` for what it does not have.
@@ -28,6 +30,9 @@ const WHITESPACE = /\s+/g
 const LOC = /<loc>([^<]*)<\/loc>/g
 // What holds text a visitor never reads.
 const UNREAD = 'script, style, template'
+// Comments set around what an element holds, to read it back off the output, then taken out.
+const MARKS = /<!--kay-(?:open|close)-\d+-->/g
+const mark = (kind: 'open' | 'close', index: number) => `<!--kay-${kind}-${index}-->`
 
 // HTMLRewriter hands over the markup as written: kay escapes with the named entities, and a page or markdown may write numeric ones.
 function decode(text: string): string {
@@ -43,10 +48,10 @@ function squash(text: string): string {
   return decode(text).replace(WHITESPACE, ' ').trim()
 }
 
-type Matched = Omit<Found, 'text'> & { raw: string }
+type Matched = Omit<Found, 'text' | 'html'> & { raw: string, html?: string }
 
-// Every element `selector` matches, a CSS selector as HTMLRewriter reads it, in the order they open, with the markup of the text inside; `visible` leaves out what a visitor does not read.
-function matches(html: string, selector: string, visible = false): Matched[] {
+// Every element `selector` matches, a CSS selector as HTMLRewriter reads it, in the order they open, with the markup of the text inside; `visible` leaves out what a visitor does not read, `markup` adds what each holds as `html`.
+function matches(html: string, selector: string, visible = false, markup = false): Matched[] {
   const found: Matched[] = []
   const open = new Set<Matched>()
   const rewriter = new HTMLRewriter()
@@ -72,12 +77,20 @@ function matches(html: string, selector: string, visible = false): Matched[] {
       element: (element) => {
         const match = { tag: element.tagName, attributes: Object.fromEntries([...element.attributes].map(([name, value]) => [name, decode(value)])), raw: '' }
 
-        found.push(match)
+        const index = found.push(match) - 1
 
         if (element.canHaveContent && !element.selfClosing) {
           open.add(match)
-          element.onEndTag(() => {
+
+          if (markup)
+            element.prepend(mark('open', index), { html: true })
+
+          // One callback, as a second would replace the first.
+          element.onEndTag((end) => {
             open.delete(match)
+
+            if (markup)
+              end.before(mark('close', index), { html: true })
           })
         }
       },
@@ -91,13 +104,23 @@ function matches(html: string, selector: string, visible = false): Matched[] {
           match.raw += chunk.text
       },
     })
-    .transform(html)
+
+  const output = rewriter.transform(html)
+
+  if (markup) {
+    for (const [index, match] of found.entries()) {
+      const start = output.indexOf(mark('open', index))
+      const inside = start === -1 ? '' : output.slice(start + mark('open', index).length, output.indexOf(mark('close', index), start))
+
+      match.html = inside.replace(MARKS, '')
+    }
+  }
 
   return found
 }
 
 function find(html: string, selector: string): Found[] {
-  return matches(html, selector).map(({ raw, ...match }) => ({ ...match, text: squash(raw) }))
+  return matches(html, selector, false, true).map(({ raw, html: inside, ...match }) => ({ ...match, text: squash(raw), html: inside! }))
 }
 
 export function readPage(html: string): PageReading {

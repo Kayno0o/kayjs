@@ -429,10 +429,24 @@ describe('reading a page', () => {
     const page = await read.visit('/trail')
 
     expect(page.links()).toEqual(['/', '/trail/', '/trail?tab=2', '/trail#end', '/trail'])
-    expect(page.find('a[aria-current="page"]')).toEqual([{ tag: 'a', attributes: { 'href': '/trail/', 'aria-current': 'page' }, text: 'Trail' }])
+    expect(page.find('a[aria-current="page"]')).toEqual([{ tag: 'a', attributes: { 'href': '/trail/', 'aria-current': 'page' }, text: 'Trail', html: 'Trail' }])
     expect(page.find('nav')[0]!.text).toBe('HomeTrailTabEndStep')
     expect(page.jsonLd()).toContainEqual(expect.objectContaining({ '@type': 'BreadcrumbList' }))
     expect(page.find('h2')).toEqual([])
+  })
+
+  it('gives the markup an element holds as the page wrote it, empty for one that holds none', () => {
+    const page = readPage('<body><a href="/" class="logo"><svg viewBox="0 0 1 1"><path d="M0"/></svg> Home &amp; <b>away</b></a><a href="/x"><img src="a.png"></a><br><ul><li><ul><li>deep</li></ul></li></ul></body>')
+    const [logo, plain] = page.find('a')
+
+    expect(logo!.html).toBe('<svg viewBox="0 0 1 1"><path d="M0"/></svg> Home &amp; <b>away</b>')
+    expect(logo!.text).toBe('Home & away')
+    expect(plain!.html).toBe('<img src="a.png">')
+    expect(page.find('img')[0]!.html).toBe('')
+    expect(page.find('br')[0]!.html).toBe('')
+    // A selector matching nested elements gives each its own.
+    expect(page.find('ul').map(({ html }) => html)).toEqual(['<li><ul><li>deep</li></ul></li>', '<li>deep</li>'])
+    expect(page.find('li').map(({ html }) => html)).toEqual(['<ul><li>deep</li></ul>', 'deep'])
   })
 
   it('decodes entities and squashes whitespace in the text it gives', async () => {

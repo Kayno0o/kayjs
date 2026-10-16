@@ -198,7 +198,7 @@ it('shows why a todo was refused', async () => {
 - `page.meta(key)` is the `content` of the `meta` whose `name` or `property` is `key`, such as `description` or `og:image`.
 - `page.jsonLd()` is each thing the JSON-LD scripts describe, parsed, the items of a `@graph` one by one.
 - `page.links()` is every `a`'s `href` in page order.
-- `page.find(selector)` is every element a CSS selector matches, as `{ tag, attributes, text }`: `expect(page.find('a[aria-current="page"]')[0]?.attributes.href).toBe('/pricing')`.
+- `page.find(selector)` is every element a CSS selector matches, as `{ tag, attributes, text, html }`, `html` the markup inside as the page wrote it and `''` for an element that holds none: `expect(page.find('a[aria-current="page"]')[0]?.attributes.href).toBe('/pricing')`, `expect(page.find('a.logo')[0]?.html).toStartWith('<svg')`.
 - `page.text(selector)` is the text a visitor reads in the first element a selector matches, or in the whole body without one, scripts, styles and templates left out, or `undefined` when nothing matches.
 - Assert on text through `text` or `find`, never on `page.html`: an island's markup holds hydration markers between the parts of an interpolated text, so `p Thanks, {name}!` renders `Thanks, <!--[-->Ada<!--]-->!`, and `expect(page.text('.success')).toBe('Thanks, Ada!')` is what passes.
 - Text and attributes come decoded, `&amp;` read as `&`, text with each run of whitespace one space and trimmed, and what the page lacks reads `undefined`.

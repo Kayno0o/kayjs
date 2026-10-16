@@ -25,7 +25,7 @@ it('lists the books', async () => {
 })
 ```
 
-The page also has `meta(key)`, `canonical()`, `jsonLd()`, `links()`, `find(selector)`, which returns `{ tag, attributes, text }` for each match, and `text(selector)`, the text a visitor reads in the first match, or in the whole body. Assert on text through these rather than on `page.html`: an island's markup holds hydration markers inside an interpolated text, so `Thanks, {name}!` is not one string there.
+The page also has `meta(key)`, `canonical()`, `jsonLd()`, `links()`, `find(selector)`, which returns `{ tag, attributes, text, html }` for each match, `html` being the markup inside the element, as the page wrote it, and `text(selector)`, the text a visitor reads in the first match, or in the whole body. Assert on text through these rather than on `page.html`: an island's markup holds hydration markers inside an interpolated text, so `Thanks, {name}!` is not one string there.
 
 ## Posting an action
 

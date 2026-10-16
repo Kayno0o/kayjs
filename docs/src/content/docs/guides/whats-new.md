@@ -32,6 +32,7 @@ This page lists what each release adds, newest first, with a link to where each 
 - **`kay build` says why a component is an island**: each island is listed with what made it one, such as `onClick, line 4`, and a static component that may become one with the prop it passes. `--format json` adds them, and the islands of each route. [Islands](/essentials/islands#see-which-components-are-islands)
 - **Actions with no input need no schema**: `action(async (ctx) => ...)` takes nothing, as with an empty schema, and an island or a test calls it with no argument. [Forms and actions](/essentials/forms-and-actions#an-action-with-no-input)
 - **Page hooks know the locale**: a `transformPage` hook gets the `locale` of the page it rewrites, with its `path`, so a footer needs no scraping of `<html lang>`. [Page hooks](/llms/components#extensions)
+- **Tests can read what an element holds**: `page.find()` returns each element's `html`, the markup inside it, so a test asserts a link holds an `svg` with no regex over the whole page. [Testing](/guides/testing)
 
 ## 1.45.0
 
