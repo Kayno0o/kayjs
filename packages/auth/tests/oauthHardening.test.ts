@@ -95,6 +95,29 @@ describe('the real metadata document reader', () => {
     await server.stop()
   })
 
+  test('connects to the address it checked, resolving the name once', async () => {
+    const server = serving(() => Response.json({ client_id: 'x' }))
+    const port = new URL(server.url).port
+    let asked = 0
+    // The first answer would be public, any later one the loopback: only the first may be used.
+    const rebinding = async () => ++asked === 1 ? [{ address: '127.0.0.1', family: 4 }] : [{ address: '10.0.0.1', family: 4 }]
+
+    expect(await fetchPublicDocument(`http://client.example:${port}/client.json`, anywhere, rebinding)).toEqual({ client_id: 'x' })
+    expect(asked).toBe(1)
+    await server.stop()
+  })
+
+  test('refuses a name when any of its addresses is private, and connects to none', async () => {
+    const server = serving(() => Response.json({ client_id: 'x' }))
+    const port = new URL(server.url).port
+    const mixed = async () => [{ address: '8.8.8.8', family: 4 }, { address: '127.0.0.1', family: 4 }]
+
+    await expect(fetchPublicDocument(`http://client.example:${port}/client.json`, undefined, mixed)).rejects.toThrow('not on the public internet')
+    await expect(fetchPublicDocument(`http://client.example:${port}/client.json`, undefined, async () => [])).rejects.toThrow('not on the public internet')
+    expect(server.requests).toEqual([])
+    await server.stop()
+  })
+
   test('reads a JSON document', async () => {
     const server = serving(() => Response.json({ client_id: 'x' }))
 

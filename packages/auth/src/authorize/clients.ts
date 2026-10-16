@@ -1,6 +1,9 @@
+import type { LookupFunction } from 'node:net'
 import type { Core } from '../core'
 import { Buffer } from 'node:buffer'
 import { lookup } from 'node:dns/promises'
+import http from 'node:http'
+import https from 'node:https'
 import { isIP } from 'node:net'
 import { spend } from '../limits'
 import { validRedirectUris } from './uris'
@@ -106,33 +109,81 @@ export function documentUrl(clientId: string): URL | undefined {
 }
 
 // Reads a document over the public internet: https only, from an address that is not on a private network, with no redirect followed, a short time and a small size.
-// `refuses` tells the addresses not to connect to, which only a test replaces.
-export async function fetchPublicDocument(url: string, refuses: (address: string) => boolean = privateAddress): Promise<unknown> {
+// The name is resolved once, by the connection itself, so the address checked is the one connected to and a DNS answer changing in between cannot lead elsewhere.
+// `refuses` tells the addresses not to connect to and `resolve` looks a name up; only a test replaces them.
+export async function fetchPublicDocument(url: string, refuses: (address: string) => boolean = privateAddress, resolve: (host: string) => Promise<{ address: string, family?: number }[]> = async host => lookup(host, { all: true })): Promise<unknown> {
   const { hostname } = new URL(url)
   const host = hostname.startsWith('[') ? hostname.slice(1, -1) : hostname
-  const addresses = isIP(host) === 0 ? await lookup(host, { all: true }) : [{ address: host }]
+  const notPublic = () => new Error('the document is not on the public internet')
 
-  if (addresses.length === 0 || addresses.some(({ address }) => refuses(address)))
-    throw new Error('the document is not on the public internet')
+  if (isIP(host) !== 0 && refuses(host))
+    throw notPublic()
 
-  const response = await fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(DOCUMENT_TIMEOUT_MS), headers: { accept: 'application/json' } })
+  async function checked(name: string): Promise<{ address: string, family: number }[]> {
+    const addresses = await resolve(name)
 
-  if (response.status !== 200 || !JSON_TYPE.test(response.headers.get('content-type') ?? ''))
-    throw new Error('the document did not answer 200 with JSON')
+    if (addresses.length === 0 || addresses.some(({ address }) => refuses(address)))
+      throw notPublic()
 
-  const chunks: Uint8Array[] = []
-  let size = 0
-
-  for await (const chunk of response.body as unknown as AsyncIterable<Uint8Array>) {
-    size += chunk.byteLength
-
-    if (size > DOCUMENT_MAX_BYTES)
-      throw new Error('the document is too large')
-
-    chunks.push(chunk)
+    return addresses.map(({ address }) => ({ address, family: isIP(address) }))
   }
 
-  return JSON.parse(Buffer.concat(chunks).toString('utf8')) as unknown
+  const connectTo = ((name, options, done) => {
+    void (async () => {
+      try {
+        const addresses = await checked(name)
+
+        if (options.all)
+          (done as unknown as (error: null, addresses: { address: string, family: number }[]) => void)(null, addresses)
+        else
+          done(null, addresses[0]!.address, addresses[0]!.family)
+      }
+      catch (error) {
+        done(error as Error, '', 0)
+      }
+    })()
+  }) as LookupFunction
+
+  const send = url.startsWith('https:') ? https.request : http.request
+
+  return new Promise((resolveDocument, reject) => {
+    const request = send(url, { lookup: connectTo, headers: { accept: 'application/json' }, signal: AbortSignal.timeout(DOCUMENT_TIMEOUT_MS) }, (response) => {
+      if (response.statusCode !== 200 || !JSON_TYPE.test(response.headers['content-type'] ?? '')) {
+        response.destroy()
+        reject(new Error('the document did not answer 200 with JSON'))
+
+        return
+      }
+
+      const chunks: Buffer[] = []
+      let size = 0
+
+      response.on('data', (chunk: Buffer) => {
+        size += chunk.byteLength
+
+        if (size > DOCUMENT_MAX_BYTES) {
+          response.destroy()
+          reject(new Error('the document is too large'))
+
+          return
+        }
+
+        chunks.push(chunk)
+      })
+      response.on('end', () => {
+        try {
+          resolveDocument(JSON.parse(Buffer.concat(chunks).toString('utf8')) as unknown)
+        }
+        catch (error) {
+          reject(error)
+        }
+      })
+      response.on('error', reject)
+    })
+
+    request.on('error', reject)
+    request.end()
+  })
 }
 
 // The reader of metadata documents: the app's own, which then also decides which hosts it may reach, else one that stays on the public internet.
