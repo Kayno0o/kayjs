@@ -366,10 +366,16 @@ describe('Markdown entries\' length', () => {
     // Headings and paragraphs count, the code's symbols and the Counter and Callout elements do not; the Callout's Markdown does.
     expect(hello).toMatchObject({ words: 17, readingTime: 1 })
 
-    const long = await compileMarkdown(`${'word '.repeat(460)}\n\n<b>a &amp; b</b>\n`, 1)
+    const lengths = collection({ name: 'lengths', load: () => [
+      { slug: 'empty', data: {}, body: '' },
+      { slug: 'short', data: {}, body: 'Three little words' },
+      { slug: 'long', data: {}, body: `${'word '.repeat(460)}\n\n<b>a &amp; b</b>\n` },
+    ] }, { schema: t.Object({}) })
+    const [empty, long, short] = await lengths.all()
 
-    expect(long.words).toBe(462)
-    expect(Math.max(1, Math.round(462 / 230))).toBe(2)
+    expect([empty!.words, empty!.readingTime]).toEqual([0, 0])
+    expect([short!.words, short!.readingTime]).toEqual([3, 1])
+    expect([long!.words, long!.readingTime]).toEqual([462, 2])
   })
 })
 
