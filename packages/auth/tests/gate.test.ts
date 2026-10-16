@@ -26,32 +26,16 @@ function req(path: string, headers: Record<string, string> = {}) {
 }
 
 describe('createGate', () => {
-  test('an unannotated route falls back to defaultRequirement and 401s when anonymous', async () => {
-    const res = await buildApp().handle(req('/default'))
+  // One credential by route: no annotation falls back to defaultRequirement, `auth: false` opts out, a requirement overrides the default and answers a signed-in denial with 403 (principal is { id: 1 }, the requirement wants id 2).
+  test.each([
+    ['anonymous', {}, { '/default': 401, '/open': 200, '/custom': 401 }],
+    ['signed in', { authorization: 'Bearer good' }, { '/default': 200, '/open': 200, '/custom': 403 }],
+  ])('%s meets the routes of a gate', async (_who, headers, expected) => {
+    const app = buildApp()
+    const answered = Object.fromEntries(await Promise.all(Object.keys(expected).map(async path => [path, (await app.handle(req(path, headers))).status])))
 
-    expect(res.status).toBe(401)
-  })
-
-  test('an unannotated route passes for an authenticated principal', async () => {
-    const res = await buildApp().handle(req('/default', { authorization: 'Bearer good' }))
-
-    expect(res.status).toBe(200)
-    expect(await res.text()).toBe('ok')
-  })
-
-  test('auth: false opts a route out entirely', async () => {
-    const res = await buildApp().handle(req('/open'))
-
-    expect(res.status).toBe(200)
-    expect(await res.text()).toBe('ok')
-  })
-
-  test('auth: <requirement> overrides the default and answers a signed-in denial with 403', async () => {
-    const denied = await buildApp().handle(req('/custom', { authorization: 'Bearer good' }))
-
-    // principal is { id: 1 }, requirement wants id === 2.
-    expect(denied.status).toBe(403)
-    expect(await denied.text()).toBe('Forbidden')
+    expect(answered).toEqual(expected)
+    expect(await (await app.handle(req('/custom', headers))).text()).toBe(expected['/custom'] === 403 ? 'Forbidden' : 'Unauthorized')
   })
 
   test('routes added through group, guard, route, all and a used plugin fall back to the default', async () => {

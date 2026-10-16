@@ -1,13 +1,15 @@
 import type { Guard, GuardContext, LocalsOf } from 'kay'
 import type { AuthSessionData } from '../src/auth'
-import { describe, expect, spyOn, test } from 'bun:test'
+import { describe, expect, expectTypeOf, spyOn, test } from 'bun:test'
 import { Elysia } from 'elysia'
 import { session } from 'kay/server'
-import { createAuth } from '../src/auth'
+import { Auth, createAuth } from '../src/auth'
 import { memoryStore } from '../src/memoryStore'
 import { browser, SECRET, testApp, userRecord } from './helpers/app'
 
 const POST = { method: 'POST' }
+
+type PluginAuth = Auth<string, 'admin' | 'editor', string>
 
 async function seeded() {
   const setup = testApp()
@@ -167,30 +169,41 @@ describe('gate', () => {
     return { ...setup, app, visitor: browser(app) }
   }
 
-  test('a route without a requirement answers 401 to an anonymous caller', async () => {
-    const { visitor } = await gated()
+  // One credential by route: the default needs any user, `editor` is held by an editor and inherited by an admin, `auth: false` is open to all.
+  const statuses = {
+    'anonymous': { '/default': 401, '/open': 200, '/editors': 401, '/admins': 401 },
+    'an editor': { '/default': 200, '/open': 200, '/editors': 200, '/admins': 403 },
+    'an admin': { '/default': 200, '/open': 200, '/editors': 200, '/admins': 200 },
+  }
+  const roles = { 'anonymous': undefined, 'an editor': ['editor'], 'an admin': ['admin'] } as const
 
-    expect((await visitor.fetch('/default')).status).toBe(401)
-    expect((await visitor.fetch('/open')).status).toBe(200)
-  })
-
-  test('a signed-in user passes the default, and a role they hold or inherit', async () => {
-    const { visitor } = await gated()
-
-    await visitor.fetch('/sign-in/u1', POST)
-
-    expect((await visitor.fetch('/default')).status).toBe(200)
-    expect((await visitor.fetch('/editors')).status).toBe(200)
-    expect((await visitor.fetch('/admins')).status).toBe(403)
-  })
-
-  test('an admin inherits editor', async () => {
+  test.each(Object.keys(statuses) as (keyof typeof statuses)[])('%s meets the routes of a gate', async (who) => {
     const { visitor, store } = await gated()
 
-    await store.users.update('u1', { roles: ['admin'] })
-    await visitor.fetch('/sign-in/u1', POST)
+    if (roles[who]) {
+      await store.users.update('u1', { roles: [...roles[who]] })
+      await visitor.fetch('/sign-in/u1', POST)
+    }
 
-    expect((await visitor.fetch('/editors')).status).toBe(200)
+    const answered = Object.fromEntries(await Promise.all(Object.keys(statuses[who]).map(async path => [path, (await visitor.fetch(path)).status])))
+
+    expect(answered).toEqual(statuses[who])
+  })
+
+  // The types are checked by `bun run check`, not by running: `auth` is the Auth on every route, `auth:` takes a role or false.
+  test('a route after the gate sees `auth`, even one opened with `auth: false`', async () => {
+    const { auth } = testApp()
+    const app = new Elysia()
+      .use(auth.gate())
+      .get('/me', async ({ auth }) => {
+        expectTypeOf(auth).toEqualTypeOf<Auth<never, 'admin' | 'editor', never>>()
+
+        return (await auth.user())?.email ?? 'nobody'
+      })
+      .get('/admin', () => 'ok', { auth: 'admin' })
+      .get('/open', ({ auth }) => auth instanceof Auth, { auth: false })
+
+    expect(await (await app.handle(new Request('http://localhost/open'))).text()).toBe('true')
   })
 
   test('a gate can ask for a role on every route', async () => {
@@ -287,8 +300,11 @@ function guardContext({ locals, path = '/', method = 'GET' }: { locals: object, 
   } as GuardContext
 }
 
+// Checked by `bun run check`: the plugin's locals carry the Auth of the app.
 test('kay types `ctx.locals.auth` from the plugin', () => {
-  const signedIn = async (locals: LocalsOf<ReturnType<typeof testApp>['auth']['plugin']>) => (await locals.auth.user())?.email
+  const typed = (locals: LocalsOf<ReturnType<typeof testApp>['auth']['plugin']>) => {
+    expectTypeOf(locals.auth).toEqualTypeOf<PluginAuth>()
+  }
 
-  expect(signedIn).toBeFunction()
+  expect(typed).toBeInstanceOf(Function)
 })
