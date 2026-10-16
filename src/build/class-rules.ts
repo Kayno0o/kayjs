@@ -5,6 +5,12 @@ import { COMMENTS } from './supports'
 const CONDITIONAL = /^@(?:media|container|supports|layer|scope|starting-style|document)\b/i
 const NAMED_LAYER = /^@layer\s+[^\s{]/i
 const IDENT_CHAR = /[\w\u0080-\uFFFF-]/
+const HEX_ESCAPE = /^\\[\da-f]{1,6}[ \t\n\r\f]?/i
+
+// How many characters the escape starting at `at` takes: a hex escape and the one space ending it, or the backslash and the character after.
+function escapeLength(text: string, at: number): number {
+  return HEX_ESCAPE.exec(text.slice(at, at + 9))?.[0].length ?? 2
+}
 
 export interface Selector {
   text: string
@@ -43,7 +49,7 @@ export function selectors(prelude: string): Selector[] {
     }
 
     if (char === '\\') {
-      at += 2
+      at += escapeLength(prelude, at)
 
       continue
     }
@@ -52,7 +58,7 @@ export function selectors(prelude: string): Selector[] {
       let end = at + 1
 
       while (end < prelude.length && (prelude[end] === '\\' || IDENT_CHAR.test(prelude[end]!)))
-        end += prelude[end] === '\\' ? 2 : 1
+        end += prelude[end] === '\\' ? escapeLength(prelude, end) : 1
 
       classes.push(prelude.slice(at + 1, end))
       at = end

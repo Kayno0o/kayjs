@@ -1,0 +1,5 @@
+---
+import '../../gb.css'
+---
+main.gb-mark
+  slot

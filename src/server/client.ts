@@ -7,7 +7,7 @@ import { join, resolve } from 'node:path'
 import { ASSET_PREFIX, clientDir, outputDir } from '../build/assets'
 import { pruneUnescaped } from '../build/class-rules'
 import { parse, print } from '../build/supports'
-import { NOWHERE } from '../runtime/base'
+import { joinBase, NOWHERE } from '../runtime/base'
 import { unrebaseCss } from './base'
 
 // Written beside the bundle as `manifest.json`, so a production server reads it instead of bundling at boot.
@@ -202,15 +202,15 @@ export async function chooseInlineStyles(client: ClientBuild, base: string, sett
   }
 
   if (client.styleUses !== undefined)
-    client.pageStyles = pageStyles(client, texts, chains)
+    client.pageStyles = pageStyles(client, base, texts, chains)
 }
 
-// Run once the page has all it needs of the shared stylesheets, and so is not held back by them.
+// Run while the head is parsed, which puts the shared stylesheets on the page the moment they load rather than after it is printed.
 export const restScript = '<script data-kay-rest>for(const l of document.querySelectorAll("link[data-kay-rest]"))l.media="all"</script>'
 
-// The head of each chain whose full stylesheets are too heavy to inline but whose own rules fit: the rules for the classes its components name, written inline, ahead of the full stylesheets linked without holding the first paint back.
-// A class no component names, or one built at runtime, has its rule in the linked stylesheet, which the entry makes apply once the page is up, and at once without scripts.
-function pageStyles(client: ClientBuild, texts: Map<string, string>, chains: string[][]): Map<string, PageStyles> {
+// The head of each chain whose full stylesheets are too heavy to inline but whose own rules fit: the rules for the classes its components name, written inline, then the full stylesheets linked without holding the first paint back.
+// A class no component names, or one built at runtime, has its rule in the linked stylesheet, which applies when it arrives, and at once without scripts. It follows the inline rules so it keeps the place it has in the whole stylesheet.
+function pageStyles(client: ClientBuild, base: string, texts: Map<string, string>, chains: string[][]): Map<string, PageStyles> {
   const { classes, entries } = client.styleUses!
   const found = new Map<string, PageStyles>()
   const parsed = new Map<string, Node[]>()
@@ -261,9 +261,10 @@ function pageStyles(client: ClientBuild, texts: Map<string, string>, chains: str
       continue
 
     const links = rest.map(url => `<link rel="stylesheet" href="${url}" media="print" data-kay-rest>`).join('')
-    const plain = rest.map(url => `<link rel="stylesheet" href="${url}">`).join('')
+    // A noscript holds text for the rewriter that puts the mount point on links, so its hrefs carry it already.
+    const plain = rest.map(url => `<link rel="stylesheet" href="${joinBase(base, url)}">`).join('')
 
-    found.set(key, { html: `${links}${rest.length === 0 ? '' : `${restScript}<noscript>${plain}</noscript>`}${inline.map(css => `<style>${css}</style>`).join('')}`, inline })
+    found.set(key, { html: `${inline.map(css => `<style>${css}</style>`).join('')}${links}${rest.length === 0 ? '' : `${restScript}<noscript>${plain}</noscript>`}`, inline })
   }
 
   return found

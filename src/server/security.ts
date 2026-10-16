@@ -80,7 +80,7 @@ export function securityHeaders(options: SecurityOptions, pages: PageSecurity[] 
   const { csp, reports, reportOnly } = options.security ?? {}
   const base = basePath(options.base)
   const hashes = [...inlineScriptHashes({ prefetch: options.prefetch, dev: options.dev, base, offline: offlineOf(options, { dev: options.dev === true }) }), ...(options.scripts ?? []).map(sourceHash)]
-  const styles = (options.styles ?? []).map(sourceHash)
+  const styles = [...new Set((options.styles ?? []).map(sourceHash))]
   const reportTo = reports === true ? `${base}${CSP_REPORTS}` : reports
 
   if (reportTo !== undefined)

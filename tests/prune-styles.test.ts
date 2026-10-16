@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import tailwind from 'bun-plugin-tailwind'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { clientDir } from '../src/build/assets'
-import { pruneNodes } from '../src/build/class-rules'
+import { pruneNodes, styledClassNames } from '../src/build/class-rules'
 import { buildClient } from '../src/build/client'
 import { findKayLibraries } from '../src/build/libraries'
 import { classTokens, unusedLibraryClasses } from '../src/build/prune'
@@ -283,5 +283,11 @@ describe('a library\'s stylesheet in an app', () => {
     await Bun.write(config, (await Bun.file(config).text()).replace('import Callout', 'import Shown from \'ui-lib/unused.kay\'\nimport Callout').replace('{ Callout }', '{ Callout, Shown }'))
 
     expect(libraryRules(await stylesheet((await build(['src/content.config.ts'])).styles))).toEqual([...KEPT, '.ui-unused'].sort())
+  })
+})
+
+describe('styledClassNames', () => {
+  it('reads a class whose escape ends in a space, as 2xl: writes it', () => {
+    expect([...styledClassNames(parse('.\\32 xl\\:p-4 { padding: 1rem }\n.a\\:b.c { color: red }'))].toSorted()).toEqual(['2xl:p-4', 'a:b', 'c'])
   })
 })

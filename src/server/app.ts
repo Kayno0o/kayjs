@@ -209,7 +209,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   const table = routeTable(routes, i18n?.settings, served)
   const app = new Elysia({ name: 'kay/pages', seed: root })
   // Hashed as they go out, under the mount point.
-  const securityOptions = { ...options, dev: mode.dev, islands: client.directives, scripts, styles: [...styles, ...client.inlineStyles?.values() ?? [], ...inlinePageStyles(client)].map(style => rebaseCss(style, base)) }
+  const securityOptions = { ...options, dev: mode.dev, islands: client.directives, scripts, styles: [...new Set([...styles, ...client.inlineStyles?.values() ?? [], ...inlinePageStyles(client)].map(style => rebaseCss(style, base)))] }
   const security = securityHeaders(securityOptions)
   // The paths of the build's files and the image route, whose responses carry the security headers themselves.
   const filePaths = new Set<string>([IMAGE_ROUTE])

@@ -15,6 +15,7 @@ export interface StyleUses {
 
 // A source is read as Tailwind reads it: split where a class name cannot continue, and again at the characters a name may hold but a list of them does not.
 const COARSE = /[\s'"`{}=;<>$]+/
+const SPLITTING = /[\s'"`{}=;<>$]/
 const PIECES = /[.,()]/
 const PUNCTUATION_ONLY = /^[-_:]+$/
 const ENDS_OPEN = /[-_:]$/
@@ -70,11 +71,14 @@ function stylesheetClasses(file: string, seen = new Set<string>()): Set<string> 
 export function styleUses(root: string, entries: Iterable<string>, sheets: Iterable<string>, reached: Reached, shorthand: ReadonlyMap<string, Iterable<string>>): StyleUses {
   const styled = new Set<string>()
 
-  for (const css of sheets) {
+  // Identical texts, as the stylesheets of two entries often are, are read once.
+  for (const css of new Set(sheets)) {
     for (const name of styledClassNames(parse(css)))
       styled.add(name)
   }
 
+  // Names the words of a source cannot hold whole, `data-[state=open]:flex` or `bg-[url('/a.png')]`, are looked for as they are written.
+  const spanning = [...styled].filter(name => SPLITTING.test(name))
   const completions = new Map<string, string[]>()
   // The styled classes a fragment may be the start or the end of, found once however many modules write it.
   const completing = (fragment: string): string[] => {
@@ -109,8 +113,14 @@ export function styleUses(root: string, entries: Iterable<string>, sheets: Itera
 
     const words = new Set<string>(shorthand.get(file) ?? [])
     const fragments = new Set<string>()
+    const text = readSource(file).text
 
-    readWords(readSource(file).text, words, fragments)
+    readWords(text, words, fragments)
+
+    for (const name of spanning) {
+      if (text.includes(name))
+        found.add(name)
+    }
 
     for (const word of words) {
       if (styled.has(word))

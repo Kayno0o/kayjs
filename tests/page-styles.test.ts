@@ -8,7 +8,9 @@ import process from 'node:process'
 import tailwind from 'bun-plugin-tailwind'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { chromium } from 'playwright-core'
+import { styledClassNames } from '../src/build/class-rules'
 import { buildClient } from '../src/build/client'
+import { parse } from '../src/build/supports'
 import { modeOf, PRODUCTION, resolveProject } from '../src/project'
 import { servePages } from '../src/server/app'
 import { INLINE_LIMIT, readClient, readInlineStyles } from '../src/server/client'
@@ -67,6 +69,11 @@ async function head(app: App, path: string): Promise<Head> {
   }
 }
 
+// Whether the rules written inline hold one for the class, as the class attribute writes it: `data-[state=open]:flex`.
+function styles(css: string, name: string): boolean {
+  return styledClassNames(parse(css)).has(name)
+}
+
 // Whether the rules written inline hold one for the class.
 function hasRule(styles: string, name: string): boolean {
   return styles.includes(`.${name.replaceAll(':', '\\:').replaceAll('/', '\\/')}`)
@@ -99,7 +106,8 @@ describe('a page\'s head', () => {
     expect(about.rest).toHaveLength(1)
     expect(about.html).toContain(`<noscript><link rel="stylesheet" href="${about.rest[0]}"></noscript>`)
     expect(about.html).toContain(`<script data-kay-rest>${REST_SCRIPT}</script>`)
-    expect(about.html.indexOf(about.rest[0]!)).toBeLessThan(about.html.indexOf('<style>'))
+    // After the inline rules, so a rule only the shared stylesheet holds keeps the place it has in the whole stylesheet.
+    expect(about.html.lastIndexOf('<style>')).toBeLessThan(about.html.indexOf(about.rest[0]!))
 
     // The layout's own, the page's component, and the stylesheet's hand-written rule.
     for (const name of ['px-4', 'font-bold', 'underline', 'decoration-wavy', 'mark'])
@@ -133,6 +141,23 @@ describe('a page\'s head', () => {
 
     expect(widgets.html).toContain('<script type="module"')
     expect(hasRule(widgets.styles, 'bg-lime-300')).toBe(true)
+  })
+
+  it('carries the rules of static classes whose names hold quotes, equals signs and angle brackets', async () => {
+    const rules = await head(await serve(), '/static')
+
+    for (const name of ['data-[state=open]:bg-red-500', '[&>svg]:size-4', 'bg-[url(\'/a.png\')]', 'has-[>img]:p-2', 'after:content-[\'x\']', '2xl:p-4'])
+      expect(styles(rules.styles, name), name).toBe(true)
+  })
+
+  it('writes the shared stylesheet after the inline rules, so a tie between them goes as in the whole stylesheet', async () => {
+    const tie = await head(await serve(), '/tie')
+
+    expect(styles(tie.styles, 'text-sm')).toBe(true)
+    expect(styles(tie.styles, 'text-xl')).toBe(false)
+    expect(tie.html.indexOf(tie.rest[0]!)).toBeGreaterThan(tie.html.lastIndexOf('</style>'))
+    expect(tie.html.indexOf(REST_SCRIPT)).toBeGreaterThan(tie.html.indexOf(tie.rest[0]!))
+    expect(await sharedText(client, tie.rest[0]!)).toContain('.text-xl')
   })
 
   it('carries the rule of a class its page builds from a template string', async () => {
@@ -173,7 +198,12 @@ describe('a page\'s head', () => {
       expect(policy).toContain(sourceHash(style))
 
     expect(html).toContain(`<link rel="stylesheet" href="${base ?? ''}/_kay/`)
+    expect(html).toMatch(new RegExp(`<noscript><link rel="stylesheet" href="${base ?? ''}/_kay/[^"]+"></noscript>`))
     expect(policy).toContain(sourceHash(REST_SCRIPT))
+    // A style several pages share is let through once.
+    const hashes = policy.match(/'sha256-[^']+'/g)!
+
+    expect(new Set(hashes).size).toBe(hashes.length)
 
     const compressed = await (await serve({ base, security, compress: true }, built)).handle(new Request(`http://localhost${path}`, { headers: { 'accept-encoding': 'br, gzip' } }))
 
@@ -286,6 +316,47 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('the page sw
     await page.goBack()
     await page.locator('h1', { hasText: 'About' }).waitFor()
     expect(await style(page, '.fancy', 'textDecorationLine')).toBe('underline')
+    await page.close()
+  })
+
+  it('drops the shared stylesheet of the layout it leaves, and keeps the new inline rules ahead of the one it keeps', async () => {
+    const page = await browser.newPage()
+
+    await page.goto(`${origin}/ga/pa`)
+    await page.waitForFunction(() => [...document.head.querySelectorAll<HTMLLinkElement>('link[data-kay-rest]')].every(link => link.media === 'all'))
+
+    const before = await page.evaluate(() => [...document.head.querySelectorAll('link[data-kay-rest]')].map(link => link.getAttribute('href')))
+
+    expect(before.length).toBeGreaterThan(1)
+    await page.click('a.to-b')
+    await page.locator('h1', { hasText: 'Page B' }).waitFor()
+
+    const after = await page.evaluate(() => [...document.head.querySelectorAll('link[data-kay-rest]')].map(link => link.getAttribute('href')))
+    const direct = await browser.newPage()
+
+    await direct.goto(`${origin}/gb/pb`)
+
+    const expected = await direct.evaluate(() => [...document.head.querySelectorAll('link[data-kay-rest]')].map(link => link.getAttribute('href')))
+
+    expect(after.toSorted()).toEqual(expected.toSorted())
+    expect(await page.evaluate(() => document.head.querySelectorAll('noscript').length)).toBe(await direct.evaluate(() => document.head.querySelectorAll('noscript').length))
+    // Every inline style sits before the first shared stylesheet.
+    expect(await page.evaluate(() => {
+      const children = [...document.head.children]
+      const first = children.findIndex(element => element.matches('link[data-kay-rest]'))
+
+      return children.slice(first).some(element => element.tagName === 'STYLE')
+    })).toBe(false)
+    await direct.close()
+    await page.close()
+  })
+
+  it('lets a rule only the shared stylesheet holds win a tie against an inline one, as in the whole stylesheet', async () => {
+    const page = await browser.newPage()
+
+    await page.goto(`${origin}/tie`)
+    await page.waitForFunction(() => document.querySelector<HTMLLinkElement>('link[data-kay-rest]')?.media === 'all')
+    await page.waitForFunction(() => getComputedStyle(document.querySelector('.tie')!).fontSize === '20px')
     await page.close()
   })
 })

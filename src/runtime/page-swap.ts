@@ -53,8 +53,8 @@ const CARRIAGE_RETURN = /\r\n?/g
 const SPECULATION = 'script[type="speculationrules"]'
 // The line a page without kay's script carries for Back after a reload, which a swapped-in page leaves to this one.
 const HISTORY = 'script[data-kay-history]'
-// The head elements a swap leaves to itself rather than merging.
 const REST_LINK = 'link[data-kay-rest]'
+// The head elements a swap leaves to itself rather than merging.
 const UNMERGED = `title,${SPECULATION},${HISTORY}`
 // The attributes naming a meta, a head holding one per name and media.
 const META_NAMES = ['name', 'property', 'http-equiv']
@@ -398,6 +398,17 @@ function tokens(value: string | undefined): string[] {
   return value?.split(SPACES).filter(Boolean) ?? []
 }
 
+// How the server put a head element in, whatever a script or the parser did to its markup since: a shared stylesheet is the same before and after its media is set, and a noscript holds its markup as text in a page and as elements in a parsed one.
+function headKey(element: Element): string {
+  if (element.matches(REST_LINK))
+    return `<link data-kay-rest href="${element.getAttribute('href')}">`
+
+  if (element.tagName === 'NOSCRIPT')
+    return `<noscript>${element.firstElementChild === null ? element.textContent : element.innerHTML}</noscript>`
+
+  return element.outerHTML
+}
+
 // Adds what the next head serves that this one lacks now, and drops what the server alone served here as the page is swapped: the page keeps its own styles until the next one's loaded.
 // An element a script changed or added since stays the script's, and the next page's copy of it is not added again, nor its meta of the same name serving another value.
 function mergeHead(next: Document): { loaded: Promise<unknown>, commit: () => void } {
@@ -405,8 +416,7 @@ function mergeHead(next: Document): { loaded: Promise<unknown>, commit: () => vo
   // Each element serialized once, as every `take` compares against all that are left.
   const markup = new Map<Element, string>()
   const html = (element: Element) => {
-    // A shared stylesheet kay applies once the page is up is the same one before and after, whatever its media.
-    const known = markup.get(element) ?? (element.matches(REST_LINK) ? `<link data-kay-rest href="${element.getAttribute('href')}">` : element.outerHTML)
+    const known = markup.get(element) ?? headKey(element)
 
     markup.set(element, known)
 
@@ -425,8 +435,8 @@ function mergeHead(next: Document): { loaded: Promise<unknown>, commit: () => vo
   const named: Element[] = []
 
   for (const element of document.head.children as HTMLCollectionOf<HeadElement>) {
-    // A stylesheet `kay dev` swapped in for an edited one is the server's as it stands.
-    if (element.matches('[data-kay-dev]'))
+    // A stylesheet `kay dev` swapped in for an edited one, and what the page's own scripts only touch the markup of, are the server's as they stand.
+    if (element.matches(`[data-kay-dev],${REST_LINK},noscript`))
       element._$s = html(element)
 
     const key = element._$s
@@ -449,7 +459,7 @@ function mergeHead(next: Document): { loaded: Promise<unknown>, commit: () => vo
 
   for (const element of incoming) {
     const key = html(element)
-    const added: HeadElement = element.tagName === 'SCRIPT' ? runnable(element as HTMLScriptElement) : document.adoptNode(element)
+    const added: HeadElement = adopted(element)
 
     added._$s = key
 
@@ -458,7 +468,13 @@ function mergeHead(next: Document): { loaded: Promise<unknown>, commit: () => vo
     else if (added instanceof HTMLLinkElement && added.rel === 'stylesheet')
       loading.push(loaded(added))
 
-    document.head.append(added)
+    // The shared stylesheet comes last, so a rule it holds that a page's own styles also write keeps the place it had in the whole stylesheet.
+    const rest = added.matches(REST_LINK) ? null : document.head.querySelector(REST_LINK)
+
+    if (rest !== null && (added.tagName === 'STYLE' || added instanceof HTMLLinkElement))
+      rest.before(added)
+    else
+      document.head.append(added)
   }
 
   return {
@@ -466,7 +482,7 @@ function mergeHead(next: Document): { loaded: Promise<unknown>, commit: () => vo
     // One a script changed while the next page's styles loaded is the script's by now.
     commit: () => {
       for (const element of stale) {
-        if (element._$s === element.outerHTML)
+        if (element._$s === headKey(element))
           element.remove()
       }
     },
@@ -481,6 +497,22 @@ function metaName(element: Element): string | undefined {
   const by = META_NAMES.find(name => element.hasAttribute(name))
 
   return by === undefined ? undefined : `${by}=${element.getAttribute(by)!.toLowerCase()} ${element.getAttribute('media') ?? ''}`
+}
+
+function adopted(element: Element): HeadElement {
+  if (element.tagName === 'SCRIPT')
+    return runnable(element as HTMLScriptElement)
+
+  return element.tagName === 'NOSCRIPT' ? asText(element) : document.adoptNode(element)
+}
+
+// A noscript of a parsed page holds elements, which would load as they are: it is made again with its markup as text, as the server sends it.
+function asText(noscript: Element): HeadElement {
+  const copy = document.createElement('noscript')
+
+  copy.textContent = noscript.innerHTML
+
+  return copy
 }
 
 // A script that ran stays, since taking it out undoes nothing; one holding data, such as the schemas of the page's forms, goes with its page.

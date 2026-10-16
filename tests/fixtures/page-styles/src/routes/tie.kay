@@ -1,0 +1,5 @@
+--- server
+const size = ['text', 'xl'].join('-')
+---
+h1 Tie
+p.tie(class={`text-sm ${size}`}) a runtime size next to a static one
