@@ -17,7 +17,8 @@ It answered `{ ok: false, error: 'unavailable' }` there; a call with no `pages.p
 
 ### `pages.profile.load` answering what is no string throws
 
-- A number, a boolean or an object for a field showed as an empty field and the next save wrote it over; the account page now answers 500 naming the field. Return a string, `null` or `undefined` for each field. `kay check` cannot see what `load` answers at run time, so no deprecated lint is possible.
+A number, a boolean or an object for a field showed as an empty field, and the next save wrote it over. The account page now answers 500 naming the field. Return a string, `null` or `undefined` for each field.
+
 ### `kay new`'s `app` keeps its members in SQLite
 
 Only what `kay new` writes changes. An app you made earlier keeps its Postgres files and has nothing to change. To scaffold the Postgres stack again, add `--with postgres` to `--template app`.

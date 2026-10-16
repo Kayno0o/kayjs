@@ -6,11 +6,12 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ### `auth.saveProfile` throws without `pages.profile`
 
-It answered `{ ok: false, error: 'unavailable' }` there; a call with no `pages.profile` is the app's mistake and now throws. Declare `pages.profile`, or drop the call, and drop a branch on `'unavailable'`.
+- It answered `{ ok: false, error: 'unavailable' }` there; a call with no `pages.profile` is the app's mistake and now throws. Declare `pages.profile`, or drop the call, and drop a branch on `'unavailable'`.
 
 ### `pages.profile.load` answering what is no string throws
 
 - A number, a boolean or an object for a field showed as an empty field and the next save wrote it over; the account page now answers 500 naming the field. Return a string, `null` or `undefined` for each field. `kay check` cannot see what `load` answers at run time, so no deprecated lint is possible.
+
 ### `kay new`'s `app` keeps its members in SQLite
 
 - Only what `kay new` writes changes: an app made earlier keeps its Postgres files and has nothing to change. To scaffold the Postgres stack again, add `--with postgres` to `--template app`. No deprecated lint covers it, as nothing in an app's code is the old form.
