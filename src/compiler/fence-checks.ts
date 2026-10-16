@@ -201,16 +201,16 @@ function memberName(key: t.Node, computed: boolean): string | undefined {
   return key.type === 'Identifier' && !computed ? key.name : undefined
 }
 
-type Moved = (typeof MOVED_IMPORTS)[number]
+interface Named { name: string }
 
 // The names a namespace import hands out that moved, read off it (`server.invalidatePage`, `server['invalidatePage']`) or destructured from it (`const { invalidatePage } = server`), as the node writing the name.
 // Babel's scopes tell the namespace from an inner binding of the same name; a fence giving it none, a name declared twice, is read by name alone.
-function namespaceReads(fence: ParsedFence, namespaces: Map<t.ImportNamespaceSpecifier, Moved[]>): { key: t.Node, moved: Moved }[] {
+function namespaceReads<Entry extends Named>(fence: ParsedFence, namespaces: Map<t.ImportNamespaceSpecifier, Entry[]>): { key: t.Node, moved: Entry }[] {
   if (namespaces.size === 0)
     return []
 
-  const found: { key: t.Node, moved: Moved }[] = []
-  const movedBy = (object: t.Node | null | undefined, name: string | undefined, scope: NodePath['scope'] | undefined): Moved | undefined => {
+  const found: { key: t.Node, moved: Entry }[] = []
+  const movedBy = (object: t.Node | null | undefined, name: string | undefined, scope: NodePath['scope'] | undefined): Entry | undefined => {
     if (object?.type !== 'Identifier')
       return undefined
 
@@ -347,35 +347,45 @@ export function deprecatedImports(fence: ParsedFence): Diagnostic[] {
 }
 
 // What `kay/cache` exports to the server alone: the browser's entry has `cached` and `invalidate`, though the types of the one entry name every export.
-const SERVER_ONLY_CACHE = new Set(['invalidatePage', 'sqliteCache'])
+const SERVER_ONLY_CACHE = ['invalidatePage', 'sqliteCache']
 
 // A server-only name of `kay/cache` imported by a fence that runs in the browser, which the build refuses with a missing export.
 export function serverOnlyImports(fence: ParsedFence): Diagnostic[] {
   if (!fence.code.includes('kay/cache'))
     return []
 
-  return fence.ast.program.body.flatMap((node) => {
-    if (node.type !== 'ImportDeclaration' || node.source.value !== 'kay/cache' || node.importKind === 'type')
-      return []
-
-    return node.specifiers.flatMap((specifier) => {
-      if (specifier.type !== 'ImportSpecifier' || specifier.importKind === 'type')
-        return []
-
-      const name = specifier.imported.type === 'Identifier' ? specifier.imported.name : specifier.imported.value
-
-      return !SERVER_ONLY_CACHE.has(name)
-        ? []
-        : [{
-          ...fence.shift(specifier),
-          code: 'server-only-import',
-          message: `\`${name}\` is exported to the server alone, and this code runs in the browser`,
-          note: 'the browser\'s `kay/cache` has `cached` and `invalidate`',
-          help: 'call it from a `--- server` fence or an action, and keep this import there',
-          checkOnly: true,
-        }]
-    })
+  const diagnostics: Diagnostic[] = []
+  const namespaces = new Map<t.ImportNamespaceSpecifier, Named[]>()
+  const report = (node: t.Node, name: string) => diagnostics.push({
+    ...fence.shift(node),
+    code: 'server-only-import',
+    message: `\`${name}\` is exported to the server alone, and this code runs in the browser`,
+    note: 'the browser\'s `kay/cache` has `cached` and `invalidate`',
+    help: 'call it from a `--- server` fence or an action, and keep this import there',
+    checkOnly: true,
   })
+
+  for (const node of fence.ast.program.body) {
+    if (node.type !== 'ImportDeclaration' || node.source.value !== 'kay/cache' || node.importKind === 'type')
+      continue
+
+    for (const specifier of node.specifiers) {
+      if (specifier.type === 'ImportNamespaceSpecifier') {
+        namespaces.set(specifier, SERVER_ONLY_CACHE.map(name => ({ name })))
+      }
+      else if (specifier.type === 'ImportSpecifier' && specifier.importKind !== 'type') {
+        const name = specifier.imported.type === 'Identifier' ? specifier.imported.name : specifier.imported.value
+
+        if (SERVER_ONLY_CACHE.includes(name))
+          report(specifier, name)
+      }
+    }
+  }
+
+  for (const { key, moved } of namespaceReads(fence, namespaces))
+    report(key, moved.name)
+
+  return diagnostics
 }
 
 const CSS_BINDING = /\bimport\b[^;'"]+from\s*['"][^'"\n]+\.css['"]/

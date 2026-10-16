@@ -608,4 +608,12 @@ describe('server-only-import', () => {
 
     expect([server, plain, shared, typed].map(only)).toEqual([[], [], [], []])
   })
+
+  it('reaches a static component only islands render, and a name read off a namespace import', () => {
+    const plain = '---\nimport { sqliteCache } from \'kay/cache\'\n\nconst disk = sqliteCache(\'a.sqlite\')\n---\np {disk}'
+    const namespace = '---\nimport { signal } from \'kay\'\nimport * as cache from \'kay/cache\'\n\nconst count = signal(0)\nconst disk = cache.sqliteCache(\'a.sqlite\')\ncache.invalidate(\'a\')\n---\nbutton(onClick={() => count++}) {count()} {disk}'
+
+    expect(lints(plain, { insideIsland: true }).filter(lint => lint.code === 'server-only-import')).toEqual([{ code: 'server-only-import', severity: 'error', at: 'sqliteCache' }])
+    expect(only(namespace)).toEqual([{ code: 'server-only-import', severity: 'error', at: 'sqliteCache' }])
+  })
 })
