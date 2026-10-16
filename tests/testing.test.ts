@@ -458,6 +458,34 @@ describe('reading a page', () => {
     expect(readPage('<dl><dt>a<dd>b<dt>c</dl>').find('dd, dt').map(({ html }) => html)).toEqual(['a', 'b', 'c'])
   })
 
+  it('closes an element through the open elements above it, without crossing a scope boundary', () => {
+    const htmls = (html: string, selector: string) => readPage(html).find(selector).map(({ html }) => html)
+
+    expect(htmls('<ul><li><span>a<li>b</ul>', 'li')).toEqual(['<span>a', 'b'])
+    expect(htmls('<ul><li><div>a<li>b</div></ul>', 'li')).toEqual(['<div>a', 'b'])
+    expect(htmls('<ul><li>a<ul><li>b</ul><li>c</ul>', 'li')).toEqual(['a<ul><li>b</ul>', 'b', 'c'])
+    expect(htmls('<dl><dt><b>a<dd>b</dl>', 'dt, dd')).toEqual(['<b>a', 'b'])
+    expect(htmls('<div><p><b>one<div>two</div>', 'p')).toEqual(['<b>one'])
+    expect(htmls('<p><span>one<p>two', 'p')).toEqual(['<span>one', 'two'])
+    // A table cell or a button holds its own scope: the outer paragraph stays open.
+    expect(htmls('<p>a<button>b<div>c</div></button>d', 'p')).toEqual(['a<button>b<div>c</div></button>d'])
+    expect(htmls('<p>a<table><tr><td>b<div>c</div></td></tr></table>d', 'p')).toEqual(['a'])
+  })
+
+  it('closes cells, rows, sections and options by the next one', () => {
+    const htmls = (html: string, selector: string) => readPage(html).find(selector).map(({ html }) => html)
+
+    expect(htmls('<table><tr><td>a<td>b<th>c</table>', 'td, th')).toEqual(['a', 'b', 'c'])
+    expect(htmls('<table><tr><td><b>a<td>b</table>', 'td')).toEqual(['<b>a', 'b'])
+    expect(htmls('<table><tr><td>a<tr><td>b</table>', 'tr')).toEqual(['<td>a', '<td>b'])
+    expect(htmls('<table><thead><tr><th>a<tbody><tr><td>b</table>', 'thead, tbody')).toEqual(['<tr><th>a', '<tr><td>b'])
+    expect(htmls('<table><tbody><tr><td>a<tbody><tr><td>b</table>', 'tbody')).toEqual(['<tr><td>a', '<tr><td>b'])
+    // A table nested in a cell has its own rows.
+    expect(htmls('<table><tr><td><table><tr><td>x</table><td>y</table>', 'td')).toEqual(['<table><tr><td>x</table>', 'x', 'y'])
+    expect(htmls('<select><option>a<option>b<optgroup label=g><option>c</select>', 'option, optgroup')).toEqual(['a', 'b', '<option>c', 'c'])
+    expect(htmls('<select><optgroup label=a><option>x<optgroup label=b><option>y</select>', 'optgroup')).toEqual(['<option>x', '<option>y'])
+  })
+
   it('reads the markup of an element beside a comment that looks like its own marker', () => {
     const page = readPage('<!--kay-open-0--><p>one</p><!--kay-close-0-->')
 
