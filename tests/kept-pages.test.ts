@@ -787,6 +787,8 @@ describe('what kay exports to a page that is kept', () => {
       'src/routes/in-value.kay': '---\nimport { persisted } from \'kay\'\n\nconst a = persisted(\'a\', { storage: \'local\' })\n---\np {a()}\n',
       'src/routes/commented.kay': '---\nimport { persisted } from \'kay\'\n\nconst a = persisted(\'a\', \'1\', /* { storage: \'local\' } */)\n---\np {a()}\n',
       'src/routes/parens.kay': '---\nimport { persisted } from \'kay\'\n\nconst a = persisted(\'(\', \'1\', { storage: \'cookie\' })\nconst b = \'storage: "local"\'\n---\np {a()}\n',
+      'src/routes/computed.kay': '---\nimport { persisted } from \'kay\'\n\nconst a = persisted(\'a\', \'1\', { storage: \'local\', [\'storage\']: \'cookie\' })\n---\np {a()}\n',
+      'src/routes/quoted.kay': '---\nimport { persisted } from \'kay\'\n\nconst a = persisted(\'a\', \'1\', { storage: \'local\', "storage": \'cookie\' })\n---\np {a()}\n',
       'src/routes/through-barrel.kay': '---\nimport { cookie } from \'../barrel\'\n---\np {cookie()}\n',
       'src/barrel.ts': 'export * from \'./cookie\'\n',
       'src/cookie.ts': 'import { persisted } from \'kay\'\n\nexport const cookie = persisted(\'c\', \'1\')\n',
@@ -800,7 +802,7 @@ describe('what kay exports to a page that is kept', () => {
     for (const page of ['local', 'typed', 'in-module'])
       expect(await at(`src/routes/${page}.kay`)).toBeUndefined()
 
-    for (const page of ['cookie', 'query', 'mixed', 'passed', 'spread', 'in-value', 'commented', 'parens'])
+    for (const page of ['cookie', 'query', 'mixed', 'passed', 'spread', 'in-value', 'commented', 'parens', 'computed', 'quoted'])
       expect(await at(`src/routes/${page}.kay`)).toMatchObject({ why: expect.stringMatching(/^imports `persisted(?: as keep)?` from `kay`, which a request or the clock can change$/) })
 
     expect(await at('src/routes/through-barrel.kay')).toMatchObject({ file: join(root, 'src/cookie.ts') })

@@ -151,6 +151,8 @@ const LOCAL_STORAGE = /^storage\s*:\s*(['"])local\1$/
 const NOT_NEWLINE = /[^\n]/g
 const FOLDER_LITERAL = /^(?:'[^'\\\n]*'|"[^"\\\n]*"|`[^`\\$]*`)$/
 const STORAGE_PROPERTY = /^storage\b/
+// A key the scan cannot read as `storage` or as another name: a computed one, or `storage` written in quotes.
+const HIDDEN_KEY = /^(?:\[|(['"`])storage\1)/
 const CALL_OPENING = /^\s*(?:<[^()]*>\s*)?\(/
 const REGEX_CHARS = /[$()*+.?[\\\]^{|}]/g
 const OPENERS = '([{'
@@ -216,7 +218,7 @@ function savesLocally(args: string): boolean {
 
   const properties = splitLevel(options.slice(1))?.map(part => part.trim()).filter(part => part !== '')
 
-  if (properties === undefined || properties.some(property => property.startsWith('...')))
+  if (properties === undefined || properties.some(property => property.startsWith('...') || HIDDEN_KEY.test(property)))
     return false
 
   const storage = properties.filter(property => STORAGE_PROPERTY.test(property))
