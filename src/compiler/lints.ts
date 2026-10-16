@@ -227,14 +227,6 @@ export const LINTS = {
     wrong: '--- server\nimport { action, s } from \'kay\'\n\nexport const add = action(s.Object({ title: s.String() }), async ({ title }) => create(title))\n---\nform(action={add})\n  input(name="title")',
     right: '--- server\nimport { action, s } from \'kay\'\n\nexport const add = action(s.Object({ title: s.String({ maxLength: 200 }) }), async ({ title }) => create(title))\n---\nform(action={add})\n  input(name="title")',
   },
-  'deprecated-import': {
-    level: 'warn',
-    group: 'deprecated',
-    since: '1.46',
-    summary: 'A name imported from the entry point it left: `invalidatePage`, once in `kay/server`, now in `kay/cache` beside `invalidate`. `kay check --fix` rewrites the import, in `.kay` fences and `.ts` modules alike.',
-    wrong: '--- server\nimport { invalidatePage } from \'kay/server\'\n\nexport const save = action(s.Object({}), async () => invalidatePage(\'/news\'))\n---\np Saved',
-    right: '--- server\nimport { invalidatePage } from \'kay/cache\'\n\nexport const save = action(s.Object({}), async () => invalidatePage(\'/news\'))\n---\np Saved',
-  },
   'css-import-without-text': {
     level: 'deny',
     group: 'code',

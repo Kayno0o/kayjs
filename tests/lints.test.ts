@@ -125,126 +125,31 @@ describe('css-import-without-text', () => {
 
 describe('the checks that read a module', () => {
   it('leaves a fence or module declaring a name twice to the type check, which reports it', () => {
-    const twice = 'import { invalidatePage } from \'kay/server\'\nconst a = 1\nconst a = 2\n'
+    const twice = 'import theme from \'./theme.css\'\nconst a = 1\nconst a = 2\n'
 
     const duplicate = { code: 'fence-syntax', severity: undefined, at: 'a' }
-    // The statement declaring it again is left out of the analysis, which still reads the rest.
-    const deprecated = { code: 'deprecated-import', severity: 'warning' as const, at: 'invalidatePage' }
+    const css = { code: 'css-import-without-text', severity: 'error' as const, at: 'import theme from \'./theme.css\'' }
 
-    expect(lints(`---\n${twice}---\ndiv {a}`)).toEqual([deprecated, duplicate])
-    expect(lints(`--- server\n${twice}---\ndiv x`)).toEqual([deprecated, duplicate])
-    expect(moduleChecks(twice).map(d => d.code)).toEqual(['deprecated-import'])
+    // The statement declaring it again is left out of the analysis, which still reads the rest.
+    expect(lints(`---\n${twice}---\ndiv {a}`)).toEqual([css, duplicate])
+    expect(lints(`--- server\n${twice}---\ndiv x`)).toEqual([css, duplicate])
+    expect(moduleChecks(twice).map(d => d.code)).toEqual(['css-import-without-text'])
   })
 
   it('reads a module whose statement does not parse once, so the checks inside that statement still run', () => {
-    const module = 'import { invalidatePage } from \'kay/server\'\nexport const a = invalidatePage({}) foo\nimport theme from \'./theme.css\' bar\n'
+    const module = 'export const a = 1 foo\nimport theme from \'./theme.css\' bar\n'
     const parse = spyOn(parser, 'parse')
 
     try {
       const found = moduleChecks(module)
 
-      expect(found.map(d => d.code)).toEqual(['deprecated-import', 'css-import-without-text'])
-      expect(found[1]!.message).toContain('./theme.css')
+      expect(found.map(d => d.code)).toEqual(['css-import-without-text'])
+      expect(found[0]!.message).toContain('./theme.css')
       expect(parse).toHaveBeenCalledTimes(1)
     }
     finally {
       parse.mockRestore()
     }
-  })
-})
-
-describe('deprecated-import', () => {
-  it('moves invalidatePage from kay/server to kay/cache, rewriting the module alone when it is the only name, else adding an import', () => {
-    const only = '--- server\nimport { invalidatePage } from \'kay/server\'\n\nexport const save = action(s.Object({}), async () => invalidatePage(\'/\'))\n---\np x'
-    const shared = '--- server\nimport { api, invalidatePage, pages } from \'kay/server\'\n\ninvalidatePage(\'/\')\n---\np x'
-    const last = '--- server\nimport { api, invalidatePage as refresh } from \'kay/server\'\n\nrefresh(\'/\')\n---\np x'
-
-    expect(lints(only)).toEqual([{ code: 'deprecated-import', severity: 'warning', at: 'invalidatePage' }])
-    expect(fixed(only)).toEqual([only.replace('kay/server', 'kay/cache')])
-    expect(fixed(shared)).toEqual([shared.replace('{ api, invalidatePage, pages } from \'kay/server\'', '{ api, pages } from \'kay/server\'\nimport { invalidatePage } from \'kay/cache\'')])
-    expect(fixed(last)).toEqual([last.replace('{ api, invalidatePage as refresh } from \'kay/server\'', '{ api } from \'kay/server\'\nimport { invalidatePage as refresh } from \'kay/cache\'')])
-  })
-
-  it('takes the name out of a multi-line import and keeps a type import a type', () => {
-    const many = '--- server\nimport {\n  api,\n  invalidatePage,\n  pages,\n} from \'kay/server\'\n\ninvalidatePage(\'/\')\n---\np x'
-    const typed = 'import type { invalidatePage, pages } from \'kay/server\'\n'
-
-    expect(fixed(many)).toEqual([many.replace('  api,\n  invalidatePage,\n  pages,\n} from \'kay/server\'', '  api,\n  pages,\n} from \'kay/server\'\nimport { invalidatePage } from \'kay/cache\'')])
-    expect(moduleChecks(typed).flatMap(d => d.fixes ?? []).map(fix => fix.edits.map(edit => edit.text))).toEqual([['', '\nimport type { invalidatePage } from \'kay/cache\'']])
-  })
-
-  it('merges the name into the import of kay/cache already there, whole when it was alone', () => {
-    const shared = '--- server\nimport { api, invalidatePage } from \'kay/server\'\nimport { cached } from \'kay/cache\'\n---\np x'
-    const alone = '--- server\nimport { invalidatePage } from \'kay/server\'\nimport { cached } from \'kay/cache\'\n---\np x'
-    const twice = 'import { invalidatePage } from \'kay/server\'\nimport { invalidatePage } from \'kay/cache\'\n'
-    const typed = 'import type { invalidatePage } from \'kay/server\'\nimport { cached } from \'kay/cache\'\n'
-
-    expect(fixed(shared)).toEqual(['--- server\nimport { api } from \'kay/server\'\nimport { cached, invalidatePage } from \'kay/cache\'\n---\np x'])
-    expect(fixed(alone)).toEqual(['--- server\nimport { cached, invalidatePage } from \'kay/cache\'\n---\np x'])
-    expect(moduleChecks(twice).flatMap(d => d.fixes ?? []).map(fix => fix.edits)).toEqual([[{ start: 0, end: 44, text: '' }]])
-    expect(moduleChecks(typed).flatMap(d => d.fixes ?? []).map(fix => fix.edits.map(edit => edit.text))).toEqual([['\'kay/cache\'']])
-  })
-
-  it('keeps the comments around a removed name and the default import beside it', () => {
-    const line = '--- server\nimport {\n  api,\n  invalidatePage, // refreshes\n  pages,\n} from \'kay/server\'\n---\np x'
-    const block = '--- server\nimport { api, invalidatePage /* why */, pages } from \'kay/server\'\n---\np x'
-    const last = '--- server\nimport { api, /* why */ invalidatePage } from \'kay/server\'\n---\np x'
-    const fallback = '--- server\nimport api, { invalidatePage } from \'kay/server\'\n---\np x'
-
-    expect(fixed(line)).toEqual([line.replace('  invalidatePage, // refreshes\n', '   // refreshes\n').replace('} from \'kay/server\'', '} from \'kay/server\'\nimport { invalidatePage } from \'kay/cache\'')])
-    expect(fixed(block)).toEqual(['--- server\nimport { api,  /* why */ pages } from \'kay/server\'\nimport { invalidatePage } from \'kay/cache\'\n---\np x'])
-    expect(fixed(last)).toEqual(['--- server\nimport { api, /* why */  } from \'kay/server\'\nimport { invalidatePage } from \'kay/cache\'\n---\np x'])
-    expect(fixed(fallback)).toEqual(['--- server\nimport api from \'kay/server\'\nimport { invalidatePage } from \'kay/cache\'\n---\np x'])
-  })
-
-  it('reports a namespace read and a re-export, fixing the re-export', () => {
-    const namespace = '--- server\nimport * as server from \'kay/server\'\n\nserver.invalidatePage(\'/\')\nserver[\'invalidatePage\']\n---\np x'
-    const reexport = 'export { invalidatePage } from \'kay/server\'\n'
-
-    expect(lints(namespace)).toEqual([{ code: 'deprecated-import', severity: 'warning', at: 'invalidatePage' }, { code: 'deprecated-import', severity: 'warning', at: '\'invalidatePage\'' }])
-    expect(fixed(namespace)).toEqual([])
-    expect(moduleChecks(reexport).map(d => d.code)).toEqual(['deprecated-import'])
-    expect(moduleChecks(reexport).flatMap(d => d.fixes ?? []).map(fix => fix.edits.map(edit => edit.text))).toEqual([['\'kay/cache\'']])
-    expect(moduleChecks('import * as other from \'./mine\'\nother.invalidatePage()\n')).toEqual([])
-  })
-
-  it('reports a namespace read where the namespace is in scope, not where an inner binding shadows it, and a name destructured off it', () => {
-    const shadowed = '--- server\nimport * as server from \'kay/server\'\n\nexport const run = (server: { invalidatePage: () => void }) => server.invalidatePage()\n\nserver.invalidatePage(\'/\')\n---\np x'
-    const destructured = '--- server\nimport * as server from \'kay/server\'\n\nconst { invalidatePage } = server\nconst { invalidatePage: refresh, pages } = server\nconst { \'invalidatePage\': quoted } = server\nconst { pages: other } = server\n---\np x'
-    const inner = '--- server\nimport * as server from \'kay/server\'\n\nfunction run(server: { invalidatePage: () => void }) {\n  const { invalidatePage } = server\n}\n---\np x'
-
-    const deprecated = (source: string) => lints(source).filter(lint => lint.code === 'deprecated-import')
-
-    expect(deprecated(shadowed)).toEqual([{ code: 'deprecated-import', severity: 'warning', at: 'invalidatePage' }])
-    expect(deprecated(destructured)).toEqual([
-      { code: 'deprecated-import', severity: 'warning', at: 'invalidatePage' },
-      { code: 'deprecated-import', severity: 'warning', at: 'invalidatePage' },
-      { code: 'deprecated-import', severity: 'warning', at: '\'invalidatePage\'' },
-    ])
-    expect(deprecated(inner)).toEqual([])
-  })
-
-  it('reads a namespace by name in a module Babel gives no scopes', () => {
-    const twice = 'import * as server from \'kay/server\'\nconst a = 1\nconst a = 2\nserver.invalidatePage(\'/\')\n'
-
-    expect(moduleChecks(twice).map(d => d.code)).toEqual(['deprecated-import'])
-  })
-
-  it('keeps the comments inside a statement removed whole, after its name merged into kay/cache', () => {
-    const before = '--- server\nimport { /* why */ invalidatePage } from \'kay/server\'\nimport { cached } from \'kay/cache\'\n---\np x'
-    const after = '--- server\nimport { invalidatePage /* why */ } from \'kay/server\'\nimport { cached } from \'kay/cache\'\n---\np x'
-    const line = '--- server\nimport {\n  invalidatePage, // why\n} from \'kay/server\'\nimport { cached } from \'kay/cache\'\n---\np x'
-    const kept = '--- server\nimport api, { /* why */ invalidatePage } from \'kay/server\'\n---\np x'
-
-    expect(fixed(before)).toEqual(['--- server\n/* why */\nimport { cached, invalidatePage } from \'kay/cache\'\n---\np x'])
-    expect(fixed(after)).toEqual(['--- server\n/* why */\nimport { cached, invalidatePage } from \'kay/cache\'\n---\np x'])
-    expect(fixed(line)).toEqual(['--- server\n// why\nimport { cached, invalidatePage } from \'kay/cache\'\n---\np x'])
-    expect(fixed(kept)).toEqual(['--- server\nimport api /* why */ from \'kay/server\'\nimport { invalidatePage } from \'kay/cache\'\n---\np x'])
-  })
-
-  it('leaves the names of other modules and kay/cache alone, and finds the import in a plain module too', () => {
-    expect(lints('--- server\nimport { invalidatePage } from \'./mine\'\nimport { invalidate } from \'kay/cache\'\n---\np x')).toEqual([])
-    expect(moduleChecks('import { invalidatePage } from \'kay/server\'\n').map(d => d.code)).toEqual(['deprecated-import'])
   })
 })
 

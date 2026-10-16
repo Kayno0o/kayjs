@@ -1,4 +1,4 @@
-// The checks a fence takes once parsed, beside what analyzing it reports: a schema field with no bound, a renamed import, a stylesheet imported for its text without asking, a page setting outside `page`.
+// The checks a fence takes once parsed, beside what analyzing it reports: a schema field with no bound, a stylesheet imported for its text without asking, a page setting outside `page`.
 
 import type { NodePath } from '@babel/traverse'
 import type * as t from '@babel/types'
@@ -129,70 +129,6 @@ export function unboundedFields(server: ServerAnalysis | undefined): Diagnostic[
   return diagnostics
 }
 
-// Names that changed entry point: kay's own entries each hold one kind of name (`kay` what browser code may run, `kay/server` what only the server does, a topic's entry its topic), and these were elsewhere.
-const MOVED_IMPORTS = [{ name: 'invalidatePage', from: 'kay/server', to: 'kay/cache' }]
-const MOVED_NAME = new RegExp(`\\b(?:${MOVED_IMPORTS.map(({ name }) => name).join('|')})\\b`)
-
-interface Edit { start: number, end: number, text: string }
-type Moving = t.ImportDeclaration | t.ExportNamedDeclaration
-type NamedSpecifier = t.ImportSpecifier | t.ExportSpecifier
-
-const COMMENT = /\/\/[^\n]*|\/\*[\s\S]*?\*\//y
-const ONLY_COMMA = /^\s*,\s*$/
-
-// The index of the first comma between two offsets that no comment holds.
-function commaBetween(code: string, from: number, to: number): number {
-  for (let index = from; index < to; index++) {
-    if (code[index] === ',')
-      return index
-
-    if (code[index] === '/') {
-      COMMENT.lastIndex = index
-      const comment = COMMENT.exec(code)
-
-      if (comment)
-        index += comment[0].length - 1
-    }
-  }
-
-  return -1
-}
-
-// The edits taking one specifier out of the braces, leaving the comments around it where they were.
-function removeSpecifier(code: string, specifiers: t.Node[], index: number): Edit[] {
-  const specifier = specifiers[index]!
-  const next = specifiers[index + 1]
-  const previous = specifiers[index - 1]
-  const own = { start: specifier.start!, end: specifier.end!, text: '' }
-
-  if (next) {
-    if (ONLY_COMMA.test(code.slice(specifier.end!, next.start!)))
-      return [{ ...own, end: next.start! }]
-
-    const comma = commaBetween(code, specifier.end!, next.start!)
-
-    return comma === -1 ? [own] : [own, { start: comma, end: comma + 1, text: '' }]
-  }
-
-  if (previous && ONLY_COMMA.test(code.slice(previous.end!, specifier.start!)))
-    return [{ ...own, start: previous.end! }]
-
-  return [own]
-}
-
-// The comments written between two offsets of the fence, as written.
-function commentsIn(fence: ParsedFence, start: number, end: number): string[] {
-  return (fence.ast.comments ?? []).filter(comment => comment.start! >= start && comment.end! <= end).map(comment => fence.code.slice(comment.start, comment.end))
-}
-
-function isNamed(specifier: t.Node): specifier is NamedSpecifier {
-  return specifier.type === 'ImportSpecifier' || specifier.type === 'ExportSpecifier'
-}
-
-function kindOf(node: Moving): string | null | undefined {
-  return node.type === 'ImportDeclaration' ? node.importKind : node.exportKind
-}
-
 // The name a property key writes: an identifier read as written unless computed, or a string literal.
 function memberName(key: t.Node, computed: boolean): string | undefined {
   if (key.type === 'StringLiteral')
@@ -258,99 +194,6 @@ function namespaceReads<Entry extends Named>(fence: ParsedFence, namespaces: Map
   }
 
   return found
-}
-
-// A name imported, re-exported, read off a namespace or destructured from one from the entry it left. The fix points the whole statement at the new entry when the name is alone in it, merges the name into the statement already naming that entry, else takes it out and adds a statement after it; a namespace read is reported with no fix, as none renames it safely, and only where the namespace binding is the one in scope.
-export function deprecatedImports(fence: ParsedFence): Diagnostic[] {
-  if (!MOVED_NAME.test(fence.code))
-    return []
-
-  const span = fence.shift
-  const code = fence.code
-  const body = fence.ast.program.body
-  const diagnostics: Diagnostic[] = []
-  const namespaces = new Map<t.ImportNamespaceSpecifier, typeof MOVED_IMPORTS>()
-
-  for (const node of body) {
-    if (node.type !== 'ImportDeclaration' && !(node.type === 'ExportNamedDeclaration' && node.source))
-      continue
-
-    const source = node.source!.value
-    const keyword = node.type === 'ImportDeclaration' ? 'import' : 'export'
-    const named = (node.specifiers as t.Node[]).filter(isNamed)
-    const others = node.specifiers.length - named.length
-
-    if (node.type === 'ImportDeclaration' && node.importKind !== 'type') {
-      for (const specifier of node.specifiers) {
-        if (specifier.type === 'ImportNamespaceSpecifier')
-          namespaces.set(specifier, MOVED_IMPORTS.filter(({ from }) => from === source))
-      }
-    }
-
-    for (const [index, specifier] of named.entries()) {
-      const name = specifier.type === 'ImportSpecifier' ? specifier.imported : specifier.local
-      const imported = name.type === 'Identifier' ? name.name : name.value
-      const moved = MOVED_IMPORTS.find(entry => entry.name === imported && entry.from === source)
-
-      if (!moved)
-        continue
-
-      const written = code.slice(specifier.start!, specifier.end!)
-      const kind = kindOf(node) === 'type' ? 'type ' : ''
-      // A statement of the same kind already naming the new entry takes the name into its braces.
-      const target = body.find((other): other is Moving => other !== node && other.type === node.type && (other).source?.value === moved.to && kindOf(other) === kindOf(node) && (other).specifiers.some(isNamed))
-      const targetLast = target?.specifiers.filter(isNamed).at(-1)
-      const whole = named.length === 1 && others === 0
-      let edits: Edit[]
-
-      if (whole && !target) {
-        edits = [{ ...span(node.source!), text: `'${moved.to}'` }]
-      }
-      else if (whole) {
-        // The comments written inside the statement stay, ahead of the import the name went into.
-        edits = [{ ...span({ start: node.start!, end: node.end! + (code[node.end!] === '\n' ? 1 : 0) } as t.Node), text: commentsIn(fence, node.start!, node.end!).map(comment => `${comment}\n`).join('') }]
-      }
-      else if (named.length === 1) {
-        // A default import stays, and the braces go with the only name in them, their comments with them.
-        const braces = { start: node.specifiers.find(entry => !isNamed(entry))!.end!, end: code.lastIndexOf('}', node.source!.start!) + 1 }
-
-        edits = [{ ...span(braces as t.Node), text: commentsIn(fence, braces.start, braces.end).map(comment => comment.startsWith('//') ? ` ${comment}\n` : ` ${comment}`).join('') }]
-      }
-      else {
-        edits = removeSpecifier(code, named, index).map(edit => ({ ...span(edit as unknown as t.Node), text: '' }))
-      }
-
-      const already = target?.specifiers.filter(isNamed).some(entry => code.slice(entry.start!, entry.end!) === written)
-
-      if (targetLast && !already)
-        edits.push({ ...span({ start: targetLast.end!, end: targetLast.end! } as t.Node), text: `, ${written}` })
-      else if (!target && !whole)
-        edits.push({ ...span({ start: node.end!, end: node.end! } as t.Node), text: `\n${keyword} ${kind}{ ${written} } from '${moved.to}'` })
-
-      diagnostics.push({
-        ...span(specifier),
-        code: 'deprecated-import',
-        message: `\`${moved.name}\` is ${keyword === 'import' ? 'imported' : 're-exported'} from '${moved.to}' now, not '${moved.from}'`,
-        note: `'${moved.to}' holds the helpers of the same job, \`invalidate\` beside it`,
-        help: `${keyword} it from '${moved.to}'`,
-        fixes: [{ title: `${keyword === 'import' ? 'Import' : 'Export'} it from '${moved.to}'`, edits, safe: true }],
-        checkOnly: true,
-      })
-    }
-  }
-
-  for (const { key, moved } of namespaceReads(fence, namespaces)) {
-    diagnostics.push({
-      ...span(key),
-      code: 'deprecated-import',
-      message: `\`${moved.name}\` is imported from '${moved.to}' now, not '${moved.from}'`,
-      note: `'${moved.to}' holds the helpers of the same job, \`invalidate\` beside it`,
-      help: `import it from '${moved.to}' by name`,
-      checkOnly: true,
-    })
-  }
-
-  return diagnostics
 }
 
 // What `kay/cache` exports to the server alone: the browser's entry has `cached` and `invalidate`, though the types of the one entry name every export.
@@ -446,7 +289,7 @@ function propertyKey(property: t.ObjectProperty | t.ObjectMethod): string | unde
 // The checks a plain module takes, parsed only when one of them may find something.
 // A module the browser bundle reaches (`browser`) is checked for the names the browser's entries lack as well.
 export function moduleChecks(source: string, browser = false): Diagnostic[] {
-  if (!CSS_BINDING.test(source) && !MOVED_NAME.test(source) && !(browser && source.includes('kay/cache')))
+  if (!CSS_BINDING.test(source) && !(browser && source.includes('kay/cache')))
     return []
 
   const whole = { start: 0, end: source.length }
@@ -465,5 +308,5 @@ export function moduleChecks(source: string, browser = false): Diagnostic[] {
 }
 
 function checksOf(module: ParsedFence, browser: boolean): Diagnostic[] {
-  return [...deprecatedImports(module), ...cssImportsWithoutText(module), ...browser ? serverOnlyImports(module) : []]
+  return [...cssImportsWithoutText(module), ...browser ? serverOnlyImports(module) : []]
 }

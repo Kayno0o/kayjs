@@ -55,7 +55,7 @@ An endpoint that reads `ctx.cookies` goes out, a redirect, denial or 404 include
 
 ### `invalidatePage` is imported from `kay/cache`
 
-It sits beside `invalidate` now, and `kay/server` no longer exports it. Write `import { invalidatePage } from 'kay/cache'`. `kay upgrade` rewrites the import.
+It sits beside `invalidate` now, and `kay/server` no longer exports it. Write `import { invalidatePage } from 'kay/cache'`.
 
 ### A page inlines its small stylesheets by default
 

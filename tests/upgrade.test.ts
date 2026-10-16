@@ -178,31 +178,6 @@ describe('kay upgrade', () => {
       await rm(root, { recursive: true, force: true })
     }
   })
-
-  it('rewrites the old forms with the project\'s own kay, a minor at a time, across the kay it moved from', async () => {
-    const root = await project(MANIFEST.replace('~1.40.1', '~1.20.0'), {
-      'tsconfig.json': await Bun.file(join(import.meta.dir, '../tsconfig.json')).text(),
-      'src/routes/index.kay': 'p Home\n',
-      'src/refresh.ts': 'import { invalidatePage } from \'kay/server\'\n\nexport const refresh = () => invalidatePage(\'/\')\n',
-    })
-    const run = (args: string[], capture: boolean) => Bun.spawn([process.execPath, CLI, ...args], { cwd: root, stdout: capture ? 'pipe' : 'ignore', stderr: 'ignore' })
-    const { deps } = fakes({ '@kaynooo/kayjs': '1.46.0', '@kaynooo/kayjs-ui': '1.46.0' })
-
-    deps.kay = async (_root, args, capture) => {
-      const child = run(args, capture)
-      const [stdout, code] = await Promise.all([capture ? new Response(child.stdout).text() : '', child.exited])
-
-      return { code, stdout }
-    }
-
-    try {
-      await quietly(async () => upgradeProject(root, deps))
-      expect(await Bun.file(join(root, 'src/refresh.ts')).text()).toBe('import { invalidatePage } from \'kay/cache\'\n\nexport const refresh = () => invalidatePage(\'/\')\n')
-    }
-    finally {
-      await rm(root, { recursive: true, force: true })
-    }
-  })
 })
 
 describe('kay upgrade, its manifest and lockfile', () => {
@@ -355,25 +330,6 @@ describe('kay upgrade through the package manager', () => {
 })
 
 describe('kay check --since', () => {
-  it('fixes the deprecations of its minor alone', async () => {
-    const root = await project(MANIFEST, {
-      'tsconfig.json': await Bun.file(join(import.meta.dir, '../tsconfig.json')).text(),
-      'src/routes/index.kay': 'p Home\n',
-      'src/refresh.ts': 'import { invalidatePage } from \'kay/server\'\n\nexport const refresh = () => invalidatePage(\'/\')\n',
-    })
-    const run = async (since: string) => Bun.spawn([process.execPath, CLI, 'check', '--fix', '--since', since], { cwd: root, stdout: 'ignore', stderr: 'ignore' }).exited
-
-    try {
-      await run('1.47')
-      expect(await Bun.file(join(root, 'src/refresh.ts')).text()).toContain('kay/server')
-      await run('1.46')
-      expect(await Bun.file(join(root, 'src/refresh.ts')).text()).toContain('kay/cache')
-    }
-    finally {
-      await rm(root, { recursive: true, force: true })
-    }
-  })
-
   it('takes a minor, and no group beside it', async () => {
     const run = async (...args: string[]) => {
       const child = Bun.spawn([process.execPath, CLI, 'check', ...args], { stdout: 'pipe', stderr: 'pipe' })
@@ -389,7 +345,7 @@ describe('kay check --since', () => {
 
 describe('the deprecations', () => {
   it('each name the minor that replaced the form, and come in the deprecated group alone', () => {
-    const lints = Object.entries(LINTS).map(([name, lint]) => ({ name, group: lint.group, since: 'since' in lint ? lint.since : undefined }))
+    const lints = Object.entries(LINTS).map(([name, lint]): { name: string, group: string, since: string | undefined } => ({ name, group: lint.group, since: (lint as { since?: string }).since }))
 
     expect(lints.filter(lint => (lint.group === 'deprecated') !== (lint.since !== undefined))).toEqual([])
   })
@@ -399,7 +355,11 @@ describe('the deprecations', () => {
     const [major, minor] = minorOf(version)!
     // Past their three minors, kept until the old form they recognise goes: when one does, its line goes from this list and its lint from LINTS.
     const overdue = new Set<string>()
-    const past = Object.entries(LINTS).filter(([, lint]) => 'since' in lint && lint.since !== undefined && (minorOf(lint.since)![0] < major || minorOf(lint.since)![1] + 3 < minor)).map(([name]) => name)
+    const past = Object.entries(LINTS).filter(([, lint]) => {
+      const since = minorOf((lint as { since?: string }).since ?? '')
+
+      return since !== undefined && (since[0] < major || since[1] + 3 < minor)
+    }).map(([name]) => name)
 
     expect(past.sort()).toEqual([...overdue])
   })

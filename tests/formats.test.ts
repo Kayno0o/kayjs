@@ -442,7 +442,6 @@ describe('kay explain --format json', () => {
     expect(all.lints.map(lint => lint.name)).toEqual(Object.keys(LINTS))
     expect(all.lints[0]).toEqual({ name: 'unread-name', group: 'code', level: 'deny', summary: LINTS['unread-name'].summary })
     expect(islands.groups).toEqual({ islands: LINT_GROUPS.islands })
-    expect(all.lints.find(lint => lint.name === 'deprecated-import')).toEqual({ name: 'deprecated-import', group: 'deprecated', level: 'warn', since: '1.46', summary: LINTS['deprecated-import'].summary })
     expect(islands.lints.map(lint => lint.name)).toEqual(['positional-key', 'identity-key', 'uncalled-signal', 'constant-signal', 'server-only-import'])
   })
 

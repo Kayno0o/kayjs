@@ -46,7 +46,7 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ### `invalidatePage` is imported from `kay/cache`
 
-- It sits beside `invalidate` now, and `kay/server` no longer exports it: `import { invalidatePage } from 'kay/cache'`. `kay upgrade` rewrites the import, `deprecated-import` finds the rest.
+- It sits beside `invalidate` now, and `kay/server` no longer exports it: `import { invalidatePage } from 'kay/cache'`.
 - The rule for what needs an import is in [Components](components.md#imports-kay-adds): `props`, the reactive primitives, a server fence's `action` and `t` need none, everything else comes from `kay`, `kay/server` or its topic's entry.
 
 ### A page inlines its small stylesheets by default
