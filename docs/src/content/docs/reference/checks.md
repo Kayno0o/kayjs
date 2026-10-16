@@ -3,17 +3,21 @@ title: Checks
 order: 4
 description: What kay check reports, how to fix it and how to change a lint's level.
 ---
-`kay check` type-checks the whole project, `.kay` files included, and reports each problem at its `.kay` line and column, as rustc does. A folder of the project holding its own `package.json` or `kay.config.ts`, such as a workspace package or a second kay app, is a project of its own: `kay check` and `kay build` leave its files out of the app's, and the app reaches a package there through `node_modules`, as it would one installed.
+`kay check` type-checks the whole project, `.kay` files included, and reports each problem at its `.kay` line and column, as rustc does.
+
+A folder holding its own `package.json` or `kay.config.ts`, such as a workspace package or a second kay app, is a project of its own. `kay check` and `kay build` leave its files out of the app's.
 
 A report reads:
 
-```
+```text
 error[missing-alt]: An `img` needs `alt`
  --> src/routes/index.kay:4:3
   = note: `alt=""` marks an image as decoration
 ```
 
-The name in brackets is a lint. `kay build` runs the same check and `kay dev` lists it in the dev tool on the page. The editor shows each problem of an open file with the same message, note and help, and leaves out what `kay check` leaves out. What `kay check` finds across the project, such as a content entry against its schema or a message a locale lacks, shows at its file after each save.
+The name in brackets is a lint. `kay build` runs the same check, and `kay dev` lists it in the [dev tool](/guides/performance#problems) on the page.
+
+The editor shows each problem of an open file with the same message, note and help. What `kay check` finds across the project, such as a message a locale lacks, shows at its file after each save.
 
 ## What it verifies
 
@@ -25,7 +29,9 @@ The name in brackets is a lint. `kay build` runs the same check and `kay dev` li
 - Island props can be serialized, and no component reads a browser global while it renders.
 - Accessibility basics: `alt`, labels, headings, keyboard access.
 - Config the server would refuse at boot, such as two pages serving one path.
-- On a public site, what search engines and social networks read: a `site`, a description, a share image, a favicon. `kay check` reads the head blocks of the pages that prerender as written, so a tag whose value is an expression, or that sits under an `if` or `for`, is judged by its presence alone, and `kay build` the head of every page it renders, which may report a lint `kay check` did not.
+- On a public site, what search engines and social networks read: a `site`, a description, a share image, a favicon.
+
+`kay check` reads the head of the pages that prerender as written. A tag whose value is an expression, or that sits under an `if` or `for`, is judged by its presence alone. `kay build` reads the head of every page it renders, so it may report a lint `kay check` did not.
 
 ## Errors and warnings
 
@@ -86,9 +92,13 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 
 ## Errors
 
-A template that does not compile, a build that stops, a collection that does not load and a page a static export cannot hold carry a code too, printed in brackets as `error[template-syntax]` or after the failure as `kay explain <code> says where the fix is written`. `kay check --format json`, `kay build --format json` and `kay explain --format json` carry it as `code`, which is `null` for what kay did not raise at compile, build, content or export time, such as a type error TypeScript names by number.
+A template that does not compile, a build that stops, a collection that does not load and a page a static export cannot hold carry a code too. It is printed in brackets, as `error[template-syntax]`, or after the failure as `kay explain <code> says where the fix is written`.
 
-`kay explain <code>` prints what raises it and the section that covers the fix, and `kay explain compile`, `command`, `build`, `content` or `export` lists a group's. The codes are stable names, one for a group of messages with one cause. No level applies to them and no `// kay-allow` comment reaches them. Errors kay raises while serving a request, and the app's own code, carry none.
+In `--format json` the code is the `code` field. It is `null` for what kay did not raise, such as a type error TypeScript names by number.
+
+`kay explain <code>` prints what raises it and the section that covers the fix, and `kay explain compile`, `command`, `build`, `content` or `export` lists a group's. The codes are stable names, one for a group of messages with one cause.
+
+No level applies to an error and no `// kay-allow` comment reaches it. Errors kay raises while serving a request, and the app's own code, carry no code.
 
 | Error | Group | Raised for | Fix |
 | --- | --- | --- | --- |
@@ -101,7 +111,7 @@ A template that does not compile, a build that stops, a collection that does not
 | `signal-misuse` | compile | A signal or memo written the wrong way: a memo assigned, a name declared twice, a `bind:` to a name holding no signal. | [Signals](/essentials/components) |
 | `client-route-fence` | compile | A page, layout or special page with a `--- client` fence: they render on the server. | [Islands](/essentials/islands) |
 | `browser-only-read` | compile | A browser-only name such as `window` read while a component renders on the server too; reported by the type check, so a page still runs. | [Browser globals on the server](/essentials/islands) |
-| `unknown-lint` | compile | A `// kay-allow` comment naming something that is no lint. | [Allow a lint on one line](/reference/checks) |
+| `unknown-lint` | compile | A `// kay-allow` comment naming something that is no lint. | [Allow a lint on one line](#allow-a-lint-on-one-line) |
 | `browser-builtin-import` | build | An island importing a module that reaches a Node built-in, which a browser does not have. | [Browser-only components](/essentials/islands) |
 | `server-only-in-island` | build | A chunk a page loads reading `process` or `Bun`, or an island importing the server's `s` schema builder, so the island dies as it loads. | [Browser globals on the server](/essentials/islands) |
 | `inert-editor` | build | An editor component running nothing in the browser, where an editor edits the page. | [The editor](/guides/content) |
@@ -114,14 +124,14 @@ A template that does not compile, a build that stops, a collection that does not
 | `executable-incomplete` | build | A compiled executable that lacks a part of what it needs: the build of a collection, the client build, its fonts or a share card key. | [Build one executable](/reference/cli) |
 | `route-invalid` | build | A route file the router cannot serve: a name with characters it cannot mount, a matcher, guard, endpoint or API module that exports the wrong thing, two files exporting the same action, or two extensions each giving an editor. | [Pages and routing](/essentials/routing) |
 | `redirect-invalid` | build | A redirect in `redirects` that does not start with `/`, holds something other than a `:param` or a final `*`, or goes to a path using a part its source lacks. | [Redirects](/essentials/routing) |
-| `locales-invalid` | build | An `i18n` config that does not hold together: no locales, a tag that is none, a default outside the locales, domains and `prefixDefault` together, `paths` naming a page that does not exist, or a catalog that exports no messages. | [Configuring locales](undefined) |
+| `locales-invalid` | build | An `i18n` config that does not hold together: no locales, a tag that is none, a default outside the locales, domains and `prefixDefault` together, `paths` naming a page that does not exist, or a catalog that exports no messages. | [Configuring locales](/guides/i18n) |
 | `font-invalid` | build | A font in `fonts` that is no font file, no installed Fontsource package, or lacks the weight, style or subset asked for. | [Fonts](/essentials/head-and-seo) |
 | `favicon-invalid` | build | A favicon, manifest icon or SVG that is no SVG kay can draw, has no size, is not square, or a manifest path outside its scope. | [Favicon and web manifest](/essentials/head-and-seo) |
 | `share-card-invalid` | build | A share card drawn with no font, a logo that is missing, not square or not an image kay draws, a colour that is no #rrggbb, or an empty title. | [Draw a share card for a page](/essentials/styling-and-assets) |
 | `image-invalid` | build | An image the build cannot fetch, or `images` settings that do not go together: `guard` with no `resolve`, a box given both a width and a height. | [Responsive images](/essentials/styling-and-assets) |
 | `env-invalid` | build | The environment does not match its schema. | [Environment](/guides/sessions-and-guards) |
 | `config-invalid` | build | A setting in kay.config.ts or a call that configures the server that kay refuses: `base`, `site`, `cors`, `preview`, `session`, `proxy`, `rateLimit`, a queue, a schedule, a size, or a file store asked for what it does not hold. | [Project setup](/reference/cli) |
-| `export-private-file` | export | A static export linking a private or stored file, which only a server can serve. | [Static export](/essentials/routing) |
+| `export-private-file` | export | A static export linking a private or stored file, which only a server can serve. | [Static export](/guides/static-export) |
 | `search-page-unreadable` | build | The search index could not read a prerendered page. | [Site search](/essentials/head-and-seo) |
 | `config-default-export` | build | kay.config.ts that does not export its config by default. | [Project setup](/reference/cli) |
 | `content-invalid` | content | Entries of a collection that do not compile or match its schema, a slug two entries share, a component the collection does not name, or a feed entry with an invalid date. | [Collections](/guides/content) |
@@ -184,18 +194,32 @@ export default defineConfig({
 })
 ```
 
-The `seo` lints warn on a site with `site` or `seo` set, or exported with `--static`, and stay quiet on any other unless `lints` turns them on. The ones about pages are found by `kay build`, in the pages it prerenders. `missing-share-image` and `default-favicon` name what a site lacks until it goes public, so only `kay build` and `kay check --only seo` report them, never a plain `kay check`. `missing-site` is reported by `kay build --static` alone: a server may read `SITE_URL` when it boots, and one with `seo` set and no site warns then.
+The `seo` lints warn on a site with `site` or `seo` set, or exported with `--static`. On any other site they stay quiet unless `lints` turns them on.
 
-For one place, with a comment on the line, or alone on the line before:
+The lints about pages are found by `kay build`, in the pages it prerenders. `missing-share-image` and `default-favicon` name what a site lacks until it goes public, so only `kay build` and `kay check --only seo` report them, never a plain `kay check`.
+
+`missing-site` is reported by `kay build --static` alone. A server may read `SITE_URL` when it boots, so a server with `seo` set and no site warns then.
+
+## Allow a lint on one line
+
+A comment on the line, or alone on the line before it, allows a lint in that place. It takes several names separated by commas, and a name that is no lint is reported.
 
 ```kay
 // kay-allow constant-signal
 const label = signal('Save')
 ```
 
+No comment silences an `seo` lint, `over-budget` or `unkept-page`, as no template reports them. Change their level in `lints` instead.
+
 ## ESLint
 
-ESLint lints the script and server fences of `.kay` files through `kay/eslint`, and the JavaScript in their templates: attribute values, `{...}` in text, and the heads of `if`, `match`, `for`, `await`, `const` and `slot`. It reports at the `.kay` line and column, and `--fix` edits the file when the code it replaces was written there as is. The classes of a template reach the Tailwind rules of `@kaynooo/eslint` when `tailwind` is on, a shorthand `.flex` and a static `class="..."` alike. A class is reported at its place in the file; its fix is made there only inside a `class="..."` of an element with no shorthand, so a shorthand class is reported without one. A `class={...}` on a component call, a value with entities or quotes in it, and two strings of one element reading the same are left out. Tags and static text are left to `kay check`. With `@kaynooo/eslint`, turn it on in `eslint.config.ts`:
+ESLint lints the script and server fences of `.kay` files through `kay/eslint`. It also lints the JavaScript in their templates: attribute values, `{...}` in text, and the heads of `if`, `match`, `for`, `await`, `const` and `slot`.
+
+It reports at the `.kay` line and column. `--fix` edits the file when the code it replaces was written there as is.
+
+With `tailwind` on, the classes of a template reach the Tailwind rules of `@kaynooo/eslint`, a shorthand `.flex` and a static `class="..."` alike. A class is reported at its place in the file. Its fix is made only inside a `class="..."` of an element with no shorthand.
+
+Tags and static text are left to `kay check`. With `@kaynooo/eslint`, turn it on in `eslint.config.ts`:
 
 ```ts
 export default defineConfig({ strict: true, kay: true })
@@ -203,7 +227,9 @@ export default defineConfig({ strict: true, kay: true })
 
 <Callout type="note">
 
-Type-aware rules read files that `kay check`, `kay dev` and the editor write. `kay lint` writes them and then runs `keslint` with your arguments, so run it instead of `keslint` and no check has to come first. The editor's ESLint, which runs `keslint` alone, writes them itself the first time it meets a component with none, so a fresh app needs no command first. A new project's `lint` script is `kay lint --cache`.
+Type-aware rules read files that `kay check`, `kay dev` and the editor write. `kay lint` writes them and then runs `keslint` with your arguments, so run it instead of `keslint` and no check has to come first.
+
+The editor's ESLint runs `keslint` alone, and writes them itself the first time it meets a component with none. A new project's `lint` script is `kay lint --cache`.
 
 </Callout>
 
