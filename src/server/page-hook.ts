@@ -87,7 +87,9 @@ export async function hookPrerendered(root: string, hooks: PageHook[], dirs: Ass
 
   await Promise.all(Object.entries(manifest.pages).map(async ([path, page]) => hooking(async () => {
     const name = join(base, PRERENDERED_DIR, page.file)
-    const html = await applyPageHooks(hooks, path, page.locale, await Bun.file(name).text(), file)
+    // A manifest a build wrote before pages recorded their locale has none.
+    const locale = (page as Partial<typeof page>).locale ?? ''
+    const html = await applyPageHooks(hooks, path, locale, await Bun.file(name).text(), file)
 
     await Bun.write(name, html)
     page.etag = pageEtag(html)

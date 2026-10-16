@@ -1,3 +1,4 @@
+import type { PrerenderedPage } from '../src/server/client'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -48,6 +49,21 @@ describe('page hooks', () => {
     ], '/about', 'en', '<body></body>', file)
 
     expect(html).toBe('<body><footer>/about two</footer></body>')
+  })
+
+  it('gives a hook a string locale for a page a manifest recorded none for', async () => {
+    const old = { pattern: '/old', file: 'old.html', status: 200, headers: {}, etag: 'stale', renderedAt: 0 } as unknown as PrerenderedPage
+    const seen: unknown[] = []
+
+    await Bun.write(join(outputDir(scratch), PRERENDERED_DIR, 'old.html'), '<p>old</p>')
+    await writeManifest(scratch, { entryImports: [], islands: {}, styles: {}, pages: { '/old': old } })
+    await hookPrerendered(scratch, [({ locale, html }) => {
+      seen.push(locale)
+
+      return html
+    }], { clientDir, publicDir, base: '' })
+
+    expect(seen).toEqual([''])
   })
 
   it('hooks several prerendered pages at once, at most 8, each written back with its own etag', async () => {

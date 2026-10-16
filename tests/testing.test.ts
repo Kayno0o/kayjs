@@ -448,7 +448,20 @@ describe('reading a page', () => {
     expect(page.find('ul').map(({ html }) => html)).toEqual(['<li><ul><li>deep</li></ul></li>', '<li>deep</li>'])
     expect(page.find('li').map(({ html }) => html)).toEqual(['<ul><li>deep</li></ul>', 'deep'])
     // An element the page never closes holds the rest of it, as the parser sees no end tag to stop at.
-    expect(readPage('<p>one<div>x</div>').find('p')[0]!.html).toBe('one<div>x</div>')
+    expect(readPage('<span>one<b>x</b>').find('span')[0]!.html).toBe('one<b>x</b>')
+  })
+
+  it('ends an element a browser closes by itself where the browser would', () => {
+    expect(readPage('<p>one<p>two').find('p').map(({ html, text }) => [html, text])).toEqual([['one', 'one'], ['two', 'two']])
+    expect(readPage('<p>one<div>x</div>').find('p')[0]!.html).toBe('one')
+    expect(readPage('<ul><li>a<li>b<ul><li>c</ul><li>d</ul>tail').find('li').map(({ html }) => html)).toEqual(['a', 'b<ul><li>c</ul>', 'c', 'd'])
+    expect(readPage('<dl><dt>a<dd>b<dt>c</dl>').find('dd, dt').map(({ html }) => html)).toEqual(['a', 'b', 'c'])
+  })
+
+  it('reads the markup of an element beside a comment that looks like its own marker', () => {
+    const page = readPage('<!--kay-open-0--><p>one</p><!--kay-close-0-->')
+
+    expect(page.find('p')[0]!.html).toBe('one')
   })
 
   it('decodes entities and squashes whitespace in the text it gives', async () => {
