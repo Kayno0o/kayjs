@@ -14,7 +14,7 @@ src/routes/
   [_layout.kay](#layouts)  wraps every page
 " />
 
-Links are plain `a` tags, and `kay check` reports a link to a page that does not exist.
+A file in `src/routes/` is a page, and its path is its URL. Links are plain `a` tags, and `kay check` reports a link to a page that does not exist.
 
 ```kay
 a(href="/about") About
@@ -22,7 +22,7 @@ a(href="/about") About
 
 ## Dynamic routes
 
-A segment in brackets is a param, read from `ctx.params` in the page's server fence:
+A segment in brackets is a param. The page's server fence reads it from `ctx.params`.
 
 ```kay
 --- server
@@ -40,7 +40,7 @@ h1 {post.title}
 | `[[page]].kay` | `/blog` and `/blog/2` |
 | `[id=integer].kay` | `/items/42` only, `ctx.params.id` a `number` |
 
-When two pages match a URL, a fixed name wins over a param, and a param over a catch-all. `/docs/intro` goes to `docs/[...path].kay` rather than `[section]/[page].kay`.
+When two pages match a URL, a fixed name wins over a param, and a param wins over a catch-all.
 
 <Callout type="tip">
 
@@ -50,7 +50,7 @@ When two pages match a URL, a fixed name wins over a param, and a param over a c
 
 ## Layouts
 
-A `_layout.kay` wraps every page in its folder and below, rendering the page at `slot`:
+A `_layout.kay` wraps every page in its folder and below. It renders the page at `slot`.
 
 ```kay
 header
@@ -60,11 +60,11 @@ main
   slot
 ```
 
-Layouts nest: `blog/_layout.kay` renders inside the root one. A folder in parentheses groups pages under a layout without changing their URL: `(marketing)/pricing.kay` is `/pricing`.
+Layouts nest, so `blog/_layout.kay` renders inside the root one. A folder in parentheses groups pages under a layout without changing their URL: `(marketing)/pricing.kay` is `/pricing`.
 
 ## Page settings
 
-A page's settings are the keys of one object its server fence exports:
+A page's settings are the keys of one object that its server fence exports.
 
 ```kay
 --- server
@@ -72,7 +72,7 @@ export const page = { prerender: true, revalidate: '1h' }
 ---
 ```
 
-The usual keys are `prerender`, `keep` and `revalidate` (see [Prerendering](#prerendering)), `layouts: false` to drop the layouts above the page, `query` (see [Data loading](/essentials/data-loading)), and `sitemap` and `noindex` (see [Head and SEO](/essentials/head-and-seo)). `kay check` types the object, so the editor completes the keys and an unknown one is an error.
+`prerender`, `keep` and `revalidate` are covered under [Prerendering](#prerendering). `layouts: false` drops the layouts above the page. `query` is covered in [Data loading](/essentials/data-loading), and `sitemap` and `noindex` in [Head and SEO](/essentials/head-and-seo). `kay check` types the object, so an unknown key is an error.
 
 ## Loading data
 
@@ -80,7 +80,7 @@ A page reads its data in a `--- server` fence, with the request in `ctx`. See [D
 
 ## Endpoint files
 
-A `.ts` file whose name keeps an extension before `.ts` serves that path with what its `GET` returns, for an `llms.txt`, a JSON feed or a CSV export, with no API module:
+A `.ts` file with an extension before `.ts` serves that path with what its `GET` returns. Use it for an `llms.txt`, a JSON feed or a CSV export.
 
 ```ts
 // src/routes/feeds/[slug].json.ts
@@ -94,11 +94,11 @@ export function GET({ params }: EndpointContext<{ slug: string }>) {
 }
 ```
 
-`GET` gets the same `ctx` a page does, minus what only a page has: `request`, `url`, `locale`, `params`, `cookies`, `locals`, `headers`, `redirect`, `notFound` and `deny`. Cookies and headers it sets go out with its answer. It returns a string, a `Blob` or a `Response`. A string goes out as the type its extension names, `text/plain` for `llms.txt`. The guards above it run first, as they do for a page, and `kay build --static` writes it to a file.
+`GET` receives the same `ctx` as a page, without the parts only a page has. It returns a string, a `Blob` or a `Response`. A string goes out as the type its extension names, such as `text/plain` for `llms.txt`. The guards above it run first, as they do for a page. `kay build --static` writes it to a file.
 
 ## Not found and errors
 
-`_404.kay` renders for `ctx.notFound()` and for every URL no page serves. `_error.kay` renders when a page throws, reading `ctx.error`:
+`_404.kay` renders for `ctx.notFound()` and for every URL no page serves. `_error.kay` renders when a page throws, and reads `ctx.error`.
 
 ```kay
 --- server
@@ -110,7 +110,7 @@ p {message}
 
 ## Prerendering
 
-A page that is the same for everyone can be rendered once at build time:
+A page that is the same for everyone can be rendered once at build time.
 
 ```kay
 --- server
@@ -118,11 +118,11 @@ export const page = { prerender: true }
 ---
 ```
 
-A page without `prerender` is built the same way when `kay build` can show it reads nothing from its request or the moment: no `ctx` beyond `ctx.url.pathname` and `ctx.params` (as written, or destructured from `ctx`; `ctx.url` whole, `ctx.url.search`, `ctx.request`, `ctx.cookies`, `ctx.locals` or `ctx` passed on all read the request), no `query`, `Date`, `Math.random` (or `Math` taken whole), `process`, `Bun` or `fetch` in it, its layouts or anything they import, no `let` at the top of a module or empty array or `Map` it fills (a `let` or an empty array in a `.kay` script or server fence is made for each render, and only counts when an export of the server fence reads it), and no import but `.kay` files, relative modules, images and data files, `kay/i18n` (except the relative time helpers, which read the clock) and the helpers of `kay` that read nothing from a request, such as `signal`, `selection` and the schema builder `s`. `kay/content` counts for a collection over a folder (every `collection(...)` call in the file names the folder as a string), since its entries are compiled by `kay build` and are the same for every visitor until the next build. Calling `invalidate()` on a collection renders the pages that read it again, and a visitor in preview mode is never served a kept copy. A collection over a loader stops the page, because a loader may read a database or refresh on a `ttl`, and neither tells a kept page; so do the functions that edit content, such as `entries` and `saveEntry`. A `persisted` signal counts when it is kept in `localStorage` (`storage: 'local'`), since the server renders its default; one kept in a cookie or the query reads the request. A page showing data that another module changes between requests, such as an array an action edits, is caught as the app runs: the first visit after a request that can write (an action, or a route answering anything but GET and HEAD) renders the page again and compares it with the kept copy. A page that came out different is rendered for each request from then on, and the server warns once naming it; `export const page = { prerender: false }` says so up front and skips the check. A page the write did not change is still served from memory, and a page that sets `prerender: true` is never checked. A value that a timer or a background job changes with no request is not seen, so such a page needs `prerender: false`. A kept page that reads `ctx.url.pathname`, a layout marking the current link for one, is served at the path it was rendered at, spelled as `trailingSlash` says, and rendered for each request at any other spelling, such as `/books/` under `ignore`. The pathname never holds `base`, and a locale's copy is rendered at its own prefixed path. A page that does not qualify, or whose two builds differ, is rendered for each request as before, and the build never fails over it.
+You often need no flag. `kay build` also keeps a page that reads nothing from its request or the clock, and serves it from memory.
 
-`kay build` shows what it decided. Its route table says `prerendered`, `kept` or `on request` for each route, and under an `on request` page the file and line that stopped it, such as `src/routes/clock.kay:2 reads Date`. `kay build --format json` gives the same as `kept` and `stop` on each route.
+`kay build` shows what it decided. Its route table says `prerendered`, `kept` or `on request` for each route. Under an `on request` page it names the file and line that stopped it, such as `src/routes/clock.kay:2 reads Date`.
 
-To have the build tell you when a page stops being kept, say so in the page:
+To be told when a page stops being kept, say so in the page.
 
 ```kay
 --- server
@@ -130,9 +130,13 @@ export const page = { keep: true }
 ---
 ```
 
-If an import, a `Date` or anything else keeps the build from keeping it, `kay build` warns with the file and line. Set the `unkept-page` lint to `deny` in `kay.config.ts` to fail the build instead. The page is still rendered for each request when it is not kept. Guards still run on every request, and development renders every page afresh.
+When the page cannot be kept, `kay build` warns with the file and line. Set the `unkept-page` lint to `deny` in `kay.config.ts` to fail the build instead. A page that is not kept is rendered for each request. Guards run on every request either way, and development renders every page afresh.
 
-A page with params lists the ones to build. Passing a content collection builds one page per entry:
+A page that shows data another module changes between requests is caught as the app runs. The server then renders it for each request and warns once with its name. `prerender: false` says so up front.
+
+<ReadMore href="/llms/routing#prerendering">What makes a page keepable, how the run-time check works, and how kept pages treat locales and `trailingSlash`.</ReadMore>
+
+A page with params lists the ones to build. Pass a content collection to build one page per entry.
 
 ```kay
 --- server
@@ -150,7 +154,7 @@ Add `revalidate: '1h'` to `page` to rebuild a prerendered page in the background
 
 ### Server islands
 
-`server` on a component call renders that component on each request, inside a page otherwise prerendered: a form with a fresh token, a greeting, a stock count. A page reaching one prerenders with no `prerender` key:
+`server` on a component call renders that component on each request, inside a page that is otherwise prerendered. Use it for a form with a fresh token, a greeting or a stock count. The page is prerendered with no `prerender` key.
 
 ```kay
 --- server
@@ -163,11 +167,11 @@ ContactForm(server token={token})
 Reviews(server="defer")
 ```
 
-`server` renders the island into the page before it is sent. `server="defer"` sends the prerendered page as is, and the browser fetches the island as it nears the screen.
+`server` renders the island into the page before it is sent. `server="defer"` sends the page as prerendered, and the browser fetches the island as it nears the screen.
 
 ## Redirects
 
-Old URLs go in `kay.config.ts`:
+Old URLs go in `kay.config.ts`.
 
 ```ts
 export default defineConfig({
@@ -179,7 +183,7 @@ export default defineConfig({
 
 ## Pages from a library
 
-A library can serve pages of its own, such as kayjs-auth's sign-in and sign-up, listed once in `extensions`:
+A library can serve pages of its own, such as the sign-in and sign-up of kayjs-auth. List it once in `extensions`.
 
 ```ts
 import { authPages } from '@kaynooo/kayjs-auth'
@@ -188,7 +192,7 @@ import { defineConfig } from 'kay/server'
 export default defineConfig({ extensions: [authPages()] })
 ```
 
-Its pages serve under their prefix, `/auth/login`, inside your layouts and guards. To change one, put your own file at the same path, `src/routes/auth/login.kay`: it replaces that page alone, and the library's others stay.
+Its pages serve under their prefix, such as `/auth/login`, inside your layouts and guards. To change one, put your own file at the same path, `src/routes/auth/login.kay`. It replaces that page alone.
 
 <ReadMore href="/llms/components#extensions">Writing an extension, its layouts, messages, API modules and config, page hooks and editor.</ReadMore>
 
