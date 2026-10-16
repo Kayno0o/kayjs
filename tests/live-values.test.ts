@@ -310,6 +310,31 @@ describe('the connections of one client', () => {
     })
   })
 
+  it('close with no end event when the slot went between the response and the first read, which a browser retries', async () => {
+    await withSite(async (connect) => {
+      const feeds: Feed[] = []
+
+      for (let count = 0; count < MAX_CONNECTIONS - 1; count++) {
+        const feed = new Feed(await connect())
+
+        await feed.next()
+        feeds.push(feed)
+      }
+
+      const late = await connect()
+      const last = new Feed(await connect())
+
+      await last.next()
+      feeds.push(last)
+
+      expect(late.status).toBe(200)
+      expect(await late.text()).toBe('')
+
+      for (const feed of feeds)
+        await feed.close()
+    })
+  })
+
   it('end with the proof they were let in on and free their slot', async () => {
     await withSite(async (connect, proofs) => {
       const feeds: Feed[] = []

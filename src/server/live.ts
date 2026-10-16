@@ -5,7 +5,7 @@ import { checkLiveWrites, LIVE_ROUTE, liveSlot, PROOF_LIFETIME_MS, slotValue, wa
 import { currentServerScope } from '../runtime/reactive'
 import { encodeValue, unsendable } from '../runtime/wire'
 import { isCrossSite } from './actions'
-import { eventStream } from './api'
+import { eventStream, StreamRefused } from './api'
 import { readCapped } from './errors'
 import { clientAddress, overLimit } from './protection'
 import { signedText, signText } from './stamp'
@@ -85,12 +85,12 @@ interface Watched {
 
 // The updates a connection sends: every watched value as it is now, then the ones that changed, as often as they do.
 // It ends when the proofs it was let in on expire, `lifetime` from now.
-// It holds a connection slot of the client from the moment it is read until it ends, and ends at once when the client has none: a response nobody reads holds nothing.
+// It holds a connection slot of the client from the moment it is read until it ends, and is refused when the client has none by then, which a browser retries after its backoff: a response nobody reads holds nothing.
 function updates(watched: Watched[], lifetime: number, client: string): AsyncIterable<LiveUpdate[]> {
   return {
     [Symbol.asyncIterator]() {
       if ((open.get(client) ?? 0) >= MAX_CONNECTIONS)
-        return { next: async () => Promise.resolve({ value: undefined, done: true as const }) }
+        return { next: async () => Promise.reject(new StreamRefused('kay: the client holds too many live connections')) }
 
       open.set(client, (open.get(client) ?? 0) + 1)
 
