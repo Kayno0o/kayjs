@@ -150,6 +150,16 @@ type RowOf<Each> = Each extends Iterable<infer Item> ? Item : never
 // An island's `for` with no key matches its rows by `item.id`, else by the item itself: objects without an `id`, made afresh as the list is rebuilt, would make every row anew. `kay check` reports it as the `identity-key` lint.
 export type IdentityKeyed<Each> = [RowOf<Each>] extends [object] ? [RowOf<Each>] extends [{ id: unknown }] ? unknown : { kayLint: 'identity-key' } : unknown
 
+// What `KayHanded` reads of a parameter before the type checker knows it: a generic one not yet inferred.
+export interface UnresolvedParameter { kayUnresolved: true }
+
+// A signal or memo the template hands on whole lands in a parameter typed `unknown` or `any`, which takes the signal itself, so a string or JSON of it is the function's source. `kay check` reports it as the `uncalled-signal` lint.
+// A parameter typed `Signal<T>`, `Memo<T>`, a function type, or a generic `T` the call infers from the signal stays silent.
+export type HandedSignal<Parameter> = 0 extends 1 & Parameter ? { kayLint: 'uncalled-signal' } : [Parameter] extends [UnresolvedParameter] ? unknown : unknown extends Parameter ? { kayLint: 'uncalled-signal' } : unknown
+
+// What the signal must fit: the parameter's type, once the type checker knows it.
+export type HandedFit<Parameter> = [Parameter] extends [UnresolvedParameter] ? unknown : Parameter
+
 // A literal schedule has five fields or is a nickname, and comes some day; a computed one, or a field this does not read, is checked when the server starts.
 export type CronSchedule<Cron extends string> = string extends Cron
   ? unknown

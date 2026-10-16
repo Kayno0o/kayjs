@@ -224,7 +224,7 @@ export default defineConfig({ extensions: [authPages()] })
 - In the template, one named bare where its value goes, `{count}` or `if count > 1`, is an error, `uncalled-signal`, which `kay check --fix` calls.
 - Named bare where it is handed on, as a component's prop, `Toggle(open={open})`, or a function's argument, it passes the signal itself.
 - `bind:value={query}` and `.set`, `count.set(c => c * 2)`, take the signal itself too.
-- Before kay 1.41 a bare name handed on passed the value: `kay check` reports such a prop or argument typed for the value, with no fix, and nothing where it takes anything, `String(count)` or `JSON.stringify(count)`: call it there.
+- Before kay 1.41 a bare name handed on passed the value: `kay check` reports such a prop or argument typed for the value, with no fix, and one typed `unknown` or `any`, `String(count)` or `JSON.stringify(count)`, as `uncalled-signal`: call it there. A parameter typed `Signal<T>`, `Memo<T>`, a function type or a generic `T` takes the signal.
 - A signal is written by assigning it, in the template and the script alike: `count = 0` compiles to `count.set(0)`.
 - `count += step` and `count++` compile to an updater, `count.set((c) => c + step)`, so an effect writing it does not track it.
 - `.set` stays for an updater of your own, `count.set(c => c * 2)`.

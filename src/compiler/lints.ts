@@ -566,8 +566,18 @@ export interface TypeLint {
 }
 
 const IDENTITY_KEY = 'kayLint: "identity-key"'
+const HANDED_SIGNAL = 'kayLint: "uncalled-signal"'
 
 export function typeLint(message: string): TypeLint | undefined {
+  if (message.includes(HANDED_SIGNAL)) {
+    return {
+      code: 'uncalled-signal',
+      message: 'A signal or memo is handed to a parameter that takes anything, which receives the signal itself',
+      note: 'a string or JSON of it is the function\'s source, not its value',
+      help: 'read it by calling it, `count()`, or type the parameter `Signal<T>` or `Memo<T>` to take the signal itself',
+    }
+  }
+
   if (!message.includes(IDENTITY_KEY))
     return undefined
 

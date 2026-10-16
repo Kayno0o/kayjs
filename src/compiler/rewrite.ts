@@ -7,7 +7,7 @@ import type { SignalKind } from './module-signals'
 import type { PropsBinding } from './script'
 import { createRequire } from 'node:module'
 import { parse } from '@babel/parser'
-import { CURRENT, defaultName, PROPS, VALUES, WRITABLE } from './names'
+import { CURRENT, defaultName, HANDED, PROPS, VALUES, WRITABLE } from './names'
 
 const IDENTIFIER = /^[A-Z_$][\w$]*$/i
 const CAPITAL = /^[A-Z]/
@@ -281,6 +281,25 @@ class RewriteFinder {
     return parent.type === 'UpdateExpression' || handedToComponent(reference) ? undefined : source
   }
 
+  // The signal the template hands on whole, as a function's argument or a component's prop, when type checking: the source offset of its name.
+  // The types decide whether the parameter takes a signal, `KayHanded` reporting one that takes anything.
+  private handed(reference: NodePath): number | undefined {
+    const { node, parent } = reference
+    const source = this.input.map.isExact(node.start!) ? this.input.map.toSource(node.start!) : undefined
+
+    if (!this.input.values || source === undefined || source < this.input.templateStart || tagPosition(reference) !== undefined || typeQueryOf(reference) !== undefined)
+      return undefined
+
+    const argument = (parent.type === 'CallExpression' || parent.type === 'OptionalCallExpression' || parent.type === 'NewExpression') && parent.callee !== node && !compilerCall(parent.callee)
+
+    return argument || handedToComponent(reference) ? source : undefined
+  }
+
+  // The rewrite asking the types whether the parameter a signal is handed to takes one.
+  private handedRead(access: Rewrite = {}): Rewrite {
+    return { ...access, before: `${HANDED}${access.before ?? ''}`, after: `${access.after ?? ''})` }
+  }
+
   // Reports a signal read uncalled, its fix calling it, when type checking.
   private reportUncalled(reference: NodePath, source: number, name: string, kind: SignalKind) {
     if (!this.input.values)
@@ -406,6 +425,14 @@ class RewriteFinder {
       if (uncalled !== undefined)
         this.reportUncalled(reference, uncalled, name, kind)
 
+      const handed = this.handed(reference)
+
+      if (handed !== undefined) {
+        this.rewrites.set(handed, { ...this.handedRead(), end: handed + name.length })
+
+        continue
+      }
+
       const source = uncalled ?? (values ? this.templateCall(reference) : undefined)
 
       if (source !== undefined)
@@ -514,7 +541,10 @@ class RewriteFinder {
         return values ? this.valueRead(name, access) : { ...access, after: `${access.after ?? ''}()` }
       }
 
-      return values && this.templateCall(reference) !== undefined ? this.valueRead(name, access) : access
+      if (values && this.templateCall(reference) !== undefined)
+        return this.valueRead(name, access)
+
+      return this.handed(reference) === undefined ? access : this.handedRead(access)
     }
 
     this.visitBinding(path.scope, name, reference => withShorthand(reference, name, read(reference)), signal ? undefined : { message: `\`${name}\` is a prop, and props are read-only`, help: 'copy it into a signal to change it locally' }, propType(prop.binding))

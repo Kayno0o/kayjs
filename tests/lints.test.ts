@@ -258,6 +258,13 @@ describe('uncalled-signal', () => {
     ])
   })
 
+  it('reports a signal prop in a class object, written in full or as a shorthand', () => {
+    const source = '---\nimport type { Signal } from \'kay\'\n\nconst { on, open } = props<{ on: Signal<boolean>, open: Signal<boolean> }>()\n---\np(class={{ active: on, open }}) x\np(class={{ active: on(), open: open() }}) y\n'
+    const found = compileKay(source, 'tab.kay', { check: true }).diagnostics.filter(d => d.code === 'uncalled-signal')
+
+    expect(found.map(d => [source.slice(d.start, d.end), d.fixes?.[0]?.edits[0]?.text])).toEqual([['on', '()'], ['open', ': open()']])
+  })
+
   it('reports a debounced value left uncalled, a memo kay makes', () => {
     const source = '---\nimport { debounced, signal } from \'kay\'\n\nconst typed = signal(\'\')\nconst settled = debounced(typed, 300)\n---\np {settled}\n'
     const found = compileKay(source, 'search.kay', { check: true }).diagnostics.filter(d => d.code === 'uncalled-signal')

@@ -463,6 +463,60 @@ describe.concurrent('kay check, edge cases', () => {
     }
   })
 
+  it('tells to call a signal handed to a parameter that takes anything, and leaves one that takes a signal', async () => {
+    const lib = [
+      'import type { Memo, Signal } from \'kay\'',
+      '',
+      'export const show = (value: unknown) => String(value)',
+      'export const showAny = (value: any) => JSON.stringify(value)',
+      'export const read = (count: Signal<number>) => count()',
+      'export const readMemo = (total: Memo<number>) => total()',
+      'export const run = (action: () => number) => action()',
+      'export const same = <T,>(value: T) => value',
+      'export const label = (n: number) => String(n)',
+      '',
+    ].join('\n')
+
+    const toggle = [
+      '---',
+      'import type { Signal } from \'kay\'',
+      '',
+      'const { open, anything } = props<{ open: Signal<boolean>, anything: unknown }>()',
+      '---',
+      'button(onClick={() => open.set(!open())}) {String(anything)}',
+      '',
+    ].join('\n')
+
+    const page = [
+      '---',
+      'import { memo, signal } from \'kay\'',
+      'import Toggle from \'../components/Toggle.kay\'',
+      'import { label, read, readMemo, run, same, show, showAny } from \'../lib\'',
+      '',
+      'const count = signal(0)',
+      'const double = memo(() => count() * 2)',
+      'const open = signal(false)',
+      '---',
+      'p {show(count)}',
+      'p {showAny(double)}',
+      'p {String(count)}',
+      'p {JSON.stringify(count)}',
+      'p {read(count)} {readMemo(double)} {run(double)} {same(count)()} {label(count())}',
+      'Toggle(open={open} anything={count})',
+      'button(onClick={() => show(count)}) go',
+      '',
+    ].join('\n')
+
+    const root = await scratchProject({ 'src/lib.ts': lib, 'src/components/Toggle.kay': toggle, 'src/routes/index.kay': page })
+
+    try {
+      expect((await check(root)).map(d => [d.line, d.code])).toEqual([[10, 'uncalled-signal'], [11, 'uncalled-signal'], [12, 'uncalled-signal'], [13, 'uncalled-signal'], [15, 'uncalled-signal'], [16, 'uncalled-signal']])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('types what the fences use of kay unimported', async () => {
     const root = await scratchProject({ 'src/routes/index.kay': '--- server\nimport { s } from \'kay\'\n\nexport const add = action(s.Object({ title: s.String({ maxLength: 9 }) }), async ({ title }) => title.length)\n---\n---\nconst count = signal(0)\nconst label: string = count()\n\neffect(() => count.set(c => c + 1))\n---\nform(action={add})\n  input(name="title" aria-label="Title")\np {label}\n' })
 
