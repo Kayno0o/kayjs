@@ -1,10 +1,12 @@
+import { mkdirSync } from 'node:fs'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, it, jest, setSystemTime, spyOn } from 'bun:test'
 import { stringify } from 'devalue'
 import { Elysia } from 'elysia'
+import { openSqlite } from '../src/runtime/sqlite.server'
 import { background, memoryJobs, queue, schedule, shutdown, sqliteJobs } from '../src/server'
 import { drainQueues } from '../src/server/queue'
 
@@ -118,6 +120,9 @@ describe('schedule', () => {
     const cron = fakeCron()
     const path = await jobsPath()
     const runs: string[] = []
+
+    // A slot is a minute rounded, so a clock reaching :30 between the two claims, as on a busy machine, would name two slots.
+    setSystemTime(new Date('2026-01-01T12:00:00Z'))
     // Two processes, each with its own connection to the store.
     const first = new Elysia().use(schedule('@hourly', () => runs.push('first'), { lock: 'report', store: sqliteJobs(path) })).listen(0)
     const second = new Elysia().use(schedule('@hourly', () => runs.push('second'), { lock: 'report', store: sqliteJobs(path) })).listen(0)
@@ -198,6 +203,58 @@ describe('schedule every so long', () => {
     }
     finally {
       jest.useRealTimers()
+    }
+  })
+
+  it('skips a run whose lock the store cannot make, rather than running unlocked, and runs the next one', async () => {
+    const cron = fakeCron()
+    const store = memoryJobs()
+    const lock = store.lock.bind(store)
+    const runs: string[] = []
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+    let busy = true
+
+    store.lock = async (name, slot) => {
+      if (busy)
+        throw new Error('database is locked')
+
+      return lock(name, slot)
+    }
+
+    const app = new Elysia().use(schedule('@hourly', () => runs.push('run'), { lock: 'busy', store })).listen(0)
+
+    try {
+      setSystemTime(new Date('2026-01-01T12:00:00Z'))
+      await Promise.all(cron.fired.map(async entry => entry.handler()))
+      expect(runs).toEqual([])
+      expect(logged).toHaveBeenCalledTimes(1)
+
+      busy = false
+      await Promise.all(cron.fired.map(async entry => entry.handler()))
+      expect(runs).toEqual(['run'])
+    }
+    finally {
+      setSystemTime()
+      logged.mockRestore()
+      cron.restore()
+      await shutdown(app)
+    }
+  })
+
+  it('waits out another process holding the job store while it opens, rather than failing', async () => {
+    const path = await jobsPath()
+
+    mkdirSync(dirname(path), { recursive: true })
+
+    // A rollback-journal file another process holds a write on, as one just created by a process still switching it to WAL.
+    const holder = Bun.spawn(['bun', '-e', `const { Database } = require('bun:sqlite'); const db = new Database(${JSON.stringify(path)}, { create: true }); db.run('CREATE TABLE t (a)'); db.run('BEGIN EXCLUSIVE'); console.log('held'); setTimeout(() => process.exit(0), 600)`], { stdout: 'pipe' })
+
+    try {
+      await holder.stdout.getReader().read()
+      expect(() => openSqlite(path).close()).not.toThrow()
+    }
+    finally {
+      holder.kill()
     }
   })
 

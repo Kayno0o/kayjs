@@ -15,11 +15,11 @@ export function openSqlite(path: string): Database {
   const sqlite = process.getBuiltinModule('bun:sqlite') as typeof import('bun:sqlite')
   const db = new sqlite.Database(path, { create: true })
 
+  // Set first, as switching to WAL needs a lock and fails at once on a file another process holds without it.
+  db.run('PRAGMA busy_timeout = 5000')
   db.run('PRAGMA journal_mode = WAL')
   // A commit waits on no disk sync, only checkpoints do: under WAL a power cut may lose the last writes, never corrupt the file.
   db.run('PRAGMA synchronous = NORMAL')
-  // Another process writing waits its turn rather than failing the write.
-  db.run('PRAGMA busy_timeout = 5000')
 
   return db
 }
