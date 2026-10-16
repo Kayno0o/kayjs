@@ -1,9 +1,9 @@
 import type { Feature } from '../src/new'
-import { expect, it } from 'bun:test'
 import { mkdir, mkdtemp, readdir, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
+import { expect, it } from 'bun:test'
 import { addExtension, addFeatures, detectFeatures, restore, snapshot as snapshotManifest } from '../src/add'
 import { createProject, PRESETS } from '../src/new'
 
