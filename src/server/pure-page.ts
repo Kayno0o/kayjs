@@ -233,15 +233,70 @@ function startsWithFolder(args: string): boolean {
   return first !== undefined && FOLDER_LITERAL.test(first)
 }
 
-// The source with its comments blanked out, strings kept, so a word in a comment is no use of a name and a comment inside a call's arguments hides nothing.
+// Where a regex literal may start: after nothing, an operator or an opening bracket, or a keyword that takes an expression.
+const BEFORE_REGEX = /(?:^|[(,=:[!&|?{};+\-*%<>~^]|(?<![\w$.])(?:return|typeof|case|do|else|in|of|void|delete|throw|new|yield|await))\s*$/
+// How far back `BEFORE_REGEX` needs to look.
+const REGEX_LOOKBACK = 16
+
+// The offset just after the regex literal starting at `at`, or undefined when its line ends before it closes: then the slash was a division.
+function regexEnd(source: string, at: number): number | undefined {
+  let inClass = false
+
+  for (let end = at + 1; end < source.length; end++) {
+    const char = source[end]
+
+    if (char === '\n')
+      return undefined
+
+    if (char === '\\')
+      end++
+    else if (char === '[')
+      inClass = true
+    else if (char === ']')
+      inClass = false
+    else if (char === '/' && !inClass)
+      return end + 1
+  }
+
+  return undefined
+}
+
+// The source with its comments blanked out, strings, regex literals and templates kept (a `${ }` inside one is scanned as code), so a word in a comment is no use of a name and a comment inside a call's arguments hides nothing.
 function withoutComments(source: string): string {
   let result = ''
+  // The brace depth each open `${ }` was entered at, to know which `}` closes it.
+  const holes: number[] = []
+  let braces = 0
+  let inTemplate = false
 
   for (let at = 0; at < source.length; at++) {
     const char = source[at]!
     const next = source[at + 1]
+    const regex = !inTemplate && char === '/' && next !== '/' && next !== '*' && BEFORE_REGEX.test(result.slice(-REGEX_LOOKBACK)) ? regexEnd(source, at) : undefined
 
-    if (char === '"' || char === '\'' || char === '`') {
+    if (inTemplate) {
+      if (char === '\\') {
+        result += source.slice(at, at + 2)
+        at++
+      }
+      else if (char === '$' && next === '{') {
+        result += '${'
+        at++
+        holes.push(braces++)
+        inTemplate = false
+      }
+      else {
+        result += char
+
+        if (char === '`')
+          inTemplate = false
+      }
+    }
+    else if (char === '`') {
+      result += char
+      inTemplate = true
+    }
+    else if (char === '"' || char === '\'') {
       let end = at + 1
 
       for (; end < source.length && source[end] !== char; end++) {
@@ -263,7 +318,23 @@ function withoutComments(source: string): string {
       result += source.slice(at, end).replace(NOT_NEWLINE, ' ')
       at = end - 1
     }
+    else if (regex !== undefined) {
+      result += source.slice(at, regex)
+      at = regex - 1
+    }
     else {
+      if (char === '{') {
+        braces++
+      }
+      else if (char === '}') {
+        braces--
+
+        if (holes.at(-1) === braces) {
+          holes.pop()
+          inTemplate = true
+        }
+      }
+
       result += char
     }
   }

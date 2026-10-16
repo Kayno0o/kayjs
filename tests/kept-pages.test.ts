@@ -826,6 +826,11 @@ describe('what kay exports to a page that is kept', () => {
       'src/routes/aliased.kay': '---\nimport { collection as make } from \'kay/content\'\nimport { s } from \'kay\'\n\nconst posts = make(\'content/posts\', { schema: s.Object({ title: s.String() }) })\n---\np {typeof posts}\n',
       'src/routes/passed.kay': '---\nimport { collection } from \'kay/content\'\n\nconst make = collection\nconst posts = make(\'content/posts\', {})\n---\np {typeof posts}\n',
       'src/routes/commented.ts': 'import { collection } from \'kay/content\'\n\n// The collection of posts, which a loader may fill\nexport const posts = collection(/* the folder */ \'content/posts\', {}) // a collection\n',
+      'src/routes/regex-slash.ts': 'import { collection } from \'kay/content\'\n\nconst loader = { name: \'rows\', load: () => [] }\n\nexport const ok = /a\\//.test(\'a/\'), posts = collection(loader, {})\n',
+      'src/routes/regex-quote.ts': 'import { collection } from \'kay/content\'\n\nexport const quote = /["\']/\n// the collection of posts\nexport const posts = collection(\'content/posts\', {})\n',
+      'src/routes/nested-template.ts': 'import { collection } from \'kay/content\'\n\nexport const label = `a ${ `it\'s` } b`\n// the collection of posts\nexport const posts = collection(\'content/posts\', {})\n',
+      'src/routes/nested-loader.ts': 'import { collection } from \'kay/content\'\n\nconst loader = { name: \'rows\', load: () => [] }\n\nexport const label = `a ${ `b` } c`, posts = collection(loader, {})\n',
+      'src/routes/division.ts': 'import { collection } from \'kay/content\'\n\nexport const half = (total: number) => total / 2 // a collection\nexport const posts = collection(\'content/posts\', {})\n',
       'src/routes/multiline.ts': 'import { collection } from \'kay/content\'\n\nexport const posts = collection(\n  \'content/posts\',\n  {},\n)\n',
       'src/routes/mixed.ts': 'import { collection } from \'kay/content\'\n\nexport const a = collection(\'content/a\', {})\nexport const b = collection({ name: \'b\', load: () => [] }, {})\n',
       'src/routes/interpolated.ts': 'import { collection } from \'kay/content\'\n\nconst lang = \'fr\'\n\nexport const posts = collection(`content/${lang}`, {})\n',
@@ -851,6 +856,13 @@ describe('what kay exports to a page that is kept', () => {
     expect(await at('src/routes/passed.kay')).toMatchObject(loader)
     expect(await at('src/routes/commented.ts')).toBeUndefined()
     expect(await at('src/routes/multiline.ts')).toBeUndefined()
+
+    for (const page of ['regex-quote', 'nested-template', 'division'])
+      expect(await at(`src/routes/${page}.ts`), page).toBeUndefined()
+
+    for (const page of ['regex-slash', 'nested-loader'])
+      expect(await at(`src/routes/${page}.ts`), page).toMatchObject(loader)
+
     expect(await at('src/routes/mixed.ts')).toMatchObject(loader)
     expect(await at('src/routes/interpolated.ts')).toMatchObject(loader)
     expect(await at('src/routes/aliased.kay')).toBeUndefined()
