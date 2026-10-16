@@ -1,5 +1,5 @@
 // What stops a compile, a build, a content load or a static export, named so that `kay explain <code>` can say where its fix is written.
-// Each code covers a group of messages with one cause; the registry is the one list a test holds the raise sites, `llms/checks.md` and the docs reference to.
+// Each code covers a group of messages with one cause; the registry is the one list a test holds the raise sites, `llms/errors.md` and the docs reference to.
 
 export const ERROR_GROUPS = {
   command: 'A command that could not run: a path that is missing, flags that do not go together.',
