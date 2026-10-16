@@ -289,13 +289,15 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   }
 
   const env = await environmentWithoutDotenv()
+  // Set once the first types settled, which say a config that does not load: until then a builder started ahead of them stays quiet about its own exit.
+  let typesSettled = false
   const buildClientNow = async (): Promise<BuildOutcome | undefined> => {
     if (ownClient || stopping)
       return undefined
 
     if (builderStale || builder?.gone() === true) {
       await builder?.stop()
-      builder = startClientBuilder(root, env, json ? STDERR : 'inherit')
+      builder = startClientBuilder(root, env, json ? STDERR : 'inherit', !typesSettled)
       builderStale = false
       unbuilt = null
     }
@@ -315,7 +317,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
 
     // Gone on its own while building, as when the config failed to load: the next build starts it again.
     if (current !== undefined && current === builder && !stopping && !ownClient) {
-      if (!builderExitSaid)
+      if (!builderExitSaid && typesSettled)
         say('builder-exit', {}, `${stamp()} the process building the client exited; each change starts it again, the servers building their own until one build succeeds`)
 
       builderExitSaid = true
@@ -689,21 +691,8 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
     await inspector?.stop()
   }
 
-  // Asked to refuse a config that does not load, the first server waits for the first types: its own boot failure would print the same error again. The process it will run in loads kay meanwhile.
-  if (options.refuseConfig === true)
-    spawnWaiting()
-  else
-    start()
-
-  try {
-    await writeTypes()
-  }
-  finally {
-    verified.resolve()
-  }
-
-  // An earlier run left a client build: its builder starts as the first server boots, instead of once the server asks for it.
-  if (!configRefused && !stopping && building === undefined && existsSync(join(root, KAY_DIR, `dev${testWorker()}`, 'manifest.json'))) {
+  // An earlier run left a client build: its builder starts beside the first types and server instead of once the server asks, and stays quiet until the types settle.
+  if (building === undefined && existsSync(join(root, KAY_DIR, `dev${testWorker()}`, 'manifest.json'))) {
     wantsClient = true
 
     const early = buildClient()
@@ -716,6 +705,20 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
       }
       catch {}
     })()
+  }
+
+  // Asked to refuse a config that does not load, the first server waits for the first types: its own boot failure would print the same error again. The process it will run in loads kay meanwhile.
+  if (options.refuseConfig === true)
+    spawnWaiting()
+  else
+    start()
+
+  try {
+    await writeTypes()
+  }
+  finally {
+    typesSettled = true
+    verified.resolve()
   }
 
   if (!booted && !configRefused && !stopping)

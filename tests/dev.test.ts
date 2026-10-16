@@ -540,7 +540,7 @@ describe.concurrent('kay dev', () => {
       await until(() => childrenRunning(real, 'builder.ts').length === 1, 5000)
       await second()
 
-      // A config that does not load is refused before any builder starts, so its error shows once.
+      // A config that does not load is refused with the builder stopped, and its error shown once.
       await Bun.write(join(root, 'kay.config.ts'), 'throw new Error(\'config broke\')\n')
       await expect(dev(root, { refuseConfig: true })).rejects.toBeInstanceOf(ConfigRefused)
       expect(childrenRunning(real, 'builder.ts')).toHaveLength(0)

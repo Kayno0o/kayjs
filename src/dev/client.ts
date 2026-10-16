@@ -27,13 +27,14 @@ const BUILDER = join(import.meta.dir, 'builder.ts')
 
 // The process building the client for the servers `kay dev` starts, kept from one build to the next: its modules stay loaded and what it last built tells what an edit reaches.
 // `stdout` is where what the build prints goes, `kay dev`'s own by default.
-export function startClientBuilder(root: string, env: Record<string, string | undefined>, stdout: 'inherit' | number = 'inherit'): ClientBuilder {
+// `quiet` keeps the first process's error output to itself, as the types of a config that does not load say it already.
+export function startClientBuilder(root: string, env: Record<string, string | undefined>, stdout: 'inherit' | number = 'inherit', quiet = false): ClientBuilder {
   const realRoot = realpathSync(root)
   let modules = new Set<string>()
-  let current = spawn()
+  let current = spawn(quiet)
   let stopped = false
 
-  function spawn() {
+  function spawn(silent = false) {
     const state: Builder = {
       gone: false,
       // Whether it answered a build: one that never did failed as it started, as when the config failed to load.
@@ -45,7 +46,7 @@ export function startClientBuilder(root: string, env: Record<string, string | un
       child: Bun.spawn([process.execPath, BUILDER], {
         cwd: root,
         env: { ...env, NODE_ENV: 'development', KAY_DEV_CODE: '0' },
-        stdio: ['ignore', stdout, 'inherit'],
+        stdio: ['ignore', stdout, silent ? 'ignore' : 'inherit'],
         ipc: (message: { reads?: string[], built?: BuildOutcome }) => {
           if (message.reads)
             modules = new Set(message.reads)
