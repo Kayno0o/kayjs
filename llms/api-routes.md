@@ -295,13 +295,13 @@ export default api()
 
 ### Live values
 
-- `live(initial)` is a `Live<T>`: `value()` reads, `value.set(next | updater)` writes; `live(key => initial)` is `LiveByKey`: `value(key)`, `value.set(key, next)`, `value.delete(key)`. A key is a string or a number, a key nothing was set for reads what the function gives, and `delete` puts it back.
+- `live(initial)` is a `Live<T>`: `value()` reads, `value.set(next | updater)` writes; `live(key => initial)` is `LiveByKey`: `value(key)`, `value.set(key, next)`, `value.delete(key)`. A key is a string, a key nothing was set for reads what the function gives, and `delete` puts it back.
 - A value must cross to the browser as island props do (Dates, Maps and Sets included); a function, class instance or other unsendable value throws where it is set. A `set` to the value it holds sends nothing.
 - A page's HTML holds the values it read, so an island hydrates with them and follows from there. One connection per page, `POST /_kay/live` (under `base`), carries every live value the page's islands read, and none opens when they read none; a swap to another page keeps it, moving it to the keys the new page reads, and closes it when none is read. Changes of one tick are sent as one event.
-- The server sends a value only to a request holding the signed proof of a page that read it, so whoever can render the page can follow the value and a guard on the page covers it. Per-user scoping is not in v1: a value is the same for everyone who can render it.
+- The server sends a value only to a request holding the signed proof of a page that read that key of it, so whoever can render the page can follow exactly what it read and a guard on the page covers it; whatever a render reads, its server fence included, goes into the page. Per-user scoping is not in v1: a value is the same for everyone who can render it.
 - A page with a server fence, a layout and a special page render once and are no islands: reading a live value in their template is an error, so read it in a component. The fence may read and write it.
 - A page reading a live value is rendered per request: `kay build` skips keeping it, and `prerender` or a static export of it fails with `export-server-render`.
-- Limits: values live in the memory of one process, so several processes do not share them (no pub/sub adapter yet); keyed entries stay until `delete`; the proofs are signed with `KAY_SECRET`, or a key made at start-up, so set it when a restart should not refuse open pages; a value an island reads only after the page rendered, such as behind a click, is not followed unless the render read it too.
+- Limits: values live in the memory of one process, so several processes do not share them (no pub/sub adapter yet); keyed entries stay until `delete`; the proofs are signed with `KAY_SECRET`, or a key made at start-up, so set it when a restart should not refuse open pages, which stop following until reloaded; a value an island reads only after the page rendered, such as behind a click, is not followed unless the render read it too.
 
 ### OpenAPI
 

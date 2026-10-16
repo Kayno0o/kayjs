@@ -4,6 +4,7 @@ import { parse } from '@babel/parser'
 
 const MENTIONS_LIVE = /\blive\b/
 const NAMES_KAY = /["']kay["']/
+const SPACE = /\s/
 
 // The name the server and the browser know a live value by: its module's path from the project and its constant, `src/live.ts#visitors`.
 export function liveId(file: string, root: string, name: string): string {
@@ -51,11 +52,15 @@ export function liveIds(source: string, file: string, root: string, jsx = false)
       if (id.type !== 'Identifier' || init?.type !== 'CallExpression' || init.callee.type !== 'Identifier' || !names.has(init.callee.name) || init.arguments.length !== 1)
         continue
 
-      const last = init.arguments[0]!
-      const comma = source.slice(last.end!, init.end! - 1).indexOf(',')
+      // After the argument's last token, parentheses and a trailing comma included.
+      let at = init.end! - 1
+
+      while (at > 0 && SPACE.test(source[at - 1]!))
+        at--
+
       const text = JSON.stringify(liveId(file, root, id.name))
 
-      inserts.push(comma === -1 ? { at: last.end!, text: `, ${text}` } : { at: last.end! + comma + 1, text: ` ${text}` })
+      inserts.push(source[at - 1] === ',' ? { at, text: ` ${text}` } : { at, text: `, ${text}` })
     }
   }
 

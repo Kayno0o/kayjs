@@ -202,7 +202,7 @@ visitors.set(n => n + 1)
 room.set('lobby', { id: 'lobby', users: 3 })
 ```
 
-A live value is read by calling it, in a template or an island, as you read a signal. The one with a function in it is a value per key: `room(id)` reads one, `room.set(id, ...)` writes it, and `room.delete(id)` puts it back to what the function gives. Declare each as `export const name = live(...)` at the top of a module, so the build can name it from its path.
+A live value is read by calling it, in a template or an island, as you read a signal. The one with a function in it is a value per key, a string: `room(id)` reads one, `room.set(id, ...)` writes it, and `room.delete(id)` puts it back to what the function gives. Declare each as `export const name = live(...)` at the top of a module, so the build can name it from its path.
 
 A component that reads one is an island, so a page reading none ships no JavaScript and opens no connection. A page that reads some opens one connection, whatever the number, and the page's HTML already holds the values, so there is no flash while it loads. Following a link to another page keeps the connection, and closes it when the new page reads nothing live.
 
@@ -212,10 +212,10 @@ A page with a server fence, a layout and the special pages render once and are n
 
 The limits of the first version:
 
-- A value is the same for everyone who can render the page. The server sends it only to a request holding the signed proof of a page that read it, so a guard on the page covers it, but there is no value per user.
+- A value is the same for everyone who can render the page. The server sends it only to a request holding the signed proof of a page that read that key of it, so a guard on the page covers it, but there is no value per user. Whatever a page reads while it renders, its server fence included, goes into its HTML, so read only what everyone who sees the page may see.
 - Values live in the memory of one process. Several processes do not share them, and there is no pub/sub adapter yet.
 - A key you set stays until you `delete` it.
-- The proof is signed with `KAY_SECRET`, or with a key made at start-up. Set `KAY_SECRET` if a restart should not leave open pages unable to follow.
+- The proof is signed with `KAY_SECRET`, or with a key made at start-up. Set `KAY_SECRET` if a restart should not leave open pages unable to follow: without it they stop following until reloaded.
 - A value an island reads only after the page rendered, behind a click for instance, is not followed unless the render read it too.
 
 ## Websockets

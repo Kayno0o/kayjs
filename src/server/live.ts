@@ -14,7 +14,7 @@ import { signedText, signText } from './stamp'
 const PROOF = 'live'
 
 // What a page carrying live values holds, which a prerendered file cannot: the values and their proof are per request.
-export const LIVE_MARK = 'data-kay-live'
+export const LIVE_MARK = '<script type="application/json" data-kay-live>'
 const MAX_REQUEST_BYTES = 64 * 1024
 // The keys one connection watches, and the length of a key.
 const MAX_WATCHED = 500
@@ -23,9 +23,9 @@ const CONNECTIONS_PER_MINUTE = 120
 const MINUTE_MS = 60_000
 const LIMIT = 'kay:live'
 
-// The proof that a page read these ids: whoever holds it is let watch them, as whoever rendered the page was.
-function proofOf(ids: string[]): string {
-  return signText(PROOF, [...ids].sort().join('\n'))
+// The proof that a page read these keys of these values: whoever holds it is let watch exactly them, as whoever rendered the page was.
+function proofOf(keys: [string, string][]): string {
+  return signText(PROOF, keys.map(key => JSON.stringify(key)).toSorted().join('\n'))
 }
 
 // A value a browser cannot be sent is refused where it is written, not where a connection would later fail on it.
@@ -48,19 +48,16 @@ export function liveScript(scope: ServerScope | undefined = currentServerScope()
     return ''
 
   const fresh = [...reads.values()].filter(read => !read.sent)
-  const ids = [...new Set([...fresh.map(read => read.id), ...scope?.liveIds ?? []])]
 
-  if (ids.length === 0)
+  if (fresh.length === 0)
     return ''
 
   for (const read of fresh)
     read.sent = true
 
-  scope!.liveIds?.clear()
+  const page: LivePage = { sig: proofOf(fresh.map(read => [read.id, read.key])), values: fresh.map(read => [read.id, read.key, read.value]) }
 
-  const page: LivePage = { ids, sig: proofOf(ids), values: fresh.map(read => [read.id, read.key, read.value]) }
-
-  return `<script type="application/json" ${LIVE_MARK}>${encodeValue(page).replaceAll('<', '\\u003c')}</script>`
+  return `${LIVE_MARK}${encodeValue(page).replaceAll('<', '\\u003c')}</script>`
 }
 
 interface Watched {
@@ -134,7 +131,7 @@ function readRequest(text: string): LiveRequest | undefined {
     if (!Array.isArray(proofs) || !Array.isArray(watch) || watch.length > MAX_WATCHED)
       return undefined
 
-    if (!proofs.every(proof => Array.isArray(proof.ids) && proof.ids.every(id => typeof id === 'string') && typeof proof.sig === 'string'))
+    if (!proofs.every(proof => Array.isArray(proof.keys) && proof.keys.every(key => Array.isArray(key) && typeof key[0] === 'string' && typeof key[1] === 'string') && typeof proof.sig === 'string'))
       return undefined
 
     if (!watch.every(entry => Array.isArray(entry) && typeof entry[0] === 'string' && typeof entry[1] === 'string' && entry[1].length <= MAX_KEY_LENGTH))
@@ -170,13 +167,13 @@ export function serveLive(app: Elysia): void {
     if (asked === undefined || asked.watch.length === 0)
       return new Response(null, { status: 400 })
 
-    const proven = new Set(asked.proofs.filter(proof => signedText(PROOF, [...proof.ids].sort().join('\n'), proof.sig)).flatMap(proof => proof.ids))
+    const proven = new Set(asked.proofs.filter(proof => signedText(PROOF, proof.keys.map(key => JSON.stringify(key)).toSorted().join('\n'), proof.sig)).flatMap(proof => proof.keys.map(key => JSON.stringify(key))))
     const watched: Watched[] = []
 
     for (const [id, key] of asked.watch) {
       const slot = liveSlot(id)
 
-      if (slot !== undefined && proven.has(id) && (slot.keyed || key === ''))
+      if (slot !== undefined && proven.has(JSON.stringify([id, key])) && (slot.keyed || key === ''))
         watched.push({ id, key, value: () => slotValue(slot, key), watch: listener => watchSlot(slot, key, listener) })
     }
 

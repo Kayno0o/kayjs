@@ -9,8 +9,8 @@ import { decodeServerValue } from './wire'
 // Defined by the browser build, which never runs the server's half: tested where it is read, so the bundler drops it.
 declare const KAY_BROWSER: true | undefined
 
-// What a keyed value is read by: text or a number, which are the same key.
-export type LiveKey = string | number
+// What a keyed value is read by.
+export type LiveKey = string
 
 // A value the server changes and every open page shows: read by calling it, as a signal is, and written with `set` on the server only.
 export interface Live<T> {
@@ -33,9 +33,8 @@ type Handle = Live<unknown> & LiveByKey<LiveKey, unknown>
 // A value reaches the browser as devalue does, so a function cannot be one.
 type PlainValue<T> = Exclude<T, (...args: never[]) => unknown>
 
-// The page's script of live values: the ids it read with the signature the connection proves them by, and the value of each as the server rendered it.
+// The page's script of live values: the value of each as the server rendered it, with the signature that proves the page read those keys.
 export interface LivePage {
-  ids: string[]
   sig: string
   values: [id: string, key: string, value: unknown][]
 }
@@ -45,7 +44,7 @@ export type LiveUpdate = [id: string, key: string, value: unknown]
 
 // What a connection asks for: the pages' proofs, and the keys it watches.
 export interface LiveRequest {
-  proofs: { ids: string[], sig: string }[]
+  proofs: { keys: [id: string, key: string][], sig: string }[]
   watch: [id: string, key: string][]
 }
 
@@ -128,9 +127,6 @@ function serverLive(id: string, initial: unknown): Handle {
   if (known) {
     known.initial = initial
     known.keyed = keyed
-
-    if (!keyed)
-      known.values.delete('')
   }
 
   slots().set(id, slot)
@@ -253,7 +249,7 @@ function sameValue(a: unknown, b: unknown): boolean {
 }
 
 function watch(slot: BrowserSlot, key: string, entry: Entry): void {
-  const at = `${slot.id}\0${key}`
+  const at = JSON.stringify([slot.id, key])
 
   if (entry.watchers === 0) {
     // A page rendered since may hold a fresher value than the last the connection delivered; the same render as before holds the one the connection has since moved past.
@@ -306,8 +302,8 @@ function sync(): void {
 
   current?.reader.close()
 
-  const proofs = pagesOf().map(page => ({ ids: page.ids, sig: page.sig }))
-  const watched: [string, string][] = [...keys].map(key => key.split('\0') as [string, string])
+  const proofs = pagesOf().map(page => ({ keys: page.values.map(([id, key]) => [id, key] as [string, string]), sig: page.sig }))
+  const watched = [...keys].map(key => JSON.parse(key) as [string, string])
   const body = JSON.stringify({ proofs, watch: watched } satisfies LiveRequest)
   const reader = readEvents<LiveUpdate[]>(async signal => fetch(withBase(LIVE_ROUTE), { method: 'POST', headers: { 'content-type': 'application/json' }, body, signal }), true)
 
