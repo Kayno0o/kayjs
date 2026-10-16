@@ -5,6 +5,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 ## Unreleased
 
 - `resource(load)` and `stream(source)` read any async function or async iterable in an island, not only an api route, with `loading`, `error`, the latest value, `refresh()` and a slower answer never replacing a newer one ([API routes](api-routes.md#read-a-routes-answer-in-an-island)).
+- `invalidate` on a `sqliteCache` reads the keys each stored value was built from in a table of their own, not every row, so it stays fast on a large cache; a custom `CacheStore` may offer `dependencies()` for the same ([Caching](rendering.md#keep-a-cached-value-across-restarts)).
 
 ## 1.46.0
 

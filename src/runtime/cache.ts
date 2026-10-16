@@ -342,11 +342,6 @@ function storedReads(store: CacheStore, key: string): string[] {
   return kept ? splitDeps(kept.text).deps ?? [] : []
 }
 
-// The keys a stored text was built from, none for a value that was built from no other.
-export function depsOfText(stored: string): string[] | undefined {
-  return splitDeps(stored).deps
-}
-
 function splitDeps(stored: string): { deps?: string[], text: string } {
   if (!stored.startsWith(DEPS_PREFIX))
     return { text: stored }

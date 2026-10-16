@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { Database } from 'bun:sqlite'
-import { afterAll, afterEach, describe, expect, it, setSystemTime, spyOn } from 'bun:test'
+import { afterAll, afterEach, describe, expect, it, mock, setSystemTime, spyOn } from 'bun:test'
 import { Elysia } from 'elysia'
 import { cached, invalidate, sqliteCache } from '../src/runtime/cache.server'
 import { pages } from '../src/server'
@@ -309,6 +309,36 @@ describe('cached with a store', () => {
     expect([...store.dependencies!()]).toEqual([['page:1', ['post:1']]])
     invalidate('post:1')
     expect(store.keys()).toEqual(['plain'])
+  })
+
+  it('follows rows another process writes straight into the file, one of an older version included', async () => {
+    const path = await storePath()
+    const store = sqliteCache(path)
+    const other = new Database(path)
+    const insert = (key: string, value: string) => other.run('INSERT OR REPLACE INTO kay_cache VALUES (?, ?, ?)', [key, value, Date.now() + 60_000])
+
+    insert('page:1', '#deps ["post:1"]\n["one"]')
+    insert('page:2', '#deps ["post:2"]\n["two"]')
+    insert('broken', '#deps ["post:3"\n["three"]')
+    expect([...store.dependencies!()].sort()).toEqual([['broken', ['\0all']], ['page:1', ['post:1']], ['page:2', ['post:2']]])
+
+    insert('page:1', '["one"]')
+    other.run('DELETE FROM kay_cache WHERE key = \'page:2\'')
+    expect([...store.dependencies!()]).toEqual([['broken', ['\0all']]])
+    other.close()
+  })
+
+  it('reads the rows of a store without dependencies() one by one', async () => {
+    const rows = new Map<string, string>([['page:1', '#deps ["post:1"]\n["one"]'], ['plain', '["plain"]']])
+    const get = (key: string) => rows.has(key) ? { text: rows.get(key)!, freshUntil: Date.now() + 60_000 } : undefined
+    const read = mock(get)
+    const store = { get: read, set: (key: string, text: string) => void rows.set(key, text), delete: (key: string) => void rows.delete(key), keys: () => [...rows.keys()] }
+
+    // Naming the store makes invalidate empty it too.
+    expect(await cached('seed', 60, () => 'x', { store })).toBe('x')
+    invalidate('post:1')
+    expect([...rows.keys()].sort()).toEqual(['plain', 'seed'])
+    expect(read).toHaveBeenCalled()
   })
 
   it('refuses a value the store cannot hold, keeping nothing', async () => {
