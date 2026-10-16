@@ -27,12 +27,13 @@ it('reloads a server component, a post and a dependency of the content config in
   await Promise.all(Object.entries({
     'src/dep.ts': 'export const label = \'one\'\n',
     'src/components/note.kay': 'aside Note one\n',
-    'src/content.config.ts': 'import { t } from \'elysia\'\nimport { collection } from \'kay/content\'\nimport { label } from \'./dep\'\nimport Note from \'./components/note.kay\'\n\nexport const posts = collection(\'content/posts\', { schema: t.Object({ title: t.String() }), components: { Note }, highlight: code => `<pre data-label="${label}">${code}</pre>` })\n',
+    'src/content.config.ts': 'import { t } from \'elysia\'\nimport { collection } from \'kay/content\'\nimport Note from \'./components/note.kay\'\n\nexport { label } from \'./dep\'\nexport const posts = collection(\'content/posts\', { schema: t.Object({ title: t.String() }), components: { Note } })\n',
     'src/content/posts/hello.md': '---\ntitle: Hello\n---\n\nBody 0\n\n<Note />\n',
-    'src/routes/index.kay': '--- server\nimport { posts } from \'../content.config\'\n\nconst post = await posts.get(\'hello\')\nconst { Content } = post!\n---\nh1 {post!.data.title}\nContent\n',
+    'src/routes/index.kay': '--- server\nimport { label, posts } from \'../content.config\'\n\nconst post = await posts.get(\'hello\')\nconst { Content } = post!\n---\nh1 {post!.data.title}\np {label}\nContent\n',
   }).map(async ([path, content]) => Bun.write(join(root, path), content)))
 
   const stop = await dev(root, { port, log: line => lines.push(line) })
+  const reloads = () => lines.filter(line => (/reloaded in \d+ ms$/).test(line))
   const page = async () => {
     try {
       return await (await fetch(`http://localhost:${port}/`)).text()
@@ -50,10 +51,10 @@ it('reloads a server component, a post and a dependency of the content config in
       const times: number[] = []
 
       for (let index = 1; index <= EDITS; index++) {
-        const before = lines.length
+        const before = reloads().length
 
         await Bun.write(join(root, path), content(index))
-        await until(() => lines.length > before)
+        await until(() => reloads().length > before)
         await until(async () => seen(index) === '' || (await page()).includes(seen(index)))
 
         const line = lines.at(-1)!
@@ -69,7 +70,7 @@ it('reloads a server component, a post and a dependency of the content config in
 
     const component = await edit('src/components/note.kay', index => `aside Note ${index + 1}\n`, index => `Note ${index + 1}`)
     const post = await edit('src/content/posts/hello.md', index => `---\ntitle: Hello\n---\n\nBody ${index}\n\n<Note />\n`, index => `Body ${index}`)
-    const dependency = await edit('src/dep.ts', index => `export const label = 'v${index}'\n`, () => '')
+    const dependency = await edit('src/dep.ts', index => `export const label = 'v${index}'\n`, index => `v${index}`)
 
     expect(component).toBeLessThan(RELOAD_BUDGET_MS)
     expect(post).toBeLessThan(RELOAD_BUDGET_MS)
@@ -90,6 +91,7 @@ it('plans an entry of a collection, and what the content config imports, as a re
     'src/content.config.ts': 'import { label } from \'./dep\'\n\nexport const posts = label\n',
     'src/routes/index.kay': '--- server\nimport { posts } from \'../content.config\'\n---\np {posts}\n',
     'src/content/posts/hello.md': 'Hello\n',
+    'src/data.json': '{}\n',
     'notes/todo.md': 'Todo\n',
   }).map(async ([path, content]) => Bun.write(join(root, path), content)))
 
@@ -98,7 +100,7 @@ it('plans an entry of a collection, and what the content config imports, as a re
     const content = join(base, 'src/content.config.ts')
     const page = join(base, 'src/routes/index.kay')
     const dep = join(base, 'src/dep.ts')
-    const input = { root, loaded: [content, page, dep], owned: [join(base, 'src/routes')], content, config: join(base, 'kay.config.ts'), entry: join(base, 'src/server.ts') }
+    const input = { root, loaded: [content, page, dep], owned: [join(base, 'src/routes')], content: { file: content, folders: [join(base, 'src/content/posts')] }, config: join(base, 'kay.config.ts'), entry: join(base, 'src/server.ts') }
 
     for (const changed of [['src/content/posts/hello.md'], ['src/dep.ts']]) {
       const plan = planReload({ ...input, changed })
@@ -107,7 +109,9 @@ it('plans an entry of a collection, and what the content config imports, as a re
       expect((plan as { evict: string[] }).evict).toEqual(expect.arrayContaining([content, page]))
     }
 
-    // Where no module of kay's reads it, a new process.
+    // Where no module of kay's reads it, a new process: a file beside the collections, one outside the content config's folder, or a collection with a loader.
+    expect(planReload({ ...input, changed: ['src/data.json'] })).toHaveProperty('restart')
+    expect(planReload({ ...input, content: undefined, changed: ['src/dep.ts'] })).toHaveProperty('restart')
     expect(planReload({ ...input, changed: ['notes/todo.md'] })).toHaveProperty('restart')
     // The config not loaded yet: nothing says what read the entry.
     expect(planReload({ ...input, loaded: [page], changed: ['src/content/posts/hello.md'] })).toHaveProperty('restart')

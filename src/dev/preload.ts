@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { loadTraverse } from '../compiler/rewrite'
 import { CONFIG_FILE, loadConfig } from '../config'
+import { reloadableFolders } from '../content/edit'
 import { projectPaths } from '../project'
 import { forgetModules } from '../server/bundle'
 import { announceReload, stopRunning } from '../server/dev'
@@ -348,7 +349,8 @@ async function reloaded({ code, startedAt, changed, files }: ReloadRequest): Pro
     return { restart: 'the config does not load' }
   }
 
-  const plan = files === null ? { restart: 'too many files changed' } : planReload({ root, changed: files, loaded: Object.keys(require.cache), owned: [paths.routes, paths.api], content: paths.content, config: join(root, CONFIG_FILE), entry: Bun.main })
+  const collectionFolders = reloadableFolders()
+  const plan = files === null ? { restart: 'too many files changed' } : planReload({ root, changed: files, loaded: Object.keys(require.cache), owned: [paths.routes, paths.api], content: collectionFolders === undefined ? undefined : { file: paths.content, folders: collectionFolders }, config: join(root, CONFIG_FILE), entry: Bun.main })
 
   if ('restart' in plan)
     return plan

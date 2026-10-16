@@ -138,6 +138,14 @@ export function registerCollections(named: [string, Collection<unknown>][]): [st
   return previous
 }
 
+// The folders the registered collections read their entries from, resolved against the content config's, or none when one of them has a loader, whose entries the process keeps after the config runs again.
+export function reloadableFolders(): string[] | undefined {
+  if (registered.some(([, collection]) => collection.dir === undefined))
+    return undefined
+
+  return registered.map(([, collection]) => folderOf(collection.dir!))
+}
+
 // Gives back what was registered before, for a test to put back.
 export function registerEditSite(served: EditSite | undefined): EditSite | undefined {
   const previous = site

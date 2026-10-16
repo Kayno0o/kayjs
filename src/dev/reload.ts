@@ -12,8 +12,8 @@ export interface ReloadInput {
   loaded: string[]
   // The directories whose files only kay imports: the routes and the API modules.
   owned: string[]
-  // The content config, which only kay imports, and which the entries of its collections are read through: a change to one of them, or to what it imports, runs it again.
-  content?: string | undefined
+  // The content config, which only kay imports, and the folders of its collections' entries: a change to an entry, or to what the config imports, runs it again. None when a collection has a loader, whose entries the process keeps.
+  content?: { file: string, folders: string[] } | undefined
   config: string
   entry: string
 }
@@ -62,7 +62,8 @@ const imports = new Map<string, Imports>()
 export function planReload({ root, changed, loaded, owned, content, config, entry }: ReloadInput): ReloadPlan {
   const real = realpathOf(root)
   const modules = new Set(loaded.filter(file => file.startsWith(real + sep) && !NOT_PROJECT.test(file.slice(real.length))))
-  const contentConfig = content === undefined ? undefined : realpathOf(content)
+  const contentConfig = content === undefined ? undefined : realpathOf(content.file)
+  const folders = (content?.folders ?? []).map(realpathOf)
   const kays = (file: string) => file.endsWith('.kay') || file === contentConfig || owned.some(dir => file.startsWith(dir + sep))
   const seeds: string[] = []
   // The modules whose glob matches a changed file, which changed no more than their file list did.
@@ -84,7 +85,7 @@ export function planReload({ root, changed, loaded, owned, content, config, entr
     if (key !== undefined)
       seeds.push(key)
     // An entry of a collection: the content config runs again, as its entries are read through it.
-    else if (contentConfig !== undefined && modules.has(contentConfig) && ENTRY_FILE.test(path) && path.startsWith(dirname(contentConfig) + sep))
+    else if (contentConfig !== undefined && modules.has(contentConfig) && ENTRY_FILE.test(path) && folders.some(folder => realpathOf(path).startsWith(folder + sep)))
       seeds.push(contentConfig)
     else if (!kays(path))
       unknown.push(file)
