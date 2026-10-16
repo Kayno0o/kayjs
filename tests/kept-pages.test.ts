@@ -2,6 +2,7 @@ import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
+import { outputDir } from '../src/build/assets'
 import { readsNothing } from '../src/server/pure-page'
 import { scratchDir } from './scratch'
 
@@ -28,7 +29,7 @@ async function built(root: string): Promise<string[]> {
   if (code !== 0)
     throw new Error(`${out}${err}`)
 
-  const manifest = await Bun.file(join(root, '.kay/client/manifest.json')).json() as { pages: Record<string, unknown> }
+  const manifest = await Bun.file(join(outputDir(root), 'manifest.json')).json() as { pages: Record<string, unknown> }
 
   return Object.keys(manifest.pages).sort()
 }

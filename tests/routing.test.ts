@@ -229,7 +229,8 @@ describe('prerendering', () => {
   it('renders an optional param\'s path with and without it, the matcher\'s value handed over', async () => {
     const dir = build.pages
 
-    expect(build.count()).toBe(2)
+    // The two paths of the optional param, and the pages reading nothing from a request.
+    expect(build.count()).toBe(5)
     expect(await Bun.file(join(dir, 'blog.html')).text()).toContain('<p class="page">Page 1, a undefined</p>')
     expect(await Bun.file(join(dir, 'blog/2.html')).text()).toContain('<p class="page">Page 2, a number</p>')
   })

@@ -38,10 +38,11 @@ describe('server islands', () => {
 
       const written = (await readManifest(process.cwd(), build.dir))!.pages!
 
-      // No page exports `prerender`: reaching a server island is enough, and a page reaching none renders per request.
+      // No page exports `prerender`: reaching a server island is enough, and a page reading nothing from its request is kept too, with no island.
       expect(written['/']!.islands).toEqual(['inline', 'defer'])
       expect(written['/deferred']!.islands).toEqual(['defer'])
-      expect(written['/plain']).toBeUndefined()
+      expect(written['/plain']).toBeDefined()
+      expect(written['/plain']!.islands).toBeUndefined()
 
       const built = await Bun.file(join(build.pages, 'index.html')).text()
       const placeholder = DEFERRED.exec(built)![0]
