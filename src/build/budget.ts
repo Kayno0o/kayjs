@@ -2,6 +2,7 @@ import type { CheckDiagnostic } from '../check/index'
 import type { LintLevels } from '../compiler/lints'
 import type { Route } from '../server/routes'
 import type { ModuleSize, RouteSize, SizeReport } from './report'
+import { KayError } from '../compiler/errors'
 import { lintLevel } from '../compiler/lints'
 
 // A size in bytes, or a string with its unit: `'20kb'`, `'1.5mb'`, `'800b'`.
@@ -24,7 +25,7 @@ export function byteSize(value: unknown, what: string): number {
   const bytes = typeof value === 'number' ? value : fromText
 
   if (!Number.isFinite(bytes) || bytes <= 0)
-    throw new Error(`kay: ${what} is ${typeof value === 'string' ? `'${value}'` : String(value)}; it takes a positive size, bytes or a string such as '20kb' or '1.5mb'`)
+    throw new KayError('config-invalid', `kay: ${what} is ${typeof value === 'string' ? `'${value}'` : String(value)}; it takes a positive size, bytes or a string such as '20kb' or '1.5mb'`)
 
   return bytes
 }
