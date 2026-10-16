@@ -5,7 +5,7 @@ import { afterAll, describe, expect, it } from 'bun:test'
 import { outputDir } from '../src/build/assets'
 import { formatRouteTable } from '../src/build/report'
 import { compileKay } from '../src/compiler'
-import { CONTENT_EXPORTS, KAY_EXPORTS, keptStop, readsNothing } from '../src/server/pure-page'
+import { CONTENT_EXPORTS, KAY_EXPORTS, keptScan, keptStop, readsNothing } from '../src/server/pure-page'
 import { scratchDir } from './scratch'
 
 const CLI = join(import.meta.dir, '../src/cli.ts')
@@ -920,6 +920,7 @@ describe('a page reading only what its path fixes', () => {
     'destructured': '--- server\nconst { url: { pathname } } = ctx\n---\np {pathname}\n',
     'aliased': '--- server\nconst { url: { pathname: here = \'/\' } } = ctx\n---\np {here}\n',
     'params': '--- server\nconst slug = ctx.params.slug\n---\np {slug}\n',
+    'on its own line': '--- server\nconst { url: { pathname } } = ctx\nconst parts = pathname.split(\'/\')\n---\np {parts.length}\n',
     'params destructured': '--- server\nconst { params, url: { pathname } } = ctx\n---\np {pathname}{params.slug}\n',
   }
   const STOPPED_READS: Record<string, string> = {
@@ -941,6 +942,10 @@ describe('a page reading only what its path fixes', () => {
     'aliased ctx': '--- server\nconst here = ctx\n---\np {here.url.pathname}\n',
     'assigned': '--- server\nctx.url.pathname = \'/other\'\n---\np Hi\n',
     'incremented': '--- server\nctx.url.pathname += \'/more\'\n---\np Hi\n',
+    'continued onto a property': '--- server\nconst { params } = ctx\n  .cookies\n---\np {params}\n',
+    'continued onto url': '--- server\nconst { params } = ctx\n.url\n---\np {params}\n',
+    'continued by a ternary': '--- server\nconst { params } = ctx\n? 1 : 2\n---\np {params}\n',
+    'continued by an index': '--- server\nconst { params } = ctx\n[0]\n---\np {params}\n',
     'a pathname read after a search': '--- server\nconst here = ctx.url.pathname\nconst found = ctx.url.search\n---\np {here}{found}\n',
   }
   const fileOf = (name: string) => name.replaceAll(' ', '-')
@@ -965,14 +970,24 @@ describe('a page reading only what its path fixes', () => {
 
     const stopOf = async (file: string, ...layouts: string[]) => keptStop({ file: join(root, file), layouts: layouts.map(layout => join(root, layout)) })
 
-    for (const name of Object.keys(KEPT_READS))
-      expect(await stopOf(`src/routes/${fileOf(name)}.kay`), name).toBeUndefined()
+    for (const name of Object.keys(KEPT_READS)) {
+      const file = `src/routes/${fileOf(name)}.kay`
+
+      expect(await stopOf(file), name).toBeUndefined()
+      // A page that reads the pathname is kept only at the path it was rendered at, so the scan must say it does.
+      expect((await keptScan({ file: join(root, file), layouts: [] })).pathname, name).toBe(!name.startsWith('params') || name === 'params destructured')
+    }
+
+    const reading = async (file: string, ...layouts: string[]) => (await keptScan({ file: join(root, file), layouts: layouts.map(layout => join(root, layout)) })).pathname
 
     for (const name of Object.keys(STOPPED_READS))
       expect(await stopOf(`src/routes/stopped/${fileOf(name)}.kay`), name).toMatchObject({ why: 'reads `ctx`' })
 
     expect(await stopOf('src/layout-reading/index.kay', 'src/layout-reading/_layout.kay')).toBeUndefined()
     expect(await stopOf('src/routes/with-nav.kay')).toBeUndefined()
+    expect(await reading('src/layout-reading/index.kay', 'src/layout-reading/_layout.kay')).toBe(true)
+    expect(await reading('src/routes/with-nav.kay')).toBe(true)
+    expect(await reading('src/routes/params.kay')).toBe(false)
     expect(await stopOf('src/routes/with-nav-search.kay')).toMatchObject({ file: join(root, 'src/nav-search.kay'), why: 'reads `ctx`' })
     expect(await stopOf('src/routes/with-helper.kay')).toMatchObject({ why: 'reads `ctx`' })
     expect(await stopOf('src/routes/foreign.kay')).toMatchObject({ why: 'reads `ctx`' })
@@ -1031,6 +1046,32 @@ describe('a page reading only what its path fixes', () => {
       expect(home!.text).toContain('At /<')
     }
   }, 120_000)
+
+  it('serves a layout reading the pathname at the rendered spelling alone, and stores the path it was rendered at', async () => {
+    const root = await project({
+      'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ log: false, trailingSlash: \'ignore\' })\n',
+      'src/routes/_layout.kay': '--- server\nconst { url: { pathname } } = ctx\n---\nheader {pathname}\nslot\n',
+      'src/routes/about.kay': 'p About\n',
+      'src/routes/plain.kay': 'p Plain\n',
+    })
+
+    roots.push(root)
+    expect(await built(root)).toEqual(['/about', '/plain'])
+
+    const manifest = await Bun.file(join(outputDir(root), 'manifest.json')).json() as { pages: Record<string, { pathname?: string }> }
+
+    expect(manifest.pages['/about']!.pathname).toBe('/about')
+    expect(manifest.pages['/plain']!.pathname).toBe('/plain')
+
+    const [bare, slashed, hostile] = await served(root, [{ path: '/about' }, { path: '/about/' }, { path: '/%61bout' }])
+
+    expect(bare!.etag).not.toBeNull()
+    expect(bare!.text).toContain('<header>/about</header>')
+    expect(slashed!.etag).toBeNull()
+    expect(slashed!.text).toContain('<header>/about/</header>')
+    expect(hostile!.etag).toBeNull()
+    expect(hostile!.status === 200 ? hostile!.text : '').not.toContain('<header>/about</header>')
+  }, 60_000)
 
   it('keeps a page whose path needs percent-encoding, at the spelling a browser sends', async () => {
     const root = await project({ 'src/routes/café.kay': AT_PATH })

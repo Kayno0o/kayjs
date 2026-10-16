@@ -231,7 +231,7 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
           options.others?.push({ file: route.file, html })
         }
 
-        const stored: PrerenderedPage = { pattern: route.pattern, locale: copy.locale ?? locales.settings.defaultLocale, file: name, status: response.status, headers: storedHeaders(response.headers), etag: pageEtag(html), renderedAt: Date.now(), revalidate, ...islands.length > 0 ? { islands } : {}, ...stamps ? { stamps } : {}, ...readsSite ? { readsSite } : {}, ...auto ? { kept: true } : {}, ...auto && readsPathname ? { pathname: served } : {}, ...dataRead.length > 0 ? { reads: dataRead } : {}, ...token === pageToken(copy.key) ? {} : { token } }
+        const stored: PrerenderedPage = { pattern: route.pattern, locale: copy.locale ?? locales.settings.defaultLocale, file: name, status: response.status, headers: storedHeaders(response.headers), etag: pageEtag(html), renderedAt: Date.now(), revalidate, ...islands.length > 0 ? { islands } : {}, ...stamps ? { stamps } : {}, ...readsSite ? { readsSite } : {}, ...auto ? { kept: true } : {}, ...auto && readsPathname ? { pathname: new URL(request.url).pathname } : {}, ...dataRead.length > 0 ? { reads: dataRead } : {}, ...token === pageToken(copy.key) ? {} : { token } }
 
         pending.push(() => {
           pages[copy.key] = stored

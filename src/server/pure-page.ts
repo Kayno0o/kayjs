@@ -102,7 +102,8 @@ const WHITESPACE = /\s+/g
 const CTX = /\bctx\b/g
 const CTX_PATHNAME = /^\s*\??\.\s*url\s*\??\.\s*pathname(?![\w$])(?![ \t]*(?:\+\+|--))(?!\s*(?:=(?!=)|[-+*/%&|^]=|<<=|>>>?=|\*\*=|&&=|\|\|=|\?\?=))/
 const CTX_PARAMS = /^\s*\??\.\s*params(?![\w$])/
-const CTX_ENDS = /^\s*(?:[;,)\n]|$)/
+// A statement ends at `;`, `,`, `)`, the end of the source, or a line break before a token that cannot continue the expression (`ctx` then `.cookies` on the next line is `ctx.cookies`); `---` closes a .kay fence.
+const CTX_ENDS = /^[ \t]*(?:[;,)]|$|\r?\n(?!\s*(?:[.?[(`+*/%&|^<>=!:]|-(?!--)|(?:in|instanceof|as|satisfies)(?![\w$]))))/
 const DECLARATION = /(?:^|[^\w$.])(?:const|let|var)$/
 const PARAMS_ENTRY = /^params\s*(?::|=|$)/
 const URL_ENTRY = /^url\s*:\s*(\{[\s\S]*\})$/
