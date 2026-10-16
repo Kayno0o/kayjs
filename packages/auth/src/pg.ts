@@ -1,6 +1,7 @@
 import type { Database, InferEntity } from '@kaynooo/pg-orm'
 import type { AuditRecord, AuthStore, BearerTokenRecord, IdentityRecord, InvitationRecord, MemberRecord, OAuthClientRecord, OAuthCodeRecord, OAuthGrantRecord, OAuthRefreshRecord, OrganizationRecord, PasskeyRecord, PruneLimits, SessionRecord, TokenRecord, TokenType, UserRecord } from './store'
 import { defineTable } from '@kaynooo/pg-orm'
+import { log } from './log'
 
 export const AuthUsers = defineTable('auth_user', t => ({
   id: t.text().primaryKey(),
@@ -406,7 +407,7 @@ export function pgStore(db: Database): AuthStore {
           })
         },
         async deleteForUser(userId) {
-          await oauthRefresh.write.deleteMany({ user_id: userId })
+          await withoutMissingOAuthTables(async () => oauthRefresh.write.deleteMany({ user_id: userId }))
         },
       },
     },
@@ -449,20 +450,47 @@ export function pgStore(db: Database): AuthStore {
     },
     async prune({ now, bearerExpiredBefore, sessionMaxAge, sessionAbsoluteMaxAge }: PruneLimits) {
       await Promise.all([
+        withoutMissingOAuthTables(async () => Promise.all([
+          oauthCodes.write.deleteMany({ expires_at: { lte: now } }),
+          oauthRefresh.write.deleteMany({ expires_at: { lte: now } }),
+          // A client that registered itself and that nobody approved within a month.
+          db.raw`DELETE FROM "auth_oauth_client" WHERE "created_at" < ${new Date(now.getTime() - UNUSED_CLIENT_MS)} AND NOT EXISTS (SELECT 1 FROM "auth_oauth_grant" WHERE "auth_oauth_grant"."client_id" = "auth_oauth_client"."id")`,
+        ])),
         tokens.write.deleteMany({ expires_at: { lte: now } }),
         invitations.write.deleteMany({ expires_at: { lte: now } }),
         bearerTokens.write.deleteMany({ expires_at: { lt: bearerExpiredBefore } }),
         attempts.write.deleteMany({ reset_at: { lte: now } }),
-        oauthCodes.write.deleteMany({ expires_at: { lte: now } }),
-        oauthRefresh.write.deleteMany({ expires_at: { lte: now } }),
-        // A client that registered itself and that nobody approved within a month.
-        db.raw`DELETE FROM "auth_oauth_client" WHERE "created_at" < ${new Date(now.getTime() - UNUSED_CLIENT_MS)} AND NOT EXISTS (SELECT 1 FROM "auth_oauth_grant" WHERE "auth_oauth_grant"."client_id" = "auth_oauth_client"."id")`,
         sessions.write.deleteMany({ last_seen_at: { lt: new Date(now.getTime() - sessionMaxAge * 1000) } }),
         sessions.write.deleteMany({ created_at: { lt: new Date(now.getTime() - sessionAbsoluteMaxAge * 1000) } }),
         // A session the user's version moved past is already refused, so its row goes too.
         db.raw`DELETE FROM "auth_session" WHERE "version" < (SELECT "session_version" FROM "auth_user" WHERE "auth_user"."id" = "auth_session"."user_id")`,
       ])
     },
+  }
+}
+
+// Postgres code 42P01 on pg-orm's error, on its Postgres cause or on a raw query's error; SQLite words it as `no such table`.
+function isMissingTable(error: unknown): boolean {
+  const { code, errno, cause, message } = (error ?? {}) as { code?: unknown, errno?: unknown, cause?: unknown, message?: unknown }
+
+  return code === '42P01' || errno === '42P01' || (cause !== undefined && cause !== error && isMissingTable(cause)) || (typeof message === 'string' && message.includes('no such table'))
+}
+
+let warnedMissingOAuthTables = false
+
+// An app whose migrations predate the OAuth server has no OAuth tables yet: what only the OAuth server needs is skipped with one warning, so sign-in, magic links and password resets still work. Any other failure is thrown.
+async function withoutMissingOAuthTables(run: () => Promise<unknown>): Promise<void> {
+  try {
+    await run()
+  }
+  catch (error) {
+    if (!isMissingTable(error))
+      throw error
+
+    if (!warnedMissingOAuthTables) {
+      warnedMissingOAuthTables = true
+      log.warn('the auth_oauth_* tables are missing, so the OAuth server is skipped: generate a migration with `bunx pg-orm generate` (or run db.sync())')
+    }
   }
 }
 

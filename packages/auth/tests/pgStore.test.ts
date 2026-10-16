@@ -1,5 +1,5 @@
 import { Database } from '@kaynooo/pg-orm'
-import { afterAll } from 'bun:test'
+import { afterAll, test } from 'bun:test'
 import { authTables, pgStore } from '../src/pg'
 import { storeContract } from './helpers/storeContract'
 
@@ -19,6 +19,21 @@ if (reachable) {
     await db.raw(`TRUNCATE ${authTables.map(table => `"${table.name}"`).join(', ')} CASCADE`, [])
 
     return pgStore(db)
+  })
+
+  // An app whose migrations predate the OAuth server: its sign-in, magic-link and reset flows revoke bearer tokens and prune, and must not fail on the missing tables.
+  test('pgStore skips the OAuth tables an older schema lacks', async () => {
+    await db.raw('DROP TABLE IF EXISTS "auth_oauth_refresh", "auth_oauth_code", "auth_oauth_grant", "auth_oauth_client" CASCADE', [])
+
+    try {
+      const store = pgStore(db)
+
+      await store.oauth!.refresh.deleteForUser('u1')
+      await store.prune!({ now: new Date(), bearerExpiredBefore: new Date(), sessionMaxAge: 60, sessionAbsoluteMaxAge: 60 })
+    }
+    finally {
+      await db.sync({ allowDestructive: true })
+    }
   })
 }
 else if (process.env.KAYJS_AUTH_REQUIRE_DATABASE !== undefined && process.env.KAYJS_AUTH_REQUIRE_DATABASE !== '') {

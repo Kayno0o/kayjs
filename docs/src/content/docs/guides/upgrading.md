@@ -11,9 +11,9 @@ kay and its libraries share one version number, so one section covers them all. 
 
 ## 1.50.0
 
-### Postgres and SQLite apps with kayjs-auth run `db.sync()`
+### Postgres and SQLite apps with kayjs-auth add tables
 
-`pgStore` adds four tables for the OAuth server, `auth_oauth_client`, `auth_oauth_grant`, `auth_oauth_code` and `auth_oauth_refresh`, and two columns on `auth_bearer_token`, `oauth_client` and `oauth_family`. Creating a bearer token writes those columns, so it fails until `db.sync()` has run. If you write your own migrations, add them there. A custom store needs nothing: without an `oauth` member the OAuth server stays off. `kay check` cannot see your database schema, so no lint warns about this.
+`pgStore` adds four tables for the OAuth server, `auth_oauth_client`, `auth_oauth_grant`, `auth_oauth_code` and `auth_oauth_refresh`, and two columns on `auth_bearer_token`, `oauth_client` and `oauth_family`. Bearer tokens are read and created with those columns, so they fail until the schema has them. If your app runs `db.sync()`, it adds them at startup. If your schema lives in pg-orm migrations, run `bunx pg-orm generate` and apply the migration it writes. Until then, sign-in, magic links and password resets keep working: the OAuth cleanup is skipped with one logged warning. A custom store needs nothing: without an `oauth` member the OAuth server stays off. `kay check` cannot see your database schema, so no lint warns about this.
 
 ## 1.49.0
 

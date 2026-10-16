@@ -4,9 +4,9 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ## 1.50.0
 
-### `pgStore` apps run `db.sync()` for the OAuth server's tables and columns
+### `pgStore` apps add the OAuth server's tables and columns: `db.sync()` or a migration
 
-- `pgStore` adds the tables `auth_oauth_client`, `auth_oauth_grant`, `auth_oauth_code` and `auth_oauth_refresh`, and the columns `oauth_client` and `oauth_family` (with indexes) on `auth_bearer_token`. Minting a bearer token writes those columns, so every token creation fails until `db.sync()` has run; an app writing its own migrations adds them. A custom `AuthStore` needs nothing: its `oauth` member is optional, and without it the OAuth server stays off. `kay check` cannot see a database schema, so no `deprecated` lint can catch this.
+- `pgStore` adds the tables `auth_oauth_client`, `auth_oauth_grant`, `auth_oauth_code` and `auth_oauth_refresh`, and the columns `oauth_client` and `oauth_family` (with indexes) on `auth_bearer_token`. Minting a bearer token writes those columns, so every bearer-token read and creation fails until they exist. An app on `db.sync()` gets them at startup; an app on pg-orm migrations runs `bunx pg-orm generate` and applies the migration (it also adds the new OAuth indexes). Without the OAuth tables, sign-in, magic links and password resets keep working: the store skips the OAuth deletes and logs one warning. A custom `AuthStore` needs nothing: its `oauth` member is optional, and without it the OAuth server stays off. `kay check` cannot see a database schema, so no `deprecated` lint can catch this.
 
 ## 1.49.0
 
