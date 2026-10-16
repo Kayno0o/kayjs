@@ -1422,9 +1422,9 @@ describe.concurrent('kay dev', () => {
       // The debugger's connection ends with its server, and connecting again reaches the next.
       await first.closed
       expect(await (await session()).pid()).not.toBe(pid)
-      // A server let go of exits within milliseconds and says so.
+      // A server let go of exits within milliseconds without a word. The new directory and its file are two events, which a slow host can spread over two restarts, the second one in place.
       await Bun.sleep(500)
-      expect(output).toHaveLength(3)
+      expect(output.slice(3).filter(line => !line.includes('restarted in'))).toEqual([])
 
       const second = Bun.spawn(['bun', join(import.meta.dir, '../src/cli.ts'), 'dev', root, `--inspect=${port}`], { stdout: 'ignore', stderr: 'pipe' })
 
