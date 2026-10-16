@@ -117,6 +117,9 @@ export function findRewrites(input: RewriteInput): FoundRewrites {
   return new RewriteFinder(input).run(ast)
 }
 
+// The types whose parameters a `typeof` inside them can name.
+const SIGNATURES = new Set(['TSFunctionType', 'TSConstructorType', 'TSMethodSignature', 'TSCallSignatureDeclaration', 'TSConstructSignatureDeclaration'])
+
 // What holds a type besides a type itself: an annotation, type arguments and parameters, and what an interface or a class declares it extends or implements.
 const TYPE_HOLDERS = new Set(['TSTypeAnnotation', 'TSTypeParameterInstantiation', 'TSTypeParameterDeclaration', 'TSInterfaceDeclaration', 'TSTypeAliasDeclaration', 'TSExpressionWithTypeArguments', 'TSInterfaceHeritage', 'TSClassImplements'])
 
@@ -289,7 +292,7 @@ class RewriteFinder {
       const binding = query.scope.getBinding(query.node.name)
       const reader = binding && this.readers.get(binding)
 
-      if (reader && !binding.referencePaths.some(reference => reference.node === query.node))
+      if (reader && !binding.referencePaths.some(reference => reference.node === query.node) && !signatureNames(query, query.node.name))
         this.visitReference(query, reader.name, reader.rewrite, reader.typeOf)
     }
   }
@@ -802,6 +805,19 @@ function propRead(binding: PropsBinding, index: number, local: string): Rewrite 
 // A prop with a default reads without `undefined`, which `typeof __props.size` would keep.
 function propType(binding: PropsBinding): string | undefined {
   return binding.fallback ? `Exclude<(typeof ${PROPS})[${JSON.stringify(binding.key)}], undefined>` : undefined
+}
+
+// Whether a function type or a signature around `path` has a parameter `name`, which `typeof name` inside it reads instead: Babel gives such a parameter no binding.
+function signatureNames(path: NodePath, name: string): boolean {
+  for (let parent = path.parentPath; parent && !parent.isStatement(); parent = parent.parentPath) {
+    const node = parent.node as { parameters?: t.Node[], params?: t.Node[] }
+    const params = SIGNATURES.has(parent.node.type) ? node.parameters ?? node.params ?? [] : []
+
+    if (params.some(param => (param.type === 'RestElement' ? param.argument : param).type === 'Identifier' && ((param.type === 'RestElement' ? param.argument : param) as t.Identifier).name === name))
+      return true
+  }
+
+  return false
 }
 
 // The `typeof` query a reference is the root of: `typeof row` or `typeof row.id`.

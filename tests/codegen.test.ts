@@ -703,6 +703,13 @@ describe('component names', () => {
         expect(code).not.toContain('typeof value')
       }
     })
+
+    it('reads a qualified `typeof` and a defaulted prop inside a nested type as the value, and leaves a function type\'s own parameter alone', () => {
+      const code = compileKay('---\nconst { value, size = 1 } = props<{ value: { a: string }, size?: number }>()\nconst f = (x: unknown) => x as ((v: typeof value.a, n: typeof size) => void)\nconst g = (x: unknown) => x as ((value: number, w: typeof value) => void)\n---\np {value.a} {size}', 'test.kay', { output: 'dom' }).tsx
+
+      expect(code).toContain('x as ((v: typeof __props.value.a, n: Exclude<(typeof __props)["size"], undefined>) => void)')
+      expect(code).toContain('x as ((value: number, w: typeof value) => void)')
+    })
   })
 
   it('reports a template `const` named like the component, which its tags after it would render', () => {
