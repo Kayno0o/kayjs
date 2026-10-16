@@ -24,9 +24,13 @@ form(action={add})
   button Add
 ```
 
-`form(action={add})` posts without JavaScript. `field="title"` names the input `title`, and `kay check` verifies the name against the schema. It also writes what the schema asks of `title` as attributes the browser checks: here `required`, `minlength` and `maxlength`. With kay's script the form posts without a reload, checked against the schema first, so the browser shows the schema's `error` message.
+`form(action={add})` posts without JavaScript. `field="title"` names the input `title`, and `kay check` verifies the name against the schema.
 
-A field's `error` is a text, or a function such as `error: () => t('titles.required')` that kay calls in the request's locale, both for the server's refusal and for the rules the page carries, so a visitor reads their own language with or without JavaScript. A function that throws or returns no string leaves the field its default wording. A `query` or `defineEnv` schema field reads its `error` the same way.
+`field` also writes what the schema asks of `title` as attributes the browser checks. Here that is `required`, `minlength` and `maxlength`.
+
+With kay's script the form posts without a reload. It is checked against the schema first, so the browser shows the schema's `error` message.
+
+A field's `error` is a text, or a function such as `error: () => t('titles.required')`. kay calls the function in the request's locale, so a visitor reads their own language with or without JavaScript. A function that throws or returns no string leaves the field its default wording.
 
 Text reaches the schema trimmed, and an optional field left blank counts as left out.
 
@@ -49,7 +53,7 @@ form(action={signOut})
 
 ## Actions shared by pages and components
 
-An action that a page and a component both use lives in a file called `_actions.kay`, in a routes directory. It has a server fence and no template, and it is not a page. A page or a component imports its actions by path.
+An action that a page and a component both use lives in a file called `_actions.kay`, in a routes directory. It has a server fence and no template, and it is not a page. A page or a component imports it by path.
 
 ```kay
 --- server
@@ -68,11 +72,13 @@ import { deleteTissue } from '../routes/admin/_actions.kay'
 button(onClick={() => deleteTissue({ id })}) Delete
 ```
 
-It is served behind the `_guard.ts` files of its directory and above, like the actions of a `_layout.kay`, and it can read the params of every page below it. It is served for the pages in its folder and below, so it sits in or above a folder with a page.
+Its actions are served behind the `_guard.ts` files of its directory and above, like those of a `_layout.kay`. They serve the pages in its folder and below, so the file sits in or above a folder with a page.
+
+An action in it can read the params of every page below it.
 
 ## Showing errors
 
-A post the schema refuses renders the page again, and the fields keep what was sent. An `error` line shows the message of a field, and a bare `error` the form-wide one.
+A post the schema refuses renders the page again, and the fields keep what was sent. An `error` line shows the message of a field. A bare `error` shows the form-wide one.
 
 ```kay
 form(action={add})
@@ -82,11 +88,13 @@ form(action={add})
   button Add
 ```
 
-While the post is refused, `error title` renders `p.error` with the message, and the field is marked `aria-invalid` and described by it. Anywhere else, `add.error('title')` reads the message.
+While the post is refused, `error title` renders `p.error` with the message. The field is marked `aria-invalid` and described by it.
+
+Anywhere else, `add.error('title')` reads the message.
 
 ## Failing on purpose
 
-A handler refuses a post with `ctx.fail(status, data)`, and the page reads `data` with `add.failed()?.data`.
+A handler refuses a post with `ctx.fail(status, data)`. The page reads `data` with `add.failed()?.data`.
 
 ```kay
 --- server
@@ -107,11 +115,15 @@ if add.failed()?.data as data
   p.error {data.message}
 ```
 
-A handler that throws is logged, and the form shows `Something went wrong on our side; try again later`, so it needs no `try`/`catch` of its own.
+A handler that throws is logged, and the form shows `Something went wrong on our side; try again later`. The handler needs no `try`/`catch` of its own.
 
 ## Redirecting after success
 
-`ctx.redirect()` in the handler sends the browser elsewhere. Write it as `return ctx.redirect()`, as in a guard. Without a redirect the post goes back to the page, where `add.succeeded()` holds what the handler returned for that one render. The handler's `ctx` also has `url`, `notFound()` and `deny()`, as a page's does.
+`ctx.redirect()` in the handler sends the browser elsewhere. Write it as `return ctx.redirect()`, as in a guard.
+
+Without a redirect the post goes back to the page. There `add.succeeded()` holds what the handler returned, for that one render.
+
+The handler's `ctx` also has `url`, `notFound()` and `deny()`, as a page's does.
 
 ```kay
 --- server
@@ -128,7 +140,7 @@ export const signUp = action(schema, async (input, ctx) => {
 
 ## Route params
 
-An action reads the params of the page it was posted from in `ctx.params`. In `src/routes/orgs/[org]/projects.kay`:
+An action reads the params of the page it was posted from in `ctx.params`. This is `src/routes/orgs/[org]/projects.kay`.
 
 ```kay
 --- server
@@ -140,11 +152,13 @@ export const remove = action(s.Object({ id: s.String({ maxLength: 36 }) }), asyn
 ---
 ```
 
-The guards checked the visitor against `ctx.params`, not against the input, which the visitor chooses, so the handler scopes what it touches by them.
+The guards checked the visitor against `ctx.params`, not against the input, which the visitor chooses. Scope what the handler touches by `ctx.params`.
 
 ## Calling an action from an island
 
-An island imports the action from the page and calls it from a submit handler, which stops kay's own post. A refused call throws an `ActionError`, and `add.error('title')` shows the message.
+An island imports the action from the page and calls it from a submit handler, which stops kay's own post.
+
+A refused call throws an `ActionError`, and `add.error('title')` shows the message.
 
 ```kay
 ---
@@ -164,15 +178,17 @@ form(action={add} onSubmit={submit})
   button(disabled={add.pending()}) Add
 ```
 
-In a `catch`, `add.refused(error)` tells a refusal from `ctx.fail` apart from any other error and types `error.data`. `focusInvalid()` from `kay` moves focus to the first field marked `aria-invalid`.
+In a `catch`, `add.refused(error)` tells a refusal from `ctx.fail` apart from any other error, and types `error.data`.
+
+`focusInvalid()` from `kay` moves focus to the first field marked `aria-invalid`.
 
 While an island's `onSubmit` returns a promise, the form and its submit buttons are `aria-busy`.
 
-Once a call goes through, the page's loads run again, so the list it shows is up to date. `add({ title }, { refresh: false })` leaves the page as it is.
+Once a call goes through, the page's loads run again, so its list is up to date. `add({ title }, { refresh: false })` leaves the page as it is.
 
 ## Fixed fields
 
-A button that always posts the same values, such as a row's move-up arrow, needs no hidden inputs. `with` gives the action with its fields fixed, and the form carries them without JavaScript too.
+A button that always posts the same values, such as a row's move-up arrow, needs no hidden inputs. `with` gives the action with its fields fixed. The form carries them without JavaScript too.
 
 ```kay
 ---
@@ -184,11 +200,15 @@ form(action={move.with({ id, to: 2 })})
   button(aria-label="Move up") Up
 ```
 
-The handler gets `id` and `to` as if the form had posted them, checked by the schema. The values travel in the form's action URL, so a visitor can change them as they could change hidden inputs: the handler still checks what it may do. They also show in server logs and in referrers, so keep secrets out of them.
+The handler gets `id` and `to` as if the form had posted them, checked by the schema.
+
+The values travel in the form's action URL. A visitor can change them as they could change hidden inputs, so the handler still checks what the visitor may do. They also show in server logs and referrers, so keep secrets out of them.
 
 ## Reading one call's outcome
 
-`add.pending()` is true while any call the page made to `add` is running, so a row of buttons calling one action would all spin together. `add.track()` gives a handle for one component: its `pending()` reads only the calls made through it, and a call resolves with how it went instead of throwing when the server refuses it.
+`add.pending()` is true while any call to `add` is running, so a row of buttons calling one action would all spin together.
+
+`add.track()` gives a handle for one component. Its `pending()` reads only the calls made through it. A call resolves with how it went, instead of throwing when the server refuses it.
 
 ```kay
 ---
@@ -210,25 +230,39 @@ if problem() !== ''
   p.error {problem()}
 ```
 
-Any answer other than success gives `{ ok: false, status, errors, data }`, with `errors` per field and `data` typed as the handler passes it to `ctx.fail`. A success gives `{ ok: true, data }`. A failure with no answer from the server, such as a lost connection, still throws. Here `data.message` is what the handler passed to `ctx.fail(409, { message })`.
+Any answer other than success gives `{ ok: false, status, errors, data }`. `errors` is per field, and `data` is typed as the handler passes it to `ctx.fail`. Here `data.message` is what the handler passed to `ctx.fail(409, { message })`.
+
+A success gives `{ ok: true, data }`. A failure with no answer from the server, such as a lost connection, still throws.
 
 ## File uploads
 
-Use `s.File()` in the schema and `input(type="file" name="avatar")` in the form, and the handler receives a `File`, which `files.put` stores. A post carries 1 MB at most, so raise `bodyLimit` in the third argument of `action`. See [File storage](/guides/file-storage).
+Use `s.File()` in the schema and `input(type="file" name="avatar")` in the form. The handler receives a `File`, which `files.put` stores.
+
+A post carries 1 MB at most. Raise `bodyLimit` in the third argument of `action`. See [File storage](/guides/file-storage).
 
 ## A post from another site
 
-An action refuses a post that another site sends, as its `Origin` or `Sec-Fetch-Site` header shows, with a 403 in plain text that says what it saw:
+An action refuses a post that another site sends, as its `Origin` or `Sec-Fetch-Site` header shows. The answer is a plain-text 403 that says what it saw.
 
 ```text
 Cross-site action refused: Origin http://localhost:4701 is not this site (http://127.0.0.1:4701; set or fix site in kay.config.ts if a proxy changes the host)
 ```
 
-The `Origin` must have the host of the request or of `site` in kay.config.ts, whatever the scheme. So open the site by the address it is served on, or, behind a proxy that does not pass the browser's `Host` on (nginx leaves it out unless told `proxy_set_header Host $host`), set `site` to the public address. A refusal for `Sec-Fetch-Site` says `Sec-Fetch-Site is cross-site and the request has no Origin, not same-origin or none`. An empty `Sec-Fetch-Site` with no `Origin` reads `the request sent an empty Sec-Fetch-Site and no Origin, not same-origin or none`. An api route refuses the same way, saying `request` where this says `action`.
+The `Origin` must have the host of the request or of `site` in kay.config.ts, whatever the scheme. Open the site by the address it is served on.
+
+Behind a proxy that does not pass the browser's `Host` on, set `site` to the public address. nginx leaves `Host` out unless told `proxy_set_header Host $host`.
+
+An api route refuses the same way, saying `request` where this says `action`.
+
+<ReadMore href="/llms/actions">The other refusal messages, for a `Sec-Fetch-Site` header with no `Origin`.</ReadMore>
 
 ## Rate limit, honeypot, minimum time and proof-of-work
 
-The third argument of `action` protects it from scripts. `rateLimit` answers 429 past `max` posts per `window`, `honeypot` names a hidden field that kay renders for you and bots fill in, and `minTime` refuses a form posted sooner than that after its page rendered. For spam that still gets through, `proofOfWork: true` makes each post cost the sender CPU, with no third-party script, and needs JavaScript in the browser. `minTime: { after: '3s', plain: true }` checks only forms posted without JavaScript, and `workChallenge` and `verifyWork` from `kay/server` put proof of work in a form field your own code checks.
+The third argument of `action` protects it from scripts.
+
+`rateLimit` answers 429 past `max` posts per `window`. `honeypot` names a hidden field that kay renders for you and bots fill in. `minTime` refuses a form posted sooner than that after its page rendered.
+
+For spam that still gets through, `proofOfWork: true` makes each post cost the sender CPU, with no third-party script. It needs JavaScript in the browser.
 
 ```kay
 --- server
@@ -244,6 +278,8 @@ export const contact = action(schema, send, {
 ---
 ```
 
-`minTime` stamps are signed. An app with no `session()` gives the signing key as `secret` in `kay.config.ts`, or as `KAY_SECRET`, at least 32 random characters. Without one a production server signs with a key of its own process, which a restart changes and other replicas do not share, and says so once in its log.
+`minTime` stamps are signed. An app with no `session()` gives the signing key as `secret` in `kay.config.ts`, or as `KAY_SECRET`, at least 32 random characters.
 
-<ReadMore href="/llms/actions">Optimistic calls, aborting a call, custom browser validation, proof of work, shared rate limit stores, messages and body limits are in the full actions reference.</ReadMore>
+Without one, a production server signs with a key of its own process. A restart changes that key and other replicas do not share it, and the server says so once in its log.
+
+<ReadMore href="/llms/actions">Optimistic calls, aborting a call, custom browser validation, `minTime` for plain forms only, your own proof of work check, shared rate limit stores, messages and body limits.</ReadMore>

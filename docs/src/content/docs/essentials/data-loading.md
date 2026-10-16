@@ -4,7 +4,7 @@ order: 4
 description: A server fence runs on each request, reads the request through ctx and hands typed values to the template.
 ---
 
-The `--- server` fence of a page or a layout runs on the server for each request. Every top-level name it declares reaches the template, typed, and none of the fence ships to the browser.
+The `--- server` fence of a page or a layout runs on the server for each request. Every top-level name it declares reaches the template, typed. None of the fence ships to the browser.
 
 ```kay
 --- server
@@ -21,14 +21,14 @@ Top-level `await` works.
 
 ## The request
 
-The fence's `ctx` holds the request:
+The fence's `ctx` holds the request.
 
 | Property | What it gives |
 | --- | --- |
 | `ctx.params` | Route params, typed from the file name |
 | `ctx.url` | The request URL |
 | `ctx.query` | Search params, typed by the `query` schemas of the page and its layouts |
-| `ctx.cookies` | A `Bun.CookieMap`, changes are sent back |
+| `ctx.cookies` | A `Bun.CookieMap`, whose changes are sent back |
 | `ctx.locals` | What the app's Elysia `derive` adds, such as the signed-in user |
 
 ```kay
@@ -59,7 +59,7 @@ const { q, page: number = 1 } = ctx.query
 h1 Results for {q}, page {number}
 ```
 
-A layout declares the params every page under it shares the same way, in its own `page`, and reads them through `ctx.query` typed and validated like a page does. The pages under it do not repeat the schema: `ctx.query` is read once against the layouts' `query` and the page's merged, so a page reads a layout's params as its own. A layout's `ctx.query` holds the params of the layouts above it and its own.
+A layout declares the params its pages share the same way, in its own `page`. Its pages do not repeat the schema. They read a layout's params through `ctx.query` as their own.
 
 ```kay
 --- server
@@ -73,11 +73,13 @@ nav Showing the last {period}
 slot
 ```
 
-A name two files of one route declare is accepted when their schemas are the same, and refused when they differ: `kay check` reports it on the later file, and the render fails for a schema it cannot compare. A special page (`_error.kay`, `_404.kay`) declares no query, and a page with `layouts: false` reads none of the dropped layouts' params.
+Two files of one route can declare the same name when their schemas are the same. `kay check` reports a name declared with different schemas, on the later file.
+
+<ReadMore href="/llms/routing">Special pages that declare no query, and a page with `layouts: false`.</ReadMore>
 
 ## Redirect, not found and deny
 
-These stop rendering:
+These three calls stop rendering.
 
 ```kay
 --- server
@@ -94,11 +96,17 @@ if (post.private && !ctx.locals.user.admin)
 h1 {post.title}
 ```
 
-`notFound()` renders the nearest `_404.kay`, `deny()` renders `_error.kay` with that status and message. All three throw. At the top of a page they are statements, in a guard or an action they are `return`ed. A guard, an endpoint and an action read the same `ctx.redirect`, `ctx.notFound()` and `ctx.deny()`. A redirect answers 302 to a read and 303 to a post unless you give a status.
+`notFound()` renders the nearest `_404.kay`. `deny()` renders `_error.kay` with that status and message.
+
+All three throw. At the top of a page they are statements. In a guard or an action you `return` them.
+
+Guards, endpoints and actions use the same `ctx.redirect`, `ctx.notFound()` and `ctx.deny()`. A redirect answers 302 to a read and 303 to a post, unless you give a status.
 
 <Callout type="warning">
 
-`ctx.redirect` goes to any URL, `//other.example/` included, so a `?next=` param goes through `localPath(value, fallback)` from `kay`: `ctx.redirect(localPath(ctx.query.next, '/account'))`. It gives `fallback` for anything that would leave the site, even once decoded, such as `/%2F/evil.example`.
+`ctx.redirect` goes to any URL, `//other.example/` included. Pass a `?next=` param through `localPath(value, fallback)` from `kay`: `ctx.redirect(localPath(ctx.query.next, '/account'))`.
+
+`localPath` gives `fallback` for anything that would leave the site, even once decoded, such as `/%2F/evil.example`.
 
 </Callout>
 
@@ -143,7 +151,11 @@ export const env = defineEnv(s.Object({
 
 Import `env` from server code. An island never sees it.
 
-A secret that development and tests can do without, and production must have, takes `requiredInProduction: true`. Under `NODE_ENV=production` a missing value stops the boot, whatever the default; anywhere else the default applies, or the variable is left out when its field is `s.Optional`. `NODE_ENV=production kay build` counts as production too, so a prerendered page reading such a variable needs it set for the build.
+Give a secret that development and tests can do without, and production must have, `requiredInProduction: true`.
+
+Under `NODE_ENV=production` a missing value stops the boot, whatever the default. Anywhere else the default applies, or the variable is left out when its field is `s.Optional`.
+
+`NODE_ENV=production kay build` counts as production too. A prerendered page reading such a variable needs it set for the build.
 
 ```ts
 export const env = defineEnv(s.Object({
@@ -154,7 +166,9 @@ export const env = defineEnv(s.Object({
 
 ### List the variables
 
-`kay env` lists every variable the project declares, for a deploy script to compare with a compose file or an env file. It reads the `defineEnv` schemas in the modules under `src`, `publicEnv`, the environment each library lists in `extensions` declares (kayjs-mail's SMTP variables, with nothing wired in the app) and kay's own `PORT`, `HOST`, `SITE_URL` and `ORIGIN`, without the server's environment and without running the server entry, whose own schema it leaves out. A schema built inside a function is not seen. A library's mailer built in one of those modules, such as `mailer()` from kayjs-mail, is listed once under that module, as its options set it up.
+`kay env` lists every variable the project declares, for a deploy script to compare with a compose file or an env file. It does not read the server's environment or run the server entry.
+
+It finds the `defineEnv` schemas in the modules under `src`, `publicEnv`, the variables of each library in `extensions` (kayjs-mail's SMTP ones, with nothing wired in the app), and kay's own `PORT`, `HOST`, `SITE_URL` and `ORIGIN`.
 
 ```sh
 kay env
@@ -167,6 +181,8 @@ SMTP_HOST       the extension @kaynooo/kayjs-mail  string  production
 PORT            kay         integer  optional    3000
 ```
 
-Each variable is `always` required, required in `production` only, or `optional`, with its default. `kay env --format json` prints `{ variables, unread }` on one line, each variable with its `name`, `source`, `type`, `required` (`"always"`, `"production"` or `false`), and `default` and `description` when it has them. A module that does not load is named under `unread`. The modules are imported, so their top-level code runs.
+Each variable is `always` required, required in `production` only, or `optional`, with its default. `kay env --format json` prints the same as one line of JSON.
 
-<ReadMore href="/llms/server">Locals, sessions, guards and the environment variables an island may read are in the full server reference.</ReadMore>
+The modules are imported, so their top-level code runs. A schema built inside a function is not seen.
+
+<ReadMore href="/llms/server">Locals, sessions, guards, the JSON fields of `kay env` and the environment variables an island may read.</ReadMore>

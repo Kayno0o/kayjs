@@ -20,7 +20,7 @@ article.card
 
 `@import`, nesting and relative `url()` assets work in the stylesheet.
 
-Imported `with { type: 'text' }`, a stylesheet is its text as a string instead, for a mail or a generated page to inline. It joins no page stylesheet.
+Imported `with { type: 'text' }`, a stylesheet is its text as a string instead. Use it to inline CSS in a mail or a generated page. It joins no page stylesheet.
 
 ```ts
 import theme from './theme.css' with { type: 'text' }
@@ -28,15 +28,19 @@ import theme from './theme.css' with { type: 'text' }
 
 ## Linked or inlined styles
 
-In production, a page with small styles writes them into its head. The browser then paints without a stylesheet request. A page whose styles compress to more than about 14 KB links them instead, so one cached file serves every page.
+In production, a page with small styles writes them into its head, so the browser paints without a stylesheet request. A page whose styles compress to more than about 14 KB links them instead. One cached file then serves every page.
 
-The page's own styles are counted, its layouts' and its page's together. Two pages of one app can differ. `kay dev` always links them.
+The size counts a page's styles together with its layouts'. Two pages of one app can differ. `kay dev` always links them.
 
-When a page's styles are over that size, kay still tries to inline what the page uses. It knows which components a page renders, so it writes into the head only the rules for the classes those components write, Tailwind's included, when they fit under the same size. The full stylesheet is linked for the rest. The browser fetches it without holding the first paint back, and once it is there the page has every rule, so a class built at runtime, one an island adds in the browser or one that comes from your data still gets its style. You write nothing for it: no safelist, no setting. A class built at runtime or coming from your data shows unstyled until that stylesheet arrives, and a class no page names, from Markdown for instance, stays inline on every page. A page whose own rules are still over the size links its stylesheets as before.
+When a page's styles are over that size, kay still tries to inline what the page uses. It writes into the head only the rules for the classes its components write, Tailwind's included, if they fit under the same size.
+
+kay links the full stylesheet for the rest. The browser fetches it without holding the first paint back. Once it arrives, every rule is there, so a class built at runtime or coming from your data still gets its style. You need no safelist and no setting.
+
+Until that stylesheet arrives, such a class shows unstyled. A class no page names, from Markdown for instance, stays inline on every page. A page whose own rules are still over the size links its stylesheets as before.
 
 When you move to another page without a reload, the next page's rules come with it.
 
-Set `inlineStyles` in `kay.config.ts` to force one way:
+Set `inlineStyles` in `kay.config.ts` to force one way.
 
 ```ts
 export default defineConfig({ inlineStyles: false })
@@ -46,7 +50,7 @@ export default defineConfig({ inlineStyles: false })
 
 ## Tailwind
 
-Tailwind runs as a build plugin. Install it with `bun add -d tailwindcss bun-plugin-tailwind`, then register it in `kay.config.ts`:
+Tailwind runs as a build plugin. Install it with `bun add -d tailwindcss bun-plugin-tailwind`, then register it in `kay.config.ts`.
 
 ```ts
 import tailwind from 'bun-plugin-tailwind'
@@ -55,17 +59,21 @@ import { defineConfig } from 'kay/server'
 export default defineConfig({ plugins: [tailwind] })
 ```
 
-Import `src/app.css` from the root `_layout.kay`. It needs only `@import 'tailwindcss';`, and classes written with the `.class` shorthand work too.
+Import `src/app.css` from the root `_layout.kay`. It needs only `@import 'tailwindcss';`. Classes written with the `.class` shorthand work too.
 
 ## Public files
 
-A file in `public/` is served at its path as it is: `public/robots.txt` is `/robots.txt`. Use it for anything that needs a fixed URL. Dotfiles (but `.well-known/`), `.env` files and editor backups (`.bak`, `.old`, `.orig`, `.swp`, `.tmp`, `~`) are left out, neither served nor exported; a static export keeps `.htaccess` and `.nojekyll`, which the host reads.
+A file in `public/` is served at its path as it is: `public/robots.txt` is `/robots.txt`. Use it for anything that needs a fixed URL.
 
-An HTML file is also served without its `.html`, as a static host does: `public/shelf/books.html` at `/shelf/books`, and `public/shelf/index.html` at `/shelf`.
+An HTML file is also served without its `.html`, as a static host does. `public/shelf/books.html` is at `/shelf/books`, and `public/shelf/index.html` at `/shelf`.
+
+Dotfiles, `.env` files and editor backups are neither served nor exported. `.well-known/` is the one dotfile folder that is served. A static export keeps `.htaccess` and `.nojekyll`, which the host reads.
+
+<ReadMore href="/llms/styles-and-assets">The editor backup extensions that are left out, and how a public file and a page with the same URL conflict.</ReadMore>
 
 ## Imported images
 
-Import an image for its URL, a content-named path served with long-lived caching:
+Import an image for its URL. It is a content-named path served with long-lived caching.
 
 ```kay
 ---
@@ -78,7 +86,7 @@ The same goes for fonts, video, audio, PDF and wasm files.
 
 ## Wasm and workers
 
-A `.wasm` file is imported for its URL as well, then loaded from it:
+A `.wasm` file is imported for its URL as well, then loaded from it.
 
 ```kay
 ---
@@ -91,17 +99,21 @@ onMount(async () => {
 p Ready
 ```
 
-A worker is a file named with `new URL`, and kay bundles it on its own, imports included:
+A worker is a file named with `new URL`. kay bundles it on its own, imports included.
 
 ```ts
 const worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })
 ```
 
-This works in development, in a build and in a compiled executable. When an island or its worker compiles wasm, kay's content security policy allows it. Threads sharing memory need extra headers, which the reference lists.
+This works in development, in a build and in a compiled executable. When an island or its worker compiles wasm, kay's content security policy allows it.
+
+Threads sharing memory need extra headers, which the reference lists.
 
 ## Responsive images
 
-An imported PNG, JPEG, WebP, GIF or AVIF used as an `img` `src` gets a `srcset` of WebP variants, with AVIF for browsers that take it, and its `width` and `height`. Write `sizes` to say how large it shows, and the browser loads the smallest variant that fits:
+An imported PNG, JPEG, WebP, GIF or AVIF used as an `img` `src` gets a `srcset` of WebP variants, with AVIF for browsers that take it. It also gets its `width` and `height`.
+
+Write `sizes` to say how large the image shows. The browser then loads the smallest variant that fits.
 
 ```kay
 ---
@@ -110,9 +122,9 @@ import hero from '../hero.jpg'
 img(src={hero} sizes="(min-width: 60rem) 50vw, 100vw" alt="The workshop")
 ```
 
-Every image a template or a collection entry's Markdown writes loads lazily and decodes off the main thread unless it says otherwise. Give the hero image above the fold `loading="eager"` or `fetchpriority="high"`, so it does not show late.
+Every image a template or a collection entry's Markdown writes loads lazily and decodes off the main thread, unless it says otherwise. Give the hero image above the fold `loading="eager"` or `fetchpriority="high"`, so it does not show late.
 
-`image(hero, { aspect: '16/9' })` from `kay/image` cuts the variants to a shape instead of relying on `object-fit`. Spread its result on the element:
+`image(hero, { aspect: '16/9' })` from `kay/image` cuts the variants to a shape instead of relying on `object-fit`. Spread its result on the element.
 
 ```kay
 ---
@@ -124,7 +136,7 @@ img({...image(hero, { aspect: '16/9', sizes: '100vw' })} alt="The workshop")
 
 ### Private images
 
-Images the app keeps behind a session, looked up its own way such as by a database id, go through the same variants once `images.resolve` gives their file and `images.guard` admits the request:
+An image the app keeps behind a session, such as one looked up by a database id, goes through the same variants. `images.resolve` gives its file and `images.guard` admits the request.
 
 ```ts
 import { defineConfig } from 'kay/server'
@@ -142,11 +154,13 @@ export default defineConfig({
 })
 ```
 
-`image('/media/42', { width, height })` then resizes that `src`. The `src` is whatever a visitor asks for: look it up, never join it to a directory.
+`image('/media/42', { width, height })` then resizes that `src`.
+
+The `src` is whatever a visitor asks for. Look it up, and never join it to a directory.
 
 ## Fonts
 
-`fonts` in `kay.config.ts` self-hosts font files, declared with `@font-face` in every page's head. An installed Fontsource package is listed once:
+`fonts` in `kay.config.ts` self-hosts font files, declared with `@font-face` in every page's head. List an installed Fontsource package once.
 
 ```ts
 export default defineConfig({
@@ -157,9 +171,11 @@ export default defineConfig({
 })
 ```
 
-Then use the family as usual: `font-family: Inter, system-ui, sans-serif`, or with Tailwind `@theme { --font-sans: Inter, system-ui, sans-serif; }`.
+Then use the family as usual: `font-family: Inter, system-ui, sans-serif`. With Tailwind, write `@theme { --font-sans: Inter, system-ui, sans-serif; }`.
 
-While a font loads, kay shows the text in a stand-in sized like it. It reads the font's metrics, declares a fallback such as `"Inter Fallback"` (Arial, Times New Roman or Courier New, resized) and adds it right after the family in your stylesheets' `font-family`, `font` shorthand and `--font-*` values, so the page barely moves when the font arrives. A stack in an inline `style` attribute is left as you wrote it.
+While a font loads, kay shows the text in a stand-in sized like it. It reads the font's metrics and declares a fallback such as `"Inter Fallback"`, a resized Arial, Times New Roman or Courier New.
+
+kay adds the fallback right after the family in your stylesheets' `font-family`, `font` and `--font-*` values. The page then barely moves when the font arrives. A stack in an inline `style` attribute is left as you wrote it.
 
 <Callout type="note">
 
@@ -169,7 +185,7 @@ Faces load once the page uses them. `preload: true` fetches one with the page, o
 
 ## Icons
 
-Any Iconify set installed as `@iconify-json/<prefix>` is imported one icon at a time, as `~icons/<prefix>/<name>`. Imported under a capitalised name, it is a tag that takes classes:
+Any Iconify set installed as `@iconify-json/<prefix>` is imported one icon at a time, as `~icons/<prefix>/<name>`. Imported under a capitalised name, it is a tag that takes classes.
 
 ```kay
 ---
@@ -180,6 +196,8 @@ a(href="/")
   | Home
 ```
 
-The icon sizes to the surrounding text and takes its colour from `currentColor`. An icon without text beside it needs `role="img"` and an `aria-label`.
+The icon sizes to the surrounding text and takes its colour from `currentColor`.
 
-<ReadMore href="/llms/styles-and-assets">Inlined styles, worker and wasm details, fixed-width and cropped images, private, remote and uploaded images, share cards, AVIF settings, public file conflicts and runtime icon lookup are in the full styles and assets reference.</ReadMore>
+An icon without text beside it needs `role="img"` and an `aria-label`.
+
+<ReadMore href="/llms/styles-and-assets">Worker and wasm details, fixed-width and cropped images, remote and uploaded images, share cards, AVIF settings and runtime icon lookup.</ReadMore>
